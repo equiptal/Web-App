@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Dialog, DialogButton, DialogSpacer } from "@/components/Dialog";
 import type { BidCard } from "@/lib/contract/bids";
 import type { BidFormData, BidFormItem, LinkBidSubmission, LinkBidItem } from "@/lib/contract/link-bids";
 import { CERT_TERM_KEYS, certCodesFromValue, certConfKey, prettyCert } from "@/lib/contract/link-bids";
@@ -240,22 +241,38 @@ export function SharedBidSubmissionModal({
   const supplierNotes = stripVatInclusiveNote(submission?.notes);
 
   return (
-    <div className="rproto slb-overlay" dir={dir} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="slb-modal" role="dialog" aria-modal="true">
+    // The shell is `Dialog` now; `.slb-overlay` and `.slb-modal` in `requests-proto.css` were this
+    // file styling its own scrim, radius, width and masthead from a stylesheet nothing else read.
+    // `xl` because the body is a rendered DOCUMENT, and `padded={false}` because that document
+    // brings its own margins.
+    <Dialog
+      open
+      onClose={onClose}
+      size="xl"
+      padded={false}
+      title={submission?.companyName ?? bid.supplierName}
+      subtitle={L("Off-platform · submitted via your shared link · read-only", "خارج المنصة · مُقدَّم عبر رابطك المشترك · للقراءة فقط")}
+      icon={<span className="grid h-[34px] w-[34px] place-items-center rounded-[10px] bg-brand-soft text-brand"><span className="material-icons-outlined" style={{ fontSize: 19 }}>link</span></span>}
+      footer={
+        <>
+          <DialogButton onClick={onClose}>{L("Close", "إغلاق")}</DialogButton>
+          <DialogSpacer />
+          {submission && (
+            onDownloadQuotation
+              ? <DialogButton tone="primary" className="qprint-hide" onClick={onDownloadQuotation}>{L("Download quotation", "تنزيل عرض السعر")}</DialogButton>
+              : <DialogButton className="qprint-hide" onClick={() => window.print()}>{L("Download / Print", "تنزيل / طباعة")}</DialogButton>
+          )}
+        </>
+      }
+    >
+      <div className="rproto flex h-full flex-col" dir={dir}>
         <style>{BID_FORM_CSS}</style>
-        <style>{`@media print{body *{visibility:hidden!important}.slb-modal,.slb-modal *{visibility:visible!important}.slb-overlay{position:static!important;background:#fff!important;padding:0!important;overflow:visible!important}.slb-modal{position:absolute!important;inset-inline-start:0;top:0;width:100%!important;height:auto!important;max-height:none!important;box-shadow:none!important}.qprint{max-height:none!important;overflow:visible!important;background:#fff!important}.qprint-hide,.slb-head-x{display:none!important}}`}</style>
+        {/* Printing this dialog prints THIS dialog. The rules moved from `.slb-modal` / `.slb-overlay`,
+            which the shell no longer draws, onto the shell's own `data-dialog-*` hooks — without this the
+            page behind would print instead, which is the sort of thing nobody notices until a supplier
+            is handed six blank sheets. */}
+        <style>{`@media print{body *{visibility:hidden!important}[data-dialog-panel],[data-dialog-panel] *{visibility:visible!important}[data-dialog-scrim]{position:static!important;background:#fff!important;padding:0!important;overflow:visible!important}[data-dialog-panel]{position:absolute!important;inset-inline-start:0;top:0;width:100%!important;height:auto!important;max-height:none!important;border:0!important;box-shadow:none!important}.qprint{max-height:none!important;overflow:visible!important;background:#fff!important}.qprint-hide{display:none!important}}`}</style>
         <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
-        <div className="slb-head">
-          <span className="slb-head-ic"><span className="material-icons-outlined">link</span></span>
-          <div className="slb-head-tx">
-            <h3>{submission?.companyName ?? bid.supplierName}</h3>
-            <p>{L("Off-platform · submitted via your shared link · read-only", "خارج المنصة · مُقدَّم عبر رابطك المشترك · للقراءة فقط")}</p>
-          </div>
-          <button className="slb-head-x" onClick={onClose} aria-label={L("Close", "إغلاق")}>
-            <span className="material-icons-outlined">close</span>
-          </button>
-        </div>
-
         <div className="slb-banner">
           <span className="material-icons-outlined">visibility</span>
           {L("Submitted bid — exactly what the supplier filled in your form", "العرض المُقدَّم — تمامًا كما ملأه المؤجّر في نموذجك")}
@@ -537,16 +554,8 @@ export function SharedBidSubmissionModal({
           )}
         </div>
 
-        <div className="slb-foot">
-          <button className="btn sm" onClick={onClose}>{L("Close", "إغلاق")}</button>
-          {submission && (
-            onDownloadQuotation
-              ? <button className="btn sm primary qprint-hide" onClick={onDownloadQuotation}>{L("Download quotation", "تنزيل عرض السعر")}</button>
-              : <button className="btn sm qprint-hide" onClick={() => window.print()}>{L("Download / Print", "تنزيل / طباعة")}</button>
-          )}
-        </div>
       </div>
-    </div>
+    </Dialog>
   );
 }
 

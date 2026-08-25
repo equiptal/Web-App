@@ -71,6 +71,7 @@ export function Dialog({
   children,
   /** Drops the header rule — for a dialog whose body starts with its own coloured band. */
   flushHeader = false,
+  padded = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -82,6 +83,8 @@ export function Dialog({
   footer?: ReactNode;
   children: ReactNode;
   flushHeader?: boolean;
+  /** Off for a body that brings its own edges — a multi-step flow, or a document in an iframe. */
+  padded?: boolean;
 }) {
   useEscape(open, onClose);
   if (!open) return null;
@@ -92,6 +95,9 @@ export function Dialog({
       onClick={onClose}
       role="dialog"
       aria-modal="true"
+      /* Print hooks. A caller that wants to print only its own dialog needs to name the scrim and the
+         panel from a stylesheet, and should not have to know how either is built to do it. */
+      data-dialog-scrim=""
     >
       {/*
         Full-bleed at the bottom of a phone, centred with a margin from `sm` up. A 520px panel
@@ -103,8 +109,17 @@ export function Dialog({
       */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`flex max-h-[100dvh] w-full flex-col rounded-t-[16px] sm:max-h-[calc(100dvh-2rem)] sm:rounded-[16px] ${PANEL} ${SIZE[size]}`}
+        data-dialog-panel=""
+        className={`relative flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-[16px] sm:max-h-[calc(100dvh-2rem)] sm:rounded-[16px] ${PANEL} ${SIZE[size]}`}
       >
+        {/* A dialog whose body supplies its own headings still needs a way out, so the close floats
+            in the corner rather than being dropped along with the header. */}
+        {!title && !icon && (
+          <div className="absolute end-1.5 top-1.5 z-10">
+            <DialogClose onClose={onClose} />
+          </div>
+        )}
+
         {(title || icon) && (
           <div className={`flex flex-none items-start gap-3 px-5 py-3.5 ${flushHeader ? "" : "border-b border-border"}`}>
             {icon && <span className="grid h-[34px] w-[34px] flex-none place-items-center">{icon}</span>}
@@ -117,7 +132,7 @@ export function Dialog({
         )}
 
         {/* The ONLY scrolling region. See the note at the top on why the panel itself must not. */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        <div className={`min-h-0 flex-1 overflow-y-auto ${padded ? "px-5 py-4" : ""}`}>{children}</div>
 
         {footer && (
           <div className="flex flex-none items-center gap-2.5 border-t border-border px-5 py-3.5">{footer}</div>

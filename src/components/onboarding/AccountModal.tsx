@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useLocale, useT } from "@/lib/i18n";
+import { Dialog } from "@/components/Dialog";
 import { useSession } from "@/lib/session";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
 import { PhoneEntry } from "@/components/auth/PhoneEntry";
@@ -34,16 +35,15 @@ export function AccountModal({ open, onClose, onCreated, title, subtitle, postHe
   const { locale } = useLocale();
   if (!open) return null;
   return (
-    <div
-      dir={locale === "ar" ? "rtl" : "ltr"}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/45 p-4 sm:items-center"
-      onClick={onClose}
-    >
-      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-surface shadow-xl" onClick={(e) => e.stopPropagation()}>
+    // No header of its own: the flow inside titles each of its four phases, and a second title above
+    // that would name the container rather than the step. `Dialog` floats the close in the corner for
+    // exactly this case, so the way out is where it is in every other dialog.
+    <Dialog open onClose={onClose} size="lg" padded={false}>
+      <div dir={locale === "ar" ? "rtl" : "ltr"}>
         {/* Fresh mount each open → the flow always starts at the right step for the current session. */}
         <AccountFlow onCreated={onCreated} title={title} subtitle={subtitle} postHeadline={postHeadline} postSubhead={postSubhead} resumeToken={resumeToken} onNeedsSignup={onNeedsSignup} />
       </div>
-    </div>
+    </Dialog>
   );
 }
 

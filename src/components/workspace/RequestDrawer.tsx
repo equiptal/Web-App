@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
+import { DialogDrawer } from "@/components/Dialog";
+import { CloseIcon } from "@/components/HeaderIcons";
 import {
   bidShareUrl,
   cancelRequest,
@@ -119,14 +121,17 @@ export function RequestDrawer({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-navy/40" onClick={onClose} />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={group.locationLabel}
-        className="fixed inset-y-0 end-0 z-50 flex w-full max-w-[440px] flex-col overflow-y-auto bg-surface shadow-2xl"
-      >
-        <div className="bg-navy px-5 pb-5 pt-4 text-white">
+      {/* A DRAWER rather than a centred dialog, and the content decides that: the request is read
+          ALONGSIDE the bids it explains, not answered and dismissed. `DialogDrawer` gives it the same
+          scrim, the same close and the same type as every other dialog; only the geometry differs.
+
+          It keeps its navy masthead through `header`, because that masthead is not chrome here — it
+          carries Share and Edit, which are what the drawer is for. */}
+      <DialogDrawer
+        open
+        onClose={onClose}
+        header={
+        <div className="flex-none bg-navy px-5 pb-5 pt-4 text-white">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-[11px] font-extrabold uppercase tracking-wide text-white/55">
@@ -138,9 +143,9 @@ export function RequestDrawer({
               type="button"
               onClick={onClose}
               aria-label={t.common.close}
-              className="grid h-8 w-8 flex-none place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+              className="grid h-[34px] w-[34px] flex-none place-items-center rounded-full text-white/70 transition hover:bg-white/10 hover:text-white"
             >
-              <Icon name="close" size={18} />
+              <CloseIcon size={18} />
             </button>
           </div>
 
@@ -166,8 +171,9 @@ export function RequestDrawer({
           {/* Said out loud rather than left to a hover: a disabled button with no reason reads as a bug. */}
           {actions.editCapUsed && <p className="mt-2 text-[11.5px] font-semibold text-white/60">{t.workspace.editCapUsed}</p>}
         </div>
-
-        <div className="flex-1 px-5 py-4">
+        }
+      >
+        <div>
           {/* The items. On a group every line is listed; the one in focus is marked. */}
           <div className="space-y-2">
             {group.items.map((it) => {
@@ -247,7 +253,7 @@ export function RequestDrawer({
             </button>
           </div>
         )}
-      </div>
+      </DialogDrawer>
 
       <ShareForBidsSheet
         open={shareOpen}
