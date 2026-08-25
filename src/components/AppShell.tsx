@@ -14,7 +14,7 @@ import { PUBLIC_WEB_ENABLED } from "@/lib/flags";
 import { fetchDealRoomUnread } from "@/lib/api/client";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { AppNav, AppNavMobile, type NavItem } from "@/components/AppNav";
-import { MailIcon, CountBadge } from "@/components/HeaderIcons";
+import { ArrowBackIcon, MailIcon, CountBadge } from "@/components/HeaderIcons";
 
 /**
  * App shell for the renter web app (web-app/004, AC-01/02/03/09/25). One bar across the top holding
@@ -181,9 +181,9 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
             <button
               onClick={back}
               aria-label={locale === "ar" ? "رجوع" : "Back"}
-              className="grid h-9 w-9 flex-none place-items-center rounded-full border border-border text-navy transition hover:bg-surface2"
+              className="grid h-[34px] w-[34px] flex-none place-items-center rounded-full border border-[#dfe3e7] text-[#1f2d3a] transition hover:bg-surface2"
             >
-              <Icon name={locale === "ar" ? "arrow_forward" : "arrow_back"} size={20} />
+              <ArrowBackIcon className="rtl:-scale-x-100" />
             </button>
           )}
 
@@ -256,19 +256,27 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                 No pill behind the active inbox any more. The prototype gives these icons no active
                 treatment at all, and a filled lozenge under a 1.7px hairline outline was the loudest
                 thing in the bar; the ink darkening to the prototype's own `#1f2d3a` says it instead. */}
+            {/* Their boxes TOUCH (`gap-0`) rather than sitting 14px apart. Each is 34px and the glyph
+                in it is 20px, so the two icons' CENTRES land 34px apart — exactly the 20 + 14 the
+                prototype spaces them by. Same picture, and a pressable target instead of a 20px one
+                (owner, 2026-08-25: "make sure all icons in the nav bar is consistent"). */}
             {status === "authed" && (
-              <div className="flex items-center gap-3.5 text-[#5b6672]">
+              <div className="flex items-center gap-0 text-[#5b6672]">
                 <Link
                   href="/inbox"
                   aria-label={t.shell.inbox}
                   title={t.shell.inbox}
                   aria-current={pathname.startsWith("/inbox") ? "page" : undefined}
-                  className={`relative inline-flex items-center justify-center transition hover:text-[#1f2d3a] ${
+                  className={`grid h-[34px] w-[34px] place-items-center rounded-full transition hover:text-[#1f2d3a] ${
                     pathname.startsWith("/inbox") ? "text-[#1f2d3a]" : ""
                   }`}
                 >
-                  <MailIcon />
-                  <CountBadge count={unread} />
+                  {/* The badge hangs off the GLYPH, not off the 34px box — pinned to the box it would
+                      float clear of the envelope it is counting. */}
+                  <span className="relative inline-flex">
+                    <MailIcon />
+                    <CountBadge count={unread} />
+                  </span>
                 </Link>
                 <NotificationsBell />
               </div>
@@ -294,7 +302,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                   aria-label={tier === "verified" ? `${t.shell.account} · ${t.shell.tierVerified}` : t.shell.account}
                   title={badge.label}
                 >
-                  {initials || <Icon name="account_circle" size={22} />}
+                  {initials || <Icon name="account_circle" size={20} />}
                   {/* The prototype puts a plain green dot here. It stays a TICK: the owner asked for
                       one by name, and a bare dot on an avatar is the presence convention — online,
                       not vetted. The prototype's green (#3fbf6f) and its 2px white ring are taken. */}

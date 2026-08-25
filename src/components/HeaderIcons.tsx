@@ -13,6 +13,50 @@
  * darker than `--brand` (`#f79009`). They are literals rather than tokens because they describe THIS
  * bar and the owner asked for this bar; promoting them would spread a second palette through the app.
  */
+/**
+ * ── Why Back, the hamburger and the close are here too ──────────────────────────────────────────
+ * The prototype has none of the three — it draws one signed-in desktop state. But leaving them as
+ * Material glyphs put two icon families in one bar, four hairline paths beside two heavier ones,
+ * and that reads as a mistake whatever the sizes say. They are drawn to the same rule the prototype
+ * sets for its own: 24 box, 1.7 stroke, round caps and joins.
+ *
+ * ── One arrow, mirrored ─────────────────────────────────────────────────────────────────────────
+ * `ArrowBackIcon` points at the inline start and takes `rtl:-scale-x-100` from its caller, which is
+ * how every other reversible arrow in this codebase turns round. It replaced a locale conditional
+ * choosing between two Material glyph names.
+ */
+type IconProps = { size?: number; className?: string };
+
+export function ArrowBackIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
+      <path
+        d="M19 12H5M5 12L11 6M5 12L11 18"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function MenuIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
+      <path d="M4 7H20M4 12H20M4 17H20" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function CloseIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
+      <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function MailIcon({ size = 20 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">

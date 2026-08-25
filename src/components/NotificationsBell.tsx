@@ -144,14 +144,18 @@ export function NotificationsBell() {
           is coloured by the group that holds them (owner, 2026-08-25). */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative inline-flex items-center justify-center transition hover:text-[#1f2d3a]"
+        className="grid h-[34px] w-[34px] place-items-center rounded-full transition hover:text-[#1f2d3a]"
         aria-label={t.notifications.title}
         aria-haspopup="menu"
         aria-expanded={open}
         title={t.notifications.title}
       >
-        <BellIcon />
-        <CountBadge count={unread} />
+        {/* 34px box, 20px glyph — the bar's one size for a standalone icon control. The badge hangs
+            off the glyph rather than the box, or it would float clear of the bell. */}
+        <span className="relative inline-flex">
+          <BellIcon />
+          <CountBadge count={unread} />
+        </span>
       </button>
 
       {open && (

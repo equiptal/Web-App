@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui";
+import { CloseIcon, MenuIcon } from "@/components/HeaderIcons";
 import { useT } from "@/lib/i18n";
 
 /**
@@ -114,9 +115,11 @@ export function AppNavMobile({ items, children }: { items: NavItem[]; children?:
         aria-label={t.shell.menu}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="grid h-9 w-9 place-items-center rounded-full text-navy-mid transition hover:bg-surface2"
+        className="grid h-[34px] w-[34px] place-items-center rounded-full text-[#5b6672] transition hover:text-[#1f2d3a]"
       >
-        <Icon name={open ? "close" : "menu"} size={22} />
+        {/* 34px box, 20px glyph — the bar's one size for a standalone icon control, shared with the
+            inbox, the bell, the avatar and Back. */}
+        {open ? <CloseIcon /> : <MenuIcon />}
       </button>
 
       {open && (
