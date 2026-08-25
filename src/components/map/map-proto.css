@@ -2371,6 +2371,12 @@
   overflow: hidden;
 }
 .bidmap .bm-chat-who { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 900; color: #0f2238; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The name opens the company's papers (owner, 2026-08-26), so it has to LOOK pressable: the hover
+   underline and the pointer are the whole affordance — a button chrome here would compete with the
+   call and kebab controls beside it for a band that is 64px tall. */
+.bidmap .bm-chat-who.is-link { cursor: pointer; }
+.bidmap .bm-chat-who.is-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.bidmap .bm-chat-who.is-link:focus-visible { outline: 2px solid #2f6fed; outline-offset: 3px; border-radius: 4px; }
 /* The tick the prototype writes as a bare '✓' after the name. A glyph rather than the panel's full
    «شركة موثّقة» chip: the panel two columns away already carries that chip, and repeating it here
    would state the same credential twice on one screen. Green, matching the avatar — it is the same

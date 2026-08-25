@@ -838,7 +838,29 @@ export function ChatDock({
               it. */}
           <header className="bm-chat-head">
             <span className="bm-chat-av" aria-hidden="true">{initials}</span>
-            <span className="bm-chat-who">
+            {/* ── The name IS the link to the papers (owner, 2026-08-26) ────────────────────────
+                «Company details» was a kebab entry; it is now the band itself. The header already
+                names the firm, and a renter who wants to know who he is dealing with presses the
+                name — not a menu behind three dots. Where this surface cannot raise the panel (no
+                handler), the band stays a plain label rather than a button that does nothing. */}
+            <span
+              className={`bm-chat-who${onOpenCompanyDocs ? " is-link" : ""}`}
+              {...(onOpenCompanyDocs
+                ? {
+                    role: "button" as const,
+                    tabIndex: 0,
+                    title: L("Company details", "بيانات الشركة"),
+                    "aria-label": L("Company details", "بيانات الشركة"),
+                    onClick: onOpenCompanyDocs,
+                    onKeyDown: (e: React.KeyboardEvent) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onOpenCompanyDocs();
+                      }
+                    },
+                  }
+                : {})}
+            >
               {bid.supplierName}
               {bid.verified && (
                 /* A stroked check, the panel header's and the prototype's `rVerifiedChip` (owner,
@@ -903,15 +925,17 @@ export function ChatDock({
                 <span className="material-icons-outlined">call</span>
               </span>
             )}
-            {/* ── The ⋮ kebab, the room's own (owner, 2026-08-19) ──────────────────────────────────
-                TWO entries, not the room's three. «Inspect the equipment» is the third there and does
-                not survive the move: it routes to `/bids/{id}/equipment`, which is the very surface
-                this dock is open on top of, so it would be a control that goes nowhere.
+            {/* ── The ⋮ kebab: the DEAL's own acts, and nothing else (owner, 2026-08-26) ───────────
+                It carried «Company details» and the room carried «Inspect the equipment» too. Neither
+                belongs in a menu here: the equipment is the surface this dock stands on, and the
+                company is the name in the band above, which now opens its papers itself. What is left
+                is what only the room can do — cancelling it, and (as the price bar moves in) the acts
+                its phase allows.
 
-                Both entries need a ROOM, and both are hidden without one. That is not the rare case
-                the map worried about: a room is created by the first thing sent — a message, an
-                availability ask, a counter (004a §4.5) — so any conversation with something in it has
-                one. A bid nobody has written to has nothing to cancel and no papers filed against it.
+                Every entry needs a ROOM and is hidden without one. That is not the rare case the map
+                worried about: a room is created by the first thing sent — a message, an availability
+                ask, a counter (004a §4.5) — so any conversation with something in it has one. A bid
+                nobody has written to has nothing to cancel.
 
                 Cancel is further gated on the phase: a CLOSED or ABANDONED room has nothing left to
                 cancel, which is the room's own `!closed && !abandoned`. */}
@@ -953,15 +977,6 @@ export function ChatDock({
             <>
               <div className="bm-chat-menu-scrim" onClick={() => setMenuOpen(false)} />
               <div className="bm-chat-menu" role="menu">
-                {/* Opens the PANEL behind this drawer, never a modal of its own (owner, 2026-08-19).
-                    The deal room's «Company details» navigates to that same panel; this dock is
-                    already standing on it, so it only has to raise it. */}
-                {onOpenCompanyDocs && (
-                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onOpenCompanyDocs(); }}>
-                    <span className="material-icons-outlined">business_center</span>
-                    {L("Company details", "بيانات الشركة")}
-                  </button>
-                )}
                 {!phaseClosed && !phaseAbandoned && (
                   <button type="button" role="menuitem" className="danger" onClick={() => { setMenuOpen(false); setCancelOpen(true); }}>
                     <span className="material-icons-outlined">cancel</span>
