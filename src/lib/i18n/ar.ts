@@ -1195,6 +1195,10 @@ export const ar: Dictionary = {
     termNationality: "الجنسية",
     didntSay: "لم يذكر",
     rankWithAi: "ترتيب بالذكاء الاصطناعي",
+    // مجموعة المعدّات. تذكر خليّتها كم من معدّات العرض حدّد المورد ساحتها، بألفاظ الخريطة نفسها —
+    // مفردات واحدة للتوفّر في المنتج كلّه.
+    groupEquipment: "المعدّات",
+    colAvailability: "التوفّر",
     exportPopupBlocked: "اسمح بالنوافذ المنبثقة لطباعة المقارنة.",
     docsEquipment: "هذه المعدّة",
     docsCompany: "الشركة",

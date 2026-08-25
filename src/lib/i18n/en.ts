@@ -1376,6 +1376,10 @@ export const en = {
     // A term the supplier never answered. Said out loud, because a blank cell reads as "nothing to pay".
     didntSay: "Didn't say",
     rankWithAi: "Rank with AI",
+    // The equipment group. Its cell states how many of the bid's machines the supplier has named a
+    // yard for, in the MAP's words — one vocabulary for availability across the product.
+    groupEquipment: "Equipment",
+    colAvailability: "Availability",
     exportPopupBlocked: "Allow pop-ups to print the comparison.",
     docsEquipment: "This machine",
     docsCompany: "The company",

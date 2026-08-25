@@ -9,7 +9,8 @@ import { buildItemComparison } from "@/lib/contract/comparison";
 import { bidColumnToComputed } from "@/lib/contract/agent-bids";
 import { recommendBids } from "@/lib/api/client";
 import { cheapest, findTerm, type WorkspaceBid } from "@/lib/contract/workspace";
-import type { TermRow } from "@/lib/contract/bids";
+import type { BidCard, TermRow } from "@/lib/contract/bids";
+import { unitAvailability } from "@/lib/contract/bid-map";
 
 /**
  * The Compare tab — every bid on the selected item as a row, its figures as columns.
@@ -24,7 +25,7 @@ import type { TermRow } from "@/lib/contract/bids";
  */
 
 /** The four column groups, in the order the matrix reads. */
-type GroupKey = "cycle" | "totals" | "asked" | "offered";
+type GroupKey = "cycle" | "totals" | "asked" | "offered" | "equipment";
 
 /** The money columns the table can be ordered by. Terms are not among them: they are answers, not
  *  amounts, and there is no order to put "didn't say" in. */
@@ -213,10 +214,14 @@ export function CompareMatrix({
                   <Icon name="auto_awesome" size={12} /> {t.workspace.rankWithAi}
                 </button>
               } />
-              {/* Delayed by decision: drawn as mocked, inert. */}
-              <th className="w-[38px] border-b border-border bg-brand-soft px-1 py-2 align-bottom" title={t.workspace.notBuiltYet}>
-                <Icon name="lock" size={13} className="text-brand" />
-              </th>
+              {/* ── The equipment group, no longer a padlock (owner, 2026-08-25) ────────────────────
+                  It was drawn as a locked strip because availability was thought to need the bid-map's
+                  own `/fleet` call, one per row. It does not: `unitAvailability` reads a single field,
+                  `locationSource`, and the bid list already carries it on `offeredUnitsDetail`. The
+                  fleet endpoint serves the same rows plus three fields — the map needs it because the
+                  MAP draws machines the supplier never offered; a comparison only compares what is on
+                  the bid. So this column costs nothing the page had not already fetched. */}
+              <Group k="equipment" label={t.workspace.groupEquipment} span={1} collapsed={collapsed} onToggle={toggleGroup} />
             </tr>
             <tr className="text-[10.5px] font-extrabold uppercase tracking-wide text-muted">
               <th className="sticky start-0 z-10 min-w-[190px] border-b border-border bg-surface px-2 py-2 text-start">
@@ -260,7 +265,7 @@ export function CompareMatrix({
                   <Col label={t.workspace.termNationality} />
                 </>
               )}
-              <th className="border-b border-border bg-brand-soft" />
+              {!collapsed.has("equipment") && <Col label={t.workspace.colAvailability} />}
             </tr>
           </thead>
 
@@ -337,7 +342,11 @@ export function CompareMatrix({
                       <TermCell row={findTerm(b.card, ["operator_nationality", "nationality"])} ar={ar} />
                     </>
                   )}
-                  <td className="border-b border-border bg-brand-soft" />
+                  {!collapsed.has("equipment") && (
+                    <td className="border-b border-border px-2 py-2">
+                      <AvailabilityCell bid={b.card} t={t} />
+                    </td>
+                  )}
                 </tr>
               );
             })}
@@ -469,6 +478,43 @@ function Col({
 
 function Cell({ children }: { children: React.ReactNode }) {
   return <td className="whitespace-nowrap border-b border-border px-2 py-2.5">{children}</td>;
+}
+
+/**
+ * **How much of this bid's equipment the supplier has actually committed a yard to.**
+ *
+ * The rule is `unitAvailability`'s and nothing else — the same function the map's pins and the
+ * equipment list's chips read, so a machine cannot be confirmed on one surface and unconfirmed on
+ * another. It needs one field, `locationSource`, and the bid list already carries it.
+ *
+ * The VOCABULARY is the map's too (owner, 2026-08-25), not the mockup's: «مؤكّد توفرها» /
+ * «لم يؤكد توفرها بعد», the words this product already uses for this fact. The mockup's own
+ * `Not checked` / `UNCONFIRMED` / `Alt offered` / `FREE ✓` are a second vocabulary for one question.
+ *
+ * **Silence on an off-platform bid.** `offeredUnitsDetail` is a native-bid field; a shared-link
+ * submission has no registered machines at all, so there is nothing whose availability could be
+ * confirmed. An «unconfirmed» there would read as a supplier who had not answered, when the truth is
+ * that nobody was ever asked.
+ */
+function AvailabilityCell({ bid, t }: { bid: BidCard; t: ReturnType<typeof useT> }) {
+  const units = bid.offeredUnitsDetail ?? [];
+  if (units.length === 0) return <span className="text-[12px] font-semibold text-muted">—</span>;
+
+  const confirmed = units.filter((u) => unitAvailability(u) === "confirmed").length;
+  const all = confirmed === units.length;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-1 text-[11.5px] font-bold ${
+        all ? "bg-ok-soft text-ok" : "bg-danger-soft text-danger"
+      }`}
+      title={all ? t.bidMap.eqChipConfirmed : t.bidMap.eqChipUnconfirmed}
+    >
+      <Icon name={all ? "check_circle" : "schedule"} size={13} />
+      {/* The COUNT, not just the verdict: "2 of 3" is the fact a renter compares on, and a bare
+          "unconfirmed" hides whether one machine is outstanding or every one of them. */}
+      {confirmed}/{units.length}
+    </span>
+  );
 }
 
 /** A term as the supplier answered it. No answer is said out loud rather than left blank — a blank
