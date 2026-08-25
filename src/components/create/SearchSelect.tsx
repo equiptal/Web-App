@@ -9,7 +9,7 @@
  * component invites callers who want subtly different behaviour.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui";
 
 export interface SearchSelectOption {
@@ -22,6 +22,7 @@ export function SearchSelect({
   options,
   placeholder,
   searchPlaceholder,
+  label,
   disabled = false,
   onChange,
 }: {
@@ -29,12 +30,20 @@ export function SearchSelect({
   options: SearchSelectOption[];
   placeholder: string;
   searchPlaceholder: string;
+  /**
+   * Accessible name for the control. Without it the only thing a screen reader announces is the
+   * currently selected value — "30 ton", with no indication of what is 30 tons — because the visible
+   * label sits in a sibling element that carries no association.
+   */
+  label?: string;
   disabled?: boolean;
   onChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const boxRef = useRef<HTMLDivElement>(null);
+  // A combobox has to name the popup it controls, or assistive tech cannot follow the relationship.
+  const listId = useId();
 
   // Close on an outside click or Escape — a dropdown left open behind a panel switch is how the
   // canvas ends up with two of them showing at once.
@@ -70,6 +79,10 @@ export function SearchSelect({
           setOpen((v) => !v);
         }}
         aria-expanded={open}
+        role="combobox"
+        aria-haspopup="listbox"
+        aria-controls={listId}
+        aria-label={label}
         className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2.5 text-start text-[13px] text-navy disabled:cursor-not-allowed disabled:opacity-60"
       >
         <span className={`truncate ${selected ? "" : "text-muted"}`}>{selected?.label ?? placeholder}</span>
@@ -87,11 +100,13 @@ export function SearchSelect({
               className="w-full rounded-md border border-border px-2.5 py-1.5 text-[13px] outline-none"
             />
           </div>
-          <div className="max-h-48 overflow-auto">
+          <div id={listId} className="max-h-48 overflow-auto" role="listbox" aria-label={label}>
             {filtered.map((o) => (
               <button
                 key={o.value}
                 type="button"
+                role="option"
+                aria-selected={o.value === value}
                 onClick={() => {
                   onChange(o.value);
                   setOpen(false);

@@ -344,46 +344,49 @@ Stated explicitly so a backend session reading this document does not go looking
 
 ## 9. Test cases
 
-| ID | Satisfies | Layer | Where | Case |
-|---|---|---|---|---|
-| MREQ-TC-01 | MREQ-AC-01 | web | `tests/unit/create-canvas.test.tsx` | Render phase `wizard`; assert canvas landmarks present and no element matching the step-chip role. |
-| MREQ-TC-02 | MREQ-AC-02, AC-15 | web | `tests/unit/create-gating.test.tsx` | With a required gap, click the Where header; assert panel stays closed and `shake-error` is applied then removed after 450 ms. |
-| MREQ-TC-03 | MREQ-AC-03 | web | `tests/unit/create-gating.test.tsx` | Equipment complete, location unconfirmed; click When header; assert closed and the confirm button shakes. |
-| MREQ-TC-04 | MREQ-AC-04, AC-05 | web | `tests/unit/create-gating.test.tsx` | Confirm location, assert When opens; tick charged-days, assert equipment panel active. |
-| MREQ-TC-05 | MREQ-AC-06, AC-07 | web | `tests/unit/create-history.test.tsx` | Assert exactly one history entry per canvas→review transition and none per panel toggle; simulate popstate from each. |
-| MREQ-TC-06 | MREQ-AC-08 | web | `tests/unit/create-canvas.test.tsx` | Start over → confirm clears the persisted draft; cancel leaves it. |
-| MREQ-TC-07 | MREQ-AC-09 | web | `tests/unit/gates.test.ts` | Table-driven over the required set; assert each single omission blocks and nothing else does. |
-| MREQ-TC-08 | MREQ-AC-10 | web | `tests/unit/gates.test.ts` | Empty `startDate` with all else set; assert `ok: true` and the advisory key returned. |
-| MREQ-TC-09 | MREQ-AC-11, AC-61 | web | `tests/unit/gates.test.ts` | Unset each optional field in turn; assert no gap counted and no dot rendered. |
-| MREQ-TC-10 | MREQ-AC-12, AC-13 | web | `tests/unit/create-canvas.test.tsx` | Assert the pill count equals `requiredGaps().length` and disappears at zero. |
-| MREQ-TC-11 | MREQ-AC-14 | web | `tests/unit/gates.test.ts` | A `no-match` and a `removed` item alongside a complete one; assert `ok: true`. |
-| MREQ-TC-12 | MREQ-AC-16, AC-17, AC-18, AC-19 | web | `tests/unit/machine-card.test.tsx` | Assert each overlay renders and its option list equals the corresponding `options.ts` export. |
-| MREQ-TC-13 | MREQ-AC-20, AC-21 | web | `tests/unit/machine-card.test.tsx` | Assert category is read-only and derived; type/size search filters and selection stamps `ref`. |
-| MREQ-TC-14 | MREQ-AC-22 | web | `tests/unit/machine-card.test.tsx` | Mock the attachments endpoint with rows and with `[]`; assert chips render with preselected on, and the section is absent when empty. |
-| MREQ-TC-15 | MREQ-AC-23 | web | `tests/unit/machine-card.test.tsx` | Crane subtype shows `workType`; excavator subtype does not. |
-| MREQ-TC-16 | MREQ-AC-24 | web | `tests/unit/no-match.test.tsx` | `no-match` item renders the red card; WhatsApp press sets `sourcingRequested` and the row persists. |
-| MREQ-TC-17 | MREQ-AC-25, AC-26 | web | `tests/unit/operator-rail.test.tsx` | Toggle off collapses and sets `operatorNeeded: "no"`; one accommodation press writes both fields. |
-| MREQ-TC-18 | MREQ-AC-27, AC-28 | web | `tests/unit/operator-rail.test.tsx` | Cert options match `OPERATOR_CERTIFICATES`; Restricted reveals `nationalityCustom`, Any clears it. |
-| MREQ-TC-19 | MREQ-AC-29, AC-31 | web | `tests/unit/where-panel.test.tsx` | Picker mounts; an unresolved `conflict` blocks. |
-| MREQ-TC-20 | MREQ-AC-30 | web | `tests/unit/where-panel.test.tsx` | Two `detectedLocations` renders the notice; one does not. |
-| MREQ-TC-21 | MREQ-AC-32, AC-33 | web | `tests/unit/when-panel.test.tsx` | `2026-08-12 → 2027-02-08` yields 181 / 26 / 155; assert the shared helpers are the source. |
-| MREQ-TC-22 | MREQ-AC-34 | web | `tests/unit/when-panel.test.tsx` | No dates: no figure, no-dates copy on both explain and confirmation, confirmation still tickable. |
-| MREQ-TC-23 | MREQ-AC-35 | web | `tests/unit/when-panel.test.tsx` | Assert no `workingDaysPerWeek` control and that submit carries `6`. |
-| MREQ-TC-24 | MREQ-AC-36, AC-37 | web | `tests/unit/when-panel.test.tsx` | Monthly over 12 days and Weekly over 4 days each render the day-count warning; neither blocks. |
-| MREQ-TC-25 | MREQ-AC-38, AC-39, AC-40, AC-41 | web | `tests/unit/multi-item.test.tsx` | Three agent items; assert no toggle, carry modal copy, locked strip on item 2, back-nav preserves edits, carried highlight present. |
-| MREQ-TC-26 | MREQ-AC-42, AC-43 | web | `tests/unit/ready-to-send.test.tsx` | Summary is read-only except Preferences; each Edit link restores the right item. |
-| MREQ-TC-27 | MREQ-AC-44 | web | `tests/unit/submit-payload.test.ts` | An agent draft carrying `payment_method`; assert the draft never holds it and the payload omits `paymentMethod`. |
-| MREQ-TC-28 | MREQ-AC-45 | web | `tests/unit/ready-to-send.test.tsx` | Export action invokes `downloadCsv` with the expected rows. |
-| MREQ-TC-29 | MREQ-AC-46 | web | `tests/unit/submit-payload.test.ts` | Uniform certs globalize and null the overrides; differing certs leave the request-wide list empty. |
-| MREQ-TC-30 | MREQ-AC-47, AC-48 | web | `tests/unit/submit-flow.test.tsx` | Guest submit raises the account modal then auto-posts; success renders the confirmation screen. |
-| MREQ-TC-31 | MREQ-AC-49 | web | `tests/unit/draft-resume.test.tsx` | A persisted draft raises the prompt; continue restores, start-over resets. |
-| MREQ-TC-32 | MREQ-AC-50 | web | `tests/unit/trial-mode.test.tsx` | `?mode=trial` renders the ribbon on every panel and submits `isTrial: true`. |
-| MREQ-TC-33 | MREQ-AC-51 | web | `tests/unit/create-rtl.test.tsx` | Locale `ar`: no untranslated key, rail on the inline-end edge, figures in Arabic-Indic digits. |
-| MREQ-TC-34 | MREQ-AC-52 | web | `tests/unit/create-canvas.test.tsx` | Reject the taxonomy and attachment fetches; assert no throw and the rest of the canvas interactive. |
-| MREQ-TC-35 | MREQ-AC-53 | web | `tests/unit/submit-payload.test.ts` | Unset delivery/return: assert the "Me" pill is rendered selected with the Default badge, and the payload matches it. |
-| MREQ-TC-36 | MREQ-AC-54, AC-55 | web | `tests/unit/gates.test.ts` | An agent-prefilled year and cert still block until touched; "Any year" / "No certificate" satisfy and map to `null` / `[]`. |
-| MREQ-TC-37 | MREQ-AC-56, AC-60 | web | `tests/unit/draft-resume.test.tsx` | Touch a field, persist, rehydrate; assert `touchedFields` survives and no dot returns. |
-| MREQ-TC-38 | MREQ-AC-57, AC-58, AC-59 | web | `tests/unit/provenance.test.tsx` | Agent value shows "AI selected"; seeded default shows "Default"; editing clears both and records the path. |
+**159 tests across 15 files**, all green. The suite runs two environments: node for pure logic, jsdom
+for the `.test.tsx` files that render components (`vitest.config.ts` `environmentMatchGlobs`). The
+DOM half is new — the four-step wizard it replaced had no component tests at all, which is how a
+screen reaches UAT unlooked-at.
+
+| File | Env | Tests | Satisfies |
+|---|---|---|---|
+| `tests/unit/gates.test.ts` | node | 23 | AC-09, 10, 11, 14, 29, 31, 54, 55 |
+| `tests/unit/charged-days.test.ts` | node | 9 | AC-32, 33, 34, 36, 37 |
+| `tests/unit/provenance.test.ts` | node | 8 | AC-57, 58, 59, 61 |
+| `tests/unit/submit-payload.test.ts` | node | 10 | AC-35, 44, 46, 53, 55 |
+| `tests/unit/create-canvas-wiring.test.ts` | node | 9 | AC-01, 32, 44 (drift guards) |
+| `tests/unit/canvas-render.test.tsx` | jsdom | 3 | AC-01, 12, 13, 38 |
+| `tests/unit/canvas-gating.test.tsx` | jsdom | 8 | AC-02, 03, 04, 05, 15 |
+| `tests/unit/machine-card.test.tsx` | jsdom | 18 | AC-16–24, 55, 62, 63 |
+| `tests/unit/operator-rail.test.tsx` | jsdom | 10 | AC-11, 25, 26, 27, 28, 62 |
+| `tests/unit/when-panel.test.tsx` | jsdom | 16 | AC-05, 10, 32–37 |
+| `tests/unit/where-panel.test.tsx` | jsdom | 8 | AC-29, 30, 31 |
+| `tests/unit/canvas-multi-item.test.tsx` | jsdom | 8 | AC-38, 39, 40, 41 |
+| `tests/unit/ready-to-send.test.tsx` | jsdom | 14 | AC-42, 43, 44, 45, 47 |
+| `tests/unit/canvas-provenance.test.tsx` | jsdom | 9 | AC-51, 52, 56, 57, 58, 59, 60, 61 |
+| `tests/unit/canvas-history.test.tsx` | jsdom | 6 | AC-01, 06, 07, 08 |
+
+### Harness
+
+`tests/setup/canvas.tsx` mounts a component inside the real `LocaleProvider` / `SessionProvider` /
+`RfqProvider` and reaches the canvas through the genuine actions — `process()` then
+`enterWizard()`. Only the HTTP layer is stubbed (session, taxonomy, attachments, and the agent's
+job POST + poll); the reducer, the `agentOrigin` snapshot and draft persistence are all real, so
+provenance and the year/certificate gates are exercised against the state shape the app actually
+produces rather than one assembled by hand.
+
+`tests/setup/dom.ts` supplies what jsdom lacks (`matchMedia`, `scrollTo`) and stubs
+`next/navigation`, whose `useRouter` throws outside a Next render.
+
+### Not covered
+
+- **The pixels.** These tests assert behaviour, structure and copy. Nothing here checks that the photo
+  panel's overlays land where they should, that the RTL mirror looks right, or that the shake reads
+  as a refusal. That is what UAT is for.
+- **The live map.** `GoogleMapLocationPicker` is `next/dynamic` and renders as nothing under jsdom, so
+  `WherePanel`'s tests cover the controls around it, not the map itself.
+- **A real submit.** The guest gate is asserted up to the account modal; the POST itself is not fired.
 
 ## 10. Open questions
 
@@ -403,4 +406,5 @@ Stated explicitly so a backend session reading this document does not go looking
 |---|---|
 | 2026-08-25 | Spec created. |
 | 2026-08-25 | Party choices renamed to name the obligation (We collect / We return / We pay / We cover); fuel label carries the fuel type. MREQ-AC-62/63. |
+| 2026-08-25 | DOM test harness added (jsdom + Testing Library); 159 tests across 15 files, §9 rewritten to what exists. |
 | 2026-08-25 | §7.1 added: `equipment_taxonomy.image_key` already exists and is already served by the bid-form handler; `getTaxonomy` just does not select it. |

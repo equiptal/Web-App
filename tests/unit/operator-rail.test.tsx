@@ -1,0 +1,140 @@
+import { describe, expect, it } from "vitest";
+import { screen, within } from "@testing-library/react";
+import { OperatorRail } from "@/components/create/OperatorRail";
+import { OPERATOR_CERTIFICATES } from "@/lib/contract";
+import { makeAgentDraft, makeItem, renderCanvas } from "../setup/canvas";
+
+/**
+ * MREQ-TC-17/18 — the operator rail.
+ *
+ * Two things here are easy to get wrong in a way nothing else notices. Accommodation and transport
+ * are ONE renter-facing choice writing TWO contract fields, so a control that sets only half produces
+ * a term pair the renter never agreed to. And the nationality free-text is only meaningful under
+ * "Restricted" — left behind after switching back to "Any", it rides along on a request that now
+ * accepts anyone.
+ */
+
+const rail = (opts: Parameters<typeof renderCanvas>[1] = {}) =>
+  renderCanvas((store) => <OperatorRail item={store.state.draft!.items[0]} />, opts);
+
+describe("turning the operator off (MREQ-AC-25)", () => {
+  it("collapses to the strip and records 'no'", async () => {
+    const handle = await rail();
+    expect(screen.getByText("FOOD")).toBeTruthy();
+
+    await handle.run(() => {
+      // The header toggle is the only checkbox-like control at the top of the rail.
+      screen.getByText("The operator").closest("div")!.parentElement!.querySelector("button")!.click();
+    });
+
+    expect(handle.store().state.draft!.items[0].operatorNeeded).toBe("no");
+    expect(screen.queryByText("FOOD")).toBeNull();
+    // Collapsed, not gone — a renter who turned it off by accident has to be able to find it.
+    expect(screen.getByLabelText("The operator")).toBeTruthy();
+  });
+
+  it("reopens from the collapsed strip", async () => {
+    const handle = await rail({ draft: makeAgentDraft({ items: [makeItem({ operatorNeeded: "no" })] }) });
+    await handle.run(() => screen.getByLabelText("The operator").click());
+    expect(handle.store().state.draft!.items[0].operatorNeeded).toBe("yes");
+    expect(screen.getByText("FOOD")).toBeTruthy();
+  });
+});
+
+describe("food, accommodation and transport (MREQ-AC-26)", () => {
+  it("writes both accommodation and transport from one press", async () => {
+    const handle = await rail();
+    const field = screen.getByText("ACCOM. & TRANSPORT").closest("div")!.parentElement!;
+
+    await handle.run(() => within(field).getByRole("button", { name: "We cover" }).click());
+
+    const op = handle.store().state.draft!.items[0].operator;
+    expect(op.fatAccommodationTransport).toBe("me");
+  });
+
+  it("names the obligation rather than the party (MREQ-AC-62)", async () => {
+    await rail();
+    expect(screen.getAllByRole("button", { name: "We cover" }).length).toBe(2); // food + accommodation
+    expect(screen.queryByRole("button", { name: "Me" })).toBeNull();
+  });
+
+  it("does not block — food and accommodation are optional in the app (MREQ-AC-11)", async () => {
+    const handle = await rail();
+    const op = handle.store().state.draft!.items[0].operator;
+    expect(op.fatFood).toBeNull();
+    expect(op.fatAccommodationTransport).toBeNull();
+    // No required dot on either label.
+    for (const label of ["FOOD", "ACCOM. & TRANSPORT"]) {
+      const row = screen.getByText(label).parentElement!;
+      expect(row.querySelector(".bg-brand")).toBeNull();
+    }
+  });
+});
+
+describe("operator certificates (MREQ-AC-27)", () => {
+  it("offers exactly the platform's operator certificate set", async () => {
+    await rail();
+    const field = screen.getByText("OPERATOR CERTIFICATES").closest("div")!.parentElement!;
+    const labels = within(field)
+      .getAllByRole("button")
+      .map((b) => b.textContent!.trim());
+    expect(labels).toEqual(["TÜV", "SPSP", "SASO technical inspection", "Other"]);
+    expect(OPERATOR_CERTIFICATES).toEqual(["tuv", "spsp", "saso-technical", "other"]);
+    // The prototype offered an "Any" operator certificate, which the platform has no code for.
+    expect(labels).not.toContain("Any");
+  });
+
+  it("reveals a free-text box for Other", async () => {
+    const handle = await rail();
+    expect(screen.queryByPlaceholderText("Name the certificate")).toBeNull();
+    await handle.run(() => screen.getByRole("button", { name: "Other" }).click());
+    expect(handle.store().state.draft!.items[0].operator.certificate).toContain("other");
+    expect(screen.getByPlaceholderText("Name the certificate")).toBeTruthy();
+  });
+});
+
+describe("nationality (MREQ-AC-28)", () => {
+  async function openMore(handle: Awaited<ReturnType<typeof rail>>) {
+    await handle.run(() => screen.getByText("MORE DETAILS").closest("button")!.click());
+  }
+
+  it("reveals the free-text list only under Restricted, and clears it on Any", async () => {
+    const handle = await rail();
+    await openMore(handle);
+
+    const field = screen.getByText("NATIONALITY").closest("div")!.parentElement!;
+    expect(screen.queryByPlaceholderText("Which nationalities work for you?")).toBeNull();
+
+    await handle.run(() => within(field).getByRole("button", { name: "Restricted" }).click());
+    const input = screen.getByPlaceholderText("Which nationalities work for you?");
+    expect(input).toBeTruthy();
+
+    await handle.run(() => {
+      handle.store().actions.patchItemOperator(handle.store().state.draft!.items[0].id, { nationalityCustom: "Filipino, Indian" });
+    });
+    expect(handle.store().state.draft!.items[0].operator.nationalityCustom).toBe("Filipino, Indian");
+
+    // Back to Any — the box goes, and so does the stale list.
+    await handle.run(() => within(field).getByRole("button", { name: "Any" }).click());
+    expect(screen.queryByPlaceholderText("Which nationalities work for you?")).toBeNull();
+    expect(handle.store().state.draft!.items[0].operator.nationalityCustom).toBeNull();
+  });
+
+  it("caps the free-text at the contract's 100 characters", async () => {
+    const handle = await rail();
+    await openMore(handle);
+    const field = screen.getByText("NATIONALITY").closest("div")!.parentElement!;
+    await handle.run(() => within(field).getByRole("button", { name: "Restricted" }).click());
+    expect(screen.getByPlaceholderText("Which nationalities work for you?").getAttribute("maxlength")).toBe("100");
+  });
+
+  it("reads the night shift as words, not a bare boolean", async () => {
+    const handle = await rail();
+    await openMore(handle);
+    expect(screen.getByText("Day only")).toBeTruthy();
+    // Toggle is role="switch", not a button.
+    await handle.run(() => screen.getAllByRole("switch").at(-1)!.click());
+    expect(handle.store().state.draft!.items[0].operator.nightShift).toBe(true);
+    expect(screen.getByText("Included")).toBeTruthy();
+  });
+});

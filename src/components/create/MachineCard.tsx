@@ -84,6 +84,7 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
                   value={overrides.safetyCerts.length ? overrides.safetyCerts[0] : NO_CERT}
                   placeholder={t.create.machineCard.noCert}
                   searchPlaceholder={t.create.machineCard.cert}
+                  label={t.create.machineCard.cert}
                   options={[
                     { value: NO_CERT, label: t.create.machineCard.noCert },
                     ...SAFETY_CERTIFICATES.map((c) => ({ value: c, label: t.options.safetyCert[c] })),
@@ -130,6 +131,7 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
                   value={item.fuelType}
                   placeholder={t.create.machineCard.fuel}
                   searchPlaceholder={t.create.machineCard.fuel}
+                  label={t.create.machineCard.fuel}
                   options={FUEL_TYPES.map((f) => ({ value: f, label: t.options.fuelType[f] }))}
                   onChange={(v) => set("fuel_type", { fuelType: v as FuelType })}
                 />
@@ -146,6 +148,7 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
                   value={overrides.equipmentYear ?? "any"}
                   placeholder={t.create.machineCard.anyYear}
                   searchPlaceholder={t.create.machineCard.minYear}
+                  label={t.create.machineCard.minYear}
                   options={EQUIPMENT_YEARS.map((y) => ({
                     value: y,
                     label: y === "any" ? t.create.machineCard.anyYear : y,
@@ -174,6 +177,7 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
                   value={item.ref.categoryId}
                   placeholder={t.create.machineCard.category}
                   searchPlaceholder={t.create.machineCard.searchTypes}
+                  label={t.create.machineCard.category}
                   options={tax.categories}
                   onChange={(v) => {
                     prov.touch("category");
@@ -191,6 +195,7 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
                   value={item.ref.subcategoryId}
                   placeholder={t.create.machineCard.type}
                   searchPlaceholder={t.create.machineCard.searchTypes}
+                  label={t.create.machineCard.type}
                   disabled={!item.ref.categoryId}
                   options={tax.subtypes}
                   onChange={(v) => {
@@ -209,6 +214,7 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
                   value={item.ref.measurementId}
                   placeholder={t.create.machineCard.size}
                   searchPlaceholder={t.create.machineCard.searchSizes}
+                  label={t.create.machineCard.size}
                   disabled={!item.ref.subcategoryId}
                   options={tax.sizes}
                   onChange={(v) => {
