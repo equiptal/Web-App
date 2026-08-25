@@ -194,8 +194,10 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
               No active ring on it, though it points at `/`: Dashboard names that destination in the
               row beside it and already carries the state. Two marks for one place is one too many. */}
           <Link href="/" aria-label={t.shell.home} className="flex-none transition hover:opacity-80">
+            {/* 32px, down from the prototype's 36 (owner, 2026-08-25). The prototype's bar is 76px
+                tall and ours is 62 — a mark sized for the taller one crowds this one. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/moedatech-logo.svg" alt="Moedatech" className="block h-9 w-auto" />
+            <img src="/moedatech-logo.svg" alt="Moedatech" className="block h-8 w-auto" />
           </Link>
 
           {/* ── The nav sits DEAD CENTRE of the bar, not after the title ────────────────────────────
