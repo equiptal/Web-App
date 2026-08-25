@@ -59,7 +59,7 @@ export const en = {
     stepsBasic: "2 of 3 steps · verify your company to unlock unlimited requests.",
     verifiedNote: "Your company is verified.",
     notifications: "Notifications",
-    company: "My Company",
+    company: "My Organization",
     // Short forms for the mobile bottom bar, which splits its width evenly across the tabs —
     // the full labels truncate to stubs there ("Compare bids" already did before Company existed).
     companyShort: "Company",
@@ -1490,9 +1490,9 @@ export const en = {
       certOther: "Name the certificate",
       quantity: "QUANTITY",
       logistics: "LOGISTICS",
-      delivery: "To site — mobilisation",
-      returnFromSite: "From site — demobilisation",
-      fuelResponsibility: "Fuel — {fuel}",
+      delivery: "DELIVERY TO SITE",
+      returnFromSite: "RETURN FROM SITE",
+      fuelResponsibility: "FUEL RESPONSIBILITY",
       attachment: "ATTACHMENT",
       workType: "WORK TYPE",
       workTypePlaceholder: "What will it lift?",

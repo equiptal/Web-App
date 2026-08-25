@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
@@ -65,6 +66,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
   const { tier, status, signOut, refresh: refreshSession } = useSession();
   const { openAuth } = useAuthGate();
   const router = useRouter();
+  const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [name, setName] = useState("");
   // A child page may register a Back handler to show an arrow in the top bar beside the title.
@@ -111,29 +113,22 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
     router.push(PUBLIC_WEB_ENABLED ? "/" : "/login");
   };
 
-  // Four tabs after the brand mark, and Home is the mark itself. Every tab is visible to everyone,
-  // guests included — each account-bound surface renders a guest empty-state and a sign-in CTA rather
-  // than being hidden, so the site feels open and there are no dead ends.
+  // ── The three places, and the two icons (owner, 2026-08-25) ─────────────────────────────────────
+  // The nav names PLACES IN THE PRODUCT and nothing else. Every one is visible to everyone, guests
+  // included — each account-bound surface renders a guest empty-state and a sign-in CTA rather than
+  // being hidden, so the site feels open and there are no dead ends.
   //
-  // ONE list now, not a start/end pair. The dock split them around a raised centre button; a header
-  // row reads left to right and has no centre to split around.
+  // DASHBOARD points at `/`, the home hub under the name the owner uses for it. Deliberately NOT
+  // `/dashboard`: that route is the procurement demo and `canSeeProcurementDashboard` returns false
+  // for every account in production, so a link there would be a dead end for everyone.
   //
-  // ── The four (owner, 2026-08-25) ────────────────────────────────────────────────────────────────
-  // DASHBOARD points at `/`, and is the home hub under the name the owner uses for it. It is NOT
-  // `/dashboard`: that route is the procurement demo, and `canSeeProcurementDashboard` returns false
-  // for every account in production — a tab leading there would be a dead end for everyone.
-  //
-  // SETTINGS is deliberately absent. It lives in the account menu beside Sign out, where Profile and
-  // My Company already are and where people look for it — the same place the reference design puts
-  // its own account entry.
-  //
-  // INBOX earns its place by carrying the only live state in the chrome: the unread badge. Without it
-  // a supplier's reply has nowhere to announce itself.
+  // NOT HERE, and each for its own reason: INBOX is an icon in the account cluster, because it
+  // carries a count and a word cannot; PROFILE is the avatar beside it; SETTINGS is inside that
+  // avatar's menu, next to Sign out, where a reader looks for it.
   const navItems: NavItem[] = [
-    { key: "dashboard", icon: "dashboard", label: t.shell.dashboard, href: "/" },
-    { key: "requests", icon: "grid_view", label: t.shell.requests, href: "/requests" },
-    { key: "inbox", icon: "inbox", label: t.shell.inbox, href: "/inbox", badge: unread },
-    { key: "company", icon: "business_center", label: t.shell.company, href: "/company" },
+    { key: "dashboard", label: t.shell.dashboard, href: "/" },
+    { key: "requests", label: t.shell.requests, href: "/requests" },
+    { key: "company", label: t.shell.company, href: "/company" },
   ];
   const initials = (name.trim() ? name.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("") : "").toUpperCase();
   const greeting = `${t.shell.welcome}${name ? `, ${name}` : ""}`;
@@ -164,7 +159,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
             The mark and the tabs lead the row, then the page's own title, then the account cluster.
             That order is the reference's and it is also the right one: what the app IS does not
             change, so it sits where the eye starts; what the page is changes with every route. */}
-        <header className="sticky top-0 z-30 flex h-[62px] items-center gap-3 border-b border-border bg-surface px-4 sm:px-7">
+        <header className="sticky top-0 z-30 flex h-[62px] items-center gap-3 border-b border-border bg-surface px-4 sm:px-7 relative">
           {back && (
             <button
               onClick={back}
@@ -175,12 +170,32 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
             </button>
           )}
 
-          <AppNav items={navItems} homeHref="/" homeLabel={t.shell.home} />
+          {/* The wordmark, not the round logomark: the reference leads with the brand written out,
+              and at 62px there is room for it. It is Home. */}
+          <Link href="/" aria-label={t.shell.home} className="flex-none">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/moedatech-logo.svg" alt="Moedatech" className="h-7 w-auto" />
+          </Link>
 
-          {/* The title YIELDS. It is contextual and it truncates; the navigation is not and does not.
-              On a narrow screen the tabs are icons alone (see `AppNav`), which is what leaves this
-              room to say anything at all. */}
-          <b className="hidden min-w-0 flex-1 truncate text-[17px] font-extrabold tracking-[-.4px] text-navy sm:block">
+          {/* ── The nav sits DEAD CENTRE of the bar, not after the title ────────────────────────────
+              Absolutely placed, so it is centred on the HEADER rather than on whatever space the
+              title and the cluster happen to leave — which is what the reference does and what stops
+              the row shifting as titles change length. It is out of the flow, so the title beside it
+              cannot push it; the title's own `max-w` is what stops the two meeting.
+
+              Below `lg` it is hidden entirely rather than squeezed. Three words plus a wordmark plus
+              the account cluster do not fit a phone, and an icon rail here would be the toolbar this
+              design is deliberately not. */}
+          <div className="pointer-events-none absolute inset-x-0 hidden justify-center lg:flex">
+            <div className="pointer-events-auto">
+              <AppNav items={navItems} />
+            </div>
+          </div>
+
+          {/* The title YIELDS: contextual, truncating, and capped so it can never run under the
+              centred nav. Hidden below `sm`, where the bar has room for the mark and the cluster
+              and nothing else. */}
+          <b className="hidden min-w-0 max-w-[26ch] flex-1 truncate text-[15px] font-extrabold tracking-[-.4px] text-navy sm:block">
             {title ?? (
               <>
                 {greeting} <span className="wave-emoji">👋</span>
@@ -211,25 +226,53 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
               </button>
             )}
 
+            {/* ── The INBOX is an icon here, not a word in the nav (owner, 2026-08-25) ─────────────
+                It carries a count, and a count is the one thing a text link cannot show. It sits with
+                the account controls because a conversation is personal, where Dashboard, Requests and
+                My Organization are places in the product. */}
             {status === "authed" && (
-              <span className={`hidden rounded-full border px-2.5 py-1 text-[11px] font-bold sm:inline-flex ${badge.cls}`}>{badge.label}</span>
+              <Link
+                href="/inbox"
+                aria-label={t.shell.inbox}
+                title={t.shell.inbox}
+                aria-current={pathname.startsWith("/inbox") ? "page" : undefined}
+                className={`relative grid h-9 w-9 place-items-center rounded-full transition ${
+                  pathname.startsWith("/inbox") ? "bg-brand-soft text-brand" : "text-navy-mid hover:bg-surface2"
+                }`}
+              >
+                <Icon name="inbox" size={21} />
+                {unread > 0 && (
+                  <span className="absolute -end-0.5 -top-0.5 grid h-[17px] min-w-[17px] place-items-center rounded-full bg-brand px-1 text-[10px] font-extrabold text-white ring-2 ring-surface">
+                    {unread > 99 ? "99+" : unread}
+                  </span>
+                )}
+              </Link>
             )}
 
-            {/* The Inbox lived here as well as in the nav while the nav was a sidebar. The dock puts
-                it in reach on every screen size and carries the same unread badge, so a second one in
-                the top bar would only be a second place to read the same number. */}
             {status === "authed" && <NotificationsBell />}
 
             {status === "authed" && (
               <div className="relative">
+                {/* ── The tier is a TICK on the avatar, not a pill beside it (owner, 2026-08-25) ────
+                    «Verified» / «Basic rentee» / «Guest» took a labelled pill in the bar to say what
+                    a mark says in 14px. Only the verified state earns a mark: an absent tick is the
+                    honest statement for the other two, where a grey «Guest» pill is a verdict printed
+                    beside the reader's own face. The full words survive in the account menu, which is
+                    where the tier nudge that explains them already lives. */}
                 <button
                   onClick={() => setMenuOpen((o) => !o)}
-                  className="grid h-9 w-9 place-items-center rounded-full bg-surface3 text-[13px] font-bold text-navy"
+                  className="relative grid h-9 w-9 place-items-center rounded-full bg-surface3 text-[13px] font-bold text-navy"
                   aria-haspopup="menu"
                   aria-expanded={menuOpen}
-                  aria-label={t.shell.account}
+                  aria-label={tier === "verified" ? `${t.shell.account} · ${t.shell.tierVerified}` : t.shell.account}
+                  title={badge.label}
                 >
                   {initials || <Icon name="account_circle" size={22} />}
+                  {tier === "verified" && (
+                    <span className="absolute -end-0.5 -bottom-0.5 grid h-[15px] w-[15px] place-items-center rounded-full bg-ok text-white ring-2 ring-surface">
+                      <Icon name="check" size={11} />
+                    </span>
+                  )}
                 </button>
                 {menuOpen && (
                   <>
