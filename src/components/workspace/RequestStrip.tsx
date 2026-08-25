@@ -31,7 +31,6 @@ export function RequestStrip({
   bidCount,
   onPickItem,
   onOpenRequest,
-  onShare,
   fetchedCode,
 }: {
   group: RequestGroup;
@@ -43,8 +42,6 @@ export function RequestStrip({
   onPickItem: (itemId: string) => void;
   /** Opens the request drawer. */
   onOpenRequest: (() => void) | null;
-  /** Opens that same drawer on its share sheet — «Share» enters it there. */
-  onShare?: (() => void) | null;
   /** The request's own code, fetched from its detail record when the list row arrived without one. */
   fetchedCode?: string | null;
 }) {
@@ -231,7 +228,7 @@ export function RequestStrip({
                 {units.length > 0 && (
                   <span
                     className={`rounded-md border px-2 py-[3px] text-[11px] font-semibold ${
-                      confirmed ? "border-ok/25 bg-ok-soft text-ok" : "border-brand/25 bg-brand-soft text-brand"
+                      confirmed ? "border-ok/25 bg-ok-soft text-ok" : "border-border bg-surface2 text-navy-mid"
                     }`}
                   >
                     {confirmed ? t.workspace.availabilityConfirmed : t.workspace.availabilityNotChecked}
@@ -271,79 +268,39 @@ export function RequestStrip({
 
         </div>
 
-        {/* ── The controls, as the reference clusters them (owner, 2026-08-25) ──────────────────────
-            Two columns on the navy, at the trailing edge, split by what they act ON:
+        {/* ── The two ways into the picked bid (owner's reference, 2026-08-25) ─────────────────────
+            «Review equipment» opens the machines on the map, where availability is answered in full;
+            «View documents» opens that same surface on the papers — and nothing else stands here. A
+            five-control cluster was tried and is not what the reference draws: the request's own
+            details and its share link belong to the drawer the site name and the id already open, and
+            crowding them onto the strip made the row about the controls rather than the request.
 
-              • the BID — «Check availability» over «Documents» and «Quotation ↓». The primary names
-                its own precondition while nothing is picked («Select a bid first») rather than sitting
-                there greyed and mute;
-              • the REQUEST — «Full details ↗» and «Share», which are about the request itself and so
-                never depend on a bid.
-
-            It shipped as two buttons, which lost the quotation, the share and the whole distinction.
-            They stay OUTSIDE the white card: the card states facts, and out here the controls hold the
-            same place whatever it is saying. */}
-        <div className="flex flex-none items-stretch gap-2.5">
-          <div className="flex w-[172px] flex-none flex-col gap-1.5">
-            <button
-              type="button"
-              disabled={!bid}
-              onClick={() => goEquipment()}
-              className={`whitespace-nowrap rounded-[8px] border px-3 py-[7px] text-[12px] font-bold transition ${
-                bid
-                  ? "border-white/15 bg-black/25 text-white hover:bg-black/35"
-                  : "cursor-default border-white/10 bg-black/10 text-white/45"
-              }`}
-            >
-              {bid ? t.workspace.checkAvailability : t.workspace.selectBidFirst}
-            </button>
-            <div className="flex gap-1.5">
-              <button
-                type="button"
-                disabled={!bid}
-                onClick={() => goEquipment("documents")}
-                className={`inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-[8px] px-2.5 py-[7px] text-[11.5px] font-bold transition ${
-                  bid ? "bg-surface text-navy hover:bg-surface2" : "cursor-default bg-surface/40 text-navy/40"
-                }`}
-              >
-                <Icon name="visibility" size={13} /> {t.workspace.docsShort}
-              </button>
-              {/* The quotation is issued in the deal room, which is where the price it prints was
-                  settled; before there is a room there is no settled figure to issue. */}
-              <button
-                type="button"
-                disabled={!bid?.dealRoomId}
-                title={bid?.dealRoomId ? undefined : t.workspace.quotationNeedsRoom}
-                onClick={() => bid?.dealRoomId && router.push(`/deal-room/${encodeURIComponent(bid.dealRoomId)}`)}
-                className={`inline-flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-[8px] px-2.5 py-[7px] text-[11.5px] font-bold transition ${
-                  bid?.dealRoomId ? "bg-surface text-navy hover:bg-surface2" : "cursor-default bg-surface/40 text-navy/40"
-                }`}
-              >
-                {t.workspace.quotation} ↓
-              </button>
-            </div>
-          </div>
-
-          <div className="hidden w-px flex-none self-stretch bg-white/15 lg:block" />
-
-          <div className="flex w-[118px] flex-none flex-col gap-1.5">
-            <button
-              type="button"
-              onClick={onOpenRequest ?? undefined}
-              disabled={!onOpenRequest}
-              className="whitespace-nowrap rounded-[8px] bg-surface px-3 py-[7px] text-[11.5px] font-bold text-navy transition hover:bg-surface2 disabled:opacity-50"
-            >
-              {t.workspace.fullDetails} ↗
-            </button>
-            <button
-              type="button"
-              onClick={onShare ?? onOpenRequest ?? undefined}
-              disabled={!onShare && !onOpenRequest}
-              className="whitespace-nowrap rounded-[8px] bg-brand-soft px-3 py-[7px] text-[11.5px] font-bold text-brand transition hover:brightness-95 disabled:opacity-50"
-            >
-              {t.workspace.share}
-            </button>
-          </div>
+            They sit on the NAVY, outside the white card: the card states facts, and out here the
+            pair holds the same place whatever it is saying. Both need a bid to point at, so they read
+            as inert until one is picked. */}
+        <div className="flex w-[152px] flex-none flex-col justify-center gap-1.5">
+          <button
+            type="button"
+            disabled={!bid}
+            onClick={() => goEquipment()}
+            className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-bold transition ${
+              bid
+                ? "border-white/15 bg-black/30 text-white hover:bg-black/40"
+                : "cursor-default border-white/10 bg-black/10 text-white/45"
+            }`}
+          >
+            {t.workspace.reviewEquipment}
+          </button>
+          <button
+            type="button"
+            disabled={!bid}
+            onClick={() => goEquipment("documents")}
+            className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
+              bid ? "bg-surface text-navy hover:bg-surface2" : "cursor-default bg-surface/40 text-navy/40"
+            }`}
+          >
+            <Icon name="visibility" size={13} /> {t.workspace.viewDocuments}
+          </button>
         </div>
       </div>
     </div>
