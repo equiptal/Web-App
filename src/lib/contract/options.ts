@@ -16,8 +16,20 @@ export const EQUIPMENT_YEARS = ["2015+", "2018+", "2020+", "2022+", "any"] as co
 // legacy values still RENDER for old data, so they stay in the union). Aramco is equipment-only.
 export type SafetyCertificate = "tuv" | "aramco" | "spsp" | "saso-technical" | "other"; // AC-50 (+ web-app/002 free-text "other")
 export const SAFETY_CERTIFICATES: SafetyCertificate[] = ["tuv", "aramco", "other"];
-/** Operator per-item certificate options — Aramco is NOT an operator cert (equipment-only, app parity). */
-export const OPERATOR_CERTIFICATES: SafetyCertificate[] = ["tuv", "spsp", "saso-technical", "other"];
+/**
+ * Operator per-item certificate options — Aramco is NOT an operator cert (equipment-only, app parity).
+ *
+ * `saso-technical` was offered here and is no longer: **no parse can produce it.** The normalization
+ * agent's operator dimension accepts only `SPSP` and `TÜV` (`rfq-prompt.ts`: *"operator_license_levels
+ * — an ARRAY — ONLY "SPSP" / "TÜV""*), so offering SASO as a live choice let a renter demand a
+ * certificate the platform never recognises on that side — and an unrecognised cert becomes a
+ * document every bidder is asked for. It stays in the {@link SafetyCertificate} union so existing
+ * data still RENDERS; it is simply not selectable any more.
+ *
+ * Note that SASO does exist elsewhere: `saso-registration` is a request-level "Other" certificate
+ * (see {@link OTHER_CERTIFICATES}), which is a different thing from an operator's licence.
+ */
+export const OPERATOR_CERTIFICATES: SafetyCertificate[] = ["tuv", "spsp", "other"];
 
 /**
  * Normalize a stored/legacy equipment-cert value to a canonical code. App parity:

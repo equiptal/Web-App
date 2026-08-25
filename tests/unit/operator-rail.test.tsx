@@ -83,10 +83,13 @@ describe("operator certificates (MREQ-AC-27)", () => {
       .getAllByRole("button")
       .map((b) => b.textContent!.trim());
     // Short chip forms; the stored codes are still OPERATOR_CERTIFICATES.
-    expect(labels).toEqual(["TÜV", "SPSP", "SASO", "Other"]);
-    expect(OPERATOR_CERTIFICATES).toEqual(["tuv", "spsp", "saso-technical", "other"]);
+    expect(labels).toEqual(["TÜV", "SPSP", "Other"]);
+    expect(OPERATOR_CERTIFICATES).toEqual(["tuv", "spsp", "other"]);
     // The prototype offered an "Any" operator certificate, which the platform has no code for.
     expect(labels).not.toContain("Any");
+    // And SASO is gone: the normalization agent accepts only SPSP / TÜV on the operator dimension,
+    // so offering it let a renter demand a cert no parse can produce.
+    expect(labels).not.toContain("SASO");
   });
 
   it("reveals a free-text box for Other", async () => {
