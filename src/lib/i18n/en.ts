@@ -45,6 +45,9 @@ export const en = {
     inbox: "Inbox",
     request: "Request",
     account: "Account",
+    // The account menu's entry to . The route and its content are unchanged; «Settings» is
+    // what a reader looks for beside Sign out, and it keeps the header to four tabs.
+    settings: "Settings",
     signIn: "Sign in",
     welcome: "Welcome",
     collapseSidebar: "Collapse sidebar",

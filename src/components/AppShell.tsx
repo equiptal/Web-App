@@ -11,20 +11,26 @@ import type { Locale } from "@/lib/i18n/config";
 import { AuthGateProvider, useAuthGate } from "@/components/auth/AuthGate";
 import { PUBLIC_WEB_ENABLED } from "@/lib/flags";
 import { fetchDealRoomUnread } from "@/lib/api/client";
-import { canSeeProcurementDashboard } from "@/lib/access/dashboard";
 import { NotificationsBell } from "@/components/NotificationsBell";
-import { AppDock, DOCK_CLEARANCE, type DockItem } from "@/components/AppDock";
+import { AppNav, type NavItem } from "@/components/AppNav";
 
 /**
- * App shell for the renter web app (web-app/004, AC-01/02/03/09/25). A top bar with a
- * "Welcome, {name}" greeting, the EN/AR toggle, and an avatar account menu with Sign out
- * (AC-03/09), over a page column that ends in the floating {@link AppDock}.
+ * App shell for the renter web app (web-app/004, AC-01/02/03/09/25). One bar across the top holding
+ * the app's mark, its four tabs ({@link AppNav}), the page's title, the EN/AR toggle, notifications
+ * and an avatar account menu with Sign out (AC-03/09). Below it, the page.
  *
- * The navy sidebar that used to stand on the left is gone (requests-workspace plan, phase 0). It
- * carried three things and each has a new home: the nav is the dock, which every screen size now
- * shares instead of desktop-sidebar / phone-bottom-bar; the tier-status nudge (AC-06/08) moved into
- * the account menu, where the rest of the account already lives; and the brand mark is the dock's
- * centre button.
+ * ── Navigation has moved twice, and each move deleted something ─────────────────────────────────
+ * A navy SIDEBAR stood on the left until the requests-workspace redesign, which replaced it with
+ * `AppDock` — a floating pill at the foot of every page — so desktop and phone would stop navigating
+ * two different ways. That much stands. What the dock cost was the bottom edge: every page reserved
+ * `pb-28` so the pill could not cover its last row, and on this product that row is never furniture
+ * (the wizard's Back/Next, the bid map's price bar, the workspace's export).
+ *
+ * The header already spans every route and already ends in a cluster of controls, so navigation
+ * costs nothing there — and the foot of a page belongs to the page again (owner, 2026-08-25).
+ *
+ * The sidebar's other two jobs kept their newer homes: the tier-status nudge (AC-06/08) sits in the
+ * account menu with the rest of the account, and the brand mark leads the nav row.
  */
 type AppShellProps = { children: ReactNode; title?: string; fullBleed?: boolean; wide?: boolean };
 
@@ -56,7 +62,7 @@ export function AppShell(props: AppShellProps) {
 function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
   const { locale, setLocale } = useLocale();
   const t = useT();
-  const { tier, status, signOut, user, refresh: refreshSession } = useSession();
+  const { tier, status, signOut, refresh: refreshSession } = useSession();
   const { openAuth } = useAuthGate();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -105,20 +111,29 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
     router.push(PUBLIC_WEB_ENABLED ? "/" : "/login");
   };
 
-  // The dock carries four tabs around the brand mark, and Home is the mark itself. Every tab is
-  // visible to everyone, guests included — each account-bound surface renders a guest empty-state and
-  // a sign-in CTA rather than being hidden, so the site feels open and there are no dead ends.
+  // Four tabs after the brand mark, and Home is the mark itself. Every tab is visible to everyone,
+  // guests included — each account-bound surface renders a guest empty-state and a sign-in CTA rather
+  // than being hidden, so the site feels open and there are no dead ends.
   //
-  // Procurement dashboard is a demo surface, so only the CCC mock account sees its tab.
-  const dockStart: DockItem[] = [
-    ...(canSeeProcurementDashboard(user)
-      ? [{ key: "dashboard", icon: "dashboard", label: t.shell.dashboard, short: t.shell.dashboardShort, href: "/dashboard" }]
-      : []),
+  // ONE list now, not a start/end pair. The dock split them around a raised centre button; a header
+  // row reads left to right and has no centre to split around.
+  //
+  // ── The four (owner, 2026-08-25) ────────────────────────────────────────────────────────────────
+  // DASHBOARD points at `/`, and is the home hub under the name the owner uses for it. It is NOT
+  // `/dashboard`: that route is the procurement demo, and `canSeeProcurementDashboard` returns false
+  // for every account in production — a tab leading there would be a dead end for everyone.
+  //
+  // SETTINGS is deliberately absent. It lives in the account menu beside Sign out, where Profile and
+  // My Company already are and where people look for it — the same place the reference design puts
+  // its own account entry.
+  //
+  // INBOX earns its place by carrying the only live state in the chrome: the unread badge. Without it
+  // a supplier's reply has nowhere to announce itself.
+  const navItems: NavItem[] = [
+    { key: "dashboard", icon: "dashboard", label: t.shell.dashboard, href: "/" },
     { key: "requests", icon: "grid_view", label: t.shell.requests, href: "/requests" },
-  ];
-  const dockEnd: DockItem[] = [
     { key: "inbox", icon: "inbox", label: t.shell.inbox, href: "/inbox", badge: unread },
-    { key: "profile", icon: "person", label: t.shell.profile, href: "/profile" },
+    { key: "company", icon: "business_center", label: t.shell.company, href: "/company" },
   ];
   const initials = (name.trim() ? name.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("") : "").toUpperCase();
   const greeting = `${t.shell.welcome}${name ? `, ${name}` : ""}`;
@@ -143,9 +158,12 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
         08-19 — so taking its side wholesale would have quietly reopened the bug the pin fixes. The
         dock shell is the redesign's; the conditional is staging's. */}
     <div className={`flex ${fullBleed ? "h-dvh overflow-hidden" : "min-h-screen"}`}>
-      {/* Main column — the whole page now; navigation is the dock at the foot of it. */}
+      {/* Main column — the whole page; navigation is the row in its header. */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Top bar — AC-03 */}
+        {/* ── Top bar (AC-03), and the app's navigation (owner, 2026-08-25) ──────────────────────
+            The mark and the tabs lead the row, then the page's own title, then the account cluster.
+            That order is the reference's and it is also the right one: what the app IS does not
+            change, so it sits where the eye starts; what the page is changes with every route. */}
         <header className="sticky top-0 z-30 flex h-[62px] items-center gap-3 border-b border-border bg-surface px-4 sm:px-7">
           {back && (
             <button
@@ -156,7 +174,13 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
               <Icon name={locale === "ar" ? "arrow_forward" : "arrow_back"} size={20} />
             </button>
           )}
-          <b className="min-w-0 flex-1 truncate text-[19px] font-extrabold tracking-[-.4px] text-navy">
+
+          <AppNav items={navItems} homeHref="/" homeLabel={t.shell.home} />
+
+          {/* The title YIELDS. It is contextual and it truncates; the navigation is not and does not.
+              On a narrow screen the tabs are icons alone (see `AppNav`), which is what leaves this
+              room to say anything at all. */}
+          <b className="hidden min-w-0 flex-1 truncate text-[17px] font-extrabold tracking-[-.4px] text-navy sm:block">
             {title ?? (
               <>
                 {greeting} <span className="wave-emoji">👋</span>
@@ -241,7 +265,11 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                       </button>
                       {/* Compare had a home here while it was still its own page. It is a tab of the
                           requests workspace now (docs/requests-workspace-disabled.md), reached by
-                          the Requests tab in the dock, so a second entry to the same thing is gone. */}
+                          the Requests tab, so a second entry to the same thing is gone. */}
+                      {/* SETTINGS, not Profile (owner, 2026-08-25). The route is the same `/profile`
+                          and its content has not moved — the word has. «Settings» is what a reader
+                          looks for beside Sign out, and this menu is where the owner ruled it should
+                          live rather than spending one of four header tabs on it. */}
                       <button
                         role="menuitem"
                         onClick={() => {
@@ -250,7 +278,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                         }}
                         className="flex w-full items-center gap-2 px-3 py-2 text-[13px] font-semibold text-navy-mid hover:bg-surface2"
                       >
-                        <Icon name="person" size={16} /> {t.shell.profile}
+                        <Icon name="settings" size={16} /> {t.shell.settings}
                       </button>
                       <button
                         role="menuitem"
@@ -267,23 +295,24 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
           </div>
         </header>
 
-        {/* `DOCK_CLEARANCE` keeps the last row of a page — the wizard's Back/Next footer, a card's
-            actions — clear of the floating dock, which now covers the foot of the viewport at every
-            width (it used to be a phone-only bar hidden from md up).
+        {/* ── The foot of a page is the page's again (owner, 2026-08-25) ──────────────────────────
+            `DOCK_CLEARANCE` reserved `pb-28` on EVERY page so the floating dock could not cover the
+            last row — the wizard's Back/Next, a card's actions, the bid map's price bar. With the
+            navigation in the header there is nothing down there to clear, so the reserve is gone and
+            a full-bleed surface ends exactly where the viewport does.
             One consistent page container across the app (T1/T2): My Requests' 1440px width and a
             generous gutter. `wide` stays uncapped (My Requests caps itself at 1440 via .rproto). */}
         <main
           className={
             fullBleed
-              ? `flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${DOCK_CLEARANCE}`
-              : `mx-auto w-full px-6 py-6 ${DOCK_CLEARANCE} sm:px-12 sm:pt-7 md:py-7 lg:px-20 xl:px-28 ${wide ? "max-w-none" : "max-w-[1440px]"}`
+              ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+              : `mx-auto w-full px-6 py-6 pb-16 sm:px-12 sm:pt-7 md:py-7 lg:px-20 xl:px-28 ${wide ? "max-w-none" : "max-w-[1440px]"}`
           }
         >
           {children}
         </main>
       </div>
 
-      <AppDock start={dockStart} end={dockEnd} homeHref="/" homeLabel={t.shell.home} />
     </div>
     </BackContext.Provider>
   );
