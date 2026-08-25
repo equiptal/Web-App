@@ -24,6 +24,19 @@ import { WhenPanel } from "@/components/create/WhenPanel";
 import { CarryForwardModal } from "@/components/create/CarryForwardModal";
 import { PanelDot } from "@/components/create/Provenance";
 import { gateWhen, gateWhere, itemGaps, panelGaps, postableItems, requiredGaps, resolveRef, taxName, transportGaps } from "@/lib/contract";
+import type { RequiredGap } from "@/lib/contract";
+
+/**
+ * A gap's reason, in the renter's words.
+ *
+ * `RequiredGap.reason` is an i18n KEY ("gate.chooseRentalBasis") — the panels have always shown gaps
+ * as dots and a counter, so nothing had needed to spell one out until the move-on button had to say
+ * what it is waiting for. An unknown key returns nothing rather than printing itself.
+ */
+function gateReason(t: ReturnType<typeof useT>, key: string): string | undefined {
+  const name = key.startsWith("gate.") ? key.slice(5) : key;
+  return (t.gate as Record<string, string | undefined>)[name];
+}
 
 const SHAKE_MS = 450;
 
@@ -45,6 +58,8 @@ export function Canvas() {
   }, []);
 
   const draft = state.draft;
+  /** The live gaps, readable from the effects above — which run before the derivation below. */
+  const gapsRef = useRef<RequiredGap[]>([]);
   // Everything below is derived defensively so the hooks that follow run on every render. `draft` is
   // null only before the agent has produced one, which the early return at the end handles.
   const whereOk = draft ? gateWhere(draft.project).ok : false;
@@ -58,10 +73,24 @@ export function Canvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [whereOk]);
 
-  // MREQ-AC-05 — and accepting the charged-day figure returns to the equipment panel.
+  /**
+   * MREQ-AC-05 — accepting the charged-day figure finishes the schedule, so the schedule closes.
+   *
+   * It used to re-open EQUIPMENT, which is what made the flow feel locked: the renter ticked «I
+   * understand», landed back on the machine, pressed «Review & send», and — with another machine
+   * still unanswered — was sent to the machine panel again. Two of the three moves went backwards.
+   *
+   * A finished panel collapses. Where the request still has a gap the panel that OWNS it opens
+   * instead, so the next thing to answer is what the renter is looking at.
+   */
   const wasUnderstood = useRef(state.chargedDaysUnderstood);
   useEffect(() => {
-    if (state.chargedDaysUnderstood && !wasUnderstood.current && state.activeSection === "when") actions.openSection("equipment");
+    if (!state.chargedDaysUnderstood || wasUnderstood.current || state.activeSection !== "when") {
+      wasUnderstood.current = state.chargedDaysUnderstood;
+      return;
+    }
+    const blocker = gapsRef.current[0];
+    actions.openSection(blocker ? blocker.panel : null);
     wasUnderstood.current = state.chargedDaysUnderstood;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.chargedDaysUnderstood]);
@@ -75,6 +104,7 @@ export function Canvas() {
   const isLastItem = index >= live.length - 1;
 
   const gaps = requiredGaps(draft, state.chargedDaysUnderstood);
+  gapsRef.current = gaps;
   const equipmentGaps = item ? [...itemGaps(item, draft), ...transportGaps([item], draft.project)] : [];
   const whenOk = gateWhen(draft.project, state.chargedDaysUnderstood).ok;
 
@@ -99,13 +129,17 @@ export function Canvas() {
   };
 
   /**
-   * Panel-to-panel movement. The equipment panel must be complete before either of the others opens,
-   * and the location must be confirmed before the schedule does — collapsing an open panel is always
-   * free, since closing something is not advancing past it.
+   * Panel-to-panel movement, under one rule (owner, 2026-08-26): **a panel cannot be left until what
+   * it requires is answered.**
+   *
+   * Collapsing used to be free — «closing something is not advancing past it» — and that is how a
+   * renter ended up with three collapsed panels, an unanswered machine among them, and a button that
+   * refused with a shake. Now the only way out of a panel is to finish it, which is also the only
+   * state in which the next one is worth opening.
    */
   const openSection = (section: "equipment" | "where" | "when") => {
     if (state.activeSection === section) {
-      actions.openSection(null);
+      collapse(section);
       return;
     }
     if (section !== "equipment" && equipmentGaps.length > 0) {
@@ -118,6 +152,22 @@ export function Canvas() {
       return;
     }
     actions.openSection(section);
+  };
+
+  /**
+   * Close the open panel — refused, visibly, while it still owes an answer.
+   *
+   * The refusal has to be legible: the equipment panel shakes its own fields, and the other two shake
+   * the block that holds them. Nothing collapses silently.
+   */
+  const collapse = (section: "equipment" | "where" | "when") => {
+    const owed =
+      section === "equipment" ? equipmentGaps.length > 0 : section === "where" ? !whereOk : !whenOk;
+    if (owed) {
+      shakeNow(section === "where" ? "where" : "fields");
+      return;
+    }
+    actions.openSection(null);
   };
 
   /**
@@ -141,14 +191,30 @@ export function Canvas() {
       return;
     }
     if (gaps.length > 0) {
-      // Point at whichever panel actually holds the blocker rather than shaking the one on screen.
+      /**
+       * The blocker is somewhere else, and «somewhere else» is usually ANOTHER MACHINE — only one is
+       * editable at a time, so opening the equipment panel on the machine already in front of the
+       * renter showed them a finished card and looked like the button had done nothing. Go to the
+       * machine that owes the answer; fall back to the panel when the gap is request-wide.
+       */
       const first = gaps[0];
-      if (first.panel !== "equipment" && state.activeSection !== first.panel) actions.openSection(first.panel);
-      shakeNow(!whereOk ? "where" : "fields");
+      const owing = first.itemId ? live.findIndex((i) => i.id === first.itemId) : -1;
+      if (owing >= 0 && owing !== index) actions.goItem(owing);
+      if (state.activeSection !== first.panel) actions.openSection(first.panel);
+      shakeNow(first.panel === "where" ? "where" : "fields");
       return;
     }
     actions.setReadyToSend(true);
   };
+
+  /**
+   * What the move-on button is waiting for — null when it is free to fire.
+   *
+   * «Review & send» is DISABLED until the whole request is answered (owner, 2026-08-26) rather than
+   * refusing on press: a button that looks live and then shakes teaches the renter that the page is
+   * broken. «Next machine» only ever owed this machine, so it keeps that narrower bar.
+   */
+  const blockedBy = isLastItem ? gaps[0] ?? null : equipmentGaps[0] ?? null;
 
   /**
    * Add a machine by hand.
@@ -240,7 +306,7 @@ export function Canvas() {
       {item &&
         (state.activeSection === "equipment" ? (
           <div ref={equipmentRef as React.Ref<HTMLDivElement>} className="mb-3.5 flex flex-col gap-4 lg:flex-row lg:items-stretch">
-            <MachineCard item={item} gaps={equipmentGaps} shaking={shaking} onCollapse={() => actions.openSection(null)} />
+            <MachineCard item={item} gaps={equipmentGaps} shaking={shaking} onCollapse={() => collapse("equipment")} />
             <OperatorRail item={item} />
           </div>
         ) : (
@@ -317,7 +383,9 @@ export function Canvas() {
           </button>
           <button
             onClick={advance}
-            className="inline-flex items-center gap-1.5 rounded-[10px] bg-brand px-5 py-2.5 text-[13px] font-bold text-brand-fg transition hover:brightness-[1.04]"
+            disabled={blockedBy != null}
+            title={blockedBy ? gateReason(t, blockedBy.reason) : undefined}
+            className="inline-flex items-center gap-1.5 rounded-[10px] bg-brand px-5 py-2.5 text-[13px] font-bold text-brand-fg transition hover:brightness-[1.04] disabled:cursor-not-allowed disabled:bg-surface3 disabled:text-muted"
           >
             {isLastItem ? t.create.reviewAndSend : t.create.nextEquipment}
             <Icon name="arrow_forward" size={16} className="rtl:rotate-180" />

@@ -98,7 +98,10 @@ describe("the location gates the schedule (MREQ-AC-03/04)", () => {
 });
 
 describe("accepting the charged days closes the schedule (MREQ-AC-05)", () => {
-  it("returns to the equipment panel", async () => {
+  // It used to re-open EQUIPMENT, which sent the renter backwards: tick «I understand», land on the
+  // machine, press «Review & send», and — with another machine unanswered — be sent to the machine
+  // panel again. A finished panel now collapses, and a request with nothing left collapses to none.
+  it("collapses the canvas when the request is answered", async () => {
     const item = makeItem();
     const handle = await renderCanvas(<Canvas />, {
       draft: makeAgentDraft({ items: [item], project: confirmedProject() }),
@@ -112,22 +115,38 @@ describe("accepting the charged days closes the schedule (MREQ-AC-05)", () => {
       handle.store().actions.setChargedDaysUnderstood(true);
     });
 
+    expect(handle.store().state.activeSection).toBeNull();
+  });
+
+  it("opens the panel that owns the next gap when one is left", async () => {
+    // Nothing answers the machine here, so the schedule hands the renter to it rather than to nothing.
+    const handle = await renderCanvas(<Canvas />, {
+      draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
+      prepare: (store) => store.actions.openSection("when"),
+    });
+
+    await handle.run(() => {
+      handle.store().actions.setChargedDaysUnderstood(true);
+    });
+
     expect(handle.store().state.activeSection).toBe("equipment");
   });
 });
 
 describe("the primary button refuses with gaps (MREQ-AC-15)", () => {
-  it("shakes instead of advancing, and does not reach the review screen", async () => {
+  // Owner, 2026-08-26: it is DISABLED while anything is owed rather than live-then-shaking. A button
+  // that looks ready and then refuses teaches the renter that the page is broken.
+  it("is disabled, and cannot reach the review screen", async () => {
     const handle = await renderCanvas(<Canvas />, {
       draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
     });
 
-    await handle.run(() => {
-      screen.getByText(/Review & send/).closest("button")!.click();
-    });
+    const button = screen.getByText(/Review & send/).closest("button")! as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+
+    await handle.run(() => button.click());
 
     expect(handle.store().state.readyToSend).toBe(false);
-    expect(shaken(handle.view.container)).toBeGreaterThan(0);
   });
 
   it("advances to the review screen when nothing is left", async () => {
@@ -148,10 +167,8 @@ describe("the primary button refuses with gaps (MREQ-AC-15)", () => {
   });
 });
 
-describe("collapsing is always free", () => {
-  // Closing a panel is not advancing past it, so it must never be refused — otherwise a renter with
-  // an incomplete item cannot collapse the panel they are already looking at.
-  it("lets an open panel close even with gaps elsewhere", async () => {
+describe("a panel closes only once it is answered (owner, 2026-08-26)", () => {
+  it("lets an ANSWERED panel close, whatever is owed elsewhere", async () => {
     const item = makeItem();
     const handle = await renderCanvas(<Canvas />, {
       draft: makeAgentDraft({ items: [item], project: confirmedProject() }),
@@ -166,6 +183,21 @@ describe("collapsing is always free", () => {
     });
 
     expect(handle.store().state.activeSection).toBeNull();
+  });
+
+  it("refuses to close one that still owes an answer, and shakes instead", async () => {
+    // The machine is unanswered, so its «collapse» cannot put it away: that is how a renter used to
+    // end up with three shut panels, an empty machine among them, and a button that would not fire.
+    const handle = await renderCanvas(<Canvas />, {
+      draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
+    });
+
+    await handle.run(() => {
+      screen.getByText(/collapse/i).closest("button")!.click();
+    });
+
+    expect(handle.store().state.activeSection).toBe("equipment");
+    expect(shaken(handle.view.container)).toBeGreaterThan(0);
   });
 });
 
