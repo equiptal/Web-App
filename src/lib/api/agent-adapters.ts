@@ -154,6 +154,50 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
     const cap = mrf.find((m) => m?.field === `line_items[${idx}].capacity`);
     if (cap?.question_for_customer) it.sizeNote = cap.question_for_customer;
   });
+  // Field-keyed agent notes (dotted path → note) for inline rendering beside each field.
+  const fieldNotes: Record<string, string> = {};
+  for (const fn of out.field_notes ?? []) {
+    if (fn?.field && typeof fn.note === "string" && fn.note.trim()) fieldNotes[fn.field] = fn.note.trim();
+  }
+
+  /**
+   * ── The operator opens only where the RFQ actually asked for one (owner, 2026-08-26) ────────────
+   *
+   * `toItem` already reads `operator_included: null` as «no». What it could not see is the agent
+   * ASSUMING one: «4 forklifts» came back with `operator_included: true`, F.A.T sides filled and both
+   * marked «AI selected», so the panel opened on a priced term the renter had never mentioned.
+   *
+   * The agent says so itself, though — in its own two channels for «I decided this, you did not»:
+   * a `field_notes` entry on the field, or a `missing_required_fields` entry raising it as a question.
+   * Either mark means the RFQ was silent, so the line goes back to operator OFF and the F.A.T sides it
+   * dragged along are cleared: an unasked-for operator is money on a bid nobody wanted to spend.
+   *
+   * What is NOT a guess, and stays: an operator the RFQ evidenced some other way — a certificate it
+   * named, a nationality, a head count, a night shift. Those cannot be inferred from an equipment
+   * line, so their presence IS the mention.
+   */
+  const mentionedOperator = (li: RFQLineItem, it: EquipmentItem): boolean =>
+    it.operator.certificate.length > 0 ||
+    (it.operator.certificateOther ?? "").trim() !== "" ||
+    li.operator_nationality != null ||
+    li.number_of_operators != null ||
+    li.night_shift_required != null;
+  const agentGuessedOperator = (idx: number): boolean => {
+    const fields = [
+      `line_items[${idx}].operator_included`,
+      `line_items[${idx}].operator`,
+      `line_items[${idx}].fat_required`,
+    ];
+    return fields.some((f) => fieldNotes[f] != null) || mrf.some((m) => fields.includes(m?.field ?? ""));
+  };
+  (out.line_items ?? []).forEach((li, idx) => {
+    const it = items[idx];
+    if (!it || it.operatorNeeded !== "yes") return;
+    if (mentionedOperator(li, it) || !agentGuessedOperator(idx)) return;
+    it.operatorNeeded = "no";
+    it.operator = { ...it.operator, fatRequired: null, fatFood: null, fatAccommodationTransport: null };
+  });
+
   const project = toProject(out.rfq_header ?? {});
   // AC-25/26: reconcile the agent's per-item mob/demob/fuel-responsibility with the request-wide
   // "Settings for all items": all items same → lift to request-wide + clear the per-item overrides;
@@ -184,11 +228,6 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
     for (const i of items) i.safetyCertsOverride = null;
   } else if (!allSameSafety) {
     project.certificates.safety = []; // items differ → no request-wide default; per-item overrides kept
-  }
-  // Field-keyed agent notes (dotted path → note) for inline rendering beside each field.
-  const fieldNotes: Record<string, string> = {};
-  for (const fn of out.field_notes ?? []) {
-    if (fn?.field && typeof fn.note === "string" && fn.note.trim()) fieldNotes[fn.field] = fn.note.trim();
   }
   return {
     rfqId: out.rfq_id ?? null, // A5: anchor for the web_review correction fired at submit
