@@ -23,6 +23,8 @@ export function SearchSelect({
   placeholder,
   searchPlaceholder,
   label,
+  tone = "field",
+  prefix,
   disabled = false,
   onChange,
 }: {
@@ -36,6 +38,17 @@ export function SearchSelect({
    * label sits in a sibling element that carries no association.
    */
   label?: string;
+  /**
+   * Which surface the trigger sits on.
+   *
+   *  - `field` (default) — a white box inside a card.
+   *  - `overlay` — the prototype's dark translucent chip, for a control anchored on the machine panel.
+   *  - `brand` — the same chip in amber, which is how the prototype marks an overlay control the
+   *    renter has not answered yet. The colour IS the prompt there; a dot alone is lost on a photo.
+   */
+  tone?: "field" | "overlay" | "brand";
+  /** A small constant prefix inside the trigger, e.g. "FUEL Diesel" on the panel. */
+  prefix?: string;
   disabled?: boolean;
   onChange: (value: string) => void;
 }) {
@@ -83,10 +96,17 @@ export function SearchSelect({
         aria-haspopup="listbox"
         aria-controls={listId}
         aria-label={label}
-        className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2.5 text-start text-[13px] text-navy disabled:cursor-not-allowed disabled:opacity-60"
+        className={`flex w-full items-center justify-between gap-1.5 rounded-lg text-start disabled:cursor-not-allowed disabled:opacity-60 ${
+          tone === "field"
+            ? "border border-border bg-surface px-3 py-2.5 text-[13px] text-navy"
+            : tone === "overlay"
+              ? "bg-[#12263acc] px-3 py-2 text-[12px] font-bold text-white shadow-[0_2px_8px_rgba(0,0,0,.25)]"
+              : "bg-[#c9660f] px-3 py-2 text-[13px] font-bold text-white shadow-[0_2px_8px_rgba(0,0,0,.25)]"
+        }`}
       >
-        <span className={`truncate ${selected ? "" : "text-muted"}`}>{selected?.label ?? placeholder}</span>
-        <Icon name="expand_more" size={16} className="flex-none text-muted" />
+        {prefix && <span className="flex-none opacity-70">{prefix}</span>}
+        <span className={`truncate ${selected || tone !== "field" ? "" : "text-muted"}`}>{selected?.label ?? placeholder}</span>
+        <Icon name="expand_more" size={tone === "field" ? 16 : 14} className={`flex-none ${tone === "field" ? "text-muted" : ""}`} />
       </button>
 
       {open && (

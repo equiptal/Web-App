@@ -63,21 +63,32 @@ async function pick(handle: Awaited<ReturnType<typeof card>>, name: string, opti
 }
 
 describe("the four overlay controls (MREQ-AC-16)", () => {
+  // These sit ON the machine panel, where the prototype gives them no visible label — the control
+  // itself carries the meaning. So they are addressed by accessible name, which is also the only
+  // thing a screen-reader user gets, and the reason SearchSelect grew a `label` prop.
   it("renders certificate, quantity, fuel and minimum year", async () => {
     await card();
-    expect(screen.getByText("CERTIFICATE")).toBeTruthy();
-    expect(screen.getByText("QUANTITY")).toBeTruthy();
-    expect(screen.getByText("FUEL")).toBeTruthy();
-    expect(screen.getByText("MINIMUM YEAR")).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "CERTIFICATE" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "FUEL" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "MINIMUM YEAR" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "QUANTITY +" })).toBeTruthy();
   });
 
   it("floors the quantity stepper at one (MREQ-AC-16)", async () => {
     const handle = await card();
-    const stepper = screen.getByText("QUANTITY").closest("div")!.parentElement!;
-    const minus = within(stepper).getAllByRole("button")[0];
+    const minus = screen.getByRole("button", { name: "QUANTITY −" });
     await handle.run(() => minus.click());
     await handle.run(() => minus.click());
     expect(handle.store().state.draft!.items[0].quantity).toBe(1);
+    // At the floor it is disabled rather than silently doing nothing.
+    expect(minus.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("counts up from the panel chip", async () => {
+    const handle = await card();
+    await handle.run(() => screen.getByRole("button", { name: "QUANTITY +" }).click());
+    expect(handle.store().state.draft!.items[0].quantity).toBe(2);
+    expect(screen.getByText("×2")).toBeTruthy();
   });
 });
 

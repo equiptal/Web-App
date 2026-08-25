@@ -1,24 +1,29 @@
 "use client";
 
 /**
- * *The machine* (MREQ-AC-16–24).
+ * *The machine* (MREQ-AC-16–24), at the prototype's geometry.
  *
- * Where the prototype put a photograph, this puts the equipment's taxonomy icon: the request model
- * has no machine image, and rendering a stock photo of an excavator next to a request for a
- * different one would be a picture of the wrong machine. The four overlay controls the prototype
- * anchored to that photo — quantity, certificate, minimum year, fuel — sit on the icon panel instead.
+ * The layout is not decoration here. The card is a `2fr 3fr` grid whose left column is a **450px
+ * tall panel** with four controls anchored to its corners, and the right column is a 16px-gap stack
+ * of three boxes. The first cut of this file let the left panel size itself to its contents, so it
+ * grew to match the right column and left the fuel and year controls stranded at the bottom of an
+ * empty grey field. Fixing the panel height is what makes the corner anchoring mean anything.
  *
- * Every option list comes from `options.ts`. The prototype invented values that do not exist in the
- * platform (CE, ISO 9001, a 2021+ year band, an "Any" operator certificate); shipping those would
- * have produced requests carrying certificate requirements no supplier is ever asked to hold.
+ * Where the prototype had a photograph this draws the equipment's taxonomy icon: the request model
+ * carries no machine image (spec §7.1 — `equipment_taxonomy.image_key` exists but holds artwork, and
+ * `getTaxonomy` does not serve it), and a stock photo of the wrong excavator is worse than a glyph.
+ *
+ * Every option list comes from `options.ts`. The prototype invented values this platform has no code
+ * for — CE, ISO 9001, a 2021+ year band, an "Any" operator certificate — and a certificate the
+ * platform cannot resolve becomes a document demanded of every supplier who bids.
  */
 
 import { fmt, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
-import { Button, Icon, Pchips, SelChips, Stepper, TextArea, TextInput } from "@/components/ui";
+import { Button, Icon, TextArea, TextInput } from "@/components/ui";
 import { equipmentIcon } from "@/components/requests/EquipImg";
-import { CanvasField, PanelDot } from "@/components/create/Provenance";
+import { CanvasField, ChoiceChips, ChoiceRow, PanelDot } from "@/components/create/Provenance";
 import { SearchSelect } from "@/components/create/SearchSelect";
 import { useItemAttachments, useItemOverrides, useItemTaxonomy, useProvenance } from "@/components/create/hooks";
 import {
@@ -54,37 +59,43 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
   };
 
   const notAvailable = item.verdict === "no-match";
-  const rawDisplay = item.rawLabel ?? tax.subtypeName ?? "";
+  const partyOptions = (renterLabel: string) =>
+    PARTIES.map((p) => ({ value: p, label: p === "supplier" ? t.create.party.supplier : renterLabel }));
+
+  /** The amber bullet used beside an overlay control, where a CanvasField label would not fit. */
+  const overlayDot = (field: string) =>
+    gapFor(field) ? (
+      <span aria-hidden className={`text-[8px] leading-none text-brand ${shake(field) ? "shake-error" : ""}`}>
+        ●
+      </span>
+    ) : null;
 
   return (
-    <div className="min-w-0 flex-1 rounded-[14px] border border-border bg-surface p-4">
+    <div className="min-w-0 flex-1 rounded-[14px] border border-border bg-surface p-3.5">
       <div className="mb-4 flex items-center gap-2">
         <PanelDot complete={gaps.length === 0} />
-        <h2 className="text-[15px] font-extrabold text-navy">{t.create.machine}</h2>
+        <h2 className="whitespace-nowrap text-[15px] font-extrabold text-navy">{t.create.machine}</h2>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        {/* ---------------- The icon panel and its four overlay controls ---------------- */}
-        <div className="relative min-h-[260px] overflow-visible rounded-xl bg-surface2 p-3">
-          <div className="grid h-full min-h-[220px] place-items-center text-navy/15">
-            <Icon name={equipmentIcon(tax.subtypeName || tax.categoryName)} size={110} />
+      {/* The prototype's 2fr / 3fr split, 20px gutter, columns aligned to the top. */}
+      <div className="grid gap-5 lg:grid-cols-[2fr_3fr] lg:items-start">
+        {/* ---------------- The 450px panel, and the four controls on its corners ---------------- */}
+        <div className="relative h-[450px] w-full min-w-0 overflow-hidden rounded-xl bg-[#f0f1f3]">
+          <div className="grid h-full place-items-center text-navy/10">
+            <Icon name={equipmentIcon(tax.subtypeName || tax.categoryName)} size={160} />
           </div>
 
-          {/* Certificate — amber while unanswered, because an unasked certificate silently narrows
-              the renter's own bidder pool (see the note in options.ts). */}
-          <div className="absolute inset-x-3 top-3 flex items-start justify-between gap-2">
-            <div className="w-[62%] max-w-[230px]">
-              <CanvasField
-                label={t.create.machineCard.cert}
-                missing={gapFor("safety_certificates")}
-                shake={shake("safety_certificates")}
-                source={prov.itemSource("safety_certificates", overrides.safetyCerts, "safetyCertsOverride")}
-              >
+          {/* Top-left the certificate, top-right the quantity. Amber while the certificate is
+              unanswered — an unasked certificate silently narrows the renter's own bidder pool. */}
+          <div className="absolute inset-x-2.5 top-2.5 flex items-start justify-between gap-2">
+            <div className="min-w-0 max-w-[58%]">
+              <div className="flex items-center gap-1.5">
                 <SearchSelect
                   value={overrides.safetyCerts.length ? overrides.safetyCerts[0] : NO_CERT}
                   placeholder={t.create.machineCard.noCert}
                   searchPlaceholder={t.create.machineCard.cert}
                   label={t.create.machineCard.cert}
+                  tone={overrides.safetyCerts.length ? "overlay" : "brand"}
                   options={[
                     { value: NO_CERT, label: t.create.machineCard.noCert },
                     ...SAFETY_CERTIFICATES.map((c) => ({ value: c, label: t.options.safetyCert[c] })),
@@ -96,7 +107,8 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
                     })
                   }
                 />
-              </CanvasField>
+                {overlayDot("safety_certificates")}
+              </div>
               {overrides.safetyCerts.includes("other") && (
                 <TextInput
                   value={overrides.safetyCertsOther}
@@ -107,68 +119,69 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
               )}
             </div>
 
-            <div className="w-[34%] max-w-[120px]">
-              <CanvasField
-                label={t.create.machineCard.quantity}
-                source={prov.itemSource("quantity", item.quantity, "quantity", true)}
-                missing={gapFor("quantity")}
-                shake={shake("quantity")}
+            {/* The prototype's inline −/×N/+ chip rather than the boxed Stepper, which is too tall
+                to sit on the panel without covering the machine. */}
+            <div className="flex flex-none items-center gap-2.5 rounded-lg bg-[#12263acc] px-2 py-1.5 text-[12px] text-white shadow-[0_2px_8px_rgba(0,0,0,.25)]">
+              <button
+                type="button"
+                aria-label={`${t.create.machineCard.quantity} −`}
+                disabled={item.quantity <= 1}
+                onClick={() => set("quantity", { quantity: Math.max(1, item.quantity - 1) })}
+                className="px-1 disabled:opacity-40"
               >
-                <Stepper value={item.quantity} min={1} onChange={(v) => set("quantity", { quantity: v })} />
-              </CanvasField>
+                −
+              </button>
+              <span className="tabular-nums">×{item.quantity}</span>
+              <button
+                type="button"
+                aria-label={`${t.create.machineCard.quantity} +`}
+                onClick={() => set("quantity", { quantity: item.quantity + 1 })}
+                className="px-1"
+              >
+                +
+              </button>
             </div>
           </div>
 
-          <div className="absolute inset-x-3 bottom-3 flex items-end justify-between gap-2">
-            <div className="w-[46%] max-w-[160px]">
-              <CanvasField
+          {/* Bottom row: fuel on the left, minimum year on the right. */}
+          <div className="absolute inset-x-2.5 bottom-2.5 flex items-end justify-between gap-2">
+            <div className="min-w-0 max-w-[46%]">
+              <SearchSelect
+                value={item.fuelType}
+                placeholder={t.create.machineCard.fuel}
+                searchPlaceholder={t.create.machineCard.fuel}
                 label={t.create.machineCard.fuel}
-                source={prov.itemSource("fuel_type", item.fuelType, "fuelType", true)}
-                missing={gapFor("fuel_type")}
-                shake={shake("fuel_type")}
-              >
-                <SearchSelect
-                  value={item.fuelType}
-                  placeholder={t.create.machineCard.fuel}
-                  searchPlaceholder={t.create.machineCard.fuel}
-                  label={t.create.machineCard.fuel}
-                  options={FUEL_TYPES.map((f) => ({ value: f, label: t.options.fuelType[f] }))}
-                  onChange={(v) => set("fuel_type", { fuelType: v as FuelType })}
-                />
-              </CanvasField>
+                tone="overlay"
+                prefix={t.create.machineCard.fuel}
+                options={FUEL_TYPES.map((f) => ({ value: f, label: t.options.fuelType[f] }))}
+                onChange={(v) => set("fuel_type", { fuelType: v as FuelType })}
+              />
             </div>
-            <div className="w-[50%] max-w-[180px]">
-              <CanvasField
+            <div className="flex min-w-0 max-w-[48%] items-center gap-1.5">
+              {overlayDot("equipment_year")}
+              <SearchSelect
+                value={overrides.equipmentYear ?? "any"}
+                placeholder={t.create.machineCard.anyYear}
+                searchPlaceholder={t.create.machineCard.minYear}
                 label={t.create.machineCard.minYear}
-                missing={gapFor("equipment_year")}
-                shake={shake("equipment_year")}
-                source={prov.itemSource("equipment_year", overrides.equipmentYear, "equipmentYear")}
-              >
-                <SearchSelect
-                  value={overrides.equipmentYear ?? "any"}
-                  placeholder={t.create.machineCard.anyYear}
-                  searchPlaceholder={t.create.machineCard.minYear}
-                  label={t.create.machineCard.minYear}
-                  options={EQUIPMENT_YEARS.map((y) => ({
-                    value: y,
-                    label: y === "any" ? t.create.machineCard.anyYear : y,
-                  }))}
-                  onChange={(v) => set("equipment_year", { equipmentYear: v })}
-                />
-              </CanvasField>
+                tone={overrides.equipmentYear ? "overlay" : "brand"}
+                options={EQUIPMENT_YEARS.map((y) => ({ value: y, label: y === "any" ? t.create.machineCard.anyYear : y }))}
+                onChange={(v) => set("equipment_year", { equipmentYear: v })}
+              />
             </div>
           </div>
         </div>
 
-        {/* ---------------- Taxonomy, logistics, attachments, notes ---------------- */}
+        {/* ---------------- Right column: three boxes, 16px apart ---------------- */}
         <div className="flex min-w-0 flex-col gap-4">
           {notAvailable ? (
-            <UnavailableCard item={item} label={rawDisplay} />
+            <UnavailableCard item={item} label={item.rawLabel ?? tax.subtypeName ?? ""} />
           ) : (
-            <div className="grid gap-3 rounded-[10px] border border-warn/40 bg-warn/[0.06] p-3 sm:grid-cols-3">
-              {/* Category is derived from the taxonomy ref, never typed. */}
+            /* The amber-tinted taxonomy trio, at the prototype's minmax columns. */
+            <div className="grid gap-2.5 rounded-[10px] border border-[#f5c98f] bg-[#fff9f0] p-3 sm:grid-cols-[minmax(88px,0.7fr)_minmax(140px,2fr)_minmax(104px,1.1fr)]">
               <CanvasField
                 label={t.create.machineCard.category}
+                amber
                 missing={gapFor("category")}
                 shake={shake("category")}
                 source={prov.itemSource("category", item.ref.categoryId, "ref")}
@@ -187,6 +200,7 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
               </CanvasField>
               <CanvasField
                 label={t.create.machineCard.type}
+                amber
                 missing={gapFor("subtype")}
                 shake={shake("subtype")}
                 source={prov.itemSource("subtype", item.ref.subcategoryId)}
@@ -206,6 +220,7 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
               </CanvasField>
               <CanvasField
                 label={t.create.machineCard.size}
+                amber
                 missing={gapFor("capacity")}
                 shake={shake("capacity")}
                 source={prov.itemSource("capacity", item.ref.measurementId)}
@@ -226,14 +241,10 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
             </div>
           )}
 
-          {/* Delivery and return are required by the app; fuel responsibility is not (MREQ-AC-09/11).
-              Each choice names the obligation rather than the party — "We collect" answers the
-              question that "Me" only labels. */}
-          <div className="grid gap-3.5 rounded-[10px] bg-surface2 p-3.5 sm:grid-cols-3">
-            <div className="sm:col-span-2">
-              <div className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.05em] text-muted">
-                {t.create.machineCard.logistics}
-              </div>
+          {/* Logistics: the prototype's 2fr / 1fr — the two haulage legs together, fuel on its own. */}
+          <div className="grid gap-3.5 sm:grid-cols-[2fr_1fr]">
+            <div className="min-w-0 rounded-[10px] bg-surface2 p-3.5">
+              <div className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.05em] text-muted">{t.create.machineCard.logistics}</div>
               <div className="grid gap-3.5 sm:grid-cols-2">
                 <CanvasField
                   label={t.create.machineCard.delivery}
@@ -241,13 +252,10 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
                   shake={shake("delivery")}
                   source={prov.itemSource("delivery", overrides.delivery, "deliveryOverride", true)}
                 >
-                  <Pchips<Party>
+                  <ChoiceRow<Party>
                     value={overrides.delivery}
                     onChange={(v) => set("delivery", { deliveryOverride: v })}
-                    options={PARTIES.map((p) => ({
-                      value: p,
-                      label: p === "supplier" ? t.create.party.supplier : t.create.party.weCollect,
-                    }))}
+                    options={partyOptions(t.create.party.weCollect)}
                   />
                 </CanvasField>
                 <CanvasField
@@ -256,34 +264,31 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
                   shake={shake("return")}
                   source={prov.itemSource("return", overrides.returnFromSite, "returnOverride", true)}
                 >
-                  <Pchips<Party>
+                  <ChoiceRow<Party>
                     value={overrides.returnFromSite}
                     onChange={(v) => set("return", { returnOverride: v })}
-                    options={PARTIES.map((p) => ({
-                      value: p,
-                      label: p === "supplier" ? t.create.party.supplier : t.create.party.weReturn,
-                    }))}
+                    options={partyOptions(t.create.party.weReturn)}
                   />
                 </CanvasField>
               </div>
             </div>
-            {/* The label carries the fuel type, so "We pay" is unambiguous about what is being paid for. */}
-            <CanvasField
-              label={fmt(t.create.machineCard.fuelResponsibility, { fuel: t.options.fuelType[item.fuelType].toLowerCase() })}
-              source={prov.itemSource("fuel_responsibility", overrides.fuelResponsibility, "fuelResponsibilityOverride", true)}
-            >
-              <Pchips<Party>
-                value={overrides.fuelResponsibility}
-                onChange={(v) => set("fuel_responsibility", { fuelResponsibilityOverride: v })}
-                options={PARTIES.map((p) => ({
-                  value: p,
-                  label: p === "supplier" ? t.create.party.supplier : t.create.party.wePay,
-                }))}
-              />
-            </CanvasField>
+            {/* The label carries the fuel type, so "We pay" is unambiguous about what is paid for. */}
+            <div className="min-w-0 rounded-[10px] bg-surface2 p-3.5">
+              <CanvasField
+                label={fmt(t.create.machineCard.fuelResponsibility, { fuel: t.options.fuelType[item.fuelType].toLowerCase() })}
+                source={prov.itemSource("fuel_responsibility", overrides.fuelResponsibility, "fuelResponsibilityOverride", true)}
+              >
+                <ChoiceRow<Party>
+                  value={overrides.fuelResponsibility}
+                  onChange={(v) => set("fuel_responsibility", { fuelResponsibilityOverride: v })}
+                  options={partyOptions(t.create.party.wePay)}
+                />
+              </CanvasField>
+            </div>
           </div>
 
-          <div className="flex flex-col gap-3.5 rounded-[10px] bg-surface2 p-3.5">
+          {/* Attachment, work type and notes — one box, as the prototype has them. */}
+          <div className="flex w-full flex-col gap-2.5 rounded-[10px] bg-surface2 p-3.5">
             {/* Hidden entirely when this subtype has no admin-defined attachments (MREQ-AC-22). */}
             {attachments.hasOptions && (
               <CanvasField
@@ -291,7 +296,7 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
                 optional
                 source={prov.itemSource("attachments", item.attachmentIds, "attachmentIds")}
               >
-                <SelChips<string> values={attachments.selected} onToggle={attachments.toggle} options={attachments.options} />
+                <ChoiceChips<string> values={attachments.selected} onToggle={attachments.toggle} options={attachments.options} />
               </CanvasField>
             )}
 
@@ -310,7 +315,7 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
             <CanvasField label={t.create.machineCard.notes} optional>
               <TextArea
                 value={item.additionalNotes}
-                rows={3}
+                rows={4}
                 placeholder={t.create.machineCard.notesPlaceholder}
                 onChange={(e) => actions.patchItem(item.id, { additionalNotes: e.target.value })}
               />

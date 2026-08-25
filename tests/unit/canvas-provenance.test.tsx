@@ -14,6 +14,15 @@ import { confirmedProject, makeAgentDraft, makeItem, renderCanvas } from "../set
  * badge that silently stops rendering is a real regression with no other symptom.
  */
 
+/** Answer the minimum-year control through the UI, the way a renter would. */
+async function pickYear(handle: Awaited<ReturnType<typeof card>>) {
+  screen.getByRole("combobox", { name: "MINIMUM YEAR" }).click();
+  await Promise.resolve();
+  const listbox = screen.getByRole("listbox", { name: "MINIMUM YEAR" });
+  listbox.querySelectorAll<HTMLButtonElement>("[role=option]")[0].click();
+  void handle;
+}
+
 const card = (opts: Parameters<typeof renderCanvas>[1] = {}) =>
   renderCanvas(
     (store) => {
@@ -33,21 +42,39 @@ describe("provenance badges (MREQ-AC-57/58/59)", () => {
   });
 
   it("marks what the agent chose", async () => {
-    // The agent supplied a year, so it still equals the snapshot and reads as the agent's.
-    await card({ draft: makeAgentDraft({ items: [makeItem({ equipmentYear: "2018+" })] }) });
+    // The agent supplied the haulage legs, so they still equal the snapshot and read as its choice.
+    await card({ draft: makeAgentDraft({ items: [makeItem({ deliveryOverride: "supplier", returnOverride: "supplier" })] }) });
     expect(screen.getAllByText("AI selected").length).toBeGreaterThan(0);
   });
 
   it("clears the mark once the renter answers, and records the field", async () => {
-    const handle = await card({ draft: makeAgentDraft({ items: [makeItem({ equipmentYear: "2018+" })] }) });
+    const handle = await card({ draft: makeAgentDraft({ items: [makeItem({ deliveryOverride: "supplier" })] }) });
     const before = screen.getAllByText("AI selected").length;
 
     await handle.run(() => {
-      handle.store().actions.touchField("line_items[a0].equipment_year");
+      handle.store().actions.touchField("line_items[a0].delivery");
     });
 
-    expect(screen.getAllByText("AI selected").length).toBe(before - 1);
-    expect(handle.store().state.draft!.touchedFields).toContain("line_items[a0].equipment_year");
+    // queryAll, not getAll: the whole point is that the count can reach zero.
+    expect(screen.queryAllByText("AI selected").length).toBe(before - 1);
+    expect(handle.store().state.draft!.touchedFields).toContain("line_items[a0].delivery");
+  });
+
+  /**
+   * The four controls on the machine panel carry no visible label and no note — the prototype colours
+   * the chip instead: amber while the renter has not answered, dark once they have. On a photo a
+   * small amber caption would be unreadable, so the colour IS the mark there.
+   */
+  it("marks the panel overlays by colour rather than by a note", async () => {
+    const handle = await card();
+    const year = screen.getByRole("combobox", { name: "MINIMUM YEAR" });
+    const cert = screen.getByRole("combobox", { name: "CERTIFICATE" });
+    expect(year.className).toContain("#c9660f");
+    expect(cert.className).toContain("#c9660f");
+
+    await handle.run(() => pickYear(handle));
+
+    expect(screen.getByRole("combobox", { name: "MINIMUM YEAR" }).className).toContain("#12263acc");
   });
 
   it("never blocks on its own (MREQ-AC-61)", async () => {
