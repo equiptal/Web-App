@@ -1268,6 +1268,9 @@ export const en = {
     tabCards: "Cards",
     tabCompare: "Compare",
     download: "Download",
+    // Puts every benched bid back on the comparison — and therefore back in the export, which covers
+    // what the comparison covers. Named with its count so the renter knows what he is bringing back.
+    selectAll: "Select all ({n} off)",
     // The source filter. "Via app" is a bid placed through Moedatech; "Offline" is one that arrived
     // through the share link or was typed in by the renter.
     source: "Source",
@@ -1448,6 +1451,22 @@ export const en = {
       default: "Default",
       renter: "changed by you",
     },
+    /**
+     * Who does what, said as the thing they'd actually do.
+     *
+     * The shared `options.party` pair is "Supplier / Me", which is fine in a table column and poor on
+     * a control: "Me" next to FUEL RESPONSIBILITY does not tell a renter whether they are supplying
+     * the diesel or paying for it. Each choice names the obligation instead, so the answer is legible
+     * without the label. `options.party` is untouched — the bid form, deal room and the review table
+     * still read it, and their columns want the short form.
+     */
+    party: {
+      supplier: "Supplier",
+      weCollect: "We collect",
+      weReturn: "We return",
+      wePay: "We pay",
+      weCover: "We cover",
+    },
     machineCard: {
       category: "CATEGORY",
       type: "TYPE",
@@ -1461,9 +1480,10 @@ export const en = {
       noCert: "No certificate",
       certOther: "Name the certificate",
       quantity: "QUANTITY",
-      delivery: "DELIVERY TO SITE",
-      returnFromSite: "RETURN FROM SITE",
-      fuelResponsibility: "FUEL RESPONSIBILITY",
+      logistics: "LOGISTICS",
+      delivery: "To site — mobilisation",
+      returnFromSite: "From site — demobilisation",
+      fuelResponsibility: "Fuel — {fuel}",
       attachment: "ATTACHMENT",
       workType: "WORK TYPE",
       workTypePlaceholder: "What will it lift?",

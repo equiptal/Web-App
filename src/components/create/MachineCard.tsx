@@ -220,40 +220,59 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
             </div>
           )}
 
-          {/* Delivery / return are required by the app; fuel responsibility is not (MREQ-AC-09/11). */}
+          {/* Delivery and return are required by the app; fuel responsibility is not (MREQ-AC-09/11).
+              Each choice names the obligation rather than the party — "We collect" answers the
+              question that "Me" only labels. */}
           <div className="grid gap-3.5 rounded-[10px] bg-surface2 p-3.5 sm:grid-cols-3">
+            <div className="sm:col-span-2">
+              <div className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.05em] text-muted">
+                {t.create.machineCard.logistics}
+              </div>
+              <div className="grid gap-3.5 sm:grid-cols-2">
+                <CanvasField
+                  label={t.create.machineCard.delivery}
+                  missing={gapFor("delivery")}
+                  shake={shake("delivery")}
+                  source={prov.itemSource("delivery", overrides.delivery, "deliveryOverride", true)}
+                >
+                  <Pchips<Party>
+                    value={overrides.delivery}
+                    onChange={(v) => set("delivery", { deliveryOverride: v })}
+                    options={PARTIES.map((p) => ({
+                      value: p,
+                      label: p === "supplier" ? t.create.party.supplier : t.create.party.weCollect,
+                    }))}
+                  />
+                </CanvasField>
+                <CanvasField
+                  label={t.create.machineCard.returnFromSite}
+                  missing={gapFor("return")}
+                  shake={shake("return")}
+                  source={prov.itemSource("return", overrides.returnFromSite, "returnOverride", true)}
+                >
+                  <Pchips<Party>
+                    value={overrides.returnFromSite}
+                    onChange={(v) => set("return", { returnOverride: v })}
+                    options={PARTIES.map((p) => ({
+                      value: p,
+                      label: p === "supplier" ? t.create.party.supplier : t.create.party.weReturn,
+                    }))}
+                  />
+                </CanvasField>
+              </div>
+            </div>
+            {/* The label carries the fuel type, so "We pay" is unambiguous about what is being paid for. */}
             <CanvasField
-              label={t.create.machineCard.delivery}
-              missing={gapFor("delivery")}
-              shake={shake("delivery")}
-              source={prov.itemSource("delivery", overrides.delivery, "deliveryOverride", true)}
-            >
-              <Pchips<Party>
-                value={overrides.delivery}
-                onChange={(v) => set("delivery", { deliveryOverride: v })}
-                options={PARTIES.map((p) => ({ value: p, label: t.options.party[p] }))}
-              />
-            </CanvasField>
-            <CanvasField
-              label={t.create.machineCard.returnFromSite}
-              missing={gapFor("return")}
-              shake={shake("return")}
-              source={prov.itemSource("return", overrides.returnFromSite, "returnOverride", true)}
-            >
-              <Pchips<Party>
-                value={overrides.returnFromSite}
-                onChange={(v) => set("return", { returnOverride: v })}
-                options={PARTIES.map((p) => ({ value: p, label: t.options.party[p] }))}
-              />
-            </CanvasField>
-            <CanvasField
-              label={t.create.machineCard.fuelResponsibility}
+              label={fmt(t.create.machineCard.fuelResponsibility, { fuel: t.options.fuelType[item.fuelType].toLowerCase() })}
               source={prov.itemSource("fuel_responsibility", overrides.fuelResponsibility, "fuelResponsibilityOverride", true)}
             >
               <Pchips<Party>
                 value={overrides.fuelResponsibility}
                 onChange={(v) => set("fuel_responsibility", { fuelResponsibilityOverride: v })}
-                options={PARTIES.map((p) => ({ value: p, label: t.options.party[p] }))}
+                options={PARTIES.map((p) => ({
+                  value: p,
+                  label: p === "supplier" ? t.create.party.supplier : t.create.party.wePay,
+                }))}
               />
             </CanvasField>
           </div>

@@ -6,7 +6,7 @@
 | **Status** | Draft |
 | **Author** | yfa245 |
 | **Created** | 2026-08-25 |
-| **Layers** | web |
+| **Layers** | web · agents-backend (one additive field, §7.1) |
 | **Links** | Prototype: `Machine Request Standalone.html` (Claude Design bundle, unpacked to a `x-dc` template + state class). Baseline behaviour: `docs/request-experience-flow.md`. |
 
 > Acceptance IDs in this document are namespaced `MREQ-AC-NN`. They are local to this
@@ -208,6 +208,14 @@ browser locale and is not ours to control.
 | `create.when.nudgeBoth` | Suppliers quote lower when they don't know your dates. Add a start and end date to get better bids. | يقدّم الموردون أسعاراً أفضل عندما يعرفون تواريخك. أضف تاريخ البداية والنهاية للحصول على عروض أفضل. |
 | `create.when.nudgeEnd` | Suppliers quote lower when they don't know your end date. Add one to get better bids. | يقدّم الموردون أسعاراً أفضل عندما يعرفون تاريخ الانتهاء. أضفه للحصول على عروض أفضل. |
 | `create.when.nudgeStart` | Suppliers quote lower when they don't know your start date. Add one to get better bids. | يقدّم الموردون أسعاراً أفضل عندما يعرفون تاريخ البداية. أضفه للحصول على عروض أفضل. |
+| `create.machineCard.delivery` | To site — mobilisation | إلى الموقع — التوصيل |
+| `create.machineCard.returnFromSite` | From site — demobilisation | من الموقع — الإرجاع |
+| `create.machineCard.fuelResponsibility` | Fuel — {fuel} | الوقود — {fuel} |
+| `create.party.supplier` | Supplier | المورّد |
+| `create.party.weCollect` | We collect | نستلمها |
+| `create.party.weReturn` | We return | نعيدها |
+| `create.party.wePay` | We pay | ندفع |
+| `create.party.weCover` | We cover | نتكفّل |
 | `create.provenance.agent` | AI selected | اختاره الذكاء الاصطناعي |
 | `create.provenance.default` | Default | افتراضي |
 | `create.provenance.renter` | changed by you | غيّرته بنفسك |
@@ -226,7 +234,33 @@ browser locale and is not ours to control.
 
 ## 7. Backend contract — implement in `Moedatech-App`
 
-**Nothing to implement.** This feature is web-only.
+### 7.1 Equipment images on the taxonomy — one endpoint change, no migration
+
+The canvas has a machine panel and no machine picture, so it renders the taxonomy icon. The data to
+do better already exists and is simply not served.
+
+- **Owning app:** `apps/backend-agents`
+- **The column exists.** `equipment_taxonomy.image_key` — `EquipmentTaxonomy.imageKey`,
+  `String? @db.VarChar(500)` (`apps/backend/prisma/schema.prisma:1037`). **No new column, no
+  migration, no admin work** if images are already being uploaded against it.
+- **The plumbing exists too.** `getBidForm.ts:93` already selects `imageKey` alongside `name` /
+  `nameAr` and converts it with the same key→public-URL helper the rest of the handler uses
+  (`imageUrl: toUrl(sub?.imageKey)`, line 134).
+- **The gap:** `getTaxonomy.ts` (lines 47–56) does not include `imageKey` in its `select`, and its
+  node mapping (lines 61–71) therefore cannot emit it. `GET /agents/taxonomy` returns
+  `id · level · name · name_ar · parent_id · aliases · tag · sort_order · visibility` and nothing else.
+- **Change:** add `imageKey: true` to the select, and `image_url: toUrl(n.imageKey)` to each node.
+  Additive — every existing consumer ignores an unknown field.
+- **Backward compatibility:** the flat node list is the "unchanged Mansour contract (§3.3)" per that
+  handler's own comment, so the addition should be confirmed against Mansour before it lands.
+
+**Web side, once served:** add `image_url` to `TaxonomyNode` (`contract/app.ts`), carry it through
+`nodesToTree` (`app-adapters.ts`) onto `Category` / `Subcategory`, and render it in `MachineCard` with
+the taxonomy icon as the fallback for nodes that have no image.
+
+### 7.2 Everything else — nothing to implement
+
+The rest of this feature is web-only.
 
 Stated explicitly so a backend session reading this document does not go looking:
 
@@ -296,6 +330,8 @@ Stated explicitly so a backend session reading this document does not go looking
 | MREQ-AC-50 | web | **Given** `?mode=trial` **Then** the trial ribbon renders above the canvas on every panel and the request submits with `isTrial: true`. |
 | MREQ-AC-51 | web | **Given** locale `ar` **Then** every canvas string resolves from `ar.ts`, the layout mirrors RTL, the operator rail collapses to the inline-end edge, and every figure renders in Arabic-Indic digits via `toArabicIndic` — matching the existing convention, not Latin numerals. |
 | MREQ-AC-52 | web | **Given** the taxonomy or attachment fetch fails **Then** the affected control renders empty and disabled rather than throwing, and the rest of the canvas stays usable. |
+| MREQ-AC-62 | web | **Given** a party choice on the canvas **Then** the renter's side names the obligation — "We collect" for mobilisation, "We return" for demobilisation, "We pay" for fuel, "We cover" for food and accommodation — and never the bare "Me"; the shared `options.party` vocabulary is unchanged for the bid form, deal room and review table. |
+| MREQ-AC-63 | web | **Given** the fuel responsibility control **Then** its label names the item's fuel type ("Fuel — diesel"), so the choice states what is being paid for. |
 | MREQ-AC-53 | web | **Given** delivery or return is unset **Then** the "Me" pill renders visibly selected with the "Default" badge, and the submitted `mobilizationByRentee` / `demobilizationByRentee` match that shown selection — the `?? "me"` fallback in `app-adapters.ts` is retained but is never invisible to the renter. |
 | MREQ-AC-54 | web | **Given** an item whose year or certificate the renter has not touched **Then** an amber dot renders on that control and advancing is blocked, even when the agent prefilled a value. |
 | MREQ-AC-55 | web | **Given** the renter picks "Any year" or "No certificate" **Then** the gate is satisfied and the submitted payload is identical to today's unset case — `equipmentYear` maps to `null` via `yearOut()`, safety certificates map to an empty list. |
@@ -358,9 +394,13 @@ Stated explicitly so a backend session reading this document does not go looking
 | 3 | The prototype's "Open in Excel" sat beside the equipment table; the existing export produces CSV, not xlsx. Keep the CSV wording, or is a real spreadsheet format wanted? | MREQ-AC-45 wording only | product |
 | 4 | Equipment certificates are now per-item only. `project.certificates.safetyOther` (the request-wide free-text cert) consequently has no editor. Retire it, or surface it somewhere on the review screen? | none — globalization still works | product |
 | 5 | The app requires `startDate`; this spec keeps it optional on the web (MREQ-AC-10). Should the app be relaxed to match, or the web tightened later, so the two stop diverging? | none today | product |
+| 6 | "We cover" is used for BOTH food and accommodation & transport (MREQ-AC-62). The three terms the owner specified — We collect / We return / We pay — each name a distinct act; food and accommodation have no equally natural verb. Confirm the wording or supply better. | MREQ-AC-62 wording only | product |
+| 7 | Are equipment images actually populated against `equipment_taxonomy.image_key` today, and at which level (category, subtype, or both)? §7.1 is a two-line change only if the images already exist; otherwise it is also an admin upload exercise. | §7.1 | product / admin |
 
 ## 11. Changelog
 
 | Date | Change |
 |---|---|
 | 2026-08-25 | Spec created. |
+| 2026-08-25 | Party choices renamed to name the obligation (We collect / We return / We pay / We cover); fuel label carries the fuel type. MREQ-AC-62/63. |
+| 2026-08-25 | §7.1 added: `equipment_taxonomy.image_key` already exists and is already served by the bid-form handler; `getTaxonomy` just does not select it. |

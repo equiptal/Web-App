@@ -78,7 +78,7 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
           <Pchips<Party>
             value={op.fatFood}
             onChange={(v) => setOp("fat_food", { fatFood: v })}
-            options={PARTIES.map((p) => ({ value: p, label: t.options.party[p] }))}
+            options={PARTIES.map((p) => ({ value: p, label: p === "supplier" ? t.create.party.supplier : t.create.party.weCover }))}
           />
         </CanvasField>
         {/* One control writes both halves — the app models accommodation and transport as a single
@@ -90,7 +90,7 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
           <Pchips<Party>
             value={op.fatAccommodationTransport}
             onChange={(v) => setOp("fat_accommodation", { fatAccommodationTransport: v })}
-            options={PARTIES.map((p) => ({ value: p, label: t.options.party[p] }))}
+            options={PARTIES.map((p) => ({ value: p, label: p === "supplier" ? t.create.party.supplier : t.create.party.weCover }))}
           />
         </CanvasField>
       </div>
