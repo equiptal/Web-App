@@ -1119,6 +1119,10 @@ export const ar: Dictionary = {
     noBidsYet: "لا عروض على هذا البند بعد",
     reviewEquipment: "مراجعة المعدّات",
     viewDocuments: "عرض المستندات",
+    ribbonConfirmed: "مؤكّد",
+    ribbonUnconfirmed: "غير مؤكّد",
+    availabilityConfirmed: "التوفّر مؤكّد",
+    availabilityNotChecked: "لم يتم التحقق من التوفّر",
     // شروط الطلب نفسه، شارات على الشريط بجانب البند الذي تصفه. كانت حبيسة اللوحة الجانبية، فكان على
     // المستأجر أن يفتح لوحة ليتذكّر ما طلبه وهو يقرأ ما يُعرض عليه.
     chipStarts: "يبدأ {date}",
@@ -1129,8 +1133,6 @@ export const ar: Dictionary = {
     tabCards: "البطاقات",
     tabCompare: "المقارنة",
     download: "تنزيل",
-    exportComparison: "تصدير المقارنة",
-    exportAllBids: "تصدير كل العروض",
     // يعيد كل عرض مُنحّى إلى المقارنة — وبالتالي إلى التصدير، فالتصدير يغطّي ما تغطّيه المقارنة.
     selectAll: "تحديد الكل ({n} خارجها)",
     source: "المصدر",
@@ -1219,6 +1221,11 @@ export const ar: Dictionary = {
     groupTerms: "الشروط",
     openCost: "إظهار أعمدة التكلفة",
     openTerms: "إظهار أعمدة الشروط",
+    openTotals: "إظهار الإجماليات",
+    hideGroup: "طيّ هذه المجموعة",
+    hideColumn: "طيّ هذا العمود",
+    showColumn: "إظهار هذا العمود",
+    sourceOfflineShort: "خارج التطبيق · أضفته",
     termYes: "نعم",
     termNo: "لا",
     checkAvailability: "تحقّق من التوفّر",

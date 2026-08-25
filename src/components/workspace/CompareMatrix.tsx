@@ -21,30 +21,25 @@ import type { TermRow } from "@/lib/contract/bids";
  * A single all-in figure would hide exactly the difference a renter is here to find — free delivery
  * looks dear beside a 6,500 charge until the second month arrives.
  *
- * ── The shape is the prototype's (owner, 2026-08-25: "match the prototype exactly") ──────────────
- * A fixed 180px supplier column on the inline-start edge, then ONE group of columns open at a time;
- * the others stand as 44px vertical rails you press to swap to. It replaced a single wide HTML table
- * whose fourteen columns had to be scrolled past each other — the rails are what let a renter read
- * the money and the terms at the same width, and a rail can carry a full-height merged cell, which a
- * `<table>` cannot span across its own header.
+ * ── Everything folds, and folds independently (owner's reference, 2026-08-25) ─────────────────────
+ * A fixed supplier column on the inline-start edge, then four groups — PER CYCLE, GRAND TOTAL, TERMS,
+ * EQUIPMENT — each of which can stand on its edge as a rail, and, inside the money groups, each
+ * COLUMN can fold to a rail of its own. That is what lets fourteen columns be read on one screen
+ * without scrolling them past each other: the renter keeps what he is comparing and folds the rest.
+ * An earlier cut let only one group be open at a time, which meant he could never see the rate and
+ * the grand total together — the one comparison the page exists for.
  *
- * Geometry is fixed and shared: every header block is 72px and every data row is 52px including its
- * hairline. That is what keeps a row's name in line with its figures when the groups have different
- * numbers of header rows.
+ * Geometry is fixed and shared: every header block is 72px and every data row 52px including its
+ * hairline, so a supplier's name stays in line with his figures across groups whose headers differ.
  *
- * ── One type scale, the app's own (owner, 2026-08-25: "same font size, style, colours") ───────────
- * 11px uppercase for every label, 13px for a term's answer, 15px for a figure, 10px for its currency
- * — and nothing below 9px. The first cut had eight sizes between 6.5px and 16px, and a table whose
- * labels are smaller than any other label in the product reads as a different product.
+ * Type is the app's own scale: 11px uppercase labels, 13px answers, 15px figures, 10px currency.
  */
 
-/** The three column groups. Exactly one of the first two is open; availability is always a rail — it
- *  opens the map rather than a group of columns. */
-type GroupKey = "cost" | "terms" | "equipment";
+/** The four groups. `equipment` never opens here — it is a door to the map (see `openEquipment`). */
+type GroupKey = "cycle" | "totals" | "terms" | "equipment";
 
-/** The money columns the table can be ordered by. Terms are not among them: they are answers, not
- *  amounts, and there is no order to put "didn't say" in. */
-type SortKey = "rate" | "mob" | "demob" | "firstCycle" | "everyCycle" | "duration";
+/** The money columns: sortable, foldable, and the only ones with an amount to order by. */
+type ColKey = "rate" | "mob" | "demob" | "firstCycle" | "everyCycle" | "duration";
 
 /** One term column: which keys answer it, and whether the renter set it or the supplier volunteered it. */
 const YOU_SET: { label: (t: Dict) => string; keys: string[] }[] = [
@@ -59,8 +54,9 @@ const THEY_OFFERED: { label: (t: Dict) => string; keys: string[] }[] = [
 ];
 
 type Dict = ReturnType<typeof useT>;
+type LFn = (en: string, arr: string) => string;
 
-/** Row height, and the header block above it. Both are shared by every group, so the rows line up. */
+const ROW_PX = 52;
 const ROW = "h-[52px] flex-none box-border border-b border-border";
 const HEAD = "h-[36px] flex-none box-border border-b border-border";
 
@@ -101,23 +97,41 @@ export function CompareMatrix({
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
+  const L: LFn = (en, arr) => (ar ? arr : en);
   const router = useRouter();
 
-  /** Which group of columns is open. Cost first: it is the question the renter came with. */
-  const [section, setSection] = useState<Exclude<GroupKey, "equipment">>("cost");
+  /** Folded groups. The money opens on the money: the two cost groups, and terms on request. */
+  const [shut, setShut] = useState<Set<GroupKey>>(() => new Set<GroupKey>(["terms"]));
+  /** Folded money columns, inside an open group. */
+  const [shutCols, setShutCols] = useState<Set<ColKey>>(new Set());
   const [popover, setPopover] = useState<"first" | "after" | "duration" | null>(null);
+
+  const toggleGroup = (k: GroupKey) =>
+    setShut((s) => {
+      const next = new Set(s);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  const toggleCol = (k: ColKey) =>
+    setShutCols((s) => {
+      const next = new Set(s);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
 
   /**
    * ── Which money column orders the table (owner, 2026-08-25) ──────────────────────────────────
    *
-   * The default is FIRST CYCLE ascending, which is the prototype's own: every money header there
+   * The default is FIRST CYCLE ascending, which is the reference's own: every money header there
    * carries «↕» except that one, which carries «▲», and its rows follow it. It is also the honest
    * default — cheapest to start is the figure a renter reads first, and the fact that cheapest to
    * FINISH is often a different supplier is exactly what one press on another column reveals.
    */
-  const [sortKey, setSortKey] = useState<SortKey>("firstCycle");
+  const [sortKey, setSortKey] = useState<ColKey>("firstCycle");
   const [sortDir, setSortDir] = useState<1 | -1>(1);
-  const sortBy = (k: SortKey) => {
+  const sortBy = (k: ColKey) => {
     if (k === sortKey) setSortDir((d) => (d === 1 ? -1 : 1));
     else {
       setSortKey(k);
@@ -195,12 +209,12 @@ export function CompareMatrix({
   }
 
   /**
-   * Where the locked EQUIPMENT rail goes (owner, 2026-08-25).
+   * Where the EQUIPMENT rail goes.
    *
-   * Availability is not a column here: it is a machine-by-machine question, and the map already
-   * answers it in full — pins, papers, the yard a lessor confirmed. So the rail is a door rather
-   * than a group, and it opens on the row the renter is reading; with nothing picked it opens on the
-   * first row, which is the one the ordering put in front of him.
+   * Availability is not a column: it is a machine-by-machine question, and the map already answers it
+   * in full — pins, papers, the yard a lessor confirmed. So the rail is a door, and it opens on the
+   * row the renter is reading; with nothing picked it opens on the first row, which is the one the
+   * ordering put in front of him.
    */
   const equipmentTarget = rows.find((b) => b.card.id === selectedId) ?? rows[0] ?? null;
   const openEquipment = () => {
@@ -208,11 +222,78 @@ export function CompareMatrix({
     router.push(`/bids/${encodeURIComponent(equipmentTarget.card.id)}/equipment`);
   };
 
+  /** The money columns, in the order they read. The duration one exists only if the request has one. */
+  const cycleCols: MoneyCol[] = [
+    { key: "rate", label: t.workspace.colRate, value: (b) => b.card.price, win: lowRate },
+    { key: "mob", label: t.priceFooter.mobilisation, value: (b) => (b.card.mobExcluded ? null : b.card.mobPrice), excluded: (b) => !!b.card.mobExcluded },
+    { key: "demob", label: t.priceFooter.demobilisation, value: (b) => (b.card.demobExcluded ? null : b.card.demobPrice), excluded: (b) => !!b.card.demobExcluded },
+  ];
+  const totalCols: MoneyCol[] = [
+    { key: "firstCycle", label: t.workspace.firstCycle, value: (b) => totals.get(b.card.id)?.firstCycle.total ?? null, win: lowFirst, vat: true, info: "first" },
+    { key: "everyCycle", label: t.workspace.everyCycleAfter, value: (b) => totals.get(b.card.id)?.everyCycleAfter?.total ?? null, win: lowAfter, vat: true, info: "after" },
+    ...(durationDays
+      ? [{
+          key: "duration" as ColKey,
+          label: t.workspace.overDays.replace("{n}", String(durationDays)),
+          value: (b: WorkspaceBid) => totals.get(b.card.id)?.duration?.total ?? null,
+          win: lowDuration,
+          vat: true,
+          info: "duration" as const,
+        }]
+      : []),
+  ];
+
+  /**
+   * A money group, laid out as a row of COLUMN STACKS rather than a stack of rows.
+   *
+   * Each column owns its header and its own cells, which is what lets a single column fold to a rail
+   * that runs the full height of the table — a row-first layout would have to leave a gap in every
+   * row and stack the rail's label across them.
+   */
+  const moneyGroup = (key: GroupKey, label: string, cols: MoneyCol[], tinted?: boolean) => (
+    <div className={`flex min-w-0 flex-[3_1_0] flex-col border-s border-border ${tinted ? "" : ""}`}>
+      <GroupBand label={label} onFold={() => toggleGroup(key)} tinted={tinted} />
+      <div className="flex flex-1">
+        {cols.map((c) =>
+          shutCols.has(c.key) ? (
+            <ColRail key={c.key} label={c.label} hint={t.workspace.showColumn} onClick={() => toggleCol(c.key)} />
+          ) : (
+            <div key={c.key} className="flex min-w-0 flex-1 flex-col border-e border-border last:border-e-0">
+              <MoneyHead
+                col={c}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={sortBy}
+                onFold={() => toggleCol(c.key)}
+                onInfo={c.info ? () => setPopover((p) => (p === c.info ? null : c.info!)) : undefined}
+                popover={
+                  c.info && popover === c.info ? (
+                    <BuildPopover which={c.info} totals={pickTotals(totals, selectedId, rows)} onClose={() => setPopover(null)} />
+                  ) : null
+                }
+              />
+              {rows.map((b) => (
+                <Money
+                  key={b.card.id}
+                  v={c.value(b)}
+                  win={!!c.win?.has(b.card.id)}
+                  vat={c.vat}
+                  excluded={c.excluded?.(b)}
+                  picked={b.card.id === selectedId}
+                />
+              ))}
+            </div>
+          ),
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div>
-      <div className="flex items-stretch">
-        {/* ── The suppliers, fixed on the inline-start edge ── */}
-        <div className="w-[180px] flex-none border-e border-border/70">
+      <div className="flex items-stretch overflow-x-auto">
+        {/* ── The suppliers, on the inline-start edge ── */}
+        <div className="w-[185px] flex-none border-e border-border">
           <div className="box-border flex h-[72px] items-end border-b border-border bg-surface2/60 px-3 pb-2">
             <span className="flex min-w-0 items-baseline gap-1.5">
               <span className="flex-none text-[11px] font-extrabold uppercase tracking-wide text-muted">
@@ -241,13 +322,13 @@ export function CompareMatrix({
                 <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-navy text-[11px] font-bold text-white">
                   {initials(b.card.supplierName)}
                 </span>
-                <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate text-[13px] font-extrabold leading-tight text-navy">{b.card.supplierName}</span>
                   <span className={`truncate text-[11px] font-semibold leading-none ${recommended ? "text-ok" : "text-muted"}`}>
                     {recommended
                       ? `★ ${t.workspace.recommended}`
                       : b.source === "offline"
-                        ? t.workspace.sourceOfflineLong
+                        ? t.workspace.sourceOfflineShort
                         : b.card.dealRoomId
                           ? t.workspace.inNegotiation
                           : t.workspace.awaitingReply}
@@ -271,92 +352,27 @@ export function CompareMatrix({
           })}
         </div>
 
-        {/* ── The money ── */}
-        {section === "cost" ? (
-          <div className="flex min-w-0 flex-[6_1_0] flex-col">
-            <div className={`${HEAD} flex items-stretch bg-surface2/60`}>
-              <Band label={t.workspace.perCycle} grow={3} />
-              <Band label={t.workspace.grandTotal} grow={durationDays ? 3 : 2} tinted />
-            </div>
-            <div className={`${HEAD} relative flex bg-surface/60`}>
-              <MoneyHead label={t.workspace.colRate} sort="rate" sortKey={sortKey} sortDir={sortDir} onSort={sortBy} />
-              <MoneyHead label={t.priceFooter.mobilisation} sort="mob" sortKey={sortKey} sortDir={sortDir} onSort={sortBy} />
-              <MoneyHead label={t.priceFooter.demobilisation} sort="demob" sortKey={sortKey} sortDir={sortDir} onSort={sortBy} />
-              <MoneyHead
-                label={t.workspace.firstCycle}
-                sort="firstCycle"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={sortBy}
-                info
-                onInfo={() => setPopover((p) => (p === "first" ? null : "first"))}
-                popover={
-                  popover === "first" ? (
-                    <BuildPopover which="first" totals={pickTotals(totals, selectedId, rows)} onClose={() => setPopover(null)} />
-                  ) : null
-                }
-              />
-              <MoneyHead
-                label={t.workspace.everyCycleAfter}
-                sort="everyCycle"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={sortBy}
-                info
-                onInfo={() => setPopover((p) => (p === "after" ? null : "after"))}
-                popover={
-                  popover === "after" ? (
-                    <BuildPopover which="after" totals={pickTotals(totals, selectedId, rows)} onClose={() => setPopover(null)} />
-                  ) : null
-                }
-              />
-              {durationDays ? (
-                <MoneyHead
-                  label={t.workspace.overDays.replace("{n}", String(durationDays))}
-                  sort="duration"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={sortBy}
-                  info
-                  onInfo={() => setPopover((p) => (p === "duration" ? null : "duration"))}
-                  popover={
-                    popover === "duration" ? (
-                      <BuildPopover which="duration" totals={pickTotals(totals, selectedId, rows)} onClose={() => setPopover(null)} />
-                    ) : null
-                  }
-                />
-              ) : null}
-            </div>
-
-            {rows.map((b) => {
-              const tot = totals.get(b.card.id);
-              const picked = b.card.id === selectedId;
-              return (
-                <div key={b.card.id} className={`${ROW} flex ${picked ? "bg-brand-soft/25" : ""}`}>
-                  <Money v={b.card.price} win={lowRate.has(b.card.id)} />
-                  <Money v={b.card.mobExcluded ? null : b.card.mobPrice} excluded={b.card.mobExcluded} win={false} />
-                  <Money v={b.card.demobExcluded ? null : b.card.demobPrice} excluded={b.card.demobExcluded} win={false} />
-                  <Money v={tot?.firstCycle.total ?? null} win={lowFirst.has(b.card.id)} vat />
-                  <Money v={tot?.everyCycleAfter?.total ?? null} win={lowAfter.has(b.card.id)} vat />
-                  {durationDays ? <Money v={tot?.duration?.total ?? null} win={lowDuration.has(b.card.id)} vat /> : null}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <Rail label={t.workspace.groupCost} hint={t.workspace.openCost} onClick={() => setSection("cost")} />
-        )}
+        {/* ── The money: what recurs, then what it comes to ── */}
+        {shut.has("cycle")
+          ? <GroupRail label={t.workspace.perCycle} hint={t.workspace.openCost} onClick={() => toggleGroup("cycle")} glyph="dot" />
+          : moneyGroup("cycle", t.workspace.perCycle, cycleCols)}
+        {shut.has("totals")
+          ? <GroupRail label={t.workspace.grandTotal} hint={t.workspace.openTotals} onClick={() => toggleGroup("totals")} glyph="dot" />
+          : moneyGroup("totals", t.workspace.grandTotal, totalCols, true)}
 
         {/* ── The terms: what the renter asked for, then what suppliers volunteered ── */}
-        {section === "terms" ? (
-          <div className="flex min-w-0 flex-[6_1_0] flex-col overflow-hidden">
+        {shut.has("terms") ? (
+          <GroupRail label={t.workspace.groupTerms} hint={t.workspace.openTerms} onClick={() => toggleGroup("terms")} glyph="square" />
+        ) : (
+          <div className="flex min-w-0 flex-[6_1_0] flex-col overflow-hidden border-s border-border">
             <div className={`${HEAD} flex items-stretch bg-surface2/60`}>
-              <div className="flex min-w-0 flex-[2] items-center px-3">
+              <div className="flex min-w-0 flex-[2] items-center gap-1.5 px-3">
                 <span className="truncate text-[11px] font-extrabold uppercase tracking-wide text-navy-mid">
                   {t.workspace.termsYouSet}
                 </span>
+                <FoldButton onClick={() => toggleGroup("terms")} hint={t.workspace.hideGroup} />
               </div>
-              <div className="flex min-w-0 flex-[4] items-center justify-center gap-2.5 border-s border-border/70 bg-surface3/50 px-3">
+              <div className="flex min-w-0 flex-[4] items-center justify-center gap-2.5 border-s border-border bg-surface3/50 px-3">
                 <span className="flex-none text-[11px] font-extrabold uppercase tracking-wide text-navy-mid">
                   {t.workspace.theyOffered}
                 </span>
@@ -374,33 +390,36 @@ export function CompareMatrix({
             </div>
             <div className="flex flex-1">
               {YOU_SET.map((col) => (
-                <TermColumn key={col.keys[0]} label={col.label(t)} keys={col.keys} rows={rows} selectedId={selectedId} ar={ar} asked />
+                <TermColumn key={col.keys[0]} label={col.label(t)} keys={col.keys} rows={rows} selectedId={selectedId} ar={ar} L={L} asked />
               ))}
               {THEY_OFFERED.map((col) => (
-                <TermColumn key={col.keys[0]} label={col.label(t)} keys={col.keys} rows={rows} selectedId={selectedId} ar={ar} />
+                <TermColumn key={col.keys[0]} label={col.label(t)} keys={col.keys} rows={rows} selectedId={selectedId} ar={ar} L={L} />
               ))}
             </div>
           </div>
-        ) : (
-          <Rail label={t.workspace.groupTerms} hint={t.workspace.openTerms} onClick={() => setSection("terms")} />
         )}
 
-        {/* ── Availability: a door to the map, not a column (owner, 2026-08-25) ──────────────────
-            No padlock. The rail is not guarding anything — it opens the picked bid's machines on the
-            map, where availability is answered in full — and a lock says «you may not», which is the
-            one thing it does not mean. */}
-        <Rail
-          label={t.workspace.colAvailability}
-          hint={t.workspace.checkAvailability}
+        {/* ── Equipment: the one rail that leaves the page ── */}
+        <button
+          type="button"
           onClick={openEquipment}
           disabled={!equipmentTarget}
-          leaves
-        />
+          title={t.workspace.checkAvailability}
+          aria-label={t.workspace.checkAvailability}
+          className="flex w-11 flex-none flex-col items-center justify-center gap-2.5 overflow-hidden border-s border-brand/25 bg-brand-soft transition hover:bg-brand/15 disabled:cursor-default disabled:opacity-50"
+        >
+          <span className="grid h-5 w-5 flex-none place-items-center rounded-full border border-brand/30 bg-surface text-brand">
+            <Icon name="lock" size={11} />
+          </span>
+          <span className="rotate-180 truncate text-[11px] font-extrabold uppercase tracking-wide text-brand [writing-mode:vertical-rl]">
+            {t.workspace.groupEquipment}
+          </span>
+        </button>
       </div>
 
       {/* The bench: bids that are on this item but not on the comparison. */}
       {bench.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2.5 border-t border-border/70 bg-surface2/40 px-3.5 py-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 border-t border-border bg-surface2/40 px-3.5 py-2.5">
           {bench.map((b) => (
             <button
               key={b.card.id}
@@ -411,8 +430,8 @@ export function CompareMatrix({
               <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface3 text-[10px] font-bold text-muted">
                 {initials(b.card.supplierName)}
               </span>
-              <span className="text-[11.5px] font-bold text-navy-mid">{b.card.supplierName}</span>
-              <span className="text-[12px] font-bold text-brand">+</span>
+              <span className="text-[12px] font-bold text-navy-mid">{b.card.supplierName}</span>
+              <span className="text-[13px] font-bold text-brand">+</span>
             </button>
           ))}
         </div>
@@ -421,12 +440,24 @@ export function CompareMatrix({
   );
 }
 
-/** Two initials at most — the avatar is 26px, and a third letter turns it into a word. */
+/** One money column: its label, where its figure comes from, and who wins it. */
+interface MoneyCol {
+  key: ColKey;
+  label: string;
+  value: (b: WorkspaceBid) => number | null | undefined;
+  win?: Set<string>;
+  vat?: boolean;
+  excluded?: (b: WorkspaceBid) => boolean;
+  info?: "first" | "after" | "duration";
+}
+
+/** Two initials at most — the avatar is 28px, and a third letter turns it into a word. */
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
-  return (parts[0][0] + parts[1][0]).toUpperCase();
+  // «Al Ghadeer Heavy» reads as AG, «Murad alabdullah» as M: a leading particle is not a name.
+  if (parts.length > 1 && parts[0].length <= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return parts[0].slice(0, 1).toUpperCase();
 }
 
 /** Whose totals the ⓘ panels explain: the picked row, else the first one on the table. */
@@ -434,87 +465,94 @@ function pickTotals(totals: Map<string, CycleTotals>, selectedId: string | null,
   return (selectedId ? totals.get(selectedId) : null) ?? totals.get(rows[0].card.id)!;
 }
 
-/** A group band — the word above a run of columns. */
-function Band({ label, grow, tinted }: { label: string; grow: number; tinted?: boolean }) {
+/** The word above a group of columns, and the control that folds the group away. */
+function GroupBand({ label, onFold, tinted }: { label: string; onFold: () => void; tinted?: boolean }) {
+  const t = useT();
   return (
-    <div
-      style={{ flexGrow: grow, flexBasis: 0 }}
-      className={`flex min-w-0 items-center justify-center px-3 ${tinted ? "border-s border-border/70 bg-surface3/50" : ""}`}
-    >
+    <div className={`${HEAD} flex items-center justify-center gap-1.5 px-3 ${tinted ? "bg-surface3/50" : "bg-surface2/60"}`}>
       <span className="truncate text-[11px] font-extrabold uppercase tracking-wide text-navy-mid">{label}</span>
+      <FoldButton onClick={onFold} hint={t.workspace.hideGroup} />
     </div>
+  );
+}
+
+/** The «»» beside a label: press it and that group or column stands on its edge. */
+function FoldButton({ onClick, hint }: { onClick: () => void; hint: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={hint}
+      aria-label={hint}
+      className="flex-none rounded px-1 text-[11px] font-bold leading-none text-muted/70 transition hover:bg-surface3 hover:text-navy-mid rtl:scale-x-[-1]"
+    >
+      »
+    </button>
   );
 }
 
 /**
  * One money column's header.
  *
- * The LABEL is the control — the whole word is the target, not a 13px glyph beside it, which is the
- * difference between a sortable table and a table with arrows on it. The arrow states the current
- * direction on the sorted column and sits neutral on the others, so a reader can see at a glance
- * both that the table is ordered and what it is ordered by.
+ * The LABEL is the sort control — the whole word is the target, not a 9px glyph beside it, which is
+ * the difference between a sortable table and a table with arrows on it. The arrow states the current
+ * direction on the sorted column and sits neutral on the others.
  */
 function MoneyHead({
-  label,
-  sort,
+  col,
   sortKey,
   sortDir,
   onSort,
-  info,
+  onFold,
   onInfo,
   popover,
 }: {
-  label: string;
-  sort: SortKey;
-  sortKey: SortKey;
+  col: MoneyCol;
+  sortKey: ColKey;
   sortDir: 1 | -1;
-  onSort: (k: SortKey) => void;
-  info?: boolean;
+  onSort: (k: ColKey) => void;
+  onFold: () => void;
   onInfo?: () => void;
   popover?: React.ReactNode;
 }) {
-  const on = sort === sortKey;
+  const t = useT();
+  const on = col.key === sortKey;
   return (
     <div
-      className="relative flex min-w-0 flex-1 items-center justify-center gap-1.5 border-e border-border/70 px-2.5 last:border-e-0"
+      className={`${HEAD} relative flex items-center justify-center gap-1.5 px-2`}
       aria-sort={on ? (sortDir === 1 ? "ascending" : "descending") : undefined}
     >
-      <button
-        type="button"
-        onClick={() => onSort(sort)}
-        className="flex min-w-0 items-center justify-center gap-1.5"
-      >
-        <span
-          className={`truncate text-[11px] font-bold uppercase leading-tight tracking-wide ${on ? "text-navy" : "text-muted"}`}
-        >
-          {label}
+      <button type="button" onClick={() => onSort(col.key)} className="flex min-w-0 items-center justify-center gap-1.5">
+        <span className={`truncate text-[11px] font-bold uppercase leading-tight tracking-wide ${on ? "text-navy" : "text-muted"}`}>
+          {col.label}
         </span>
         <span aria-hidden="true" className={`flex-none text-[9px] font-bold ${on ? "text-brand" : "text-muted/50"}`}>
           {on ? (sortDir === 1 ? "▲" : "▼") : "↕"}
         </span>
       </button>
-      {info && (
+      {onInfo && (
         <button
           type="button"
           onClick={onInfo}
-          aria-label={label}
+          aria-label={col.label}
           className="grid h-4 w-4 flex-none place-items-center rounded-full border border-brand/40 bg-brand-soft text-[10px] font-extrabold text-brand"
         >
           i
         </button>
       )}
+      <FoldButton onClick={onFold} hint={t.workspace.hideColumn} />
       {popover}
     </div>
   );
 }
 
-/** One figure. Winners carry the green ground; the three totals carry «with VAT» under them. */
-function Money({ v, win, vat, excluded }: { v: number | null | undefined; win: boolean; vat?: boolean; excluded?: boolean | null }) {
+/** One figure. Winners carry the green ground; the totals carry «with VAT» under them. */
+function Money({ v, win, vat, excluded, picked }: { v: number | null | undefined; win: boolean; vat?: boolean; excluded?: boolean | null; picked?: boolean }) {
   const t = useT();
   return (
     <div
-      className={`relative flex min-w-0 flex-1 items-center justify-center overflow-hidden border-e border-border/70 px-2.5 last:border-e-0 ${
-        win ? "bg-ok-soft/70" : ""
+      className={`${ROW} relative flex items-center justify-center overflow-hidden px-2 ${
+        win ? "bg-ok-soft/70" : picked ? "bg-brand-soft/25" : ""
       }`}
     >
       {v == null ? (
@@ -532,11 +570,7 @@ function Money({ v, win, vat, excluded }: { v: number | null | undefined; win: b
         </span>
       )}
       {vat && v != null && (
-        <span
-          className={`absolute bottom-1 end-2 text-[9px] font-bold uppercase tracking-wide ${
-            win ? "text-ok/70" : "text-muted/70"
-          }`}
-        >
+        <span className={`absolute bottom-1 end-2 text-[9px] font-bold uppercase tracking-wide ${win ? "text-ok/70" : "text-muted/70"}`}>
           {t.workspace.withVat}
         </span>
       )}
@@ -550,9 +584,6 @@ function Money({ v, win, vat, excluded }: { v: number | null | undefined; win: b
  * **The column speaks once when every supplier said the same thing.** Three cells reading «Included»
  * is three readings of one fact; merged, it says the fact and then says that nobody differs — which
  * is the answer a renter is actually looking for on a term he set.
- *
- * A term nobody answered is said out loud rather than left blank: a blank cell reads as "nothing to
- * pay", and an unanswered term is not the same fact.
  */
 function TermColumn({
   label,
@@ -560,6 +591,7 @@ function TermColumn({
   rows,
   selectedId,
   ar,
+  L,
   asked,
 }: {
   label: string;
@@ -567,21 +599,20 @@ function TermColumn({
   rows: WorkspaceBid[];
   selectedId: string | null;
   ar: boolean;
+  L: LFn;
   /** A term the RENTER set: its header carries what he asked for, under the label. */
   asked?: boolean;
 }) {
   const t = useT();
-  const L = (en: string, arr: string) => (ar ? arr : en);
   const answers = rows.map((b) => readTerm(findTerm(b.card, keys), keys[0], ar, t, L));
   const askedFor = asked
     ? rows.map((b) => humanTerm(findTerm(b.card, keys)?.renteeValue ?? null, keys[0], t, L)).find((v): v is string => !!v) ?? null
     : null;
   const first = answers[0];
-  const merged =
-    answers.length > 1 && first.text != null && answers.every((a) => a.text === first.text && !a.against);
+  const merged = answers.length > 1 && first.text != null && answers.every((a) => a.text === first.text && !a.against);
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col border-e border-border/70 last:border-e-0">
+    <div className="flex min-w-0 flex-1 flex-col border-e border-border last:border-e-0">
       <div className={`${HEAD} flex items-center gap-1.5 bg-surface/60 px-3`}>
         <span className="flex-none text-[11px] font-bold uppercase leading-tight tracking-wide text-muted">{label}</span>
         {askedFor && (
@@ -592,10 +623,7 @@ function TermColumn({
       </div>
 
       {merged ? (
-        <div
-          style={{ height: rows.length * 52 }}
-          className="flex flex-none flex-col items-center justify-center gap-1 bg-surface/40 px-3"
-        >
+        <div style={{ height: rows.length * ROW_PX }} className="flex flex-none flex-col items-center justify-center gap-1 bg-surface/40 px-3">
           <span className="text-center text-[13px] font-semibold leading-snug text-muted">{first.text}</span>
           <span className="text-center text-[11px] font-medium leading-snug text-muted/80">
             {t.workspace.sameFromAll.replace("{n}", String(rows.length))}
@@ -608,9 +636,7 @@ function TermColumn({
           return (
             <div
               key={b.card.id}
-              className={`${ROW} flex items-center gap-1.5 px-3 ${
-                a.against ? "bg-danger-soft" : picked ? "bg-brand-soft/25" : ""
-              }`}
+              className={`${ROW} flex items-center gap-1.5 px-3 ${a.against ? "bg-danger-soft" : picked ? "bg-brand-soft/25" : ""}`}
             >
               <span
                 className={`truncate text-[13px] leading-snug ${
@@ -631,24 +657,17 @@ function TermColumn({
  * A term as the supplier answered it, and whether it goes against what the renter asked.
  *
  * ── The value is READ, never printed raw (owner, 2026-08-25) ────────────────────────────────────
- * The wire says `NO`, `supplier`, `net_0`; the table was printing exactly that, so a renter
- * comparing offers was reading the database. Three passes, in order:
- *
- * 1. `termValueLabel` — the app's own vocabularies (responsibility, SLA, rental type …), keyed by the
- *    term key, so «supplier» becomes «Supplier» in the same words the deal room uses;
- * 2. the create flow's own option labels for payment (`net_30` → «Net 30»), matched on the hyphenated
- *    spelling the picker uses;
- * 3. a last tidy — YES/NO become Yes/No, and anything left has its underscores opened and its first
- *    letter raised, which is right for the free text and the numbers that make up the rest.
- *
- * Nothing is invented: a value this cannot name comes back tidied, not translated.
+ * The wire says `NO`, `supplier`, `net_0`; the table was printing exactly that, so a renter comparing
+ * offers was reading the database. Three passes, in order: the app's own vocabularies keyed by the
+ * term; the create flow's payment labels; then a last tidy for yes/no and underscores. A value none
+ * of them can name comes back tidied, not invented.
  */
-function readTerm(row: TermRow | null, key: string, ar: boolean, t: Dict, L: (en: string, arr: string) => string): { text: string | null; against: boolean } {
+function readTerm(row: TermRow | null, key: string, ar: boolean, t: Dict, L: LFn): { text: string | null; against: boolean } {
   const raw = row?.value ?? (row?.detail ? (ar ? row.detail.ar : row.detail.en) : null) ?? row?.renteeValue ?? null;
   return { text: humanTerm(raw, row?.key ?? key, t, L), against: !!row && row.state === "conflict" };
 }
 
-function humanTerm(raw: string | null, key: string, t: Dict, L: (en: string, arr: string) => string): string | null {
+function humanTerm(raw: string | null, key: string, t: Dict, L: LFn): string | null {
   const v = (raw ?? "").trim();
   if (!v) return null;
 
@@ -663,50 +682,58 @@ function humanTerm(raw: string | null, key: string, t: Dict, L: (en: string, arr
   if (token === "yes" || token === "true") return t.workspace.termYes;
   if (token === "no" || token === "false") return t.workspace.termNo;
 
-  // Nothing named it: open the separators and raise the first letter. «net_0» → «Net 0».
   const opened = v.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
   return opened.charAt(0).toUpperCase() + opened.slice(1);
 }
 
 /**
- * A closed group, standing on its edge — press it to swap it for the open one.
+ * A folded GROUP, standing on its edge — press it to bring the columns back.
  *
- * **Every rail looks the same and reads as a control** (owner, 2026-08-25): the brand-soft ground the
- * availability rail already had, a chevron so the press is visible before you hover, and a hover that
- * moves. A grey rail beside an orange one read as furniture beside a button when both do the same
- * thing.
- *
- * The label is ONE word and the sentence lives in `title`. A long vertical label is what forced the
- * table taller than its own rows — the rail cannot fit «EQUIPMENT · CHECK AVAILABILITY» in the height
- * of two bids, so it stretched the whole card and left a field of empty white under the last row.
+ * Neutral surface, as the reference draws it: these rails hold what the table itself is made of, and
+ * the one coloured rail on the row is the one that leaves the page. The glyph is the group's own mark
+ * so two folded rails are told apart at a glance without reading them sideways.
  */
-function Rail({
+function GroupRail({
   label,
   hint,
   onClick,
-  disabled,
-  leaves,
+  glyph,
 }: {
   label: string;
   hint: string;
   onClick: () => void;
-  disabled?: boolean;
-  /** This rail goes somewhere else rather than opening in place — it says so with an arrow. */
-  leaves?: boolean;
+  glyph: "dot" | "square";
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
       title={hint}
       aria-label={hint}
-      className="group flex w-11 flex-none flex-col items-center justify-center gap-2 overflow-hidden border-s border-brand/20 bg-brand-soft transition hover:bg-brand/15 disabled:cursor-default disabled:opacity-50"
+      className="group flex w-11 flex-none flex-col items-center justify-center gap-2.5 overflow-hidden border-s border-border bg-surface2/70 transition hover:bg-surface3"
     >
-      <span aria-hidden="true" className="flex-none text-[11px] font-bold leading-none text-brand rtl:scale-x-[-1]">
-        {leaves ? "→" : "‹"}
+      <span
+        aria-hidden="true"
+        className={`h-1.5 w-1.5 flex-none bg-muted/60 transition group-hover:bg-navy-mid ${glyph === "dot" ? "rounded-full" : "rounded-[1px]"}`}
+      />
+      <span className="rotate-180 truncate text-[11px] font-extrabold uppercase tracking-wide text-navy-mid [writing-mode:vertical-rl]">
+        {label}
       </span>
-      <span className="rotate-180 truncate text-[11px] font-extrabold uppercase tracking-wide text-brand [writing-mode:vertical-rl]">
+    </button>
+  );
+}
+
+/** A folded COLUMN, inside an open group. Narrower than a group rail, and lighter. */
+function ColRail({ label, hint, onClick }: { label: string; hint: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={hint}
+      aria-label={`${label} — ${hint}`}
+      className="flex w-8 flex-none items-center justify-center overflow-hidden border-e border-border bg-surface2/40 transition last:border-e-0 hover:bg-surface3/70"
+    >
+      <span className="rotate-180 truncate text-[10px] font-bold uppercase tracking-wide text-muted [writing-mode:vertical-rl]">
         {label}
       </span>
     </button>
@@ -734,10 +761,10 @@ function BuildPopover({ which, totals, onClose }: { which: "first" | "after" | "
   return (
     <>
       <div className="fixed inset-0 z-30" onClick={onClose} />
-      <div className="absolute end-0 top-[34px] z-40 flex w-[246px] flex-col gap-2 rounded-[11px] border border-border bg-surface px-3.5 py-3 text-start shadow-[0_14px_34px_rgba(19,44,74,.16)]">
+      <div className="absolute end-0 top-[34px] z-40 flex w-[250px] flex-col gap-2 rounded-[11px] border border-border bg-surface px-3.5 py-3 text-start shadow-[0_14px_34px_rgba(19,44,74,.16)]">
         <div className="flex items-baseline gap-2.5">
           <span className="flex-1 text-[11px] font-extrabold uppercase tracking-wide text-muted">{heading}</span>
-          <button type="button" onClick={onClose} aria-label={t.common.cancel} className="text-[11px] font-bold text-border">
+          <button type="button" onClick={onClose} aria-label={t.common.cancel} className="text-[13px] font-bold text-muted/60">
             ✕
           </button>
         </div>

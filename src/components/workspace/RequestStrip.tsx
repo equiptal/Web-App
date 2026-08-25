@@ -6,6 +6,7 @@ import { fmt, useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { publicTaxonomyUrl, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
 import { CERT_LABEL, type BidCard } from "@/lib/contract/bids";
+import { unitAvailability } from "@/lib/contract/bid-map";
 
 /**
  * The dark strip under the rail. Two halves, and they answer different questions.
@@ -30,7 +31,6 @@ export function RequestStrip({
   bidCount,
   onPickItem,
   onOpenRequest,
-  onShare,
 }: {
   group: RequestGroup;
   item: RequestListItem | null;
@@ -39,10 +39,8 @@ export function RequestStrip({
   bid: BidCard | null;
   bidCount: number;
   onPickItem: (itemId: string) => void;
-  /** Opens the request drawer. */
+  /** Opens the request drawer, which is also where sharing lives. */
   onOpenRequest: (() => void) | null;
-  /** Opens the drawer on its share sheet — the same panel, entered at the share. */
-  onShare?: (() => void) | null;
 }) {
   const t = useT();
   const { locale } = useLocale();
@@ -55,6 +53,18 @@ export function RequestStrip({
     : null;
   const itemLabel = item?.item ? (ar ? item.item.nameAr || item.item.name : item.item.name) : "—";
   const photo = publicTaxonomyUrl(item?.item?.imageUrl ?? null);
+
+  // What the supplier put against this item: make and model, as the renter would name it.
+  const offered = bid?.equipment ? [bid.equipment.make, bid.equipment.model].filter(Boolean).join(" ") || null : null;
+  const offeredYear = bid?.equipment?.year ?? null;
+  /**
+   * Has this bid's equipment been placed in a yard the lessor confirmed?
+   *
+   * `unitAvailability`'s rule and no other — the map's pins and the equipment list's chips read the
+   * same function, so a machine cannot be confirmed on one surface and unconfirmed on another.
+   */
+  const units = bid?.offeredUnitsDetail ?? [];
+  const confirmed = units.length > 0 && units.every((u) => unitAvailability(u) === "confirmed");
 
 
   /** The request's own terms, for the chip row below the item name. */
@@ -144,6 +154,8 @@ export function RequestStrip({
             the map that «Check availability» opens. Reading a supplier’s verification here made the
             request line say something about the request that the request never said. */}
         <div className="flex min-w-0 flex-1 flex-col gap-3 rounded-[10px] bg-surface p-2 sm:flex-row sm:items-center sm:gap-3 sm:pe-3">
+          {/* The thumbnail carries the state of the picked machine: a ribbon naming it, and a tick
+              once the supplier has put it in a yard he confirmed. Nothing picked, nothing claimed. */}
           <span className="relative grid h-[46px] w-16 flex-none place-items-center overflow-hidden rounded-[7px] border border-border bg-surface2">
             {photo ? (
               /* eslint-disable-next-line @next/next/no-img-element */
@@ -151,102 +163,107 @@ export function RequestStrip({
             ) : (
               <Icon name="precision_manufacturing" size={20} className="text-muted" />
             )}
+            {bid && (
+              <>
+                <span
+                  className={`absolute inset-x-0 bottom-0 truncate px-1 py-[2px] text-center text-[8px] font-extrabold uppercase tracking-wide text-white ${
+                    confirmed ? "bg-ok/90" : "bg-navy/80"
+                  }`}
+                >
+                  {confirmed ? t.workspace.ribbonConfirmed : t.workspace.ribbonUnconfirmed}
+                </span>
+                {confirmed && (
+                  <span className="absolute -end-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-ok text-white ring-2 ring-surface">
+                    <Icon name="check" size={10} />
+                  </span>
+                )}
+              </>
+            )}
           </span>
 
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-bold leading-[1.3] text-navy">{itemLabel}</div>
+            <div className="truncate text-[13px] font-bold leading-snug text-navy">{itemLabel}</div>
 
-            {/* These facts were drawer-only, which meant the renter had to open a panel to recall
-                what he had asked for while reading what he was being offered. Nothing here is
-                derived — a chip is a requirement, and one invented from `rentalType` would be a
-                claim the request never made. */}
-            {(startsOn || item?.durationDays || certs.length > 0 || unitCount > 1 || withOperator) && (
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                {startsOn && <Chip>{fmt(t.workspace.chipStarts, { date: startsOn })}</Chip>}
-                {item?.durationDays ? (
-                  <Chip tone="duration" lead={t.workspace.factDuration}>
-                    {fmt(t.workspace.chipDuration, { n: String(item.durationDays) })}
-                  </Chip>
-                ) : null}
-                {unitCount > 1 && <Chip>{fmt(t.workspace.unitsCount, { n: String(unitCount) })}</Chip>}
-                {withOperator && <Chip>{t.workspace.chipOperator}</Chip>}
-                {/* The certificates the request REQUIRES — the papers a supplier has to hold to
-                    answer it. Two, then a count, so the row keeps one line on a narrow card; the
-                    drawer lists them in full. */}
-                {certs.slice(0, 2).map((c) => (
-                  <Chip key={c} tone="cert">
-                    {ar ? CERT_LABEL[c].ar : CERT_LABEL[c].en}
-                  </Chip>
-                ))}
-                {certs.length > 2 && (
-                  <span className="text-[10.5px] font-semibold text-muted">
-                    {fmt(t.workspace.chipMore, { n: String(certs.length - 2) })}
+            {bid ? (
+              /* What the picked supplier put against it, and whether the machine behind it has been
+                 checked. Both are HIS answers — the request's own chips take this line back the
+                 moment nothing is picked. */
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <span className="flex-none text-[11px] font-semibold text-muted">
+                  {t.workspace.offers.replace("{supplier}", bid.supplierName)}
+                </span>
+                <span className="flex-none text-[12px] font-extrabold text-navy">
+                  {offered ?? "—"}
+                  {offeredYear ? ` · ${offeredYear}` : ""}
+                </span>
+                {/* `unitAvailability`'s rule and no other — the map's pins and the equipment list's
+                    chips read the same function. An off-platform submission registers no machines at
+                    all, so it says nothing: nobody was ever asked. */}
+                {units.length > 0 && (
+                  <span
+                    className={`rounded-md border px-2 py-[3px] text-[11px] font-semibold ${
+                      confirmed ? "border-ok/25 bg-ok-soft text-ok" : "border-border bg-surface2 text-navy-mid"
+                    }`}
+                  >
+                    {confirmed ? t.workspace.availabilityConfirmed : t.workspace.availabilityNotChecked}
                   </span>
                 )}
               </div>
+            ) : (
+              /* What the REQUEST asks for. Drawer-only until now, which made the renter open a panel
+                 to recall what he had asked for. Nothing here is derived — a chip is a requirement,
+                 and one invented from `rentalType` would be a claim the request never made. */
+              (startsOn || item?.durationDays || certs.length > 0 || unitCount > 1 || withOperator) && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {startsOn && <Chip>{fmt(t.workspace.chipStarts, { date: startsOn })}</Chip>}
+                  {item?.durationDays ? (
+                    <Chip tone="duration" lead={t.workspace.factDuration}>
+                      {fmt(t.workspace.chipDuration, { n: String(item.durationDays) })}
+                    </Chip>
+                  ) : null}
+                  {unitCount > 1 && <Chip>{fmt(t.workspace.unitsCount, { n: String(unitCount) })}</Chip>}
+                  {withOperator && <Chip>{t.workspace.chipOperator}</Chip>}
+                  {/* The certificates the request REQUIRES — the papers a supplier must hold to
+                      answer it. Two, then a count; the drawer lists them in full. */}
+                  {certs.slice(0, 2).map((c) => (
+                    <Chip key={c} tone="cert">
+                      {ar ? CERT_LABEL[c].ar : CERT_LABEL[c].en}
+                    </Chip>
+                  ))}
+                  {certs.length > 2 && (
+                    <span className="text-[11px] font-semibold text-muted">
+                      {fmt(t.workspace.chipMore, { n: String(certs.length - 2) })}
+                    </span>
+                  )}
+                </div>
+              )
             )}
           </div>
 
-          {/* ── The controls, in one column: what to do with the picked bid ── */}
+          {/* ── The two ways into the picked bid (owner's reference, 2026-08-25) ─────────────────
+              «Review equipment» opens the machines on the map, where availability is answered in
+              full; «View documents» opens the same surface on the papers. Both need a bid to point
+              at, so they read as inert until one is picked. */}
           <div className="flex flex-none flex-col gap-1.5">
             <button
               type="button"
               disabled={!bid}
               onClick={() => goEquipment()}
-              className={`whitespace-nowrap rounded-[7px] border px-2.5 py-1.5 text-[11px] font-bold transition ${
-                bid
-                  ? "border-navy bg-navy text-white hover:brightness-110"
-                  : "cursor-default border-border bg-surface2 text-muted"
+              className={`whitespace-nowrap rounded-[7px] px-3 py-2 text-[12px] font-bold transition ${
+                bid ? "bg-navy text-white hover:brightness-110" : "cursor-default bg-surface2 text-muted"
               }`}
             >
-              {bid ? t.workspace.checkAvailability : t.workspace.selectBidFirst}
-            </button>
-            <div className="flex gap-1.5">
-              <button
-                type="button"
-                disabled={!bid}
-                onClick={() => goEquipment("documents")}
-                className={`inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-[7px] border bg-surface2 px-2.5 py-1.5 text-[11px] font-bold transition ${
-                  bid ? "border-border text-navy hover:bg-surface3" : "cursor-default border-border/60 text-muted"
-                }`}
-              >
-                <Icon name="visibility" size={13} /> {t.workspace.viewDocuments}
-              </button>
-              {/* The quotation lives in the deal room, which is where the price it prints was settled;
-                  before there is a room there is no settled figure to issue. */}
-              <button
-                type="button"
-                disabled={!bid?.dealRoomId}
-                title={bid?.dealRoomId ? undefined : t.workspace.quotationNeedsRoom}
-                onClick={() => bid?.dealRoomId && router.push(`/deal-room/${encodeURIComponent(bid.dealRoomId)}`)}
-                className={`inline-flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-[7px] border bg-surface2 px-2.5 py-1.5 text-[11px] font-bold transition ${
-                  bid?.dealRoomId ? "border-border text-navy hover:bg-surface3" : "cursor-default border-border/60 text-muted"
-                }`}
-              >
-                {t.workspace.quotation} ↓
-              </button>
-            </div>
-          </div>
-
-          <div className="hidden h-[34px] w-px flex-none bg-border sm:block" />
-
-          {/* The request itself: the whole of it, and the link that invites more bids onto it. */}
-          <div className="flex flex-none flex-col gap-1.5">
-            <button
-              type="button"
-              onClick={onOpenRequest ?? undefined}
-              disabled={!onOpenRequest}
-              className="whitespace-nowrap rounded-[7px] border border-border bg-surface2 px-2.5 py-1.5 text-[11px] font-bold text-navy transition hover:bg-surface3 disabled:opacity-50"
-            >
-              {t.workspace.fullDetails} ↗
+              {t.workspace.reviewEquipment}
             </button>
             <button
               type="button"
-              onClick={onShare ?? onOpenRequest ?? undefined}
-              disabled={!onShare && !onOpenRequest}
-              className="whitespace-nowrap rounded-[7px] border border-brand/30 bg-brand-soft px-2.5 py-1.5 text-[11px] font-bold text-brand transition hover:brightness-95 disabled:opacity-50"
+              disabled={!bid}
+              onClick={() => goEquipment("documents")}
+              className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[7px] border px-3 py-2 text-[12px] font-bold transition ${
+                bid ? "border-border bg-surface text-navy hover:bg-surface2" : "cursor-default border-border/60 bg-surface2 text-muted"
+              }`}
             >
-              {t.workspace.share}
+              <Icon name="visibility" size={14} /> {t.workspace.viewDocuments}
             </button>
           </div>
         </div>

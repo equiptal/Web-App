@@ -1275,6 +1275,12 @@ export const en = {
     noBidsYet: "No bids on this item yet",
     reviewEquipment: "Review equipment",
     viewDocuments: "View documents",
+    // The picked machine, as the reference shows it: a ribbon on the thumbnail and a chip beside
+    // the model. «Not checked» is the honest state — nobody has confirmed a yard for it yet.
+    ribbonConfirmed: "Confirmed",
+    ribbonUnconfirmed: "Unconfirmed",
+    availabilityConfirmed: "Availability confirmed",
+    availabilityNotChecked: "Availability not checked",
     // The request's own terms, as chips on the strip beside the item they qualify. They were
     // drawer-only, which made the renter open a panel to recall what he had asked for while reading
     // what he was being offered.
@@ -1287,9 +1293,6 @@ export const en = {
     tabCards: "Cards",
     tabCompare: "Compare",
     download: "Download",
-    // The export names what it will contain, which is whichever pane is open.
-    exportComparison: "Export comparison",
-    exportAllBids: "Export all bids",
     // Puts every benched bid back on the comparison — and therefore back in the export, which covers
     // what the comparison covers. Named with its count so the renter knows what he is bringing back.
     selectAll: "Select all ({n} off)",
@@ -1412,6 +1415,13 @@ export const en = {
     // The rails say what pressing them does; the rail itself carries one word.
     openCost: "Show the cost columns",
     openTerms: "Show the terms columns",
+    // The fold controls. A rail says what pressing it brings back.
+    openTotals: "Show the grand totals",
+    hideGroup: "Fold this group away",
+    hideColumn: "Fold this column away",
+    showColumn: "Show this column",
+    // The supplier line under a name in the comparison, where the column is 185px wide.
+    sourceOfflineShort: "Offline · added by you",
     // A yes/no term, said as a word rather than the wire's own YES / NO.
     termYes: "Yes",
     termNo: "No",

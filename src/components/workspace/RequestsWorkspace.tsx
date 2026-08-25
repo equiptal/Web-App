@@ -341,7 +341,6 @@ export function RequestsWorkspace() {
         bidCount={bids.length}
         onPickItem={pickItem}
         onOpenRequest={() => { setDrawerShare(false); setDrawerOpen(true); }}
-        onShare={() => { setDrawerShare(true); setDrawerOpen(true); }}
       />
 
       <div className="mx-3 mt-4 sm:mx-5">
@@ -373,36 +372,6 @@ export function RequestsWorkspace() {
           {/* The same export the comparison workspace had: the renter's own templates, with the
               built-in sheet as the fallback whenever a template cannot be used. Nothing is rebuilt —
               `buildExportPayload` and the dialog are the originals. */}
-          {/* ── The source filter, beside the tabs (owner, 2026-08-25) ────────────────────────────
-              It was a full-width row inside the panel, which pushed the comparison down and put a
-              second horizontal rule above a table that already has two header rows. It narrows both
-              panes, so it belongs to neither — and up here it sits with the other controls that act
-              on the whole pane. It appears only when there is a mix to narrow: with every bid from
-              one source, three buttons offer a choice that changes nothing. */}
-          {counts.app > 0 && counts.offline > 0 && (
-            <div className="mb-[7px] flex items-center gap-0.5 rounded-lg border border-border bg-surface p-0.5">
-              {(
-                [
-                  ["all", t.workspace.sourceAll],
-                  ["app", t.workspace.sourceApp],
-                  ["offline", t.workspace.sourceOffline],
-                ] as [SourceFilter, string][]
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setSource(key)}
-                  aria-current={source === key ? "true" : undefined}
-                  className={`rounded-md px-2.5 py-1 text-[10.5px] font-bold transition ${
-                    source === key ? "bg-navy text-white" : "text-navy-mid hover:bg-surface2"
-                  }`}
-                >
-                  {label}
-                  <span className={source === key ? "text-white/60" : "text-muted"}> {counts[key]}</span>
-                </button>
-              ))}
-            </div>
-          )}
           <div className="mb-[7px] flex items-center gap-2">
             {/* ── «Select all» puts the whole comparison back (owner, 2026-08-25) ─────────────────
                 The export covers what the comparison covers, so putting a bid back on the table is
@@ -424,12 +393,44 @@ export function RequestsWorkspace() {
               onClick={() => setExportOpen(true)}
               className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border bg-surface px-3 py-[7px] text-[10.5px] font-bold text-navy-mid transition hover:border-navy-mid hover:bg-surface2/60 disabled:opacity-40"
             >
-              {tab === "compare" ? t.workspace.exportComparison : t.workspace.exportAllBids} <Icon name="download" size={14} />
+              {t.workspace.download} <Icon name="download" size={14} />
             </button>
           </div>
         </div>
 
         <div className="overflow-hidden rounded-b-[14px] rounded-tr-[14px] border border-border bg-surface shadow-[0_2px_10px_rgba(19,44,74,.07)]">
+          {/* ── Source, above whichever pane is showing (owner's reference, 2026-08-25) ───────────
+              It narrows both panes, so it belongs to neither — and it reads as a quiet row of words
+              rather than a row of pills, because it is a filter over the table, not an action on it.
+              It appears only when there is a mix to narrow: with every bid from one source, three
+              choices that change nothing are furniture. */}
+          {counts.app > 0 && counts.offline > 0 && (
+            <div className="flex flex-wrap items-center gap-4 border-b border-border px-4 py-2.5">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide text-muted">
+                <Icon name="filter_list" size={14} /> {t.workspace.source}
+              </span>
+              {(
+                [
+                  ["all", t.workspace.sourceAll],
+                  ["app", t.workspace.sourceApp],
+                  ["offline", t.workspace.sourceOffline],
+                ] as [SourceFilter, string][]
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSource(key)}
+                  aria-current={source === key ? "true" : undefined}
+                  className={`border-b-2 pb-0.5 text-[12.5px] font-bold transition ${
+                    source === key ? "border-brand text-navy" : "border-transparent text-muted hover:text-navy-mid"
+                  }`}
+                >
+                  {label}
+                  <span className={source === key ? "text-muted" : "text-muted/70"}> {counts[key]}</span>
+                </button>
+              ))}
+            </div>
+          )}
           {tab === "cards" ? (
             <BidCards
               bids={shown}
