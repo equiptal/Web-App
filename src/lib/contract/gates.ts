@@ -25,6 +25,7 @@
 
 import { EquipmentItem, ProjectDetails, RfqDraft } from "./draft";
 import { isCompleteRef } from "./taxonomy";
+import { computeChargedDays } from "./charged-days";
 
 export interface GateResult {
   ok: boolean;
@@ -177,9 +178,19 @@ export function gateWhere(project: ProjectDetails): GateResult {
 export function gateWhen(project: ProjectDetails, chargedDaysUnderstood: boolean): GateResult {
   const reasons: string[] = [];
   if (!project.timing.rentalBasis) reasons.push("gate.chooseRentalBasis");
+  // A window that runs backwards blocks the send (owner, 2026-08-25). The `min` on the end input
+  // stops a PICKED date; this stops a typed or pasted one, and a draft restored from before the
+  // input was constrained. See `computeChargedDays().reversed` for why nothing caught it before.
+  if (computeChargedDays(project.timing).reversed) reasons.push("gate.datesReversed");
   if (!chargedDaysUnderstood) reasons.push("gate.confirmChargedDays");
   return { ok: reasons.length === 0, reasons };
 }
+
+/** Which field each `gateWhen` reason belongs to. Anything unlisted is a charged-days gap. */
+const WHEN_GAP_FIELD: Record<string, string> = {
+  "gate.chooseRentalBasis": "rental_basis",
+  "gate.datesReversed": "dates",
+};
 
 /**
  * Every unmet requirement across the whole draft — the "N things need you" counter (MREQ-AC-12) and
@@ -199,7 +210,7 @@ export function requiredGaps(draft: RfqDraft, chargedDaysUnderstood: boolean): R
     gaps.push({ panel: "where", itemId: null, field: "location", reason: r });
   }
   for (const r of gateWhen(draft.project, chargedDaysUnderstood).reasons) {
-    gaps.push({ panel: "when", itemId: null, field: r === "gate.chooseRentalBasis" ? "rental_basis" : "charged_days", reason: r });
+    gaps.push({ panel: "when", itemId: null, field: WHEN_GAP_FIELD[r] ?? "charged_days", reason: r });
   }
   return gaps;
 }

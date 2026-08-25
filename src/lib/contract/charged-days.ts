@@ -34,6 +34,21 @@ export interface ChargedDays {
   /** Which end is missing, for the nudge (MREQ-AC-10). */
   missing: "none" | "start" | "end" | "both";
   /**
+   * The end date falls BEFORE the start date (owner, 2026-08-25: "how end date can be before start?").
+   *
+   * Nothing used to notice. `durationDaysBetween` ends in `d < 1 ? 1 : d`, so a reversed range came
+   * back as one day — `known` went true, `missing` went "none", the panel turned green and the nudge
+   * stayed quiet. Meanwhile `computeDurationDays` in the app adapter floors the same subtraction and
+   * drops anything under a day, so the REQUEST went out carrying no duration at all. The renter saw a
+   * valid one-day rental; the backend got one it could not price.
+   *
+   * The clamp itself is not touched: `durationDaysBetween` is shared pricing code that the bid form
+   * and the deal room also call, and changing what it returns reaches well past this flow. The
+   * reversal is detected HERE instead, and the figures come back unknown — a window that runs
+   * backwards has no honest day count to report.
+   */
+  reversed: boolean;
+  /**
    * The chosen billing basis needs a longer window than the dates cover (MREQ-AC-36/37). `null` when
    * the basis is fine, or when there are no dates to judge. Carries the DAY count, never a month
    * count — the prototype divided by 30 inside a branch that only ran below 30, so its warning could
@@ -49,9 +64,14 @@ export function computeChargedDays(timing: Pick<TimingHours, "startDate" | "endD
   const { startDate, endDate, rentalBasis } = timing;
   const missing: ChargedDays["missing"] = !startDate && !endDate ? "both" : !startDate ? "start" : !endDate ? "end" : "none";
 
+  // Read the two dates directly rather than asking `durationDaysBetween`, whose clamp would have
+  // already turned the answer into 1 by the time we could look at it.
+  const reversed =
+    !!startDate && !!endDate && Date.parse(`${startDate.slice(0, 10)}T00:00:00Z`) > Date.parse(`${endDate.slice(0, 10)}T00:00:00Z`);
+
   const totalDays = durationDaysBetween(startDate, endDate);
-  if (totalDays == null) {
-    return { known: false, totalDays: 0, fridays: 0, chargedDays: 0, missing, tooShort: null };
+  if (reversed || totalDays == null) {
+    return { known: false, totalDays: 0, fridays: 0, chargedDays: 0, missing, reversed, tooShort: null };
   }
 
   const fridays = countFridays(startDate, totalDays);
@@ -63,5 +83,5 @@ export function computeChargedDays(timing: Pick<TimingHours, "startDate" | "endD
       ? { basis: rentalBasis as Extract<RentalBasis, "weekly" | "monthly">, days: totalDays, needs }
       : null;
 
-  return { known: true, totalDays, fridays, chargedDays, missing, tooShort };
+  return { known: true, totalDays, fridays, chargedDays, missing, reversed, tooShort };
 }

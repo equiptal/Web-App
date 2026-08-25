@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { screen } from "@testing-library/react";
 import { WhenPanel } from "@/components/create/WhenPanel";
 import { confirmedProject, makeAgentDraft, makeItem, renderCanvas } from "../setup/canvas";
+import { gateWhen } from "@/lib/contract/gates";
 
 /**
  * MREQ-TC-21/22/23/24 — the schedule panel, which is where this feature touches money.
@@ -29,25 +30,28 @@ const withTiming = (timing: Partial<ReturnType<typeof confirmedProject>["timing"
 describe("the charged-day figure (MREQ-AC-32/33)", () => {
   it("states 181 calendar days, 26 Fridays and 155 charged for the worked example", async () => {
     await panel();
-    expect(screen.getByText("DAYS YOU'LL BE CHARGED FOR")).toBeTruthy();
     expect(screen.getByText("155")).toBeTruthy();
     expect(
-      screen.getByText(
-        "Your rental runs 181 calendar days. Fridays are not charged, and there are 26 of them, so suppliers price 155 days at 10 hours each.",
-      ),
+      screen.getByText("billable days — 181 calendar days less 26 Fridays, at 10 hours a day, billed monthly"),
     ).toBeTruthy();
   });
 
-  it("states the gap in the acknowledgement, not just the total", async () => {
+  it("names the figure being accepted in the acknowledgement", async () => {
     await panel();
-    // The disclosure is the difference between what was booked and what is paid for.
-    expect(screen.getByText("I understand suppliers will price 155 days, not 181.")).toBeTruthy();
+    expect(screen.getByText("I understand suppliers will quote against 155 billable days")).toBeTruthy();
   });
 
-  it("does not use the old arithmetic phrasing", async () => {
+  /**
+   * This assertion is INVERTED from what it was, and deliberately (owner, 2026-08-25). It used to
+   * forbid «billable days» as jargon and «N calendar days less M Fridays» as arithmetic-rather-than-
+   * a-sentence. The owner has since specified exactly that wording, so the guard that remains is the
+   * one they asked for instead: two lines, and no heading above them.
+   */
+  it("is two lines with no heading over them", async () => {
     await panel();
-    expect(screen.queryByText(/less 26 Fridays/)).toBeNull();
-    expect(screen.queryByText(/billable days/i)).toBeNull();
+    expect(screen.queryByText("DAYS YOU'LL BE CHARGED FOR")).toBeNull();
+    expect(screen.getByText(/^billable days —/)).toBeTruthy();
+    expect(screen.getByText(/^I understand suppliers will quote against/)).toBeTruthy();
   });
 
   it("re-asks the acknowledgement when the figure changes (MREQ-AC-05)", async () => {
@@ -58,6 +62,38 @@ describe("the charged-day figure (MREQ-AC-32/33)", () => {
     // A new end date is a new number, so the previous acceptance no longer refers to anything.
     await handle.run(() => handle.store().actions.patchTiming({ endDate: "2027-03-08" }));
     expect(handle.store().state.chargedDaysUnderstood).toBe(false);
+  });
+});
+
+/**
+ * An end date before the start date used to pass everything (owner, 2026-08-25). `durationDaysBetween`
+ * ends in `d < 1 ? 1 : d`, so the reversed window came back as ONE day: the figure printed, the panel
+ * turned green, the nudge stayed quiet — while the adapter that builds the payload floors the same
+ * subtraction and dropped the duration entirely, so the request went out with none.
+ */
+describe("with the end date before the start date", () => {
+  const backwards = { startDate: "2026-09-10", endDate: "2026-09-03" };
+
+  it("withholds the figure instead of reporting one day", async () => {
+    await panel({ draft: withTiming(backwards) });
+    expect(screen.queryByText(/billable days —/)).toBeNull();
+    expect(screen.getAllByText("The end date is before the start date. Fix the dates to see billable days.").length).toBeGreaterThan(0);
+  });
+
+  it("blocks the send even once the acknowledgement is ticked", async () => {
+    const handle = await panel({ draft: withTiming(backwards) });
+    await handle.run(() => handle.store().actions.setChargedDaysUnderstood(true));
+    const gate = gateWhen(handle.store().state.draft!.project, true);
+    expect(gate.ok).toBe(false);
+    expect(gate.reasons).toContain("gate.datesReversed");
+  });
+
+  it("bounds each date input by the other, so the picker cannot offer one", async () => {
+    await panel({ draft: withTiming({ startDate: "2026-09-10", endDate: null }) });
+    const dates = screen.getAllByDisplayValue("2026-09-10")[0] as HTMLInputElement;
+    expect(dates.max).toBe("");
+    const ends = document.querySelectorAll<HTMLInputElement>('input[type="date"]');
+    expect(ends[1].min).toBe("2026-09-10");
   });
 });
 
@@ -152,6 +188,6 @@ describe("hours and overtime (MREQ-AC-37)", () => {
 
     expect(handle.store().state.draft!.project.timing.hoursPerDay).toBe(12);
     expect(handle.store().state.chargedDaysUnderstood).toBe(false);
-    expect(screen.getByText(/so suppliers price 155 days at 12 hours each/)).toBeTruthy();
+    expect(screen.getByText(/at 12 hours a day/)).toBeTruthy();
   });
 });

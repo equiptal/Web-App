@@ -1589,14 +1589,17 @@ export const en = {
       hours: "HOURS A DAY",
       hoursStandard: "KSA STANDARD",
       overtime: "OVERTIME RATE",
-      // MREQ-AC-33/34 — the charged-day disclosure. "Billable days" was jargon and the old
-      // "N calendar days less M Fridays" read as arithmetic rather than a sentence.
-      chargedLabel: "DAYS YOU'LL BE CHARGED FOR",
-      chargedExplain:
-        "Your rental runs {total} calendar days. Fridays are not charged, and there are {fridays} of them, so suppliers price {charged} days at {hours} hours each.",
+      // MREQ-AC-33/34 — the charged-day disclosure, in TWO LINES (owner, 2026-08-25): the count and
+      // its arithmetic on one, the acknowledgement on the next. The uppercase title above it is gone
+      // — the sentence names the number, so a heading only made the block taller.
+      // `chargedLine` follows the count, which is rendered beside it at 20px.
+      chargedLine: "billable days — {total} calendar days less {fridays} Fridays, at {hours} hours a day",
+      chargedLineBasis: "billable days — {total} calendar days less {fridays} Fridays, at {hours} hours a day, billed {basis}",
       chargedNoDates: "Add a start and end date and we'll show exactly how many days you'll be charged for. Fridays are never charged.",
-      confirmCharged: "I understand suppliers will price {charged} days, not {total}.",
+      confirmCharged: "I understand suppliers will quote against {charged} billable days",
       confirmChargedNoDates: "I understand suppliers will price without a fixed end date.",
+      // Shown in place of the count when the window runs backwards, which used to read as «1 day».
+      datesReversed: "The end date is before the start date. Fix the dates to see billable days.",
       tooShortMonthly: "Your dates cover {days} days. Monthly billing usually needs 30 days or more.",
       tooShortWeekly: "Your dates cover {days} days. Weekly billing usually needs 7 days or more.",
       nudgeBoth: "Suppliers quote lower when they don't know your dates. Add a start and end date to get better bids.",

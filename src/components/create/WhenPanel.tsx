@@ -105,8 +105,12 @@ export function WhenPanel({
                 <div className="flex items-center gap-3">
                   <label className="flex-1 rounded-[10px] border border-border bg-surface px-3.5 py-2.5">
                     <span className="mb-1 block text-[11px] font-bold tracking-wide text-muted">{t.create.whenPanel.startDate}</span>
+                    {/* Each end bounds the other, so the PICKER cannot offer a backwards window
+                        (owner, 2026-08-25). A typed or pasted date still can, which is what the
+                        reversal message below and the `gate.datesReversed` gap are for. */}
                     <input
                       type="date"
+                      max={timing.endDate ?? undefined}
                       value={timing.startDate ?? ""}
                       onChange={(e) => setTiming({ startDate: e.target.value || null }, "timing.start_date")}
                       className="w-full bg-transparent text-[15px] font-bold text-navy outline-none"
@@ -117,6 +121,7 @@ export function WhenPanel({
                     <span className="mb-1 block text-[11px] font-bold tracking-wide text-muted">{t.create.whenPanel.endDate}</span>
                     <input
                       type="date"
+                      min={timing.startDate ?? undefined}
                       value={timing.endDate ?? ""}
                       onChange={(e) => setTiming({ endDate: e.target.value || null }, "timing.end_date")}
                       className="w-full bg-transparent text-[15px] font-bold text-navy outline-none"
@@ -131,6 +136,14 @@ export function WhenPanel({
                 <p className="mt-3.5 flex items-start gap-2 rounded-lg border border-warn/40 bg-warn/[0.08] px-3.5 py-2.5 text-[13px] font-semibold leading-snug text-navy">
                   <Icon name="info" size={15} className="mt-px flex-none text-warn" />
                   {nudge}
+                </p>
+              )}
+              {/* A backwards window is an ERROR, not a nudge: it blocks the send, where a missing end
+                  date only costs a better bid. Said here, beside the two fields that caused it. */}
+              {charged.reversed && (
+                <p className="mt-3.5 flex items-start gap-2 rounded-lg border border-danger/40 bg-danger/[0.08] px-3.5 py-2.5 text-[13px] font-semibold leading-snug text-navy">
+                  <Icon name="error" size={15} className="mt-px flex-none text-danger" />
+                  {t.create.whenPanel.datesReversed}
                 </p>
               )}
               {charged.known && (
@@ -173,23 +186,29 @@ export function WhenPanel({
               )}
 
               {/* ---- The charged-day disclosure and its acknowledgement. ---- */}
+              {/* TWO LINES and no heading (owner, 2026-08-25). The count leads its own sentence, so
+                  «DAYS YOU'LL BE CHARGED FOR» above it was the same fact twice and a third line of
+                  height. The number sits at 20px beside the text rather than above it, so the
+                  sentence wraps under itself and not under the figure. */}
               <div className="mt-4 border-t border-border pt-4">
-                {charged.known && (
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-brand">{t.create.whenPanel.chargedLabel}</span>
-                    <span className="text-[20px] font-extrabold text-navy">{num(charged.chargedDays)}</span>
-                  </div>
-                )}
-                <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted">
-                  {charged.known
-                    ? fmt(t.create.whenPanel.chargedExplain, {
+                {charged.known ? (
+                  <p className="flex items-baseline gap-2 text-[12.5px] leading-relaxed text-muted">
+                    <span className="flex-none text-[20px] font-extrabold text-navy">{num(charged.chargedDays)}</span>
+                    <span>
+                      {fmt(timing.rentalBasis ? t.create.whenPanel.chargedLineBasis : t.create.whenPanel.chargedLine, {
                         total: num(charged.totalDays),
                         fridays: num(charged.fridays),
-                        charged: num(charged.chargedDays),
                         hours: num(timing.hoursPerDay),
-                      })
-                    : t.create.whenPanel.chargedNoDates}
-                </p>
+                        // Only reached when a basis is set; the other string has no {basis} slot.
+                        basis: timing.rentalBasis ? t.options.rentalBasis[timing.rentalBasis].toLowerCase() : "",
+                      })}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="text-[12.5px] leading-relaxed text-muted">
+                    {charged.reversed ? t.create.whenPanel.datesReversed : t.create.whenPanel.chargedNoDates}
+                  </p>
+                )}
                 <label
                   className={`mt-3 flex cursor-pointer items-start gap-2 text-[12.5px] leading-snug text-navy-mid ${shakeConfirm ? "shake-error" : ""}`}
                 >
@@ -200,7 +219,7 @@ export function WhenPanel({
                     className="mt-0.5 flex-none"
                   />
                   {charged.known
-                    ? fmt(t.create.whenPanel.confirmCharged, { charged: num(charged.chargedDays), total: num(charged.totalDays) })
+                    ? fmt(t.create.whenPanel.confirmCharged, { charged: num(charged.chargedDays) })
                     : t.create.whenPanel.confirmChargedNoDates}
                 </label>
               </div>

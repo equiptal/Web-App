@@ -135,7 +135,12 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
   const [notes, setNotes] = useState(s(r.additionalNotes));
   const [busy, setBusy] = useState(false);
 
+  /** A window that runs backwards. The `min`/`max` above stop a picked date; this stops a typed one,
+   *  and a request that already holds a reversed pair from before either guard existed. */
+  const datesReversed = !!startDate && !!endDate && startDate > endDate;
+
   async function save() {
+    if (datesReversed) return;
     setBusy(true);
     const patch: Record<string, unknown> = {};
     if (rentalType) patch.rentalType = rentalType;
@@ -223,8 +228,10 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
           <div className="grid grid-cols-2 gap-3">
             <Sel label={L("Rental basis", "أساس الإيجار")} value={rentalType} onChange={setRentalType} opts={RENTAL_OPTS} />
             <Sel label={L("Overtime rate", "معدل العمل الإضافي")} value={overtime} onChange={setOvertime} opts={OVERTIME_OPTS} />
-            <label><span className={lbl}>{L("Start date", "تاريخ البدء")}</span><input type="date" className={fld} value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
-            <label><span className={lbl}>{L("End date", "تاريخ الانتهاء")}</span><input type="date" className={fld} value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
+            {/* Each end bounds the other, as the numeric fields on this same row already bound
+                themselves (owner, 2026-08-25). Save is blocked too — see `datesReversed`. */}
+            <label><span className={lbl}>{L("Start date", "تاريخ البدء")}</span><input type="date" max={endDate || undefined} className={fld} value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
+            <label><span className={lbl}>{L("End date", "تاريخ الانتهاء")}</span><input type="date" min={startDate || undefined} className={fld} value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
             <Num label={L("Working hours/day", "ساعات العمل/يوم")} value={hours} onChange={setHours} min={1} max={24} />
             <Num label={L("Working days/week", "أيام العمل/أسبوع")} value={days} onChange={setDays} min={1} max={7} />
             <label className="col-span-2"><span className={lbl}>{L("Terrain", "طبيعة الأرض")}</span><input className={fld} value={terrain} onChange={(e) => setTerrain(e.target.value)} placeholder={L("e.g. sand, rocky", "مثل: رملية، صخرية")} /></label>
@@ -264,7 +271,12 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
 
         <div className="flex justify-end gap-2.5 border-t border-[var(--border)] px-5 py-4">
           <button className="rounded-[10px] border border-[var(--border)] px-4 py-2.5 text-[13px] font-bold text-[var(--navy)]" onClick={onClose}>{L("Cancel", "إلغاء")}</button>
-          <button className="rounded-[10px] bg-[var(--action)] px-5 py-2.5 text-[13px] font-bold text-white disabled:opacity-50" disabled={busy} onClick={save}>{busy ? L("Saving…", "جارٍ الحفظ…") : L("Save changes", "حفظ التغييرات")}</button>
+          {datesReversed && (
+            <span className="me-auto text-[12.5px] font-bold text-[#d64545]">
+              {L("End date is before the start date.", "تاريخ الانتهاء يسبق تاريخ البدء.")}
+            </span>
+          )}
+          <button className="rounded-[10px] bg-[var(--action)] px-5 py-2.5 text-[13px] font-bold text-white disabled:opacity-50" disabled={busy || datesReversed} onClick={save}>{busy ? L("Saving…", "جارٍ الحفظ…") : L("Save changes", "حفظ التغييرات")}</button>
         </div>
       </div>
     </div>
