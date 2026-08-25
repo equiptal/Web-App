@@ -12,6 +12,7 @@
  */
 
 import { useState } from "react";
+import { Dialog } from "@/components/Dialog";
 
 const CANCEL_REASONS: ReadonlyArray<{ en: string; ar: string }> = [
   { en: "Found a better offer", ar: "وجدت عرضاً أفضل" },
@@ -44,8 +45,8 @@ export function CancelReasonsModal({ ar, L, busy, error, onSubmit, onClose }: {
   const canSubmit = !busy && reason.length > 0;
 
   return (
-    <div dir={ar ? "rtl" : "ltr"} onClick={busy ? undefined : onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(16,38,63,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, maxHeight: "90vh", overflowY: "auto", background: "#fff", borderRadius: 20, boxShadow: "0 24px 60px rgba(16,38,63,.35)", padding: "26px 22px 22px", textAlign: "center" }}>
+    <Dialog open onClose={busy ? () => {} : onClose} size="sm" padded={false}>
+      <div dir={ar ? "rtl" : "ltr"} style={{ padding: "26px 22px 22px", textAlign: "center" }}>
         <span style={{ display: "inline-flex", width: 44, height: 44, borderRadius: "50%", background: "var(--danger-bg, #fdeceb)", color: "var(--danger, #d9362a)", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
           <span className="material-icons-outlined" style={{ fontSize: 22 }}>cancel</span>
         </span>
@@ -96,7 +97,7 @@ export function CancelReasonsModal({ ar, L, busy, error, onSubmit, onClose }: {
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }
 

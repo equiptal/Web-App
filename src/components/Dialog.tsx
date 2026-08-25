@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { CloseIcon } from "@/components/HeaderIcons";
 
 /**
@@ -27,10 +27,14 @@ import { CloseIcon } from "@/components/HeaderIcons";
  * `size` is a named width rather than a number at the call site: four sizes is a decision, and
  * `max-w-[537px]` in one file is not.
  *
- * ── What it deliberately does not do ────────────────────────────────────────────────────────────
- * It does not trap focus. That is a real gap and it is named here rather than left to be discovered:
- * Escape closes, the backdrop closes, and the close control is the first thing in the header, but a
- * Tab from the last field still walks into the page behind. Worth fixing; not fixed by this.
+ * ── Getting out ─────────────────────────────────────────────────────────────────────────────────
+ * Three ways, on every dialog, because the owner asked for exactly that: click the backdrop, press
+ * Escape, or press the X. Several of these surfaces used to offer one of the three — one offered
+ * none but the backdrop, which on a phone means guessing where the panel ends.
+ *
+ * Focus is trapped while a dialog is open and handed back to whatever opened it on close. Tab from
+ * the last field cycles to the first rather than walking into the page behind, which was reachable
+ * but invisible, and could be typed into.
  */
 
 export type DialogSize = "sm" | "md" | "lg" | "xl";
@@ -49,15 +53,48 @@ const SCRIM = "fixed inset-0 z-[60] bg-navy/45";
 /** The panel's own skin — one radius, one border, one shadow. */
 const PANEL = "border border-border bg-surface shadow-[0_24px_60px_rgba(16,38,63,.28)]";
 
-function useEscape(open: boolean, onClose: () => void) {
+/** Anything a keyboard can land on, in the order it would reach them. */
+const FOCUSABLE =
+  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
+/**
+ * Escape, the focus trap, and giving focus back.
+ *
+ * The trap is a Tab handler rather than an `inert` on the page behind: `inert` needs every sibling of
+ * the dialog to be marked, and the dialog is rendered at the end of the body by a portal-less React
+ * tree, so there is no reliable list of siblings to mark. Cycling the ring is what the panel itself
+ * can guarantee.
+ */
+function useDialogKeys(open: boolean, onClose: () => void, panel: React.RefObject<HTMLElement | null>) {
   useEffect(() => {
     if (!open) return;
+
+    // Hand focus back to whatever opened this when it closes — otherwise the ring restarts at the top
+    // of the document and a keyboard user has to walk the whole page again.
+    const opener = document.activeElement as HTMLElement | null;
+    const first = panel.current?.querySelector<HTMLElement>(FOCUSABLE);
+    (first ?? panel.current)?.focus?.();
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") { onClose(); return; }
+      if (e.key !== "Tab" || !panel.current) return;
+      const items = Array.from(panel.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+        (el) => el.offsetParent !== null || el === document.activeElement,
+      );
+      if (items.length === 0) { e.preventDefault(); return; }
+      const edge = e.shiftKey ? items[0] : items[items.length - 1];
+      if (document.activeElement === edge) {
+        e.preventDefault();
+        (e.shiftKey ? items[items.length - 1] : items[0]).focus();
+      }
     };
+
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      opener?.focus?.();
+    };
+  }, [open, onClose, panel]);
 }
 
 export function Dialog({
@@ -86,7 +123,8 @@ export function Dialog({
   /** Off for a body that brings its own edges — a multi-step flow, or a document in an iframe. */
   padded?: boolean;
 }) {
-  useEscape(open, onClose);
+  const panel = useRef<HTMLDivElement>(null);
+  useDialogKeys(open, onClose, panel);
   if (!open) return null;
 
   return (
@@ -108,6 +146,8 @@ export function Dialog({
         against the lie puts its footer under the browser's own chrome.
       */}
       <div
+        ref={panel}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         data-dialog-panel=""
         className={`relative flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-[16px] sm:max-h-[calc(100dvh-2rem)] sm:rounded-[16px] ${PANEL} ${SIZE[size]}`}
@@ -167,13 +207,16 @@ export function DialogDrawer({
   footer?: ReactNode;
   children: ReactNode;
 }) {
-  useEscape(open, onClose);
+  const panel = useRef<HTMLElement>(null);
+  useDialogKeys(open, onClose, panel);
   if (!open) return null;
 
   return (
     <>
       <div className={SCRIM} onClick={onClose} />
       <aside
+        ref={panel}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         className="fixed inset-y-0 end-0 z-[61] flex w-full max-w-[440px] flex-col border-s border-border bg-surface shadow-[0_24px_60px_rgba(16,38,63,.28)]"

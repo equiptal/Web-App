@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Dialog } from "@/components/Dialog";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import type { EquipmentDetail } from "@/lib/contract/stores";
@@ -53,10 +54,9 @@ export function EquipmentDetailModal({
   const photos = eq?.photos ?? [];
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-end overflow-y-auto bg-black/50 p-0 sm:place-items-center sm:p-4" onClick={onClose}>
+    <Dialog open onClose={onClose} size="lg" padded={false}>
       <div
-        className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[18px] bg-surface sm:rounded-[16px]"
-        onClick={(e) => e.stopPropagation()}
+        className="flex min-h-0 flex-1 flex-col"
       >
         {/* Header / close */}
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -157,7 +157,7 @@ export function EquipmentDetailModal({
         )}
 
       </div>
-    </div>
+    </Dialog>
   );
 }
 

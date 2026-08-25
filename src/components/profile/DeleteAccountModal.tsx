@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Dialog } from "@/components/Dialog";
 import { useT, useLocale, fmt } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { deleteAccount } from "@/lib/api/profile-client";
@@ -41,9 +42,9 @@ export function DeleteAccountModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-navy/40 p-4" onClick={onClose}>
+    <Dialog open onClose={onClose} size="md" padded={false}>
       <div
-        className="w-full max-w-md rounded-[16px] border border-danger/30 bg-surface p-6"
+        className="p-6"
         dir={ar ? "rtl" : "ltr"}
         onClick={(e) => e.stopPropagation()}
       >
@@ -82,6 +83,6 @@ export function DeleteAccountModal({
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

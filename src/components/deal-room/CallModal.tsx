@@ -19,6 +19,7 @@
  */
 
 import { useState } from "react";
+import { Dialog } from "@/components/Dialog";
 
 export function CallModal({
   ar,
@@ -40,8 +41,8 @@ export function CallModal({
     try { await navigator.clipboard.writeText(phone); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch { /* clipboard blocked */ }
   };
   return (
-    <div dir={ar ? "rtl" : "ltr"} onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(16,38,63,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(16,38,63,.35)", padding: "26px 22px 22px", textAlign: "center" }}>
+    <Dialog open onClose={onClose} size="sm" padded={false}>
+      <div dir={ar ? "rtl" : "ltr"} style={{ padding: "26px 22px 22px", textAlign: "center" }}>
         <span style={{ display: "inline-flex", width: 56, height: 56, borderRadius: "50%", background: "#e7f7ee", color: "#1daf58", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
           <span className="material-icons-outlined" style={{ fontSize: 28 }}>call</span>
         </span>
@@ -60,6 +61,6 @@ export function CallModal({
         </div>
         <button onClick={onClose} style={{ marginTop: 12, width: "100%", padding: "11px", borderRadius: 13, border: "none", background: "#eff4f9", color: "#6b8fa8", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>{L("Close", "إغلاق")}</button>
       </div>
-    </div>
+    </Dialog>
   );
 }

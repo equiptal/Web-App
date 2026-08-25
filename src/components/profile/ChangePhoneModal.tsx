@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
+import { Dialog } from "@/components/Dialog";
 import { useT, useLocale, fmt } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { requestPhoneChange, verifyPhoneChange } from "@/lib/api/profile-client";
@@ -97,9 +98,9 @@ export function ChangePhoneModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-navy/40 p-4" onClick={onClose}>
+    <Dialog open onClose={onClose} size="md" padded={false}>
       <div
-        className="w-full max-w-md rounded-[16px] border border-border bg-surface p-6"
+        className="p-6"
         dir={ar ? "rtl" : "ltr"}
         onClick={(e) => e.stopPropagation()}
       >
@@ -182,6 +183,6 @@ export function ChangePhoneModal({
           </>
         )}
       </div>
-    </div>
+    </Dialog>
   );
 }

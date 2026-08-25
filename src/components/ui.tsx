@@ -2,6 +2,7 @@
 
 import type { ReactNode, InputHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { useT } from "@/lib/i18n";
+import { Dialog } from "@/components/Dialog";
 
 /* ------------------------------------ Icon ------------------------------------ */
 
@@ -443,14 +444,18 @@ export function Badge({ children, tone = "default" }: { children: ReactNode; ton
 
 /* ------------------------------------ Modal ------------------------------------ */
 
+/**
+ * Kept as a name, not as an implementation (owner, 2026-08-26).
+ *
+ * This drew its own scrim, radius and 16px semibold title — a fourth answer to questions `Dialog`
+ * now answers once — and it had NO close control at all, so a caller using it offered the backdrop
+ * and nothing else. It forwards to `Dialog` instead of being deleted because its call sites read
+ * fine as they are; what they get is the shared shell, the X, and Escape.
+ */
 export function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title?: ReactNode; children: ReactNode }) {
-  if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-lg" onClick={(e) => e.stopPropagation()}>
-        {title && <h3 className="mb-3 text-base font-semibold">{title}</h3>}
-        {children}
-      </div>
-    </div>
+    <Dialog open={open} onClose={onClose} size="lg" title={title}>
+      {children}
+    </Dialog>
   );
 }
