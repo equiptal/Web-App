@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Dialog, DialogButton } from "@/components/Dialog";
 import { bucketBidTerms, type TermRow, type TermState } from "@/lib/contract/bids";
 
 /**
@@ -66,21 +67,18 @@ export function BidTermsModal({
   const rows = byBucket[active];
 
   return (
-    <div
-      dir={ar ? "rtl" : "ltr"}
-      onClick={onClose}
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-navy-deep/50 p-4"
+    <Dialog
+      open
+      onClose={onClose}
+      size="lg"
+      title={L("Terms", "الشروط")}
+      subtitle={supplier}
+      footer={
+        <DialogButton tone="primary" full disabled={busy} onClick={onNegotiate}>
+          {negotiateLabel ?? L("Negotiate terms", "التفاوض على الشروط")}
+        </DialogButton>
+      }
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[90vh] w-full max-w-[560px] flex-col overflow-hidden rounded-[20px] bg-surface shadow-[0_24px_60px_rgba(16,38,63,.35)]"
-      >
-        <div className="flex items-center justify-between gap-3 px-[22px] pb-3.5 pt-5">
-          <h3 className="m-0 text-[18px] font-black text-navy">{L("Terms", "الشروط")} — {supplier}</h3>
-          <button onClick={onClose} aria-label={L("Close", "إغلاق")} className="flex h-9 w-9 flex-none items-center justify-center rounded-[10px] bg-surface2 text-muted transition hover:bg-surface3">
-            <span className="material-icons-outlined" style={{ fontSize: 20 }}>close</span>
-          </button>
-        </div>
 
         {/* 3 state tabs (Conflict / Pending review / Matched) with counts */}
         {/* ── Restyled onto the workspace's tokens (owner, 2026-08-25) ────────────────────────────
@@ -91,7 +89,7 @@ export function BidTermsModal({
 
             The tab below and the verdict beside each row keep their INLINE colour, and deliberately:
             each carries its own state's hue, which is data rather than a class. */}
-        <div className="flex gap-2 px-[22px] pb-1">
+        <div className="flex gap-2 pb-1">
           {tabs.map((t) => {
             const on = active === t.key;
             const n = byBucket[t.key].length;
@@ -107,7 +105,7 @@ export function BidTermsModal({
           })}
         </div>
 
-        <div className="overflow-y-auto px-[22px] pb-[18px] pt-2.5">
+        <div className="pt-2.5">
           {rows.length === 0 ? (
             <div className="py-[26px] text-center text-[13.5px] font-semibold text-muted">
               {active === "conflict" ? L("No conflicts.", "لا تعارضات.") : active === "pending" ? L("Nothing pending review.", "لا شيء بانتظار المراجعة.") : L("Nothing matched yet.", "لا مطابقات بعد.")}
@@ -130,16 +128,6 @@ export function BidTermsModal({
           )}
         </div>
 
-        <div className="border-t border-border px-[22px] pb-5 pt-3.5">
-          <button
-            onClick={onNegotiate}
-            disabled={busy}
-            className="w-full rounded-[14px] bg-navy p-3.5 text-[15px] font-extrabold text-white transition hover:brightness-110 disabled:cursor-default disabled:opacity-70"
-          >
-            {negotiateLabel ?? L("Negotiate terms", "التفاوض على الشروط")}
-          </button>
-        </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }

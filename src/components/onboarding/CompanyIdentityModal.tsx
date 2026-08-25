@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useT, useLocale } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
+import { Dialog, DialogButton } from "@/components/Dialog";
 
 export type AuthorityRole = "owner" | "manager" | "employee";
 
@@ -54,7 +55,6 @@ export function CompanyIdentityModal({
   const t = useT();
   const p = t.verify.pile;
   const { locale } = useLocale();
-  const L = (e: string, a: string) => (locale === "ar" ? a : e);
 
   const [role, setRole] = useState<AuthorityRole | null>(prefill?.role ?? null);
   const [nationalId, setNationalId] = useState(prefill?.nationalId ?? "");
@@ -148,31 +148,20 @@ export function CompanyIdentityModal({
     "h-[46px] w-full rounded-[10px] border border-border bg-surface px-[14px] text-[14px] outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)]";
 
   return (
-    <div
-      dir={locale === "ar" ? "rtl" : "ltr"}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/45 p-4 sm:items-center"
-      onClick={onCancel}
-      role="dialog"
-      aria-modal="true"
-      aria-label={p.identityTitle}
+    <Dialog
+      open
+      onClose={onCancel}
+      size="md"
+      title={p.identityTitle}
+      footer={
+        <>
+          <DialogButton full onClick={onCancel}>{t.verify.back}</DialogButton>
+          <DialogButton full tone="primary" disabled={!role} onClick={submit}>{p.continue}</DialogButton>
+        </>
+      }
     >
-      <div
-        className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-surface p-5 shadow-xl sm:p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start gap-3">
-          <h2 className="flex-1 text-[18px] font-extrabold tracking-tight text-navy">{p.identityTitle}</h2>
-          <button
-            type="button"
-            onClick={onCancel}
-            aria-label={L("Close", "إغلاق")}
-            className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-surface2"
-          >
-            <Icon name="close" size={18} />
-          </button>
-        </div>
-
-        <div className="mt-4 flex flex-col gap-[14px]">
+      <div dir={locale === "ar" ? "rtl" : "ltr"}>
+        <div className="flex flex-col gap-[14px]">
           {/* Role — three equal chips, the only required answer. */}
           <div>
             <label className={labelCls}>
@@ -273,24 +262,7 @@ export function CompanyIdentityModal({
           </div>
         </div>
 
-        <div className="mt-5 flex gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="flex-1 rounded-[10px] border border-border bg-surface px-4 py-3 text-[14px] font-bold text-navy-mid"
-          >
-            {t.verify.back}
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={!role}
-            className="flex-1 rounded-[10px] border border-brand bg-brand px-4 py-3 text-[14px] font-bold text-brand-fg transition hover:brightness-[1.04] disabled:cursor-not-allowed disabled:border-border disabled:bg-surface2 disabled:text-muted"
-          >
-            {p.continue}
-          </button>
-        </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

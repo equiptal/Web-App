@@ -1,0 +1,244 @@
+"use client";
+
+import { useEffect, type ReactNode } from "react";
+import { CloseIcon } from "@/components/HeaderIcons";
+
+/**
+ * The one dialog shell (owner, 2026-08-26: "i want consistent layout for these modals in terms of ui
+ * and fonts and size etc so all modal and forms of our system has same design theme").
+ *
+ * ── What it replaces ────────────────────────────────────────────────────────────────────────────
+ * Six surfaces, six different answers to the same questions:
+ *
+ *   scrim     black/40 · black/45 · navy/40 · navy-deep/50 · a gradient in a stylesheet
+ *   radius    12 · 16 · 18 · 20
+ *   width     448 · 512 · 560 · 880 (and one at 440 as a side sheet)
+ *   title     16 semibold · 18 extrabold · 18 black · 20 extrabold · 22 extrabold
+ *   close     a 36px chip · a 34px ring · a bare glyph · nothing at all
+ *
+ * None of that was decided; it accumulated. One of the six even styled itself from a separate CSS
+ * file. What follows is a single answer to each question, so a reader who has opened one dialog knows
+ * where the title, the close and the buttons will be in the next.
+ *
+ * ── The shape ───────────────────────────────────────────────────────────────────────────────────
+ * Header, body, footer — and only the BODY scrolls. A dialog whose whole panel scrolls takes its own
+ * title and its confirm button off screen, which is how you end up with a «Save» nobody can find.
+ *
+ * `size` is a named width rather than a number at the call site: four sizes is a decision, and
+ * `max-w-[537px]` in one file is not.
+ *
+ * ── What it deliberately does not do ────────────────────────────────────────────────────────────
+ * It does not trap focus. That is a real gap and it is named here rather than left to be discovered:
+ * Escape closes, the backdrop closes, and the close control is the first thing in the header, but a
+ * Tab from the last field still walks into the page behind. Worth fixing; not fixed by this.
+ */
+
+export type DialogSize = "sm" | "md" | "lg" | "xl";
+
+/** Four widths, and no fifth. `xl` is for a dialog showing a document, not a form. */
+const SIZE: Record<DialogSize, string> = {
+  sm: "max-w-[420px]",
+  md: "max-w-[520px]",
+  lg: "max-w-[640px]",
+  xl: "max-w-[880px]",
+};
+
+/** The scrim, shared by the centred dialog and the side drawer so both dim the page identically. */
+const SCRIM = "fixed inset-0 z-[60] bg-navy/45";
+
+/** The panel's own skin — one radius, one border, one shadow. */
+const PANEL = "border border-border bg-surface shadow-[0_24px_60px_rgba(16,38,63,.28)]";
+
+function useEscape(open: boolean, onClose: () => void) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+}
+
+export function Dialog({
+  open,
+  onClose,
+  title,
+  subtitle,
+  icon,
+  size = "md",
+  footer,
+  children,
+  /** Drops the header rule — for a dialog whose body starts with its own coloured band. */
+  flushHeader = false,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title?: ReactNode;
+  subtitle?: ReactNode;
+  /** A mark beside the title. Sized by the caller; the slot is 34px, the bar's own control size. */
+  icon?: ReactNode;
+  size?: DialogSize;
+  footer?: ReactNode;
+  children: ReactNode;
+  flushHeader?: boolean;
+}) {
+  useEscape(open, onClose);
+  if (!open) return null;
+
+  return (
+    <div
+      className={`${SCRIM} flex items-end justify-center p-0 sm:items-center sm:p-4`}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      {/*
+        Full-bleed at the bottom of a phone, centred with a margin from `sm` up. A 520px panel
+        floating in the middle of a 390px screen is a card with nowhere to go; against the bottom
+        edge it is a sheet, which is what a phone expects.
+
+        `100dvh` rather than `100vh`: on a phone the address bar makes `vh` lie, and a dialog sized
+        against the lie puts its footer under the browser's own chrome.
+      */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className={`flex max-h-[100dvh] w-full flex-col rounded-t-[16px] sm:max-h-[calc(100dvh-2rem)] sm:rounded-[16px] ${PANEL} ${SIZE[size]}`}
+      >
+        {(title || icon) && (
+          <div className={`flex flex-none items-start gap-3 px-5 py-3.5 ${flushHeader ? "" : "border-b border-border"}`}>
+            {icon && <span className="grid h-[34px] w-[34px] flex-none place-items-center">{icon}</span>}
+            <div className="min-w-0 flex-1">
+              {title && <h2 className="text-[17px] font-extrabold leading-tight tracking-[-.2px] text-navy">{title}</h2>}
+              {subtitle && <p className="mt-0.5 text-[12.5px] leading-snug text-muted">{subtitle}</p>}
+            </div>
+            <DialogClose onClose={onClose} />
+          </div>
+        )}
+
+        {/* The ONLY scrolling region. See the note at the top on why the panel itself must not. */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+
+        {footer && (
+          <div className="flex flex-none items-center gap-2.5 border-t border-border px-5 py-3.5">{footer}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A dialog that arrives from the trailing edge instead of the middle — for a surface you READ
+ * alongside the page rather than answer and dismiss, which is the request drawer's whole job.
+ *
+ * Same scrim, same header, same footer, same type. Only the geometry differs, and it differs because
+ * the content does.
+ */
+export function DialogDrawer({
+  open,
+  onClose,
+  title,
+  subtitle,
+  header,
+  footer,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title?: ReactNode;
+  subtitle?: ReactNode;
+  /** Replaces the standard header outright, for a drawer with a coloured masthead of its own. */
+  header?: ReactNode;
+  footer?: ReactNode;
+  children: ReactNode;
+}) {
+  useEscape(open, onClose);
+  if (!open) return null;
+
+  return (
+    <>
+      <div className={SCRIM} onClick={onClose} />
+      <aside
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-y-0 end-0 z-[61] flex w-full max-w-[440px] flex-col border-s border-border bg-surface shadow-[0_24px_60px_rgba(16,38,63,.28)]"
+      >
+        {header ?? (
+          (title || subtitle) && (
+            <div className="flex flex-none items-start gap-3 border-b border-border px-5 py-3.5">
+              <div className="min-w-0 flex-1">
+                {title && <h2 className="text-[17px] font-extrabold leading-tight tracking-[-.2px] text-navy">{title}</h2>}
+                {subtitle && <p className="mt-0.5 text-[12.5px] leading-snug text-muted">{subtitle}</p>}
+              </div>
+              <DialogClose onClose={onClose} />
+            </div>
+          )
+        )}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        {footer && <div className="flex flex-none items-center gap-2.5 border-t border-border px-5 py-3.5">{footer}</div>}
+      </aside>
+    </>
+  );
+}
+
+/**
+ * The close control, exported because a drawer with its own masthead still has to close the same way.
+ *
+ * 34px, and the same hairline glyph the top bar uses — a dialog is chrome, and the app has one set of
+ * chrome icons now. `tone="onDark"` for a coloured masthead.
+ */
+export function DialogClose({ onClose, tone = "default" }: { onClose: () => void; tone?: "default" | "onDark" }) {
+  return (
+    <button
+      type="button"
+      onClick={onClose}
+      aria-label="Close"
+      className={`grid h-[34px] w-[34px] flex-none place-items-center rounded-full transition ${
+        tone === "onDark" ? "text-white/70 hover:bg-white/10 hover:text-white" : "text-muted hover:bg-surface2 hover:text-navy"
+      }`}
+    >
+      <CloseIcon size={18} />
+    </button>
+  );
+}
+
+/**
+ * The buttons a dialog closes with.
+ *
+ * Three tones and no more. `primary` is the thing the dialog is FOR, `ghost` is the way out, and
+ * `danger` is the one that cannot be undone — every dialog in the app should be describable in those
+ * terms, and one that is not is probably two dialogs.
+ *
+ * Height is fixed at 40px so a row of them lines up whatever their labels say.
+ */
+export function DialogButton({
+  tone = "ghost",
+  full = false,
+  className = "",
+  ...rest
+}: {
+  tone?: "primary" | "ghost" | "danger";
+  /** Fill the row — for a dialog whose footer holds one button. */
+  full?: boolean;
+} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  const skin =
+    tone === "primary"
+      ? "bg-brand text-white hover:brightness-105"
+      : tone === "danger"
+        ? "bg-danger text-white hover:brightness-105"
+        : "border border-border bg-surface text-navy-mid hover:border-navy-mid";
+  return (
+    <button
+      type="button"
+      {...rest}
+      className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-[10px] px-4 text-[13.5px] font-bold transition disabled:opacity-50 ${
+        full ? "w-full" : ""
+      } ${skin} ${className}`}
+    />
+  );
+}
+
+/** Pushes whatever follows it to the trailing edge of a dialog footer. */
+export function DialogSpacer() {
+  return <span className="flex-1" />;
+}

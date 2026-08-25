@@ -1,6 +1,7 @@
 "use client";
 
 import { useT, useLocale } from "@/lib/i18n";
+import { Dialog, DialogButton } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 
 /**
@@ -27,17 +28,10 @@ export function CompanyDocsConfirmDialog({
   if (!open) return null;
 
   return (
-    <div
-      dir={locale === "ar" ? "rtl" : "ltr"}
-      className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/45 p-4"
-      onClick={onCancel}
-      role="dialog"
-      aria-modal="true"
-      aria-label={p.confirmHeadline}
-    >
+    <Dialog open onClose={onCancel} size="sm">
       <div
-        className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 text-center shadow-xl"
-        onClick={(e) => e.stopPropagation()}
+        dir={locale === "ar" ? "rtl" : "ltr"}
+        className="text-center"
       >
         <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-danger-soft text-danger">
           <Icon name="warning_amber" size={28} />
@@ -46,23 +40,13 @@ export function CompanyDocsConfirmDialog({
         <p className="mt-3 inline-block rounded-full bg-surface2 px-3 py-1.5 text-[12.5px] font-semibold text-muted">
           {p.confirmEstimate}
         </p>
-        <div className="mt-5 border-t border-border pt-4 flex gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="flex-1 rounded-[10px] border border-border bg-surface px-4 py-3 text-[14px] font-bold text-navy-mid"
-          >
-            {p.confirmBack}
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className="flex-1 rounded-[10px] border border-brand bg-brand px-4 py-3 text-[14px] font-bold text-brand-fg transition hover:brightness-[1.04]"
-          >
-            {p.confirmSubmit}
-          </button>
+        {/* The two buttons come from `DialogButton` now, so they are the same height, radius and
+            weight as the pair in every other dialog. */}
+        <div className="mt-5 flex gap-2 border-t border-border pt-4">
+          <DialogButton full onClick={onCancel}>{p.confirmBack}</DialogButton>
+          <DialogButton full tone="primary" onClick={onConfirm}>{p.confirmSubmit}</DialogButton>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }
