@@ -160,7 +160,7 @@ export function RequestRail({
                   The padding is back and there is still no ring, because the pad and the clip share
                   one background: no edge is drawn between them. One 56px tinted circle, with the
                   picture inset inside it. */}
-              <span className="relative grid h-14 w-14 flex-none place-items-center rounded-full bg-surface3 p-1">
+              <span className="relative grid h-14 w-14 flex-none place-items-center rounded-full bg-surface p-1">
                 <span className="relative h-12 w-12 rounded-full">
                   <span className={`grid h-12 w-12 place-items-center overflow-hidden rounded-full bg-surface3 ${tile.closed ? "grayscale" : ""}`}>
                     {img ? (

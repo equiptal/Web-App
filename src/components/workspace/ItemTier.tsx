@@ -16,12 +16,15 @@ const SHOWN = 3;
  * The context bar names the current one and its caret reaches the rest, but reaching them takes a
  * press: the owner wants the others *read* rather than *found*.
  *
- * ── Why it looks like the source row and not like chips ───────────────────────────────────────
- * ~~Pills.~~ The source filter directly under this one is a label and a row of underlined words, and
- * these two rows do the same kind of work — narrowing what the panel below shows. Two rows doing one
- * job in two visual languages is how a screen stops looking designed. The label names the row, the
- * chosen word carries the brand rule under it, and the number after each name is that item's bid
- * count, exactly as the source row counts what each source contributed.
+ * ── It IS the source row (owner, 2026-08-27) ──────────────────────────────────────────────────
+ * ~~Pills, on a row of their own under the rail.~~ Then a row of underlined words that merely looked
+ * like the source filter. Now it shares that filter's line: the two narrow the same panel, one by
+ * machine and one by where the bid came from, and a screen that asks one question in two rows is a
+ * screen that has not decided the question is one.
+ *
+ * So this renders no chrome of its own — no background, no rule, no height. The source row owns
+ * those, and this is a group inside it. The number after each name is that item's bid count, which
+ * is what the source row counts too.
  *
  * ── The chosen item is always among the three ─────────────────────────────────────────────────
  * The first three in the order the renter asked for them, except that a selection outside that slice
@@ -71,11 +74,7 @@ export function ItemTier({
     it.item ? (ar ? it.item.nameAr || it.item.name : it.item.name) : it.displayId;
 
   return (
-    <div
-      {...pin("item-tier")}
-      ref={boxRef}
-      className="relative flex h-[38px] flex-none items-center gap-4 border-b border-border bg-surface2 px-4 sm:px-6"
-    >
+    <div {...pin("item-tier")} ref={boxRef} className="relative flex flex-wrap items-center gap-4">
       <span className="flex-none text-label font-extrabold uppercase tracking-wide text-muted">
         {t.workspace.itemsInRequest}
       </span>
@@ -118,7 +117,7 @@ export function ItemTier({
       )}
 
       {open && rest.length > 0 && (
-        <div role="menu" className={cx(POPOVER, "absolute end-4 top-[calc(100%-2px)] z-50 min-w-[220px] sm:end-6")}>
+        <div role="menu" className={cx(POPOVER, "absolute end-0 top-[calc(100%+6px)] z-50 min-w-[220px]")}>
           {rest.map((it) => (
             <button
               key={it.id}

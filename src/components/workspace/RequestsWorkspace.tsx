@@ -468,12 +468,6 @@ export function RequestsWorkspace() {
         onHide={hide}
       />
 
-      {/* ── The machines in this submission, under the requests (owner, 2026-08-27) ────────────────
-          Only where there is a choice: one chip nobody can depart from is furniture, and this row
-          costs 34px of every page it draws on. */}
-      {group && group.items.length > 1 && (
-        <ItemTier items={group.items} activeId={resolved.itemId} onPick={pickItem} />
-      )}
 
       <div className={`${PAGE_MX_BLEED} mt-2 flex min-h-0 flex-1 flex-col pb-2`}>
         {/* ── The row above the panel (owner, 2026-08-27) ─────────────────────────────────────────
@@ -567,7 +561,16 @@ export function RequestsWorkspace() {
               choices that change nothing are furniture. */}
           {/* Centred, so it sits under the tabs rather than off at the leading edge while they are
               in the middle (owner, 2026-08-27). */}
-          <div className="flex flex-none flex-wrap items-center justify-center gap-4 border-b border-border px-3.5 py-1.5">
+          <div className="flex flex-none flex-wrap items-center justify-center gap-x-5 gap-y-1.5 border-b border-border px-3.5 py-1.5">
+              {/* The machines, on the same line as the source (owner, 2026-08-27). Both narrow the
+                  panel below — one by machine, one by where the bid came from — and asking one
+                  question in two rows is a screen that has not decided the question is one. */}
+              {group && group.items.length > 1 && (
+                <>
+                  <ItemTier items={group.items} activeId={resolved.itemId} onPick={pickItem} />
+                  <span className="h-4 w-px flex-none bg-border" />
+                </>
+              )}
               <span className="inline-flex items-center gap-1.5 text-label font-extrabold uppercase tracking-wide text-muted">
                 <Icon name="filter_list" size={14} /> {t.workspace.source}
               </span>
