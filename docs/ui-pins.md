@@ -2,7 +2,13 @@
 
 > **Staging branch only — do not merge to `main`.** This is a developer instrument, not part of the product. The overlay also refuses to render on the production host, but that guard is the belt, not the plan.
 
-The number every surface answers to on staging. Toggle the overlay with `Ctrl+Shift+U`, or the small `#` button at the bottom-left.
+The number every surface answers to on staging. Three ways in:
+
+- the **`# PINS`** button at the bottom-left of every page
+- `Ctrl+Shift+U`
+- `?pins=1` on any URL — and `?pins=0` to switch it off again
+
+If none of those show anything, the host is not on the list in `uiPinsAllowed()`: staging, localhost and `*.amplifyapp.com` only. The console says `[ui-pins] ready` where it is live.
 
 Three levels, and the panel switches between them.
 

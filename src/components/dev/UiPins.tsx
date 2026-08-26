@@ -139,13 +139,31 @@ export function UiPins() {
   // renders would be a hydration mismatch.
   useEffect(() => {
     setAllowed(uiPinsAllowed());
+    // `?pins=1` wins over what was remembered, so a link can carry the overlay to someone who has
+    // never opened it. `?pins=0` is the way back out if the state is somehow stuck on.
+    const flag = new URLSearchParams(window.location.search).get("pins");
     try {
-      setOn(window.localStorage.getItem(STORAGE_KEY) === "1");
+      if (flag === "1" || flag === "0") {
+        const next = flag === "1";
+        setOn(next);
+        window.localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
+      } else {
+        setOn(window.localStorage.getItem(STORAGE_KEY) === "1");
+      }
     } catch {
-      /* private mode, storage disabled — start off */
+      /* private mode, storage disabled — honour the URL, forget the rest */
+      setOn(flag === "1");
     }
     setReady(true);
   }, []);
+
+  // One line in the console on the hosts where this runs, so "is it even here?" has an answer that
+  // does not depend on spotting a button.
+  useEffect(() => {
+    if (!ready || !allowed) return;
+    // eslint-disable-next-line no-console
+    console.info("[ui-pins] ready — press Ctrl+Shift+U, or click # PINS at the bottom-left. Numbers: docs/ui-pins.md");
+  }, [ready, allowed]);
 
   const toggle = useCallback(() => {
     setOn((prev) => {
@@ -177,29 +195,34 @@ export function UiPins() {
   return (
     <div data-ui-pins="root" dir="ltr" style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
       {on && <PinLayer />}
+      {/* The toggle says its own name. A 28px dark dot at 45% opacity was findable only by someone
+          who already knew it was there, which is the one person who does not need it. This is a
+          staging-only instrument — being loud costs nothing and being quiet cost a day. */}
       <button
         type="button"
         onClick={toggle}
-        title="UI pins (Ctrl+Shift+U)"
+        title="UI pins — click, or Ctrl+Shift+U"
         style={{
           position: "fixed",
-          bottom: 12,
-          left: 12,
+          bottom: 16,
+          left: 16,
           zIndex: 2147483647,
-          width: 28,
-          height: 28,
-          borderRadius: 14,
-          border: "1px solid rgba(255,255,255,.6)",
-          background: on ? MAGENTA : "rgba(20,20,25,.55)",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          height: 32,
+          padding: "0 12px",
+          borderRadius: 16,
+          border: "1px solid rgba(255,255,255,.35)",
+          background: on ? MAGENTA : "#14141a",
           color: "#fff",
-          fontSize: 13,
-          lineHeight: "26px",
+          font: "600 12px/32px ui-monospace, Menlo, monospace",
+          letterSpacing: ".04em",
+          boxShadow: "0 2px 10px rgba(0,0,0,.35)",
           cursor: "pointer",
-          opacity: on ? 1 : 0.45,
-          padding: 0,
         }}
       >
-        #
+        # PINS{on ? " ON" : ""}
       </button>
     </div>
   );
