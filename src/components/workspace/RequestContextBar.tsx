@@ -109,14 +109,22 @@ export function RequestContextBar({
 
             `min-w-0` is what makes `truncate` work at all inside a flex row — without it the span
             refuses to shrink below its content and the overflow escapes instead of ellipsing. */}
-        <span className="flex min-w-0 items-center gap-1 text-label font-semibold leading-[13px] text-white/60">
-          <Icon name="place" size={11} className="flex-none" />
+        {/* ── The site leads, the machine follows (owner, 2026-08-27) ────────────────────────────
+            The order of the lines is unchanged; their WEIGHT is swapped. Where the machine used to be
+            the strong line and the site the note under it, the site is now the 12.5px white and the
+            machine the 11px grey.
+
+            The item tier under the rail is why that works: the machine is named there in full, on a
+            chip that also says which one is being read, so the bar does not have to carry it loudly
+            as well. What the tier cannot say is where the work is. */}
+        <span className="flex min-w-0 items-center gap-1.5 text-meta font-semibold leading-[15px] text-white">
+          <Icon name="place" size={13} className="flex-none" />
           <span className="truncate">{group.locationLabel}</span>
         </span>
-        <span className="flex min-w-0 items-center gap-1.5 text-meta font-semibold leading-[15px] text-white">
+        <span className="flex min-w-0 items-center gap-1.5 text-label font-semibold leading-[13px] text-white/60">
           <span className="truncate">{label}</span>
           {qty > 1 && (
-            <span className="flex-none rounded-full bg-white/15 px-1.5 text-label font-semibold text-white/80">
+            <span className="flex-none rounded-full bg-white/15 px-1.5 text-label font-semibold text-white/70">
               ×{qty}
             </span>
           )}
