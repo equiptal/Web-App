@@ -46,11 +46,10 @@ describe("the palette is defined once, in two places that must agree", () => {
 
   it("builds a :root block a standalone document can use", () => {
     expect(DS_ROOT_CSS.startsWith(":root{")).toBe(true);
-    expect(DS_ROOT_CSS).toContain("--navy:#1c3550;");
-    expect(DS_ROOT_CSS).toContain("--warn:#ed6a5e;");
-    // Every token, so a document that prepends this can use any of them.
-    for (const varName of Object.values(CSS_VAR_NAME)) {
-      expect(DS_ROOT_CSS).toContain(`${varName}:`);
+    // Every token, at its current value — read from the palette rather than written out here, so a
+    // colour the owner changes his mind about does not also break this file.
+    for (const key of Object.keys(COLORS) as (keyof typeof COLORS)[]) {
+      expect(DS_ROOT_CSS).toContain(`${CSS_VAR_NAME[key]}:${COLORS[key]};`);
     }
   });
 });

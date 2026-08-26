@@ -573,7 +573,7 @@ describe("the surface's stylesheet carries the same colour tokens the models do"
     // the line of text. `var(--brand-deep)` is the prototype's own ink for this sentence (decoded 3779) — a
     // darkened orange, and the check that matters is that it is warm and is not the availability red.
     const line = hex(cssBlock(css, ".bidmap .bm-short-t {"));
-    expect(line).toContain("var(--brand-deep)");
+    expect(line).toContain("var(--warn-deep)");
     expect(line).not.toContain(AVAILABILITY_COLOUR.unconfirmed);
   });
 

@@ -477,7 +477,7 @@
 .bm-pin .bm-pinfo-far {
   font-size: 10.5px;
   font-weight: 700;
-  color: var(--brand-deep);
+  color: var(--warn-deep);
   white-space: nowrap;
 }
 .bm-pin .bm-pinfo-km {
@@ -554,7 +554,7 @@
   padding: 2px 9px;
   font-size: 10px;
   font-weight: 800;
-  color: var(--brand-deep);
+  color: var(--warn-deep);
   white-space: nowrap;
 }
 
@@ -667,7 +667,7 @@
      the pills and the shortfall each carry their own fill; making the column white behind them left
      the pills and the shortfall floating on one shade and the list on another. The takeovers
      (`.mp`, `.mp-over`) set their own white and are unaffected. */
-  background: var(--border-strong);
+  background: var(--surface2);
   /* The divider is on whichever edge FACES THE MAP, which is now the trailing one. */
   border-inline-end: 1px solid var(--surface3);
 }
@@ -924,7 +924,7 @@
    and can join it — see `.bm-short-s`. With nothing pending it collapses to exactly the prototype's
    single flexed span. */
 .bidmap .bm-short-body { flex: 1; min-width: 0; }
-.bidmap .bm-short-t { font-size: 10.5px; font-weight: 700; color: var(--brand-deep); line-height: 1.4; }
+.bidmap .bm-short-t { font-size: 10.5px; font-weight: 700; color: var(--warn-deep); line-height: 1.4; }
 /* NOT in the prototype, and deliberately kept: the one thing this line says is why the button beside
    it is inert, and a disabled control whose label merely changed to «تم الطلب» leaves the renter
    guessing whether the ask failed. It renders only while an ask is outstanding, so the resting alert
@@ -969,7 +969,7 @@
   min-height: 0;
   overflow-y: auto;
   padding: 11px 14px;
-  background: var(--border-strong);
+  background: var(--surface2);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1084,7 +1084,7 @@
   align-items: center;
   justify-content: center;
   background-color: var(--surface2);
-  background-image: linear-gradient(90deg, var(--surface3) 20%, var(--surface3) 40%, var(--surface3) 60%);
+  background-image: linear-gradient(90deg, var(--background) 20%, var(--surface3) 40%, var(--surface3) 60%);
   background-size: 220% 100%;
   animation: dpShimmer 1.25s linear infinite;
   border-inline-end: 1px solid var(--surface3);
@@ -1253,7 +1253,7 @@
   top: 6px;
   inset-inline-start: 6px;
   pointer-events: none;
-  color: var(--brand-deep);
+  color: var(--warn-deep);
   background: var(--brand-soft);
   border: 1px solid color-mix(in srgb, var(--brand) 45%, transparent);
 
@@ -1274,7 +1274,7 @@
    turns a delivery into a mobilisation worth asking about. Stated in the state row rather than beside
    the distance: it qualifies the offer, not the number. Deliberately plain text, not a chip — the row
    already carries one chip, and a second would read as a second availability state. */
-.bidmap .bm-eq .bm-eq-far { flex-shrink: 0; font-size: 10.5px; font-weight: 700; color: var(--brand-deep); white-space: nowrap; }
+.bidmap .bm-eq .bm-eq-far { flex-shrink: 0; font-size: 10.5px; font-weight: 700; color: var(--warn-deep); white-space: nowrap; }
 /* BLUE, never navy (RM3-AC-33): beside a red chip, navy reads as disabled, and this is the one control
    the renter is supposed to press.
 
@@ -1325,7 +1325,7 @@
 .bidmap .bm-eq .bm-eq-r4 { display: flex; align-items: center; gap: 5px; min-height: 19px; overflow: hidden; }
 .bidmap .bm-eq .bm-eq-cert {
   flex-shrink: 0;
-  color: var(--brand-deep);
+  color: var(--warn-deep);
   background: color-mix(in srgb, var(--brand) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--brand) 32%, transparent);
   border-radius: 7px;
@@ -1541,7 +1541,7 @@
   align-items: center;
   gap: 5px;
   background: var(--surface);
-  border: 1px solid var(--surface3);
+  border: 1px solid var(--border);
   border-radius: 999px;
   padding: 4px 9px;
   font-size: 10.5px;
@@ -1631,7 +1631,7 @@
 .bidmap .bm-note { font-size: 9.5px; color: var(--muted); font-weight: 600; margin-top: 4px; line-height: 1.6; }
 
 /* Sort tabs — exactly two (D-D, AC-24). Rating is retired and there is no distance band (D-C). */
-.bidmap .bm-sorts { display: flex; gap: 5px; margin-top: 10px; background: var(--border-strong); padding: 3px; border-radius: 10px; }
+.bidmap .bm-sorts { display: flex; gap: 5px; margin-top: 10px; background: var(--surface2); padding: 3px; border-radius: 10px; }
 .bidmap .bm-sort {
   flex: 1;
   background: transparent;
@@ -1747,7 +1747,7 @@
   flex-shrink: 0;
   font-size: 8.5px;
   font-weight: 800;
-  color: var(--brand-deep);
+  color: var(--warn-deep);
   background: color-mix(in srgb, var(--warn) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--warn) 25%, transparent);
   border-radius: 20px;
@@ -1788,7 +1788,7 @@
 }
 .bidmap .bm-units .u-off { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; color: var(--navy-deep); }
 .bidmap .bm-units .u-id { display: flex; align-items: center; gap: 6px; font-size: 9.5px; font-weight: 700; color: var(--ok); }
-.bidmap .bm-units .u-un { display: flex; align-items: center; gap: 6px; font-size: 9.5px; font-weight: 700; color: var(--brand-deep); }
+.bidmap .bm-units .u-un { display: flex; align-items: center; gap: 6px; font-size: 9.5px; font-weight: 700; color: var(--warn-deep); }
 
 /* ── Colour key (T15) — hosted INSIDE the panel, below the scroll area. Never a floating overlay: at a
    low z-index with `inset-inline-end` it renders BEHIND this panel in RTL, which is how the key became
@@ -2434,7 +2434,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: var(--border-strong);
+  background: var(--surface2);
   border: 1px solid var(--surface3);
   border-radius: 16px;
   padding: 5px 10px;
@@ -2701,7 +2701,7 @@
 }
 .bidmap .bm-chat-phase .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .bidmap .bm-chat-phase.is-done { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 32%, transparent); }
-.bidmap .bm-chat-phase.is-off { color: var(--muted); border-color: var(--muted-light); }
+.bidmap .bm-chat-phase.is-off { color: var(--muted); border-color: var(--border); }
 
 /* The ⋮ — the same 30px round control the close button is, because they sit on one row and a kebab
    that outweighed the close would read as the louder act. */

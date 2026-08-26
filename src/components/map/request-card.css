@@ -52,7 +52,7 @@
 .bm-rq.is-refused { --rq-accent: var(--danger); --rq-tint: var(--danger-soft); --rq-edge: color-mix(in srgb, var(--danger) 55%, transparent); --rq-rule: color-mix(in srgb, var(--danger) 22%, transparent); }
 /* The DRAFT is the same card, in blue and lifted — the prototype's only two differences besides the
    buttons. It has to read as "not yet in the conversation" at a glance, from the frame alone. */
-.bm-rq.is-draft { border-color: var(--info-deep); }
+.bm-rq.is-draft { border-color: var(--info); }
 
 /* ── V12c · the answer's arrival cue (owner, 2026-08-11) ─────────────────────────────────────────
    *"light plumbing or something to show the answer when opening the chat"*.
@@ -128,7 +128,9 @@
 .bm-rq-tile.has-photo { background: var(--surface3); border-color: transparent; }
 /* The firm, not a machine — the prototype's second gradient, so the two scopes are told apart before
    the title is read. A company card names no equipment, so there is no picture to show instead. */
-.bm-rq-tile.is-co { background: linear-gradient(135deg, var(--navy-mid), var(--info-deep)); border-color: transparent; color: var(--surface); }
+/* Two blues, dark into bright — the prototype ran #1e4a7a into #2563eb, and the direction is the
+   point: the tile lifts toward the light rather than sinking. */
+.bm-rq-tile.is-co { background: linear-gradient(135deg, var(--info-deep), var(--info)); border-color: transparent; color: var(--surface); }
 .bm-rq-tile img { width: 100%; height: 100%; object-fit: cover; }
 .bm-rq-tile .material-icons-outlined { font-size: 22px; }
 .bm-rq-who { flex: 1; min-width: 0; display: block; }
@@ -217,6 +219,6 @@
   cursor: pointer;
 }
 .bm-rq-btn:disabled { opacity: 0.55; cursor: default; }
-.bm-rq-btn.ghost { flex: 1; background: var(--border-strong); border: 1.5px solid var(--border-strong); color: var(--navy); }
+.bm-rq-btn.ghost { flex: 1; background: var(--surface); border: 1.5px solid var(--border-strong); color: var(--navy); }
 /* `flex: 2` — the prototype's own weighting. The send is the action; the cancel is the way out. */
 .bm-rq-btn.go { flex: 2; background: var(--info); border: 0; color: var(--surface); }
