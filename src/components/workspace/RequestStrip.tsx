@@ -129,14 +129,14 @@ export function RequestStrip({
           the other way round — a navy strip with a white card floating in it — which spent the
           brightest surface on the chrome and left the machine, the offer and the controls sharing a
           panel inside it. The card is the subject now; the navy names what it belongs to. */}
-      <div className="flex items-stretch gap-3 rounded-[14px] bg-surface p-1.5 shadow-[0_2px_10px_rgba(19,44,74,.07)]">
+      <div className="flex items-stretch gap-3 rounded-lg bg-surface p-1.5">
         {/* ── The request ── */}
-        <div className="flex flex-none flex-col justify-center gap-1 rounded-[11px] bg-navy px-4 py-2.5 text-white">
+        <div className="flex flex-none flex-col justify-center gap-1 rounded-lg bg-navy px-4 py-2.5 text-white">
           <button
             type="button"
             onClick={onOpenRequest ?? undefined}
             disabled={!onOpenRequest}
-            className="flex items-center gap-1.5 text-start text-[15px] font-extrabold leading-tight tracking-[-.01em] underline-offset-4 hover:underline disabled:no-underline"
+            className="flex items-center gap-1.5 text-start text-subhead font-extrabold leading-tight tracking-[-.01em] underline-offset-4 hover:underline disabled:no-underline"
             title={group.address ?? group.locationLabel}
           >
             {group.locationLabel}
@@ -148,19 +148,19 @@ export function RequestStrip({
                 type="button"
                 onClick={onOpenRequest ?? undefined}
                 disabled={!onOpenRequest}
-                className="text-[11.5px] font-semibold text-white/60 underline decoration-white/30 underline-offset-4 hover:decoration-white disabled:no-underline"
+                className="text-label font-semibold text-white/60 underline decoration-white/30 underline-offset-4 hover:decoration-white disabled:no-underline"
               >
                 {requestRef}
               </button>
             )}
-            <span className="text-[11.5px] font-semibold text-white/35">·</span>
-            <span className="text-[12px] font-extrabold text-brand">
+            <span className="text-label font-semibold text-white/35">·</span>
+            <span className="text-meta font-extrabold text-brand">
               {bidCount} {bidCount === 1 ? t.workspace.bidWord : t.workspace.bidsWord}
             </span>
             {raised && (
               <>
-                <span className="text-[11.5px] font-semibold text-white/35">·</span>
-                <span className="text-[11px] font-medium text-white/45">{raised}</span>
+                <span className="text-label font-semibold text-white/35">·</span>
+                <span className="text-label font-semibold text-white/45">{raised}</span>
               </>
             )}
           </div>
@@ -178,7 +178,7 @@ export function RequestStrip({
             floor and the word still fits: eleven uppercase characters at ~5.3px of advance is 58px
             inside a 70px tile. The rule was «read in full»; the way to keep it was to measure, not
             to shrink until it happened to go in. */}
-        <span className="relative my-1 grid h-12 w-[70px] flex-none place-items-center overflow-hidden rounded-[8px] border border-border bg-surface2">
+        <span className="relative my-1 grid h-12 w-[70px] flex-none place-items-center overflow-hidden rounded-sm border border-border bg-surface2">
           {photo ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src={photo} alt="" className="h-full w-full object-cover" />
@@ -188,7 +188,7 @@ export function RequestStrip({
           {bid && (
             <>
               <span
-                className={`absolute inset-x-0 bottom-0 whitespace-nowrap px-0.5 py-[2px] text-center text-[8px] font-extrabold uppercase tracking-[.03em] text-white ${
+                className={`absolute inset-x-0 bottom-0 whitespace-nowrap px-0.5 py-1 text-center text-label font-extrabold uppercase tracking-[.03em] text-white ${
                   confirmed ? "bg-ok/90" : "bg-navy/85"
                 }`}
               >
@@ -208,14 +208,14 @@ export function RequestStrip({
 
         {/* ── The item, and the offer against it ── */}
         <div className="flex min-w-0 flex-1 flex-col justify-center">
-          <div className="truncate text-[15px] font-extrabold leading-tight text-navy">{itemLabel}</div>
+          <div className="truncate text-subhead font-extrabold leading-tight text-navy">{itemLabel}</div>
 
           {bid ? (
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <span className="flex-none text-[12px] font-semibold text-muted">
+              <span className="flex-none text-meta font-semibold text-muted">
                 {t.workspace.offers.replace("{supplier}", bid.supplierName)}
               </span>
-              <span className="flex-none text-[12.5px] font-extrabold text-navy">
+              <span className="flex-none text-meta font-extrabold text-navy">
                 {offered ?? "—"}
                 {offeredYear ? ` · ${offeredYear}` : ""}
               </span>
@@ -224,7 +224,7 @@ export function RequestStrip({
                   it says nothing: nobody was ever asked. */}
               {units.length > 0 && (
                 <span
-                  className={`rounded-md border px-2 py-[3px] text-[11px] font-semibold ${
+                  className={`rounded-sm border px-2 py-1 text-label font-semibold ${
                     confirmed ? "border-ok/25 bg-ok-soft text-ok" : "border-border bg-surface2 text-navy-mid"
                   }`}
                 >
@@ -251,7 +251,7 @@ export function RequestStrip({
                   </Chip>
                 ))}
                 {certs.length > 2 && (
-                  <span className="text-[11px] font-semibold text-muted">
+                  <span className="text-label font-semibold text-muted">
                     {fmt(t.workspace.chipMore, { n: String(certs.length - 2) })}
                   </span>
                 )}
@@ -279,7 +279,7 @@ export function RequestStrip({
                 onClick={() => setMoreOpen((o) => !o)}
                 aria-expanded={moreOpen}
                 aria-label={fmt(t.workspace.chipMore, { n: String(hidden.length) })}
-                className="flex-none rounded-full border border-brand/25 bg-brand-soft px-2.5 py-1.5 text-[11.5px] font-extrabold text-brand transition hover:brightness-95"
+                className="flex-none rounded-full border border-brand/25 bg-brand-soft px-2.5 py-1.5 text-label font-extrabold text-brand transition"
               >
                 +{hidden.length}
               </button>
@@ -287,7 +287,7 @@ export function RequestStrip({
             {moreOpen && hidden.length > 0 && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setMoreOpen(false)} />
-                <div className="absolute end-0 top-[calc(100%+8px)] z-50 flex min-w-[190px] flex-col gap-1.5 rounded-[14px] border border-border bg-surface p-2.5 shadow-[0_14px_34px_rgba(19,44,74,.18)]">
+                <div className="absolute end-0 top-[calc(100%+8px)] z-50 flex min-w-[190px] flex-col gap-1.5 rounded-sm border border-border bg-surface p-2.5">
                   {hidden.map((it) => (
                     <SiblingChip
                       key={it.id}
@@ -308,24 +308,32 @@ export function RequestStrip({
 
         {/* ── The two ways into the picked bid ─────────────────────────────────────────────────────
             «Review equipment» opens the machines on the map, where availability is answered in full;
-            «View documents» opens that same surface on the papers. Both need a bid to point at, so
-            they read as inert until one is picked. */}
+            «View documents» opens that same surface on the papers. Both need a bid to point at.
+
+            ── With nothing picked, the first button NAMES the reason (owner, 2026-08-26) ──────────
+            It used to read «Review equipment» in a dimmed navy, which says what the control does and
+            leaves the renter to work out why it will not do it. It now reads «Select a bid first»,
+            and drops to the outline the second button already wears — a filled button that cannot be
+            pressed still looks like the thing to press. The label IS the instruction; nothing else on
+            this row had to carry it. */}
         <div className="flex w-[152px] flex-none flex-col justify-center gap-1.5 pe-1">
           <button
             type="button"
             disabled={!bid}
             onClick={() => goEquipment()}
-            className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
-              bid ? "bg-navy text-white hover:bg-navy-mid" : "cursor-default bg-navy/25 text-white/70"
+            className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-label font-semibold transition ${
+              bid
+                ? "border-navy bg-navy text-white hover:bg-navy-mid"
+                : "cursor-default border-border bg-surface text-navy"
             }`}
           >
-            {t.workspace.reviewEquipment}
+            {bid ? t.workspace.reviewEquipment : t.workspace.selectBidFirst}
           </button>
           <button
             type="button"
             disabled={!bid}
             onClick={() => goEquipment("documents")}
-            className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-bold transition ${
+            className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-label font-semibold transition ${
               bid ? "border-border bg-surface text-navy hover:bg-surface2" : "cursor-default border-border/60 bg-surface text-navy/35"
             }`}
           >
@@ -365,7 +373,7 @@ function SiblingChip({
       type="button"
       onClick={onPick}
       title={label}
-      className={`truncate rounded-full border border-border bg-surface2 px-3 py-1.5 text-[11.5px] font-bold text-navy-mid transition hover:border-navy-mid hover:bg-surface3 ${
+      className={`truncate rounded-full border border-border bg-surface2 px-3 py-1.5 text-label font-semibold text-navy-mid transition hover:border-navy-mid hover:bg-surface3 ${
         block ? "w-full text-center" : "max-w-[150px] flex-none"
       }`}
     >
@@ -386,13 +394,13 @@ function SiblingChip({
 function Chip({ children, tone = "plain", lead }: { children: ReactNode; tone?: "plain" | "cert" | "duration"; lead?: string }) {
   const skin =
     tone === "cert"
-      ? "border-brand/25 bg-brand-soft text-brand font-bold"
+      ? "border-brand/25 bg-brand-soft text-brand font-semibold"
       : tone === "duration"
         ? "border-info/25 bg-info-soft text-info font-extrabold"
         : "border-border bg-surface2 text-navy-mid font-semibold";
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-[5px] text-[10.5px] ${skin}`}>
-      {lead && <span className="text-[8px] font-bold uppercase tracking-[.08em] opacity-70">{lead}</span>}
+    <span className={`inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 text-label ${skin}`}>
+      {lead && <span className="text-label font-semibold uppercase tracking-[.08em] opacity-70">{lead}</span>}
       {children}
     </span>
   );
