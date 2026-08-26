@@ -3,8 +3,8 @@
 .dlproto {
   --action: var(--brand);
   --action-dim: var(--brand-soft);
-  --rentee: var(--info);
-  --supplier: var(--ok);
+  --rentee: #2563eb;
+  --supplier: #0d8a6a;
   --success: var(--ok);
   --success-bg: var(--ok-soft);
   --warning: var(--warn);
@@ -12,7 +12,7 @@
   --danger-bg: var(--danger-soft);
   --surface1: var(--surface);
   --line: var(--surface3);
-  --text-disabled: var(--muted-light);
+  --text-disabled: #9bb3c8;
   --shadow: color-mix(in srgb, var(--navy) 6%, transparent);
   --r-sm: 8px;
   --r-md: 10px;
@@ -38,8 +38,8 @@
 .dlproto .btn .material-icons-outlined { font-size: 18px; }
 
 /* ── top bar (§5.2) — prototype chatTopHeader: pale-blue bar, supplier chip · equipment · phase · icons ── */
-.dlproto .topbar { display: flex; align-items: center; gap: 14px; padding: 10px 16px; background: var(--info-soft); border: 1px solid var(--info-soft); border-radius: var(--r-lg); margin-bottom: 14px; overflow-x: auto; }
-.dlproto .tb-sup { display: inline-flex; align-items: center; gap: 10px; background: var(--surface1); border: 1px solid var(--info-soft); border-radius: 12px; padding: 6px 12px; cursor: pointer; flex: 0 0 auto; font: inherit; }
+.dlproto .topbar { display: flex; align-items: center; gap: 14px; padding: 10px 16px; background: var(--info-soft); border: 1px solid #cfe6f7; border-radius: var(--r-lg); margin-bottom: 14px; overflow-x: auto; }
+.dlproto .tb-sup { display: inline-flex; align-items: center; gap: 10px; background: var(--surface1); border: 1px solid #cfe6f7; border-radius: 12px; padding: 6px 12px; cursor: pointer; flex: 0 0 auto; font: inherit; }
 .dlproto .tb-sup .av { width: 38px; height: 38px; border-radius: 50%; background: var(--supplier); color: var(--surface); font-weight: 800; font-size: 15px; display: grid; place-items: center; flex: 0 0 auto; }
 .dlproto .tb-sup .nm { display: flex; flex-direction: column; gap: 1px; min-width: 0; text-align: start; }
 .dlproto .tb-sup .nm .n { display: inline-flex; align-items: center; gap: 5px; font-size: 15px; font-weight: 800; color: var(--info); white-space: nowrap; }
@@ -47,7 +47,7 @@
    the ink is set here. The old rule targeted Material's glyph and no longer matches anything. */
 .dlproto .tb-sup .nm .n .tb-tick { flex-shrink: 0; color: var(--success); }
 .dlproto .tb-sup .nm .sub { font-size: 11.5px; font-weight: 600; color: var(--muted); white-space: nowrap; }
-.dlproto .tb-div { width: 1px; height: 34px; background: var(--info-soft); flex: 0 0 auto; }
+.dlproto .tb-div { width: 1px; height: 34px; background: #cfe6f7; flex: 0 0 auto; }
 .dlproto .tb-eq { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; font: inherit; text-align: start; background: none; border: 0; padding: 0; cursor: pointer; border-radius: 12px; }
 .dlproto .tb-eq:hover .meta .t { text-decoration: underline; }
 .dlproto .tb-eq .chev { font-size: 18px; color: var(--muted); flex: 0 0 auto; }
@@ -56,13 +56,13 @@
 .dlproto .tb-eq .ic .material-icons-outlined { font-size: 20px; }
 .dlproto .tb-eq .meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .dlproto .tb-eq .meta .t { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800; color: var(--navy); white-space: nowrap; }
-.dlproto .tb-code { font-size: 11px; font-weight: 800; color: var(--info); background: var(--surface1); border: 1px solid var(--info-soft); border-radius: 7px; padding: 2px 8px; direction: ltr; }
+.dlproto .tb-code { font-size: 11px; font-weight: 800; color: var(--info); background: var(--surface1); border: 1px solid #cfe6f7; border-radius: 7px; padding: 2px 8px; direction: ltr; }
 .dlproto .tb-eq .meta .sub { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
-.dlproto .tb-phase { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 800; color: var(--info); background: var(--surface1); border: 1px solid var(--info-soft); border-radius: var(--r-full); padding: 6px 14px; flex: 0 0 auto; white-space: nowrap; }
+.dlproto .tb-phase { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 800; color: var(--info); background: var(--surface1); border: 1px solid #cfe6f7; border-radius: var(--r-full); padding: 6px 14px; flex: 0 0 auto; white-space: nowrap; }
 .dlproto .tb-phase .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .dlproto .tb-spacer { flex: 1; }
 .dlproto .tb-icons { display: flex; gap: 8px; flex: 0 0 auto; }
-.dlproto .tb-ic { width: 40px; height: 40px; border-radius: 50%; background: var(--surface1); border: 1px solid var(--info-soft); color: var(--info); display: grid; place-items: center; cursor: pointer; }
+.dlproto .tb-ic { width: 40px; height: 40px; border-radius: 50%; background: var(--surface1); border: 1px solid #cfe6f7; color: var(--info); display: grid; place-items: center; cursor: pointer; }
 .dlproto .tb-ic.call { color: #25d366; } .dlproto .tb-ic.locked { color: var(--text-disabled); cursor: not-allowed; }
 .dlproto .tb-ic .material-icons-outlined { font-size: 18px; }
 
@@ -70,10 +70,10 @@
    end-side action cluster (status pill + CTAs), and a breakdown popover. ── */
 .dlproto .price-bar { position: relative; display: flex; align-items: center; justify-content: center; min-height: 84px; padding: 20px 22px 18px; margin-bottom: 16px; background: var(--navy-deep); color: var(--surface); border-radius: var(--r-lg); }
 /* status pill pinned to the top corner (end: right in LTR, left in RTL) */
-.dlproto .pb-status { position: absolute; top: 14px; inset-inline-end: 16px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; padding: 4px 11px; border-radius: var(--r-full); background: color-mix(in srgb, var(--border-strong) 14%, transparent); border: 1px solid color-mix(in srgb, var(--border-strong) 34%, transparent); color: var(--border-strong); }
+.dlproto .pb-status { position: absolute; top: 14px; inset-inline-end: 16px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; padding: 4px 11px; border-radius: var(--r-full); background: color-mix(in srgb, var(--border-strong) 14%, transparent); border: 1px solid color-mix(in srgb, var(--border-strong) 34%, transparent); color: #8fd0ff; }
 .dlproto .pb-status .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.dlproto .pb-status.done { background: color-mix(in srgb, var(--ok) 16%, transparent); border-color: color-mix(in srgb, var(--ok) 40%, transparent); color: var(--ok); }
-.dlproto .pb-status.wait { background: color-mix(in srgb, var(--warn) 16%, transparent); border-color: color-mix(in srgb, var(--warn) 42%, transparent); color: var(--brand-light); }
+.dlproto .pb-status.done { background: color-mix(in srgb, var(--ok) 16%, transparent); border-color: color-mix(in srgb, var(--ok) 40%, transparent); color: #6fe0a0; }
+.dlproto .pb-status.wait { background: color-mix(in srgb, var(--warn) 16%, transparent); border-color: color-mix(in srgb, var(--warn) 42%, transparent); color: #f3c77a; }
 .dlproto .pb-btns { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
 .dlproto .pb-btn { display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 12px; padding: 9px 16px; font: inherit; font-weight: 800; font-size: 13px; cursor: pointer; color: var(--surface); }
 .dlproto .pb-btn.neg { background: var(--rentee); }
@@ -84,8 +84,8 @@
 /* centered price block */
 .dlproto .pb-center { display: flex; flex-direction: column; align-items: center; gap: 5px; text-align: center; }
 .dlproto .pb-src { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: rgba(255, 255, 255, 0.72); }
-.dlproto .pb-src .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border-strong); }
-.dlproto .pb-src.done .dot { background: var(--ok); } .dlproto .pb-src.wait .dot { background: var(--brand-light); }
+.dlproto .pb-src .dot { width: 8px; height: 8px; border-radius: 50%; background: #8fd0ff; }
+.dlproto .pb-src.done .dot { background: #6fe0a0; } .dlproto .pb-src.wait .dot { background: #f3c77a; }
 .dlproto .pb-hero { display: flex; align-items: baseline; gap: 8px; }
 .dlproto .pb-hero .n { font-family: "IBM Plex Sans", monospace; font-size: 52px; font-weight: 800; letter-spacing: -1.5px; line-height: 1; color: var(--surface); }
 .dlproto .pb-hero .u { font-size: 17px; font-weight: 600; color: rgba(255, 255, 255, 0.68); }
@@ -93,7 +93,7 @@
 .dlproto .pb-seg { display: inline-flex; background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 2px; }
 .dlproto .pb-seg button { border: 0; background: none; color: rgba(255, 255, 255, 0.75); font: inherit; font-size: 11.5px; font-weight: 800; padding: 4px 12px; border-radius: 7px; cursor: pointer; }
 .dlproto .pb-seg button.on { background: var(--surface); color: var(--navy); }
-.dlproto .pb-details { background: none; border: 0; color: var(--border-strong); font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; }
+.dlproto .pb-details { background: none; border: 0; color: #8fd0ff; font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; }
 .dlproto .pb-details .material-icons-outlined { font-size: 15px; transition: 0.2s; }
 .dlproto .pb-details.open .material-icons-outlined { transform: rotate(180deg); }
 /* breakdown popover — click-away backdrop closes it (sits below the popover) */
@@ -104,7 +104,7 @@
 .dlproto .pb-brow .v { font-family: "IBM Plex Sans", monospace; font-size: 15px; font-weight: 800; color: var(--surface); }
 .dlproto .pb-brow .v.ex { color: rgba(255, 255, 255, 0.4); font-family: inherit; font-weight: 700; }
 .dlproto .pb-brow.tot { border-top: 1px solid rgba(255, 255, 255, 0.2); margin-top: 4px; padding-top: 10px; }
-.dlproto .pb-brow.tot .l { font-weight: 800; color: var(--surface); } .dlproto .pb-brow.tot .v { font-size: 17px; color: var(--border-strong); }
+.dlproto .pb-brow.tot .l { font-weight: 800; color: var(--surface); } .dlproto .pb-brow.tot .v { font-size: 17px; color: #8fd0ff; }
 /* «Per unit» — the heading that makes the block under it readable on a multi-unit deal, and which a
    single-unit deal never draws because there would be nothing to distinguish it from. */
 .dlproto .pb-bhead { font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); padding-bottom: 2px; }
@@ -174,7 +174,7 @@
 
    KEEP when pruning: `.composer` itself, `.composer.ro`, `.ro-note` and `.composer.quote-bar`. The
    quotation link and the closed/cancelled notes still use them, and they are not chat. ── */
-.dlproto .thread { flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 16px; background: var(--surface3); }
+.dlproto .thread { flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 16px; background: #E9EEF3; }
 /* ── the system line, measured against the app (`deal_system_events.dart`) ────────────────────────
    Same pill on both clients, down to the alphas: muted at 20% behind a 30% hairline, radius full,
    7px/12px, at most 85% of the width.
@@ -344,21 +344,21 @@
   align-self: flex-start;
   background: var(--surface);
   border: 0;
-  color: var(--navy-deep);
+  color: #16304f;
   border-end-end-radius: 4px;
 }
 .dlproto .msg.mine {
   align-self: flex-end;
-  background: var(--surface3);
+  background: #d9eeff;
   border: 0;
-  color: var(--navy-deep);
+  color: #16304f;
   border-end-start-radius: 4px;
 }
 .dlproto .msg.mine .meta { text-align: end; }
 /* «حفظ» beside an attachment, in the bubble's own ink both sides — the outgoing fill is pale now, so
    the white this used to be on `.msg.mine` would be invisible. */
-.dlproto .msg .msg-att-dl { color: var(--info); }
-.dlproto .msg.mine .msg-att-dl { color: var(--info); }
+.dlproto .msg .msg-att-dl { color: #2563eb; }
+.dlproto .msg.mine .msg-att-dl { color: #1d4ed8; }
 /* supplier-started banner */
 .dlproto .started-banner { display: flex; align-items: center; gap: 8px; margin: 10px 0; padding: 10px 13px; border-radius: 10px; background: var(--info-bg); color: var(--info); font-size: 12.5px; font-weight: 700; }
 .dlproto .started-banner .material-icons-outlined { font-size: 17px; flex: 0 0 auto; }
@@ -384,13 +384,13 @@
    same blue: the live control in the composer and the live control in the bar now read as one family,
    with «Accept» keeping the green that separates settling from negotiating. */
 .dlproto .composer { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 12px 18px; background: var(--surface1); border-top: 1px solid var(--border); }
-.dlproto .composer .ib { width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--surface); color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; }
+.dlproto .composer .ib { width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 1px solid #c8d8e8; background: var(--surface); color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; }
 .dlproto .composer .ib .material-icons-outlined { font-size: 17px; }
 .dlproto .composer .ib:disabled { opacity: 0.5; cursor: default; }
-.dlproto .composer input { flex: 1; min-width: 0; height: auto; border: 1px solid var(--border-strong); border-radius: 20px; padding: 10px 14px; font: inherit; font-size: 12.5px; color: var(--navy-deep); outline: 0; background: var(--surface); }
-.dlproto .composer input:focus { border-color: var(--info); background: var(--surface); }
+.dlproto .composer input { flex: 1; min-width: 0; height: auto; border: 1px solid #c8d8e8; border-radius: 20px; padding: 10px 14px; font: inherit; font-size: 12.5px; color: #16304f; outline: 0; background: #f8fafc; }
+.dlproto .composer input:focus { border-color: #2563eb; background: var(--surface); }
 .dlproto .composer input:disabled { opacity: 0.65; }
-.dlproto .composer .send { background: var(--info); border-color: var(--info); color: var(--surface); }
+.dlproto .composer .send { background: #2563eb; border-color: #2563eb; color: var(--surface); }
 .dlproto .composer.ro { justify-content: center; } .dlproto .ro-note { font-size: 13px; font-weight: 700; color: var(--muted); }
 /* closed-deal quotation download (app parity) */
 .dlproto .composer.quote-bar { flex-direction: column; gap: 6px; }
@@ -398,7 +398,7 @@
 .dlproto .dl-quote:hover:not(:disabled) { filter: brightness(1.05); }
 .dlproto .dl-quote:disabled { opacity: 0.7; cursor: default; }
 .dlproto .dl-quote .material-icons-outlined { font-size: 19px; }
-.dlproto .quote-err { color: var(--danger, var(--danger)); }
+.dlproto .quote-err { color: var(--danger, #d92d20); }
 .dlproto[dir="rtl"] .composer .send .material-icons-outlined { transform: scaleX(-1); }
 
 /* The composer and the quotation link share ONE sticky footer, so the link sits BELOW the composer
@@ -424,7 +424,7 @@
    ════════════════════════════════════════════════════════════════════════════════════════════ */
 .qp-scrim { position: fixed; inset: 0; z-index: 60; background: color-mix(in srgb, var(--navy-deep) 50%, transparent); display: flex; align-items: center; justify-content: center; padding: clamp(10px,3%,28px); }
 .qp-scrim .material-icons-outlined { font-family: "Material Icons Outlined"; line-height: 1; }
-.qp-sheet {--rentee:var(--info); --action:var(--brand); --success:var(--ok); --success-bg:var(--ok-soft);--danger-bg:var(--danger-soft); --warning:var(--warn);--line:var(--surface3);--paper-2:var(--surface);
+.qp-sheet {--rentee: #2563eb; --action:var(--brand); --success:var(--ok); --success-bg:var(--ok-soft);--danger-bg:var(--danger-soft); --warning:var(--warn);--line:var(--surface3);--paper-2:var(--surface);
   display: flex; flex-direction: column; width: 100%; max-width: 860px; max-height: 94vh; background: var(--surface); border-radius: 16px; overflow: hidden; font-family: "Inter",-apple-system,"Segoe UI",Roboto,sans-serif; color: var(--navy); animation: dpModal .22s ease; }
 @keyframes dpModal { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: none; } }
 
@@ -440,7 +440,7 @@
 .qp-x { flex: 0 0 auto; display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); border-radius: 50%; cursor: pointer; }
 .qp-x .material-icons-outlined { font-size: 18px; }
 /* stepper */
-.qp-steps { display: flex; align-items: center; gap: 4px; padding: 12px 22px 14px; background: var(--surface2); }
+.qp-steps { display: flex; align-items: center; gap: 4px; padding: 12px 22px 14px; background: #eaf1fc; }
 .qp-step { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .qp-step .badge { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--surface2); border: 2px solid var(--border); color: var(--muted); font-size: 14px; font-weight: 800; }
 .qp-step .lbl { font-size: 15px; font-weight: 600; color: var(--muted); }
@@ -452,7 +452,7 @@
 .qp-steps .bar.done { background: var(--success); }
 
 /* body — grey "desk" holding the white paper */
-.qp-body { flex: 1 1 auto; overflow-y: auto; min-height: 0; background: var(--border); padding: 18px clamp(10px,3%,26px) 26px; }
+.qp-body { flex: 1 1 auto; overflow-y: auto; min-height: 0; background: #dbe6f1; padding: 18px clamp(10px,3%,26px) 26px; }
 .qp-paper { width: 800px; max-width: 100%; flex-shrink: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 28px 30px 38px; }
 .qp-paper + .qp-paper { margin-top: 16px; }
 
@@ -533,11 +533,11 @@
 .qp-compare .side { text-align: center; flex: 1; }
 .qp-compare .side .k { font-size: 10.5px; font-weight: 700; color: rgba(255,255,255,.7); }
 .qp-compare .side .v { font-size: 27px; font-weight: 800; font-family: "IBM Plex Sans", monospace; direction: ltr; margin-top: 2px; line-height: 1; }
-.qp-compare .side.sup .v { color: var(--brand-light); } .qp-compare .side.me .v { color: var(--border-strong); }
+.qp-compare .side.sup .v { color: #f3c77a; } .qp-compare .side.me .v { color: #8fd0ff; }
 .qp-compare .conv { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 .qp-compare .conv .track { flex: 1; height: 3px; border-radius: 3px; background: rgba(255,255,255,.18); }
 .qp-compare .conv .chip { font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,.14); white-space: nowrap; }
-.qp-compare .conv .chip.ok { background: color-mix(in srgb, var(--ok) 20%, transparent); color: var(--ok); }
+.qp-compare .conv .chip.ok { background: color-mix(in srgb, var(--ok) 20%, transparent); color: #6fe0a0; }
 /* per-line breakdown (app _DeltaTable parity) — collapsible, sits inside the dark compare card */
 .qp-cmp-toggle { display: flex; align-items: center; justify-content: center; gap: 4px; width: 100%; margin-top: 10px; background: none; border: 0; color: rgba(255,255,255,.82); font: inherit; font-size: 11.5px; font-weight: 800; cursor: pointer; }
 .qp-cmp-toggle .material-icons-outlined { font-size: 16px; }
@@ -548,7 +548,7 @@
 .qp-cmp-tbl td.ln { text-align: start; font-family: inherit; color: rgba(255,255,255,.9); }
 .qp-cmp-tbl td .u { font-size: 9.5px; font-weight: 700; color: rgba(255,255,255,.55); }
 .qp-cmp-tbl td.na { color: rgba(255,255,255,.45); font-weight: 700; }
-.qp-cmp-tbl td.gap { color: var(--brand-light); }
+.qp-cmp-tbl td.gap { color: #f3c77a; }
 
 /* classic terms table (step ②) */
 .qp-tt { width: 100%; border-collapse: collapse; }
@@ -573,8 +573,8 @@
 .qp-guide-bar { flex: 1 1 auto; height: 6px; border-radius: 6px; background: var(--surface3,var(--surface3)); overflow: hidden; max-width: 160px; margin-inline-start: auto; }
 .qp-guide-bar > div { height: 100%; background: var(--success); border-radius: 6px; }
 .qp-gcat { border-top: 1px solid var(--line); }
-.qp-gcat-h { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: var(--surface2); cursor: pointer; padding: 8px 14px; font: inherit; font-size: 12px; font-weight: 800; color: var(--navy); text-align: start; }
-.qp-gcat-h.all-matched { background: var(--ok-soft); color: var(--success); }
+.qp-gcat-h { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: #eef5ff; cursor: pointer; padding: 8px 14px; font: inherit; font-size: 12px; font-weight: 800; color: var(--navy); text-align: start; }
+.qp-gcat-h.all-matched { background: #e9f7ef; color: var(--success); }
 .qp-gcat-h .chev { margin-inline-start: auto; transition: transform .15s; }
 .qp-gcat-h .chev.open { transform: rotate(180deg); }
 .qp-grow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 16px; font-size: 12px; border-top: 1px solid var(--line); }
@@ -603,11 +603,11 @@
 /* activity log (📜 السجل) — real system_bot negotiation timeline */
 .qp-log-tabs { display: flex; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--border,var(--border)); background: var(--surface2,var(--surface2)); }
 .qp-log-tab { border: 1px solid var(--border,var(--border)); background: var(--surface1,var(--surface)); border-radius: 100px; padding: 5px 14px; font: inherit; font-size: 12px; font-weight: 800; color: var(--muted,var(--muted)); cursor: pointer; }
-.qp-log-tab.on { background: var(--rentee,var(--info)); border-color: var(--rentee,var(--info)); color: var(--surface); }
+.qp-log-tab.on { background: var(--rentee,#2563eb); border-color: var(--rentee,#2563eb); color: var(--surface); }
 .qp-log-list { list-style: none; margin: 0; padding: 6px 0; max-height: 60vh; overflow-y: auto; }
 .qp-log-row { display: flex; align-items: flex-start; gap: 9px; padding: 10px 16px; border-bottom: 1px solid var(--line,var(--surface3)); }
 .qp-log-row:last-child { border-bottom: 0; }
-.qp-log-ic { font-size: 16px; color: var(--rentee,var(--info)); flex: 0 0 auto; margin-top: 1px; }
+.qp-log-ic { font-size: 16px; color: var(--rentee,#2563eb); flex: 0 0 auto; margin-top: 1px; }
 .qp-log-txt { flex: 1; font-size: 12.5px; font-weight: 600; color: var(--navy,var(--navy)); line-height: 1.5; }
 .qp-log-time { flex: 0 0 auto; font-size: 10.5px; font-weight: 700; color: var(--muted,var(--muted)); white-space: nowrap; }
 
@@ -668,7 +668,7 @@
 .dlproto .qp-gn-legend { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: rgba(255, 255, 255, 0.82); }
 .dlproto .qp-gn-legend .d { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .dlproto .qp-gn-legend .d.ok { background: var(--success); } .dlproto .qp-gn-legend .d.df { background: var(--action); margin-inline-start: 8px; }
-.dlproto .qp-gn-review { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; font-size: 11.5px; font-weight: 800; color: var(--border-strong); }
+.dlproto .qp-gn-review { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; font-size: 11.5px; font-weight: 800; color: #8fd0ff; }
 .dlproto .qp-gncat { display: flex; flex-direction: column; gap: 6px; }
 .dlproto .qp-gncat-h { display: flex; align-items: center; gap: 7px; width: 100%; background: rgba(255, 255, 255, 0.94); color: var(--navy); border: 0; border-radius: 9px; padding: 8px 11px; font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer; text-align: start; }
 .dlproto .qp-gncat-h .cnt { margin-inline-start: auto; font-size: 10.5px; font-weight: 700; color: var(--muted); }
@@ -678,10 +678,10 @@
 .dlproto .qp-gnrow.conflict { background: color-mix(in srgb, var(--danger) 20%, transparent); }
 .dlproto .qp-gnrow.none { background: color-mix(in srgb, var(--info) 18%, transparent); }
 .dlproto .qp-gnbadge { margin-inline-start: auto; font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
-.dlproto .qp-gnbadge.match { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok); }
-.dlproto .qp-gnbadge.conflict { background: color-mix(in srgb, var(--danger) 24%, transparent); color: var(--danger-soft); }
+.dlproto .qp-gnbadge.match { background: color-mix(in srgb, var(--ok) 22%, transparent); color: #6fe0a0; }
+.dlproto .qp-gnbadge.conflict { background: color-mix(in srgb, var(--danger) 24%, transparent); color: #ff9b90; }
 .dlproto .qp-gnbadge.locked { background: rgba(255, 255, 255, 0.14); color: rgba(255, 255, 255, 0.75); }
-.dlproto .qp-gnbadge.none { background: color-mix(in srgb, var(--border-strong) 20%, transparent); color: var(--border-strong); }
+.dlproto .qp-gnbadge.none { background: color-mix(in srgb, var(--border-strong) 20%, transparent); color: #8fd0ff; }
 
 /* page-flip between the 3 sheets (§6.1) — each step mounts a fresh .qp-paper, so this replays on every
    السعر ⇄ الشروط ⇄ المراجعة transition. Respects reduced-motion. */
@@ -735,8 +735,8 @@
 }
 
 /* deal-room/negotiation — turn cue badge + pulsing Negotiate CTA (app parity: negotiateFresh) */
-.dlproto .pb-turn { display: inline-flex; align-items: center; justify-content: center; gap: 5px; margin-top: 8px; font-size: 11.5px; font-weight: 800; color: var(--border-strong); }
-.dlproto .pb-turn.alert { color: var(--brand-light); }
+.dlproto .pb-turn { display: inline-flex; align-items: center; justify-content: center; gap: 5px; margin-top: 8px; font-size: 11.5px; font-weight: 800; color: #8fd0ff; }
+.dlproto .pb-turn.alert { color: #f3c77a; }
 .dlproto .pb-btn.neg.pulse { animation: dlPulse 1.6s ease-in-out infinite; }
 @keyframes dlPulse { 0%, 100% { } 50% { outline: 6px solid color-mix(in srgb, var(--info) 0%, transparent); outline-offset: 0; } }
 
@@ -746,7 +746,7 @@
 .dlproto .qp-round-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .dlproto .qp-round-role { font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 999px; background: var(--surface2); color: var(--navy-mid); }
 .dlproto .qp-round-role.supplier { background: var(--success-bg); color: var(--supplier); }
-.dlproto .qp-round-role.rentee { background: var(--surface3); color: var(--rentee); }
+.dlproto .qp-round-role.rentee { background: #eef4ff; color: var(--rentee); }
 .dlproto .qp-round-tot { font-family: "IBM Plex Sans", monospace; font-size: 14px; font-weight: 800; color: var(--navy); }
 .dlproto .qp-round-d { margin-top: 5px; font-size: 12px; font-weight: 600; color: var(--navy-mid); display: flex; flex-wrap: wrap; gap: 4px 12px; }
 .dlproto .qp-round-t { margin-top: 4px; font-size: 10.5px; font-weight: 600; color: var(--muted); }
