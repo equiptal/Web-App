@@ -94,17 +94,26 @@ export function RequestContextBar({
         disabled={!onOpenRequest}
         title={group.address ?? group.locationLabel}
         className={cx(
-          "control-md flex flex-col justify-center rounded-s-md border border-navy bg-navy !px-3 text-start transition-colors",
+          "control-md flex min-w-0 max-w-[30rem] flex-col justify-center rounded-s-md border border-navy bg-navy !px-3 text-start transition-colors",
           others.length === 0 && "rounded-e-md",
           onOpenRequest ? "hover:bg-navy-mid" : "cursor-default",
         )}
       >
-        <span className="flex items-center gap-1 text-label font-semibold leading-[13px] text-white/60">
+        {/* ── Sized to the name, not to 170px (owner, 2026-08-27) ────────────────────────────────
+            Both lines were capped at 170, which cut «Impact Hammer (Diesel/Hydraulic)» in half and
+            cut a Riyadh street address well before its district. The cap is on the BUTTON now and it
+            is generous: the bar takes what the name needs, up to 30rem, and only past that does
+            anything truncate. The two lines no longer cap each other, so a long address does not
+            shorten the machine's name.
+
+            `min-w-0` is what makes `truncate` work at all inside a flex row — without it the span
+            refuses to shrink below its content and the overflow escapes instead of ellipsing. */}
+        <span className="flex min-w-0 items-center gap-1 text-label font-semibold leading-[13px] text-white/60">
           <Icon name="place" size={11} className="flex-none" />
-          <span className="max-w-[170px] truncate">{group.locationLabel}</span>
+          <span className="truncate">{group.locationLabel}</span>
         </span>
-        <span className="flex items-center gap-1.5 text-meta font-semibold leading-[15px] text-white">
-          <span className="max-w-[170px] truncate">{label}</span>
+        <span className="flex min-w-0 items-center gap-1.5 text-meta font-semibold leading-[15px] text-white">
+          <span className="truncate">{label}</span>
           {qty > 1 && (
             <span className="flex-none rounded-full bg-white/15 px-1.5 text-label font-semibold text-white/80">
               ×{qty}

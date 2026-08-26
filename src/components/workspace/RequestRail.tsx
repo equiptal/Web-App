@@ -60,23 +60,33 @@ export function RequestRail({
   // What a tile actually occupies, from its highest ink to its lowest:
   //
   //     2  the share badge's overhang above the ring
-  //   +44  the circle
+  //   +56  the circle
   //   + 4  the gap under it
   //   +13  the name
   //   + 9  «CLOSED», on the tiles that carry it — 7px caps, tight against the name
-  //   = 72
+  //   = 84
   //
   // «CLOSED» came down from 8px on 10 with a 2px gap over it (owner, 2026-08-25: "for closed make
   // it small so this header of circles has a little more space"). It is a footnote on a request
   // nobody is bidding on any more, and it was spending 12px of a row that needed the air more.
   //
-  // 88 now leaves 7px clear above the badge and 9 below the caption. The flow height is 70 of that
-  // 72 — the badge hangs out of it absolutely — which is the number the margins further down are
-  // cut from. Change any line above and both figures move with it; that is the point of the sum.
+  // ── The circle went 44 → 56 (owner, 2026-08-27: "i feel it small and some space are wasted") ──
+  // Both halves of that were true. 88 held 72 of content, so 16px of the row was air, and the
+  // circle — the thing the rail IS — was the smaller half of what a tile spent its height on.
+  //
+  // 96 now holds 84, so it leaves 6px clear above the badge and 6 below the caption. The row grew
+  // 8px and the header opposite it lost 10 in the same pass, so the chrome above a page is 2px
+  // shorter than it was while the circles are a quarter larger.
+  //
+  // The flow height is 82 of that 84 — the badge hangs out of it absolutely — which is the number
+  // the margins further down are cut from: a tile's gap and label are 4 + 22 = 26, so the divider
+  // and the chevron take `mb-[26px]` to sit on the circles' line. That was `mb-7`, which is 28, and
+  // put both of them 2px low. Change any line above and every figure here moves with it; that is
+  // the point of writing the sum down.
   return (
-    <div {...pin("request-rail")} className={`flex h-[88px] flex-none select-none items-center gap-4 overflow-hidden border-b border-border bg-surface3/60 ${PAGE_X_BLEED}`}>
+    <div {...pin("request-rail")} className={`flex h-[96px] flex-none select-none items-center gap-4 overflow-hidden border-b border-border bg-surface3/60 ${PAGE_X_BLEED}`}>
       <Link {...pin("rail-create-tile")} href="/create" className="group flex flex-none flex-col items-center gap-1">
-        <span className="grid h-11 w-11 place-items-center rounded-full border-2 border-dashed border-border text-muted transition group-hover:border-brand group-hover:text-brand">
+        <span className="grid h-14 w-14 place-items-center rounded-full border-2 border-dashed border-border text-muted transition group-hover:border-brand group-hover:text-brand">
           <Icon name="add" size={20} />
         </span>
         <span className="flex h-[22px] flex-col items-center text-label font-semibold leading-[13px] text-muted">{t.workspace.newRequest}</span>
@@ -89,7 +99,7 @@ export function RequestRail({
           `-mt-2` that got it roughly half way. Borrowing the tile's own 4 + 22 as a bottom margin
           gives these two a tile's column height, so one `items-center` lands all three on the
           circles' line. */}
-      <div className="mb-7 h-9 w-px flex-none bg-border/70" />
+      <div className="mb-[26px] h-11 w-px flex-none bg-border/70" />
 
       <div {...pin("rail-tiles")}
         ref={scroller}
@@ -141,9 +151,9 @@ export function RequestRail({
                   44 / 40 / 36 are the numbers the percentages were computing anyway. Stated
                   outright there is nothing left to resolve, so the clip is 36px on every tile and
                   every machine, whatever its shape. */}
-              <span className={`grid h-11 w-11 flex-none place-items-center rounded-full p-1 ${ring}`}>
-                <span className="relative h-10 w-10 rounded-full border-2 border-surface">
-                  <span className={`grid h-9 w-9 place-items-center overflow-hidden rounded-full bg-surface3 ${tile.closed ? "grayscale" : ""}`}>
+              <span className={`grid h-14 w-14 flex-none place-items-center rounded-full p-1 ${ring}`}>
+                <span className="relative h-13 w-13 rounded-full border-2 border-surface">
+                  <span className={`grid h-12 w-12 place-items-center overflow-hidden rounded-full bg-surface3 ${tile.closed ? "grayscale" : ""}`}>
                     {img ? (
                       /* ── `contain`, not `cover` (owner, 2026-08-25: "the circles must fit any icon
                          + why some have floating icons") ──────────────────────────────────────────
@@ -171,7 +181,7 @@ export function RequestRail({
                          every machine whole. Reaching further needs a bigger circle, not less
                          padding. */
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={img} alt="" draggable={false} className="h-9 w-9 object-contain p-1" />
+                      <img src={img} alt="" draggable={false} className="h-12 w-12 object-contain p-1" />
                     ) : (
                       <Icon name="precision_manufacturing" size={20} className="text-muted" />
                     )}
@@ -278,7 +288,7 @@ export function RequestRail({
         onClick={() => scrollBy(1)}
         aria-label={t.workspace.railScrollNext}
         title={t.workspace.railScrollNext}
-        className="mb-7 grid h-7 w-7 flex-none place-items-center rounded-full border border-border bg-surface/60 text-muted transition hover:bg-surface"
+        className="mb-[26px] grid h-7 w-7 flex-none place-items-center rounded-full border border-border bg-surface/60 text-muted transition hover:bg-surface"
       >
         <Icon name="chevron_right" size={16} className="rtl:scale-x-[-1]" />
       </button>

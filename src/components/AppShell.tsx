@@ -221,7 +221,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
             account controls take white at reduced strength, and the hairlines become white/15. Where a
             control keeps a light ground of its own — the account menu, the nav sheet — it stays light,
             because it is a surface, not part of the bar. */}
-        <header {...pin("app-header")} className="sticky top-0 z-30 flex h-[62px] items-center gap-3 border-b border-white/10 bg-navy px-4 text-white sm:px-7 relative">
+        <header {...pin("app-header")} className="sticky top-0 z-30 flex h-[52px] items-center gap-3 border-b border-white/10 bg-navy px-4 text-white sm:px-7 relative">
           {/* ~~The Back arrow led this row.~~ It is on the PAGE now, under the bar (owner,
               2026-08-26) — see `usePageBack` and the block at the top of `<main>`. The bar carries
               only what is true of the app on every route; back is true of one page. */}
@@ -243,7 +243,11 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                 wordmark's 2.66 aspect (53px wide), and no smaller than the 20px glyphs in the icon
                 cluster opposite — a logo that undercuts the icons beside it stops reading as the
                 brand and starts reading as a favicon. Slimming the BAR is the other half of that
-                answer, and it is a change to every page's chrome, so it waits for the owner. */}
+                answer, and the owner called for it on 2026-08-27: the bar is 52px now. That is the
+                34px control cluster with 9px clear above and below it — the least a row holding a
+                34px avatar, a 34px bell and a 34px inbox can be without them touching its edges.
+                The mark stays 20px, which against 52 is much closer to the 34:13 of his reference
+                than it ever was against 62. */}
             {/* The mark is one dark navy (var(--navy)) and would sink into the bar, so it is filtered to
                 white rather than swapped for a second asset — one file, one logo, and no risk of the
                 two drifting. */}

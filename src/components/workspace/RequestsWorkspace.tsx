@@ -24,6 +24,7 @@ import {
 import { RequestRail } from "@/components/workspace/RequestRail";
 import { hiddenRequests, hideRequest } from "@/lib/access/hidden-requests";
 import { RequestContextBar } from "@/components/workspace/RequestContextBar";
+import { ItemTier } from "@/components/workspace/ItemTier";
 import { BidCards } from "@/components/workspace/BidCards";
 import { CompareMatrix } from "@/components/workspace/CompareMatrix";
 import { RequestDrawer, type ShareLinkMeta } from "@/components/workspace/RequestDrawer";
@@ -466,6 +467,13 @@ export function RequestsWorkspace() {
         onShare={() => { setDrawerShare(true); setDrawerOpen(true); }}
         onHide={hide}
       />
+
+      {/* ── The machines in this submission, under the requests (owner, 2026-08-27) ────────────────
+          Only where there is a choice: one chip nobody can depart from is furniture, and this row
+          costs 34px of every page it draws on. */}
+      {group && group.items.length > 1 && (
+        <ItemTier items={group.items} activeId={resolved.itemId} onPick={pickItem} />
+      )}
 
       <div className={`${PAGE_MX_BLEED} mt-2 flex min-h-0 flex-1 flex-col pb-2`}>
         {/* ── The row above the panel (owner, 2026-08-27) ─────────────────────────────────────────
