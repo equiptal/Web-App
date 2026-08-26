@@ -93,7 +93,7 @@ export function RequestRail({
       </Link>
 
       {/* ── The 26px under this rule, and under the chevron at the far end (owner, 2026-08-25) ─────
-          A tile is 70px of flow in an 88px row — a 44px circle, a 4px gap, a 22px label block — so
+          A tile is 82px of flow in a 96px row — a 56px circle, a 4px gap, a 22px label block — so
           the row centres the TILE, which leaves the circle above the row's own middle. Anything
           centred on the row itself misses the circles; the chevron used to pay for that with a
           `-mt-2` that got it roughly half way. Borrowing the tile's own 4 + 22 as a bottom margin
