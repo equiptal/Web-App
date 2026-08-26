@@ -1,15 +1,33 @@
 # The design system
 
-Three files hold it, and they are the only three:
+Four files hold it, and they are the only four:
 
 | | |
 |---|---|
 | `src/app/globals.css` | every **value** a screen may use |
 | `src/lib/ds.ts` | every **combination** of those values |
+| `src/lib/ds-colors.ts` | the same palette as **literals**, for the surfaces with no stylesheet |
 | `eslint.config.mjs` | what happens when a screen writes its own |
 
 Nothing else decides what the app looks like. If you need something these do not
 have, change these — do not write the value where you need it.
+
+### The three surfaces that never see `globals.css`
+
+Most of the app reads colour through `var(--navy)`. Three things it produces do
+not, because nothing gives them a `:root`:
+
+- **the OG image** (`app/bid/[token]/og/route.tsx`) — Satori rasterises a tree of
+  inline styles with no document and no cascade
+- **the clipboard card** (`bidCardHtml.ts`) — pasted into Gmail or Outlook, which
+  supply their own document and none of ours
+- **the quotation** (`quotation/render.ts`) — a standalone file that is printed or
+  saved, and the one document a renter keeps
+
+The first two take literals from `COLORS`. The third builds its own stylesheet,
+so it prepends `DS_ROOT_CSS` and goes on writing `var(--navy)` like everywhere
+else. `ds-colors.ts` duplicates `globals.css` on purpose, and
+`tests/unit/ds-colors.test.ts` parses that file and fails if either drifts.
 
 ---
 
@@ -351,6 +369,24 @@ Nothing moved that did not have to. What did:
   hex (`--navy: var(--navy)`), which makes a property invalid at computed-value
   time and takes everything reading it down with it. Deleted, so the scope
   inherits `:root` — which was always the intent.
+
+## Two things worth knowing before you touch the sweep again
+
+Both of these cost real time, and both are the kind of thing that looks fine
+until something renders.
+
+**Placing a colour by lightness is not placing it by colour.** The first pass put
+every unlisted hex on its ramp by an index into that ramp's steps. It sent
+`#c8d8e8` — a border — to `surface2`, which is a fill, and `#e8890c`, the brand
+orange, to `brand-light`. Nearest colour *within the chosen ramp* gets all of
+them right. The ramp still has to be chosen by hue, because the red and orange
+families cannot be resolved by distance: warning moved from an orange to a
+coral, so nearest-colour alone would send every caution into the brand ramp.
+
+**A lone `\r` is a line terminator in a JavaScript regex.** `^` in a multiline
+pattern matches *inside* a CRLF pair, so a rule meant to drop blank lines before
+a `}` dropped the `\n` and joined 286 pairs of code lines. If a codemod here
+touches whole lines, match `\r?\n` explicitly and never anchor on `^`.
 
 ---
 
