@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
@@ -10,8 +10,8 @@ import type { Locale } from "@/lib/i18n/config";
 // DISABLED — Outcome Survey feature switched off. See docs/surveys-disabled.md.
 // import { SurveyProvider } from "@/components/surveys/SurveyProvider";
 import { AuthGateProvider, useAuthGate } from "@/components/auth/AuthGate";
-import { PUBLIC_WEB_ENABLED } from "@/lib/flags";
 import { fetchDealRoomUnread } from "@/lib/api/client";
+import { OVERLAY, SCRIM } from "@/lib/ds";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { AppNav, AppNavMobile, type NavItem } from "@/components/AppNav";
 import { ArrowBackIcon, MailIcon, CountBadge } from "@/components/HeaderIcons";
@@ -96,11 +96,9 @@ export function AppShell(props: AppShellProps) {
 function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
   const { locale, setLocale } = useLocale();
   const t = useT();
-  const { tier, status, signOut, refresh: refreshSession } = useSession();
+  const { tier, status, refresh: refreshSession } = useSession();
   const { openAuth } = useAuthGate();
-  const router = useRouter();
   const pathname = usePathname();
-  const [menuOpen, setMenuOpen] = useState(false);
   const [name, setName] = useState("");
   // A child page may register a Back handler to show an arrow in the top bar beside the title.
   const [back, setBack] = useState<(() => void) | null>(null);
@@ -154,14 +152,6 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
     fetchDealRoomUnread().then((r) => active && setUnread(r.total)).catch(() => {});
     return () => { active = false; };
   }, [status]);
-
-  const handleSignOut = async () => {
-    setMenuOpen(false);
-    await signOut(); // AC-09
-    // Public web: no /login page — a signed-out user lands on the public home and browses as a guest
-    // (auth is the modal form on the next gated action). Legacy/prod: back to the /login gate.
-    router.push(PUBLIC_WEB_ENABLED ? "/" : "/login");
-  };
 
   // ── The three places, and the two icons (owner, 2026-08-25) ─────────────────────────────────────
   // The nav names PLACES IN THE PRODUCT and nothing else. Every one is visible to everyone, guests
@@ -342,92 +332,35 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                 are signed in as. */}
             {status === "authed" && <span aria-hidden="true" className="h-6 w-px flex-none bg-white/15" />}
 
+              {/* ── The avatar goes STRAIGHT to settings (owner, 2026-08-26) ─────────────────────────
+                  It opened a menu of three: «My Organization», «Settings», «Sign out». Two of those
+                  had a home already — My Organization is one of the three places in the bar, and Sign
+                  out is on the settings page the menu would have taken you to — so it mostly offered
+                  the reader a list of doors to the room he was standing in. One press, one
+                  destination: press your own face, land on your own settings.
+
+                  The tick still says «verified», and only that state earns a mark: an absent tick is
+                  the honest statement for the other two, where a grey «Guest» pill is a verdict
+                  printed beside the reader's own face.
+
+                  What this drops is the tier NUDGE (AC-06/08), which had this menu as its only home.
+                  Not re-homed in the bar on purpose — the tier and its next step belong on the
+                  settings page, and a second nudge up here would repeat the mistake the menu was
+                  already making. Flagged for the owner rather than quietly kept. */}
             {status === "authed" && (
-              <div className="relative">
-                {/* ── The tier is a TICK on the avatar, not a pill beside it (owner, 2026-08-25) ────
-                    «Verified» / «Basic rentee» / «Guest» took a labelled pill in the bar to say what
-                    a mark says in 14px. Only the verified state earns a mark: an absent tick is the
-                    honest statement for the other two, where a grey «Guest» pill is a verdict printed
-                    beside the reader's own face. The full words survive in the account menu, which is
-                    where the tier nudge that explains them already lives. */}
-                <button
-                  onClick={() => setMenuOpen((o) => !o)}
-                  className="relative grid h-[34px] w-[34px] place-items-center rounded-full border border-white/25 bg-white/15 text-body font-semibold text-white"
-                  aria-haspopup="menu"
-                  aria-expanded={menuOpen}
-                  aria-label={tier === "verified" ? `${t.shell.account} · ${t.shell.tierVerified}` : t.shell.account}
-                  title={badge.label}
-                >
-                  {initials || <Icon name="account_circle" size={20} />}
-                  {/* The prototype puts a plain green dot here. It stays a TICK: the owner asked for
-                      one by name, and a bare dot on an avatar is the presence convention — online,
-                      not vetted. The prototype's green (var(--ok)) and its 2px white ring are taken. */}
-                  {tier === "verified" && (
-                    <span className="absolute -end-0.5 -bottom-0.5 grid h-[15px] w-[15px] place-items-center rounded-full border-2 border-navy bg-ok text-white">
-                      <Icon name="check" size={9} />
-                    </span>
-                  )}
-                </button>
-                {menuOpen && (
-                  <>
-                    <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
-                    <div role="menu" className="absolute end-0 z-40 mt-1 w-[260px] overflow-hidden rounded-sm border border-border bg-surface py-1">
-                      {/* The tier nudge (AC-06/08) came off the sidebar and landed here, where the rest
-                          of the account already is. Verified accounts have nothing to be nudged towards,
-                          so it renders only below that. */}
-                      {tier !== "verified" && (
-                        <div className="px-2 pb-1 pt-2">
-                          <TierCard
-                            tier={tier}
-                            onGo={(href) => {
-                              setMenuOpen(false);
-                              router.push(href);
-                            }}
-                            onCompleteProfile={() => {
-                              setMenuOpen(false);
-                              openAuth();
-                            }}
-                          />
-                        </div>
-                      )}
-                      <button
-                        role="menuitem"
-                        onClick={() => {
-                          setMenuOpen(false);
-                          router.push("/company");
-                        }}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-body font-semibold text-navy-mid hover:bg-surface2"
-                      >
-                        <Icon name="business_center" size={16} /> {t.shell.company}
-                      </button>
-                      {/* Compare had a home here while it was still its own page. It is a tab of the
-                          requests workspace now (docs/requests-workspace-disabled.md), reached by
-                          the Requests tab, so a second entry to the same thing is gone. */}
-                      {/* SETTINGS, not Profile (owner, 2026-08-25). The route is the same `/profile`
-                          and its content has not moved — the word has. «Settings» is what a reader
-                          looks for beside Sign out, and this menu is where the owner ruled it should
-                          live rather than spending one of four header tabs on it. */}
-                      <button
-                        role="menuitem"
-                        onClick={() => {
-                          setMenuOpen(false);
-                          router.push("/profile");
-                        }}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-body font-semibold text-navy-mid hover:bg-surface2"
-                      >
-                        <Icon name="settings" size={16} /> {t.shell.settings}
-                      </button>
-                      <button
-                        role="menuitem"
-                        onClick={handleSignOut}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-body font-semibold text-danger hover:bg-surface2"
-                      >
-                        <Icon name="logout" size={16} /> {t.auth.signOut}
-                      </button>
-                    </div>
-                  </>
+              <Link
+                href="/profile"
+                className="relative grid h-[34px] w-[34px] flex-none place-items-center rounded-full border border-white/25 bg-white/15 text-body font-semibold text-white transition hover:bg-white/25"
+                aria-label={tier === "verified" ? `${t.shell.settings} · ${t.shell.tierVerified}` : t.shell.settings}
+                title={badge.label}
+              >
+                {initials || <Icon name="account_circle" size={20} />}
+                {tier === "verified" && (
+                  <span className="absolute -end-0.5 -bottom-0.5 grid h-[15px] w-[15px] place-items-center rounded-full border-2 border-navy bg-ok text-white">
+                    <Icon name="check" size={9} />
+                  </span>
                 )}
-              </div>
+              </Link>
             )}
 
             {/* ── Navigation, for a bar too narrow to lay it out (owner, 2026-08-25) ───────────────
@@ -507,7 +440,7 @@ function LocaleToggle({ locale, setLocale, tone = "bar" }: { locale: Locale; set
         aria-expanded={open}
         aria-label={t.shell.switchLang}
         title={t.shell.switchLang}
-        className={`inline-flex h-7 flex-none items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-bold leading-none transition ${
+        className={`inline-flex h-7 flex-none items-center gap-1.5 rounded-full border px-2.5 text-meta font-semibold leading-none transition ${
           onBar
             ? "border-white/25 text-white hover:bg-white/10"
             : "border-border text-navy hover:bg-surface2"
@@ -519,10 +452,11 @@ function LocaleToggle({ locale, setLocale, tone = "bar" }: { locale: Locale; set
       </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          <div className={SCRIM} onClick={() => setOpen(false)} />
           {/* The panel is a SURFACE wherever the control sits — a light menu on the navy bar reads as
-              the app answering, where a translucent one reads as part of the bar. */}
-          <div role="menu" className="absolute end-0 z-40 mt-1 w-[132px] overflow-hidden rounded-[10px] border border-border bg-surface py-1 shadow-[0_10px_28px_rgba(19,44,74,.18)]">
+              the app answering, where a translucent one reads as part of the bar. It is separated by
+              the scrim behind it rather than by a shadow (see OVERLAY in `ds.ts`). */}
+          <div role="menu" className={`${OVERLAY} absolute end-0 mt-1 w-[132px] overflow-hidden py-1`}>
             {([
               ["en", "English"],
               ["ar", "العربية"],
@@ -533,7 +467,7 @@ function LocaleToggle({ locale, setLocale, tone = "bar" }: { locale: Locale; set
                 type="button"
                 onClick={() => pick(code)}
                 aria-current={locale === code ? "true" : undefined}
-                className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-[12.5px] transition hover:bg-surface2 ${
+                className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-meta transition hover:bg-surface2 ${
                   locale === code ? "font-extrabold text-navy" : "font-semibold text-navy-mid"
                 }`}
               >
@@ -548,41 +482,3 @@ function LocaleToggle({ locale, setLocale, tone = "bar" }: { locale: Locale; set
   );
 }
 
-/** Tier-status card: tier label + progress + a tier-appropriate CTA (AC-06/08). It stood at the foot
- *  of the sidebar; it now sits at the head of the account menu, so it keeps its dark treatment. */
-function TierCard({ tier, onGo, onCompleteProfile }: { tier: string; onGo: (href: string) => void; onCompleteProfile: () => void }) {
-  const t = useT();
-  const verified = tier === "verified";
-  const guest = tier === "guest";
-  const label = verified ? t.shell.tierVerified : guest ? t.shell.tierGuest : t.shell.tierBasic;
-  const pct = verified ? 100 : guest ? 33 : 66;
-  const note = verified ? t.shell.verifiedNote : guest ? t.shell.stepsGuest : t.shell.stepsBasic;
-
-  return (
-    <div className="rounded-sm bg-navy p-3.5 text-white">
-      <div className="flex items-center gap-1.5 text-meta font-extrabold">
-        <Icon name={verified ? "verified" : "workspace_premium"} size={17} className={verified ? "text-ok" : "text-brand-pale"} /> {label}
-      </div>
-      <div className="my-3 mb-1.5 h-[5px] overflow-hidden rounded-full bg-white/[.14]">
-        <div className={`h-full rounded-full ${verified ? "bg-ok" : "bg-brand"}`} style={{ width: `${pct}%` }} />
-      </div>
-      <small className="block text-label leading-snug text-white/55">{note}</small>
-      {!verified && (
-        <button
-          // Basic → /company (the hub: create your own company by verifying, OR join one with an
-          // invite code) rather than dropping straight into the verification form.
-          //
-          // A GUEST opens the account modal instead of navigating. It is the only profile-creation
-          // surface: `hasGuestSession` lands them straight on the profile step with email REQUIRED,
-          // keeping the "every account ends with both phone + email" invariant. This used to push to
-          // /onboarding, which rendered the same form with `requireEmail` defaulted off — so the one
-          // route that skipped the email requirement was the one the chrome linked to.
-          onClick={() => (guest ? onCompleteProfile() : onGo("/company"))}
-          className="mt-3 w-full rounded-sm bg-brand px-3 py-2 text-meta font-semibold text-white"
-        >
-          {guest ? t.home.nudgeGuestCta : t.home.nudgeBasicCta}
-        </button>
-      )}
-    </div>
-  );
-}
