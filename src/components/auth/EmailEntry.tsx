@@ -56,7 +56,7 @@ export function EmailEntry({
 
       <label className="mb-2 block text-meta font-semibold text-navy-mid">{a.emailLabel}</label>
       <input
-        className="h-[50px] w-full rounded-sm border border-border bg-surface px-4 text-subhead font-semibold text-navy outline-0 placeholder:font-semibold placeholder:text-muted-light focus:border-brand"
+        className="h-[50px] w-full rounded-md border border-border bg-surface px-4 text-subhead font-semibold text-navy outline-0 placeholder:font-semibold placeholder:text-muted-light focus:border-brand"
         type="email"
         dir="ltr"
         autoComplete="email"

@@ -193,7 +193,7 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
     }
   }
 
-  const fld = "mt-1 h-[42px] w-full rounded-sm border border-border bg-surface2 px-3 text-body outline-0";
+  const fld = "mt-1 h-[42px] w-full rounded-md border border-border bg-surface2 px-3 text-body outline-0";
   const lbl = "text-meta font-semibold text-navy-mid";
   const Sel = ({ label, value, onChange, opts }: { label: string; value: string; onChange: (v: string) => void; opts: Opt[] }) => (
     <label><span className={lbl}>{label}</span>
@@ -247,7 +247,7 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
           </div>
           <Chk label={L("Night shift required", "يتطلب وردية ليلية")} value={nightShift} onChange={setNightShift} />
           <label className="mt-1 block"><span className={lbl}>{L("Equipment notes", "ملاحظات المعدة")}</span>
-            <textarea rows={2} className="mt-1 w-full rounded-sm border border-border bg-surface2 p-3 text-body outline-0" value={itemNotes} onChange={(e) => setItemNotes(e.target.value)} />
+            <textarea rows={2} className="mt-1 w-full rounded-md border border-border bg-surface2 p-3 text-body outline-0" value={itemNotes} onChange={(e) => setItemNotes(e.target.value)} />
           </label>
 
           <SecH icon="tune">{L("Preferences", "التفضيلات")}</SecH>
@@ -262,7 +262,7 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
           <Chk label={L("Verified suppliers only", "المؤجّرون الموثّقون فقط")} value={verifiedOnly} onChange={setVerifiedOnly} />
           <Chk label={L("Allow subletting", "السماح بالتأجير من الباطن")} value={subletting} onChange={setSubletting} />
           <label className="mt-1 block"><span className={lbl}>{L("Additional notes", "ملاحظات إضافية")}</span>
-            <textarea rows={3} className="mt-1 w-full rounded-sm border border-border bg-surface2 p-3 text-body outline-0" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <textarea rows={3} className="mt-1 w-full rounded-md border border-border bg-surface2 p-3 text-body outline-0" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </label>
         </div>
 

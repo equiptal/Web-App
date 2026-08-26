@@ -66,7 +66,7 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
 
   if (error) {
     return (
-      <div className="rounded-sm border border-border bg-surface p-8 text-center text-body text-muted">
+      <div className="rounded-lg border border-border bg-surface p-8 text-center text-body text-muted">
         <Icon name="error_outline" size={22} className="mx-auto mb-2 text-muted" />
         <p>{t.store.error}</p>
         <button
@@ -167,7 +167,7 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
         <span className="rounded-full bg-brand-soft px-2.5 py-0.5 text-meta font-extrabold text-brand">{detail.activeEquipmentCount}</span>
       </div>
       {detail.equipment.length === 0 ? (
-        <div className="rounded-sm border border-border bg-surface p-8 text-center text-body text-muted">{t.store.noEquipment}</div>
+        <div className="rounded-lg border border-border bg-surface p-8 text-center text-body text-muted">{t.store.noEquipment}</div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {detail.equipment.map((e) => (

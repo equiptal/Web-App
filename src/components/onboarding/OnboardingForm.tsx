@@ -246,7 +246,7 @@ export function OnboardingForm({
   };
 
   const inputCls =
-    "h-[46px] w-full rounded-sm border border-border bg-surface px-4 text-body outline-0 focus:border-brand";
+    "h-[46px] w-full rounded-md border border-border bg-surface px-4 text-body outline-0 focus:border-brand";
   const labelCls = "mb-2 block text-meta font-semibold text-navy-mid";
 
   return (

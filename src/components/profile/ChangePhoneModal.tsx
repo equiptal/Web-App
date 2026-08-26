@@ -162,7 +162,7 @@ export function ChangePhoneModal({
                   onPaste={onPaste}
                   aria-label={`Digit ${i + 1}`}
                   style={OTP_FONT}
-                  className={`h-[56px] w-full rounded-sm border-[1.5px] text-center text-display font-semibold text-navy outline-0 focus:border-brand ${
+                  className={`h-[56px] w-full rounded-md border-[1.5px] text-center text-display font-semibold text-navy outline-0 focus:border-brand ${
                     d ? "border-brand bg-brand-soft" : "border-border bg-surface"
                   }`}
                 />

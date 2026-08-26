@@ -92,7 +92,7 @@ export function PhoneEntry({
           </div>
         )}
         <input
-          className="h-[50px] min-w-0 flex-1 rounded-sm border border-border bg-surface px-4 text-subhead font-semibold text-navy outline-0 placeholder:font-semibold placeholder:text-muted-light focus:border-brand"
+          className="h-[50px] min-w-0 flex-1 rounded-md border border-border bg-surface px-4 text-subhead font-semibold text-navy outline-0 placeholder:font-semibold placeholder:text-muted-light focus:border-brand"
           type="tel"
           inputMode="numeric"
           autoComplete="tel-national"

@@ -70,7 +70,7 @@ export function DeleteAccountModal({
         <div className="mt-5 flex gap-2">
           <button
             onClick={onClose}
-            className="h-11 flex-1 rounded-sm border border-border bg-surface text-body font-semibold text-navy-mid hover:bg-surface2"
+            className="h-11 flex-1 rounded-md border border-border bg-surface text-body font-semibold text-navy-mid hover:bg-surface2"
           >
             {p.cancel}
           </button>

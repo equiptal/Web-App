@@ -244,7 +244,7 @@
 //                   value={price[it.surveyId] ?? ""}
 //                   onChange={(e) => setPrice((p) => ({ ...p, [it.surveyId]: e.target.value }))}
 //                   placeholder={fmt(t.survey.priceLabel, { unit: unit$ })}
-//                   className="w-full rounded-sm border border-border bg-surface px-3 py-2.5 text-body text-navy outline-none focus:border-brand"
+//                   className="w-full rounded-md border border-border bg-surface px-3 py-2.5 text-body text-navy outline-none focus:border-brand"
 //                 />
 //               )}
 //               {showReason && (
@@ -253,7 +253,7 @@
 //                   value={reason[it.surveyId] ?? ""}
 //                   onChange={(e) => setReason((r) => ({ ...r, [it.surveyId]: e.target.value }))}
 //                   placeholder={sel === NO_ONE ? t.survey.reasonNoOne : t.survey.reasonSomeoneElse}
-//                   className="w-full resize-none rounded-sm border border-border bg-surface px-3 py-2.5 text-body text-navy outline-none focus:border-brand"
+//                   className="w-full resize-none rounded-md border border-border bg-surface px-3 py-2.5 text-body text-navy outline-none focus:border-brand"
 //                 />
 //               )}
 //             </div>

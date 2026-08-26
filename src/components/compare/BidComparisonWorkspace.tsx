@@ -1928,12 +1928,12 @@
 //             </div>
 //             <div className="flex justify-end gap-2.5 border-t px-6 py-4" style={{ borderColor: C.line }}>
 //               {offPlatform ? (
-//                 <button onClick={() => setAwardPrompt(null)} className="inline-flex items-center gap-1.5 rounded-sm px-4 py-2 text-body font-semibold text-white" style={{ background: C.success }}>
+//                 <button onClick={() => setAwardPrompt(null)} className="inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-body font-semibold text-white" style={{ background: C.success }}>
 //                   <span className="material-icons-outlined" style={{ fontSize: 17 }}>check</span>{L("Got it", "تمام")}
 //                 </button>
 //               ) : (<>
 //                 <button onClick={() => setAwardPrompt(null)} className={btn("secondary", "md")} style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Stay here", "البقاء هنا")}</button>
-//                 <button onClick={() => { const b = awardPrompt; setAwardPrompt(null); goDealRoom(b, "award"); }} disabled={busy} className="inline-flex items-center gap-1.5 rounded-sm px-4 py-2 text-body font-semibold text-white disabled:bg-disabled-bg disabled:text-disabled-fg" style={{ background: C.success }}>
+//                 <button onClick={() => { const b = awardPrompt; setAwardPrompt(null); goDealRoom(b, "award"); }} disabled={busy} className="inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-body font-semibold text-white disabled:bg-disabled-bg disabled:text-disabled-fg" style={{ background: C.success }}>
 //                   <span className="material-icons-outlined" style={{ fontSize: 17 }}>meeting_room</span>{L("Accept in deal room", "القبول في غرفة الصفقة")}
 //                 </button>
 //               </>)}
@@ -2020,11 +2020,11 @@
 //             </div>
 //             <div className="flex justify-end gap-2.5 border-t px-6 py-4" style={{ borderColor: C.line }}>
 //               {confirmAdd.blocking ? (
-//                 <button onClick={() => setConfirmAdd(null)} className="rounded-sm px-4 py-2 text-body font-semibold text-white" style={{ background: C.navy }}>{L("Close", "إغلاق")}</button>
+//                 <button onClick={() => setConfirmAdd(null)} className="rounded-md px-4 py-2 text-body font-semibold text-white" style={{ background: C.navy }}>{L("Close", "إغلاق")}</button>
 //               ) : (
 //                 <>
 //                   <button onClick={() => setConfirmAdd(null)} className={btn("secondary", "md")} style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Don't add", "لا تُضِف")}</button>
-//                   <button onClick={confirmAddBid} className="rounded-sm px-4 py-2 text-body font-semibold text-white" style={{ background: C.action }}>{L("Add anyway", "أضِفه على أي حال")}</button>
+//                   <button onClick={confirmAddBid} className="rounded-md px-4 py-2 text-body font-semibold text-white" style={{ background: C.action }}>{L("Add anyway", "أضِفه على أي حال")}</button>
 //                 </>
 //               )}
 //             </div>
@@ -2057,7 +2057,7 @@
 //               <span className="text-body font-extrabold" style={{ color: C.navy }}>{L("Your total est.", "إجمالي تقديرك")} <span style={{ color: C.rentee }}>{sar} {nf(Object.values(renterCosts).reduce((a, b) => a + (b ?? 0), 0) + Object.values(renterMob).reduce((a, b) => a + (b ?? 0), 0))}</span></span>
 //               <div className="flex gap-2.5">
 //                 <button onClick={() => setCostAsk(null)} className={btn("secondary", "md")} style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Cancel", "إلغاء")}</button>
-//                 <button onClick={submitCost} className="rounded-sm px-5 py-2 text-body font-semibold text-white" style={{ background: C.rentee }}>{L("Save estimate", "حفظ التقدير")}</button>
+//                 <button onClick={submitCost} className="rounded-md px-5 py-2 text-body font-semibold text-white" style={{ background: C.rentee }}>{L("Save estimate", "حفظ التقدير")}</button>
 //               </div>
 //             </div>
 //           </div>
@@ -2108,7 +2108,7 @@
 //               <span className="text-body font-extrabold" style={{ color: C.navy }}>{L("Your total est.", "إجمالي تقديرك")} <span style={{ color: C.rentee }}>{sar} {nf(["__delivery", "__return", ...youTerms.map((m) => m.key)].reduce((s, k) => s + (parseInt((estDraft[k] ?? "").replace(/[^0-9]/g, ""), 10) || 0), 0))}</span></span>
 //               <div className="flex gap-2.5">
 //                 <button onClick={() => setEstimateOpen(false)} className={btn("secondary", "md")} style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Cancel", "إلغاء")}</button>
-//                 <button onClick={saveEstimate} className="rounded-sm px-5 py-2 text-body font-semibold text-white" style={{ background: C.rentee }}>{L("Save estimate", "حفظ التقدير")}</button>
+//                 <button onClick={saveEstimate} className="rounded-md px-5 py-2 text-body font-semibold text-white" style={{ background: C.rentee }}>{L("Save estimate", "حفظ التقدير")}</button>
 //               </div>
 //             </div>
 //           </div>
