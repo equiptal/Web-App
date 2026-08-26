@@ -3,63 +3,192 @@
 /* Material Icons fonts are loaded via <link> in layout.tsx (Tailwind v4 inlines its own
    import, which would push CSS @imports out of legal position). */
 
-/* Moedatech Design System v3 palette (from the web-app/002 prototype). */
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   Moedatech Design System — the web app's single source of truth.
+
+   Every value a screen is allowed to use is named here. `DESIGN.md` carries the reasoning and the
+   rules; this file carries the numbers. If a screen needs a colour, a size, a radius or a state
+   that is not in this file, the answer is to change this file — never to write the value inline.
+
+   The scale was derived from the app itself (owner, 2026-08-26): the sizes, colours and radii it
+   already used most, named rather than reinvented, so nothing moved that did not have to. What did
+   move, and why, is listed in `DESIGN.md` under "What changed".
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
+
 :root {
-  /* Sampled from the owner's navigation bar (2026-08-26): the bar is #1c2838 and its search field
-     #2d3542, so the two navy steps are the design's own rather than a pair mixed to look like it. The
-     old #1c3550 / #2a4f72 leaned blue against it — side by side the difference read as two products. */
-  --navy: #1c2838;
-  --navy-mid: #2d3542;
-  --gold: #b8860b;
-  --background: #f5f8fc;
-  --surface: #ffffff;
-  --surface2: #eff4f9;
-  --surface3: #e4edf5;
-  --foreground: #1c2838;
-  --muted: #6b8fa8;
-  --border: #d4e0ec;
-  --brand: #f79009; /* action orange — primary CTA */
+  /* ── Navy / neutral ramp ─────────────────────────────────────────────────────────────────────
+     Twelve steps, dark to light. Eighty-seven distinct blues were doing this work before; each of
+     these twelve has a job none of the others can do. */
+  --navy-deep: #16263f;      /* dark headers, overlay grounds — deeper than a navy block */
+  --navy: #1c3550;           /* foreground text, navy blocks */
+  --navy-mid: #2a4f72;       /* the navy gradient's partner */
+  --muted-dark: #5a6b82;     /* secondary text that still has to carry weight */
+  --muted: #6b8fa8;          /* secondary text */
+  --muted-light: #9aa7b8;    /* tertiary text, placeholders, disabled */
+  --border-strong: #c3d2e0;  /* a divider that has to be seen */
+  --border: #d4e0ec;         /* the default border */
+  --surface3: #e4edf5;       /* pressed, selected */
+  --surface2: #eff4f9;       /* inset panels, tinted fills, hover */
+  --background: #f5f8fc;     /* the page ground */
+  --surface: #ffffff;        /* cards, floating layers */
+  --foreground: #1c3550;
+
+  /* ── Brand ───────────────────────────────────────────────────────────────────────────────────
+     #f79009 is the brand orange, confirmed against the mobile app (`apps/mobile/lib/core/theme/
+     app_colors.dart`, the `action` token). The mobile standards document still names #E8650A;
+     neither product's code agrees with it, so the document is the thing that is wrong. */
+  --brand-deep: #b45309;     /* brand text on a light ground */
+  --brand: #f79009;          /* the primary CTA */
+  --brand-hover: #e58108;
+  --brand-press: #cc7207;
+  --brand-light: #fbbf6b;    /* accents, dots */
+  --brand-pale: #fde8cc;     /* fills, progress tracks */
+  --brand-soft: #fff4e5;     /* tinted backgrounds, selected chips */
   --brand-fg: #ffffff;
-  --brand-soft: #fff4e5;
-  --warn: #d4780a;
-  --warn-soft: #fff3e0;
-  --danger: #d9362a;
-  --danger-soft: #fcebea;
+  --gold: #b8860b;           /* the mark's own colour — not a UI state */
+
+  /* ── Status ──────────────────────────────────────────────────────────────────────────────────
+     Three tiers each. `base` is the colour itself, `soft` is a background you can lay it on, and
+     `deep` is the text colour that stays readable on that background.
+
+     Warning is coral and danger is deep red, deliberately far apart (owner, 2026-08-26). Before
+     this, warning was an orange one shade off the primary CTA, so a caution and a button meant to
+     be pressed looked alike — see the "you wrote" block in `create/Canvas.tsx`, which used one
+     orange for its warning label and for the link inside it. The soft tints are pulled apart too:
+     warning's leans peach, danger's leans grey-red, so the two panels never read as the same. */
   --ok: #1daf58;
   --ok-soft: #e7f7ee;
+  --ok-deep: #15803d;
+  --warn: #ed6a5e;
+  --warn-soft: #fff0ec;
+  --warn-deep: #c0392b;
+  --danger: #b03636;
+  --danger-soft: #fbe5e5;
+  --danger-deep: #8f2626;
+  --danger-hover: #9a2f2f;
+  --danger-press: #822828;
   --info: #1a7ec8;
   --info-soft: #e6f2fb;
+  --info-deep: #0e4f7e;
+
+  /* ── Disabled ────────────────────────────────────────────────────────────────────────────────
+     A state with its own colours rather than a faded copy of another one. `opacity: .5` over an
+     orange or coral fill produced a muddy tint nobody chose, and landed around 2.1:1 against white
+     — under the 3:1 floor WCAG 1.4.11 sets for a control. */
+  --disabled-bg: var(--surface2);
+  --disabled-fg: var(--muted-light);
+  --disabled-border: var(--border);
+
+  /* ── Control heights ─────────────────────────────────────────────────────────────────────────
+     Three. 34px is the default and matches the top bar. 44px is the touch minimum: a primary CTA,
+     and anything a thumb has to hit on a phone. */
+  --control-sm: 30px;
+  --control-md: 34px;
+  --control-lg: 44px;
+
+  /* ── Focus ───────────────────────────────────────────────────────────────────────────────────
+     A solid outline, not a shadow. This app has no shadows, and a focus ring is not decoration —
+     a keyboard user has no other way to know where they are. */
+  --ring-focus: 2px solid var(--brand);
+  --ring-offset: 2px;
+
+  /* ── Floating layers ─────────────────────────────────────────────────────────────────────────
+     Nothing in this app casts a shadow. A modal, sheet, dropdown or tooltip is separated from the
+     page by its own border and by the page dimming behind it. */
+  --scrim: rgba(28, 53, 80, 0.45);
 }
 
 @theme inline {
+  /* ── Colour ──────────────────────────────────────────────────────────────────────────────── */
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface2: var(--surface2);
   --color-surface3: var(--surface3);
   --color-foreground: var(--foreground);
+  --color-navy-deep: var(--navy-deep);
   --color-navy: var(--navy);
   --color-navy-mid: var(--navy-mid);
+  --color-muted-dark: var(--muted-dark);
   --color-muted: var(--muted);
+  --color-muted-light: var(--muted-light);
+  --color-border-strong: var(--border-strong);
   --color-border: var(--border);
+  --color-brand-deep: var(--brand-deep);
   --color-brand: var(--brand);
-  --color-brand-fg: var(--brand-fg);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-press: var(--brand-press);
+  --color-brand-light: var(--brand-light);
+  --color-brand-pale: var(--brand-pale);
   --color-brand-soft: var(--brand-soft);
-  --color-warn: var(--warn);
-  --color-warn-soft: var(--warn-soft);
-  --color-danger: var(--danger);
-  --color-danger-soft: var(--danger-soft);
+  --color-brand-fg: var(--brand-fg);
+  --color-gold: var(--gold);
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
+  --color-ok-deep: var(--ok-deep);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-deep: var(--warn-deep);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-deep: var(--danger-deep);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-press: var(--danger-press);
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
+  --color-info-deep: var(--info-deep);
+  --color-disabled-bg: var(--disabled-bg);
+  --color-disabled-fg: var(--disabled-fg);
+  --color-disabled-border: var(--disabled-border);
+
+  /* ── Font families ───────────────────────────────────────────────────────────────────────── */
   --font-sans: var(--font-nunito);
   --font-mono: var(--font-plex);
+}
+
+/* The scales below are literal values rather than references into `:root`, so they belong in a
+   plain `@theme` — `inline` exists to stop Tailwind copying a variable it should point at. */
+@theme {
+  /* ── Type ────────────────────────────────────────────────────────────────────────────────────
+     Six sizes and no others. The app had twenty, among them 13.5px, 11.5px and 10.5px — sizes a
+     reader cannot tell apart, but which guarantee two screens never quite match. Every default
+     Tailwind size (`text-xs` … `text-9xl`) is cleared so it cannot be reached by accident. */
+  --text-*: initial;
+  --text-label: 11px;        /* UPPERCASE SECTION LABEL */
+  --text-meta: 12.5px;       /* the muted sentence under a value */
+  --text-body: 13px;         /* the answer, list rows, buttons — the default */
+  --text-subhead: 15px;      /* card headings */
+  --text-title: 17px;        /* a page or masthead name */
+  --text-display: 22px;      /* a number worth shouting */
+
+  /* ── Weight ──────────────────────────────────────────────────────────────────────────────────
+     Three. `font-medium`, `font-bold` and `font-black` are cleared: five weights is not a
+     hierarchy, it is one guess repeated across files. */
+  --font-weight-*: initial;
+  --font-weight-normal: 400;     /* body copy, answers */
+  --font-weight-semibold: 600;   /* labels, buttons, inline emphasis */
+  --font-weight-extrabold: 800;  /* titles, mastheads, big numbers */
+
+  /* ── Radius ──────────────────────────────────────────────────────────────────────────────────
+     Four. `rounded-md` is the default; `rounded-lg` is the card skin. */
+  --radius-*: initial;
+  --radius-sm: 8px;    /* chips, tags, tight controls */
+  --radius-md: 10px;   /* inputs, buttons, list rows — the default */
+  --radius-lg: 14px;   /* cards, panels, sheets */
+
+  /* ── Shadow ──────────────────────────────────────────────────────────────────────────────────
+     There are none (owner, 2026-08-26). The whole namespace is cleared, so `shadow-sm` and its
+     relatives resolve to nothing rather than quietly reintroducing depth. Separation is carried by
+     a border, by a step on the surface ramp, and by the scrim behind a floating layer. */
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-nunito), var(--font-inter), -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: var(--text-body);
 }
 
 /* Arabic uses IBM Plex Sans Arabic — the prototype's own face (owner, 2026-08-19; `layout.tsx` carries
@@ -71,6 +200,14 @@ body {
   font-family: var(--font-arabic), var(--font-inter), sans-serif;
 }
 
+/* ── Focus ──────────────────────────────────────────────────────────────────────────────────────
+   One rule for everything focusable. `:focus-visible` rather than `:focus`, so a mouse click on a
+   button does not leave a ring behind it. */
+:focus-visible {
+  outline: var(--ring-focus);
+  outline-offset: var(--ring-offset);
+}
+
 .material-symbols-rounded {
   font-variation-settings: "opsz" 24, "wght" 500, "FILL" 0, "GRAD" 0;
   line-height: 1;
@@ -78,6 +215,17 @@ body {
 .tabular {
   font-family: var(--font-plex), monospace;
 }
+
+/* ── Control heights ────────────────────────────────────────────────────────────────────────────
+   Classes rather than an arbitrary `h-[34px]`, so a control's height and its horizontal padding
+   move together and no screen can set one without the other. `.control-icon` squares it off for a
+   button that holds nothing but a glyph. */
+.control-sm { height: var(--control-sm); padding-inline: 10px; }
+.control-md { height: var(--control-md); padding-inline: 14px; }
+.control-lg { height: var(--control-lg); padding-inline: 18px; }
+.control-sm.control-icon { width: var(--control-sm); padding-inline: 0; }
+.control-md.control-icon { width: var(--control-md); padding-inline: 0; }
+.control-lg.control-icon { width: var(--control-lg); padding-inline: 0; }
 
 /* Waving hand for the home greeting — plays a couple of times on first land. */
 @keyframes wave {
@@ -94,8 +242,9 @@ body {
 /* ---- Request canvas (MREQ) ----
    A refused move shakes the blocks that caused it (MREQ-AC-02/03/15). The canvas gates its panels in
    order and does not explain why, so the shake is the whole of the feedback — it has to be visible
-   without being alarming, hence the inset ring rather than a colour change on the content itself.
-   Respecting `prefers-reduced-motion` leaves the ring, which is the part that carries the meaning. */
+   without being alarming, hence a ring rather than a colour change on the content itself.
+   Respecting `prefers-reduced-motion` leaves the ring, which is the part that carries the meaning.
+   The ring is an outline, not an inset shadow: this app has no shadows. */
 @keyframes shake-x {
   10%, 90% { transform: translateX(-1px); }
   20%, 80% { transform: translateX(2px); }
@@ -104,8 +253,9 @@ body {
 }
 .shake-error {
   animation: shake-x 0.4s ease;
-  box-shadow: inset 0 0 0 2px var(--color-brand, #f5871f);
-  border-radius: 12px;
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+  border-radius: var(--radius-lg);
 }
 @media (prefers-reduced-motion: reduce) {
   .shake-error {
@@ -114,7 +264,7 @@ body {
 }
 
 /* A value carried from the previous equipment item (MREQ-AC-41) — the renter needs to see what was
-   inherited rather than chosen, so it pulses once on arrival and keeps the halo. */
+   inherited rather than chosen, so it pulses once on arrival and keeps the ring. */
 @keyframes carried-bump {
   0% { transform: scale(1); }
   35% { transform: scale(1.06); }
@@ -123,8 +273,8 @@ body {
 }
 .carried-mark {
   animation: carried-bump 0.5s ease-out;
-  box-shadow: 0 0 0 3px var(--color-brand-soft, #fde0c7);
-  border-radius: 10px;
+  outline: 3px solid var(--brand-pale);
+  border-radius: var(--radius-md);
 }
 @media (prefers-reduced-motion: reduce) {
   .carried-mark {

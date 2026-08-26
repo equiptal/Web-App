@@ -3,6 +3,35 @@
 import type { ReactNode, InputHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { useT } from "@/lib/i18n";
 import { Dialog } from "@/components/Dialog";
+import {
+  btn,
+  cx,
+  BADGE_BASE,
+  BADGE_TONE,
+  CHIP,
+  CHIP_BOX,
+  INPUT,
+  INPUT_AGENT,
+  INPUT_ERROR,
+  NOTICE_BASE,
+  NOTICE_TONE,
+  SEGMENT,
+  TEXTAREA,
+  TRACK,
+  TYPE,
+  type ButtonVariant,
+  type ControlSize,
+  type Tone,
+} from "@/lib/ds";
+
+/**
+ * The app's primitives.
+ *
+ * Every one of these is a thin wrapper over a recipe in `@/lib/ds` — the classes live there so that
+ * a feature file needing the same shape without the component (a `<label>` that has to look like a
+ * chip, a link that has to look like a button) reaches for the same string rather than copying it
+ * by eye. `DESIGN.md` says which to use when.
+ */
 
 /* ------------------------------------ Icon ------------------------------------ */
 
@@ -26,34 +55,50 @@ export function MIcon({ name, className = "", size }: { name: string; className?
 
 /* ------------------------------------ Button ------------------------------------ */
 
-type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+/**
+ * The app's button. Six variants and three heights, and nothing else.
+ *
+ * `primary` is the one orange thing on a screen — if two of them are visible at once, one of them
+ * is wrong. `secondary` is the bordered alternative beside it, `tinted` a filled but quieter one,
+ * `ghost` a bare icon or a toolbar action, `danger` a destructive confirm, `link` a word in a
+ * sentence.
+ */
 export function Button({
   children,
   onClick,
   variant = "primary",
+  size = "md",
+  icon,
+  full,
   disabled,
   type = "button",
   className = "",
   title,
+  ariaLabel,
 }: {
   children: ReactNode;
   onClick?: () => void;
   variant?: ButtonVariant;
+  /** `sm` 30px · `md` 34px (default) · `lg` 44px, the touch minimum for a CTA or a phone row. */
+  size?: ControlSize;
+  /** Squares the button off for a lone glyph. Give it an `ariaLabel` when you do. */
+  icon?: boolean;
+  full?: boolean;
   disabled?: boolean;
   type?: "button" | "submit";
   className?: string;
   title?: string;
+  ariaLabel?: string;
 }) {
-  const base =
-    "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50";
-  const variants: Record<ButtonVariant, string> = {
-    primary: "bg-brand text-brand-fg hover:opacity-90",
-    secondary: "border border-border bg-surface text-foreground hover:bg-background",
-    ghost: "text-brand hover:bg-brand-soft",
-    danger: "bg-danger text-white hover:opacity-90",
-  };
   return (
-    <button type={type} onClick={onClick} disabled={disabled} title={title} className={`${base} ${variants[variant]} ${className}`}>
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      aria-label={ariaLabel}
+      className={btn(variant, size, { icon, full, className })}
+    >
       {children}
     </button>
   );
@@ -61,30 +106,39 @@ export function Button({
 
 /* ------------------------------------ Card ------------------------------------ */
 
+/**
+ * A bordered box with an optional header. No shadow — this app has none; a card is its border and
+ * its fill, and a card that needs more weight than its neighbours takes `raised`, which darkens the
+ * border rather than lifting the box.
+ */
 export function Card({
   title,
   children,
   aside,
   tone = "default",
+  pad = "md",
   className = "",
 }: {
   title?: ReactNode;
   children: ReactNode;
   aside?: ReactNode;
-  tone?: "default" | "warn" | "danger" | "ok";
+  tone?: "default" | "raised" | "warn" | "danger" | "ok";
+  pad?: "sm" | "md" | "lg";
   className?: string;
 }) {
   const tones: Record<string, string> = {
     default: "border-border",
+    raised: "border-border-strong",
     warn: "border-warn/40",
     danger: "border-danger/40",
     ok: "border-ok/40",
   };
+  const pads = { sm: "p-3", md: "p-4", lg: "p-5" };
   return (
-    <section className={`rounded-xl border ${tones[tone]} bg-surface p-4 shadow-sm ${className}`}>
+    <section className={cx("rounded-lg border bg-surface", tones[tone], pads[pad], className)}>
       {(title || aside) && (
         <header className="mb-3 flex items-center justify-between gap-2">
-          {title && <h3 className="text-sm font-semibold">{title}</h3>}
+          {title && <h3 className={TYPE.subhead}>{title}</h3>}
           {aside}
         </header>
       )}
@@ -96,15 +150,18 @@ export function Card({
 /* ------------------------------------ Field ------------------------------------ */
 
 /**
- * web-app/002: marks a value the AI agent filled in from the RFQ (orange + agent icon). The caller
+ * web-app/002: marks a value the AI agent filled in from the RFQ (coral + agent icon). The caller
  * decides when to show it — it clears once the renter edits the field (the value stops matching the
  * agent's original). See `agentMatches` in the rfq-store.
+ *
+ * Coral is the caution colour. It used to be an orange one shade off the primary CTA, which meant
+ * an assumption the renter should check looked like a button they should press.
  */
 export function AgentMark({ className = "" }: { className?: string }) {
   const t = useT();
   return (
     <span
-      className={`inline-flex items-center gap-0.5 text-warn ${className}`}
+      className={cx("inline-flex items-center gap-0.5 text-warn", className)}
       title={t.common.byAgent}
       aria-label={t.common.byAgent}
     >
@@ -130,7 +187,7 @@ export function Field({
    *  still holds what the agent assumed; it clears the moment the renter edits. Dynamic by design. */
   note?: ReactNode;
   optional?: boolean;
-  /** AC: value was filled by the AI agent (orange badge). */
+  /** AC: value was filled by the AI agent (coral badge). */
   agent?: boolean;
   /** AC: field is required to advance. */
   required?: boolean;
@@ -141,7 +198,12 @@ export function Field({
   const t = useT();
   return (
     <label className="block">
-      <span className={`mb-1 flex items-center gap-2 text-xs font-medium ${missing ? "text-danger" : agent ? "text-warn" : "text-muted"}`}>
+      <span
+        className={cx(
+          "mb-1 flex items-center gap-2 text-label font-semibold uppercase tracking-[0.05em]",
+          missing ? "text-danger" : agent ? "text-warn" : "text-muted",
+        )}
+      >
         {label}
         {required && (
           <span className="text-danger" aria-hidden>
@@ -149,37 +211,49 @@ export function Field({
           </span>
         )}
         {agent && <AgentMark />}
-        {optional && <span className="text-[10px] uppercase tracking-wide text-muted/70">{t.common.optional}</span>}
-        {missing && <span className="text-[10px] font-semibold lowercase text-danger">{t.common.missing}</span>}
+        {optional && <span className="text-label normal-case text-muted-light">{t.common.optional}</span>}
+        {missing && <span className="text-label normal-case text-danger">{t.common.missing}</span>}
       </span>
-      {/* Field box: red ring when a required value is missing, orange ring when the agent filled it. */}
-      <div className={`rounded-lg ${missing ? "ring-2 ring-danger/70" : agent ? "ring-1 ring-warn/60" : ""}`}>
-        {children}
-      </div>
+      {children}
       {agent && note && (
-        <span className="mt-1 flex items-start gap-1.5 text-[12px] leading-snug text-info">
-          <Icon name="lightbulb" size={13} className="mt-[1.5px] flex-none" /> {note}
+        <span className="mt-1 flex items-start gap-1.5 text-meta leading-snug text-info-deep">
+          <Icon name="lightbulb" size={13} className="mt-[1px] flex-none" /> {note}
         </span>
       )}
-      {hint && <span className="mt-1 block text-xs text-muted">{hint}</span>}
+      {hint && <span className={cx("mt-1 block", TYPE.meta)}>{hint}</span>}
     </label>
   );
 }
 
-export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
+/**
+ * A text input. The error and agent states sit on the border, not on a ring — a ring means focus in
+ * this app, and only focus, so that a keyboard user is never guessing which of two rings they are
+ * looking at.
+ */
+export function TextInput({
+  invalid,
+  agent,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean; agent?: boolean }) {
   return (
     <input
       {...props}
-      className={`w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-brand ${props.className ?? ""}`}
+      aria-invalid={invalid || undefined}
+      className={cx(INPUT, invalid && INPUT_ERROR, !invalid && agent && INPUT_AGENT, props.className)}
     />
   );
 }
 
-export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function TextArea({
+  invalid,
+  agent,
+  ...props
+}: TextareaHTMLAttributes<HTMLTextAreaElement> & { invalid?: boolean; agent?: boolean }) {
   return (
     <textarea
       {...props}
-      className={`w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-brand ${props.className ?? ""}`}
+      aria-invalid={invalid || undefined}
+      className={cx(TEXTAREA, invalid && INPUT_ERROR, !invalid && agent && INPUT_AGENT, props.className)}
     />
   );
 }
@@ -204,7 +278,7 @@ export function Select<T extends string>({
       value={value ?? ""}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value as T)}
-      className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-brand disabled:opacity-50"
+      className={INPUT}
     >
       {placeholder && (
         <option value="" disabled>
@@ -220,7 +294,10 @@ export function Select<T extends string>({
   );
 }
 
-/* ------------------------------------ RadioGroup ------------------------------------ */
+/* ------------------------------------ Selection controls ------------------------------------
+   Two rules, and both live in `@/lib/ds`. A segmented control marks its choice by lifting a white
+   panel out of a tinted groove; a chip marks its choice with a brand tint. Which one a control uses
+   is decided by its shape, not by which file it was written in. */
 
 export function RadioGroup<T extends string>({
   value,
@@ -236,18 +313,16 @@ export function RadioGroup<T extends string>({
   return (
     <div className="flex flex-wrap gap-2" role="radiogroup">
       {options.map((o) => {
-        const active = value === o.value;
+        const on = value === o.value;
         return (
           <button
             key={o.value}
             type="button"
             role="radio"
-            aria-checked={active}
+            aria-checked={on}
             name={name}
             onClick={() => onChange(o.value)}
-            className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-              active ? "border-brand bg-brand-soft text-brand" : "border-border bg-surface hover:bg-background"
-            }`}
+            className={cx("rounded-md px-3 text-body control-sm", on ? CHIP.on : CHIP.off)}
           >
             {o.label}
           </button>
@@ -256,8 +331,6 @@ export function RadioGroup<T extends string>({
     </div>
   );
 }
-
-/* ------------------------------------ Pchips (single-select) ------------------------------------ */
 
 /** Prototype `.pchips` — single-select rounded chips (e.g. Me/Supplier, fuel type). */
 export function Pchips<T extends string>({
@@ -280,10 +353,9 @@ export function Pchips<T extends string>({
           <button
             key={o.value}
             type="button"
+            aria-pressed={on}
             onClick={() => (on && onClear ? onClear() : onChange(o.value))}
-            className={`rounded-full border px-3.5 py-1.5 text-[12.5px] font-bold transition ${
-              on ? "border-brand bg-brand-soft text-brand" : "border-border bg-surface text-navy-mid hover:border-navy-mid"
-            }`}
+            className={cx(CHIP_BOX, on ? CHIP.on : CHIP.off)}
           >
             {o.label}
           </button>
@@ -292,8 +364,6 @@ export function Pchips<T extends string>({
     </div>
   );
 }
-
-/* ------------------------------------ Seg2 (segmented) ------------------------------------ */
 
 /** Prototype `.seg2` — segmented single-select (e.g. Daily/Weekly/Monthly, Supplier/Renter). */
 export function Seg2<T extends string>({
@@ -309,15 +379,16 @@ export function Seg2<T extends string>({
   options: { value: T; label: string }[];
 }) {
   return (
-    <div className="inline-flex flex-wrap rounded-[10px] border border-border bg-surface2 p-[3px]">
+    <div className={cx(TRACK, "flex-wrap")}>
       {options.map((o) => {
         const on = value === o.value;
         return (
           <button
             key={o.value}
             type="button"
+            aria-pressed={on}
             onClick={() => (on && onClear ? onClear() : onChange(o.value))}
-            className={`rounded-[7px] px-4 py-2 text-[13px] font-semibold transition ${on ? "bg-surface text-navy shadow-sm" : "text-muted"}`}
+            className={on ? SEGMENT.on : SEGMENT.off}
           >
             {o.label}
           </button>
@@ -327,9 +398,7 @@ export function Seg2<T extends string>({
   );
 }
 
-/* ------------------------------------ SelChips (multi toggle) ------------------------------------ */
-
-/** Prototype `.selchip` — multi-select pill that fills navy with a ✓ when on. */
+/** Prototype `.selchip` — multi-select pill that shows a ✓ when on. */
 export function SelChips<T extends string>({
   values,
   onToggle,
@@ -347,10 +416,9 @@ export function SelChips<T extends string>({
           <button
             key={o.value}
             type="button"
+            aria-pressed={on}
             onClick={() => onToggle(o.value)}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[12.5px] font-bold transition ${
-              on ? "border-navy bg-navy text-white" : "border-border bg-surface text-navy-mid hover:border-navy-mid"
-            }`}
+            className={cx(CHIP_BOX, on ? CHIP.on : CHIP.off)}
           >
             {on && <Icon name="check" size={14} />}
             {o.label}
@@ -361,37 +429,18 @@ export function SelChips<T extends string>({
   );
 }
 
-/* ------------------------------------ MultiChips ------------------------------------ */
-
-export function MultiChips<T extends string>({
-  values,
-  onToggle,
-  options,
-}: {
+/**
+ * Kept as a name (owner, 2026-08-26). This and `SelChips` were the same control drawn twice — a
+ * multi-select pill row — differing only in that one filled navy and the other tinted brand, which
+ * is exactly the inconsistency the selection rule exists to settle. It forwards rather than being
+ * deleted because its call sites read fine as they are.
+ */
+export function MultiChips<T extends string>(props: {
   values: T[];
   onToggle: (v: T) => void;
   options: { value: T; label: string }[];
 }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((o) => {
-        const active = values.includes(o.value);
-        return (
-          <button
-            key={o.value}
-            type="button"
-            aria-pressed={active}
-            onClick={() => onToggle(o.value)}
-            className={`rounded-full border px-3 py-1 text-sm transition-colors ${
-              active ? "border-brand bg-brand-soft text-brand" : "border-border bg-surface hover:bg-background"
-            }`}
-          >
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
-  );
+  return <SelChips {...props} />;
 }
 
 /* ------------------------------------ Toggle ------------------------------------ */
@@ -403,10 +452,10 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className="inline-flex items-center gap-2 text-sm"
+      className="inline-flex items-center gap-2 text-body"
     >
-      <span className={`relative h-5 w-9 rounded-full transition-colors ${checked ? "bg-brand" : "bg-border"}`}>
-        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${checked ? "start-4" : "start-0.5"}`} />
+      <span className={cx("relative h-5 w-9 rounded-full transition-colors", checked ? "bg-brand" : "bg-border")}>
+        <span className={cx("absolute top-0.5 h-4 w-4 rounded-full bg-surface transition-all", checked ? "start-4" : "start-0.5")} />
       </span>
       {label}
     </button>
@@ -417,12 +466,24 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
 
 export function Stepper({ value, onChange, min = 1, max = 99 }: { value: number; onChange: (v: number) => void; min?: number; max?: number }) {
   return (
-    <div className="inline-flex items-center rounded-lg border border-border bg-surface">
-      <button type="button" className="px-3 py-1.5 text-sm disabled:opacity-40" disabled={value <= min} onClick={() => onChange(Math.max(min, value - 1))}>
+    <div className="inline-flex items-center rounded-md border border-border bg-surface">
+      <button
+        type="button"
+        aria-label="−"
+        className={btn("ghost", "sm", { icon: true, className: "rounded-none rounded-s-md" })}
+        disabled={value <= min}
+        onClick={() => onChange(Math.max(min, value - 1))}
+      >
         −
       </button>
-      <span className="min-w-8 text-center text-sm tabular-nums">{value}</span>
-      <button type="button" className="px-3 py-1.5 text-sm disabled:opacity-40" disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))}>
+      <span className="min-w-8 text-center text-body font-semibold tabular">{value}</span>
+      <button
+        type="button"
+        aria-label="+"
+        className={btn("ghost", "sm", { icon: true, className: "rounded-none rounded-e-md" })}
+        disabled={value >= max}
+        onClick={() => onChange(Math.min(max, value + 1))}
+      >
         +
       </button>
     </div>
@@ -431,15 +492,23 @@ export function Stepper({ value, onChange, min = 1, max = 99 }: { value: number;
 
 /* ------------------------------------ Badge ------------------------------------ */
 
-export function Badge({ children, tone = "default" }: { children: ReactNode; tone?: "default" | "ok" | "warn" | "danger" | "brand" }) {
-  const tones: Record<string, string> = {
-    default: "bg-background text-muted",
-    ok: "bg-ok-soft text-ok",
-    warn: "bg-warn-soft text-warn",
-    danger: "bg-danger-soft text-danger",
-    brand: "bg-brand-soft text-brand",
-  };
-  return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${tones[tone]}`}>{children}</span>;
+/**
+ * A status, small. Each tone lays its `deep` text colour on its `soft` background — the base colour
+ * alone is not readable at 11px on its own tint.
+ */
+export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: Tone | "default" }) {
+  const key: Tone = tone === "default" ? "neutral" : tone;
+  return <span className={cx(BADGE_BASE, BADGE_TONE[key])}>{children}</span>;
+}
+
+/** A status, full width — the panel form, for a caution or an error above a form. */
+export function Notice({ children, tone = "info", icon }: { children: ReactNode; tone?: Tone; icon?: string }) {
+  return (
+    <div className={cx(NOTICE_BASE, NOTICE_TONE[tone])} role={tone === "danger" ? "alert" : undefined}>
+      {icon && <Icon name={icon} size={16} className="mt-[1px] flex-none" />}
+      <div>{children}</div>
+    </div>
+  );
 }
 
 /* ------------------------------------ Modal ------------------------------------ */
