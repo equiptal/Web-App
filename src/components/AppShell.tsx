@@ -236,13 +236,16 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
               No active ring on it, though it points at `/`: Dashboard names that destination in the
               row beside it and already carries the state. Two marks for one place is one too many. */}
           <Link href="/" aria-label={t.shell.home} className="flex-none transition hover:opacity-80">
-            {/* 32px, down from the prototype's 36 (owner, 2026-08-25). The prototype's bar is 76px
-                tall and ours is 62 — a mark sized for the taller one crowds this one. */}
+            {/* ── 24px, measured off the owner's own bar (2026-08-26) ────────────────────────────
+                His screenshot: a 34px bar carrying a 13px mark — the logo is 38% of the bar's height,
+                and it sat at 32px here, half the bar and the loudest thing on it. 24px on our 62px bar
+                is the same proportion (0.387 against his 0.382), so the mark reads as a signature
+                rather than as a heading. */}
             {/* The mark is one dark navy (#25384a) and would sink into the bar, so it is filtered to
                 white rather than swapped for a second asset — one file, one logo, and no risk of the
                 two drifting. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/moedatech-logo.svg" alt="Moedatech" className="block h-8 w-auto brightness-0 invert" />
+            <img src="/moedatech-logo.svg" alt="Moedatech" className="block h-6 w-auto brightness-0 invert" />
           </Link>
 
           {/* ── The nav sits DEAD CENTRE of the bar, not after the title ────────────────────────────
