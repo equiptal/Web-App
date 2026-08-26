@@ -46,6 +46,7 @@ import { equipmentIcon } from "@/components/requests/EquipImg";
 // which is the shape the dependency should have — the map has no business knowing how a card is made.
 import type { EquipmentCardModel } from "@/components/map/equipment-card-model";
 import { useLocale, useT } from "@/lib/i18n";
+import { pin } from "@/lib/uiPins";
 
 export interface SitePoint {
   lat: number;
@@ -869,7 +870,7 @@ export default function MapCanvas({
   const iconName = useMemo(() => equipmentIcon(itemName), [itemName]);
 
   return (
-    <div className="bm-leaflet">
+    <div {...pin("map-canvas")} className="bm-leaflet">
       <MapContainer
         center={site ? [site.lat, site.lng] : FALLBACK_CENTRE}
         zoom={site ? SITE_ZOOM : FALLBACK_ZOOM}

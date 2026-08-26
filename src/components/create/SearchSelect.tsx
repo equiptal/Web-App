@@ -11,6 +11,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui";
+import { pin } from "@/lib/uiPins";
 
 export interface SearchSelectOption {
   value: string;
@@ -113,7 +114,7 @@ export function SearchSelect({
   }, [options, query]);
 
   return (
-    <div ref={boxRef} className="relative">
+    <div {...pin("search-select")} ref={boxRef} className="relative">
       <button
         type="button"
         disabled={disabled || options.length === 0}

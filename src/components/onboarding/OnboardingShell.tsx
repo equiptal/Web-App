@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useLocale, useT } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n/config";
 import { Icon } from "@/components/ui";
+import { pin } from "@/lib/uiPins";
 
 /**
  * Shared chrome for the onboarding + verification screens (web-app/003), matching the prototype:
@@ -26,7 +27,7 @@ export function OnboardingShell({ step, children }: { step: 1 | 2; children: Rea
   );
 
   return (
-    <div dir={locale === "ar" ? "rtl" : "ltr"} className="min-h-screen bg-surface2">
+    <div {...pin("onboarding-shell")} dir={locale === "ar" ? "rtl" : "ltr"} className="min-h-screen bg-surface2">
       <div className="flex h-[60px] items-center justify-between border-b border-border bg-surface px-6">
         {/* Logo links home — the onboarding/verify screens have no sidebar, so this (and the explicit
             "Back to home" button) are the only in-app way out. Without them a submitted renter is

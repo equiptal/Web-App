@@ -87,6 +87,7 @@ import {
   type DocDownloadTarget,
 } from "./machine-panel-model";
 import "./panel-proto.css";
+import { pin } from "@/lib/uiPins";
 
 /* ───────────────────── what the batch acts on — pure, so it is testable ───────────────────── */
 
@@ -195,7 +196,7 @@ export function CompanyPanel({ companyName, verified, docs, ar, L, onBack }: Com
         : L(`Download (${targets.length})`, `تنزيل (${arDigits(targets.length)})`);
 
   return (
-    <div className="mp mp-over" dir={ar ? "rtl" : "ltr"}>
+    <div {...pin("company-panel")} className="mp mp-over" dir={ar ? "rtl" : "ltr"}>
       {/* **The prototype's header, at 64 px** (2026-08-09): a circular back, the firm's initials, its
           name, and the verified chip. The subtitle «مستندات الشركة» is gone from it — the group
           heading four lines down already says exactly that, and a header that repeats the first

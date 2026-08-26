@@ -15,6 +15,7 @@ import { btn, cx, OVERLAY, PAGE_BACK, PAGE_X_BLEED, PAGE_X_READING, PAGE_X_WORKI
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { AppNav, AppNavMobile, type NavItem } from "@/components/AppNav";
 import { ArrowBackIcon, MailIcon, CountBadge } from "@/components/HeaderIcons";
+import { pin } from "@/lib/uiPins";
 
 /**
  * App shell for the renter web app (web-app/004, AC-01/02/03/09/25). One bar across the top holding
@@ -203,7 +204,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
         sidebar, and had no reason to carry the pin — it forked on 2026-08-13 and the pin landed on
         08-19 — so taking its side wholesale would have quietly reopened the bug the pin fixes. The
         dock shell is the redesign's; the conditional is staging's. */}
-    <div className={`flex ${fullBleed ? "h-dvh overflow-hidden" : "min-h-screen"}`}>
+    <div {...pin("app-shell")} className={`flex ${fullBleed ? "h-dvh overflow-hidden" : "min-h-screen"}`}>
       {/* Main column — the whole page; navigation is the row in its header. */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* ── Top bar (AC-03), and the app's navigation (owner, 2026-08-25) ──────────────────────
@@ -220,7 +221,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
             account controls take white at reduced strength, and the hairlines become white/15. Where a
             control keeps a light ground of its own — the account menu, the nav sheet — it stays light,
             because it is a surface, not part of the bar. */}
-        <header className="sticky top-0 z-30 flex h-[62px] items-center gap-3 border-b border-white/10 bg-navy px-4 text-white sm:px-7 relative">
+        <header {...pin("app-header")} className="sticky top-0 z-30 flex h-[62px] items-center gap-3 border-b border-white/10 bg-navy px-4 text-white sm:px-7 relative">
           {/* ~~The Back arrow led this row.~~ It is on the PAGE now, under the bar (owner,
               2026-08-26) — see `usePageBack` and the block at the top of `<main>`. The bar carries
               only what is true of the app on every route; back is true of one page. */}
@@ -231,7 +232,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
 
               No active ring on it, though it points at `/`: Dashboard names that destination in the
               row beside it and already carries the state. Two marks for one place is one too many. */}
-          <Link href="/" aria-label={t.shell.home} className="flex-none transition">
+          <Link {...pin("header-logo")} href="/" aria-label={t.shell.home} className="flex-none transition">
             {/* ── 20px, matched to the owner's bar by SIZE, not by ratio (2026-08-26) ─────────────
                 His screenshot is a 34px bar carrying a 13px mark. Matching that PROPORTION on our
                 62px bar gave 24px — and he read it as still too big, which it is: the ratio holds
@@ -259,7 +260,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
               Below `lg` it is hidden entirely rather than squeezed. Three words plus a wordmark plus
               the account cluster do not fit a phone, and an icon rail here would be the toolbar this
               design is deliberately not. */}
-          <div className="pointer-events-none absolute inset-x-0 hidden justify-center lg:flex">
+          <div {...pin("header-nav-slot")} className="pointer-events-none absolute inset-x-0 hidden justify-center lg:flex">
             <div className="pointer-events-auto">
               <AppNav items={navItems} />
             </div>
@@ -276,12 +277,12 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
 
           {/* 22px between the groups of this cluster is the prototype's spacing; a phone cannot spend
               it, so it opens up at `sm` where the language control also returns. */}
-          <div className="ms-auto flex flex-none items-center gap-3 text-body font-semibold text-white/75 sm:gap-6">
+          <div {...pin("header-account")} className="ms-auto flex flex-none items-center gap-3 text-body font-semibold text-white/75 sm:gap-6">
             {/* ── The language toggle steps out of the bar on a phone (owner, 2026-08-25) ──────────
                 It is ~70px of a 360px row and it is pressed roughly never — a reader picks a language
                 once. Below `sm` it moves into the nav sheet, under the three places, which is room
                 the bar does not have to find. It is not removed anywhere. */}
-            <span className="hidden sm:inline-flex">
+            <span {...pin("header-locale")} className="hidden sm:inline-flex">
               <LocaleToggle locale={locale} setLocale={setLocale} />
             </span>
 
@@ -313,7 +314,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                 prototype spaces them by. Same picture, and a pressable target instead of a 20px one
                 (owner, 2026-08-25: "make sure all icons in the nav bar is consistent"). */}
             {status === "authed" && (
-              <div className="flex items-center gap-0 text-white/70">
+              <div {...pin("header-icons")} className="flex items-center gap-0 text-white/70">
                 <Link
                   href="/inbox"
                   aria-label={t.shell.inbox}
@@ -354,7 +355,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                   settings page, and a second nudge up here would repeat the mistake the menu was
                   already making. Flagged for the owner rather than quietly kept. */}
             {status === "authed" && (
-              <Link
+              <Link {...pin("header-avatar")}
                 href="/profile"
                 className="flex flex-none items-center gap-1.5"
                 aria-label={tier === "verified" ? `${t.shell.settings} · ${t.shell.tierVerified}` : `${t.shell.settings} · ${t.shell.verifyNudge}`}
@@ -406,6 +407,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
             One consistent page container across the app (T1/T2): My Requests' 1440px width and a
             generous gutter. `wide` stays uncapped (My Requests caps itself at 1440 via .rproto). */}
         <main
+          {...pin("page-main")}
           className={
             fullBleed
               ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
@@ -423,7 +425,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
 
               A full-bleed surface has no gutter of its own to sit on, so the control brings one. */}
           {back && (
-            <div className={cx(PAGE_BACK, fullBleed && `${PAGE_X_BLEED} pt-4`)}>
+            <div {...pin("page-back")} className={cx(PAGE_BACK, fullBleed && `${PAGE_X_BLEED} pt-4`)}>
               <button
                 onClick={back}
                 aria-label={locale === "ar" ? "رجوع" : "Back"}

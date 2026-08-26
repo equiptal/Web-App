@@ -26,6 +26,7 @@ import { PanelDot } from "@/components/create/Provenance";
 import { gateWhen, gateWhere, itemGaps, panelGaps, postableItems, requiredGaps, resolveRef, taxName, transportGaps } from "@/lib/contract";
 import type { RequiredGap } from "@/lib/contract";
 import { btn } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 /**
  * A gap's reason, in the renter's words.
@@ -256,7 +257,7 @@ export function Canvas() {
   })();
 
   return (
-    <div>
+    <div {...pin("create-canvas")}>
       {/* ---------------- The renter's own words, and what's left ---------------- */}
       <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-warn/45 bg-warn/[0.07] px-5 py-3.5">
         <div className="flex min-w-0 items-center gap-2.5">

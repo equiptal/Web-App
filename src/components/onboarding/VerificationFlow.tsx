@@ -16,6 +16,7 @@ import { CompanyIdentityModal, type AuthorityRole, type CompanyIdentity } from "
 import { CompanyDocsConfirmDialog } from "./CompanyDocsConfirmDialog";
 import type { VerificationStatus } from "@/lib/contract/onboarding";
 import { btn } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 const ACCEPT = "image/jpeg,image/png,image/webp,application/pdf";
 
@@ -354,7 +355,7 @@ export function VerificationFlow() {
   // pile; `resubmitVerification` cannot run one — it stacks a second queue row and names it from a
   // legal name a pile never collects).
   return (
-    <div>
+    <div {...pin("verification-flow")}>
       <div className="flex items-start gap-3 border-b border-border p-6">
         <span className="grid h-10 w-10 flex-none place-items-center rounded-sm bg-brand-soft text-brand">
           <Icon name="domain" size={22} />

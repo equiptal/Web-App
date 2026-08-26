@@ -4,6 +4,7 @@ import "./globals.css";
 import { LocaleProvider } from "@/lib/i18n";
 import { SessionProvider } from "@/lib/session";
 import { IntercomWidget } from "@/components/support/IntercomWidget";
+import { UiPins } from "@/components/dev/UiPins";
 
 // Nunito is the prototype's brand typeface (weights 400–900) — the default sans for the redesign, used
 // on every page → preload it. The other three are contextual (Inter on prototype screens, IBM Plex for
@@ -79,6 +80,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             {/* Inside the providers because it reads the session and the locale, and at the root so the
                 launcher is on every page — support is least reachable exactly where it is most needed. */}
             <IntercomWidget />
+            {/* STAGING BRANCH ONLY — DO NOT MERGE TO main. A developer toggle that numbers every
+                registered surface, so a restyle can be asked for by number ("tighten #26"). This one
+                line is the whole mount: delete it and the overlay is gone, whatever else is left in
+                the tree. It already renders nothing on the production host (see lib/uiPins.ts), but
+                that guard is the belt, not the plan. */}
+            <UiPins />
           </SessionProvider>
         </LocaleProvider>
       </body>

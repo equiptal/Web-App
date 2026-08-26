@@ -9,6 +9,7 @@ import { publicTaxonomyUrl, type RequestGroup, type RequestListItem } from "@/li
 import { CERT_LABEL, offeredFrontPhotoUrl, type BidCard } from "@/lib/contract/bids";
 import { unitAvailability } from "@/lib/contract/bid-map";
 import { btn } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 /**
  * The dark strip under the rail. Two halves, and they answer different questions.
@@ -124,15 +125,15 @@ export function RequestStrip({
   };
 
   return (
-    <div className={`${PAGE_MX_BLEED} mt-2 flex-none`}>
+    <div {...pin("request-strip")} className={`${PAGE_MX_BLEED} mt-2 flex-none`}>
       {/* ── The request header, as the owner's reference draws it (2026-08-26) ────────────────────
           ONE white card, with the request itself as a navy block inset at its leading edge. It was
           the other way round — a navy strip with a white card floating in it — which spent the
           brightest surface on the chrome and left the machine, the offer and the controls sharing a
           panel inside it. The card is the subject now; the navy names what it belongs to. */}
-      <div className="flex items-stretch gap-3 rounded-lg bg-surface p-1.5">
+      <div {...pin("strip-card")} className="flex items-stretch gap-3 rounded-lg bg-surface p-1.5">
         {/* ── The request ── */}
-        <div className="flex flex-none flex-col justify-center gap-1 rounded-lg bg-navy px-4 py-2.5 text-white">
+        <div {...pin("strip-ref-block")} className="flex flex-none flex-col justify-center gap-1 rounded-lg bg-navy px-4 py-2.5 text-white">
           <button
             type="button"
             onClick={onOpenRequest ?? undefined}

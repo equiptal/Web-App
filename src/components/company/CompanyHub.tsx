@@ -24,6 +24,7 @@ import {
 } from "@/lib/api/company-client";
 import type { CompanyMember, MyCompany } from "@/lib/contract/company";
 import { btn } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 /**
  * Company hub — the web twin of the app's `company_page.dart`
@@ -120,7 +121,7 @@ export function CompanyHub() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl pb-10" dir={ar ? "rtl" : "ltr"}>
+    <div {...pin("company-hub")} className="mx-auto max-w-2xl pb-10" dir={ar ? "rtl" : "ltr"}>
       {toast && (
         <p className="mb-4 flex items-center gap-2 rounded-sm border border-ok/30 bg-ok-soft px-3.5 py-2.5 text-body font-semibold text-ok">
           <Icon name="check_circle" size={16} /> {toast}

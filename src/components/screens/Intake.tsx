@@ -7,6 +7,7 @@ import { useSession } from "@/lib/session";
 import { Button, Icon } from "@/components/ui";
 import { AccountModal } from "@/components/onboarding/AccountModal";
 import { bumpAgentUse, guestLimitReached } from "@/lib/access/agent-quota";
+import { pin } from "@/lib/uiPins";
 
 /** Accepted file types (AC-05/07): PDF, image, Word, Excel. No size/count/length limit (AC-08). */
 const ACCEPT_ATTR =
@@ -144,7 +145,7 @@ export function Intake() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1040px]">
+    <div {...pin("create-intake")} className="mx-auto w-full max-w-[1040px]">
       <h1 className="text-display font-extrabold leading-tight tracking-[-.02em] text-navy">{t.intake.heading}</h1>
       <p className="mb-7 mt-2 text-subhead leading-relaxed text-muted">{t.intake.subheading}</p>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ChatCardView } from "@/lib/contract/deal-rounds";
+import { pin } from "@/lib/uiPins";
 
 type LFn = (en: string, arr: string) => string;
 
@@ -61,7 +62,7 @@ export function ChatCard({
     // `cc-prominent` class was emitted here for a while with no rule behind it in any stylesheet: it
     // carried no meaning, only the appearance of one, and the next reader of `.cc-quiet` would go
     // looking for its opposite and find nothing. The rendered card is byte-identical without it.
-    <div className={`chatcard${prominent ? "" : " cc-quiet"} cc-${view.tone}`}>
+    <div {...pin("chat-card")} className={`chatcard${prominent ? "" : " cc-quiet"} cc-${view.tone}`}>
       <div className="cc-head">
         <span className="material-icons-outlined">{view.icon}</span>
         <span className="cc-title">{view.title}</span>

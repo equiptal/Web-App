@@ -14,6 +14,7 @@ import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 import type { LinkBidSubmission } from "@/lib/contract/link-bids";
 import { termsDial, type WorkspaceBid } from "@/lib/contract/workspace";
+import { pin } from "@/lib/uiPins";
 
 /**
  * The Cards tab — one card per bid on the selected item, in a row that scrolls sideways.
@@ -61,7 +62,7 @@ export function BidCards({
     // `items-stretch`, not `items-start`: the pane now has a definite height, so every card takes
     // all of it and they end on one line instead of stepping down with their content. The footer was
     // already `mt-auto`, waiting for exactly this — the way on sits at the bottom of every card.
-    <div className="flex h-full snap-x items-stretch gap-5 overflow-x-auto p-3">
+    <div {...pin("workspace-bid-cards")} className="flex h-full snap-x items-stretch gap-5 overflow-x-auto p-3">
       {bids.map((b) => (
         <BidCardTile
           key={b.card.id}
@@ -211,7 +212,7 @@ function BidCardTile({
   };
 
   return (
-    <article
+    <article {...pin("bid-card")}
       onClick={onSelect}
       className={`flex max-h-full w-[344px] max-w-full flex-none snap-start cursor-pointer flex-col overflow-hidden rounded-lg border bg-surface transition ${
         selected
@@ -220,7 +221,7 @@ function BidCardTile({
       }`}
     >
       {/* Where it came from, and when. */}
-      <header
+      <header {...pin("bid-card-header")}
         className={`flex flex-none items-center justify-between gap-2 border-b px-3.5 py-1.5 text-label font-semibold ${
           offline ? "border-border bg-surface2 text-navy-mid" : "border-info/20 bg-info-soft text-info"
         }`}
@@ -232,7 +233,7 @@ function BidCardTile({
         {submitted && <span className="font-semibold text-muted">{submitted}</span>}
       </header>
 
-      <div className="flex flex-none items-center gap-3 px-3.5 py-2.5">
+      <div {...pin("bid-card-footer")} className="flex flex-none items-center gap-3 px-3.5 py-2.5">
         <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-navy text-body font-semibold text-white">
           {card.supplierName.trim().charAt(0).toUpperCase() || "?"}
         </span>

@@ -5,6 +5,7 @@ import { useT, useLocale, fmt } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Button, Icon } from "@/components/ui";
 import type { EquipmentItem } from "@/lib/contract/draft";
+import { pin } from "@/lib/uiPins";
 
 /**
  * The agent at work (owner, 2026-08-26 — the Processing prototype).
@@ -191,7 +192,7 @@ export function Processing() {
     step === 0 ? 12 : step === 1 ? 30 : step === 2 ? Math.round(45 + (items.length ? (revealed + matched) / (items.length * 2) : 0) * 35) : 92;
 
   return (
-    <div className="flex min-h-[70vh] items-center justify-center">
+    <div {...pin("create-processing")} className="flex min-h-[70vh] items-center justify-center">
       <div className="w-full max-w-[520px] rounded-lg border border-border bg-surface p-7 text-center">
         {/* ── The agent's mark, and the fact that it is live (owner's reference, 2026-08-26) ───────
             A 64px amber tile ABOVE its own label rather than a 30px chip beside it. This is the one

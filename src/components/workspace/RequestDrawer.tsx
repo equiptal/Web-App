@@ -18,6 +18,7 @@ import { requestActions, type WorkspaceBid } from "@/lib/contract/workspace";
 import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
 import { ConfirmCancelModal, EditRequestModal } from "@/components/requests/RequestEditModals";
 import { ACTIONS, btn, cx } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 /** What the share sheet needs about this request's public bid link. */
 export interface ShareLinkMeta {
@@ -132,7 +133,7 @@ export function RequestDrawer({
         open
         onClose={onClose}
         header={
-        <div className="flex-none bg-navy px-5 pb-5 pt-4 text-white">
+        <div {...pin("request-drawer")} className="flex-none bg-navy px-5 pb-5 pt-4 text-white">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-label font-extrabold uppercase tracking-wide text-white/55">

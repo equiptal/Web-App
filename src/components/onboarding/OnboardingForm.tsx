@@ -9,6 +9,7 @@ import { postAuth, type AuthKind } from "@/components/auth/authClient";
 import { COUNTRY_CODES, SAUDI_DIAL } from "@/components/auth/PhoneEntry";
 import type { RenterUser } from "@/lib/contract/auth";
 import { btn } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 interface Opt {
   value: string;
@@ -250,7 +251,7 @@ export function OnboardingForm({
   const labelCls = "mb-2 block text-meta font-semibold text-navy-mid";
 
   return (
-    <form onSubmit={submit} noValidate>
+    <form {...pin("onboarding-form")} onSubmit={submit} noValidate>
       <div className="flex items-start gap-3 border-b border-border p-6">
         {/* Back to step 1 (OTP entry) — keeps the two steps tied so the user can return to the code step. */}
         {onSignIn && (

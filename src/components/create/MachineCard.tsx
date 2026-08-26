@@ -26,6 +26,7 @@ import { equipmentIcon } from "@/components/requests/EquipImg";
 import { CanvasField, ChoiceChips, ChoiceRow, PanelDot } from "@/components/create/Provenance";
 import { SearchSelect } from "@/components/create/SearchSelect";
 import { useItemAttachments, useItemOverrides, useItemTaxonomy, useProvenance } from "@/components/create/hooks";
+import { pin } from "@/lib/uiPins";
 import {
   EQUIPMENT_YEARS,
   isTouched,
@@ -90,8 +91,8 @@ export function MachineCard({
   ];
 
   return (
-    <div className="min-w-0 flex-1 rounded-sm border border-border bg-surface p-3.5">
-      <div className="mb-4 flex items-center justify-between gap-2">
+    <div {...pin("machine-card")} className="min-w-0 flex-1 rounded-sm border border-border bg-surface p-3.5">
+      <div {...pin("machine-card-head")} className="mb-4 flex items-center justify-between gap-2">
         <span className="flex items-center gap-2">
           <PanelDot complete={gaps.length === 0} />
           <h2 className="whitespace-nowrap text-subhead font-extrabold text-navy">{t.create.machine}</h2>
@@ -104,9 +105,9 @@ export function MachineCard({
       </div>
 
       {/* The prototype's 2fr / 3fr split, 20px gutter, columns aligned to the top. */}
-      <div className="grid gap-5 lg:grid-cols-[2fr_3fr] lg:items-stretch">
+      <div {...pin("machine-card-body")} className="grid gap-5 lg:grid-cols-[2fr_3fr] lg:items-stretch">
         {/* ---------------- The 450px panel, and the four controls on its corners ---------------- */}
-        <div className="relative h-full min-h-[450px] w-full min-w-0 rounded-md bg-surface2">
+        <div {...pin("machine-card-image")} className="relative h-full min-h-[450px] w-full min-w-0 rounded-md bg-surface2">
           <div className="grid h-full place-content-center justify-items-center gap-2 px-6 text-center">
             <Icon name={equipmentIcon(tax.subtypeName || tax.categoryName)} size={132} className="text-navy/20" />
             {(tax.subtypeName || tax.categoryName) && (

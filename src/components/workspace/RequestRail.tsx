@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui";
 import { PAGE_X_BLEED } from "@/components/AppShell";
 import { publicTaxonomyUrl } from "@/lib/contract/requests";
 import type { RailTile } from "@/lib/contract/workspace";
+import { pin } from "@/lib/uiPins";
 
 /**
  * The rail at the top of the workspace — one circle per request, newest first, and a `New` tile that
@@ -63,8 +64,8 @@ export function RequestRail({
   // 72 — the badge hangs out of it absolutely — which is the number the margins further down are
   // cut from. Change any line above and both figures move with it; that is the point of the sum.
   return (
-    <div className={`flex h-[88px] flex-none select-none items-center gap-4 overflow-hidden border-b border-border bg-surface3/60 ${PAGE_X_BLEED}`}>
-      <Link href="/create" className="group flex flex-none flex-col items-center gap-1">
+    <div {...pin("request-rail")} className={`flex h-[88px] flex-none select-none items-center gap-4 overflow-hidden border-b border-border bg-surface3/60 ${PAGE_X_BLEED}`}>
+      <Link {...pin("rail-create-tile")} href="/create" className="group flex flex-none flex-col items-center gap-1">
         <span className="grid h-11 w-11 place-items-center rounded-full border-2 border-dashed border-border text-muted transition group-hover:border-brand group-hover:text-brand">
           <Icon name="add" size={20} />
         </span>
@@ -80,7 +81,7 @@ export function RequestRail({
           circles' line. */}
       <div className="mb-7 h-9 w-px flex-none bg-border/70" />
 
-      <div
+      <div {...pin("rail-tiles")}
         ref={scroller}
         /* Every circle on one line, `New` included (owner, 2026-08-25).
 

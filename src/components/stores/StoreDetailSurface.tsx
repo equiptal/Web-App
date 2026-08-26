@@ -9,6 +9,7 @@ import { Icon } from "@/components/ui";
 import { EquipmentDetailModal } from "@/components/stores/EquipmentDetailModal";
 import type { EquipmentCard, StoreDetail, TaxonomyNode } from "@/lib/contract/stores";
 import { btn } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 /**
  * Store detail surface — matches the prototype's `view-store` (navy gradient banner, trust tiles,
@@ -83,7 +84,7 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
   const docStatus = detail.isVerified ? t.store.statusVerified : t.store.statusPending;
 
   return (
-    <div>
+    <div {...pin("store-detail")}>
       {/* Banner (navy gradient) — AC-18 */}
       <div className="relative mb-4 overflow-hidden rounded-sm bg-gradient-to-br from-navy to-navy-deep px-6 py-5 text-white">
         <div className="relative z-10 mb-5 flex justify-between">

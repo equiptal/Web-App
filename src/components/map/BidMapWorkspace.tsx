@@ -80,6 +80,7 @@ import {
 import { publicTaxonomyUrl, type RequestRecord } from "@/lib/contract/requests";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import "@/components/map/map-proto.css";
+import { pin } from "@/lib/uiPins";
 
 // `leaflet` reaches for `window` at import time, so the canvas is client-only — the same handling
 // `MapLocationPicker`/`GoogleMapLocationPicker` need in this repo.
@@ -858,8 +859,8 @@ export function BidMapWorkspace({
   return (
     // No `dir` here: the shell's direction is the locale's, and every offset in `map-proto.css` is a
     // logical property, so the panel lands on the inline-start edge in both (AC-30, AC-98).
-    <div className="bidmap" ref={rootRef} style={panelW == null ? undefined : ({ "--bm-panel-w": `${panelW}px` } as CSSProperties)}>
-      <div className="bm-canvas">
+    <div {...pin("bid-map-workspace")} className="bidmap" ref={rootRef} style={panelW == null ? undefined : ({ "--bm-panel-w": `${panelW}px` } as CSSProperties)}>
+      <div {...pin("bidmap-canvas")} className="bm-canvas">
         <MapCanvas
           site={site}
           addressLabel={request?.projectAddressLabel ?? null}
@@ -893,7 +894,7 @@ export function BidMapWorkspace({
           Fixed width, in flow beside the map rather than floating over it (§5). Its DOM position is
           what puts it on the inline-end edge — the same edge the prototype's `left: 18px` lands on in
           Arabic — and it mirrors with the reading direction instead of trading places with the map. */}
-      <aside className="bm-panel">
+      <aside {...pin("bidmap-panel")} className="bm-panel">
         {/* The grip lives on the panel's map-facing edge and is invisible until the pointer is on it —
             the surface already carries a lot of furniture and a permanent handle would be one more
             thing to read. `role="separator"` with the width on `aria-valuenow` is what makes it a

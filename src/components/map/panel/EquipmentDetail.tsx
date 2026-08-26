@@ -56,6 +56,7 @@ import {
   type PanelRequestDraft,
 } from "./machine-panel-model";
 import "./panel-proto.css";
+import { pin } from "@/lib/uiPins";
 
 const MARK: Record<"green" | "grey" | "red", string> = { green: "✓", grey: "—", red: "!" };
 
@@ -222,7 +223,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
   const framedBroken = framed != null && framedFailed === framed.url;
 
   return (
-    <div className="mp" dir={ar ? "rtl" : "ltr"}>
+    <div {...pin("equipment-detail")} className="mp" dir={ar ? "rtl" : "ltr"}>
       {/* **A VIEWER, not a hero** (2026-08-09): `196px`, a circular back control, its tools on the
           opposite corner (pills then, icons since 2026-08-11), and a caption STRIP rather than a
           gradient scrim. The scrim dimmed the

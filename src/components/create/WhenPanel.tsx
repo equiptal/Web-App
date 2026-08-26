@@ -21,6 +21,7 @@ import { CanvasField, ChoiceRow, PanelDot } from "@/components/create/Provenance
 import { useProvenance } from "@/components/create/hooks";
 import { computeChargedDays, OVERTIME_RATES, RENTAL_BASES, type OvertimeRate, type RentalBasis } from "@/lib/contract";
 import { arabicIndicDigits } from "@/lib/contract/bid-map";
+import { pin } from "@/lib/uiPins";
 
 const HOURS_OPTIONS = [8, 10, 12];
 
@@ -78,10 +79,10 @@ export function WhenPanel({
           : null;
 
   return (
-    <section
+    <section {...pin("when-panel")}
       className={`mb-3.5 rounded-sm border transition ${complete && !open ? "border-ok/40 bg-ok/[0.06]" : "border-border bg-surface"}`}
     >
-      <button
+      <button {...pin("when-panel-head")}
         type="button"
         onClick={onToggle}
         className="flex w-full items-center justify-between gap-3 px-5 py-4 text-start"
@@ -97,7 +98,7 @@ export function WhenPanel({
       </button>
 
       {open && (
-        <div className="flex flex-col gap-4 px-5 pb-5">
+        <div {...pin("when-panel-body")} className="flex flex-col gap-4 px-5 pb-5">
           <div className="grid gap-4 md:grid-cols-2">
             {/* ---- Dates. Optional here; the nudge explains what it costs to leave them out. ---- */}
             <div className="rounded-sm bg-surface2 p-5">

@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui";
 import { fetchMyCompany } from "@/lib/api/company-client";
 import type { MyCompany } from "@/lib/contract/company";
 import { btn } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 /**
  * "My Company" entry on the profile tab — web twin of the app's `company_profile_card.dart`
@@ -50,7 +51,7 @@ export function MyCompanyCard() {
         : company.name;
 
   return (
-    <button
+    <button {...pin("my-company-card")}
       onClick={() => router.push("/company")}
       className={btn("secondary", "md", { full: true, className: "mt-4 flex text-start transition" })}
     >

@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Icon } from "@/components/ui";
+import { pin } from "@/lib/uiPins";
 
 /**
  * The parts an account-shaped page is built from — a masthead, labelled sections, list rows and
@@ -142,7 +143,7 @@ export function Section({
   boxed?: boolean;
 }) {
   return (
-    <section className="mt-5 first:mt-0">
+    <section {...pin("page-section")} className="mt-5 first:mt-0">
       {(title || action) && (
         <div className="mb-2 flex items-end justify-between gap-3 px-1">
           <div className="min-w-0">

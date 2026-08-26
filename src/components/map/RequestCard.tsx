@@ -29,6 +29,7 @@ import type { RequestCardView } from "@/lib/contract/request-card";
    the owner put the same card in `/deal-room/[id]` (2026-08-11) — a surface that is not `.bidmap`,
    where the shared markup therefore painted as unstyled text. See `request-card.css`. */
 import "@/components/map/request-card.css";
+import { pin } from "@/lib/uiPins";
 
 export interface RequestCardProps {
   view: RequestCardView;
@@ -141,7 +142,7 @@ export function RequestCard({
   const accent = tone === "answered" || tone === "partial" ? " is-done" : tone === "refused" ? " is-refused" : " is-open";
 
   return (
-    <article className={`bm-rq${accent}${draft ? " is-draft" : ""}${cue ? " is-cued" : ""}`}>
+    <article {...pin("map-request-card")} className={`bm-rq${accent}${draft ? " is-draft" : ""}${cue ? " is-cued" : ""}`}>
       {view.openable && view.equipmentId && onOpenMachine ? (
         <button
           type="button"

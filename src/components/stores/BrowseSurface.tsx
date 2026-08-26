@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui";
 import { StoreCard } from "@/components/stores/StoreCard";
 import type { StoreCard as StoreCardData, TaxonomyNode } from "@/lib/contract/stores";
 import { btn } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 interface CityOpt {
   value: string;
@@ -130,7 +131,7 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
   const shown = previewCount != null && !expanded ? all.slice(0, previewCount) : all;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div {...pin("browse-surface")} className="flex flex-col gap-4">
       {/* Section header + View-all / Show-less (count only — never touches the filters) */}
       {title && (
         <div className="flex items-center justify-between">

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import type { BidReadiness, ReadinessBand, ReadinessCert, UnitReadiness } from "@/lib/contract/bid-readiness";
+import { pin } from "@/lib/uiPins";
 
 /**
  * Bid-readiness renter surface (read-only auditor). A compact badge for the bid card + a full eligibility
@@ -48,7 +49,7 @@ export function BidReadinessSection({ r, L, onView }: { r: BidReadiness; L: LFn;
   const ready = allReady(r);
   const c = BAND[ready ? "green" : r.band];
   return (
-    <div style={{ border: "1px solid var(--surface3)", borderRadius: 12, overflow: "hidden", background: "var(--surface)" }}>
+    <div {...pin("bid-readiness")} style={{ border: "1px solid var(--surface3)", borderRadius: 12, overflow: "hidden", background: "var(--surface)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px" }}>
         <span className="material-icons-outlined" style={{ fontSize: 18, color: "var(--muted)" }}>fact_check</span>
         <span style={{ fontSize: 13, fontWeight: 800, color: "var(--navy)" }}>{L("Bid readiness", "جاهزية العرض")}</span>

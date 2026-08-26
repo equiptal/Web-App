@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui";
 import { CloseIcon, MenuIcon } from "@/components/HeaderIcons";
 import { useT } from "@/lib/i18n";
+import { pin } from "@/lib/uiPins";
 
 /**
  * The app's navigation — plain text links, centred in the top bar.
@@ -50,11 +51,11 @@ export function AppNav({ items }: { items: NavItem[] }) {
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
   return (
-    <nav className="flex items-center gap-1">
+    <nav {...pin("app-nav")} className="flex items-center gap-1">
       {items.map((it) => {
         const active = isActive(it.href);
         return (
-          <Link
+          <Link {...pin("nav-tab")}
             key={it.key}
             href={it.href}
             aria-current={active ? "page" : undefined}
@@ -112,7 +113,7 @@ export function AppNavMobile({ items, children }: { items: NavItem[]; children?:
   }, [open]);
 
   return (
-    <div className="lg:hidden">
+    <div {...pin("app-nav-mobile")} className="lg:hidden">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

@@ -5,6 +5,7 @@ import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { useAuthGate } from "@/components/auth/AuthGate";
 import { btn } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 /**
  * Empty state for signed-out visitors on account-bound surfaces (public-web-auth-gate). Shown instead
@@ -34,7 +35,7 @@ export function SignInPrompt({
   // auth modal in place (no /login page).
   const go = () => (ctaHref ? router.push(ctaHref) : openAuth());
   return (
-    <div className="rounded-sm border border-border bg-surface p-8 text-center">
+    <div {...pin("sign-in-prompt")} className="rounded-sm border border-border bg-surface p-8 text-center">
       <span className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-brand-soft text-brand">
         <Icon name={icon} size={24} />
       </span>

@@ -12,6 +12,7 @@ import {
   markAllNotificationsRead,
 } from "@/lib/api/client";
 import { notificationHref, type NotificationItem, type NotificationFilter } from "@/lib/contract/notifications";
+import { pin } from "@/lib/uiPins";
 
 /**
  * Top-bar notifications bell (app parity). Distinct from the inbox icon (deal-room unread). The badge
@@ -138,7 +139,7 @@ export function NotificationsBell() {
   const isEmpty = !loading && !error && items.length === 0;
 
   return (
-    <div className="relative">
+    <div {...pin("notifications-bell")} className="relative">
       {/* The bell is the header prototype's outline, not Material's glyph, and it inherits the bar's
           `var(--muted-dark)` rather than setting its own colour — it and the inbox are one pair, and the pair
           is coloured by the group that holds them (owner, 2026-08-25). */}

@@ -5,6 +5,7 @@ import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 import { copyBidLink } from "@/lib/bidCardHtml";
 import { ACTIONS, btn, cx } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 // Flip to true once the `logo_url` migration is applied + the agents backend redeployed.
 const LOGO_ENABLED = false;
@@ -138,7 +139,7 @@ export function ShareForBidsSheet({
 
   return (
     <Dialog open onClose={onClose} size="md" padded={false}>
-      <div className="flex min-h-0 flex-1 flex-col text-start" dir={ar ? "rtl" : "ltr"}>
+      <div {...pin("share-for-bids")} className="flex min-h-0 flex-1 flex-col text-start" dir={ar ? "rtl" : "ltr"}>
         {/* header */}
         <div className="flex items-start gap-3 border-b border-border px-5 py-4">
           <span className="grid h-10 w-10 flex-none place-items-center rounded-sm bg-brand text-white"><Icon name="ios_share" size={20} /></span>

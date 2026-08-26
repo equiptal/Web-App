@@ -10,6 +10,7 @@ import { cheapest, findTerm, type WorkspaceBid } from "@/lib/contract/workspace"
 import { termValueLabel } from "@/lib/contract/labels";
 import type { TermRow } from "@/lib/contract/bids";
 import { btn } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 /**
  * The Compare tab — every bid on the selected item as a ROW, its figures as columns.
@@ -318,10 +319,10 @@ export function CompareMatrix({
     // The pane no longer scrolls the page for anyone, so a table that outgrows it scrolls itself
     // (owner, 2026-08-25). That is a table's own business: a comparison with twenty rows has to stay
     // readable, and clipping its tail would hide the very figures it exists to line up.
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="flex items-stretch overflow-x-auto">
+    <div {...pin("compare-matrix")} className="min-h-0 flex-1 overflow-y-auto">
+      <div {...pin("matrix-scroller")} className="flex items-stretch overflow-x-auto">
         {/* ── The suppliers, on the inline-start edge ── */}
-        <div className="w-[185px] flex-none border-e border-border">
+        <div {...pin("matrix-supplier-col")} className="w-[185px] flex-none border-e border-border">
           <div className="box-border flex h-[72px] items-end border-b border-border bg-surface2/60 px-3 pb-2">
             <span className="flex min-w-0 items-baseline gap-1.5">
               <span className="flex-none text-label font-extrabold uppercase tracking-wide text-muted">

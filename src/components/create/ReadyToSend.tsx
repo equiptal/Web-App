@@ -34,6 +34,7 @@ import {
 } from "@/lib/contract";
 import { arabicIndicDigits } from "@/lib/contract/bid-map";
 import { ACTIONS, btn } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 export function ReadyToSend() {
   const t = useT();
@@ -98,7 +99,7 @@ export function ReadyToSend() {
   };
 
   return (
-    <div>
+    <div {...pin("ready-to-send")}>
       <h1 className="text-display font-extrabold text-navy">{t.create.ready.title}</h1>
       <p className="mb-3 mt-1 text-meta text-muted">{t.create.ready.subtitle}</p>
 

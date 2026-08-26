@@ -13,6 +13,7 @@ import { updateProfile, type ProfileUpdatePayload } from "@/lib/api/profile-clie
 import { EMAIL_FIRST_AUTH_ENABLED } from "@/lib/flags";
 import { Icon } from "@/components/ui";
 import { btn } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 /** Mask a stored email for display: `mahmoud@gmail.com` → `m•••@gmail.com`. */
 function maskEmail(e: string): string {
@@ -40,7 +41,7 @@ export function AccountModal({ open, onClose, onCreated, title, subtitle, postHe
     // that would name the container rather than the step. `Dialog` floats the close in the corner for
     // exactly this case, so the way out is where it is in every other dialog.
     <Dialog open onClose={onClose} size="lg" padded={false}>
-      <div dir={locale === "ar" ? "rtl" : "ltr"}>
+      <div {...pin("auth-gate")} dir={locale === "ar" ? "rtl" : "ltr"}>
         {/* Fresh mount each open → the flow always starts at the right step for the current session. */}
         <AccountFlow onCreated={onCreated} title={title} subtitle={subtitle} postHeadline={postHeadline} postSubhead={postSubhead} resumeToken={resumeToken} onNeedsSignup={onNeedsSignup} />
       </div>

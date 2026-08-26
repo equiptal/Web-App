@@ -5,6 +5,7 @@ import { useT, useLocale } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { updateProfile } from "@/lib/api/profile-client";
 import type { RenterProfile } from "@/lib/contract/onboarding";
+import { pin } from "@/lib/uiPins";
 
 interface Opt {
   value: string;
@@ -152,7 +153,7 @@ export function EditProfileForm({
   const labelCls = "mb-2 block text-meta font-semibold text-navy-mid";
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+    <form {...pin("edit-profile-form")} onSubmit={submit} noValidate className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className={labelCls}>{p.firstName}</label>

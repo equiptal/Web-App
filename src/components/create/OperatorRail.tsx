@@ -24,6 +24,7 @@ import { Icon, TextInput, Toggle } from "@/components/ui";
 import { CanvasField, ChoiceChips, ChoiceRow, PanelDot } from "@/components/create/Provenance";
 import { useProvenance } from "@/components/create/hooks";
 import { OPERATOR_CERTIFICATES, type EquipmentItem, type OperatorCertificate, type Party } from "@/lib/contract";
+import { pin } from "@/lib/uiPins";
 
 export function OperatorRail({ item }: { item: EquipmentItem }) {
   const t = useT();
@@ -66,8 +67,8 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
   }
 
   return (
-    <div className="flex w-full flex-none flex-col gap-4 self-stretch rounded-sm border border-border bg-surface p-3.5 lg:min-h-[530px] lg:w-[380px]">
-      <div className="flex items-center justify-between gap-2">
+    <div {...pin("operator-rail")} className="flex w-full flex-none flex-col gap-4 self-stretch rounded-sm border border-border bg-surface p-3.5 lg:min-h-[530px] lg:w-[380px]">
+      <div {...pin("operator-rail-head")} className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-2">
           <PanelDot complete={complete} />
           <h2 className="text-subhead font-extrabold text-navy">{t.create.operator}</h2>
@@ -75,7 +76,7 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
         <Toggle checked={on} onChange={() => actions.patchItem(item.id, { operatorNeeded: "no" })} />
       </div>
 
-      <div className="grid gap-3.5 rounded-sm bg-surface2 p-3.5 sm:grid-cols-2">
+      <div {...pin("operator-rail-options")} className="grid gap-3.5 rounded-sm bg-surface2 p-3.5 sm:grid-cols-2">
         <CanvasField label={t.create.operatorCard.food} source={prov.itemSource("operator.fat_food", op.fatFood)}>
           <ChoiceRow<Party> value={op.fatFood} onChange={(v) => setOp("fat_food", { fatFood: v })} options={partyOptions} />
         </CanvasField>
@@ -93,7 +94,7 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
         </CanvasField>
       </div>
 
-      <div className="rounded-sm bg-surface2 p-3.5">
+      <div {...pin("operator-rail-note")} className="rounded-sm bg-surface2 p-3.5">
         <CanvasField
           label={t.create.operatorCard.certificates}
           optional

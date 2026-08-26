@@ -13,6 +13,7 @@
 import { fmt, useT } from "@/lib/i18n";
 import { Icon, Modal } from "@/components/ui";
 import { btn } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 export function CarryForwardModal({
   open,
@@ -37,7 +38,7 @@ export function CarryForwardModal({
   const t = useT();
   return (
     <Modal open={open} onClose={onClose} title={fmt(t.create.carry.title, { n: itemNumber })}>
-      <div className="mb-5 flex flex-col gap-3.5">
+      <div {...pin("carry-forward-modal")} className="mb-5 flex flex-col gap-3.5">
         <p className="flex items-start gap-3 text-body leading-relaxed text-navy-mid">
           <span className="grid h-7 w-7 flex-none place-items-center rounded-sm bg-surface2 text-navy">
             <Icon name="lock" size={15} />

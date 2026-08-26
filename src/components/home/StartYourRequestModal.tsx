@@ -3,6 +3,7 @@
 import { useLocale, useT } from "@/lib/i18n";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
+import { pin } from "@/lib/uiPins";
 
 /** mobile/016 — the renter's choice on the first-request "Start Your Request" pop-up. */
 export type StartRequestChoice = "trial" | "real";
@@ -33,7 +34,7 @@ export function StartYourRequestModal({
 
   return (
     <Dialog open onClose={onClose} size="md" padded={false}>
-      <div
+      <div {...pin("start-request-modal")}
         dir={locale === "ar" ? "rtl" : "ltr"}
         className="p-5 sm:p-6"
       >

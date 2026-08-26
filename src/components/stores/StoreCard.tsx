@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import type { StoreCard as StoreCardData } from "@/lib/contract/stores";
+import { pin } from "@/lib/uiPins";
 
 /**
  * Supplier store card — gradient banner with an overlapping logo, a verified/New pill, then the
@@ -13,7 +14,7 @@ import type { StoreCard as StoreCardData } from "@/lib/contract/stores";
 export function StoreCard({ store }: { store: StoreCardData }) {
   const t = useT();
   return (
-    <Link
+    <Link {...pin("store-card")}
       href={`/stores/${store.id}`}
       className="block overflow-hidden rounded-sm border border-border bg-surface transition"
     >

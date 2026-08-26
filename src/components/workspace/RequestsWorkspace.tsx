@@ -34,6 +34,7 @@ import { buildBidQuotationDoc, quotationSupplierInitials, quotationSupplierKey }
 import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
 import { quotationDownloadName } from "@/lib/compare/quotation-token";
 import { btn } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 type Tab = "cards" | "compare";
 
@@ -439,7 +440,7 @@ export function RequestsWorkspace() {
     // this surface, and `fullBleed` gives it none to cancel. Every band below is `flex-none`; the one
     // that grows is the tab panel, and the only thing that scrolls is the list inside it — so the
     // rail and the strip cannot be pushed off the top by a long column of bids.
-    <div className="flex h-full min-h-0 flex-col">
+    <div {...pin("requests-workspace")} className="flex h-full min-h-0 flex-col">
       <RequestRail
         tiles={tiles}
         activeKey={resolved.groupId}

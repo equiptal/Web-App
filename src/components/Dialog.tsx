@@ -3,6 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { CloseIcon } from "@/components/HeaderIcons";
 import { CARD_FOOTER, cx } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 /**
  * The one dialog shell (owner, 2026-08-26: "i want consistent layout for these modals in terms of ui
@@ -129,7 +130,7 @@ export function Dialog({
   if (!open) return null;
 
   return (
-    <div
+    <div {...pin("dialog")}
       className={`${SCRIM} flex items-end justify-center p-0 sm:items-center sm:p-4`}
       onClick={onClose}
       role="dialog"
@@ -146,7 +147,7 @@ export function Dialog({
         `100dvh` rather than `100vh`: on a phone the address bar makes `vh` lie, and a dialog sized
         against the lie puts its footer under the browser's own chrome.
       */}
-      <div
+      <div {...pin("dialog-panel")}
         ref={panel}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
@@ -162,7 +163,7 @@ export function Dialog({
         )}
 
         {(title || icon) && (
-          <div className={`flex flex-none items-start gap-3 px-5 py-3.5 ${flushHeader ? "" : "border-b border-border"}`}>
+          <div {...pin("dialog-header")} className={`flex flex-none items-start gap-3 px-5 py-3.5 ${flushHeader ? "" : "border-b border-border"}`}>
             {icon && <span className="grid h-[34px] w-[34px] flex-none place-items-center">{icon}</span>}
             <div className="min-w-0 flex-1">
               {title && <h2 className="text-title font-extrabold leading-tight tracking-[-.2px] text-navy">{title}</h2>}

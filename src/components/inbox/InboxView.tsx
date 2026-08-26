@@ -6,6 +6,7 @@ import { useLocale } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { fetchReceivedBids, fetchMyRequests, startDealRoom, fetchRequestSubmissions } from "@/lib/api/client";
 import type { InboxBid } from "@/lib/contract/inbox";
+import { pin } from "@/lib/uiPins";
 
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 
@@ -153,7 +154,7 @@ export function InboxView() {
   );
 
   return (
-    <div dir={ar ? "rtl" : "ltr"} className="mx-auto w-full max-w-3xl">
+    <div {...pin("inbox-view")} dir={ar ? "rtl" : "ltr"} className="mx-auto w-full max-w-3xl">
       {[...groups.values()].map((g) => (
         <div key={g.key} className="mb-6">
           {/* Level 1 — the RFQ group: the short code first (RFQ-NNNNN when available, else the REQ- code —

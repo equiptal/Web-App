@@ -55,6 +55,7 @@ import type { BidCard } from "@/lib/contract/bids";
 import { priceFooterModel } from "@/lib/contract/price-footer";
 import { computeQuoteTotals } from "@/lib/pricing/rental";
 import { fmt, useLocale, useT } from "@/lib/i18n";
+import { pin } from "@/lib/uiPins";
 
 const ARABIC_INDIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
 const arDigits = (s: string): string => s.replace(/\d/g, (d) => ARABIC_INDIC_DIGITS[Number(d)]);
@@ -171,7 +172,7 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
 
 
   return (
-    <footer className="bm-foot">
+    <footer {...pin("price-footer")} className="bm-foot">
       {/* ── The breakdown, back — and as a POPOVER, not a growing bar (owner, 2026-08-19) ──────────
           It was withdrawn this morning and is asked for again. What returns is not what left: the old
           one expanded the footer itself, which is why the bar needed a `max-height` cap, an inner

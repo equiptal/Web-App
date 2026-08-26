@@ -25,6 +25,7 @@ import {
 import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
 import "@/components/deal-room/deal-room-proto.css";
 import { computeQuoteTotals, computeRentalTotal, divisorNote } from "@/lib/pricing/rental";
+import { pin } from "@/lib/uiPins";
 
 // The attachment shape is the SHARED one — this surface and the map's chat dock read the same
 // channel, so a second declaration here is a second thing to keep in step.
@@ -683,7 +684,7 @@ export function DealRoom({ id, onTitle, initialFlow }: {
   flowGate.current = { counter: live, accept: showAct && canAccept };
 
   return (
-    <div className="dlproto" dir={ar ? "rtl" : "ltr"}>
+    <div {...pin("deal-room")} className="dlproto" dir={ar ? "rtl" : "ltr"}>
       {/* top bar (§5.2) — supplier chip · equipment/request block · phase pill · icon actions */}
       <div className="topbar">
         {/* supplier chip → profile & documents. NOTE: the deal-room payload only carries name + isVerified

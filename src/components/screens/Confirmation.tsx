@@ -7,6 +7,7 @@ import { useRfq } from "@/lib/store/rfq-store";
 import { postableItems } from "@/lib/contract";
 import { fetchRequestSubmissions, bidShareUrl, setBidDeadline, setShareLinkLogo } from "@/lib/api/client";
 import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
+import { pin } from "@/lib/uiPins";
 
 /**
  * AC-42 confirmation — "Your request is live" (prototype: Request Sent). Animated success hero,
@@ -92,7 +93,7 @@ export function Confirmation() {
   const onView = () => router.push(reqUuid ? `/requests/group/${encodeURIComponent(reqUuid)}` : "/requests");
 
   return (
-    <div className="rlive" dir={ar ? "rtl" : "ltr"}>
+    <div {...pin("create-confirmation")} className="rlive" dir={ar ? "rtl" : "ltr"}>
       <style>{CSS}</style>
       <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
       <div className="rlive-in">

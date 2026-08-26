@@ -18,6 +18,7 @@ import { useRfq } from "@/lib/store/rfq-store";
 import { Icon } from "@/components/ui";
 import { PanelDot } from "@/components/create/Provenance";
 import { btn } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 // Client-only: the maps script touches `window` at import.
 const MapLocationPicker = dynamic(() => import("@/components/shared/GoogleMapLocationPicker"), { ssr: false });
@@ -70,10 +71,10 @@ export function WherePanel({
   );
 
   return (
-    <section
+    <section {...pin("where-panel")}
       className={`mb-3.5 rounded-sm border transition ${complete && !open ? "border-ok/40 bg-ok/[0.06]" : "border-border bg-surface"}`}
     >
-      <button
+      <button {...pin("where-panel-head")}
         type="button"
         onClick={onToggle}
         className="flex w-full items-center justify-between gap-3 px-5 py-4 text-start"
@@ -92,7 +93,7 @@ export function WherePanel({
       </button>
 
       {open && (
-        <div className="px-5 pb-5">
+        <div {...pin("where-panel-body")} className="px-5 pb-5">
           {/* AC-47 — a text↔file disagreement is settled before anything else; confirming over an
               unresolved conflict would pick a site by accident. */}
           {conflictUnresolved && loc.conflict && (

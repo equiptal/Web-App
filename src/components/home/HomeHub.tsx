@@ -9,6 +9,7 @@ import { fetchActivity, type ActivityCounts } from "@/lib/api/client";
 import { StartYourRequestModal, type StartRequestChoice } from "@/components/home/StartYourRequestModal";
 import { useStartRequestGate } from "@/lib/access/start-request-gate";
 import { btn } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 /**
  * mobile/016 — once-per-tab guard for the AUTOMATIC first-request pop-up, mirroring the app's
@@ -90,9 +91,9 @@ export function HomeHub() {
   const newBids = activity?.newBids ?? 0;
 
   return (
-    <div className="flex flex-col gap-7">
+    <div {...pin("home-hub")} className="flex flex-col gap-7">
       {/* Hero */}
-      <div className={`relative overflow-hidden rounded-sm px-8 py-9 sm:px-10 ${DARK_GRADIENT}`}>
+      <div {...pin("home-hero")} className={`relative overflow-hidden rounded-sm px-8 py-9 sm:px-10 ${DARK_GRADIENT}`}>
         <div className="pointer-events-none absolute inset-0" style={GRID_STYLE} />
         <span className="pointer-events-none absolute -top-[60px] end-[-40px] h-[260px] w-[260px] rounded-full bg-brand opacity-[0.20] blur-[80px]" />
         <span className="pointer-events-none absolute -bottom-[90px] end-[120px] h-[280px] w-[280px] rounded-full opacity-20 blur-[80px]" style={{ background: "var(--info)" }} />
@@ -107,7 +108,7 @@ export function HomeHub() {
           </div>
 
           {/* Single entry into the RFQ input flow (web-app/002). */}
-          <div className="flex flex-none flex-col gap-3 sm:flex-row lg:flex-col lg:items-stretch">
+          <div {...pin("home-hero-actions")} className="flex flex-none flex-col gap-3 sm:flex-row lg:flex-col lg:items-stretch">
             <button
               onClick={onCreateRequest}
               className={btn("primary", "lg", { className: "transition" })}
@@ -142,7 +143,7 @@ export function HomeHub() {
       {/* Activity cards. The bids and deals tabs are gone: the workspace shows a request and its
           bids together, so "bids" is not a separate destination, and completed deals live in the
           Inbox with their rooms (docs/requests-workspace-disabled.md). */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div {...pin("home-tiles")} className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <ActivityCard accent="brand" icon="assignment" title={t.home.yourRequests} sub={t.home.reqSub} href="/requests" count={activity?.openRequests} />
         <ActivityCard accent="info" icon="gavel" title={t.home.priceBids} sub={t.home.bidsSub} href="/requests" count={newBids} />
         <ActivityCard accent="ok" icon="handshake" title={t.home.completedDeals} sub={t.home.dealsSub} href="/inbox" count={activity?.completedDeals} />
