@@ -83,8 +83,9 @@ export function RequestContextBar({
     <div {...pin("request-context")} ref={boxRef} className="relative flex flex-none items-stretch">
       {/* ── Navy, and 34px like everything else on this row (owner, 2026-08-27) ────────────────────
           It is the subject of the page, so it takes the app's own dark surface rather than another
-          white box among white boxes. Two lines inside a 44px control: 13px and 15px of leading, 28
-          in total, which now clears the height with 8px a side rather than 3.
+          white box among white boxes. Two lines inside a 44px control: 15px and 13px of leading with
+          4px between them — 32 in total, 6px clear a side. The gap was 0 and the two lines ran into
+          each other, which is what made the machine's name hard to pick out (owner, 2026-08-27).
 
           `control-lg` is the same 44 the export button and the tabs carry — the row reads as one set
           of controls rather than three things that happen to be near each other. 34 was consistent and
@@ -95,7 +96,7 @@ export function RequestContextBar({
         disabled={!onOpenRequest}
         title={group.address ?? group.locationLabel}
         className={cx(
-          "control-lg flex min-w-0 max-w-[30rem] flex-col justify-center rounded-s-md border border-navy bg-navy !px-3 text-start transition-colors",
+          "control-lg flex min-w-0 max-w-[30rem] flex-col justify-center gap-1 rounded-s-md border border-navy bg-navy !px-3 text-start transition-colors",
           others.length === 0 && "rounded-e-md",
           onOpenRequest ? "hover:bg-navy-mid" : "cursor-default",
         )}
