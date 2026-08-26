@@ -1,4 +1,3 @@
-import { CARD_FOOTER } from "@/lib/ds";
 // DISABLED — the /compare matrix, replaced by the requests workspace at /requests.
 // Nothing was deleted: every line below is the original, line-commented in place, so re-enabling
 // is a mechanical revert. See docs/requests-workspace-disabled.md.
