@@ -518,7 +518,7 @@ export function RequestsWorkspace() {
                      heights in it. Only the fill and the bottom edge change now; the box does not. */
                   className={cx(
                     // `control-md` sets the height; the button needs a display mode to centre in it.
-                    "control-md relative -mb-px inline-flex items-center justify-center rounded-t-md border border-border text-meta font-semibold transition-colors",
+                    "control-lg relative -mb-px inline-flex items-center justify-center rounded-t-md border border-border text-meta font-semibold transition-colors",
                     on
                       ? "z-[2] border-b-surface bg-surface text-navy"
                       : "z-[1] bg-surface3/70 text-muted hover:text-navy-mid",
@@ -539,7 +539,7 @@ export function RequestsWorkspace() {
               <button
                 type="button"
                 onClick={() => setBenched(new Set())}
-                className={btn("secondary", "md", { className: "transition" })}
+                className={btn("secondary", "lg", { className: "transition" })}
               >
                 <Icon name="done_all" size={14} /> {fmt(t.workspace.selectAll, { n: String(benched.size) })}
               </button>
@@ -551,7 +551,7 @@ export function RequestsWorkspace() {
               type="button"
               disabled={shown.length === 0}
               onClick={() => (tab === "compare" ? printComparison() : void downloadQuotation())}
-              className={btn("secondary", "md", { className: "whitespace-nowrap transition" })}
+              className={btn("secondary", "lg", { className: "whitespace-nowrap transition" })}
             >
               {tab === "compare" ? t.workspace.exportComparison : t.workspace.downloadQuotation}{" "}
               <Icon name="download" size={14} />
