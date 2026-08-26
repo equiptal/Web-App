@@ -114,28 +114,38 @@ describe("with dates missing (MREQ-AC-34/10)", () => {
     expect(handle.store().state.chargedDaysUnderstood).toBe(true);
   });
 
-  it("nudges for whichever end is missing — including the start-only case", async () => {
+  /**
+   * The three variants are told apart by their ASK, not by their reason.
+   *
+   * They used to be matched on «don`t know your dates / end date / start date» — three different
+   * reasons for one fact. The reason is one sentence now, shared: suppliers price lower when they know
+   * the duration. What changes between the three is which date the renter is asked for, so that is
+   * what these look for.
+   */
+  it("asks for both when neither is set", async () => {
     await panel({ draft: withTiming({ startDate: null, endDate: null }) });
-    expect(screen.getByText(/don't know your dates/)).toBeTruthy();
+    expect(screen.getByText(/Add a start and end date to get better bids/)).toBeTruthy();
   });
 
-  it("nudges for a missing end date", async () => {
+  // A renter who has filled the start in is not told his dates are missing — he is told WHICH is.
+  it("asks only for the end date when the start is set", async () => {
     await panel({ draft: withTiming({ endDate: null }) });
-    expect(screen.getByText(/don't know your end date/)).toBeTruthy();
+    expect(screen.getByText(/Add an end date to get better bids/)).toBeTruthy();
+    expect(screen.queryByText(/Add a start and end date to get better bids/)).toBeNull();
   });
 
   // The prototype gated this notice on the end date alone, so this branch was unreachable in it.
-  it("nudges for a missing START date, which the prototype could never show", async () => {
+  it("asks only for the start date when the end is set — a branch the prototype could never show", async () => {
     await panel({ draft: withTiming({ startDate: null }) });
-    expect(screen.getByText(/don't know your start date/)).toBeTruthy();
+    expect(screen.getByText(/Add a start date to get better bids/)).toBeTruthy();
   });
 
   it("shows no nudge when both dates are set", async () => {
     await panel();
-    // Matched on the sentence the notice actually carries. It matched «Suppliers quote lower», which
+    // Matched on the reason the notice actually carries. It matched «Suppliers quote lower», which
     // stopped existing when that copy was corrected — leaving an assertion that passed because its
     // needle was gone rather than because the notice was.
-    expect(screen.queryByText(/price for the worst case/)).toBeNull();
+    expect(screen.queryByText(/price lower when they know your duration/)).toBeNull();
   });
 });
 
