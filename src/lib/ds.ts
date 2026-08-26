@@ -221,6 +221,71 @@ export const ROW =
 /** The line between rows. */
 export const DIVIDER = "border-t border-border";
 
+/* ══════════════════════════════════════ Page layout ══════════════════════════════════════════
+   Where things sit, so that a page does not decide it for itself. These were spread across
+   `AppShell` and copied into feature files; they are named here because placement is as much a part
+   of the system as colour, and two pages agreeing on a gutter by coincidence is not a rule. */
+
+/**
+ * The side gutter, in two widths.
+ *
+ * A **reading** page — a form, an account page, the deal room — is a column of text and wants space
+ * around it. A **working** surface — the map, the requests workspace, the compare matrix — is trying
+ * to fit things on screen and wants that space back. Two scales because the two kinds of page have
+ * genuinely different jobs, not because nobody could decide.
+ */
+export const PAGE_X_READING = "px-6 sm:px-12 lg:px-20 xl:px-28";
+export const PAGE_X_WORKING = "px-4 sm:px-6 lg:px-8 xl:px-10";
+
+/**
+ * A third, for a surface that owns the whole viewport (`fullBleed`) and whose bands set their own
+ * edges. It is the working gutter's first two steps, which is why the requests rail and the strip
+ * beneath it line up — at 16/26 against 12/20 they never did.
+ */
+export const PAGE_X_BLEED = "px-4 sm:px-6";
+
+/** The same bleed step as a margin, for a band that insets a card rather than padding a row. */
+export const PAGE_MX_BLEED = "mx-4 sm:mx-6";
+
+/** The vertical rhythm of a page, which is one rule for all of them. */
+export const PAGE_Y = "py-6 sm:py-7";
+
+/**
+ * The back control (owner, 2026-08-26: it belongs on the screen, not on the nav bar).
+ *
+ * It used to be a white circle inside the navy bar, which made "leave this page" look like part of
+ * the app's frame — the one row that is the same everywhere. On the page, aligned to the content's
+ * own leading edge, it reads as belonging to what it leaves.
+ *
+ * `AppShell` renders this itself for any page that registered a handler, so no page positions it.
+ */
+export const PAGE_BACK = "mb-4 inline-flex";
+
+/**
+ * A row of buttons.
+ *
+ * The primary action is LAST, on the row's trailing edge, which is where the Dialog footer and the
+ * create wizard already put it. Written with `justify-end` rather than a margin so Arabic mirrors it
+ * without a second rule.
+ */
+export const ACTIONS = "flex flex-wrap items-center justify-end gap-2.5";
+
+/**
+ * The same row when one of the actions destroys something. The destructive one goes to the OPPOSITE
+ * edge, so Delete cannot be reached for while aiming at Save.
+ */
+export const ACTIONS_SPLIT = "flex flex-wrap items-center justify-between gap-2.5";
+
+/**
+ * The foot of a card, where that card's actions live — the action belongs to the thing it acts on.
+ * Same geometry as the Dialog footer, because they are the same row in two containers.
+ */
+export const CARD_FOOTER =
+  "flex flex-wrap items-center justify-end gap-2.5 border-t border-border px-5 py-3.5";
+
+/** The gap between a page's stacked sections. */
+export const SECTION_GAP = "space-y-4";
+
 /* ══════════════════════════════════════ Helper ═══════════════════════════════════════════════ */
 
 /** Joins class names, dropping anything falsy — so a conditional class needs no ternary-to-"". */

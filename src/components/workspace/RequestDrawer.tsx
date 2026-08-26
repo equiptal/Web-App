@@ -17,7 +17,7 @@ import { publicTaxonomyUrl, type RequestGroup, type RequestListItem, type Reques
 import { requestActions, type WorkspaceBid } from "@/lib/contract/workspace";
 import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
 import { ConfirmCancelModal, EditRequestModal } from "@/components/requests/RequestEditModals";
-import { btn } from "@/lib/ds";
+import { ACTIONS, btn, cx } from "@/lib/ds";
 
 /** What the share sheet needs about this request's public bid link. */
 export interface ShareLinkMeta {
@@ -345,7 +345,7 @@ function Confirm({
       <div className="p-5">
         <h3 className="text-subhead font-extrabold text-navy">{title}</h3>
         <p className="mt-1.5 text-body font-semibold leading-relaxed text-navy-mid">{body}</p>
-        <div className="mt-4 flex justify-end gap-2">
+        <div className={cx(ACTIONS, "mt-4")}>
           <button type="button" onClick={onClose} className={btn("secondary", "md")}>
             {t.common.cancel}
           </button>

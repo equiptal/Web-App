@@ -1,3 +1,4 @@
+import { CARD_FOOTER } from "@/lib/ds";
 // DISABLED — the /compare matrix, replaced by the requests workspace at /requests.
 // Nothing was deleted: every line below is the original, line-commented in place, so re-enabling
 // is a mechanical revert. See docs/requests-workspace-disabled.md.
@@ -1926,7 +1927,7 @@
 //                 ? L("You've marked this supplier as your choice. They bid off-platform via your shared link, so there's no deal room — reach out to them directly with the contact details on their submission to finalize.", "لقد اخترت هذا المؤجّر. قدّم عرضه خارج المنصة عبر رابطك المشترك، لذا لا توجد غرفة صفقة — تواصل معه مباشرةً عبر بيانات التواصل في عرضه لإتمام الترسية.")
 //                 : L("You've marked this supplier as your choice. To finalize the award, accept the terms with them in the deal room.", "لقد اخترت هذا المؤجّر. لإتمام الترسية، اقبل الشروط معه في غرفة الصفقة.")}
 //             </div>
-//             <div className="flex justify-end gap-2.5 border-t px-6 py-4" style={{ borderColor: C.line }}>
+//             <div className={CARD_FOOTER} style={{ borderColor: C.line }}>
 //               {offPlatform ? (
 //                 <button onClick={() => setAwardPrompt(null)} className="inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-body font-semibold text-white" style={{ background: C.success }}>
 //                   <span className="material-icons-outlined" style={{ fontSize: 17 }}>check</span>{L("Got it", "تمام")}
@@ -1963,7 +1964,7 @@
 //                 <span className="material-icons-outlined" style={{ fontSize: 17, color: C.rentee }}>auto_awesome</span>{L("Your assistant normalizes the quote to the same basis as platform bids — same rate units, same all-in, same requirement checks — so it compares like-for-like.", "يوحّد مساعدك عرض السعر على نفس أساس عروض المنصة — نفس الوحدات ونفس الإجمالي ونفس الفحوصات — ليقارن مثلاً بمثل.")}
 //               </div>
 //             </div>
-//             <div className="flex justify-end gap-2.5 border-t px-6 py-4" style={{ borderColor: C.line }}>
+//             <div className={CARD_FOOTER} style={{ borderColor: C.line }}>
 //               <button onClick={() => setUploadOpen(false)} className={btn("secondary", "md")} style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Cancel", "إلغاء")}</button>
 //             </div>
 //           </div>
@@ -2018,7 +2019,7 @@
 //               </ul>
 //               <p className="mt-3 text-label" style={{ color: C.muted }}>{confirmAdd.blocking ? L("Upload the quote for the right equipment to compare it here.", "ارفع عرضاً للمعدة الصحيحة لمقارنته هنا.") : L("Adding it keeps it flagged — it's still shown for review, never auto-excluded.", "ستبقى الإضافة مع تنبيه — يظهر للمراجعة ولا يُستبعد تلقائياً.")}</p>
 //             </div>
-//             <div className="flex justify-end gap-2.5 border-t px-6 py-4" style={{ borderColor: C.line }}>
+//             <div className={CARD_FOOTER} style={{ borderColor: C.line }}>
 //               {confirmAdd.blocking ? (
 //                 <button onClick={() => setConfirmAdd(null)} className="rounded-md px-4 py-2 text-body font-semibold text-white" style={{ background: C.navy }}>{L("Close", "إغلاق")}</button>
 //               ) : (

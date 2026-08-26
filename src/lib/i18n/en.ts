@@ -1669,12 +1669,16 @@ export const en = {
       // it had said the opposite all along («better prices when they DO know»), so the two languages
       // were handing a renter opposite advice out of the same box.
       //
-      // What a supplier actually does with no dates is price for the worst case: he cannot tell how
-      // long the machine is committed for, so he covers the longest plausible answer — or does not bid
-      // at all. That is the true mechanism and it is also the persuasive one, so it is what these say.
-      nudgeBoth: "Suppliers price for the worst case when they don't know your dates. Add a start and end date to get sharper bids.",
-      nudgeEnd: "Suppliers price for the worst case when they don't know your end date. Add one to get sharper bids.",
-      nudgeStart: "Suppliers price for the worst case when they don't know your start date. Add one to get sharper bids.",
+      // The owner's wording, and DURATION is the word that carries it: a supplier who knows how long
+      // the machine is committed for prices that period, and one who does not pads for the longest
+      // plausible answer. Dates are what he is being asked for; duration is what he does with them.
+      //
+      // One first sentence across all three, because the reason does not change — only the ask does.
+      // A renter who has filled the start in should not be told again that his dates are missing; he
+      // should be told which one is.
+      nudgeBoth: "Suppliers price lower when they know your duration. Add a start and end date to get better bids.",
+      nudgeEnd: "Suppliers price lower when they know your duration. Add an end date to get better bids.",
+      nudgeStart: "Suppliers price lower when they know your duration. Add a start date to get better bids.",
     },
     carry: {
       title: "Equipment #{n}",

@@ -1426,11 +1426,11 @@ export const ar: Dictionary = {
       tooShortMonthly: "تغطي تواريخك {days} يوماً. الفوترة الشهرية تحتاج عادةً ٣٠ يوماً أو أكثر.",
       tooShortWeekly: "تغطي تواريخك {days} أيام. الفوترة الأسبوعية تحتاج عادةً ٧ أيام أو أكثر.",
       // The Arabic already had the condition the right way round — it is what caught the English
-      // saying the opposite. Kept, with «أفضل» once instead of twice in a sentence: it was both the
-      // reason and the reward, which made the line read as a promise rather than an explanation.
-      nudgeBoth: "يقدّم الموردون أسعاراً أدق عندما يعرفون تواريخك. أضف تاريخ البداية والنهاية للحصول على عروض أفضل.",
-      nudgeEnd: "يقدّم الموردون أسعاراً أدق عندما يعرفون تاريخ الانتهاء. أضفه للحصول على عروض أفضل.",
-      nudgeStart: "يقدّم الموردون أسعاراً أدق عندما يعرفون تاريخ البداية. أضفه للحصول على عروض أفضل.",
+      // saying the opposite. Now both say the same thing in the same shape: one reason, then the ask,
+      // and the ask names the date that is actually missing rather than repeating both.
+      nudgeBoth: "يقدّم الموردون أسعاراً أقل عندما يعرفون مدة الإيجار. أضف تاريخ البداية والنهاية للحصول على عروض أفضل.",
+      nudgeEnd: "يقدّم الموردون أسعاراً أقل عندما يعرفون مدة الإيجار. أضف تاريخ الانتهاء للحصول على عروض أفضل.",
+      nudgeStart: "يقدّم الموردون أسعاراً أقل عندما يعرفون مدة الإيجار. أضف تاريخ البداية للحصول على عروض أفضل.",
     },
     carry: {
       title: "المعدة رقم {n}",

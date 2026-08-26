@@ -33,7 +33,7 @@ import {
   type PaymentTerm,
 } from "@/lib/contract";
 import { arabicIndicDigits } from "@/lib/contract/bid-map";
-import { btn } from "@/lib/ds";
+import { ACTIONS, btn } from "@/lib/ds";
 
 export function ReadyToSend() {
   const t = useT();
@@ -272,7 +272,7 @@ export function ReadyToSend() {
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center justify-end gap-2.5">
+      <div className={ACTIONS}>
         <button
           onClick={() => actions.setReadyToSend(false)}
           className={btn("secondary", "lg", { className: "transition" })}

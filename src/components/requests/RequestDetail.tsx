@@ -1,3 +1,4 @@
+import { CARD_FOOTER } from "@/lib/ds";
 // DISABLED — the per-request detail page, replaced by the requests workspace at /requests.
 // Nothing was deleted: every line below is the original, line-commented in place, so re-enabling
 // is a mechanical revert. See docs/requests-workspace-disabled.md.
@@ -570,7 +571,7 @@
 //           </label>
 //         </div>
 //
-//         <div className="flex justify-end gap-2.5 border-t border-border px-5 py-4">
+//         <div className={CARD_FOOTER}>
 //           <button className={btn("secondary", "md", { className: "text-navy" })} onClick={onClose}>{L("Cancel", "إلغاء")}</button>
 //           <button className="rounded-sm bg-brand px-5 py-2.5 text-body font-semibold text-white disabled:bg-disabled-bg disabled:text-disabled-fg" disabled={busy} onClick={save}>{busy ? L("Saving…", "جارٍ الحفظ…") : L("Save changes", "حفظ التغييرات")}</button>
 //         </div>

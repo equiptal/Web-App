@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 import { copyBidLink } from "@/lib/bidCardHtml";
-import { btn } from "@/lib/ds";
+import { ACTIONS, btn, cx } from "@/lib/ds";
 
 // Flip to true once the `logo_url` migration is applied + the agents backend redeployed.
 const LOGO_ENABLED = false;
@@ -193,7 +193,7 @@ export function ShareForBidsSheet({
             ) : (
               <div className="rounded-sm border border-border bg-surface p-3.5">
                 <input type="datetime-local" value={dlInput} onChange={(e) => setDlInput(e.target.value)} className="h-11 w-full rounded-sm border border-border bg-surface2 px-3 text-body text-navy outline-0" />
-                <div className="mt-2.5 flex justify-end gap-2">
+                <div className={cx(ACTIONS, "mt-2.5")}>
                   {deadline && <button onClick={() => saveDl(true)} className={btn("secondary", "sm")}>{L("Clear", "مسح")}</button>}
                   <button onClick={() => setDlEdit(false)} className={btn("secondary", "sm")}>{L("Cancel", "إلغاء")}</button>
                   <button onClick={() => saveDl(false)} className={btn("primary", "sm")}><Icon name="check" size={15} />{L("Save", "حفظ")}</button>

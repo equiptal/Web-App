@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
 import { STREAM_API_KEY, leaseStream } from "@/lib/chat/stream-connection";
-import { useHeaderBack } from "@/components/AppShell";
+import { usePageBack } from "@/components/AppShell";
 import { fetchBids, fetchRequestDetail, fetchRequestGroup, fetchDealRoom, fetchStreamToken, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, closeDealRoom, ApiError } from "@/lib/api/client";
 import { computeDealTotals, buildDealRoomQuotationDoc, quotationLinkKind, lastTermMove, type DealRoomView, type DealTerm, type QuotationView } from "@/lib/contract/deal-room";
 import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, liveRound, roundOverride, type DealRound } from "@/lib/contract/deal-rounds";
@@ -110,7 +110,7 @@ export function DealRoom({ id, onTitle, initialFlow }: {
   const router = useRouter();
   // In-app Back arrow in the AppShell header → the Inbox (the deal-room list). A deal room is a
   // drill-down, so this gives an explicit way up instead of relying on the browser back button.
-  useHeaderBack(() => router.push("/inbox"));
+  usePageBack(() => router.push("/inbox"));
 
   const [room, setRoom] = useState<DealRoomView | null>(null);
   const [error, setError] = useState(false);

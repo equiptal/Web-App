@@ -5,7 +5,7 @@ import { Dialog } from "@/components/Dialog";
 import { updateRequest } from "@/lib/api/client";
 import { type RequestRecord } from "@/lib/contract/requests";
 import "@/components/requests/requests-proto.css";
-import { btn } from "@/lib/ds";
+import { CARD_FOOTER, btn } from "@/lib/ds";
 
 /**
  * The two modals that outlived the request-detail page.
@@ -266,7 +266,7 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
           </label>
         </div>
 
-        <div className="flex justify-end gap-2.5 border-t border-border px-5 py-4">
+        <div className={CARD_FOOTER}>
           <button className={btn("secondary", "md", { className: "text-navy" })} onClick={onClose}>{L("Cancel", "إلغاء")}</button>
           {datesReversed && (
             <span className="me-auto text-meta font-semibold text-danger">

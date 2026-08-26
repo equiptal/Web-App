@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { CloseIcon } from "@/components/HeaderIcons";
+import { CARD_FOOTER, cx } from "@/lib/ds";
 
 /**
  * The one dialog shell (owner, 2026-08-26: "i want consistent layout for these modals in terms of ui
@@ -175,7 +176,7 @@ export function Dialog({
         <div className={`min-h-0 flex-1 overflow-y-auto ${padded ? "px-5 py-4" : ""}`}>{children}</div>
 
         {footer && (
-          <div className="flex flex-none items-center gap-2.5 border-t border-border px-5 py-3.5">{footer}</div>
+          <div className={cx(CARD_FOOTER, "flex-none")}>{footer}</div>
         )}
       </div>
     </div>
@@ -233,7 +234,7 @@ export function DialogDrawer({
           )
         )}
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
-        {footer && <div className="flex flex-none items-center gap-2.5 border-t border-border px-5 py-3.5">{footer}</div>}
+        {footer && <div className={cx(CARD_FOOTER, "flex-none")}>{footer}</div>}
       </aside>
     </>
   );

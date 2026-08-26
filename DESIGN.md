@@ -304,6 +304,81 @@ already on the system; what remains is composition, and that needs eyes.
 
 ---
 
+## Placement
+
+Where a thing sits is as much a rule as what colour it is. These live in `ds.ts`
+with everything else, because a gutter declared inside `AppShell` was a gutter no
+other file could find.
+
+### Page gutters
+
+Two widths, and they are roles rather than accidents.
+
+| | |
+|---|---|
+| `PAGE_X_READING` | `px-6 sm:px-12 lg:px-20 xl:px-28` — a form, an account page, the deal room |
+| `PAGE_X_WORKING` | `px-4 sm:px-6 lg:px-8 xl:px-10` — the map, the requests workspace, compare |
+| `PAGE_X_BLEED` | `px-4 sm:px-6` — a band inside a full-bleed surface |
+| `PAGE_MX_BLEED` | `mx-4 sm:mx-6` — the same step as a margin |
+| `PAGE_Y` | `py-6 sm:py-7` — one vertical rule for all of them |
+
+A **reading** page is a column of text and wants space around it. A **working**
+surface is trying to fit things on screen and wants that space back. `AppShell`
+picks between them from the `wide` prop; a page never sets its own.
+
+### The back control
+
+**It is on the page, under the bar — never in it.** It used to be a white circle
+inside the navy header, which put "leave this page" in the one row that is
+identical on every route, beside the logo and the tabs. Those say what the app
+is; back says something about this page alone.
+
+A page registers a handler with `usePageBack(fn)` and places nothing. `AppShell`
+draws the control as the first thing inside `<main>`, so every screen that has
+one has it in the same spot, at the same size, with the same 16px under it.
+
+```tsx
+usePageBack(() => router.push("/inbox"));
+```
+
+It is a `btn("secondary", "md", { icon: true, pill: true })` — a 34px bordered
+circle on the content's own leading edge, which mirrors in Arabic like everything
+else.
+
+### Where an action sits
+
+**At the foot of the thing it acts on.** A card's actions go in that card's
+footer, behind a `border-t`; a dialog's go in the dialog's. The action and the
+fields it submits stay in one box, so a long form cannot separate them.
+
+**The primary action is last, on the trailing edge.** `justify-end` rather than a
+margin, so Arabic mirrors it without a second rule.
+
+```
+English (LTR)              العربية (RTL)
+   [ Cancel ]  [ Send ]    [ إرسال ]  [ إلغاء ]
+```
+
+| Recipe | |
+|---|---|
+| `ACTIONS` | `flex flex-wrap items-center justify-end gap-2.5` — a bare row |
+| `CARD_FOOTER` | the same row with `border-t border-border px-5 py-3.5` |
+| `ACTIONS_SPLIT` | `justify-between`, for when one action destroys something |
+
+A destructive action goes to the **opposite** edge, so Delete cannot be reached
+for while aiming at Save:
+
+```
+[ Delete ]              [ Cancel ]  [ Save ]
+```
+
+### Spacing between things
+
+`SECTION_GAP` (`space-y-4`) between a page's stacked sections. Card padding is
+`PAD.sm` / `PAD.md` / `PAD.lg` — 12, 16, 20. Everything else is the 4px grid.
+
+---
+
 ## What to reach for
 
 Everything below is exported from `@/lib/ds`.
@@ -327,6 +402,11 @@ Everything below is exported from `@/lib/ds`.
 | a status panel | `NOTICE_BASE` + `NOTICE_TONE[tone]`, or `<Notice>` |
 | a tappable list row | `ROW` |
 | a divider | `DIVIDER` |
+| a row of buttons | `ACTIONS`, or `ACTIONS_SPLIT` with a destructive one |
+| a card's action row | `CARD_FOOTER` |
+| a page gutter | `PAGE_X_READING` / `PAGE_X_WORKING` / `PAGE_X_BLEED` |
+| a back control | `usePageBack(fn)` — the shell places it |
+| space between sections | `SECTION_GAP` |
 | joining classes | `cx()` |
 
 ---

@@ -11,7 +11,7 @@ import type { Locale } from "@/lib/i18n/config";
 // import { SurveyProvider } from "@/components/surveys/SurveyProvider";
 import { AuthGateProvider, useAuthGate } from "@/components/auth/AuthGate";
 import { fetchDealRoomUnread } from "@/lib/api/client";
-import { btn, OVERLAY, SCRIM } from "@/lib/ds";
+import { btn, cx, OVERLAY, PAGE_BACK, PAGE_X_BLEED, PAGE_X_READING, PAGE_X_WORKING, PAGE_Y, SCRIM } from "@/lib/ds";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { AppNav, AppNavMobile, type NavItem } from "@/components/AppNav";
 import { ArrowBackIcon, MailIcon, CountBadge } from "@/components/HeaderIcons";
@@ -61,22 +61,33 @@ type AppShellProps = { children: ReactNode; title?: string; fullBleed?: boolean;
  * It is the working gutter's first two steps, which is why the requests rail and the strip beneath it
  * now line up — at 16/26 against 12/20 they never did.
  */
-export const PAGE_X_READING = "px-6 sm:px-12 lg:px-20 xl:px-28";
-export const PAGE_X_WORKING = "px-4 sm:px-6 lg:px-8 xl:px-10";
-export const PAGE_X_BLEED = "px-4 sm:px-6";
-/** The same bleed step as a margin, for a band that insets a card rather than padding a row. */
-export const PAGE_MX_BLEED = "mx-4 sm:mx-6";
+/* The four gutters live in `@/lib/ds` now — placement is part of the design system, and a gutter
+   declared here was a gutter no other file could find. Re-exported so existing callers are unmoved;
+   `ds.ts` imports nothing, so there is no cycle. */
+export { PAGE_X_READING, PAGE_X_WORKING, PAGE_X_BLEED, PAGE_MX_BLEED, PAGE_Y } from "@/lib/ds";
 
-
-/** A page can show a Back arrow in the top bar (beside the title) by registering a handler. */
+/**
+ * A page can show a Back arrow by registering a handler.
+ *
+ * **It renders on the PAGE, under the bar — not in it** (owner, 2026-08-26). It used to be a white
+ * circle inside the navy header, which put "leave this page" in the one row that is identical
+ * everywhere, next to the logo and the tabs. Those say what the app is; back says something about
+ * this page only. On the page, on the content's own leading edge, it belongs to what it leaves.
+ *
+ * The page does not place it: `AppShell` draws it as the first thing inside `<main>`, so every page
+ * that has one has it in the same spot, at the same size, with the same 16px under it.
+ */
 const BackContext = createContext<(fn: (() => void) | null) => void>(() => {});
-export function useHeaderBack(handler: (() => void) | null) {
+export function usePageBack(handler: (() => void) | null) {
   const register = useContext(BackContext);
   useEffect(() => {
     register(handler);
     return () => register(null);
   }, [handler, register]);
 }
+
+/** Its old name, kept so a call site does not have to change to say the same thing. */
+export const useHeaderBack = usePageBack;
 
 /** Public shell: hosts the app-wide auth-gate modal (public-web has no `/login` page — sign-in/register
  *  is a modal fired by actions), so the chrome and pages can use it.
@@ -100,7 +111,8 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
   const { openAuth } = useAuthGate();
   const pathname = usePathname();
   const [name, setName] = useState("");
-  // A child page may register a Back handler to show an arrow in the top bar beside the title.
+  // A child page may register a Back handler; the arrow then draws at the top of `<main>`, on the
+  // page's own gutter. Never in the bar — see `usePageBack`.
   const [back, setBack] = useState<(() => void) | null>(null);
   const registerBack = useCallback((fn: (() => void) | null) => setBack(() => fn), []);
 
@@ -209,15 +221,9 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
             control keeps a light ground of its own — the account menu, the nav sheet — it stays light,
             because it is a surface, not part of the bar. */}
         <header className="sticky top-0 z-30 flex h-[62px] items-center gap-3 border-b border-white/10 bg-navy px-4 text-white sm:px-7 relative">
-          {back && (
-            <button
-              onClick={back}
-              aria-label={locale === "ar" ? "رجوع" : "Back"}
-              className="grid h-[34px] w-[34px] flex-none place-items-center rounded-full border border-white/20 text-white/80 transition hover:bg-surface/10 hover:text-white"
-            >
-              <ArrowBackIcon className="rtl:-scale-x-100" />
-            </button>
-          )}
+          {/* ~~The Back arrow led this row.~~ It is on the PAGE now, under the bar (owner,
+              2026-08-26) — see `usePageBack` and the block at the top of `<main>`. The bar carries
+              only what is true of the app on every route; back is true of one page. */}
 
           {/* The FULL LOGO, 36px tall and bare — the header prototype's, and the same artwork
               (owner, 2026-08-25: "keep the moedatech logo not this watermark"). It replaced the
@@ -407,9 +413,26 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                 // `py-6 pb-16 sm:pt-7 md:py-7`, where `md:py-7` silently overrode `pb-16` — so the
                 // foot of a page was 64px on a phone and 28px on a desktop, the opposite way round
                 // from what either wants. The 64 was `AppDock` clearance, and the dock is gone.
-                `mx-auto w-full py-6 sm:py-7 ${wide ? `max-w-none ${PAGE_X_WORKING}` : `max-w-[1440px] ${PAGE_X_READING}`}`
+                `mx-auto w-full ${PAGE_Y} ${wide ? `max-w-none ${PAGE_X_WORKING}` : `max-w-[1440px] ${PAGE_X_READING}`}`
           }
         >
+          {/* ── Back, on the page (owner, 2026-08-26) ────────────────────────────────────────────
+              The shell draws it, not the page, so every screen that has one has it in the same place
+              at the same size with the same 16px under it — which is the whole reason it is here and
+              not left to each caller.
+
+              A full-bleed surface has no gutter of its own to sit on, so the control brings one. */}
+          {back && (
+            <div className={cx(PAGE_BACK, fullBleed && `${PAGE_X_BLEED} pt-4`)}>
+              <button
+                onClick={back}
+                aria-label={locale === "ar" ? "رجوع" : "Back"}
+                className={btn("secondary", "md", { icon: true, pill: true })}
+              >
+                <ArrowBackIcon className="rtl:-scale-x-100" />
+              </button>
+            </div>
+          )}
           {children}
         </main>
       </div>
