@@ -192,16 +192,23 @@ export function Processing() {
 
   return (
     <div className="flex min-h-[70vh] items-center justify-center">
-      <div className="w-full max-w-[520px] rounded-sm border border-border bg-surface p-6 text-center">
-        {/* The agent, and that it is live. The dot pulses; it is the only thing on this card that moves
-            without a reason, and it is the reason. */}
-        <div className="mb-5 flex items-center justify-center gap-2.5">
-          <span className="grid h-[30px] w-[30px] flex-none place-items-center rounded-sm bg-gradient-to-br from-brand-light to-brand text-white">
-            <Icon name="auto_awesome" size={16} />
+      <div className="w-full max-w-[520px] rounded-lg border border-border bg-surface p-7 text-center">
+        {/* ── The agent's mark, and the fact that it is live (owner's reference, 2026-08-26) ───────
+            A 64px amber tile ABOVE its own label rather than a 30px chip beside it. This is the one
+            moment in the flow where the renter is waiting on something he cannot see, so the thing
+            he is waiting on is drawn at a size that admits it.
+
+            The live dot moves from beside the label onto the tile's own corner, where it reads as
+            "this is running" rather than as a bullet before a word. It is still the only thing on the
+            card that moves without a reason — it is the reason — and the white ring is what keeps it
+            legible against the amber it overlaps. */}
+        <div className="mb-4 flex justify-center">
+          <span className="relative grid h-16 w-16 place-items-center rounded-lg bg-gradient-to-br from-brand-light to-brand text-white">
+            <Icon name="auto_awesome" size={30} />
+            <span className="absolute -bottom-1 -end-1 h-4 w-4 rounded-full border-2 border-surface bg-ok motion-safe:animate-pulse" />
           </span>
-          <span className="h-2 w-2 flex-none rounded-full bg-ok motion-safe:animate-pulse" />
-          <span className="text-meta font-extrabold uppercase tracking-[.04em] text-ok">{t.processing.agentWorking}</span>
         </div>
+        <div className="mb-2 text-label font-extrabold uppercase tracking-[.06em] text-ok">{t.processing.agentWorking}</div>
 
         <h2 className="text-display font-extrabold tracking-tight text-navy">
           {stages[Math.min(step, 3)].title}
@@ -222,13 +229,18 @@ export function Processing() {
                       isDone
                         ? "bg-ok text-white"
                         : active
-                          ? "bg-gradient-to-br from-brand-light to-brand text-white motion-safe:animate-pulse"
+                          ? "bg-brand text-white motion-safe:animate-pulse"
                           : "bg-surface2 text-muted"
                     }`}
                   >
                     <Icon name={isDone ? "check" : s.icon} size={17} />
                   </span>
-                  <span className={`whitespace-nowrap text-label font-semibold ${isDone ? "text-ok" : active ? "text-navy" : "text-muted"}`}>
+                  {/* The step in hand is the only one in navy: green is behind you, grey is ahead. */}
+                  <span
+                    className={`whitespace-nowrap text-meta ${
+                      isDone ? "font-semibold text-ok" : active ? "font-extrabold text-navy" : "font-semibold text-muted"
+                    }`}
+                  >
                     {s.label}
                   </span>
                 </div>
@@ -240,24 +252,41 @@ export function Processing() {
           })}
         </div>
 
-        {/* What the agent has said so far. Four lines: enough to follow, short enough not to scroll. */}
-        <div className="min-h-[110px] rounded-sm border border-border bg-surface2/40 px-4 py-3.5">
+        {/* ── What the agent has said so far (owner's reference, 2026-08-26) ──────────────────────
+            Four lines: enough to follow, short enough not to scroll.
+
+            Each line carries a BADGE rather than a 6px dot — a green tick for a line that finished,
+            a filled amber disc for the one still running. A dot that small could only be read by its
+            colour, which asked a renter to know that amber means "working" before he had been told
+            it once; a tick says finished in any palette. */}
+        <div className="min-h-[110px] rounded-md border border-border bg-surface2/40 px-4 py-3.5">
           <div className="mb-2.5 text-label font-extrabold uppercase tracking-[.03em] text-muted">{t.processing.liveActivity}</div>
-          <div className="flex flex-col items-stretch gap-2.5">
-            {feed.map((entry, i) => (
-              <div key={entry.id} className="flex items-center gap-2.5 text-start">
-                <span className={`h-1.5 w-1.5 flex-none rounded-full ${i === feed.length - 1 ? "bg-brand" : "bg-ok"}`} />
-                <span className="min-w-0 flex-1 truncate text-body text-navy-mid">{entry.text}</span>
-              </div>
-            ))}
+          <div className="flex flex-col items-stretch gap-2">
+            {feed.map((entry, i) => {
+              const running = i === feed.length - 1;
+              return (
+                <div key={entry.id} className="flex items-center gap-2.5 text-start">
+                  <span
+                    className={`grid h-5 w-5 flex-none place-items-center rounded-full ${
+                      running ? "bg-brand motion-safe:animate-pulse" : "bg-ok text-white"
+                    }`}
+                  >
+                    {!running && <Icon name="check" size={13} />}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-body text-navy-mid">{entry.text}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        <div className="mt-4 flex items-center gap-3">
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface3">
-            <div className="h-full rounded-full bg-gradient-to-r from-brand to-brand-light transition-[width] duration-500" style={{ width: `${pct}%` }} />
+        {/* Thicker, and the figure in a pill of its own — the reference's, and it earns the weight:
+            this is the only number on the screen and it was set in the same grey as the caption. */}
+        <div className="mt-5 flex items-center gap-3">
+          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-surface3">
+            <div className="h-full rounded-full bg-brand transition-[width] duration-500" style={{ width: `${pct}%` }} />
           </div>
-          <span className="w-9 text-end text-meta font-semibold text-brand">{pct}%</span>
+          <span className="flex-none rounded-full bg-brand-soft px-2 py-0.5 text-meta font-extrabold text-brand">{pct}%</span>
         </div>
 
         {/* The counts the canvas will open on, once there are any. */}
