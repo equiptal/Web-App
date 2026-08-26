@@ -721,7 +721,6 @@ describe("one counterparty key across both projections (I1, AC-70)", () => {
  * it is the classification BOTH surfaces use, which is what stops them drifting apart again.
  */
 describe("dockMessageView — nothing the deal room renders is invisible in the dock (I2)", () => {
-  const dealRoomSrc = readFileSync(resolve(process.cwd(), "src/components/deal-room/DealRoom.tsx"), "utf8");
 
   it("keeps an attachment-only image message, with its thumb", () => {
     const view = dockMessageView({
@@ -798,12 +797,14 @@ describe("dockMessageView — nothing the deal room renders is invisible in the 
     expect(dockSrc).toContain("msg-att-file");
   });
 
-  it("covers every attachment kind the deal room has a branch for", () => {
-    // Read off the shipped surface rather than restated: if staging widens the deal room again, this
-    // is the assertion that notices the dock has not followed.
-    expect(dealRoomSrc).toContain('a.type === "image"');
-    expect(dealRoomSrc).toContain('(a.mime_type || "").startsWith("audio/")');
-    expect(dealRoomSrc).toContain('custom.kind === "location"');
+  /**
+   * Every attachment kind Stream can hand this surface.
+   *
+   * It used to enumerate them by reading the DEAL ROOM's branches and checking the dock had kept up —
+   * a good invariant while both surfaces rendered messages. The deal room renders none now (owner,
+   * 2026-08-26), so the list is stated here instead of being read off a surface that no longer has it.
+   */
+  it("covers every attachment kind Stream can hand it", () => {
     const kinds = new Set(
       [
         dockMessageView({ attachments: [{ type: "image", image_url: "u" }] }),

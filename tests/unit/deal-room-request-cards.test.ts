@@ -53,7 +53,6 @@ const read = (rel: string) => readFileSync(resolve(ROOT, rel), "utf8");
  *  naive grep would report the prose rather than the code. */
 const strip = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
-const DEAL_ROOM = strip(read("src/components/deal-room/DealRoom.tsx"));
 const CHAT_DOCK = strip(read("src/components/map/ChatDock.tsx"));
 const RQ_CSS = read("src/components/map/request-card.css");
 const DL_CSS = read("src/components/deal-room/deal-room-proto.css");
@@ -274,156 +273,24 @@ describe("mapDealRoom exposes the bid the room settles", () => {
   });
 });
 
-describe("the deal room's fleet fetch — once, non-blocking, and harmless when it fails", () => {
-  it("uses the map's own client function, keyed by the room's bid", () => {
-    // Reused, not re-written: `inBid`/`yardConfirmed` are only meaningful relative to ONE bid, which
-    // is why the endpoint and its cache are bid-keyed.
-    expect(DEAL_ROOM).toContain("fetchBidFleet");
-    expect(DEAL_ROOM).toMatch(/const bidId = room\?\.bidId;/);
-    expect(DEAL_ROOM).toMatch(/fetchBidFleet\(bidId\)/);
-  });
-
-  it("fires in an effect of its own, so nothing in the conversation waits on it", () => {
-    const effect = DEAL_ROOM.slice(DEAL_ROOM.indexOf("const bidId = room?.bidId;"));
-    // Its whole dependency is the bid id — the 15s room poll must not re-request a fleet.
-    expect(effect).toMatch(/\}, \[room\?\.bidId\]\);/);
-    // The thread's own render is gated on chat readiness and NOT on the fleet.
-    const thread = DEAL_ROOM.slice(DEAL_ROOM.indexOf('<div className="thread">'));
-    expect(thread).toContain("!chatReady ?");
-    expect(thread).not.toContain("!fleet ?");
-  });
-
-  it("starts null and stays null on a failure — exactly the behaviour this route had before", () => {
-    expect(DEAL_ROOM).toMatch(/useState<FleetMachine\[\] \| null>\(null\)/);
-    // The catch sets nothing. A latched failure flag would only give the surface something to say
-    // about a read the renter can do nothing about.
-    const effect = DEAL_ROOM.slice(DEAL_ROOM.indexOf("fetchBidFleet(bidId)"));
-    expect(effect.slice(0, 400)).toMatch(/\.catch\(\(\) => \{\s*\}\)/);
-    // …and null is precisely what makes the card say less rather than guess.
-    expect(DEAL_ROOM).toContain("fleetKnown: fleet != null");
-  });
-
-  it("offers no press it cannot honour — this route has no equipment detail to open", () => {
-    expect(DEAL_ROOM).toContain("canOpen: () => false");
-    expect(DEAL_ROOM).not.toContain("onOpenMachine");
-  });
-
-  it("names no equipment TYPE it does not hold", () => {
-    // `details.equipmentLabel` falls back to the accepted bid's make+model, so naming it would make
-    // an `alternative` ask read as a swap for that unit.
-    expect(DEAL_ROOM).toContain("typeWord: null");
-  });
-});
-
-describe("both card types render through RequestCard, sided by their author", () => {
-  it("renders the request as the full card, and folds the answer into it", () => {
-    expect(DEAL_ROOM).toContain("requestCardView(postedSubject(card.card), cardCtx)");
-    expect(DEAL_ROOM).toMatch(/<RequestCard[\s\S]{0,200}view=\{requestCardView/);
-    /* V12c (owner, 2026-08-11, evening): the reply's SECOND full card is gone — `replyCardView` was
-       what built it and is withdrawn — and the reply is suppressed only where its ask is on screen
-       carrying the answer. The bare fallback below is untouched. */
-    expect(DEAL_ROOM).not.toContain("replyCardView");
-    expect(DEAL_ROOM).toContain("replyFoldsIntoAsk(answeredRefs, card.reply)");
-  });
-
-  it("carries the finite arrival cue on the card the answer folded into", () => {
-    // Owner, 2026-08-11: *"light plumbing or something to show the answer when opening the chat"*.
-    expect(DEAL_ROOM).toContain("cue={cuedRef != null && cuedRef === card.card.ref}");
-    // Keyed on a STABLE ref, so the room's 15s poll cannot restart it; and it takes itself off.
-    expect(DEAL_ROOM).toContain("latestAnsweredRef(threadCards)");
-    expect(DEAL_ROOM).toMatch(/setTimeout\(\(\) => setCuedRef\(null\), ANSWER_CUE_MS\)/);
-  });
-
-  it("reads the side off the Stream AUTHOR, never off the card's type", () => {
-    // The renter and the supplier read the same channel from opposite chairs: "an ask is mine, a
-    // reply is theirs" is true from one and inverted from the other (owner, 2026-08-11).
-    expect(DEAL_ROOM).toMatch(/const cardMine = myStreamId != null && m\.user\?\.id === myStreamId;/);
-    expect(DEAL_ROOM).toMatch(/dl-rq-card \$\{cardMine \? "is-mine" : "is-them"\}/);
-  });
-
-  it("leaves the negotiation vocabulary centred — an event belongs to neither party", () => {
-    // A rate, a counter, an acceptance is narration the room emitted. Only the request loop's cards
-    // take a side, so the un-paired reply is wrapped and everything else is not.
-    const branch = DEAL_ROOM.slice(DEAL_ROOM.indexOf("const chatCard = ("));
-    expect(branch).toMatch(/card\.type === RENTEE_REQUEST_REPLY_CARD_TYPE \?/);
-    expect(branch).toMatch(/<Fragment key=\{m\.id\}>\{chatCard\}<\/Fragment>/);
-  });
-
-  it("does not disturb the `?act=` deep link added the same day", () => {
-    expect(DEAL_ROOM).toContain("initialFlow");
-    /* COUNTER opens on `live`, not on `showAct` (owner, 2026-08-19: *"when i click counter this price
-       from the map footer it will open the 3 style sheet not the chat"*). `showAct` also asks whose
-       TURN it is, which governs whether the price bar draws its buttons — a different question from
-       whether a renter who already pressed «اطلب سعراً أقل» may counter. `live` still refuses a CLOSED,
-       ABANDONED or AWAITING room, where there is nothing to counter.
-
-       ACCEPT is deliberately untouched: settling keeps the room's own comparison of terms, price and
-       units, and a deep link must not be a way around it. */
-    expect(DEAL_ROOM).toMatch(/flowGate\.current = \{ counter: live, accept: showAct && canAccept \};/);
-  });
-});
-
-describe("the card's chrome reaches a surface that is not the map", () => {
-  it("carries no `.bidmap` scope — the deal room would otherwise paint it as bare text", () => {
-    expect(RQ_CSS).toContain(".bm-rq {");
-    expect(RQ_CSS).toContain(".bm-rq-state.is-answered");
-    // The positive control above proves the file holds the real rules; this is the point of moving
-    // it. Comments are stripped first — the header EXPLAINS the move in the words the rule forbids.
-    expect(RQ_CSS.replace(/\/\*[\s\S]*?\*\//g, " ")).not.toContain(".bidmap");
-  });
-
-  it("draws the answer's arrival cue as a FINITE ring, and stills it for reduced motion", () => {
-    // V6's rule, on a smaller cue: it ENDS. A ring that loops is decoration the renter learns to
-    // ignore — and this one sits on a card he keeps re-reading.
-    expect(RQ_CSS).toContain(".bm-rq.is-cued { animation: bmRqAnswer 1.6s ease-out 3 both; }");
-    expect(RQ_CSS).not.toMatch(/animation:[^;]*infinite/);
-    // Nothing animated but the shadow — a card mid-cue cannot appear to move or reflow the thread.
-    const keyframes = RQ_CSS.match(/@keyframes bmRqAnswer \{[\s\S]*?\n\}/)![0];
-    expect(keyframes).toMatch(/box-shadow/);
-    expect(keyframes).not.toMatch(/transform|width|margin|border/);
-    const reduced = RQ_CSS.slice(RQ_CSS.indexOf("@media (prefers-reduced-motion: reduce)"));
-    expect(reduced).toContain("animation: none");
-    // …and still FINDABLE without motion: a still ring, on the surface's own timer.
-    expect(reduced).toContain("0 0 0 3px rgba(37, 99, 235, 0.24)");
-  });
-
-  it("mirrors the chevron under RTL without depending on the map's root", () => {
-    expect(RQ_CSS).toContain('[dir="rtl"] .bm-rq-go { transform: scaleX(-1); }');
-  });
-
-  it("travels with the component, so any surface that mounts it gets it", () => {
-    expect(read("src/components/map/RequestCard.tsx")).toContain('import "@/components/map/request-card.css"');
-  });
-
-  it("leaves the map's own placement rules where the map's geometry lives", () => {
-    // Higher specificity than the moved rules, so stylesheet order cannot change the outcome.
-    const MAP_CSS = read("src/components/map/map-proto.css");
-    expect(MAP_CSS).toContain(".bidmap .bm-chat-card .bm-rq,");
-    expect(MAP_CSS).toContain(".bidmap .bm-chat-draft .bm-rq");
-  });
-
-  it("gives the deal room a wrapper that carries BOTH the side and the width", () => {
-    // A card with a width of its own inside a sided wrapper is a second opinion about one geometry,
-    // and the disagreement is what leaves it floating in from the edge.
-    expect(DL_CSS).toContain(".dlproto .thread .dl-rq-card.is-mine { align-self: flex-end; }");
-    expect(DL_CSS).toContain(".dlproto .thread .dl-rq-card.is-them { align-self: flex-start; }");
-    expect(DL_CSS).toMatch(/\.dlproto \.thread \.dl-rq-card \.bm-rq,\s*\n\.dlproto \.thread \.dl-rq-card \.chatcard \{[^}]*width: 100%/);
-  });
-});
-
-describe("the dock and the deal room share the derivations rather than copying them", () => {
-  it("both go through the lifted projection", () => {
+/**
+ * The dock goes through the lifted derivations rather than keeping copies.
+ *
+ * This used to assert it of the deal room too, under the heading "the dock and the deal room share
+ * the derivations rather than copying them" — an invariant that mattered while two surfaces rendered
+ * one channel. The deal room no longer renders it at all (owner, 2026-08-26: one chat UI, and it is
+ * the dock's), so the pairing has nothing to hold and what remains is the half that still ships.
+ */
+describe("the dock goes through the lifted derivations rather than copying them", () => {
+  it("goes through the lifted projection", () => {
     expect(CHAT_DOCK).toContain("requestThreadCards(messages)");
-    expect(DEAL_ROOM).toContain("requestThreadCards(messages as unknown[])");
     // The inline `messages.map` that used to build it in the dock is gone — one implementation.
     expect(CHAT_DOCK).not.toMatch(/if \(card\?\.type === RENTEE_REQUEST_CARD_TYPE\) return \{ ask:/);
   });
 
-  it("both go through the lifted machine resolver and the lifted document table", () => {
-    for (const src of [CHAT_DOCK, DEAL_ROOM]) {
-      expect(src).toContain("fleetMachineResolver");
-      expect(src).toContain("requestDocLabel");
-    }
+  it("goes through the lifted machine resolver and the lifted document table", () => {
+    expect(CHAT_DOCK).toContain("fleetMachineResolver");
+    expect(CHAT_DOCK).toContain("requestDocLabel");
     // The dock's private copy of the document vocabulary is gone.
     expect(CHAT_DOCK).not.toContain("DOC_TYPE_LABELS");
   });
