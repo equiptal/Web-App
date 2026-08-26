@@ -150,13 +150,19 @@ export function RequestRail({
                   44 / 40 / 36 are the numbers the percentages were computing anyway. Stated
                   outright there is nothing left to resolve, so the clip is 36px on every tile and
                   every machine, whatever its shape. */}
-              {/* Two spans where there were three. The outer one was the ring and the middle one the
-                  white band that separated it from the picture; with no ring the white band would
-                  simply have become the outline in its place. What is left is an anchor for the
-                  badges and the clip itself, both the full 56. */}
-              <span className="relative grid h-14 w-14 flex-none place-items-center rounded-full">
-                <span className="relative h-14 w-14 rounded-full">
-                  <span className={`grid h-14 w-14 place-items-center overflow-hidden rounded-full bg-surface3 ${tile.closed ? "grayscale" : ""}`}>
+              {/* ── The disc keeps its padding (owner, 2026-08-27) ────────────────────────────────
+                  Taking the ring off, I took the band under it off too, reasoning that with nothing
+                  to separate from it would become the outline in the ring's place. That was wrong,
+                  and the owner is the one who saw it: the band was not a frame, it was the disc's
+                  PADDING. Without it a photograph — and much of this artwork reaches its own edges —
+                  sits as a bare rectangle inside a round clip with nothing holding it.
+
+                  The padding is back and there is still no ring, because the pad and the clip share
+                  one background: no edge is drawn between them. One 56px tinted circle, with the
+                  picture inset inside it. */}
+              <span className="relative grid h-14 w-14 flex-none place-items-center rounded-full bg-surface3 p-1">
+                <span className="relative h-12 w-12 rounded-full">
+                  <span className={`grid h-12 w-12 place-items-center overflow-hidden rounded-full bg-surface3 ${tile.closed ? "grayscale" : ""}`}>
                     {img ? (
                       /* ── `contain`, not `cover` (owner, 2026-08-25: "the circles must fit any icon
                          + why some have floating icons") ──────────────────────────────────────────
@@ -184,7 +190,7 @@ export function RequestRail({
                          every machine whole. Reaching further needs a bigger circle, not less
                          padding. */
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={img} alt="" draggable={false} className="h-14 w-14 object-contain p-1.5" />
+                      <img src={img} alt="" draggable={false} className="h-12 w-12 object-contain p-1" />
                     ) : (
                       <Icon name="precision_manufacturing" size={20} className="text-muted" />
                     )}
