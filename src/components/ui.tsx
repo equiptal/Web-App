@@ -150,7 +150,7 @@ export function Card({
 /* ------------------------------------ Field ------------------------------------ */
 
 /**
- * web-app/002: marks a value the AI agent filled in from the RFQ (coral + agent icon). The caller
+ * web-app/002: marks a value the AI agent filled in from the RFQ (orange + agent icon). The caller
  * decides when to show it — it clears once the renter edits the field (the value stops matching the
  * agent's original). See `agentMatches` in the rfq-store.
  *
@@ -187,7 +187,7 @@ export function Field({
    *  still holds what the agent assumed; it clears the moment the renter edits. Dynamic by design. */
   note?: ReactNode;
   optional?: boolean;
-  /** AC: value was filled by the AI agent (coral badge). */
+  /** AC: value was filled by the AI agent (orange badge). */
   agent?: boolean;
   /** AC: field is required to advance. */
   required?: boolean;

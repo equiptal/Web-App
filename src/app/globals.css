@@ -51,29 +51,37 @@
      Three tiers each. `base` is the colour itself, `soft` is a background you can lay it on, and
      `deep` is the text colour that stays readable on that background.
 
-     Warning is coral and danger is deep red, deliberately far apart (owner, 2026-08-26). Before
-     this, warning was an orange one shade off the primary CTA, so a caution and a button meant to
-     be pressed looked alike — see the "you wrote" block in `create/Canvas.tsx`, which used one
-     orange for its warning label and for the link inside it. The soft tints are pulled apart too:
-     warning's leans peach, danger's leans grey-red, so the two panels never read as the same. */
+     ~~Warning is coral and danger is deep red, deliberately far apart.~~ **Withdrawn 2026-08-26**,
+     same day, by the owner: he did not like them — the coral, and the grey-red tint under it, read
+     wrong to him. Both are back to the values the app has always used.
+
+     What that restores is also the objection they were meant to answer, and it is worth writing
+     down rather than losing: `--warn` #d4780a is an orange one shade off `--brand` #f79009, so a
+     caution and a button meant to be pressed are told apart by darkness alone. The clearest case is
+     the "you wrote" block in `create/Canvas.tsx`, which uses one orange for its warning label and
+     for the link inside it, thirteen pixels apart. If that ever needs solving again, the answer is
+     not a redder warning — it is to stop `--warn` being an orange at all, or to let the icon and
+     the wording carry the caution and leave the hue to the CTA. */
   --ok: #1daf58;
   --ok-soft: #e7f7ee;
   --ok-deep: #15803d;
-  --warn: #ed6a5e;
-  --warn-soft: #fff0ec;
-  --warn-deep: #c0392b;
-  --danger: #b03636;
-  --danger-soft: #fbe5e5;
-  --danger-deep: #8f2626;
-  --danger-hover: #9a2f2f;
-  --danger-press: #822828;
+  --warn: #d4780a;
+  --warn-soft: #fff3e0;
+  /* The app's own darkened orange for warning text on a warning tint (9 uses before the sweep). */
+  --warn-deep: #8a4f08;
+  --danger: #d9362a;
+  --danger-soft: #fcebea;
+  /* The app's own dark red, for danger text on a danger tint. */
+  --danger-deep: #b03636;
+  --danger-hover: #c22e23;
+  --danger-press: #a8281e;
   --info: #1a7ec8;
   --info-soft: #e6f2fb;
   --info-deep: #0e4f7e;
 
   /* ── Disabled ────────────────────────────────────────────────────────────────────────────────
      A state with its own colours rather than a faded copy of another one. `opacity: .5` over an
-     orange or coral fill produced a muddy tint nobody chose, and landed around 2.1:1 against white
+     orange or red fill produced a muddy tint nobody chose, and landed around 2.1:1 against white
      — under the 3:1 floor WCAG 1.4.11 sets for a control. */
   --disabled-bg: var(--surface2);
   --disabled-fg: var(--muted-light);

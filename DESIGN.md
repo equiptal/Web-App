@@ -106,18 +106,24 @@ is for.
 | | base | soft | deep |
 |---|---|---|---|
 | ok | `#1daf58` | `#e7f7ee` | `#15803d` |
-| warn | `#ed6a5e` | `#fff0ec` | `#c0392b` |
-| danger | `#b03636` | `#fbe5e5` | `#8f2626` |
+| warn | `#d4780a` | `#fff3e0` | `#8a4f08` |
+| danger | `#d9362a` | `#fcebea` | `#b03636` |
 | info | `#1a7ec8` | `#e6f2fb` | `#0e4f7e` |
 
-**Warning is coral, and it used to be orange.** That mattered: the old warning
-`#d4780a` was one shade off the primary CTA, so a caution and a button meant to
-be pressed looked alike. The clearest case was the "you wrote" block in
-`create/Canvas.tsx`, which used one orange for its warning label and for the
-link inside it, thirteen pixels apart. Danger deepened at the same time to keep
-its distance from coral, and the two soft tints were pulled apart as well —
-warning's leans peach, danger's leans grey-red — because at a single hex digit
-apart they were indistinguishable side by side.
+These are the app's own colours and always have been. ~~Warning was moved to a
+coral and danger deepened to keep clear of it.~~ **Withdrawn the same day**
+(owner, 2026-08-26): he did not like the coral or the grey-red tint under it.
+
+The objection those changes answered is still true, and is worth keeping written
+down rather than losing with them: `--warn` `#d4780a` is an orange one shade off
+`--brand` `#f79009`, so a caution and a button meant to be pressed are told apart
+by darkness alone. The clearest case is the "you wrote" block in
+`create/Canvas.tsx`, which uses one orange for its warning label and for the link
+inside it, thirteen pixels apart.
+
+If it is ever worth solving again, the answer is **not** a redder warning. Either
+stop `--warn` being an orange at all, or leave the hue to the CTA and let the
+icon and the wording carry the caution.
 
 ### What is not a token
 
@@ -433,9 +439,9 @@ off.
 
 Nothing moved that did not have to. What did:
 
-- **Warning went from orange to coral**, and danger deepened. 24 cautions and 21
-  errors changed colour. This is the change with a reason rather than a rule
-  behind it: a caution should not look like a button.
+- **No colour changed value.** Warning was moved to a coral and danger deepened,
+  and both were withdrawn the same day (owner, 2026-08-26). Every token holds the
+  value the app already used — the sweep named them, it did not repaint them.
 - **Every shadow disappeared.** 86 in the components, 88 in the stylesheets.
   Cards, modals and dropdowns now separate by border, surface step and scrim.
 - **Half-pixel type snapped.** 13.5px and 14px to 13, 11.5px to 11, 10.5px to 11.
@@ -459,9 +465,9 @@ until something renders.
 every unlisted hex on its ramp by an index into that ramp's steps. It sent
 `#c8d8e8` — a border — to `surface2`, which is a fill, and `#e8890c`, the brand
 orange, to `brand-light`. Nearest colour *within the chosen ramp* gets all of
-them right. The ramp still has to be chosen by hue, because the red and orange
-families cannot be resolved by distance: warning moved from an orange to a
-coral, so nearest-colour alone would send every caution into the brand ramp.
+them right. The ramp still has to be chosen by hue rather than by distance: an
+orange caution and an orange CTA are near neighbours in RGB and opposite in
+meaning, so distance alone would fold `--warn` into the brand ramp.
 
 **A lone `\r` is a line terminator in a JavaScript regex.** `^` in a multiline
 pattern matches *inside* a CRLF pair, so a rule meant to drop blank lines before
