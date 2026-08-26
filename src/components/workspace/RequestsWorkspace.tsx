@@ -609,7 +609,7 @@ export function RequestsWorkspace() {
                 <div className="flex min-w-0 flex-1 flex-col gap-2.5">
                   <div className="flex items-baseline gap-2.5">
                     <span className="text-[11px] font-bold text-muted">{t.workspace.aiWhatIdDo}</span>
-                    <span className="font-mono text-[7.5px] font-bold tracking-[.09em] text-muted/70">{t.workspace.aiBrand}</span>
+                    <span className="font-mono text-[8px] font-bold tracking-[.09em] text-muted/70">{t.workspace.aiBrand}</span>
                   </div>
                   <p className="text-[12px] font-medium leading-[1.5] text-navy-mid">{ranking.note}</p>
                 </div>

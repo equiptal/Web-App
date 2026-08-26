@@ -171,7 +171,13 @@ export function RequestStrip({
             is the papers (`eqVerified`, whether the listing was checked). Separate facts, drawn
             separately, which is why a machine can carry a green tick under an UNCONFIRMED ribbon. The
             ribbon reads in full: half a word is worse than none on the one state a renter must not
-            misread. */}
+            misread.
+
+            It was set at 6.5px to make «UNCONFIRMED» fit, which is not a size — it is roughly a 4px
+            cap height, and this is a fact the renter is being asked to act on. 8px is the app's own
+            floor and the word still fits: eleven uppercase characters at ~5.3px of advance is 58px
+            inside a 70px tile. The rule was «read in full»; the way to keep it was to measure, not
+            to shrink until it happened to go in. */}
         <span className="relative my-1 grid h-12 w-[70px] flex-none place-items-center overflow-hidden rounded-[8px] border border-border bg-surface2">
           {photo ? (
             /* eslint-disable-next-line @next/next/no-img-element */
@@ -182,7 +188,7 @@ export function RequestStrip({
           {bid && (
             <>
               <span
-                className={`absolute inset-x-0 bottom-0 whitespace-nowrap px-0.5 py-[2px] text-center text-[6.5px] font-extrabold uppercase tracking-[.04em] text-white ${
+                className={`absolute inset-x-0 bottom-0 whitespace-nowrap px-0.5 py-[2px] text-center text-[8px] font-extrabold uppercase tracking-[.03em] text-white ${
                   confirmed ? "bg-ok/90" : "bg-navy/85"
                 }`}
               >

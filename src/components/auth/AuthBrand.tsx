@@ -58,7 +58,7 @@ export function AuthBrand() {
           {a.brandPill}
         </div>
         <h1 className="mb-[14px] max-w-[17ch] text-[36px] font-extrabold leading-[1.16] tracking-[-.6px]">{a.brandHeadline}</h1>
-        <p className="mb-[32px] max-w-[44ch] text-[15.5px] leading-[1.6] text-white/[0.72]">{a.brandSubtitle}</p>
+        <p className="mb-[32px] max-w-[44ch] text-[15px] leading-[1.6] text-white/[0.72]">{a.brandSubtitle}</p>
 
         <div className="flex flex-col gap-[14px]">
           <Feat icon="edit_note" title={a.feat1Title} sub={a.feat1Sub} />
