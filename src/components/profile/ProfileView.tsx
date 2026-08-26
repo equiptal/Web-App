@@ -101,7 +101,11 @@ export function ProfileView() {
 
 
   return (
-    <div className="pb-10" dir={ar ? "rtl" : "ltr"}>
+    /* ── One column, and it is the organization page's (owner, 2026-08-26) ────────────────────────
+       This page was full-width of the shell while `/company` was 672px centred, so the same card was
+       two different widths depending on which account page you were standing on — and the field grid
+       both pages now share broke to one column at a different viewport on each. */
+    <div className="mx-auto max-w-2xl pb-10" dir={ar ? "rtl" : "ltr"}>
       {/* ── One masthead shape across the account pages (owner, 2026-08-26) ──────────────────────
           Light, like the organization page's, and for the same reason: a navy slab directly above a
           white card makes the page read as stacked boxes rather than a person with their details

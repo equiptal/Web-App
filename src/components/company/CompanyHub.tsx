@@ -120,7 +120,7 @@ export function CompanyHub() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl" dir={ar ? "rtl" : "ltr"}>
+    <div className="mx-auto max-w-2xl pb-10" dir={ar ? "rtl" : "ltr"}>
       {toast && (
         <p className="mb-4 flex items-center gap-2 rounded-sm border border-ok/30 bg-ok-soft px-3.5 py-2.5 text-body font-semibold text-ok">
           <Icon name="check_circle" size={16} /> {toast}
