@@ -853,6 +853,13 @@ export const en = {
   },
   profile: {
     greeting: "Hi{name}",
+    // The field's own name. It read «First name / Last name» — a form's question standing in for a
+    // fact's label, which is what a two-part name field leaves behind when it stops being a form.
+    name: "Name",
+    // Headings for the page's three groups. «Edit profile» used to title the first one AND its own
+    // button, and «Log out» titled a group holding two acts only one of which is logging out.
+    profileSection: "Profile",
+    accountSection: "Account",
     editProfile: "Edit profile",
     editProfileSub: "Update your name, city, and contact details.",
     account: "Account",

@@ -89,18 +89,41 @@ export function ProfileView() {
   };
 
   const fullName = [profile?.firstName, profile?.lastName].filter(Boolean).join(" ").trim();
+  /**
+   * The first letter of the name, or nothing to show one from.
+   *
+   * Spread rather than indexed: `"خالد"[0]` is fine but an emoji or a surrogate pair would be cut in
+   * half by an index, and a name is the last place to render half a character. Falls back to a mark
+   * rather than a letter when there is no name yet — a blank circle reads as a failure to load.
+   */
+  const initial = [...(fullName || "")][0] ?? null;
   const tierLabel = tier === "verified" ? t.shell.tierVerified : tier === "basic" ? t.shell.tierBasic : t.shell.tierGuest;
 
 
   return (
     <div className="pb-10" dir={ar ? "rtl" : "ltr"}>
-      {/* One masthead shape across the account pages — see `PageMasthead`. */}
+      {/* ── One masthead shape across the account pages (owner, 2026-08-26) ──────────────────────
+          Light, like the organization page's, and for the same reason: a navy slab directly above a
+          white card makes the page read as stacked boxes rather than a person with their details
+          under them. Round mark rather than square — this one is somebody.
+
+          The mark is the initial, not a generic `account_circle`. A glyph every account shares says
+          nothing; the letter says whose page this is, and it is the same letter the roster draws
+          beside this person's name on the organization page. */}
       <PageMasthead
-        icon={<Icon name="account_circle" size={34} className="text-white" />}
+        tone="plain"
+        iconShape="circle"
+        icon={
+          initial ? (
+            <span className="text-display font-extrabold text-brand">{initial}</span>
+          ) : (
+            <Icon name="account_circle" size={30} className="text-white/70" />
+          )
+        }
         title={p.greeting.replace("{name}", fullName ? (ar ? `، ${fullName}` : `, ${fullName}`) : "")}
         subtitle={<span dir="ltr">{user?.phone ?? profile?.phone ?? "—"}</span>}
         badge={
-          <MastheadPill tone={tier === "verified" ? "ok" : "neutral"}>
+          <MastheadPill tone={tier === "verified" ? "ok" : "neutral"} onLight>
             {tier === "verified" && <Icon name="verified" size={13} />}
             {tierLabel}
           </MastheadPill>
@@ -133,12 +156,18 @@ export function ProfileView() {
 
       {!loading && profile && (
         <Section
-          title={p.editProfile}
+          // The section names the SUBJECT and its action names the act; both read «Edit profile»
+          // before, so the heading and the button on the same line said the same thing.
+          title={p.profileSection}
           action={
             !editing && (
+              /* Amber text, not a bordered button (owner reference, 2026-08-26). A section label is
+                 a quiet line and a boxed control beside it outweighed the heading it belonged to —
+                 the eye landed on «Edit profile» before «PROFILE». The act stays obvious without a
+                 border because it is the only coloured thing on that line. */
               <button
                 onClick={() => setEditing(true)}
-                className={btn("secondary", "md", { className: "h-8" })}
+                className="inline-flex items-center gap-1.5 text-body font-semibold text-brand transition hover:underline"
               >
                 <Icon name="edit" size={15} /> {p.editProfile}
               </button>
@@ -150,18 +179,28 @@ export function ProfileView() {
               <Icon name="check_circle" size={15} /> {p.saved}
             </p>
           )}
+          {/* ── Marked, and paired the way the reference pairs them (owner, 2026-08-26) ─────────
+              The same amber tiles the organization page gives a firm's particulars, so a person's
+              details and a company's read as one family of fact rather than two designs.
+
+              The order matters because the grid fills in rows: who and where, then what they do
+              and how to write to them, then which firm and which number. It used to run
+              name · city · job · company · email · whatsapp, which paired a job title with a
+              company name and left the two contact fields alone on the last row — a sensible list
+              and an odd table. And the name's label was «First name / Last name», a form's
+              question rather than a fact's name. */}
           {editing ? (
             <div className="p-4">
               <EditProfileForm profile={profile} onSaved={onSaved} onCancel={() => setEditing(false)} />
             </div>
           ) : (
             <FieldGrid>
-              <Field label={`${p.firstName} / ${p.lastName}`} value={fullName || "—"} />
-              <Field label={p.city} value={profile.city || "—"} />
-              <Field label={p.jobTitle} value={profile.jobTitle || "—"} />
-              <Field label={p.companyName} value={profile.companyName || "—"} />
-              <Field label={p.email} value={profile.email || "—"} ltr />
-              <Field label={p.whatsapp} value={profile.whatsapp || "—"} ltr />
+              <Field icon="person" label={p.name} value={fullName || "—"} />
+              <Field icon="location_on" label={p.city} value={profile.city || "—"} />
+              <Field icon="work" label={p.jobTitle} value={profile.jobTitle || "—"} />
+              <Field icon="mail" label={p.email} value={profile.email || "—"} ltr />
+              <Field icon="domain" label={p.companyName} value={profile.companyName || "—"} />
+              <Field icon="chat" label={p.whatsapp} value={profile.whatsapp || "—"} ltr />
             </FieldGrid>
           )}
         </Section>
@@ -221,7 +260,7 @@ export function ProfileView() {
 
           {/* Leaving and deleting, together and last. Sign out sat among the links to privacy and
               support, where it read as another page to visit rather than the end of a session. */}
-          <Section title={p.logout}>
+          <Section title={p.accountSection}>
             <RowList>
               <Row icon="logout" label={p.logout} onClick={doLogout} chevron={false} />
               <Row icon="delete" label={p.deleteAccount} hint={p.deleteAccountSub} danger onClick={() => setShowDelete(true)} chevron={false} />

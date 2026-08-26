@@ -36,10 +36,19 @@ export function PageMasthead({
   subtitle,
   badge,
   tone = "navy",
+  iconShape = "square",
   children,
 }: {
   /** A mark, a logo, or an initial. Sized by the caller inside a 56px slot. */
   icon?: ReactNode;
+  /**
+   * Square for a thing, round for a person (owner's references, 2026-08-26).
+   *
+   * The organization page opens on a rounded-square tile and the profile on a circle, and that is a
+   * distinction worth keeping rather than flattening: a circle reads as somebody, a square as
+   * something. It is the only difference between the two mastheads.
+   */
+  iconShape?: "square" | "circle";
   title: ReactNode;
   subtitle?: ReactNode;
   /** The one status worth carrying up here — verified, pending, owner. */
@@ -62,7 +71,9 @@ export function PageMasthead({
       <div className="flex items-center gap-4">
         {icon && (
           <span
-            className={`grid h-14 w-14 flex-none place-items-center rounded-sm ${plain ? "bg-navy text-white" : "bg-white/10"}`}
+            className={`grid h-14 w-14 flex-none place-items-center ${iconShape === "circle" ? "rounded-full" : "rounded-sm"} ${
+              plain ? "bg-navy text-white" : "bg-white/10"
+            }`}
           >
             {icon}
           </span>

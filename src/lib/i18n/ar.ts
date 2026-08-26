@@ -800,6 +800,9 @@ export const ar: Dictionary = {
   },
   profile: {
     greeting: "مرحباً{name}",
+    name: "الاسم",
+    profileSection: "الملف الشخصي",
+    accountSection: "الحساب",
     editProfile: "تعديل الملف الشخصي",
     editProfileSub: "حدّث اسمك ومدينتك وبيانات التواصل.",
     account: "الحساب",
