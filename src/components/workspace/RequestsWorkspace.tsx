@@ -34,7 +34,7 @@ import { formatSar } from "@/lib/pricing/rental";
 import { buildBidQuotationDoc, quotationSupplierInitials, quotationSupplierKey } from "@/lib/quotation/bid-quotation";
 import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
 import { quotationDownloadName } from "@/lib/compare/quotation-token";
-import { btn } from "@/lib/ds";
+import { btn, cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 
 type Tab = "cards" | "compare";
@@ -503,11 +503,18 @@ export function RequestsWorkspace() {
                   type="button"
                   onClick={() => setTab(k)}
                   aria-current={on ? "page" : undefined}
-                  className={`relative -mb-px rounded-t-sm border border-border text-meta font-semibold transition ${
+                  /* ── One height for the row (owner, 2026-08-27) ──────────────────────────────────
+                     34px, the same `control-md` the export button and the context bar carry. The two
+                     tabs used to differ from each OTHER as well — `pt-2` against `pt-1.5` — so the
+                     open one stood a half-pixel taller than its neighbour and the row had three
+                     heights in it. Only the fill and the bottom edge change now; the box does not. */
+                  className={cx(
+                    // `control-md` sets the height; the button needs a display mode to centre in it.
+                    "control-md relative -mb-px inline-flex items-center justify-center rounded-t-md border border-border text-meta font-semibold transition-colors",
                     on
-                      ? "z-[2] border-b-surface bg-surface px-4 pb-2 pt-2 text-navy"
-                      : "z-[1] bg-surface3/70 px-3.5 pb-2 pt-1.5 text-muted hover:text-navy-mid"
-                  }`}
+                      ? "z-[2] border-b-surface bg-surface text-navy"
+                      : "z-[1] bg-surface3/70 text-muted hover:text-navy-mid",
+                  )}
                 >
                   {k === "cards" ? t.workspace.tabCards : t.workspace.tabCompare}
                 </button>
@@ -550,7 +557,9 @@ export function RequestsWorkspace() {
               rather than a row of pills, because it is a filter over the table, not an action on it.
               It appears only when there is a mix to narrow: with every bid from one source, three
               choices that change nothing are furniture. */}
-          <div className="flex flex-none flex-wrap items-center gap-4 border-b border-border px-3.5 py-1.5">
+          {/* Centred, so it sits under the tabs rather than off at the leading edge while they are
+              in the middle (owner, 2026-08-27). */}
+          <div className="flex flex-none flex-wrap items-center justify-center gap-4 border-b border-border px-3.5 py-1.5">
               <span className="inline-flex items-center gap-1.5 text-label font-extrabold uppercase tracking-wide text-muted">
                 <Icon name="filter_list" size={14} /> {t.workspace.source}
               </span>

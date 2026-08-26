@@ -81,25 +81,32 @@ export function RequestContextBar({
 
   return (
     <div {...pin("request-context")} ref={boxRef} className="relative flex flex-none items-stretch">
+      {/* ── Navy, and 34px like everything else on this row (owner, 2026-08-27) ────────────────────
+          It is the subject of the page, so it takes the app's own dark surface rather than another
+          white box among white boxes. Two lines inside a 34px control: 13px and 15px of leading, 28
+          in total, which clears the height with 3px a side.
+
+          `control-md` is the same 34 the export button and the tabs carry — the row reads as one set
+          of controls rather than three things that happen to be near each other. */}
       <button
         type="button"
         onClick={() => onOpenRequest?.()}
         disabled={!onOpenRequest}
         title={group.address ?? group.locationLabel}
         className={cx(
-          "flex flex-col justify-center gap-0.5 rounded-s-md border border-border bg-surface px-3 py-1.5 text-start transition-colors",
+          "control-md flex flex-col justify-center rounded-s-md border border-navy bg-navy !px-3 text-start transition-colors",
           others.length === 0 && "rounded-e-md",
-          onOpenRequest ? "hover:bg-surface2 active:bg-surface3" : "cursor-default",
+          onOpenRequest ? "hover:bg-navy-mid" : "cursor-default",
         )}
       >
-        <span className="flex items-center gap-1 text-label font-semibold text-muted">
-          <Icon name="place" size={12} className="flex-none" />
-          <span className="max-w-[180px] truncate">{group.locationLabel}</span>
+        <span className="flex items-center gap-1 text-label font-semibold leading-[13px] text-white/60">
+          <Icon name="place" size={11} className="flex-none" />
+          <span className="max-w-[170px] truncate">{group.locationLabel}</span>
         </span>
-        <span className="flex items-center gap-1.5 text-meta font-semibold text-navy">
-          <span className="max-w-[180px] truncate">{label}</span>
+        <span className="flex items-center gap-1.5 text-meta font-semibold leading-[15px] text-white">
+          <span className="max-w-[170px] truncate">{label}</span>
           {qty > 1 && (
-            <span className="flex-none rounded-full bg-surface2 px-1.5 text-label font-semibold text-muted-dark">
+            <span className="flex-none rounded-full bg-white/15 px-1.5 text-label font-semibold text-white/80">
               ×{qty}
             </span>
           )}
@@ -115,9 +122,9 @@ export function RequestContextBar({
           aria-haspopup="menu"
           aria-label={ar ? "معدّات أخرى في هذا الطلب" : "Other equipment in this request"}
           className={cx(
-            "-ms-px grid w-8 flex-none place-items-center rounded-e-md border border-border bg-surface text-muted transition-colors",
-            "hover:bg-surface2 hover:text-navy active:bg-surface3",
-            open && "bg-surface2 text-navy",
+            "control-md -ms-px grid w-8 flex-none place-items-center rounded-e-md border border-navy bg-navy !px-0 text-white/60 transition-colors",
+            "hover:bg-navy-mid hover:text-white",
+            open && "bg-navy-mid text-white",
           )}
         >
           <Icon name="expand_more" size={16} className={open ? "rotate-180" : undefined} />
