@@ -493,7 +493,7 @@ export function RequestsWorkspace() {
               <button
                 type="button"
                 onClick={() => setBenched(new Set())}
-                className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-surface px-3 py-2 text-label font-semibold text-navy-mid transition hover:border-navy-mid"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-label font-semibold text-navy-mid transition hover:border-navy-mid"
               >
                 <Icon name="done_all" size={14} /> {fmt(t.workspace.selectAll, { n: String(benched.size) })}
               </button>
@@ -505,7 +505,7 @@ export function RequestsWorkspace() {
               type="button"
               disabled={shown.length === 0}
               onClick={() => (tab === "compare" ? printComparison() : void downloadQuotation())}
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm border border-border bg-surface px-3 py-2 text-label font-semibold text-navy-mid transition hover:border-navy-mid hover:bg-surface2/60 disabled:bg-disabled-bg disabled:text-disabled-fg"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-border bg-surface px-3 py-2 text-label font-semibold text-navy-mid transition hover:border-navy-mid hover:bg-surface2/60 disabled:bg-disabled-bg disabled:text-disabled-fg"
             >
               {tab === "compare" ? t.workspace.exportComparison : t.workspace.downloadQuotation}{" "}
               <Icon name="download" size={14} />
@@ -604,7 +604,7 @@ export function RequestsWorkspace() {
                 <span className="flex-none text-label font-semibold text-muted/70">⌄</span>
               </button>
             ) : ranking?.note && tipOpen ? (
-              <div className="flex items-start gap-3 rounded-sm border border-border bg-surface px-4 py-3.5">
+              <div className="flex items-start gap-3 rounded-lg border border-border bg-surface px-4 py-3.5">
                 <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface2 text-label font-semibold text-muted">✦</span>
                 <div className="flex min-w-0 flex-1 flex-col gap-2.5">
                   <div className="flex items-baseline gap-2.5">

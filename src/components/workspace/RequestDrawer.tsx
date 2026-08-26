@@ -153,7 +153,7 @@ export function RequestDrawer({
             <button
               type="button"
               onClick={() => setShareOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-sm bg-brand px-4 py-2 text-body font-extrabold text-white transition"
+              className="inline-flex items-center gap-1.5 rounded-md bg-brand px-4 py-2 text-body font-extrabold text-white transition"
             >
               <Icon name="ios_share" size={16} /> {t.workspace.shareRequest}
             </button>
@@ -162,7 +162,7 @@ export function RequestDrawer({
                 type="button"
                 disabled={actions.editCapUsed || loadingEdit}
                 onClick={() => (actions.editNeedsConfirm ? setConfirmEdit(true) : void openEdit())}
-                className="rounded-sm border border-white/30 px-4 py-2 text-body font-semibold text-white transition hover:bg-surface/10 disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
+                className="rounded-md border border-white/30 px-4 py-2 text-body font-semibold text-white transition hover:bg-surface/10 disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
               >
                 {t.workspace.editRequest}
               </button>
@@ -182,7 +182,7 @@ export function RequestDrawer({
               return (
                 <div
                   key={it.id}
-                  className={`flex items-center gap-3 rounded-sm border px-3 py-2.5 ${
+                  className={`flex items-center gap-3 rounded-md border px-3 py-2.5 ${
                     focused ? "border-brand bg-brand-soft/40" : "border-border bg-surface2"
                   }`}
                 >
@@ -345,10 +345,10 @@ function Confirm({
         <h3 className="text-subhead font-extrabold text-navy">{title}</h3>
         <p className="mt-1.5 text-body font-semibold leading-relaxed text-navy-mid">{body}</p>
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-sm border border-border px-4 py-2 text-body font-semibold text-navy-mid">
+          <button type="button" onClick={onClose} className="rounded-md border border-border px-4 py-2 text-body font-semibold text-navy-mid">
             {t.common.cancel}
           </button>
-          <button type="button" onClick={onConfirm} className="rounded-sm bg-navy px-4 py-2 text-body font-extrabold text-white">
+          <button type="button" onClick={onConfirm} className="rounded-md bg-navy px-4 py-2 text-body font-extrabold text-white">
             {confirmLabel}
           </button>
         </div>

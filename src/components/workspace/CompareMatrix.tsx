@@ -820,7 +820,7 @@ function BuildPopover({
   return (
     <>
       <div className="fixed inset-0 z-30" onClick={onClose} />
-      <div className="absolute end-0 top-[34px] z-40 flex w-[250px] flex-col gap-2 rounded-sm border border-border bg-surface px-3.5 py-3 text-start">
+      <div className="absolute end-0 top-[34px] z-40 flex w-[250px] flex-col gap-2 rounded-lg border border-border bg-surface px-3.5 py-3 text-start">
         <div className="flex items-baseline gap-2.5">
           <span className="flex-1 text-label font-extrabold uppercase tracking-wide text-muted">{heading}</span>
           <button type="button" onClick={onClose} aria-label={t.common.cancel} className="text-body font-semibold text-muted/60">

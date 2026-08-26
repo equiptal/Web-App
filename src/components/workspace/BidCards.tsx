@@ -212,7 +212,7 @@ function BidCardTile({
   return (
     <article
       onClick={onSelect}
-      className={`flex max-h-full w-[344px] max-w-full flex-none snap-start cursor-pointer flex-col overflow-hidden rounded-sm border bg-surface transition ${
+      className={`flex max-h-full w-[344px] max-w-full flex-none snap-start cursor-pointer flex-col overflow-hidden rounded-lg border bg-surface transition ${
         selected
           ? "border-brand"
           : "border-border hover:border-navy-mid/40"
@@ -425,7 +425,7 @@ function BidCardTile({
                   window.open(`https://wa.me/${invitePhone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
                   setInvited(true);
                 }}
-                className="flex-1 rounded-sm bg-navy py-3 text-meta font-extrabold text-white transition"
+                className="flex-1 rounded-md bg-navy py-3 text-meta font-extrabold text-white transition"
               >
                 {invited ? t.workspace.inviteSent : t.workspace.inviteToApp}
               </button>
@@ -435,7 +435,7 @@ function BidCardTile({
                 disabled
                 title={t.workspace.inviteNoContact}
                 onClick={(e) => e.stopPropagation()}
-                className="flex-1 rounded-sm bg-navy py-3 text-meta font-extrabold text-white disabled:bg-disabled-bg disabled:text-disabled-fg"
+                className="flex-1 rounded-md bg-navy py-3 text-meta font-extrabold text-white disabled:bg-disabled-bg disabled:text-disabled-fg"
               >
                 {t.workspace.inviteToApp}
               </button>
@@ -446,7 +446,7 @@ function BidCardTile({
                 e.stopPropagation();
                 setSubOpen(true);
               }}
-              className="rounded-sm border border-border px-3.5 py-3 text-meta font-semibold text-navy transition hover:bg-surface2"
+              className="rounded-md border border-border px-3.5 py-3 text-meta font-semibold text-navy transition hover:bg-surface2"
             >
               {t.workspace.editQuote}
             </button>
@@ -459,7 +459,7 @@ function BidCardTile({
               if (card.dealRoomId) router.push(`/deal-room/${encodeURIComponent(card.dealRoomId)}?act=counter`);
               else void openRoom();
             }}
-            className="flex-1 rounded-sm bg-navy py-3 text-meta font-extrabold text-white transition"
+            className="flex-1 rounded-md bg-navy py-3 text-meta font-extrabold text-white transition"
           >
             {/* ── The button carries the ROUND, once there has been one (owner, 2026-08-25) ────────
                 `bidCounterDelta` is the app's rule and was already written and tested; its only
