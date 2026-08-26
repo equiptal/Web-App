@@ -35,6 +35,7 @@ export function PageMasthead({
   title,
   subtitle,
   badge,
+  tone = "navy",
   children,
 }: {
   /** A mark, a logo, or an initial. Sized by the caller inside a 56px slot. */
@@ -43,18 +44,38 @@ export function PageMasthead({
   subtitle?: ReactNode;
   /** The one status worth carrying up here — verified, pending, owner. */
   badge?: ReactNode;
+  /**
+   * `navy` is a filled block; `plain` is the same shape with no box at all, sitting on the page
+   * (owner's reference, 2026-08-26).
+   *
+   * The organization page opens on `plain`: it is followed immediately by two white cards, and a
+   * navy slab above them made the page read as three stacked boxes rather than a subject with its
+   * details under it. Profile keeps the block — it has no card directly beneath its masthead.
+   */
+  tone?: "navy" | "plain";
   /** Actions, under the name rather than beside it, so a long name never squeezes them. */
   children?: ReactNode;
 }) {
+  const plain = tone === "plain";
   return (
-    <div className="rounded-sm bg-navy p-5 text-white">
+    <div className={plain ? "px-1 pb-1" : "rounded-sm bg-navy p-5 text-white"}>
       <div className="flex items-center gap-4">
-        {icon && <span className="grid h-14 w-14 flex-none place-items-center rounded-sm bg-white/10">{icon}</span>}
+        {icon && (
+          <span
+            className={`grid h-14 w-14 flex-none place-items-center rounded-sm ${plain ? "bg-navy text-white" : "bg-white/10"}`}
+          >
+            {icon}
+          </span>
+        )}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-title font-extrabold leading-tight">{title}</p>
-          {subtitle && <p className="mt-0.5 truncate text-meta text-white/65">{subtitle}</p>}
-          {badge && <span className="mt-2 inline-flex items-center gap-1">{badge}</span>}
+          <p className={`truncate text-title font-extrabold leading-tight ${plain ? "text-navy" : ""}`}>{title}</p>
+          {subtitle && <p className={`mt-0.5 truncate text-meta ${plain ? "text-muted" : "text-white/65"}`}>{subtitle}</p>}
+          {/* On the plain tone the badge takes the trailing edge instead of a third line under the
+              name: there is no dark field for it to sit quietly on, so beneath the subtitle it read
+              as a fact ABOUT the subtitle. */}
+          {badge && !plain && <span className="mt-2 inline-flex items-center gap-1">{badge}</span>}
         </div>
+        {badge && plain && <span className="flex-none">{badge}</span>}
       </div>
       {children && <div className="mt-4 flex flex-wrap gap-2">{children}</div>}
     </div>
@@ -62,9 +83,27 @@ export function PageMasthead({
 }
 
 /** A status pill for the masthead. Three tones, and the neutral one is the default. */
-export function MastheadPill({ tone = "neutral", children }: { tone?: "neutral" | "ok" | "warn"; children: ReactNode }) {
-  const skin =
-    tone === "ok" ? "bg-ok/20 text-white" : tone === "warn" ? "bg-warn/25 text-white" : "bg-white/12 text-white";
+export function MastheadPill({
+  tone = "neutral",
+  /** True on a `plain` masthead: the pill has to carry its own colour, having no navy to sit on. */
+  onLight = false,
+  children,
+}: {
+  tone?: "neutral" | "ok" | "warn";
+  onLight?: boolean;
+  children: ReactNode;
+}) {
+  const skin = onLight
+    ? tone === "ok"
+      ? "bg-ok-soft text-ok"
+      : tone === "warn"
+        ? "bg-warn-soft text-warn"
+        : "bg-surface2 text-navy-mid"
+    : tone === "ok"
+      ? "bg-ok/20 text-white"
+      : tone === "warn"
+        ? "bg-warn/25 text-white"
+        : "bg-white/12 text-white";
   return (
     <span className={`inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-label font-semibold uppercase tracking-wide ${skin}`}>
       {children}
@@ -187,13 +226,74 @@ export function FieldGrid({ children }: { children: ReactNode }) {
   return <dl className="grid grid-cols-1 gap-x-6 gap-y-3.5 p-4 sm:grid-cols-2">{children}</dl>;
 }
 
-export function Field({ label, value, ltr = false }: { label: ReactNode; value: ReactNode; ltr?: boolean }) {
+export function Field({
+  label,
+  value,
+  icon,
+  ltr = false,
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  /**
+   * A mark beside the pair (owner's reference, 2026-08-26).
+   *
+   * Amber-soft, because these are the facts a firm was VERIFIED on and amber is this app's word for
+   * "we know this". Optional: a field with no icon still reads as a field, and inventing a glyph for
+   * every possible fact would put a meaningless mark next to half of them.
+   */
+  icon?: string;
+  ltr?: boolean;
+}) {
   return (
-    <div className="min-w-0">
-      <dt className="text-label font-semibold uppercase tracking-wide text-muted">{label}</dt>
-      <dd className="mt-0.5 truncate text-body font-semibold text-navy" dir={ltr ? "ltr" : undefined}>
-        {value}
-      </dd>
+    <div className="flex min-w-0 items-start gap-2.5">
+      {icon && (
+        <span className="grid h-[34px] w-[34px] flex-none place-items-center rounded-sm bg-brand-soft text-brand">
+          <Icon name={icon} size={17} />
+        </span>
+      )}
+      <div className="min-w-0">
+        <dt className="text-label font-semibold uppercase tracking-wide text-muted">{label}</dt>
+        <dd className="mt-0.5 truncate text-body font-semibold text-navy" dir={ltr ? "ltr" : undefined}>
+          {value}
+        </dd>
+      </div>
     </div>
+  );
+}
+
+/**
+ * One paper, as a row you can open — the shape the owner's reference draws for CR, VAT and the
+ * national-address certificate.
+ *
+ * A document is not a label with an answer: its "value" is the file itself, so the row states the
+ * KIND on a badge, names it, and offers the one thing there is to do with it. Where no presigned URL
+ * came back — `/verification/docs` 403s for a caller who is not verified — it says «Verified» in
+ * green instead of a dead link, which is the same rule the old field-shaped version held.
+ */
+export function DocPill({ label, url, viewLabel, verifiedLabel }: { label: ReactNode; url: string | null; viewLabel: string; verifiedLabel: string }) {
+  const body = (
+    <>
+      <span className="flex-none rounded-sm bg-navy px-1.5 py-0.5 text-label font-extrabold uppercase tracking-wide text-white">
+        PDF
+      </span>
+      <span className="min-w-0 flex-1 truncate text-body font-semibold text-navy">{label}</span>
+      {url ? (
+        <span className="flex flex-none items-center gap-1 text-body font-semibold text-brand">
+          <Icon name="visibility" size={15} /> {viewLabel}
+        </span>
+      ) : (
+        <span className="flex flex-none items-center gap-1 text-body font-semibold text-ok">
+          <Icon name="verified" size={14} /> {verifiedLabel}
+        </span>
+      )}
+    </>
+  );
+  const cls = "flex items-center gap-2.5 rounded-sm border border-border bg-surface1 px-3 py-2.5";
+  return url ? (
+    <a href={url} target="_blank" rel="noopener noreferrer" className={`${cls} transition hover:bg-surface2`}>
+      {body}
+    </a>
+  ) : (
+    <div className={cls}>{body}</div>
   );
 }

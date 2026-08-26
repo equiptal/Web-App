@@ -516,6 +516,11 @@ export const en = {
       "Withdraw your request to join this company? Nothing has been shared yet, so nothing is lost — and you'll be able to enter a different invite code straight away.",
     cancelJoinDone: "Join request withdrawn.",
     // Owner: invite code + join requests.
+    // The heading over the whole team card — the code, the roster and the way out under one word.
+    team: "Team",
+    // The invite panel names itself INSIDE that card, so it says what the code is rather than
+    // repeating the card it sits in.
+    inviteCode: "Invite code",
     inviteTeam: "Invite your team",
     inviteHint: "Share this code with your team so they can join.",
     inviteCodeCopied: "Invite code copied",

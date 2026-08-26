@@ -492,6 +492,8 @@ export const ar: Dictionary = {
     cancelJoinConfirm:
       "هل تريد سحب طلب انضمامك إلى هذه الشركة؟ لم تُشارَك أي بيانات بعد، لذا لن تفقد شيئًا — وسيمكنك إدخال رمز دعوة آخر فورًا.",
     cancelJoinDone: "تم سحب طلب الانضمام.",
+    team: "الفريق",
+    inviteCode: "رمز الدعوة",
     inviteTeam: "ادعُ فريقك",
     inviteHint: "شارك هذا الرمز مع فريقك لينضموا إلى الشركة.",
     inviteCodeCopied: "تم نسخ رمز الدعوة",

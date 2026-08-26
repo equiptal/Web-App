@@ -464,12 +464,13 @@ function ActiveCompany({
   return (
     <div>
       <PageMasthead
+        tone="plain"
         icon={<Icon name="business_center" size={26} className="text-white" />}
         title={company.name}
         subtitle={company.isOwner ? c.roleOwner : c.roleMember}
         badge={
           company.isVerified ? (
-            <MastheadPill tone="ok">
+            <MastheadPill tone="ok" onLight>
               <Icon name="verified" size={13} /> {c.verified}
             </MastheadPill>
           ) : undefined
@@ -479,12 +480,15 @@ function ActiveCompany({
       {/* The papers. Renders nothing at all until the company is verified. */}
       <CompanyDetails />
 
-      {/* Invite code — active owners of a verified company only (the backend decides). */}
-      {company.isOwner && company.inviteCode && (
-        <Section title={c.members} boxed={false}>
-          <InviteCodeCard code={company.inviteCode} onCopied={onCopied} />
-        </Section>
-      )}
+      {/* ── One TEAM card (owner's reference, 2026-08-26) ────────────────────────────────────────
+          The invite code, the roster and the way out were three sections with three headings, and a
+          reader had to work out that they were all about the same thing: who is in this firm. They
+          are one card now — the code to bring someone in, the people already here, and the exit set
+          apart at its foot — which is the order the reference draws and the order the acts happen in.
+
+          Pending joiners stay OUTSIDE it, above. An approval is a decision waiting on the owner
+          rather than a statement about the team, and burying it inside a card of settled facts is
+          how a join request goes unanswered for a week. */}
 
       {/* Pending join requests — owners approve or reject. */}
       {company.isOwner && company.pendingMembers.length > 0 && (
@@ -520,8 +524,16 @@ function ActiveCompany({
         </Section>
       )}
 
-      {/* Roster */}
-      <Section title={c.members}>
+      <Section title={c.team}>
+        {company.isOwner && company.inviteCode && (
+          <div className="p-4 pb-0">
+            <InviteCodeCard code={company.inviteCode} onCopied={onCopied} />
+          </div>
+        )}
+
+        <div className="px-4 pt-3.5">
+          <h3 className="text-label font-semibold uppercase tracking-wide text-muted">{c.members}</h3>
+        </div>
         <RowList>
           {company.activeMembers.map((m) => (
             <MemberRow
@@ -535,20 +547,22 @@ function ActiveCompany({
             />
           ))}
         </RowList>
-      </Section>
 
-      {/* The way out — leave, or dissolve when they are the last one standing. Set apart at the foot,
-          for the same reason cancelling a request is: it ends the thing the page is about. */}
-      <div className="mt-5">
-        <button
-          onClick={onExit}
-          disabled={busy}
-          className={btn("secondary", "lg", { full: true, className: "transition" })}
-        >
-          <Icon name="logout" size={17} className="rtl:scale-x-[-1]" />
-          {company.activeMembers.length <= 1 ? c.dissolve : c.leave}
-        </button>
-      </div>
+        {/* The way out, at the foot of the team it ends — and stated in red as what it is rather than
+            hidden in a neutral button, because leaving or dissolving is the one act on this page that
+            cannot be undone from this page. Centred and unboxed: it is the last thing here, not
+            another row of the roster. */}
+        <div className="border-t border-border px-4 py-3.5 text-center">
+          <button
+            onClick={onExit}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 text-body font-semibold text-danger transition hover:underline disabled:text-disabled-fg disabled:no-underline"
+          >
+            <Icon name="logout" size={17} className="rtl:scale-x-[-1]" />
+            {company.activeMembers.length <= 1 ? c.dissolve : c.leave}
+          </button>
+        </div>
+      </Section>
     </div>
   );
 }
@@ -598,38 +612,45 @@ function InviteCodeCard({ code, onCopied }: { code: string; onCopied: () => void
     }
   };
 
+  /**
+   * ── Navy, with the code inside a frame of its own (owner's reference, 2026-08-26) ─────────────
+   * It was an amber-tinted box with the code as its heading. The reference makes it the darkest thing
+   * on the page and puts the code in a bordered well inside that: the code is a thing to be READ OUT
+   * or handed over, and a frame around it says "this is the part you copy" in a way a large font
+   * alone does not. The two controls move onto the navy beside it, quiet, because they are how you
+   * take the code rather than what the panel is about.
+   *
+   * The caption stays a full sentence under the well. «Share this code so teammates can join» is the
+   * only line here that explains what any of it is for.
+   */
   return (
-    <section>
-      <h3 className="mb-2 px-1 text-label font-semibold uppercase tracking-wide text-muted">{c.inviteTeam}</h3>
-      <div className="rounded-sm border border-brand/30 bg-brand-soft p-4">
-        <div className="flex items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-title font-extrabold tracking-[1.5px] text-navy" dir="ltr">
-              {code}
-            </p>
-            <p className="mt-0.5 text-meta leading-relaxed text-muted">{c.inviteHint}</p>
-          </div>
-          <div className="flex flex-none gap-1.5">
-            <button
-              onClick={() => void (canShare ? share() : copyInvite())}
-              aria-label={c.share}
-              title={c.share}
-              className="grid h-10 w-10 place-items-center rounded-sm border border-border bg-surface text-navy-mid transition hover:bg-surface2"
-            >
-              <Icon name={canShare ? "share" : "forward_to_inbox"} size={18} />
-            </button>
-            <button
-              onClick={() => void copy()}
-              aria-label={c.inviteCodeCopied}
-              title={c.inviteCodeCopied}
-              className="grid h-10 w-10 place-items-center rounded-sm border border-border bg-surface text-navy-mid transition hover:bg-surface2"
-            >
-              <Icon name="content_copy" size={18} />
-            </button>
-          </div>
+    <div className="rounded-sm bg-navy p-4">
+      <h3 className="text-label font-semibold uppercase tracking-wide text-white/55">{c.inviteCode}</h3>
+      <div className="mt-2 flex items-center gap-3 rounded-sm border border-brand/45 bg-white/[0.04] px-3.5 py-3">
+        <p className="min-w-0 flex-1 truncate text-title font-extrabold tracking-[1.5px] text-brand" dir="ltr">
+          {code}
+        </p>
+        <div className="flex flex-none gap-1.5">
+          <button
+            onClick={() => void (canShare ? share() : copyInvite())}
+            aria-label={c.share}
+            title={c.share}
+            className="grid h-[34px] w-[34px] place-items-center rounded-sm bg-white/10 text-white transition hover:bg-white/20"
+          >
+            <Icon name={canShare ? "share" : "forward_to_inbox"} size={17} />
+          </button>
+          <button
+            onClick={() => void copy()}
+            aria-label={c.inviteCodeCopied}
+            title={c.inviteCodeCopied}
+            className="grid h-[34px] w-[34px] place-items-center rounded-sm bg-white/10 text-white transition hover:bg-white/20"
+          >
+            <Icon name="content_copy" size={17} />
+          </button>
         </div>
       </div>
-    </section>
+      <p className="mt-2.5 text-meta leading-relaxed text-white/60">{c.inviteHint}</p>
+    </div>
   );
 }
 

@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useLocale, useT } from "@/lib/i18n";
-import { Icon } from "@/components/ui";
-import { Field, FieldGrid, Section } from "@/components/PageSection";
+import { DocPill, Field, FieldGrid, Section } from "@/components/PageSection";
 
 /**
  * The verified company's own particulars — authority role, national ID, city, national address, and
@@ -88,14 +87,20 @@ export function CompanyDetails() {
     return u === "owner" ? L("Owner", "المالك") : u === "manager" ? L("Manager", "مدير") : u === "employee" ? L("Employee", "موظف") : r || null;
   };
 
-  /** Facts with a value to print. Anything the backend did not send is dropped, not shown as «—»:
-   *  a blank field on a verification page reads as something missing rather than something absent. */
+  /**
+   * Facts with a value to print, each with its own mark (owner's reference, 2026-08-26).
+   *
+   * Anything the backend did not send is dropped, not shown as «—»: a blank field on a verification
+   * page reads as something missing rather than something absent. The icons are chosen to say what
+   * KIND of fact each is at a glance — a name, a person, a number, a place — which is what lets four
+   * of them sit in a 2×2 grid and still be told apart without reading the labels.
+   */
   const facts = [
-    { label: L("Legal name", "الاسم النظامي"), value: info.legalName },
-    { label: L("Authority role", "الصفة"), value: role(info.authorityRole) },
-    { label: L("National ID", "رقم الهوية"), value: info.nationalId },
-    { label: L("City", "المدينة"), value: info.companyCity },
-    { label: L("National Address", "العنوان الوطني"), value: info.companyAddress },
+    { icon: "domain", label: L("Legal name", "الاسم النظامي"), value: info.legalName },
+    { icon: "person", label: L("Authority role", "الصفة"), value: role(info.authorityRole) },
+    { icon: "badge", label: L("National ID", "رقم الهوية"), value: info.nationalId },
+    { icon: "location_on", label: L("City", "المدينة"), value: info.companyCity },
+    { icon: "home_pin", label: L("National Address", "العنوان الوطني"), value: info.companyAddress },
   ].filter((f) => f.value);
 
   /** CR, VAT and the national-address certificate are FILES, not numbers — so the answer is a way to
@@ -106,30 +111,37 @@ export function CompanyDetails() {
     { label: L("National Address certificate", "شهادة العنوان الوطني"), url: info.docs?.nationalAddressDocUrl ?? null },
   ];
 
+  /**
+   * ── The papers are not fields (owner's reference, 2026-08-26) ─────────────────────────────────
+   * All eight used to share one `FieldGrid`, so «CR document» sat in the same column shape as
+   * «National ID» with the word «View» where a number belongs. A label/value pair answers *what is
+   * it*; a document answers *here it is*. They are now two blocks in one card, divided by a
+   * hairline — the facts above, the files below, each in the shape that suits it.
+   */
   return (
     <Section title={t.profile.companyVerifiedTitle}>
       <FieldGrid>
         {facts.map((f) => (
-          <Field key={f.label} label={f.label} value={f.value} />
-        ))}
-        {docs.map((d) => (
-          <Field
-            key={d.label}
-            label={d.label}
-            value={
-              d.url ? (
-                <a href={d.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-brand hover:underline">
-                  <Icon name="visibility" size={14} /> {L("View", "عرض")}
-                </a>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-ok">
-                  <Icon name="verified" size={13} /> {L("Verified", "موثَّق")}
-                </span>
-              )
-            }
-          />
+          <Field key={f.label} icon={f.icon} label={f.label} value={f.value} />
         ))}
       </FieldGrid>
+
+      <div className="border-t border-border px-4 pb-4 pt-3.5">
+        <h3 className="mb-2 text-label font-semibold uppercase tracking-wide text-muted">{L("Documents", "المستندات")}</h3>
+        {/* Two across, like the facts, so a card of three papers does not run down the page as three
+            full-width bars. The odd one takes the leading column and the row simply ends. */}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {docs.map((d) => (
+            <DocPill
+              key={d.label}
+              label={d.label}
+              url={d.url}
+              viewLabel={L("View", "عرض")}
+              verifiedLabel={L("Verified", "موثَّق")}
+            />
+          ))}
+        </div>
+      </div>
     </Section>
   );
 }
