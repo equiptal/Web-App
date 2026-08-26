@@ -80,3 +80,72 @@ describe("INTERCOM_APP_ID", () => {
     expect(INTERCOM_APP_ID).toBe("w17eryax");
   });
 });
+
+/**
+ * Identity verification — the server's half.
+ *
+ * A messenger booted with a bare `user_id` accepts whatever id the page hands it, which is the hole
+ * the hash closes. So the signature is computed on the server, over the id the BACKEND reported, and
+ * the browser never sees the secret. These pin the payload's side of that contract.
+ */
+describe("buildIntercomPayload with the server's identity", () => {
+  const user = { id: 42, phone: "+966501234567", tier: "verified" as const };
+  const server = {
+    userId: "42",
+    name: "Yara F",
+    email: "yara@moedatech.net",
+    phone: "+966501234567",
+    company: "Al-Faisal Contracting Est.",
+    userHash: "a".repeat(64),
+    verified: true,
+  };
+
+  it("prefers the server's name, email and company over the session's fallbacks", () => {
+    const p = buildIntercomPayload({ user, locale: "en", appVersion: "1.0.0", server });
+    expect(p.name).toBe("Yara F");
+    expect(p.email).toBe("yara@moedatech.net");
+    expect(p.company_name).toBe("Al-Faisal Contracting Est.");
+  });
+
+  it("sends the signature when the workspace has one configured", () => {
+    const p = buildIntercomPayload({ user, locale: "en", appVersion: "1.0.0", server });
+    expect(p.user_hash).toBe("a".repeat(64));
+  });
+
+  /**
+   * The key must be ABSENT, not null.
+   *
+   * Intercom reads its presence: a `user_hash: null` is a FAILED signature rather than an unsigned
+   * boot, and it would be refused on a workspace that is not even asking for verification — which is
+   * the workspace mobile runs against today.
+   */
+  it("omits the key entirely when there is no secret, rather than sending null", () => {
+    const p = buildIntercomPayload({
+      user,
+      locale: "en",
+      appVersion: "1.0.0",
+      server: { ...server, userHash: null, verified: false },
+    });
+    expect("user_hash" in p).toBe(false);
+  });
+
+  it("omits company_name rather than sending an empty one", () => {
+    const p = buildIntercomPayload({ user, locale: "en", appVersion: "1.0.0", server: { ...server, company: null } });
+    expect("company_name" in p).toBe(false);
+  });
+
+  it("still addresses the person the webhook can resolve", () => {
+    // The server signs the id it reports, so signed and unsigned boots name the same user.
+    const p = buildIntercomPayload({ user, locale: "en", appVersion: "1.0.0", server });
+    expect(p.user_id).toBe(server.userId);
+    expect(p.user_id).toBe(String(user.id));
+  });
+
+  it("falls back to the session alone when the route answered nothing", () => {
+    const p = buildIntercomPayload({ user, locale: "en", appVersion: "1.0.0", server: null });
+    expect(p.user_id).toBe("42");
+    expect(p.name).toBe("User 42");
+    expect(p.email).toBe("966501234567@moedatech.app");
+    expect("user_hash" in p).toBe(false);
+  });
+});

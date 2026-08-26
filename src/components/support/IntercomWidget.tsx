@@ -21,10 +21,15 @@
  * has answered, and the queue stub below means calls made before the script lands are not lost.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
-import { buildIntercomPayload, INTERCOM_API_BASE, INTERCOM_APP_ID } from "@/lib/support/intercom";
+import {
+  buildIntercomPayload,
+  INTERCOM_API_BASE,
+  INTERCOM_APP_ID,
+  type IntercomServerIdentity,
+} from "@/lib/support/intercom";
 
 type IntercomFn = ((...args: unknown[]) => void) & { q?: unknown[][]; c?: (args: unknown[]) => void };
 
@@ -76,6 +81,41 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
   const booted = useRef(false);
   /** The identity the messenger currently holds, so a re-render does not re-send the same one. */
   const identity = useRef<string | null>(null);
+  /**
+   * The signature, the real name and the email — everything only the server can answer.
+   *
+   * Fetched once per signed-in user, then held. Until it lands the messenger stays ANONYMOUS rather
+   * than booting on the session alone: an unsigned identified boot is refused outright by a workspace
+   * with identity verification switched on, and being briefly anonymous is recoverable where being
+   * refused is not. It also spares support a «User 42» contact that a second boot then renames.
+   */
+  const [server, setServer] = useState<IntercomServerIdentity | null>(null);
+  /** Which user `server` describes, so a sign-out or an account switch cannot inherit it. */
+  const serverFor = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (status !== "authed" || !user) {
+      setServer(null);
+      serverFor.current = null;
+      return;
+    }
+    if (serverFor.current === user.id) return;
+    serverFor.current = user.id;
+    let alive = true;
+    void (async () => {
+      try {
+        const res = await fetch("/api/support/intercom", { cache: "no-store" });
+        if (!res.ok) return; // no identity to add — the anonymous messenger stands
+        const data = (await res.json()) as IntercomServerIdentity;
+        if (alive && serverFor.current === user.id) setServer(data);
+      } catch {
+        /* Support must not be the thing that breaks when a fetch does. The launcher stays, anonymous. */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [status, user]);
 
   useEffect(() => {
     if (!INTERCOM_APP_ID) return;
@@ -99,9 +139,10 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
       language_override: locale,
     };
 
-    // Still asking the server who this is — boot anonymous rather than waiting. Support is most
-    // useful to the person who cannot get in, and that person never reaches `authed`.
-    if (status === "loading" || !user) {
+    // Still asking who this is — boot anonymous rather than waiting. Support is most useful to the
+    // person who cannot get in, and that person never reaches `authed`. `server` is part of the test
+    // because an identified boot without its signature is refused where verification is on.
+    if (status === "loading" || !user || !server) {
       const wanted = "anon";
       if (identity.current === wanted && booted.current) return;
       // A signed-in messenger must be torn down before an anonymous one replaces it, or the previous
@@ -113,8 +154,10 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
       return;
     }
 
-    const payload = { ...base, ...buildIntercomPayload({ user, locale, appVersion }) };
-    const wanted = `${user.id}:${user.tier}:${locale}`;
+    const payload = { ...base, ...buildIntercomPayload({ user, locale, appVersion, server }) };
+    // The signature is in the key: a workspace that switches verification on mid-session must
+    // re-boot rather than keep an unsigned messenger it will refuse the next call from.
+    const wanted = `${user.id}:${user.tier}:${locale}:${server.userHash ?? "unsigned"}`;
     if (identity.current === wanted) return;
 
     // `boot` the first time this browser meets the user, `update` for anything that changes after —
@@ -123,7 +166,7 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
     api(identity.current && identity.current !== "anon" ? "update" : "boot", payload);
     booted.current = true;
     identity.current = wanted;
-  }, [status, user, locale, dir, appVersion]);
+  }, [status, user, locale, dir, appVersion, server]);
 
   return null;
 }

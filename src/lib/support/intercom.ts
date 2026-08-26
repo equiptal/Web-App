@@ -46,6 +46,27 @@ export interface IntercomIdentity {
 }
 
 /**
+ * What `GET /api/support/intercom` answers — the parts of an identity only the server can supply.
+ *
+ * `userHash` is Intercom's identity verification: an HMAC of the user id under the workspace secret,
+ * which exists because a messenger booted with a bare `user_id` will accept any id the page hands it.
+ * Null while no secret is configured, which is the state mobile runs in — it calls
+ * `loginIdentifiedUser` with no hash — and the messenger then boots unsigned, exactly as before.
+ *
+ * The name and email are here because the web SESSION has neither; they live on `GET /users/me`,
+ * which needs the renter's own token. Without them support was talking to «User 42».
+ */
+export interface IntercomServerIdentity {
+  userId: string;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  company: string | null;
+  userHash: string | null;
+  verified: boolean;
+}
+
+/**
  * The address a support agent sees.
  *
  * A real email wins, because it is the one the user actually owns. Failing that the app derives one
@@ -79,18 +100,39 @@ export function buildIntercomPayload(args: {
   appVersion: string;
   name?: string | null;
   email?: string | null;
+  /** What the server route answered, when it has answered. */
+  server?: IntercomServerIdentity | null;
 }): Record<string, unknown> {
-  const { user, locale, appVersion } = args;
+  const { user, locale, appVersion, server } = args;
+  const name = server?.name ?? args.name;
+  const email = server?.email ?? args.email;
+  const phone = server?.phone ?? user.phone;
   return {
-    user_id: String(user.id),
-    name: intercomName(user.id, args.name),
-    email: intercomEmail(user.phone, args.email),
-    phone: user.phone,
+    /**
+     * The DATABASE id, as a string.
+     *
+     * The backend's `conversation.admin.replied` webhook resolves a recipient by mapping this exact
+     * value back to a `User` row. The server route signs the same id it reports, so a signed boot and
+     * an unsigned one address the same person.
+     */
+    user_id: server?.userId ?? String(user.id),
+    name: intercomName(user.id, name),
+    email: intercomEmail(phone, email),
+    phone,
     // `active_role` 1 on the app. There is no supplier surface on the web to be anything else.
     user_type: "rentee",
     tier: user.tier,
     locale,
     device_os: "web",
     app_version: appVersion,
+    ...(server?.company ? { company_name: server.company } : {}),
+    /**
+     * Identity verification, when the workspace has it configured.
+     *
+     * OMITTED rather than sent as null when it does not: Intercom reads the key's PRESENCE, and a
+     * `user_hash: null` is a failed signature rather than an absent one — it would refuse the boot
+     * on a workspace that is not even asking for verification.
+     */
+    ...(server?.userHash ? { user_hash: server.userHash } : {}),
   };
 }
