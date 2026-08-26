@@ -1663,9 +1663,18 @@ export const en = {
       datesReversed: "The end date is before the start date. Fix the dates to see billable days.",
       tooShortMonthly: "Your dates cover {days} days. Monthly billing usually needs 30 days or more.",
       tooShortWeekly: "Your dates cover {days} days. Weekly billing usually needs 7 days or more.",
-      nudgeBoth: "Suppliers quote lower when they don't know your dates. Add a start and end date to get better bids.",
-      nudgeEnd: "Suppliers quote lower when they don't know your end date. Add one to get better bids.",
-      nudgeStart: "Suppliers quote lower when they don't know your start date. Add one to get better bids.",
+      // ── The condition was inverted, and the Arabic proved it (owner, 2026-08-26) ─────────────────
+      // These read «Suppliers quote LOWER when they don't know your dates» — an argument for leaving
+      // the dates blank, on the one notice whose whole job is to get them filled in. The Arabic beside
+      // it had said the opposite all along («better prices when they DO know»), so the two languages
+      // were handing a renter opposite advice out of the same box.
+      //
+      // What a supplier actually does with no dates is price for the worst case: he cannot tell how
+      // long the machine is committed for, so he covers the longest plausible answer — or does not bid
+      // at all. That is the true mechanism and it is also the persuasive one, so it is what these say.
+      nudgeBoth: "Suppliers price for the worst case when they don't know your dates. Add a start and end date to get sharper bids.",
+      nudgeEnd: "Suppliers price for the worst case when they don't know your end date. Add one to get sharper bids.",
+      nudgeStart: "Suppliers price for the worst case when they don't know your start date. Add one to get sharper bids.",
     },
     carry: {
       title: "Equipment #{n}",

@@ -132,7 +132,10 @@ describe("with dates missing (MREQ-AC-34/10)", () => {
 
   it("shows no nudge when both dates are set", async () => {
     await panel();
-    expect(screen.queryByText(/Suppliers quote lower/)).toBeNull();
+    // Matched on the sentence the notice actually carries. It matched «Suppliers quote lower», which
+    // stopped existing when that copy was corrected — leaving an assertion that passed because its
+    // needle was gone rather than because the notice was.
+    expect(screen.queryByText(/price for the worst case/)).toBeNull();
   });
 });
 

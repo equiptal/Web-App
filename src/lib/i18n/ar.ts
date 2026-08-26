@@ -1425,9 +1425,12 @@ export const ar: Dictionary = {
       confirmChargedNoDates: "أفهم أن الموردين سيسعّرون دون تاريخ انتهاء محدد.",
       tooShortMonthly: "تغطي تواريخك {days} يوماً. الفوترة الشهرية تحتاج عادةً ٣٠ يوماً أو أكثر.",
       tooShortWeekly: "تغطي تواريخك {days} أيام. الفوترة الأسبوعية تحتاج عادةً ٧ أيام أو أكثر.",
-      nudgeBoth: "يقدّم الموردون أسعاراً أفضل عندما يعرفون تواريخك. أضف تاريخ البداية والنهاية للحصول على عروض أفضل.",
-      nudgeEnd: "يقدّم الموردون أسعاراً أفضل عندما يعرفون تاريخ الانتهاء. أضفه للحصول على عروض أفضل.",
-      nudgeStart: "يقدّم الموردون أسعاراً أفضل عندما يعرفون تاريخ البداية. أضفه للحصول على عروض أفضل.",
+      // The Arabic already had the condition the right way round — it is what caught the English
+      // saying the opposite. Kept, with «أفضل» once instead of twice in a sentence: it was both the
+      // reason and the reward, which made the line read as a promise rather than an explanation.
+      nudgeBoth: "يقدّم الموردون أسعاراً أدق عندما يعرفون تواريخك. أضف تاريخ البداية والنهاية للحصول على عروض أفضل.",
+      nudgeEnd: "يقدّم الموردون أسعاراً أدق عندما يعرفون تاريخ الانتهاء. أضفه للحصول على عروض أفضل.",
+      nudgeStart: "يقدّم الموردون أسعاراً أدق عندما يعرفون تاريخ البداية. أضفه للحصول على عروض أفضل.",
     },
     carry: {
       title: "المعدة رقم {n}",
