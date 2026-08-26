@@ -208,12 +208,22 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
             The mark and the tabs lead the row, then the page's own title, then the account cluster.
             That order is the reference's and it is also the right one: what the app IS does not
             change, so it sits where the eye starts; what the page is changes with every route. */}
-        <header className="sticky top-0 z-30 flex h-[62px] items-center gap-3 border-b border-border bg-surface px-4 sm:px-7 relative">
+        {/* ── The bar is NAVY (owner, 2026-08-26) ────────────────────────────────────────────────
+            His own reference: a dark bar, the places centred on it, and the one you are on drawn as a
+            white pill. It was white with a 2px rule under the active word — legible, but it spent the
+            top of every page on chrome that looked like content. Dark, the bar reads as the frame and
+            the page reads as the thing.
+
+            Everything in the row inverts with it: the logo is filtered to white, the icons and the
+            account controls take white at reduced strength, and the hairlines become white/15. Where a
+            control keeps a light ground of its own — the account menu, the nav sheet — it stays light,
+            because it is a surface, not part of the bar. */}
+        <header className="sticky top-0 z-30 flex h-[62px] items-center gap-3 border-b border-white/10 bg-navy px-4 text-white sm:px-7 relative">
           {back && (
             <button
               onClick={back}
               aria-label={locale === "ar" ? "رجوع" : "Back"}
-              className="grid h-[34px] w-[34px] flex-none place-items-center rounded-full border border-[#dfe3e7] text-[#1f2d3a] transition hover:bg-surface2"
+              className="grid h-[34px] w-[34px] flex-none place-items-center rounded-full border border-white/20 text-white/80 transition hover:bg-white/10 hover:text-white"
             >
               <ArrowBackIcon className="rtl:-scale-x-100" />
             </button>
@@ -228,8 +238,11 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
           <Link href="/" aria-label={t.shell.home} className="flex-none transition hover:opacity-80">
             {/* 32px, down from the prototype's 36 (owner, 2026-08-25). The prototype's bar is 76px
                 tall and ours is 62 — a mark sized for the taller one crowds this one. */}
+            {/* The mark is one dark navy (#25384a) and would sink into the bar, so it is filtered to
+                white rather than swapped for a second asset — one file, one logo, and no risk of the
+                two drifting. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/moedatech-logo.svg" alt="Moedatech" className="block h-8 w-auto" />
+            <img src="/moedatech-logo.svg" alt="Moedatech" className="block h-8 w-auto brightness-0 invert" />
           </Link>
 
           {/* ── The nav sits DEAD CENTRE of the bar, not after the title ────────────────────────────
@@ -258,7 +271,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
 
           {/* 22px between the groups of this cluster is the prototype's spacing; a phone cannot spend
               it, so it opens up at `sm` where the language control also returns. */}
-          <div className="ms-auto flex flex-none items-center gap-3 text-[13px] font-semibold text-navy-mid sm:gap-[22px]">
+          <div className="ms-auto flex flex-none items-center gap-3 text-[13px] font-semibold text-white/75 sm:gap-[22px]">
             {/* ── The language toggle steps out of the bar on a phone (owner, 2026-08-25) ──────────
                 It is ~70px of a 360px row and it is pressed roughly never — a reader picks a language
                 once. Below `sm` it moves into the nav sheet, under the three places, which is room
@@ -295,14 +308,14 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                 prototype spaces them by. Same picture, and a pressable target instead of a 20px one
                 (owner, 2026-08-25: "make sure all icons in the nav bar is consistent"). */}
             {status === "authed" && (
-              <div className="flex items-center gap-0 text-[#5b6672]">
+              <div className="flex items-center gap-0 text-white/70">
                 <Link
                   href="/inbox"
                   aria-label={t.shell.inbox}
                   title={t.shell.inbox}
                   aria-current={pathname.startsWith("/inbox") ? "page" : undefined}
-                  className={`grid h-[34px] w-[34px] place-items-center rounded-full transition hover:text-[#1f2d3a] ${
-                    pathname.startsWith("/inbox") ? "text-[#1f2d3a]" : ""
+                  className={`grid h-[34px] w-[34px] place-items-center rounded-full transition hover:text-white ${
+                    pathname.startsWith("/inbox") ? "text-white" : ""
                   }`}
                 >
                   {/* The badge hangs off the GLYPH, not off the 34px box — pinned to the box it would
@@ -318,7 +331,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
 
             {/* The prototype's separator: 1px by 24px, between what the app says to you and who you
                 are signed in as. */}
-            {status === "authed" && <span aria-hidden="true" className="h-6 w-px flex-none bg-[#eceef0]" />}
+            {status === "authed" && <span aria-hidden="true" className="h-6 w-px flex-none bg-white/15" />}
 
             {status === "authed" && (
               <div className="relative">
@@ -330,7 +343,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                     where the tier nudge that explains them already lives. */}
                 <button
                   onClick={() => setMenuOpen((o) => !o)}
-                  className="relative grid h-[34px] w-[34px] place-items-center rounded-full border border-[#dfe3e7] bg-[#eef1f3] text-[13px] font-bold text-[#1f2d3a]"
+                  className="relative grid h-[34px] w-[34px] place-items-center rounded-full border border-white/25 bg-white/15 text-[13px] font-bold text-white"
                   aria-haspopup="menu"
                   aria-expanded={menuOpen}
                   aria-label={tier === "verified" ? `${t.shell.account} · ${t.shell.tierVerified}` : t.shell.account}
@@ -341,7 +354,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                       one by name, and a bare dot on an avatar is the presence convention — online,
                       not vetted. The prototype's green (#3fbf6f) and its 2px white ring are taken. */}
                   {tier === "verified" && (
-                    <span className="absolute -end-0.5 -bottom-0.5 grid h-[15px] w-[15px] place-items-center rounded-full border-2 border-white bg-[#3fbf6f] text-white">
+                    <span className="absolute -end-0.5 -bottom-0.5 grid h-[15px] w-[15px] place-items-center rounded-full border-2 border-navy bg-[#3fbf6f] text-white">
                       <Icon name="check" size={9} />
                     </span>
                   )}
@@ -485,15 +498,17 @@ function LocaleToggle({ locale, setLocale }: { locale: Locale; setLocale: (l: Lo
       aria-label={t.shell.switchLang}
       className="inline-flex flex-none items-center gap-2 rounded-full text-[13px] leading-none"
     >
-      <span className={ar ? "font-semibold text-[#9aa2ab]" : "font-bold text-[#1f2d3a]"}>EN</span>
-      <span className="relative h-[22px] w-10 flex-none rounded-full bg-[#e5e8eb]">
+      {/* On the navy bar the two words and the track invert: the chosen language takes white, the
+          other white at a third, and the knob is white on a translucent track. */}
+      <span className={ar ? "font-semibold text-white/45" : "font-bold text-white"}>EN</span>
+      <span className="relative h-[22px] w-10 flex-none rounded-full bg-white/20">
         <span
-          className={`absolute top-0.5 start-0.5 h-[18px] w-[18px] rounded-full bg-[#1f2d3a] shadow-[0_1px_2px_rgba(31,45,58,.3)] transition-transform duration-200 ${
+          className={`absolute top-0.5 start-0.5 h-[18px] w-[18px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,.35)] transition-transform duration-200 ${
             ar ? "ltr:translate-x-[18px] rtl:-translate-x-[18px]" : ""
           }`}
         />
       </span>
-      <span className={ar ? "font-bold text-[#1f2d3a]" : "font-semibold text-[#9aa2ab]"}>عربي</span>
+      <span className={ar ? "font-bold text-white" : "font-semibold text-white/45"}>عربي</span>
     </button>
   );
 }

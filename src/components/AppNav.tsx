@@ -50,7 +50,7 @@ export function AppNav({ items }: { items: NavItem[] }) {
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
   return (
-    <nav className="flex items-center gap-5 lg:gap-8">
+    <nav className="flex items-center gap-1">
       {items.map((it) => {
         const active = isActive(it.href);
         return (
@@ -58,14 +58,18 @@ export function AppNav({ items }: { items: NavItem[] }) {
             key={it.key}
             href={it.href}
             aria-current={active ? "page" : undefined}
-            className={`relative whitespace-nowrap py-1 text-[14px] transition ${
-              active ? "font-extrabold text-navy" : "font-semibold text-muted hover:text-navy-mid"
+            /* ── A PILL, on the navy bar (owner, 2026-08-26) ──────────────────────────────────
+               His reference draws the place you are on as a white lozenge and the others as plain
+               light text. It replaced a 2px rule under the active word, which was the right answer on
+               a white bar and nearly invisible on a dark one.
+
+               Both states carry the same padding, so the row does not shift by a pixel when the
+               active item changes — which is what the drawn rule was protecting. */
+            className={`whitespace-nowrap rounded-full px-4 py-1.5 text-[14px] transition ${
+              active ? "bg-white font-extrabold text-navy" : "font-semibold text-white/70 hover:bg-white/10 hover:text-white"
             }`}
           >
             {it.label}
-            {/* The rule is drawn rather than a border, so an inactive link reserves no space for one
-                and the row does not shift by a pixel when the active item changes. */}
-            {active && <span aria-hidden="true" className="absolute inset-x-0 -bottom-0.5 h-[2px] rounded-full bg-navy" />}
           </Link>
         );
       })}
@@ -115,7 +119,7 @@ export function AppNavMobile({ items, children }: { items: NavItem[]; children?:
         aria-label={t.shell.menu}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="grid h-[34px] w-[34px] place-items-center rounded-full text-[#5b6672] transition hover:text-[#1f2d3a]"
+        className="grid h-[34px] w-[34px] place-items-center rounded-full text-white/70 transition hover:bg-white/10 hover:text-white"
       >
         {/* 34px box, 20px glyph — the bar's one size for a standalone icon control, shared with the
             inbox, the bell, the avatar and Back. */}

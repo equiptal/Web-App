@@ -5,14 +5,17 @@
 
 /* Moedatech Design System v3 palette (from the web-app/002 prototype). */
 :root {
-  --navy: #1c3550;
-  --navy-mid: #2a4f72;
+  /* Sampled from the owner's navigation bar (2026-08-26): the bar is #1c2838 and its search field
+     #2d3542, so the two navy steps are the design's own rather than a pair mixed to look like it. The
+     old #1c3550 / #2a4f72 leaned blue against it — side by side the difference read as two products. */
+  --navy: #1c2838;
+  --navy-mid: #2d3542;
   --gold: #b8860b;
   --background: #f5f8fc;
   --surface: #ffffff;
   --surface2: #eff4f9;
   --surface3: #e4edf5;
-  --foreground: #1c3550;
+  --foreground: #1c2838;
   --muted: #6b8fa8;
   --border: #d4e0ec;
   --brand: #f79009; /* action orange — primary CTA */
