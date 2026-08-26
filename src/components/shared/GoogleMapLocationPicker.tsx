@@ -254,7 +254,7 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
           <Search className="absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
           <input
             type="text"
-            className="w-full rounded-lg border border-border bg-surface ps-8 pe-8 py-2 text-sm outline-none focus:border-brand"
+            className="w-full rounded-sm border border-border bg-surface ps-8 pe-8 py-2 text-body outline-none focus:border-brand"
             placeholder={mp.searchPlaceholder}
             aria-label={mp.searchPlaceholder}
             value={searchInput}
@@ -272,18 +272,18 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
           {searching && <Loader2 className="absolute end-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-muted" />}
 
           {open && suggestions.length > 0 && (
-            <ul className="absolute z-[1000] mt-1 max-h-64 w-full overflow-auto rounded-lg border border-border bg-surface py-1 shadow-lg">
+            <ul className="absolute z-[1000] mt-1 max-h-64 w-full overflow-auto rounded-sm border border-border bg-surface py-1">
               {suggestions.map((s, i) => (
                 <li key={`${s.lat},${s.lng},${i}`}>
                   <button
                     type="button"
                     onClick={() => select(s.lat, s.lng, s.display)}
-                    className="flex w-full items-start gap-2 px-3 py-2 text-start text-sm hover:bg-surface2"
+                    className="flex w-full items-start gap-2 px-3 py-2 text-start text-body hover:bg-surface2"
                   >
                     <MapPin className="mt-0.5 h-3.5 w-3.5 flex-none text-brand" />
                     <span className="min-w-0">
                       <span className="block truncate font-semibold">{s.primary}</span>
-                      <span className="block truncate text-xs text-muted">{s.display}</span>
+                      <span className="block truncate text-label text-muted">{s.display}</span>
                     </span>
                   </button>
                 </li>
@@ -296,15 +296,15 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
           onClick={handleMyLocation}
           title={mp.useMyLocation}
           aria-label={mp.useMyLocation}
-          className="flex items-center rounded-lg border border-border px-2.5 py-2 text-xs hover:bg-background"
+          className="flex items-center rounded-sm border border-border px-2.5 py-2 text-label hover:bg-surface2"
         >
           <Navigation className="h-3.5 w-3.5 text-muted" />
         </button>
       </div>
 
-      <div style={{ height }} className="overflow-hidden rounded-lg border border-border">
+      <div style={{ height }} className="overflow-hidden rounded-sm border border-border">
         {error ? (
-          <div className="flex h-full items-center justify-center p-4 text-center text-xs text-danger">
+          <div className="flex h-full items-center justify-center p-4 text-center text-label text-danger">
             Google Maps failed to load (check the API key / enabled APIs).
           </div>
         ) : (
@@ -313,13 +313,13 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
       </div>
 
       {value && !hideAddress && (
-        <div className="flex items-start gap-1.5 rounded-lg border border-border bg-surface2 px-3 py-2">
+        <div className="flex items-start gap-1.5 rounded-sm border border-border bg-surface2 px-3 py-2">
           <MapPin className="mt-0.5 h-3.5 w-3.5 flex-none text-brand" />
-          <div className="min-w-0 flex-1 text-sm">
+          <div className="min-w-0 flex-1 text-body">
             <div className="font-semibold leading-tight">
               {resolved || (resolving ? mp.locating : label?.trim() || mp.pinnedNoAddress)}
             </div>
-            <div className="text-[11px] text-muted">
+            <div className="text-label text-muted">
               {value.lat.toFixed(6)}, {value.lng.toFixed(6)}
             </div>
           </div>

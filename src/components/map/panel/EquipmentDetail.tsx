@@ -229,7 +229,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
           photograph in order to write over it the two facts the panel repeats underneath anyway; a
           white strip under the image leaves the image alone and still names what is being looked at.
           The prototype's own frame, and the owner's screenshot's. */}
-      {/* `.doc` is the prototype's taller frame for a paper (268 px over its `#EEF3F9`) — a certificate
+      {/* `.doc` is the prototype's taller frame for a paper (268 px over its `var(--surface2)`) — a certificate
           at 196 px is a picture of a certificate. The `photo` / `paper` half decides how the file sits
           in it, and comes off the ROW'S GROUP rather than off its url; see `DocViewSubject.kind`. */}
       <div className={`mp-viewer${framedDoc ? ` doc ${framedDoc.kind}` : ""}`}>

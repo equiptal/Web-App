@@ -257,32 +257,32 @@ export function Canvas() {
   return (
     <div>
       {/* ---------------- The renter's own words, and what's left ---------------- */}
-      <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-warn/45 bg-warn/[0.07] px-5 py-3.5">
+      <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-warn/45 bg-warn/[0.07] px-5 py-3.5">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="grid h-[30px] w-[30px] flex-none place-items-center rounded-[9px] bg-warn/15 text-warn">
+          <span className="grid h-[30px] w-[30px] flex-none place-items-center rounded-sm bg-warn/15 text-warn">
             <Icon name="chat_bubble" size={15} />
           </span>
           <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-[0.05em] text-warn">{t.create.youWrote}</div>
-            <p className="mt-0.5 truncate text-[13px] italic text-navy-mid">{state.text ? `"${state.text}"` : "—"}</p>
+            <div className="text-label font-semibold uppercase tracking-[0.05em] text-warn">{t.create.youWrote}</div>
+            <p className="mt-0.5 truncate text-body italic text-navy-mid">{state.text ? `"${state.text}"` : "—"}</p>
           </div>
         </div>
         <div className="flex flex-none items-center gap-3.5">
           <button
             onClick={() => window.history.back()}
-            className="text-[13px] font-bold text-warn underline decoration-warn/40 underline-offset-2 hover:decoration-warn"
+            className="text-body font-semibold text-warn underline decoration-warn/40 underline-offset-2 hover:decoration-warn"
           >
             {t.common.edit}
           </button>
           <button
             onClick={() => setConfirmReset(true)}
-            className="inline-flex items-center gap-1.5 text-[13px] font-bold text-navy-mid hover:text-navy"
+            className="inline-flex items-center gap-1.5 text-body font-semibold text-navy-mid hover:text-navy"
           >
             <Icon name="restart_alt" size={16} />
             <span className="hidden sm:inline">{t.create.startOver}</span>
           </button>
           {gaps.length > 0 && (
-            <span className="flex items-center gap-1.5 rounded-full bg-surface px-3 py-1.5 text-[12px] font-bold text-warn">
+            <span className="flex items-center gap-1.5 rounded-full bg-surface px-3 py-1.5 text-meta font-semibold text-warn">
               <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden />
               {needsYou}
             </span>
@@ -292,7 +292,7 @@ export function Canvas() {
 
       {/* Which machine, when there is more than one. */}
       {live.length > 1 && (
-        <p className="mb-2.5 text-[12px] font-bold uppercase tracking-[0.05em] text-muted">
+        <p className="mb-2.5 text-meta font-semibold uppercase tracking-[0.05em] text-muted">
           {fmt(t.create.itemOfCount, { n: index + 1, total: live.length })}
         </p>
       )}
@@ -314,7 +314,7 @@ export function Canvas() {
             ref={equipmentRef as React.Ref<HTMLButtonElement>}
             type="button"
             onClick={() => actions.openSection("equipment")}
-            className={`mb-3.5 flex w-full items-center justify-between gap-3 rounded-[14px] border px-5 py-4 text-start transition ${
+            className={`mb-3.5 flex w-full items-center justify-between gap-3 rounded-sm border px-5 py-4 text-start transition ${
               equipmentGaps.length === 0 ? "border-ok/40 bg-ok/[0.06]" : "border-border bg-surface"
             }`}
             aria-expanded={false}
@@ -322,8 +322,8 @@ export function Canvas() {
             <span className="flex min-w-0 items-center gap-2">
               <PanelDot complete={equipmentGaps.length === 0} />
               <Icon name="construction" size={16} className="flex-none text-navy" />
-              <span className="flex-none text-[15px] font-extrabold text-navy">{t.create.ready.machineAndOperator}</span>
-              <span className="truncate text-[13px] text-muted">{equipmentSummary}</span>
+              <span className="flex-none text-subhead font-extrabold text-navy">{t.create.ready.machineAndOperator}</span>
+              <span className="truncate text-body text-muted">{equipmentSummary}</span>
             </span>
             <Icon name="expand_more" size={18} className="flex-none text-muted" />
           </button>
@@ -348,17 +348,17 @@ export function Canvas() {
           />
         </>
       ) : (
-        <div className="mb-3.5 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[14px] border border-ok/40 bg-ok/[0.06] px-5 py-3.5">
-          <span className="flex items-center gap-2 text-[13px] text-ok">
+        <div className="mb-3.5 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-sm border border-ok/40 bg-ok/[0.06] px-5 py-3.5">
+          <span className="flex items-center gap-2 text-body text-ok">
             <Icon name="lock" size={14} />
-            <span className="font-bold">{t.create.where}</span> — {draft.project.location.label ?? "—"}
+            <span className="font-semibold">{t.create.where}</span> — {draft.project.location.label ?? "—"}
           </span>
-          <span className="flex items-center gap-2 text-[13px] text-ok">
+          <span className="flex items-center gap-2 text-body text-ok">
             <Icon name="lock" size={14} />
-            <span className="font-bold">{t.create.when}</span> —{" "}
+            <span className="font-semibold">{t.create.when}</span> —{" "}
             {draft.project.timing.rentalBasis ? t.options.rentalBasis[draft.project.timing.rentalBasis] : "—"}
           </span>
-          <span className="ms-auto text-[11px] text-ok/80">{t.create.lockedForRequest}</span>
+          <span className="ms-auto text-label text-ok/80">{t.create.lockedForRequest}</span>
         </div>
       )}
 
@@ -367,7 +367,7 @@ export function Canvas() {
         {!isFirstItem ? (
           <button
             onClick={() => actions.goItem(index - 1)}
-            className="inline-flex items-center gap-1.5 text-[13px] font-bold text-navy-mid hover:text-navy"
+            className="inline-flex items-center gap-1.5 text-body font-semibold text-navy-mid hover:text-navy"
           >
             <Icon name="arrow_back" size={16} className="rtl:rotate-180" /> {t.create.previousEquipment}
           </button>
@@ -377,7 +377,7 @@ export function Canvas() {
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={addMachine}
-            className="rounded-[10px] bg-warn/15 px-5 py-2.5 text-[13px] font-bold text-warn transition hover:bg-warn/25"
+            className="rounded-sm bg-warn/15 px-5 py-2.5 text-body font-semibold text-warn transition hover:bg-warn/25"
           >
             + {t.create.addAnother}
           </button>
@@ -385,7 +385,7 @@ export function Canvas() {
             onClick={advance}
             disabled={blockedBy != null}
             title={blockedBy ? gateReason(t, blockedBy.reason) : undefined}
-            className="inline-flex items-center gap-1.5 rounded-[10px] bg-brand px-5 py-2.5 text-[13px] font-bold text-brand-fg transition hover:brightness-[1.04] disabled:cursor-not-allowed disabled:bg-surface3 disabled:text-muted"
+            className="inline-flex items-center gap-1.5 rounded-sm bg-brand px-5 py-2.5 text-body font-semibold text-brand-fg transition disabled:cursor-not-allowed disabled:bg-surface3 disabled:text-muted"
           >
             {isLastItem ? t.create.reviewAndSend : t.create.nextEquipment}
             <Icon name="arrow_forward" size={16} className="rtl:rotate-180" />
@@ -410,11 +410,11 @@ export function Canvas() {
 
       {/* Start over clears the saved draft, so it asks first. */}
       <Modal open={confirmReset} onClose={() => setConfirmReset(false)} title={t.draftPrompt.restartTitle}>
-        <p className="mb-5 text-[13.5px] leading-relaxed text-muted">{t.draftPrompt.restartConfirm}</p>
+        <p className="mb-5 text-body leading-relaxed text-muted">{t.draftPrompt.restartConfirm}</p>
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             onClick={() => setConfirmReset(false)}
-            className="rounded-[10px] border border-border bg-surface px-4 py-2.5 text-[13.5px] font-bold text-navy-mid transition hover:bg-surface2"
+            className="rounded-sm border border-border bg-surface px-4 py-2.5 text-body font-semibold text-navy-mid transition hover:bg-surface2"
           >
             {t.common.cancel}
           </button>
@@ -423,7 +423,7 @@ export function Canvas() {
               setConfirmReset(false);
               actions.reset();
             }}
-            className="rounded-[10px] bg-brand px-4 py-2.5 text-[13.5px] font-bold text-brand-fg transition hover:brightness-[1.04]"
+            className="rounded-sm bg-brand px-4 py-2.5 text-body font-semibold text-brand-fg transition"
           >
             {t.create.startOver}
           </button>

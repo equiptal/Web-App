@@ -19,7 +19,7 @@ import { useStartRequestGate } from "@/lib/access/start-request-gate";
 const POPUP_SHOWN_KEY = "start-request-popup-shown";
 
 /** Gradient that darkens to the corner — shared by the hero and the store-card banners. */
-export const DARK_GRADIENT = "bg-gradient-to-br from-[#1e3a5f] to-[#0f1e2e]";
+export const DARK_GRADIENT = "bg-gradient-to-br from-navy to-navy-deep";
 
 /** Subtle grid overlay with a radial mask — the "blended light" look from the login page. */
 const GRID_STYLE: React.CSSProperties = {
@@ -91,25 +91,25 @@ export function HomeHub() {
   return (
     <div className="flex flex-col gap-7">
       {/* Hero */}
-      <div className={`relative overflow-hidden rounded-[20px] px-8 py-9 sm:px-10 ${DARK_GRADIENT}`}>
+      <div className={`relative overflow-hidden rounded-sm px-8 py-9 sm:px-10 ${DARK_GRADIENT}`}>
         <div className="pointer-events-none absolute inset-0" style={GRID_STYLE} />
         <span className="pointer-events-none absolute -top-[60px] end-[-40px] h-[260px] w-[260px] rounded-full bg-brand opacity-[0.20] blur-[80px]" />
-        <span className="pointer-events-none absolute -bottom-[90px] end-[120px] h-[280px] w-[280px] rounded-full opacity-20 blur-[80px]" style={{ background: "#2563EB" }} />
+        <span className="pointer-events-none absolute -bottom-[90px] end-[120px] h-[280px] w-[280px] rounded-full opacity-20 blur-[80px]" style={{ background: "var(--info)" }} />
 
         <div className="relative z-10 flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex-1">
-            <span className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-brand/20 px-3 py-1 text-[12px] font-semibold uppercase tracking-wide text-[#FB923C]">
+            <span className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-brand/20 px-3 py-1 text-meta font-semibold uppercase tracking-wide text-brand-light">
               <Icon name="bolt" size={13} /> {t.home.eyebrow}
             </span>
-            <h1 className="text-[26px] font-bold leading-tight text-white sm:text-[29px]">{t.home.bannerTitle}</h1>
-            <p className="mt-2.5 max-w-[520px] text-[13.5px] leading-relaxed text-white/65">{t.home.bannerSubtitle}</p>
+            <h1 className="text-display font-extrabold leading-tight text-white sm:text-[29px]">{t.home.bannerTitle}</h1>
+            <p className="mt-2.5 max-w-[520px] text-body leading-relaxed text-white/65">{t.home.bannerSubtitle}</p>
           </div>
 
           {/* Single entry into the RFQ input flow (web-app/002). */}
           <div className="flex flex-none flex-col gap-3 sm:flex-row lg:flex-col lg:items-stretch">
             <button
               onClick={onCreateRequest}
-              className="inline-flex items-center justify-center gap-2 rounded-[12px] bg-brand px-6 py-3 text-[14px] font-semibold text-brand-fg transition hover:brightness-[1.04]"
+              className="inline-flex items-center justify-center gap-2 rounded-sm bg-brand px-6 py-3 text-body font-semibold text-brand-fg transition"
             >
               <Icon name="add" size={16} /> {t.home.createRequest}
             </button>
@@ -122,19 +122,19 @@ export function HomeHub() {
         <button
           type="button"
           onClick={() => router.push("/requests")}
-          className="flex items-center gap-3 rounded-[14px] border border-[#f59e0b]/30 bg-[#f59e0b]/[0.06] p-3.5 text-start transition hover:bg-[#f59e0b]/[0.10]"
+          className="flex items-center gap-3 rounded-sm border border-brand-light/30 bg-brand-light/[0.06] p-3.5 text-start transition hover:bg-brand-light/[0.10]"
         >
-          <span className="relative grid h-9 w-9 flex-none place-items-center rounded-[10px] bg-[#f59e0b]/[0.14]">
-            <Icon name="gavel" size={20} className="text-[#d97706]" />
-            <span className="absolute -end-1.5 -top-1.5 grid min-w-[18px] place-items-center rounded-full bg-[#d97706] px-1 text-[10px] font-bold leading-[18px] text-white">{newBids}</span>
+          <span className="relative grid h-9 w-9 flex-none place-items-center rounded-sm bg-brand-light/[0.14]">
+            <Icon name="gavel" size={20} className="text-brand-light" />
+            <span className="absolute -end-1.5 -top-1.5 grid min-w-[18px] place-items-center rounded-full bg-brand-light px-1 text-label font-semibold leading-[18px] text-white">{newBids}</span>
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[14px] font-bold text-navy">
+            <span className="block text-body font-semibold text-navy">
               {ar ? `${newBids} ${newBids === 1 ? "عرض جديد" : "عروض جديدة"} على طلباتك` : `${newBids} new ${newBids === 1 ? "bid" : "bids"} on your requests`}
             </span>
-            <span className="block text-[13px] font-semibold text-[#d97706]">{ar ? "عرض العروض" : "View bids"}</span>
+            <span className="block text-body font-semibold text-brand-light">{ar ? "عرض العروض" : "View bids"}</span>
           </span>
-          <Icon name="chevron_right" size={20} className="flex-none text-[#d97706] rtl:scale-x-[-1]" />
+          <Icon name="chevron_right" size={20} className="flex-none text-brand-light rtl:scale-x-[-1]" />
         </button>
       )}
 
@@ -183,22 +183,22 @@ function ActivityCard({
     <button
       type="button"
       onClick={() => href && router.push(href)}
-      className="group relative flex cursor-pointer flex-col gap-3.5 overflow-hidden rounded-[16px] border border-border bg-surface p-5 text-start transition hover:-translate-y-0.5 hover:shadow-[0_8px_28px_rgba(0,0,0,.09)]"
+      className="group relative flex cursor-pointer flex-col gap-3.5 overflow-hidden rounded-sm border border-border bg-surface p-5 text-start transition"
     >
       <div className="flex items-start justify-between">
-        <span className={`relative grid h-11 w-11 place-items-center rounded-[12px] ${c.iconBg}`}>
+        <span className={`relative grid h-11 w-11 place-items-center rounded-sm ${c.iconBg}`}>
           <Icon name={icon} size={22} className={c.iconText} />
           {count != null && count > 0 && (
-            <span className={`absolute -end-1.5 -top-1.5 grid min-w-[19px] place-items-center rounded-full px-1 text-[10px] font-bold leading-[19px] text-white ${c.bar}`}>{count}</span>
+            <span className={`absolute -end-1.5 -top-1.5 grid min-w-[19px] place-items-center rounded-full px-1 text-label font-semibold leading-[19px] text-white ${c.bar}`}>{count}</span>
           )}
         </span>
         <Icon name="chevron_right" size={20} className="text-muted/60 rtl:scale-x-[-1]" />
       </div>
       <div>
-        <div className="text-[15px] font-bold text-navy">{title}</div>
-        <div className="mt-0.5 text-[12px] text-muted">{sub}</div>
+        <div className="text-subhead font-extrabold text-navy">{title}</div>
+        <div className="mt-0.5 text-meta text-muted">{sub}</div>
       </div>
-      <div className={`absolute inset-x-0 bottom-0 h-[3px] opacity-0 transition group-hover:opacity-100 ${c.bar}`} />
+      <div className={`absolute inset-x-0 bottom-0 h-[3px] opacity-0 transition group- ${c.bar}`} />
     </button>
   );
 }

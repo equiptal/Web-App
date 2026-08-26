@@ -37,15 +37,15 @@ export function CarryForwardModal({
   return (
     <Modal open={open} onClose={onClose} title={fmt(t.create.carry.title, { n: itemNumber })}>
       <div className="mb-5 flex flex-col gap-3.5">
-        <p className="flex items-start gap-3 text-[13.5px] leading-relaxed text-navy-mid">
-          <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-surface2 text-navy">
+        <p className="flex items-start gap-3 text-body leading-relaxed text-navy-mid">
+          <span className="grid h-7 w-7 flex-none place-items-center rounded-sm bg-surface2 text-navy">
             <Icon name="lock" size={15} />
           </span>
           {t.create.carry.locked}
         </p>
         {copied && (
-          <p className="flex items-start gap-3 text-[13.5px] leading-relaxed text-navy-mid">
-            <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-surface2 text-navy">
+          <p className="flex items-start gap-3 text-body leading-relaxed text-navy-mid">
+            <span className="grid h-7 w-7 flex-none place-items-center rounded-sm bg-surface2 text-navy">
               <Icon name="content_copy" size={15} />
             </span>
             {t.create.carry.copied}
@@ -55,13 +55,13 @@ export function CarryForwardModal({
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <button
           onClick={onClose}
-          className="rounded-[10px] border border-border bg-surface px-4 py-2.5 text-[13px] font-bold text-navy-mid transition hover:bg-surface2"
+          className="rounded-sm border border-border bg-surface px-4 py-2.5 text-body font-semibold text-navy-mid transition hover:bg-surface2"
         >
           {t.create.carry.editFirst}
         </button>
         <button
           onClick={onContinue}
-          className="rounded-[10px] bg-brand px-4 py-2.5 text-[13px] font-bold text-brand-fg transition hover:brightness-[1.04]"
+          className="rounded-sm bg-brand px-4 py-2.5 text-body font-semibold text-brand-fg transition"
         >
           {t.create.carry.continue}
         </button>

@@ -33,15 +33,15 @@ export function SignInPrompt({
   // auth modal in place (no /login page).
   const go = () => (ctaHref ? router.push(ctaHref) : openAuth());
   return (
-    <div className="rounded-[12px] border border-border bg-surface p-8 text-center">
+    <div className="rounded-sm border border-border bg-surface p-8 text-center">
       <span className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-brand-soft text-brand">
         <Icon name={icon} size={24} />
       </span>
-      <h3 className="text-[16px] font-extrabold text-navy">{title ?? t.browse.signInTitle}</h3>
-      <p className="mx-auto mt-1.5 max-w-sm text-[13px] leading-relaxed text-muted">{body ?? t.browse.signInBody}</p>
+      <h3 className="text-subhead font-extrabold text-navy">{title ?? t.browse.signInTitle}</h3>
+      <p className="mx-auto mt-1.5 max-w-sm text-body leading-relaxed text-muted">{body ?? t.browse.signInBody}</p>
       <button
         onClick={go}
-        className="mt-4 inline-flex items-center gap-1.5 rounded-[10px] bg-brand px-5 py-2.5 text-[13.5px] font-bold text-white transition hover:brightness-105"
+        className="mt-4 inline-flex items-center gap-1.5 rounded-sm bg-brand px-5 py-2.5 text-body font-semibold text-white transition"
       >
         <Icon name={ctaLabel ? "add" : "login"} size={17} /> {ctaLabel ?? t.shell.signIn}
       </button>

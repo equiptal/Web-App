@@ -9,8 +9,8 @@
  * paths verbatim. This is the only surface that does; anywhere else, use `Icon`.
  *
  * ── The hexes are the prototype's, not the app's tokens ─────────────────────────────────────────
- * `#5b6672` is a cool grey where `--muted` is blue-tinted (`#6b8fa8`), and `#e2891a` is a half-step
- * darker than `--brand` (`#f79009`). They are literals rather than tokens because they describe THIS
+ * `var(--muted-dark)` is a cool grey where `--muted` is blue-tinted (`var(--muted)`), and `var(--brand)` is a half-step
+ * darker than `--brand` (`var(--brand)`). They are literals rather than tokens because they describe THIS
  * bar and the owner asked for this bar; promoting them would spread a second palette through the app.
  */
 /**
@@ -121,7 +121,7 @@ export function BellIcon({ size = 20 }: { size?: number }) {
 export function CountBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span className="absolute -top-1.5 -end-2 flex h-[15px] min-w-[15px] items-center justify-center rounded-lg bg-[#e2891a] px-[3px] text-[9.5px] font-bold leading-none text-white">
+    <span className="absolute -top-1.5 -end-2 flex h-[15px] min-w-[15px] items-center justify-center rounded-sm bg-brand px-1 text-[9.5px] font-semibold leading-none text-white">
       {count > 99 ? "99+" : count}
     </span>
   );

@@ -326,7 +326,7 @@
 //               <button key={k} type="button" onClick={() => setSrc(k)}
 //                 className="srcchip"
 //                 style={{ border: "1px solid", borderRadius: 999, padding: "3px 10px", fontSize: 11.5, fontWeight: 700,
-//                   ...(src === k ? { background: "#0f172a", color: "#fff", borderColor: "#0f172a" } : { background: "#fff", color: "#475569", borderColor: "#e2e8f0" }) }}>
+//                   ...(src === k ? { background: "var(--navy-deep)", color: "var(--surface)", borderColor: "var(--navy-deep)" } : { background: "var(--surface)", color: "var(--navy-mid)", borderColor: "var(--surface3)" }) }}>
 //                 {lbl} <span style={{ opacity: 0.7 }}>{n}</span>
 //               </button>
 //             ))}
@@ -407,7 +407,7 @@
 //                   <span className={`spill ${sp.cls}`}>{sp.dot && <span className="d" />}{ar ? sp.ar : sp.en}</span>
 //                   {b.converted ? (
 //                     // web-app/006: a converted bid is a real app bid, but keep its OFF-PLATFORM origin label.
-//                     <span className="src-chip" style={{ background: "var(--brand-soft, #fff4e5)", color: "var(--brand, #f79009)" }}><span className="material-icons-outlined">link</span>{L("via shared link", "عبر الرابط")}</span>
+//                     <span className="src-chip" style={{ background: "var(--brand-soft, var(--brand-soft))", color: "var(--brand, var(--brand))" }}><span className="material-icons-outlined">link</span>{L("via shared link", "عبر الرابط")}</span>
 //                   ) : (
 //                     <span className="src-chip src-app"><span className="material-icons-outlined">verified_user</span>{L("via Moedatech app", "عبر تطبيق معداتك")}</span>
 //                   )}
@@ -447,12 +447,12 @@
 //                 return (
 //                   <span style={{ display: "inline-flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
 //                     {([
-//                       { label: L("Conflict", "تعارض"), n: tc.conflict, c: "#d9362a" },
-//                       { label: L("Pending review", "قيد المراجعة"), n: tc.pending, c: "#d4780a" },
-//                       { label: L("Matched", "مطابق"), n: tc.matched, c: "#1daf58" },
+//                       { label: L("Conflict", "تعارض"), n: tc.conflict, c: "var(--danger)" },
+//                       { label: L("Pending review", "قيد المراجعة"), n: tc.pending, c: "var(--warn)" },
+//                       { label: L("Matched", "مطابق"), n: tc.matched, c: "var(--ok)" },
 //                     ] as const).map((t) => (
-//                       <span key={t.label} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 800, color: t.n > 0 ? t.c : "#9AA7B8", whiteSpace: "nowrap" }}>
-//                         <span style={{ width: 7, height: 7, borderRadius: "50%", background: t.n > 0 ? t.c : "#c3d2e0" }} />{t.label} {t.n}
+//                       <span key={t.label} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 800, color: t.n > 0 ? t.c : "var(--muted-light)", whiteSpace: "nowrap" }}>
+//                         <span style={{ width: 7, height: 7, borderRadius: "50%", background: t.n > 0 ? t.c : "var(--border-strong)" }} />{t.label} {t.n}
 //                       </span>
 //                     ))}
 //                   </span>

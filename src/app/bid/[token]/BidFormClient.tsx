@@ -149,11 +149,11 @@ const CERT_BASE_LABEL: Record<string, [string, string]> = {
 
 // Per-section colour identity for the attachment cards (matches the uploader accent CSS vars).
 const ATT_ACCENT = {
-  photo: { c: "#e8830c", bg: "#fff7ed", bd: "#f6d5a8" },
-  own: { c: "#2563eb", bg: "#eef4ff", bd: "#c7d8fb" },
-  eqc: { c: "#0e9384", bg: "#ecfdf8", bd: "#9fe0d2" },
-  opc: { c: "#7c3aed", bg: "#f5f2ff", bd: "#dccdfb" },
-  co: { c: "#475569", bg: "#f1f5f9", bd: "#cbd5e1" },
+  photo: { c: "var(--brand)", bg: "var(--brand-soft)", bd: "var(--brand-pale)" },
+  own: { c: "var(--info)", bg: "var(--background)", bd: "var(--info-soft)" },
+  eqc: { c: "var(--info-deep)", bg: "var(--ok-soft)", bd: "var(--ok-soft)" },
+  opc: { c: "#7c3aed", bg: "var(--background)", bd: "var(--info-soft)" },
+  co: { c: "var(--navy-mid)", bg: "var(--background)", bd: "var(--border-strong)" },
 } as const;
 
 /** A coloured attachment card — icon tile + title + description + Required/Optional pill, then the uploader. */
@@ -262,7 +262,7 @@ export default function BidFormClient({ token }: { token: string }) {
   const setPrice = (id: string, field: "rentalRate" | "deliveryPrice" | "returnPrice", v: string) => setAnswers((p) => ({ ...p, [id]: { ...p[id], [field]: v } }));
   const setOffered = (id: string, v: string) => setAnswers((p) => ({ ...p, [id]: { ...p[id], offeredUnits: v } }));
   // Units still open to a shared-link supplier = numberOfUnits − units already held by other suppliers'
-  // accepted (AWAITING) + confirmed (CLOSED) deals (backend PR #484 via `remainingUnits`). Absent → the
+  // accepted (AWAITING) + confirmed (CLOSED) deals (backend PR var(--ok) via `remainingUnits`). Absent → the
   // full requested count (no regression). Only multi-unit MULTIPLE_SUPPLIERS lines ever cap below it.
   const remainingOf = (it: BidFormItem) => it.remainingUnits ?? it.numberOfUnits;
   const isFullyCovered = (it: BidFormItem) => remainingOf(it) <= 0;
@@ -637,7 +637,7 @@ export default function BidFormClient({ token }: { token: string }) {
                   <span className="item-ic"><ItemThumb src={it.imageUrl} name={rawLabel} /></span>
                   <div className="inm-wrap"><span className="inm">{label}</span>{size && <span className="imeta">· {size}</span>}
                     <span className={`units-chip${q > 1 ? " multi" : ""}`}><span className="msym">{q > 1 ? "layers" : "package_2"}</span>×{q} {q === 1 ? L("unit", "وحدة") : L("units", "وحدات")}</span>
-                    {fullyCovered && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 800, color: "#c0392b", background: "#fdecea", border: "1px solid #f3c0ba", borderRadius: 20, padding: "2px 9px" }}><span className="material-icons-outlined" style={{ fontSize: 14 }}>lock</span>{L("Fully covered", "مُغطّى بالكامل")}</span>}</div>
+                    {fullyCovered && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 800, color: "var(--danger)", background: "var(--danger-soft)", border: "1px solid var(--danger-soft)", borderRadius: 20, padding: "2px 9px" }}><span className="material-icons-outlined" style={{ fontSize: 14 }}>lock</span>{L("Fully covered", "مُغطّى بالكامل")}</span>}</div>
                   <span className="ibadge">{L(`Item ${idx + 1} of ${data.items.length}`, `البند ${idx + 1} من ${data.items.length}`)}</span>
                 </div>
 
@@ -673,18 +673,18 @@ export default function BidFormClient({ token }: { token: string }) {
                         choose to supply fewer than the units still open. Capped at `remaining` (units not
                         already covered by others). Hidden when only 1 unit is left (no choice). */}
                     {remaining > 1 && (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 10, whiteSpace: "nowrap", background: "#fff", border: "1px solid #e6c690", borderRadius: 10, padding: "6px 12px" }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{L("Units you can supply", "الوحدات المتاحة لديك")}</span>
-                      <span style={{ display: "inline-flex", alignItems: "center", border: "2px solid #f79009", borderRadius: 9, overflow: "hidden" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 10, whiteSpace: "nowrap", background: "var(--surface)", border: "1px solid var(--brand-light)", borderRadius: 10, padding: "6px 12px" }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 800, color: "var(--navy)" }}>{L("Units you can supply", "الوحدات المتاحة لديك")}</span>
+                      <span style={{ display: "inline-flex", alignItems: "center", border: "2px solid var(--brand)", borderRadius: 9, overflow: "hidden" }}>
                         <button type="button" aria-label={L("Fewer units", "تقليل")} disabled={oq <= 1}
                           onClick={() => setOffered(it.requestItemId, String(Math.max(1, oq - 1)))}
-                          style={{ width: 36, height: 36, border: "none", background: oq <= 1 ? "#f6efe2" : "#fff5e8", color: oq <= 1 ? "#c9b48c" : "#b45309", fontSize: 22, fontWeight: 900, cursor: oq <= 1 ? "default" : "pointer", lineHeight: 1, fontFamily: "inherit" }}>−</button>
-                        <span style={{ minWidth: 38, textAlign: "center", fontSize: 16, fontWeight: 900, color: "#1c3550" }}>{oq}</span>
+                          style={{ width: 36, height: 36, border: "none", background: oq <= 1 ? "var(--brand-soft)" : "var(--brand-soft)", color: oq <= 1 ? "var(--brand-light)" : "var(--brand-deep)", fontSize: 22, fontWeight: 900, cursor: oq <= 1 ? "default" : "pointer", lineHeight: 1, fontFamily: "inherit" }}>−</button>
+                        <span style={{ minWidth: 38, textAlign: "center", fontSize: 16, fontWeight: 900, color: "var(--navy)" }}>{oq}</span>
                         <button type="button" aria-label={L("More units", "زيادة")} disabled={oq >= remaining}
                           onClick={() => setOffered(it.requestItemId, String(Math.min(remaining, oq + 1)))}
-                          style={{ width: 36, height: 36, border: "none", background: oq >= remaining ? "#f6efe2" : "#fff5e8", color: oq >= remaining ? "#c9b48c" : "#b45309", fontSize: 22, fontWeight: 900, cursor: oq >= remaining ? "default" : "pointer", lineHeight: 1, fontFamily: "inherit" }}>+</button>
+                          style={{ width: 36, height: 36, border: "none", background: oq >= remaining ? "var(--brand-soft)" : "var(--brand-soft)", color: oq >= remaining ? "var(--brand-light)" : "var(--brand-deep)", fontSize: 22, fontWeight: 900, cursor: oq >= remaining ? "default" : "pointer", lineHeight: 1, fontFamily: "inherit" }}>+</button>
                       </span>
-                      <span style={{ color: "#6b8fa8", fontWeight: 800, fontSize: 14 }}>/ {remaining}</span>
+                      <span style={{ color: "var(--muted)", fontWeight: 800, fontSize: 14 }}>/ {remaining}</span>
                     </span>
                     )}
                   </div>
@@ -732,7 +732,7 @@ export default function BidFormClient({ token }: { token: string }) {
                   {/* Inline VAT toggle — clarifies right at the price box whether the entered prices include 15% VAT. */}
                   <span style={{ marginInlineStart: "auto", display: "inline-flex", border: "1px solid var(--border)", borderRadius: 7, overflow: "hidden", textTransform: "none", letterSpacing: 0 }}>
                     {([[false, L("Excl. VAT", "قبل الضريبة")], [true, L("Incl. VAT", "شامل الضريبة")]] as [boolean, string][]).map(([v, lab]) => (
-                      <button key={String(v)} type="button" onClick={() => setVatIncluded(v)} style={{ border: "none", cursor: "pointer", font: "inherit", textTransform: "none", letterSpacing: 0, fontWeight: 800, fontSize: 10.5, padding: "3px 9px", background: vatIncluded === v ? "var(--navy)" : "var(--surface1)", color: vatIncluded === v ? "#fff" : "var(--muted)" }}>{lab}</button>
+                      <button key={String(v)} type="button" onClick={() => setVatIncluded(v)} style={{ border: "none", cursor: "pointer", font: "inherit", textTransform: "none", letterSpacing: 0, fontWeight: 800, fontSize: 10.5, padding: "3px 9px", background: vatIncluded === v ? "var(--navy)" : "var(--surface1)", color: vatIncluded === v ? "var(--surface)" : "var(--muted)" }}>{lab}</button>
                     ))}
                   </span>
                 </div>
@@ -913,13 +913,13 @@ export default function BidFormClient({ token }: { token: string }) {
           <div className="dlapp-btns">
             {device !== "android" && (
               <a className="store-badge" href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" aria-label="Download on the App Store">
-                <svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" /></svg>
+                <svg viewBox="0 0 24 24" fill="var(--surface)" aria-hidden="true"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" /></svg>
                 <span className="sb-tx"><small>{L("Download on the", "حمّله من")}</small><b>App Store</b></span>
               </a>
             )}
             {device !== "ios" && (
               <a className="store-badge" href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer" aria-label="Get it on Google Play">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="gpgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#00e0ff" /><stop offset=".45" stopColor="#00e676" /><stop offset=".75" stopColor="#ffcd00" /><stop offset="1" stopColor="#ff3b3b" /></linearGradient></defs><path fill="url(#gpgrad)" d="M4 2.4v19.2l15-9.6z" /></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="gpgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="var(--info)" /><stop offset=".45" stopColor="var(--ok)" /><stop offset=".75" stopColor="#ffcd00" /><stop offset="1" stopColor="var(--danger)" /></linearGradient></defs><path fill="url(#gpgrad)" d="M4 2.4v19.2l15-9.6z" /></svg>
                 <span className="sb-tx"><small>{L("GET IT ON", "احصل عليه من")}</small><b>Google Play</b></span>
               </a>
             )}

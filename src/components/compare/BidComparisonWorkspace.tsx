@@ -77,11 +77,11 @@
 //
 // // Prototype palette (bid-comparison-workspace.html) — exact hex for the bits Tailwind tokens don't cover.
 // const C = {
-//   navy: "#1C3550", navyDeep: "#12263A", navyMid: "#2A4F72", gold: "#B8860B",
-//   action: "#F79009", actionDim: "#FFF4E5", rentee: "#2563EB", renteeDim: "#EAF1FE", supplier: "#0D8A6A",
-//   success: "#1DAF58", successBg: "#E7F7EE", warning: "#D4780A", warningBg: "#FFF3E0",
-//   danger: "#D9362A", dangerBg: "#FCEBEA", muted: "#6B8FA8",
-//   surface2: "#EFF4F9", surface3: "#E4EDF5", border: "#D4E0EC", line: "#E4EDF5", disabled: "#9BB3C8",
+//   navy: "var(--navy)", navyDeep: "var(--navy-deep)", navyMid: "var(--navy-mid)", gold: "var(--gold)",
+//   action: "var(--brand)", actionDim: "var(--brand-soft)", rentee: "var(--info)", renteeDim: "var(--surface2)", supplier: "var(--ok)",
+//   success: "var(--ok)", successBg: "var(--ok-soft)", warning: "var(--warn)", warningBg: "var(--warn-soft)",
+//   danger: "var(--danger)", dangerBg: "var(--danger-soft)", muted: "var(--muted)",
+//   surface2: "var(--surface2)", surface3: "var(--surface3)", border: "var(--border)", line: "var(--surface3)", disabled: "var(--muted-light)",
 // };
 //
 // /** The five cost-responsibility items (AC-11/12). */
@@ -618,8 +618,8 @@
 //   const docChip = (c: BidColumn, label: string, has: boolean, hint: string, big = false) => {
 //     // small = supplier-header chip (10px); big = cert/ownership row chip (prototype 11.5px/800, pad 5px 10px, r8, bordered).
 //     const base = has ? { background: C.successBg, color: C.success } : { background: C.dangerBg, color: C.danger };
-//     const style = big ? { ...base, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${has ? "rgba(29,175,88,.3)" : "rgba(217,54,42,.3)"}` } : base;
-//     const cls = big ? "inline-flex items-center gap-1 text-[11.5px]" : "inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold";
+//     const style = big ? { ...base, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${has ? "color-mix(in srgb, var(--ok) 30%, transparent)" : "color-mix(in srgb, var(--danger) 30%, transparent)"}` } : base;
+//     const cls = big ? "inline-flex items-center gap-1 text-label" : "inline-flex items-center gap-0.5 rounded-sm px-1.5 py-0.5 text-label font-semibold";
 //     // Off-platform: prefer the actual uploaded FILE (pre-loaded in bidDocs) when the supplier attached one;
 //     // else fall back to the captured VALUE (CR/VAT/national text they typed instead of a file).
 //     const dd = c.bid.viaSharedLink ? bidDocs[c.bid.id] : undefined;
@@ -636,11 +636,11 @@
 //   // Green ✓ / red × cert pill. `fileUrl` (off-platform operator cert) makes it a clickable eye that opens
 //   // the uploaded file; without it, it's a plain declared-cert pill (no file to open). Same weight as docChip.
 //   const certPill = (label: string, held: boolean, fileUrl?: string | null) => {
-//     const style = { background: held ? C.successBg : C.dangerBg, color: held ? C.success : C.danger, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${held ? "rgba(29,175,88,.3)" : "rgba(217,54,42,.3)"}` } as const;
+//     const style = { background: held ? C.successBg : C.dangerBg, color: held ? C.success : C.danger, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${held ? "color-mix(in srgb, var(--ok) 30%, transparent)" : "color-mix(in srgb, var(--danger) 30%, transparent)"}` } as const;
 //     const inner = <><span className="material-icons-outlined" style={{ fontSize: 11 }}>{held ? "check" : "close"}</span>{label}{fileUrl && <span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>}</>;
 //     return fileUrl
-//       ? <button type="button" onClick={() => setDocView({ label, url: fileUrl, loading: false })} title={L("View document", "عرض المستند")} className="inline-flex items-center gap-1 text-[11.5px]" style={style}>{inner}</button>
-//       : <span className="inline-flex items-center gap-1 text-[11.5px]" style={style}>{inner}</span>;
+//       ? <button type="button" onClick={() => setDocView({ label, url: fileUrl, loading: false })} title={L("View document", "عرض المستند")} className="inline-flex items-center gap-1 text-label" style={style}>{inner}</button>
+//       : <span className="inline-flex items-center gap-1 text-label" style={style}>{inner}</span>;
 //   };
 //   const grandTotal = (c: BidColumn) => Math.round(supplierStated(c) * (1 + VAT)) + renterAddBid(c);
 //   const hasCost = (c: BidColumn) => supplierStated(c) > 0 || renterAddBid(c) > 0;
@@ -701,9 +701,9 @@
 //   };
 //   // A green(all)/amber(partial "K/M")/red(none) chip for a per-unit cert status, doc-linked when present.
 //   const unitCertChip = (label: string, st: { held: number; total: number; all: boolean; none: boolean; url: string | null }) => {
-//     const tone = st.all ? { bg: C.successBg, c: C.success, bd: "rgba(29,175,88,.3)", icon: "check" }
-//       : st.none ? { bg: C.dangerBg, c: C.danger, bd: "rgba(217,54,42,.3)", icon: "close" }
-//       : { bg: "#fff3e0", c: "#d4780a", bd: "rgba(212,120,10,.35)", icon: "remove" };
+//     const tone = st.all ? { bg: C.successBg, c: C.success, bd: "color-mix(in srgb, var(--ok) 30%, transparent)", icon: "check" }
+//       : st.none ? { bg: C.dangerBg, c: C.danger, bd: "color-mix(in srgb, var(--danger) 30%, transparent)", icon: "close" }
+//       : { bg: "var(--warn-soft)", c: "var(--warn)", bd: "color-mix(in srgb, var(--warn) 35%, transparent)", icon: "remove" };
 //     const text = label + (!st.all && !st.none ? ` ${st.held}/${st.total}` : "");
 //     const style = { display: "inline-flex", alignItems: "center", gap: 4, fontSize: "11.5px", fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${tone.bd}`, background: tone.bg, color: tone.c } as const;
 //     const inner = <><span className="material-icons-outlined" style={{ fontSize: 11 }}>{tone.icon}</span>{text}{st.url && <span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>}</>;
@@ -711,7 +711,7 @@
 //       ? <a href={st.url} target="_blank" rel="noopener noreferrer" style={style} title={L("View document", "عرض المستند")}>{inner}</a>
 //       : <span style={style}>{inner}</span>;
 //   };
-//   const bestTag = <span className="ms-1 inline-flex items-center gap-0.5 rounded-full px-[7px] py-0.5 align-middle text-[9.5px]" style={{ background: C.successBg, color: C.success, fontWeight: 900, letterSpacing: ".03em" }}>✓ {L("BEST", "الأفضل")}</span>;
+//   const bestTag = <span className="ms-1 inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 align-middle text-[9.5px]" style={{ background: C.successBg, color: C.success, fontWeight: 900, letterSpacing: ".03em" }}>✓ {L("BEST", "الأفضل")}</span>;
 //   // §6 rule: only show cost responsibilities the REQUEST assigned (requestSide set) — not required → not shown.
 //   const requiredResp = RESP_META.filter((m) => cols.some((c) => c.costResponsibilities.find((x) => x.key === m.key)?.requestSide != null));
 //   // The responsibilities the request put on the RENTER → the fields of the "Estimate your own costs" popup.
@@ -1042,7 +1042,7 @@
 //     const row = (label: string, fn: (c: BidColumn) => string) => `<tr><th class="lbl">${esc(label)}</th>${cols.map((c) => `<td>${fn(c)}</td>`).join("")}</tr>`;
 //     const pickName = cols.find((c) => c.bid.id === pickId)?.bid.supplierName;
 //     const html = `<!doctype html><html dir="${ar ? "rtl" : "ltr"}" lang="${ar ? "ar" : "en"}"><head><meta charset="utf-8"><title>${esc(itemName)} — ${L("Bid comparison", "مقارنة العروض")}</title>
-// <style>*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#1C3550;margin:26px}h1{font-size:18px;margin:0 0 4px}.meta{color:#6B8FA8;font-size:12px;margin-bottom:12px}.pick{display:inline-block;background:#FFF4E5;color:#8A5A06;border:1px solid #F79009;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:bold;margin-bottom:14px}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #D4E0EC;padding:8px 10px;text-align:${ar ? "right" : "left"};vertical-align:top}thead th{background:#1C3550;color:#fff}th.lbl{background:#EFF4F9;width:175px}.star{color:#FFC97A}.foot{margin-top:16px;color:#9BB3C8;font-size:10px}@media print{@page{margin:12mm}}</style></head><body>
+// <style>*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:var(--navy);margin:26px}h1{font-size:18px;margin:0 0 4px}.meta{color:var(--muted);font-size:12px;margin-bottom:12px}.pick{display:inline-block;background:var(--brand-soft);color:var(--brand-deep);border:1px solid var(--brand);border-radius:20px;padding:4px 12px;font-size:12px;font-weight:bold;margin-bottom:14px}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid var(--border);padding:8px 10px;text-align:${ar ? "right" : "left"};vertical-align:top}thead th{background:var(--navy);color:var(--surface)}th.lbl{background:var(--surface2);width:175px}.star{color:var(--brand-light)}.foot{margin-top:16px;color:var(--muted-light);font-size:10px}@media print{@page{margin:12mm}}</style></head><body>
 // <h1>${esc(itemName)} — ${L("Bid comparison", "مقارنة العروض")}</h1>
 // <div class="meta">${esc(group?.items[0]?.displayId ?? "")} · ${esc(loc?.label ?? "")} · ${esc(when)}${durationDays ? ` · ${durationDays} ${L("days", "يوم")}` : ""}${units > 1 ? ` · ${units} ${L("units", "وحدات")}` : ""}</div>
 // ${pickName ? `<div class="pick">★ ${L("AI pick", "اختيار المساعد")}: ${esc(pickName)}</div>` : ""}
@@ -1093,34 +1093,34 @@
 //   // Visible agent status: pulses "thinking…" while a /bids/recommend call is in flight, then "live · N%".
 //   const conf = rec?.recommendation.confidence != null ? Math.round(rec.recommendation.confidence * 100) : null;
 //   const agentBadge = () => {
-//     if (recLoading) return <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: C.actionDim, color: "#8A5A06" }}><span className="material-icons-outlined animate-spin" style={{ fontSize: 13 }}>autorenew</span>{L("AI thinking…", "الذكاء يفكّر…")}</span>;
-//     if (agentLive) return <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: C.successBg, color: C.success }}><span className="h-2 w-2 rounded-full" style={{ background: C.success }} />{L("AI assistant · live", "المساعد الذكي · متصل")}{conf != null ? ` · ${conf}%` : ""}</span>;
-//     return <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: C.surface3, color: C.muted }}><span className="h-2 w-2 rounded-full" style={{ background: C.muted }} />{L("AI assistant · offline", "المساعد · غير متصل")}</span>;
+//     if (recLoading) return <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-label font-semibold" style={{ background: C.actionDim, color: "var(--brand-deep)" }}><span className="material-icons-outlined animate-spin" style={{ fontSize: 13 }}>autorenew</span>{L("AI thinking…", "الذكاء يفكّر…")}</span>;
+//     if (agentLive) return <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-label font-semibold" style={{ background: C.successBg, color: C.success }}><span className="h-2 w-2 rounded-full" style={{ background: C.success }} />{L("AI assistant · live", "المساعد الذكي · متصل")}{conf != null ? ` · ${conf}%` : ""}</span>;
+//     return <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-label font-semibold" style={{ background: C.surface3, color: C.muted }}><span className="h-2 w-2 rounded-full" style={{ background: C.muted }} />{L("AI assistant · offline", "المساعد · غير متصل")}</span>;
 //   };
 //
 //   return (
-//     <div className={`min-w-0 space-y-4 transition-[margin] duration-200 ${chatOpen ? "md:me-[412px]" : ""}`} style={{ color: C.navy }}>
+//     <div className={`min-w-0 space-y-4 transition-[margin] duration-200 ${chatOpen ? "md:me-103" : ""}`} style={{ color: C.navy }}>
 //       {/* ── Guest header: no requests/groups — just the upload CTA + free-trial counter ── */}
 //       {anon && (
-//         <div className="rounded-2xl border p-5" style={{ borderColor: C.border, background: "#fff" }}>
+//         <div className="rounded-lg border p-5" style={{ borderColor: C.border, background: "var(--surface)" }}>
 //           <div className="flex items-start gap-3">
-//             <span className="grid h-11 w-11 flex-none place-items-center rounded-xl" style={{ background: C.actionDim, color: C.action }}><span className="material-icons-outlined" style={{ fontSize: 24 }}>compare_arrows</span></span>
+//             <span className="grid h-11 w-11 flex-none place-items-center rounded-md" style={{ background: C.actionDim, color: C.action }}><span className="material-icons-outlined" style={{ fontSize: 24 }}>compare_arrows</span></span>
 //             <div className="min-w-0">
-//               <h2 className="text-[18px] font-extrabold" style={{ color: C.navy }}>{L("Compare supplier quotes", "قارن عروض المؤجّرين")}</h2>
-//               <p className="mt-0.5 text-[13px]" style={{ color: C.muted }}>{L("Upload the quotes you received — your AI assistant reads each one, normalizes it to the same template, and lines them up so you can compare like-for-like. No account needed.", "ارفع العروض التي استلمتها — يقرأ مساعدك الذكي كل عرض ويوحّده على نفس القالب ويصفّها لتقارن مثلاً بمثل. دون حساب.")}</p>
+//               <h2 className="text-title font-extrabold" style={{ color: C.navy }}>{L("Compare supplier quotes", "قارن عروض المؤجّرين")}</h2>
+//               <p className="mt-0.5 text-body" style={{ color: C.muted }}>{L("Upload the quotes you received — your AI assistant reads each one, normalizes it to the same template, and lines them up so you can compare like-for-like. No account needed.", "ارفع العروض التي استلمتها — يقرأ مساعدك الذكي كل عرض ويوحّده على نفس القالب ويصفّها لتقارن مثلاً بمثل. دون حساب.")}</p>
 //             </div>
 //           </div>
 //           <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-//             <button onClick={() => setUploadOpen(true)} className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-[13.5px] font-bold text-white transition hover:brightness-105" style={{ background: C.action }}>
+//             <button onClick={() => setUploadOpen(true)} className="inline-flex items-center gap-2 rounded-sm px-4 py-2.5 text-body font-semibold text-white transition" style={{ background: C.action }}>
 //               <span className="material-icons-outlined" style={{ fontSize: 18 }}>upload_file</span>{L("Upload a quote", "رفع عرض")}
 //             </button>
-//             <span className="text-[12px] font-semibold" style={{ color: C.muted }}>{L(`Free uploads left: ${guestUploadsLeft} · sign in to continue`, `رفعات مجانية متبقية: ${guestUploadsLeft} · سجّل الدخول للمتابعة`)}</span>
+//             <span className="text-meta font-semibold" style={{ color: C.muted }}>{L(`Free uploads left: ${guestUploadsLeft} · sign in to continue`, `رفعات مجانية متبقية: ${guestUploadsLeft} · سجّل الدخول للمتابعة`)}</span>
 //           </div>
 //         </div>
 //       )}
 //
 //       {/* ── RFQ tabs (§1: replace location grouping; same pill style as My Requests) ── */}
-//       {!anon && <div className="text-[11px] font-extrabold" style={{ color: C.muted, letterSpacing: ".4px" }}>{L("REQUESTS FOR QUOTE", "طلبات التسعير")}</div>}
+//       {!anon && <div className="text-label font-extrabold" style={{ color: C.muted, letterSpacing: ".4px" }}>{L("REQUESTS FOR QUOTE", "طلبات التسعير")}</div>}
 //       {!anon && (
 //       <div className="flex gap-2.5 overflow-x-auto pb-1.5">
 //         {locations.map((l) => {
@@ -1130,13 +1130,13 @@
 //           const code = l.groups[0]?.groupRef ?? groupRefById[l.groups[0]?.id ?? ""] ?? l.groups[0]?.items[0]?.displayId ?? "RFQ";
 //           return (
 //             <button key={l.key} onClick={() => setActiveLoc(l.key)}
-//               className="flex-none rounded-2xl border px-[15px] py-[11px] text-start transition"
-//               style={{ minWidth: 180, ...(on ? { background: C.navy, borderColor: C.navy } : { background: "#fff", borderColor: C.border }) }}>
+//               className="flex-none rounded-lg border px-4 py-3 text-start transition"
+//               style={{ minWidth: 180, ...(on ? { background: C.navy, borderColor: C.navy } : { background: "var(--surface)", borderColor: C.border }) }}>
 //               <span className="flex items-center justify-between gap-2">
-//                 <span className="text-[14px] font-black" style={{ color: on ? "#fff" : C.navy }}>{code}</span>
-//                 <span className="rounded-full px-2 py-0.5 text-[11px] font-extrabold" style={on ? { background: "rgba(255,255,255,.16)", color: "#fff" } : { background: C.surface2, color: C.muted }}>{l.itemCount} {L("items", "عناصر")}</span>
+//                 <span className="text-body font-extrabold" style={{ color: on ? "var(--surface)" : C.navy }}>{code}</span>
+//                 <span className="rounded-full px-2 py-0.5 text-label font-extrabold" style={on ? { background: "rgba(255,255,255,.16)", color: "var(--surface)" } : { background: C.surface2, color: C.muted }}>{l.itemCount} {L("items", "عناصر")}</span>
 //               </span>
-//               <span className="mt-[3px] block text-[12px] font-semibold" style={{ color: on ? "#C7D4E5" : C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 165 }}>{l.label}</span>
+//               <span className="mt-1 block text-meta font-semibold" style={{ color: on ? "var(--border-strong)" : C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 165 }}>{l.label}</span>
 //             </button>
 //           );
 //         })}
@@ -1156,11 +1156,11 @@
 //           {/* T17 — decided banner: once a bid is accepted (deal room / survey‑bidder), the request is
 //               closed. Losing columns are left as‑is (per decision); only the winner is badged below. */}
 //           {decidedByAccept && (
-//             <div className="flex flex-wrap items-center gap-2 rounded-2xl border px-4 py-3 text-[13px] font-extrabold" style={{ background: C.successBg, borderColor: "rgba(29,175,88,.35)", color: "#137C42" }}>
+//             <div className="flex flex-wrap items-center gap-2 rounded-lg border px-4 py-3 text-body font-extrabold" style={{ background: C.successBg, borderColor: "color-mix(in srgb, var(--ok) 35%, transparent)", color: "var(--ok-deep)" }}>
 //               <span className="material-icons-outlined" style={{ fontSize: 18 }}>check_circle</span>
 //               {L(`${decidedWord} — ${awarded!.supplierName} · request closed`, `${decidedWord} — ${awarded!.supplierName} · الطلب مُغلق`)}
 //               {awarded!.dealRoomId && (
-//                 <button onClick={() => router.push(`/deal-room/${awarded!.dealRoomId}`)} className="ms-auto inline-flex items-center gap-1 underline" style={{ color: "#137C42" }}>
+//                 <button onClick={() => router.push(`/deal-room/${awarded!.dealRoomId}`)} className="ms-auto inline-flex items-center gap-1 underline" style={{ color: "var(--ok-deep)" }}>
 //                   {L("View deal room", "غرفة الصفقة")}<span className="material-icons-outlined" style={{ fontSize: 14, transform: ar ? "scaleX(-1)" : undefined }}>arrow_forward</span>
 //                 </button>
 //               )}
@@ -1168,30 +1168,30 @@
 //           )}
 //
 //           {/* ── item card: icon + name + "N bidding · N in comparison" + item dropdown + supplier chips ── */}
-//           <div className="rounded-2xl border" style={{ borderColor: C.border, background: "#fff" }}>
+//           <div className="rounded-lg border" style={{ borderColor: C.border, background: "var(--surface)" }}>
 //             {anon ? (
 //               // Guest: no request/item context — a plain header with the quote count (no item switcher).
 //               <div className="flex items-center gap-3 p-4">
-//                 <div className="grid h-14 w-14 flex-none place-items-center rounded-xl" style={{ background: C.navy }}>
-//                   <span className="material-icons-outlined" style={{ fontSize: 30, color: "#fff" }}>compare_arrows</span>
+//                 <div className="grid h-14 w-14 flex-none place-items-center rounded-md" style={{ background: C.navy }}>
+//                   <span className="material-icons-outlined" style={{ fontSize: 30, color: "var(--surface)" }}>compare_arrows</span>
 //                 </div>
 //                 <div className="min-w-0 flex-1">
-//                   <div className="text-[17px] font-extrabold leading-tight" style={{ color: C.navy }}>{L("Your uploaded quotes", "عروضك المرفوعة")}</div>
-//                   <div className="mt-0.5 text-[12.5px] font-semibold" style={{ color: C.muted }}>{allCols.length} {L("uploaded", "مرفوع")} · {selected.size} {L("in comparison", "في المقارنة")}</div>
+//                   <div className="text-title font-extrabold leading-tight" style={{ color: C.navy }}>{L("Your uploaded quotes", "عروضك المرفوعة")}</div>
+//                   <div className="mt-0.5 text-meta font-semibold" style={{ color: C.muted }}>{allCols.length} {L("uploaded", "مرفوع")} · {selected.size} {L("in comparison", "في المقارنة")}</div>
 //                 </div>
 //               </div>
 //             ) : (
 //             <div className="flex items-center gap-3 p-4">
-//               <div className="grid h-14 w-14 flex-none place-items-center rounded-xl" style={{ background: C.navy }}>
+//               <div className="grid h-14 w-14 flex-none place-items-center rounded-md" style={{ background: C.navy }}>
 //                 <EquipImg src={activeItemObj?.item?.imageUrl ?? null} categoryId={activeItemObj?.item?.categoryId ?? null} name={(ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? ""} box="" img="h-8 w-8 object-contain" iconSize={30} />
 //               </div>
 //               <div className="min-w-0 flex-1">
-//                 <div className="text-[17px] font-extrabold leading-tight" style={{ color: C.navy }}>{itemBaseName}{units > 1 ? ` · ×${units}` : ""}</div>
-//                 <div className="mt-0.5 text-[12.5px] font-semibold" style={{ color: C.muted }}>{itemSpec ? `${itemSpec} · ` : ""}{allCols.length} {L("bidding", "عرض")} · {selected.size} {L("in comparison", "في المقارنة")}</div>
+//                 <div className="text-title font-extrabold leading-tight" style={{ color: C.navy }}>{itemBaseName}{units > 1 ? ` · ×${units}` : ""}</div>
+//                 <div className="mt-0.5 text-meta font-semibold" style={{ color: C.muted }}>{itemSpec ? `${itemSpec} · ` : ""}{allCols.length} {L("bidding", "عرض")} · {selected.size} {L("in comparison", "في المقارنة")}</div>
 //               </div>
 //               {/* item dropdown (icon + name + ▾) */}
 //               <div className="relative flex-none">
-//                 <button onClick={() => setItemMenuOpen((o) => !o)} title={L("Switch item", "تبديل الصنف")} className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-[13px] font-bold" style={{ borderColor: C.border, background: "#fff", color: C.navy }}>
+//                 <button onClick={() => setItemMenuOpen((o) => !o)} title={L("Switch item", "تبديل الصنف")} className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-body font-semibold" style={{ borderColor: C.border, background: "var(--surface)", color: C.navy }}>
 //                   <EquipImg src={activeItemObj?.item?.imageUrl ?? null} categoryId={activeItemObj?.item?.categoryId ?? null} name={(ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? ""} box="" img="h-5 w-5 object-contain" iconSize={18} />
 //                   <span className="max-w-[150px] truncate">{ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name}</span>
 //                   <span className="material-icons-outlined" style={{ fontSize: 16, color: C.muted }}>expand_more</span>
@@ -1199,14 +1199,14 @@
 //                 {itemMenuOpen && (
 //                   <>
 //                     <div className="fixed inset-0 z-20" onClick={() => setItemMenuOpen(false)} />
-//                     <div className="absolute z-30 mt-1.5 w-[300px] rounded-xl border p-1.5" style={{ insetInlineEnd: 0, background: "#fff", borderColor: C.border, boxShadow: "0 16px 40px rgba(20,40,70,.2)" }}>
-//                       <div className="px-2.5 py-1.5 text-[10px] font-extrabold" style={{ color: C.muted, letterSpacing: ".06em" }}>{L("VIEWING ITEM", "الصنف المعروض")}</div>
+//                     <div className="absolute z-30 mt-1.5 w-[300px] rounded-md border p-1.5" style={{ insetInlineEnd: 0, background: "var(--surface)", borderColor: C.border, }}>
+//                       <div className="px-2.5 py-1.5 text-label font-extrabold" style={{ color: C.muted, letterSpacing: ".06em" }}>{L("VIEWING ITEM", "الصنف المعروض")}</div>
 //                       {items.map((it) => (
-//                         <button key={it.id} onClick={() => { setActiveItem(it.id); setItemMenuOpen(false); }} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start text-[13px] font-bold" style={{ background: it.id === activeItem ? C.surface2 : "transparent", color: C.navy, opacity: it.bidCount === 0 ? 0.6 : 1 }}>
+//                         <button key={it.id} onClick={() => { setActiveItem(it.id); setItemMenuOpen(false); }} className="flex w-full items-center gap-2.5 rounded-sm px-2.5 py-2 text-start text-body font-semibold" style={{ background: it.id === activeItem ? C.surface2 : "transparent", color: C.navy, opacity: it.bidCount === 0 ? 0.6 : 1 }}>
 //                           <EquipImg src={it.item?.imageUrl ?? null} categoryId={it.item?.categoryId ?? null} name={(ar ? it.item?.nameAr : it.item?.name) ?? ""} box="" img="h-5 w-5 object-contain" iconSize={18} />
 //                           <span className="flex-1 truncate">{ar ? it.item?.nameAr : it.item?.name}</span>
-//                           {(it.item?.qty ?? 1) > 1 && <span className="rounded-full px-1.5 text-[10px] font-extrabold" style={{ background: C.actionDim, color: C.action }}>×{it.item?.qty}</span>}
-//                           <span className="rounded-full px-2 text-[11px] font-bold" style={{ background: C.surface3, color: C.muted }}>{it.bidCount > 0 ? it.bidCount : 0}</span>
+//                           {(it.item?.qty ?? 1) > 1 && <span className="rounded-full px-1.5 text-label font-extrabold" style={{ background: C.actionDim, color: C.action }}>×{it.item?.qty}</span>}
+//                           <span className="rounded-full px-2 text-label font-semibold" style={{ background: C.surface3, color: C.muted }}>{it.bidCount > 0 ? it.bidCount : 0}</span>
 //                         </button>
 //                       ))}
 //                     </div>
@@ -1216,23 +1216,23 @@
 //             </div>
 //             )}
 //             <div className="border-t px-4 py-3" style={{ borderColor: C.line }}>
-//               <div className="mb-2 text-[12px] font-semibold" style={{ color: C.muted }}>{L("Tap a supplier to add or remove it from the comparison columns", "انقر على مؤجّر لإضافته أو إزالته من أعمدة المقارنة")}</div>
+//               <div className="mb-2 text-meta font-semibold" style={{ color: C.muted }}>{L("Tap a supplier to add or remove it from the comparison columns", "انقر على مؤجّر لإضافته أو إزالته من أعمدة المقارنة")}</div>
 //               <div className="flex flex-wrap gap-2">
 //                 {comparison.columns.map((c) => {
 //                   const on = selected.has(c.bid.id);
 //                   return (
-//                     <button key={c.bid.id} onClick={() => toggleBid(c.bid.id)} title={on ? L("Remove from comparison", "إزالة من المقارنة") : L("Add to comparison", "إضافة للمقارنة")} className="inline-flex items-center gap-2 rounded-full py-1.5 ps-1.5 pe-3 text-[13px] font-bold transition"
-//                       style={on ? { background: C.navy, color: "#fff" } : { background: "#fff", color: C.navy, border: `1px solid ${C.border}` }}>
-//                       <span className="grid h-6 w-6 place-items-center rounded-full text-[11px] font-black" style={on ? { background: "rgba(255,255,255,.2)", color: "#fff" } : { background: C.navy, color: "#fff" }}>{c.bid.supplierName.slice(0, 1).toUpperCase()}</span>
+//                     <button key={c.bid.id} onClick={() => toggleBid(c.bid.id)} title={on ? L("Remove from comparison", "إزالة من المقارنة") : L("Add to comparison", "إضافة للمقارنة")} className="inline-flex items-center gap-2 rounded-full py-1.5 ps-1.5 pe-3 text-body font-semibold transition"
+//                       style={on ? { background: C.navy, color: "var(--surface)" } : { background: "var(--surface)", color: C.navy, border: `1px solid ${C.border}` }}>
+//                       <span className="grid h-6 w-6 place-items-center rounded-full text-label font-extrabold" style={on ? { background: "rgba(255,255,255,.2)", color: "var(--surface)" } : { background: C.navy, color: "var(--surface)" }}>{c.bid.supplierName.slice(0, 1).toUpperCase()}</span>
 //                       {c.bid.supplierName}
-//                       {c.bid.verified && <span className="material-icons-outlined" style={{ fontSize: 14, color: on ? "#7BE0A5" : C.success }}>verified</span>}
+//                       {c.bid.verified && <span className="material-icons-outlined" style={{ fontSize: 14, color: on ? "var(--ok-soft)" : C.success }}>verified</span>}
 //                       <span className="material-icons-outlined" style={{ fontSize: 15, color: on ? "rgba(255,255,255,.8)" : C.muted }}>{on ? "close" : "add"}</span>
 //                     </button>
 //                   );
 //                 })}
 //                 {comparison.excluded.map((c) => (
-//                   <button key={c.bid.id} onClick={() => goDealRoom(c.bid, "negotiate")} className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-bold" style={{ background: C.dangerBg, borderColor: "rgba(217,54,42,.35)", color: C.danger, borderStyle: "dashed" }}>
-//                     <span className="rounded-full px-2 text-[10px] font-extrabold" style={{ background: "#fff", color: C.danger }}>{L("excluded", "مستبعد")}</span>
+//                   <button key={c.bid.id} onClick={() => goDealRoom(c.bid, "negotiate")} className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-meta font-semibold" style={{ background: C.dangerBg, borderColor: "color-mix(in srgb, var(--danger) 35%, transparent)", color: C.danger, borderStyle: "dashed" }}>
+//                     <span className="rounded-full px-2 text-label font-extrabold" style={{ background: "var(--surface)", color: C.danger }}>{L("excluded", "مستبعد")}</span>
 //                     {c.bid.supplierName}
 //                   </button>
 //                 ))}
@@ -1241,32 +1241,32 @@
 //           </div>
 //
 //           {/* ── Ask-AI floating button → opens the side chat drawer (ranking above stays visible) ── */}
-//           <button onClick={() => setChatOpen(true)} className="fixed bottom-6 z-40 inline-flex items-center gap-2 rounded-full px-5 py-3.5 text-[13.5px] font-extrabold text-white"
-//             style={{ insetInlineEnd: "1.5rem", background: `linear-gradient(135deg,${C.action},#FFA733)`, boxShadow: "0 10px 26px rgba(247,144,9,.4)" }}>
+//           <button onClick={() => setChatOpen(true)} className="fixed bottom-6 z-40 inline-flex items-center gap-2 rounded-full px-5 py-3.5 text-body font-extrabold text-white"
+//             style={{ insetInlineEnd: "1.5rem", background: `linear-gradient(135deg,${C.action},var(--brand-light))`, }}>
 //             <span className="material-icons-outlined" style={{ fontSize: 19 }}>auto_awesome</span>{L("Ask AI", "اسأل الذكاء")}
-//             {suggestions.length > 0 && <span className="grid h-5 min-w-[20px] place-items-center rounded-full px-1 text-[11px] font-black" style={{ background: "#fff", color: C.action }}>{suggestions.length}</span>}
+//             {suggestions.length > 0 && <span className="grid h-5 min-w-[20px] place-items-center rounded-full px-1 text-label font-extrabold" style={{ background: "var(--surface)", color: C.action }}>{suggestions.length}</span>}
 //           </button>
 //           {chatOpen && (
 //             <>
-//               <div className="fixed inset-0 z-40 md:hidden" style={{ background: "rgba(28,53,80,.4)" }} onClick={() => setChatOpen(false)} />
-//               <div className="fixed inset-y-0 z-50 flex w-[400px] max-w-full flex-col bg-white" style={{ insetInlineEnd: 0, boxShadow: "-10px 0 40px rgba(28,53,80,.25)" }}>
+//               <div className="fixed inset-0 z-40 md:hidden" style={{ background: "color-mix(in srgb, var(--navy) 40%, transparent)" }} onClick={() => setChatOpen(false)} />
+//               <div className="fixed inset-y-0 z-50 flex w-[400px] max-w-full flex-col bg-white" style={{ insetInlineEnd: 0, }}>
 //                 <div className="flex items-start gap-2.5 px-4 py-4 text-white" style={{ background: `linear-gradient(150deg,${C.navy},${C.navyDeep})` }}>
-//                   <div className="grid h-9 w-9 flex-none place-items-center rounded-lg" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }}><span className="material-icons-outlined" style={{ fontSize: 21 }}>auto_awesome</span></div>
+//                   <div className="grid h-9 w-9 flex-none place-items-center rounded-sm" style={{ background: `linear-gradient(135deg,${C.action},var(--brand-light))` }}><span className="material-icons-outlined" style={{ fontSize: 21 }}>auto_awesome</span></div>
 //                   <div className="flex-1">
-//                     <b className="text-[15px]">{L("Your AI assistant", "مساعدك الذكي")}</b>
-//                     <p className="m-0 text-[11.5px]" style={{ color: "rgba(255,255,255,.66)" }}>
+//                     <b className="text-subhead">{L("Your AI assistant", "مساعدك الذكي")}</b>
+//                     <p className="m-0 text-label" style={{ color: "rgba(255,255,255,.66)" }}>
 //                       {recLoading ? L("thinking…", "يفكّر…") : agentLive ? `${L("live", "متصل")}${conf != null ? ` · ${conf}%` : ""}` : L("offline · ranking from your stated data", "غير متصل · يرتّب من بياناتك")}
 //                     </p>
 //                   </div>
-//                   <button onClick={() => setChatOpen(false)} className="grid h-8 w-8 flex-none place-items-center rounded-full" style={{ border: "1px solid rgba(255,255,255,.3)", background: "rgba(255,255,255,.1)", color: "#fff" }}><span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span></button>
+//                   <button onClick={() => setChatOpen(false)} className="grid h-8 w-8 flex-none place-items-center rounded-full" style={{ border: "1px solid rgba(255,255,255,.3)", background: "rgba(255,255,255,.1)", color: "var(--surface)" }}><span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span></button>
 //                 </div>
 //                 <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
 //                   {recoMsg && (
 //                     <div className="flex max-w-[92%] gap-2.5">
-//                       <div className="grid h-[30px] w-[30px] flex-none place-items-center rounded-lg" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }}><span className="material-icons-outlined" style={{ fontSize: 17, color: "#fff" }}>auto_awesome</span></div>
-//                       <div className="rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed" style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.navy, borderStartStartRadius: 4 }}>
-//                         <span className="mb-1 flex items-center gap-1.5 text-[12px] font-extrabold">
-//                           <span className="grid h-5 w-5 flex-none place-items-center rounded-full text-[11px] font-black" style={{ background: `linear-gradient(135deg,${C.gold},#E0A92E)`, color: "#2A1D00" }}>1</span>
+//                       <div className="grid h-[30px] w-[30px] flex-none place-items-center rounded-sm" style={{ background: `linear-gradient(135deg,${C.action},var(--brand-light))` }}><span className="material-icons-outlined" style={{ fontSize: 17, color: "var(--surface)" }}>auto_awesome</span></div>
+//                       <div className="rounded-lg px-3.5 py-2.5 text-body leading-relaxed" style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.navy, borderStartStartRadius: 4 }}>
+//                         <span className="mb-1 flex items-center gap-1.5 text-meta font-extrabold">
+//                           <span className="grid h-5 w-5 flex-none place-items-center rounded-full text-label font-extrabold" style={{ background: `linear-gradient(135deg,${C.gold},var(--brand-light))`, color: "var(--brand-deep)" }}>1</span>
 //                           {(cols.find((c) => c.bid.id === pickId) ?? cols[0])?.bid.supplierName}
 //                         </span>
 //                         {recoMsg}
@@ -1274,12 +1274,12 @@
 //                     </div>
 //                   )}
 //                   {chat.length === 0 && !recoMsg && (
-//                     <p className="text-[13px]" style={{ color: C.muted }}>{L("Ask anything about these bids — or use the suggestions below.", "اسأل أي شيء عن هذه العروض — أو استخدم الاقتراحات أدناه.")}</p>
+//                     <p className="text-body" style={{ color: C.muted }}>{L("Ask anything about these bids — or use the suggestions below.", "اسأل أي شيء عن هذه العروض — أو استخدم الاقتراحات أدناه.")}</p>
 //                   )}
 //                   {chat.map((m, i) => (
 //                     <div key={i} className={`flex max-w-[92%] gap-2.5 ${m.role === "user" ? "ms-auto flex-row-reverse" : ""}`}>
-//                       {m.role === "mansour" && <div className="grid h-[30px] w-[30px] flex-none place-items-center rounded-lg" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }}><span className="material-icons-outlined" style={{ fontSize: 17, color: "#fff" }}>auto_awesome</span></div>}
-//                       <div className="rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed" style={m.role === "user" ? { background: C.rentee, color: "#fff", borderStartEndRadius: 4 } : { background: C.surface2, border: `1px solid ${C.border}`, color: C.navy, borderStartStartRadius: 4 }}>{m.text}</div>
+//                       {m.role === "mansour" && <div className="grid h-[30px] w-[30px] flex-none place-items-center rounded-sm" style={{ background: `linear-gradient(135deg,${C.action},var(--brand-light))` }}><span className="material-icons-outlined" style={{ fontSize: 17, color: "var(--surface)" }}>auto_awesome</span></div>}
+//                       <div className="rounded-lg px-3.5 py-2.5 text-body leading-relaxed" style={m.role === "user" ? { background: C.rentee, color: "var(--surface)", borderStartEndRadius: 4 } : { background: C.surface2, border: `1px solid ${C.border}`, color: C.navy, borderStartStartRadius: 4 }}>{m.text}</div>
 //                     </div>
 //                   ))}
 //                 </div>
@@ -1295,13 +1295,13 @@
 //                   const seen = new Set(whatif.map((w) => w.label));
 //                   const extra = suggestions.filter((s) => !seen.has(s.label));
 //                   const chip = (key: string, icon: string, label: string, message: string) => (
-//                     <button key={key} onClick={() => sendChat(message)} className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[12.5px] font-bold" style={{ borderColor: C.border, color: C.rentee, background: "#fff" }}>
+//                     <button key={key} onClick={() => sendChat(message)} className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-meta font-semibold" style={{ borderColor: C.border, color: C.rentee, background: "var(--surface)" }}>
 //                       <span className="material-icons-outlined" style={{ fontSize: 15 }}>{icon}</span>{label}
 //                     </button>
 //                   );
 //                   return (
 //                     <div className="px-4 pb-3">
-//                       <div className="mb-1.5 text-[11px] font-extrabold" style={{ color: C.muted, letterSpacing: ".3px" }}>{L("What if…", "ماذا لو…")}</div>
+//                       <div className="mb-1.5 text-label font-extrabold" style={{ color: C.muted, letterSpacing: ".3px" }}>{L("What if…", "ماذا لو…")}</div>
 //                       <div className="flex flex-wrap gap-2">
 //                         {whatif.map((s, i) => chip(`w${i}`, s.icon, s.label, s.message))}
 //                         {extra.map((s, i) => chip(`s${i}`, SUGGEST_ICON[s.icon] ?? "help", s.label, s.message))}
@@ -1310,9 +1310,9 @@
 //                   );
 //                 })()}
 //                 <div className="flex gap-2.5 border-t px-4 py-3" style={{ borderColor: C.line, background: C.surface2 }}>
-//                   <div className="flex h-[46px] flex-1 items-center gap-2.5 rounded-full border px-4" style={{ background: "#fff", borderColor: C.border }}>
+//                   <div className="flex h-[46px] flex-1 items-center gap-2.5 rounded-full border px-4" style={{ background: "var(--surface)", borderColor: C.border }}>
 //                     <span className="material-icons-outlined" style={{ fontSize: 18, color: C.action }}>auto_awesome</span>
-//                     <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") sendChat(chatInput); }} placeholder={L("Ask your assistant…", "اسأل مساعدك…")} className="min-w-0 flex-1 bg-transparent text-[14px] outline-none" style={{ color: C.navy }} />
+//                     <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") sendChat(chatInput); }} placeholder={L("Ask your assistant…", "اسأل مساعدك…")} className="min-w-0 flex-1 bg-transparent text-body outline-none" style={{ color: C.navy }} />
 //                   </div>
 //                   <button onClick={() => sendChat(chatInput)} className="grid h-[46px] w-[46px] flex-none place-items-center rounded-full text-white" style={{ background: C.action }}><span className="material-icons-outlined" style={{ fontSize: 20, transform: ar ? "scaleX(-1)" : undefined }}>send</span></button>
 //                 </div>
@@ -1322,41 +1322,41 @@
 //
 //
 //           {/* ── comparison table ── */}
-//           <div className="overflow-hidden rounded-2xl border" style={{ borderColor: C.border, background: "#fff" }}>
+//           <div className="overflow-hidden rounded-lg border" style={{ borderColor: C.border, background: "var(--surface)" }}>
 //             <div className="overflow-x-auto">
 //               <table className="w-full border-collapse" style={{ minWidth: 320 + cols.length * 215 }}>
 //                 {/* tint the whole rank-winning column green (cells' own red/green layer on top) */}
 //                 <colgroup>
 //                   <col style={{ width: 200 }} />
-//                   {cols.map((c) => <col key={c.bid.id} style={c.bid.id === pickId ? { background: "rgba(29,175,88,0.09)" } : undefined} />)}
+//                   {cols.map((c) => <col key={c.bid.id} style={c.bid.id === pickId ? { background: "color-mix(in srgb, var(--ok) 9%, transparent)" } : undefined} />)}
 //                 </colgroup>
 //                 <thead>
 //                   {/* rank band — part of the table (⇅ Rank by · chips · Ask-AI input+Re-rank · AI badge) */}
 //                   <tr>
-//                     <td colSpan={cols.length + 1} style={{ background: "#FCFDFE", borderBottom: `1px solid ${C.line}`, padding: "12px 16px" }}>
+//                     <td colSpan={cols.length + 1} style={{ background: "var(--surface)", borderBottom: `1px solid ${C.line}`, padding: "12px 16px" }}>
 //                       <div className="flex flex-wrap items-center gap-2.5">
-//                         <span className="inline-flex flex-none items-center gap-1.5 text-[12.5px] font-extrabold" style={{ color: C.navy }}>
+//                         <span className="inline-flex flex-none items-center gap-1.5 text-meta font-extrabold" style={{ color: C.navy }}>
 //                           <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>swap_vert</span>{L("Rank by", "رتّب حسب")}
 //                         </span>
 //                         {presetDefs.map(([p, ic, en, arl]) => (
-//                           <button key={p} onClick={() => choosePreset(p, en, arl)} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-bold transition"
-//                             style={preset === p && !fxEcho ? { background: C.navy, color: "#fff" } : { background: C.surface2, color: C.navyMid, border: `1px solid ${C.border}` }}>
+//                           <button key={p} onClick={() => choosePreset(p, en, arl)} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-meta font-semibold transition"
+//                             style={preset === p && !fxEcho ? { background: C.navy, color: "var(--surface)" } : { background: C.surface2, color: C.navyMid, border: `1px solid ${C.border}` }}>
 //                             <span className="material-icons-outlined" style={{ fontSize: 15 }}>{ic}</span>{ar ? arl : en}
 //                           </button>
 //                         ))}
-//                         <div className="flex h-[40px] min-w-[220px] flex-1 items-center gap-2 rounded-full border ps-3.5 pe-1.5" style={{ background: "#fff", borderColor: C.border }}>
+//                         <div className="flex h-[40px] min-w-[220px] flex-1 items-center gap-2 rounded-full border ps-3.5 pe-1.5" style={{ background: "var(--surface)", borderColor: C.border }}>
 //                           <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>auto_awesome</span>
 //                           <input value={freeText} onChange={(e) => setFreeText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") applyFreeText(); }}
 //                             placeholder={L("Ask AI — e.g. closest equipment, newest with operator…", "اسأل الذكاء — مثلاً أقرب معدّة، الأحدث مع مشغّل…")}
-//                             className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold outline-none" style={{ color: C.navy }} />
-//                           <button onClick={applyFreeText} className="inline-flex flex-none items-center gap-1 rounded-full px-3 py-1.5 text-[12.5px] font-extrabold text-white" style={{ background: C.action }}>
+//                             className="min-w-0 flex-1 bg-transparent text-body font-semibold outline-none" style={{ color: C.navy }} />
+//                           <button onClick={applyFreeText} className="inline-flex flex-none items-center gap-1 rounded-full px-3 py-1.5 text-meta font-extrabold text-white" style={{ background: C.action }}>
 //                             <span className="material-icons-outlined" style={{ fontSize: 15, transform: ar ? "scaleX(-1)" : undefined }}>send</span>{L("Re-rank", "إعادة")}
 //                           </button>
 //                         </div>
 //                         <span className="flex-none">{agentBadge()}</span>
 //                       </div>
 //                       {fxEcho && (
-//                         <div className="mt-3 flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-[12.5px]" style={{ background: C.actionDim, borderColor: "rgba(247,144,9,.3)", color: "#8A5A06" }}>
+//                         <div className="mt-3 flex items-start gap-2.5 rounded-sm border px-3 py-2.5 text-meta" style={{ background: C.actionDim, borderColor: "color-mix(in srgb, var(--brand) 30%, transparent)", color: "var(--brand-deep)" }}>
 //                           <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>auto_awesome</span>{fxEcho}
 //                         </div>
 //                       )}
@@ -1364,7 +1364,7 @@
 //                   </tr>
 //                   <tr>
 //                     <th className="sticky start-0 z-[3] p-3 text-start align-bottom" style={{ background: C.surface2, width: 200, minWidth: 200, borderBottom: `1px solid ${C.line}` }}>
-//                       <span className="text-[11px] font-black" style={{ color: C.muted, letterSpacing: ".06em" }}>{L("SUPPLIER", "المؤجّر")}</span>
+//                       <span className="text-label font-extrabold" style={{ color: C.muted, letterSpacing: ".06em" }}>{L("SUPPLIER", "المؤجّر")}</span>
 //                     </th>
 //                     {cols.map((c, idx) => {
 //                       const isPick = c.bid.id === pickId;
@@ -1374,12 +1374,12 @@
 //                       const rankWord = idx === 0 ? L("Recommended", "موصى به") : L(`Rank #${idx + 1}`, `المركز #${idx + 1}`);
 //                       const rankStyle = idx === 0 ? { background: C.successBg, color: C.success } : { background: C.surface3, color: C.muted };
 //                       return (
-//                         <th key={c.bid.id} className="p-0 text-start align-top transition-colors" style={{ minWidth: 215, background: isPick ? "linear-gradient(180deg,#E7F7EE,#fff)" : "#fff", borderBottom: `1px solid ${C.line}` }}>
+//                         <th key={c.bid.id} className="p-0 text-start align-top transition-colors" style={{ minWidth: 215, background: isPick ? "linear-gradient(180deg,var(--ok-soft),var(--surface))" : "var(--surface)", borderBottom: `1px solid ${C.line}` }}>
 //                           <div style={{ height: 4, background: idx === 0 ? C.success : "transparent" }} />
 //                           <div className="p-3">
 //                             {/* rank pill + remove */}
 //                             <div className="mb-2.5 flex items-center justify-between gap-2">
-//                               <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-extrabold" style={rankStyle}>
+//                               <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-label font-extrabold" style={rankStyle}>
 //                                 <span className="material-icons-outlined" style={{ fontSize: 13 }}>emoji_events</span>{rankWord}
 //                               </span>
 //                               <button onClick={() => toggleBid(c.bid.id)} title={L("Remove from comparison", "إزالة من المقارنة")} className="grid h-[22px] w-[22px] flex-none place-items-center rounded-full" style={{ background: C.surface2, color: C.muted }}>
@@ -1388,13 +1388,13 @@
 //                             </div>
 //                             {/* avatar + name + rating/source */}
 //                             <div className="flex items-center gap-2.5">
-//                               <div className="grid h-9 w-9 flex-none place-items-center rounded-[10px] text-[14px] font-extrabold text-white" style={{ background: C.navy }}>{c.bid.supplierName.slice(0, 1).toUpperCase()}</div>
+//                               <div className="grid h-9 w-9 flex-none place-items-center rounded-sm text-body font-extrabold text-white" style={{ background: C.navy }}>{c.bid.supplierName.slice(0, 1).toUpperCase()}</div>
 //                               <div className="min-w-0 flex-1">
-//                                 <b className="flex items-center gap-1 text-[14px] leading-tight" style={{ color: C.navy }}>
+//                                 <b className="flex items-center gap-1 text-body leading-tight" style={{ color: C.navy }}>
 //                                   <span className="truncate">{c.bid.supplierName}</span>
 //                                   <span className="material-icons-outlined flex-none" style={{ fontSize: 15, color: c.bid.verified ? C.success : C.danger }} title={c.bid.verified ? L("Verified supplier", "مؤجّر موثّق") : L("Not verified", "غير موثّق")}>{c.bid.verified ? "verified" : "gpp_bad"}</span>
 //                                 </b>
-//                                 <div className="mt-0.5 flex items-center gap-2 whitespace-nowrap text-[10.5px] font-bold">
+//                                 <div className="mt-0.5 flex items-center gap-2 whitespace-nowrap text-label font-semibold">
 //                                   {c.bid.rating != null && <span className="inline-flex items-center gap-0.5" style={{ color: C.action }}><span className="material-icons-outlined" style={{ fontSize: 12 }}>star</span>{c.bid.rating}</span>}
 //                                   {(() => {
 //                                     // Source chip — same colours + wording as the bid-card banners (T4):
@@ -1402,8 +1402,8 @@
 //                                     const chip = isUpload
 //                                       ? { bg: C.surface2, c: C.muted, icon: "description", text: L("Uploaded file", "ملف مرفوع") }
 //                                       : (c.bid.viaSharedLink || c.bid.converted) // converted = off-platform origin (web-app/006)
-//                                         ? { bg: "#fff4e5", c: "#d4780a", icon: "link", text: L("Off-platform · via your request link", "خارج المنصة · عبر رابط طلبك") }
-//                                         : { bg: "#e6f2fb", c: "#1a7ec8", icon: "verified_user", text: L("Via Moedatech app", "عبر تطبيق معداتك") };
+//                                         ? { bg: "var(--brand-soft)", c: "var(--warn)", icon: "link", text: L("Off-platform · via your request link", "خارج المنصة · عبر رابط طلبك") }
+//                                         : { bg: "var(--info-soft)", c: "var(--info)", icon: "verified_user", text: L("Via Moedatech app", "عبر تطبيق معداتك") };
 //                                     return (
 //                                       <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5" style={{ background: chip.bg, color: chip.c }}>
 //                                         <span className="material-icons-outlined" style={{ fontSize: 12 }}>{chip.icon}</span>{chip.text}
@@ -1429,7 +1429,7 @@
 //                               const li = linkInfo.get(c.bid.id);
 //                               return li ? <div className="mt-1.5"><QualityBadge quality={li.quality} L={L} onClick={() => setSubBid(c.bid)} /></div> : null;
 //                             })()}
-//                             {recog && <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-bold" style={{ background: C.renteeDim, color: "#1E4FB8", borderColor: "rgba(37,99,235,.28)" }}><span className="material-icons-outlined" style={{ fontSize: 13, color: C.rentee }}>history</span>{recog}</span>}
+//                             {recog && <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-label font-semibold" style={{ background: C.renteeDim, color: "var(--info)", borderColor: "color-mix(in srgb, var(--info) 28%, transparent)" }}><span className="material-icons-outlined" style={{ fontSize: 13, color: C.rentee }}>history</span>{recog}</span>}
 //                           </div>
 //                         </th>
 //                       );
@@ -1438,14 +1438,14 @@
 //                 </thead>
 //                 <tbody>
 //                   {/* 💰 COST */}
-//                   <SectionRow id="cost" icon="payments" title={L("Cost", "التكلفة")} accent={C.action} accentText="#fff" n={cols.length} collapsed={collapsed.has("cost")} onToggle={() => toggleSection("cost")} />
+//                   <SectionRow id="cost" icon="payments" title={L("Cost", "التكلفة")} accent={C.action} accentText="var(--surface)" n={cols.length} collapsed={collapsed.has("cost")} onToggle={() => toggleSection("cost")} />
 //                   {!collapsed.has("cost") && (<>
 //                     {/* These prices aren't final — the renter negotiates them in the deal room (in-app bids
 //                         only; a guest has no deal room, so the note is hidden for them). */}
 //                     {!anon && (
 //                     <tr>
 //                       <td colSpan={cols.length + 1} style={{ padding: "8px 14px", background: C.warningBg, borderTop: `1px solid ${C.line}` }}>
-//                         <span className="inline-flex flex-wrap items-center gap-1.5 text-[11.5px] font-bold" style={{ color: C.warning }}>
+//                         <span className="inline-flex flex-wrap items-center gap-1.5 text-label font-semibold" style={{ color: C.warning }}>
 //                           <span className="material-icons-outlined" style={{ fontSize: 15 }}>forum</span>
 //                           {L("You can negotiate these prices in the deal room for bids in app.", "يمكنك التفاوض على هذه الأسعار في غرفة الصفقة لعروض التطبيق.")}
 //                         </span>
@@ -1457,20 +1457,20 @@
 //                       <td colSpan={cols.length + 1} style={{ padding: "9px 16px", background: C.surface2, borderBottom: `1px solid ${C.line}` }}>
 //                         <div className="flex flex-wrap items-end gap-5">
 //                           <div className="flex flex-col gap-1">
-//                             <span className="text-[9px] font-extrabold" style={{ color: C.muted, letterSpacing: ".08em" }}>{L("RATE PERIOD", "أساس السعر")}</span>
-//                             <div className="inline-flex rounded-lg p-0.5" style={{ background: C.surface3 }}>
+//                             <span className="text-label font-extrabold" style={{ color: C.muted, letterSpacing: ".08em" }}>{L("RATE PERIOD", "أساس السعر")}</span>
+//                             <div className="inline-flex rounded-sm p-0.5" style={{ background: C.surface3 }}>
 //                               {([["PER_DAY", L("Day", "يوم")], ["PER_WEEK", L("Week", "أسبوع")], ["PER_MONTH", L("Month", "شهر")]] as [RatePeriod, string][]).map(([p, lab]) => (
-//                                 <button key={p} onClick={() => setPeriod(p)} className="rounded-md px-3 py-1 text-[11.5px] font-extrabold transition" style={period === p ? { background: "#fff", color: C.navy, boxShadow: "0 1px 3px rgba(20,40,70,.12)" } : { background: "transparent", color: C.muted }}>{lab}</button>
+//                                 <button key={p} onClick={() => setPeriod(p)} className="rounded-sm px-3 py-1 text-label font-extrabold transition" style={period === p ? { background: "var(--surface)", color: C.navy, } : { background: "transparent", color: C.muted }}>{lab}</button>
 //                               ))}
 //                             </div>
 //                           </div>
 //                           {/* Per-unit vs all-units only matters for a multi-unit request (they're identical at 1 unit). */}
 //                           {units > 1 && (
 //                             <div className="flex flex-col gap-1">
-//                               <span className="text-[9px] font-extrabold" style={{ color: C.muted, letterSpacing: ".08em" }}>{L("PRICES FOR", "الأسعار لـ")}</span>
-//                               <div className="inline-flex rounded-lg p-0.5" style={{ background: C.surface3 }}>
+//                               <span className="text-label font-extrabold" style={{ color: C.muted, letterSpacing: ".08em" }}>{L("PRICES FOR", "الأسعار لـ")}</span>
+//                               <div className="inline-flex rounded-sm p-0.5" style={{ background: C.surface3 }}>
 //                                 {([["unit", L("Per unit", "لكل وحدة")], ["all", L("All units offered", "كل الوحدات المعروضة")]] as [PricesFor, string][]).map(([p, lab]) => (
-//                                   <button key={p} onClick={() => setPricesFor(p)} className="rounded-md px-3 py-1 text-[11.5px] font-extrabold transition" style={pricesFor === p ? { background: "#fff", color: C.navy, boxShadow: "0 1px 3px rgba(20,40,70,.12)" } : { background: "transparent", color: C.muted }}>{lab}</button>
+//                                   <button key={p} onClick={() => setPricesFor(p)} className="rounded-sm px-3 py-1 text-label font-extrabold transition" style={pricesFor === p ? { background: "var(--surface)", color: C.navy, } : { background: "transparent", color: C.muted }}>{lab}</button>
 //                                 ))}
 //                               </div>
 //                             </div>
@@ -1489,7 +1489,7 @@
 //                         const short = units - off;
 //                         return (
 //                           <Td key={c.bid.id} ok={off >= units}>
-//                             <div className="flex items-center justify-between gap-2"><span className="text-[13px] font-extrabold" style={{ color: bc }}>{off}/{units}</span><span className="text-[10.5px] font-bold" style={{ color: C.muted }}>{L("units", "وحدة")}</span></div>
+//                             <div className="flex items-center justify-between gap-2"><span className="text-body font-extrabold" style={{ color: bc }}>{off}/{units}</span><span className="text-label font-semibold" style={{ color: C.muted }}>{L("units", "وحدة")}</span></div>
 //                             <div className="mt-1 h-[7px] max-w-[160px] overflow-hidden rounded" style={{ background: C.surface3 }}><i className="block h-full rounded" style={{ width: `${pct}%`, background: bc }} /></div>
 //                             <Sub>{off >= units ? L("covers full request", "يغطي كامل الطلب") : L(`${short} short`, `ناقص ${short}`)}</Sub>
 //                           </Td>
@@ -1508,13 +1508,13 @@
 //                             ) : (<>
 //                               {/* per-unit rate → all-units total, e.g. "SAR 100/day → SAR 400/day", breakdown below */}
 //                               <span className="inline-flex flex-wrap items-center gap-1.5">
-//                                 <span className="font-mono text-[15px] font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(dq(c).ratePerPeriod)}/{per}{unitsOf(c) > 1 ? ` → ${sar} ${nf(dq(c).rentalForPeriod)}/${per}` : ""}</span>
+//                                 <span className="font-mono text-subhead font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(dq(c).ratePerPeriod)}/{per}{unitsOf(c) > 1 ? ` → ${sar} ${nf(dq(c).rentalForPeriod)}/${per}` : ""}</span>
 //                                 {rentalWin.has(idx) && bestTag}
 //                               </span>
 //                               {unitsOf(c) > 1 && <Sub>{`(${nf(dq(c).ratePerPeriod)}/${per} × ${unitsOf(c)} ${L("units", "وحدة")})`}</Sub>}
 //                               {/* Estimated rental for the whole duration — a smaller, coloured sub of the rental cost. */}
 //                               {hasDuration && dq(c).durationRental != null && (
-//                                 <div className="mt-0.5 text-[11px] font-bold" style={{ color: C.rentee }}>
+//                                 <div className="mt-0.5 text-label font-semibold" style={{ color: C.rentee }}>
 //                                   {L("Est. rental", "الإيجار التقديري")}: {sar} {nf(dq(c).durationRental!)}
 //                                   {/* The BILLABLE days the figure was charged across, as the bid card
 //                                       captions it — the request's calendar duration counts the Fridays
@@ -1556,21 +1556,21 @@
 //                           <Td key={c.bid.id} ok={!conflict} fail={conflict}>
 //                             {supUnit > 0 ? (<>
 //                               <span className="inline-flex flex-wrap items-center gap-1.5">
-//                                 <span className="font-mono text-[15px] font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(supUnit)}{unitsOf(c) > 1 ? ` → ${sar} ${nf(supTotal)}` : ""}</span>
-//                                 {c.bid.distanceKm != null && <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={{ background: C.surface2, color: C.navyMid }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>place</span>{Math.round(c.bid.distanceKm)} {L("km", "كم")}</span>}
+//                                 <span className="font-mono text-subhead font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(supUnit)}{unitsOf(c) > 1 ? ` → ${sar} ${nf(supTotal)}` : ""}</span>
+//                                 {c.bid.distanceKm != null && <span className="inline-flex items-center gap-0.5 rounded-sm px-1.5 py-0.5 text-label font-semibold" style={{ background: C.surface2, color: C.navyMid }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>place</span>{Math.round(c.bid.distanceKm)} {L("km", "كم")}</span>}
 //                                 {mobWin.has(idx) && bestTag}
 //                               </span>
 //                               {breakdown}
 //                             </>) : rm ? (<>
-//                               <span className="inline-flex items-center gap-1.5 text-[13px] font-bold">{sar} {nf(rm)}
-//                                 <button onClick={() => addMobCost(c.bid.id, L("Delivery + return", "النقل والإرجاع"))} className="text-[10px] font-bold underline" style={{ color: C.rentee }}>{L("edit", "تعديل")}</button>
+//                               <span className="inline-flex items-center gap-1.5 text-body font-semibold">{sar} {nf(rm)}
+//                                 <button onClick={() => addMobCost(c.bid.id, L("Delivery + return", "النقل والإرجاع"))} className="text-label font-semibold underline" style={{ color: C.rentee }}>{L("edit", "تعديل")}</button>
 //                                 <button onClick={() => removeMobCost(c.bid.id)} title={L("Remove your estimate", "إزالة تقديرك")} className="grid h-4 w-4 place-items-center rounded-full" style={{ background: C.surface3, color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>close</span></button>
 //                               </span>
 //                               <Sub>{L("your estimate", "تقديرك")} · {L("Delivery", "التوصيل")}: {token(c.mob, mobByRentee, deliveryEst)} · {L("Return", "الإرجاع")}: {token(c.demob, demobByRentee, returnEst)}</Sub>
 //                             </>) : conflict ? (
-//                               <><span className="inline-flex items-center gap-1.5 text-[12px] font-bold" style={{ color: C.danger }}>{L("supplier didn't include it", "لم يُدرجه المؤجّر")}</span>{breakdown}</>
+//                               <><span className="inline-flex items-center gap-1.5 text-meta font-semibold" style={{ color: C.danger }}>{L("supplier didn't include it", "لم يُدرجه المؤجّر")}</span>{breakdown}</>
 //                             ) : (
-//                               <><span className="inline-flex items-center gap-1.5 text-[12px]" style={{ color: C.muted }}>{anyOnRenter ? (mobEstOnYou > 0 ? `${sar} ${nf(mobEstOnYou)}` : L("on you", "عليك")) : L("not stated", "غير محدد")}</span>{breakdown}</>
+//                               <><span className="inline-flex items-center gap-1.5 text-meta" style={{ color: C.muted }}>{anyOnRenter ? (mobEstOnYou > 0 ? `${sar} ${nf(mobEstOnYou)}` : L("on you", "عليك")) : L("not stated", "غير محدد")}</span>{breakdown}</>
 //                             )}
 //                           </Td>
 //                         );
@@ -1580,18 +1580,18 @@
 //                     {requiredResp.length > 0 && (
 //                     <tr>
 //                       {/* §6: label cell carries ONE "Estimate your costs" popup button (not per-term add) */}
-//                       <td className="sticky start-0 z-[1] align-top text-[12.5px]" style={{ background: C.surface2, color: C.navy, fontWeight: 900, width: 200, minWidth: 200, padding: "14px 16px" }}>
+//                       <td className="sticky start-0 z-[1] align-top text-meta" style={{ background: C.surface2, color: C.navy, fontWeight: 900, width: 200, minWidth: 200, padding: "14px 16px" }}>
 //                         {L("Cost terms", "شروط التكلفة")}
-//                         <span className="mt-0.5 block text-[10.5px] font-semibold" style={{ color: C.muted }}>{L("who handles what", "من يتحمّل ماذا")}</span>
+//                         <span className="mt-0.5 block text-label font-semibold" style={{ color: C.muted }}>{L("who handles what", "من يتحمّل ماذا")}</span>
 //                         {(youTerms.length > 0 || showDeliveryEst || showReturnEst) && (
-//                           <button onClick={openEstimate} className="mt-2 inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-extrabold" style={{ borderColor: "rgba(37,99,235,.4)", color: C.rentee, background: C.renteeDim, borderStyle: "dashed" }}>
+//                           <button onClick={openEstimate} className="mt-2 inline-flex items-center gap-1 rounded-sm border px-2.5 py-1.5 text-label font-extrabold" style={{ borderColor: "color-mix(in srgb, var(--info) 40%, transparent)", color: C.rentee, background: C.renteeDim, borderStyle: "dashed" }}>
 //                             🧮 {estTotal > 0 ? L(`Your est. ~${sar} ${nf(estTotal)}`, `تقديرك ~${sar} ${nf(estTotal)}`) : L("Estimate your costs", "قدّر تكاليفك")}
 //                           </button>
 //                         )}
 //                       </td>
 //                       {cols.map((c) => (
 //                         <Td key={c.bid.id}>
-//                           <div className="flex flex-col items-start gap-[5px]">
+//                           <div className="flex flex-col items-start gap-1">
 //                             {requiredResp.map((m) => {
 //                               const cr = c.costResponsibilities.find((x) => x.key === m.key)!;
 //                               const fatKey = m.key === "operator_food" ? "fat_food" : m.key === "operator_transport_accommodation" ? "fat_accommodation_transport" : null;
@@ -1603,7 +1603,7 @@
 //                               const tone = dealConflict ? "red" : responsibilityTone(cr);
 //                               const bg = tone === "green" ? C.successBg : tone === "red" ? C.dangerBg : C.surface3;
 //                               const fg = tone === "green" ? C.success : tone === "red" ? C.danger : C.muted;
-//                               const bd = tone === "green" ? "rgba(29,175,88,.3)" : tone === "red" ? "rgba(217,54,42,.3)" : C.border;
+//                               const bd = tone === "green" ? "color-mix(in srgb, var(--ok) 30%, transparent)" : tone === "red" ? "color-mix(in srgb, var(--danger) 30%, transparent)" : C.border;
 //                               const side = cr.bidSide ?? cr.requestSide;
 //                               // On a conflict, name BOTH sides — what the request asked ("your choice") vs the
 //                               // supplier's position — instead of a bare "conflict" (user: show what the conflict is).
@@ -1613,7 +1613,7 @@
 //                                 : side === "supplier" ? L("supplier", "المؤجّر") : side === "me" ? L("you", "أنت") : L("—", "—");
 //                               const entered = renterCosts[m.key];
 //                               return (
-//                                 <span key={m.key} className="inline-flex items-center gap-1 self-start px-[9px] py-1 text-[11px]" style={{ background: bg, color: fg, fontWeight: 800, borderRadius: 7, border: `1px solid ${bd}` }}>
+//                                 <span key={m.key} className="inline-flex items-center gap-1 self-start px-2 py-1 text-label" style={{ background: bg, color: fg, fontWeight: 800, borderRadius: 7, border: `1px solid ${bd}` }}>
 //                                   {tone === "red" && <span className="material-icons-outlined" style={{ fontSize: 13 }}>warning_amber</span>}
 //                                   {ar ? m.ar : m.en}<span style={{ fontWeight: 700, opacity: 0.8 }}> · {owner}{entered != null ? ` · ~${sar} ${nf(entered)}` : ""}</span>
 //                                 </span>
@@ -1636,13 +1636,13 @@
 //                         return (
 //                           <Td key={c.bid.id} ok={hasCost(c) && isLow} fail={false}>
 //                             {hasCost(c) ? (<>
-//                               <span className="font-mono text-[19px] font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(total)}</span>
-//                               {cols.length > 1 && lowestGrand != null && <span className="ms-1.5 rounded-full px-2 py-0.5 font-mono text-[10.5px] font-extrabold" style={isLow ? { background: C.successBg, color: C.success } : { background: C.warningBg, color: C.warning }}>{isLow ? L("lowest", "الأقل") : `+${Math.round(((total - lowestGrand) / lowestGrand) * 100)}%`}</span>}
+//                               <span className="font-mono text-title font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(total)}</span>
+//                               {cols.length > 1 && lowestGrand != null && <span className="ms-1.5 rounded-full px-2 py-0.5 font-mono text-label font-extrabold" style={isLow ? { background: C.successBg, color: C.success } : { background: C.warningBg, color: C.warning }}>{isLow ? L("lowest", "الأقل") : `+${Math.round(((total - lowestGrand) / lowestGrand) * 100)}%`}</span>}
 //                               <div className="mt-1.5 h-[6px] max-w-[160px] overflow-hidden rounded" style={{ background: C.surface3 }}><i className="block h-full rounded" style={{ width: `${Math.round((total / maxGrand) * 100)}%`, background: isLow ? C.success : total === maxGrand ? C.warning : C.navyMid }} /></div>
 //                               {partial && <Sub>{L("rental not totaled — set a duration", "لم تُحتسب المدة — حدّد مدة")}</Sub>}
 //                               {yourCosts > 0 && <Sub>{L(`incl. ${sar} ${nf(yourCosts)} of your estimates`, `يشمل ${sar} ${nf(yourCosts)} من تقديراتك`)}</Sub>}
 //                             </>) : rateInclVat != null ? (<>
-//                               <span className="font-mono text-[15px] font-bold" style={{ color: C.navy }}>{sar} {nf(rateInclVat)}<small style={{ fontSize: 10.5, color: C.muted }}>/{periodLabel(c.bid.priceUnit)}</small></span>
+//                               <span className="font-mono text-subhead font-extrabold" style={{ color: C.navy }}>{sar} {nf(rateInclVat)}<small style={{ fontSize: 10.5, color: C.muted }}>/{periodLabel(c.bid.priceUnit)}</small></span>
 //                             </>) : <span style={{ color: C.muted }}>{L("not stated", "غير محدد")}</span>}
 //                           </Td>
 //                         );
@@ -1656,7 +1656,7 @@
 //                         • Equipment safety cert + Proof of ownership → the EQUIPMENT's documents (equipmentCertCodes / ownershipDocs).
 //                         • Operator cert + required equipment cert term → negotiable DEAL-ROOM terms (live).
 //                       Colour rule (T11): green = matches the request · blue = held/shown but not required · red = required-unmet. */}
-//                   <SectionRow id="equip" icon="construction" title={L("Equipment", "المعدّة")} accent={C.action} accentText="#fff" n={cols.length} collapsed={collapsed.has("equip")} onToggle={() => toggleSection("equip")} />
+//                   <SectionRow id="equip" icon="construction" title={L("Equipment", "المعدّة")} accent={C.action} accentText="var(--surface)" n={cols.length} collapsed={collapsed.has("equip")} onToggle={() => toggleSection("equip")} />
 //                   {!collapsed.has("equip") && (<>
 //                     {/* One merged banner (T8): supplier-acknowledged + (when multi-unit) the per-unit caveat,
 //                         scoped to in-app bids, with the "verify in deal room" link when a room exists. Hidden
@@ -1664,7 +1664,7 @@
 //                     {!anon && (
 //                     <tr>
 //                       <td colSpan={cols.length + 1} style={{ padding: "8px 14px", background: C.warningBg, borderTop: `1px solid ${C.line}` }}>
-//                         <span className="inline-flex flex-wrap items-center gap-1.5 text-[11.5px] font-bold" style={{ color: C.warning }}>
+//                         <span className="inline-flex flex-wrap items-center gap-1.5 text-label font-semibold" style={{ color: C.warning }}>
 //                           <span className="material-icons-outlined" style={{ fontSize: 15 }}>warning_amber</span>
 //                           {units > 1
 //                             ? L(`Supplier-acknowledged, not verified; shown for 1 of ${units} units — verify each in the deal room (in-app bids).`, `مُقَرّة من المؤجّر، غير مُتحقَّق منها؛ معروضة لوحدة من ${units} — تحقّق من كلٍّ منها في غرفة الصفقة (لعروض التطبيق).`)
@@ -1687,7 +1687,7 @@
 //                           // Confirmed → green "≥ 2022" (the requirement the supplier met); declined → red "Not met".
 //                           // (Previously showed "≥ 2022" even on a conflict, so a decline read as a red requirement.)
 //                           const v = yr ? (yr.state === "conflict" ? L("Not met", "غير مطابق") : c.bid.reqMinYear != null ? `≥ ${c.bid.reqMinYear}` : L("Confirmed", "مؤكّد")) : null;
-//                           return <Td key={c.bid.id} ok={!!yr && yr.state !== "conflict"} fail={yr?.state === "conflict"}>{v ? <span className="text-[14px]" style={{ fontWeight: 900 }}>{v}</span> : <span style={{ color: C.muted }}>—</span>}</Td>;
+//                           return <Td key={c.bid.id} ok={!!yr && yr.state !== "conflict"} fail={yr?.state === "conflict"}>{v ? <span className="text-body" style={{ fontWeight: 900 }}>{v}</span> : <span style={{ color: C.muted }}>—</span>}</Td>;
 //                         }
 //                         // NATIVE → below-min-year is read per OFFERED UNIT (readiness): fail if any offered
 //                         // unit is below the request's min year; show "K/M below min" when partial.
@@ -1695,12 +1695,12 @@
 //                         const badUnits = rd ? rd.units.filter((u) => u.yearConflict).length : 0;
 //                         const totUnits = rd ? rd.units.length : 0;
 //                         const yearFail = rd ? badUnits > 0 : yr?.state === "conflict";
-//                         return <Td key={c.bid.id} ok={!yearFail} fail={yearFail}><span className="text-[14px]" style={{ fontWeight: 900 }}>{c.bid.equipment?.year ?? "—"}</span>{rd && badUnits > 0 && <span className="mt-0.5 block text-[11px]" style={{ color: C.danger, fontWeight: 800 }}>{L(`${badUnits}/${totUnits} below min`, `${badUnits}/${totUnits} دون الحد`)}</span>}{!yearFail && yearWin.has(idx) && <span className="mt-0.5 block text-[11px]" style={{ color: C.success, fontWeight: 800 }}>{L("newest", "الأحدث")}</span>}</Td>;
+//                         return <Td key={c.bid.id} ok={!yearFail} fail={yearFail}><span className="text-body" style={{ fontWeight: 900 }}>{c.bid.equipment?.year ?? "—"}</span>{rd && badUnits > 0 && <span className="mt-0.5 block text-label" style={{ color: C.danger, fontWeight: 800 }}>{L(`${badUnits}/${totUnits} below min`, `${badUnits}/${totUnits} دون الحد`)}</span>}{!yearFail && yearWin.has(idx) && <span className="mt-0.5 block text-label" style={{ color: C.success, fontWeight: 800 }}>{L("newest", "الأحدث")}</span>}</Td>;
 //                       })}
 //                     </tr>
 //                     <tr>
 //                       <RowHead title={L("Distance to site", "المسافة للموقع")} />
-//                       {cols.map((c, idx) => <Td key={c.bid.id} ok><span className="text-[14px]" style={{ fontWeight: 900 }}>{c.bid.distanceKm != null ? `${Math.round(c.bid.distanceKm)} ${L("km", "كم")}` : <span style={{ color: C.muted }}>—</span>}</span>{distanceWin.has(idx) && <span className="mt-0.5 block text-[11px]" style={{ color: C.success, fontWeight: 800 }}>{L("closest", "الأقرب")}</span>}</Td>)}
+//                       {cols.map((c, idx) => <Td key={c.bid.id} ok><span className="text-body" style={{ fontWeight: 900 }}>{c.bid.distanceKm != null ? `${Math.round(c.bid.distanceKm)} ${L("km", "كم")}` : <span style={{ color: C.muted }}>—</span>}</span>{distanceWin.has(idx) && <span className="mt-0.5 block text-label" style={{ color: C.success, fontWeight: 800 }}>{L("closest", "الأقرب")}</span>}</Td>)}
 //                     </tr>
 //                     {/* L2 equipment — ONE field: safety certs (required ✓/✗ + held) + proof-of-ownership
 //                         docs (istimara / customs / sale_contract / saso_registration), combined per column. */}
@@ -1734,7 +1734,7 @@
 //                               <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
 //                                 {requiredEquipCerts.map((cert) => <span key={cert}>{docChip(c, certLabel(cert), codes.includes(cert), cert, true)}</span>)}
 //                                 {extras.map((cert) => (
-//                                   <span key={cert} className="inline-flex items-center gap-1 text-[11.5px]" title={L("Held — not required", "متوفّرة — غير مطلوبة")} style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: "1px solid rgba(37,99,235,.3)" }}>
+//                                   <span key={cert} className="inline-flex items-center gap-1 text-label" title={L("Held — not required", "متوفّرة — غير مطلوبة")} style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: "1px solid color-mix(in srgb, var(--info) 30%, transparent)" }}>
 //                                     <span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{certLabel(cert)}
 //                                   </span>
 //                                 ))}
@@ -1761,7 +1761,7 @@
 //                           if (!held) return <Td key={c.bid.id}><span style={{ color: C.muted }}>—</span></Td>;
 //                           return (
 //                             <Td key={c.bid.id}>
-//                               <button type="button" onClick={() => openDoc(c, doc.key, label)} title={L("View document", "عرض المستند")} className="inline-flex items-center gap-1 text-[11.5px]" style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: "1px solid rgba(37,99,235,.3)" }}>
+//                               <button type="button" onClick={() => openDoc(c, doc.key, label)} title={L("View document", "عرض المستند")} className="inline-flex items-center gap-1 text-label" style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: "1px solid color-mix(in srgb, var(--info) 30%, transparent)" }}>
 //                                 <span className="material-icons-outlined" style={{ fontSize: 11 }}>description</span>{label}<span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>
 //                               </button>
 //                             </Td>
@@ -1827,7 +1827,7 @@
 //                             <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
 //                               {certPill(req, met, opFile)}
 //                               {showExtra && (
-//                                 <span className="inline-flex items-center gap-1 text-[11.5px]" title={L("Declared — doesn’t meet the requirement", "مُعلن — لا يفي بالمطلوب")} style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: "1px solid rgba(37,99,235,.3)" }}>
+//                                 <span className="inline-flex items-center gap-1 text-label" title={L("Declared — doesn’t meet the requirement", "مُعلن — لا يفي بالمطلوب")} style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: "1px solid color-mix(in srgb, var(--info) 30%, transparent)" }}>
 //                                   <span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{declared}
 //                                 </span>
 //                               )}
@@ -1850,7 +1850,7 @@
 //                       {cols.map((c) => (
 //                         <Td key={c.bid.id}>
 //                           {c.bid.note && c.bid.note.trim() !== ""
-//                             ? <span className="block text-[12px] font-semibold leading-snug" style={{ color: C.navy, whiteSpace: "pre-wrap", maxHeight: 150, overflowY: "auto" }}>{c.bid.note}</span>
+//                             ? <span className="block text-meta font-semibold leading-snug" style={{ color: C.navy, whiteSpace: "pre-wrap", maxHeight: 150, overflowY: "auto" }}>{c.bid.note}</span>
 //                             : <span style={{ color: C.muted }}>—</span>}
 //                         </Td>
 //                       ))}
@@ -1860,9 +1860,9 @@
 //                   {/* DECIDE — its own band, clearly separated from the equipment section. Award/Negotiate use
 //                       the SAME colours for every supplier (Award = green solid, Negotiate = navy outline). */}
 //                   <tr>
-//                     <th className="sticky start-0 z-[2] text-start align-top text-[12.5px]" style={{ background: C.surface2, color: C.navy, fontWeight: 900, width: 200, minWidth: 200, padding: "14px 16px", borderTop: `2px solid ${C.border}` }}>
+//                     <th className="sticky start-0 z-[2] text-start align-top text-meta" style={{ background: C.surface2, color: C.navy, fontWeight: 900, width: 200, minWidth: 200, padding: "14px 16px", borderTop: `2px solid ${C.border}` }}>
 //                       <span className="inline-flex items-center gap-1.5"><span className="material-icons-outlined" style={{ fontSize: 16 }}>gavel</span>{L("Decide", "القرار")}</span>
-//                       <span className="mt-0.5 block text-[10.5px] font-semibold" style={{ color: C.muted }}>{L("opens the deal room", "يفتح غرفة الصفقة")}</span>
+//                       <span className="mt-0.5 block text-label font-semibold" style={{ color: C.muted }}>{L("opens the deal room", "يفتح غرفة الصفقة")}</span>
 //                     </th>
 //                     {cols.map((c) => {
 //                       const isAwarded = !!awardedIds[c.bid.id];
@@ -1873,19 +1873,19 @@
 //                       const blockedByAccept = (decidedByAccept && !isAcceptedWinner) || (!isAwarded && otherLocalWinner);
 //                       return (
 //                         <td key={c.bid.id} className="align-top" style={{ padding: "14px 15px", borderTop: `2px solid ${C.border}`, borderInlineStart: `1px solid ${C.line}` }}>
-//                           <div className="flex flex-col gap-[7px]">
+//                           <div className="flex flex-col gap-2">
 //                             {isAcceptedWinner ? (
 //                               /* Case A / C-bidder: finalized winner — a static "Accepted" badge, not a toggle. */
-//                               <span className="inline-flex w-full items-center justify-center gap-1.5 text-[12.5px] text-white" style={{ background: "#137C42", padding: 9, borderRadius: 9, fontWeight: 800 }}>
+//                               <span className="inline-flex w-full items-center justify-center gap-1.5 text-meta text-white" style={{ background: "var(--ok-deep)", padding: 9, borderRadius: 9, fontWeight: 800 }}>
 //                                 <span className="material-icons-outlined" style={{ fontSize: 16 }}>check_circle</span>{decidedWord}
 //                               </span>
 //                             ) : (
 //                               /* Award = in-place toggle: "Award" (green) ⇄ "Awarded" (Case B, soft/reversible). Disabled once the request is decided elsewhere. */
-//                               <button onClick={() => toggleAward(c.bid)} disabled={blockedByAccept} title={isAwarded && !blockedByAccept ? L("Awarded — finalize in the deal room", "تمت الترسية — أتمِم في غرفة الصفقة") : undefined} className="inline-flex w-full items-center justify-center gap-1.5 text-[12.5px] text-white disabled:opacity-45 disabled:cursor-default" style={{ background: isAwarded ? "#137C42" : C.success, padding: 9, borderRadius: 9, fontWeight: 800 }}>
+//                               <button onClick={() => toggleAward(c.bid)} disabled={blockedByAccept} title={isAwarded && !blockedByAccept ? L("Awarded — finalize in the deal room", "تمت الترسية — أتمِم في غرفة الصفقة") : undefined} className="inline-flex w-full items-center justify-center gap-1.5 text-meta text-white disabled:bg-disabled-bg disabled:text-disabled-fg disabled:cursor-default" style={{ background: isAwarded ? "var(--ok-deep)" : C.success, padding: 9, borderRadius: 9, fontWeight: 800 }}>
 //                                 <span className="material-icons-outlined" style={{ fontSize: 16 }}>{isAwarded ? "check_circle" : "gavel"}</span>{isAwarded ? L("Awarded", "تمت الترسية") : L("Award", "ترسية")}
 //                               </button>
 //                             )}
-//                             <button onClick={() => goDealRoom(c.bid, isAcceptedWinner ? "award" : "negotiate")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 text-[12.5px] disabled:opacity-60" style={{ background: "#fff", color: C.rentee, border: `1px solid rgba(37,99,235,.35)`, padding: 9, borderRadius: 9, fontWeight: 800 }}>
+//                             <button onClick={() => goDealRoom(c.bid, isAcceptedWinner ? "award" : "negotiate")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 text-meta disabled:bg-disabled-bg disabled:text-disabled-fg" style={{ background: "var(--surface)", color: C.rentee, border: `1px solid color-mix(in srgb, var(--info) 35%, transparent)`, padding: 9, borderRadius: 9, fontWeight: 800 }}>
 //                               <span className="material-icons-outlined" style={{ fontSize: 15 }}>{isAcceptedWinner ? "forum" : "swap_horiz"}</span>{isAcceptedWinner ? L("View deal room", "غرفة الصفقة") : L("Negotiate", "تفاوض")}
 //                             </button>
 //                           </div>
@@ -1900,8 +1900,8 @@
 //
 //           {/* table footer — export the comparison (§6), in our layout or the company's own template */}
 //           <div className="mt-3 flex flex-wrap items-center gap-2.5">
-//             <span className="flex-1 text-[11.5px] font-semibold" style={{ color: C.muted, minWidth: 140 }}>{L("Export this comparison to share or keep — in our layout or your company's own template.", "صدّر هذه المقارنة للمشاركة أو الحفظ — بتنسيقنا أو بقالب شركتك.")}</span>
-//             <button onClick={() => setExportOpen(true)} className="inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-[9px] text-[12.5px] font-extrabold text-white" style={{ background: C.action }}>
+//             <span className="flex-1 text-label font-semibold" style={{ color: C.muted, minWidth: 140 }}>{L("Export this comparison to share or keep — in our layout or your company's own template.", "صدّر هذه المقارنة للمشاركة أو الحفظ — بتنسيقنا أو بقالب شركتك.")}</span>
+//             <button onClick={() => setExportOpen(true)} className="inline-flex items-center gap-1.5 rounded-sm px-3.5 py-2 text-meta font-extrabold text-white" style={{ background: C.action }}>
 //               <span className="material-icons-outlined" style={{ fontSize: 17 }}>ios_share</span>{L("Export", "تصدير")}
 //             </button>
 //           </div>
@@ -1914,26 +1914,26 @@
 //         // Off-platform / shared-link bids have no account and no deal room — the deal-room redirect can't work.
 //         const offPlatform = !!awardPrompt.viaSharedLink || String(awardPrompt.id).startsWith("link-") || String(awardPrompt.id).startsWith("upload:");
 //         return (
-//         <div className="fixed inset-0 z-[420] grid place-items-center p-6" style={{ background: "rgba(28,53,80,.42)", backdropFilter: "blur(3px)" }} onClick={() => setAwardPrompt(null)}>
-//           <div className="w-[440px] max-w-full overflow-hidden rounded-2xl" style={{ background: "#fff" }} onClick={(e) => e.stopPropagation()}>
+//         <div className="fixed inset-0 z-[420] grid place-items-center p-6" style={{ background: "color-mix(in srgb, var(--navy) 42%, transparent)", backdropFilter: "blur(3px)" }} onClick={() => setAwardPrompt(null)}>
+//           <div className="w-[440px] max-w-full overflow-hidden rounded-lg" style={{ background: "var(--surface)" }} onClick={(e) => e.stopPropagation()}>
 //             <div className="flex items-start gap-3 border-b px-6 py-5" style={{ borderColor: C.line }}>
-//               <div className="grid h-11 w-11 flex-none place-items-center rounded-lg" style={{ background: C.successBg, color: C.success }}><span className="material-icons-outlined" style={{ fontSize: 24 }}>check_circle</span></div>
-//               <div className="flex-1"><h3 className="m-0 text-[17px] font-extrabold">{L(`Awarded to ${awardPrompt.supplierName}`, `تمت الترسية لـ ${awardPrompt.supplierName}`)}</h3><p className="m-0 text-[12.5px]" style={{ color: C.muted }}>{offPlatform ? L("Off-platform supplier — finalize directly", "مؤجّر خارج المنصة — أتمِم مباشرة") : L("Finalize by accepting the terms in the deal room", "أتمِم الترسية بقبول الشروط في غرفة الصفقة")}</p></div>
+//               <div className="grid h-11 w-11 flex-none place-items-center rounded-sm" style={{ background: C.successBg, color: C.success }}><span className="material-icons-outlined" style={{ fontSize: 24 }}>check_circle</span></div>
+//               <div className="flex-1"><h3 className="m-0 text-title font-extrabold">{L(`Awarded to ${awardPrompt.supplierName}`, `تمت الترسية لـ ${awardPrompt.supplierName}`)}</h3><p className="m-0 text-meta" style={{ color: C.muted }}>{offPlatform ? L("Off-platform supplier — finalize directly", "مؤجّر خارج المنصة — أتمِم مباشرة") : L("Finalize by accepting the terms in the deal room", "أتمِم الترسية بقبول الشروط في غرفة الصفقة")}</p></div>
 //               <button onClick={() => setAwardPrompt(null)} className="grid h-8 w-8 flex-none place-items-center rounded-full border" style={{ borderColor: C.border, color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span></button>
 //             </div>
-//             <div className="px-6 py-5 text-[13px] leading-relaxed" style={{ color: C.navyMid }}>
+//             <div className="px-6 py-5 text-body leading-relaxed" style={{ color: C.navyMid }}>
 //               {offPlatform
 //                 ? L("You've marked this supplier as your choice. They bid off-platform via your shared link, so there's no deal room — reach out to them directly with the contact details on their submission to finalize.", "لقد اخترت هذا المؤجّر. قدّم عرضه خارج المنصة عبر رابطك المشترك، لذا لا توجد غرفة صفقة — تواصل معه مباشرةً عبر بيانات التواصل في عرضه لإتمام الترسية.")
 //                 : L("You've marked this supplier as your choice. To finalize the award, accept the terms with them in the deal room.", "لقد اخترت هذا المؤجّر. لإتمام الترسية، اقبل الشروط معه في غرفة الصفقة.")}
 //             </div>
 //             <div className="flex justify-end gap-2.5 border-t px-6 py-4" style={{ borderColor: C.line }}>
 //               {offPlatform ? (
-//                 <button onClick={() => setAwardPrompt(null)} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-[13px] font-bold text-white" style={{ background: C.success }}>
+//                 <button onClick={() => setAwardPrompt(null)} className="inline-flex items-center gap-1.5 rounded-sm px-4 py-2 text-body font-semibold text-white" style={{ background: C.success }}>
 //                   <span className="material-icons-outlined" style={{ fontSize: 17 }}>check</span>{L("Got it", "تمام")}
 //                 </button>
 //               ) : (<>
-//                 <button onClick={() => setAwardPrompt(null)} className="rounded-lg border px-4 py-2 text-[13px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>{L("Stay here", "البقاء هنا")}</button>
-//                 <button onClick={() => { const b = awardPrompt; setAwardPrompt(null); goDealRoom(b, "award"); }} disabled={busy} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-[13px] font-bold text-white disabled:opacity-60" style={{ background: C.success }}>
+//                 <button onClick={() => setAwardPrompt(null)} className="rounded-sm border px-4 py-2 text-body font-semibold" style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Stay here", "البقاء هنا")}</button>
+//                 <button onClick={() => { const b = awardPrompt; setAwardPrompt(null); goDealRoom(b, "award"); }} disabled={busy} className="inline-flex items-center gap-1.5 rounded-sm px-4 py-2 text-body font-semibold text-white disabled:bg-disabled-bg disabled:text-disabled-fg" style={{ background: C.success }}>
 //                   <span className="material-icons-outlined" style={{ fontSize: 17 }}>meeting_room</span>{L("Accept in deal room", "القبول في غرفة الصفقة")}
 //                 </button>
 //               </>)}
@@ -1945,26 +1945,26 @@
 //
 //       {/* ── upload modal ── */}
 //       {uploadOpen && (
-//         <div className="fixed inset-0 z-[400] grid place-items-center p-6" style={{ background: "rgba(28,53,80,.42)", backdropFilter: "blur(3px)" }} onClick={() => setUploadOpen(false)}>
-//           <div className="w-[460px] max-w-full overflow-hidden rounded-2xl" style={{ background: "#fff" }} onClick={(e) => e.stopPropagation()}>
+//         <div className="fixed inset-0 z-[400] grid place-items-center p-6" style={{ background: "color-mix(in srgb, var(--navy) 42%, transparent)", backdropFilter: "blur(3px)" }} onClick={() => setUploadOpen(false)}>
+//           <div className="w-[460px] max-w-full overflow-hidden rounded-lg" style={{ background: "var(--surface)" }} onClick={(e) => e.stopPropagation()}>
 //             <div className="flex items-start gap-3 border-b px-6 py-5" style={{ borderColor: C.line }}>
-//               <div className="grid h-11 w-11 flex-none place-items-center rounded-lg" style={{ background: C.actionDim, color: C.action }}><span className="material-icons-outlined" style={{ fontSize: 24 }}>upload_file</span></div>
-//               <div className="flex-1"><h3 className="m-0 text-[18px] font-extrabold">{L("Upload an off-platform quote", "رفع عرض سعر خارجي")}</h3><p className="m-0 text-[12.5px]" style={{ color: C.muted }}>{L("Your AI assistant reads it and adds it to this comparison.", "يقرأه مساعدك الذكي ويضيفه إلى هذه المقارنة.")}</p></div>
+//               <div className="grid h-11 w-11 flex-none place-items-center rounded-sm" style={{ background: C.actionDim, color: C.action }}><span className="material-icons-outlined" style={{ fontSize: 24 }}>upload_file</span></div>
+//               <div className="flex-1"><h3 className="m-0 text-title font-extrabold">{L("Upload an off-platform quote", "رفع عرض سعر خارجي")}</h3><p className="m-0 text-meta" style={{ color: C.muted }}>{L("Your AI assistant reads it and adds it to this comparison.", "يقرأه مساعدك الذكي ويضيفه إلى هذه المقارنة.")}</p></div>
 //               <button onClick={() => setUploadOpen(false)} className="grid h-8 w-8 flex-none place-items-center rounded-full border" style={{ borderColor: C.border, color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span></button>
 //             </div>
 //             <div className="px-6 py-5">
-//               <label className="block cursor-pointer rounded-xl border-2 border-dashed p-7 text-center" style={{ borderColor: C.border, background: C.surface2 }}>
+//               <label className="block cursor-pointer rounded-md border-2 border-dashed p-7 text-center" style={{ borderColor: C.border, background: C.surface2 }}>
 //                 <span className="material-icons-outlined" style={{ fontSize: 38, color: C.action }}>cloud_upload</span>
-//                 <b className="mt-2 block text-[14px]" style={{ color: C.navy }}>{L("Drop a file or click to browse", "أفلت ملفاً أو انقر للتصفّح")}</b>
-//                 <span className="text-[12px]" style={{ color: C.muted }}>{L("Excel or PDF quote", "عرض سعر Excel أو PDF")}</span>
+//                 <b className="mt-2 block text-body" style={{ color: C.navy }}>{L("Drop a file or click to browse", "أفلت ملفاً أو انقر للتصفّح")}</b>
+//                 <span className="text-meta" style={{ color: C.muted }}>{L("Excel or PDF quote", "عرض سعر Excel أو PDF")}</span>
 //                 <input type="file" accept=".pdf,.xlsx,.xls,.csv,image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.currentTarget.value = ""; }} />
 //               </label>
-//               <div className="mt-3.5 flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-[12px]" style={{ background: C.renteeDim, borderColor: "rgba(37,99,235,.2)", color: C.navyMid }}>
+//               <div className="mt-3.5 flex items-start gap-2.5 rounded-sm border px-3 py-2.5 text-meta" style={{ background: C.renteeDim, borderColor: "color-mix(in srgb, var(--info) 20%, transparent)", color: C.navyMid }}>
 //                 <span className="material-icons-outlined" style={{ fontSize: 17, color: C.rentee }}>auto_awesome</span>{L("Your assistant normalizes the quote to the same basis as platform bids — same rate units, same all-in, same requirement checks — so it compares like-for-like.", "يوحّد مساعدك عرض السعر على نفس أساس عروض المنصة — نفس الوحدات ونفس الإجمالي ونفس الفحوصات — ليقارن مثلاً بمثل.")}
 //               </div>
 //             </div>
 //             <div className="flex justify-end gap-2.5 border-t px-6 py-4" style={{ borderColor: C.line }}>
-//               <button onClick={() => setUploadOpen(false)} className="rounded-lg border px-4 py-2 text-[13px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>{L("Cancel", "إلغاء")}</button>
+//               <button onClick={() => setUploadOpen(false)} className="rounded-sm border px-4 py-2 text-body font-semibold" style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Cancel", "إلغاء")}</button>
 //             </div>
 //           </div>
 //         </div>
@@ -1999,32 +1999,32 @@
 //       )}
 //
 //       {confirmAdd && (
-//         <div className="fixed inset-0 z-[420] grid place-items-center p-6" style={{ background: "rgba(28,53,80,.42)", backdropFilter: "blur(3px)" }} onClick={() => setConfirmAdd(null)}>
-//           <div className="w-[460px] max-w-full overflow-hidden rounded-2xl" style={{ background: "#fff" }} onClick={(e) => e.stopPropagation()}>
+//         <div className="fixed inset-0 z-[420] grid place-items-center p-6" style={{ background: "color-mix(in srgb, var(--navy) 42%, transparent)", backdropFilter: "blur(3px)" }} onClick={() => setConfirmAdd(null)}>
+//           <div className="w-[460px] max-w-full overflow-hidden rounded-lg" style={{ background: "var(--surface)" }} onClick={(e) => e.stopPropagation()}>
 //             <div className="flex items-start gap-3 border-b px-6 py-5" style={{ borderColor: C.line }}>
-//               <div className="grid h-11 w-11 flex-none place-items-center rounded-lg" style={{ background: confirmAdd.blocking ? C.dangerBg : C.warningBg, color: confirmAdd.blocking ? C.danger : C.warning }}><span className="material-icons-outlined" style={{ fontSize: 24 }}>{confirmAdd.blocking ? "block" : "warning_amber"}</span></div>
-//               <div className="flex-1"><h3 className="m-0 text-[17px] font-extrabold">{confirmAdd.blocking ? L("Wrong equipment — can't compare", "معدة غير مطابقة — يتعذّر المقارنة") : L("This quote may not match", "قد لا يطابق هذا العرض")}</h3><p className="m-0 text-[12.5px]" style={{ color: C.muted }}>{confirmAdd.blocking ? L(`${confirmAdd.card.supplierName} — this quote is for different equipment, so it can't be added to this comparison.`, `${confirmAdd.card.supplierName} — هذا العرض لمعدة مختلفة، فلا يمكن إضافته لهذه المقارنة.`) : L(`${confirmAdd.card.supplierName} — check these before adding it to the comparison.`, `${confirmAdd.card.supplierName} — راجع هذه قبل إضافته للمقارنة.`)}</p></div>
+//               <div className="grid h-11 w-11 flex-none place-items-center rounded-sm" style={{ background: confirmAdd.blocking ? C.dangerBg : C.warningBg, color: confirmAdd.blocking ? C.danger : C.warning }}><span className="material-icons-outlined" style={{ fontSize: 24 }}>{confirmAdd.blocking ? "block" : "warning_amber"}</span></div>
+//               <div className="flex-1"><h3 className="m-0 text-title font-extrabold">{confirmAdd.blocking ? L("Wrong equipment — can't compare", "معدة غير مطابقة — يتعذّر المقارنة") : L("This quote may not match", "قد لا يطابق هذا العرض")}</h3><p className="m-0 text-meta" style={{ color: C.muted }}>{confirmAdd.blocking ? L(`${confirmAdd.card.supplierName} — this quote is for different equipment, so it can't be added to this comparison.`, `${confirmAdd.card.supplierName} — هذا العرض لمعدة مختلفة، فلا يمكن إضافته لهذه المقارنة.`) : L(`${confirmAdd.card.supplierName} — check these before adding it to the comparison.`, `${confirmAdd.card.supplierName} — راجع هذه قبل إضافته للمقارنة.`)}</p></div>
 //               <button onClick={() => setConfirmAdd(null)} className="grid h-8 w-8 flex-none place-items-center rounded-full border" style={{ borderColor: C.border, color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span></button>
 //             </div>
 //             <div className="px-6 py-5">
 //               <ul className="flex flex-col gap-2">
 //                 {confirmAdd.warnings.length ? confirmAdd.warnings.map((wn, i) => (
-//                   <li key={i} className="flex items-start gap-2 rounded-lg border px-3 py-2.5 text-[12.5px]" style={{ background: C.warningBg, borderColor: "rgba(212,120,10,.3)", color: "#8A5A06" }}>
+//                   <li key={i} className="flex items-start gap-2 rounded-sm border px-3 py-2.5 text-meta" style={{ background: C.warningBg, borderColor: "color-mix(in srgb, var(--warn) 30%, transparent)", color: "var(--brand-deep)" }}>
 //                     <span className="material-icons-outlined" style={{ fontSize: 16, color: C.warning }}>error_outline</span>{wn}
 //                   </li>
 //                 )) : (
-//                   <li className="text-[12.5px]" style={{ color: C.muted }}>{L("The assistant couldn't fully confirm this quote matches your item, location and dates.", "تعذّر على المساعد تأكيد مطابقة العرض للصنف والموقع والتواريخ.")}</li>
+//                   <li className="text-meta" style={{ color: C.muted }}>{L("The assistant couldn't fully confirm this quote matches your item, location and dates.", "تعذّر على المساعد تأكيد مطابقة العرض للصنف والموقع والتواريخ.")}</li>
 //                 )}
 //               </ul>
-//               <p className="mt-3 text-[11.5px]" style={{ color: C.muted }}>{confirmAdd.blocking ? L("Upload the quote for the right equipment to compare it here.", "ارفع عرضاً للمعدة الصحيحة لمقارنته هنا.") : L("Adding it keeps it flagged — it's still shown for review, never auto-excluded.", "ستبقى الإضافة مع تنبيه — يظهر للمراجعة ولا يُستبعد تلقائياً.")}</p>
+//               <p className="mt-3 text-label" style={{ color: C.muted }}>{confirmAdd.blocking ? L("Upload the quote for the right equipment to compare it here.", "ارفع عرضاً للمعدة الصحيحة لمقارنته هنا.") : L("Adding it keeps it flagged — it's still shown for review, never auto-excluded.", "ستبقى الإضافة مع تنبيه — يظهر للمراجعة ولا يُستبعد تلقائياً.")}</p>
 //             </div>
 //             <div className="flex justify-end gap-2.5 border-t px-6 py-4" style={{ borderColor: C.line }}>
 //               {confirmAdd.blocking ? (
-//                 <button onClick={() => setConfirmAdd(null)} className="rounded-lg px-4 py-2 text-[13px] font-bold text-white" style={{ background: C.navy }}>{L("Close", "إغلاق")}</button>
+//                 <button onClick={() => setConfirmAdd(null)} className="rounded-sm px-4 py-2 text-body font-semibold text-white" style={{ background: C.navy }}>{L("Close", "إغلاق")}</button>
 //               ) : (
 //                 <>
-//                   <button onClick={() => setConfirmAdd(null)} className="rounded-lg border px-4 py-2 text-[13px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>{L("Don't add", "لا تُضِف")}</button>
-//                   <button onClick={confirmAddBid} className="rounded-lg px-4 py-2 text-[13px] font-bold text-white" style={{ background: C.action }}>{L("Add anyway", "أضِفه على أي حال")}</button>
+//                   <button onClick={() => setConfirmAdd(null)} className="rounded-sm border px-4 py-2 text-body font-semibold" style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Don't add", "لا تُضِف")}</button>
+//                   <button onClick={confirmAddBid} className="rounded-sm px-4 py-2 text-body font-semibold text-white" style={{ background: C.action }}>{L("Add anyway", "أضِفه على أي حال")}</button>
 //                 </>
 //               )}
 //             </div>
@@ -2034,30 +2034,30 @@
 //
 //       {/* ── add-your-cost popup (replaces the browser prompt) ── */}
 //       {costAsk && (
-//         <div className="fixed inset-0 z-[420] grid place-items-center p-6" style={{ background: "rgba(28,53,80,.42)", backdropFilter: "blur(3px)" }} onClick={() => setCostAsk(null)}>
-//           <div className="w-[420px] max-w-full overflow-hidden rounded-2xl" style={{ background: "#fff" }} onClick={(e) => e.stopPropagation()}>
+//         <div className="fixed inset-0 z-[420] grid place-items-center p-6" style={{ background: "color-mix(in srgb, var(--navy) 42%, transparent)", backdropFilter: "blur(3px)" }} onClick={() => setCostAsk(null)}>
+//           <div className="w-[420px] max-w-full overflow-hidden rounded-lg" style={{ background: "var(--surface)" }} onClick={(e) => e.stopPropagation()}>
 //             <div className="flex items-start gap-3 border-b px-6 py-5" style={{ borderColor: C.line }}>
-//               <div className="grid h-11 w-11 flex-none place-items-center rounded-lg text-[22px]" style={{ background: C.renteeDim }}>🧮</div>
-//               <div className="flex-1"><h3 className="m-0 text-[17px] font-extrabold">{L("Estimate your own costs", "قدّر تكاليفك")}</h3><p className="m-0 text-[12.5px]" style={{ color: C.muted }}>{costAsk.label} · {L("a cost you said you'll handle", "تكلفة ستتحمّلها أنت")}</p></div>
+//               <div className="grid h-11 w-11 flex-none place-items-center rounded-sm text-display" style={{ background: C.renteeDim }}>🧮</div>
+//               <div className="flex-1"><h3 className="m-0 text-title font-extrabold">{L("Estimate your own costs", "قدّر تكاليفك")}</h3><p className="m-0 text-meta" style={{ color: C.muted }}>{costAsk.label} · {L("a cost you said you'll handle", "تكلفة ستتحمّلها أنت")}</p></div>
 //               <button onClick={() => setCostAsk(null)} className="grid h-8 w-8 flex-none place-items-center rounded-full border" style={{ borderColor: C.border, color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span></button>
 //             </div>
 //             {/* privacy note — these estimates are the renter's own, never shown to the supplier */}
 //             <div className="flex items-start gap-2.5 px-6 py-3.5" style={{ background: C.warningBg, borderBottom: `1px solid ${C.line}` }}>
-//               <span className="flex-none text-[15px]">🔒</span>
-//               <span className="text-[12px] font-bold leading-relaxed" style={{ color: "#9A6A1E" }}>{L("Rough estimates for your own planning only — not real costs, not part of the bid, and never shown to the supplier.", "تقديرات تقريبية لتخطيطك أنت فقط — ليست تكاليف فعلية، وليست جزءًا من العرض، ولا تظهر للمؤجّر أبدًا.")}</span>
+//               <span className="flex-none text-subhead">🔒</span>
+//               <span className="text-meta font-semibold leading-relaxed" style={{ color: "var(--brand-deep)" }}>{L("Rough estimates for your own planning only — not real costs, not part of the bid, and never shown to the supplier.", "تقديرات تقريبية لتخطيطك أنت فقط — ليست تكاليف فعلية، وليست جزءًا من العرض، ولا تظهر للمؤجّر أبدًا.")}</span>
 //             </div>
 //             <div className="px-6 py-5">
-//               <label className="mb-1.5 block text-[12.5px] font-extrabold" style={{ color: C.navy }}>{costAsk.label}</label>
-//               <div className="flex h-[50px] items-center gap-2.5 rounded-lg border px-4" style={{ background: C.surface2, borderColor: C.border }}>
-//                 <span className="text-[14px] font-extrabold" style={{ color: C.muted }}>{sar}</span>
-//                 <input autoFocus type="number" inputMode="numeric" min={0} value={costInput} onChange={(e) => setCostInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submitCost(); }} placeholder="0" className="min-w-0 flex-1 bg-transparent text-[16px] font-bold outline-none" style={{ color: C.navy }} />
+//               <label className="mb-1.5 block text-meta font-extrabold" style={{ color: C.navy }}>{costAsk.label}</label>
+//               <div className="flex h-[50px] items-center gap-2.5 rounded-sm border px-4" style={{ background: C.surface2, borderColor: C.border }}>
+//                 <span className="text-body font-extrabold" style={{ color: C.muted }}>{sar}</span>
+//                 <input autoFocus type="number" inputMode="numeric" min={0} value={costInput} onChange={(e) => setCostInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submitCost(); }} placeholder="0" className="min-w-0 flex-1 bg-transparent text-subhead font-extrabold outline-none" style={{ color: C.navy }} />
 //               </div>
 //             </div>
 //             <div className="flex items-center justify-between gap-3 border-t px-6 py-4" style={{ borderColor: C.line }}>
-//               <span className="text-[13px] font-extrabold" style={{ color: C.navy }}>{L("Your total est.", "إجمالي تقديرك")} <span style={{ color: C.rentee }}>{sar} {nf(Object.values(renterCosts).reduce((a, b) => a + (b ?? 0), 0) + Object.values(renterMob).reduce((a, b) => a + (b ?? 0), 0))}</span></span>
+//               <span className="text-body font-extrabold" style={{ color: C.navy }}>{L("Your total est.", "إجمالي تقديرك")} <span style={{ color: C.rentee }}>{sar} {nf(Object.values(renterCosts).reduce((a, b) => a + (b ?? 0), 0) + Object.values(renterMob).reduce((a, b) => a + (b ?? 0), 0))}</span></span>
 //               <div className="flex gap-2.5">
-//                 <button onClick={() => setCostAsk(null)} className="rounded-lg border px-4 py-2 text-[13px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>{L("Cancel", "إلغاء")}</button>
-//                 <button onClick={submitCost} className="rounded-lg px-5 py-2 text-[13px] font-bold text-white" style={{ background: C.rentee }}>{L("Save estimate", "حفظ التقدير")}</button>
+//                 <button onClick={() => setCostAsk(null)} className="rounded-sm border px-4 py-2 text-body font-semibold" style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Cancel", "إلغاء")}</button>
+//                 <button onClick={submitCost} className="rounded-sm px-5 py-2 text-body font-semibold text-white" style={{ background: C.rentee }}>{L("Save estimate", "حفظ التقدير")}</button>
 //               </div>
 //             </div>
 //           </div>
@@ -2066,24 +2066,24 @@
 //
 //       {/* §6 — one private "Estimate your own costs" popup (multi-field, all your terms at once) */}
 //       {estimateOpen && (
-//         <div className="fixed inset-0 z-[420] grid place-items-center p-6" style={{ background: "rgba(28,53,80,.42)", backdropFilter: "blur(3px)" }} onClick={() => setEstimateOpen(false)}>
-//           <div className="flex max-h-[86vh] w-[440px] max-w-full flex-col overflow-hidden rounded-2xl" style={{ background: "#fff" }} onClick={(e) => e.stopPropagation()}>
+//         <div className="fixed inset-0 z-[420] grid place-items-center p-6" style={{ background: "color-mix(in srgb, var(--navy) 42%, transparent)", backdropFilter: "blur(3px)" }} onClick={() => setEstimateOpen(false)}>
+//           <div className="flex max-h-[86vh] w-[440px] max-w-full flex-col overflow-hidden rounded-lg" style={{ background: "var(--surface)" }} onClick={(e) => e.stopPropagation()}>
 //             <div className="flex items-start gap-3 border-b px-6 py-5" style={{ borderColor: C.line }}>
-//               <div className="grid h-11 w-11 flex-none place-items-center rounded-lg text-[22px]" style={{ background: C.renteeDim }}>🧮</div>
-//               <div className="flex-1"><h3 className="m-0 text-[17px] font-extrabold">{L("Estimate your own costs", "قدّر تكاليفك")}</h3><p className="m-0 text-[12.5px]" style={{ color: C.muted }}>{(ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? ""} · {L("the items you said you'll handle", "البنود التي ستتحمّلها")}</p></div>
+//               <div className="grid h-11 w-11 flex-none place-items-center rounded-sm text-display" style={{ background: C.renteeDim }}>🧮</div>
+//               <div className="flex-1"><h3 className="m-0 text-title font-extrabold">{L("Estimate your own costs", "قدّر تكاليفك")}</h3><p className="m-0 text-meta" style={{ color: C.muted }}>{(ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? ""} · {L("the items you said you'll handle", "البنود التي ستتحمّلها")}</p></div>
 //               <button onClick={() => setEstimateOpen(false)} className="grid h-8 w-8 flex-none place-items-center rounded-full border" style={{ borderColor: C.border, color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span></button>
 //             </div>
 //             <div className="flex items-start gap-2.5 px-6 py-3.5" style={{ background: C.warningBg, borderBottom: `1px solid ${C.line}` }}>
-//               <span className="flex-none text-[15px]">🔒</span>
-//               <span className="text-[12px] font-bold leading-relaxed" style={{ color: "#9A6A1E" }}>{L("Rough estimates for your own planning only — not real costs, not part of the bid, and never shown to the supplier.", "تقديرات تقريبية لتخطيطك أنت فقط — ليست تكاليف فعلية، وليست جزءًا من العرض، ولا تظهر للمؤجّر أبدًا.")}</span>
+//               <span className="flex-none text-subhead">🔒</span>
+//               <span className="text-meta font-semibold leading-relaxed" style={{ color: "var(--brand-deep)" }}>{L("Rough estimates for your own planning only — not real costs, not part of the bid, and never shown to the supplier.", "تقديرات تقريبية لتخطيطك أنت فقط — ليست تكاليف فعلية، وليست جزءًا من العرض، ولا تظهر للمؤجّر أبدًا.")}</span>
 //             </div>
 //             <div className="flex flex-col gap-3.5 overflow-y-auto px-6 py-5">
 //               {youTerms.map((m) => (
 //                 <div key={m.key}>
-//                   <label className="mb-1.5 block text-[12.5px] font-extrabold" style={{ color: C.navy }}>{ar ? m.ar : m.en}</label>
-//                   <div className="flex h-[48px] items-center gap-2.5 rounded-lg border px-4" style={{ background: C.surface2, borderColor: C.border }}>
-//                     <span className="text-[13px] font-extrabold" style={{ color: C.muted }}>{sar}</span>
-//                     <input type="number" inputMode="numeric" min={0} value={estDraft[m.key] ?? ""} onChange={(e) => setEstDraft((p) => ({ ...p, [m.key]: e.target.value }))} placeholder="0" className="min-w-0 flex-1 bg-transparent text-[15px] font-bold outline-none" style={{ color: C.navy }} />
+//                   <label className="mb-1.5 block text-meta font-extrabold" style={{ color: C.navy }}>{ar ? m.ar : m.en}</label>
+//                   <div className="flex h-[48px] items-center gap-2.5 rounded-sm border px-4" style={{ background: C.surface2, borderColor: C.border }}>
+//                     <span className="text-body font-extrabold" style={{ color: C.muted }}>{sar}</span>
+//                     <input type="number" inputMode="numeric" min={0} value={estDraft[m.key] ?? ""} onChange={(e) => setEstDraft((p) => ({ ...p, [m.key]: e.target.value }))} placeholder="0" className="min-w-0 flex-1 bg-transparent text-subhead font-extrabold outline-none" style={{ color: C.navy }} />
 //                   </div>
 //                 </div>
 //               ))}
@@ -2093,22 +2093,22 @@
 //                 .filter(([, , show]) => show)
 //                 .map(([key, label]) => (
 //                   <div key={key}>
-//                     <label className="mb-1.5 block text-[12.5px] font-extrabold" style={{ color: C.navy }}>{label}</label>
-//                     <div className="flex h-[48px] items-center gap-2.5 rounded-lg border px-4" style={{ background: C.surface2, borderColor: C.border }}>
-//                       <span className="text-[13px] font-extrabold" style={{ color: C.muted }}>{sar}</span>
-//                       <input type="number" inputMode="numeric" min={0} value={estDraft[key] ?? ""} onChange={(e) => setEstDraft((p) => ({ ...p, [key]: e.target.value }))} placeholder="0" className="min-w-0 flex-1 bg-transparent text-[15px] font-bold outline-none" style={{ color: C.navy }} />
+//                     <label className="mb-1.5 block text-meta font-extrabold" style={{ color: C.navy }}>{label}</label>
+//                     <div className="flex h-[48px] items-center gap-2.5 rounded-sm border px-4" style={{ background: C.surface2, borderColor: C.border }}>
+//                       <span className="text-body font-extrabold" style={{ color: C.muted }}>{sar}</span>
+//                       <input type="number" inputMode="numeric" min={0} value={estDraft[key] ?? ""} onChange={(e) => setEstDraft((p) => ({ ...p, [key]: e.target.value }))} placeholder="0" className="min-w-0 flex-1 bg-transparent text-subhead font-extrabold outline-none" style={{ color: C.navy }} />
 //                     </div>
 //                   </div>
 //                 ))}
 //               {youTerms.length === 0 && !showDeliveryEst && !showReturnEst && (
-//                 <p className="m-0 text-[13px] font-semibold" style={{ color: C.muted }}>{L("Nothing on you to estimate — the request put every cost on the supplier.", "لا شيء عليك لتقديره — وضع الطلب كل التكاليف على المؤجّر.")}</p>
+//                 <p className="m-0 text-body font-semibold" style={{ color: C.muted }}>{L("Nothing on you to estimate — the request put every cost on the supplier.", "لا شيء عليك لتقديره — وضع الطلب كل التكاليف على المؤجّر.")}</p>
 //               )}
 //             </div>
 //             <div className="flex items-center justify-between gap-3 border-t px-6 py-4" style={{ borderColor: C.line }}>
-//               <span className="text-[13px] font-extrabold" style={{ color: C.navy }}>{L("Your total est.", "إجمالي تقديرك")} <span style={{ color: C.rentee }}>{sar} {nf(["__delivery", "__return", ...youTerms.map((m) => m.key)].reduce((s, k) => s + (parseInt((estDraft[k] ?? "").replace(/[^0-9]/g, ""), 10) || 0), 0))}</span></span>
+//               <span className="text-body font-extrabold" style={{ color: C.navy }}>{L("Your total est.", "إجمالي تقديرك")} <span style={{ color: C.rentee }}>{sar} {nf(["__delivery", "__return", ...youTerms.map((m) => m.key)].reduce((s, k) => s + (parseInt((estDraft[k] ?? "").replace(/[^0-9]/g, ""), 10) || 0), 0))}</span></span>
 //               <div className="flex gap-2.5">
-//                 <button onClick={() => setEstimateOpen(false)} className="rounded-lg border px-4 py-2 text-[13px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>{L("Cancel", "إلغاء")}</button>
-//                 <button onClick={saveEstimate} className="rounded-lg px-5 py-2 text-[13px] font-bold text-white" style={{ background: C.rentee }}>{L("Save estimate", "حفظ التقدير")}</button>
+//                 <button onClick={() => setEstimateOpen(false)} className="rounded-sm border px-4 py-2 text-body font-semibold" style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Cancel", "إلغاء")}</button>
+//                 <button onClick={saveEstimate} className="rounded-sm px-5 py-2 text-body font-semibold text-white" style={{ background: C.rentee }}>{L("Save estimate", "حفظ التقدير")}</button>
 //               </div>
 //             </div>
 //           </div>
@@ -2117,8 +2117,8 @@
 //
 //       {/* ── toast ── */}
 //       {toastMsg && (
-//         <div className="fixed inset-x-0 bottom-6 z-[500] mx-auto flex w-max max-w-[90%] items-center gap-2 rounded-lg px-4 py-3 text-[13px] font-bold text-white" style={{ background: C.navy, boxShadow: "0 14px 30px rgba(28,53,80,.35)" }}>
-//           <span className="material-icons-outlined" style={{ fontSize: 18, color: "#7BE0A5" }}>check_circle</span>{toastMsg}
+//         <div className="fixed inset-x-0 bottom-6 z-[500] mx-auto flex w-max max-w-[90%] items-center gap-2 rounded-sm px-4 py-3 text-body font-semibold text-white" style={{ background: C.navy, }}>
+//           <span className="material-icons-outlined" style={{ fontSize: 18, color: "var(--ok-soft)" }}>check_circle</span>{toastMsg}
 //         </div>
 //       )}
 //
@@ -2128,9 +2128,9 @@
 //       {/* In-app document viewer — renders the actual file (presigned S3) in a modal, no redirect. */}
 //       {docView && (
 //         <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/55 p-3 sm:p-6" onClick={() => setDocView(null)}>
-//           <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-[14px] bg-white" onClick={(e) => e.stopPropagation()} dir={ar ? "rtl" : "ltr"}>
+//           <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-sm bg-white" onClick={(e) => e.stopPropagation()} dir={ar ? "rtl" : "ltr"}>
 //             <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: C.border }}>
-//               <span className="inline-flex items-center gap-2 text-[14px] font-extrabold" style={{ color: C.navy }}><span className="material-icons-outlined" style={{ fontSize: 18, color: C.navyMid }}>description</span>{docView.label}</span>
+//               <span className="inline-flex items-center gap-2 text-body font-extrabold" style={{ color: C.navy }}><span className="material-icons-outlined" style={{ fontSize: 18, color: C.navyMid }}>description</span>{docView.label}</span>
 //               <div className="flex items-center gap-1">
 //                 {/* T3: anything viewable is downloadable — fetch the presigned file as a blob and save it. */}
 //                 {docView.url && <button onClick={() => downloadDocFile(docView.url!, docView.label)} title={L("Download", "تنزيل")} className="grid h-8 w-8 place-items-center rounded-full" style={{ color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 18 }}>download</span></button>}
@@ -2144,17 +2144,17 @@
 //               ) : docView.value ? (
 //                 <div className="max-w-sm px-6 py-10 text-center">
 //                   <span className="material-icons-outlined" style={{ fontSize: 34, color: C.navyMid }}>badge</span>
-//                   <p className="mt-3 text-[11px] font-bold uppercase tracking-wide" style={{ color: C.muted }}>{docView.label}</p>
-//                   <p className="mt-1 select-text break-words text-[18px] font-extrabold" style={{ color: C.navy }}>{docView.value}</p>
-//                   <p className="mt-2 text-[12px]" style={{ color: C.muted }}>{L("Captured from the supplier's bid form — no uploaded document.", "مُلتقط من نموذج عرض المؤجّر — لا يوجد مستند مرفوع.")}</p>
+//                   <p className="mt-3 text-label font-semibold uppercase tracking-wide" style={{ color: C.muted }}>{docView.label}</p>
+//                   <p className="mt-1 select-text break-words text-title font-extrabold" style={{ color: C.navy }}>{docView.value}</p>
+//                   <p className="mt-2 text-meta" style={{ color: C.muted }}>{L("Captured from the supplier's bid form — no uploaded document.", "مُلتقط من نموذج عرض المؤجّر — لا يوجد مستند مرفوع.")}</p>
 //                 </div>
 //               ) : docView.url ? (
 //                 <iframe src={docView.url} title={docView.label} className="h-full w-full" style={{ minHeight: "60vh", border: 0 }} />
 //               ) : (
 //                 <div className="max-w-sm px-6 py-10 text-center">
 //                   <span className="material-icons-outlined" style={{ fontSize: 36, color: C.muted }}>lock</span>
-//                   <p className="mt-2 text-[13.5px] font-bold" style={{ color: C.navy }}>{L("Document not available to view", "المستند غير متاح للعرض")}</p>
-//                   <p className="mt-1 text-[12.5px]" style={{ color: C.muted }}>{L("This supplier hasn’t shared this file, or it isn’t viewable yet. Company docs (CR/VAT) open once a deal room is started.", "لم يشارك المؤجّر هذا الملف، أو أنه غير متاح للعرض بعد. تُفتح وثائق الشركة (السجل/الضريبة) بعد بدء غرفة الصفقة.")}</p>
+//                   <p className="mt-2 text-body font-semibold" style={{ color: C.navy }}>{L("Document not available to view", "المستند غير متاح للعرض")}</p>
+//                   <p className="mt-1 text-meta" style={{ color: C.muted }}>{L("This supplier hasn’t shared this file, or it isn’t viewable yet. Company docs (CR/VAT) open once a deal room is started.", "لم يشارك المؤجّر هذا الملف، أو أنه غير متاح للعرض بعد. تُفتح وثائق الشركة (السجل/الضريبة) بعد بدء غرفة الصفقة.")}</p>
 //                 </div>
 //               )}
 //             </div>
@@ -2206,7 +2206,7 @@
 //   });
 // }
 // function Box({ title, children }: { title?: string; children: React.ReactNode }) {
-//   return <div className="rounded-xl border p-8 text-center" style={{ borderColor: C.border, background: "#fff" }}>{title && <div className="text-[14px] font-bold" style={{ color: C.navy }}>{title}</div>}<div className="mt-1 text-[12.5px]" style={{ color: C.muted }}>{children}</div></div>;
+//   return <div className="rounded-md border p-8 text-center" style={{ borderColor: C.border, background: "var(--surface)" }}>{title && <div className="text-body font-semibold" style={{ color: C.navy }}>{title}</div>}<div className="mt-1 text-meta" style={{ color: C.muted }}>{children}</div></div>;
 // }
 // function Spinner() {
 //   return <div className="grid place-items-center py-16" style={{ color: C.muted }}><span className="material-icons-outlined animate-spin" style={{ fontSize: 28 }}>progress_activity</span></div>;
@@ -2218,7 +2218,7 @@
 //     <tr><td colSpan={n + 1} style={{ background: C.navy, padding: 0 }}>
 //       <button onClick={onToggle} className="flex w-full items-center gap-2.5 px-4 py-3 text-start" style={{ paddingTop: 12, paddingBottom: 12 }}>
 //         <span className="material-icons-outlined" style={{ fontSize: 18, color: accentText }}>{icon}</span>
-//         <b className="text-[12.5px] uppercase" style={{ color: accentText, fontWeight: 900, letterSpacing: ".05em" }}>{title}</b>
+//         <b className="text-meta uppercase" style={{ color: accentText, fontWeight: 900, letterSpacing: ".05em" }}>{title}</b>
 //         <span className="material-icons-outlined ms-auto" style={{ fontSize: 20, color: "rgba(255,255,255,.72)", transform: collapsed ? "rotate(-90deg)" : "" }}>expand_more</span>
 //       </button>
 //     </td></tr>
@@ -2226,7 +2226,7 @@
 // }
 // function RowHead({ title, sub }: { title: string; sub?: string }) {
 //   // prototype: 200px sticky cell, padding 14px 16px; label 12.5px/900 navy; sub 10.5px/600 margin-top 2px.
-//   return <td className="sticky start-0 z-[1] align-top text-[12.5px]" style={{ background: C.surface2, color: C.navy, fontWeight: 900, width: 200, minWidth: 200, padding: "14px 16px", borderBottom: `1px solid ${C.line}` }}>{title}{sub && <span className="mt-0.5 block text-[10.5px] font-semibold" style={{ color: C.muted }}>{sub}</span>}</td>;
+//   return <td className="sticky start-0 z-[1] align-top text-meta" style={{ background: C.surface2, color: C.navy, fontWeight: 900, width: 200, minWidth: 200, padding: "14px 16px", borderBottom: `1px solid ${C.line}` }}>{title}{sub && <span className="mt-0.5 block text-label font-semibold" style={{ color: C.muted }}>{sub}</span>}</td>;
 // }
 // function Td({ children, ok, fail }: { children: React.ReactNode; ok?: boolean; fail?: boolean }) {
 //   // prototype: data cell padding 14px 15px, 1px left column separator.
@@ -2234,13 +2234,13 @@
 //   // inside the green "Recommended" column (T6) — the old 7%-opacity tint was invisible there.
 //   return (
 //     <td
-//       className="align-top text-[13px] font-bold"
+//       className="align-top text-body font-semibold"
 //       style={{
 //         padding: "14px 15px",
 //         borderBottom: `1px solid ${C.line}`,
 //         borderInlineStart: `1px solid ${C.line}`,
 //         color: fail ? C.danger : C.navy,
-//         background: fail ? C.dangerBg : ok ? "rgba(29,175,88,.06)" : undefined,
+//         background: fail ? C.dangerBg : ok ? "color-mix(in srgb, var(--ok) 6%, transparent)" : undefined,
 //         boxShadow: fail ? `inset 3px 0 0 ${C.danger}` : undefined,
 //       }}
 //     >
@@ -2250,6 +2250,6 @@
 // }
 // function Sub({ children }: { children: React.ReactNode }) {
 //   // prototype: secondary line 11px/600, margin-top 3px.
-//   return <span className="block text-[11px] font-semibold" style={{ color: C.muted, marginTop: 3 }}>{children}</span>;
+//   return <span className="block text-label font-semibold" style={{ color: C.muted, marginTop: 3 }}>{children}</span>;
 // }
 //

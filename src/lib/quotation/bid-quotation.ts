@@ -176,7 +176,7 @@ export function buildBidQuotationDoc(input: BuildBidQuotationInput): QuotationDo
 
   // ── Line items ───────────────────────────────────────────────────────────────────────────────────
   const eqLine = (b: BidCard) => (b.equipment ? [b.equipment.make, b.equipment.model, b.equipment.year].filter(Boolean).join(" · ") : "—");
-  // App rule (014 CR #141): the bid is priced per billing period; the unit count is NOT multiplied into
+  // App rule (014 CR var(--ok-deep)): the bid is priced per billing period; the unit count is NOT multiplied into
   // the rental (it is shown for information only). Open-ended → ∞ qty + one-period "as operated".
   const periodLabel = (u: string | null) => {
     switch ((u ?? "PER_DAY").toUpperCase()) {

@@ -123,12 +123,12 @@ export function SearchSelect({
         aria-haspopup="listbox"
         aria-controls={listId}
         aria-label={label}
-        className={`flex w-full items-center justify-between gap-1.5 rounded-lg text-start disabled:cursor-not-allowed disabled:opacity-60 ${
+        className={`flex w-full items-center justify-between gap-1.5 rounded-sm text-start disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg ${
           tone === "field"
-            ? "border border-border bg-surface px-3 py-2.5 text-[13px] text-navy"
+            ? "border border-border bg-surface px-3 py-2.5 text-body text-navy"
             : tone === "overlay"
-              ? "bg-[#12263acc] px-3 py-2 text-[12px] font-bold text-white shadow-[0_2px_8px_rgba(0,0,0,.25)]"
-              : "bg-[#c9660f] px-3 py-2 text-[13px] font-bold text-white shadow-[0_2px_8px_rgba(0,0,0,.25)]"
+              ? "bg-[#12263acc] px-3 py-2 text-meta font-semibold text-white"
+              : "bg-brand-press px-3 py-2 text-body font-semibold text-white"
         }`}
       >
         {prefix && <span className="flex-none opacity-70">{prefix}</span>}
@@ -138,7 +138,7 @@ export function SearchSelect({
 
       {open && (
         <div
-          className={`absolute start-0 z-20 min-w-[max(100%,190px)] overflow-hidden rounded-lg border border-border bg-surface shadow-lg ${
+          className={`absolute start-0 z-20 min-w-[max(100%,190px)] overflow-hidden rounded-sm border border-border bg-surface ${
             dropUp ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"
           }`}
         >
@@ -149,7 +149,7 @@ export function SearchSelect({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="w-full rounded-md border border-border px-2.5 py-1.5 text-[13px] outline-none"
+                className="w-full rounded-sm border border-border px-2.5 py-1.5 text-body outline-none"
               />
             </div>
           )}
@@ -164,15 +164,15 @@ export function SearchSelect({
                   onChange(o.value);
                   setOpen(false);
                 }}
-                className={`flex w-full items-center gap-2 px-3.5 py-2 text-start text-[13px] hover:bg-surface2 ${
-                  o.value === value ? "bg-surface2 font-bold text-navy" : "text-navy-mid"
+                className={`flex w-full items-center gap-2 px-3.5 py-2 text-start text-body hover:bg-surface2 ${
+                  o.value === value ? "bg-surface2 font-semibold text-navy" : "text-navy-mid"
                 }`}
               >
                 {o.value === value && <Icon name="check" size={14} className="flex-none text-brand" />}
                 <span className="whitespace-nowrap">{o.label}</span>
               </button>
             ))}
-            {filtered.length === 0 && <p className="px-3.5 py-3 text-[13px] text-muted">—</p>}
+            {filtered.length === 0 && <p className="px-3.5 py-3 text-body text-muted">—</p>}
           </div>
         </div>
       )}

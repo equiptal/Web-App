@@ -245,38 +245,38 @@ export function OnboardingForm({
   };
 
   const inputCls =
-    "h-[46px] w-full rounded-[10px] border border-border bg-surface px-[14px] text-[14px] outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)]";
-  const labelCls = "mb-[6px] block text-[12.5px] font-bold text-navy-mid";
+    "h-[46px] w-full rounded-sm border border-border bg-surface px-4 text-body outline-0 focus:border-brand";
+  const labelCls = "mb-2 block text-meta font-semibold text-navy-mid";
 
   return (
     <form onSubmit={submit} noValidate>
-      <div className="flex items-start gap-3 border-b border-border p-[22px]">
+      <div className="flex items-start gap-3 border-b border-border p-6">
         {/* Back to step 1 (OTP entry) — keeps the two steps tied so the user can return to the code step. */}
         {onSignIn && (
-          <button type="button" onClick={onSignIn} aria-label={t.common.back} className="grid h-10 w-10 flex-none place-items-center rounded-[10px] border border-border text-navy-mid transition hover:bg-surface2">
+          <button type="button" onClick={onSignIn} aria-label={t.common.back} className="grid h-10 w-10 flex-none place-items-center rounded-sm border border-border text-navy-mid transition hover:bg-surface2">
             <Icon name="arrow_back" size={20} className="rtl:-scale-x-100" />
           </button>
         )}
-        <span className="grid h-10 w-10 flex-none place-items-center rounded-[10px] bg-brand-soft text-brand">
+        <span className="grid h-10 w-10 flex-none place-items-center rounded-sm bg-brand-soft text-brand">
           <Icon name="person_add" size={22} />
         </span>
         <div>
-          <h1 className="text-[20px] font-extrabold text-navy">{headline ?? o.title}</h1>
-          <p className="mt-1 text-[13.5px] text-muted">{subhead ?? o.subtitle}</p>
+          <h1 className="text-display font-extrabold text-navy">{headline ?? o.title}</h1>
+          <p className="mt-1 text-body text-muted">{subhead ?? o.subtitle}</p>
         </div>
       </div>
 
-      <div className="flex flex-col gap-[14px] p-[22px]">
-        <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
+      <div className="flex flex-col gap-4 p-6">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className={labelCls}>{o.firstName}</label>
             <input className={inputCls} value={firstName} onChange={(e) => setFirstName(e.target.value)} maxLength={30} />
-            {fe.firstName && <p className="mt-1 text-[12px] text-danger">{fe.firstName}</p>}
+            {fe.firstName && <p className="mt-1 text-meta text-danger">{fe.firstName}</p>}
           </div>
           <div>
             <label className={labelCls}>{o.lastName}</label>
             <input className={inputCls} value={lastName} onChange={(e) => setLastName(e.target.value)} maxLength={50} />
-            {fe.lastName && <p className="mt-1 text-[12px] text-danger">{fe.lastName}</p>}
+            {fe.lastName && <p className="mt-1 text-meta text-danger">{fe.lastName}</p>}
           </div>
         </div>
 
@@ -286,15 +286,15 @@ export function OnboardingForm({
           <div>
             <label className={labelCls}>
               {o.phone} <span className="text-danger">*</span>
-              {phoneVerified && <span className="ms-2 text-[11px] font-bold text-ok">✓ {t.auth.phoneVerified}</span>}
+              {phoneVerified && <span className="ms-2 text-label font-semibold text-ok">✓ {t.auth.phoneVerified}</span>}
             </label>
-            <div className="flex gap-[10px]" dir="ltr">
+            <div className="flex gap-3" dir="ltr">
               <select
                 aria-label={t.auth.countryLabel}
                 value={dial}
                 onChange={(e) => { setDial(e.target.value); resetPhone(); }}
                 disabled={phoneVerified}
-                className="h-[46px] rounded-[10px] border border-border bg-surface px-[10px] text-[13.5px] font-bold text-navy outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)] disabled:opacity-60"
+                className="h-[46px] rounded-sm border border-border bg-surface px-3 text-body font-semibold text-navy outline-0 focus:border-brand disabled:bg-disabled-bg disabled:text-disabled-fg"
               >
                 {COUNTRY_CODES.map((c) => (
                   <option key={c.dial} value={c.dial}>{c.flag} {c.dial}</option>
@@ -317,14 +317,14 @@ export function OnboardingForm({
                 type="button"
                 onClick={sendPhoneCode}
                 disabled={phoneBusy || !phoneDigits.trim()}
-                className="mt-[10px] inline-flex items-center gap-1.5 rounded-[10px] border border-brand px-4 py-2 text-[13px] font-bold text-brand transition hover:bg-brand-soft disabled:opacity-50"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-sm border border-brand px-4 py-2 text-body font-semibold text-brand transition hover:bg-brand-soft disabled:bg-disabled-bg disabled:text-disabled-fg"
               >
                 <Icon name="sms" size={16} /> {phoneBusy ? t.auth.sending : t.auth.sendCode}
               </button>
             ) : (
-              <div className="mt-[10px]">
-                <p className="mb-2 text-[12px] text-muted">{sentPre}<b className="text-navy" dir="ltr">{phoneE164}</b>{sentPost}</p>
-                <div className="flex gap-[10px]">
+              <div className="mt-3">
+                <p className="mb-2 text-meta text-muted">{sentPre}<b className="text-navy" dir="ltr">{phoneE164}</b>{sentPost}</p>
+                <div className="flex gap-3">
                   <input
                     className={`${inputCls} flex-1`}
                     inputMode="numeric"
@@ -339,20 +339,20 @@ export function OnboardingForm({
                     type="button"
                     onClick={verifyPhone}
                     disabled={phoneBusy || otpCode.replace(/\D/g, "").length < 4}
-                    className="flex-none rounded-[10px] border border-brand bg-brand px-4 text-[13px] font-bold text-white transition hover:brightness-[1.04] disabled:opacity-50"
+                    className="flex-none rounded-sm border border-brand bg-brand px-4 text-body font-semibold text-white transition disabled:bg-disabled-bg disabled:text-disabled-fg"
                   >
                     {phoneBusy ? t.auth.verifying : t.auth.verifyPhone}
                   </button>
                 </div>
-                <button type="button" onClick={sendPhoneCode} className="mt-2 text-[12.5px] font-bold text-info">{t.auth.resend}</button>
+                <button type="button" onClick={sendPhoneCode} className="mt-2 text-meta font-semibold text-info">{t.auth.resend}</button>
               </div>
             )}
-            {fe.phone && <p className="mt-1 text-[12px] text-danger">{fe.phone}</p>}
+            {fe.phone && <p className="mt-1 text-meta text-danger">{fe.phone}</p>}
             {phoneErr && (
-              <p className="mt-1 text-[12px] text-danger">
+              <p className="mt-1 text-meta text-danger">
                 {t.auth.errors[phoneErr]}
                 {phoneErr === "phone_taken" && onSignIn && (
-                  <> <button type="button" onClick={onSignIn} className="font-bold text-info underline">{t.auth.signInInstead}</button></>
+                  <> <button type="button" onClick={onSignIn} className="font-semibold text-info underline">{t.auth.signInInstead}</button></>
                 )}
               </p>
             )}
@@ -360,13 +360,13 @@ export function OnboardingForm({
         ) : (
           <div>
             <label className={labelCls}>
-              {o.phone} <span className="ms-1 text-[11px] font-bold text-ok">✓ {o.verified}</span>
+              {o.phone} <span className="ms-1 text-label font-semibold text-ok">✓ {o.verified}</span>
             </label>
             <input className={`${inputCls} bg-surface2 text-muted`} value={user?.phone ?? ""} readOnly dir="ltr" />
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className={labelCls}>{o.city}</label>
             <select className={inputCls} value={city} onChange={(e) => setCity(e.target.value)}>
@@ -375,7 +375,7 @@ export function OnboardingForm({
                 <option key={c.value} value={c.value}>{c.label}</option>
               ))}
             </select>
-            {fe.city && <p className="mt-1 text-[12px] text-danger">{fe.city}</p>}
+            {fe.city && <p className="mt-1 text-meta text-danger">{fe.city}</p>}
           </div>
           <div>
             <label className={labelCls}>{o.jobTitle}</label>
@@ -385,18 +385,18 @@ export function OnboardingForm({
                 <option key={j.value} value={j.value}>{j.label}</option>
               ))}
             </select>
-            {fe.jobTitle && <p className="mt-1 text-[12px] text-danger">{fe.jobTitle}</p>}
+            {fe.jobTitle && <p className="mt-1 text-meta text-danger">{fe.jobTitle}</p>}
           </div>
         </div>
 
         <div>
           <label className={labelCls}>
-            {o.companyName} <span className="text-[11px] font-medium text-muted">— {o.optional}</span>
+            {o.companyName} <span className="text-label font-semibold text-muted">— {o.optional}</span>
           </label>
           <input className={inputCls} value={companyName} onChange={(e) => setCompanyName(e.target.value)} maxLength={200} placeholder={o.companyNamePlaceholder} />
         </div>
 
-        <div className={`grid grid-cols-1 gap-[12px] ${showEmail ? "sm:grid-cols-2" : ""}`}>
+        <div className={`grid grid-cols-1 gap-3 ${showEmail ? "sm:grid-cols-2" : ""}`}>
           {showEmail && (
             <div>
               <label className={labelCls}>
@@ -404,30 +404,30 @@ export function OnboardingForm({
                 {requireEmail ? (
                   <span className="text-danger">*</span>
                 ) : (
-                  <span className="text-[11px] font-medium text-muted">— {o.optional}</span>
+                  <span className="text-label font-semibold text-muted">— {o.optional}</span>
                 )}
               </label>
               <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" />
-              {fe.email && <p className="mt-1 text-[12px] text-danger">{fe.email}</p>}
+              {fe.email && <p className="mt-1 text-meta text-danger">{fe.email}</p>}
             </div>
           )}
           <div>
             <label className={labelCls}>
-              {o.whatsapp} <span className="text-[11px] font-medium text-muted">— {o.optional}</span>
+              {o.whatsapp} <span className="text-label font-semibold text-muted">— {o.optional}</span>
             </label>
             <input className={inputCls} inputMode="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+9665XXXXXXXX" dir="ltr" />
-            {fe.whatsapp && <p className="mt-1 text-[12px] text-danger">{fe.whatsapp}</p>}
+            {fe.whatsapp && <p className="mt-1 text-meta text-danger">{fe.whatsapp}</p>}
           </div>
         </div>
 
-        {err && <p className="text-[13px] font-semibold text-danger">{err}</p>}
+        {err && <p className="text-body font-semibold text-danger">{err}</p>}
       </div>
 
-      <div className="border-t border-border p-[22px]">
+      <div className="border-t border-border p-6">
         <button
           type="submit"
           disabled={busy || (!!phoneVerify && !phoneVerified)}
-          className="flex w-full items-center justify-center gap-[7px] rounded-[10px] border border-brand bg-brand px-[24px] py-[13px] text-[14.5px] font-bold text-brand-fg transition hover:brightness-[1.04] disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-2 rounded-sm border border-brand bg-brand px-6 py-3 text-subhead font-extrabold text-brand-fg transition disabled:bg-disabled-bg disabled:text-disabled-fg"
         >
           {busy ? o.submitting : o.submit}
           {!busy && <Icon name="arrow_forward" size={18} className="rtl:scale-x-[-1]" />}

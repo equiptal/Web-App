@@ -60,16 +60,16 @@ export function EquipmentDetailModal({
       >
         {/* Header / close */}
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <span className="text-[14px] font-extrabold text-navy">{eq?.storeName ?? storeName ?? ""}</span>
+          <span className="text-body font-extrabold text-navy">{eq?.storeName ?? storeName ?? ""}</span>
           <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface2" aria-label={t.store.close}>
             <Icon name="close" size={18} />
           </button>
         </div>
 
         {error ? (
-          <div className="p-8 text-center text-[13px] text-muted">{t.store.error}</div>
+          <div className="p-8 text-center text-body text-muted">{t.store.error}</div>
         ) : !eq ? (
-          <div className="p-8 text-center text-[13px] text-muted">{t.store.loading}</div>
+          <div className="p-8 text-center text-body text-muted">{t.store.loading}</div>
         ) : (
           <div className="overflow-y-auto">
             {/* Photo carousel */}
@@ -93,7 +93,7 @@ export function EquipmentDetailModal({
                   >
                     <Icon name="chevron_right" size={20} className="rtl:scale-x-[-1]" />
                   </button>
-                  <span className="absolute end-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-[11px] font-bold text-white">
+                  <span className="absolute end-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-label font-semibold text-white">
                     {idx + 1}/{photos.length}
                   </span>
                 </>
@@ -104,15 +104,15 @@ export function EquipmentDetailModal({
               {/* Taxonomy header */}
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-[18px] font-extrabold text-navy">{category || subcategory || measurement || "—"}</h2>
+                  <h2 className="text-title font-extrabold text-navy">{category || subcategory || measurement || "—"}</h2>
                   {eq.isVerified && <Icon name="verified" size={16} className="text-ok" />}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  {subcategory && <span className="rounded-full bg-navy px-2.5 py-1 text-[11px] font-bold text-white">{subcategory}</span>}
-                  {measurement && <span className="rounded-full bg-navy px-2.5 py-1 text-[11px] font-bold text-white">{measurement}</span>}
+                  {subcategory && <span className="rounded-full bg-navy px-2.5 py-1 text-label font-semibold text-white">{subcategory}</span>}
+                  {measurement && <span className="rounded-full bg-navy px-2.5 py-1 text-label font-semibold text-white">{measurement}</span>}
                 </div>
                 {(eq.manufacturer || eq.modelName) && (
-                  <p className="mt-2 text-[13px] text-muted">{[eq.manufacturer, eq.modelName].filter(Boolean).join(" ")}</p>
+                  <p className="mt-2 text-body text-muted">{[eq.manufacturer, eq.modelName].filter(Boolean).join(" ")}</p>
                 )}
               </div>
 
@@ -133,17 +133,17 @@ export function EquipmentDetailModal({
 
               {/* Documents / photos status (no contents — AC-19) */}
               {(eq.docTypes.length > 0 || photos.length > 0) && (
-                <div className="rounded-[12px] border border-border bg-surface2/40 p-3.5">
-                  <div className="flex items-center gap-2 text-[12.5px] font-bold text-navy">
+                <div className="rounded-sm border border-border bg-surface2/40 p-3.5">
+                  <div className="flex items-center gap-2 text-meta font-semibold text-navy">
                     <Icon name="photo_camera" size={16} className="text-muted" /> {t.store.photos}
-                    <span className="rounded-full bg-surface3 px-2 py-0.5 text-[11px] font-bold text-muted">{photos.length}</span>
+                    <span className="rounded-full bg-surface3 px-2 py-0.5 text-label font-semibold text-muted">{photos.length}</span>
                   </div>
                   {eq.docTypes.length > 0 && (
-                    <div className="mt-2.5 flex items-center gap-2 text-[12.5px] font-bold text-navy">
+                    <div className="mt-2.5 flex items-center gap-2 text-meta font-semibold text-navy">
                       <Icon name="description" size={16} className="text-muted" /> {t.store.docsShort}
                       <span className="flex flex-wrap gap-1.5">
                         {eq.docTypes.map((d) => (
-                          <span key={d} className="inline-flex items-center gap-0.5 rounded-full bg-ok-soft px-2 py-0.5 text-[11px] font-bold text-ok">
+                          <span key={d} className="inline-flex items-center gap-0.5 rounded-full bg-ok-soft px-2 py-0.5 text-label font-semibold text-ok">
                             <Icon name="check" size={12} /> {d.toUpperCase()}
                           </span>
                         ))}
@@ -164,9 +164,9 @@ export function EquipmentDetailModal({
 function Spec({ label, value, highlight }: { label: string; value: string | null; highlight?: boolean }) {
   if (!value) return null;
   return (
-    <div className="rounded-[10px] border border-border bg-surface px-3 py-2">
-      <div className="text-[10.5px] font-semibold uppercase tracking-wide text-muted">{label}</div>
-      <div className={`mt-0.5 text-[13px] font-bold ${highlight ? "text-brand" : "text-navy"}`}>{value}</div>
+    <div className="rounded-sm border border-border bg-surface px-3 py-2">
+      <div className="text-label font-semibold uppercase tracking-wide text-muted">{label}</div>
+      <div className={`mt-0.5 text-body font-semibold ${highlight ? "text-brand" : "text-navy"}`}>{value}</div>
     </div>
   );
 }

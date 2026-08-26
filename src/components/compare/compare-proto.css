@@ -2,14 +2,14 @@
    Relies on the .rproto CSS variables + .gctx/.flab from requests-proto.css. */
 
 /* drop zone */
-.rproto .dropzone { border: 2px dashed #bcd4fb; background: var(--rentee-dim); border-radius: var(--r-lg); padding: 26px 18px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
-.rproto .dropzone:hover, .rproto .dropzone.over { border-color: var(--rentee); background: #dde9fd; }
+.rproto .dropzone { border: 2px dashed var(--surface2); background: var(--rentee-dim); border-radius: var(--r-lg); padding: 26px 18px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+.rproto .dropzone:hover, .rproto .dropzone.over { border-color: var(--rentee); background: var(--background); }
 .rproto .dropzone .dz-ic { width: 46px; height: 46px; border-radius: 12px; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; background: var(--rentee-dim); color: var(--rentee); }
 .rproto .dropzone .dz-ic .material-icons-outlined { font-size: 26px; }
 .rproto .dropzone .dz-t { font-size: 14px; font-weight: 800; }
 .rproto .dropzone .dz-s { font-size: 12px; color: var(--muted); font-weight: 600; margin-top: 4px; }
 .rproto .cmp-error { margin-top: 12px; font-size: 12.5px; font-weight: 600; color: var(--danger); background: var(--danger-bg); border-radius: var(--r-md); padding: 9px 12px; }
-.rproto .cmp-note { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; font-size: 12.5px; font-weight: 600; color: var(--navy-mid); background: var(--info-bg); border: 1px solid #cfe6f7; border-radius: var(--r-md); padding: 10px 12px; }
+.rproto .cmp-note { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; font-size: 12.5px; font-weight: 600; color: var(--navy-mid); background: var(--info-bg); border: 1px solid var(--info-soft); border-radius: var(--r-md); padding: 10px 12px; }
 .rproto .cmp-note .material-icons-outlined { font-size: 16px; color: var(--info); flex: 0 0 auto; margin-top: 1px; }
 
 /* uploaded tray (one chip per quotation) */
@@ -25,7 +25,7 @@
 .rproto .clear-all { font-size: 12px; font-weight: 700; color: var(--danger); cursor: pointer; margin-inline-start: 4px; }
 
 /* basket */
-.rproto .basket { display: flex; align-items: center; gap: 12px; background: var(--action-dim); border: 1.5px solid rgba(247,144,9,0.4); border-radius: var(--r-lg); padding: 13px 16px; margin: 16px 0; }
+.rproto .basket { display: flex; align-items: center; gap: 12px; background: var(--action-dim); border: 1.5px solid color-mix(in srgb, var(--brand) 40%, transparent); border-radius: var(--r-lg); padding: 13px 16px; margin: 16px 0; }
 .rproto .basket .bk-ic { color: var(--action); }
 .rproto .basket .bk-t { font-size: 13px; font-weight: 800; }
 .rproto .basket .bk-s { font-size: 11.5px; color: var(--navy-mid); font-weight: 600; margin-top: 2px; }
@@ -36,10 +36,10 @@
 .rproto .itabs { display: flex; gap: 9px; overflow-x: auto; padding-bottom: 4px; }
 .rproto .itab { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; border: 1.5px solid var(--border); background: var(--surface1); border-radius: var(--r-full); padding: 9px 15px; font-size: 12.5px; font-weight: 800; color: var(--navy-mid); cursor: pointer; white-space: nowrap; transition: background .12s, border-color .12s; }
 .rproto .itab:hover { border-color: var(--navy-mid); }
-.rproto .itab.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+.rproto .itab.on { background: var(--navy); border-color: var(--navy); color: var(--surface); }
 .rproto .itab .material-icons-outlined { font-size: 16px; }
 .rproto .itab .ct { display: inline-flex; align-items: center; justify-content: center; min-width: 19px; height: 19px; padding: 0 6px; border-radius: var(--r-full); background: var(--surface2); color: var(--navy-mid); font-family: "IBM Plex Sans", monospace; font-size: 11px; font-weight: 800; }
-.rproto .itab.on .ct { background: rgba(255,255,255,0.22); color: #fff; }
+.rproto .itab.on .ct { background: rgba(255,255,255,0.22); color: var(--surface); }
 
 /* per-item comparison */
 .rproto .cmp { margin-bottom: 20px; }
@@ -47,7 +47,7 @@
 .rproto .cmp-h .ci { width: 40px; height: 40px; border-radius: 10px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; background: var(--surface3); color: var(--navy-mid); overflow: hidden; }
 .rproto .cmp-h .ct { font-size: 15px; font-weight: 900; }
 .rproto .cmp-h .cs { font-size: 11.5px; font-weight: 700; color: var(--muted); margin-top: 2px; }
-.rproto .cmp-empty { border: 1px dashed var(--border); border-radius: var(--r-lg); padding: 22px; text-align: center; font-size: 12.5px; color: var(--muted); background: rgba(239,244,249,0.5); }
+.rproto .cmp-empty { border: 1px dashed var(--border); border-radius: var(--r-lg); padding: 22px; text-align: center; font-size: 12.5px; color: var(--muted); background: color-mix(in srgb, var(--surface2) 50%, transparent); }
 
 /* compare overlay: suppliers = columns, terms = rows, 3 blocks */
 .rproto .cmpx-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface1); }
@@ -55,20 +55,20 @@
 .rproto .cstrip { position: sticky; top: 0; z-index: 4; background: var(--surface1); border-bottom: 1px solid var(--border); }
 .rproto .cstrip .clbl { background: var(--surface1); }
 .rproto .csup { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 12px 6px; border-inline-start: 1px solid var(--line); }
-.rproto .cava { position: relative; width: 36px; height: 36px; border-radius: 50%; background: #F3E9D8; color: var(--navy); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; }
-.rproto .cava .ctick { position: absolute; inset-inline-start: -3px; bottom: -3px; width: 15px; height: 15px; border-radius: 50%; background: var(--success); border: 1.5px solid #fff; color: #fff; font-size: 9px; display: flex; align-items: center; justify-content: center; }
+.rproto .cava { position: relative; width: 36px; height: 36px; border-radius: 50%; background: var(--brand-soft); color: var(--navy); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; }
+.rproto .cava .ctick { position: absolute; inset-inline-start: -3px; bottom: -3px; width: 15px; height: 15px; border-radius: 50%; background: var(--success); border: 1.5px solid var(--surface); color: var(--surface); font-size: 9px; display: flex; align-items: center; justify-content: center; }
 .rproto .cname { font-size: 11.5px; font-weight: 800; text-align: center; line-height: 1.25; }
-.rproto .cacc { background: var(--success); color: #fff; font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 999px; }
+.rproto .cacc { background: var(--success); color: var(--surface); font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 999px; }
 .rproto .cbhead { display: flex; align-items: center; gap: 8px; padding: 9px 14px; font-size: 12px; font-weight: 800; }
 .rproto .cdot { width: 8px; height: 8px; border-radius: 50%; }
-.rproto .b-price .cbhead { background: rgba(247,144,9,.08); color: var(--action); } .rproto .b-price .cdot { background: var(--action); }
-.rproto .b-qual .cbhead { background: rgba(37,99,235,.08); color: var(--rentee); } .rproto .b-qual .cdot { background: var(--rentee); }
-.rproto .b-comp .cbhead { background: rgba(29,175,88,.08); color: var(--success); } .rproto .b-comp .cdot { background: var(--success); }
+.rproto .b-price .cbhead { background: color-mix(in srgb, var(--brand) 8%, transparent); color: var(--action); } .rproto .b-price .cdot { background: var(--action); }
+.rproto .b-qual .cbhead { background: color-mix(in srgb, var(--info) 8%, transparent); color: var(--rentee); } .rproto .b-qual .cdot { background: var(--rentee); }
+.rproto .b-comp .cbhead { background: color-mix(in srgb, var(--ok) 8%, transparent); color: var(--success); } .rproto .b-comp .cdot { background: var(--success); }
 .rproto .crow { border-bottom: 1px solid var(--line); }
-.rproto .crow .clbl { background: #FAFCFE; font-size: 11px; font-weight: 800; color: var(--muted); display: flex; align-items: center; padding: 10px 10px; }
+.rproto .crow .clbl { background: var(--surface); font-size: 11px; font-weight: 800; color: var(--muted); display: flex; align-items: center; padding: 10px 10px; }
 .rproto[dir="rtl"] .crow .clbl, .rproto[dir="rtl"] .cstrip .clbl { text-align: right; }
 .rproto .ccell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 10px 6px; text-align: center; border-inline-start: 1px solid var(--line); }
-.rproto .ccell.win { background: rgba(29,175,88,0.10); }
+.rproto .ccell.win { background: color-mix(in srgb, var(--ok) 10%, transparent); }
 .rproto .cmoney { font-weight: 800; font-size: 12.5px; color: var(--navy); } .rproto .cmoney.big { font-size: 14px; }
 .rproto .sar { font-size: 10px; font-weight: 700; opacity: .8; }
 .rproto .cval { font-size: 12px; font-weight: 700; color: var(--navy); } .rproto .cval.num { font-size: 13px; font-weight: 800; }
@@ -80,12 +80,12 @@
 
 /* export-to-PDF action */
 .rproto .cmp-actions { display: flex; justify-content: flex-end; margin: 4px 0 12px; }
-.rproto .cmp-export { display: inline-flex; align-items: center; gap: 7px; background: var(--navy); color: #fff; border: 0; border-radius: var(--r-full); padding: 9px 16px; font-size: 12.5px; font-weight: 800; cursor: pointer; }
+.rproto .cmp-export { display: inline-flex; align-items: center; gap: 7px; background: var(--navy); color: var(--surface); border: 0; border-radius: var(--r-full); padding: 9px 16px; font-size: 12.5px; font-weight: 800; cursor: pointer; }
 .rproto .cmp-export:hover { background: var(--navy-mid); }
 .rproto .cmp-export .material-icons-outlined { font-size: 17px; }
 
 /* computed conclusion under each item's comparison table */
-.rproto .cmp-summary { margin-top: 12px; border: 1px solid #cfe0fb; background: var(--rentee-dim); border-radius: var(--r-lg); padding: 12px 14px; }
+.rproto .cmp-summary { margin-top: 12px; border: 1px solid var(--info-soft); background: var(--rentee-dim); border-radius: var(--r-lg); padding: 12px 14px; }
 .rproto .cmp-summary .cmp-sum-h { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 800; color: var(--rentee); margin-bottom: 7px; }
 .rproto .cmp-summary .cmp-sum-h .material-icons-outlined { font-size: 17px; }
 .rproto .cmp-summary ul { margin: 0; padding-inline-start: 18px; }

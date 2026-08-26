@@ -252,7 +252,7 @@ export function SharedBidSubmissionModal({
       padded={false}
       title={submission?.companyName ?? bid.supplierName}
       subtitle={L("Off-platform · submitted via your shared link · read-only", "خارج المنصة · مُقدَّم عبر رابطك المشترك · للقراءة فقط")}
-      icon={<span className="grid h-[34px] w-[34px] place-items-center rounded-[10px] bg-brand-soft text-brand"><span className="material-icons-outlined" style={{ fontSize: 19 }}>link</span></span>}
+      icon={<span className="grid h-[34px] w-[34px] place-items-center rounded-sm bg-brand-soft text-brand"><span className="material-icons-outlined" style={{ fontSize: 19 }}>link</span></span>}
       footer={
         <>
           <DialogButton onClick={onClose}>{L("Close", "إغلاق")}</DialogButton>
@@ -271,7 +271,7 @@ export function SharedBidSubmissionModal({
             which the shell no longer draws, onto the shell's own `data-dialog-*` hooks — without this the
             page behind would print instead, which is the sort of thing nobody notices until a supplier
             is handed six blank sheets. */}
-        <style>{`@media print{body *{visibility:hidden!important}[data-dialog-panel],[data-dialog-panel] *{visibility:visible!important}[data-dialog-scrim]{position:static!important;background:#fff!important;padding:0!important;overflow:visible!important}[data-dialog-panel]{position:absolute!important;inset-inline-start:0;top:0;width:100%!important;height:auto!important;max-height:none!important;border:0!important;box-shadow:none!important}.qprint{max-height:none!important;overflow:visible!important;background:#fff!important}.qprint-hide{display:none!important}}`}</style>
+        <style>{`@media print{body *{visibility:hidden!important}[data-dialog-panel],[data-dialog-panel] *{visibility:visible!important}[data-dialog-scrim]{position:static!important;background:var(--surface)!important;padding:0!important;overflow:visible!important}[data-dialog-panel]{position:absolute!important;inset-inline-start:0;top:0;width:100%!important;height:auto!important;max-height:none!important;border:0!important;box-shadow:none!important}.qprint{max-height:none!important;overflow:visible!important;background:var(--surface)!important}.qprint-hide{display:none!important}}`}</style>
         <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
         <div className="slb-banner">
           <span className="material-icons-outlined">visibility</span>
@@ -280,7 +280,7 @@ export function SharedBidSubmissionModal({
 
         <div className="qprint" style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
           {!submission ? (
-            <p style={{ padding: "40px 0", textAlign: "center", fontSize: 13, color: "#6b8fa8" }}>{L("Submission details aren't available.", "تفاصيل العرض غير متاحة.")}</p>
+            <p style={{ padding: "40px 0", textAlign: "center", fontSize: 13, color: "var(--muted)" }}>{L("Submission details aren't available.", "تفاصيل العرض غير متاحة.")}</p>
           ) : (
             <div className={`bidpage${ar ? " rtl" : ""}`} dir={dir}>
               <div style={{ padding: "18px 18px 40px", maxWidth: 900, margin: "0 auto" }}>
@@ -513,7 +513,7 @@ export function SharedBidSubmissionModal({
 
                 {/* Supplier priced VAT-inclusive — informational (stored prices are VAT-exclusive). */}
                 {vatInclusive && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 12px", padding: "10px 14px", borderRadius: "var(--r-md)", background: "var(--action-dim)", border: "1px solid rgba(247,144,9,.3)", fontSize: 12.5, fontWeight: 700, color: "var(--navy-mid)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 12px", padding: "10px 14px", borderRadius: "var(--r-md)", background: "var(--action-dim)", border: "1px solid color-mix(in srgb, var(--brand) 30%, transparent)", fontSize: 12.5, fontWeight: 700, color: "var(--navy-mid)" }}>
                     <span className="material-icons-outlined" style={{ fontSize: 18, color: "var(--action)", flexShrink: 0 }}>receipt_long</span>
                     {L("The supplier quoted VAT-inclusive prices. Amounts here are shown net of 15% VAT — the grand total is exactly what they entered.", "قدّم المؤجّر أسعارًا شاملة لضريبة القيمة المضافة. تُعرض المبالغ هنا صافية من ضريبة ١٥٪ — والإجمالي الكلي هو ما أدخله تمامًا.")}
                   </div>
@@ -548,7 +548,7 @@ export function SharedBidSubmissionModal({
                   ) : null;
                 })()}
 
-                <div style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: "#9AA7B8", padding: "4px 0 2px" }}>{L("Powered by", "مُشغّل بواسطة")} <b style={{ color: "var(--navy)", fontWeight: 800 }}>Moedatech</b></div>
+                <div style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: "var(--muted-light)", padding: "4px 0 2px" }}>{L("Powered by", "مُشغّل بواسطة")} <b style={{ color: "var(--navy)", fontWeight: 800 }}>Moedatech</b></div>
               </div>
             </div>
           )}
@@ -567,8 +567,8 @@ function RoCell({ k, children }: { k: string; children: React.ReactNode }) {
 /** Static read-only Yes/No chip — the supplier's confirmation for a term. */
 function RoAns({ ok, L }: { ok: boolean | undefined; L: (e: string, a: string) => string }) {
   const base = { display: "inline-flex", alignItems: "center", gap: 4, borderRadius: 7, padding: "5px 11px", fontSize: 11.5, fontWeight: 800 } as const;
-  if (ok === true) return <span style={{ ...base, color: "#fff", background: "var(--success)" }}><span className="material-icons-outlined" style={{ fontSize: 14 }}>check</span>{L("Yes", "نعم")}</span>;
-  if (ok === false) return <span style={{ ...base, color: "#fff", background: "var(--danger)" }}><span className="material-icons-outlined" style={{ fontSize: 14 }}>close</span>{L("No", "لا")}</span>;
+  if (ok === true) return <span style={{ ...base, color: "var(--surface)", background: "var(--success)" }}><span className="material-icons-outlined" style={{ fontSize: 14 }}>check</span>{L("Yes", "نعم")}</span>;
+  if (ok === false) return <span style={{ ...base, color: "var(--surface)", background: "var(--danger)" }}><span className="material-icons-outlined" style={{ fontSize: 14 }}>close</span>{L("No", "لا")}</span>;
   return <span style={{ ...base, color: "var(--muted)", background: "var(--surface2)" }}>—</span>;
 }
 

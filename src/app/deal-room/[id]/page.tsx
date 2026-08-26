@@ -56,10 +56,10 @@ function DealRoomGate({ id, onTitle }: { id: string; onTitle: (t: string) => voi
       <div className="mx-auto flex max-w-md flex-col items-center gap-4 py-20 text-center">
         <span className="grid h-14 w-14 place-items-center rounded-full bg-surface2 text-navy-mid"><Icon name="lock" size={26} /></span>
         <div>
-          <h2 className="text-[17px] font-extrabold text-navy">{L("Sign in to view this deal room", "سجّل الدخول لعرض غرفة الصفقة")}</h2>
-          <p className="mt-1 text-[13px] text-muted">{L("Deal rooms are tied to your account.", "غرف الصفقات مرتبطة بحسابك.")}</p>
+          <h2 className="text-title font-extrabold text-navy">{L("Sign in to view this deal room", "سجّل الدخول لعرض غرفة الصفقة")}</h2>
+          <p className="mt-1 text-body text-muted">{L("Deal rooms are tied to your account.", "غرف الصفقات مرتبطة بحسابك.")}</p>
         </div>
-        <button onClick={() => openAuth()} className="rounded-full bg-brand px-5 py-2 text-[13px] font-bold text-white">{L("Sign in", "تسجيل الدخول")}</button>
+        <button onClick={() => openAuth()} className="rounded-full bg-brand px-5 py-2 text-body font-semibold text-white">{L("Sign in", "تسجيل الدخول")}</button>
       </div>
     );
   }

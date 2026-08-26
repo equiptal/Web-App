@@ -158,7 +158,7 @@ export function Processing() {
         aria-labelledby="proc-err-title"
         onClick={(e) => { if (e.target === e.currentTarget) actions.goIntake(); }}
       >
-        <div className="relative w-full max-w-sm rounded-2xl bg-surface p-6 text-center shadow-[0_24px_60px_rgba(16,32,58,.35)]">
+        <div className="relative w-full max-w-sm rounded-lg bg-surface p-6 text-center">
           <button
             onClick={() => actions.goIntake()}
             aria-label={t.common.close}
@@ -169,12 +169,12 @@ export function Processing() {
           <div className={`mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full ${isEmpty || agentBusy ? "bg-warn-soft text-warn" : "bg-danger-soft text-danger"}`}>
             <Icon name={icon} size={34} />
           </div>
-          <h2 id="proc-err-title" className="text-[19px] font-extrabold tracking-tight text-navy">{title}</h2>
-          <p className="mx-auto mt-2 max-w-[300px] text-[14px] leading-relaxed text-muted">{body}</p>
+          <h2 id="proc-err-title" className="text-title font-extrabold tracking-tight text-navy">{title}</h2>
+          <p className="mx-auto mt-2 max-w-[300px] text-body leading-relaxed text-muted">{body}</p>
           {errorDetail?.detail && (
-            <p className="mx-auto mt-3 max-w-[320px] break-words rounded-lg bg-surface3 px-3 py-2 text-start font-mono text-[11.5px] leading-snug text-muted">{errorDetail.detail}</p>
+            <p className="mx-auto mt-3 max-w-[320px] break-words rounded-sm bg-surface3 px-3 py-2 text-start font-mono text-label leading-snug text-muted">{errorDetail.detail}</p>
           )}
-          <Button className="mt-6 w-full py-3 text-[15px]" onClick={() => actions.process()}>
+          <Button className="mt-6 w-full py-3 text-subhead" onClick={() => actions.process()}>
             <Icon name="refresh" size={19} /> {t.common.retry}
           </Button>
         </div>
@@ -192,22 +192,22 @@ export function Processing() {
 
   return (
     <div className="flex min-h-[70vh] items-center justify-center">
-      <div className="w-full max-w-[520px] rounded-[16px] border border-border bg-surface p-6 text-center shadow-[0_1px_3px_rgba(15,23,31,.06),0_30px_70px_-20px_rgba(31,45,58,.2)]">
+      <div className="w-full max-w-[520px] rounded-sm border border-border bg-surface p-6 text-center">
         {/* The agent, and that it is live. The dot pulses; it is the only thing on this card that moves
             without a reason, and it is the reason. */}
         <div className="mb-5 flex items-center justify-center gap-2.5">
-          <span className="grid h-[30px] w-[30px] flex-none place-items-center rounded-[9px] bg-gradient-to-br from-[#f7c675] to-brand text-white shadow-[0_4px_10px_rgba(237,161,83,.35)]">
+          <span className="grid h-[30px] w-[30px] flex-none place-items-center rounded-sm bg-gradient-to-br from-brand-light to-brand text-white">
             <Icon name="auto_awesome" size={16} />
           </span>
           <span className="h-2 w-2 flex-none rounded-full bg-ok motion-safe:animate-pulse" />
-          <span className="text-[12px] font-extrabold uppercase tracking-[.04em] text-ok">{t.processing.agentWorking}</span>
+          <span className="text-meta font-extrabold uppercase tracking-[.04em] text-ok">{t.processing.agentWorking}</span>
         </div>
 
         <h2 className="text-[21px] font-extrabold tracking-tight text-navy">
           {stages[Math.min(step, 3)].title}
           <span className="motion-safe:animate-pulse">…</span>
         </h2>
-        <p className="mb-5 mt-1 text-[13.5px] text-muted">{t.processing.sub}</p>
+        <p className="mb-5 mt-1 text-body text-muted">{t.processing.sub}</p>
 
         {/* The four stages, with the rule between them filling as each is passed. */}
         <div className="mx-auto mb-5 flex max-w-[400px] items-start">
@@ -222,13 +222,13 @@ export function Processing() {
                       isDone
                         ? "bg-ok text-white"
                         : active
-                          ? "bg-gradient-to-br from-[#f7c675] to-brand text-white motion-safe:animate-pulse"
+                          ? "bg-gradient-to-br from-brand-light to-brand text-white motion-safe:animate-pulse"
                           : "bg-surface2 text-muted"
                     }`}
                   >
                     <Icon name={isDone ? "check" : s.icon} size={17} />
                   </span>
-                  <span className={`whitespace-nowrap text-[11px] font-bold ${isDone ? "text-ok" : active ? "text-navy" : "text-muted"}`}>
+                  <span className={`whitespace-nowrap text-label font-semibold ${isDone ? "text-ok" : active ? "text-navy" : "text-muted"}`}>
                     {s.label}
                   </span>
                 </div>
@@ -241,13 +241,13 @@ export function Processing() {
         </div>
 
         {/* What the agent has said so far. Four lines: enough to follow, short enough not to scroll. */}
-        <div className="min-h-[110px] rounded-[14px] border border-border bg-surface2/40 px-4 py-3.5">
-          <div className="mb-2.5 text-[11px] font-extrabold uppercase tracking-[.03em] text-muted">{t.processing.liveActivity}</div>
+        <div className="min-h-[110px] rounded-sm border border-border bg-surface2/40 px-4 py-3.5">
+          <div className="mb-2.5 text-label font-extrabold uppercase tracking-[.03em] text-muted">{t.processing.liveActivity}</div>
           <div className="flex flex-col items-stretch gap-2.5">
             {feed.map((entry, i) => (
               <div key={entry.id} className="flex items-center gap-2.5 text-start">
                 <span className={`h-1.5 w-1.5 flex-none rounded-full ${i === feed.length - 1 ? "bg-brand" : "bg-ok"}`} />
-                <span className="min-w-0 flex-1 truncate text-[13px] text-navy-mid">{entry.text}</span>
+                <span className="min-w-0 flex-1 truncate text-body text-navy-mid">{entry.text}</span>
               </div>
             ))}
           </div>
@@ -255,14 +255,14 @@ export function Processing() {
 
         <div className="mt-4 flex items-center gap-3">
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface3">
-            <div className="h-full rounded-full bg-gradient-to-r from-brand to-[#f7c675] transition-[width] duration-500" style={{ width: `${pct}%` }} />
+            <div className="h-full rounded-full bg-gradient-to-r from-brand to-brand-light transition-[width] duration-500" style={{ width: `${pct}%` }} />
           </div>
-          <span className="w-9 text-end text-[12.5px] font-bold text-brand">{pct}%</span>
+          <span className="w-9 text-end text-meta font-semibold text-brand">{pct}%</span>
         </div>
 
         {/* The counts the canvas will open on, once there are any. */}
         {done && draft && (
-          <p className="mt-3 text-[12.5px] font-semibold text-muted">
+          <p className="mt-3 text-meta font-semibold text-muted">
             {fmt(t.processing.summaryItems, { count: draft.summary.totalItems })}
             {draft.summary.needsValidation > 0 && ` · ${fmt(t.processing.summaryNeedCheck, { count: draft.summary.needsValidation })}`}
             {draft.summary.notAvailable > 0 && ` · ${fmt(t.processing.summaryNotAvailable, { count: draft.summary.notAvailable })}`}

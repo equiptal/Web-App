@@ -90,14 +90,14 @@ export function MachineCard({
   ];
 
   return (
-    <div className="min-w-0 flex-1 rounded-[14px] border border-border bg-surface p-3.5">
+    <div className="min-w-0 flex-1 rounded-sm border border-border bg-surface p-3.5">
       <div className="mb-4 flex items-center justify-between gap-2">
         <span className="flex items-center gap-2">
           <PanelDot complete={gaps.length === 0} />
-          <h2 className="whitespace-nowrap text-[15px] font-extrabold text-navy">{t.create.machine}</h2>
+          <h2 className="whitespace-nowrap text-subhead font-extrabold text-navy">{t.create.machine}</h2>
         </span>
         {onCollapse && (
-          <button type="button" onClick={onCollapse} className="text-[12px] font-semibold text-muted hover:text-navy-mid">
+          <button type="button" onClick={onCollapse} className="text-meta font-semibold text-muted hover:text-navy-mid">
             {t.create.collapse}
           </button>
         )}
@@ -106,11 +106,11 @@ export function MachineCard({
       {/* The prototype's 2fr / 3fr split, 20px gutter, columns aligned to the top. */}
       <div className="grid gap-5 lg:grid-cols-[2fr_3fr] lg:items-stretch">
         {/* ---------------- The 450px panel, and the four controls on its corners ---------------- */}
-        <div className="relative h-full min-h-[450px] w-full min-w-0 rounded-xl bg-[#f0f1f3]">
+        <div className="relative h-full min-h-[450px] w-full min-w-0 rounded-md bg-surface2">
           <div className="grid h-full place-content-center justify-items-center gap-2 px-6 text-center">
             <Icon name={equipmentIcon(tax.subtypeName || tax.categoryName)} size={132} className="text-navy/20" />
             {(tax.subtypeName || tax.categoryName) && (
-              <p className="text-[13px] font-bold leading-snug text-navy/45">
+              <p className="text-body font-semibold leading-snug text-navy/45">
                 {[tax.subtypeName || tax.categoryName, tax.sizeName].filter(Boolean).join(" · ")}
               </p>
             )}
@@ -151,13 +151,13 @@ export function MachineCard({
 
             {/* The prototype's inline −/×N/+ chip rather than the boxed Stepper, which is too tall
                 to sit on the panel without covering the machine. */}
-            <div className="flex flex-none items-center gap-2.5 rounded-lg bg-[#12263acc] px-2 py-1.5 text-[12px] text-white shadow-[0_2px_8px_rgba(0,0,0,.25)]">
+            <div className="flex flex-none items-center gap-2.5 rounded-sm bg-[#12263acc] px-2 py-1.5 text-meta text-white">
               <button
                 type="button"
                 aria-label={`${t.create.machineCard.quantity} −`}
                 disabled={item.quantity <= 1}
                 onClick={() => set("quantity", { quantity: Math.max(1, item.quantity - 1) })}
-                className="px-1 disabled:opacity-40"
+                className="px-1 disabled:bg-disabled-bg disabled:text-disabled-fg"
               >
                 −
               </button>
@@ -206,7 +206,7 @@ export function MachineCard({
             <UnavailableCard item={item} label={item.rawLabel ?? tax.subtypeName ?? ""} />
           ) : (
             /* The amber-tinted taxonomy trio, at the prototype's minmax columns. */
-            <div className="grid gap-2.5 rounded-[10px] bg-surface2 p-3.5 sm:grid-cols-[minmax(132px,1fr)_minmax(150px,1.5fr)_minmax(104px,0.9fr)]">
+            <div className="grid gap-2.5 rounded-sm bg-surface2 p-3.5 sm:grid-cols-[minmax(132px,1fr)_minmax(150px,1.5fr)_minmax(104px,0.9fr)]">
               {/* Derived, never picked. The renter chooses a TYPE and the category follows from it —
                   so this shows the taxonomy's `tag` (its canonical grouping, e.g. "Earthmoving") as a
                   read-only box, exactly as the prototype does. No chevron, because there is nothing
@@ -215,7 +215,7 @@ export function MachineCard({
                 label={t.create.machineCard.category}
                 source={prov.itemSource("category", item.ref.categoryId, "ref")}
               >
-                <div className="truncate rounded-lg border border-border bg-surface px-3 py-2.5 text-[13px] text-navy">
+                <div className="truncate rounded-sm border border-border bg-surface px-3 py-2.5 text-body text-navy">
                   {tax.tagName || "—"}
                 </div>
               </CanvasField>
@@ -274,7 +274,7 @@ export function MachineCard({
               at 13px they overflowed ~60px of chip and forced the legs to stack. Smaller type keeps
               the prototype's layout AND the wording that says what the choice means. */}
           <div className="grid items-start gap-3.5 sm:grid-cols-[2fr_1fr]">
-            <div className="grid min-w-0 gap-3.5 rounded-[10px] bg-surface2 p-3.5 sm:grid-cols-2">
+            <div className="grid min-w-0 gap-3.5 rounded-sm bg-surface2 p-3.5 sm:grid-cols-2">
               <CanvasField
                   label={t.create.machineCard.delivery}
                   missing={gapFor("delivery")}
@@ -313,7 +313,7 @@ export function MachineCard({
                 />
               </CanvasField>
             </div>
-            <div className="min-w-0 rounded-[10px] bg-surface2 p-3.5">
+            <div className="min-w-0 rounded-sm bg-surface2 p-3.5">
               <CanvasField
                 label={t.create.machineCard.fuelResponsibility}
                 source={prov.itemSource("fuel_responsibility", overrides.fuelResponsibility, "fuelResponsibilityOverride", true)}
@@ -334,7 +334,7 @@ export function MachineCard({
           </div>
 
           {/* Attachment, work type and notes — one box, as the prototype has them. */}
-          <div className="flex w-full flex-col gap-2.5 rounded-[10px] bg-surface2 p-3.5">
+          <div className="flex w-full flex-col gap-2.5 rounded-sm bg-surface2 p-3.5">
             {/* Hidden entirely when this subtype has no admin-defined attachments (MREQ-AC-22). */}
             {attachments.hasOptions && (
               <CanvasField
@@ -387,14 +387,14 @@ function UnavailableCard({ item, label }: { item: EquipmentItem; label: string }
   const { actions } = useRfq();
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-[10px] border border-danger/40 bg-danger/[0.06] p-3.5">
-      <p className="flex items-start gap-2 text-[13px] leading-snug text-danger">
+    <div className="flex flex-col gap-2.5 rounded-sm border border-danger/40 bg-danger/[0.06] p-3.5">
+      <p className="flex items-start gap-2 text-body leading-snug text-danger">
         <Icon name="error_outline" size={16} className="mt-px flex-none" />
         {fmt(t.create.machineCard.unavailableTitle, { equipment: label })}
       </p>
-      <p className="text-[12px] leading-snug text-muted">{t.step2.noMatch.explainer}</p>
+      <p className="text-meta leading-snug text-muted">{t.step2.noMatch.explainer}</p>
       {item.sourcingRequested ? (
-        <p className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ok">
+        <p className="flex items-center gap-1.5 text-meta font-semibold text-ok">
           <Icon name="check_circle" size={15} /> {t.create.machineCard.sourcingRequested}
         </p>
       ) : (

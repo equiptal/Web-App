@@ -106,23 +106,23 @@ export function ChangePhoneModal({
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-[18px] font-extrabold text-navy">{p.changePhone}</h2>
-            <p className="mt-0.5 text-[12.5px] text-muted">{step === "phone" ? p.changePhoneSub : fmt(p.phoneCodeSentTo, { phone: newPhone })}</p>
+            <h2 className="text-title font-extrabold text-navy">{p.changePhone}</h2>
+            <p className="mt-0.5 text-meta text-muted">{step === "phone" ? p.changePhoneSub : fmt(p.phoneCodeSentTo, { phone: newPhone })}</p>
           </div>
-          <button onClick={onClose} className="flex-none rounded-lg p-1 text-muted hover:bg-surface2" aria-label={p.cancel}>
+          <button onClick={onClose} className="flex-none rounded-sm p-1 text-muted hover:bg-surface2" aria-label={p.cancel}>
             <Icon name="close" size={20} />
           </button>
         </div>
 
         {step === "phone" ? (
           <>
-            <label className="mb-1.5 block text-[12.5px] font-bold text-navy-mid">{p.newPhone}</label>
+            <label className="mb-1.5 block text-meta font-semibold text-navy-mid">{p.newPhone}</label>
             <div className="flex gap-2" dir="ltr">
-              <div className="flex h-[48px] items-center gap-1.5 whitespace-nowrap rounded-[10px] border border-border bg-surface2 px-3 text-[14px] font-bold text-navy">
-                <span className="text-[16px]">🇸🇦</span> +966
+              <div className="flex h-[48px] items-center gap-1.5 whitespace-nowrap rounded-sm border border-border bg-surface2 px-3 text-body font-semibold text-navy">
+                <span className="text-subhead">🇸🇦</span> +966
               </div>
               <input
-                className="h-[48px] min-w-0 flex-1 rounded-[10px] border border-border bg-surface px-3 text-[15px] font-semibold text-navy outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)]"
+                className="h-[48px] min-w-0 flex-1 rounded-sm border border-border bg-surface px-3 text-subhead font-semibold text-navy outline-0 focus:border-brand"
                 type="tel"
                 inputMode="numeric"
                 maxLength={11}
@@ -132,11 +132,11 @@ export function ChangePhoneModal({
                 autoFocus
               />
             </div>
-            {err && <p className="mt-2 text-[12.5px] font-semibold text-danger">{err}</p>}
+            {err && <p className="mt-2 text-meta font-semibold text-danger">{err}</p>}
             <button
               onClick={sendCode}
               disabled={busy || digits.replace(/\D/g, "").length < 9}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-[10px] bg-brand px-5 py-3 text-[14px] font-bold text-brand-fg transition hover:brightness-[1.04] disabled:opacity-50"
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-sm bg-brand px-5 py-3 text-body font-semibold text-brand-fg transition disabled:bg-disabled-bg disabled:text-disabled-fg"
             >
               {busy ? p.sending : p.sendCode}
               {!busy && <Icon name="arrow_forward" size={16} className="rtl:scale-x-[-1]" />}
@@ -144,7 +144,7 @@ export function ChangePhoneModal({
           </>
         ) : (
           <>
-            <h3 className="mb-3 text-[14px] font-bold text-navy">{p.phoneCodeTitle}</h3>
+            <h3 className="mb-3 text-body font-semibold text-navy">{p.phoneCodeTitle}</h3>
             <div className="grid grid-cols-4 gap-3" dir="ltr">
               {boxes.map((d, i) => (
                 <input
@@ -161,23 +161,23 @@ export function ChangePhoneModal({
                   onPaste={onPaste}
                   aria-label={`Digit ${i + 1}`}
                   style={OTP_FONT}
-                  className={`h-[56px] w-full rounded-[10px] border-[1.5px] text-center text-[22px] font-bold text-navy outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)] ${
+                  className={`h-[56px] w-full rounded-sm border-[1.5px] text-center text-display font-semibold text-navy outline-0 focus:border-brand ${
                     d ? "border-brand bg-brand-soft" : "border-border bg-surface"
                   }`}
                 />
               ))}
             </div>
-            {err && <p className="mt-3 text-[12.5px] font-semibold text-danger">{err}</p>}
-            {resent && !err && <p className="mt-3 text-[12.5px] font-semibold text-ok">{p.resent}</p>}
+            {err && <p className="mt-3 text-meta font-semibold text-danger">{err}</p>}
+            {resent && !err && <p className="mt-3 text-meta font-semibold text-ok">{p.resent}</p>}
             <button
               onClick={verify}
               disabled={busy || code.length < 4}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-[10px] bg-brand px-5 py-3 text-[14px] font-bold text-brand-fg transition hover:brightness-[1.04] disabled:opacity-50"
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-sm bg-brand px-5 py-3 text-body font-semibold text-brand-fg transition disabled:bg-disabled-bg disabled:text-disabled-fg"
             >
               {!busy && <Icon name="check" size={16} />}
               {busy ? p.verifying : p.verify}
             </button>
-            <button onClick={resend} className="mt-4 w-full text-center text-[13px] font-bold text-[#2563EB]">
+            <button onClick={resend} className="mt-4 w-full text-center text-body font-semibold text-info">
               {p.resend}
             </button>
           </>

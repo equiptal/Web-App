@@ -3,12 +3,12 @@
 import type { BidQuality } from "@/lib/contract/bid-quality";
 
 /** Band → colour, shared with the renter-side bid cards so the ring and the card score agree. */
-export const BAND_COLOR: Record<string, string> = { high: "#12b76a", mid: "#f79009", low: "#f04438" };
+export const BAND_COLOR: Record<string, string> = { high: "var(--ok)", mid: "var(--brand)", low: "var(--danger)" };
 /** Band → soft tint + border, for the compact badge (same tone family as the ring's stroke colour). */
 const BAND_TINT: Record<string, { bg: string; bd: string }> = {
-  high: { bg: "#E7F7EE", bd: "rgba(18,183,106,.32)" },
-  mid: { bg: "#FEF4E6", bd: "rgba(247,144,9,.32)" },
-  low: { bg: "#FDECEA", bd: "rgba(240,68,56,.32)" },
+  high: { bg: "var(--ok-soft)", bd: "color-mix(in srgb, var(--ok) 32%, transparent)" },
+  mid: { bg: "var(--brand-soft)", bd: "color-mix(in srgb, var(--brand) 32%, transparent)" },
+  low: { bg: "var(--danger-soft)", bd: "color-mix(in srgb, var(--danger) 32%, transparent)" },
 };
 
 /**
@@ -58,13 +58,13 @@ export function QualityRing({ quality, L, size = 72 }: { quality: BidQuality; L:
   return (
     <div className="qring" title={title}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-label={title} role="img">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#eef2f6" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--surface2)" strokeWidth={stroke} />
         <circle
           cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
           strokeDasharray={circ} strokeDashoffset={offset} transform={`rotate(-90 ${size / 2} ${size / 2})`}
           style={{ transition: "stroke-dashoffset .4s ease, stroke .3s ease" }}
         />
-        <text x="50%" y="50%" dominantBaseline="central" textAnchor="middle" style={{ fontWeight: 900, fontSize: size * 0.27, fill: "#1c3550" }}>{score}%</text>
+        <text x="50%" y="50%" dominantBaseline="central" textAnchor="middle" style={{ fontWeight: 900, fontSize: size * 0.27, fill: "var(--navy)" }}>{score}%</text>
       </svg>
       <div className="qring-lb" style={{ color }}>{label}</div>
     </div>

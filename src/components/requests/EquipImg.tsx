@@ -43,7 +43,7 @@ export function EquipImg({
   src,
   categoryId,
   name,
-  box = "grid h-[54px] w-[54px] flex-none place-items-center overflow-hidden rounded-xl border border-border bg-surface2",
+  box = "grid h-[54px] w-[54px] flex-none place-items-center overflow-hidden rounded-md border border-border bg-surface2",
   img = "h-9 w-9 object-contain",
   iconSize = 26,
 }: {

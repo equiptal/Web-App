@@ -460,7 +460,7 @@ function FleetLayer({
               // `className` carries the travelling dash; the dash pattern itself is a Leaflet path
               // option, not CSS, so it stays here.
               className="bm-flow"
-              pathOptions={{ color: "#6E869C", weight: 3, opacity: seg.opacity, dashArray: "1 9", lineCap: "round" }}
+              pathOptions={{ color: "var(--muted-dark)", weight: 3, opacity: seg.opacity, dashArray: "1 9", lineCap: "round" }}
               interactive={false}
             />
           ))}
@@ -491,7 +491,7 @@ function FleetLayer({
             {p.displaced && (
               <Polyline
                 positions={[[pin.lat, pin.lng], [at.lat, at.lng]]}
-                pathOptions={{ color: "#A9BCCC", weight: 1, opacity: 0.8 }}
+                pathOptions={{ color: "var(--muted-light)", weight: 1, opacity: 0.8 }}
                 interactive={false}
               />
             )}
@@ -653,9 +653,9 @@ function hoverBoxHtml(card: EquipmentCardModel, ar: boolean, scale: number, t: R
  *
  * ── The machine is a FREE-STANDING OBJECT (owner's ruling, 2026-08-08) ────────────────────────────
  * The prototype draws it as `machineArt(u)` at **94 × 74, `object-fit: contain`, with no container,
- * no fill and no ring**: it rests `translateY(-4px)` under `drop-shadow(0 7px 7px rgba(15,34,56,.30))`
+ * no fill and no ring**: it rests `translateY(-4px)` under `drop-shadow(0 7px 7px color-mix(in srgb, var(--info-deep) 30%, transparent))`
  * and, when selected, lifts on `dpLift .55s cubic-bezier(.34,1.4,.64,1) forwards` under
- * `drop-shadow(0 14px 12px rgba(15,34,56,.34))`.
+ * `drop-shadow(0 14px 12px color-mix(in srgb, var(--info-deep) 34%, transparent))`.
  *
  * This drew a **44 px circle filled with the availability colour**, white-ringed, holding a Material
  * glyph with the taxonomy image painted over it at 62 %. The justification cited here was
@@ -714,8 +714,8 @@ function machineIcon(
   // The disc's fill is the ring at low alpha — one value per state, kept beside the ring so a fourth
   // state cannot be added to one and forgotten in the other.
   const tint = {
-    confirmed: "rgba(22,163,74,.34)",
-    unconfirmed: "rgba(217,54,42,.32)",
+    confirmed: "color-mix(in srgb, var(--ok) 34%, transparent)",
+    unconfirmed: "color-mix(in srgb, var(--danger) 32%, transparent)",
   }[pin.availability];
 
   // «مؤكّد توفرها» / «لم يؤكد توفرها بعد». Both read as a STATE and neither carries a reason, a cause
@@ -732,8 +732,8 @@ function machineIcon(
   // The object's own motion and shadow, both prototype values. `drop-shadow`, not `box-shadow`: it has
   // to follow the machine's silhouette, which is the point of shadowing the art rather than a box.
   const art = selected
-    ? "animation:dpLift .55s cubic-bezier(.34,1.4,.64,1) forwards;filter:drop-shadow(0 14px 12px rgba(15,34,56,.34))"
-    : "transform:translateY(-4px);filter:drop-shadow(0 7px 7px rgba(15,34,56,.30))";
+    ? "animation:dpLift .55s cubic-bezier(.34,1.4,.64,1) forwards;filter:drop-shadow(0 14px 12px color-mix(in srgb, var(--info-deep) 34%, transparent))"
+    : "transform:translateY(-4px);filter:drop-shadow(0 7px 7px color-mix(in srgb, var(--info-deep) 30%, transparent))";
 
   return L.divIcon({
     className: "", // no Leaflet default box — the marker is entirely our own markup
@@ -764,7 +764,7 @@ function machineIcon(
       // where the halo does not animate at all.
       (selected ? `<span class="bm-pin-ring"></span>` : "") +
       (selected ? `<span class="bm-pin-halo" style="border:2.5px solid ${ring}"></span>` : "") +
-      `<span class="bm-pin-disc" style="background:${tint};border:2.5px solid ${ring}${selected ? ";box-shadow:0 0 0 4px rgba(37,99,235,.6),0 0 0 10px rgba(37,99,235,.16)" : ""}"></span>` +
+      `<span class="bm-pin-disc" style="background:${tint};border:2.5px solid ${ring}${selected ? ";box-shadow:0 0 0 4px color-mix(in srgb, var(--info) 60%, transparent),0 0 0 10px color-mix(in srgb, var(--info) 16%, transparent)" : ""}"></span>` +
       `<span class="bm-pin-shadow"></span>` +
       `<span class="bm-pin-art" style="${art}">` +
       `<span class="bm-pin-glyph material-icons-outlined">${esc(iconName)}</span>` +
@@ -897,7 +897,7 @@ export default function MapCanvas({
       >
         {/* CARTO **voyager**, not OpenStreetMap standard (`baseUrl('voyager')`, decoded 3840). Not a
             taste choice: every colour on this canvas was judged against voyager's pale ground — the
-            `#6E869C` route, the `#A9BCCC` leader line, the white chips and the white pin tag. On OSM
+            `var(--muted-dark)` route, the `var(--muted-light)` leader line, the white chips and the white pin tag. On OSM
             standard's saturated green-and-buff they all lose contrast, and the route in particular
             disappears into the road network it is drawn over.
 

@@ -36,8 +36,8 @@ export function CompanyDocsConfirmDialog({
         <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-danger-soft text-danger">
           <Icon name="warning_amber" size={28} />
         </span>
-        <p className="mt-4 text-[14px] font-bold leading-relaxed text-danger">{p.confirmHeadline}</p>
-        <p className="mt-3 inline-block rounded-full bg-surface2 px-3 py-1.5 text-[12.5px] font-semibold text-muted">
+        <p className="mt-4 text-body font-semibold leading-relaxed text-danger">{p.confirmHeadline}</p>
+        <p className="mt-3 inline-block rounded-full bg-surface2 px-3 py-1.5 text-meta font-semibold text-muted">
           {p.confirmEstimate}
         </p>
         {/* The two buttons come from `DialogButton` now, so they are the same height, radius and

@@ -23,7 +23,7 @@ import { isSystemChosen, type FieldSource } from "@/lib/contract";
 /** The sparkle the prototype puts beside an agent-chosen value. 11px, amber, decorative. */
 function Sparkle() {
   return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="#f5871f" className="flex-none" aria-hidden>
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="var(--brand)" className="flex-none" aria-hidden>
       <path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2z" />
     </svg>
   );
@@ -46,7 +46,7 @@ export function ProvenanceNote({ source }: { source: FieldSource }) {
   return (
     <div className="mt-1.5 flex items-center gap-1">
       <Sparkle />
-      <span className="whitespace-nowrap text-[10px] font-bold text-warn">{t.create.provenance.agent}</span>
+      <span className="whitespace-nowrap text-label font-semibold text-warn">{t.create.provenance.agent}</span>
     </div>
   );
 }
@@ -55,7 +55,7 @@ export function ProvenanceNote({ source }: { source: FieldSource }) {
 export function RequiredDot({ show }: { show: boolean }) {
   if (!show) return null;
   return (
-    <span aria-hidden className="text-[8px] leading-none text-brand">
+    <span aria-hidden className="text-label leading-none text-brand">
       ●
     </span>
   );
@@ -91,7 +91,7 @@ export function CanvasField({
   return (
     <div className={`min-w-0 ${shake ? "shake-error" : ""}`}>
       <div
-        className={`mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase leading-tight tracking-[0.05em] ${
+        className={`mb-2 flex items-center gap-1.5 text-label font-semibold uppercase leading-tight tracking-[0.05em] ${
           missing ? "text-brand" : "text-muted"
         }`}
       >
@@ -109,11 +109,11 @@ export function CanvasField({
         * on the thing it describes and leaves every leg on the same baseline.
         */}
       <div
-        className={isSystemChosen(source) ? "rounded-[10px] bg-warn/[0.07] ring-1 ring-warn/45 ring-offset-2 ring-offset-surface2" : undefined}
+        className={isSystemChosen(source) ? "rounded-sm bg-warn/[0.07] ring-1 ring-warn/45 ring-offset-2 ring-offset-surface2" : undefined}
       >
         {children}
       </div>
-      {hint && <p className="mt-1.5 text-[11.5px] leading-snug text-muted">{hint}</p>}
+      {hint && <p className="mt-1.5 text-label leading-snug text-muted">{hint}</p>}
       <ProvenanceNote source={source} />
     </div>
   );
@@ -146,8 +146,8 @@ export function ChoiceRow<T extends string>({
             type="button"
             onClick={() => onChange(o.value)}
             /** Wraps rather than truncating: a choice whose label is cut off has lost its meaning. */
-            className={`rounded-lg border px-1.5 py-2 text-center text-[13px] leading-tight transition ${
-              on ? "border-navy bg-navy font-bold text-white shadow-[0_0_0_2px_#dbe6f1]" : "border-border bg-surface font-semibold text-navy-mid"
+            className={`rounded-sm border px-1.5 py-2 text-center text-body leading-tight transition ${
+              on ? "border-navy bg-navy font-semibold text-white" : "border-border bg-surface font-semibold text-navy-mid"
             }`}
           >
             {o.label}
@@ -177,8 +177,8 @@ export function ChoiceChips<T extends string>({
             key={o.value}
             type="button"
             onClick={() => onToggle(o.value)}
-            className={`rounded-lg border px-4 py-2 text-[13px] transition ${
-              on ? "border-navy bg-navy font-bold text-white shadow-[0_0_0_2px_#dbe6f1]" : "border-border bg-surface font-semibold text-navy-mid"
+            className={`rounded-sm border px-4 py-2 text-body transition ${
+              on ? "border-navy bg-navy font-semibold text-white" : "border-border bg-surface font-semibold text-navy-mid"
             }`}
           >
             {o.label}

@@ -49,15 +49,15 @@ export type UnitAvailability = "confirmed" | "unconfirmed" | "absent";
  * §6.3.1 / §6.3.2 fills. Kept next to the states they belong to so a surface cannot invent a fourth.
  *
  * **The prototype's pair, not §6.3.1's** (`design.md` §7 decision 1, settled 2026-08-06). The spec asks
- * for `#12904A` / `#C62A2A` on the header chip while the prototype's pin, machine chip and composition
- * bar all use `#16A34A` / `#D9362A`. AC-168 requires all four surfaces to be the *same* red, so there
+ * for `var(--ok)` / `var(--danger)` on the header chip while the prototype's pin, machine chip and composition
+ * bar all use `var(--ok)` / `var(--danger)`. AC-168 requires all four surfaces to be the *same* red, so there
  * can only be one pair — and the prototype's is the one three of the four already draw.
  *
  * Two entries, not three: orange left this map on 2026-08-17 — see {@link IN_OFFER_BADGE_COLOUR}.
  */
 export const AVAILABILITY_COLOUR: Record<"confirmed" | "unconfirmed", string> = {
-  confirmed: "#16A34A",
-  unconfirmed: "#D9362A",
+  confirmed: "var(--ok)",
+  unconfirmed: "var(--danger)",
 };
 
 /**
@@ -72,7 +72,7 @@ export const AVAILABILITY_COLOUR: Record<"confirmed" | "unconfirmed", string> = 
  * offer". One surface, one orange — but if either ever wants its own tone, the other must not follow
  * it by accident.
  */
-export const IN_OFFER_BADGE_COLOUR = "#E8890C";
+export const IN_OFFER_BADGE_COLOUR = "var(--brand-light)";
 
 /**
  * **Is this machine in the offer?** — the second, INDEPENDENT flag, drawn as a badge rather than a
@@ -221,7 +221,7 @@ export function availabilityView(
  * on an unconfirmed card the renter is supposed to press. It is a constant rather than a CSS literal
  * so the rule is assertable: `map-proto.css` carries the same value, and a test binds the two.
  */
-export const REQUEST_ACTION_COLOUR = "#2563EB";
+export const REQUEST_ACTION_COLOUR = "var(--info)";
 
 /**
  * **The shortfall alert's one colour** (RM3-AC-06) — ORANGE, and never the availability RED.
@@ -231,15 +231,15 @@ export const REQUEST_ACTION_COLOUR = "#2563EB";
  * here rather than only in the stylesheet for the same reason as {@link REQUEST_ACTION_COLOUR}: a
  * colour rule that lives only in CSS cannot be asserted, and this one is a criterion.
  *
- * **Which orange, and why it moved.** This was `#D4780A` until 2026-08-11. Both are orange and
+ * **Which orange, and why it moved.** This was `var(--warn)` until 2026-08-11. Both are orange and
  * RM3-AC-06 is untouched by the change — what was wrong is that the v3 palette carries TWO warm
- * tokens, `orange` `#E8890C` and `amber` `#D4780A` (decoded line 9 and line 12), and the prototype's
+ * tokens, `orange` `var(--brand-light)` and `amber` `var(--warn)` (decoded line 9 and line 12), and the prototype's
  * own shortfall alert is drawn in `orangeLt`/`orangeBd` (decoded 3778), as is the equipment card's
  * certificate chip beside it. Holding `amber` here while the alert was tinted from `orange` would
  * leave this constant naming a colour the surface paints nowhere — which defeats the only reason it
  * is a constant, since the test that binds it to `map-proto.css` is what makes the rule assertable.
  */
-export const SHORTFALL_COLOUR = "#E8890C";
+export const SHORTFALL_COLOUR = "var(--brand-light)";
 
 /**
  * The shortfall alert, or null when there is no shortfall (§6.3, RM3-AC-05/06).

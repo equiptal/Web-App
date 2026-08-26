@@ -12,11 +12,11 @@ import { bucketBidTerms, type TermRow, type TermState } from "@/lib/contract/bid
  */
 type Tone = { word: (ok: string) => string; ar: string; c: string; mark: string };
 const STATE: Record<TermState, Tone> = {
-  matched: { word: (ok) => ok, ar: "مطابق", c: "#1daf58", mark: "✓" },
-  agreed: { word: (ok) => ok, ar: "متفق", c: "#1daf58", mark: "✓" },
-  negotiating: { word: () => "In deal room", ar: "في غرفة الصفقة", c: "#d4780a", mark: "↻" },
-  conflict: { word: () => "Conflict", ar: "تعارض", c: "#d9362a", mark: "!" },
-  grey: { word: () => "Pending review", ar: "بانتظار المراجعة", c: "#9AA7B8", mark: "–" },
+  matched: { word: (ok) => ok, ar: "مطابق", c: "var(--ok)", mark: "✓" },
+  agreed: { word: (ok) => ok, ar: "متفق", c: "var(--ok)", mark: "✓" },
+  negotiating: { word: () => "In deal room", ar: "في غرفة الصفقة", c: "var(--warn)", mark: "↻" },
+  conflict: { word: () => "Conflict", ar: "تعارض", c: "var(--danger)", mark: "!" },
+  grey: { word: () => "Pending review", ar: "بانتظار المراجعة", c: "var(--muted-light)", mark: "–" },
 };
 
 type Bucket = "conflict" | "pending" | "matched";
@@ -56,10 +56,10 @@ export function BidTermsModal({
   const { byBucket } = bucketBidTerms(terms, negotiable, { all: allTerms });
 
   const tabs: { key: Bucket; label: string; c: string; bg: string }[] = [
-    { key: "conflict", label: L("Conflict", "تعارض"), c: "#d9362a", bg: "#fdecea" },
+    { key: "conflict", label: L("Conflict", "تعارض"), c: "var(--danger)", bg: "var(--danger-soft)" },
     // Hidden for off-platform bids — no deal room means terms are answered Yes/No, never "pending review".
-    ...(hidePending ? [] : [{ key: "pending" as Bucket, label: L("Pending review", "بانتظار المراجعة"), c: "#d4780a", bg: "#fff3e0" }]),
-    { key: "matched", label: L("Matched", "مطابق"), c: "#1daf58", bg: "#e7f7ee" },
+    ...(hidePending ? [] : [{ key: "pending" as Bucket, label: L("Pending review", "بانتظار المراجعة"), c: "var(--warn)", bg: "var(--warn-soft)" }]),
+    { key: "matched", label: L("Matched", "مطابق"), c: "var(--ok)", bg: "var(--ok-soft)" },
   ];
   // Open on the first tab that has something (Conflict → Pending → Matched), else Matched.
   const firstNonEmpty = tabs.find((t) => byBucket[t.key].length)?.key ?? "matched";
@@ -83,7 +83,7 @@ export function BidTermsModal({
         {/* 3 state tabs (Conflict / Pending review / Matched) with counts */}
         {/* ── Restyled onto the workspace's tokens (owner, 2026-08-25) ────────────────────────────
             This sheet opens from a card built on `bg-surface` / `border-border` / `text-navy`, and
-            arrived in hard-coded hex — `#fff`, `#1c3550`, `rgba(16,38,63,.5)` — that reads as another
+            arrived in hard-coded hex — `var(--surface)`, `var(--navy)`, `color-mix(in srgb, var(--info-deep) 50%, transparent)` — that reads as another
             product and cannot follow a theme. Its BEHAVIOUR is untouched: the same three state
             buckets, the same tab that opens on the first non-empty one, the same deal-room footer.
 
@@ -97,9 +97,9 @@ export function BidTermsModal({
               <button
                 key={t.key}
                 onClick={() => setActive(t.key)}
-                style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 8px", borderRadius: 11, border: `1.5px solid ${on ? t.c : "#e6ebf2"}`, background: on ? t.bg : "#fff", color: on ? t.c : "#6b8fa8", fontFamily: "inherit", fontWeight: 800, fontSize: 12.5, cursor: "pointer", whiteSpace: "nowrap" }}
+                style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 8px", borderRadius: 11, border: `1.5px solid ${on ? t.c : "var(--surface3)"}`, background: on ? t.bg : "var(--surface)", color: on ? t.c : "var(--muted)", fontFamily: "inherit", fontWeight: 800, fontSize: 12.5, cursor: "pointer", whiteSpace: "nowrap" }}
               >
-                {t.label} <span className="font-black">{n}</span>
+                {t.label} <span className="font-extrabold">{n}</span>
               </button>
             );
           })}
@@ -107,7 +107,7 @@ export function BidTermsModal({
 
         <div className="pt-2.5">
           {rows.length === 0 ? (
-            <div className="py-[26px] text-center text-[13.5px] font-semibold text-muted">
+            <div className="py-7 text-center text-body font-semibold text-muted">
               {active === "conflict" ? L("No conflicts.", "لا تعارضات.") : active === "pending" ? L("Nothing pending review.", "لا شيء بانتظار المراجعة.") : L("Nothing matched yet.", "لا مطابقات بعد.")}
             </div>
           ) : (
@@ -116,10 +116,10 @@ export function BidTermsModal({
               const okWord = active === "matched" ? L("Matched", "مطابق") : st.word("");
               const word = ar ? st.ar : st.word(active === "matched" ? "Matched" : "");
               return (
-                <div key={`${r.key}-${i}`} className="flex items-center justify-between gap-3 border-b border-border py-[13px]">
-                  <span className="text-[15px] font-semibold text-navy">
+                <div key={`${r.key}-${i}`} className="flex items-center justify-between gap-3 border-b border-border py-3">
+                  <span className="text-subhead font-semibold text-navy">
                     {ar ? r.labelAr : r.labelEn}
-                    {r.detail && (r.state === "conflict" || r.state === "negotiating") && <span className="font-medium text-muted"> · {ar ? r.detail.ar : r.detail.en}</span>}
+                    {r.detail && (r.state === "conflict" || r.state === "negotiating") && <span className="font-semibold text-muted"> · {ar ? r.detail.ar : r.detail.en}</span>}
                   </span>
                   <span style={{ fontSize: 14.5, fontWeight: 800, color: st.c, whiteSpace: "nowrap" }}>{st.mark} {word || okWord}</span>
                 </div>

@@ -50,12 +50,12 @@ export function EmailEntry({
 
   return (
     <form onSubmit={submit} noValidate>
-      <h2 className="mb-[6px] text-center text-[26px] font-extrabold tracking-[-.5px] text-navy">{title ?? a.signInTitle}</h2>
-      <p className="mb-[24px] text-center text-[14px] leading-[1.55] text-muted">{subtitle ?? a.signInSub}</p>
+      <h2 className="mb-2 text-center text-display font-extrabold tracking-[-.5px] text-navy">{title ?? a.signInTitle}</h2>
+      <p className="mb-6 text-center text-body leading-[1.55] text-muted">{subtitle ?? a.signInSub}</p>
 
-      <label className="mb-[8px] block text-[12.5px] font-bold text-navy-mid">{a.emailLabel}</label>
+      <label className="mb-2 block text-meta font-semibold text-navy-mid">{a.emailLabel}</label>
       <input
-        className="h-[50px] w-full rounded-[10px] border border-border bg-surface px-[14px] text-[15px] font-semibold text-navy outline-0 placeholder:font-medium placeholder:text-[#9BB3C8] focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)]"
+        className="h-[50px] w-full rounded-sm border border-border bg-surface px-4 text-subhead font-semibold text-navy outline-0 placeholder:font-semibold placeholder:text-muted-light focus:border-brand"
         type="email"
         dir="ltr"
         autoComplete="email"
@@ -63,15 +63,15 @@ export function EmailEntry({
         onChange={(e) => setEmail(e.target.value)}
         placeholder="you@company.com"
       />
-      {emailErr && <p className="mt-[8px] text-[13px] font-semibold text-danger">{a.emailInvalid}</p>}
+      {emailErr && <p className="mt-2 text-body font-semibold text-danger">{a.emailInvalid}</p>}
 
       {err && (
-        <div className="mt-[10px]">
+        <div className="mt-3">
           {/* `invalid_phone` here is the backend's generic VALIDATION_ERROR — nonsensical on the email
               tab, so show an email-appropriate message. Both it and ambiguous offer the phone fallback. */}
-          <p className="text-[13px] font-semibold text-danger">{err === "invalid_phone" ? a.emailSignInUnavailable : a.errors[err]}</p>
+          <p className="text-body font-semibold text-danger">{err === "invalid_phone" ? a.emailSignInUnavailable : a.errors[err]}</p>
           {(err === "email_ambiguous" || err === "invalid_phone") && onUsePhone && (
-            <button type="button" onClick={onUsePhone} className="mt-[6px] inline-flex items-center gap-1.5 text-[13px] font-bold text-info">
+            <button type="button" onClick={onUsePhone} className="mt-2 inline-flex items-center gap-1.5 text-body font-semibold text-info">
               <Icon name="smartphone" size={16} /> {a.withPhone}
             </button>
           )}
@@ -81,13 +81,13 @@ export function EmailEntry({
       <button
         type="submit"
         disabled={busy || !email.trim()}
-        className="mt-[24px] flex w-full items-center justify-center gap-[7px] rounded-[10px] border border-brand bg-brand px-[24px] py-[13px] text-[14.5px] font-bold text-white transition hover:brightness-[1.04] disabled:opacity-50"
+        className="mt-6 flex w-full items-center justify-center gap-2 rounded-sm border border-brand bg-brand px-6 py-3 text-subhead font-extrabold text-white transition disabled:bg-disabled-bg disabled:text-disabled-fg"
       >
         <span>{busy ? a.sending : a.sendCode}</span>
         {!busy && <Icon name="arrow_forward" size={18} className="rtl:scale-x-[-1]" />}
       </button>
 
-      <div className="mt-[22px] text-center text-[13px] leading-[1.55] text-muted">{a.signInFoot}</div>
+      <div className="mt-6 text-center text-body leading-[1.55] text-muted">{a.signInFoot}</div>
     </form>
   );
 }

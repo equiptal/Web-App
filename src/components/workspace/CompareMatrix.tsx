@@ -202,7 +202,7 @@ export function CompareMatrix({
       <div className="grid min-h-[220px] place-items-center px-4 py-12 text-center">
         <div>
           <Icon name="table_chart" size={30} className="text-muted" />
-          <p className="mt-2 text-[13px] font-semibold text-muted">{t.workspace.noBidsYet}</p>
+          <p className="mt-2 text-body font-semibold text-muted">{t.workspace.noBidsYet}</p>
         </div>
       </div>
     );
@@ -323,10 +323,10 @@ export function CompareMatrix({
         <div className="w-[185px] flex-none border-e border-border">
           <div className="box-border flex h-[72px] items-end border-b border-border bg-surface2/60 px-3 pb-2">
             <span className="flex min-w-0 items-baseline gap-1.5">
-              <span className="flex-none text-[11px] font-extrabold uppercase tracking-wide text-muted">
+              <span className="flex-none text-label font-extrabold uppercase tracking-wide text-muted">
                 {t.workspace.supplier}
               </span>
-              <span className="min-w-0 truncate text-[11px] font-bold uppercase tracking-wide text-brand">
+              <span className="min-w-0 truncate text-label font-semibold uppercase tracking-wide text-brand">
                 {t.workspace.pickOne}
               </span>
             </span>
@@ -346,12 +346,12 @@ export function CompareMatrix({
                 }`}
               >
                 {picked && <span className="absolute inset-y-0 start-0 w-[3px] bg-brand" />}
-                <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-navy text-[11px] font-bold text-white">
+                <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-navy text-label font-semibold text-white">
                   {initials(b.card.supplierName)}
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="truncate text-[13px] font-extrabold leading-tight text-navy">{b.card.supplierName}</span>
-                  <span className={`truncate text-[11px] font-semibold leading-none ${recommended ? "text-ok" : "text-muted"}`}>
+                  <span className="truncate text-body font-extrabold leading-tight text-navy">{b.card.supplierName}</span>
+                  <span className={`truncate text-label font-semibold leading-none ${recommended ? "text-ok" : "text-muted"}`}>
                     {recommended
                       ? `★ ${t.workspace.recommended}`
                       : b.source === "offline"
@@ -370,7 +370,7 @@ export function CompareMatrix({
                   }}
                   aria-label={t.workspace.removeColumn}
                   title={t.workspace.removeColumn}
-                  className="flex-none rounded px-1 py-0.5 text-[13px] font-semibold text-muted/50 transition hover:bg-danger-soft hover:text-danger"
+                  className="flex-none rounded px-1 py-0.5 text-body font-semibold text-muted/50 transition hover:bg-danger-soft hover:text-danger"
                 >
                   ✕
                 </span>
@@ -394,20 +394,20 @@ export function CompareMatrix({
           <div className="flex min-w-0 flex-[6_1_0] flex-col overflow-hidden border-s border-border">
             <div className={`${HEAD} flex items-stretch bg-surface2/60`}>
               <div className="flex min-w-0 flex-[2] items-center gap-1.5 px-3">
-                <span className="truncate text-[11px] font-extrabold uppercase tracking-wide text-navy-mid">
+                <span className="truncate text-label font-extrabold uppercase tracking-wide text-navy-mid">
                   {t.workspace.termsYouSet}
                 </span>
                 <FoldButton onClick={() => toggleGroup("terms")} hint={t.workspace.hideGroup} />
               </div>
               <div className="flex min-w-0 flex-[4] items-center justify-center gap-2.5 border-s border-border bg-surface3/50 px-3">
-                <span className="flex-none text-[11px] font-extrabold uppercase tracking-wide text-navy-mid">
+                <span className="flex-none text-label font-extrabold uppercase tracking-wide text-navy-mid">
                   {t.workspace.theyOffered}
                 </span>
                 <button
                   type="button"
                   onClick={() => onRank(rows)}
                   disabled={rankBusy || rows.length === 0}
-                  className={`flex-none whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-bold transition disabled:opacity-50 ${
+                  className={`flex-none whitespace-nowrap rounded-full border px-2.5 py-1 text-label font-semibold transition disabled:bg-disabled-bg disabled:text-disabled-fg ${
                     ranking ? "border-ok/40 bg-ok-soft text-ok" : "border-border bg-surface text-navy-mid"
                   }`}
                 >
@@ -433,12 +433,12 @@ export function CompareMatrix({
           disabled={!equipmentTarget}
           title={t.workspace.checkAvailability}
           aria-label={t.workspace.checkAvailability}
-          className="flex w-11 flex-none flex-col items-center justify-center gap-2.5 overflow-hidden border-s border-brand/25 bg-brand-soft transition hover:bg-brand/15 disabled:cursor-default disabled:opacity-50"
+          className="flex w-11 flex-none flex-col items-center justify-center gap-2.5 overflow-hidden border-s border-brand/25 bg-brand-soft transition hover:bg-brand/15 disabled:cursor-default disabled:bg-disabled-bg disabled:text-disabled-fg"
         >
           <span className="grid h-5 w-5 flex-none place-items-center rounded-full border border-brand/30 bg-surface text-brand">
             <Icon name="lock" size={11} />
           </span>
-          <span className="rotate-180 truncate text-[11px] font-extrabold uppercase tracking-wide text-brand [writing-mode:vertical-rl]">
+          <span className="rotate-180 truncate text-label font-extrabold uppercase tracking-wide text-brand [writing-mode:vertical-rl]">
             {t.workspace.groupEquipment}
           </span>
         </button>
@@ -452,13 +452,13 @@ export function CompareMatrix({
               key={b.card.id}
               type="button"
               onClick={() => onBench(b.card.id, false)}
-              className="flex flex-none items-center gap-2 rounded-full border border-dashed border-border bg-surface py-[5px] pe-3 ps-[5px] transition hover:border-navy-mid hover:bg-surface2/60"
+              className="flex flex-none items-center gap-2 rounded-full border border-dashed border-border bg-surface py-1 pe-3 ps-1 transition hover:border-navy-mid hover:bg-surface2/60"
             >
-              <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface3 text-[10px] font-bold text-muted">
+              <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface3 text-label font-semibold text-muted">
                 {initials(b.card.supplierName)}
               </span>
-              <span className="text-[12px] font-bold text-navy-mid">{b.card.supplierName}</span>
-              <span className="text-[13px] font-bold text-brand">+</span>
+              <span className="text-meta font-semibold text-navy-mid">{b.card.supplierName}</span>
+              <span className="text-body font-semibold text-brand">+</span>
             </button>
           ))}
         </div>
@@ -506,7 +506,7 @@ function GroupBand({ label, onFold, tinted }: { label: string; onFold: () => voi
   const t = useT();
   return (
     <div className={`${HEAD} flex items-center justify-center gap-1.5 px-3 ${tinted ? "bg-surface3/50" : "bg-surface2/60"}`}>
-      <span className="truncate text-[11px] font-extrabold uppercase tracking-wide text-navy-mid">{label}</span>
+      <span className="truncate text-label font-extrabold uppercase tracking-wide text-navy-mid">{label}</span>
       <FoldButton onClick={onFold} hint={t.workspace.hideGroup} />
     </div>
   );
@@ -520,7 +520,7 @@ function FoldButton({ onClick, hint }: { onClick: () => void; hint: string }) {
       onClick={onClick}
       title={hint}
       aria-label={hint}
-      className="flex-none rounded px-1 text-[11px] font-bold leading-none text-muted/70 transition hover:bg-surface3 hover:text-navy-mid rtl:scale-x-[-1]"
+      className="flex-none rounded px-1 text-label font-semibold leading-none text-muted/70 transition hover:bg-surface3 hover:text-navy-mid rtl:scale-x-[-1]"
     >
       »
     </button>
@@ -559,10 +559,10 @@ function MoneyHead({
       aria-sort={on ? (sortDir === 1 ? "ascending" : "descending") : undefined}
     >
       <button type="button" onClick={() => onSort(col.key)} className="flex min-w-0 items-center justify-center gap-1.5">
-        <span className={`truncate text-[11px] font-bold uppercase leading-tight tracking-wide ${on ? "text-navy" : "text-muted"}`}>
+        <span className={`truncate text-label font-semibold uppercase leading-tight tracking-wide ${on ? "text-navy" : "text-muted"}`}>
           {col.label}
         </span>
-        <span aria-hidden="true" className={`flex-none text-[9px] font-bold ${on ? "text-brand" : "text-muted/50"}`}>
+        <span aria-hidden="true" className={`flex-none text-label font-semibold ${on ? "text-brand" : "text-muted/50"}`}>
           {on ? (sortDir === 1 ? "▲" : "▼") : "↕"}
         </span>
       </button>
@@ -571,7 +571,7 @@ function MoneyHead({
           type="button"
           onClick={onInfo}
           aria-label={col.label}
-          className="grid h-4 w-4 flex-none place-items-center rounded-full border border-brand/40 bg-brand-soft text-[10px] font-extrabold text-brand"
+          className="grid h-4 w-4 flex-none place-items-center rounded-full border border-brand/40 bg-brand-soft text-label font-extrabold text-brand"
         >
           i
         </button>
@@ -592,21 +592,21 @@ function Money({ v, win, vat, excluded, picked }: { v: number | null | undefined
       }`}
     >
       {v == null ? (
-        <span className="truncate text-[13px] font-semibold text-muted">
+        <span className="truncate text-body font-semibold text-muted">
           {excluded ? t.priceFooter.excluded : t.workspace.didntSay}
         </span>
       ) : (
         <span className="flex min-w-0 items-baseline gap-1.5">
-          <span className={`truncate text-[15px] font-extrabold leading-none ${win ? "text-ok" : "text-navy"}`}>
+          <span className={`truncate text-subhead font-extrabold leading-none ${win ? "text-ok" : "text-navy"}`}>
             {formatSar(v)}
           </span>
-          <span className={`flex-none text-[10px] font-bold leading-none ${win ? "text-ok/80" : "text-muted"}`}>
+          <span className={`flex-none text-label font-semibold leading-none ${win ? "text-ok/80" : "text-muted"}`}>
             {t.priceFooter.currency}
           </span>
         </span>
       )}
       {vat && v != null && (
-        <span className={`absolute bottom-1 end-2 text-[9px] font-bold uppercase tracking-wide ${win ? "text-ok/70" : "text-muted/70"}`}>
+        <span className={`absolute bottom-1 end-2 text-label font-semibold uppercase tracking-wide ${win ? "text-ok/70" : "text-muted/70"}`}>
           {t.workspace.withVat}
         </span>
       )}
@@ -650,9 +650,9 @@ function TermColumn({
   return (
     <div className="flex min-w-0 flex-1 flex-col border-e border-border last:border-e-0">
       <div className={`${HEAD} flex items-center gap-1.5 bg-surface/60 px-3`}>
-        <span className="flex-none text-[11px] font-bold uppercase leading-tight tracking-wide text-muted">{label}</span>
+        <span className="flex-none text-label font-semibold uppercase leading-tight tracking-wide text-muted">{label}</span>
         {askedFor && (
-          <span className="min-w-0 truncate text-[10px] font-semibold leading-tight text-muted/80">
+          <span className="min-w-0 truncate text-label font-semibold leading-tight text-muted/80">
             {t.workspace.youAsked} · {askedFor}
           </span>
         )}
@@ -660,8 +660,8 @@ function TermColumn({
 
       {merged ? (
         <div style={{ height: rows.length * ROW_PX }} className="flex flex-none flex-col items-center justify-center gap-1 bg-surface/40 px-3">
-          <span className="text-center text-[13px] font-semibold leading-snug text-muted">{first.text}</span>
-          <span className="text-center text-[11px] font-medium leading-snug text-muted/80">
+          <span className="text-center text-body font-semibold leading-snug text-muted">{first.text}</span>
+          <span className="text-center text-label font-semibold leading-snug text-muted/80">
             {t.workspace.sameFromAll.replace("{n}", String(rows.length))}
           </span>
         </div>
@@ -675,8 +675,8 @@ function TermColumn({
               className={`${ROW} flex items-center gap-1.5 px-3 ${a.against ? "bg-danger-soft" : picked ? "bg-brand-soft/25" : ""}`}
             >
               <span
-                className={`truncate text-[13px] leading-snug ${
-                  a.against ? "font-bold text-danger" : a.text ? "font-semibold text-navy" : "font-semibold text-muted"
+                className={`truncate text-body leading-snug ${
+                  a.against ? "font-semibold text-danger" : a.text ? "font-semibold text-navy" : "font-semibold text-muted"
                 }`}
               >
                 {a.text ?? t.workspace.didntSay}
@@ -750,9 +750,9 @@ function GroupRail({
     >
       <span
         aria-hidden="true"
-        className={`h-1.5 w-1.5 flex-none bg-muted/60 transition group-hover:bg-navy-mid ${glyph === "dot" ? "rounded-full" : "rounded-[1px]"}`}
+        className={`h-1.5 w-1.5 flex-none bg-muted/60 transition group-hover:bg-navy-mid ${glyph === "dot" ? "rounded-full" : "rounded-sm"}`}
       />
-      <span className="rotate-180 truncate text-[11px] font-extrabold uppercase tracking-wide text-navy-mid [writing-mode:vertical-rl]">
+      <span className="rotate-180 truncate text-label font-extrabold uppercase tracking-wide text-navy-mid [writing-mode:vertical-rl]">
         {label}
       </span>
     </button>
@@ -769,7 +769,7 @@ function ColRail({ label, hint, onClick }: { label: string; hint: string; onClic
       aria-label={`${label} — ${hint}`}
       className="flex w-8 flex-none items-center justify-center overflow-hidden border-e border-border bg-surface2/40 transition last:border-e-0 hover:bg-surface3/70"
     >
-      <span className="rotate-180 truncate text-[10px] font-bold uppercase tracking-wide text-muted [writing-mode:vertical-rl]">
+      <span className="rotate-180 truncate text-label font-semibold uppercase tracking-wide text-muted [writing-mode:vertical-rl]">
         {label}
       </span>
     </button>
@@ -820,10 +820,10 @@ function BuildPopover({
   return (
     <>
       <div className="fixed inset-0 z-30" onClick={onClose} />
-      <div className="absolute end-0 top-[34px] z-40 flex w-[250px] flex-col gap-2 rounded-[11px] border border-border bg-surface px-3.5 py-3 text-start shadow-[0_14px_34px_rgba(19,44,74,.16)]">
+      <div className="absolute end-0 top-[34px] z-40 flex w-[250px] flex-col gap-2 rounded-sm border border-border bg-surface px-3.5 py-3 text-start">
         <div className="flex items-baseline gap-2.5">
-          <span className="flex-1 text-[11px] font-extrabold uppercase tracking-wide text-muted">{heading}</span>
-          <button type="button" onClick={onClose} aria-label={t.common.cancel} className="text-[13px] font-bold text-muted/60">
+          <span className="flex-1 text-label font-extrabold uppercase tracking-wide text-muted">{heading}</span>
+          <button type="button" onClick={onClose} aria-label={t.common.cancel} className="text-body font-semibold text-muted/60">
             ✕
           </button>
         </div>
@@ -837,10 +837,10 @@ function BuildPopover({
         <Line label={t.priceFooter.subtotal} v={part.subtotal} />
         <Line label={t.priceFooter.vat} v={part.vat} />
         <div className="mt-0.5 flex items-baseline justify-between gap-3 border-t border-border pt-2">
-          <span className="text-[12px] font-extrabold text-navy">{t.priceFooter.total}</span>
-          <span className="text-[14px] font-extrabold text-navy">{formatSar(part.total)}</span>
+          <span className="text-meta font-extrabold text-navy">{t.priceFooter.total}</span>
+          <span className="text-body font-extrabold text-navy">{formatSar(part.total)}</span>
         </div>
-        <p className="text-[11px] font-medium leading-snug text-muted">
+        <p className="text-label font-semibold leading-snug text-muted">
           {t.workspace.vatNote}
           {which === "duration" && dur && !dur.raw && (
             <> {t.workspace.fridaysNote.replace("{days}", String(dur.days)).replace("{billable}", String(dur.billableDays))}</>
@@ -854,8 +854,8 @@ function BuildPopover({
 function Line({ label, v, note }: { label: string; v: number; note?: string }) {
   return (
     <div className="flex items-baseline gap-3">
-      <span className="flex-1 text-[12px] font-medium leading-snug text-navy-mid">{label}</span>
-      <span className="flex-none whitespace-nowrap text-[12.5px] font-semibold leading-snug text-navy">
+      <span className="flex-1 text-meta font-semibold leading-snug text-navy-mid">{label}</span>
+      <span className="flex-none whitespace-nowrap text-meta font-semibold leading-snug text-navy">
         {note ?? formatSar(v)}
       </span>
     </div>

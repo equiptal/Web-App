@@ -106,9 +106,9 @@ export function ProfileView() {
         }
       />
 
-      {loading && <p className="mt-6 text-center text-[13px] text-muted">…</p>}
+      {loading && <p className="mt-6 text-center text-body text-muted">…</p>}
       {loadError && !loading && (
-        <p className="mt-6 rounded-[12px] border border-danger/30 bg-danger-soft px-4 py-3 text-center text-[13px] font-semibold text-danger">
+        <p className="mt-6 rounded-sm border border-danger/30 bg-danger-soft px-4 py-3 text-center text-body font-semibold text-danger">
           {p.loadError}
         </p>
       )}
@@ -120,11 +120,11 @@ export function ProfileView() {
           // This banner renders alongside that card, so pointing them at different destinations would
           // give the same page two verification nudges that disagree.
           onClick={() => router.push("/company")}
-          className="mt-4 flex w-full items-center justify-between rounded-[12px] border border-brand/30 bg-brand-soft px-4 py-3 text-start transition hover:border-brand"
+          className="mt-4 flex w-full items-center justify-between rounded-sm border border-brand/30 bg-brand-soft px-4 py-3 text-start transition hover:border-brand"
         >
           <div>
-            <p className="text-[13.5px] font-bold text-navy">{t.shell.tierBasic} · {t.home.nudgeBasicTitle}</p>
-            <p className="text-[12.5px] text-muted">{t.home.nudgeBasicBody}</p>
+            <p className="text-body font-semibold text-navy">{t.shell.tierBasic} · {t.home.nudgeBasicTitle}</p>
+            <p className="text-meta text-muted">{t.home.nudgeBasicBody}</p>
           </div>
           <Icon name="arrow_forward" size={18} className="flex-none text-brand rtl:scale-x-[-1]" />
         </button>
@@ -137,7 +137,7 @@ export function ProfileView() {
             !editing && (
               <button
                 onClick={() => setEditing(true)}
-                className="inline-flex h-8 items-center gap-1.5 rounded-[9px] border border-border bg-surface px-3 text-[12.5px] font-bold text-navy-mid hover:bg-surface2"
+                className="inline-flex h-8 items-center gap-1.5 rounded-sm border border-border bg-surface px-3 text-meta font-semibold text-navy-mid hover:bg-surface2"
               >
                 <Icon name="edit" size={15} /> {p.editProfile}
               </button>
@@ -145,7 +145,7 @@ export function ProfileView() {
           }
         >
           {savedToast && (
-            <p className="mx-4 mt-4 flex items-center gap-1.5 rounded-[10px] border border-ok/30 bg-ok-soft px-3 py-2 text-[12.5px] font-semibold text-ok">
+            <p className="mx-4 mt-4 flex items-center gap-1.5 rounded-sm border border-ok/30 bg-ok-soft px-3 py-2 text-meta font-semibold text-ok">
               <Icon name="check_circle" size={15} /> {p.saved}
             </p>
           )}
@@ -206,7 +206,7 @@ export function ProfileView() {
           <Section title={p.settings}>
             <RowList>
               <Row icon="language" label={p.language} hint={ar ? p.arabic : p.english} chevron={false}>
-                <span className="flex flex-none overflow-hidden rounded-[9px] border border-border">
+                <span className="flex flex-none overflow-hidden rounded-sm border border-border">
                   <LangBtn active={!ar} disabled={langBusy} onClick={() => switchLang("en")}>EN</LangBtn>
                   <LangBtn active={ar} disabled={langBusy} onClick={() => switchLang("ar")}>عر</LangBtn>
                 </span>
@@ -249,7 +249,7 @@ function LangBtn({ active, disabled, onClick, children }: { active: boolean; dis
       onClick={onClick}
       disabled={disabled}
       aria-pressed={active}
-      className={`px-3 py-1.5 text-[12.5px] font-bold transition disabled:opacity-60 ${active ? "bg-brand text-brand-fg" : "bg-surface text-navy-mid hover:bg-surface2"}`}
+      className={`px-3 py-1.5 text-meta font-semibold transition disabled:bg-disabled-bg disabled:text-disabled-fg ${active ? "bg-brand text-brand-fg" : "bg-surface text-navy-mid hover:bg-surface2"}`}
     >
       {children}
     </button>

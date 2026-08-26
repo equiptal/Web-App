@@ -301,7 +301,7 @@ export function VerificationFlow() {
   };
 
   if (status === "loading") {
-    return <div className="p-[22px] text-sm text-muted">…</div>;
+    return <div className="p-6 text-body text-muted">…</div>;
   }
 
   // Terminal state (the app uses a whole screen for the same reason): there is no way back into a
@@ -337,10 +337,10 @@ export function VerificationFlow() {
       <div>
         <StatePanel icon="hourglass_top" tone="info" title={v.pendingTitle} body={v.pendingBody} />
         <DocsPanel docs={docs} p={p} />
-        <div className="px-[22px] pb-[30px] text-center">
+        <div className="px-6 pb-8 text-center">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 rounded-[10px] bg-navy px-5 py-2.5 text-[13.5px] font-bold text-white transition hover:brightness-110"
+            className="inline-flex items-center gap-2 rounded-sm bg-navy px-5 py-2.5 text-body font-semibold text-white transition"
           >
             <Icon name="home" size={18} /> {t.onboarding.backToHome}
           </Link>
@@ -354,41 +354,41 @@ export function VerificationFlow() {
   // legal name a pile never collects).
   return (
     <div>
-      <div className="flex items-start gap-3 border-b border-border p-[22px]">
-        <span className="grid h-10 w-10 flex-none place-items-center rounded-[10px] bg-brand-soft text-brand">
+      <div className="flex items-start gap-3 border-b border-border p-6">
+        <span className="grid h-10 w-10 flex-none place-items-center rounded-sm bg-brand-soft text-brand">
           <Icon name="domain" size={22} />
         </span>
         <div>
-          <h1 className="text-[20px] font-extrabold text-navy">{p.title}</h1>
-          <p className="mt-1 text-[13.5px] text-muted">{v.subtitle}</p>
+          <h1 className="text-display font-extrabold text-navy">{p.title}</h1>
+          <p className="mt-1 text-body text-muted">{v.subtitle}</p>
         </div>
       </div>
 
-      <div className="flex flex-col gap-[14px] p-[22px]">
+      <div className="flex flex-col gap-4 p-6">
         {/* Above everything: the renter arrived from a Resubmit button, so the first thing on screen
             has to be what to fix — not the generic pitch for sending documents. */}
         {status === "rejected" &&
           (rejectionReason ? (
-            <div className="rounded-[10px] border border-danger/30 bg-danger-soft px-3.5 py-3">
-              <p className="flex items-center gap-1.5 text-[13px] font-extrabold text-danger">
+            <div className="rounded-sm border border-danger/30 bg-danger-soft px-3.5 py-3">
+              <p className="flex items-center gap-1.5 text-body font-extrabold text-danger">
                 <Icon name="cancel" size={18} /> {p.rejectionLabel}
               </p>
-              <p className="mt-1.5 text-[13px] font-medium text-navy">{rejectionReason}</p>
+              <p className="mt-1.5 text-body font-semibold text-navy">{rejectionReason}</p>
             </div>
           ) : (
-            <div className="flex items-center gap-2 rounded-[10px] border border-danger/30 bg-danger-soft px-3.5 py-3 text-[13px] font-semibold text-danger">
+            <div className="flex items-center gap-2 rounded-sm border border-danger/30 bg-danger-soft px-3.5 py-3 text-body font-semibold text-danger">
               <Icon name="error_outline" size={18} /> {v.rejectedBody}
             </div>
           ))}
 
         {/* Hero */}
-        <div className="flex items-start gap-3 rounded-[10px] border border-info/25 bg-info-soft p-4">
+        <div className="flex items-start gap-3 rounded-sm border border-info/25 bg-info-soft p-4">
           <span className="grid h-10 w-10 flex-none place-items-center rounded-full border border-info/25 bg-surface text-info">
             <Icon name="upload_file" size={22} />
           </span>
           <div>
-            <p className="text-[14px] font-extrabold text-navy">{p.heroTitle}</p>
-            <p className="mt-1 text-[12.5px] text-muted">{p.heroSubtitle}</p>
+            <p className="text-body font-extrabold text-navy">{p.heroTitle}</p>
+            <p className="mt-1 text-meta text-muted">{p.heroSubtitle}</p>
           </div>
         </div>
 
@@ -414,25 +414,25 @@ export function VerificationFlow() {
             setDragOver(false);
             addFiles(e.dataTransfer.files);
           }}
-          className={`rounded-[10px] border-2 border-dashed p-5 text-center transition ${
+          className={`rounded-sm border-2 border-dashed p-5 text-center transition ${
             dragOver ? "border-brand bg-brand-soft" : "border-border bg-surface2"
           }`}
         >
           <Icon name="cloud_upload" size={26} className="text-brand" />
-          <p className="mt-1 text-[14px] font-bold text-navy">{p.dropzoneTitle}</p>
-          <p className="mx-auto mt-1 max-w-sm text-[12.5px] text-muted">{p.dropzoneSubtitle}</p>
+          <p className="mt-1 text-body font-semibold text-navy">{p.dropzoneTitle}</p>
+          <p className="mx-auto mt-1 max-w-sm text-meta text-muted">{p.dropzoneSubtitle}</p>
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={busy || files.length >= COMPANY_PILE_MAX_FILES}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-[10px] border border-brand bg-surface px-4 py-2 text-[13px] font-bold text-brand disabled:border-border disabled:text-muted"
+            className="mt-3 inline-flex items-center gap-1.5 rounded-sm border border-brand bg-surface px-4 py-2 text-body font-semibold text-brand disabled:border-border disabled:text-muted"
           >
             <Icon name="add" size={16} />
             {files.length >= COMPANY_PILE_MAX_FILES
               ? p.limitReached.replace("{count}", String(COMPANY_PILE_MAX_FILES))
               : v.upload}
           </button>
-          <p className="mt-2 text-[11.5px] text-muted">
+          <p className="mt-2 text-label text-muted">
             {p.dropzoneHint.replace("{max}", String(COMPANY_PILE_MAX_FILES))}
           </p>
           <input
@@ -455,7 +455,7 @@ export function VerificationFlow() {
               return (
                 <li
                   key={`${f.name}-${f.size}-${i}`}
-                  className={`flex items-center gap-2.5 rounded-[10px] border px-3 py-2.5 ${
+                  className={`flex items-center gap-2.5 rounded-sm border px-3 py-2.5 ${
                     failed ? "border-danger/40 bg-danger-soft" : "border-border bg-surface"
                   }`}
                 >
@@ -464,7 +464,7 @@ export function VerificationFlow() {
                     size={18}
                     className={failed ? "text-danger" : "text-muted"}
                   />
-                  <span className="min-w-0 flex-1 truncate text-[13px] text-navy" title={f.name}>
+                  <span className="min-w-0 flex-1 truncate text-body text-navy" title={f.name}>
                     {f.name}
                   </span>
                   <button
@@ -472,7 +472,7 @@ export function VerificationFlow() {
                     onClick={() => removeFile(i)}
                     disabled={busy}
                     aria-label={p.remove}
-                    className="grid h-7 w-7 flex-none place-items-center rounded-lg text-muted hover:bg-surface2 disabled:opacity-40"
+                    className="grid h-7 w-7 flex-none place-items-center rounded-sm text-muted hover:bg-surface2 disabled:bg-disabled-bg disabled:text-disabled-fg"
                   >
                     <Icon name="close" size={16} />
                   </button>
@@ -493,21 +493,21 @@ export function VerificationFlow() {
         {/* What already reached us, for a renter who is resubmitting. */}
         {status === "rejected" && <DocsPanel docs={docs} p={p} compact />}
 
-        {err && <p className="text-[13px] font-semibold text-danger">{err}</p>}
+        {err && <p className="text-body font-semibold text-danger">{err}</p>}
       </div>
 
-      <div className="border-t border-border p-[22px]">
+      <div className="border-t border-border p-6">
         <button
           type="button"
           onClick={onSend}
           disabled={busy || files.length === 0}
-          className="flex w-full items-center justify-center gap-[7px] rounded-[10px] border border-brand bg-brand px-[24px] py-[13px] text-[14.5px] font-bold text-brand-fg transition hover:brightness-[1.04] disabled:cursor-not-allowed disabled:border-border disabled:bg-surface2 disabled:text-muted"
+          className="flex w-full items-center justify-center gap-2 rounded-sm border border-brand bg-brand px-6 py-3 text-subhead font-extrabold text-brand-fg transition disabled:cursor-not-allowed disabled:border-border disabled:bg-surface2 disabled:text-muted"
         >
           {!busy && <Icon name={failedIndexes.size > 0 ? "refresh" : "send"} size={18} />}
           {busy ? v.submitting : p.submit}
         </button>
         {failedIndexes.size > 0 && !busy && (
-          <p className="mt-2 text-center text-[12px] text-muted">
+          <p className="mt-2 text-center text-meta text-muted">
             {L(
               `${failedIndexes.size} of ${files.length} didn't upload — only those will be sent again.`,
               `${failedIndexes.size} من ${files.length} لم تُرفع — سيُعاد إرسالها فقط.`,
@@ -542,9 +542,9 @@ export function VerificationFlow() {
 function SectionHeader({ title, pill, tone }: { title: string; pill: string; tone: "danger" | "warn" }) {
   return (
     <div className="mt-1 flex items-center gap-2">
-      <span className="text-[13.5px] font-extrabold text-navy">{title}</span>
+      <span className="text-body font-extrabold text-navy">{title}</span>
       <span
-        className={`rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${
+        className={`rounded-full px-2 py-0.5 text-label font-extrabold ${
           tone === "danger" ? "bg-danger-soft text-danger" : "bg-warn-soft text-warn"
         }`}
       >
@@ -556,11 +556,11 @@ function SectionHeader({ title, pill, tone }: { title: string; pill: string; ton
 
 function InfoTile({ icon, title }: { icon: string; title: string }) {
   return (
-    <div className="flex flex-col items-center gap-1.5 rounded-[10px] border border-border bg-surface px-2 py-3 text-center">
-      <span className="grid h-8 w-8 place-items-center rounded-lg bg-navy/5 text-navy">
+    <div className="flex flex-col items-center gap-1.5 rounded-sm border border-border bg-surface px-2 py-3 text-center">
+      <span className="grid h-8 w-8 place-items-center rounded-sm bg-navy/5 text-navy">
         <Icon name={icon} size={18} />
       </span>
-      <span className="text-[11.5px] font-bold leading-tight text-navy">{title}</span>
+      <span className="text-label font-semibold leading-tight text-navy">{title}</span>
     </div>
   );
 }
@@ -587,31 +587,31 @@ function DocsPanel({
 
   if (!rows.length) {
     return (
-      <div className={compact ? "" : "px-[22px] pb-4"}>
-        <div className="rounded-[10px] border border-border bg-surface2 px-3.5 py-3 text-center">
-          <p className="text-[13px] font-bold text-navy">{p.noDocsTitle}</p>
-          <p className="mt-1 text-[12.5px] text-muted">{p.noDocsBody}</p>
+      <div className={compact ? "" : "px-6 pb-4"}>
+        <div className="rounded-sm border border-border bg-surface2 px-3.5 py-3 text-center">
+          <p className="text-body font-semibold text-navy">{p.noDocsTitle}</p>
+          <p className="mt-1 text-meta text-muted">{p.noDocsBody}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={compact ? "" : "px-[22px] pb-4"}>
-      <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted">{p.docsOnFileTitle}</p>
+    <div className={compact ? "" : "px-6 pb-4"}>
+      <p className="mb-2 text-label font-semibold uppercase tracking-wide text-muted">{p.docsOnFileTitle}</p>
       <ul className="flex flex-col gap-2">
         {rows.map((r) => (
           <li
             key={r.label}
-            className="flex items-center gap-2.5 rounded-[10px] border border-border bg-surface px-3 py-2.5"
+            className="flex items-center gap-2.5 rounded-sm border border-border bg-surface px-3 py-2.5"
           >
             <Icon name="description" size={18} className="text-muted" />
-            <span className="min-w-0 flex-1 truncate text-[13px] text-navy">{r.label}</span>
+            <span className="min-w-0 flex-1 truncate text-body text-navy">{r.label}</span>
             <a
               href={r.url ?? "#"}
               target="_blank"
               rel="noreferrer"
-              className="flex-none rounded-lg border border-brand px-3 py-1 text-[12.5px] font-bold text-brand"
+              className="flex-none rounded-sm border border-brand px-3 py-1 text-meta font-semibold text-brand"
             >
               {p.docsOnFileView}
             </a>
@@ -636,7 +636,7 @@ function StatePanel({
   homeLabel?: string;
 }) {
   return (
-    <div className="p-[40px] text-center">
+    <div className="p-10 text-center">
       <span
         className={`mx-auto grid h-14 w-14 place-items-center rounded-full ${
           tone === "ok" ? "bg-ok-soft text-ok" : "bg-info-soft text-info"
@@ -644,14 +644,14 @@ function StatePanel({
       >
         <Icon name={icon} size={28} />
       </span>
-      <h1 className="mt-4 text-[20px] font-extrabold text-navy">{title}</h1>
-      <p className="mx-auto mt-2 max-w-sm text-[13.5px] text-muted">{body}</p>
+      <h1 className="mt-4 text-display font-extrabold text-navy">{title}</h1>
+      <p className="mx-auto mt-2 max-w-sm text-body text-muted">{body}</p>
       {/* Terminal state (sent/verified): the form is gone, so give the renter an explicit way home
           instead of leaving the browser back button as the only exit. */}
       {homeLabel && (
         <Link
           href="/"
-          className="mt-6 inline-flex items-center gap-2 rounded-[10px] bg-navy px-5 py-2.5 text-[13.5px] font-bold text-white transition hover:brightness-110"
+          className="mt-6 inline-flex items-center gap-2 rounded-sm bg-navy px-5 py-2.5 text-body font-semibold text-white transition"
         >
           <Icon name="home" size={18} /> {homeLabel}
         </Link>

@@ -65,8 +65,8 @@ export function AppNav({ items }: { items: NavItem[] }) {
 
                Both states carry the same padding, so the row does not shift by a pixel when the
                active item changes — which is what the drawn rule was protecting. */
-            className={`whitespace-nowrap rounded-full px-4 py-1.5 text-[14px] transition ${
-              active ? "bg-white font-extrabold text-navy" : "font-semibold text-white/70 hover:bg-white/10 hover:text-white"
+            className={`whitespace-nowrap rounded-full px-4 py-1.5 text-body transition ${
+              active ? "bg-white font-extrabold text-navy" : "font-semibold text-white/70 hover:bg-surface/10 hover:text-white"
             }`}
           >
             {it.label}
@@ -119,7 +119,7 @@ export function AppNavMobile({ items, children }: { items: NavItem[]; children?:
         aria-label={t.shell.menu}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="grid h-[34px] w-[34px] place-items-center rounded-full text-white/70 transition hover:bg-white/10 hover:text-white"
+        className="grid h-[34px] w-[34px] place-items-center rounded-full text-white/70 transition hover:bg-surface/10 hover:text-white"
       >
         {/* 34px box, 20px glyph — the bar's one size for a standalone icon control, shared with the
             inbox, the bell, the avatar and Back. */}
@@ -134,7 +134,7 @@ export function AppNavMobile({ items, children }: { items: NavItem[]; children?:
               width whichever end the button sits at — the row mirrors itself in Arabic. */}
           <div
             role="menu"
-            className="fixed inset-x-0 top-[62px] z-40 border-b border-border bg-surface px-4 py-2 shadow-lg sm:px-7"
+            className="fixed inset-x-0 top-[62px] z-40 border-b border-border bg-surface px-4 py-2 sm:px-7"
           >
             {items.map((it) => {
               const active = isActive(it.href);
@@ -144,7 +144,7 @@ export function AppNavMobile({ items, children }: { items: NavItem[]; children?:
                   href={it.href}
                   role="menuitem"
                   aria-current={active ? "page" : undefined}
-                  className={`flex items-center justify-between rounded-[10px] px-3 py-3 text-[15px] transition ${
+                  className={`flex items-center justify-between rounded-sm px-3 py-3 text-subhead transition ${
                     active ? "bg-surface2 font-extrabold text-navy" : "font-semibold text-navy-mid hover:bg-surface2"
                   }`}
                 >

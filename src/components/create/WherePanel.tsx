@@ -52,7 +52,7 @@ export function WherePanel({
    * keeps those two places from drifting into two different buttons.
    */
   const confirmControl = loc.confirmed ? (
-    <span className="flex flex-none items-center gap-1.5 rounded-[10px] border border-ok/30 bg-ok-soft px-3 py-2 text-[13px] font-bold text-ok">
+    <span className="flex flex-none items-center gap-1.5 rounded-sm border border-ok/30 bg-ok-soft px-3 py-2 text-body font-semibold text-ok">
       <Icon name="check_circle" size={17} /> {t.step1.location.confirmed}
     </span>
   ) : (
@@ -60,7 +60,7 @@ export function WherePanel({
       type="button"
       disabled={!hasLocation}
       onClick={() => actions.confirmLocation()}
-      className={`flex-none rounded-[10px] bg-navy px-4 py-2 text-[13px] font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`flex-none rounded-sm bg-navy px-4 py-2 text-body font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg ${
         shakeConfirm ? "shake-error" : ""
       }`}
     >
@@ -70,7 +70,7 @@ export function WherePanel({
 
   return (
     <section
-      className={`mb-3.5 rounded-[14px] border transition ${complete && !open ? "border-ok/40 bg-ok/[0.06]" : "border-border bg-surface"}`}
+      className={`mb-3.5 rounded-sm border transition ${complete && !open ? "border-ok/40 bg-ok/[0.06]" : "border-border bg-surface"}`}
     >
       <button
         type="button"
@@ -81,8 +81,8 @@ export function WherePanel({
         <span className="flex min-w-0 items-center gap-2">
           <PanelDot complete={complete} />
           <Icon name="place" size={16} className="flex-none text-navy" />
-          <span className="flex-none text-[15px] font-extrabold text-navy">{t.create.where}</span>
-          <span className="truncate text-[13px] text-muted">
+          <span className="flex-none text-subhead font-extrabold text-navy">{t.create.where}</span>
+          <span className="truncate text-body text-muted">
             {loc.label ?? "—"}
             {hasLocation && <span className="ms-1.5 text-muted/70">{`${loc.lat?.toFixed(6)}, ${loc.lng?.toFixed(6)}`}</span>}
           </span>
@@ -95,35 +95,35 @@ export function WherePanel({
           {/* AC-47 — a text↔file disagreement is settled before anything else; confirming over an
               unresolved conflict would pick a site by accident. */}
           {conflictUnresolved && loc.conflict && (
-            <div className="mb-3 rounded-[10px] border border-warn/40 bg-warn-soft p-3.5">
-              <div className="flex items-center gap-1.5 text-[13.5px] font-extrabold text-warn">
+            <div className="mb-3 rounded-sm border border-warn/40 bg-warn-soft p-3.5">
+              <div className="flex items-center gap-1.5 text-body font-extrabold text-warn">
                 <Icon name="error_outline" size={18} /> {t.step1.location.conflictTitle}
               </div>
               <div className="mt-2 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 <button
-                  className="flex flex-col gap-1 rounded-[10px] border border-border bg-surface p-3 text-start hover:border-brand"
+                  className="flex flex-col gap-1 rounded-sm border border-border bg-surface p-3 text-start hover:border-brand"
                   onClick={() => actions.resolveLocationConflict("text")}
                 >
-                  <span className="flex items-center gap-1 text-[11px] font-bold text-muted">
+                  <span className="flex items-center gap-1 text-label font-semibold text-muted">
                     <Icon name="notes" size={14} /> {t.step1.location.fromText}
                   </span>
-                  <span className="text-[13.5px] font-bold">{loc.conflict.fromText}</span>
+                  <span className="text-body font-semibold">{loc.conflict.fromText}</span>
                 </button>
                 <button
-                  className="flex flex-col gap-1 rounded-[10px] border border-border bg-surface p-3 text-start hover:border-brand"
+                  className="flex flex-col gap-1 rounded-sm border border-border bg-surface p-3 text-start hover:border-brand"
                   onClick={() => actions.resolveLocationConflict("file")}
                 >
-                  <span className="flex items-center gap-1 text-[11px] font-bold text-muted">
+                  <span className="flex items-center gap-1 text-label font-semibold text-muted">
                     <Icon name="picture_as_pdf" size={14} /> {t.step1.location.fromFile}
                   </span>
-                  <span className="text-[13.5px] font-bold">{loc.conflict.fromFile}</span>
+                  <span className="text-body font-semibold">{loc.conflict.fromFile}</span>
                 </button>
               </div>
             </div>
           )}
 
           {!conflictUnresolved && (
-            <div className="rounded-[10px] bg-surface2 p-3.5">
+            <div className="rounded-sm bg-surface2 p-3.5">
               {/* ── The answer sits beside the question (owner, 2026-08-26) ──────────────────────
                   «This is the right spot» was a row of its own under the address box, which read as a
                   second step rather than as the confirmation OF that address. Address and control now
@@ -144,19 +144,19 @@ export function WherePanel({
 
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                 {hasLocation ? (
-                  <span className="flex min-w-0 flex-1 items-start gap-1.5 rounded-lg border border-border bg-surface px-3 py-2">
+                  <span className="flex min-w-0 flex-1 items-start gap-1.5 rounded-sm border border-border bg-surface px-3 py-2">
                     <Icon name="location_on" size={15} className="mt-px flex-none text-brand" />
                     <span className="min-w-0">
-                      <span className="block text-[13px] font-semibold leading-tight text-navy">
+                      <span className="block text-body font-semibold leading-tight text-navy">
                         {loc.label?.trim() || t.step1.location.mapPicker.pinnedNoAddress}
                       </span>
-                      <span className="block text-[11px] text-muted">
+                      <span className="block text-label text-muted">
                         {(loc.lat as number).toFixed(6)}, {(loc.lng as number).toFixed(6)}
                       </span>
                     </span>
                   </span>
                 ) : (
-                  <p className="min-w-0 flex-1 text-[13px] leading-snug text-navy-mid">
+                  <p className="min-w-0 flex-1 text-body leading-snug text-navy-mid">
                     <Icon name="location_on" size={15} className="me-1 align-[-3px] text-brand" />
                     {t.create.wherePanel.dragHint}
                   </p>
@@ -168,12 +168,12 @@ export function WherePanel({
 
           {/* AC-48 — one request, one site. Raised only when the agent genuinely found more than one. */}
           {multi.length > 1 && !state.multiLocationDismissed && (
-            <div className="mt-3 flex items-start gap-3 rounded-[10px] border border-info/25 bg-info-soft px-3.5 py-3">
+            <div className="mt-3 flex items-start gap-3 rounded-sm border border-info/25 bg-info-soft px-3.5 py-3">
               <Icon name="pin_drop" size={22} className="flex-none text-info" />
-              <div className="min-w-0 text-[#0e4f7e]">
-                <div className="text-[13px] font-extrabold">{t.step1.location.multiLocationTitle}</div>
-                <div className="mt-0.5 text-xs opacity-85">{t.step1.location.multiLocationBody}</div>
-                <ul className="mt-1 list-disc ps-5 text-xs opacity-85">
+              <div className="min-w-0 text-info-deep">
+                <div className="text-body font-extrabold">{t.step1.location.multiLocationTitle}</div>
+                <div className="mt-0.5 text-label opacity-85">{t.step1.location.multiLocationBody}</div>
+                <ul className="mt-1 list-disc ps-5 text-label opacity-85">
                   {multi.map((l) => (
                     <li key={l}>{l}</li>
                   ))}
@@ -181,13 +181,13 @@ export function WherePanel({
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button
                     onClick={() => window.open(window.location.href, "_blank", "noopener")}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-info/40 bg-surface px-3 py-1.5 text-xs font-bold text-info hover:border-info"
+                    className="inline-flex items-center gap-1.5 rounded-sm border border-info/40 bg-surface px-3 py-1.5 text-label font-semibold text-info hover:border-info"
                   >
                     {t.step1.location.startSeparateRequest} <Icon name="open_in_new" size={14} />
                   </button>
                   <button
                     onClick={() => actions.dismissMultiLocation()}
-                    className="inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-bold text-info/80 hover:text-info"
+                    className="inline-flex items-center rounded-sm px-3 py-1.5 text-label font-semibold text-info/80 hover:text-info"
                   >
                     {t.common.cancel}
                   </button>

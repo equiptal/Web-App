@@ -143,9 +143,9 @@ export function CompanyIdentityModal({
     });
   };
 
-  const labelCls = "mb-[6px] block text-[12.5px] font-bold text-navy-mid";
+  const labelCls = "mb-2 block text-meta font-semibold text-navy-mid";
   const inputCls =
-    "h-[46px] w-full rounded-[10px] border border-border bg-surface px-[14px] text-[14px] outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)]";
+    "h-[46px] w-full rounded-sm border border-border bg-surface px-4 text-body outline-0 focus:border-brand";
 
   return (
     <Dialog
@@ -161,7 +161,7 @@ export function CompanyIdentityModal({
       }
     >
       <div dir={locale === "ar" ? "rtl" : "ltr"}>
-        <div className="flex flex-col gap-[14px]">
+        <div className="flex flex-col gap-4">
           {/* Role — three equal chips, the only required answer. */}
           <div>
             <label className={labelCls}>
@@ -174,7 +174,7 @@ export function CompanyIdentityModal({
                   key={r.value}
                   onClick={() => setRole(r.value)}
                   aria-pressed={role === r.value}
-                  className={`min-h-[52px] rounded-[10px] border-[1.5px] px-2 py-2 text-[12.5px] font-bold leading-tight transition ${
+                  className={`min-h-[52px] rounded-sm border-[1.5px] px-2 py-2 text-meta font-semibold leading-tight transition ${
                     role === r.value
                       ? "border-brand bg-brand-soft text-brand"
                       : "border-border bg-surface text-muted hover:border-brand/60"
@@ -189,7 +189,7 @@ export function CompanyIdentityModal({
           <div>
             <label className={labelCls}>
               {p.nationalIdLabel}{" "}
-              <span className="text-[11px] font-medium text-muted">— {t.verify.optional}</span>
+              <span className="text-label font-semibold text-muted">— {t.verify.optional}</span>
             </label>
             <input
               className={inputCls}
@@ -203,7 +203,7 @@ export function CompanyIdentityModal({
 
           <div>
             <label className={labelCls}>
-              {p.cityLabel} <span className="text-[11px] font-medium text-muted">— {t.verify.optional}</span>
+              {p.cityLabel} <span className="text-label font-semibold text-muted">— {t.verify.optional}</span>
             </label>
             <select className={inputCls} value={city} onChange={(e) => setCity(e.target.value)}>
               <option value="">{t.verify.cityPlaceholder}</option>
@@ -217,10 +217,10 @@ export function CompanyIdentityModal({
 
           <div>
             <label className={labelCls}>
-              {p.logoLabel} <span className="text-[11px] font-medium text-muted">— {t.verify.optional}</span>
+              {p.logoLabel} <span className="text-label font-semibold text-muted">— {t.verify.optional}</span>
             </label>
-            <div className="flex items-center gap-3 rounded-[10px] border border-border bg-surface px-[14px] py-3">
-              <span className="grid h-12 w-12 flex-none place-items-center overflow-hidden rounded-[10px] border border-border bg-surface2">
+            <div className="flex items-center gap-3 rounded-sm border border-border bg-surface px-4 py-3">
+              <span className="grid h-12 w-12 flex-none place-items-center overflow-hidden rounded-sm border border-border bg-surface2">
                 {logoBusy ? (
                   <Icon name="hourglass_empty" size={20} className="text-muted" />
                 ) : logoPreview ? (
@@ -230,8 +230,8 @@ export function CompanyIdentityModal({
                   <Icon name="image" size={20} className="text-muted" />
                 )}
               </span>
-              <span className="flex-1 text-[12px] text-muted">{p.logoNote}</span>
-              <label className="flex-none cursor-pointer rounded-lg border border-brand bg-surface px-3 py-1.5 text-[12.5px] font-bold text-brand">
+              <span className="flex-1 text-meta text-muted">{p.logoNote}</span>
+              <label className="flex-none cursor-pointer rounded-sm border border-brand bg-surface px-3 py-1.5 text-meta font-semibold text-brand">
                 {logoBusy ? t.verify.uploading : logoKey || logoPreview ? p.logoChange : p.logoUpload}
                 <input
                   type="file"
@@ -252,13 +252,13 @@ export function CompanyIdentityModal({
                     setLogoKey(null);
                     setLogoPreview(null);
                   }}
-                  className="flex-none rounded-lg border border-border px-3 py-1.5 text-[12.5px] font-bold text-danger"
+                  className="flex-none rounded-sm border border-border px-3 py-1.5 text-meta font-semibold text-danger"
                 >
                   {p.logoRemove}
                 </button>
               )}
             </div>
-            {logoErr && <p className="mt-1 text-[12px] text-danger">{logoErr}</p>}
+            {logoErr && <p className="mt-1 text-meta text-danger">{logoErr}</p>}
           </div>
         </div>
 

@@ -355,10 +355,10 @@ export function RequestsWorkspace() {
     }
     w.document.write(
       `<!doctype html><html dir="${ar ? "rtl" : "ltr"}"><head><meta charset="utf-8"><title>${esc(title)}</title>` +
-        `<style>body{font:14px system-ui,sans-serif;padding:28px;color:#1c3550}h1{font-size:18px;margin:0 0 2px}` +
-        `p{margin:0 0 18px;color:#6b8fa8;font-size:12px}table{border-collapse:collapse;width:100%}` +
-        `th,td{border:1px solid #d4e0ec;padding:8px 10px;text-align:${ar ? "right" : "left"};font-size:12.5px}` +
-        `th{background:#f2f7fb;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px}.q{color:#9AA7B8}</style></head><body>` +
+        `<style>body{font:14px system-ui,sans-serif;padding:28px;color:var(--navy)}h1{font-size:18px;margin:0 0 2px}` +
+        `p{margin:0 0 18px;color:var(--muted);font-size:12px}table{border-collapse:collapse;width:100%}` +
+        `th,td{border:1px solid var(--border);padding:8px 10px;text-align:${ar ? "right" : "left"};font-size:12.5px}` +
+        `th{background:var(--background);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px}.q{color:var(--muted-light)}</style></head><body>` +
         `<h1>${esc(title)}</h1><p>${esc(group?.locationLabel ?? "")} · ${esc(group?.groupRef ?? item.displayId)}` +
         (item.durationDays ? ` · ${esc(t.workspace.overDays.replace("{n}", String(item.durationDays)))}` : "") +
         `</p><table><thead><tr><th>${esc(t.workspace.supplierPickOne)}</th><th>${esc(t.workspace.colRate)}</th>` +
@@ -395,7 +395,7 @@ export function RequestsWorkspace() {
   if (groups === null) {
     return (
       <Standalone>
-        <div className="text-center text-[13px] font-semibold text-muted">{t.workspace.loading}</div>
+        <div className="text-center text-body font-semibold text-muted">{t.workspace.loading}</div>
       </Standalone>
     );
   }
@@ -403,14 +403,14 @@ export function RequestsWorkspace() {
     return (
       <Standalone>
         <div className="text-center">
-          <p className="text-[13px] font-semibold text-muted">{t.workspace.loadFailed}</p>
+          <p className="text-body font-semibold text-muted">{t.workspace.loadFailed}</p>
           <button
             type="button"
             onClick={() => {
               setGroups(null);
               setReloads((n) => n + 1);
             }}
-            className="mt-3 rounded-full bg-brand px-4 py-2 text-[12.5px] font-bold text-white"
+            className="mt-3 rounded-full bg-brand px-4 py-2 text-meta font-semibold text-white"
           >
             {t.workspace.retry}
           </button>
@@ -471,9 +471,9 @@ export function RequestsWorkspace() {
                   type="button"
                   onClick={() => setTab(k)}
                   aria-current={on ? "page" : undefined}
-                  className={`relative -mb-px rounded-t-[10px] border border-border text-[12px] font-bold transition ${
+                  className={`relative -mb-px rounded-t-sm border border-border text-meta font-semibold transition ${
                     on
-                      ? "z-[2] border-b-surface bg-surface px-4 pb-2 pt-2 text-navy shadow-[0_-2px_6px_rgba(19,44,74,.05)]"
+                      ? "z-[2] border-b-surface bg-surface px-4 pb-2 pt-2 text-navy"
                       : "z-[1] bg-surface3/70 px-3.5 pb-2 pt-1.5 text-muted hover:text-navy-mid"
                   }`}
                 >
@@ -483,7 +483,7 @@ export function RequestsWorkspace() {
             })}
           </div>
           <span className="flex-1" />
-          <div className="mb-[7px] flex items-center gap-2">
+          <div className="mb-2 flex items-center gap-2">
             {/* ── «Select all» puts the whole comparison back (owner, 2026-08-25) ─────────────────
                 The export covers what the comparison covers, so putting a bid back on the table is
                 the same act as putting it back in the sheet — one concept, not two. It appears only
@@ -493,7 +493,7 @@ export function RequestsWorkspace() {
               <button
                 type="button"
                 onClick={() => setBenched(new Set())}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-[7px] text-[10.5px] font-bold text-navy-mid transition hover:border-navy-mid"
+                className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-surface px-3 py-2 text-label font-semibold text-navy-mid transition hover:border-navy-mid"
               >
                 <Icon name="done_all" size={14} /> {fmt(t.workspace.selectAll, { n: String(benched.size) })}
               </button>
@@ -505,7 +505,7 @@ export function RequestsWorkspace() {
               type="button"
               disabled={shown.length === 0}
               onClick={() => (tab === "compare" ? printComparison() : void downloadQuotation())}
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border bg-surface px-3 py-[7px] text-[10.5px] font-bold text-navy-mid transition hover:border-navy-mid hover:bg-surface2/60 disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm border border-border bg-surface px-3 py-2 text-label font-semibold text-navy-mid transition hover:border-navy-mid hover:bg-surface2/60 disabled:bg-disabled-bg disabled:text-disabled-fg"
             >
               {tab === "compare" ? t.workspace.exportComparison : t.workspace.downloadQuotation}{" "}
               <Icon name="download" size={14} />
@@ -513,14 +513,14 @@ export function RequestsWorkspace() {
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-[14px] rounded-tr-[14px] border border-border bg-surface shadow-[0_2px_10px_rgba(19,44,74,.07)]">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-sm rounded-tr-sm border border-border bg-surface">
           {/* ── Source, above whichever pane is showing (owner's reference, 2026-08-25) ───────────
               It narrows both panes, so it belongs to neither — and it reads as a quiet row of words
               rather than a row of pills, because it is a filter over the table, not an action on it.
               It appears only when there is a mix to narrow: with every bid from one source, three
               choices that change nothing are furniture. */}
           <div className="flex flex-none flex-wrap items-center gap-4 border-b border-border px-3.5 py-1.5">
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide text-muted">
+              <span className="inline-flex items-center gap-1.5 text-label font-extrabold uppercase tracking-wide text-muted">
                 <Icon name="filter_list" size={14} /> {t.workspace.source}
               </span>
               {(
@@ -535,7 +535,7 @@ export function RequestsWorkspace() {
                   type="button"
                   onClick={() => setSource(key)}
                   aria-current={source === key ? "true" : undefined}
-                  className={`border-b-2 pb-0.5 text-[12.5px] font-bold transition ${
+                  className={`border-b-2 pb-0.5 text-meta font-semibold transition ${
                     source === key ? "border-brand text-navy" : "border-transparent text-muted hover:text-navy-mid"
                   }`}
                 >
@@ -596,28 +596,28 @@ export function RequestsWorkspace() {
               <button
                 type="button"
                 onClick={() => setTipOpen(true)}
-                className="inline-flex max-w-full items-center gap-2.5 rounded-full border border-border bg-surface py-2 pe-4 ps-[9px] shadow-[0_2px_8px_rgba(19,44,74,.06)] transition hover:border-navy-mid/40"
+                className="inline-flex max-w-full items-center gap-2.5 rounded-full border border-border bg-surface py-2 pe-4 ps-2 transition hover:border-navy-mid/40"
               >
-                <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface2 text-[11px] font-bold text-muted">✦</span>
-                <span className="flex-none text-[11.5px] font-bold text-navy-mid">{t.workspace.aiSuggestion}</span>
-                <span className="min-w-0 truncate text-[11.5px] font-medium text-muted">{ranking.note}</span>
-                <span className="flex-none text-[10px] font-semibold text-muted/70">⌄</span>
+                <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface2 text-label font-semibold text-muted">✦</span>
+                <span className="flex-none text-label font-semibold text-navy-mid">{t.workspace.aiSuggestion}</span>
+                <span className="min-w-0 truncate text-label font-semibold text-muted">{ranking.note}</span>
+                <span className="flex-none text-label font-semibold text-muted/70">⌄</span>
               </button>
             ) : ranking?.note && tipOpen ? (
-              <div className="flex items-start gap-3 rounded-[14px] border border-border bg-surface px-4 py-3.5 shadow-[0_2px_10px_rgba(19,44,74,.06)]">
-                <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface2 text-[11px] font-bold text-muted">✦</span>
+              <div className="flex items-start gap-3 rounded-sm border border-border bg-surface px-4 py-3.5">
+                <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface2 text-label font-semibold text-muted">✦</span>
                 <div className="flex min-w-0 flex-1 flex-col gap-2.5">
                   <div className="flex items-baseline gap-2.5">
-                    <span className="text-[11px] font-bold text-muted">{t.workspace.aiWhatIdDo}</span>
-                    <span className="font-mono text-[8px] font-bold tracking-[.09em] text-muted/70">{t.workspace.aiBrand}</span>
+                    <span className="text-label font-semibold text-muted">{t.workspace.aiWhatIdDo}</span>
+                    <span className="font-mono text-label font-semibold tracking-[.09em] text-muted/70">{t.workspace.aiBrand}</span>
                   </div>
-                  <p className="text-[12px] font-medium leading-[1.5] text-navy-mid">{ranking.note}</p>
+                  <p className="text-meta font-semibold leading-[1.5] text-navy-mid">{ranking.note}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setTipOpen(false)}
                   aria-label={t.common.cancel}
-                  className="flex-none self-start rounded-md px-[7px] py-[5px] text-[11px] font-semibold text-muted/70 transition hover:bg-surface2 hover:text-navy-mid"
+                  className="flex-none self-start rounded-sm px-2 py-1 text-label font-semibold text-muted/70 transition hover:bg-surface2 hover:text-navy-mid"
                 >
                   ⌃
                 </button>
@@ -627,11 +627,11 @@ export function RequestsWorkspace() {
                 type="button"
                 onClick={() => void rank(shown)}
                 disabled={rankBusy}
-                className="inline-flex items-center gap-2.5 rounded-full border border-border bg-surface py-2 pe-4 ps-[9px] shadow-[0_2px_8px_rgba(19,44,74,.06)] transition hover:border-navy-mid/40 disabled:opacity-60"
+                className="inline-flex items-center gap-2.5 rounded-full border border-border bg-surface py-2 pe-4 ps-2 transition hover:border-navy-mid/40 disabled:bg-disabled-bg disabled:text-disabled-fg"
               >
-                <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface2 text-[11px] font-bold text-muted">✦</span>
-                <span className="text-[11.5px] font-bold text-navy-mid">{t.workspace.aiSuggestion}</span>
-                <span className="text-[11.5px] font-medium text-muted">
+                <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface2 text-label font-semibold text-muted">✦</span>
+                <span className="text-label font-semibold text-navy-mid">{t.workspace.aiSuggestion}</span>
+                <span className="text-label font-semibold text-muted">
                   {rankBusy ? t.workspace.aiRanking : t.workspace.aiRankPrompt}
                 </span>
               </button>
@@ -641,7 +641,7 @@ export function RequestsWorkspace() {
       </div>
 
       {toast && (
-        <div className="fixed inset-x-0 bottom-28 z-[70] mx-auto w-fit rounded-full bg-navy px-4 py-2 text-[12.5px] font-bold text-white shadow-lg">
+        <div className="fixed inset-x-0 bottom-28 z-[70] mx-auto w-fit rounded-full bg-navy px-4 py-2 text-meta font-semibold text-white">
           {toast}
         </div>
       )}

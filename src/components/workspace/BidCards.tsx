@@ -50,7 +50,7 @@ export function BidCards({
       <div className="grid min-h-[220px] place-items-center px-4 py-12 text-center">
         <div>
           <Icon name="inbox" size={30} className="text-muted" />
-          <p className="mt-2 text-[13px] font-semibold text-muted">{t.workspace.noBidsYet}</p>
+          <p className="mt-2 text-body font-semibold text-muted">{t.workspace.noBidsYet}</p>
         </div>
       </div>
     );
@@ -60,7 +60,7 @@ export function BidCards({
     // `items-stretch`, not `items-start`: the pane now has a definite height, so every card takes
     // all of it and they end on one line instead of stepping down with their content. The footer was
     // already `mt-auto`, waiting for exactly this — the way on sits at the bottom of every card.
-    <div className="flex h-full snap-x items-stretch gap-[18px] overflow-x-auto p-3">
+    <div className="flex h-full snap-x items-stretch gap-5 overflow-x-auto p-3">
       {bids.map((b) => (
         <BidCardTile
           key={b.card.id}
@@ -212,15 +212,15 @@ function BidCardTile({
   return (
     <article
       onClick={onSelect}
-      className={`flex max-h-full w-[344px] max-w-full flex-none snap-start cursor-pointer flex-col overflow-hidden rounded-[12px] border bg-surface transition ${
+      className={`flex max-h-full w-[344px] max-w-full flex-none snap-start cursor-pointer flex-col overflow-hidden rounded-sm border bg-surface transition ${
         selected
-          ? "border-brand shadow-[0_0_0_1px_var(--brand),0_6px_18px_rgba(247,144,9,.2)]"
-          : "border-border shadow-[0_2px_8px_rgba(19,44,74,.06)] hover:border-navy-mid/40"
+          ? "border-brand"
+          : "border-border hover:border-navy-mid/40"
       }`}
     >
       {/* Where it came from, and when. */}
       <header
-        className={`flex flex-none items-center justify-between gap-2 border-b px-3.5 py-1.5 text-[11px] font-semibold ${
+        className={`flex flex-none items-center justify-between gap-2 border-b px-3.5 py-1.5 text-label font-semibold ${
           offline ? "border-border bg-surface2 text-navy-mid" : "border-info/20 bg-info-soft text-info"
         }`}
       >
@@ -232,22 +232,22 @@ function BidCardTile({
       </header>
 
       <div className="flex flex-none items-center gap-3 px-3.5 py-2.5">
-        <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-navy text-[14px] font-bold text-white">
+        <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-navy text-body font-semibold text-white">
           {card.supplierName.trim().charAt(0).toUpperCase() || "?"}
         </span>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[15px] font-extrabold leading-[1.15] text-navy">{card.supplierName}</div>
+          <div className="truncate text-subhead font-extrabold leading-[1.15] text-navy">{card.supplierName}</div>
           {/* «Supplier · Riyadh», as the app's own card reads (owner, 2026-08-25). The city was on the
               wire the whole time — the bid-list `supplierProfile` carries it, and `mapBid` was already
               reading it into the composed national address. The distance keeps its place after it. */}
-          <div className="truncate text-[11.5px] font-semibold text-muted">
+          <div className="truncate text-label font-semibold text-muted">
             {L("Supplier", "مؤجّر")}
             {card.supplierCity ? ` · ${card.supplierCity}` : ""}
             {card.distanceKm != null ? ` · ${Math.round(card.distanceKm)} ${L("km", "كم")}` : ""}
           </div>
         </div>
         {offline ? (
-          <span className="flex-none rounded-full border border-border px-2 py-1 text-[10.5px] font-bold text-muted">{t.workspace.notOnApp}</span>
+          <span className="flex-none rounded-full border border-border px-2 py-1 text-label font-semibold text-muted">{t.workspace.notOnApp}</span>
         ) : (
           /* The conversation, as one round control: filled while there is something unread on it,
              quiet while there is not. */
@@ -259,8 +259,8 @@ function BidCardTile({
             }}
             aria-label={t.workspace.openChat}
             title={t.workspace.openChat}
-            className={`relative grid h-[34px] w-[34px] flex-none place-items-center rounded-full border transition disabled:opacity-50 ${
-              unread > 0 ? "border-navy bg-navy text-white hover:brightness-110" : "border-border bg-surface2 text-muted hover:bg-surface3"
+            className={`relative grid h-[34px] w-[34px] flex-none place-items-center rounded-full border transition disabled:bg-disabled-bg disabled:text-disabled-fg ${
+              unread > 0 ? "border-navy bg-navy text-white" : "border-border bg-surface2 text-muted hover:bg-surface3"
             }`}
           >
             <Icon name="chat_bubble_outline" size={16} />
@@ -279,8 +279,8 @@ function BidCardTile({
         className="flex flex-none items-center gap-3 border-t border-border px-3.5 py-2 text-start transition hover:bg-surface2/40"
       >
         <TermsDialGlyph met={dial.met} against={dial.against} unanswered={dial.unanswered} />
-        <span className="flex-1 text-[13px] font-bold text-navy">{L("Terms", "الشروط")}</span>
-        <span className="text-[11.5px] font-bold text-info">{L("View", "عرض")} ›</span>
+        <span className="flex-1 text-body font-semibold text-navy">{L("Terms", "الشروط")}</span>
+        <span className="text-label font-semibold text-info">{L("View", "عرض")} ›</span>
       </button>
 
       {/* The money. */}
@@ -295,25 +295,25 @@ function BidCardTile({
           }}
           aria-expanded={open}
           className={`flex items-start gap-2.5 text-start ${
-            accepted ? "-mx-3.5 -mt-3.5 rounded-t-[11px] border-b-2 border-ok bg-ok-soft px-3.5 pb-2 pt-3.5" : ""
+            accepted ? "-mx-3.5 -mt-3.5 rounded-t-sm border-b-2 border-ok bg-ok-soft px-3.5 pb-2 pt-3.5" : ""
           }`}
         >
           <div className="min-w-0 flex-1">
-            <div className="text-[14px] font-extrabold leading-none text-navy">{headlineLabel}</div>
-            {basis && <div className="mt-1.5 text-[11px] font-medium leading-none text-muted">{basis}</div>}
+            <div className="text-body font-extrabold leading-none text-navy">{headlineLabel}</div>
+            {basis && <div className="mt-1.5 text-label font-semibold leading-none text-muted">{basis}</div>}
           </div>
           <div className="flex flex-none items-baseline gap-1.5">
-            <b className="text-[15px] font-extrabold leading-none text-navy">{formatSar(headline)}</b>
-            <span className="text-[10.5px] font-semibold leading-none text-muted">{t.priceFooter.currency}</span>
+            <b className="text-subhead font-extrabold leading-none text-navy">{formatSar(headline)}</b>
+            <span className="text-label font-semibold leading-none text-muted">{t.priceFooter.currency}</span>
             {accepted && <Icon name="check_circle" size={15} className="self-center text-ok" />}
-            <span aria-hidden="true" className={`text-[10px] leading-none ${open ? "text-info" : "rotate-180 text-muted"}`}>
+            <span aria-hidden="true" className={`text-label leading-none ${open ? "text-info" : "rotate-180 text-muted"}`}>
               ⌃
             </span>
           </div>
         </button>
 
         {open && (
-          <div className="flex flex-none flex-col gap-2 rounded-[8px] border border-info/15 bg-info-soft/40 px-3 py-2.5">
+          <div className="flex flex-none flex-col gap-2 rounded-sm border border-info/15 bg-info-soft/40 px-3 py-2.5">
             {/* The rental, prorated across the billable days — what the headline's rate adds up to
                 over this request. Dropped when the headline already is the total. */}
             {showRentalRow && <Row label={rentalRowLabel} value={totals.perUnit.rental} />}
@@ -326,7 +326,7 @@ function BidCardTile({
           </div>
         )}
 
-        <div className="flex flex-none flex-col gap-2 rounded-[8px] border border-border px-3 py-2.5">
+        <div className="flex flex-none flex-col gap-2 rounded-sm border border-border px-3 py-2.5">
           {/* ── One grand total, as the app and prod both state it (owner, 2026-08-26) ─────────────
               There were two here: one billing period, then the whole request. The per-period one is
               gone, and the app is where that was already settled — it carried the same pair, removed
@@ -349,10 +349,10 @@ function BidCardTile({
               row above rather than being restated here. PER UNIT, like every row above it; the
               all-units figure keeps its own row below. */}
           <div className="flex items-baseline justify-between gap-2.5">
-            <span className="text-[12.5px] font-extrabold text-navy">{t.workspace.grandTotalInclVat}</span>
+            <span className="text-meta font-extrabold text-navy">{t.workspace.grandTotalInclVat}</span>
             <span className="flex-none whitespace-nowrap">
-              <b className="text-[16px] font-extrabold text-navy">{formatSar(totals.perUnit.total)}</b>{" "}
-              <span className="text-[10.5px] font-semibold text-muted">{t.priceFooter.currency}</span>
+              <b className="text-subhead font-extrabold text-navy">{formatSar(totals.perUnit.total)}</b>{" "}
+              <span className="text-label font-semibold text-muted">{t.priceFooter.currency}</span>
             </span>
           </div>
 
@@ -360,12 +360,12 @@ function BidCardTile({
               the per-unit total × units — each transport leg carries its own count. */}
           {units > 1 && (
             <div className="flex items-baseline justify-between gap-2 border-t border-border/70 pt-2.5">
-              <span className="text-[12px] font-extrabold text-brand">
-                {t.workspace.overallTotal} <span className="font-bold text-muted">· {units}</span>
+              <span className="text-meta font-extrabold text-brand">
+                {t.workspace.overallTotal} <span className="font-semibold text-muted">· {units}</span>
               </span>
               <span className="flex-none">
-                <b className="text-[15px] font-black text-brand">{formatSar(totals.overall.total)}</b>{" "}
-                <span className="text-[10.5px] font-bold text-muted">{t.priceFooter.currency}</span>
+                <b className="text-subhead font-extrabold text-brand">{formatSar(totals.overall.total)}</b>{" "}
+                <span className="text-label font-semibold text-muted">{t.priceFooter.currency}</span>
               </span>
             </div>
           )}
@@ -380,7 +380,7 @@ function BidCardTile({
             Placed UNDER the totals rather than beside the headline: it qualifies what the money was
             built on, and a reader who has not reached the total has no use for it yet. */}
         {!countNotes.isEmpty && (
-          <div className="mt-2 flex flex-col gap-1 text-[11.5px] font-semibold leading-snug text-muted">
+          <div className="mt-2 flex flex-col gap-1 text-label font-semibold leading-snug text-muted">
             {countNotes.hasPricedNote && (
               <span>
                 {fmt(
@@ -425,7 +425,7 @@ function BidCardTile({
                   window.open(`https://wa.me/${invitePhone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
                   setInvited(true);
                 }}
-                className="flex-1 rounded-[9px] bg-navy py-3 text-[12.5px] font-extrabold text-white shadow-[0_4px_12px_rgba(19,44,74,.24)] transition hover:-translate-y-px hover:brightness-110"
+                className="flex-1 rounded-sm bg-navy py-3 text-meta font-extrabold text-white transition"
               >
                 {invited ? t.workspace.inviteSent : t.workspace.inviteToApp}
               </button>
@@ -435,7 +435,7 @@ function BidCardTile({
                 disabled
                 title={t.workspace.inviteNoContact}
                 onClick={(e) => e.stopPropagation()}
-                className="flex-1 rounded-[9px] bg-navy py-3 text-[12.5px] font-extrabold text-white disabled:opacity-40"
+                className="flex-1 rounded-sm bg-navy py-3 text-meta font-extrabold text-white disabled:bg-disabled-bg disabled:text-disabled-fg"
               >
                 {t.workspace.inviteToApp}
               </button>
@@ -446,7 +446,7 @@ function BidCardTile({
                 e.stopPropagation();
                 setSubOpen(true);
               }}
-              className="rounded-[9px] border border-border px-3.5 py-3 text-[12.5px] font-bold text-navy transition hover:bg-surface2"
+              className="rounded-sm border border-border px-3.5 py-3 text-meta font-semibold text-navy transition hover:bg-surface2"
             >
               {t.workspace.editQuote}
             </button>
@@ -459,7 +459,7 @@ function BidCardTile({
               if (card.dealRoomId) router.push(`/deal-room/${encodeURIComponent(card.dealRoomId)}?act=counter`);
               else void openRoom();
             }}
-            className="flex-1 rounded-[9px] bg-navy py-3 text-[12.5px] font-extrabold text-white shadow-[0_4px_12px_rgba(19,44,74,.24)] transition hover:-translate-y-px hover:brightness-110"
+            className="flex-1 rounded-sm bg-navy py-3 text-meta font-extrabold text-white transition"
           >
             {/* ── The button carries the ROUND, once there has been one (owner, 2026-08-25) ────────
                 `bidCounterDelta` is the app's rule and was already written and tested; its only
@@ -473,9 +473,9 @@ function BidCardTile({
             {delta ? (
               <span className="inline-flex items-baseline gap-1.5">
                 {t.priceFooter.counterPrice}
-                <span className="text-[11.5px] font-bold text-white/55 line-through">{formatSar(delta.from)}</span>
-                <span aria-hidden="true" className="text-[11.5px] font-bold text-white/55">→</span>
-                <span className="text-[12.5px] font-black">{formatSar(delta.to)}</span>
+                <span className="text-label font-semibold text-white/55 line-through">{formatSar(delta.from)}</span>
+                <span aria-hidden="true" className="text-label font-semibold text-white/55">→</span>
+                <span className="text-meta font-extrabold">{formatSar(delta.to)}</span>
               </span>
             ) : (
               t.priceFooter.counterPrice
@@ -517,9 +517,9 @@ function Row({ label, value, muted }: { label: string; value: number; muted?: bo
   const t = useT();
   return (
     <div className="flex items-baseline justify-between gap-2">
-      <span className={`text-[12px] ${muted ? "font-medium text-muted" : "font-bold text-navy"}`}>{label}</span>
-      <span className={`flex-none whitespace-nowrap text-[12.5px] ${muted ? "font-medium text-muted" : "font-bold text-navy"}`}>
-        {formatSar(value)} <span className="text-[10px] font-semibold text-muted">{t.priceFooter.currency}</span>
+      <span className={`text-meta ${muted ? "font-semibold text-muted" : "font-semibold text-navy"}`}>{label}</span>
+      <span className={`flex-none whitespace-nowrap text-meta ${muted ? "font-semibold text-muted" : "font-semibold text-navy"}`}>
+        {formatSar(value)} <span className="text-label font-semibold text-muted">{t.priceFooter.currency}</span>
       </span>
     </div>
   );
@@ -535,11 +535,11 @@ function LegRow({ label, amount, excluded }: { label: string; amount: number | n
   const leg = legDisplay({ amount, excluded });
   return (
     <div className="flex items-baseline justify-between gap-2 text-navy">
-      <span className="text-[12px] font-bold">{label}</span>
-      <span className={`flex-none whitespace-nowrap text-[12.5px] font-bold ${leg.kind === "amount" ? "" : "text-muted"}`}>
+      <span className="text-meta font-semibold">{label}</span>
+      <span className={`flex-none whitespace-nowrap text-meta font-semibold ${leg.kind === "amount" ? "" : "text-muted"}`}>
         {leg.kind === "amount" ? (
           <>
-            {formatSar(leg.amount)} <span className="text-[10px] font-semibold text-muted">{t.priceFooter.currency}</span>
+            {formatSar(leg.amount)} <span className="text-label font-semibold text-muted">{t.priceFooter.currency}</span>
           </>
         ) : leg.kind === "excluded" ? (
           t.priceFooter.excluded
@@ -561,7 +561,7 @@ function TermsDialGlyph({ met, against, unanswered }: { met: number; against: nu
   const b = a + pct(against);
   return (
     <span
-      className="h-[18px] w-[18px] flex-none rounded-full shadow-[inset_0_0_0_1px_rgba(19,44,74,.08)]"
+      className="h-[18px] w-[18px] flex-none rounded-full"
       style={{
         background: `conic-gradient(var(--ok) 0deg ${a}deg, var(--danger) ${a}deg ${b}deg, var(--border) ${b}deg 360deg)`,
       }}

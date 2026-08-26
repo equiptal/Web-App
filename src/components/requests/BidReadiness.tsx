@@ -13,9 +13,9 @@ import type { BidReadiness, ReadinessBand, ReadinessCert, UnitReadiness } from "
 type LFn = (en: string, ar: string) => string;
 
 const BAND: Record<ReadinessBand, { c: string; bg: string; bd: string }> = {
-  green: { c: "#1daf58", bg: "#e7f7ee", bd: "rgba(29,175,88,.32)" },
-  yellow: { c: "#d4780a", bg: "#fff3e0", bd: "rgba(212,120,10,.32)" },
-  red: { c: "#d9362a", bg: "#fcebea", bd: "rgba(217,54,42,.32)" },
+  green: { c: "var(--ok)", bg: "var(--ok-soft)", bd: "color-mix(in srgb, var(--ok) 32%, transparent)" },
+  yellow: { c: "var(--warn)", bg: "var(--warn-soft)", bd: "color-mix(in srgb, var(--warn) 32%, transparent)" },
+  red: { c: "var(--danger)", bg: "var(--danger-soft)", bd: "color-mix(in srgb, var(--danger) 32%, transparent)" },
 };
 
 const allReady = (r: BidReadiness) => r.band === "green" && r.readyCount >= r.committed && r.units.every((u) => !u.yearConflict);
@@ -48,20 +48,20 @@ export function BidReadinessSection({ r, L, onView }: { r: BidReadiness; L: LFn;
   const ready = allReady(r);
   const c = BAND[ready ? "green" : r.band];
   return (
-    <div style={{ border: "1px solid #e4edf5", borderRadius: 12, overflow: "hidden", background: "#fff" }}>
+    <div style={{ border: "1px solid var(--surface3)", borderRadius: 12, overflow: "hidden", background: "var(--surface)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px" }}>
-        <span className="material-icons-outlined" style={{ fontSize: 18, color: "#6b8fa8" }}>fact_check</span>
-        <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Bid readiness", "جاهزية العرض")}</span>
+        <span className="material-icons-outlined" style={{ fontSize: 18, color: "var(--muted)" }}>fact_check</span>
+        <span style={{ fontSize: 13, fontWeight: 800, color: "var(--navy)" }}>{L("Bid readiness", "جاهزية العرض")}</span>
         <span style={{ marginInlineStart: "auto", display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, border: `1px solid ${c.bd}`, background: c.bg, color: c.c, fontSize: 11.5, fontWeight: 800, whiteSpace: "nowrap" }}>
           <span className="material-icons-outlined" style={{ fontSize: 14 }}>{ready ? "verified" : "fact_check"}</span>
           {ready ? L("All ready", "الكل جاهز") : `${r.readyCount}/${r.committed}`}
         </span>
       </div>
       <div style={{ padding: "0 12px 10px" }}>
-        <p style={{ margin: "0 0 9px", fontSize: 11.5, lineHeight: 1.5, color: "#6b8fa8", fontWeight: 600 }}>
+        <p style={{ margin: "0 0 9px", fontSize: 11.5, lineHeight: 1.5, color: "var(--muted)", fontWeight: 600 }}>
           {L("Checks each offered unit's photos and the certificates your request asked for (ownership documents aren't shown here).", "يتحقق من صور كل وحدة معروضة والشهادات التي طلبها طلبك (لا تُعرض مستندات الملكية هنا).")}
         </p>
-        <button type="button" onClick={onView} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "10px", borderRadius: 10, border: "1px solid #d4e0ec", background: "#F7FAFC", color: "#1a7ec8", fontWeight: 800, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+        <button type="button" onClick={onView} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "10px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--info)", fontWeight: 800, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
           <span className="material-icons-outlined" style={{ fontSize: 17 }}>visibility</span>{L("View eligibility", "عرض الجاهزية")}
         </button>
       </div>
@@ -71,7 +71,7 @@ export function BidReadinessSection({ r, L, onView }: { r: BidReadiness; L: LFn;
 
 function Bar({ percent, band }: { percent: number; band: ReadinessBand }) {
   return (
-    <div style={{ height: 7, borderRadius: 6, background: "#eef2f6", overflow: "hidden", flex: 1, minWidth: 80 }}>
+    <div style={{ height: 7, borderRadius: 6, background: "var(--surface2)", overflow: "hidden", flex: 1, minWidth: 80 }}>
       <div style={{ height: "100%", width: `${Math.max(4, percent)}%`, background: BAND[band].c, borderRadius: 6 }} />
     </div>
   );
@@ -96,11 +96,11 @@ function CertChip({ cert, L }: { cert: ReadinessCert; ar?: boolean; L: LFn }) {
 function UnitCard({ u, ar, L }: { u: UnitReadiness; ar: boolean; L: LFn }) {
   const tone = BAND[u.band];
   return (
-    <div style={{ border: `1px solid ${tone.bd}`, borderRadius: 14, overflow: "hidden", background: "#fff" }}>
+    <div style={{ border: `1px solid ${tone.bd}`, borderRadius: 14, overflow: "hidden", background: "var(--surface)" }}>
       <div style={{ height: 4, background: tone.c }} />
       <div style={{ padding: "12px 14px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-          <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 900, color: "#1c3550", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ar ? u.titleAr : u.titleEn}</span>
+          <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 900, color: "var(--navy)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ar ? u.titleAr : u.titleEn}</span>
           <span style={{ fontSize: 11.5, fontWeight: 800, color: tone.c, fontVariantNumeric: "tabular-nums" }}>{u.done}/{u.total}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
@@ -110,7 +110,7 @@ function UnitCard({ u, ar, L }: { u: UnitReadiness; ar: boolean; L: LFn }) {
 
         {/* Year + conflict */}
         {u.year != null && (
-          <div style={{ fontSize: 12, fontWeight: 700, color: u.yearConflict ? "#d9362a" : "#6b8fa8", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: u.yearConflict ? "var(--danger)" : "var(--muted)", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
             <span className="material-icons-outlined" style={{ fontSize: 14 }}>{u.yearConflict ? "error_outline" : "event"}</span>
             {u.yearConflict
               ? L(`Year ${u.year} — below the requested ${u.reqMinYear}+`, `الصنع ${u.year} — أقل من المطلوب ${u.reqMinYear}+`)
@@ -125,7 +125,7 @@ function UnitCard({ u, ar, L }: { u: UnitReadiness; ar: boolean; L: LFn }) {
             {u.photosPresent ? L("Front + serial", "أمامية + رقم") : L("Missing photos", "صور ناقصة")}
           </span>
           {u.photos.filter((p) => p.url).slice(0, 4).map((p, i) => (
-            <a key={i} href={p.url!} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, fontWeight: 700, color: "#1a7ec8", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>
+            <a key={i} href={p.url!} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, fontWeight: 700, color: "var(--info)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>
               <span className="material-icons-outlined" style={{ fontSize: 13 }}>image</span>{p.slot.replace(/_/g, " ")}
             </a>
           ))}
@@ -149,8 +149,8 @@ function UnitCard({ u, ar, L }: { u: UnitReadiness; ar: boolean; L: LFn }) {
 function Row({ label, children, L }: { label: string; children: React.ReactNode; L: LFn }) {
   void L;
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", padding: "6px 0", borderTop: "1px solid #f2f5f8" }}>
-      <span style={{ fontSize: 11, fontWeight: 800, color: "#6b8fa8", minWidth: 96 }}>{label}</span>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", padding: "6px 0", borderTop: "1px solid var(--background)" }}>
+      <span style={{ fontSize: 11, fontWeight: 800, color: "var(--muted)", minWidth: 96 }}>{label}</span>
       {children}
     </div>
   );
@@ -169,27 +169,27 @@ export function BidEligibilityModal({ r, supplierName, ar, L, onClose }: { r: Bi
   const ready = allReady(r);
   return (
     <div dir={ar ? "rtl" : "ltr"} onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(9,20,34,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      style={{ position: "fixed", inset: 0, zIndex: 1000, background: "color-mix(in srgb, var(--info-deep) 55%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
-      <div role="dialog" aria-modal="true" style={{ width: "min(680px,96vw)", maxHeight: "88vh", background: "#eff4f9", borderRadius: 18, display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 24px 70px rgba(9,20,34,.42)", fontFamily: "Inter, system-ui, sans-serif" }}>
+      <div role="dialog" aria-modal="true" style={{ width: "min(680px,96vw)", maxHeight: "88vh", background: "var(--surface2)", borderRadius: 18, display: "flex", flexDirection: "column", overflow: "hidden", fontFamily: "Inter, system-ui, sans-serif" }}>
         {/* header */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", background: "#fff", borderBottom: "1px solid #d4e0ec" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
           <span style={{ width: 34, height: 34, borderRadius: 9, background: BAND[ready ? "green" : r.band].bg, color: BAND[ready ? "green" : r.band].c, display: "grid", placeItems: "center", flexShrink: 0 }}>
             <span className="material-icons-outlined" style={{ fontSize: 20 }}>{ready ? "verified" : "fact_check"}</span>
           </span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14.5, fontWeight: 900, color: "#1c3550" }}>{L("Equipment eligibility", "جاهزية المعدات")}</div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#6b8fa8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div style={{ fontSize: 14.5, fontWeight: 900, color: "var(--navy)" }}>{L("Equipment eligibility", "جاهزية المعدات")}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {supplierName} · {ready ? L("all units ready", "كل الوحدات جاهزة") : L(`${r.readyCount} of ${r.committed} units ready`, `${r.readyCount} من ${r.committed} وحدة جاهزة`)}
             </div>
           </div>
-          <button onClick={onClose} aria-label={L("Close", "إغلاق")} style={{ width: 34, height: 34, borderRadius: "50%", border: "none", background: "#eff4f9", color: "#1c3550", display: "grid", placeItems: "center", cursor: "pointer" }}>
+          <button onClick={onClose} aria-label={L("Close", "إغلاق")} style={{ width: 34, height: 34, borderRadius: "50%", border: "none", background: "var(--surface2)", color: "var(--navy)", display: "grid", placeItems: "center", cursor: "pointer" }}>
             <span className="material-icons-outlined" style={{ fontSize: 20 }}>close</span>
           </button>
         </div>
 
         <div style={{ padding: "14px 16px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#6b8fa8", lineHeight: 1.5 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", lineHeight: 1.5 }}>
             {L("What each offered unit holds for your request — photos and the certificates you asked for. Proof-of-ownership isn't shown here.",
                "ما توفّره كل وحدة معروضة لطلبك — الصور والشهادات التي طلبتها. لا تُعرض إثباتات الملكية هنا.")}
           </div>

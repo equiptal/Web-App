@@ -108,7 +108,7 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
     // Email-first not enabled (backend still requires a phone) → phone-only entry, no toggle.
     if (!EMAIL_FIRST_AUTH_ENABLED) {
       return (
-        <div className="p-[22px]">
+        <div className="p-6">
           <PhoneEntry
             title={title ?? t.auth.entryTitle}
             subtitle={subtitle ?? t.auth.entrySub}
@@ -122,14 +122,14 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
         type="button"
         onClick={() => setEntryMode(mode)}
         aria-pressed={entryMode === mode}
-        className={`flex-1 rounded-[8px] py-2 text-[13px] font-bold transition ${entryMode === mode ? "bg-surface text-navy shadow-[0_1px_2px_rgba(28,53,80,.12)]" : "text-navy-mid"}`}
+        className={`flex-1 rounded-sm py-2 text-body font-semibold transition ${entryMode === mode ? "bg-surface text-navy" : "text-navy-mid"}`}
       >
         {label}
       </button>
     );
     return (
-      <div className="p-[22px]">
-        <div className="mb-[18px] grid grid-cols-2 gap-[6px] rounded-[10px] border border-border bg-surface2 p-[4px]">
+      <div className="p-6">
+        <div className="mb-5 grid grid-cols-2 gap-2 rounded-sm border border-border bg-surface2 p-1">
           {seg("phone", t.auth.withPhone)}
           {seg("email", t.auth.withEmail)}
         </div>
@@ -157,7 +157,7 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
     const verifyPayload = codePhone ? { phone: codePhone } : { otpEmail: codeEmail };
     const resendPayload = codePhone ? { phone: codePhone, otpMethod: "SMS" } : { otpEmail: codeEmail, otpMethod: "EMAIL" };
     return (
-      <div className="p-[22px]">
+      <div className="p-6">
         <CodeEntry
           dest={codePhone ?? codeEmail ?? ""}
           verifyPayload={verifyPayload}
@@ -194,16 +194,16 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
     };
     const body = t.auth.emailChoiceBody.replace("{stored}", maskEmail(storedEmail)).replace("{new}", typedEmail.trim());
     return (
-      <div className="p-[22px]">
+      <div className="p-6">
         <span className="mb-3 grid h-11 w-11 place-items-center rounded-full bg-brand-soft text-brand"><Icon name="mail" size={22} /></span>
-        <h2 className="mb-[6px] text-[22px] font-extrabold tracking-[-.4px] text-navy">{t.auth.emailChoiceTitle}</h2>
-        <p className="mb-[20px] text-[14px] leading-[1.55] text-muted">{body}</p>
-        {switchErr && <p className="mb-3 text-[13px] font-semibold text-danger">{t.auth.emailSwitchError}</p>}
+        <h2 className="mb-2 text-display font-extrabold tracking-[-.4px] text-navy">{t.auth.emailChoiceTitle}</h2>
+        <p className="mb-5 text-body leading-[1.55] text-muted">{body}</p>
+        {switchErr && <p className="mb-3 text-body font-semibold text-danger">{t.auth.emailSwitchError}</p>}
         <div className="flex gap-3">
-          <button type="button" onClick={() => onCreated()} disabled={switching} className="flex-1 rounded-[10px] border border-border bg-surface px-4 py-3 text-[14px] font-bold text-navy-mid transition hover:border-navy-mid disabled:opacity-50">
+          <button type="button" onClick={() => onCreated()} disabled={switching} className="flex-1 rounded-sm border border-border bg-surface px-4 py-3 text-body font-semibold text-navy-mid transition hover:border-navy-mid disabled:bg-disabled-bg disabled:text-disabled-fg">
             {t.auth.emailKeep}
           </button>
-          <button type="button" onClick={useNew} disabled={switching} className="flex-1 rounded-[10px] border border-brand bg-brand px-4 py-3 text-[14px] font-bold text-white transition hover:brightness-[1.04] disabled:opacity-50">
+          <button type="button" onClick={useNew} disabled={switching} className="flex-1 rounded-sm border border-brand bg-brand px-4 py-3 text-body font-semibold text-white transition disabled:bg-disabled-bg disabled:text-disabled-fg">
             {switching ? t.auth.emailSwitching : t.auth.emailUseNew}
           </button>
         </div>

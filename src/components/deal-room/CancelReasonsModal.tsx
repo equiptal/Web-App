@@ -47,10 +47,10 @@ export function CancelReasonsModal({ ar, L, busy, error, onSubmit, onClose }: {
   return (
     <Dialog open onClose={busy ? () => {} : onClose} size="sm" padded={false}>
       <div dir={ar ? "rtl" : "ltr"} style={{ padding: "26px 22px 22px", textAlign: "center" }}>
-        <span style={{ display: "inline-flex", width: 44, height: 44, borderRadius: "50%", background: "var(--danger-bg, #fdeceb)", color: "var(--danger, #d9362a)", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+        <span style={{ display: "inline-flex", width: 44, height: 44, borderRadius: "50%", background: "var(--danger-bg, var(--danger-soft))", color: "var(--danger, var(--danger))", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
           <span className="material-icons-outlined" style={{ fontSize: 22 }}>cancel</span>
         </span>
-        <h3 style={{ fontSize: 16, fontWeight: 900, color: "#1c3550", margin: "0 0 14px" }}>{L("Cancellation Reason", "سبب الإلغاء")}</h3>
+        <h3 style={{ fontSize: 16, fontWeight: 900, color: "var(--navy)", margin: "0 0 14px" }}>{L("Cancellation Reason", "سبب الإلغاء")}</h3>
 
         <div style={{ display: "grid", gap: 8, textAlign: ar ? "right" : "left" }}>
           {CANCEL_REASONS.map((r, i) => {
@@ -66,12 +66,12 @@ export function CancelReasonsModal({ ar, L, busy, error, onSubmit, onClose }: {
                 style={{
                   display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "inherit",
                   padding: "12px 12px", borderRadius: 12, cursor: busy ? "default" : "pointer",
-                  background: on ? "rgba(217,54,42,.06)" : "#f4f7fa",
-                  border: `${on ? 1.5 : 1}px solid ${on ? "rgba(217,54,42,.4)" : "rgba(203,216,227,.5)"}`,
+                  background: on ? "color-mix(in srgb, var(--danger) 6%, transparent)" : "var(--background)",
+                  border: `${on ? 1.5 : 1}px solid ${on ? "color-mix(in srgb, var(--danger) 40%, transparent)" : "color-mix(in srgb, var(--surface2) 50%, transparent)"}`,
                 }}
               >
-                <span style={{ width: 20, height: 20, borderRadius: "50%", flex: "0 0 auto", border: `${on ? 6 : 2}px solid ${on ? "var(--danger, #d9362a)" : "#6b8fa8"}` }} />
-                <span style={{ fontSize: 13, fontWeight: on ? 700 : 600, color: "#1c3550" }}>{L(r.en, r.ar)}</span>
+                <span style={{ width: 20, height: 20, borderRadius: "50%", flex: "0 0 auto", border: `${on ? 6 : 2}px solid ${on ? "var(--danger, var(--danger))" : "var(--muted)"}` }} />
+                <span style={{ fontSize: 13, fontWeight: on ? 700 : 600, color: "var(--navy)" }}>{L(r.en, r.ar)}</span>
               </button>
             );
           })}
@@ -84,7 +84,7 @@ export function CancelReasonsModal({ ar, L, busy, error, onSubmit, onClose }: {
             disabled={busy}
             onChange={(e) => setOther(e.target.value)}
             placeholder={L("Write the reason...", "اكتب السبب...")}
-            style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, background: "#f4f7fa", border: "1px solid rgba(203,216,227,.5)", fontSize: 14, color: "#1c3550", resize: "vertical" }}
+            style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, background: "var(--background)", border: "1px solid color-mix(in srgb, var(--surface2) 50%, transparent)", fontSize: 14, color: "var(--navy)", resize: "vertical" }}
           />
         )}
 

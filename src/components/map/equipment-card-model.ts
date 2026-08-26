@@ -36,7 +36,7 @@ import { heroPhotoUrl, type MatchRequest } from "@/components/map/panel/machine-
 export interface EquipmentCardChip {
   /** From {@link availabilityView} — the same call the marker set makes (RM3-AC-19). */
   availability: "confirmed" | "unconfirmed";
-  /** `#16A34A` / `#E8890C` / `#D9362A`. The chip, and the hairline down the photo's inner edge, are
+  /** `var(--ok)` / `var(--brand-light)` / `var(--danger)`. The chip, and the hairline down the photo's inner edge, are
    *  this one colour; the marker's disc and caption are the same one for the same machine.
    *
    *  Three since 2026-08-13 (owner): the list now carries machines he did NOT offer, and "offered but

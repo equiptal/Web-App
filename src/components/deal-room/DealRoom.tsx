@@ -1016,7 +1016,7 @@ export function DealRoom({ id, onTitle, initialFlow }: {
         {closed ? (
           <span className="pb-status done"><span className="dot" />{L("Approved", "معتمد")}</span>
         ) : abandoned ? (
-          <span className="pb-status" style={{ background: "var(--danger-bg)", borderColor: "rgba(217,54,42,.4)", color: "var(--danger)" }}><span className="dot" />{L("Cancelled", "ملغاة")}</span>
+          <span className="pb-status" style={{ background: "var(--danger-bg)", borderColor: "color-mix(in srgb, var(--danger) 40%, transparent)", color: "var(--danger)" }}><span className="dot" />{L("Cancelled", "ملغاة")}</span>
         ) : awaiting ? (
           <span className="pb-status wait"><span className="dot" />{L("Awaiting confirmation", "بانتظار التأكيد")}</span>
         ) : (
@@ -1489,15 +1489,15 @@ function RequestSummaryModal({ room, ar, L, onClose }: {
   ];
 
   return (
-    <div dir={ar ? "rtl" : "ltr"} onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(16,38,63,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(16,38,63,.35)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "18px 20px", borderBottom: "1px solid #eef2f6" }}>
-          <span className="material-icons-outlined" style={{ color: "#1c3550" }}>assignment</span>
+    <div dir={ar ? "rtl" : "ltr"} onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "color-mix(in srgb, var(--info-deep) 50%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, maxHeight: "88vh", display: "flex", flexDirection: "column", background: "var(--surface)", borderRadius: 20, overflow: "hidden", }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "18px 20px", borderBottom: "1px solid var(--surface2)" }}>
+          <span className="material-icons-outlined" style={{ color: "var(--navy)" }}>assignment</span>
           <span style={{ flex: 1, textAlign: ar ? "right" : "left" }}>
-            <span style={{ display: "block", fontSize: 15, fontWeight: 900, color: "#1c3550" }}>{L("Request details", "تفاصيل الطلب")}</span>
-            {room.shortCode && <span style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#6b8fa8" }}>{room.shortCode}</span>}
+            <span style={{ display: "block", fontSize: 15, fontWeight: 900, color: "var(--navy)" }}>{L("Request details", "تفاصيل الطلب")}</span>
+            {room.shortCode && <span style={{ display: "block", fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>{room.shortCode}</span>}
           </span>
-          <button type="button" onClick={onClose} aria-label={L("Close", "إغلاق")} style={{ background: "none", border: 0, cursor: "pointer", color: "#6b8fa8", display: "flex" }}>
+          <button type="button" onClick={onClose} aria-label={L("Close", "إغلاق")} style={{ background: "none", border: 0, cursor: "pointer", color: "var(--muted)", display: "flex" }}>
             <span className="material-icons-outlined">close</span>
           </button>
         </div>
@@ -1508,15 +1508,15 @@ function RequestSummaryModal({ room, ar, L, onClose }: {
             if (!rows.length) return null;
             return (
               <div key={sec.title} style={{ marginTop: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, color: "#1c3550" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, color: "var(--navy)" }}>
                   <span className="material-icons-outlined" style={{ fontSize: 16 }}>{sec.icon}</span>
                   <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: ".02em", textTransform: "uppercase" }}>{sec.title}</span>
                 </div>
-                <div style={{ display: "grid", gap: 1, background: "#eef2f6", borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ display: "grid", gap: 1, background: "var(--surface2)", borderRadius: 12, overflow: "hidden" }}>
                   {rows.map(([k, v]) => (
-                    <div key={k} style={{ display: "flex", gap: 12, justifyContent: "space-between", background: "#f9fbfc", padding: "10px 12px" }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 600, color: "#6b8fa8" }}>{k}</span>
-                      <span style={{ fontSize: 12.5, fontWeight: 700, color: "#1c3550", textAlign: ar ? "left" : "right" }}>{v}</span>
+                    <div key={k} style={{ display: "flex", gap: 12, justifyContent: "space-between", background: "var(--surface)", padding: "10px 12px" }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--muted)" }}>{k}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--navy)", textAlign: ar ? "left" : "right" }}>{v}</span>
                     </div>
                   ))}
                 </div>
@@ -1527,13 +1527,13 @@ function RequestSummaryModal({ room, ar, L, onClose }: {
           {/* Certificates the request asked for — flat chips, since each is a name and nothing more. */}
           {(room.details.equipmentCerts.length > 0 || room.details.operatorCerts.length > 0) && (
             <div style={{ marginTop: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, color: "#1c3550" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, color: "var(--navy)" }}>
                 <span className="material-icons-outlined" style={{ fontSize: 16 }}>verified</span>
                 <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: ".02em", textTransform: "uppercase" }}>{L("Certificates", "الشهادات")}</span>
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {[...room.details.equipmentCerts, ...room.details.operatorCerts].map((c) => (
-                  <span key={c} style={{ fontSize: 12, fontWeight: 700, color: "#1c3550", background: "#f4f7fa", border: "1px solid rgba(203,216,227,.6)", borderRadius: 999, padding: "4px 10px" }}>{c}</span>
+                  <span key={c} style={{ fontSize: 12, fontWeight: 700, color: "var(--navy)", background: "var(--background)", border: "1px solid color-mix(in srgb, var(--surface2) 60%, transparent)", borderRadius: 999, padding: "4px 10px" }}>{c}</span>
                 ))}
               </div>
             </div>
@@ -1683,13 +1683,13 @@ function CounterFlow({
   const Stepper = ({ value, min, max, onChange, disabled }: { value: number; min: number; max: number; onChange: (v: number) => void; disabled?: boolean }) => {
     const btn = (d: number, lbl: string, off: boolean) => (
       <button type="button" disabled={disabled || off} onClick={() => onChange(Math.max(min, Math.min(max, value + d)))}
-        className="grid h-[26px] w-[26px] place-items-center rounded-[8px] border text-[16px] font-extrabold disabled:opacity-40"
-        style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)", background: "var(--surface1,#fff)" }}>{lbl}</button>
+        className="grid h-[26px] w-[26px] place-items-center rounded-sm border text-subhead font-extrabold disabled:bg-disabled-bg disabled:text-disabled-fg"
+        style={{ borderColor: "var(--border,var(--border))", color: "var(--navy,var(--navy-deep))", background: "var(--surface1,var(--surface))" }}>{lbl}</button>
     );
     return (
       <span className="inline-flex items-center gap-1.5">
         {btn(-1, "−", value <= min)}
-        <span className="min-w-[20px] text-center text-[14px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{value}</span>
+        <span className="min-w-[20px] text-center text-body font-extrabold" style={{ color: "var(--navy,var(--navy-deep))" }}>{value}</span>
         {btn(1, "+", value >= max)}
       </span>
     );
@@ -2048,7 +2048,7 @@ function CounterFlow({
                   ); })}
                 </div>
               )}
-              {editable && !rateValid && <p style={{ marginTop: 10, fontSize: 12, fontWeight: 700, color: "var(--danger,#d9362a)" }}>{L("Enter a rate to continue", "أدخل سعرًا للمتابعة")}</p>}
+              {editable && !rateValid && <p style={{ marginTop: 10, fontSize: 12, fontWeight: 700, color: "var(--danger,var(--danger))" }}>{L("Enter a rate to continue", "أدخل سعرًا للمتابعة")}</p>}
             </div>
           )}
 
@@ -2058,7 +2058,7 @@ function CounterFlow({
               {qhead()}
               <div className="qp-sech">{L("Operating terms", "شروط التشغيل")}</div>
               {operatingTerms.length === 0 ? (
-                <p style={{ padding: "20px 0", textAlign: "center", color: "var(--muted,#6b8fa8)", fontSize: 13 }}>{L("No operating terms.", "لا توجد شروط تشغيل.")}</p>
+                <p style={{ padding: "20px 0", textAlign: "center", color: "var(--muted,var(--muted))", fontSize: 13 }}>{L("No operating terms.", "لا توجد شروط تشغيل.")}</p>
               ) : (
                 <div className="qp-scrollx"><table className="qp-tt">
                   <thead><tr><th>{L("Term", "البند")}</th><th>{L("Supplier's offer", "عرض المورد")}</th><th>{L("Your decision", "قرارك")}</th><th>{L("Status", "الحالة")}</th></tr></thead>
@@ -2151,7 +2151,7 @@ function CounterFlow({
                     <div className="qp-rcard">
                       <div className="qp-rcard-h"><span className="material-icons-outlined">credit_card</span>{L("Payment terms", "شروط الدفع")}</div>
                       <div className="qp-totals" style={{ borderTop: 0, paddingTop: 0 }}>
-                        {payTerms.map((t) => { const d = decide(t); return <div key={t.key} className="qp-trow"><span className="l">{ar ? t.labelAr : t.label}</span><span className="v" style={{ fontFamily: "inherit", color: d.badge === "conflict" ? "var(--danger,#d9362a)" : "var(--navy,#1c3550)" }}>{tval(t, d.chosen ?? t.supplierDeclared)}</span></div>; })}
+                        {payTerms.map((t) => { const d = decide(t); return <div key={t.key} className="qp-trow"><span className="l">{ar ? t.labelAr : t.label}</span><span className="v" style={{ fontFamily: "inherit", color: d.badge === "conflict" ? "var(--danger,var(--danger))" : "var(--navy,var(--navy))" }}>{tval(t, d.chosen ?? t.supplierDeclared)}</span></div>; })}
                       </div>
                     </div>
                   )}
@@ -2178,19 +2178,19 @@ function CounterFlow({
               </div>
               {mode === "accept" && (
                 <label style={{ display: "block", marginTop: 16 }}>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: "var(--navy-mid,#2a4f72)" }}>{L("Contract type", "نوع العقد")}</span>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: "var(--navy-mid,var(--navy-mid))" }}>{L("Contract type", "نوع العقد")}</span>
                   <select value={contractType} onChange={(e) => setContractType(e.target.value)} className="qp-sel" style={{ marginTop: 5, width: "100%", height: 42 }}>
                     {CONTRACT_TYPES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                   </select>
                 </label>
               )}
               {mode === "accept" && (
-                <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 14, fontSize: 12.5, fontWeight: 600, color: "var(--navy,#1c3550)" }}>
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 14, fontSize: 12.5, fontWeight: 600, color: "var(--navy,var(--navy))" }}>
                   <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} style={{ marginTop: 2 }} />
                   {L("I confirm the agreed rate and terms.", "أؤكّد السعر والشروط المتفق عليها.")}
                 </label>
               )}
-              {error && <p style={{ marginTop: 8, fontSize: 12.5, fontWeight: 700, color: "var(--danger,#d9362a)" }}>{error}</p>}
+              {error && <p style={{ marginTop: 8, fontSize: 12.5, fontWeight: 700, color: "var(--danger,var(--danger))" }}>{error}</p>}
             </div>
           )}
           </div>
@@ -2220,19 +2220,19 @@ function CounterFlow({
 
         {pendingEx && (
           <div className="qp-scrim" style={{ zIndex: 75 }} dir={ar ? "rtl" : "ltr"} onClick={() => setPendingEx(null)}>
-            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 400, background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(16,38,63,.35)", padding: "22px 22px 20px", textAlign: "start" }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 400, background: "var(--surface)", borderRadius: 20, overflow: "hidden", padding: "22px 22px 20px", textAlign: "start" }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-                <h3 style={{ fontSize: 16.5, fontWeight: 900, color: "#1c3550", margin: 0, lineHeight: 1.45 }}>{pendingEx.title}</h3>
-                <span style={{ flexShrink: 0, display: "inline-flex", width: 42, height: 42, borderRadius: 12, background: "#fff4e5", color: "#d4780a", alignItems: "center", justifyContent: "center" }}>
+                <h3 style={{ fontSize: 16.5, fontWeight: 900, color: "var(--navy)", margin: 0, lineHeight: 1.45 }}>{pendingEx.title}</h3>
+                <span style={{ flexShrink: 0, display: "inline-flex", width: 42, height: 42, borderRadius: 12, background: "var(--brand-soft)", color: "var(--warn)", alignItems: "center", justifyContent: "center" }}>
                   <span className="material-icons-outlined" style={{ fontSize: 24 }}>warning_amber</span>
                 </span>
               </div>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#6b8fa8", lineHeight: 1.7, margin: "10px 0 18px" }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--muted)", lineHeight: 1.7, margin: "10px 0 18px" }}>
                 {L("If you cancel, the supplier won't handle it — it becomes your responsibility: you arrange the transport and cover its cost, and it won't appear in the supplier's offer.", "عند الإلغاء لن يتكفّل المورد بها — تصبح على مسؤوليتك أنت: تنظّم النقل وتتحمّل تكلفته، ولن تظهر ضمن عرض المورد.")}
               </p>
               <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => setPendingEx(null)} style={{ flex: "0 0 auto", padding: "13px 22px", borderRadius: 13, border: "1.5px solid #d4e0ec", background: "#fff", color: "#1c3550", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>{L("Go back", "تراجع")}</button>
-                <button onClick={() => { pendingEx.onYes(); setPendingEx(null); }} style={{ flex: 1, padding: "13px 12px", borderRadius: 13, border: "none", background: "#d9362a", color: "#fff", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{L("Yes, cancel it — on me", "نعم، ألغِها — عليّ أنا")}</button>
+                <button onClick={() => setPendingEx(null)} style={{ flex: "0 0 auto", padding: "13px 22px", borderRadius: 13, border: "1.5px solid var(--border)", background: "var(--surface)", color: "var(--navy)", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>{L("Go back", "تراجع")}</button>
+                <button onClick={() => { pendingEx.onYes(); setPendingEx(null); }} style={{ flex: 1, padding: "13px 12px", borderRadius: 13, border: "none", background: "var(--danger)", color: "var(--surface)", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{L("Yes, cancel it — on me", "نعم، ألغِها — عليّ أنا")}</button>
               </div>
             </div>
           </div>
@@ -2247,7 +2247,7 @@ function CounterFlow({
                   <button key={k} type="button" className={`qp-log-tab${logTab === k ? " on" : ""}`} onClick={() => setLogTab(k)}>{lbl}</button>
                 ))}
               </div>
-              <div className="qp-body" style={{ background: "#fff", padding: "4px 0 8px" }}>
+              <div className="qp-body" style={{ background: "var(--surface)", padding: "4px 0 8px" }}>
                 {/* Reconstructed price rounds (newest first) — role, rate, units, legs, total per round. */}
                 {logTab !== "terms" && flowRounds.length > 0 && (
                   <div className="qp-rounds">
@@ -2280,7 +2280,7 @@ function CounterFlow({
                   const PRICE_RE = /سعر|ر\.?\s?س|price|rate|تعبئة|إرجاع|موب|ديموب|SAR/i;
                   const TERMS_RE = /شرط|بند|term|إعاشة|وقود|صيانة|دفع|مشغّل|مشغل|قبول/i;
                   const shown = sorted.filter((m) => (logTab === "all" ? true : logTab === "price" ? PRICE_RE.test(m.text ?? "") : TERMS_RE.test(m.text ?? "")));
-                  if (shown.length === 0) return <p style={{ fontSize: 13, color: "var(--muted,#6b8fa8)", textAlign: "center", padding: "24px 0" }}>{L("No activity yet.", "لا يوجد نشاط بعد.")}</p>;
+                  if (shown.length === 0) return <p style={{ fontSize: 13, color: "var(--muted,var(--muted))", textAlign: "center", padding: "24px 0" }}>{L("No activity yet.", "لا يوجد نشاط بعد.")}</p>;
                   return (
                     <ul className="qp-log-list">
                       {shown.map((m) => (

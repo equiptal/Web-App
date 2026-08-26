@@ -124,13 +124,13 @@ export function AuthGateProvider({ children }: { children: ReactNode }) {
       />
       {showBanner && (
         <div className="fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
-          <div className="flex w-full max-w-md items-center gap-3 rounded-[14px] border border-border bg-surface p-3 shadow-[0_10px_30px_rgba(28,53,80,.16)]">
+          <div className="flex w-full max-w-md items-center gap-3 rounded-sm border border-border bg-surface p-3">
             <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-brand-soft text-brand"><Icon name="person_add" size={18} /></span>
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-extrabold text-navy">{t.auth.finishTitle}</p>
-              <p className="truncate text-[12px] text-muted">{t.auth.finishBody}</p>
+              <p className="text-body font-extrabold text-navy">{t.auth.finishTitle}</p>
+              <p className="truncate text-meta text-muted">{t.auth.finishBody}</p>
             </div>
-            <button onClick={() => { setResume(true); setOpen(true); }} className="flex-none rounded-[9px] bg-brand px-3 py-2 text-[12.5px] font-bold text-white transition hover:brightness-105">
+            <button onClick={() => { setResume(true); setOpen(true); }} className="flex-none rounded-sm bg-brand px-3 py-2 text-meta font-semibold text-white transition">
               {t.auth.finishCta}
             </button>
             <button onClick={clearPending} aria-label={t.common.close} className="flex-none rounded-full p-1 text-muted hover:text-navy">

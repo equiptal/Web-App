@@ -109,11 +109,11 @@ export function VoiceRecorder({ disabled, ar, L, maxBytes, onRecorded, onError, 
   }
   return (
     <div className="vn-rec" dir={ar ? "rtl" : "ltr"} style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
-      <span className="vn-dot" aria-hidden style={{ width: 9, height: 9, borderRadius: "50%", background: "#d9362a", animation: "pulse 1s infinite" }} />
-      <span className="vn-time" style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700, color: "var(--navy,#0f1e2e)" }}>{fmtTime(seconds)}</span>
-      <span style={{ flex: 1, fontSize: 12.5, color: "var(--muted,#6b7280)" }}>{L("Recording…", "جارٍ التسجيل…")}</span>
+      <span className="vn-dot" aria-hidden style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--danger)", animation: "pulse 1s infinite" }} />
+      <span className="vn-time" style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700, color: "var(--navy,var(--navy-deep))" }}>{fmtTime(seconds)}</span>
+      <span style={{ flex: 1, fontSize: 12.5, color: "var(--muted,var(--muted-dark))" }}>{L("Recording…", "جارٍ التسجيل…")}</span>
       <button type="button" className="ib" onClick={() => finish(true)} aria-label={L("Cancel", "إلغاء")} title={L("Cancel", "إلغاء")}>
-        <span className="material-icons-outlined" style={{ color: "#d9362a" }}>delete</span>
+        <span className="material-icons-outlined" style={{ color: "var(--danger)" }}>delete</span>
       </button>
       <button type="button" className="ib send" onClick={() => finish(false)} aria-label={L("Send voice note", "إرسال")} title={L("Send", "إرسال")}>
         <span className="material-icons-outlined">send</span>

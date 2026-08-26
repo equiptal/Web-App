@@ -10,7 +10,7 @@
 /**
  * The wordmark from `public/moedatech-logo.svg`, with the fill left as a parameter.
  *
- * The source file is a single-colour mark (`#25384a`) drawn for light backgrounds. The card is navy,
+ * The source file is a single-colour mark (`var(--navy)`) drawn for light backgrounds. The card is navy,
  * so it is re-filled white here rather than shipping a second asset that could drift from the first.
  */
 const LOGO_PATHS = [
@@ -32,7 +32,7 @@ const LOGO_POLYGONS = [
 ];
 
 /** The wordmark as an SVG data URI in the given colour. Satori renders `<img>` from a data URI. */
-export function logoDataUri(fill = "#ffffff"): string {
+export function logoDataUri(fill = "var(--surface)"): string {
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 566.92913 213.48413">` +
     LOGO_PATHS.map((d) => `<path fill="${fill}" d="${d}"/>`).join("") +
@@ -44,9 +44,9 @@ export function logoDataUri(fill = "#ffffff"): string {
 
 /** Brand palette, mirrored from `globals.css` (`--navy`, `--gold`, `--brand`). */
 export const OG_COLORS = {
-  navy: "#1c3550",
-  navyDeep: "#14283c",
-  gold: "#b8860b",
-  amber: "#f79009",
-  white: "#ffffff",
+  navy: "var(--navy)",
+  navyDeep: "var(--info-deep)",
+  gold: "var(--gold)",
+  amber: "var(--brand)",
+  white: "var(--surface)",
 } as const;

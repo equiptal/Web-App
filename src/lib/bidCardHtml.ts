@@ -16,7 +16,7 @@
  * `Moedatech-App/apps/backend-admin/src/services/email/bid-link-card.ts`, which renders the same card
  * into app-sent email. Separate repos, no shared package. The WORDING is not duplicated — it comes
  * from the backend via `/api/bid-form/{token}/preview`, so only the markup is repeated here. Both
- * come from the approved prototype (`email-link-preview.html`): 1px #E1E4E8 border, 10px radius,
+ * come from the approved prototype (`email-link-preview.html`): 1px var(--background) border, 10px radius,
  * 440px wide, a 160px image band, then title / description / source domain.
  */
 
@@ -60,14 +60,14 @@ export function bidCardHtml(card: BidCardPreview, lang: "en" | "ar" = "en"): str
   const url = escapeHtml(card.url);
 
   return `<a href="${url}" style="text-decoration:none;color:inherit;display:block;max-width:440px;">
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="440" dir="${dir}" style="width:440px;max-width:100%;border:1px solid #E1E4E8;border-radius:10px;border-collapse:separate;overflow:hidden;background:#ffffff;font-family:'Segoe UI',Roboto,Arial,sans-serif;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="440" dir="${dir}" style="width:440px;max-width:100%;border:1px solid var(--background);border-radius:10px;border-collapse:separate;overflow:hidden;background:var(--surface);font-family:'Segoe UI',Roboto,Arial,sans-serif;">
     <tr><td style="padding:0;line-height:0;">
-      <img src="${escapeHtml(card.imageUrl)}" alt="" width="440" height="160" style="display:block;width:440px;max-width:100%;height:160px;border:0;outline:none;text-decoration:none;background-color:#1C3550;">
+      <img src="${escapeHtml(card.imageUrl)}" alt="" width="440" height="160" style="display:block;width:440px;max-width:100%;height:160px;border:0;outline:none;text-decoration:none;background-color:var(--navy);">
     </td></tr>
     <tr><td align="${align}" style="padding:14px 16px 16px;">
-      <div style="font-size:13.5px;font-weight:700;color:#1a1a1a;line-height:1.35;">${escapeHtml(card.title)}</div>
-      <div style="font-size:11.5px;color:#6B7280;line-height:1.4;padding-top:7px;">${escapeHtml(card.description)}</div>
-      <div style="font-size:10.5px;color:#9AA0A6;letter-spacing:0.4px;padding-top:7px;">${escapeHtml(hostOf(card.url))}</div>
+      <div style="font-size:13.5px;font-weight:700;color:var(--navy);line-height:1.35;">${escapeHtml(card.title)}</div>
+      <div style="font-size:11.5px;color:var(--muted-dark);line-height:1.4;padding-top:7px;">${escapeHtml(card.description)}</div>
+      <div style="font-size:10.5px;color:var(--border);letter-spacing:0.4px;padding-top:7px;">${escapeHtml(hostOf(card.url))}</div>
     </td></tr>
   </table>
 </a>`;

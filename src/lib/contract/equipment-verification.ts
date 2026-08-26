@@ -37,7 +37,7 @@
  * ── `source` is accepted and ignored, on purpose ─────────────────────────────────────────────────
  * The app's signature carries it and its body does not use it. There WAS a gate — a listing uploaded
  * through the documentation-free wizard (`source == 'WIZARD'`) was ineligible for the tick — and the
- * #197 UAT directive removed it (*"show verified whatever the source is"*). The parameter stayed for
+ * var(--ok) UAT directive removed it (*"show verified whatever the source is"*). The parameter stayed for
  * call-site compatibility. It stays here too, so the port is checkable against its twin line by line
  * and so a future reader who finds the Dart signature does not conclude the web dropped a rule.
  *

@@ -79,7 +79,7 @@ export function WhenPanel({
 
   return (
     <section
-      className={`mb-3.5 rounded-[14px] border transition ${complete && !open ? "border-ok/40 bg-ok/[0.06]" : "border-border bg-surface"}`}
+      className={`mb-3.5 rounded-sm border transition ${complete && !open ? "border-ok/40 bg-ok/[0.06]" : "border-border bg-surface"}`}
     >
       <button
         type="button"
@@ -90,8 +90,8 @@ export function WhenPanel({
         <span className="flex min-w-0 items-center gap-2">
           <PanelDot complete={complete} />
           <Icon name="calendar_month" size={16} className="flex-none text-navy" />
-          <span className="flex-none text-[15px] font-extrabold text-navy">{t.create.when}</span>
-          <span className="truncate text-[13px] text-muted">{summary}</span>
+          <span className="flex-none text-subhead font-extrabold text-navy">{t.create.when}</span>
+          <span className="truncate text-body text-muted">{summary}</span>
         </span>
         <Icon name={open ? "expand_less" : "expand_more"} size={18} className="flex-none text-muted" />
       </button>
@@ -100,11 +100,11 @@ export function WhenPanel({
         <div className="flex flex-col gap-4 px-5 pb-5">
           <div className="grid gap-4 md:grid-cols-2">
             {/* ---- Dates. Optional here; the nudge explains what it costs to leave them out. ---- */}
-            <div className="rounded-[10px] bg-surface2 p-5">
+            <div className="rounded-sm bg-surface2 p-5">
               <CanvasField label={t.create.whenPanel.dates}>
                 <div className="flex items-center gap-3">
-                  <label className="flex-1 rounded-[10px] border border-border bg-surface px-3.5 py-2.5">
-                    <span className="mb-1 block text-[11px] font-bold tracking-wide text-muted">{t.create.whenPanel.startDate}</span>
+                  <label className="flex-1 rounded-sm border border-border bg-surface px-3.5 py-2.5">
+                    <span className="mb-1 block text-label font-semibold tracking-wide text-muted">{t.create.whenPanel.startDate}</span>
                     {/* Each end bounds the other, so the PICKER cannot offer a backwards window
                         (owner, 2026-08-25). A typed or pasted date still can, which is what the
                         reversal message below and the `gate.datesReversed` gap are for. */}
@@ -113,18 +113,18 @@ export function WhenPanel({
                       max={timing.endDate ?? undefined}
                       value={timing.startDate ?? ""}
                       onChange={(e) => setTiming({ startDate: e.target.value || null }, "timing.start_date")}
-                      className="w-full bg-transparent text-[15px] font-bold text-navy outline-none"
+                      className="w-full bg-transparent text-subhead font-extrabold text-navy outline-none"
                     />
                   </label>
                   <Icon name="arrow_forward" size={16} className="flex-none text-muted rtl:rotate-180" />
-                  <label className="flex-1 rounded-[10px] border border-border bg-surface px-3.5 py-2.5">
-                    <span className="mb-1 block text-[11px] font-bold tracking-wide text-muted">{t.create.whenPanel.endDate}</span>
+                  <label className="flex-1 rounded-sm border border-border bg-surface px-3.5 py-2.5">
+                    <span className="mb-1 block text-label font-semibold tracking-wide text-muted">{t.create.whenPanel.endDate}</span>
                     <input
                       type="date"
                       min={timing.startDate ?? undefined}
                       value={timing.endDate ?? ""}
                       onChange={(e) => setTiming({ endDate: e.target.value || null }, "timing.end_date")}
-                      className="w-full bg-transparent text-[15px] font-bold text-navy outline-none"
+                      className="w-full bg-transparent text-subhead font-extrabold text-navy outline-none"
                     />
                   </label>
                 </div>
@@ -133,7 +133,7 @@ export function WhenPanel({
               {/* MREQ-AC-10 — shown whenever EITHER end is missing. The prototype gated this on the end
                   date alone, so its own "add a start date" wording could never appear. */}
               {nudge && (
-                <p className="mt-3.5 flex items-start gap-2 rounded-lg border border-warn/40 bg-warn/[0.08] px-3.5 py-2.5 text-[13px] font-semibold leading-snug text-navy">
+                <p className="mt-3.5 flex items-start gap-2 rounded-sm border border-warn/40 bg-warn/[0.08] px-3.5 py-2.5 text-body font-semibold leading-snug text-navy">
                   <Icon name="info" size={15} className="mt-px flex-none text-warn" />
                   {nudge}
                 </p>
@@ -141,20 +141,20 @@ export function WhenPanel({
               {/* A backwards window is an ERROR, not a nudge: it blocks the send, where a missing end
                   date only costs a better bid. Said here, beside the two fields that caused it. */}
               {charged.reversed && (
-                <p className="mt-3.5 flex items-start gap-2 rounded-lg border border-danger/40 bg-danger/[0.08] px-3.5 py-2.5 text-[13px] font-semibold leading-snug text-navy">
+                <p className="mt-3.5 flex items-start gap-2 rounded-sm border border-danger/40 bg-danger/[0.08] px-3.5 py-2.5 text-body font-semibold leading-snug text-navy">
                   <Icon name="error" size={15} className="mt-px flex-none text-danger" />
                   {t.create.whenPanel.datesReversed}
                 </p>
               )}
               {charged.known && (
-                <p className="mt-3.5 text-[13px] text-muted">
-                  {t.create.whenPanel.duration}: <span className="font-bold text-navy">{num(charged.totalDays)}</span>
+                <p className="mt-3.5 text-body text-muted">
+                  {t.create.whenPanel.duration}: <span className="font-semibold text-navy">{num(charged.totalDays)}</span>
                 </p>
               )}
             </div>
 
             {/* ---- Billing basis. ---- */}
-            <div className="rounded-[10px] bg-surface2 p-5">
+            <div className="rounded-sm bg-surface2 p-5">
               <CanvasField
                 label={t.create.whenPanel.billing}
                 source={basisSource}
@@ -173,8 +173,8 @@ export function WhenPanel({
                     onChange={(v) => setTiming({ rentalBasis: v }, "timing.rental_basis")}
                     options={RENTAL_BASES.map((b) => ({ value: b, label: t.options.rentalBasis[b] }))}
                   />
-                  <span className="flex items-center gap-2 rounded-lg border border-border bg-surface px-2.5 py-1">
-                    <span className="text-[12.5px] text-muted">{t.create.whenPanel.extendable}</span>
+                  <span className="flex items-center gap-2 rounded-sm border border-border bg-surface px-2.5 py-1">
+                    <span className="text-meta text-muted">{t.create.whenPanel.extendable}</span>
                     <Toggle checked={timing.extendable} onChange={(v) => setTiming({ extendable: v }, "timing.extendable")} />
                   </span>
                 </div>
@@ -182,7 +182,7 @@ export function WhenPanel({
 
               {/* MREQ-AC-36/37 — in DAYS. Applies to weekly as well as monthly. */}
               {charged.tooShort && (
-                <p className="mt-3.5 flex items-start gap-2 rounded-lg border border-warn/40 bg-warn/[0.08] px-3.5 py-2.5 text-[13px] font-semibold leading-snug text-navy">
+                <p className="mt-3.5 flex items-start gap-2 rounded-sm border border-warn/40 bg-warn/[0.08] px-3.5 py-2.5 text-body font-semibold leading-snug text-navy">
                   <Icon name="warning" size={15} className="mt-px flex-none text-warn" />
                   {fmt(
                     charged.tooShort.basis === "monthly" ? t.create.whenPanel.tooShortMonthly : t.create.whenPanel.tooShortWeekly,
@@ -198,8 +198,8 @@ export function WhenPanel({
                   sentence wraps under itself and not under the figure. */}
               <div className="mt-4 border-t border-border pt-4">
                 {charged.known ? (
-                  <p className="flex items-baseline gap-2 text-[12.5px] leading-relaxed text-muted">
-                    <span className="flex-none text-[20px] font-extrabold text-navy">{num(charged.chargedDays)}</span>
+                  <p className="flex items-baseline gap-2 text-meta leading-relaxed text-muted">
+                    <span className="flex-none text-display font-extrabold text-navy">{num(charged.chargedDays)}</span>
                     <span>
                       {fmt(timing.rentalBasis ? t.create.whenPanel.chargedLineBasis : t.create.whenPanel.chargedLine, {
                         total: num(charged.totalDays),
@@ -211,12 +211,12 @@ export function WhenPanel({
                     </span>
                   </p>
                 ) : (
-                  <p className="text-[12.5px] leading-relaxed text-muted">
+                  <p className="text-meta leading-relaxed text-muted">
                     {charged.reversed ? t.create.whenPanel.datesReversed : t.create.whenPanel.chargedNoDates}
                   </p>
                 )}
                 <label
-                  className={`mt-3 flex cursor-pointer items-start gap-2 text-[12.5px] leading-snug text-navy-mid ${shakeConfirm ? "shake-error" : ""}`}
+                  className={`mt-3 flex cursor-pointer items-start gap-2 text-meta leading-snug text-navy-mid ${shakeConfirm ? "shake-error" : ""}`}
                 >
                   <input
                     type="checkbox"
@@ -233,14 +233,14 @@ export function WhenPanel({
           </div>
 
           {/* ---- Hours and overtime. ---- */}
-          <div className="overflow-hidden rounded-[10px] bg-surface2">
+          <div className="overflow-hidden rounded-sm bg-surface2">
             <button
               type="button"
               onClick={() => setMoreOpen((v) => !v)}
               className="flex w-full items-center justify-between px-4 py-3 text-start"
               aria-expanded={moreOpen}
             >
-              <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-muted">
+              <span className="text-label font-semibold uppercase tracking-[0.05em] text-muted">
                 {t.create.whenPanel.moreDetails} <span className="font-normal normal-case tracking-normal">{t.create.whenPanel.moreDetailsHint}</span>
               </span>
               <Icon name={moreOpen ? "expand_less" : "expand_more"} size={16} className="text-muted" />

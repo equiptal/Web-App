@@ -145,21 +145,21 @@ export function Intake() {
 
   return (
     <div className="mx-auto w-full max-w-[920px]">
-      <h1 className="text-[26px] font-extrabold leading-tight tracking-[-.02em] text-navy">{t.intake.heading}</h1>
-      <p className="mb-7 mt-2 text-[15px] leading-relaxed text-muted">{t.intake.subheading}</p>
+      <h1 className="text-display font-extrabold leading-tight tracking-[-.02em] text-navy">{t.intake.heading}</h1>
+      <p className="mb-7 mt-2 text-subhead leading-relaxed text-muted">{t.intake.subheading}</p>
 
       {/* ── Describe ── */}
-      <div className="rounded-[16px] border border-border bg-surface shadow-[0_1px_3px_rgba(15,23,31,.06),0_16px_40px_-20px_rgba(31,45,58,.12)]">
+      <div className="rounded-sm border border-border bg-surface">
         <div className="flex items-center gap-2.5 px-5 pb-1 pt-4">
-          <span className="grid h-8 w-8 flex-none place-items-center rounded-[10px] bg-gradient-to-br from-[#f7c675] to-brand text-white">
+          <span className="grid h-8 w-8 flex-none place-items-center rounded-sm bg-gradient-to-br from-brand-light to-brand text-white">
             <Icon name="auto_awesome" size={16} />
           </span>
-          <b className="whitespace-nowrap text-[15px] font-extrabold text-navy">{t.intake.pasteLabel}</b>
-          <span className="whitespace-nowrap rounded-full bg-brand-soft px-2.5 py-[3px] text-[11px] font-extrabold uppercase tracking-[.03em] text-warn">
+          <b className="whitespace-nowrap text-subhead font-extrabold text-navy">{t.intake.pasteLabel}</b>
+          <span className="whitespace-nowrap rounded-full bg-brand-soft px-2.5 py-1 text-label font-extrabold uppercase tracking-[.03em] text-warn">
             {t.intake.beta}
           </span>
           <span className="min-w-0 flex-1" />
-          <span className="whitespace-nowrap text-[12px] font-semibold text-muted">
+          <span className="whitespace-nowrap text-meta font-semibold text-muted">
             {state.text.length} {t.intake.chars}
           </span>
         </div>
@@ -168,14 +168,14 @@ export function Intake() {
           onChange={(e) => actions.setText(e.target.value)}
           placeholder={typed}
           rows={4}
-          className="w-full resize-none border-0 bg-transparent px-5 pb-5 pt-2.5 text-[15px] leading-relaxed text-navy outline-none placeholder:text-muted/70"
+          className="w-full resize-none border-0 bg-transparent px-5 pb-5 pt-2.5 text-subhead leading-relaxed text-navy outline-none placeholder:text-muted/70"
         />
       </div>
 
       {/* ── or ── */}
       <div className="my-5 flex items-center gap-3.5">
         <span className="h-px flex-1 bg-border" />
-        <span className="text-[12.5px] font-extrabold uppercase tracking-[.04em] text-muted">{t.intake.attachDivider}</span>
+        <span className="text-meta font-extrabold uppercase tracking-[.04em] text-muted">{t.intake.attachDivider}</span>
         <span className="h-px flex-1 bg-border" />
       </div>
 
@@ -184,39 +184,39 @@ export function Intake() {
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={(e) => { e.preventDefault(); setDragging(false); }}
         onDrop={(e) => { e.preventDefault(); setDragging(false); onFiles(e.dataTransfer.files); }}
-        className={`rounded-[16px] border bg-surface shadow-[0_1px_3px_rgba(15,23,31,.06),0_16px_40px_-20px_rgba(31,45,58,.12)] transition ${
+        className={`rounded-sm border bg-surface transition ${
           dragging ? "border-[1.5px] border-brand" : "border-border"
         }`}
       >
         <div className="flex items-center gap-2.5 px-5 pb-3.5 pt-4">
-          <span className="grid h-8 w-8 flex-none place-items-center rounded-[10px] bg-navy text-white">
+          <span className="grid h-8 w-8 flex-none place-items-center rounded-sm bg-navy text-white">
             <Icon name="upload" size={16} />
           </span>
-          <b className="whitespace-nowrap text-[15px] font-extrabold text-navy">{t.intake.attachTitle}</b>
+          <b className="whitespace-nowrap text-subhead font-extrabold text-navy">{t.intake.attachTitle}</b>
         </div>
 
         <div
-          className={`mx-5 mb-4 rounded-[16px] border-[1.5px] border-dashed px-5 py-6 text-center transition ${
+          className={`mx-5 mb-4 rounded-sm border-[1.5px] border-dashed px-5 py-6 text-center transition ${
             dragging ? "border-brand bg-brand-soft" : "border-brand/40 bg-brand-soft/45"
           }`}
         >
-          <span className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-[12px] border border-border bg-surface text-brand shadow-[0_2px_6px_rgba(31,45,58,.06)]">
+          <span className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-sm border border-border bg-surface text-brand">
             <Icon name="upload" size={19} />
           </span>
-          <div className="text-[14px] text-navy">
-            <b className="font-bold">{t.intake.dropTitleNew}</b>{" "}
+          <div className="text-body text-navy">
+            <b className="font-semibold">{t.intake.dropTitleNew}</b>{" "}
             <button
               type="button"
               onClick={() => fileInput.current?.click()}
-              className="font-bold text-brand underline underline-offset-2 hover:brightness-110"
+              className="font-semibold text-brand underline underline-offset-2"
             >
               {t.intake.browse}
             </button>
           </div>
-          <p className="mb-3.5 mt-1.5 text-[12.5px] text-muted">{t.intake.dropSub}</p>
+          <p className="mb-3.5 mt-1.5 text-meta text-muted">{t.intake.dropSub}</p>
           <div className="flex flex-wrap justify-center gap-2">
             {FILE_CHIPS.map((c) => (
-              <span key={c} className="rounded-lg border border-border bg-surface px-3 py-[5px] text-[11.5px] font-bold text-navy-mid">
+              <span key={c} className="rounded-sm border border-border bg-surface px-3 py-1 text-label font-semibold text-navy-mid">
                 {c}
               </span>
             ))}
@@ -225,15 +225,15 @@ export function Intake() {
 
         <input ref={fileInput} type="file" multiple accept={ACCEPT_ATTR} className="hidden" onChange={(e) => onFiles(e.target.files)} />
 
-        {rejected && <p className="px-5 pb-3.5 text-[12.5px] font-semibold text-danger">{t.intake.fileRejected}</p>}
+        {rejected && <p className="px-5 pb-3.5 text-meta font-semibold text-danger">{t.intake.fileRejected}</p>}
 
         {state.files.length > 0 && (
           <div className="flex flex-col gap-2 px-5 pb-4">
             {state.files.map((f, i) => (
-              <div key={`${f.name}-${i}`} className="flex items-center gap-2.5 rounded-[12px] border border-border bg-surface2/50 px-3.5 py-2.5">
+              <div key={`${f.name}-${i}`} className="flex items-center gap-2.5 rounded-sm border border-border bg-surface2/50 px-3.5 py-2.5">
                 <Icon name="description" size={16} className="flex-none text-muted" />
-                <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-navy">{f.name}</span>
-                <span className="flex-none text-[12px] text-muted">{sizeOf(f.data)}</span>
+                <span className="min-w-0 flex-1 truncate text-body font-semibold text-navy">{f.name}</span>
+                <span className="flex-none text-meta text-muted">{sizeOf(f.data)}</span>
                 <button
                   onClick={() => actions.removeFile(i)}
                   aria-label={t.common.close}
@@ -254,9 +254,9 @@ export function Intake() {
             <Icon name="arrow_back" size={16} className="rtl:scale-x-[-1]" /> {t.intake.backToReview}
           </Button>
         ) : (
-          <span className="text-[13px] text-muted">{canStart ? t.intake.readyToReview : t.intake.addSomething}</span>
+          <span className="text-body text-muted">{canStart ? t.intake.readyToReview : t.intake.addSomething}</span>
         )}
-        <Button disabled={!canStart} onClick={runAgent} className="px-6 py-3 text-[14px]">
+        <Button disabled={!canStart} onClick={runAgent} className="px-6 py-3 text-body">
           {hasDraft ? t.intake.reAnalyze : t.intake.continueLabel}{" "}
           <Icon name="arrow_forward" size={17} className="rtl:scale-x-[-1]" />
         </Button>

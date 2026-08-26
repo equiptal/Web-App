@@ -14,7 +14,7 @@ interface CityOpt {
 
 // Filter pill — equal width so all filters are the same size.
 const selectCls =
-  "h-[40px] flex-1 min-w-[150px] rounded-[10px] border border-border bg-surface2 px-3 text-[13px] font-semibold text-navy-mid outline-0 hover:border-navy-mid focus:border-brand";
+  "h-[40px] flex-1 min-w-[150px] rounded-sm border border-border bg-surface2 px-3 text-body font-semibold text-navy-mid outline-0 hover:border-navy-mid focus:border-brand";
 
 /**
  * Suggested-suppliers surface (web-app/004, AC-10–17, AC-23). The filter bar (search + city +
@@ -133,9 +133,9 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
       {/* Section header + View-all / Show-less (count only — never touches the filters) */}
       {title && (
         <div className="flex items-center justify-between">
-          <h3 className="text-[18px] font-extrabold tracking-[-.3px] text-navy">{title}</h3>
+          <h3 className="text-title font-extrabold tracking-[-.3px] text-navy">{title}</h3>
           {canToggle && (
-            <button onClick={() => setExpanded((v) => !v)} className="inline-flex items-center gap-0.5 text-[12.5px] font-bold text-info hover:underline">
+            <button onClick={() => setExpanded((v) => !v)} className="inline-flex items-center gap-0.5 text-meta font-semibold text-info hover:underline">
               {expanded ? t.home.showLess : t.home.viewAll}
               <Icon name={expanded ? "expand_less" : "chevron_right"} size={16} className={expanded ? "" : "rtl:scale-x-[-1]"} />
             </button>
@@ -144,14 +144,14 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
       )}
 
       {/* Filter bar — always shown, in a card. Search row, then filters + verified toggle on one row. */}
-      <div className="flex flex-col gap-2.5 rounded-[16px] border border-border bg-surface p-4">
+      <div className="flex flex-col gap-2.5 rounded-sm border border-border bg-surface p-4">
         <div className="relative">
           <Icon name="search" size={18} className="absolute start-3 top-1/2 -translate-y-1/2 text-muted" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t.browse.search}
-            className="h-[40px] w-full rounded-[10px] border border-border bg-surface2 ps-9 pe-3 text-[13px] outline-0 focus:border-brand"
+            className="h-[40px] w-full rounded-sm border border-border bg-surface2 ps-9 pe-3 text-body outline-0 focus:border-brand"
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -199,11 +199,11 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
           <button
             type="button"
             onClick={() => setVerifiedOnly((v) => !v)}
-            className="ms-1 inline-flex select-none items-center gap-2 text-[13px] font-bold text-navy-mid"
+            className="ms-1 inline-flex select-none items-center gap-2 text-body font-semibold text-navy-mid"
             aria-pressed={verifiedOnly}
           >
             <span className={`relative h-[23px] w-[40px] flex-none rounded-full border transition ${verifiedOnly ? "border-ok bg-ok" : "border-border bg-surface3"}`}>
-              <span className={`absolute top-[2px] h-[17px] w-[17px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,.2)] transition-all ${verifiedOnly ? "start-[19px]" : "start-[2px]"}`} />
+              <span className={`absolute top-[2px] h-[17px] w-[17px] rounded-full bg-white transition-all ${verifiedOnly ? "start-[19px]" : "start-[2px]"}`} />
             </span>
             {t.browse.verifiedOnly}
           </button>
@@ -212,17 +212,17 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
 
       {/* Results (AC-16/17/23) */}
       {error ? (
-        <div className="rounded-[12px] border border-border bg-surface p-8 text-center text-[13px] text-muted">
+        <div className="rounded-sm border border-border bg-surface p-8 text-center text-body text-muted">
           <Icon name="error_outline" size={22} className="mx-auto mb-2 text-muted" />
           <p>{t.browse.error}</p>
-          <button onClick={() => setReloadKey((k) => k + 1)} className="mt-3 rounded-md border border-border px-3 py-1.5 text-[13px] font-bold text-navy-mid hover:border-brand">
+          <button onClick={() => setReloadKey((k) => k + 1)} className="mt-3 rounded-sm border border-border px-3 py-1.5 text-body font-semibold text-navy-mid hover:border-brand">
             {t.browse.retry}
           </button>
         </div>
       ) : stores === null ? (
-        <div className="p-8 text-center text-[13px] text-muted">{t.browse.loading}</div>
+        <div className="p-8 text-center text-body text-muted">{t.browse.loading}</div>
       ) : shown.length === 0 ? (
-        <div className="rounded-[12px] border border-border bg-surface p-8 text-center text-[13px] text-muted">
+        <div className="rounded-sm border border-border bg-surface p-8 text-center text-body text-muted">
           <Icon name="storefront" size={22} className="mx-auto mb-2 text-muted" />
           {t.browse.empty}
         </div>

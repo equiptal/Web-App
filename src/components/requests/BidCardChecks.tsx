@@ -21,18 +21,18 @@ import { checkArcs, type BidCardCheck, type CheckTone } from "@/lib/contract/bid
 type LFn = (en: string, ar: string) => string;
 
 const TONE_COLOUR: Record<CheckTone, string> = {
-  good: "#1daf58",
-  bad: "#d9362a",
-  warn: "#d4780a",
-  dead: "#c3d2e0",
-  none: "#c3d2e0",
+  good: "var(--ok)",
+  bad: "var(--danger)",
+  warn: "var(--warn)",
+  dead: "var(--border-strong)",
+  none: "var(--border-strong)",
 };
 
 /** The ring, built from the arcs the model states. A dead or empty half draws one flat track. */
 function Ring({ check }: { check: BidCardCheck }) {
   const arcs = checkArcs(check);
   const size = 34;
-  const track = check.dead ? TONE_COLOUR.dead : check.allClear ? TONE_COLOUR.good : "#e4ecf3";
+  const track = check.dead ? TONE_COLOUR.dead : check.allClear ? TONE_COLOUR.good : "var(--surface3)";
 
   let gradient = `conic-gradient(${track} 0turn 1turn)`;
   if (arcs.length > 0) {
@@ -51,7 +51,7 @@ function Ring({ check }: { check: BidCardCheck }) {
     <span style={{ position: "relative", width: size, height: size, flexShrink: 0, display: "inline-block" }}>
       <span style={{ display: "block", width: size, height: size, borderRadius: "50%", background: gradient }} />
       {/* The hole. An inset disc rather than a border, so the arcs stay true shares of the circle. */}
-      <span style={{ position: "absolute", inset: 5, borderRadius: "50%", background: "#fff" }} />
+      <span style={{ position: "absolute", inset: 5, borderRadius: "50%", background: "var(--surface)" }} />
       {check.allClear && (
         <span
           className="material-icons-outlined"
@@ -62,7 +62,7 @@ function Ring({ check }: { check: BidCardCheck }) {
       )}
       {/* News rides ON the ring — it is news without a strip of its own. */}
       {check.hasNews && (
-        <span style={{ position: "absolute", insetInlineEnd: -1, top: -1, width: 9, height: 9, borderRadius: "50%", background: "#1a7ec8", border: "1.5px solid #fff" }} />
+        <span style={{ position: "absolute", insetInlineEnd: -1, top: -1, width: 9, height: 9, borderRadius: "50%", background: "var(--info)", border: "1.5px solid var(--surface)" }} />
       )}
     </span>
   );
@@ -84,11 +84,11 @@ function Half({ check, title, allClearText, emptyText, L, action }: {
   action?: React.ReactNode;
 }) {
   const line = check.dead
-    ? <span style={{ fontSize: 11, fontWeight: 700, color: "#9AA7B8" }}>{L("Not checked", "لم تُراجع")}</span>
+    ? <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted-light)" }}>{L("Not checked", "لم تُراجع")}</span>
     : check.allClear
       ? <span style={{ fontSize: 11, fontWeight: 800, color: TONE_COLOUR.good }}>✓ {allClearText}</span>
       : check.empty
-        ? <span style={{ fontSize: 11, fontWeight: 700, color: "#9AA7B8" }}>{emptyText}</span>
+        ? <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted-light)" }}>{emptyText}</span>
         : (
           <span style={{ display: "inline-flex", gap: 8, flexWrap: "wrap" }}>
             {check.parts.map((p, i) => (
@@ -104,7 +104,7 @@ function Half({ check, title, allClearText, emptyText, L, action }: {
     <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
       <Ring check={check} />
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550", whiteSpace: "nowrap" }}>{title}</div>
+        <div style={{ fontSize: 12.5, fontWeight: 800, color: "var(--navy)", whiteSpace: "nowrap" }}>{title}</div>
         <div style={{ marginTop: 2 }}>{line}</div>
       </div>
       {action ? <div style={{ marginInlineStart: "auto", flexShrink: 0 }}>{action}</div> : null}
@@ -122,7 +122,7 @@ export function BidCardChecks({ equipment, terms, L, equipmentAction, termsActio
   termsAction?: React.ReactNode;
 }) {
   return (
-    <div style={{ borderTop: "1px solid #EFF2F6", display: "flex", alignItems: "stretch", gap: 12, padding: "13px 16px" }}>
+    <div style={{ borderTop: "1px solid var(--surface2)", display: "flex", alignItems: "stretch", gap: 12, padding: "13px 16px" }}>
       <Half
         check={equipment}
         title={L("Equipment", "المعدة")}
@@ -131,7 +131,7 @@ export function BidCardChecks({ equipment, terms, L, equipmentAction, termsActio
         L={L}
         action={equipmentAction}
       />
-      <span style={{ width: 1, background: "#EFF2F6", flexShrink: 0 }} />
+      <span style={{ width: 1, background: "var(--surface2)", flexShrink: 0 }} />
       <Half
         check={terms}
         title={L("Terms", "الشروط")}

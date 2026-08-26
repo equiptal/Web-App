@@ -76,11 +76,11 @@
 //       onClick={onClose}
 //     >
 //       <div
-//         className="flex max-h-[90vh] w-full max-w-[520px] flex-col overflow-hidden rounded-t-2xl bg-surface shadow-2xl sm:rounded-2xl"
+//         className="flex max-h-[90vh] w-full max-w-[520px] flex-col overflow-hidden rounded-t-lg bg-surface sm:rounded-lg"
 //         onClick={(e) => e.stopPropagation()}
 //       >
 //         <div className="flex items-center justify-between border-b border-border px-5 py-4">
-//           <h3 className="text-[16px] font-extrabold text-navy">{title}</h3>
+//           <h3 className="text-subhead font-extrabold text-navy">{title}</h3>
 //           <button type="button" onClick={onClose} aria-label={ar ? "إغلاق" : "Close"} className="text-muted hover:text-navy">
 //             <Icon name="close" size={20} />
 //           </button>
@@ -121,7 +121,7 @@
 //             type="button"
 //             disabled={busy}
 //             onClick={() => onSubmit([{ surveyId: item.surveyId, body: { action: "edit" } }])}
-//             className="w-full rounded-[10px] bg-brand px-4 py-2.5 text-[13.5px] font-bold text-white disabled:opacity-50"
+//             className="w-full rounded-sm bg-brand px-4 py-2.5 text-body font-semibold text-white disabled:bg-disabled-bg disabled:text-disabled-fg"
 //           >
 //             {t.survey.edit}
 //           </button>
@@ -129,7 +129,7 @@
 //             type="button"
 //             disabled={busy}
 //             onClick={() => onSubmit([{ surveyId: item.surveyId, body: { action: "close" } }])}
-//             className="w-full rounded-[10px] border border-danger/30 bg-danger-soft px-4 py-2.5 text-[13.5px] font-bold text-danger disabled:opacity-50"
+//             className="w-full rounded-sm border border-danger/30 bg-danger-soft px-4 py-2.5 text-body font-semibold text-danger disabled:bg-disabled-bg disabled:text-disabled-fg"
 //           >
 //             {t.survey.close}
 //           </button>
@@ -137,14 +137,14 @@
 //             type="button"
 //             disabled={busy}
 //             onClick={() => onSubmit([{ surveyId: item.surveyId, body: { action: "skip" } }])}
-//             className="w-full py-1.5 text-[13px] font-semibold text-muted disabled:opacity-50"
+//             className="w-full py-1.5 text-body font-semibold text-muted disabled:bg-disabled-bg disabled:text-disabled-fg"
 //           >
 //             {t.survey.skip}
 //           </button>
 //         </>
 //       }
 //     >
-//       <p className="text-[13.5px] leading-relaxed text-navy-mid">{t.survey.q2Body}</p>
+//       <p className="text-body leading-relaxed text-navy-mid">{t.survey.q2Body}</p>
 //     </Shell>
 //   );
 // }
@@ -188,7 +188,7 @@
 //             type="button"
 //             disabled={busy || !allAnswered}
 //             onClick={() => onSubmit(unit.items.map(build))}
-//             className="w-full rounded-[10px] bg-brand px-4 py-2.5 text-[13.5px] font-bold text-white disabled:opacity-50"
+//             className="w-full rounded-sm bg-brand px-4 py-2.5 text-body font-semibold text-white disabled:bg-disabled-bg disabled:text-disabled-fg"
 //           >
 //             {t.survey.confirm}
 //           </button>
@@ -196,7 +196,7 @@
 //             type="button"
 //             disabled={busy}
 //             onClick={() => onSubmit(unit.items.map((it) => ({ surveyId: it.surveyId, body: { action: "skip" } })))}
-//             className="w-full py-1.5 text-[13px] font-semibold text-muted disabled:opacity-50"
+//             className="w-full py-1.5 text-body font-semibold text-muted disabled:bg-disabled-bg disabled:text-disabled-fg"
 //           >
 //             {t.survey.skip}
 //           </button>
@@ -211,7 +211,7 @@
 //           const unit$ = unitLabel(it.bidders?.[0]?.priceUnit ?? it.rentalType, ar);
 //           return (
 //             <div key={it.surveyId} className="flex flex-col gap-2.5">
-//               <p className="text-[13px] leading-relaxed text-navy-mid">
+//               <p className="text-body leading-relaxed text-navy-mid">
 //                 {fmt(t.survey.q1Question, { equipment: it.requestContext.equipmentSummary || it.requestContext.shortCode || "" })}
 //               </p>
 //               <div className="flex flex-col gap-1.5">
@@ -244,7 +244,7 @@
 //                   value={price[it.surveyId] ?? ""}
 //                   onChange={(e) => setPrice((p) => ({ ...p, [it.surveyId]: e.target.value }))}
 //                   placeholder={fmt(t.survey.priceLabel, { unit: unit$ })}
-//                   className="w-full rounded-[10px] border border-border bg-surface px-3 py-2.5 text-[13.5px] text-navy outline-none focus:border-brand"
+//                   className="w-full rounded-sm border border-border bg-surface px-3 py-2.5 text-body text-navy outline-none focus:border-brand"
 //                 />
 //               )}
 //               {showReason && (
@@ -253,7 +253,7 @@
 //                   value={reason[it.surveyId] ?? ""}
 //                   onChange={(e) => setReason((r) => ({ ...r, [it.surveyId]: e.target.value }))}
 //                   placeholder={sel === NO_ONE ? t.survey.reasonNoOne : t.survey.reasonSomeoneElse}
-//                   className="w-full resize-none rounded-[10px] border border-border bg-surface px-3 py-2.5 text-[13.5px] text-navy outline-none focus:border-brand"
+//                   className="w-full resize-none rounded-sm border border-border bg-surface px-3 py-2.5 text-body text-navy outline-none focus:border-brand"
 //                 />
 //               )}
 //             </div>
@@ -279,14 +279,14 @@
 //     <button
 //       type="button"
 //       onClick={onTap}
-//       className={`flex w-full items-center gap-3 rounded-[10px] border px-3 py-2.5 text-start transition ${
+//       className={`flex w-full items-center gap-3 rounded-sm border px-3 py-2.5 text-start transition ${
 //         selected ? "border-brand bg-brand-soft" : "border-border bg-surface hover:bg-surface2"
 //       }`}
 //     >
 //       <Icon name={selected ? "radio_button_checked" : "radio_button_unchecked"} size={20} className={selected ? "text-brand" : "text-muted"} />
 //       <span className="min-w-0 flex-1">
-//         <span className="block truncate text-[13.5px] font-bold text-navy">{title}</span>
-//         {subtitle && <span className="block truncate text-[12px] font-semibold text-muted">{subtitle}</span>}
+//         <span className="block truncate text-body font-semibold text-navy">{title}</span>
+//         {subtitle && <span className="block truncate text-meta font-semibold text-muted">{subtitle}</span>}
 //       </span>
 //     </button>
 //   );

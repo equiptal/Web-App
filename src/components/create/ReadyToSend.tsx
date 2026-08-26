@@ -98,12 +98,12 @@ export function ReadyToSend() {
 
   return (
     <div>
-      <h1 className="text-[20px] font-extrabold text-navy">{t.create.ready.title}</h1>
-      <p className="mb-3 mt-1 text-[12.5px] text-muted">{t.create.ready.subtitle}</p>
+      <h1 className="text-display font-extrabold text-navy">{t.create.ready.title}</h1>
+      <p className="mb-3 mt-1 text-meta text-muted">{t.create.ready.subtitle}</p>
 
       {/* ---------------- Site ---------------- */}
       <SummaryCard title={t.create.ready.where} onEdit={() => backToItem(0)}>
-        <p className="text-[13px] text-navy-mid">
+        <p className="text-body text-navy-mid">
           {project.location.label ?? "—"}
           {project.location.lat != null && (
             <span className="ms-2 text-muted">{`${project.location.lat.toFixed(6)}, ${project.location.lng?.toFixed(6)}`}</span>
@@ -221,19 +221,19 @@ export function ReadyToSend() {
         extra={
           <button
             onClick={() => downloadCsv("rfq-spec-sheet.csv", toCsv(headers, body))}
-            className="inline-flex items-center gap-1 text-xs font-bold text-info"
+            className="inline-flex items-center gap-1 text-label font-semibold text-info"
           >
             <Icon name="grid_on" size={15} /> {t.preview.export}
           </button>
         }
       >
         <div className="-mx-1 overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse text-[13px]">
+          <table className="w-full min-w-[720px] border-collapse text-body">
             <thead>
               <tr className="border-b border-border text-start">
                 {headers.map((h, i) =>
                   keepCol[i] ? (
-                    <th key={h} className="px-2 pb-2 text-start text-[10px] font-bold uppercase tracking-[0.05em] text-muted">
+                    <th key={h} className="px-2 pb-2 text-start text-label font-semibold uppercase tracking-[0.05em] text-muted">
                       {h}
                     </th>
                   ) : null,
@@ -247,7 +247,7 @@ export function ReadyToSend() {
                     keepCol[ci] ? (
                       <td key={ci} className="px-2 py-2.5 align-top text-navy-mid">
                         {ci === 0 ? (
-                          <button className="font-bold text-info" onClick={() => backToItem(ri)}>
+                          <button className="font-semibold text-info" onClick={() => backToItem(ri)}>
                             {c}
                           </button>
                         ) : (
@@ -263,10 +263,10 @@ export function ReadyToSend() {
         </div>
       </SummaryCard>
 
-      <div className="mb-3.5 flex items-start gap-3 rounded-[14px] border border-info/25 bg-info-soft px-4 py-3">
+      <div className="mb-3.5 flex items-start gap-3 rounded-sm border border-info/25 bg-info-soft px-4 py-3">
         <Icon name="ios_share" size={18} className="mt-0.5 flex-none text-info" />
-        <p className="text-[13px] leading-relaxed text-navy">
-          <b className="font-bold">{t.create.ready.inviteTitle}</b>
+        <p className="text-body leading-relaxed text-navy">
+          <b className="font-semibold">{t.create.ready.inviteTitle}</b>
           <span className="text-navy-mid"> — {t.create.ready.inviteBody}</span>
         </p>
       </div>
@@ -274,11 +274,11 @@ export function ReadyToSend() {
       <div className="flex flex-wrap items-center justify-end gap-2.5">
         <button
           onClick={() => actions.setReadyToSend(false)}
-          className="rounded-[10px] border border-info/40 bg-surface px-5 py-3 text-[14px] font-bold text-info transition hover:border-info"
+          className="rounded-sm border border-info/40 bg-surface px-5 py-3 text-body font-semibold text-info transition hover:border-info"
         >
           {t.create.ready.backToEditing}
         </button>
-        <Button disabled={busy || items.length === 0} onClick={onSubmit} className="px-6 py-3 text-[14.5px]">
+        <Button disabled={busy || items.length === 0} onClick={onSubmit} className="px-6 py-3 text-subhead">
           <Icon name="send" size={18} /> {busy ? `${t.create.ready.send}…` : t.create.ready.send}
         </Button>
       </div>
@@ -300,14 +300,14 @@ export function ReadyToSend() {
           dir={ar ? "rtl" : "ltr"}
           onClick={(e) => e.target === e.currentTarget && setShowLimit(false)}
         >
-          <div className="w-full max-w-[440px] rounded-t-2xl bg-surface p-5 shadow-xl sm:rounded-2xl">
+          <div className="w-full max-w-[440px] rounded-t-lg bg-surface p-5 sm:rounded-lg">
             <div className="flex items-start gap-3">
               <span className="grid h-11 w-11 flex-none place-items-center rounded-full bg-warn-soft text-warn">
                 <Icon name="verified_user" size={24} />
               </span>
               <div className="flex-1">
-                <h3 className="text-[17px] font-extrabold text-navy">{L("Request limit reached", "بلغت الحد الأقصى للطلبات")}</h3>
-                <p className="mt-1.5 text-[13.5px] leading-relaxed text-muted">
+                <h3 className="text-title font-extrabold text-navy">{L("Request limit reached", "بلغت الحد الأقصى للطلبات")}</h3>
+                <p className="mt-1.5 text-body leading-relaxed text-muted">
                   {L(
                     "Basic accounts can post a limited number of requests. Get verified to post unlimited requests and unlock the full marketplace.",
                     "تستطيع الحسابات الأساسية إرسال عدد محدود من الطلبات. وثّق حسابك لإرسال طلبات غير محدودة والاستفادة من المنصة بالكامل.",
@@ -321,7 +321,7 @@ export function ReadyToSend() {
             <div className="mt-5 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
               <button
                 onClick={() => setShowLimit(false)}
-                className="rounded-[10px] border border-border bg-surface px-4 py-2.5 text-[13.5px] font-bold text-navy-mid transition hover:bg-surface2"
+                className="rounded-sm border border-border bg-surface px-4 py-2.5 text-body font-semibold text-navy-mid transition hover:bg-surface2"
               >
                 {L("Not now", "ليس الآن")}
               </button>
@@ -330,7 +330,7 @@ export function ReadyToSend() {
                   setShowLimit(false);
                   router.push("/verify");
                 }}
-                className="inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-brand px-5 py-2.5 text-[13.5px] font-bold text-white"
+                className="inline-flex items-center justify-center gap-1.5 rounded-sm bg-brand px-5 py-2.5 text-body font-semibold text-white"
               >
                 <Icon name="verified_user" size={17} /> {L("Get verified", "وثّق حسابك")}
               </button>
@@ -355,16 +355,16 @@ function SummaryCard({
 }) {
   const t = useT();
   return (
-    <section className="mb-2.5 rounded-[14px] border border-border bg-surface px-[18px] py-3">
+    <section className="mb-2.5 rounded-sm border border-border bg-surface px-5 py-3">
       <div className="mb-2.5 flex items-center justify-between gap-3">
-        <span className="flex items-center gap-2 text-[14px] font-extrabold text-navy">
+        <span className="flex items-center gap-2 text-body font-extrabold text-navy">
           <span className="h-2 w-2 rounded-full bg-ok" aria-hidden />
           {title}
         </span>
         <span className="flex items-center gap-4">
           {extra}
           {onEdit && (
-            <button className="inline-flex items-center gap-1 text-xs font-bold text-info" onClick={onEdit}>
+            <button className="inline-flex items-center gap-1 text-label font-semibold text-info" onClick={onEdit}>
               <Icon name="edit" size={15} /> {t.preview.edit}
             </button>
           )}
@@ -377,9 +377,9 @@ function SummaryCard({
 
 function Tile({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="rounded-[10px] bg-surface2 px-3 py-2.5">
-      <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.05em] text-muted">{label}</div>
-      <div className="text-[13px] font-semibold text-navy">{children}</div>
+    <div className="rounded-sm bg-surface2 px-3 py-2.5">
+      <div className="mb-1.5 text-label font-semibold uppercase tracking-[0.05em] text-muted">{label}</div>
+      <div className="text-body font-semibold text-navy">{children}</div>
     </div>
   );
 }

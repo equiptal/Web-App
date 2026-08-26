@@ -51,7 +51,7 @@ const SIZE: Record<DialogSize, string> = {
 const SCRIM = "fixed inset-0 z-[60] bg-navy/45";
 
 /** The panel's own skin — one radius, one border, one shadow. */
-const PANEL = "border border-border bg-surface shadow-[0_24px_60px_rgba(16,38,63,.28)]";
+const PANEL = "border border-border bg-surface";
 
 /** Anything a keyboard can land on, in the order it would reach them. */
 const FOCUSABLE =
@@ -150,7 +150,7 @@ export function Dialog({
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         data-dialog-panel=""
-        className={`relative flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-[16px] sm:max-h-[calc(100dvh-2rem)] sm:rounded-[16px] ${PANEL} ${SIZE[size]}`}
+        className={`relative flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-sm sm:max-h-[calc(100dvh-2rem)] sm:rounded-sm ${PANEL} ${SIZE[size]}`}
       >
         {/* A dialog whose body supplies its own headings still needs a way out, so the close floats
             in the corner rather than being dropped along with the header. */}
@@ -164,8 +164,8 @@ export function Dialog({
           <div className={`flex flex-none items-start gap-3 px-5 py-3.5 ${flushHeader ? "" : "border-b border-border"}`}>
             {icon && <span className="grid h-[34px] w-[34px] flex-none place-items-center">{icon}</span>}
             <div className="min-w-0 flex-1">
-              {title && <h2 className="text-[17px] font-extrabold leading-tight tracking-[-.2px] text-navy">{title}</h2>}
-              {subtitle && <p className="mt-0.5 text-[12.5px] leading-snug text-muted">{subtitle}</p>}
+              {title && <h2 className="text-title font-extrabold leading-tight tracking-[-.2px] text-navy">{title}</h2>}
+              {subtitle && <p className="mt-0.5 text-meta leading-snug text-muted">{subtitle}</p>}
             </div>
             <DialogClose onClose={onClose} />
           </div>
@@ -219,14 +219,14 @@ export function DialogDrawer({
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        className="fixed inset-y-0 end-0 z-[61] flex w-full max-w-[440px] flex-col border-s border-border bg-surface shadow-[0_24px_60px_rgba(16,38,63,.28)]"
+        className="fixed inset-y-0 end-0 z-[61] flex w-full max-w-[440px] flex-col border-s border-border bg-surface"
       >
         {header ?? (
           (title || subtitle) && (
             <div className="flex flex-none items-start gap-3 border-b border-border px-5 py-3.5">
               <div className="min-w-0 flex-1">
-                {title && <h2 className="text-[17px] font-extrabold leading-tight tracking-[-.2px] text-navy">{title}</h2>}
-                {subtitle && <p className="mt-0.5 text-[12.5px] leading-snug text-muted">{subtitle}</p>}
+                {title && <h2 className="text-title font-extrabold leading-tight tracking-[-.2px] text-navy">{title}</h2>}
+                {subtitle && <p className="mt-0.5 text-meta leading-snug text-muted">{subtitle}</p>}
               </div>
               <DialogClose onClose={onClose} />
             </div>
@@ -252,7 +252,7 @@ export function DialogClose({ onClose, tone = "default" }: { onClose: () => void
       onClick={onClose}
       aria-label="Close"
       className={`grid h-[34px] w-[34px] flex-none place-items-center rounded-full transition ${
-        tone === "onDark" ? "text-white/70 hover:bg-white/10 hover:text-white" : "text-muted hover:bg-surface2 hover:text-navy"
+        tone === "onDark" ? "text-white/70 hover:bg-surface/10 hover:text-white" : "text-muted hover:bg-surface2 hover:text-navy"
       }`}
     >
       <CloseIcon size={18} />
@@ -281,15 +281,15 @@ export function DialogButton({
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const skin =
     tone === "primary"
-      ? "bg-brand text-white hover:brightness-105"
+      ? "bg-brand text-white"
       : tone === "danger"
-        ? "bg-danger text-white hover:brightness-105"
+        ? "bg-danger text-white"
         : "border border-border bg-surface text-navy-mid hover:border-navy-mid";
   return (
     <button
       type="button"
       {...rest}
-      className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-[10px] px-4 text-[13.5px] font-bold transition disabled:opacity-50 ${
+      className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-sm px-4 text-body font-semibold transition disabled:bg-disabled-bg disabled:text-disabled-fg ${
         full ? "w-full" : ""
       } ${skin} ${className}`}
     />

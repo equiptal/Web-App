@@ -52,32 +52,32 @@ export function DeleteAccountModal({
           <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-danger-soft text-danger">
             <Icon name="warning" size={22} />
           </span>
-          <h2 className="text-[18px] font-extrabold text-navy">{p.deleteTitle}</h2>
+          <h2 className="text-title font-extrabold text-navy">{p.deleteTitle}</h2>
         </div>
-        <p className="text-[13px] leading-[1.55] text-muted">{p.deleteBody}</p>
+        <p className="text-body leading-[1.55] text-muted">{p.deleteBody}</p>
 
-        <label className="mt-4 block text-[12.5px] font-bold text-navy-mid">
+        <label className="mt-4 block text-meta font-semibold text-navy-mid">
           {fmt(p.deleteConfirmLabel, { word: p.deleteConfirmWord })}
         </label>
         <input
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
-          className="mt-1.5 h-11 w-full rounded-[10px] border border-border bg-surface2 px-3 text-[14px] font-bold text-navy outline-0 focus:border-danger"
+          className="mt-1.5 h-11 w-full rounded-sm border border-border bg-surface2 px-3 text-body font-semibold text-navy outline-0 focus:border-danger"
           autoFocus
         />
-        {err && <p className="mt-2 text-[12.5px] font-semibold text-danger">{err}</p>}
+        {err && <p className="mt-2 text-meta font-semibold text-danger">{err}</p>}
 
         <div className="mt-5 flex gap-2">
           <button
             onClick={onClose}
-            className="h-11 flex-1 rounded-[10px] border border-border bg-surface text-[13.5px] font-bold text-navy-mid hover:bg-surface2"
+            className="h-11 flex-1 rounded-sm border border-border bg-surface text-body font-semibold text-navy-mid hover:bg-surface2"
           >
             {p.cancel}
           </button>
           <button
             onClick={run}
             disabled={!confirmed || busy}
-            className="h-11 flex-1 rounded-[10px] bg-danger text-[13.5px] font-bold text-white transition hover:brightness-[1.05] disabled:opacity-50"
+            className="h-11 flex-1 rounded-sm bg-danger text-body font-semibold text-white transition disabled:bg-disabled-bg disabled:text-disabled-fg"
           >
             {busy ? p.deleting : p.deleteAccount}
           </button>

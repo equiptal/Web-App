@@ -39,12 +39,12 @@ export function StartYourRequestModal({
       >
         {/* Header: title + × */}
         <div className="flex items-start gap-3">
-          <h2 className="flex-1 text-[19px] font-extrabold tracking-tight text-navy">{t.startRequest.title}</h2>
+          <h2 className="flex-1 text-title font-extrabold tracking-tight text-navy">{t.startRequest.title}</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label={t.startRequest.close}
-            className="-me-1 -mt-1 grid h-8 w-8 flex-none place-items-center rounded-[9px] text-muted transition hover:bg-surface2 hover:text-navy"
+            className="-me-1 -mt-1 grid h-8 w-8 flex-none place-items-center rounded-sm text-muted transition hover:bg-surface2 hover:text-navy"
           >
             <Icon name="close" size={18} />
           </button>
@@ -72,7 +72,7 @@ export function StartYourRequestModal({
         <button
           type="button"
           onClick={onClose}
-          className="mt-4 w-full rounded-[10px] py-2.5 text-[12px] font-bold uppercase tracking-[0.5px] text-navy-mid transition hover:bg-surface2"
+          className="mt-4 w-full rounded-sm py-2.5 text-meta font-semibold uppercase tracking-[0.5px] text-navy-mid transition hover:bg-surface2"
         >
           {t.startRequest.cancel}
         </button>
@@ -98,22 +98,22 @@ function ChoiceCard({
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center gap-3 rounded-[14px] p-4 text-start transition ${
+      className={`flex w-full items-center gap-3 rounded-sm p-4 text-start transition ${
         emphasized
-          ? "border-2 border-brand bg-brand-soft hover:brightness-[0.99]"
+          ? "border-2 border-brand bg-brand-soft"
           : "border border-border bg-surface hover:bg-surface2"
       }`}
     >
       <span
-        className={`grid h-11 w-11 flex-none place-items-center rounded-[10px] ${
+        className={`grid h-11 w-11 flex-none place-items-center rounded-sm ${
           emphasized ? "bg-brand text-white" : "bg-surface2 text-navy-mid"
         }`}
       >
         <Icon name={icon} size={22} />
       </span>
       <span className="min-w-0 flex-1">
-        <b className="block text-[14.5px] font-bold text-navy">{title}</b>
-        <span className="mt-0.5 block text-[12.5px] leading-relaxed text-muted">{body}</span>
+        <b className="block text-subhead font-extrabold text-navy">{title}</b>
+        <span className="mt-0.5 block text-meta leading-relaxed text-muted">{body}</span>
       </span>
       <Icon
         name="chevron_right"

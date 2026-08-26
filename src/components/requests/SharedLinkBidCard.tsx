@@ -114,30 +114,30 @@ export function SharedLinkBidCard({
   const daysLeft = validUntil ? Math.ceil((new Date(validUntil).getTime() - Date.now()) / 86400000) : null;
   const expired = daysLeft != null && daysLeft < 0;
   const soon = daysLeft != null && daysLeft >= 0 && daysLeft <= 3;
-  const validTone = expired ? { c: "#d9362a", bg: "#fcebea" } : soon ? { c: "#d4780a", bg: "#fff3e0" } : { c: "#1a7ec8", bg: "#e6f2fb" };
+  const validTone = expired ? { c: "var(--danger)", bg: "var(--danger-soft)" } : soon ? { c: "var(--warn)", bg: "var(--warn-soft)" } : { c: "var(--info)", bg: "var(--info-soft)" };
 
   // App parity: the SAME shared tally the on-platform card + the Terms modal use (bucketBidTerms), so the
   // off-platform card count always equals the modal. Off-platform has no deal room → no "Pending review"
   // chip on the card (mirrors the terms modal's hidePending); Conflict / Matched only.
   const termTally = bucketBidTerms(bid.terms, bid.negotiableTerms, { all: true }).counts;
   const termChips = [
-    { label: L("Conflict", "تعارض"), n: termTally.conflict, c: "#d9362a" },
-    { label: L("Matched", "مطابق"), n: termTally.matched, c: "#1daf58" },
+    { label: L("Conflict", "تعارض"), n: termTally.conflict, c: "var(--danger)" },
+    { label: L("Matched", "مطابق"), n: termTally.matched, c: "var(--ok)" },
   ];
 
-  const rowSep = { borderTop: "1px solid #EFF2F6" } as const;
-  const iconBox = { width: 40, height: 40, borderRadius: 11, background: "#eff4f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } as const;
-  const blueLink = { background: "none", border: "none", color: "#1a7ec8", fontWeight: 800, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" } as const;
+  const rowSep = { borderTop: "1px solid var(--surface2)" } as const;
+  const iconBox = { width: 40, height: 40, borderRadius: 11, background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } as const;
+  const blueLink = { background: "none", border: "none", color: "var(--info)", fontWeight: 800, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" } as const;
 
   return (
     <div
       onClick={picking ? onToggleSelect : undefined}
-      style={{ flex: cardFlex ?? "0 0 calc(44% - 8px)", minWidth: 0, scrollSnapAlign: "start", alignSelf: "flex-start", display: "flex", flexDirection: "column", position: "relative", background: "#fff", border: `1px solid ${isSel ? "#f79009" : "#d4e0ec"}`, borderRadius: 18, overflow: "hidden", boxShadow: "0 1px 2px rgba(20,40,70,.04)", outline: isSel ? "2px solid #f79009" : "none", outlineOffset: 2, cursor: picking ? "pointer" : "default" }}
+      style={{ flex: cardFlex ?? "0 0 calc(44% - 8px)", minWidth: 0, scrollSnapAlign: "start", alignSelf: "flex-start", display: "flex", flexDirection: "column", position: "relative", background: "var(--surface)", border: `1px solid ${isSel ? "var(--brand)" : "var(--border)"}`, borderRadius: 18, overflow: "hidden", outline: isSel ? "2px solid var(--brand)" : "none", outlineOffset: 2, cursor: picking ? "pointer" : "default" }}
     >
-      <div style={{ height: 4, background: "#d4780a" }} />
+      <div style={{ height: 4, background: "var(--warn)" }} />
       {/* off-platform banner — replaces a status pill + the old "submitted" footer line */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 14px", background: "#fff4e5", borderBottom: "1px solid #f7e4c6" }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 11.5, fontWeight: 800, color: "#d4780a", minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 14px", background: "var(--brand-soft)", borderBottom: "1px solid var(--brand-pale)" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 11.5, fontWeight: 800, color: "var(--warn)", minWidth: 0 }}>
           <span className="material-icons-outlined" style={{ fontSize: 15, flexShrink: 0 }}>link</span>
           <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{L("Off-platform · via your request link", "خارج المنصة · عبر رابط طلبك")}</span>
         </span>
@@ -149,14 +149,14 @@ export function SharedLinkBidCard({
               {expired ? L("Expired", "منتهٍ") : L(`Valid until ${fmtDate(validUntil)}`, `صالح حتى ${fmtDate(validUntil)}`)}
             </span>
           )}
-          <span style={{ fontSize: 12, fontWeight: 700, color: "#b07a3a" }}>{agoShort}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--brand-deep)" }}>{agoShort}</span>
         </span>
       </div>
       {(picking || legacy) && (
         <div
           onClick={legacy ? (e) => { e.stopPropagation(); onToggleSelect(); } : undefined}
           title={legacy ? L("Select for quotation", "حدّد لعرض السعر") : undefined}
-          style={{ position: "absolute", top: 12, insetInlineEnd: 12, width: 26, height: 26, borderRadius: "50%", background: isSel ? "#f79009" : "#fff", border: `2px solid ${isSel ? "#f79009" : "#d4e0ec"}`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(20,40,70,.18)", zIndex: 5, cursor: legacy ? "pointer" : "default", pointerEvents: legacy ? "auto" : "none" }}
+          style={{ position: "absolute", top: 12, insetInlineEnd: 12, width: 26, height: 26, borderRadius: "50%", background: isSel ? "var(--brand)" : "var(--surface)", border: `2px solid ${isSel ? "var(--brand)" : "var(--border)"}`, color: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 5, cursor: legacy ? "pointer" : "default", pointerEvents: legacy ? "auto" : "none" }}
         >
           {isSel && <span className="material-icons-outlined" style={{ fontSize: 16 }}>check</span>}
         </div>
@@ -164,23 +164,23 @@ export function SharedLinkBidCard({
 
       {/* header */}
       <div style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "16px 16px 12px" }}>
-        <div style={{ width: 56, height: 56, borderRadius: 14, background: "#eff4f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <div style={{ width: 56, height: 56, borderRadius: 14, background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <EquipImg src={itemImage ?? null} categoryId={categoryId ?? null} name={title} box="" img="h-10 w-10 object-contain" iconSize={36} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
-            <span style={{ flex: "0 1 auto", minWidth: 0, fontSize: 13.5, fontWeight: 900, color: "#1c3550", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.25 }} title={title}>{title}</span>
-            <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: "#d4780a", background: "#fff3e0", padding: "1px 8px", borderRadius: 20 }}>×{offered}</span>
+            <span style={{ flex: "0 1 auto", minWidth: 0, fontSize: 13.5, fontWeight: 900, color: "var(--navy)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.25 }} title={title}>{title}</span>
+            <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: "var(--warn)", background: "var(--warn-soft)", padding: "1px 8px", borderRadius: 20 }}>×{offered}</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 6 }}>
-            <span style={{ width: 22, height: 22, borderRadius: "50%", background: "#1c3550", color: "#fff", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(bid.supplierName || "S").charAt(0).toUpperCase()}</span>
-            <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bid.supplierName}</span>
-            {bid.verified && <span className="material-icons-outlined" style={{ fontSize: 16, color: "#1daf58", flexShrink: 0 }}>verified</span>}
+            <span style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--navy)", color: "var(--surface)", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(bid.supplierName || "S").charAt(0).toUpperCase()}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: "var(--navy)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bid.supplierName}</span>
+            {bid.verified && <span className="material-icons-outlined" style={{ fontSize: 16, color: "var(--ok)", flexShrink: 0 }}>verified</span>}
             {/* Bid-quality score sits right beside the name (same spot as the app's verified tick) — a
                 solid band-coloured badge so it reads at a glance, without adding card height. */}
             {quality && (
               <span title={L(`Bid quality ${quality.score}% — terms match, documents & company details`, `جودة العرض ${quality.score}٪ — مطابقة الشروط والمستندات وبيانات الشركة`)}
-                style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 900, color: "#fff", background: BAND_COLOR[quality.band], padding: "3px 9px", borderRadius: 20, fontVariantNumeric: "tabular-nums", boxShadow: `0 1px 3px ${BAND_COLOR[quality.band]}59` }}>
+                style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 900, color: "var(--surface)", background: BAND_COLOR[quality.band], padding: "3px 9px", borderRadius: 20, fontVariantNumeric: "tabular-nums", }}>
                 <span className="material-icons-outlined" style={{ fontSize: 14 }}>workspace_premium</span>{quality.score}%
               </span>
             )}
@@ -189,12 +189,12 @@ export function SharedLinkBidCard({
       </div>
 
       {/* fulfillment band */}
-      <div style={{ margin: "0 16px 14px", padding: "10px 14px", borderRadius: 12, background: "#fff4e5", display: "flex", alignItems: "center", gap: 12 }}>
-        <span style={{ fontSize: 12, fontWeight: 800, color: "#1c3550", whiteSpace: "nowrap" }}>{L(`Covers ${offered} of ${needed} units`, `يغطّي ${offered} من ${needed} وحدات`)}</span>
-        <div style={{ flex: 1, height: 8, borderRadius: 6, background: "rgba(247,144,9,.18)", overflow: "hidden" }}>
-          <div style={{ height: "100%", borderRadius: 6, background: "#f79009", width: `${cover}%` }} />
+      <div style={{ margin: "0 16px 14px", padding: "10px 14px", borderRadius: 12, background: "var(--brand-soft)", display: "flex", alignItems: "center", gap: 12 }}>
+        <span style={{ fontSize: 12, fontWeight: 800, color: "var(--navy)", whiteSpace: "nowrap" }}>{L(`Covers ${offered} of ${needed} units`, `يغطّي ${offered} من ${needed} وحدات`)}</span>
+        <div style={{ flex: 1, height: 8, borderRadius: 6, background: "color-mix(in srgb, var(--brand) 18%, transparent)", overflow: "hidden" }}>
+          <div style={{ height: "100%", borderRadius: 6, background: "var(--brand)", width: `${cover}%` }} />
         </div>
-        {bid.distanceKm != null && <span style={{ fontSize: 12, color: "#6b8fa8", fontWeight: 700, whiteSpace: "nowrap" }}>{Math.round(bid.distanceKm)} km</span>}
+        {bid.distanceKm != null && <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700, whiteSpace: "nowrap" }}>{Math.round(bid.distanceKm)} km</span>}
       </div>
 
       {/* Equipment row */}
@@ -202,7 +202,7 @@ export function SharedLinkBidCard({
         <div style={iconBox}>
           <EquipImg src={itemImage ?? null} categoryId={categoryId ?? null} name={title} box="" img="h-5 w-5 object-contain" iconSize={20} />
         </div>
-        <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Equipment", "المعدة")}</span>
+        <span style={{ fontSize: 13, fontWeight: 800, color: "var(--navy)" }}>{L("Equipment", "المعدة")}</span>
         {/* No cert/term chips on the card — all equipment detail lives in the Details modal only. */}
         <div style={{ flex: 1 }} />
         {!picking && <button onClick={() => setEquipOpen(true)} style={blueLink}>{L("Details", "التفاصيل")} ›</button>}
@@ -210,12 +210,12 @@ export function SharedLinkBidCard({
 
       {/* Terms row */}
       <div style={{ ...rowSep, display: "flex", alignItems: "center", gap: 12, padding: "13px 16px" }}>
-        <div style={iconBox}><span className="material-icons-outlined" style={{ fontSize: 20, color: "#6b8fa8" }}>description</span></div>
-        <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Terms", "الشروط")}</span>
+        <div style={iconBox}><span className="material-icons-outlined" style={{ fontSize: 20, color: "var(--muted)" }}>description</span></div>
+        <span style={{ fontSize: 13, fontWeight: 800, color: "var(--navy)" }}>{L("Terms", "الشروط")}</span>
         <div style={{ display: "flex", gap: 4, flexWrap: "nowrap", flex: 1, minWidth: 0, overflowX: "auto" }} className="no-sb">
           {termChips.map((t) => (
-            <span key={t.label} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 800, color: t.n > 0 ? t.c : "#9AA7B8", whiteSpace: "nowrap" }}>
-              <span style={{ width: 7, height: 7, borderRadius: "50%", background: t.n > 0 ? t.c : "#c3d2e0" }} />{t.label} {t.n}
+            <span key={t.label} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 800, color: t.n > 0 ? t.c : "var(--muted-light)", whiteSpace: "nowrap" }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: t.n > 0 ? t.c : "var(--border-strong)" }} />{t.label} {t.n}
             </span>
           ))}
         </div>
@@ -225,13 +225,13 @@ export function SharedLinkBidCard({
       {/* Rate row */}
       <div style={{ ...rowSep, padding: "13px 16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ ...iconBox, background: "#fff4e5" }}><span className="material-icons-outlined" style={{ fontSize: 20, color: "#f79009" }}>payments</span></div>
-          <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Rate", "السعر")}</span>
+          <div style={{ ...iconBox, background: "var(--brand-soft)" }}><span className="material-icons-outlined" style={{ fontSize: 20, color: "var(--brand)" }}>payments</span></div>
+          <span style={{ fontSize: 13, fontWeight: 800, color: "var(--navy)" }}>{L("Rate", "السعر")}</span>
           <div style={{ flex: 1 }} />
-          <span style={{ fontSize: 17, fontWeight: 900, color: "#f79009" }}>{nf(bid.price ?? 0)} {L("SAR", "ر.س")}</span>
-          <span style={{ fontSize: 13, color: "#6b8fa8", fontWeight: 700 }}>/ {periodOf(bid.priceUnit)}</span>
+          <span style={{ fontSize: 17, fontWeight: 900, color: "var(--brand)" }}>{nf(bid.price ?? 0)} {L("SAR", "ر.س")}</span>
+          <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 700 }}>/ {periodOf(bid.priceUnit)}</span>
           {!picking && (
-            <button onClick={() => { setPriceOpen((o) => !o); setPerUnit(false); }} style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #d4e0ec", background: "#F7FAFC", color: "#6b8fa8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <button onClick={() => { setPriceOpen((o) => !o); setPerUnit(false); }} style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--muted)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <span className="material-icons-outlined" style={{ fontSize: 18 }}>{priceOpen ? "expand_less" : "expand_more"}</span>
             </button>
           )}
@@ -239,9 +239,9 @@ export function SharedLinkBidCard({
         {priceOpen && !picking && (
           <div style={{ marginTop: 12 }}>
             {offered > 1 && (
-              <div style={{ display: "inline-flex", background: "#eff4f9", borderRadius: 10, padding: 3, marginBottom: 12 }}>
+              <div style={{ display: "inline-flex", background: "var(--surface2)", borderRadius: 10, padding: 3, marginBottom: 12 }}>
                 {([[false, L(`All ${offered} units`, `كل ${offered} وحدات`)], [true, L("Per unit", "لكل وحدة")]] as [boolean, string][]).map(([v, lab]) => (
-                  <button key={String(v)} onClick={() => setPerUnit(v)} style={{ padding: "6px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12.5, fontFamily: "inherit", background: perUnit === v ? "#1c3550" : "transparent", color: perUnit === v ? "#fff" : "#6b8fa8" }}>{lab}</button>
+                  <button key={String(v)} onClick={() => setPerUnit(v)} style={{ padding: "6px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12.5, fontFamily: "inherit", background: perUnit === v ? "var(--navy)" : "transparent", color: perUnit === v ? "var(--surface)" : "var(--muted)" }}>{lab}</button>
                 ))}
               </div>
             )}
@@ -257,14 +257,14 @@ export function SharedLinkBidCard({
               [L("Subtotal before VAT", "المجموع قبل الضريبة"), sub],
               [L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"), vat],
             ] as [string, number][]).map(([lab, val], i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 0", borderBottom: "1px solid #F2F5F8" }}>
-                <span style={{ fontSize: 13.5, color: "#2a4f72", fontWeight: 600 }}>{lab}</span>
-                <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550", fontVariantNumeric: "tabular-nums" }}>{nf(val)}</span>
+              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--background)" }}>
+                <span style={{ fontSize: 13.5, color: "var(--navy-mid)", fontWeight: 600 }}>{lab}</span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: "var(--navy)", fontVariantNumeric: "tabular-nums" }}>{nf(val)}</span>
               </div>
             ))}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, padding: "12px 14px", borderRadius: 12, background: "#fff4e5" }}>
-              <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{L("Quoted total", "الإجمالي المُسعّر")}</span>
-              <span style={{ fontSize: 16, fontWeight: 900, color: "#f79009" }}>{nf(grand)} {L("SAR", "ر.س")}</span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, padding: "12px 14px", borderRadius: 12, background: "var(--brand-soft)" }}>
+              <span style={{ fontSize: 12.5, fontWeight: 800, color: "var(--navy)" }}>{L("Quoted total", "الإجمالي المُسعّر")}</span>
+              <span style={{ fontSize: 16, fontWeight: 900, color: "var(--brand)" }}>{nf(grand)} {L("SAR", "ر.س")}</span>
             </div>
           </div>
         )}
@@ -276,16 +276,16 @@ export function SharedLinkBidCard({
           <div style={{ display: "flex", gap: 8 }}>
             {/* When negotiate is hidden this is the sole CTA → filled navy (primary), matching the in-app
                 bid card. When negotiate shows (dev), it's outlined so the orange Negotiate reads as primary. */}
-            <button onClick={onViewSubmission} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px 10px", borderRadius: 14, ...(onNegotiate ? { border: "1.5px solid #1c3550", background: "#fff", color: "#1c3550" } : { border: "none", background: "#1c3550", color: "#fff" }), fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+            <button onClick={onViewSubmission} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px 10px", borderRadius: 14, ...(onNegotiate ? { border: "1.5px solid var(--navy)", background: "var(--surface)", color: "var(--navy)" } : { border: "none", background: "var(--navy)", color: "var(--surface)" }), fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
               <span className="material-icons-outlined" style={{ fontSize: 18 }}>visibility</span>{L("View bid", "عرض العرض")}
             </button>
             {onNegotiate && (
-              <button onClick={onNegotiate} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px 10px", borderRadius: 14, border: "none", background: "#f79009", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 2px 6px rgba(247,144,9,.32)" }}>
+              <button onClick={onNegotiate} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px 10px", borderRadius: 14, border: "none", background: "var(--brand)", color: "var(--surface)", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit", }}>
                 <span className="material-icons-outlined" style={{ fontSize: 18 }}>forum</span>{L("Negotiate", "تفاوض")}
               </button>
             )}
           </div>
-          <p style={{ fontSize: 11.5, color: "#9AA7B8", fontWeight: 600, textAlign: "center", margin: "9px 0 0" }}>
+          <p style={{ fontSize: 11.5, color: "var(--muted-light)", fontWeight: 600, textAlign: "center", margin: "9px 0 0" }}>
             {onNegotiate
               ? L("Message this supplier now — continue the deal with them in the app.", "راسل هذا المؤجّر الآن — وأكمل الصفقة معه في التطبيق.")
               : L("Off-platform supplier — view their submitted bid.", "مؤجّر خارج المنصة — اعرض عرضه المُقدَّم.")}

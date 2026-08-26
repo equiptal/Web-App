@@ -121,24 +121,24 @@ export function CompanyHub() {
   return (
     <div className="mx-auto max-w-2xl" dir={ar ? "rtl" : "ltr"}>
       {toast && (
-        <p className="mb-4 flex items-center gap-2 rounded-[10px] border border-ok/30 bg-ok-soft px-3.5 py-2.5 text-[13px] font-semibold text-ok">
+        <p className="mb-4 flex items-center gap-2 rounded-sm border border-ok/30 bg-ok-soft px-3.5 py-2.5 text-body font-semibold text-ok">
           <Icon name="check_circle" size={16} /> {toast}
         </p>
       )}
       {error && (
-        <p className="mb-4 flex items-start gap-2 rounded-[10px] border border-danger/30 bg-danger-soft px-3.5 py-2.5 text-[13px] font-semibold text-danger">
+        <p className="mb-4 flex items-start gap-2 rounded-sm border border-danger/30 bg-danger-soft px-3.5 py-2.5 text-body font-semibold text-danger">
           <Icon name="error" size={16} className="mt-px flex-none" /> {error}
         </p>
       )}
 
       {loading ? (
-        <p className="py-16 text-center text-[13px] text-muted">…</p>
+        <p className="py-16 text-center text-body text-muted">…</p>
       ) : loadError ? (
-        <div className="rounded-[14px] border border-border bg-surface p-8 text-center">
-          <p className="text-[13.5px] font-semibold text-navy">{c.loadError}</p>
+        <div className="rounded-sm border border-border bg-surface p-8 text-center">
+          <p className="text-body font-semibold text-navy">{c.loadError}</p>
           <button
             onClick={() => void load()}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-[10px] bg-brand px-5 py-2.5 text-[13px] font-bold text-brand-fg transition hover:brightness-105"
+            className="mt-4 inline-flex items-center gap-1.5 rounded-sm bg-brand px-5 py-2.5 text-body font-semibold text-brand-fg transition"
           >
             <Icon name="refresh" size={16} /> {c.retry}
           </button>
@@ -286,16 +286,16 @@ function CreateOwnCompanyCard() {
   return (
     <button
       onClick={() => router.push("/verify")}
-      className="flex w-full items-center gap-3.5 rounded-[14px] border border-brand/30 bg-brand-soft p-5 text-start transition hover:border-brand"
+      className="flex w-full items-center gap-3.5 rounded-sm border border-brand/30 bg-brand-soft p-5 text-start transition hover:border-brand"
     >
-      <span className="grid h-11 w-11 flex-none place-items-center rounded-[11px] bg-brand text-brand-fg">
+      <span className="grid h-11 w-11 flex-none place-items-center rounded-sm bg-brand text-brand-fg">
         <Icon name="verified" size={22} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[15px] font-extrabold text-navy">{c.createOwnTitle}</p>
-        <p className="mt-0.5 text-[12.5px] leading-relaxed text-muted">{c.createOwnDesc}</p>
+        <p className="text-subhead font-extrabold text-navy">{c.createOwnTitle}</p>
+        <p className="mt-0.5 text-meta leading-relaxed text-muted">{c.createOwnDesc}</p>
       </div>
-      <span className="inline-flex flex-none items-center gap-1 rounded-[9px] bg-brand px-3 py-2 text-[12px] font-bold text-brand-fg">
+      <span className="inline-flex flex-none items-center gap-1 rounded-sm bg-brand px-3 py-2 text-meta font-semibold text-brand-fg">
         {c.createOwnCta}
         <Icon name="arrow_forward" size={15} className="rtl:scale-x-[-1]" />
       </span>
@@ -342,14 +342,14 @@ function JoinForm({
   };
 
   return (
-    <div className="rounded-[14px] border border-border bg-surface p-6">
+    <div className="rounded-sm border border-border bg-surface p-6">
       <div className="flex items-center gap-3">
-        <span className="grid h-11 w-11 flex-none place-items-center rounded-[11px] bg-brand-soft text-brand">
+        <span className="grid h-11 w-11 flex-none place-items-center rounded-sm bg-brand-soft text-brand">
           <Icon name="business_center" size={22} />
         </span>
         <div>
-          <h2 className="text-[15px] font-extrabold text-navy">{c.joinTitle}</h2>
-          <p className="mt-0.5 text-[12.5px] leading-relaxed text-muted">{c.noCompany}</p>
+          <h2 className="text-subhead font-extrabold text-navy">{c.joinTitle}</h2>
+          <p className="mt-0.5 text-meta leading-relaxed text-muted">{c.noCompany}</p>
         </div>
       </div>
 
@@ -360,7 +360,7 @@ function JoinForm({
           void check();
         }}
       >
-        <label htmlFor="invite-code" className="block text-[11.5px] font-bold uppercase tracking-wide text-navy-mid">
+        <label htmlFor="invite-code" className="block text-label font-semibold uppercase tracking-wide text-navy-mid">
           {c.enterCode}
         </label>
         <input
@@ -372,12 +372,12 @@ function JoinForm({
           autoComplete="off"
           spellCheck={false}
           dir="ltr"
-          className="mt-1.5 w-full rounded-[10px] border border-border bg-surface px-3.5 py-2.5 text-[14px] font-semibold tracking-[1px] text-navy outline-none transition focus:border-brand"
+          className="mt-1.5 w-full rounded-sm border border-border bg-surface px-3.5 py-2.5 text-body font-semibold tracking-[1px] text-navy outline-none transition focus:border-brand"
         />
         <button
           type="submit"
           disabled={busy || checking || !code.trim()}
-          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[10px] bg-brand px-5 py-3 text-[14px] font-bold text-brand-fg transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-55"
+          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-sm bg-brand px-5 py-3 text-body font-semibold text-brand-fg transition disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
         >
           {checking ? "…" : c.joinButton}
         </button>
@@ -401,25 +401,25 @@ function PendingPanel({
   const t = useT();
   const c = t.company;
   return (
-    <div className="rounded-[14px] border border-border bg-surface px-6 py-10 text-center">
+    <div className="rounded-sm border border-border bg-surface px-6 py-10 text-center">
       <span className="mx-auto grid h-[88px] w-[88px] place-items-center rounded-full bg-warn-soft">
         <span className="grid h-[62px] w-[62px] place-items-center rounded-full bg-warn/15 text-warn">
           <Icon name="hourglass_top" size={30} />
         </span>
       </span>
-      <p className="mt-6 text-[19px] font-extrabold text-navy">{company.name}</p>
-      <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-warn-soft px-3 py-1.5 text-[12.5px] font-bold text-warn">
+      <p className="mt-6 text-title font-extrabold text-navy">{company.name}</p>
+      <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-warn-soft px-3 py-1.5 text-meta font-semibold text-warn">
         <Icon name="schedule" size={14} /> {c.pendingBadge}
       </span>
-      <p className="mx-auto mt-5 max-w-sm text-[14px] leading-relaxed text-navy">{c.pendingApproval}</p>
-      <p className="mx-auto mt-2 max-w-sm text-[12.5px] leading-relaxed text-muted">{c.pendingHint}</p>
+      <p className="mx-auto mt-5 max-w-sm text-body leading-relaxed text-navy">{c.pendingApproval}</p>
+      <p className="mx-auto mt-2 max-w-sm text-meta leading-relaxed text-muted">{c.pendingHint}</p>
 
       {/* Wrong code? Withdraw. Without this the pending row blocks joining anywhere else until an
           owner happens to reject you — the request would otherwise be a one-way door. */}
       <button
         onClick={onCancel}
         disabled={busy}
-        className="mt-6 inline-flex items-center gap-1.5 rounded-[10px] border border-border px-4 py-2.5 text-[13px] font-bold text-navy-mid transition hover:bg-surface2 disabled:opacity-55"
+        className="mt-6 inline-flex items-center gap-1.5 rounded-sm border border-border px-4 py-2.5 text-body font-semibold text-navy-mid transition hover:bg-surface2 disabled:bg-disabled-bg disabled:text-disabled-fg"
       >
         <Icon name="undo" size={16} /> {c.cancelJoin}
       </button>
@@ -450,7 +450,7 @@ function ActiveCompany({
 }) {
   const t = useT();
   const c = t.company;
-  const card = "rounded-[14px] border border-border bg-surface";
+  const card = "rounded-sm border border-border bg-surface";
 
   /**
    * ── One organization page (owner, 2026-08-26) ─────────────────────────────────────────────────
@@ -491,9 +491,9 @@ function ActiveCompany({
           <div className="flex flex-col gap-2.5">
             {company.pendingMembers.map((m) => (
               <div key={m.userId} className={`${card} p-4`}>
-                <p className="text-[14px] font-bold text-navy">{m.name}</p>
+                <p className="text-body font-semibold text-navy">{m.name}</p>
                 {m.phone && (
-                  <p className="mt-0.5 text-[12.5px] text-muted" dir="ltr">
+                  <p className="mt-0.5 text-meta text-muted" dir="ltr">
                     {m.phone}
                   </p>
                 )}
@@ -501,14 +501,14 @@ function ActiveCompany({
                   <button
                     onClick={() => onRemove(m)}
                     disabled={busy}
-                    className="flex-1 rounded-[10px] border border-danger px-3 py-2.5 text-[13px] font-bold text-danger transition hover:bg-danger-soft disabled:opacity-55"
+                    className="flex-1 rounded-sm border border-danger px-3 py-2.5 text-body font-semibold text-danger transition hover:bg-danger-soft disabled:bg-disabled-bg disabled:text-disabled-fg"
                   >
                     {c.remove}
                   </button>
                   <button
                     onClick={() => onApprove(m)}
                     disabled={busy}
-                    className="flex-1 rounded-[10px] bg-ok px-3 py-2.5 text-[13px] font-bold text-white transition hover:brightness-105 disabled:opacity-55"
+                    className="flex-1 rounded-sm bg-ok px-3 py-2.5 text-body font-semibold text-white transition disabled:bg-disabled-bg disabled:text-disabled-fg"
                   >
                     {c.approve}
                   </button>
@@ -542,7 +542,7 @@ function ActiveCompany({
         <button
           onClick={onExit}
           disabled={busy}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-[12px] border border-danger px-5 py-3 text-[13.5px] font-bold text-danger transition hover:bg-danger-soft disabled:opacity-55"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-sm border border-danger px-5 py-3 text-body font-semibold text-danger transition hover:bg-danger-soft disabled:bg-disabled-bg disabled:text-disabled-fg"
         >
           <Icon name="logout" size={17} className="rtl:scale-x-[-1]" />
           {company.activeMembers.length <= 1 ? c.dissolve : c.leave}
@@ -599,21 +599,21 @@ function InviteCodeCard({ code, onCopied }: { code: string; onCopied: () => void
 
   return (
     <section>
-      <h3 className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wide text-muted">{c.inviteTeam}</h3>
-      <div className="rounded-[14px] border border-brand/30 bg-brand-soft p-4">
+      <h3 className="mb-2 px-1 text-label font-semibold uppercase tracking-wide text-muted">{c.inviteTeam}</h3>
+      <div className="rounded-sm border border-brand/30 bg-brand-soft p-4">
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[17px] font-extrabold tracking-[1.5px] text-navy" dir="ltr">
+            <p className="truncate text-title font-extrabold tracking-[1.5px] text-navy" dir="ltr">
               {code}
             </p>
-            <p className="mt-0.5 text-[12px] leading-relaxed text-muted">{c.inviteHint}</p>
+            <p className="mt-0.5 text-meta leading-relaxed text-muted">{c.inviteHint}</p>
           </div>
           <div className="flex flex-none gap-1.5">
             <button
               onClick={() => void (canShare ? share() : copyInvite())}
               aria-label={c.share}
               title={c.share}
-              className="grid h-10 w-10 place-items-center rounded-[10px] border border-border bg-surface text-navy-mid transition hover:bg-surface2"
+              className="grid h-10 w-10 place-items-center rounded-sm border border-border bg-surface text-navy-mid transition hover:bg-surface2"
             >
               <Icon name={canShare ? "share" : "forward_to_inbox"} size={18} />
             </button>
@@ -621,7 +621,7 @@ function InviteCodeCard({ code, onCopied }: { code: string; onCopied: () => void
               onClick={() => void copy()}
               aria-label={c.inviteCodeCopied}
               title={c.inviteCodeCopied}
-              className="grid h-10 w-10 place-items-center rounded-[10px] border border-border bg-surface text-navy-mid transition hover:bg-surface2"
+              className="grid h-10 w-10 place-items-center rounded-sm border border-border bg-surface text-navy-mid transition hover:bg-surface2"
             >
               <Icon name="content_copy" size={18} />
             </button>
@@ -665,11 +665,11 @@ function MemberRow({
         <Icon name={isOwner ? "admin_panel_settings" : "person"} size={18} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13.5px] font-bold text-navy">
+        <p className="truncate text-body font-semibold text-navy">
           {member.name}
-          {isSelf && <span className="ms-1.5 text-[11.5px] font-semibold text-muted">({c.you})</span>}
+          {isSelf && <span className="ms-1.5 text-label font-semibold text-muted">({c.you})</span>}
         </p>
-        <p className="text-[12px] text-muted">{isOwner ? c.roleOwner : c.roleMember}</p>
+        <p className="text-meta text-muted">{isOwner ? c.roleOwner : c.roleMember}</p>
       </div>
 
       {canManage && (
@@ -679,7 +679,7 @@ function MemberRow({
             disabled={busy}
             aria-label={c.members}
             aria-expanded={open}
-            className="grid h-8 w-8 flex-none place-items-center rounded-[9px] text-muted transition hover:bg-surface2 hover:text-navy disabled:opacity-55"
+            className="grid h-8 w-8 flex-none place-items-center rounded-sm text-muted transition hover:bg-surface2 hover:text-navy disabled:bg-disabled-bg disabled:text-disabled-fg"
           >
             <Icon name="more_vert" size={18} />
           </button>
@@ -687,7 +687,7 @@ function MemberRow({
             <>
               {/* Click-away layer — keeps the menu dismissible without a document listener. */}
               <button className="fixed inset-0 z-10 cursor-default" aria-hidden tabIndex={-1} onClick={() => setOpen(false)} />
-              <div className="absolute end-3 top-12 z-20 w-52 overflow-hidden rounded-[11px] border border-border bg-surface py-1 shadow-lg">
+              <div className="absolute end-3 top-12 z-20 w-52 overflow-hidden rounded-sm border border-border bg-surface py-1">
                 {!isOwner && (
                   <MenuItem
                     onClick={() => {
@@ -732,7 +732,7 @@ function MenuItem({ children, onClick, danger }: { children: React.ReactNode; on
   return (
     <button
       onClick={onClick}
-      className={`block w-full px-3.5 py-2.5 text-start text-[13px] font-semibold transition hover:bg-surface2 ${danger ? "text-danger" : "text-navy"}`}
+      className={`block w-full px-3.5 py-2.5 text-start text-body font-semibold transition hover:bg-surface2 ${danger ? "text-danger" : "text-navy"}`}
     >
       {children}
     </button>
@@ -777,23 +777,23 @@ function ConfirmDialog({
         >
           <Icon name={spec.icon} size={26} />
         </span>
-        <h2 className="mt-4 text-[17px] font-extrabold text-navy">{spec.title}</h2>
+        <h2 className="mt-4 text-title font-extrabold text-navy">{spec.title}</h2>
         {/* `whitespace-pre-line` so the dissolve copy keeps its paragraph breaks (app parity). */}
-        <p className="mt-3 whitespace-pre-line text-start text-[13px] leading-relaxed text-muted">{spec.body}</p>
+        <p className="mt-3 whitespace-pre-line text-start text-body leading-relaxed text-muted">{spec.body}</p>
 
         <div className="mt-5 flex flex-col gap-1.5">
           {!spec.blocking && (
             <button
               onClick={onConfirm}
               disabled={busy}
-              className={`w-full rounded-[10px] px-5 py-3 text-[13.5px] font-bold transition hover:brightness-105 disabled:opacity-55 ${spec.danger ? "bg-danger text-white" : "bg-brand text-brand-fg"}`}
+              className={`w-full rounded-sm px-5 py-3 text-body font-semibold transition disabled:bg-disabled-bg disabled:text-disabled-fg ${spec.danger ? "bg-danger text-white" : "bg-brand text-brand-fg"}`}
             >
               {spec.confirmLabel ?? spec.title}
             </button>
           )}
           <button
             onClick={onCancel}
-            className="w-full rounded-[10px] px-5 py-2.5 text-[13px] font-bold text-muted transition hover:bg-surface2"
+            className="w-full rounded-sm px-5 py-2.5 text-body font-semibold text-muted transition hover:bg-surface2"
           >
             {c.cancel}
           </button>

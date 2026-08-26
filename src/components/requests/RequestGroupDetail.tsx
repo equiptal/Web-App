@@ -215,7 +215,7 @@
 //                 })()}
 //               </div>
 //               {blockedItem === rec.id && !isCancellable(rec.status) && (
-//                 <div style={{ margin: "0 0 10px", padding: "8px 12px", borderRadius: 10, background: "#FFF7ED", border: "1px solid #FDE8CC", fontSize: 12.5, fontWeight: 700, lineHeight: 1.5, color: "#92400e" }}>{cancelBlockedReason(rec.status, ar)}</div>
+//                 <div style={{ margin: "0 0 10px", padding: "8px 12px", borderRadius: 10, background: "var(--brand-soft)", border: "1px solid var(--brand-pale)", fontSize: 12.5, fontWeight: 700, lineHeight: 1.5, color: "var(--brand-deep)" }}>{cancelBlockedReason(rec.status, ar)}</div>
 //               )}
 //               {it ? <Ditem item={it} ar={ar} L={L} /> : <div className="notes">—</div>}
 //             </div>

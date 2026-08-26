@@ -63,17 +63,17 @@ export function RestoreAccountPrompt({
         <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-brand-soft text-brand">
           <Icon name="history" size={22} />
         </span>
-        <h2 className="text-[22px] font-extrabold tracking-[-.4px] text-navy">{a.restoreTitle}</h2>
+        <h2 className="text-display font-extrabold tracking-[-.4px] text-navy">{a.restoreTitle}</h2>
       </div>
-      <p className="text-[14px] leading-[1.55] text-muted">{a.restoreBody}</p>
+      <p className="text-body leading-[1.55] text-muted">{a.restoreBody}</p>
 
-      {err && <p className="mt-[12px] text-[13px] font-semibold text-danger">{err}</p>}
+      {err && <p className="mt-3 text-body font-semibold text-danger">{err}</p>}
 
       <button
         type="button"
         onClick={restore}
         disabled={busy !== null}
-        className="mt-[22px] flex w-full items-center justify-center gap-[7px] rounded-[10px] border border-brand bg-brand px-[24px] py-[13px] text-[14.5px] font-bold text-white transition hover:brightness-[1.04] disabled:opacity-50"
+        className="mt-6 flex w-full items-center justify-center gap-2 rounded-sm border border-brand bg-brand px-6 py-3 text-subhead font-extrabold text-white transition disabled:bg-disabled-bg disabled:text-disabled-fg"
       >
         {busy !== "restore" && <Icon name="check" size={18} />}
         <span>{busy === "restore" ? a.restoring : a.restoreConfirm}</span>
@@ -83,7 +83,7 @@ export function RestoreAccountPrompt({
         type="button"
         onClick={declineAndSignOut}
         disabled={busy !== null}
-        className="mt-[10px] w-full rounded-[10px] border border-border bg-surface px-[24px] py-[13px] text-[13.5px] font-bold text-navy-mid transition hover:bg-surface2 disabled:opacity-50"
+        className="mt-3 w-full rounded-sm border border-border bg-surface px-6 py-3 text-body font-semibold text-navy-mid transition hover:bg-surface2 disabled:bg-disabled-bg disabled:text-disabled-fg"
       >
         {a.restoreDeny}
       </button>

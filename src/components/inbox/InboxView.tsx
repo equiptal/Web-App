@@ -88,10 +88,10 @@ export function InboxView() {
   }
   if (bids.length === 0) {
     return (
-      <div className="mx-auto mt-10 max-w-md rounded-2xl border border-border bg-surface p-8 text-center">
+      <div className="mx-auto mt-10 max-w-md rounded-lg border border-border bg-surface p-8 text-center">
         <Icon name="inbox" size={40} className="text-muted" />
-        <h2 className="mt-3 text-[16px] font-extrabold text-navy">{L("No in-app bids yet", "لا عروض داخل التطبيق بعد")}</h2>
-        <p className="mt-1 text-[13px] text-muted">{L("Bids suppliers send you inside the app show up here, grouped by request. Off-platform bids from your shared link appear on each request itself.", "تظهر هنا العروض التي يرسلها المؤجّرون داخل التطبيق، مُجمّعة حسب الطلب. أمّا عروض الرابط المشترك (خارج المنصة) فتظهر على كل طلب.")}</p>
+        <h2 className="mt-3 text-subhead font-extrabold text-navy">{L("No in-app bids yet", "لا عروض داخل التطبيق بعد")}</h2>
+        <p className="mt-1 text-body text-muted">{L("Bids suppliers send you inside the app show up here, grouped by request. Off-platform bids from your shared link appear on each request itself.", "تظهر هنا العروض التي يرسلها المؤجّرون داخل التطبيق، مُجمّعة حسب الطلب. أمّا عروض الرابط المشترك (خارج المنصة) فتظهر على كل طلب.")}</p>
       </div>
     );
   }
@@ -118,8 +118,8 @@ export function InboxView() {
   }
 
   const row = (b: InboxBid) => (
-    <div key={b.bidId} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
-      <div className="grid h-11 w-11 flex-none place-items-center overflow-hidden rounded-xl bg-surface2 text-navy-mid">
+    <div key={b.bidId} className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3">
+      <div className="grid h-11 w-11 flex-none place-items-center overflow-hidden rounded-md bg-surface2 text-navy-mid">
         {b.supplierLogoUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img src={b.supplierLogoUrl} alt="" className="h-full w-full object-cover" />
@@ -129,23 +129,23 @@ export function InboxView() {
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-[14px] font-bold text-navy">{b.supplierName}</span>
-          <span className="inline-flex flex-none items-center gap-0.5 rounded-full bg-info-soft px-1.5 py-0.5 text-[9px] font-extrabold text-info">
+          <span className="truncate text-body font-semibold text-navy">{b.supplierName}</span>
+          <span className="inline-flex flex-none items-center gap-0.5 rounded-full bg-info-soft px-1.5 py-0.5 text-label font-extrabold text-info">
             <Icon name="verified_user" size={11} /> {L("via app", "عبر التطبيق")}
           </span>
-          {b.unreadCount > 0 && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand px-1 text-[10px] font-extrabold text-white">{b.unreadCount}</span>}
+          {b.unreadCount > 0 && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand px-1 text-label font-extrabold text-white">{b.unreadCount}</span>}
         </div>
-        <div className="truncate text-[12px] font-semibold text-muted">
+        <div className="truncate text-meta font-semibold text-muted">
           {b.equipmentName || b.request.equipmentSummary || L("Equipment", "معدة")}
           {b.currentPrice != null && <> · {nf(b.currentPrice)} {L("SAR", "ر.س")}</>}
         </div>
-        <div className="mt-1 text-[11px] font-bold" style={{ color: b.supplierStarted ? "var(--brand)" : "var(--muted)" }}>{statusLabel(b)}</div>
+        <div className="mt-1 text-label font-semibold" style={{ color: b.supplierStarted ? "var(--brand)" : "var(--muted)" }}>{statusLabel(b)}</div>
       </div>
       <button
         type="button"
         disabled={busyId === b.bidId}
         onClick={() => open(b)}
-        className={`flex-none rounded-[10px] px-3.5 py-2 text-[12.5px] font-bold ${b.supplierStarted ? "bg-brand text-white" : "border border-border bg-surface text-navy"} disabled:opacity-50`}
+        className={`flex-none rounded-sm px-3.5 py-2 text-meta font-semibold ${b.supplierStarted ? "bg-brand text-white" : "border border-border bg-surface text-navy"} disabled:bg-disabled-bg disabled:text-disabled-fg`}
       >
         {ctaLabel(b)}
       </button>
@@ -159,19 +159,19 @@ export function InboxView() {
           {/* Level 1 — the RFQ group: the short code first (RFQ-NNNNN when available, else the REQ- code —
               same fallback as the requests page), then the location. */}
           {(() => { const code = groupRefs.get(g.key) ?? g.code; return (
-          <div className="mb-2 flex items-center gap-2 px-1 text-[13.5px] font-extrabold text-navy">
+          <div className="mb-2 flex items-center gap-2 px-1 text-body font-extrabold text-navy">
             <Icon name="folder_open" size={16} />
-            {code && <span className="flex-none rounded-md bg-navy px-2 py-0.5 font-mono text-[11.5px] font-extrabold text-white">{code}</span>}
+            {code && <span className="flex-none rounded-sm bg-navy px-2 py-0.5 font-mono text-label font-extrabold text-white">{code}</span>}
             <span className="truncate text-muted">{g.label}</span>
-            <span className="flex-none text-[11px] font-bold uppercase tracking-wide text-muted">· {g.count} {L("bids", "عروض")}</span>
+            <span className="flex-none text-label font-semibold uppercase tracking-wide text-muted">· {g.count} {L("bids", "عروض")}</span>
           </div>
           ); })()}
           {[...g.subs.values()].map((sub) => (
             <div key={sub.key} className="mb-3 ms-2 border-s-2 border-border ps-3">
               {/* Level 2 — equipment type (prominent) */}
-              <div className="mb-2 inline-flex items-center gap-1.5 rounded-lg bg-brand-soft px-2.5 py-1 text-[12.5px] font-extrabold text-brand">
+              <div className="mb-2 inline-flex items-center gap-1.5 rounded-sm bg-brand-soft px-2.5 py-1 text-meta font-extrabold text-brand">
                 <Icon name="construction" size={15} /> <span className="truncate">{sub.label}</span>
-                <span className="flex-none rounded-full bg-brand/15 px-1.5 text-[11px] font-bold">{sub.rows.length}</span>
+                <span className="flex-none rounded-full bg-brand/15 px-1.5 text-label font-semibold">{sub.rows.length}</span>
               </div>
               <div className="flex flex-col gap-2">{sub.rows.map(row)}</div>
             </div>

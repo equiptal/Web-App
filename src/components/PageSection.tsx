@@ -9,7 +9,7 @@ import { Icon } from "@/components/ui";
  * "with nice redesign according to our new theme").
  *
  * ── Why this is a file and not a convention ─────────────────────────────────────────────────────
- * `/company` and `/profile` had each arrived at `rounded-[14px] border border-border bg-surface`
+ * `/company` and `/profile` had each arrived at `rounded-sm border border-border bg-surface`
  * independently, written out in both, and then diverged everywhere else: one titled its sections at
  * 11px uppercase and the other at 14px extrabold; one padded cards `p-5`, the other `p-4`; the
  * settings rows had a shape nothing else could reuse. Two pages agreeing by coincidence is not a
@@ -22,7 +22,7 @@ import { Icon } from "@/components/ui";
  */
 
 /** The card skin. Exported because a page occasionally needs the box without the label above it. */
-export const CARD = "rounded-[14px] border border-border bg-surface";
+export const CARD = "rounded-sm border border-border bg-surface";
 
 /**
  * The navy block a page opens with: who or what this page is about.
@@ -47,12 +47,12 @@ export function PageMasthead({
   children?: ReactNode;
 }) {
   return (
-    <div className="rounded-[16px] bg-navy p-5 text-white">
+    <div className="rounded-sm bg-navy p-5 text-white">
       <div className="flex items-center gap-4">
-        {icon && <span className="grid h-14 w-14 flex-none place-items-center rounded-[14px] bg-white/10">{icon}</span>}
+        {icon && <span className="grid h-14 w-14 flex-none place-items-center rounded-sm bg-white/10">{icon}</span>}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[17px] font-extrabold leading-tight">{title}</p>
-          {subtitle && <p className="mt-0.5 truncate text-[12.5px] text-white/65">{subtitle}</p>}
+          <p className="truncate text-title font-extrabold leading-tight">{title}</p>
+          {subtitle && <p className="mt-0.5 truncate text-meta text-white/65">{subtitle}</p>}
           {badge && <span className="mt-2 inline-flex items-center gap-1">{badge}</span>}
         </div>
       </div>
@@ -66,7 +66,7 @@ export function MastheadPill({ tone = "neutral", children }: { tone?: "neutral" 
   const skin =
     tone === "ok" ? "bg-ok/20 text-white" : tone === "warn" ? "bg-warn/25 text-white" : "bg-white/12 text-white";
   return (
-    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${skin}`}>
+    <span className={`inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-label font-semibold uppercase tracking-wide ${skin}`}>
       {children}
     </span>
   );
@@ -96,8 +96,8 @@ export function Section({
       {(title || action) && (
         <div className="mb-2 flex items-end justify-between gap-3 px-1">
           <div className="min-w-0">
-            {title && <h2 className="text-[11px] font-bold uppercase tracking-wide text-muted">{title}</h2>}
-            {hint && <p className="mt-1 text-[12.5px] leading-snug text-muted">{hint}</p>}
+            {title && <h2 className="text-label font-semibold uppercase tracking-wide text-muted">{title}</h2>}
+            {hint && <p className="mt-1 text-meta leading-snug text-muted">{hint}</p>}
           </div>
           {action && <div className="flex-none">{action}</div>}
         </div>
@@ -142,16 +142,16 @@ export function Row({
   const body = (
     <>
       {icon && (
-        <span className={`grid h-[34px] w-[34px] flex-none place-items-center rounded-[10px] ${danger ? "bg-danger-soft text-danger" : "bg-surface2 text-navy-mid"}`}>
+        <span className={`grid h-[34px] w-[34px] flex-none place-items-center rounded-sm ${danger ? "bg-danger-soft text-danger" : "bg-surface2 text-navy-mid"}`}>
           <Icon name={icon} size={18} />
         </span>
       )}
       <span className="min-w-0 flex-1">
-        <span className={`block truncate text-[13.5px] font-bold ${danger ? "text-danger" : "text-navy"}`}>{label}</span>
-        {hint && <span className="mt-0.5 block text-[12px] leading-snug text-muted">{hint}</span>}
+        <span className={`block truncate text-body font-semibold ${danger ? "text-danger" : "text-navy"}`}>{label}</span>
+        {hint && <span className="mt-0.5 block text-meta leading-snug text-muted">{hint}</span>}
       </span>
       {children}
-      {value != null && <span className="flex-none text-[13px] font-semibold text-muted">{value}</span>}
+      {value != null && <span className="flex-none text-body font-semibold text-muted">{value}</span>}
       {showArrow && <Icon name="chevron_right" size={18} className="flex-none text-muted rtl:scale-x-[-1]" />}
     </>
   );
@@ -190,8 +190,8 @@ export function FieldGrid({ children }: { children: ReactNode }) {
 export function Field({ label, value, ltr = false }: { label: ReactNode; value: ReactNode; ltr?: boolean }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] font-bold uppercase tracking-wide text-muted">{label}</dt>
-      <dd className="mt-0.5 truncate text-[13px] font-semibold text-navy" dir={ltr ? "ltr" : undefined}>
+      <dt className="text-label font-semibold uppercase tracking-wide text-muted">{label}</dt>
+      <dd className="mt-0.5 truncate text-body font-semibold text-navy" dir={ltr ? "ltr" : undefined}>
         {value}
       </dd>
     </div>

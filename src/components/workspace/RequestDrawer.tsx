@@ -134,16 +134,16 @@ export function RequestDrawer({
         <div className="flex-none bg-navy px-5 pb-5 pt-4 text-white">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-[11px] font-extrabold uppercase tracking-wide text-white/55">
+              <div className="text-label font-extrabold uppercase tracking-wide text-white/55">
                 {group.groupRef ?? subject?.displayId ?? group.id}
               </div>
-              <h2 className="mt-0.5 truncate text-[20px] font-extrabold tracking-[-.3px]">{group.locationLabel}</h2>
+              <h2 className="mt-0.5 truncate text-display font-extrabold tracking-[-.3px]">{group.locationLabel}</h2>
             </div>
             <button
               type="button"
               onClick={onClose}
               aria-label={t.common.close}
-              className="grid h-[34px] w-[34px] flex-none place-items-center rounded-full text-white/70 transition hover:bg-white/10 hover:text-white"
+              className="grid h-[34px] w-[34px] flex-none place-items-center rounded-full text-white/70 transition hover:bg-surface/10 hover:text-white"
             >
               <CloseIcon size={18} />
             </button>
@@ -153,7 +153,7 @@ export function RequestDrawer({
             <button
               type="button"
               onClick={() => setShareOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-[10px] bg-brand px-4 py-2 text-[13px] font-extrabold text-white transition hover:brightness-105"
+              className="inline-flex items-center gap-1.5 rounded-sm bg-brand px-4 py-2 text-body font-extrabold text-white transition"
             >
               <Icon name="ios_share" size={16} /> {t.workspace.shareRequest}
             </button>
@@ -162,14 +162,14 @@ export function RequestDrawer({
                 type="button"
                 disabled={actions.editCapUsed || loadingEdit}
                 onClick={() => (actions.editNeedsConfirm ? setConfirmEdit(true) : void openEdit())}
-                className="rounded-[10px] border border-white/30 px-4 py-2 text-[13px] font-bold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
+                className="rounded-sm border border-white/30 px-4 py-2 text-body font-semibold text-white transition hover:bg-surface/10 disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
               >
                 {t.workspace.editRequest}
               </button>
             )}
           </div>
           {/* Said out loud rather than left to a hover: a disabled button with no reason reads as a bug. */}
-          {actions.editCapUsed && <p className="mt-2 text-[11.5px] font-semibold text-white/60">{t.workspace.editCapUsed}</p>}
+          {actions.editCapUsed && <p className="mt-2 text-label font-semibold text-white/60">{t.workspace.editCapUsed}</p>}
         </div>
         }
       >
@@ -182,11 +182,11 @@ export function RequestDrawer({
               return (
                 <div
                   key={it.id}
-                  className={`flex items-center gap-3 rounded-[12px] border px-3 py-2.5 ${
+                  className={`flex items-center gap-3 rounded-sm border px-3 py-2.5 ${
                     focused ? "border-brand bg-brand-soft/40" : "border-border bg-surface2"
                   }`}
                 >
-                  <span className="grid h-11 w-14 flex-none place-items-center overflow-hidden rounded-[8px] bg-surface3">
+                  <span className="grid h-11 w-14 flex-none place-items-center overflow-hidden rounded-sm bg-surface3">
                     {img ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img src={img} alt="" className="h-full w-full object-cover" />
@@ -195,10 +195,10 @@ export function RequestDrawer({
                     )}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13.5px] font-extrabold text-navy">
+                    <div className="truncate text-body font-extrabold text-navy">
                       {it.item ? (ar ? it.item.nameAr || it.item.name : it.item.name) : it.displayId}
                     </div>
-                    <div className="text-[11.5px] font-semibold text-muted">
+                    <div className="text-label font-semibold text-muted">
                       {t.workspace.unitsCount.replace("{n}", String(it.item?.qty ?? 1))}
                     </div>
                   </div>
@@ -230,10 +230,10 @@ export function RequestDrawer({
               rendered rather than guessed at. */}
           {certs.length > 0 && (
             <div className="mt-4">
-              <div className="text-[10.5px] font-extrabold uppercase tracking-wide text-muted">{t.workspace.certsRequired}</div>
+              <div className="text-label font-extrabold uppercase tracking-wide text-muted">{t.workspace.certsRequired}</div>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {certs.map((c) => (
-                  <span key={c} className="rounded-full border border-brand/30 bg-brand-soft px-2.5 py-1 text-[11.5px] font-bold text-navy">
+                  <span key={c} className="rounded-full border border-brand/30 bg-brand-soft px-2.5 py-1 text-label font-semibold text-navy">
                     {ar ? CERT_LABEL[c].ar : CERT_LABEL[c].en}
                   </span>
                 ))}
@@ -247,7 +247,7 @@ export function RequestDrawer({
             <button
               type="button"
               onClick={() => setConfirmCancel(true)}
-              className="text-[12.5px] font-bold text-danger underline-offset-4 hover:underline"
+              className="text-meta font-semibold text-danger underline-offset-4 hover:underline"
             >
               {t.workspace.cancelRequest}
             </button>
@@ -319,8 +319,8 @@ export function RequestDrawer({
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-4 py-2.5">
-      <dt className="text-[10.5px] font-extrabold uppercase tracking-wide text-muted">{label}</dt>
-      <dd className="text-end text-[13px] font-bold text-navy">{value}</dd>
+      <dt className="text-label font-extrabold uppercase tracking-wide text-muted">{label}</dt>
+      <dd className="text-end text-body font-semibold text-navy">{value}</dd>
     </div>
   );
 }
@@ -342,13 +342,13 @@ function Confirm({
   return (
     <Dialog open onClose={onClose} size="sm" padded={false}>
       <div className="p-5">
-        <h3 className="text-[16px] font-extrabold text-navy">{title}</h3>
-        <p className="mt-1.5 text-[13px] font-semibold leading-relaxed text-navy-mid">{body}</p>
+        <h3 className="text-subhead font-extrabold text-navy">{title}</h3>
+        <p className="mt-1.5 text-body font-semibold leading-relaxed text-navy-mid">{body}</p>
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-[10px] border border-border px-4 py-2 text-[13px] font-bold text-navy-mid">
+          <button type="button" onClick={onClose} className="rounded-sm border border-border px-4 py-2 text-body font-semibold text-navy-mid">
             {t.common.cancel}
           </button>
-          <button type="button" onClick={onConfirm} className="rounded-[10px] bg-navy px-4 py-2 text-[13px] font-extrabold text-white">
+          <button type="button" onClick={onConfirm} className="rounded-sm bg-navy px-4 py-2 text-body font-extrabold text-white">
             {confirmLabel}
           </button>
         </div>

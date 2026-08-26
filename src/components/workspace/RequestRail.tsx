@@ -68,7 +68,7 @@ export function RequestRail({
         <span className="grid h-11 w-11 place-items-center rounded-full border-2 border-dashed border-border text-muted transition group-hover:border-brand group-hover:text-brand">
           <Icon name="add" size={20} />
         </span>
-        <span className="flex h-[22px] flex-col items-center text-[11px] font-semibold leading-[13px] text-muted">{t.workspace.newRequest}</span>
+        <span className="flex h-[22px] flex-col items-center text-label font-semibold leading-[13px] text-muted">{t.workspace.newRequest}</span>
       </Link>
 
       {/* ── The 26px under this rule, and under the chevron at the far end (owner, 2026-08-25) ─────
@@ -78,7 +78,7 @@ export function RequestRail({
           `-mt-2` that got it roughly half way. Borrowing the tile's own 4 + 22 as a bottom margin
           gives these two a tile's column height, so one `items-center` lands all three on the
           circles' line. */}
-      <div className="mb-[26px] h-9 w-px flex-none bg-border/70" />
+      <div className="mb-7 h-9 w-px flex-none bg-border/70" />
 
       <div
         ref={scroller}
@@ -106,14 +106,14 @@ export function RequestRail({
               onClick={() => onPick(tile.key)}
               aria-current={active ? "true" : undefined}
               title={tile.label}
-              className={`flex max-w-[104px] flex-none flex-col items-center gap-1 text-center transition ${dim} hover:opacity-100`}
+              className={`flex max-w-[104px] flex-none flex-col items-center gap-1 text-center transition ${dim}`}
             >
               {/* ── Pixels, not percentages of percentages (owner, 2026-08-25) ────────────────────
                   One machine kept drawing at about twice its circle, over its own caption, on one
                   tile out of eighteen — while the other seventeen sat correctly inside the same
                   markup. Padding was not what did it, and neither was `contain`: a 36px box with
                   `overflow-hidden rounded-full` over it cannot leak at all. What CAN fail is the
-                  chain that produced the 36 — `h-full` inside `h-full` inside a `p-[2px]` grid
+                  chain that produced the 36 — `h-full` inside `h-full` inside a `p-1` grid
                   area, three percentage heights deep, each one relying on the box above it being
                   resolvable. Where that chain gives out the boxes fall back to the picture's own
                   size, the clip grows to fit rather than cropping, and a portrait rig runs the
@@ -121,7 +121,7 @@ export function RequestRail({
                   44 / 40 / 36 are the numbers the percentages were computing anyway. Stated
                   outright there is nothing left to resolve, so the clip is 36px on every tile and
                   every machine, whatever its shape. */}
-              <span className={`grid h-11 w-11 flex-none place-items-center rounded-full p-[2px] ${ring}`}>
+              <span className={`grid h-11 w-11 flex-none place-items-center rounded-full p-1 ${ring}`}>
                 <span className="relative h-10 w-10 rounded-full border-2 border-surface">
                   <span className={`grid h-9 w-9 place-items-center overflow-hidden rounded-full bg-surface3 ${tile.closed ? "grayscale" : ""}`}>
                     {img ? (
@@ -151,7 +151,7 @@ export function RequestRail({
                          every machine whole. Reaching further needs a bigger circle, not less
                          padding. */
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={img} alt="" draggable={false} className="h-9 w-9 object-contain p-[3px]" />
+                      <img src={img} alt="" draggable={false} className="h-9 w-9 object-contain p-1" />
                     ) : (
                       <Icon name="precision_manufacturing" size={20} className="text-muted" />
                     )}
@@ -193,7 +193,7 @@ export function RequestRail({
                       carries the words, since neither badge is large enough to say them. */}
                   {tile.items > 1 ? (
                     <span
-                      className="absolute -bottom-px -end-px flex items-center gap-[2px] rounded-full border-2 border-surface bg-brand px-1 py-[1px] text-[10px] font-extrabold leading-[13px] text-brand-fg"
+                      className="absolute -bottom-px -end-px flex items-center gap-1 rounded-full border-2 border-surface bg-brand px-1 py-[1px] text-label font-extrabold leading-[13px] text-brand-fg"
                       title={t.workspace.itemsBadge.replace("{n}", String(tile.items))}
                     >
                       <Icon name="layers" size={9} />
@@ -201,7 +201,7 @@ export function RequestRail({
                     </span>
                   ) : tile.units > 1 ? (
                     <span
-                      className="absolute -bottom-px -end-px min-w-[19px] rounded-full border-2 border-surface bg-navy px-1 text-[10px] font-extrabold leading-[15px] text-white"
+                      className="absolute -bottom-px -end-px min-w-[19px] rounded-full border-2 border-surface bg-navy px-1 text-label font-extrabold leading-[15px] text-white"
                       title={t.workspace.unitsTitle.replace("{n}", String(tile.units))}
                     >
                       {t.workspace.unitsBadge.replace("{n}", String(tile.units))}
@@ -210,11 +210,11 @@ export function RequestRail({
                 </span>
               </span>
               <span className="flex h-[22px] flex-col items-center">
-                <span className={`max-w-[104px] truncate text-[11px] leading-[13px] ${active ? "font-bold text-navy" : "font-semibold text-navy-mid"}`}>
+                <span className={`max-w-[104px] truncate text-label leading-[13px] ${active ? "font-semibold text-navy" : "font-semibold text-navy-mid"}`}>
                   {tile.label}
                 </span>
                 {tile.closed && (
-                  <span className="text-[7px] font-bold uppercase leading-[9px] tracking-[.07em] text-muted">{t.workspace.closed}</span>
+                  <span className="text-[7px] font-semibold uppercase leading-[9px] tracking-[.07em] text-muted">{t.workspace.closed}</span>
                 )}
               </span>
             </button>
@@ -229,7 +229,7 @@ export function RequestRail({
         onClick={() => scrollBy(1)}
         aria-label={t.workspace.railScrollNext}
         title={t.workspace.railScrollNext}
-        className="mb-[26px] grid h-7 w-7 flex-none place-items-center rounded-full border border-border bg-surface/60 text-muted transition hover:bg-surface"
+        className="mb-7 grid h-7 w-7 flex-none place-items-center rounded-full border border-border bg-surface/60 text-muted transition hover:bg-surface"
       >
         <Icon name="chevron_right" size={16} className="rtl:scale-x-[-1]" />
       </button>

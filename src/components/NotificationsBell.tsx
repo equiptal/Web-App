@@ -140,11 +140,11 @@ export function NotificationsBell() {
   return (
     <div className="relative">
       {/* The bell is the header prototype's outline, not Material's glyph, and it inherits the bar's
-          `#5b6672` rather than setting its own colour — it and the inbox are one pair, and the pair
+          `var(--muted-dark)` rather than setting its own colour — it and the inbox are one pair, and the pair
           is coloured by the group that holds them (owner, 2026-08-25). */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="grid h-[34px] w-[34px] place-items-center rounded-full transition hover:text-[#1f2d3a]"
+        className="grid h-[34px] w-[34px] place-items-center rounded-full transition hover:text-navy-deep"
         aria-label={t.notifications.title}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -163,14 +163,14 @@ export function NotificationsBell() {
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div
             role="menu"
-            className="absolute end-0 z-40 mt-1 flex max-h-[70vh] w-[340px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[12px] border border-border bg-surface shadow-lg"
+            className="absolute end-0 z-40 mt-1 flex max-h-[70vh] w-[340px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-sm border border-border bg-surface"
           >
             <div className="flex items-center justify-between gap-2 border-b border-border px-3.5 py-2.5">
-              <b className="text-[14px] font-extrabold text-navy">{t.notifications.title}</b>
+              <b className="text-body font-extrabold text-navy">{t.notifications.title}</b>
               {unread > 0 && (
                 <button
                   onClick={onMarkAll}
-                  className="text-[12px] font-bold text-brand transition hover:brightness-110"
+                  className="text-meta font-semibold text-brand transition"
                 >
                   {t.notifications.markAllRead}
                 </button>
@@ -182,7 +182,7 @@ export function NotificationsBell() {
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`rounded-full px-3 py-1 text-[12px] font-bold transition ${
+                  className={`rounded-full px-3 py-1 text-meta font-semibold transition ${
                     filter === f ? "bg-navy text-white" : "bg-surface2 text-muted hover:text-navy-mid"
                   }`}
                 >
@@ -198,10 +198,10 @@ export function NotificationsBell() {
                 </div>
               )}
               {error && !loading && (
-                <p className="px-4 py-10 text-center text-[13px] font-semibold text-muted">{t.notifications.loadError}</p>
+                <p className="px-4 py-10 text-center text-body font-semibold text-muted">{t.notifications.loadError}</p>
               )}
               {isEmpty && (
-                <p className="px-4 py-10 text-center text-[13px] font-semibold text-muted">
+                <p className="px-4 py-10 text-center text-body font-semibold text-muted">
                   {filter === "unread" ? t.notifications.emptyUnread : t.notifications.empty}
                 </p>
               )}
@@ -210,7 +210,7 @@ export function NotificationsBell() {
                 order.map((key) =>
                   groups[key].length ? (
                     <div key={key}>
-                      <div className="bg-surface2/60 px-3.5 py-1.5 text-[11px] font-extrabold uppercase tracking-wide text-muted">
+                      <div className="bg-surface2/60 px-3.5 py-1.5 text-label font-extrabold uppercase tracking-wide text-muted">
                         {groupLabel[key]}
                       </div>
                       {groups[key].map((n) => (
@@ -225,14 +225,14 @@ export function NotificationsBell() {
                           />
                           <span className="min-w-0 flex-1">
                             <span className="flex items-baseline justify-between gap-2">
-                              <b className={`truncate text-[13px] ${n.isRead ? "font-semibold text-navy-mid" : "font-extrabold text-navy"}`}>
+                              <b className={`truncate text-body ${n.isRead ? "font-semibold text-navy-mid" : "font-extrabold text-navy"}`}>
                                 {n.title}
                               </b>
-                              <small className="flex-none text-[11px] font-semibold text-muted">
+                              <small className="flex-none text-label font-semibold text-muted">
                                 {relativeTime(n.createdAt, locale, t.notifications.justNow)}
                               </small>
                             </span>
-                            {n.body && <span className="mt-0.5 block text-[12px] leading-snug text-muted">{n.body}</span>}
+                            {n.body && <span className="mt-0.5 block text-meta leading-snug text-muted">{n.body}</span>}
                           </span>
                         </button>
                       ))}

@@ -66,10 +66,10 @@ function BidEquipmentGate({ bidId }: { bidId: string }) {
       <div className="mx-auto flex max-w-md flex-col items-center gap-4 py-20 text-center">
         <span className="grid h-14 w-14 place-items-center rounded-full bg-surface2 text-navy-mid"><Icon name="lock" size={26} /></span>
         <div>
-          <h2 className="text-[17px] font-extrabold text-navy">{t.bidMap.signInTitle}</h2>
-          <p className="mt-1 text-[13px] text-muted">{t.bidMap.signInBody}</p>
+          <h2 className="text-title font-extrabold text-navy">{t.bidMap.signInTitle}</h2>
+          <p className="mt-1 text-body text-muted">{t.bidMap.signInBody}</p>
         </div>
-        <button onClick={() => openAuth()} className="rounded-full bg-brand px-5 py-2 text-[13px] font-bold text-white">{t.bidMap.signIn}</button>
+        <button onClick={() => openAuth()} className="rounded-full bg-brand px-5 py-2 text-body font-semibold text-white">{t.bidMap.signIn}</button>
       </div>
     );
   }
@@ -155,7 +155,7 @@ function BidEquipment({ bidId }: { bidId: string }) {
     );
   }
   if (!bid) {
-    return <div className="py-20 text-center text-[13px] font-bold text-muted">{t.bidMap.loadingBid}</div>;
+    return <div className="py-20 text-center text-body font-semibold text-muted">{t.bidMap.loadingBid}</div>;
   }
   // RM3-AC-25, second line of defence. The id check above is the one that fires today; this catches a
   // bid that arrives flagged off-platform from a mapper that does not exist yet. Both read the same
@@ -209,9 +209,9 @@ function OffPlatformState() {
 function StatePanel({ title, body, back }: { title: string; body: string; back: string }) {
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-3 py-20 text-center">
-      <h2 className="text-[17px] font-extrabold text-navy">{title}</h2>
-      <p className="text-[13px] leading-relaxed text-muted">{body}</p>
-      <Link href="/requests" className="rounded-full border border-border px-5 py-2 text-[13px] font-bold text-navy">{back}</Link>
+      <h2 className="text-title font-extrabold text-navy">{title}</h2>
+      <p className="text-body leading-relaxed text-muted">{body}</p>
+      <Link href="/requests" className="rounded-full border border-border px-5 py-2 text-body font-semibold text-navy">{back}</Link>
     </div>
   );
 }

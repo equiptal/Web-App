@@ -133,17 +133,17 @@ export function ShareForBidsSheet({
     ["More", "ios_share", L("More", "المزيد")],
   ] as const;
 
-  const lbl = "mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted";
+  const lbl = "mb-2 text-label font-semibold uppercase tracking-wide text-muted";
 
   return (
     <Dialog open onClose={onClose} size="md" padded={false}>
       <div className="flex min-h-0 flex-1 flex-col text-start" dir={ar ? "rtl" : "ltr"}>
         {/* header */}
         <div className="flex items-start gap-3 border-b border-border px-5 py-4">
-          <span className="grid h-10 w-10 flex-none place-items-center rounded-[10px] bg-brand text-white"><Icon name="ios_share" size={20} /></span>
+          <span className="grid h-10 w-10 flex-none place-items-center rounded-sm bg-brand text-white"><Icon name="ios_share" size={20} /></span>
           <div className="flex-1">
-            <h3 className="text-[16px] font-bold text-navy">{L("Share for bids", "مشاركة لتلقّي العروض")}</h3>
-            <p className="mt-0.5 text-[12.5px] font-normal text-muted">{L("Send this link to suppliers — they bid without an account, even off-platform.", "أرسل هذا الرابط للمؤجّرين — يقدّمون عرضهم دون حساب، حتى خارج المنصة.")}</p>
+            <h3 className="text-subhead font-extrabold text-navy">{L("Share for bids", "مشاركة لتلقّي العروض")}</h3>
+            <p className="mt-0.5 text-meta font-normal text-muted">{L("Send this link to suppliers — they bid without an account, even off-platform.", "أرسل هذا الرابط للمؤجّرين — يقدّمون عرضهم دون حساب، حتى خارج المنصة.")}</p>
           </div>
           <button onClick={onClose} className="grid h-8 w-8 flex-none place-items-center rounded-full text-muted hover:bg-surface2"><Icon name="close" size={18} /></button>
         </div>
@@ -153,11 +153,11 @@ export function ShareForBidsSheet({
           <div>
             <div className={lbl}>{L("Your bid link", "رابط تقديم العرض")}</div>
             <div className="flex gap-2">
-              <div className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-[10px] border border-border bg-surface2 px-3 text-[12.5px] text-navy">
+              <div className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-sm border border-border bg-surface2 px-3 text-meta text-navy">
                 <Icon name="link" size={15} className="flex-none text-muted" />
                 <span className="truncate" dir="ltr">{shareUrl || "…"}</span>
               </div>
-              <button onClick={copyLink} className={`inline-flex h-11 flex-none items-center gap-1.5 rounded-[10px] px-4 text-[13px] font-semibold text-white ${copied ? "bg-ok" : "bg-brand"}`}>
+              <button onClick={copyLink} className={`inline-flex h-11 flex-none items-center gap-1.5 rounded-sm px-4 text-body font-semibold text-white ${copied ? "bg-ok" : "bg-brand"}`}>
                 <Icon name={copied ? "check" : "content_copy"} size={16} />{copied ? L("Copied", "تم النسخ") : L("Copy", "نسخ")}
               </button>
             </div>
@@ -168,7 +168,7 @@ export function ShareForBidsSheet({
             <div className={lbl}>{L("Or share directly", "أو شارك مباشرة")}</div>
             <div className="grid grid-cols-4 gap-2">
               {channels.map(([kind, icon, label]) => (
-                <button key={kind} onClick={() => shareVia(kind)} className="flex flex-col items-center gap-1.5 rounded-[11px] border border-border bg-surface px-2 py-3 text-[11.5px] font-medium text-navy hover:bg-surface2">
+                <button key={kind} onClick={() => shareVia(kind)} className="flex flex-col items-center gap-1.5 rounded-sm border border-border bg-surface px-2 py-3 text-label font-semibold text-navy hover:bg-surface2">
                   <span className="grid h-9 w-9 place-items-center rounded-full bg-surface2 text-navy-mid"><Icon name={icon} size={18} /></span>{label}
                 </button>
               ))}
@@ -179,23 +179,23 @@ export function ShareForBidsSheet({
           <div>
             <div className={lbl}>{L("Bid deadline", "موعد نهائي للعروض")} · <span className="lowercase text-muted">{L("optional", "اختياري")}</span></div>
             {!dlEdit ? (
-              <div className="flex items-center gap-3 rounded-[11px] border border-border bg-surface px-3.5 py-3">
+              <div className="flex items-center gap-3 rounded-sm border border-border bg-surface px-3.5 py-3">
                 <Icon name="schedule" size={18} className="flex-none text-brand" />
                 <div className="flex-1">
-                  <b className="block text-[13px] font-semibold text-navy">{deadline ? new Date(deadline).toLocaleString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { dateStyle: "medium", timeStyle: "short" }) : L("No deadline set", "لا يوجد موعد نهائي")}</b>
-                  <span className="text-[11.5px] font-normal text-muted">{deadline ? L("Suppliers see a countdown; the link closes then.", "يرى المؤجّرون عدّاً تنازلياً؛ يُغلق الرابط حينها.") : L("The link stays open until you close the request.", "يبقى الرابط مفتوحاً حتى تُغلق الطلب.")}</span>
+                  <b className="block text-body font-semibold text-navy">{deadline ? new Date(deadline).toLocaleString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { dateStyle: "medium", timeStyle: "short" }) : L("No deadline set", "لا يوجد موعد نهائي")}</b>
+                  <span className="text-label font-normal text-muted">{deadline ? L("Suppliers see a countdown; the link closes then.", "يرى المؤجّرون عدّاً تنازلياً؛ يُغلق الرابط حينها.") : L("The link stays open until you close the request.", "يبقى الرابط مفتوحاً حتى تُغلق الطلب.")}</span>
                 </div>
-                <button onClick={openDl} className="flex-none rounded-lg px-4 py-1.5 text-[12.5px] font-bold text-brand" style={{ background: "#FFE0B3", border: "1px solid #F7A83D" }}>
+                <button onClick={openDl} className="flex-none rounded-sm px-4 py-1.5 text-meta font-semibold text-brand" style={{ background: "var(--brand-pale)", border: "1px solid var(--brand-light)" }}>
                   {deadline ? L("Edit", "تعديل") : L("Set", "تحديد")}
                 </button>
               </div>
             ) : (
-              <div className="rounded-[11px] border border-border bg-surface p-3.5">
-                <input type="datetime-local" value={dlInput} onChange={(e) => setDlInput(e.target.value)} className="h-11 w-full rounded-[10px] border border-border bg-surface2 px-3 text-[14px] text-navy outline-0" />
+              <div className="rounded-sm border border-border bg-surface p-3.5">
+                <input type="datetime-local" value={dlInput} onChange={(e) => setDlInput(e.target.value)} className="h-11 w-full rounded-sm border border-border bg-surface2 px-3 text-body text-navy outline-0" />
                 <div className="mt-2.5 flex justify-end gap-2">
-                  {deadline && <button onClick={() => saveDl(true)} className="rounded-lg border border-border px-3 py-1.5 text-[12.5px] font-semibold text-danger">{L("Clear", "مسح")}</button>}
-                  <button onClick={() => setDlEdit(false)} className="rounded-lg border border-border px-3 py-1.5 text-[12.5px] font-semibold text-navy-mid">{L("Cancel", "إلغاء")}</button>
-                  <button onClick={() => saveDl(false)} className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-1.5 text-[12.5px] font-semibold text-white"><Icon name="check" size={15} />{L("Save", "حفظ")}</button>
+                  {deadline && <button onClick={() => saveDl(true)} className="rounded-sm border border-border px-3 py-1.5 text-meta font-semibold text-danger">{L("Clear", "مسح")}</button>}
+                  <button onClick={() => setDlEdit(false)} className="rounded-sm border border-border px-3 py-1.5 text-meta font-semibold text-navy-mid">{L("Cancel", "إلغاء")}</button>
+                  <button onClick={() => saveDl(false)} className="inline-flex items-center gap-1.5 rounded-sm bg-brand px-4 py-1.5 text-meta font-semibold text-white"><Icon name="check" size={15} />{L("Save", "حفظ")}</button>
                 </div>
               </div>
             )}
@@ -205,28 +205,28 @@ export function ShareForBidsSheet({
           {LOGO_ENABLED && (
           <div>
             <div className={lbl}>{L("Company logo", "شعار الشركة")} · <span className="lowercase text-muted">{L("optional", "اختياري")}</span></div>
-            <div className="flex items-center gap-3 rounded-[11px] border border-border bg-surface px-3.5 py-3">
-              <span className="grid h-12 w-12 flex-none place-items-center overflow-hidden rounded-[10px] border border-border bg-surface2">
+            <div className="flex items-center gap-3 rounded-sm border border-border bg-surface px-3.5 py-3">
+              <span className="grid h-12 w-12 flex-none place-items-center overflow-hidden rounded-sm border border-border bg-surface2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 {logo ? <img src={logo} alt="" className="h-full w-full object-contain" /> : <Icon name="image" size={20} className="text-muted" />}
               </span>
-              <div className="flex-1 text-[12px] font-normal text-muted">{L("Shown at the top of the bid form suppliers see.", "يظهر أعلى نموذج العرض الذي يراه المؤجّرون.")}</div>
-              <label className="flex-none cursor-pointer rounded-lg border border-brand bg-white px-3 py-1.5 text-[12.5px] font-semibold text-brand">
+              <div className="flex-1 text-meta font-normal text-muted">{L("Shown at the top of the bid form suppliers see.", "يظهر أعلى نموذج العرض الذي يراه المؤجّرون.")}</div>
+              <label className="flex-none cursor-pointer rounded-sm border border-brand bg-white px-3 py-1.5 text-meta font-semibold text-brand">
                 {logo ? L("Change", "تغيير") : L("Upload", "رفع")}
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onPickLogo(f); }} />
               </label>
-              {logo && <button onClick={() => { setLogo(null); onSaveLogo?.(null); }} className="flex-none rounded-lg border border-border px-3 py-1.5 text-[12.5px] font-semibold text-danger">{L("Remove", "إزالة")}</button>}
+              {logo && <button onClick={() => { setLogo(null); onSaveLogo?.(null); }} className="flex-none rounded-sm border border-border px-3 py-1.5 text-meta font-semibold text-danger">{L("Remove", "إزالة")}</button>}
             </div>
           </div>
           )}
 
           {/* optional preview */}
           {formUrl && (
-            <a href={formUrl} target="_blank" rel="noopener" className="flex items-center gap-3 rounded-[11px] border border-border bg-surface px-3.5 py-3 hover:bg-surface2">
+            <a href={formUrl} target="_blank" rel="noopener" className="flex items-center gap-3 rounded-sm border border-border bg-surface px-3.5 py-3 hover:bg-surface2">
               <Icon name="visibility" size={18} className="flex-none text-navy-mid" />
               <span className="flex-1">
-                <b className="block text-[13px] font-semibold text-navy">{L("View the bid form", "عرض نموذج تقديم العرض")}</b>
-                <span className="text-[11.5px] font-normal text-muted">{L("See exactly what suppliers fill in — read-only.", "شاهد ما سيعبّيه المؤجّرون — للعرض فقط.")}</span>
+                <b className="block text-body font-semibold text-navy">{L("View the bid form", "عرض نموذج تقديم العرض")}</b>
+                <span className="text-label font-normal text-muted">{L("See exactly what suppliers fill in — read-only.", "شاهد ما سيعبّيه المؤجّرون — للعرض فقط.")}</span>
               </span>
               <Icon name="open_in_new" size={16} className="flex-none text-muted" />
             </a>
@@ -234,7 +234,7 @@ export function ShareForBidsSheet({
         </div>
 
         <div className="flex justify-end border-t border-border px-5 py-3">
-          <button onClick={onClose} className="rounded-[10px] border border-border bg-surface px-4 py-2.5 text-[13.5px] font-semibold text-navy-mid hover:bg-surface2">{L("Done", "تم")}</button>
+          <button onClick={onClose} className="rounded-sm border border-border bg-surface px-4 py-2.5 text-body font-semibold text-navy-mid hover:bg-surface2">{L("Done", "تم")}</button>
         </div>
       </div>
     </Dialog>

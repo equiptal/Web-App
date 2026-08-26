@@ -11,8 +11,8 @@ type NegMsg = { text: string; at: string; pending?: boolean; failed?: boolean };
 
 const SBNR_CSS = `
 .sbnr-page{position:fixed;inset:0;z-index:1000;background:var(--surface2);overflow-y:auto;-webkit-overflow-scrolling:touch}
-.sbnr-topnav{position:sticky;top:0;z-index:12;display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;background:#fff;border-bottom:1px solid var(--border)}
-.sbnr-topnav .bk{width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:#fff;color:var(--navy);display:grid;place-items:center;cursor:pointer;flex:0 0 auto}
+.sbnr-topnav{position:sticky;top:0;z-index:12;display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border)}
+.sbnr-topnav .bk{width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--navy);display:grid;place-items:center;cursor:pointer;flex:0 0 auto}
 .sbnr-topnav .bk .material-icons-outlined{font-size:20px}
 .sbnr-topnav .tt{font-size:15px;font-weight:800;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sbnr-inner{padding:16px 16px 0}
@@ -151,7 +151,7 @@ export function SharedBidNegotiateRoom({
           {/* top bar — supplier chip · equipment/RFQ block · off-platform phase pill · view-submission icon */}
           <div className="topbar">
             <div className="tb-sup" style={{ cursor: "default" }}>
-              <span className="av" style={{ background: "#d4780a" }}>{companyName.charAt(0).toUpperCase()}</span>
+              <span className="av" style={{ background: "var(--warn)" }}>{companyName.charAt(0).toUpperCase()}</span>
               <span className="nm">
                 <span className="n" style={{ color: "var(--navy)" }}>{companyName}{bid.verified && <span className="material-icons-outlined">verified</span>}</span>
                 <span className="sub">{L("Supplier · off-platform", "مؤجّر · خارج المنصة")}</span>
@@ -165,7 +165,7 @@ export function SharedBidNegotiateRoom({
                 <span className="sub">{submission?.validUntil ? L(`Valid until ${fmtDate(submission.validUntil)}`, `صالح حتى ${fmtDate(submission.validUntil)}`) : L("Submitted via your shared link", "مُقدَّم عبر رابطك المشترك")}</span>
               </span>
             </div>
-            <span className="tb-phase" style={{ color: "#d4780a", borderColor: "rgba(247,144,9,.4)", background: "#fff4e5" }}><span className="dot" />{L("Off-platform", "خارج المنصة")}</span>
+            <span className="tb-phase" style={{ color: "var(--warn)", borderColor: "color-mix(in srgb, var(--brand) 40%, transparent)", background: "var(--brand-soft)" }}><span className="dot" />{L("Off-platform", "خارج المنصة")}</span>
             <span className="tb-spacer" />
             {onViewSubmission && (
               <div className="tb-icons">

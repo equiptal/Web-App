@@ -133,20 +133,20 @@ export function CodeEntry({
       <button
         type="button"
         onClick={onEditNumber}
-        className="mb-[20px] inline-flex items-center gap-[4px] text-[13px] font-bold text-muted"
+        className="mb-5 inline-flex items-center gap-1 text-body font-semibold text-muted"
       >
         <Icon name="arrow_back" size={18} className="rtl:-scale-x-100" />
         {a.back}
       </button>
 
-      <h2 className="mb-[6px] text-[26px] font-extrabold tracking-[-.5px] text-navy">{a.codeTitle}</h2>
-      <p className="mb-[28px] text-[14px] leading-[1.55] text-muted">
+      <h2 className="mb-2 text-display font-extrabold tracking-[-.5px] text-navy">{a.codeTitle}</h2>
+      <p className="mb-7 text-body leading-[1.55] text-muted">
         {sentPre}
         <b className="text-navy" dir="ltr">{dest}</b>
         {sentPost}
       </p>
 
-      <div className="grid grid-cols-4 gap-[12px]" dir="ltr">
+      <div className="grid grid-cols-4 gap-3" dir="ltr">
         {boxes.map((d, i) => (
           <input
             key={i}
@@ -162,27 +162,27 @@ export function CodeEntry({
             onPaste={onPaste}
             aria-label={`Digit ${i + 1}`}
             style={OTP_FONT}
-            className={`h-[60px] w-full rounded-[10px] border-[1.5px] text-center text-[24px] font-bold text-navy outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)] ${
+            className={`h-[60px] w-full rounded-sm border-[1.5px] text-center text-display font-semibold text-navy outline-0 focus:border-brand ${
               d ? "border-brand bg-brand-soft" : "border-border bg-surface"
             }`}
           />
         ))}
       </div>
 
-      {err && <p className="mt-[12px] text-[13px] font-semibold text-danger">{a.errors[err]}</p>}
-      {resent && !err && <p className="mt-[12px] text-[13px] font-semibold text-ok">{a.resent}</p>}
+      {err && <p className="mt-3 text-body font-semibold text-danger">{a.errors[err]}</p>}
+      {resent && !err && <p className="mt-3 text-body font-semibold text-ok">{a.resent}</p>}
 
       <button
         type="submit"
         disabled={busy || code.length < 4}
-        className="mt-[24px] flex w-full items-center justify-center gap-[7px] rounded-[10px] border border-brand bg-brand px-[24px] py-[13px] text-[14.5px] font-bold text-white transition hover:brightness-[1.04] disabled:opacity-50"
+        className="mt-6 flex w-full items-center justify-center gap-2 rounded-sm border border-brand bg-brand px-6 py-3 text-subhead font-extrabold text-white transition disabled:bg-disabled-bg disabled:text-disabled-fg"
       >
         {!busy && <Icon name="check" size={18} />}
         <span>{busy ? a.verifying : verifyLabel ?? a.verify}</span>
       </button>
 
-      <div className="mt-[22px] text-center text-[13px] text-muted">
-        <button type="button" onClick={resend} className="font-bold text-[#2563EB]">
+      <div className="mt-6 text-center text-body text-muted">
+        <button type="button" onClick={resend} className="font-semibold text-info">
           {a.resend}
         </button>
       </div>

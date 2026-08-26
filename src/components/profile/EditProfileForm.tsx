@@ -137,7 +137,7 @@ export function EditProfileForm({
 
   // "optional" describes an EMPTY field only — once a value is stored it can't be cleared here (above).
   const optionalTag = (stored: string | null | undefined) =>
-    stored ? null : <span className="text-[11px] font-medium text-muted">— {p.optional}</span>;
+    stored ? null : <span className="text-label font-semibold text-muted">— {p.optional}</span>;
 
   // Optionals show `cantClear` as soon as a stored value is blanked — not only on submit — so the field
   // is never left looking emptied when the save can't empty it. Submit-time errors still take priority.
@@ -148,25 +148,25 @@ export function EditProfileForm({
   const companyNote = noteFor("companyName", profile.companyName, companyName);
 
   const inputCls =
-    "h-[46px] w-full rounded-[10px] border border-border bg-surface px-[14px] text-[14px] text-navy outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)]";
-  const labelCls = "mb-[6px] block text-[12.5px] font-bold text-navy-mid";
+    "h-[46px] w-full rounded-sm border border-border bg-surface px-4 text-body text-navy outline-0 focus:border-brand";
+  const labelCls = "mb-2 block text-meta font-semibold text-navy-mid";
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-[14px]">
-      <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
+    <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className={labelCls}>{p.firstName}</label>
           <input className={inputCls} value={firstName} onChange={(e) => setFirstName(e.target.value)} maxLength={30} />
-          {fe.firstName && <p className="mt-1 text-[12px] text-danger">{fe.firstName}</p>}
+          {fe.firstName && <p className="mt-1 text-meta text-danger">{fe.firstName}</p>}
         </div>
         <div>
           <label className={labelCls}>{p.lastName}</label>
           <input className={inputCls} value={lastName} onChange={(e) => setLastName(e.target.value)} maxLength={50} />
-          {fe.lastName && <p className="mt-1 text-[12px] text-danger">{fe.lastName}</p>}
+          {fe.lastName && <p className="mt-1 text-meta text-danger">{fe.lastName}</p>}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className={labelCls}>{p.city}</label>
           <select className={inputCls} value={city} onChange={(e) => setCity(e.target.value)}>
@@ -175,7 +175,7 @@ export function EditProfileForm({
               <option key={c.value} value={c.value}>{c.label}</option>
             ))}
           </select>
-          {fe.city && <p className="mt-1 text-[12px] text-danger">{fe.city}</p>}
+          {fe.city && <p className="mt-1 text-meta text-danger">{fe.city}</p>}
         </div>
         <div>
           <label className={labelCls}>{p.jobTitle}</label>
@@ -185,7 +185,7 @@ export function EditProfileForm({
               <option key={j.value} value={j.value}>{j.label}</option>
             ))}
           </select>
-          {fe.jobTitle && <p className="mt-1 text-[12px] text-danger">{fe.jobTitle}</p>}
+          {fe.jobTitle && <p className="mt-1 text-meta text-danger">{fe.jobTitle}</p>}
         </div>
       </div>
 
@@ -194,40 +194,40 @@ export function EditProfileForm({
           {p.companyName} {optionalTag(profile.companyName)}
         </label>
         <input className={inputCls} value={companyName} onChange={(e) => setCompanyName(e.target.value)} maxLength={200} placeholder={p.companyNamePlaceholder} />
-        {companyNote && <p className="mt-1 text-[12px] text-danger">{companyNote}</p>}
+        {companyNote && <p className="mt-1 text-meta text-danger">{companyNote}</p>}
       </div>
 
-      <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className={labelCls}>
             {p.email} {optionalTag(profile.email)}
           </label>
           <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" />
-          {emailNote && <p className="mt-1 text-[12px] text-danger">{emailNote}</p>}
+          {emailNote && <p className="mt-1 text-meta text-danger">{emailNote}</p>}
         </div>
         <div>
           <label className={labelCls}>
             {p.whatsapp} {optionalTag(profile.whatsapp)}
           </label>
           <input className={inputCls} inputMode="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+9665XXXXXXXX" dir="ltr" />
-          {whatsappNote && <p className="mt-1 text-[12px] text-danger">{whatsappNote}</p>}
+          {whatsappNote && <p className="mt-1 text-meta text-danger">{whatsappNote}</p>}
         </div>
       </div>
 
-      {err && <p className="text-[13px] font-semibold text-danger">{err}</p>}
+      {err && <p className="text-body font-semibold text-danger">{err}</p>}
 
       <div className="flex gap-2 pt-1">
         <button
           type="button"
           onClick={onCancel}
-          className="h-11 flex-1 rounded-[10px] border border-border bg-surface text-[13.5px] font-bold text-navy-mid hover:bg-surface2"
+          className="h-11 flex-1 rounded-sm border border-border bg-surface text-body font-semibold text-navy-mid hover:bg-surface2"
         >
           {p.cancel}
         </button>
         <button
           type="submit"
           disabled={busy}
-          className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-[10px] bg-brand text-[13.5px] font-bold text-brand-fg transition hover:brightness-[1.04] disabled:opacity-50"
+          className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-sm bg-brand text-body font-semibold text-brand-fg transition disabled:bg-disabled-bg disabled:text-disabled-fg"
         >
           {!busy && <Icon name="save" size={16} />}
           {busy ? p.saving : p.save}

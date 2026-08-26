@@ -194,9 +194,9 @@
 //                 <GroupStrip group={activeGroup} ar={ar} L={L} router={router} filledByItem={filledByItem} />
 //                 {/* items bar */}
 //                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "2px 0 14px" }}>
-//                   <span style={{ fontSize: 14, fontWeight: 800, color: "#1c3550" }}>{L(`${activeGroup.items.length} items in this request`, `${activeGroup.items.length} بنود في هذا الطلب`)}</span>
-//                   <button onClick={() => { setBidsItemId(null); setSeg("bids"); setActiveGroupId(activeGroup.id); }} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 12, border: "none", background: "#1c3550", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer", flexShrink: 0 }}>
-//                     <span className="material-icons-outlined" style={{ fontSize: 17 }}>compare_arrows</span>{L("View all bids for all items", "عرض كل العروض لكل البنود")} <span style={{ fontSize: 12, fontWeight: 800, background: "rgba(255,255,255,.16)", color: "#FBBF6B", padding: "1px 8px", borderRadius: 20 }}>{activeGroup.totalBids + linkCountOf(activeGroup)}</span>
+//                   <span style={{ fontSize: 14, fontWeight: 800, color: "var(--navy)" }}>{L(`${activeGroup.items.length} items in this request`, `${activeGroup.items.length} بنود في هذا الطلب`)}</span>
+//                   <button onClick={() => { setBidsItemId(null); setSeg("bids"); setActiveGroupId(activeGroup.id); }} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 12, border: "none", background: "var(--navy)", color: "var(--surface)", fontWeight: 800, fontSize: 13, cursor: "pointer", flexShrink: 0 }}>
+//                     <span className="material-icons-outlined" style={{ fontSize: 17 }}>compare_arrows</span>{L("View all bids for all items", "عرض كل العروض لكل البنود")} <span style={{ fontSize: 12, fontWeight: 800, background: "rgba(255,255,255,.16)", color: "var(--brand-light)", padding: "1px 8px", borderRadius: 20 }}>{activeGroup.totalBids + linkCountOf(activeGroup)}</span>
 //                   </button>
 //                 </div>
 //                 {/* 2-column item cards */}
@@ -206,37 +206,37 @@
 //                     const qty = r.item?.qty ?? 1;
 //                     const filled = filledByItem[r.id] ?? 0;
 //                     const p = qty ? Math.round((filled / qty) * 100) : 0;
-//                     const bc = p >= 50 ? "#1daf58" : p > 0 ? "#f79009" : "#d9362a";
+//                     const bc = p >= 50 ? "var(--ok)" : p > 0 ? "var(--brand)" : "var(--danger)";
 //                     const bidN = r.bidCount + (linkByRequest[r.id] ?? 0);
 //                     const basis = r.rentalType ? r.rentalType.charAt(0) + r.rentalType.slice(1).toLowerCase() : null;
 //                     return (
-//                       <div key={r.id} style={{ background: "#fff", border: "1px solid #d4e0ec", borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 2px rgba(20,40,70,.04)" }}>
-//                         <div style={{ height: 4, background: "#f79009" }} />
+//                       <div key={r.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", }}>
+//                         <div style={{ height: 4, background: "var(--brand)" }} />
 //                         <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-//                           <div style={{ width: 50, height: 50, borderRadius: 13, background: "#eff4f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+//                           <div style={{ width: 50, height: 50, borderRadius: 13, background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
 //                             <EquipImg src={r.item?.imageUrl ?? null} categoryId={r.item?.categoryId ?? null} name={title} box="" img="h-8 w-8 object-contain" iconSize={32} />
 //                           </div>
 //                           <div style={{ flex: 1, minWidth: 0 }}>
 //                             <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-//                               <span style={{ fontSize: 14, fontWeight: 900, color: "#1c3550", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</span>
-//                               {qty > 1 && <span style={{ fontSize: 12, fontWeight: 800, color: "#d4780a", background: "#fff3e0", padding: "1px 8px", borderRadius: 20, flexShrink: 0 }}>×{qty}</span>}
+//                               <span style={{ fontSize: 14, fontWeight: 900, color: "var(--navy)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</span>
+//                               {qty > 1 && <span style={{ fontSize: 12, fontWeight: 800, color: "var(--warn)", background: "var(--warn-soft)", padding: "1px 8px", borderRadius: 20, flexShrink: 0 }}>×{qty}</span>}
 //                             </div>
-//                             {basis && <div style={{ fontSize: 13, color: "#6b8fa8", fontWeight: 600, marginTop: 2 }}>{basis}</div>}
+//                             {basis && <div style={{ fontSize: 13, color: "var(--muted)", fontWeight: 600, marginTop: 2 }}>{basis}</div>}
 //                           </div>
 //                           <div style={{ width: 120, flexShrink: 0 }}>
 //                             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6, marginBottom: 4 }}>
 //                               <span style={{ fontSize: 13, fontWeight: 900, color: bc }}>{filled}/{qty}</span>
-//                               <span style={{ fontSize: 11, color: "#6b8fa8", fontWeight: 700 }}>{L("fulfilled", "موردة")}</span>
+//                               <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700 }}>{L("fulfilled", "موردة")}</span>
 //                             </div>
-//                             <div style={{ height: 7, borderRadius: 6, background: "#E4EAF1", overflow: "hidden" }}>
+//                             <div style={{ height: 7, borderRadius: 6, background: "var(--surface3)", overflow: "hidden" }}>
 //                               <div style={{ height: "100%", borderRadius: 6, background: bc, width: `${Math.min(100, p)}%` }} />
 //                             </div>
 //                           </div>
 //                         </div>
-//                         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 16px", background: "#F8FAFC", borderTop: "1px solid #EFF2F6" }}>
-//                           <span style={{ fontSize: 13, fontWeight: 700, color: "#2a4f72" }}><b style={{ color: bidN > 0 ? "#f79009" : "#9AA7B8", fontWeight: 900 }}>{bidN}</b> {L("total bids", "إجمالي العروض")}</span>
+//                         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 16px", background: "var(--surface)", borderTop: "1px solid var(--surface2)" }}>
+//                           <span style={{ fontSize: 13, fontWeight: 700, color: "var(--navy-mid)" }}><b style={{ color: bidN > 0 ? "var(--brand)" : "var(--muted-light)", fontWeight: 900 }}>{bidN}</b> {L("total bids", "إجمالي العروض")}</span>
 //                           <span style={{ flex: 1 }} />
-//                           <span style={{ fontSize: 12, fontWeight: 700, color: "#6b8fa8" }}>{r.displayId}</span>
+//                           <span style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>{r.displayId}</span>
 //                           {/* Per-item cancel. Always rendered — greyed out rather than removed — so a card
 //                               without it never reads as broken, and a tap explains why it's unavailable. */}
 //                           {(() => {
@@ -246,18 +246,18 @@
 //                             return (
 //                               <span role="button" tabIndex={0} aria-disabled={!can} title={label} aria-label={label}
 //                                 onClick={act} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); act(); } }}
-//                                 style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: "50%", flexShrink: 0, cursor: "pointer", color: can ? "#9AA7B8" : "#C3CDD9", background: can ? "#eef2f7" : "transparent", border: can ? "none" : "1px solid #E4EAF1" }}>
+//                                 style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: "50%", flexShrink: 0, cursor: "pointer", color: can ? "var(--muted-light)" : "var(--border-strong)", background: can ? "var(--surface2)" : "transparent", border: can ? "none" : "1px solid var(--surface3)" }}>
 //                                 <span className="material-icons-outlined" style={{ fontSize: 15 }}>close</span>
 //                               </span>
 //                             );
 //                           })()}
 //                         </div>
 //                         {blockedItem === r.id && !isCancellable(r.status) && (
-//                           <div style={{ padding: "8px 16px", background: "#FFF7ED", borderTop: "1px solid #FDE8CC", fontSize: 12, fontWeight: 700, lineHeight: 1.5, color: "#92400e" }}>{cancelBlockedReason(r.status, ar)}</div>
+//                           <div style={{ padding: "8px 16px", background: "var(--brand-soft)", borderTop: "1px solid var(--brand-pale)", fontSize: 12, fontWeight: 700, lineHeight: 1.5, color: "var(--brand-deep)" }}>{cancelBlockedReason(r.status, ar)}</div>
 //                         )}
-//                         <div style={{ display: "flex", gap: 11, padding: "12px 16px", borderTop: "1px solid #eff4f9" }}>
-//                           <button onClick={() => router.push(`/requests/group/${encodeURIComponent(activeGroup.id)}`)} style={{ flex: 1, padding: "11px", borderRadius: 11, border: "1px solid #d4e0ec", background: "#fff", color: "#1c3550", fontWeight: 800, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>{L("View Details", "عرض التفاصيل")}</button>
-//                           <button onClick={() => { setBidsItemId(r.id); setSeg("bids"); setActiveGroupId(activeGroup.id); }} style={{ flex: 1, padding: "11px", borderRadius: 11, border: "none", background: "#1c3550", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>{L("View Bids", "عرض العروض")} ({bidN})</button>
+//                         <div style={{ display: "flex", gap: 11, padding: "12px 16px", borderTop: "1px solid var(--surface2)" }}>
+//                           <button onClick={() => router.push(`/requests/group/${encodeURIComponent(activeGroup.id)}`)} style={{ flex: 1, padding: "11px", borderRadius: 11, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--navy)", fontWeight: 800, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>{L("View Details", "عرض التفاصيل")}</button>
+//                           <button onClick={() => { setBidsItemId(r.id); setSeg("bids"); setActiveGroupId(activeGroup.id); }} style={{ flex: 1, padding: "11px", borderRadius: 11, border: "none", background: "var(--navy)", color: "var(--surface)", fontWeight: 800, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>{L("View Bids", "عرض العروض")} ({bidN})</button>
 //                         </div>
 //                       </div>
 //                     );
@@ -306,7 +306,7 @@
 // function GroupChips({ groups, activeId, onPick, L, ar, groupRefs, onCancel }: { groups: RequestGroup[]; activeId: string | null; onPick: (id: string) => void; L: L; ar: boolean; groupRefs: Record<string, string>; onCancel: (gr: RequestGroup) => void }) {
 //   return (
 //     <div style={{ marginBottom: 4 }}>
-//       <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".09em", color: "#6b8fa8", marginBottom: 9 }}>{L("REQUESTS FOR QUOTE", "طلبات التسعير")}</div>
+//       <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".09em", color: "var(--muted)", marginBottom: 9 }}>{L("REQUESTS FOR QUOTE", "طلبات التسعير")}</div>
 //       <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 6 }}>
 //         {groups.map((gr) => {
 //           const on = gr.id === activeId;
@@ -317,23 +317,23 @@
 //             ? L("Cancel request", "إلغاء الطلب")
 //             : L(`Cancel remaining items (${canc.length})`, `إلغاء البنود المتبقية (${canc.length})`);
 //           return (
-//             <button key={gr.id} onClick={() => onPick(gr.id)} style={{ flexShrink: 0, textAlign: "start", minWidth: 180, padding: "11px 15px", borderRadius: 14, cursor: "pointer", background: on ? "#1c3550" : "#fff", border: `1px solid ${on ? "#1c3550" : "#d4e0ec"}` }}>
+//             <button key={gr.id} onClick={() => onPick(gr.id)} style={{ flexShrink: 0, textAlign: "start", minWidth: 180, padding: "11px 15px", borderRadius: 14, cursor: "pointer", background: on ? "var(--navy)" : "var(--surface)", border: `1px solid ${on ? "var(--navy)" : "var(--border)"}` }}>
 //               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-//                 <span style={{ fontSize: 14, fontWeight: 900, color: on ? "#fff" : "#1c3550" }}>{gr.groupRef ?? groupRefs[gr.id] ?? gr.items[0]?.displayId ?? shortRef(gr.id)}</span>
+//                 <span style={{ fontSize: 14, fontWeight: 900, color: on ? "var(--surface)" : "var(--navy)" }}>{gr.groupRef ?? groupRefs[gr.id] ?? gr.items[0]?.displayId ?? shortRef(gr.id)}</span>
 //                 <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
 //                   {(() => {
 //                     // One label for the whole RFQ: the shared status when the items agree, else the split
 //                     // ("Open (2) · Accepted (1)"). The dot follows whichever status is still actionable.
 //                     const rep = representativeStatus(gr.items);
-//                     const dot = rep && ["OPEN", "ACTIVE", "ACCEPTED"].includes(rep) ? "#1daf58" : rep === "PARTIALLY_ACCEPTED" ? "#f79009" : rep && ["EXPIRED", "FORCE_EXPIRED"].includes(rep) ? "#d9362a" : "#9AA7B8";
-//                     return <span style={{ display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "2px 9px", borderRadius: 20, background: on ? "rgba(255,255,255,.16)" : "#eff4f9", color: on ? "#fff" : "#2a4f72" }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: dot }} />{statusSummary(gr.items, ar)}</span>;
+//                     const dot = rep && ["OPEN", "ACTIVE", "ACCEPTED"].includes(rep) ? "var(--ok)" : rep === "PARTIALLY_ACCEPTED" ? "var(--brand)" : rep && ["EXPIRED", "FORCE_EXPIRED"].includes(rep) ? "var(--danger)" : "var(--muted-light)";
+//                     return <span style={{ display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "2px 9px", borderRadius: 20, background: on ? "rgba(255,255,255,.16)" : "var(--surface2)", color: on ? "var(--surface)" : "var(--navy-mid)" }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: dot }} />{statusSummary(gr.items, ar)}</span>;
 //                   })()}
 //                   {canc.length > 0 && (
-//                     <span role="button" tabIndex={0} title={xTitle} aria-label={xTitle} onClick={(e) => { e.stopPropagation(); onCancel(gr); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onCancel(gr); } }} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, borderRadius: "50%", cursor: "pointer", color: on ? "rgba(255,255,255,.8)" : "#9AA7B8", background: on ? "rgba(255,255,255,.12)" : "#eef2f7" }}><span className="material-icons-outlined" style={{ fontSize: 15 }}>close</span></span>
+//                     <span role="button" tabIndex={0} title={xTitle} aria-label={xTitle} onClick={(e) => { e.stopPropagation(); onCancel(gr); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onCancel(gr); } }} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, borderRadius: "50%", cursor: "pointer", color: on ? "rgba(255,255,255,.8)" : "var(--muted-light)", background: on ? "rgba(255,255,255,.12)" : "var(--surface2)" }}><span className="material-icons-outlined" style={{ fontSize: 15 }}>close</span></span>
 //                   )}
 //                 </span>
 //               </div>
-//               <div style={{ fontSize: 12, fontWeight: 600, color: on ? "#C7D4E5" : "#6b8fa8", marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 165 }}>{gr.locationLabel}</div>
+//               <div style={{ fontSize: 12, fontWeight: 600, color: on ? "var(--border-strong)" : "var(--muted)", marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 165 }}>{gr.locationLabel}</div>
 //             </button>
 //           );
 //         })}
@@ -347,7 +347,7 @@
 // export function GroupStrip({ group, ar, L, router, filledByItem = {} }: { group: RequestGroup; ar: boolean; L: L; router: Router; filledByItem?: Record<string, number> }) {
 //   const ovLabel = statusSummary(group.items, ar);
 //   const [ffExpanded, setFfExpanded] = useState(false);
-//   const barColor = (p: number) => (p >= 50 ? "#1daf58" : p > 0 ? "#FBBF6B" : "#F87171");
+//   const barColor = (p: number) => (p >= 50 ? "var(--ok)" : p > 0 ? "var(--brand-light)" : "var(--danger)");
 //   // web-app/006 — shared-link tracker for this group (copy link + opened/submitted, keyed by group id).
 //   const [link, setLink] = useState<{ openedCount: number; submittedCount: number; renterName: string | null; bidDeadline: string | null; logoUrl: string | null; groupRef: string | null } | null>(null);
 //   // Share + deadline both happen in the shared sheet (same UI as the post-submit confirmation).
@@ -368,30 +368,30 @@
 //   const ffItems = [...group.items].sort((a, b) => (b.item?.qty ?? 1) - (a.item?.qty ?? 1));
 //   const ffShown = ffExpanded ? ffItems : ffItems.slice(0, 4);
 //   return (
-//     <div style={{ background: "linear-gradient(135deg,#1c3550 0%,#12263a 100%)", borderRadius: 20, padding: "14px 20px", color: "#fff", margin: "12px 0 16px", boxShadow: "0 12px 32px rgba(19,35,60,.18)" }}>
+//     <div style={{ background: "linear-gradient(135deg,var(--navy) 0%,var(--navy-deep) 100%)", borderRadius: 20, padding: "14px 20px", color: "var(--surface)", margin: "12px 0 16px", }}>
 //       <div style={{ display: "flex", gap: 24, alignItems: "stretch", flexWrap: "wrap" }}>
 //         {/* LEFT — request info + share link + stats */}
 //         <div style={{ flex: "1 1 280px", minWidth: 210, display: "flex", flexDirection: "column" }}>
 //           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
 //             <span style={{ flex: "0 1 auto", minWidth: 0, fontSize: 18, fontWeight: 900, lineHeight: 1.25, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={group.locationLabel}>{group.locationLabel}</span>
-//             <span style={{ flexShrink: 0, whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20, background: "rgba(29,175,88,.16)", color: "#7CE5A6" }}>● {ovLabel}</span>
-//             {isBroadcast && <span style={{ flexShrink: 0, whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20, background: "rgba(255,255,255,.10)", color: "#C7D4E5" }}>📣 {L("Broadcast", "بثّ")}</span>}
+//             <span style={{ flexShrink: 0, whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20, background: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok-soft)" }}>● {ovLabel}</span>
+//             {isBroadcast && <span style={{ flexShrink: 0, whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20, background: "rgba(255,255,255,.10)", color: "var(--border-strong)" }}>📣 {L("Broadcast", "بثّ")}</span>}
 //           </div>
-//           <div style={{ fontSize: 13, color: "#9DAFC6", marginTop: 5, fontWeight: 600 }}>{group.groupRef ?? link?.groupRef ?? group.items[0]?.displayId ?? shortRef(group.id)}{group.createdAt ? ` · ${fmtDate(group.createdAt, ar)}` : ""}</div>
-//           <button onClick={() => router.push(`/requests/group/${encodeURIComponent(group.id)}`)} style={{ display: "inline-flex", alignItems: "center", gap: 6, alignSelf: "flex-start", marginTop: 8, padding: "6px 12px", borderRadius: 9, border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.06)", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>{L("View full request details", "عرض تفاصيل الطلب كاملة")} <span className="material-icons-outlined" style={{ fontSize: 15 }}>open_in_new</span></button>
+//           <div style={{ fontSize: 13, color: "var(--muted-light)", marginTop: 5, fontWeight: 600 }}>{group.groupRef ?? link?.groupRef ?? group.items[0]?.displayId ?? shortRef(group.id)}{group.createdAt ? ` · ${fmtDate(group.createdAt, ar)}` : ""}</div>
+//           <button onClick={() => router.push(`/requests/group/${encodeURIComponent(group.id)}`)} style={{ display: "inline-flex", alignItems: "center", gap: 6, alignSelf: "flex-start", marginTop: 8, padding: "6px 12px", borderRadius: 9, border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.06)", color: "var(--surface)", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>{L("View full request details", "عرض تفاصيل الطلب كاملة")} <span className="material-icons-outlined" style={{ fontSize: 15 }}>open_in_new</span></button>
 //           {isBroadcast && (
 //             <div style={{ marginTop: "auto", paddingTop: 11, borderTop: "1px solid rgba(255,255,255,.12)" }}>
 //               <div style={{ display: "flex", alignItems: "center", gap: 11, flexWrap: "wrap" }}>
-//                 <span className="material-icons-outlined" style={{ fontSize: 17, color: "#FBBF6B" }}>link</span>
-//                 <span style={{ flex: 1, minWidth: 120, fontSize: 13, fontWeight: 800, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{shareUrl}</span>
+//                 <span className="material-icons-outlined" style={{ fontSize: 17, color: "var(--brand-light)" }}>link</span>
+//                 <span style={{ flex: 1, minWidth: 120, fontSize: 13, fontWeight: 800, color: "var(--surface)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{shareUrl}</span>
 //                 <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-//                   <button onClick={() => setShareOpen(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "none", background: "#f79009", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer" }}><span className="material-icons-outlined" style={{ fontSize: 16 }}>ios_share</span>{L("Share", "مشاركة")}</button>
+//                   <button onClick={() => setShareOpen(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "none", background: "var(--brand)", color: "var(--surface)", fontWeight: 800, fontSize: 13, cursor: "pointer" }}><span className="material-icons-outlined" style={{ fontSize: 16 }}>ios_share</span>{L("Share", "مشاركة")}</button>
 //                 </div>
 //               </div>
-//               <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", fontSize: 12.5, fontWeight: 800, color: "#E3ECF6", marginTop: 9 }}>
-//                 <span><span className="material-icons-outlined" style={{ fontSize: 14, verticalAlign: "-2px" }}>visibility</span> <b style={{ color: "#C7D4E5" }}>{link?.openedCount ?? 0}</b> {L("opened", "فتحة")}</span>
-//                 <span><span className="material-icons-outlined" style={{ fontSize: 14, verticalAlign: "-2px" }}>inbox</span> <b style={{ color: "#FBBF6B" }}>{link?.submittedCount ?? 0}</b> {L("submitted", "عرض")}</span>
-//                 <span><span className="material-icons-outlined" style={{ fontSize: 14, verticalAlign: "-2px" }}>schedule</span> {L("Closes", "يُغلق")} <b style={{ color: "#fff" }}>{link?.bidDeadline ? new Date(link.bidDeadline).toLocaleString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { dateStyle: "medium", timeStyle: "short" }) : L("—", "—")}</b></span>
+//               <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", fontSize: 12.5, fontWeight: 800, color: "var(--surface3)", marginTop: 9 }}>
+//                 <span><span className="material-icons-outlined" style={{ fontSize: 14, verticalAlign: "-2px" }}>visibility</span> <b style={{ color: "var(--border-strong)" }}>{link?.openedCount ?? 0}</b> {L("opened", "فتحة")}</span>
+//                 <span><span className="material-icons-outlined" style={{ fontSize: 14, verticalAlign: "-2px" }}>inbox</span> <b style={{ color: "var(--brand-light)" }}>{link?.submittedCount ?? 0}</b> {L("submitted", "عرض")}</span>
+//                 <span><span className="material-icons-outlined" style={{ fontSize: 14, verticalAlign: "-2px" }}>schedule</span> {L("Closes", "يُغلق")} <b style={{ color: "var(--surface)" }}>{link?.bidDeadline ? new Date(link.bidDeadline).toLocaleString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { dateStyle: "medium", timeStyle: "short" }) : L("—", "—")}</b></span>
 //               </div>
 //             </div>
 //           )}
@@ -400,10 +400,10 @@
 //         {/* RIGHT — fulfillment tracking */}
 //         <div style={{ flex: "1 1 360px", minWidth: 210, maxWidth: 460, background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.10)", borderRadius: 16, padding: "11px 13px" }}>
 //           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 9 }}>
-//             <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".07em", color: "#8FA2BC" }}>{L("FULFILLMENT TRACKING", "متابعة التوريد")}</span>
+//             <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".07em", color: "var(--muted-light)" }}>{L("FULFILLMENT TRACKING", "متابعة التوريد")}</span>
 //             <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-//               <span style={{ fontSize: 13, fontWeight: 900, color: "#FBBF6B", whiteSpace: "nowrap" }}>{group.totalBids + (link?.submittedCount ?? 0)} {L("bids", "عرض")}</span>
-//               {group.items.length > 4 && <button onClick={() => setFfExpanded((v) => !v)} style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, fontWeight: 800, color: "#FBBF6B", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.12)", padding: "5px 10px", borderRadius: 8, cursor: "pointer", whiteSpace: "nowrap" }}>{ffExpanded ? L("Show less", "أقل") : L(`View all ${group.items.length} items`, `عرض كل ${group.items.length} بند`)}<span className="material-icons-outlined" style={{ fontSize: 14 }}>{ffExpanded ? "expand_less" : "expand_more"}</span></button>}
+//               <span style={{ fontSize: 13, fontWeight: 900, color: "var(--brand-light)", whiteSpace: "nowrap" }}>{group.totalBids + (link?.submittedCount ?? 0)} {L("bids", "عرض")}</span>
+//               {group.items.length > 4 && <button onClick={() => setFfExpanded((v) => !v)} style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, fontWeight: 800, color: "var(--brand-light)", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.12)", padding: "5px 10px", borderRadius: 8, cursor: "pointer", whiteSpace: "nowrap" }}>{ffExpanded ? L("Show less", "أقل") : L(`View all ${group.items.length} items`, `عرض كل ${group.items.length} بند`)}<span className="material-icons-outlined" style={{ fontSize: 14 }}>{ffExpanded ? "expand_less" : "expand_more"}</span></button>}
 //             </div>
 //           </div>
 //           <div style={{ display: "grid", gridTemplateColumns: ffItems.length <= 2 ? "1fr" : "repeat(2,1fr)", gap: 7 }}>
@@ -413,15 +413,15 @@
 //               return (
 //                 <div key={it.id} style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.10)", borderRadius: 12, padding: "7px 10px", display: "flex", alignItems: "center", gap: 9 }}>
 //                   <div style={{ position: "relative", width: 46, height: 46, flexShrink: 0 }}>
-//                     <div style={{ width: 46, height: 46, borderRadius: 12, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", padding: 1 }}>
+//                     <div style={{ width: 46, height: 46, borderRadius: 12, background: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", padding: 1 }}>
 //                       <EquipImg src={it.item?.imageUrl ?? null} categoryId={it.item?.categoryId ?? null} name={name} box="" img="h-[42px] w-[42px] object-contain" iconSize={40} />
 //                     </div>
-//                     <span style={{ position: "absolute", top: -7, insetInlineEnd: -7, fontSize: 10, fontWeight: 900, color: "#1c3550", background: "#FBBF6B", padding: "1px 5px", borderRadius: 20, boxShadow: "0 1px 3px rgba(0,0,0,.25)" }}>×{needed}</span>
+//                     <span style={{ position: "absolute", top: -7, insetInlineEnd: -7, fontSize: 10, fontWeight: 900, color: "var(--navy)", background: "var(--brand-light)", padding: "1px 5px", borderRadius: 20, }}>×{needed}</span>
 //                   </div>
 //                   <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 5 }}>
 //                     <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
 //                       <span style={{ fontSize: 14, fontWeight: 900, color: bc, whiteSpace: "nowrap" }}>{fl}/{needed}</span>
-//                       <span style={{ fontSize: 10, color: "#9DAFC6", fontWeight: 700, whiteSpace: "nowrap" }}>{L("units filled", "موردة")}</span>
+//                       <span style={{ fontSize: 10, color: "var(--muted-light)", fontWeight: 700, whiteSpace: "nowrap" }}>{L("units filled", "موردة")}</span>
 //                     </div>
 //                     <div style={{ height: 6, borderRadius: 6, background: "rgba(255,255,255,.14)", overflow: "hidden" }}>
 //                       <div style={{ height: "100%", borderRadius: 6, background: bc, width: `${Math.min(100, p)}%` }} />

@@ -578,7 +578,7 @@ function EquipmentCard({
               **«التفاصيل» is back on this row** (owner, 2026-08-19, against the v3 prototype's own
               card — `app-decoded.js:4009`). ~~It moved to row 3's cluster on 2026-08-11 because a white
               pill on a white card had no ground under it and read as floating.~~ Withdrawn: the ground
-              was the fix, not the row. The pill keeps the `#F2F6FA` tint it gained there, so it is no
+              was the fix, not the row. The pill keeps the `var(--background)` tint it gained there, so it is no
               longer white-on-white — and it returns to the trailing edge of the title, which is where
               the prototype puts it and where the reader's eye already is after the machine's name.
 
