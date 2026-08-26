@@ -285,7 +285,7 @@ function BidCardTile({
           e.stopPropagation();
           router.push(`/bids/${encodeURIComponent(card.id)}/equipment`);
         }}
-        className={btn("secondary", "md", { className: "flex flex-none text-start transition" })}
+        className="flex flex-none items-center gap-3 border-t border-border px-3.5 py-2 text-start transition-colors hover:bg-surface2/40"
       >
         <Icon name="precision_manufacturing" size={16} className="flex-none text-muted" />
         <span className="flex-1 text-body font-semibold text-navy">{t.workspace.equipmentAndDocs}</span>
@@ -299,7 +299,7 @@ function BidCardTile({
           e.stopPropagation();
           setTermsOpen(true);
         }}
-        className={btn("secondary", "md", { className: "flex flex-none text-start transition" })}
+        className="flex flex-none items-center gap-3 border-t border-border px-3.5 py-2 text-start transition-colors hover:bg-surface2/40"
       >
         <TermsDialGlyph met={dial.met} against={dial.against} unanswered={dial.unanswered} />
         <span className="flex-1 text-body font-semibold text-navy">{L("Terms", "الشروط")}</span>
