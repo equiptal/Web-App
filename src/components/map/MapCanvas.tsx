@@ -729,11 +729,15 @@ function machineIcon(
     unconfirmed: t.bidMap.pinUnconfirmed,
   }[pin.availability];
 
-  // The object's own motion and shadow, both prototype values. `drop-shadow`, not `box-shadow`: it has
-  // to follow the machine's silhouette, which is the point of shadowing the art rather than a box.
+  // The object's own motion. It used to carry a `drop-shadow` as well — the one shadow in the app
+  // with a case for itself, since a marker on a map has terrain under it and the shadow is what said
+  // so. It went with the rest (owner, 2026-08-26: no shadows anywhere). If the machines stop reading
+  // against a busy map, these two lines are where to put it back:
+  //   selected: filter:drop-shadow(0 14px 12px color-mix(in srgb, var(--info-deep) 34%, transparent))
+  //   resting:  filter:drop-shadow(0 7px 7px color-mix(in srgb, var(--info-deep) 30%, transparent))
   const art = selected
-    ? "animation:dpLift .55s cubic-bezier(.34,1.4,.64,1) forwards;filter:drop-shadow(0 14px 12px color-mix(in srgb, var(--info-deep) 34%, transparent))"
-    : "transform:translateY(-4px);filter:drop-shadow(0 7px 7px color-mix(in srgb, var(--info-deep) 30%, transparent))";
+    ? "animation:dpLift .55s cubic-bezier(.34,1.4,.64,1) forwards"
+    : "transform:translateY(-4px)";
 
   return L.divIcon({
     className: "", // no Leaflet default box — the marker is entirely our own markup
@@ -764,7 +768,10 @@ function machineIcon(
       // where the halo does not animate at all.
       (selected ? `<span class="bm-pin-ring"></span>` : "") +
       (selected ? `<span class="bm-pin-halo" style="border:2.5px solid ${ring}"></span>` : "") +
-      `<span class="bm-pin-disc" style="background:${tint};border:2.5px solid ${ring}${selected ? ";box-shadow:0 0 0 4px color-mix(in srgb, var(--info) 60%, transparent),0 0 0 10px color-mix(in srgb, var(--info) 16%, transparent)" : ""}"></span>` +
+      // The selected disc's ring. It was two stacked rings drawn as a box-shadow — 4px solid, then a
+      // 10px wash. An outline draws one, so it keeps the inner, solid one; the wash was the softer
+      // half of a shadow this app no longer has.
+      `<span class="bm-pin-disc" style="background:${tint};border:2.5px solid ${ring}${selected ? ";outline:4px solid color-mix(in srgb, var(--info) 60%, transparent)" : ""}"></span>` +
       `<span class="bm-pin-shadow"></span>` +
       `<span class="bm-pin-art" style="${art}">` +
       `<span class="bm-pin-glyph material-icons-outlined">${esc(iconName)}</span>` +

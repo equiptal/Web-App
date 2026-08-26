@@ -21,6 +21,7 @@ import {
 } from "@/lib/contract/bid-map";
 import { bidSuppliers, bidSupplierKey, mapBidList, type BidCard, type OfferedUnitDetail, type UnitLocationSource } from "@/lib/contract/bids";
 import type { UnitReadiness } from "@/lib/contract/bid-readiness";
+import { channels } from "../setup/ds";
 
 /**
  * The pure selectors behind the deal-room equipment-verification surface (spec 004 §6.4, §6.8, §7.2).
@@ -285,15 +286,15 @@ describe("the shortfall is ORANGE, and never availability's red (RM3-AC-06)", ()
   });
 
   it("is orange by measurement, not by name — red and green are both excluded", () => {
-    // The mutation this catches is `SHORTFALL_COLOUR = "#D9362A"`, which is still a constant called
+    // The mutation this catches is `SHORTFALL_COLOUR = "var(--danger)"`, which is still a constant called
     // SHORTFALL_COLOUR. Orange has a substantial green channel between the two; red does not.
-    const [r, g, b] = [1, 3, 5].map((i) => parseInt(SHORTFALL_COLOUR.slice(i, i + 2), 16));
+    const { r, g, b } = channels(SHORTFALL_COLOUR)!;
     expect(r).toBeGreaterThan(150); // warm
     expect(g).toBeGreaterThan(90); // …and not red, which has almost no green
     expect(g).toBeLessThan(r); // …and not yellow or green either
     expect(b).toBeLessThan(60);
 
-    const [rr, rg] = [1, 3].map((i) => parseInt(AVAILABILITY_COLOUR.unconfirmed.slice(i, i + 2), 16));
+    const { r: rr, g: rg } = channels(AVAILABILITY_COLOUR.unconfirmed)!;
     expect(rg).toBeLessThan(90); // the positive control: availability's red really is green-poor
     expect(rr).toBeGreaterThan(150);
   });

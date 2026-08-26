@@ -4,14 +4,14 @@
  * EXACTLY like the form — same layout, same classes — just filled with the supplier's answers.
  */
 export const BID_FORM_CSS = `
-.bidpage{--navy:var(--navy);--navy-deep:var(--navy-deep);--navy-mid:var(--navy-mid);--action:var(--brand);--action-dim:var(--brand-soft);--rentee:var(--info);--success:var(--ok);--success-bg:var(--ok-soft);--danger:var(--danger);--danger-bg:var(--danger-soft);--muted:var(--muted);--surface1:var(--surface);--surface2:var(--surface2);--border:var(--border);--line:var(--surface3);--r-md:10px;--r-lg:14px;--r-full:100px;
+.bidpage{--action:var(--brand);--action-dim:var(--brand-soft);--rentee:var(--info);--success:var(--ok);--success-bg:var(--ok-soft);--danger-bg:var(--danger-soft);--surface1:var(--surface);--line:var(--surface3);--r-md:10px;--r-lg:14px;--r-full:100px;
   min-height:100vh;background:var(--surface2);color:var(--navy);font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
 .bidpage.rtl{font-family:"IBM Plex Sans Arabic","Inter",sans-serif}
 .bidpage *{box-sizing:border-box}
 .bidpage .material-icons-outlined{font-family:'Material Icons Outlined';line-height:1}
 .pubbar{background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
 .pubbar-in{max-width:1060px;margin:0 auto;display:flex;align-items:center;gap:13px;padding:12px 24px}
-.rlogo{width:44px;height:44px;border-radius:10px;flex:0 0 auto;background:linear-gradient(135deg,var(--rentee),var(--info));color:var(--surface);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
+.rlogo{width:44px;height:44px;border-radius:10px;flex:0 0 auto;background:linear-gradient(135deg,var(--rentee),var(--info-deep));color:var(--surface);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
 .rlogo.rlogo-img{background:var(--surface);border:1px solid var(--border);overflow:hidden;padding:3px}
 .rlogo.rlogo-img img{width:100%;height:100%;object-fit:contain}
 .rmeta{min-width:0;flex:1 1 auto}
@@ -23,10 +23,10 @@ export const BID_FORM_CSS = `
 .rmeta .rsub .material-icons-outlined{font-size:13px;color:var(--success)}
 .pubbar .spacer{flex:1}
 /* Language toggle — a compact segmented pill: light track with the active side as a navy pill. */
-.langtog{display:inline-flex;align-items:center;gap:3px;flex:0 0 auto;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:3px;box-shadow:inset 0 1px 2px color-mix(in srgb, var(--navy) 7%, transparent)}
+.langtog{display:inline-flex;align-items:center;gap:3px;flex:0 0 auto;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:3px;}
 .langtog button{border:0;background:transparent;color:var(--muted);min-width:40px;padding:6px 13px;font:inherit;font-weight:800;font-size:13px;line-height:1;cursor:pointer;border-radius:999px;transition:background .15s,color .15s}
 .langtog button:hover{color:var(--navy)}
-.langtog button.on{background:var(--navy);color:var(--surface);box-shadow:0 1px 3px color-mix(in srgb, var(--navy) 28%, transparent)}
+.langtog button.on{background:var(--navy);color:var(--surface);}
 .langtog button.on:hover{color:var(--surface)}
 .wrap{max-width:1060px;margin:0 auto;padding:22px 24px 24px}
 .intro{margin:4px 0 18px}
@@ -38,12 +38,12 @@ export const BID_FORM_CSS = `
 .confirm-all .ca-tx .material-icons-outlined{font-size:18px;color:var(--success)}
 .confirm-all .ca-sw{margin-inline-start:auto;position:relative;width:46px;height:26px;border-radius:100px;background:var(--border);border:0;cursor:pointer;flex:0 0 auto;transition:background .15s}
 .confirm-all .ca-sw.on{background:var(--success)}
-.confirm-all .ca-sw::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:20px;height:20px;border-radius:50%;background:var(--surface);transition:inset-inline-start .15s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.confirm-all .ca-sw::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:20px;height:20px;border-radius:50%;background:var(--surface);transition:inset-inline-start .15s;}
 .confirm-all .ca-sw.on::after{inset-inline-start:23px}
 /* multi-unit confirmation note */
 .units-note{display:flex;align-items:flex-start;gap:10px;background:var(--action-dim);border:1px solid color-mix(in srgb, var(--brand) 30%, transparent);border-radius:var(--r-md);padding:11px 13px;margin:-4px 0 12px}
 .units-note.on{background:var(--success-bg);border-color:color-mix(in srgb, var(--ok) 35%, transparent)}
-.units-note.needpick{box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--info) 40%, transparent)}
+.units-note.needpick{outline: 2px solid color-mix(in srgb, var(--info) 40%, transparent); outline-offset: -2px}
 .units-note > .un-lead{font-size:18px;color:var(--brand);flex:0 0 auto;margin-top:1px}
 .units-note.on > .un-lead{color:var(--success)}
 .units-note .un-tx{flex:1;font-size:12.5px;color:var(--navy);line-height:1.5}
@@ -58,7 +58,7 @@ export const BID_FORM_CSS = `
 .subhead .yall.on{color:var(--success)}
 .subhead .yall .yall-sw{position:relative;width:34px;height:19px;border-radius:100px;background:var(--border);transition:background .15s;flex:0 0 auto}
 .subhead .yall.on .yall-sw{background:var(--success)}
-.subhead .yall .yall-sw::after{content:"";position:absolute;top:2.5px;inset-inline-start:2.5px;width:14px;height:14px;border-radius:50%;background:var(--surface);transition:inset-inline-start .15s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.subhead .yall .yall-sw::after{content:"";position:absolute;top:2.5px;inset-inline-start:2.5px;width:14px;height:14px;border-radius:50%;background:var(--surface);transition:inset-inline-start .15s;}
 .subhead .yall.on .yall-sw::after{inset-inline-start:17.5px}
 .countdown{background:linear-gradient(135deg,var(--navy),var(--navy-deep));color:var(--surface);border-radius:var(--r-lg);padding:18px;margin-bottom:18px;text-align:center}
 .cd-label{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--brand-pale);margin-bottom:13px}
@@ -103,14 +103,14 @@ export const BID_FORM_CSS = `
 .item-hd .units-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;letter-spacing:.01em;color:var(--surface);background:var(--brand);border:1px solid var(--brand);border-radius:var(--r-full);padding:3px 11px;white-space:nowrap}
 .item-hd .units-chip .msym{font-size:14px}
 /* Multi-unit: still subtle/light-grey (not bright orange) — just a touch more visible than single. */
-.item-hd .units-chip.multi{background:var(--brand);border-color:var(--brand);color:var(--surface);box-shadow:0 1px 4px color-mix(in srgb, var(--brand) 50%, transparent)}
+.item-hd .units-chip.multi{background:var(--brand);border-color:var(--brand);color:var(--surface);}
 .item-hd .ibadge{margin-inline-start:auto;flex:0 0 auto;font-size:10.5px;font-weight:800;color:rgba(255,255,255,.85);background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:var(--r-full);padding:4px 11px;white-space:nowrap}
 /* Opt-out toggle — supplier bids on only the items they can supply (multi-item requests). */
 .supply-tog{display:flex;align-items:center;gap:11px;width:100%;background:var(--success-bg);border:1px solid color-mix(in srgb, var(--ok) 35%, transparent);border-radius:var(--r-md);padding:11px 14px;margin-bottom:14px;cursor:pointer;font:inherit;text-align:start}
 .supply-tog.off{background:var(--surface2);border-color:var(--border)}
 .supply-tog .supply-sw{position:relative;width:44px;height:25px;border-radius:100px;background:var(--success);flex:0 0 auto;transition:background .15s}
 .supply-tog.off .supply-sw{background:var(--border)}
-.supply-tog .supply-sw::after{content:"";position:absolute;top:3px;inset-inline-start:22px;width:19px;height:19px;border-radius:50%;background:var(--surface);transition:inset-inline-start .15s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.supply-tog .supply-sw::after{content:"";position:absolute;top:3px;inset-inline-start:22px;width:19px;height:19px;border-radius:50%;background:var(--surface);transition:inset-inline-start .15s;}
 .supply-tog.off .supply-sw::after{inset-inline-start:3px}
 .supply-tog .supply-tx{flex:1;font-size:13.5px;font-weight:800;color:var(--navy)}
 .supply-tog .supply-skip{font-size:11.5px;font-weight:700;color:var(--muted);white-space:nowrap}
@@ -132,10 +132,10 @@ export const BID_FORM_CSS = `
    tablet/mobile; two per row on wider screens (each card needs room for its three zones). */
 .treqgrid{display:grid;grid-template-columns:1fr;gap:10px;align-items:stretch}
 @media(min-width:760px){.treqgrid{grid-template-columns:1fr 1fr}}
-.treqcell{display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:12px;padding:11px 14px;background:var(--surface);min-width:0;transition:border-color .15s,background .15s,box-shadow .15s}
+.treqcell{display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:12px;padding:11px 14px;background:var(--surface);min-width:0;transition: border-color .15s, background .15s}
 .treqcell.ok{border-color:color-mix(in srgb, var(--ok) 32%, transparent);background:var(--ok-soft)}
 .treqcell.declined{background:var(--danger-bg);border-color:color-mix(in srgb, var(--danger) 32%, transparent)}
-.treqcell.needpick{background:var(--surface2);border-color:transparent;box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--info) 40%, transparent)}
+.treqcell.needpick{background:var(--surface2);border-color:transparent;outline: 2px solid color-mix(in srgb, var(--info) 40%, transparent); outline-offset: -2px}
 /* zone 1 — term name + explainer (takes remaining width). break-word (not anywhere) so long names
    like "Operator FAT — Accommodation/Transport" wrap between words, never mid-word ("Transpo·rt"). */
 .treqcell .tc-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
@@ -162,7 +162,7 @@ export const BID_FORM_CSS = `
   .treqcell .tc-rw .q,.treqcell .tc-sw .q{white-space:nowrap}
 }
 .tmtx td.declined{background:var(--danger-bg)}
-.tmtx td.needpick{background:var(--surface2);box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--info) 40%, transparent)}
+.tmtx td.needpick{background:var(--surface2);outline: 2px solid color-mix(in srgb, var(--info) 40%, transparent); outline-offset: -2px}
 .celllbl{display:none}
 .miniseg{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;width:fit-content}
 .miniseg button{border:0;background:var(--surface);color:var(--navy-mid);font:inherit;font-weight:700;font-size:11.5px;padding:6px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
@@ -189,7 +189,7 @@ export const BID_FORM_CSS = `
 .ptbl .it-lbl{font-weight:700}
 .ptbl .it-sub2{font-size:10.5px;color:var(--muted);margin-top:2px}
 .ptbl-in{width:120px;text-align:end;border:1px solid var(--border);border-radius:6px;height:36px;padding:0 9px;font:inherit;font-size:13.5px;font-weight:700;color:var(--navy);background:var(--surface);outline:0}
-.ptbl-in:focus{border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb, var(--brand) 12%, transparent)}
+.ptbl-in:focus{border-color:var(--brand);outline: 3px solid color-mix(in srgb, var(--brand) 12%, transparent); outline-offset: 0}
 .ptbl-in.invalid{border-color:var(--danger);background:var(--danger-bg)}
 .ptbl-ro{display:inline-block;min-width:90px;text-align:end;font-family:"IBM Plex Sans",monospace;font-weight:700;color:var(--navy)}
 .ptbl .tot{font-family:"IBM Plex Sans",monospace;font-weight:700}
@@ -212,7 +212,7 @@ export const BID_FORM_CSS = `
 .optx{display:inline-block;margin-inline-start:6px;font-size:9.5px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:1px 7px;vertical-align:middle}
 .reqx{color:var(--danger);font-weight:800}
 .field input{width:100%;height:46px;border:1px solid var(--border);border-radius:var(--r-md);padding:0 13px;font:inherit;font-size:14px;color:var(--navy);outline:0}
-.field input:focus{border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb, var(--brand) 12%, transparent)}
+.field input:focus{border-color:var(--brand);outline: 3px solid color-mix(in srgb, var(--brand) 12%, transparent); outline-offset: 0}
 .field input:disabled,.field input[readonly]{background:var(--surface2);color:var(--navy);-webkit-text-fill-color:var(--navy);opacity:1}
 .field.invalid input{border-color:var(--danger);background:var(--danger-bg)}
 .field .err{display:none;font-size:11.5px;color:var(--danger);font-weight:700;margin-top:6px}
@@ -230,11 +230,11 @@ export const BID_FORM_CSS = `
 .footer-note{text-align:center;color:var(--muted);font-size:12px;margin-top:16px}
 /* Footer — download-the-app CTA + a bigger "Powered by Moedatech". */
 .pb-foot{max-width:1060px;margin:0 auto;padding:8px 24px 34px}
-.dlapp{display:flex;align-items:center;gap:18px;background:linear-gradient(120deg,var(--surface),var(--surface) 62%);border:1px solid var(--border);border-radius:16px;padding:20px 22px;margin-bottom:10px}
+.dlapp{display:flex;align-items:center;gap:18px;background:linear-gradient(120deg,var(--surface2),var(--surface2) 62%);border:1px solid var(--border);border-radius:16px;padding:20px 22px;margin-bottom:10px}
 .dlapp-foot{text-align:center;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:18px}
 .dlapp-brand{flex:0 0 auto;display:flex;align-items:center}
 .dlapp-brand img{height:30px;width:auto}
-.dlapp-ic{flex:0 0 auto;width:58px;height:58px;border-radius:15px;background:linear-gradient(135deg,var(--rentee),var(--info));display:grid;place-items:center;box-shadow:0 6px 16px color-mix(in srgb, var(--info) 28%, transparent)}
+.dlapp-ic{flex:0 0 auto;width:58px;height:58px;border-radius:15px;background:linear-gradient(135deg,var(--rentee),var(--info-deep));display:grid;place-items:center;}
 .dlapp-ic img{width:36px;height:36px;object-fit:contain}
 .dlapp-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .dlapp-tx b{font-size:16.5px;font-weight:800;color:var(--navy);letter-spacing:-.2px}
@@ -292,22 +292,22 @@ export const BID_FORM_CSS = `
 .up-rm{flex:none;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--muted);cursor:pointer}
 .up-rm:hover{color:var(--danger);border-color:var(--danger-soft);background:var(--danger-soft)}
 .up-rm .material-icons-outlined{font-size:18px}
-.up-add{display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:13px;font-weight:800;color:var(--navy);border:1.5px dashed var(--surface2);border-radius:9px;padding:9px 14px;background:var(--surface);cursor:pointer}
-.up-add:hover:not(:disabled){background:var(--surface);border-color:var(--surface3)}
+.up-add{display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:13px;font-weight:800;color:var(--navy);border:1.5px dashed var(--border-strong);border-radius:9px;padding:9px 14px;background:var(--surface);cursor:pointer}
+.up-add:hover:not(:disabled){background:var(--surface);border-color:var(--muted-light)}
 .up-add:disabled{opacity:.6;cursor:default}
 .up-add .material-icons-outlined{font-size:18px}
 .up-err{margin-top:6px;font-size:12px;font-weight:700;color:var(--danger)}
 
 /* ── FileUploader v2 — picker (choose type) + labeled slot, accent-driven ─── */
 /* Instances set --ac / --ac-bg / --ac-bd inline for their section colour. */
-.uploader{--ac:var(--muted-dark);--ac-bg:var(--background);--ac-bd:var(--surface2)}
+.uploader{--ac:var(--navy-mid);--ac-bg:var(--background);--ac-bd:var(--border-strong)}
 .u-pick{display:flex;gap:9px;align-items:stretch}
 .u-sel{position:relative;flex:1;min-width:0}
 .u-sel-btn{width:100%;display:flex;align-items:center;gap:8px;border:1px solid var(--ac-bd);background:var(--surface);border-radius:10px;padding:10px 12px;font:inherit;font-size:13px;font-weight:700;color:var(--navy);cursor:pointer;text-align:start}
 .u-sel-btn>span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .u-sel-car{color:var(--muted);font-size:20px}
 .u-sel-back{position:fixed;inset:0;z-index:20}
-.u-sel-menu{position:absolute;top:calc(100% + 6px);inset-inline:0;background:var(--surface);border:1px solid var(--border);border-radius:11px;box-shadow:0 10px 28px color-mix(in srgb, var(--navy) 13%, transparent);padding:5px;z-index:21;max-height:240px;overflow:auto}
+.u-sel-menu{position:absolute;top:calc(100% + 6px);inset-inline:0;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:5px;z-index:21;max-height:240px;overflow:auto}
 .u-sel-mi{width:100%;display:flex;align-items:center;gap:9px;padding:9px 10px;border:none;background:none;border-radius:8px;font:inherit;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;text-align:start}
 .u-sel-mi:hover{background:var(--ac-bg)}
 .u-sel-mi.on{background:var(--ac-bg);color:var(--ac);font-weight:800}
@@ -358,14 +358,14 @@ export const BID_FORM_CSS = `
 .att-dd{font-size:12px;color:var(--muted);margin-top:1px}
 .att-pill{margin-inline-start:auto;font-size:10.5px;font-weight:800;letter-spacing:.3px;border-radius:20px;padding:3px 9px;white-space:nowrap}
 .att-pill.req{background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger-soft)}
-.att-pill.opt{background:var(--surface);color:var(--muted-light);border:1px solid var(--background)}
+.att-pill.opt{background:var(--surface2);color:var(--muted-dark);border:1px solid var(--surface3)}
 .att-body{padding:0 15px 15px}
 /* combine-into-one-file guidance under a document uploader */
 .att-hint{display:flex;align-items:flex-start;gap:6px;margin:0 15px 13px;padding:8px 10px;background:var(--action-dim);border:1px solid color-mix(in srgb, var(--brand) 28%, transparent);border-radius:9px;font-size:11.5px;font-weight:600;line-height:1.45;color:var(--navy-mid)}
 .att-hint .material-icons-outlined{font-size:15px;color:var(--brand);flex:0 0 auto;margin-top:1px}
 /* Encouragement banner above the attachments — ties uploading to bid quality + winning the deal. */
 .att-upsell{display:flex;align-items:flex-start;gap:13px;margin:20px 0 12px;padding:15px 17px;border-radius:var(--r-lg);background:var(--success-bg);border:1px solid color-mix(in srgb, var(--ok) 45%, transparent);border-inline-start:4px solid var(--success)}
-.att-upsell .au-ic{flex:0 0 auto;font-size:26px;color:var(--surface);width:42px;height:42px;display:grid;place-items:center;background:var(--success);border-radius:11px;box-shadow:0 2px 6px color-mix(in srgb, var(--ok) 35%, transparent)}
+.att-upsell .au-ic{flex:0 0 auto;font-size:26px;color:var(--surface);width:42px;height:42px;display:grid;place-items:center;background:var(--success);border-radius:11px;}
 .att-upsell .au-tx{display:flex;flex-direction:column;gap:3px;min-width:0}
 .att-upsell .au-tx b{font-size:14.5px;font-weight:800;color:var(--ok-deep)}
 .att-upsell .au-tx span{font-size:12.5px;color:var(--navy);font-weight:600;line-height:1.55}
@@ -380,7 +380,7 @@ export const BID_FORM_CSS = `
 .ro-fig-lb{font-size:10.5px;font-weight:700;color:var(--navy-mid);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ro-chips{display:flex;flex-wrap:wrap;gap:8px}
 .ro-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--navy);background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:7px 11px;text-decoration:none}
-.ro-chip:hover{background:var(--surface);border-color:var(--surface2)}
+.ro-chip:hover{background:var(--surface);border-color:var(--border-strong)}
 .ro-chip .ic{font-size:15px;color:var(--muted)}
 .ro-chip .dl{font-size:16px;color:var(--brand);margin-inline-start:2px}
 

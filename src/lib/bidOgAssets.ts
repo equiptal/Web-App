@@ -7,10 +7,12 @@
  * one request that must not be slow. So the logo travels in the bundle as a string.
  */
 
+import { COLORS } from "@/lib/ds-colors";
+
 /**
  * The wordmark from `public/moedatech-logo.svg`, with the fill left as a parameter.
  *
- * The source file is a single-colour mark (`var(--navy)`) drawn for light backgrounds. The card is navy,
+ * The source file is a single-colour mark (`--navy`) drawn for light backgrounds. The card is navy,
  * so it is re-filled white here rather than shipping a second asset that could drift from the first.
  */
 const LOGO_PATHS = [
@@ -32,7 +34,7 @@ const LOGO_POLYGONS = [
 ];
 
 /** The wordmark as an SVG data URI in the given colour. Satori renders `<img>` from a data URI. */
-export function logoDataUri(fill = "var(--surface)"): string {
+export function logoDataUri(fill = COLORS.surface): string {
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 566.92913 213.48413">` +
     LOGO_PATHS.map((d) => `<path fill="${fill}" d="${d}"/>`).join("") +
@@ -42,11 +44,17 @@ export function logoDataUri(fill = "var(--surface)"): string {
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 }
 
-/** Brand palette, mirrored from `globals.css` (`--navy`, `--gold`, `--brand`). */
+/**
+ * The palette, as literal values.
+ *
+ * Satori rasterises a tree of inline styles with no document and no cascade, so `--navy` here
+ * resolves to nothing and the card comes out black. These come from `ds-colors.ts`, which is checked
+ * against `globals.css` by a test, so they are the app's colours without being the app's syntax.
+ */
 export const OG_COLORS = {
-  navy: "var(--navy)",
-  navyDeep: "var(--info-deep)",
-  gold: "var(--gold)",
-  amber: "var(--brand)",
-  white: "var(--surface)",
+  navy: COLORS.navy,
+  navyDeep: COLORS.navyDeep,
+  gold: COLORS.gold,
+  amber: COLORS.brand,
+  white: COLORS.surface,
 } as const;

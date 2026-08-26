@@ -8,6 +8,8 @@
  * never drift apart again.
  */
 
+import { DS_ROOT_CSS } from "@/lib/ds-colors";
+
 export type QLang = "en" | "ar";
 
 /** One party identity row (National Address / CR # / VAT # / Phone / Email). A row shows its `value`,
@@ -102,14 +104,14 @@ export interface QuotationDoc {
 }
 
 /** Formal quotation stylesheet — ported verbatim from prototypes/requests-grouped.html. */
-export const QUOTATION_STYLE = `
+export const QUOTATION_STYLE = `${DS_ROOT_CSS}
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:'Inter','Segoe UI',Roboto,sans-serif;color:var(--navy);background:var(--background);-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .q-doc{position:relative;max-width:780px;margin:18px auto;background:var(--surface);border-radius:14px;overflow:hidden;box-shadow:0 6px 24px color-mix(in srgb, var(--navy) 10%, transparent);page-break-after:always;}
+  .q-doc{position:relative;max-width:780px;margin:18px auto;background:var(--surface);border-radius:14px;overflow:hidden;page-break-after:always;}
   .q-doc:last-child{page-break-after:auto;}
   /* DRAFT marking (pre-confirmation quotations) — amber badge in the header + a diagonal watermark
      over the whole page, so an exported/printed draft can never be mistaken for the signed document. */
-  .q-draft{display:inline-block;margin-top:9px;font-size:10.5px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--brand-pale);background:color-mix(in srgb, var(--brand) 20%, transparent);border:1px solid color-mix(in srgb, var(--brand) 55%, transparent);border-radius:100px;padding:3px 11px;}
+  .q-draft{display:inline-block;margin-top:9px;font-size:10.5px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--brand-light);background:color-mix(in srgb, var(--brand) 20%, transparent);border:1px solid color-mix(in srgb, var(--brand) 55%, transparent);border-radius:100px;padding:3px 11px;}
   .q-wm{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;overflow:hidden;pointer-events:none;}
   .q-wm b{transform:rotate(-32deg);font-size:76px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;color:color-mix(in srgb, var(--brand) 13%, transparent);}
   .q-head{background:linear-gradient(135deg,var(--navy),var(--navy-deep));color:var(--surface);padding:26px 34px;}
@@ -118,7 +120,7 @@ export const QUOTATION_STYLE = `
   .q-title{font-size:23px;font-weight:900;letter-spacing:-.3px;}
   .price-extras{border:1px solid var(--surface3);border-radius:10px;margin:2px 0 12px;overflow:hidden;}
   .price-extras .pe-h{background:var(--surface2);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:8px 13px;}
-  .price-extras .pe-row{display:flex;justify-content:space-between;gap:10px;padding:8px 13px;border-top:1px solid var(--surface);font-size:12.5px;}
+  .price-extras .pe-row{display:flex;justify-content:space-between;gap:10px;padding:8px 13px;border-top:1px solid var(--surface2);font-size:12.5px;}
   .price-extras .pe-row span{color:var(--muted);font-weight:600;}.price-extras .pe-row b{font-weight:800;}
   .q-sub{display:flex;justify-content:space-between;margin-top:10px;font-size:12.5px;font-weight:700;color:rgba(255,255,255,.72);}
   .q-sub .qn{color:var(--surface);font-family:'IBM Plex Sans',monospace;}
@@ -127,7 +129,7 @@ export const QUOTATION_STYLE = `
   .party{flex:1;}
   .plabel{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
   .phead{display:flex;align-items:center;gap:10px;margin-top:6px;}
-  .pava{flex:0 0 auto;width:38px;height:38px;border-radius:50%;background:var(--background);color:var(--navy-mid);font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center;}
+  .pava{flex:0 0 auto;width:38px;height:38px;border-radius:50%;background:var(--surface2);color:var(--navy-mid);font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center;}
   .phead-t{min-width:0;}
   .phead .pname{margin-top:0;}
   .pname{font-size:17px;font-weight:800;margin-top:5px;}
@@ -154,7 +156,7 @@ export const QUOTATION_STYLE = `
   .listed .ll{font-size:10.5px;font-weight:700;text-transform:uppercase;color:var(--muted);}
   .listed .lv{font-size:13.5px;font-weight:700;color:var(--navy-mid);margin-top:5px;}
   .lchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
-  .lchip{font-size:11px;font-weight:700;color:var(--navy-mid);background:var(--surface);border:1px solid var(--background);border-radius:8px;padding:3px 9px;}
+  .lchip{font-size:11px;font-weight:700;color:var(--navy-mid);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:3px 9px;}
   .lchip i{color:var(--muted);font-style:normal;font-weight:800;margin-inline-end:5px;text-transform:uppercase;font-size:9.5px;letter-spacing:.03em;}
   .ptable{width:100%;border-collapse:collapse;margin-bottom:8px;}
   .ptable th{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);text-align:start;padding:8px 10px;background:var(--surface2);}
@@ -174,11 +176,11 @@ export const QUOTATION_STYLE = `
   .trow b{font-family:'IBM Plex Sans',monospace;font-weight:800;}
   .trow.grand{border-top:2px solid var(--border);margin-top:4px;padding-top:11px;font-size:16px;}
   .trow.grand b{color:var(--brand);}
-  .words{background:var(--surface2);border:1px solid var(--info-soft);border-radius:10px;padding:13px 15px;margin-bottom:18px;font-size:13px;color:var(--info);}
+  .words{background:var(--surface2);border:1px solid var(--info-soft);border-radius:10px;padding:13px 15px;margin-bottom:18px;font-size:13px;color:var(--info-deep);}
   .words .wl{font-size:10px;font-weight:800;text-transform:uppercase;margin-bottom:4px;}
   .card{border:1px solid var(--surface3);border-radius:10px;overflow:hidden;margin-bottom:18px;}
   .card-h{background:var(--danger-soft);padding:11px 15px;font-size:13.5px;font-weight:800;}
-  .kv{display:flex;align-items:center;gap:8px;padding:9px 15px;border-top:1px solid var(--surface);font-size:13px;}
+  .kv{display:flex;align-items:center;gap:8px;padding:9px 15px;border-top:1px solid var(--surface2);font-size:13px;}
   .kv::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ok);flex:0 0 auto;}
   .kv span{color:var(--muted);font-weight:600;}.kv b{font-weight:800;margin-inline-start:auto;text-align:end;}
   .tc{margin:0 0 18px;padding-inline-start:20px;font-size:11.5px;color:var(--navy-mid);line-height:1.7;}

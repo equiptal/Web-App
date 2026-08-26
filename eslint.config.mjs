@@ -21,7 +21,9 @@ const compat = new FlatCompat({
  */
 const designSystem = {
   files: ["src/**/*.{ts,tsx}"],
-  ignores: ["src/lib/ds.ts", "src/app/globals.css"],
+  // The two files that ARE the system, plus the one that mirrors it as literals for the surfaces
+  // with no stylesheet (the OG image, the clipboard card, the printed quotation).
+  ignores: ["src/lib/ds.ts", "src/lib/ds-colors.ts", "src/app/globals.css"],
   rules: {
     "no-restricted-syntax": [
       "error",

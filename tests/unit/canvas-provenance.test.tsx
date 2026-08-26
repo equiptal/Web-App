@@ -71,12 +71,12 @@ describe("provenance badges (MREQ-AC-57/58/59)", () => {
     const handle = await card();
     const year = screen.getByRole("combobox", { name: "MINIMUM YEAR" });
     const cert = screen.getByRole("combobox", { name: "CERTIFICATE" });
-    expect(year.className).toContain("#c9660f");
-    expect(cert.className).toContain("#c9660f");
+    expect(year.className).toContain("brand-press");
+    expect(cert.className).toContain("brand-press");
 
     await handle.run(() => pickYear(handle));
 
-    expect(screen.getByRole("combobox", { name: "MINIMUM YEAR" }).className).toContain("#12263acc");
+    expect(screen.getByRole("combobox", { name: "MINIMUM YEAR" }).className).toContain("navy-deep");
   });
 
   it("never blocks on its own (MREQ-AC-61)", async () => {

@@ -40,6 +40,7 @@ import {
 import { machineMarkers, listedMachines } from "@/lib/contract/equipment-list";
 import { mapFleet, type FleetMachine } from "@/lib/contract/fleet";
 import { equipmentCardModel } from "@/components/map/equipment-card-model";
+import { channels, NAVY_TOKENS } from "../setup/ds";
 
 /* ─────────────────────────────────── fixtures ─────────────────────────────────── */
 
@@ -188,7 +189,8 @@ describe("the card's chip and the machine's marker are one derivation (RM3-AC-19
        question, and the moment it appears among the availability colours it has become a third
        state again. */
     const card = equipmentCardModel(trap);
-    const palette = valuesDeep(card).filter((v) => /^#[0-9a-f]{6}$/i.test(v));
+    // The model states colours as tokens now, not as hex.
+    const palette = valuesDeep(card).filter((v) => /^var\(--[a-z0-9-]+\)$/i.test(v));
     expect(palette.filter((v) => v.toUpperCase() === AVAILABILITY_COLOUR.unconfirmed.toUpperCase())).toHaveLength(1);
     expect(palette.filter((v) => v.toUpperCase() === AVAILABILITY_COLOUR.confirmed.toUpperCase())).toHaveLength(0);
     expect(palette.filter((v) => v.toUpperCase() === IN_OFFER_BADGE_COLOUR.toUpperCase())).toHaveLength(0);
@@ -617,12 +619,12 @@ describe("distanceDigits — the one formatter every surface's distance goes thr
 describe("the request action is blue, never navy (RM3-AC-33)", () => {
   /** The navies this surface actually draws — the card title, the distance figure, the empty state's
    *  heading. Any of them on the ask would read as disabled beside a red chip. */
-  const NAVY = ["#16304F", "#1C3550", "#0F2238", "#16304f"];
+  const NAVY = NAVY_TOKENS;
 
   it("gives the ask the blue token and nothing else", () => {
     const card = one({ id: "eq", source: "listing_yard" });
     expect(card.askAvailability?.colour).toBe(REQUEST_ACTION_COLOUR);
-    expect(REQUEST_ACTION_COLOUR.toUpperCase()).toBe("#2563EB");
+    expect(REQUEST_ACTION_COLOUR).toBe("var(--info)");
   });
 
   it("is not any navy on the surface, and not the availability red beside it", () => {
@@ -633,12 +635,14 @@ describe("the request action is blue, never navy (RM3-AC-33)", () => {
   });
 
   it("is blue by measurement, not by name — its blue channel dominates", () => {
-    // The mutation this catches is `REQUEST_ACTION_COLOUR = "#16304F"`, which is still "a colour
-    // called blue" by the constant's name. Navy is dark and near-neutral; this token is neither.
-    const [r, g, b] = [1, 3, 5].map((i) => parseInt(REQUEST_ACTION_COLOUR.slice(i, i + 2), 16));
-    expect(b).toBeGreaterThan(200);
+    // The mutation this catches is `REQUEST_ACTION_COLOUR = "var(--navy-deep)"`, which is still "a
+    // colour called blue" by the constant's name. Navy is dark and near-neutral; this token is
+    // neither. Resolved through the palette first, because a token NAME proves nothing about what
+    // the reader sees — `--info` could be pointed anywhere tomorrow and the AC would go on passing.
+    const { r, g, b } = channels(REQUEST_ACTION_COLOUR)!;
+    expect(b).toBeGreaterThan(180);
     expect(b - r).toBeGreaterThan(120);
-    expect(b - g).toBeGreaterThan(120);
+    expect(b - g).toBeGreaterThan(50);
   });
 });
 

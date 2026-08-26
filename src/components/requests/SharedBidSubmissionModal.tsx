@@ -271,7 +271,7 @@ export function SharedBidSubmissionModal({
             which the shell no longer draws, onto the shell's own `data-dialog-*` hooks — without this the
             page behind would print instead, which is the sort of thing nobody notices until a supplier
             is handed six blank sheets. */}
-        <style>{`@media print{body *{visibility:hidden!important}[data-dialog-panel],[data-dialog-panel] *{visibility:visible!important}[data-dialog-scrim]{position:static!important;background:var(--surface)!important;padding:0!important;overflow:visible!important}[data-dialog-panel]{position:absolute!important;inset-inline-start:0;top:0;width:100%!important;height:auto!important;max-height:none!important;border:0!important;box-shadow:none!important}.qprint{max-height:none!important;overflow:visible!important;background:var(--surface)!important}.qprint-hide{display:none!important}}`}</style>
+        <style>{`@media print{body *{visibility:hidden!important}[data-dialog-panel],[data-dialog-panel] *{visibility:visible!important}[data-dialog-scrim]{position:static!important;background:var(--surface)!important;padding:0!important;overflow:visible!important}[data-dialog-panel]{position:absolute!important;inset-inline-start:0;top:0;width:100%!important;height:auto!important;max-height:none!important;border:0!important;}.qprint{max-height:none!important;overflow:visible!important;background:var(--surface)!important}.qprint-hide{display:none!important}}`}</style>
         <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
         <div className="slb-banner">
           <span className="material-icons-outlined">visibility</span>

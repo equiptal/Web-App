@@ -29,8 +29,8 @@ const CSS = `
 @keyframes rlv-ringOut{0%{transform:scale(.7);opacity:.5}100%{transform:scale(2);opacity:0}}
 @keyframes rlv-dropIn{0%{opacity:0;transform:translateY(-14px) scale(.96)}60%{transform:translateY(2px) scale(1.01)}100%{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes rlv-fillBar{from{width:0}to{width:var(--w)}}
-@keyframes rlv-pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb, var(--ok) 40%, transparent)}50%{box-shadow:0 0 0 8px color-mix(in srgb, var(--ok) 0%, transparent)}}
-.rlive-toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--navy-deep);color:var(--surface);font-size:13px;font-weight:700;padding:11px 18px;border-radius:12px;box-shadow:0 12px 30px color-mix(in srgb, var(--info-deep) 32%, transparent);z-index:60;display:inline-flex;align-items:center;gap:8px;animation:rlv-fade .25s ease both}
+@keyframes rlv-pulse{0%,100%{}50%{outline: 8px solid color-mix(in srgb, var(--ok) 0%, transparent); outline-offset: 0}}
+.rlive-toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--navy-deep);color:var(--surface);font-size:13px;font-weight:700;padding:11px 18px;border-radius:12px;z-index:60;display:inline-flex;align-items:center;gap:8px;animation:rlv-fade .25s ease both}
 @media (prefers-reduced-motion: reduce){.rlive [style*="animation"]{animation:none!important}}
 `;
 

@@ -71,7 +71,7 @@ export interface LinkBidItem {
   requestId?: string | null;
   label?: string | null;
   numberOfUnits?: number;
-  /** Units the supplier offered on this line (partial bid) — ≤ numberOfUnits. Backend (PR var(--ok)) falls back
+  /** Units the supplier offered on this line (partial bid) — ≤ numberOfUnits. Backend (PR var(--ok-deep)) falls back
    *  to the requested count; on staging it's absent, so the mapper falls back to numberOfUnits. */
   offeredUnits?: number;
   /** Rental basis carried from the request (PER_DAY/PER_WEEK/PER_MONTH/PER_JOB) so totals normalize. */
@@ -131,7 +131,7 @@ export interface BidFormItem {
   sizeAr?: string | null;
   numberOfUnits: number;
   /** Units still open for a shared-link supplier to offer = numberOfUnits − units already held by other
-   *  suppliers' accepted (AWAITING) + confirmed (CLOSED) deals, clamped ≥ 0. Backend (PR var(--ok)) sends it
+   *  suppliers' accepted (AWAITING) + confirmed (CLOSED) deals, clamped ≥ 0. Backend (PR var(--ok-deep)) sends it
    *  per item; OPTIONAL — when absent (pre-deploy backend) the form falls back to numberOfUnits. */
   remainingUnits?: number;
   /** Taxonomy image — same source the in-app bid/request cards render via EquipImg. Optional: the public

@@ -1,9 +1,6 @@
 /* Exact port of rentee-deal-room.html styles (contact bar, price card, chat thread, composer),
    scoped under .dlproto. Real data + live GetStream chat render into this exact markup. */
 .dlproto {
-  --navy: var(--navy);
-  --navy-deep: var(--navy-deep);
-  --navy-mid: var(--navy-mid);
   --action: var(--brand);
   --action-dim: var(--brand-soft);
   --rentee: var(--info);
@@ -12,14 +9,8 @@
   --success-bg: var(--ok-soft);
   --warning: var(--warn);
   --warning-bg: var(--warn-soft);
-  --danger: var(--danger);
   --danger-bg: var(--danger-soft);
-  --info: var(--info);
-  --muted: var(--muted);
   --surface1: var(--surface);
-  --surface2: var(--surface2);
-  --surface3: var(--surface3);
-  --border: var(--border);
   --line: var(--surface3);
   --text-disabled: var(--muted-light);
   --shadow: color-mix(in srgb, var(--navy) 6%, transparent);
@@ -75,14 +66,14 @@
 .dlproto .tb-ic.call { color: #25d366; } .dlproto .tb-ic.locked { color: var(--text-disabled); cursor: not-allowed; }
 .dlproto .tb-ic .material-icons-outlined { font-size: 18px; }
 
-/* ── price bar — prototype navy banner (var(--info-deep) → our --navy-deep). Centered hero price, an
+/* ── price bar — prototype navy banner (var(--navy-deep) → our --navy-deep). Centered hero price, an
    end-side action cluster (status pill + CTAs), and a breakdown popover. ── */
-.dlproto .price-bar { position: relative; display: flex; align-items: center; justify-content: center; min-height: 84px; padding: 20px 22px 18px; margin-bottom: 16px; background: var(--navy-deep); color: var(--surface); border-radius: var(--r-lg); box-shadow: 0 5px 16px color-mix(in srgb, var(--info-deep) 20%, transparent); }
+.dlproto .price-bar { position: relative; display: flex; align-items: center; justify-content: center; min-height: 84px; padding: 20px 22px 18px; margin-bottom: 16px; background: var(--navy-deep); color: var(--surface); border-radius: var(--r-lg); }
 /* status pill pinned to the top corner (end: right in LTR, left in RTL) */
-.dlproto .pb-status { position: absolute; top: 14px; inset-inline-end: 16px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; padding: 4px 11px; border-radius: var(--r-full); background: color-mix(in srgb, var(--surface2) 14%, transparent); border: 1px solid color-mix(in srgb, var(--surface2) 34%, transparent); color: var(--surface2); }
+.dlproto .pb-status { position: absolute; top: 14px; inset-inline-end: 16px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; padding: 4px 11px; border-radius: var(--r-full); background: color-mix(in srgb, var(--border-strong) 14%, transparent); border: 1px solid color-mix(in srgb, var(--border-strong) 34%, transparent); color: var(--border-strong); }
 .dlproto .pb-status .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .dlproto .pb-status.done { background: color-mix(in srgb, var(--ok) 16%, transparent); border-color: color-mix(in srgb, var(--ok) 40%, transparent); color: var(--ok); }
-.dlproto .pb-status.wait { background: color-mix(in srgb, var(--warn) 16%, transparent); border-color: color-mix(in srgb, var(--warn) 42%, transparent); color: var(--brand-pale); }
+.dlproto .pb-status.wait { background: color-mix(in srgb, var(--warn) 16%, transparent); border-color: color-mix(in srgb, var(--warn) 42%, transparent); color: var(--brand-light); }
 .dlproto .pb-btns { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
 .dlproto .pb-btn { display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 12px; padding: 9px 16px; font: inherit; font-weight: 800; font-size: 13px; cursor: pointer; color: var(--surface); }
 .dlproto .pb-btn.neg { background: var(--rentee); }
@@ -93,8 +84,8 @@
 /* centered price block */
 .dlproto .pb-center { display: flex; flex-direction: column; align-items: center; gap: 5px; text-align: center; }
 .dlproto .pb-src { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: rgba(255, 255, 255, 0.72); }
-.dlproto .pb-src .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--surface2); }
-.dlproto .pb-src.done .dot { background: var(--ok); } .dlproto .pb-src.wait .dot { background: var(--brand-pale); }
+.dlproto .pb-src .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border-strong); }
+.dlproto .pb-src.done .dot { background: var(--ok); } .dlproto .pb-src.wait .dot { background: var(--brand-light); }
 .dlproto .pb-hero { display: flex; align-items: baseline; gap: 8px; }
 .dlproto .pb-hero .n { font-family: "IBM Plex Sans", monospace; font-size: 52px; font-weight: 800; letter-spacing: -1.5px; line-height: 1; color: var(--surface); }
 .dlproto .pb-hero .u { font-size: 17px; font-weight: 600; color: rgba(255, 255, 255, 0.68); }
@@ -102,18 +93,18 @@
 .dlproto .pb-seg { display: inline-flex; background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 2px; }
 .dlproto .pb-seg button { border: 0; background: none; color: rgba(255, 255, 255, 0.75); font: inherit; font-size: 11.5px; font-weight: 800; padding: 4px 12px; border-radius: 7px; cursor: pointer; }
 .dlproto .pb-seg button.on { background: var(--surface); color: var(--navy); }
-.dlproto .pb-details { background: none; border: 0; color: var(--surface2); font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; }
+.dlproto .pb-details { background: none; border: 0; color: var(--border-strong); font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; }
 .dlproto .pb-details .material-icons-outlined { font-size: 15px; transition: 0.2s; }
 .dlproto .pb-details.open .material-icons-outlined { transform: rotate(180deg); }
 /* breakdown popover — click-away backdrop closes it (sits below the popover) */
 .dlproto .pb-bd-backdrop { position: fixed; inset: 0; z-index: 19; }
-.dlproto .pb-breakdown { position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); z-index: 20; width: min(460px, calc(100vw - 40px)); background: var(--navy-deep); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 16px; padding: 16px 20px; box-shadow: 0 20px 50px color-mix(in srgb, var(--info-deep) 50%, transparent); }
+.dlproto .pb-breakdown { position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); z-index: 20; width: min(460px, calc(100vw - 40px)); background: var(--navy-deep); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 16px; padding: 16px 20px; }
 .dlproto .pb-brow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 6px 0; }
 .dlproto .pb-brow .l { font-size: 13.5px; font-weight: 600; color: rgba(255, 255, 255, 0.82); }
 .dlproto .pb-brow .v { font-family: "IBM Plex Sans", monospace; font-size: 15px; font-weight: 800; color: var(--surface); }
 .dlproto .pb-brow .v.ex { color: rgba(255, 255, 255, 0.4); font-family: inherit; font-weight: 700; }
 .dlproto .pb-brow.tot { border-top: 1px solid rgba(255, 255, 255, 0.2); margin-top: 4px; padding-top: 10px; }
-.dlproto .pb-brow.tot .l { font-weight: 800; color: var(--surface); } .dlproto .pb-brow.tot .v { font-size: 17px; color: var(--surface2); }
+.dlproto .pb-brow.tot .l { font-weight: 800; color: var(--surface); } .dlproto .pb-brow.tot .v { font-size: 17px; color: var(--border-strong); }
 /* «Per unit» — the heading that makes the block under it readable on a multi-unit deal, and which a
    single-unit deal never draws because there would be nothing to distinguish it from. */
 .dlproto .pb-bhead { font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); padding-bottom: 2px; }
@@ -129,7 +120,7 @@
 .dlproto .pb-strip.danger { color: var(--danger); } .dlproto .pb-strip.danger .material-icons-outlined { color: var(--danger); }
 .dlproto .pb-strip .pb-inline-btn { margin-inline-start: auto; border: 0; background: var(--surface1); border: 1px solid var(--border); border-radius: var(--r-md); padding: 7px 12px; font: inherit; font-weight: 800; font-size: 12.5px; color: var(--navy); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
 
-/* thread — the chat panel (prototype: the var(--background) chat area under the price bar) */
+/* thread — the chat panel (prototype: the var(--surface3) chat area under the price bar) */
 /* The map dock's stream rhythm (`.bm-chat-body`): an 8px gap carries the spacing between bubbles, so
    the bubbles themselves have no margin. It was a 3px gap with `margin: 5px 0` on each bubble — the
    same total, reached two ways, which is why a card and a bubble sat differently in the two routes. */
@@ -154,7 +145,7 @@
 }
 .dlproto .dl-chat-away > .material-icons-outlined { font-size: 21px; color: var(--info); flex: 0 0 auto; }
 .dlproto .dl-chat-away-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-.dlproto .dl-chat-away-txt b { font-size: 13px; font-weight: 800; color: var(--info-deep); }
+.dlproto .dl-chat-away-txt b { font-size: 13px; font-weight: 800; color: var(--navy-deep); }
 .dlproto .dl-chat-away-txt span { font-size: 12px; font-weight: 600; color: var(--muted); line-height: 1.5; }
 .dlproto .dl-chat-away-go {
   flex: 0 0 auto;
@@ -183,7 +174,7 @@
 
    KEEP when pruning: `.composer` itself, `.composer.ro`, `.ro-note` and `.composer.quote-bar`. The
    quotation link and the closed/cancelled notes still use them, and they are not chat. ── */
-.dlproto .thread { flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 16px; background: var(--background); }
+.dlproto .thread { flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 16px; background: var(--surface3); }
 /* ── the system line, measured against the app (`deal_system_events.dart`) ────────────────────────
    Same pill on both clients, down to the alphas: muted at 20% behind a 30% hairline, radius full,
    7px/12px, at most 85% of the width.
@@ -211,7 +202,7 @@
 /* Centred, because the negotiation vocabulary is an EVENT in the room rather than either party's
    remark — the dock reaches the same answer through `.bm-chat-event`. The dock's ceiling and no
    margin, for the reason `.dl-rq-card` above carries. */
-.dlproto .chatcard { align-self: center; width: 86%; max-width: min(86%, 376px); margin: 0; padding: 11px 13px; background: var(--surface1); border: 1px solid var(--border); border-inline-start: 3px solid var(--border); border-radius: 14px; box-shadow: 0 1px 3px color-mix(in srgb, var(--info-deep) 6%, transparent); }
+.dlproto .chatcard { align-self: center; width: 86%; max-width: min(86%, 376px); margin: 0; padding: 11px 13px; background: var(--surface1); border: 1px solid var(--border); border-inline-start: 3px solid var(--border); border-radius: 14px; }
 .dlproto .cc-head { display: flex; align-items: center; gap: 7px; }
 .dlproto .cc-head .material-icons-outlined { font-size: 17px; flex: 0 0 auto; }
 .dlproto .cc-title { font-size: 12.5px; font-weight: 800; color: var(--navy); line-height: 1.35; }
@@ -344,7 +335,7 @@
    ruled the other way: the map's is the style, and the deal room follows it.
 
    What actually changes for a reader here: the outgoing bubble stops being a saturated blue with white
-   ink and becomes pale `var(--background)` with the SAME dark ink as the incoming one, so a thread reads as one
+   ink and becomes pale `var(--surface3)` with the SAME dark ink as the incoming one, so a thread reads as one
    conversation rather than two voices in two liveries; the incoming bubble drops its border for the
    shadow both now share; and the tail notch moves to the far edge. */
 .dlproto .msg { max-width: 80%; margin: 0; padding: 9px 12px; border-radius: 13px; font-size: 12.5px; line-height: 1.7; }
@@ -353,17 +344,15 @@
   align-self: flex-start;
   background: var(--surface);
   border: 0;
-  color: var(--info-deep);
+  color: var(--navy-deep);
   border-end-end-radius: 4px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 .dlproto .msg.mine {
   align-self: flex-end;
-  background: var(--background);
+  background: var(--surface3);
   border: 0;
-  color: var(--info-deep);
+  color: var(--navy-deep);
   border-end-start-radius: 4px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 .dlproto .msg.mine .meta { text-align: end; }
 /* «حفظ» beside an attachment, in the bubble's own ink both sides — the outgoing fill is pale now, so
@@ -378,7 +367,7 @@
 .dlproto .msg-att-img img { max-width: 220px; max-height: 220px; border-radius: 10px; display: block; }
 .dlproto .msg-att-file { display: inline-flex; align-items: center; gap: 7px; margin-top: 6px; padding: 8px 11px; border-radius: 10px; background: rgba(0,0,0,.06); color: inherit; text-decoration: none; font-size: 12.5px; font-weight: 700; max-width: 240px; }
 /* `rgba(255,255,255,.18)` was a white wash for the saturated outgoing fill this bubble no longer has;
-   on pale `var(--background)` it is invisible. Both sides now take the same dark wash. */
+   on pale `var(--surface3)` it is invisible. Both sides now take the same dark wash. */
 .dlproto .msg.mine .msg-att-file { background: rgba(0, 0, 0, 0.06); }
 .dlproto .msg-att-file .material-icons-outlined { font-size: 18px; flex: 0 0 auto; }
 .dlproto .msg-att-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -387,7 +376,7 @@
 /* ── The composer is the dock's too (owner, 2026-08-19) ──────────────────────────────────────────
    `.bm-chat-compose`'s numbers, on this route's own class name — the two markups are the same shape
    (`.ib` · input · `.ib send`), so only the skin was ever different. 38px round controls on white
-   inside `var(--surface2)`, an r20 field on `var(--surface)`, 18px gutters.
+   inside `var(--border-strong)`, an r20 field on `var(--surface)`, 18px gutters.
 
    The send goes BLUE — `var(--info)`, the dock's. It was `--action`, the product's orange, and the reason
    for the change is simply that the dock is the style being adopted; nothing in the price bar above is
@@ -395,10 +384,10 @@
    same blue: the live control in the composer and the live control in the bar now read as one family,
    with «Accept» keeping the green that separates settling from negotiating. */
 .dlproto .composer { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 12px 18px; background: var(--surface1); border-top: 1px solid var(--border); }
-.dlproto .composer .ib { width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 1px solid var(--surface2); background: var(--surface); color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; }
+.dlproto .composer .ib { width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--surface); color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; }
 .dlproto .composer .ib .material-icons-outlined { font-size: 17px; }
 .dlproto .composer .ib:disabled { opacity: 0.5; cursor: default; }
-.dlproto .composer input { flex: 1; min-width: 0; height: auto; border: 1px solid var(--surface2); border-radius: 20px; padding: 10px 14px; font: inherit; font-size: 12.5px; color: var(--info-deep); outline: 0; background: var(--surface); }
+.dlproto .composer input { flex: 1; min-width: 0; height: auto; border: 1px solid var(--border-strong); border-radius: 20px; padding: 10px 14px; font: inherit; font-size: 12.5px; color: var(--navy-deep); outline: 0; background: var(--surface); }
 .dlproto .composer input:focus { border-color: var(--info); background: var(--surface); }
 .dlproto .composer input:disabled { opacity: 0.65; }
 .dlproto .composer .send { background: var(--info); border-color: var(--info); color: var(--surface); }
@@ -433,10 +422,10 @@
    Negotiation sheet — quotation-paper 3-step wizard (spec §6). Scoped .qp-*; scrim class .qp-scrim
    lives OUTSIDE .dlproto (the sheet is portaled at the document body via a fixed overlay).
    ════════════════════════════════════════════════════════════════════════════════════════════ */
-.qp-scrim { position: fixed; inset: 0; z-index: 60; background: color-mix(in srgb, var(--info-deep) 50%, transparent); display: flex; align-items: center; justify-content: center; padding: clamp(10px,3%,28px); }
+.qp-scrim { position: fixed; inset: 0; z-index: 60; background: color-mix(in srgb, var(--navy-deep) 50%, transparent); display: flex; align-items: center; justify-content: center; padding: clamp(10px,3%,28px); }
 .qp-scrim .material-icons-outlined { font-family: "Material Icons Outlined"; line-height: 1; }
-.qp-sheet { --navy:var(--navy); --navy-deep:var(--navy-deep); --navy-mid:var(--navy-mid); --rentee:var(--info); --action:var(--brand); --success:var(--ok); --success-bg:var(--ok-soft); --danger:var(--danger); --danger-bg:var(--danger-soft); --warning:var(--warn); --info:var(--info); --muted:var(--muted); --border:var(--border); --line:var(--surface3); --surface2:var(--surface2); --surface3:var(--surface3); --paper-2:var(--surface);
-  display: flex; flex-direction: column; width: 100%; max-width: 860px; max-height: 94vh; background: var(--surface); border-radius: 16px; overflow: hidden; box-shadow: 0 30px 70px color-mix(in srgb, var(--info-deep) 40%, transparent); font-family: "Inter",-apple-system,"Segoe UI",Roboto,sans-serif; color: var(--navy); animation: dpModal .22s ease; }
+.qp-sheet {--rentee:var(--info); --action:var(--brand); --success:var(--ok); --success-bg:var(--ok-soft);--danger-bg:var(--danger-soft); --warning:var(--warn);--line:var(--surface3);--paper-2:var(--surface);
+  display: flex; flex-direction: column; width: 100%; max-width: 860px; max-height: 94vh; background: var(--surface); border-radius: 16px; overflow: hidden; font-family: "Inter",-apple-system,"Segoe UI",Roboto,sans-serif; color: var(--navy); animation: dpModal .22s ease; }
 @keyframes dpModal { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: none; } }
 
 /* header — two rows */
@@ -451,7 +440,7 @@
 .qp-x { flex: 0 0 auto; display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); border-radius: 50%; cursor: pointer; }
 .qp-x .material-icons-outlined { font-size: 18px; }
 /* stepper */
-.qp-steps { display: flex; align-items: center; gap: 4px; padding: 12px 22px 14px; background: var(--background); }
+.qp-steps { display: flex; align-items: center; gap: 4px; padding: 12px 22px 14px; background: var(--surface2); }
 .qp-step { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .qp-step .badge { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--surface2); border: 2px solid var(--border); color: var(--muted); font-size: 14px; font-weight: 800; }
 .qp-step .lbl { font-size: 15px; font-weight: 600; color: var(--muted); }
@@ -464,7 +453,7 @@
 
 /* body — grey "desk" holding the white paper */
 .qp-body { flex: 1 1 auto; overflow-y: auto; min-height: 0; background: var(--border); padding: 18px clamp(10px,3%,26px) 26px; }
-.qp-paper { width: 800px; max-width: 100%; flex-shrink: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 34px color-mix(in srgb, var(--info-deep) 20%, transparent); padding: 28px 30px 38px; }
+.qp-paper { width: 800px; max-width: 100%; flex-shrink: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 28px 30px 38px; }
 .qp-paper + .qp-paper { margin-top: 16px; }
 
 /* full-screen desk sheet (§6 oldWrap): fills the viewport, slides up; the paper sits on a grey desk
@@ -474,8 +463,8 @@
 .qp-desk { position: relative; flex: 1 1 auto; min-height: 0; overflow: auto; background: var(--surface2); }
 .qp-deskpad { min-height: 100%; display: flex; justify-content: center; align-items: flex-start; padding: 22px 0 46px; }
 .qp-zoom { position: absolute; top: 50%; inset-inline-start: 20px; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 6; }
-.qp-zoom button { width: 52px; height: 52px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); color: var(--navy); font: inherit; font-size: 26px; font-weight: 800; line-height: 1; cursor: pointer; box-shadow: 0 6px 18px color-mix(in srgb, var(--info-deep) 20%, transparent); display: grid; place-items: center; padding: 0; }
-.qp-zoom button.pct { width: auto; height: auto; border-radius: 9px; padding: 6px 9px; font-size: 11px; box-shadow: 0 3px 10px color-mix(in srgb, var(--info-deep) 12%, transparent); border-color: var(--line); }
+.qp-zoom button { width: 52px; height: 52px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); color: var(--navy); font: inherit; font-size: 26px; font-weight: 800; line-height: 1; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.qp-zoom button.pct { width: auto; height: auto; border-radius: 9px; padding: 6px 9px; font-size: 11px; border-color: var(--line); }
 /* quotation head */
 .qp-qhead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); padding-bottom: 14px; margin-bottom: 16px; }
 .qp-qco { display: flex; align-items: center; gap: 12px; }
@@ -544,7 +533,7 @@
 .qp-compare .side { text-align: center; flex: 1; }
 .qp-compare .side .k { font-size: 10.5px; font-weight: 700; color: rgba(255,255,255,.7); }
 .qp-compare .side .v { font-size: 27px; font-weight: 800; font-family: "IBM Plex Sans", monospace; direction: ltr; margin-top: 2px; line-height: 1; }
-.qp-compare .side.sup .v { color: var(--brand-pale); } .qp-compare .side.me .v { color: var(--surface2); }
+.qp-compare .side.sup .v { color: var(--brand-light); } .qp-compare .side.me .v { color: var(--border-strong); }
 .qp-compare .conv { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 .qp-compare .conv .track { flex: 1; height: 3px; border-radius: 3px; background: rgba(255,255,255,.18); }
 .qp-compare .conv .chip { font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,.14); white-space: nowrap; }
@@ -559,7 +548,7 @@
 .qp-cmp-tbl td.ln { text-align: start; font-family: inherit; color: rgba(255,255,255,.9); }
 .qp-cmp-tbl td .u { font-size: 9.5px; font-weight: 700; color: rgba(255,255,255,.55); }
 .qp-cmp-tbl td.na { color: rgba(255,255,255,.45); font-weight: 700; }
-.qp-cmp-tbl td.gap { color: var(--brand-pale); }
+.qp-cmp-tbl td.gap { color: var(--brand-light); }
 
 /* classic terms table (step ②) */
 .qp-tt { width: 100%; border-collapse: collapse; }
@@ -584,7 +573,7 @@
 .qp-guide-bar { flex: 1 1 auto; height: 6px; border-radius: 6px; background: var(--surface3,var(--surface3)); overflow: hidden; max-width: 160px; margin-inline-start: auto; }
 .qp-guide-bar > div { height: 100%; background: var(--success); border-radius: 6px; }
 .qp-gcat { border-top: 1px solid var(--line); }
-.qp-gcat-h { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: var(--surface); cursor: pointer; padding: 8px 14px; font: inherit; font-size: 12px; font-weight: 800; color: var(--navy); text-align: start; }
+.qp-gcat-h { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: var(--surface2); cursor: pointer; padding: 8px 14px; font: inherit; font-size: 12px; font-weight: 800; color: var(--navy); text-align: start; }
 .qp-gcat-h.all-matched { background: var(--ok-soft); color: var(--success); }
 .qp-gcat-h .chev { margin-inline-start: auto; transition: transform .15s; }
 .qp-gcat-h .chev.open { transform: rotate(180deg); }
@@ -609,7 +598,7 @@
 .qp-foot-main { display: flex; align-items: center; gap: 10px; }
 .qp-cch { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 900; line-height: 1; flex: 0 0 auto; background: color-mix(in srgb, var(--info) 12%, transparent); color: var(--rentee); }
 .qp-fbtn.primary .qp-cch, .qp-fbtn.accept .qp-cch { background: rgba(255, 255, 255, 0.24); color: var(--surface); }
-.qp-gate { position: absolute; bottom: 64px; inset-inline-start: 50%; transform: translateX(-50%); background: var(--danger); color: var(--surface); font-size: 11.5px; font-weight: 700; padding: 7px 12px; border-radius: 9px; box-shadow: 0 8px 22px color-mix(in srgb, var(--danger) 35%, transparent); }
+.qp-gate { position: absolute; bottom: 64px; inset-inline-start: 50%; transform: translateX(-50%); background: var(--danger); color: var(--surface); font-size: 11.5px; font-weight: 700; padding: 7px 12px; border-radius: 9px; }
 
 /* activity log (📜 السجل) — real system_bot negotiation timeline */
 .qp-log-tabs { display: flex; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--border,var(--border)); background: var(--surface2,var(--surface2)); }
@@ -625,8 +614,8 @@
 /* ── shared auxiliary modal (region 9 modalShell): documents · reopen confirm · binding commitment ── */
 @keyframes dlFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes dlPop { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
-.dlproto .dl-modal { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--info-deep) 55%, transparent); animation: dlFade .18s ease; }
-.dlproto .dl-modal-card { display: flex; flex-direction: column; width: 100%; max-height: 88vh; overflow: hidden; background: var(--surface1); border-radius: 20px; box-shadow: 0 30px 70px color-mix(in srgb, var(--info-deep) 40%, transparent); animation: dlPop .22s cubic-bezier(.22, 1, .36, 1); }
+.dlproto .dl-modal { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--navy-deep) 55%, transparent); animation: dlFade .18s ease; }
+.dlproto .dl-modal-card { display: flex; flex-direction: column; width: 100%; max-height: 88vh; overflow: hidden; background: var(--surface1); border-radius: 20px; animation: dlPop .22s cubic-bezier(.22, 1, .36, 1); }
 .dlproto .dl-modal-head { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
 .dlproto .dl-modal-ic { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; flex: 0 0 auto; background: color-mix(in srgb, var(--info) 12%, transparent); color: var(--rentee); }
 .dlproto .dl-modal-ic.warn { background: color-mix(in srgb, var(--brand) 14%, transparent); color: var(--action); }
@@ -666,7 +655,7 @@
 .dlproto .qp-addrbox .v { display: block; font-size: 13.5px; font-weight: 800; color: var(--navy); margin-top: 2px; }
 .dlproto .qp-rgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
 .dlproto .qp-rcol { display: flex; flex-direction: column; gap: 14px; }
-.dlproto .qp-rcard { border: 1px solid var(--border); border-radius: 14px; padding: 0 16px 14px; background: var(--surface1); box-shadow: 0 2px 12px var(--shadow); }
+.dlproto .qp-rcard { border: 1px solid var(--border); border-radius: 14px; padding: 0 16px 14px; background: var(--surface1); }
 .dlproto .qp-rcard-h { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; color: var(--navy); padding: 12px 0 10px 10px; border-inline-start: 3px solid var(--rentee); margin: 4px 0 6px; }
 .dlproto .qp-rcard-h .material-icons-outlined { font-size: 18px; color: var(--rentee); }
 /* navy دليل البنود card */
@@ -679,7 +668,7 @@
 .dlproto .qp-gn-legend { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: rgba(255, 255, 255, 0.82); }
 .dlproto .qp-gn-legend .d { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .dlproto .qp-gn-legend .d.ok { background: var(--success); } .dlproto .qp-gn-legend .d.df { background: var(--action); margin-inline-start: 8px; }
-.dlproto .qp-gn-review { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; font-size: 11.5px; font-weight: 800; color: var(--surface2); }
+.dlproto .qp-gn-review { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; font-size: 11.5px; font-weight: 800; color: var(--border-strong); }
 .dlproto .qp-gncat { display: flex; flex-direction: column; gap: 6px; }
 .dlproto .qp-gncat-h { display: flex; align-items: center; gap: 7px; width: 100%; background: rgba(255, 255, 255, 0.94); color: var(--navy); border: 0; border-radius: 9px; padding: 8px 11px; font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer; text-align: start; }
 .dlproto .qp-gncat-h .cnt { margin-inline-start: auto; font-size: 10.5px; font-weight: 700; color: var(--muted); }
@@ -692,12 +681,12 @@
 .dlproto .qp-gnbadge.match { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok); }
 .dlproto .qp-gnbadge.conflict { background: color-mix(in srgb, var(--danger) 24%, transparent); color: var(--danger-soft); }
 .dlproto .qp-gnbadge.locked { background: rgba(255, 255, 255, 0.14); color: rgba(255, 255, 255, 0.75); }
-.dlproto .qp-gnbadge.none { background: color-mix(in srgb, var(--surface2) 20%, transparent); color: var(--surface2); }
+.dlproto .qp-gnbadge.none { background: color-mix(in srgb, var(--border-strong) 20%, transparent); color: var(--border-strong); }
 
 /* page-flip between the 3 sheets (§6.1) — each step mounts a fresh .qp-paper, so this replays on every
    السعر ⇄ الشروط ⇄ المراجعة transition. Respects reduced-motion. */
 @keyframes qpFlip {
-  0% { opacity: 0; transform: perspective(1600px) rotateY(9deg) translateY(6px); box-shadow: 0 18px 44px color-mix(in srgb, var(--info-deep) 28%, transparent); }
+  0% { opacity: 0; transform: perspective(1600px) rotateY(9deg) translateY(6px); }
   100% { opacity: 1; transform: perspective(1600px) rotateY(0deg) translateY(0); }
 }
 .dlproto .qp-paper { animation: qpFlip 0.36s cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: 50% 0%; }
@@ -746,10 +735,10 @@
 }
 
 /* deal-room/negotiation — turn cue badge + pulsing Negotiate CTA (app parity: negotiateFresh) */
-.dlproto .pb-turn { display: inline-flex; align-items: center; justify-content: center; gap: 5px; margin-top: 8px; font-size: 11.5px; font-weight: 800; color: var(--surface2); }
-.dlproto .pb-turn.alert { color: var(--brand-pale); }
+.dlproto .pb-turn { display: inline-flex; align-items: center; justify-content: center; gap: 5px; margin-top: 8px; font-size: 11.5px; font-weight: 800; color: var(--border-strong); }
+.dlproto .pb-turn.alert { color: var(--brand-light); }
 .dlproto .pb-btn.neg.pulse { animation: dlPulse 1.6s ease-in-out infinite; }
-@keyframes dlPulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--info) 45%, transparent); } 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--info) 0%, transparent); } }
+@keyframes dlPulse { 0%, 100% { } 50% { outline: 6px solid color-mix(in srgb, var(--info) 0%, transparent); outline-offset: 0; } }
 
 /* deal-room/negotiation — reconstructed round history (Log modal) */
 .dlproto .qp-rounds { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
@@ -757,7 +746,7 @@
 .dlproto .qp-round-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .dlproto .qp-round-role { font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 999px; background: var(--surface2); color: var(--navy-mid); }
 .dlproto .qp-round-role.supplier { background: var(--success-bg); color: var(--supplier); }
-.dlproto .qp-round-role.rentee { background: var(--background); color: var(--rentee); }
+.dlproto .qp-round-role.rentee { background: var(--surface3); color: var(--rentee); }
 .dlproto .qp-round-tot { font-family: "IBM Plex Sans", monospace; font-size: 14px; font-weight: 800; color: var(--navy); }
 .dlproto .qp-round-d { margin-top: 5px; font-size: 12px; font-weight: 600; color: var(--navy-mid); display: flex; flex-wrap: wrap; gap: 4px 12px; }
 .dlproto .qp-round-t { margin-top: 4px; font-size: 10.5px; font-weight: 600; color: var(--muted); }
@@ -783,7 +772,7 @@
 .dlproto .dr-menu {
   position: absolute; z-index: 61; top: 62px; inset-inline-end: 6px; min-width: 218px;
   background: var(--surface1); border: 1px solid var(--border); border-radius: 14px;
-  box-shadow: 0 18px 44px color-mix(in srgb, var(--info-deep) 22%, transparent); padding: 6px; display: grid; gap: 2px;
+ padding: 6px; display: grid; gap: 2px;
 }
 .dlproto .dr-menu button {
   display: flex; align-items: center; gap: 10px; width: 100%; text-align: start;

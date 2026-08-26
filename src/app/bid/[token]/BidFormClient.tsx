@@ -262,7 +262,7 @@ export default function BidFormClient({ token }: { token: string }) {
   const setPrice = (id: string, field: "rentalRate" | "deliveryPrice" | "returnPrice", v: string) => setAnswers((p) => ({ ...p, [id]: { ...p[id], [field]: v } }));
   const setOffered = (id: string, v: string) => setAnswers((p) => ({ ...p, [id]: { ...p[id], offeredUnits: v } }));
   // Units still open to a shared-link supplier = numberOfUnits − units already held by other suppliers'
-  // accepted (AWAITING) + confirmed (CLOSED) deals (backend PR var(--ok) via `remainingUnits`). Absent → the
+  // accepted (AWAITING) + confirmed (CLOSED) deals (backend PR var(--ok-deep) via `remainingUnits`). Absent → the
   // full requested count (no regression). Only multi-unit MULTIPLE_SUPPLIERS lines ever cap below it.
   const remainingOf = (it: BidFormItem) => it.remainingUnits ?? it.numberOfUnits;
   const isFullyCovered = (it: BidFormItem) => remainingOf(it) <= 0;

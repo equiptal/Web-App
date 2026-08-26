@@ -1,0 +1,365 @@
+# The design system
+
+Three files hold it, and they are the only three:
+
+| | |
+|---|---|
+| `src/app/globals.css` | every **value** a screen may use |
+| `src/lib/ds.ts` | every **combination** of those values |
+| `eslint.config.mjs` | what happens when a screen writes its own |
+
+Nothing else decides what the app looks like. If you need something these do not
+have, change these — do not write the value where you need it.
+
+---
+
+## Why it exists
+
+The app had a token file and 122 files ignoring it. Counted on 2026-08-26:
+
+- **171** distinct hex colours, in 888 places, against 10 defined tokens
+- **20** font sizes, including 13.5px, 12.5px, 11.5px and 10.5px — sizes no
+  reader can tell apart, but which guarantee two screens never quite match
+- **10** arbitrary radii plus 5 named ones
+- **~30** shadows, every one of them unique
+- **456** hand-rolled `<button>` elements, and a `Card` component with **zero**
+  call sites
+- **6** competing treatments for a selected chip, and **30** for a hover
+
+`PageSection.tsx` already said this out loud, in a comment above the code:
+
+> Two pages agreeing by coincidence is not a theme — it is two pages that will
+> disagree at the next edit.
+
+The scale below was taken from the app itself: the sizes and colours it already
+used most, named rather than reinvented. Almost nothing moved. What did is at
+the end, under [What changed](#what-changed).
+
+---
+
+## Colour
+
+### Navy — the neutral ramp
+
+Twelve steps, dark to light. Eighty-seven distinct blues used to do this work.
+
+| Token | Value | For |
+|---|---|---|
+| `navy-deep` | `#16263f` | dark headers, overlay grounds |
+| `navy` | `#1c3550` | foreground text, navy blocks |
+| `navy-mid` | `#2a4f72` | the navy gradient's partner |
+| `muted-dark` | `#5a6b82` | secondary text that still carries weight |
+| `muted` | `#6b8fa8` | secondary text |
+| `muted-light` | `#9aa7b8` | tertiary text, placeholders, disabled |
+| `border-strong` | `#c3d2e0` | a divider that has to be seen |
+| `border` | `#d4e0ec` | the default border |
+| `surface3` | `#e4edf5` | pressed, selected |
+| `surface2` | `#eff4f9` | inset panels, tinted fills, hover |
+| `background` | `#f5f8fc` | the page ground |
+| `surface` | `#ffffff` | cards, floating layers |
+
+### Brand
+
+`#f79009`, checked against the mobile app's `action` token in
+`apps/mobile/lib/core/theme/app_colors.dart`. The mobile standards document at
+`agent-os/standards/mobile/design-system.md:24` still names `#E8650A`; neither
+product's code agrees with it, so the document is the thing that is wrong.
+
+| Token | Value | For |
+|---|---|---|
+| `brand-deep` | `#b45309` | brand text on a light ground |
+| `brand` | `#f79009` | the primary CTA |
+| `brand-hover` | `#e58108` | |
+| `brand-press` | `#cc7207` | |
+| `brand-light` | `#fbbf6b` | accents, dots |
+| `brand-pale` | `#fde8cc` | fills, progress tracks |
+| `brand-soft` | `#fff4e5` | tinted backgrounds, selected chips |
+
+`gold` `#b8860b` is the mark's own colour. It is not a UI state and does not
+belong on a control.
+
+### Status
+
+Three tiers each. **base** is the colour, **soft** is a background you may lay it
+on, and **deep** is the text colour that stays readable on that background. The
+base colour alone is not readable at 11px on its own tint — that is what `deep`
+is for.
+
+| | base | soft | deep |
+|---|---|---|---|
+| ok | `#1daf58` | `#e7f7ee` | `#15803d` |
+| warn | `#ed6a5e` | `#fff0ec` | `#c0392b` |
+| danger | `#b03636` | `#fbe5e5` | `#8f2626` |
+| info | `#1a7ec8` | `#e6f2fb` | `#0e4f7e` |
+
+**Warning is coral, and it used to be orange.** That mattered: the old warning
+`#d4780a` was one shade off the primary CTA, so a caution and a button meant to
+be pressed looked alike. The clearest case was the "you wrote" block in
+`create/Canvas.tsx`, which used one orange for its warning label and for the
+link inside it, thirteen pixels apart. Danger deepened at the same time to keep
+its distance from coral, and the two soft tints were pulled apart as well —
+warning's leans peach, danger's leans grey-red — because at a single hex digit
+apart they were indistinguishable side by side.
+
+### What is not a token
+
+White and black are exempt: a grid line at 4% white over a navy block, or a mask
+gradient in black, is not a palette colour, and a token for it would only ever
+mean "white" or "black".
+
+Five colours are kept raw on purpose, because they belong to someone else:
+WhatsApp's green on the "message on WhatsApp" control, Google Play's yellow
+inside its own four-colour glyph, the mobile app's cream, and two one-offs.
+
+---
+
+## Type
+
+Six sizes. There is no seventh for UI.
+
+| Token | Size | For |
+|---|---|---|
+| `text-label` | 11px | UPPERCASE SECTION LABEL |
+| `text-meta` | 12.5px | the muted sentence under a value |
+| `text-body` | 13px | the answer, list rows, buttons — **the default** |
+| `text-subhead` | 15px | card headings |
+| `text-title` | 17px | a page or masthead name |
+| `text-display` | 22px | a number worth shouting |
+
+`text-hero` (32px) exists for display copy — the auth headline and the home
+banner, and nothing else. It is a seventh step in a six-step scale, which is a
+debt, not a feature; the alternative was leaving those two headlines hardcoded
+at 36px and 29px, which is the same debt with no name on it.
+
+Tailwind's own sizes (`text-xs` … `text-9xl`) are **cleared from the theme**, so
+writing one produces no CSS at all rather than a value nobody chose.
+
+### Weight
+
+Three: `font-normal` 400, `font-semibold` 600, `font-extrabold` 800.
+`font-medium`, `font-bold`, `font-black`, `font-thin` and `font-light` are
+cleared. Five weights is not a hierarchy; it is one guess repeated across files.
+
+---
+
+## Radius
+
+Four. Tailwind's `rounded-xl`, `rounded-2xl` and up are cleared.
+
+| Token | Size | For |
+|---|---|---|
+| `rounded-sm` | 8px | chips, tags, tight controls |
+| `rounded-md` | 10px | inputs, buttons, list rows — **the default** |
+| `rounded-lg` | 14px | cards, panels, sheets |
+| `rounded-full` | — | pills, avatars, dots |
+
+---
+
+## Spacing
+
+The 4px grid, which is Tailwind's default and the mobile app's: `p-1` is 4px,
+`gap-2` is 8px, `px-3` is 12px. Nine steps are in use — 4, 8, 12, 16, 20, 24,
+32, 40, 48. Off-grid values (`gap-1.5`, `mt-[11px]`, `py-[10px]`) are not.
+
+---
+
+## Controls
+
+Three heights, as classes, so a control's height and its horizontal padding move
+together and no screen can set one without the other.
+
+| Class | Height | For |
+|---|---|---|
+| `control-sm` | 30px | chips, icon buttons, table controls |
+| `control-md` | 34px | inputs, buttons, selects — **the default**, and the top bar's |
+| `control-lg` | 44px | primary CTA, mobile list rows — the touch minimum |
+
+Add `control-icon` to square one off for a lone glyph.
+
+---
+
+## Shadows
+
+**There are none.** The whole `shadow-*` namespace is cleared from the theme, so
+`shadow-sm` and its relatives resolve to nothing.
+
+Separation is carried three other ways:
+
+- a **card** is its border and its fill; one that needs more weight takes
+  `border-border-strong`, which darkens the edge rather than lifting the box
+- a **floating layer** — modal, sheet, dropdown — has a 1px border, and the page
+  behind it dims under `SCRIM`
+- a **tooltip** inverts instead: navy ground, white text, no border
+
+A ring is not a shadow. `0 0 0 3px <colour>` written as a `box-shadow` is an
+outline that happened to be drawn with the wrong tool; those are `outline` now,
+which looks the same and costs no layout.
+
+The one shadow with a case for itself was the map markers' `drop-shadow` — a
+marker on a map has terrain under it, and the shadow is what said so. It went
+with the rest; `MapCanvas.tsx` carries the two lines to put it back if the
+machines stop reading against a busy map.
+
+### Focus
+
+A solid outline, applied once in `globals.css` to everything focusable:
+
+```css
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+```
+
+Not a shadow, and not optional — a keyboard user has no other way to know where
+they are. Because a ring means focus and only focus, an input's error and agent
+states sit on its **border** instead, so nobody is left guessing which of two
+rings they are looking at.
+
+---
+
+## States
+
+### Hover and press
+
+Colours, never filters. `brightness()` was in use in 35 places and does nothing
+at all to a white or transparent element, which is what most of the app's
+buttons are. Nothing lifts, and nothing casts a shadow.
+
+| | hover | press |
+|---|---|---|
+| ghost, secondary | `bg-surface2` | `bg-surface3` |
+| tinted | `bg-surface3` | `bg-border` |
+| primary | `brand-hover` | `brand-press` |
+| danger | `danger-hover` | `danger-press` |
+
+### Disabled
+
+Its own colours, not a faded copy: `bg-disabled-bg`, `text-disabled-fg`,
+`border-disabled-border`. `opacity-.5` over an orange fill produced a muddy tint
+nobody chose and landed near 2.1:1 against white — under the 3:1 floor WCAG
+1.4.11 sets for a control.
+
+### Selected
+
+Two rules, because the two shapes genuinely read differently. There were six.
+
+**A tab strip or segmented control has a track.** The chosen item is a white
+panel lifted out of a tinted groove, and the groove does the separating — no
+shadow needed. Use `TRACK` and `SEGMENT.on` / `SEGMENT.off`.
+
+**A chip, toggle or selectable card has no track**, so it marks itself with a
+brand tint: `bg-brand-soft`, `border-brand`, `text-brand-deep`. Use
+`CHIP.on` / `CHIP.off`, or `CARD_SELECTABLE` at card scale.
+
+---
+
+## Buttons
+
+Six variants, three heights. `btn(variant, size, opts)` returns the classes;
+`<Button>` in `components/ui.tsx` wraps it.
+
+| Variant | |
+|---|---|
+| `primary` | the one orange thing on a screen. Two visible at once means one is wrong |
+| `secondary` | the bordered alternative beside it |
+| `tinted` | filled but quieter |
+| `ghost` | a bare icon, a toolbar action |
+| `danger` | a destructive confirm |
+| `link` | a word in a sentence — no control height, no padding |
+
+`opts`: `icon` squares it for a lone glyph, `full` stretches it to its row,
+`pill` rounds it completely for a CTA that floats free of a form.
+
+```tsx
+<Button variant="primary" size="lg" full>Send request</Button>
+
+// Or, where the element cannot be the component:
+<a href={url} className={btn("secondary", "sm")}>Open</a>
+```
+
+**89 of the app's 449 buttons are on this.** The rest are honest exceptions and
+are documented as such in the commit: 175 ghosts and links whose geometry is
+load-bearing, 127 with a computed className, 45 that are cards or rows rather
+than buttons, and 5 with no chassis at all. Their colours, sizes and radii are
+already on the system; what remains is composition, and that needs eyes.
+
+---
+
+## What to reach for
+
+Everything below is exported from `@/lib/ds`.
+
+| Need | Use |
+|---|---|
+| a button | `btn()` or `<Button>` |
+| a card | `CARD` + `PAD.md`, or `<Card>` |
+| a card with more weight | `CARD_RAISED` |
+| a panel set into a card | `PANEL` |
+| the navy block a page opens with | `MASTHEAD` |
+| a modal or sheet | `OVERLAY` + `SCRIM` |
+| a dropdown | `POPOVER` |
+| a tooltip | `TOOLTIP` |
+| a text role | `TYPE.label` … `TYPE.display` |
+| an input | `INPUT`, `TEXTAREA`, `INPUT_ERROR`, `INPUT_AGENT` |
+| a tab strip | `TRACK` + `SEGMENT` |
+| a chip | `CHIP_BOX` + `CHIP` |
+| a selectable card | `CARD_SELECTABLE` |
+| a status pill | `BADGE_BASE` + `BADGE_TONE[tone]`, or `<Badge>` |
+| a status panel | `NOTICE_BASE` + `NOTICE_TONE[tone]`, or `<Notice>` |
+| a tappable list row | `ROW` |
+| a divider | `DIVIDER` |
+| joining classes | `cx()` |
+
+---
+
+## What the linter blocks
+
+Each rule names its replacement, because a rule that only says no gets switched
+off.
+
+| Blocked | Instead |
+|---|---|
+| a raw hex colour | a token, or `var(--token)` in a style |
+| `rgba(…)` | `color-mix(in srgb, var(--brand) 12%, transparent)`, or `border-warn/40` |
+| `text-[14px]` | the six-step scale |
+| `rounded-[12px]` | the four-step scale |
+| any `shadow-*`, any `boxShadow` | a border, a surface step, or `SCRIM` |
+| `hover:brightness-*`, `hover:opacity-*`, `hover:-translate-*` | a hover colour |
+| `disabled:opacity-*` | the disabled colours |
+| `font-medium`, `font-bold`, `font-black` | the three weights |
+
+---
+
+## What changed
+
+Nothing moved that did not have to. What did:
+
+- **Warning went from orange to coral**, and danger deepened. 24 cautions and 21
+  errors changed colour. This is the change with a reason rather than a rule
+  behind it: a caution should not look like a button.
+- **Every shadow disappeared.** 86 in the components, 88 in the stylesheets.
+  Cards, modals and dropdowns now separate by border, surface step and scrim.
+- **Half-pixel type snapped.** 13.5px and 14px to 13, 11.5px to 11, 10.5px to 11.
+  12.5px stayed, because 114 uses of it carry the muted-meta role.
+- **`font-bold` split by role.** On a title-sized element it became extrabold; on
+  everything else, semibold. 303 places.
+- **43 classes reached for `var(--action)` and `var(--surface1)`** — the *mobile*
+  app's token names, defined nowhere in the web app. Every one of them was
+  resolving to nothing. Fixed, not tokenised.
+- **34 custom properties referenced themselves** after the sweep tokenised their
+  hex (`--navy: var(--navy)`), which makes a property invalid at computed-value
+  time and takes everything reading it down with it. Deleted, so the scope
+  inherits `:root` — which was always the intent.
+
+---
+
+## Adding to it
+
+1. Add the **value** to `globals.css`, in the ramp it belongs to, with a comment
+   saying what it is for.
+2. Add the **combination** to `ds.ts` if more than one screen will want it.
+3. Use it.
+
+If step 1 feels like it needs a thirteenth blue, it usually needs one of the
+twelve instead.

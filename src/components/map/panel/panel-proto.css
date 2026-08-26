@@ -12,12 +12,12 @@
    deliberately not the app's `--rentee`/`--success` set (map-proto.css §head, design.md §5). Read off
    the prototype's own `const C` in the decoded source, NOT off design-v3.md, which mis-transcribes two
    of them:
-     deep var(--info-deep) · navy var(--navy) · muted var(--muted) · border var(--surface2) · blt var(--background) · surface var(--surface2)
+     deep var(--navy-deep) · navy var(--navy) · muted var(--muted) · border var(--surface2) · blt var(--background) · surface var(--surface2)
      s2 var(--surface) · blue var(--info) · green var(--ok) · red var(--danger) · amber var(--warn)
 
-   ~~deep var(--info-deep) · blt var(--surface3)~~ — **wrong, corrected 2026-08-09** alongside the same correction in
+   ~~deep var(--navy-deep) · blt var(--surface3)~~ — **wrong, corrected 2026-08-09** alongside the same correction in
    `map-proto.css`. The comment named the prototype's `deep` and `blt` and then used two colours that
-   are not them: `var(--info-deep)` is a literal the prototype spends elsewhere (a photo backdrop, the modal
+   are not them: `var(--navy-deep)` is a literal the prototype spends elsewhere (a photo backdrop, the modal
    scrim's base) and never as the token, and `var(--surface3)` belongs to other surfaces in this app. Every site
    that inherited them is corrected here too — panel ink, the company header's slab, row and thumbnail
    hairlines, the tab strip's rule. `rgba(15, 34, 56, …)` survives untouched wherever it appears: that
@@ -34,8 +34,8 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: var(--surface);
-  color: var(--info-deep);
+  background: var(--surface2);
+  color: var(--navy-deep);
   font-size: 14px;
 }
 
@@ -43,7 +43,7 @@
    stacking context, so the host only has to be `position: relative`.
 
    It arrives by SLIDING, and it casts a shadow with an edge under it — the prototype's `dpPanelIn`,
-   `6px 0 24px color-mix(in srgb, var(--info-deep) 10%, transparent)` and `border-inline-end: 1px var(--background)`. ~~A 6 px rise and a fade
+   `6px 0 24px color-mix(in srgb, var(--navy-deep) 10%, transparent)` and `border-inline-end: 1px var(--background)`. ~~A 6 px rise and a fade
    from nothing.~~ A rise says "this appeared here"; a slide from the leading edge says "this came in
    over what you were reading, and it can go back", which is the only thing the renter needs to know
    about a panel that covers another one. Starting at `.4` rather than `0` is part of that: it is
@@ -52,9 +52,9 @@
   position: absolute;
   inset: 0;
   z-index: 12;
-  background: var(--surface);
-  border-inline-end: 1px solid var(--background);
-  box-shadow: 6px 0 24px color-mix(in srgb, var(--info-deep) 10%, transparent);
+  background: var(--surface2);
+  border-inline-end: 1px solid var(--surface3);
+
   animation: mpPanelIn 0.18s ease;
 }
 
@@ -78,7 +78,7 @@
   position: relative;
   flex-shrink: 0;
   height: 196px;
-  background: var(--background);
+  background: var(--surface3);
   overflow: hidden;
 }
 .mp-viewer img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -93,13 +93,13 @@
      what it says. `contain` for the same reason — a cropped certificate loses precisely the corner the
      stamp is in. `34px` of bottom padding is the caption strip's height, kept clear so the sheet is
      never partly under it.
-   - **a photo opened from a ROW — `268px`, `contain`, over `var(--info-deep)`.** Same frame, and the dark
+   - **a photo opened from a ROW — `268px`, `contain`, over `var(--navy-deep)`.** Same frame, and the dark
      backdrop is the prototype's: a photograph shown whole rather than cropped has letterboxing beside
      it, and light bars around a photograph read as part of the photograph. */
 .mp-viewer.doc { height: 268px; background: var(--surface2); }
 .mp-viewer.doc img { object-fit: contain; }
-.mp-viewer.doc.photo img { background: var(--info-deep); }
-.mp-viewer.doc.paper img { background: var(--surface); padding: 10px 10px 34px; }
+.mp-viewer.doc.photo img { background: var(--navy-deep); }
+.mp-viewer.doc.paper img { background: var(--surface2); padding: 10px 10px 34px; }
 
 /* **The file the `<img>` could not draw, drawn** (owner, UAT of 2026-08-11 — *"the document does not
    render at the top"*). An `<object>` fills the frame exactly as the image it replaces does, so a PDF
@@ -116,7 +116,7 @@
   padding-bottom: 34px;
   border: 0;
   display: block;
-  background: var(--surface);
+  background: var(--surface2);
 }
 
 /* Two states share this: a machine with no photograph on its file, and a file NEITHER an image nor an
@@ -136,7 +136,7 @@
   font-size: 12px;
   font-weight: 700;
   color: var(--muted);
-  background: var(--surface);
+  background: var(--surface2);
 }
 .mp-hero-empty a { color: var(--info); text-decoration: underline; }
 /* **A CAPTION STRIP, not a scrim** (2026-08-09). ~~A scrim under the title only — never over the
@@ -151,8 +151,8 @@
   bottom: 0;
   padding: 9px 14px;
   background: rgba(255, 255, 255, 0.94);
-  border-top: 1px solid var(--background);
-  color: var(--info-deep);
+  border-top: 1px solid var(--surface3);
+  color: var(--navy-deep);
   font-size: 11.5px;
   font-weight: 800;
   white-space: nowrap;
@@ -174,17 +174,16 @@
   justify-content: center;
   width: 34px;
   height: 34px;
-  border: 1px solid var(--background);
+  border: 1px solid var(--surface3);
   border-radius: 50%;
   padding: 0;
-  background: var(--surface);
+  background: var(--surface2);
   color: var(--navy);
   font-family: inherit;
   font-size: 15px;
   font-weight: 900;
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--info-deep) 14%, transparent);
 }
 .mp-back:hover { background: var(--surface); }
 
@@ -218,7 +217,7 @@
   width: 32px;
   height: 32px;
   padding: 0;
-  border: 1px solid var(--surface2);
+  border: 1px solid var(--border-strong);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.97);
   color: var(--navy);
@@ -229,7 +228,6 @@
   white-space: nowrap;
   cursor: pointer;
   text-decoration: none;
-  box-shadow: 0 2px 10px color-mix(in srgb, var(--info-deep) 16%, transparent);
 }
 .mp-tool.solid { border-color: var(--navy); background: var(--navy); color: var(--surface); }
 .mp-tool:disabled { opacity: 0.7; cursor: default; }
@@ -248,8 +246,8 @@
 .mp-tabs {
   flex-shrink: 0;
   display: flex;
-  background: var(--surface);
-  border-bottom: 1px solid var(--background);
+  background: var(--surface2);
+  border-bottom: 1px solid var(--surface3);
 }
 .mp-tab {
   flex: 1;
@@ -268,7 +266,7 @@
   line-height: 1.3;
   cursor: pointer;
 }
-.mp-tab.on { border-bottom-color: var(--navy); color: var(--info-deep); }
+.mp-tab.on { border-bottom-color: var(--navy); color: var(--navy-deep); }
 /* The attention badge counts ROWS NEEDING ACTION, never a total (§6.1, AC-42). RED, with the rows it
    counts — see §missing below for why it is no longer amber.
    It rides INLINE beside the label now: a tab has no raised corner to hang a badge off, and a
@@ -312,7 +310,7 @@
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.5px;
-  color: var(--info-deep);
+  color: var(--navy-deep);
 }
 .mp-band { font-size: 12px; font-weight: 700; color: var(--muted); }
 .mp-yard {
@@ -333,7 +331,7 @@
   border-radius: 20px;
   padding: 2px 8px;
   background: var(--brand-soft);
-  color: var(--brand);
+  color: var(--brand-deep);
   font-size: 10.5px;
   font-weight: 800;
   white-space: nowrap;
@@ -373,7 +371,7 @@
 /* `14px 18px`, not `14px` — both `sect()` helpers in the prototype (`rCompanyPanel` 4130,
    `rEquipDetail` 4196) set the wider horizontal inset, and at the panel's real 392 px every section
    on the machine detail was sitting 4 px proud of it. */
-.mp-sect { padding: 14px 18px; border-top: 1px solid var(--background); }
+.mp-sect { padding: 14px 18px; border-top: 1px solid var(--surface3); }
 .mp-sect-h { font-size: 11px; font-weight: 800; letter-spacing: 0.3px; color: var(--muted); }
 .mp-sect-n { margin-top: 6px; font-size: 11.5px; font-weight: 600; line-height: 1.8; color: var(--navy); }
 
@@ -388,7 +386,7 @@
 .mp-h4 small { display: block; font-size: 9.5px; font-weight: 600; color: var(--muted); margin-top: 2px; }
 
 /* Every number here is the prototype's, corrected 2026-08-09 — ours differed on all of them. Cell
-   `9px 10px` on a `7px` gap; the neutral cell over `var(--surface2)` inside `var(--background)` rather than our paler
+   `9px 10px` on a `7px` gap; the neutral cell over `var(--surface2)` inside `var(--surface3)` rather than our paler
    grey inside the border token; the two verdict tints at `.055` / `.045` over `.28` / `.24`, which
    are lighter fills inside firmer edges than we had. The label rises to `10.5/700` and the finding
    falls to `11.5/800`: the pair was reading as caption-then-sentence, and it is meant to read as
@@ -397,7 +395,7 @@
 @media (max-width: 420px) { .mp-grid { grid-template-columns: 1fr; } }
 
 .mp-cell {
-  border: 1px solid var(--background);
+  border: 1px solid var(--surface3);
   border-radius: 10px;
   padding: 9px 10px;
   background: var(--surface2);
@@ -444,7 +442,7 @@ button.mp-cell {
   text-align: start;
   cursor: pointer;
 }
-/* **THE FRAMED CELL WEARS WHAT THE FRAMED ROW WEARS** — `var(--info-deep)`, stated as a doubled hairline with no
+/* **THE FRAMED CELL WEARS WHAT THE FRAMED ROW WEARS** — `var(--navy-deep)`, stated as a doubled hairline with no
    fill of its own (`.mp-row.open`, and the note there for why emphasis rather than a second colour).
    Selection on this surface is navy wherever it happens: a ticked row, a ticked box, a framed row, a
    framed cell (owner, 2026-08-11 — *"use consistent styling on any selection of a row, whether here or
@@ -452,7 +450,7 @@ button.mp-cell {
    The border-color override has to beat `.mp-cell.green`, which is why it is written with the state
    class beside it rather than relying on source order. */
 .mp-cell.press.open,
-.mp-cell.green.press.open { border-color: var(--info-deep); box-shadow: inset 0 0 0 1px var(--info-deep); }
+.mp-cell.green.press.open { border-color: var(--navy-deep); outline: 1px solid var(--navy-deep); outline-offset: -1px; }
 
 /* ═══════════════════════════ document rows (V8 + V9 share this grammar) ═══════════════════════════ */
 
@@ -479,7 +477,7 @@ button.mp-cell {
    lists of near-identical rows, and at 11 px in the row's own navy it was reading as one more row.
    Its pill: `999px`, `2px 9px`, `10px/800`, `nowrap` — a rounder, slightly larger capsule than the
    `20px / 2px 8px / 9.5px` it carried. Only the two hues are ours, and both are the documented
-   substitutions this file's head records (`var(--danger)` for its `var(--danger)`, `var(--ok)` for its `var(--ok)`). */
+   substitutions this file's head records (`var(--danger)` for its `var(--danger)`, `var(--ok-deep)` for its `var(--ok-deep)`). */
 .mp-grp { margin-top: 14px; }
 .mp-grp-h {
   display: flex;
@@ -488,7 +486,7 @@ button.mp-cell {
   margin-bottom: 9px;
   font-size: 12px;
   font-weight: 800;
-  color: var(--info-deep);
+  color: var(--navy-deep);
 }
 /* `flex: 1` on the title, so the pill sits on the group's FAR edge rather than trailing the words —
    the prototype's `grp()` and its company twin (4112) both do it. It is what puts every group's
@@ -550,7 +548,7 @@ button.mp-cell {
   font-weight: 800;
   cursor: pointer;
 }
-.mp-linkbtn:disabled { color: var(--surface2); cursor: default; }
+.mp-linkbtn:disabled { color: var(--border-strong); cursor: default; }
 /* «إلغاء التحديد (n)» — the way back to neutral. Quieter than the select-all beside it: undoing is never
    the act being offered, only the one that must stay reachable. */
 .mp-linkbtn.muted { color: var(--muted); }
@@ -560,24 +558,24 @@ button.mp-cell {
   align-items: center;
   gap: 10px;
   padding: 7px 10px;
-  border: 1px solid var(--background);
+  border: 1px solid var(--surface3);
   border-radius: 12px;
   margin-bottom: 6px;
-  background: var(--surface);
+  background: var(--surface2);
 }
-/* A PICKED row wears the prototype's navy `var(--info-deep)`, not the action blue (owner, 2026-08-10). The
+/* A PICKED row wears the prototype's navy `var(--navy-deep)`, not the action blue (owner, 2026-08-10). The
    same move `.mp-doc` already made on 2026-08-09 and for the same reason: `var(--info)` is this surface's
    ACTION colour — it is what «اطلب التأكيد» is painted in, and AC-33 requires it there precisely
    because that control must read as pressable beside a red chip. A selected row is not an action; it
    is a state. Sharing the action's colour made a ticked row look like something still to be pressed.
    `picked.missing` repeats the rule rather than inheriting it, because the missing tint below would
    otherwise win on specificity and a selected missing row would lose its outline entirely. */
-.mp-row.picked { border-color: var(--info-deep); background: color-mix(in srgb, var(--info-deep) 8%, transparent); }
+.mp-row.picked { border-color: var(--navy-deep); background: color-mix(in srgb, var(--navy-deep) 8%, transparent); }
 .mp-row.missing { border-color: color-mix(in srgb, var(--danger) 22%, transparent); background: color-mix(in srgb, var(--danger) 5%, transparent); }
-.mp-row.picked.missing { border-color: var(--info-deep); background: color-mix(in srgb, var(--info-deep) 8%, transparent); }
+.mp-row.picked.missing { border-color: var(--navy-deep); background: color-mix(in srgb, var(--navy-deep) 8%, transparent); }
 
 /* **The row that is IN THE FRAME** (owner, 2026-08-11). The prototype marks it with the navy border
-   and a `color-mix(in srgb, var(--info-deep) 5%, transparent)` fill — but the prototype has no other state to confuse it with, because
+   and a `color-mix(in srgb, var(--navy-deep) 5%, transparent)` fill — but the prototype has no other state to confuse it with, because
    there selection is the checkbox and nothing else. Here navy-plus-fill is already `.picked`, and
    `.picked` is settled (owner, 2026-08-10: a selection is navy, `var(--info)` is the ACTION).
 
@@ -586,7 +584,7 @@ button.mp-cell {
    two-colour rule intact and, more to the point, lets a row be framed and ticked at once and still say
    both. A third hue would have made "I am reading this" and "I am about to download this" two things
    the renter has to learn apart. The statement is also made in words: `aria-current` on the button. */
-.mp-row.open { border-color: var(--info-deep); box-shadow: inset 0 0 0 1px var(--info-deep); }
+.mp-row.open { border-color: var(--navy-deep); outline: 1px solid var(--navy-deep); outline-offset: -1px; }
 
 /* The pressable body of a row: its name, its status line and its thumbnail, in ONE control (owner,
    2026-08-11). It is a `<button>` when there is a file to frame and a `<span>` when there is not, and
@@ -616,7 +614,7 @@ span.mp-rowopen { cursor: default; }
    `disabled`, so this is a colour restating an inert control, never the only thing stopping a click. */
 .mp-row.dim { opacity: 0.45; }
 
-/* `22 × 22`, r6, `1.5px var(--surface2)` — the prototype's `box()`, which is ONE function drawing both the
+/* `22 × 22`, r6, `1.5px var(--border-strong)` — the prototype's `box()`, which is ONE function drawing both the
    row's tick and the select-all bar's. Written once here for the same reason: the bar's box sits at
    the head of the rows' column and any difference between them reads as a different kind of control.
    `inline-flex` because the bar's copy is a <span> inside a labelled button, and a bare span would
@@ -626,9 +624,9 @@ span.mp-rowopen { cursor: default; }
   width: 22px;
   height: 22px;
   padding: 0;
-  border: 1.5px solid var(--surface2);
+  border: 1.5px solid var(--border-strong);
   border-radius: 6px;
-  background: var(--surface);
+  background: var(--surface2);
   color: var(--surface);
   font-family: inherit;
   font-size: 12px;
@@ -640,11 +638,11 @@ span.mp-rowopen { cursor: default; }
   justify-content: center;
 }
 /* NAVY when ticked, not the action blue — the prototype's `box()` fills with `C.blue`, which §1's
-   palette settles as `var(--info-deep)`. The block above already cited `box()` for the 22px, the r6 and the
+   palette settles as `var(--navy-deep)`. The block above already cited `box()` for the 22px, the r6 and the
    1.5px border and then diverged on the one value that is visible only once the renter acts. It also
    left a picked row wearing navy (`.mp-row.picked`) and its own tick wearing blue — two colours for
    one selection. `var(--info)` on this surface is the request ACTION (AC-33), not a selection. */
-.mp-tick.on { border-color: var(--info-deep); background: var(--info-deep); }
+.mp-tick.on { border-color: var(--navy-deep); background: var(--navy-deep); }
 /* The other mode's checkbox. `disabled` already refuses the click and drops it out of the tab order;
    this only makes the cursor say so before the renter tries. */
 .mp-tick:disabled { cursor: not-allowed; }
@@ -672,9 +670,9 @@ span.mp-rowopen { cursor: default; }
   flex-shrink: 0;
   width: 46px;
   height: 40px;
-  border: 1px solid var(--background);
+  border: 1px solid var(--surface3);
   border-radius: 8px;
-  background: var(--surface);
+  background: var(--surface2);
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -743,8 +741,8 @@ span.mp-rowopen { cursor: default; }
   gap: 6px;
 }
 
-/* **ONE weight, an outline, in the prototype's own navy** — `color-mix(in srgb, var(--info-deep) 7%, transparent)` over
-   `color-mix(in srgb, var(--info-deep) 22%, transparent)` with `var(--info-deep)` ink, which is `C.blueLt` / `C.blueBd` / `C.blue` read off the
+/* **ONE weight, an outline, in the prototype's own navy** — `color-mix(in srgb, var(--navy-deep) 7%, transparent)` over
+   `color-mix(in srgb, var(--navy-deep) 22%, transparent)` with `var(--navy-deep)` ink, which is `C.blueLt` / `C.blueBd` / `C.blue` read off the
    decoded source. The prototype's per-row control is that outline on every row, and only that.
 
    ~~Primary — filled, because looking is what the renter came here to do.~~ **Withdrawn 2026-08-09.**
@@ -762,10 +760,10 @@ span.mp-rowopen { cursor: default; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid color-mix(in srgb, var(--info-deep) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--navy-deep) 22%, transparent);
   border-radius: 9px;
-  background: color-mix(in srgb, var(--info-deep) 7%, transparent);
-  color: var(--info-deep);
+  background: color-mix(in srgb, var(--navy-deep) 7%, transparent);
+  color: var(--navy-deep);
   font-family: inherit;
   font-size: 14px;
   font-weight: 800;
@@ -797,7 +795,7 @@ span.mp-rowopen { cursor: default; }
   align-items: center;
   gap: 8px;
   padding: 0 18px;
-  border-top: 1px solid var(--background);
+  border-top: 1px solid var(--surface3);
   background: var(--surface2);
 }
 .mp-foot-b {
@@ -805,9 +803,9 @@ span.mp-rowopen { cursor: default; }
   min-width: 0;
   padding: 12px 10px;
   /* A border the colour of the fill, so the solid and the outline are exactly the same height. */
-  border: 1px solid var(--surface2);
+  border: 1px solid var(--border-strong);
   border-radius: 11px;
-  background: var(--surface);
+  background: var(--surface2);
   color: var(--navy);
   font-family: inherit;
   font-size: 12px;
@@ -846,8 +844,8 @@ span.mp-rowopen { cursor: default; }
    description of the button that stays visible beside the live one. `not-allowed` is what tells a renter
    who tries it that it is the selection, not the button, that has to change. */
 .mp-send:disabled {
-  background: var(--surface);
-  border-color: var(--background);
+  background: var(--surface2);
+  border-color: var(--border);
   color: var(--muted-light);
   opacity: 0.7;
   cursor: not-allowed;
@@ -891,7 +889,7 @@ span.mp-rowopen { cursor: default; }
   align-items: center;
   gap: 8px;
   padding: 0 18px;
-  border-top: 1px solid var(--background);
+  border-top: 1px solid var(--surface3);
   background: rgba(255, 255, 255, 0.97);
 }
 /* `12px`, `foot()`'s own size (4397) — the shared `.mp-send` is 11.5 px because the company panel's
@@ -938,7 +936,7 @@ span.mp-rowopen { cursor: default; }
   flex-wrap: wrap;
   gap: 4px 10px;
   padding: 8px 18px;
-  background: var(--info-deep);
+  background: var(--navy-deep);
   color: var(--surface);
 }
 /* The firm's letters — `40 × 40`, r11, a lift off the slab rather than a colour of its own. Absent
@@ -990,11 +988,11 @@ span.mp-rowopen { cursor: default; }
 }
 .mp-cohead .mp-back:hover { background: rgba(255, 255, 255, 0.24); }
 /* Only when verified (AC-02) — an absent chip is the whole statement for an unverified firm.
-   **A NEAR-WHITE PILL** (2026-08-09). ~~A translucent green wash with `var(--ok)` text.~~ Withdrawn:
+   **A NEAR-WHITE PILL** (2026-08-09). ~~A translucent green wash with `var(--ok-soft)` text.~~ Withdrawn:
    that wash is a colour that exists nowhere else in this product, invented to survive a dark
    background, and it made the same verification read as one thing on the machine panel's white and
    another here. A white pill carrying the palette's own green says it identically on both.
-   `var(--ok)`, our green, where the prototype writes its `var(--ok)` — the same documented substitution
+   `var(--ok-deep)`, our green, where the prototype writes its `var(--ok-deep)` — the same documented substitution
    the red family gets (see this file's head). */
 .mp-vchip {
   flex-shrink: 0;
@@ -1034,4 +1032,4 @@ span.mp-rowopen { cursor: default; }
 /* The firm's rows pick the same way the machine's do — the prototype's `coDocsBody` calls the SAME
    `box()` and its own comment says "same selection model as the machine's documents". So the same
    navy, not the action blue this carried while `.mp-row.picked` had already moved to it. */
-.mp-over .mp-row.picked { border-color: var(--info-deep); background: color-mix(in srgb, var(--info-deep) 8%, transparent); }
+.mp-over .mp-row.picked { border-color: var(--navy-deep); background: color-mix(in srgb, var(--navy-deep) 8%, transparent); }

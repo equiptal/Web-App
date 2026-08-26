@@ -2,8 +2,8 @@
    Relies on the .rproto CSS variables + .gctx/.flab from requests-proto.css. */
 
 /* drop zone */
-.rproto .dropzone { border: 2px dashed var(--surface2); background: var(--rentee-dim); border-radius: var(--r-lg); padding: 26px 18px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
-.rproto .dropzone:hover, .rproto .dropzone.over { border-color: var(--rentee); background: var(--background); }
+.rproto .dropzone { border: 2px dashed var(--border-strong); background: var(--rentee-dim); border-radius: var(--r-lg); padding: 26px 18px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+.rproto .dropzone:hover, .rproto .dropzone.over { border-color: var(--rentee); background: var(--surface3); }
 .rproto .dropzone .dz-ic { width: 46px; height: 46px; border-radius: 12px; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; background: var(--rentee-dim); color: var(--rentee); }
 .rproto .dropzone .dz-ic .material-icons-outlined { font-size: 26px; }
 .rproto .dropzone .dz-t { font-size: 14px; font-weight: 800; }
@@ -55,7 +55,7 @@
 .rproto .cstrip { position: sticky; top: 0; z-index: 4; background: var(--surface1); border-bottom: 1px solid var(--border); }
 .rproto .cstrip .clbl { background: var(--surface1); }
 .rproto .csup { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 12px 6px; border-inline-start: 1px solid var(--line); }
-.rproto .cava { position: relative; width: 36px; height: 36px; border-radius: 50%; background: var(--brand-soft); color: var(--navy); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; }
+.rproto .cava { position: relative; width: 36px; height: 36px; border-radius: 50%; background: var(--brand-pale); color: var(--navy); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; }
 .rproto .cava .ctick { position: absolute; inset-inline-start: -3px; bottom: -3px; width: 15px; height: 15px; border-radius: 50%; background: var(--success); border: 1.5px solid var(--surface); color: var(--surface); font-size: 9px; display: flex; align-items: center; justify-content: center; }
 .rproto .cname { font-size: 11.5px; font-weight: 800; text-align: center; line-height: 1.25; }
 .rproto .cacc { background: var(--success); color: var(--surface); font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 999px; }

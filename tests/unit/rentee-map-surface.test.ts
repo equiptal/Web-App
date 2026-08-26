@@ -28,7 +28,8 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { LANDING_CUE_MS, REQUEST_ACTION_COLOUR, SHORTFALL_COLOUR } from "@/lib/contract/bid-map";
+import { AVAILABILITY_COLOUR, LANDING_CUE_MS, REQUEST_ACTION_COLOUR, SHORTFALL_COLOUR } from "@/lib/contract/bid-map";
+import { channels, NAVY_TOKENS } from "../setup/ds";
 
 const ROOT = process.cwd();
 const read = (rel: string) => readFileSync(resolve(ROOT, rel), "utf8");
@@ -242,10 +243,10 @@ describe("the selected marker is emphasised by geometry, never by a colour (RM3-
   });
 
   it("puts NO availability colour in any selected-only rule — selection is not a third state", () => {
-    // The mutation: "make it more visible" answered with `background: #2563EB` on the disc, or worse
+    // The mutation: "make it more visible" answered with `background: var(--info)` on the disc, or worse
     // with a green/red of its own. Either turns "the one being looked at" into something a machine IS.
     for (const rule of selectedRules) {
-      for (const availability of ["#16a34a", "#d9362a", "rgba(22, 163, 74", "rgba(217, 54, 42"]) {
+      for (const availability of ["var(--ok)", "var(--danger)"]) {
         expect(rule.toLowerCase(), rule).not.toContain(availability);
       }
     }
@@ -329,7 +330,7 @@ describe("the card's controls each keep a row, and both keep their rules", () =>
   // sight: *"for the asked make it beside not confirmed"*, *"the details button make it as before"*.
   // ~~"«التفاصيل» alone on the distance row"~~ (same day) — withdrawn 2026-08-19 against
   // `app-decoded.js:4009`, which draws it on the TITLE row. What cured the "floating" pill was the
-  // `#F2F6FA` ground it gained, not the row it was moved to, and the ground travels with it.
+  // `var(--background)` ground it gained, not the row it was moved to, and the ground travels with it.
   //
   // The rule that survived both moves is the one being pinned here: row 3 carries the distance and
   // nothing else. It is `nowrap`, so any control sharing it clips the distance mid-word — and the
@@ -507,12 +508,15 @@ describe("the landing cue is finite (RM3-AC-35)", () => {
      cue, so the card never appears to shift"* — is a rendered-appearance fact. What CAN be asserted is
      that the keyframes never animate geometry and always carry the resting shadow first; the
      perceptual claim itself stays a visual check in T41. */
-  it("animates no geometry, and carries the resting shadow in every keyframe (the assertable part)", () => {
+  it("animates no geometry, and rings without moving anything (the assertable part)", () => {
     const frames = css.slice(css.indexOf("@keyframes bmCue"), css.indexOf("}", css.indexOf("100%", css.indexOf("@keyframes bmCue"))));
     expect(frames).toMatch(/0%/);
     expect(frames).toMatch(/100%/);
     for (const stop of frames.split("\n").filter((l) => /\d+%/.test(l))) {
-      expect(stop, stop).toMatch(/var\(--eq-rest\)/);
+      // It was a two-shadow stack whose first layer carried the card's resting elevation. There are
+      // no shadows now, so the cue is an outline — painted outside the box and taking no space,
+      // which is the property that actually mattered: a pulsing card cannot nudge its neighbours.
+      expect(stop, stop).toMatch(/outline/);
       expect(stop, stop).not.toMatch(/transform|margin|width|height|top|left/);
     }
   });
@@ -552,33 +556,37 @@ describe("the surface's stylesheet carries the same colour tokens the models do"
 
   it("paints the shortfall alert orange, and nowhere near availability's red (RM3-AC-06)", () => {
     const alert = cssBlock(css, ".bidmap .bm-short {");
-    const [r, g, b] = [1, 3, 5].map((i) => parseInt(SHORTFALL_COLOUR.slice(i, i + 2), 16));
-    // The stylesheet writes the token as an rgba tint, so it is matched by channel rather than by hex.
-    expect(alert).toContain(`rgba(${r}, ${g}, ${b}`);
-    // And the availability red is not in the alert at all, in either notation.
-    expect(hex(alert)).not.toContain("d9362a");
-    expect(alert).not.toContain("rgba(217, 54, 42");
+    // The stylesheet tints the token rather than naming a colour, so the alert is matched on it.
+    expect(alert).toContain(SHORTFALL_COLOUR);
+    // …and the token really is orange, resolved through the palette. A name proves nothing on its own.
+    const { r, g, b } = channels(SHORTFALL_COLOUR)!;
+    expect(r).toBeGreaterThan(150);
+    expect(g).toBeGreaterThan(90);
+    expect(g).toBeLessThan(r);
+    expect(b).toBeLessThan(g);
+    // And the availability red is not in the alert at all.
+    expect(alert).not.toContain(AVAILABILITY_COLOUR.unconfirmed);
     // The sentence's ink is the same warm family, never the red. This assertion used to read
     // `.bm-short-ic` — the alert's warning glyph, which the v3 alignment removed on 2026-08-11 along
     // with the heading and the body paragraph (the prototype's alert is one line and a button). The
     // criterion is unchanged; only the element wearing the colour is, so the assertion followed it to
-    // the line of text. `#8a4f08` is the prototype's own ink for this sentence (decoded 3779) — a
+    // the line of text. `var(--brand-deep)` is the prototype's own ink for this sentence (decoded 3779) — a
     // darkened orange, and the check that matters is that it is warm and is not the availability red.
     const line = hex(cssBlock(css, ".bidmap .bm-short-t {"));
-    expect(line).toContain("#8a4f08");
-    expect(line).not.toContain("d9362a");
+    expect(line).toContain("var(--brand-deep)");
+    expect(line).not.toContain(AVAILABILITY_COLOUR.unconfirmed);
   });
 
   it("paints the card's ask blue, never navy (RM3-AC-33)", () => {
     const ask = cssBlock(css, ".bidmap .bm-eq .bm-eq-ask {");
     expect(hex(ask)).toContain(hex(REQUEST_ACTION_COLOUR));
-    for (const navy of ["#16304f", "#1c3550", "#0f2238"]) expect(hex(ask)).not.toContain(navy);
+    for (const navy of NAVY_TOKENS) expect(hex(ask)).not.toContain(navy);
   });
 
   it("has an availability red the stylesheet really does draw — the positive control", () => {
-    // Both assertions above are negatives about `#D9362A`. If the surface had stopped using it, they
+    // Both assertions above are negatives about `var(--danger)`. If the surface had stopped using it, they
     // would be vacuous.
-    expect(hex(css)).toContain("d9362a");
+    expect(css).toContain(AVAILABILITY_COLOUR.unconfirmed);
   });
 });
 

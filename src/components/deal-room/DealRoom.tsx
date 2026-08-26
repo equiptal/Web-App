@@ -1194,7 +1194,7 @@ function RequestSummaryModal({ room, ar, L, onClose }: {
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {[...room.details.equipmentCerts, ...room.details.operatorCerts].map((c) => (
-                  <span key={c} style={{ fontSize: 12, fontWeight: 700, color: "var(--navy)", background: "var(--background)", border: "1px solid color-mix(in srgb, var(--surface2) 60%, transparent)", borderRadius: 999, padding: "4px 10px" }}>{c}</span>
+                  <span key={c} style={{ fontSize: 12, fontWeight: 700, color: "var(--navy)", background: "var(--background)", border: "1px solid color-mix(in srgb, var(--border-strong) 60%, transparent)", borderRadius: 999, padding: "4px 10px" }}>{c}</span>
                 ))}
               </div>
             </div>
