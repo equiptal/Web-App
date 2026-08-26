@@ -47,12 +47,14 @@ const BTN_VARIANT: Record<ButtonVariant, string> = {
  * @param variant  which of the six shapes — see `ButtonVariant`.
  * @param size     `sm` 30px, `md` 34px (the default, matching the top bar), `lg` 44px (the touch
  *                 minimum: a primary CTA, and anything a thumb has to hit on a phone).
- * @param opts     `icon` squares the button off for a lone glyph; `full` stretches it to its row.
+ * @param opts     `icon` squares the button off for a lone glyph; `full` stretches it to its row;
+ *                 `pill` rounds it completely, which the app uses for a CTA that floats free of a
+ *                 form rather than sitting in one.
  */
 export function btn(
   variant: ButtonVariant = "primary",
   size: ControlSize = "md",
-  opts: { icon?: boolean; full?: boolean; className?: string } = {},
+  opts: { icon?: boolean; full?: boolean; pill?: boolean; className?: string } = {},
 ): string {
   const parts = [BTN_BASE, BTN_VARIANT[variant]];
   // A link is text in a line of text; it takes neither a control height nor horizontal padding.
@@ -60,6 +62,7 @@ export function btn(
     parts.push(`control-${size}`);
     if (opts.icon) parts.push("control-icon");
   }
+  if (opts.pill) parts.push("!rounded-full");
   if (opts.full) parts.push("w-full");
   if (opts.className) parts.push(opts.className);
   return parts.join(" ");

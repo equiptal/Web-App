@@ -13,6 +13,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Search, MapPin, Loader2, Navigation } from "lucide-react";
 import { parseCoordinatesFromInput } from "@/lib/parseMapUrl";
 import { useT } from "@/lib/i18n";
+import { btn } from "@/lib/ds";
 
 const KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
 const RIYADH = { lat: 24.7136, lng: 46.6753 };
@@ -296,7 +297,7 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
           onClick={handleMyLocation}
           title={mp.useMyLocation}
           aria-label={mp.useMyLocation}
-          className="flex items-center rounded-sm border border-border px-2.5 py-2 text-label hover:bg-surface2"
+          className={btn("secondary", "md", { className: "flex" })}
         >
           <Navigation className="h-3.5 w-3.5 text-muted" />
         </button>

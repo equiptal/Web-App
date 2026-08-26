@@ -57,7 +57,7 @@ export function AuthBrand() {
           <Icon name="bolt" size={15} />
           {a.brandPill}
         </div>
-        <h1 className="mb-4 max-w-[17ch] text-[36px] font-extrabold leading-[1.16] tracking-[-.6px]">{a.brandHeadline}</h1>
+        <h1 className="mb-4 max-w-[17ch] text-hero font-extrabold leading-[1.16] tracking-[-.6px]">{a.brandHeadline}</h1>
         <p className="mb-8 max-w-[44ch] text-subhead leading-[1.6] text-white/[0.72]">{a.brandSubtitle}</p>
 
         <div className="flex flex-col gap-4">

@@ -203,7 +203,7 @@ export function Processing() {
           <span className="text-meta font-extrabold uppercase tracking-[.04em] text-ok">{t.processing.agentWorking}</span>
         </div>
 
-        <h2 className="text-[21px] font-extrabold tracking-tight text-navy">
+        <h2 className="text-display font-extrabold tracking-tight text-navy">
           {stages[Math.min(step, 3)].title}
           <span className="motion-safe:animate-pulse">…</span>
         </h2>

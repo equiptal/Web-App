@@ -5,6 +5,7 @@ import { Dialog } from "@/components/Dialog";
 import { updateRequest } from "@/lib/api/client";
 import { type RequestRecord } from "@/lib/contract/requests";
 import "@/components/requests/requests-proto.css";
+import { btn } from "@/lib/ds";
 
 /**
  * The two modals that outlived the request-detail page.
@@ -34,7 +35,7 @@ export type CancelScope =
 export function ConfirmCancelModal({ ar, L, busy, scope, error, onClose, onConfirm }: { ar: boolean; L: (en: string, arr: string) => string; busy: boolean; scope: CancelScope; error?: string | null; onClose: () => void; onConfirm: () => void }) {
   // A one-item "all" is just a single request — "All 1 items" would be nonsense.
   const s: CancelScope = scope.kind === "all" && scope.total <= 1 ? { kind: "single", idLabel: scope.idLabel } : scope;
-  const id = <span className="font-semibold text-[var(--navy)]">{s.idLabel}</span>;
+  const id = <span className="font-semibold text-navy">{s.idLabel}</span>;
   const UNDO = L("This can’t be undone.", "لا يمكن التراجع عن هذا الإجراء.");
   const NO_BIDS = L("and suppliers can no longer bid", "ولن يتمكن المؤجّرون من تقديم عروض");
 
@@ -45,7 +46,7 @@ export function ConfirmCancelModal({ ar, L, busy, scope, error, onClose, onConfi
   const body = s.kind === "single" ? <>{ar ? <>الطلب {id} سيتم سحبه {NO_BIDS}. {UNDO}</> : <>Request {id} will be withdrawn {NO_BIDS}. {UNDO}</>}</>
     : s.kind === "all" ? <>{ar ? <>سيتم سحب جميع البنود ({s.total}) في {id} {NO_BIDS}. {UNDO}</> : <>All {s.total} items in {id} will be withdrawn {NO_BIDS}. {UNDO}</>}</>
     : s.kind === "remaining" ? <>{ar ? <>سيتم سحب {s.count} من {s.total} بنود في {id}. لن تتأثر البنود الأخرى ({s.total - s.count}). {UNDO}</> : <>{s.count} of {s.total} items in {id} will be withdrawn. The other {s.total - s.count} will not be affected. {UNDO}</>}</>
-    : <>{ar ? <><span className="font-semibold text-[var(--navy)]">{s.itemLabel}</span> ({id}) سيتم سحبه{s.others > 0 ? <>. لن تتأثر البنود الأخرى في هذا الطلب ({s.others})</> : null}. {UNDO}</> : <><span className="font-semibold text-[var(--navy)]">{s.itemLabel}</span> ({id}) will be withdrawn{s.others > 0 ? <>. The other {s.others} {s.others === 1 ? "item" : "items"} in this request {s.others === 1 ? "is" : "are"} not affected</> : null}. {UNDO}</>}</>;
+    : <>{ar ? <><span className="font-semibold text-navy">{s.itemLabel}</span> ({id}) سيتم سحبه{s.others > 0 ? <>. لن تتأثر البنود الأخرى في هذا الطلب ({s.others})</> : null}. {UNDO}</> : <><span className="font-semibold text-navy">{s.itemLabel}</span> ({id}) will be withdrawn{s.others > 0 ? <>. The other {s.others} {s.others === 1 ? "item" : "items"} in this request {s.others === 1 ? "is" : "are"} not affected</> : null}. {UNDO}</>}</>;
 
   const confirmLabel = s.kind === "item" ? L("Cancel item", "إلغاء البند")
     : s.kind === "all" ? L(`Cancel all ${s.total} items`, `إلغاء جميع البنود (${s.total})`)
@@ -58,14 +59,14 @@ export function ConfirmCancelModal({ ar, L, busy, scope, error, onClose, onConfi
         <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-danger-soft">
           <span className="material-icons-outlined" style={{ color: "var(--danger)", fontSize: 26 }}>report_problem</span>
         </div>
-        <h3 className="text-title font-extrabold text-[var(--navy)]">{title}</h3>
-        <p className="mt-1.5 text-body leading-relaxed text-[var(--muted)]">{body}</p>
+        <h3 className="text-title font-extrabold text-navy">{title}</h3>
+        <p className="mt-1.5 text-body leading-relaxed text-muted">{body}</p>
         {error && <p className="mt-3 rounded-sm bg-danger-soft px-3 py-2 text-meta font-semibold leading-relaxed text-danger-deep">{error}</p>}
         <div className="mt-5 flex gap-2.5">
-          <button className="flex-1 rounded-sm border border-[var(--border)] px-4 py-2.5 text-body font-semibold text-[var(--navy)]" disabled={busy} onClick={onClose}>
+          <button className={btn("secondary", "md", { className: "flex-1 text-navy" })} disabled={busy} onClick={onClose}>
             {error ? L("Close", "إغلاق") : s.kind === "item" ? L("Keep item", "الإبقاء على البند") : L("Keep request", "الإبقاء على الطلب")}
           </button>
-          <button className="flex-1 rounded-sm bg-danger px-4 py-2.5 text-body font-semibold text-white disabled:bg-disabled-bg disabled:text-disabled-fg" disabled={busy} onClick={onConfirm}>
+          <button className={btn("danger", "md", { className: "flex-1" })} disabled={busy} onClick={onConfirm}>
             {busy ? L("Cancelling…", "جارٍ الإلغاء…") : error ? L("Try again", "إعادة المحاولة") : confirmLabel}
           </button>
         </div>
@@ -192,8 +193,8 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
     }
   }
 
-  const fld = "mt-1 h-[42px] w-full rounded-sm border border-[var(--border)] bg-[var(--surface2)] px-3 text-body outline-0";
-  const lbl = "text-meta font-semibold text-[var(--navy-mid)]";
+  const fld = "mt-1 h-[42px] w-full rounded-sm border border-border bg-surface2 px-3 text-body outline-0";
+  const lbl = "text-meta font-semibold text-navy-mid";
   const Sel = ({ label, value, onChange, opts }: { label: string; value: string; onChange: (v: string) => void; opts: Opt[] }) => (
     <label><span className={lbl}>{label}</span>
       <select className={fld} value={value} onChange={(e) => onChange(e.target.value)}>
@@ -206,13 +207,13 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
     <label><span className={lbl}>{label}</span><input type="number" min={min} max={max} className={fld} value={value} onChange={(e) => onChange(e.target.value)} /></label>
   );
   const Chk = ({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) => (
-    <label className="flex items-center gap-2 py-1.5 text-body font-semibold text-[var(--navy)]">
-      <input type="checkbox" checked={value} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 accent-[var(--action)]" />{label}
+    <label className="flex items-center gap-2 py-1.5 text-body font-semibold text-navy">
+      <input type="checkbox" checked={value} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 accent-brand" />{label}
     </label>
   );
   const SecH = ({ icon, children }: { icon: string; children: ReactNode }) => (
-    <div className="mb-2 mt-4 flex items-center gap-1.5 text-body font-extrabold text-[var(--navy)] first:mt-0">
-      <span className="material-icons-outlined" style={{ fontSize: 18, color: "var(--action)" }}>{icon}</span>{children}
+    <div className="mb-2 mt-4 flex items-center gap-1.5 text-body font-extrabold text-navy first:mt-0">
+      <span className="material-icons-outlined" style={{ fontSize: 18, color: "var(--brand)" }}>{icon}</span>{children}
     </div>
   );
 
@@ -246,7 +247,7 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
           </div>
           <Chk label={L("Night shift required", "يتطلب وردية ليلية")} value={nightShift} onChange={setNightShift} />
           <label className="mt-1 block"><span className={lbl}>{L("Equipment notes", "ملاحظات المعدة")}</span>
-            <textarea rows={2} className="mt-1 w-full rounded-sm border border-[var(--border)] bg-[var(--surface2)] p-3 text-body outline-0" value={itemNotes} onChange={(e) => setItemNotes(e.target.value)} />
+            <textarea rows={2} className="mt-1 w-full rounded-sm border border-border bg-surface2 p-3 text-body outline-0" value={itemNotes} onChange={(e) => setItemNotes(e.target.value)} />
           </label>
 
           <SecH icon="tune">{L("Preferences", "التفضيلات")}</SecH>
@@ -261,18 +262,18 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
           <Chk label={L("Verified suppliers only", "المؤجّرون الموثّقون فقط")} value={verifiedOnly} onChange={setVerifiedOnly} />
           <Chk label={L("Allow subletting", "السماح بالتأجير من الباطن")} value={subletting} onChange={setSubletting} />
           <label className="mt-1 block"><span className={lbl}>{L("Additional notes", "ملاحظات إضافية")}</span>
-            <textarea rows={3} className="mt-1 w-full rounded-sm border border-[var(--border)] bg-[var(--surface2)] p-3 text-body outline-0" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <textarea rows={3} className="mt-1 w-full rounded-sm border border-border bg-surface2 p-3 text-body outline-0" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </label>
         </div>
 
-        <div className="flex justify-end gap-2.5 border-t border-[var(--border)] px-5 py-4">
-          <button className="rounded-sm border border-[var(--border)] px-4 py-2.5 text-body font-semibold text-[var(--navy)]" onClick={onClose}>{L("Cancel", "إلغاء")}</button>
+        <div className="flex justify-end gap-2.5 border-t border-border px-5 py-4">
+          <button className={btn("secondary", "md", { className: "text-navy" })} onClick={onClose}>{L("Cancel", "إلغاء")}</button>
           {datesReversed && (
             <span className="me-auto text-meta font-semibold text-danger">
               {L("End date is before the start date.", "تاريخ الانتهاء يسبق تاريخ البدء.")}
             </span>
           )}
-          <button className="rounded-sm bg-[var(--action)] px-5 py-2.5 text-body font-semibold text-white disabled:bg-disabled-bg disabled:text-disabled-fg" disabled={busy || datesReversed} onClick={save}>{busy ? L("Saving…", "جارٍ الحفظ…") : L("Save changes", "حفظ التغييرات")}</button>
+          <button className="rounded-sm bg-brand px-5 py-2.5 text-body font-semibold text-white disabled:bg-disabled-bg disabled:text-disabled-fg" disabled={busy || datesReversed} onClick={save}>{busy ? L("Saving…", "جارٍ الحفظ…") : L("Save changes", "حفظ التغييرات")}</button>
         </div>
       </div>
     </Dialog>

@@ -17,6 +17,7 @@ import { publicTaxonomyUrl, type RequestGroup, type RequestListItem, type Reques
 import { requestActions, type WorkspaceBid } from "@/lib/contract/workspace";
 import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
 import { ConfirmCancelModal, EditRequestModal } from "@/components/requests/RequestEditModals";
+import { btn } from "@/lib/ds";
 
 /** What the share sheet needs about this request's public bid link. */
 export interface ShareLinkMeta {
@@ -153,7 +154,7 @@ export function RequestDrawer({
             <button
               type="button"
               onClick={() => setShareOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-brand px-4 py-2 text-body font-extrabold text-white transition"
+              className={btn("primary", "md", { className: "transition" })}
             >
               <Icon name="ios_share" size={16} /> {t.workspace.shareRequest}
             </button>
@@ -162,7 +163,7 @@ export function RequestDrawer({
                 type="button"
                 disabled={actions.editCapUsed || loadingEdit}
                 onClick={() => (actions.editNeedsConfirm ? setConfirmEdit(true) : void openEdit())}
-                className="rounded-md border border-white/30 px-4 py-2 text-body font-semibold text-white transition hover:bg-surface/10 disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
+                className={btn("secondary", "md", { className: "transition" })}
               >
                 {t.workspace.editRequest}
               </button>
@@ -345,10 +346,10 @@ function Confirm({
         <h3 className="text-subhead font-extrabold text-navy">{title}</h3>
         <p className="mt-1.5 text-body font-semibold leading-relaxed text-navy-mid">{body}</p>
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-md border border-border px-4 py-2 text-body font-semibold text-navy-mid">
+          <button type="button" onClick={onClose} className={btn("secondary", "md")}>
             {t.common.cancel}
           </button>
-          <button type="button" onClick={onConfirm} className="rounded-md bg-navy px-4 py-2 text-body font-extrabold text-white">
+          <button type="button" onClick={onConfirm} className={btn("primary", "md")}>
             {confirmLabel}
           </button>
         </div>

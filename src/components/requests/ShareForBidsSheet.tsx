@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 import { copyBidLink } from "@/lib/bidCardHtml";
+import { btn } from "@/lib/ds";
 
 // Flip to true once the `logo_url` migration is applied + the agents backend redeployed.
 const LOGO_ENABLED = false;
@@ -193,9 +194,9 @@ export function ShareForBidsSheet({
               <div className="rounded-sm border border-border bg-surface p-3.5">
                 <input type="datetime-local" value={dlInput} onChange={(e) => setDlInput(e.target.value)} className="h-11 w-full rounded-sm border border-border bg-surface2 px-3 text-body text-navy outline-0" />
                 <div className="mt-2.5 flex justify-end gap-2">
-                  {deadline && <button onClick={() => saveDl(true)} className="rounded-sm border border-border px-3 py-1.5 text-meta font-semibold text-danger">{L("Clear", "مسح")}</button>}
-                  <button onClick={() => setDlEdit(false)} className="rounded-sm border border-border px-3 py-1.5 text-meta font-semibold text-navy-mid">{L("Cancel", "إلغاء")}</button>
-                  <button onClick={() => saveDl(false)} className="inline-flex items-center gap-1.5 rounded-sm bg-brand px-4 py-1.5 text-meta font-semibold text-white"><Icon name="check" size={15} />{L("Save", "حفظ")}</button>
+                  {deadline && <button onClick={() => saveDl(true)} className={btn("secondary", "sm")}>{L("Clear", "مسح")}</button>}
+                  <button onClick={() => setDlEdit(false)} className={btn("secondary", "sm")}>{L("Cancel", "إلغاء")}</button>
+                  <button onClick={() => saveDl(false)} className={btn("primary", "sm")}><Icon name="check" size={15} />{L("Save", "حفظ")}</button>
                 </div>
               </div>
             )}
@@ -215,7 +216,7 @@ export function ShareForBidsSheet({
                 {logo ? L("Change", "تغيير") : L("Upload", "رفع")}
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onPickLogo(f); }} />
               </label>
-              {logo && <button onClick={() => { setLogo(null); onSaveLogo?.(null); }} className="flex-none rounded-sm border border-border px-3 py-1.5 text-meta font-semibold text-danger">{L("Remove", "إزالة")}</button>}
+              {logo && <button onClick={() => { setLogo(null); onSaveLogo?.(null); }} className={btn("secondary", "sm", { className: "flex-none" })}>{L("Remove", "إزالة")}</button>}
             </div>
           </div>
           )}
@@ -234,7 +235,7 @@ export function ShareForBidsSheet({
         </div>
 
         <div className="flex justify-end border-t border-border px-5 py-3">
-          <button onClick={onClose} className="rounded-sm border border-border bg-surface px-4 py-2.5 text-body font-semibold text-navy-mid hover:bg-surface2">{L("Done", "تم")}</button>
+          <button onClick={onClose} className={btn("secondary", "md")}>{L("Done", "تم")}</button>
         </div>
       </div>
     </Dialog>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
+import { btn } from "@/lib/ds";
 // Both were written and tested for the bid list this workspace retired, and have had no caller since
 // (owner, 2026-08-25). The rules did not stop being true when their surface went away.
 import { bidCounterDelta } from "@/lib/contract/bid-counter-delta";
@@ -276,7 +277,7 @@ function BidCardTile({
           e.stopPropagation();
           setTermsOpen(true);
         }}
-        className="flex flex-none items-center gap-3 border-t border-border px-3.5 py-2 text-start transition hover:bg-surface2/40"
+        className={btn("secondary", "md", { className: "flex flex-none text-start transition" })}
       >
         <TermsDialGlyph met={dial.met} against={dial.against} unanswered={dial.unanswered} />
         <span className="flex-1 text-body font-semibold text-navy">{L("Terms", "الشروط")}</span>
@@ -425,7 +426,7 @@ function BidCardTile({
                   window.open(`https://wa.me/${invitePhone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
                   setInvited(true);
                 }}
-                className="flex-1 rounded-md bg-navy py-3 text-meta font-extrabold text-white transition"
+                className={btn("primary", "lg", { className: "flex-1 transition" })}
               >
                 {invited ? t.workspace.inviteSent : t.workspace.inviteToApp}
               </button>
@@ -435,7 +436,7 @@ function BidCardTile({
                 disabled
                 title={t.workspace.inviteNoContact}
                 onClick={(e) => e.stopPropagation()}
-                className="flex-1 rounded-md bg-navy py-3 text-meta font-extrabold text-white disabled:bg-disabled-bg disabled:text-disabled-fg"
+                className={btn("primary", "lg", { className: "flex-1" })}
               >
                 {t.workspace.inviteToApp}
               </button>
@@ -446,7 +447,7 @@ function BidCardTile({
                 e.stopPropagation();
                 setSubOpen(true);
               }}
-              className="rounded-md border border-border px-3.5 py-3 text-meta font-semibold text-navy transition hover:bg-surface2"
+              className={btn("secondary", "lg", { className: "transition" })}
             >
               {t.workspace.editQuote}
             </button>
@@ -459,7 +460,7 @@ function BidCardTile({
               if (card.dealRoomId) router.push(`/deal-room/${encodeURIComponent(card.dealRoomId)}?act=counter`);
               else void openRoom();
             }}
-            className="flex-1 rounded-md bg-navy py-3 text-meta font-extrabold text-white transition"
+            className={btn("primary", "lg", { className: "flex-1 transition" })}
           >
             {/* ── The button carries the ROUND, once there has been one (owner, 2026-08-25) ────────
                 `bidCounterDelta` is the app's rule and was already written and tested; its only

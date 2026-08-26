@@ -6,6 +6,7 @@ import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { fetchMyCompany } from "@/lib/api/company-client";
 import type { MyCompany } from "@/lib/contract/company";
+import { btn } from "@/lib/ds";
 
 /**
  * "My Company" entry on the profile tab — web twin of the app's `company_profile_card.dart`
@@ -51,7 +52,7 @@ export function MyCompanyCard() {
   return (
     <button
       onClick={() => router.push("/company")}
-      className="mt-4 flex w-full items-center gap-3 rounded-sm border border-border bg-surface p-4 text-start transition hover:bg-surface2"
+      className={btn("secondary", "md", { full: true, className: "mt-4 flex text-start transition" })}
     >
       <span className="grid h-10 w-10 flex-none place-items-center rounded-sm bg-surface2 text-navy-mid">
         <Icon name="business_center" size={20} />

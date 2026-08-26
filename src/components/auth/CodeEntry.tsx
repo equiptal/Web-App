@@ -6,6 +6,7 @@ import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { RestoreAccountPrompt } from "./RestoreAccountPrompt";
 import type { RenterUser } from "@/lib/contract/auth";
+import { btn } from "@/lib/ds";
 
 const OTP_FONT: React.CSSProperties = { fontFamily: "var(--font-plex), monospace" };
 
@@ -175,7 +176,7 @@ export function CodeEntry({
       <button
         type="submit"
         disabled={busy || code.length < 4}
-        className="mt-6 flex w-full items-center justify-center gap-2 rounded-sm border border-brand bg-brand px-6 py-3 text-subhead font-extrabold text-white transition disabled:bg-disabled-bg disabled:text-disabled-fg"
+        className={btn("primary", "lg", { full: true, className: "mt-6 flex transition" })}
       >
         {!busy && <Icon name="check" size={18} />}
         <span>{busy ? a.verifying : verifyLabel ?? a.verify}</span>

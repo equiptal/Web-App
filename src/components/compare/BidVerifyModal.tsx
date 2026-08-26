@@ -202,7 +202,7 @@ export function BidVerifyModal({
                   <div className="subhead"><span className="material-icons-outlined">request_quote</span>{L("Pricing", "التسعير")}
                     <span style={{ marginInlineStart: "auto", display: "inline-flex", border: "1px solid var(--border)", borderRadius: 7, overflow: "hidden", textTransform: "none", letterSpacing: 0 }}>
                       {([["excl", L("Excl. VAT", "قبل الضريبة")], ["incl", L("Incl. VAT", "شامل الضريبة")]] as ["excl" | "incl", string][]).map(([v, lab]) => (
-                        <button key={v} type="button" onClick={() => setVat(v)} style={{ border: "none", cursor: "pointer", font: "inherit", textTransform: "none", letterSpacing: 0, fontWeight: 800, fontSize: 10.5, padding: "3px 9px", background: vatMode === v ? "var(--navy)" : "var(--surface1)", color: vatMode === v ? "var(--surface)" : "var(--muted)" }}>{lab}</button>
+                        <button key={v} type="button" onClick={() => setVat(v)} style={{ border: "none", cursor: "pointer", font: "inherit", textTransform: "none", letterSpacing: 0, fontWeight: 800, fontSize: 10.5, padding: "3px 9px", background: vatMode === v ? "var(--navy)" : "var(--surface)", color: vatMode === v ? "var(--surface)" : "var(--muted)" }}>{lab}</button>
                       ))}
                     </span>
                   </div>

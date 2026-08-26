@@ -12,6 +12,7 @@ import { normalizeTier, type RenterUser } from "@/lib/contract/auth";
 import { updateProfile, type ProfileUpdatePayload } from "@/lib/api/profile-client";
 import { EMAIL_FIRST_AUTH_ENABLED } from "@/lib/flags";
 import { Icon } from "@/components/ui";
+import { btn } from "@/lib/ds";
 
 /** Mask a stored email for display: `mahmoud@gmail.com` → `m•••@gmail.com`. */
 function maskEmail(e: string): string {
@@ -200,10 +201,10 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
         <p className="mb-5 text-body leading-[1.55] text-muted">{body}</p>
         {switchErr && <p className="mb-3 text-body font-semibold text-danger">{t.auth.emailSwitchError}</p>}
         <div className="flex gap-3">
-          <button type="button" onClick={() => onCreated()} disabled={switching} className="flex-1 rounded-sm border border-border bg-surface px-4 py-3 text-body font-semibold text-navy-mid transition hover:border-navy-mid disabled:bg-disabled-bg disabled:text-disabled-fg">
+          <button type="button" onClick={() => onCreated()} disabled={switching} className={btn("secondary", "lg", { className: "flex-1 transition" })}>
             {t.auth.emailKeep}
           </button>
-          <button type="button" onClick={useNew} disabled={switching} className="flex-1 rounded-sm border border-brand bg-brand px-4 py-3 text-body font-semibold text-white transition disabled:bg-disabled-bg disabled:text-disabled-fg">
+          <button type="button" onClick={useNew} disabled={switching} className={btn("primary", "lg", { className: "flex-1 transition" })}>
             {switching ? t.auth.emailSwitching : t.auth.emailUseNew}
           </button>
         </div>

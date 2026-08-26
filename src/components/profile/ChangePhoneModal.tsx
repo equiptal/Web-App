@@ -5,6 +5,7 @@ import { Dialog } from "@/components/Dialog";
 import { useT, useLocale, fmt } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { requestPhoneChange, verifyPhoneChange } from "@/lib/api/profile-client";
+import { btn } from "@/lib/ds";
 
 const OTP_FONT: React.CSSProperties = { fontFamily: "var(--font-plex), monospace" };
 
@@ -136,7 +137,7 @@ export function ChangePhoneModal({
             <button
               onClick={sendCode}
               disabled={busy || digits.replace(/\D/g, "").length < 9}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-sm bg-brand px-5 py-3 text-body font-semibold text-brand-fg transition disabled:bg-disabled-bg disabled:text-disabled-fg"
+              className={btn("primary", "lg", { full: true, className: "mt-5 flex transition" })}
             >
               {busy ? p.sending : p.sendCode}
               {!busy && <Icon name="arrow_forward" size={16} className="rtl:scale-x-[-1]" />}
@@ -172,7 +173,7 @@ export function ChangePhoneModal({
             <button
               onClick={verify}
               disabled={busy || code.length < 4}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-sm bg-brand px-5 py-3 text-body font-semibold text-brand-fg transition disabled:bg-disabled-bg disabled:text-disabled-fg"
+              className={btn("primary", "lg", { full: true, className: "mt-5 flex transition" })}
             >
               {!busy && <Icon name="check" size={16} />}
               {busy ? p.verifying : p.verify}

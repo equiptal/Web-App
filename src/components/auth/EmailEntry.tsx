@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { postAuth, type AuthKind, type OtpChannel } from "./authClient";
 import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
+import { btn } from "@/lib/ds";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -81,7 +82,7 @@ export function EmailEntry({
       <button
         type="submit"
         disabled={busy || !email.trim()}
-        className="mt-6 flex w-full items-center justify-center gap-2 rounded-sm border border-brand bg-brand px-6 py-3 text-subhead font-extrabold text-white transition disabled:bg-disabled-bg disabled:text-disabled-fg"
+        className={btn("primary", "lg", { full: true, className: "mt-6 flex transition" })}
       >
         <span>{busy ? a.sending : a.sendCode}</span>
         {!busy && <Icon name="arrow_forward" size={18} className="rtl:scale-x-[-1]" />}

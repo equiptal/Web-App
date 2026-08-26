@@ -8,6 +8,7 @@ import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import { EquipmentDetailModal } from "@/components/stores/EquipmentDetailModal";
 import type { EquipmentCard, StoreDetail, TaxonomyNode } from "@/lib/contract/stores";
+import { btn } from "@/lib/ds";
 
 /**
  * Store detail surface — matches the prototype's `view-store` (navy gradient banner, trust tiles,
@@ -70,7 +71,7 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
         <p>{t.store.error}</p>
         <button
           onClick={() => setReloadKey((k) => k + 1)}
-          className="mt-3 rounded-sm border border-border px-3 py-1.5 text-body font-semibold text-navy-mid hover:border-brand"
+          className={btn("secondary", "sm", { className: "mt-3" })}
         >
           {t.store.retry}
         </button>
@@ -97,7 +98,7 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
           >
             {!detail.logoUrl && (detail.name.trim()[0]?.toUpperCase() ?? "?")}
           </div>
-          <h2 className="m-0 flex flex-wrap items-center gap-2 text-[21px] font-extrabold tracking-[-.3px]">
+          <h2 className="m-0 flex flex-wrap items-center gap-2 text-display font-extrabold tracking-[-.3px]">
             {detail.name}
             {detail.isVerified && (
               <span className="inline-flex items-center gap-1 rounded-full border border-ok/40 bg-ok/[.18] px-2 py-1 text-label font-extrabold text-ok-soft">
@@ -134,7 +135,7 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
         <button
           type="button"
           onClick={() => setShowDocs(true)}
-          className="flex w-full items-center gap-3 rounded-sm border border-border bg-surface px-4 py-4 text-start transition hover:border-brand"
+          className={btn("secondary", "lg", { full: true, className: "flex text-start transition" })}
         >
           <span className="grid h-10 w-10 flex-none place-items-center rounded-sm bg-ok-soft text-ok">
             <Icon name="description" size={22} />

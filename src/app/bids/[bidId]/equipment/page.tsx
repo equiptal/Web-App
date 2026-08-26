@@ -33,6 +33,7 @@ import type { BidCard } from "@/lib/contract/bids";
 import type { RequestRecord } from "@/lib/contract/requests";
 import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
+import { btn } from "@/lib/ds";
 
 export default function BidEquipmentPage({ params }: { params: Promise<{ bidId: string }> }) {
   const { bidId } = use(params);
@@ -69,7 +70,7 @@ function BidEquipmentGate({ bidId }: { bidId: string }) {
           <h2 className="text-title font-extrabold text-navy">{t.bidMap.signInTitle}</h2>
           <p className="mt-1 text-body text-muted">{t.bidMap.signInBody}</p>
         </div>
-        <button onClick={() => openAuth()} className="rounded-full bg-brand px-5 py-2 text-body font-semibold text-white">{t.bidMap.signIn}</button>
+        <button onClick={() => openAuth()} className={btn("primary", "md", { pill: true })}>{t.bidMap.signIn}</button>
       </div>
     );
   }

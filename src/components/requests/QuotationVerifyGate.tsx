@@ -1,6 +1,7 @@
 "use client";
 
 import { Icon } from "@/components/ui";
+import { btn } from "@/lib/ds";
 
 /**
  * Marketplace · My Bids — gate shown when an UNVERIFIED renter tries to issue a quotation (app parity:
@@ -39,10 +40,10 @@ export function QuotationVerifyGate({
           <button onClick={onClose} className="grid h-8 w-8 flex-none place-items-center rounded-full text-muted hover:bg-surface2"><Icon name="close" size={18} /></button>
         </div>
         <div className="mt-5 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
-          <button onClick={onContinue} className="rounded-sm border border-border bg-surface px-4 py-2.5 text-body font-semibold text-navy-mid transition hover:bg-surface2">
+          <button onClick={onContinue} className={btn("secondary", "md", { className: "transition" })}>
             {L("Continue without it", "المتابعة بدون ذلك")}
           </button>
-          <button onClick={onVerify} className="inline-flex items-center justify-center gap-1.5 rounded-sm bg-brand px-5 py-2.5 text-body font-semibold text-white">
+          <button onClick={onVerify} className={btn("primary", "md")}>
             <Icon name="verified_user" size={17} /> {L("Verify", "توثيق")}
           </button>
         </div>

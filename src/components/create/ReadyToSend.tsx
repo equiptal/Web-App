@@ -33,6 +33,7 @@ import {
   type PaymentTerm,
 } from "@/lib/contract";
 import { arabicIndicDigits } from "@/lib/contract/bid-map";
+import { btn } from "@/lib/ds";
 
 export function ReadyToSend() {
   const t = useT();
@@ -274,7 +275,7 @@ export function ReadyToSend() {
       <div className="flex flex-wrap items-center justify-end gap-2.5">
         <button
           onClick={() => actions.setReadyToSend(false)}
-          className="rounded-sm border border-info/40 bg-surface px-5 py-3 text-body font-semibold text-info transition hover:border-info"
+          className={btn("secondary", "lg", { className: "transition" })}
         >
           {t.create.ready.backToEditing}
         </button>
@@ -321,7 +322,7 @@ export function ReadyToSend() {
             <div className="mt-5 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
               <button
                 onClick={() => setShowLimit(false)}
-                className="rounded-sm border border-border bg-surface px-4 py-2.5 text-body font-semibold text-navy-mid transition hover:bg-surface2"
+                className={btn("secondary", "md", { className: "transition" })}
               >
                 {L("Not now", "ليس الآن")}
               </button>
@@ -330,7 +331,7 @@ export function ReadyToSend() {
                   setShowLimit(false);
                   router.push("/verify");
                 }}
-                className="inline-flex items-center justify-center gap-1.5 rounded-sm bg-brand px-5 py-2.5 text-body font-semibold text-white"
+                className={btn("primary", "md")}
               >
                 <Icon name="verified_user" size={17} /> {L("Get verified", "وثّق حسابك")}
               </button>

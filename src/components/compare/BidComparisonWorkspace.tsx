@@ -1130,7 +1130,7 @@
 //           const code = l.groups[0]?.groupRef ?? groupRefById[l.groups[0]?.id ?? ""] ?? l.groups[0]?.items[0]?.displayId ?? "RFQ";
 //           return (
 //             <button key={l.key} onClick={() => setActiveLoc(l.key)}
-//               className="flex-none rounded-lg border px-4 py-3 text-start transition"
+//               className={btn("secondary", "lg", { className: "flex-none text-start transition" })}
 //               style={{ minWidth: 180, ...(on ? { background: C.navy, borderColor: C.navy } : { background: "var(--surface)", borderColor: C.border }) }}>
 //               <span className="flex items-center justify-between gap-2">
 //                 <span className="text-body font-extrabold" style={{ color: on ? "var(--surface)" : C.navy }}>{code}</span>
@@ -1191,7 +1191,7 @@
 //               </div>
 //               {/* item dropdown (icon + name + ▾) */}
 //               <div className="relative flex-none">
-//                 <button onClick={() => setItemMenuOpen((o) => !o)} title={L("Switch item", "تبديل الصنف")} className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-body font-semibold" style={{ borderColor: C.border, background: "var(--surface)", color: C.navy }}>
+//                 <button onClick={() => setItemMenuOpen((o) => !o)} title={L("Switch item", "تبديل الصنف")} className={btn("secondary", "md")} style={{ borderColor: C.border, background: "var(--surface)", color: C.navy }}>
 //                   <EquipImg src={activeItemObj?.item?.imageUrl ?? null} categoryId={activeItemObj?.item?.categoryId ?? null} name={(ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? ""} box="" img="h-5 w-5 object-contain" iconSize={18} />
 //                   <span className="max-w-[150px] truncate">{ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name}</span>
 //                   <span className="material-icons-outlined" style={{ fontSize: 16, color: C.muted }}>expand_more</span>
@@ -1231,7 +1231,7 @@
 //                   );
 //                 })}
 //                 {comparison.excluded.map((c) => (
-//                   <button key={c.bid.id} onClick={() => goDealRoom(c.bid, "negotiate")} className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-meta font-semibold" style={{ background: C.dangerBg, borderColor: "color-mix(in srgb, var(--danger) 35%, transparent)", color: C.danger, borderStyle: "dashed" }}>
+//                   <button key={c.bid.id} onClick={() => goDealRoom(c.bid, "negotiate")} className={btn("secondary", "sm", { pill: true })} style={{ background: C.dangerBg, borderColor: "color-mix(in srgb, var(--danger) 35%, transparent)", color: C.danger, borderStyle: "dashed" }}>
 //                     <span className="rounded-full px-2 text-label font-extrabold" style={{ background: "var(--surface)", color: C.danger }}>{L("excluded", "مستبعد")}</span>
 //                     {c.bid.supplierName}
 //                   </button>
@@ -1295,7 +1295,7 @@
 //                   const seen = new Set(whatif.map((w) => w.label));
 //                   const extra = suggestions.filter((s) => !seen.has(s.label));
 //                   const chip = (key: string, icon: string, label: string, message: string) => (
-//                     <button key={key} onClick={() => sendChat(message)} className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-meta font-semibold" style={{ borderColor: C.border, color: C.rentee, background: "var(--surface)" }}>
+//                     <button key={key} onClick={() => sendChat(message)} className={btn("secondary", "md", { pill: true })} style={{ borderColor: C.border, color: C.rentee, background: "var(--surface)" }}>
 //                       <span className="material-icons-outlined" style={{ fontSize: 15 }}>{icon}</span>{label}
 //                     </button>
 //                   );
@@ -1584,7 +1584,7 @@
 //                         {L("Cost terms", "شروط التكلفة")}
 //                         <span className="mt-0.5 block text-label font-semibold" style={{ color: C.muted }}>{L("who handles what", "من يتحمّل ماذا")}</span>
 //                         {(youTerms.length > 0 || showDeliveryEst || showReturnEst) && (
-//                           <button onClick={openEstimate} className="mt-2 inline-flex items-center gap-1 rounded-sm border px-2.5 py-1.5 text-label font-extrabold" style={{ borderColor: "color-mix(in srgb, var(--info) 40%, transparent)", color: C.rentee, background: C.renteeDim, borderStyle: "dashed" }}>
+//                           <button onClick={openEstimate} className={btn("secondary", "sm", { className: "mt-2" })} style={{ borderColor: "color-mix(in srgb, var(--info) 40%, transparent)", color: C.rentee, background: C.renteeDim, borderStyle: "dashed" }}>
 //                             🧮 {estTotal > 0 ? L(`Your est. ~${sar} ${nf(estTotal)}`, `تقديرك ~${sar} ${nf(estTotal)}`) : L("Estimate your costs", "قدّر تكاليفك")}
 //                           </button>
 //                         )}
@@ -1932,7 +1932,7 @@
 //                   <span className="material-icons-outlined" style={{ fontSize: 17 }}>check</span>{L("Got it", "تمام")}
 //                 </button>
 //               ) : (<>
-//                 <button onClick={() => setAwardPrompt(null)} className="rounded-sm border px-4 py-2 text-body font-semibold" style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Stay here", "البقاء هنا")}</button>
+//                 <button onClick={() => setAwardPrompt(null)} className={btn("secondary", "md")} style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Stay here", "البقاء هنا")}</button>
 //                 <button onClick={() => { const b = awardPrompt; setAwardPrompt(null); goDealRoom(b, "award"); }} disabled={busy} className="inline-flex items-center gap-1.5 rounded-sm px-4 py-2 text-body font-semibold text-white disabled:bg-disabled-bg disabled:text-disabled-fg" style={{ background: C.success }}>
 //                   <span className="material-icons-outlined" style={{ fontSize: 17 }}>meeting_room</span>{L("Accept in deal room", "القبول في غرفة الصفقة")}
 //                 </button>
@@ -1964,7 +1964,7 @@
 //               </div>
 //             </div>
 //             <div className="flex justify-end gap-2.5 border-t px-6 py-4" style={{ borderColor: C.line }}>
-//               <button onClick={() => setUploadOpen(false)} className="rounded-sm border px-4 py-2 text-body font-semibold" style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Cancel", "إلغاء")}</button>
+//               <button onClick={() => setUploadOpen(false)} className={btn("secondary", "md")} style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Cancel", "إلغاء")}</button>
 //             </div>
 //           </div>
 //         </div>
@@ -2023,7 +2023,7 @@
 //                 <button onClick={() => setConfirmAdd(null)} className="rounded-sm px-4 py-2 text-body font-semibold text-white" style={{ background: C.navy }}>{L("Close", "إغلاق")}</button>
 //               ) : (
 //                 <>
-//                   <button onClick={() => setConfirmAdd(null)} className="rounded-sm border px-4 py-2 text-body font-semibold" style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Don't add", "لا تُضِف")}</button>
+//                   <button onClick={() => setConfirmAdd(null)} className={btn("secondary", "md")} style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Don't add", "لا تُضِف")}</button>
 //                   <button onClick={confirmAddBid} className="rounded-sm px-4 py-2 text-body font-semibold text-white" style={{ background: C.action }}>{L("Add anyway", "أضِفه على أي حال")}</button>
 //                 </>
 //               )}
@@ -2056,7 +2056,7 @@
 //             <div className="flex items-center justify-between gap-3 border-t px-6 py-4" style={{ borderColor: C.line }}>
 //               <span className="text-body font-extrabold" style={{ color: C.navy }}>{L("Your total est.", "إجمالي تقديرك")} <span style={{ color: C.rentee }}>{sar} {nf(Object.values(renterCosts).reduce((a, b) => a + (b ?? 0), 0) + Object.values(renterMob).reduce((a, b) => a + (b ?? 0), 0))}</span></span>
 //               <div className="flex gap-2.5">
-//                 <button onClick={() => setCostAsk(null)} className="rounded-sm border px-4 py-2 text-body font-semibold" style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Cancel", "إلغاء")}</button>
+//                 <button onClick={() => setCostAsk(null)} className={btn("secondary", "md")} style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Cancel", "إلغاء")}</button>
 //                 <button onClick={submitCost} className="rounded-sm px-5 py-2 text-body font-semibold text-white" style={{ background: C.rentee }}>{L("Save estimate", "حفظ التقدير")}</button>
 //               </div>
 //             </div>
@@ -2107,7 +2107,7 @@
 //             <div className="flex items-center justify-between gap-3 border-t px-6 py-4" style={{ borderColor: C.line }}>
 //               <span className="text-body font-extrabold" style={{ color: C.navy }}>{L("Your total est.", "إجمالي تقديرك")} <span style={{ color: C.rentee }}>{sar} {nf(["__delivery", "__return", ...youTerms.map((m) => m.key)].reduce((s, k) => s + (parseInt((estDraft[k] ?? "").replace(/[^0-9]/g, ""), 10) || 0), 0))}</span></span>
 //               <div className="flex gap-2.5">
-//                 <button onClick={() => setEstimateOpen(false)} className="rounded-sm border px-4 py-2 text-body font-semibold" style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Cancel", "إلغاء")}</button>
+//                 <button onClick={() => setEstimateOpen(false)} className={btn("secondary", "md")} style={{ borderColor: C.border, color: C.navy, background: "var(--surface)" }}>{L("Cancel", "إلغاء")}</button>
 //                 <button onClick={saveEstimate} className="rounded-sm px-5 py-2 text-body font-semibold text-white" style={{ background: C.rentee }}>{L("Save estimate", "حفظ التقدير")}</button>
 //               </div>
 //             </div>

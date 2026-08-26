@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { restoreAccount } from "@/lib/api/profile-client";
+import { btn } from "@/lib/ds";
 
 /**
  * Restore-or-sign-out gate, shown when an OTP verify succeeds on a SELF-DELETED account (app parity:
@@ -73,7 +74,7 @@ export function RestoreAccountPrompt({
         type="button"
         onClick={restore}
         disabled={busy !== null}
-        className="mt-6 flex w-full items-center justify-center gap-2 rounded-sm border border-brand bg-brand px-6 py-3 text-subhead font-extrabold text-white transition disabled:bg-disabled-bg disabled:text-disabled-fg"
+        className={btn("primary", "lg", { full: true, className: "mt-6 flex transition" })}
       >
         {busy !== "restore" && <Icon name="check" size={18} />}
         <span>{busy === "restore" ? a.restoring : a.restoreConfirm}</span>
@@ -83,7 +84,7 @@ export function RestoreAccountPrompt({
         type="button"
         onClick={declineAndSignOut}
         disabled={busy !== null}
-        className="mt-3 w-full rounded-sm border border-border bg-surface px-6 py-3 text-body font-semibold text-navy-mid transition hover:bg-surface2 disabled:bg-disabled-bg disabled:text-disabled-fg"
+        className={btn("secondary", "lg", { full: true, className: "mt-3 transition" })}
       >
         {a.restoreDeny}
       </button>

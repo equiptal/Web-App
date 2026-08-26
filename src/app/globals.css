@@ -159,6 +159,10 @@
   --text-subhead: 15px;      /* card headings */
   --text-title: 17px;        /* a page or masthead name */
   --text-display: 22px;      /* a number worth shouting */
+  /* Display copy, not UI: the auth headline and the home banner, and nothing else. It is a seventh
+     step in a six-step scale, which is a debt, not a feature — the alternative was leaving those two
+     headlines at a hardcoded 36px and 29px, which is the same debt with no name on it. */
+  --text-hero: 32px;
 
   /* ── Weight ──────────────────────────────────────────────────────────────────────────────────
      Three. `font-medium`, `font-bold` and `font-black` are cleared: five weights is not a

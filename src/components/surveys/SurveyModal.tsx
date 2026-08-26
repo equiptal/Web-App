@@ -121,7 +121,7 @@
 //             type="button"
 //             disabled={busy}
 //             onClick={() => onSubmit([{ surveyId: item.surveyId, body: { action: "edit" } }])}
-//             className="w-full rounded-sm bg-brand px-4 py-2.5 text-body font-semibold text-white disabled:bg-disabled-bg disabled:text-disabled-fg"
+//             className={btn("primary", "md", { full: true })}
 //           >
 //             {t.survey.edit}
 //           </button>
@@ -129,7 +129,7 @@
 //             type="button"
 //             disabled={busy}
 //             onClick={() => onSubmit([{ surveyId: item.surveyId, body: { action: "close" } }])}
-//             className="w-full rounded-sm border border-danger/30 bg-danger-soft px-4 py-2.5 text-body font-semibold text-danger disabled:bg-disabled-bg disabled:text-disabled-fg"
+//             className={btn("secondary", "md", { full: true })}
 //           >
 //             {t.survey.close}
 //           </button>
@@ -188,7 +188,7 @@
 //             type="button"
 //             disabled={busy || !allAnswered}
 //             onClick={() => onSubmit(unit.items.map(build))}
-//             className="w-full rounded-sm bg-brand px-4 py-2.5 text-body font-semibold text-white disabled:bg-disabled-bg disabled:text-disabled-fg"
+//             className={btn("primary", "md", { full: true })}
 //           >
 //             {t.survey.confirm}
 //           </button>

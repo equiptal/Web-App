@@ -514,7 +514,7 @@ export function SharedBidSubmissionModal({
                 {/* Supplier priced VAT-inclusive — informational (stored prices are VAT-exclusive). */}
                 {vatInclusive && (
                   <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 12px", padding: "10px 14px", borderRadius: "var(--r-md)", background: "var(--action-dim)", border: "1px solid color-mix(in srgb, var(--brand) 30%, transparent)", fontSize: 12.5, fontWeight: 700, color: "var(--navy-mid)" }}>
-                    <span className="material-icons-outlined" style={{ fontSize: 18, color: "var(--action)", flexShrink: 0 }}>receipt_long</span>
+                    <span className="material-icons-outlined" style={{ fontSize: 18, color: "var(--brand)", flexShrink: 0 }}>receipt_long</span>
                     {L("The supplier quoted VAT-inclusive prices. Amounts here are shown net of 15% VAT — the grand total is exactly what they entered.", "قدّم المؤجّر أسعارًا شاملة لضريبة القيمة المضافة. تُعرض المبالغ هنا صافية من ضريبة ١٥٪ — والإجمالي الكلي هو ما أدخله تمامًا.")}
                   </div>
                 )}

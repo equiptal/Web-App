@@ -152,7 +152,7 @@ const ATT_ACCENT = {
   photo: { c: "var(--brand)", bg: "var(--brand-soft)", bd: "var(--brand-pale)" },
   own: { c: "var(--info)", bg: "var(--background)", bd: "var(--info-soft)" },
   eqc: { c: "var(--info-deep)", bg: "var(--ok-soft)", bd: "var(--ok-soft)" },
-  opc: { c: "#7c3aed", bg: "var(--background)", bd: "var(--info-soft)" },
+  opc: { c: "var(--info)", bg: "var(--background)", bd: "var(--info-soft)" },
   co: { c: "var(--navy-mid)", bg: "var(--background)", bd: "var(--border-strong)" },
 } as const;
 
@@ -732,7 +732,7 @@ export default function BidFormClient({ token }: { token: string }) {
                   {/* Inline VAT toggle — clarifies right at the price box whether the entered prices include 15% VAT. */}
                   <span style={{ marginInlineStart: "auto", display: "inline-flex", border: "1px solid var(--border)", borderRadius: 7, overflow: "hidden", textTransform: "none", letterSpacing: 0 }}>
                     {([[false, L("Excl. VAT", "قبل الضريبة")], [true, L("Incl. VAT", "شامل الضريبة")]] as [boolean, string][]).map(([v, lab]) => (
-                      <button key={String(v)} type="button" onClick={() => setVatIncluded(v)} style={{ border: "none", cursor: "pointer", font: "inherit", textTransform: "none", letterSpacing: 0, fontWeight: 800, fontSize: 10.5, padding: "3px 9px", background: vatIncluded === v ? "var(--navy)" : "var(--surface1)", color: vatIncluded === v ? "var(--surface)" : "var(--muted)" }}>{lab}</button>
+                      <button key={String(v)} type="button" onClick={() => setVatIncluded(v)} style={{ border: "none", cursor: "pointer", font: "inherit", textTransform: "none", letterSpacing: 0, fontWeight: 800, fontSize: 10.5, padding: "3px 9px", background: vatIncluded === v ? "var(--navy)" : "var(--surface)", color: vatIncluded === v ? "var(--surface)" : "var(--muted)" }}>{lab}</button>
                     ))}
                   </span>
                 </div>
@@ -919,6 +919,9 @@ export default function BidFormClient({ token }: { token: string }) {
             )}
             {device !== "ios" && (
               <a className="store-badge" href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer" aria-label="Get it on Google Play">
+                {/* Google Play’s own four colours, in its own glyph. A brand mark is not a palette colour, and
+                    a token for this yellow would only ever mean “Google Play’s yellow”. */}
+                {/* eslint-disable-next-line no-restricted-syntax */}
                 <svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="gpgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="var(--info)" /><stop offset=".45" stopColor="var(--ok)" /><stop offset=".75" stopColor="#ffcd00" /><stop offset="1" stopColor="var(--danger)" /></linearGradient></defs><path fill="url(#gpgrad)" d="M4 2.4v19.2l15-9.6z" /></svg>
                 <span className="sb-tx"><small>{L("GET IT ON", "احصل عليه من")}</small><b>Google Play</b></span>
               </a>

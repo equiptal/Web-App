@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useT, useLocale } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { Dialog, DialogButton } from "@/components/Dialog";
+import { btn } from "@/lib/ds";
 
 export type AuthorityRole = "owner" | "manager" | "employee";
 
@@ -252,7 +253,7 @@ export function CompanyIdentityModal({
                     setLogoKey(null);
                     setLogoPreview(null);
                   }}
-                  className="flex-none rounded-sm border border-border px-3 py-1.5 text-meta font-semibold text-danger"
+                  className={btn("secondary", "sm", { className: "flex-none" })}
                 >
                   {p.logoRemove}
                 </button>

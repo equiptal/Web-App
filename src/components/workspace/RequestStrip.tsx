@@ -8,6 +8,7 @@ import { PAGE_MX_BLEED } from "@/components/AppShell";
 import { publicTaxonomyUrl, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
 import { CERT_LABEL, offeredFrontPhotoUrl, type BidCard } from "@/lib/contract/bids";
 import { unitAvailability } from "@/lib/contract/bid-map";
+import { btn } from "@/lib/ds";
 
 /**
  * The dark strip under the rail. Two halves, and they answer different questions.
@@ -279,7 +280,7 @@ export function RequestStrip({
                 onClick={() => setMoreOpen((o) => !o)}
                 aria-expanded={moreOpen}
                 aria-label={fmt(t.workspace.chipMore, { n: String(hidden.length) })}
-                className="flex-none rounded-full border border-brand/25 bg-brand-soft px-2.5 py-1.5 text-label font-extrabold text-brand transition"
+                className={btn("secondary", "sm", { pill: true, className: "flex-none transition" })}
               >
                 +{hidden.length}
               </button>

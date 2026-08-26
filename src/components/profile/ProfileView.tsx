@@ -13,6 +13,7 @@ import { Field, FieldGrid, MastheadPill, PageMasthead, Row, RowList, Section } f
 import { EditProfileForm } from "./EditProfileForm";
 import { ChangePhoneModal } from "./ChangePhoneModal";
 import { DeleteAccountModal } from "./DeleteAccountModal";
+import { btn } from "@/lib/ds";
 
 const SUPPORT_URL = "https://moedatech.net/contact";
 const PRIVACY_URL = "https://moedatech.net/privacy";
@@ -120,7 +121,7 @@ export function ProfileView() {
           // This banner renders alongside that card, so pointing them at different destinations would
           // give the same page two verification nudges that disagree.
           onClick={() => router.push("/company")}
-          className="mt-4 flex w-full items-center justify-between rounded-sm border border-brand/30 bg-brand-soft px-4 py-3 text-start transition hover:border-brand"
+          className={btn("secondary", "lg", { full: true, className: "mt-4 flex justify-between text-start transition" })}
         >
           <div>
             <p className="text-body font-semibold text-navy">{t.shell.tierBasic} · {t.home.nudgeBasicTitle}</p>
@@ -137,7 +138,7 @@ export function ProfileView() {
             !editing && (
               <button
                 onClick={() => setEditing(true)}
-                className="inline-flex h-8 items-center gap-1.5 rounded-sm border border-border bg-surface px-3 text-meta font-semibold text-navy-mid hover:bg-surface2"
+                className={btn("secondary", "md", { className: "h-8" })}
               >
                 <Icon name="edit" size={15} /> {p.editProfile}
               </button>

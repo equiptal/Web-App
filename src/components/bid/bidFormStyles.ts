@@ -9,7 +9,7 @@ export const BID_FORM_CSS = `
 .bidpage.rtl{font-family:"IBM Plex Sans Arabic","Inter",sans-serif}
 .bidpage *{box-sizing:border-box}
 .bidpage .material-icons-outlined{font-family:'Material Icons Outlined';line-height:1}
-.pubbar{background:var(--surface1);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
+.pubbar{background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
 .pubbar-in{max-width:1060px;margin:0 auto;display:flex;align-items:center;gap:13px;padding:12px 24px}
 .rlogo{width:44px;height:44px;border-radius:10px;flex:0 0 auto;background:linear-gradient(135deg,var(--rentee),var(--info));color:var(--surface);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
 .rlogo.rlogo-img{background:var(--surface);border:1px solid var(--border);overflow:hidden;padding:3px}
@@ -32,7 +32,7 @@ export const BID_FORM_CSS = `
 .intro{margin:4px 0 18px}
 .intro h1{margin:0 0 5px;font-size:22px;font-weight:800;letter-spacing:-.4px}
 .intro p{margin:0;font-size:13.5px;color:var(--muted)}
-.confirm-all{display:flex;align-items:center;gap:12px;background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-lg);padding:11px 15px;margin-bottom:14px;cursor:pointer}
+.confirm-all{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:11px 15px;margin-bottom:14px;cursor:pointer}
 .confirm-all.on{background:var(--success-bg);border-color:color-mix(in srgb, var(--ok) 35%, transparent)}
 .confirm-all .ca-tx{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:800;color:var(--navy)}
 .confirm-all .ca-tx .material-icons-outlined{font-size:18px;color:var(--success)}
@@ -44,11 +44,11 @@ export const BID_FORM_CSS = `
 .units-note{display:flex;align-items:flex-start;gap:10px;background:var(--action-dim);border:1px solid color-mix(in srgb, var(--brand) 30%, transparent);border-radius:var(--r-md);padding:11px 13px;margin:-4px 0 12px}
 .units-note.on{background:var(--success-bg);border-color:color-mix(in srgb, var(--ok) 35%, transparent)}
 .units-note.needpick{box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--info) 40%, transparent)}
-.units-note > .un-lead{font-size:18px;color:var(--action);flex:0 0 auto;margin-top:1px}
+.units-note > .un-lead{font-size:18px;color:var(--brand);flex:0 0 auto;margin-top:1px}
 .units-note.on > .un-lead{color:var(--success)}
 .units-note .un-tx{flex:1;font-size:12.5px;color:var(--navy);line-height:1.5}
 .units-note .un-tx b{font-weight:800}
-.units-note .un-box{flex:0 0 auto;width:22px;height:22px;border-radius:6px;border:2px solid var(--border);display:grid;place-items:center;background:var(--surface1)}
+.units-note .un-box{flex:0 0 auto;width:22px;height:22px;border-radius:6px;border:2px solid var(--border);display:grid;place-items:center;background:var(--surface)}
 .units-note.on .un-box{background:var(--success);border-color:var(--success)}
 .units-note .un-box .material-icons-outlined{font-size:15px;color:var(--surface);opacity:0}
 .units-note.on .un-box .material-icons-outlined{opacity:1}
@@ -70,7 +70,7 @@ export const BID_FORM_CSS = `
 .cd-sep{font-size:24px;color:rgba(255,255,255,.4)}
 .cd-deadline{margin-top:13px;font-size:12.5px;color:rgba(255,255,255,.72);font-weight:600}
 .cd-deadline b{color:var(--surface)}
-.sec{background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:14px}
+.sec{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:14px}
 .sec-h{display:flex;align-items:center;gap:9px;margin:0 0 14px}
 .sec-h h3{margin:0;font-size:15px;font-weight:800;letter-spacing:-.2px}
 .sec-h .hdic{font-size:19px;color:var(--navy-mid)}
@@ -100,10 +100,10 @@ export const BID_FORM_CSS = `
 .item-hd .inm{font-size:17px;font-weight:800;letter-spacing:-.2px}
 .item-hd .imeta{font-size:13px;color:rgba(255,255,255,.72);font-weight:700}
 /* compact, self-sizing units pill — subtle tinted amber (single) / solid orange (multi); never stretches */
-.item-hd .units-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;letter-spacing:.01em;color:var(--surface);background:var(--action);border:1px solid var(--action);border-radius:var(--r-full);padding:3px 11px;white-space:nowrap}
+.item-hd .units-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;letter-spacing:.01em;color:var(--surface);background:var(--brand);border:1px solid var(--brand);border-radius:var(--r-full);padding:3px 11px;white-space:nowrap}
 .item-hd .units-chip .msym{font-size:14px}
 /* Multi-unit: still subtle/light-grey (not bright orange) — just a touch more visible than single. */
-.item-hd .units-chip.multi{background:var(--action);border-color:var(--action);color:var(--surface);box-shadow:0 1px 4px color-mix(in srgb, var(--brand) 50%, transparent)}
+.item-hd .units-chip.multi{background:var(--brand);border-color:var(--brand);color:var(--surface);box-shadow:0 1px 4px color-mix(in srgb, var(--brand) 50%, transparent)}
 .item-hd .ibadge{margin-inline-start:auto;flex:0 0 auto;font-size:10.5px;font-weight:800;color:rgba(255,255,255,.85);background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:var(--r-full);padding:4px 11px;white-space:nowrap}
 /* Opt-out toggle — supplier bids on only the items they can supply (multi-item requests). */
 .supply-tog{display:flex;align-items:center;gap:11px;width:100%;background:var(--success-bg);border:1px solid color-mix(in srgb, var(--ok) 35%, transparent);border-radius:var(--r-md);padding:11px 14px;margin-bottom:14px;cursor:pointer;font:inherit;text-align:start}
@@ -132,7 +132,7 @@ export const BID_FORM_CSS = `
    tablet/mobile; two per row on wider screens (each card needs room for its three zones). */
 .treqgrid{display:grid;grid-template-columns:1fr;gap:10px;align-items:stretch}
 @media(min-width:760px){.treqgrid{grid-template-columns:1fr 1fr}}
-.treqcell{display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:12px;padding:11px 14px;background:var(--surface1);min-width:0;transition:border-color .15s,background .15s,box-shadow .15s}
+.treqcell{display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:12px;padding:11px 14px;background:var(--surface);min-width:0;transition:border-color .15s,background .15s,box-shadow .15s}
 .treqcell.ok{border-color:color-mix(in srgb, var(--ok) 32%, transparent);background:var(--ok-soft)}
 .treqcell.declined{background:var(--danger-bg);border-color:color-mix(in srgb, var(--danger) 32%, transparent)}
 .treqcell.needpick{background:var(--surface2);border-color:transparent;box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--info) 40%, transparent)}
@@ -165,12 +165,12 @@ export const BID_FORM_CSS = `
 .tmtx td.needpick{background:var(--surface2);box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--info) 40%, transparent)}
 .celllbl{display:none}
 .miniseg{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;width:fit-content}
-.miniseg button{border:0;background:var(--surface1);color:var(--navy-mid);font:inherit;font-weight:700;font-size:11.5px;padding:6px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+.miniseg button{border:0;background:var(--surface);color:var(--navy-mid);font:inherit;font-weight:700;font-size:11.5px;padding:6px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
 .miniseg button .material-icons-outlined{font-size:14px}
 .miniseg button.ok.on{background:var(--success);color:var(--surface)}
 .miniseg button.no.on{background:var(--danger);color:var(--surface)}
 .treqs{display:flex;flex-direction:column;gap:8px}
-.treq{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid var(--line);border-radius:var(--r-md);padding:12px 14px;background:var(--surface1)}
+.treq{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid var(--line);border-radius:var(--r-md);padding:12px 14px;background:var(--surface)}
 .treq.no{background:var(--danger-bg);border-color:color-mix(in srgb, var(--danger) 28%, transparent)}
 .treq-tx{min-width:0}
 .treq-q{font-size:13.5px;font-weight:700;color:var(--navy);line-height:1.45}
@@ -188,8 +188,8 @@ export const BID_FORM_CSS = `
 .ptbl tbody tr:last-child td{border-bottom:0}
 .ptbl .it-lbl{font-weight:700}
 .ptbl .it-sub2{font-size:10.5px;color:var(--muted);margin-top:2px}
-.ptbl-in{width:120px;text-align:end;border:1px solid var(--border);border-radius:6px;height:36px;padding:0 9px;font:inherit;font-size:13.5px;font-weight:700;color:var(--navy);background:var(--surface1);outline:0}
-.ptbl-in:focus{border-color:var(--action);box-shadow:0 0 0 3px color-mix(in srgb, var(--brand) 12%, transparent)}
+.ptbl-in{width:120px;text-align:end;border:1px solid var(--border);border-radius:6px;height:36px;padding:0 9px;font:inherit;font-size:13.5px;font-weight:700;color:var(--navy);background:var(--surface);outline:0}
+.ptbl-in:focus{border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb, var(--brand) 12%, transparent)}
 .ptbl-in.invalid{border-color:var(--danger);background:var(--danger-bg)}
 .ptbl-ro{display:inline-block;min-width:90px;text-align:end;font-family:"IBM Plex Sans",monospace;font-weight:700;color:var(--navy)}
 .ptbl .tot{font-family:"IBM Plex Sans",monospace;font-weight:700}
@@ -197,10 +197,10 @@ export const BID_FORM_CSS = `
 .itot .r{font-size:12.5px;color:var(--muted);font-weight:600}
 .itot .r b{font-family:"IBM Plex Sans",monospace;color:var(--navy);margin-inline-start:6px}
 .itot .r.t{font-size:14px;font-weight:800;color:var(--navy)}
-.itot .r.t b{color:var(--action);font-size:16px}
+.itot .r.t b{color:var(--brand);font-size:16px}
 .grand{display:flex;align-items:center;justify-content:space-between;background:var(--action-dim);border:1px solid color-mix(in srgb, var(--brand) 30%, transparent);border-radius:var(--r-md);padding:18px 20px;margin:0 0 16px}
 .grand .gk{font-size:14px;font-weight:800}
-.grand .gv{font-family:"IBM Plex Sans",monospace;font-size:24px;font-weight:800;color:var(--action)}
+.grand .gv{font-family:"IBM Plex Sans",monospace;font-size:24px;font-weight:800;color:var(--brand)}
 .notes-field{margin-top:14px}
 .notes-field label{display:block;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
 .notes-field textarea{width:100%;min-height:64px;border:1px solid var(--border);border-radius:var(--r-md);padding:11px 13px;font:inherit;font-size:14px;color:var(--navy);outline:0;resize:vertical}
@@ -212,14 +212,14 @@ export const BID_FORM_CSS = `
 .optx{display:inline-block;margin-inline-start:6px;font-size:9.5px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:1px 7px;vertical-align:middle}
 .reqx{color:var(--danger);font-weight:800}
 .field input{width:100%;height:46px;border:1px solid var(--border);border-radius:var(--r-md);padding:0 13px;font:inherit;font-size:14px;color:var(--navy);outline:0}
-.field input:focus{border-color:var(--action);box-shadow:0 0 0 3px color-mix(in srgb, var(--brand) 12%, transparent)}
+.field input:focus{border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb, var(--brand) 12%, transparent)}
 .field input:disabled,.field input[readonly]{background:var(--surface2);color:var(--navy);-webkit-text-fill-color:var(--navy);opacity:1}
 .field.invalid input{border-color:var(--danger);background:var(--danger-bg)}
 .field .err{display:none;font-size:11.5px;color:var(--danger);font-weight:700;margin-top:6px}
 .field.invalid .err{display:block}
 .frow{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.btn{border:1px solid var(--border);background:var(--surface1);border-radius:var(--r-md);padding:11px 18px;font:inherit;font-weight:700;font-size:13.5px;color:var(--navy);display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}
-.btn.primary{background:var(--action);border-color:var(--action);color:var(--surface)}
+.btn{border:1px solid var(--border);background:var(--surface);border-radius:var(--r-md);padding:11px 18px;font:inherit;font-weight:700;font-size:13.5px;color:var(--navy);display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:var(--surface)}
 .btn.lg{font-size:15px;padding:14px 26px}
 .btn[disabled]{opacity:.6;cursor:not-allowed}
 .btn .material-icons-outlined{font-size:18px}
@@ -250,7 +250,7 @@ export const BID_FORM_CSS = `
 .pb-powered{text-align:center;color:var(--muted);font-size:14.5px;font-weight:700;letter-spacing:.02em}
 .pb-powered b{color:var(--navy);font-weight:900;font-size:16px}
 @media(max-width:600px){.dlapp{flex-wrap:wrap;gap:14px;padding:16px}.dlapp-btns{flex-direction:row;width:100%}.store-badge{flex:1;justify-content:center;min-width:0}}
-.state{max-width:560px;margin:60px auto;text-align:center;background:var(--surface1);border:1px solid var(--border);border-radius:20px;padding:44px 34px}
+.state{max-width:560px;margin:60px auto;text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:44px 34px}
 .state .sic{width:78px;height:78px;border-radius:50%;margin:0 auto 20px;display:flex;align-items:center;justify-content:center;background:var(--success-bg);color:var(--success)}
 .state .sic.neutral{background:var(--surface2);color:var(--muted)}
 .state .sic.err{background:var(--danger-bg);color:var(--danger)}
@@ -278,13 +278,13 @@ export const BID_FORM_CSS = `
 /* ── Attachment uploader (FileUploader) ─────────────────────────────────── */
 .uploader{margin:6px 0 12px}
 .up-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
-.up-item{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:var(--r-md);padding:8px 10px;background:var(--surface1)}
+.up-item{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:var(--r-md);padding:8px 10px;background:var(--surface)}
 .up-thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--border);flex:none}
 .up-fic{font-size:26px;color:var(--navy-mid);flex:none}
 .up-meta{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
 .up-fn{font-size:12.5px;color:var(--navy);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .up-sel{font:inherit;font-size:12px;font-weight:700;color:var(--navy);border:1px solid var(--border);border-radius:7px;padding:5px 8px;background:var(--surface);max-width:220px}
-.up-kind{align-self:flex-start;font-size:11px;font-weight:800;color:var(--navy-mid);background:var(--surface1);border:1px solid var(--border);border-radius:20px;padding:2px 9px}
+.up-kind{align-self:flex-start;font-size:11px;font-weight:800;color:var(--navy-mid);background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:2px 9px}
 .uprow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .uptog{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden}
 .uptog button{border:none;background:var(--surface);font:inherit;font-size:11.5px;font-weight:800;color:var(--muted);padding:5px 11px;cursor:pointer}
@@ -293,7 +293,7 @@ export const BID_FORM_CSS = `
 .up-rm:hover{color:var(--danger);border-color:var(--danger-soft);background:var(--danger-soft)}
 .up-rm .material-icons-outlined{font-size:18px}
 .up-add{display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:13px;font-weight:800;color:var(--navy);border:1.5px dashed var(--surface2);border-radius:9px;padding:9px 14px;background:var(--surface);cursor:pointer}
-.up-add:hover:not(:disabled){background:var(--surface1);border-color:var(--surface3)}
+.up-add:hover:not(:disabled){background:var(--surface);border-color:var(--surface3)}
 .up-add:disabled{opacity:.6;cursor:default}
 .up-add .material-icons-outlined{font-size:18px}
 .up-err{margin-top:6px;font-size:12px;font-weight:700;color:var(--danger)}
@@ -307,7 +307,7 @@ export const BID_FORM_CSS = `
 .u-sel-btn>span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .u-sel-car{color:var(--muted);font-size:20px}
 .u-sel-back{position:fixed;inset:0;z-index:20}
-.u-sel-menu{position:absolute;top:calc(100% + 6px);inset-inline:0;background:var(--surface);border:1px solid var(--border);border-radius:11px;box-shadow:0 10px 28px #1c355022;padding:5px;z-index:21;max-height:240px;overflow:auto}
+.u-sel-menu{position:absolute;top:calc(100% + 6px);inset-inline:0;background:var(--surface);border:1px solid var(--border);border-radius:11px;box-shadow:0 10px 28px color-mix(in srgb, var(--navy) 13%, transparent);padding:5px;z-index:21;max-height:240px;overflow:auto}
 .u-sel-mi{width:100%;display:flex;align-items:center;gap:9px;padding:9px 10px;border:none;background:none;border-radius:8px;font:inherit;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;text-align:start}
 .u-sel-mi:hover{background:var(--ac-bg)}
 .u-sel-mi.on{background:var(--ac-bg);color:var(--ac);font-weight:800}
@@ -346,7 +346,7 @@ export const BID_FORM_CSS = `
 .att-row .att-card{margin-bottom:13px}
 @media(max-width:640px){.att-row{grid-template-columns:1fr;gap:0}}
 /* delivery/return handled by the renter — read-only chip in the price cell */
-.byrenter{display:inline-block;font-size:11.5px;font-weight:800;color:var(--muted);background:var(--surface1);border:1px solid var(--border);border-radius:20px;padding:2px 10px;white-space:nowrap}
+.byrenter{display:inline-block;font-size:11.5px;font-weight:800;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:2px 10px;white-space:nowrap}
 /* uploaded-file "done" tick — distinguishes a stored file from the empty upload slot */
 .u-fdone{color:var(--ok);font-size:19px;flex:none;margin-inline-start:2px}
 /* compact "add another" shown in a slot once it already holds a file (vs the full dropzone) */
@@ -362,7 +362,7 @@ export const BID_FORM_CSS = `
 .att-body{padding:0 15px 15px}
 /* combine-into-one-file guidance under a document uploader */
 .att-hint{display:flex;align-items:flex-start;gap:6px;margin:0 15px 13px;padding:8px 10px;background:var(--action-dim);border:1px solid color-mix(in srgb, var(--brand) 28%, transparent);border-radius:9px;font-size:11.5px;font-weight:600;line-height:1.45;color:var(--navy-mid)}
-.att-hint .material-icons-outlined{font-size:15px;color:var(--action);flex:0 0 auto;margin-top:1px}
+.att-hint .material-icons-outlined{font-size:15px;color:var(--brand);flex:0 0 auto;margin-top:1px}
 /* Encouragement banner above the attachments — ties uploading to bid quality + winning the deal. */
 .att-upsell{display:flex;align-items:flex-start;gap:13px;margin:20px 0 12px;padding:15px 17px;border-radius:var(--r-lg);background:var(--success-bg);border:1px solid color-mix(in srgb, var(--ok) 45%, transparent);border-inline-start:4px solid var(--success)}
 .att-upsell .au-ic{flex:0 0 auto;font-size:26px;color:var(--surface);width:42px;height:42px;display:grid;place-items:center;background:var(--success);border-radius:11px;box-shadow:0 2px 6px color-mix(in srgb, var(--ok) 35%, transparent)}
@@ -379,15 +379,15 @@ export const BID_FORM_CSS = `
 .ro-fig img{width:66px;height:66px;object-fit:cover;border-radius:8px;border:1px solid var(--border)}
 .ro-fig-lb{font-size:10.5px;font-weight:700;color:var(--navy-mid);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ro-chips{display:flex;flex-wrap:wrap;gap:8px}
-.ro-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--navy);background:var(--surface1);border:1px solid var(--border);border-radius:9px;padding:7px 11px;text-decoration:none}
+.ro-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--navy);background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:7px 11px;text-decoration:none}
 .ro-chip:hover{background:var(--surface);border-color:var(--surface2)}
 .ro-chip .ic{font-size:15px;color:var(--muted)}
-.ro-chip .dl{font-size:16px;color:var(--action);margin-inline-start:2px}
+.ro-chip .dl{font-size:16px;color:var(--brand);margin-inline-start:2px}
 
 /* ── Bid-quality ring ───────────────────────────────────────────────────── */
 .qring{display:inline-flex;flex-direction:column;align-items:center;gap:4px;flex:none}
 .qring-lb{font-size:11px;font-weight:800;letter-spacing:.2px}
-.qbanner{display:flex;align-items:flex-start;gap:16px;background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:14px}
+.qbanner{display:flex;align-items:flex-start;gap:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:14px}
 .qb-tx{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
 .qb-tx b{font-size:14px;color:var(--navy);font-weight:800}
 .qb-tx span{font-size:12.5px;color:var(--muted);line-height:1.5}
@@ -399,7 +399,7 @@ export const BID_FORM_CSS = `
 .qpart-lb .material-icons-outlined{font-size:15px;color:var(--muted)}
 .qpart-pc{font-size:11.5px;font-weight:800;color:var(--muted);font-variant-numeric:tabular-nums}
 .qpart-track{height:5px;border-radius:100px;background:var(--line);overflow:hidden}
-.qpart-track i{display:block;height:100%;border-radius:100px;background:var(--action);transition:width .4s ease,background .3s ease}
+.qpart-track i{display:block;height:100%;border-radius:100px;background:var(--brand);transition:width .4s ease,background .3s ease}
 .qpart-w{font-size:10px;font-weight:600;color:var(--muted);opacity:.75;letter-spacing:.02em}
 .qpart.done .qpart-lb,.qpart.done .qpart-pc{color:var(--success)}
 .qpart.done .qpart-lb .material-icons-outlined{color:var(--success)}

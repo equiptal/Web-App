@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { useAuthGate } from "@/components/auth/AuthGate";
+import { btn } from "@/lib/ds";
 
 /**
  * Empty state for signed-out visitors on account-bound surfaces (public-web-auth-gate). Shown instead
@@ -41,7 +42,7 @@ export function SignInPrompt({
       <p className="mx-auto mt-1.5 max-w-sm text-body leading-relaxed text-muted">{body ?? t.browse.signInBody}</p>
       <button
         onClick={go}
-        className="mt-4 inline-flex items-center gap-1.5 rounded-sm bg-brand px-5 py-2.5 text-body font-semibold text-white transition"
+        className={btn("primary", "md", { className: "mt-4 transition" })}
       >
         <Icon name={ctaLabel ? "add" : "login"} size={17} /> {ctaLabel ?? t.shell.signIn}
       </button>

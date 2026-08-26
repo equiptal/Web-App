@@ -6,6 +6,7 @@ import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import { StoreCard } from "@/components/stores/StoreCard";
 import type { StoreCard as StoreCardData, TaxonomyNode } from "@/lib/contract/stores";
+import { btn } from "@/lib/ds";
 
 interface CityOpt {
   value: string;
@@ -215,7 +216,7 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
         <div className="rounded-sm border border-border bg-surface p-8 text-center text-body text-muted">
           <Icon name="error_outline" size={22} className="mx-auto mb-2 text-muted" />
           <p>{t.browse.error}</p>
-          <button onClick={() => setReloadKey((k) => k + 1)} className="mt-3 rounded-sm border border-border px-3 py-1.5 text-body font-semibold text-navy-mid hover:border-brand">
+          <button onClick={() => setReloadKey((k) => k + 1)} className={btn("secondary", "sm", { className: "mt-3" })}>
             {t.browse.retry}
           </button>
         </div>

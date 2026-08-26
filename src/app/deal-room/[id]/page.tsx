@@ -8,6 +8,7 @@ import { useSession } from "@/lib/session";
 import { useAuthGate } from "@/components/auth/AuthGate";
 import { DealRoom } from "@/components/deal-room/DealRoom";
 import { Icon } from "@/components/ui";
+import { btn } from "@/lib/ds";
 
 /** /deal-room/[id] — the deal room (web-app/request-details-bids): price card + live chat. */
 export default function DealRoomPage({ params }: { params: Promise<{ id: string }> }) {
@@ -59,7 +60,7 @@ function DealRoomGate({ id, onTitle }: { id: string; onTitle: (t: string) => voi
           <h2 className="text-title font-extrabold text-navy">{L("Sign in to view this deal room", "سجّل الدخول لعرض غرفة الصفقة")}</h2>
           <p className="mt-1 text-body text-muted">{L("Deal rooms are tied to your account.", "غرف الصفقات مرتبطة بحسابك.")}</p>
         </div>
-        <button onClick={() => openAuth()} className="rounded-full bg-brand px-5 py-2 text-body font-semibold text-white">{L("Sign in", "تسجيل الدخول")}</button>
+        <button onClick={() => openAuth()} className={btn("primary", "md", { pill: true })}>{L("Sign in", "تسجيل الدخول")}</button>
       </div>
     );
   }

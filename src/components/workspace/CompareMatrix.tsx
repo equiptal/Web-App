@@ -9,6 +9,7 @@ import { computeCycleTotals, type CycleTotals } from "@/lib/contract/cycle-total
 import { cheapest, findTerm, type WorkspaceBid } from "@/lib/contract/workspace";
 import { termValueLabel } from "@/lib/contract/labels";
 import type { TermRow } from "@/lib/contract/bids";
+import { btn } from "@/lib/ds";
 
 /**
  * The Compare tab — every bid on the selected item as a ROW, its figures as columns.
@@ -452,7 +453,7 @@ export function CompareMatrix({
               key={b.card.id}
               type="button"
               onClick={() => onBench(b.card.id, false)}
-              className="flex flex-none items-center gap-2 rounded-full border border-dashed border-border bg-surface py-1 pe-3 ps-1 transition hover:border-navy-mid hover:bg-surface2/60"
+              className={btn("secondary", "sm", { pill: true, className: "flex flex-none pe-3 ps-1 transition" })}
             >
               <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface3 text-label font-semibold text-muted">
                 {initials(b.card.supplierName)}

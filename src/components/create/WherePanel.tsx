@@ -17,6 +17,7 @@ import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Icon } from "@/components/ui";
 import { PanelDot } from "@/components/create/Provenance";
+import { btn } from "@/lib/ds";
 
 // Client-only: the maps script touches `window` at import.
 const MapLocationPicker = dynamic(() => import("@/components/shared/GoogleMapLocationPicker"), { ssr: false });
@@ -181,7 +182,7 @@ export function WherePanel({
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button
                     onClick={() => window.open(window.location.href, "_blank", "noopener")}
-                    className="inline-flex items-center gap-1.5 rounded-sm border border-info/40 bg-surface px-3 py-1.5 text-label font-semibold text-info hover:border-info"
+                    className={btn("secondary", "sm")}
                   >
                     {t.step1.location.startSeparateRequest} <Icon name="open_in_new" size={14} />
                   </button>

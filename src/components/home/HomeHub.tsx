@@ -8,6 +8,7 @@ import { BrowseSurface } from "@/components/stores/BrowseSurface";
 import { fetchActivity, type ActivityCounts } from "@/lib/api/client";
 import { StartYourRequestModal, type StartRequestChoice } from "@/components/home/StartYourRequestModal";
 import { useStartRequestGate } from "@/lib/access/start-request-gate";
+import { btn } from "@/lib/ds";
 
 /**
  * mobile/016 — once-per-tab guard for the AUTOMATIC first-request pop-up, mirroring the app's
@@ -101,7 +102,7 @@ export function HomeHub() {
             <span className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-brand/20 px-3 py-1 text-meta font-semibold uppercase tracking-wide text-brand-light">
               <Icon name="bolt" size={13} /> {t.home.eyebrow}
             </span>
-            <h1 className="text-display font-extrabold leading-tight text-white sm:text-[29px]">{t.home.bannerTitle}</h1>
+            <h1 className="text-display font-extrabold leading-tight text-white sm:text-hero">{t.home.bannerTitle}</h1>
             <p className="mt-2.5 max-w-[520px] text-body leading-relaxed text-white/65">{t.home.bannerSubtitle}</p>
           </div>
 
@@ -109,7 +110,7 @@ export function HomeHub() {
           <div className="flex flex-none flex-col gap-3 sm:flex-row lg:flex-col lg:items-stretch">
             <button
               onClick={onCreateRequest}
-              className="inline-flex items-center justify-center gap-2 rounded-sm bg-brand px-6 py-3 text-body font-semibold text-brand-fg transition"
+              className={btn("primary", "lg", { className: "transition" })}
             >
               <Icon name="add" size={16} /> {t.home.createRequest}
             </button>
@@ -122,7 +123,7 @@ export function HomeHub() {
         <button
           type="button"
           onClick={() => router.push("/requests")}
-          className="flex items-center gap-3 rounded-sm border border-brand-light/30 bg-brand-light/[0.06] p-3.5 text-start transition hover:bg-brand-light/[0.10]"
+          className={btn("secondary", "md", { className: "flex text-start transition" })}
         >
           <span className="relative grid h-9 w-9 flex-none place-items-center rounded-sm bg-brand-light/[0.14]">
             <Icon name="gavel" size={20} className="text-brand-light" />

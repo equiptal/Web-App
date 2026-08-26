@@ -1,26 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from "react";
+import { useCallback, useEffect, useRef, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
 import { STREAM_API_KEY, leaseStream } from "@/lib/chat/stream-connection";
 import { useHeaderBack } from "@/components/AppShell";
-import { fetchBidFleet, fetchBids, fetchRequestDetail, fetchRequestGroup, fetchDealRoom, fetchStreamToken, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, closeDealRoom, ApiError } from "@/lib/api/client";
+import { fetchBids, fetchRequestDetail, fetchRequestGroup, fetchDealRoom, fetchStreamToken, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, closeDealRoom, ApiError } from "@/lib/api/client";
 import { computeDealTotals, buildDealRoomQuotationDoc, quotationLinkKind, lastTermMove, type DealRoomView, type DealTerm, type QuotationView } from "@/lib/contract/deal-room";
-import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, liveRound, roundOverride, chatCardOfMessage, chatCardTime, buildChatCardView, requestRepliesByRef, requestThreadCards, respondedProposalIds, latestProposalId, type DealRound } from "@/lib/contract/deal-rounds";
-import type { FleetMachine } from "@/lib/contract/fleet";
-import { RENTEE_REQUEST_CARD_TYPE, RENTEE_REQUEST_REPLY_CARD_TYPE } from "@/lib/contract/rentee-request";
-import { ANSWER_CUE_MS, answeredAskRefs, latestAnsweredRef, postedSubject, replyFoldsIntoAsk, requestCardView, requestDocLabel, type RequestCardCtx } from "@/lib/contract/request-card";
+import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, liveRound, roundOverride, type DealRound } from "@/lib/contract/deal-rounds";
 import { valText, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
 import { cityLabel, rentalTypeLabel, urgencyLabel, termValueLabel } from "@/lib/contract/labels";
 import { buildSiblingTabs, type SiblingItemTab } from "@/lib/contract/sibling-tabs";
-import { dealSystemEventIcon } from "@/lib/contract/deal-system-event";
 import type { BidCard } from "@/lib/contract/bids";
-import { ChatCard } from "@/components/deal-room/ChatCard";
-import { RequestCard } from "@/components/map/RequestCard";
-import { fleetMachineResolver } from "@/components/map/request-card-ctx";
-import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
 // Extracted so the map's chat dock mounts the SAME sheet rather than growing a second answer to
 // "call the supplier" (owner, 2026-08-19). Its own file carries the reasoning.
 import { CallModal } from "@/components/deal-room/CallModal";
@@ -28,15 +20,6 @@ import { CallModal } from "@/components/deal-room/CallModal";
 // same six reasons the supplier will be shown (owner, 2026-08-19).
 import { CancelReasonsModal } from "@/components/deal-room/CancelReasonsModal";
 import {
-  CHAT_ACCEPT,
-  CHAT_MAX_MEDIA,
-  chatAttachmentFilename,
-  chatFileRejection,
-  chatSendFailure,
-  classifyChatFile,
-  saveChatAttachment,
-  sendChatAttachment,
-  sendChatVoiceNote,
   type ChatAttachment,
 } from "@/lib/chat/chat-attachments";
 import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
@@ -71,14 +54,6 @@ function liveRoundOf(room: DealRoomView, msgs: readonly unknown[]): DealRound | 
 
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 type LFn = (en: string, arr: string) => string;
-
-/** A chat attachment's filename. `attName` produces a LOCALISED label for the bubble ("مرفق"), which is
- *  the wrong thing to write to disk — prefer the real title, then the name off the URL. The rule and
- *  the save itself moved to `lib/chat/chat-attachments` when the map's dock grew the same control:
- *  one channel, one answer to what a file is called (owner, 2026-08-11). */
-function attFilename(a: StreamAttachment): string {
-  return chatAttachmentFilename({ title: a.title, url: a.asset_url || a.image_url || a.thumb_url });
-}
 
 /**
  * The rentee's quotation, as an HTML page.
@@ -158,14 +133,10 @@ export function DealRoom({ id, onTitle, initialFlow }: {
   useEffect(() => { setCanCall(typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true); }, []);
   const [quoteBusy, setQuoteBusy] = useState(false);
   const [quoteErr, setQuoteErr] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [fileErr, setFileErr] = useState<string | null>(null);
-  const [voiceRecording, setVoiceRecording] = useState(false); // mic active → composer hands its row to the recorder
   const [releaseOpen, setReleaseOpen] = useState(false); // reopen-accepted-deal confirm modal
   const [releasing, setReleasing] = useState(false);
   const [releaseErr, setReleaseErr] = useState<string | null>(null);
   const [withdrawing, setWithdrawing] = useState(false); // withdraw a pending acceptance (AWAITING)
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   // App parity: term accept/counter are collected LOCALLY here and submitted once (batched) on
   // Counter/Accept — nothing is PATCHed per click.
   const [resolutions, setResolutions] = useState<ResolutionsMap>({});
@@ -193,15 +164,10 @@ export function DealRoom({ id, onTitle, initialFlow }: {
    * 3. **It is a READ.** Opening a deal room that already exists creates nothing, and this must not
    *    become a second write path — `GET` all the way down.
    */
-  const [fleet, setFleet] = useState<FleetMachine[] | null>(null);
 
   const [messages, setMessages] = useState<ChatMsg[]>([]);
-  const [myStreamId, setMyStreamId] = useState<string | null>(null);
   const [chatReady, setChatReady] = useState(false);
-  const [text, setText] = useState("");
   // deal-room/chat parity — per-message inline translation (incoming text only): id → translated text.
-  const [translations, setTranslations] = useState<Record<string, string>>({});
-  const [translating, setTranslating] = useState<string | null>(null);
   const channelRef = useRef<Channel | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const roomRefetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -356,17 +322,6 @@ export function DealRoom({ id, onTitle, initialFlow }: {
      asked and simply claims no verdict (`fleetKnown: false`). There is nothing for the renter to do
      about a fleet read, so there is nothing to tell him about one; the conversation is what he came
      for and it is untouched. */
-  useEffect(() => {
-    const bidId = room?.bidId;
-    if (!bidId) return;
-    let active = true;
-    fetchBidFleet(bidId)
-      .then((r) => { if (active) setFleet(r.machines); })
-      .catch(() => { /* the cards fall back to the fleet-less form — see the state's comment */ });
-    return () => {
-      active = false;
-    };
-  }, [room?.bidId]);
 
 
   /* ── The sibling strip (app parity: `sibling_item_tabs.dart`) ────────────────────────────────────
@@ -445,7 +400,6 @@ export function DealRoom({ id, onTitle, initialFlow }: {
         if (cancelled || !tok.token || !tok.userId || !tok.channelId) return;
         const client = await lease.connect(tok.userId, tok.token);
         if (cancelled) return;
-        setMyStreamId(tok.userId);
         const ch = client.channel("messaging", tok.channelId);
         await ch.watch();
         if (cancelled) return;
@@ -479,55 +433,6 @@ export function DealRoom({ id, onTitle, initialFlow }: {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  async function send() {
-    const body = text.trim();
-    if (!body || !channelRef.current) return;
-    setText("");
-    try {
-      await channelRef.current.sendMessage({ text: body });
-    } catch {
-      setText(body);
-    }
-  }
-
-  /** Upload + send ONE attachment via GetStream. The gate, the caps and the message shape are the
-   *  SHARED ones (`lib/chat/chat-attachments`) — the map's chat dock sends through the same pair, so
-   *  a file is the same object whichever surface it left from. */
-  async function sendFiles(files: FileList | null) {
-    const ch = channelRef.current;
-    // App parity: one attachment per message — take the first only.
-    const file = files?.[0];
-    if (!ch || !file) return;
-    setFileErr(null);
-    const verdict = classifyChatFile(file);
-    // A refusal never reached the wire, so no spinner is owed for it.
-    if (!verdict.ok) { setFileErr(chatFileRejection(verdict, L)); return; }
-    setUploading(true);
-    try {
-      await sendChatAttachment(ch, file, verdict.kind, text);
-      setText("");
-    } catch {
-      setFileErr(chatSendFailure("attachment", L));
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  /** Send a recorded voice note as an audio attachment (app parity: mic → voice bubble). */
-  async function sendVoiceNote(file: File) {
-    const ch = channelRef.current;
-    if (!ch) return;
-    setFileErr(null);
-    setUploading(true);
-    try {
-      await sendChatVoiceNote(ch, file);
-    } catch {
-      setFileErr(chatSendFailure("voice", L));
-    } finally {
-      setUploading(false);
-    }
-  }
 
   function openFlow(mode: "counter" | "accept") {
     if (!room || busy) return;
@@ -616,28 +521,6 @@ export function DealRoom({ id, onTitle, initialFlow }: {
     }
   }
 
-  // Inline translate (app parity): toggle an incoming message to the opposite script via Stream's
-  // translateMessage; a second tap restores the original. Best-effort — silent if translate is off.
-  async function translateMsg(m: ChatMsg) {
-    const body = (m.text ?? "").trim();
-    if (!body || translating) return;
-    if (translations[m.id]) { setTranslations((t) => { const n = { ...t }; delete n[m.id]; return n; }); return; }
-    const client = channelRef.current?.getClient?.();
-    if (!client) return;
-    const target = /[؀-ۿ]/.test(body) ? "en" : "ar";
-    setTranslating(m.id);
-    try {
-      const res = await client.translateMessage(m.id, target);
-      const i18n = ((res as { message?: { i18n?: Record<string, unknown> } })?.message?.i18n ?? {}) as Record<string, unknown>;
-      const tx = (i18n[`${target}_text`] as string) || "";
-      if (tx) setTranslations((t) => ({ ...t, [m.id]: tx }));
-    } catch {
-      /* translation unavailable — keep original */
-    } finally {
-      setTranslating(null);
-    }
-  }
-
   /* ── V12b · the request loop's context, exactly as the map's dock assembles it ───────────────────
      Owner, 2026-08-11: *"i want it like request card"*. Everything below is SHARED with `ChatDock`
      rather than restated: `requestThreadCards` is the one projection of a message list into asks and
@@ -648,65 +531,6 @@ export function DealRoom({ id, onTitle, initialFlow }: {
 
      These are hooks, so they sit ABOVE the two early returns below: a room that has not loaded yet
      still has to run them, and a conversation with no cards in it costs three empty derivations. */
-  const threadCards = useMemo(() => requestThreadCards(messages as unknown[]), [messages]);
-  const repliesByRef = useMemo(() => requestRepliesByRef(threadCards), [threadCards]);
-  const machineOf = useMemo(() => fleetMachineResolver(fleet, ar), [fleet, ar]);
-
-  /* ── V12c · ONE card per request, and the light cue on it (owner, 2026-08-11) ───────────────────
-     *"make it one card for request and show his answer, but light plumbing or something to show the
-     answer when opening the chat"*. Both halves are decided in the contract layer and are therefore
-     the SAME fold the map's dock performs — the supplier reads this conversation from the other chair
-     and must not see a different number of cards in it.
-
-     `answeredRefs` suppresses the reply whose ask is on screen carrying the answer; `cueRef` names the
-     card that answer landed in. The cue is finite (`ANSWER_CUE_MS`) and cannot re-fire on the room's
-     15s poll: `latestAnsweredRef` returns the same string for the same conversation, so the effect
-     does not re-run. It DOES fire on arriving at the route, which is this surface's "opening the
-     chat". */
-  const answeredRefs = useMemo(() => answeredAskRefs(threadCards), [threadCards]);
-  const cueRef = useMemo(() => latestAnsweredRef(threadCards), [threadCards]);
-  const [cuedRef, setCuedRef] = useState<string | null>(null);
-  useEffect(() => {
-    if (!cueRef) {
-      setCuedRef(null);
-      return;
-    }
-    setCuedRef(cueRef);
-    const timer = window.setTimeout(() => setCuedRef(null), ANSWER_CUE_MS);
-    return () => window.clearTimeout(timer);
-  }, [cueRef]);
-
-  const cardCtx: RequestCardCtx = useMemo(
-    () => ({
-      L,
-      /* The rule this route documented and now finally satisfies (see `RequestCardCtx.fleetKnown`):
-         **the status row is omitted when the fleet is genuinely unknown, never guessed.** Until the
-         fetch lands — and forever, if it fails — this is false and the card states the ask without a
-         verdict, which is what `/deal-room/[id]` has always done. Once the fleet is in hand the
-         verdict is derived on every render (RM3-AC-18) from the machine as the fleet holds it NOW.
-
-         A machine MISSING from a fleet we do hold is a different answer again: `machineOf` returns
-         null, `renteeRequestState` reads `unknown`, and the card says the equipment is not in his
-         current list — a statement the fleet supports, rather than one made out of our ignorance. */
-      fleetKnown: fleet != null,
-      machine: machineOf,
-      reply: (ref: string) => repliesByRef.get(ref) ?? null,
-      docLabel: (docType: string) => requestDocLabel(docType, L),
-      /* **Nothing here is pressable, and the card must say so before it is pressed.** The card's whole
-         reason to exist is that pressing it lands the reader on the machine (owner, 2026-08-10) — but
-         that detail is the MAP's panel, and this route has no equipment surface to open. A chevron
-         that did nothing would be worse than one that never claimed to be there. */
-      canOpen: () => false,
-      /* The REQUEST's type word — "Crawler Excavator 30 ton" — which only an `alternative` card reads.
-         Null here by the rule `RequestCardCtx.typeWord` already states for this surface: the deal
-         room holds the accepted BID's equipment, not the request's taxonomy, and `details.equipmentLabel`
-         falls back to the bid's make+model. Naming one machine where the card means a TYPE would make
-         the ask read as a swap for that unit, which is the exact misreading the type word was added
-         to remove. The card names no type instead. */
-      typeWord: null,
-    }),
-    [L, fleet, machineOf, repliesByRef],
-  );
 
   if (error) return <div className="dlproto"><div className="rempty">{L("Couldn’t open this deal room.", "تعذّر فتح غرفة الصفقة.")}</div></div>;
   if (!room) return <div className="dlproto"><div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 28 }}>progress_activity</span></div></div>;
@@ -809,8 +633,6 @@ export function DealRoom({ id, onTitle, initialFlow }: {
   // DRCARD — which rate proposals a later `rate_response` has settled, and which one is still the live
   // offer. Both derived from the stream, not from local state, so a reload shows the same
   // settled/actionable split and only the standing offer is ever actionable.
-  const respondedIds = respondedProposalIds(messages as unknown[]);
-  const lastProposalId = latestProposalId(messages as unknown[]);
 
   // Accept gate — app parity `allMatched` (rentee perspective): every non-fixed term matched/accepted,
   // AND the rentee's latest price+units round equals the supplier's (nothing left to change). When rounds
@@ -1125,178 +947,44 @@ export function DealRoom({ id, onTitle, initialFlow }: {
 
       {/* terms are negotiated inside the negotiation sheet (§6 step ②) — no standalone terms card here. */}
 
-      {/* thread */}
-      <div className="thread">
-        {!STREAM_API_KEY ? (
-          <div className="sysev">{L("Chat is unavailable.", "المحادثة غير متاحة.")}</div>
-        ) : !chatReady ? (
-          <div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 22 }}>progress_activity</span></div>
-        ) : messages.length === 0 ? (
-          <div className="sysev">{L("No messages yet — say hello 👋", "لا رسائل بعد — ابدأ المحادثة 👋")}</div>
-        ) : (
-          messages.map((m) => {
-            // deal-room/negotiation — the structured `custom` payload FIRST (DRCARD). This branch has to
-            // precede the `system_bot` check below: all six negotiation card types are posted by
-            // `system_bot`, so the early return used to swallow them into one grey pill, showing English
-            // `text` in an Arabic chat and dropping a counter-offer's figures entirely.
-            const card = chatCardOfMessage(m);
-            /* ── WHOSE message this is, and why the CARDS ask it too (owner, 2026-08-11) ───────────
-               *"make these cards appear like messages sent by the other side or by me whether the
-               request or the response."*
+      {/* ── The conversation is NOT here (owner, 2026-08-26) ─────────────────────────────────────
+          *"i want this chat ui for all chat surfaces, no more this one … it is just chat"*.
 
-               The side is read from the Stream AUTHOR, never from the card's TYPE — the renter and
-               the supplier read the SAME channel from opposite chairs, and "an ask is mine, a reply
-               is theirs" is true from one of them and inverted from the other. Authorship is the one
-               reading that is correct from both, and it is the reading the plain bubbles below have
-               always used. The dock sides its cards off this same fact; this route centred every one
-               of them, so a renter's own request read as narration the room had emitted. */
-            const cardMine = myStreamId != null && m.user?.id === myStreamId;
-            /* ── The renter's ASK, as the card he sent (owner, 2026-08-11: "i want it like request
-               card") ──────────────────────────────────────────────────────────────────────────────
-               The identity strip, the ask, the reference and — now that this route holds the fleet —
-               the live verdict, built by the very function the map's dock builds it with. Both sides
-               of the conversation are looking at one object; it must not be one object on one surface
-               and a list of rows on the other. */
-            if (card?.type === RENTEE_REQUEST_CARD_TYPE) {
-              return (
-                <div key={m.id} className={`dl-rq-card ${cardMine ? "is-mine" : "is-them"}`}>
-                  <RequestCard
-                    view={requestCardView(postedSubject(card.card), cardCtx)}
-                    // The SAME clock face every other card in this thread carries (AC-16).
-                    at={chatCardTime(m.created_at, ar)}
-                    // The answer folds into THIS card (V12c), wherever in the thread the question was
-                    // asked — so this is the card that points at itself when the answer is new.
-                    cue={cuedRef != null && cuedRef === card.card.ref}
-                  />
-                </div>
-              );
-            }
-            /* ── The supplier's ANSWER has no card of its own (owner, 2026-08-11) ──────────────────
-               *"make it one card for request and show his answer"* — which SUPERSEDES this morning's
-               *"the supplier response must arrive in the same format of the sent card"*. That ruling
-               drew the ask's card a second time under the reply (`replyCardView`, now withdrawn), and
-               because each card takes its own author's side the pair sat on opposite edges of the
-               column both stating the answer in different words. The ask's card carries it now, in the
-               reply's own kind-specific wording.
+          This page carried a second chat — its own thread, its own bubbles, its own composer, its
+          own `Translate` link — under a price bar with Negotiate and Accept on it. Two chat UIs in
+          one app, and the one that lived here was the only place a conversation shared a screen
+          with a negotiation. Both are gone: chat is the map's dock, and this page is the act.
 
-               The fallback survives and is why this suppresses rather than deletes: a reply whose ask
-               is NOT in the loaded window — an older page, a partial channel read — falls through to
-               the bare `ChatCard` below, which states the reference and the answer and names no
-               equipment nobody read. */
-            if (card?.type === RENTEE_REQUEST_REPLY_CARD_TYPE && replyFoldsIntoAsk(answeredRefs, card.reply)) {
-              return null;
-            }
-            if (card) {
-              const view = buildChatCardView(card, {
-                ar, L, terms: room.terms, at: m.created_at,
-                responded: respondedIds.has(m.id),
-                superseded: card.type === "rate_proposal" && lastProposalId !== null && lastProposalId !== m.id,
-                live,
-              });
-              const chatCard = (
-                <ChatCard
-                  view={view}
-                  ar={ar}
-                  L={L}
-                  busy={busy}
-                  onAccept={() => openFlow("accept")}
-                  onCounter={() => openFlow("counter")}
-                  onTranslate={(m.text ?? "").trim() ? () => void translateMsg(m) : undefined}
-                  translating={translating === m.id}
-                  translation={translations[m.id]}
-                />
-              );
-              /* An unpaired ANSWER is still a message somebody wrote, so it takes his side the way
-                 the full card above does — the bare form is a smaller card, not a different kind of
-                 event. The negotiation vocabulary is NOT sided: a rate, a counter, an acceptance is
-                 an event in the room rather than either party's remark, and `.chatcard` centres
-                 itself for exactly that reason (a wrapper here would turn its `align-self` inert). */
-              return card.type === RENTEE_REQUEST_REPLY_CARD_TYPE ? (
-                <div key={m.id} className={`dl-rq-card ${cardMine ? "is-mine" : "is-them"}`}>{chatCard}</div>
-              ) : (
-                <Fragment key={m.id}>{chatCard}</Fragment>
-              );
-            }
-            // deal-room/negotiation — system narration (posted by the backend's `system_bot`) renders as a
-            // centered chip (prototype's role-tinted narration), NOT a left/right bubble. An UNKNOWN
-            // `custom.type` lands here too: a card type added later degrades to this pill rather than
-            // vanishing from the conversation.
-            if (m.user?.id === "system_bot") {
-              return (
-                <div className="sysev" key={m.id}>
-                  {/* The glyph says WHICH move this was — the app reads the same five out of the same
-                      narration, in both locales, because the backend sends no type beside it. One
-                      lightning bolt for every line said only "something happened". */}
-                  <span className="material-icons-outlined">{dealSystemEventIcon(m.text)}</span>
-                  <span>{m.text}</span>
-                </div>
-              );
-            }
-            const mine = m.user?.id === myStreamId;
-            const custom = m.custom ?? {};
-            const lat = Number(custom.lat), lng = Number(custom.lng);
-            const isLocation = custom.kind === "location" && Number.isFinite(lat) && Number.isFinite(lng);
-            const shownText = translations[m.id] ?? m.text;
-            const canTranslate = !mine && !isLocation && !!(m.text ?? "").trim();
-            // Attachments are open to both parties at ANY status. A file the counterparty deliberately
-            // sent in chat is the recipient's to keep — a renter has to be able to save a quotation while
-            // they're deciding on it, which is precisely when the room is NOT closed. The old lock (open
-            // only once `closed`, app parity with mobile's isDownloadEnabled) was never protection either:
-            // images were viewable inline the whole time, so it only added friction.
-            const attName = (a: StreamAttachment) => a.title || (a.type === "image" ? L("Photo", "صورة") : a.type === "audio" || (a.mime_type || "").startsWith("audio/") ? L("Voice note", "ملاحظة صوتية") : L("Attachment", "مرفق"));
-            return (
-              <div className={`msg ${mine ? "mine" : "them"}`} key={m.id}>
-                {isLocation ? (
-                  <a href={`https://www.google.com/maps?q=${lat},${lng}`} target="_blank" rel="noopener noreferrer" className="msg-att-file msg-loc">
-                    <span className="material-icons-outlined">place</span>
-                    <span className="msg-att-name">{(shownText && String(shownText).trim()) || L("Shared location", "موقع مشترك")}</span>
-                  </a>
-                ) : shownText}
-                {m.attachments?.map((a, i) => {
-                  // The element itself OPENS the attachment (image fullsize, PDF in the browser's viewer,
-                  // voice note inline). Saving is a separate, explicit action beside it — opening a file
-                  // is not keeping it, and the anchor alone gave no way to keep it.
-                  const src = a.asset_url || a.image_url || a.thumb_url || "";
-                  return (
-                    <Fragment key={i}>
-                      {a.type === "image" ? (
-                        <a href={a.image_url || a.thumb_url} target="_blank" rel="noopener noreferrer" className="msg-att-img">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={a.thumb_url || a.image_url} alt={a.fallback || ""} />
-                        </a>
-                      ) : a.type === "audio" || (a.mime_type || "").startsWith("audio/") ? (
-                        <audio controls preload="none" src={a.asset_url} className="msg-att-audio" style={{ display: "block", maxWidth: "100%", marginTop: 6 }} />
-                      ) : (
-                        <a href={a.asset_url} target="_blank" rel="noopener noreferrer" className="msg-att-file">
-                          <span className="material-icons-outlined">{(a.mime_type || "").includes("pdf") ? "picture_as_pdf" : "insert_drive_file"}</span>
-                          <span className="msg-att-name">{attName(a)}</span>
-                        </a>
-                      )}
-                      {src && (
-                        <button type="button" className="msg-att-dl" onClick={() => void saveChatAttachment(src, attFilename(a))}>
-                          <span className="material-icons-outlined">download</span>
-                          {L("Save", "حفظ")}
-                        </button>
-                      )}
-                    </Fragment>
-                  );
-                })}
-                {canTranslate && (
-                  <button type="button" className="msg-tr" disabled={translating === m.id} onClick={() => void translateMsg(m)}>
-                    {translating === m.id ? L("Translating…", "جارٍ الترجمة…") : translations[m.id] ? L("Show original", "النص الأصلي") : L("Translate", "ترجمة")}
-                  </button>
-                )}
-                <div className="meta">{m.created_at ? new Date(m.created_at as string).toLocaleTimeString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { hour: "2-digit", minute: "2-digit" }) : ""}</div>
-              </div>
-            );
-          })
+          The dock was ALREADY only chat and needed no change for this — `live: false` strips
+          accept/counter from a rate card there (`ChatDock.tsx:1104`), "so there is exactly one
+          place a rate can be accepted". This deletion is what makes that sentence true of the app
+          rather than only of the dock.
+
+          What does NOT go is the message FETCH. The rounds are reconstructed from the channel —
+          `reconstructRounds(messages)` is what produces the live position and seeds the sheet's
+          rate — so the messages are this page's ledger even with nothing rendering them. Only the
+          rendering left. */}
+      <div className="dl-chat-away">
+        <span className="material-icons-outlined">forum</span>
+        <div className="dl-chat-away-txt">
+          <b>{L("The conversation lives with the machines", "المحادثة مع المعدات")}</b>
+          <span>{L("Messages, files and voice notes are in the chat on the map.", "الرسائل والملفات والملاحظات الصوتية في المحادثة على الخريطة.")}</span>
+        </div>
+        {room.bidId && (
+          <button
+            type="button"
+            className="dl-chat-away-go"
+            onClick={() => router.push(`/bids/${encodeURIComponent(room.bidId as string)}/equipment?chat=1`)}
+          >
+            {L("Open chat", "فتح المحادثة")}
+            <span className="material-icons-outlined chev">chevron_right</span>
+          </button>
         )}
-        <div ref={bottomRef} />
       </div>
 
-      {/* Footer — the composer (or what replaces it) with the quotation link PINNED underneath. One
-          sticky container, because two `position: sticky; bottom: 0` siblings would both pin to the
-          viewport bottom and overlap. */}
+      {/* Footer — the quotation link, and the note a closed or cancelled room puts in its place.
+          One sticky container: two `position: sticky; bottom: 0` siblings would both pin to the
+          viewport bottom and overlap. The composer that used to head it is gone with the thread. */}
       <div className="dl-footer">
       {closed ? (
         <div className="composer ro quote-bar">
@@ -1309,34 +997,7 @@ export function DealRoom({ id, onTitle, initialFlow }: {
         </div>
       ) : abandoned ? (
         <div className="composer ro"><span className="ro-note">{L("Deal room has been cancelled", "تم إلغاء غرفة الصفقة")}</span></div>
-      ) : (
-        <div className="composer">
-          {!voiceRecording && (
-            <>
-              <button type="button" className="ib" disabled={!chatReady || uploading} onClick={() => fileInputRef.current?.click()} aria-label={L("Attach a file", "إرفاق ملف")}>
-                <span className="material-icons-outlined">{uploading ? "hourglass_top" : "attach_file"}</span>
-              </button>
-              <input ref={fileInputRef} type="file" accept={CHAT_ACCEPT} hidden onChange={(e) => { void sendFiles(e.target.files); e.target.value = ""; }} />
-            </>
-          )}
-          <VoiceRecorder
-            disabled={!chatReady || uploading}
-            ar={ar}
-            L={L}
-            maxBytes={CHAT_MAX_MEDIA}
-            onRecordingChange={setVoiceRecording}
-            onRecorded={(f) => void sendVoiceNote(f)}
-            onError={setFileErr}
-          />
-          {!voiceRecording && (
-            <>
-              <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} disabled={!chatReady} placeholder={L("Type a message…", "اكتب رسالة…")} />
-              <span className="ib send" onClick={send}><span className="material-icons-outlined">send</span></span>
-            </>
-          )}
-          {fileErr && <span className="ro-note quote-err">{fileErr}</span>}
-        </div>
-      )}
+      ) : null}
 
       {/* The rentee's quotation link, PINNED below the composer — app parity (quotation_button.dart).
           It sits outside the thread so it never scrolls away with the conversation, it is there at

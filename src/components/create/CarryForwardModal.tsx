@@ -12,6 +12,7 @@
 
 import { fmt, useT } from "@/lib/i18n";
 import { Icon, Modal } from "@/components/ui";
+import { btn } from "@/lib/ds";
 
 export function CarryForwardModal({
   open,
@@ -55,13 +56,13 @@ export function CarryForwardModal({
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <button
           onClick={onClose}
-          className="rounded-sm border border-border bg-surface px-4 py-2.5 text-body font-semibold text-navy-mid transition hover:bg-surface2"
+          className={btn("secondary", "md", { className: "transition" })}
         >
           {t.create.carry.editFirst}
         </button>
         <button
           onClick={onContinue}
-          className="rounded-sm bg-brand px-4 py-2.5 text-body font-semibold text-brand-fg transition"
+          className={btn("primary", "md", { className: "transition" })}
         >
           {t.create.carry.continue}
         </button>

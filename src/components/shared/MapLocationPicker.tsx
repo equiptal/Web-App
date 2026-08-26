@@ -12,6 +12,7 @@ import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useT } from "@/lib/i18n";
+import { btn } from "@/lib/ds";
 
 // Fix default marker icon (leaflet + bundler issue)
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
@@ -247,7 +248,7 @@ export default function MapLocationPicker({ value, label, onChange, height = "30
           onClick={handleMyLocation}
           title={mp.useMyLocation}
           aria-label={mp.useMyLocation}
-          className="flex items-center rounded-sm border border-border px-2.5 py-2 text-label hover:bg-surface2"
+          className={btn("secondary", "md", { className: "flex" })}
         >
           <Navigation className="h-3.5 w-3.5 text-muted" />
         </button>

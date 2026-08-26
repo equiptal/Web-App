@@ -214,7 +214,7 @@ export function RequestRail({
                   {tile.label}
                 </span>
                 {tile.closed && (
-                  <span className="text-[7px] font-semibold uppercase leading-[9px] tracking-[.07em] text-muted">{t.workspace.closed}</span>
+                  <span className="text-label font-semibold uppercase leading-[9px] tracking-[.07em] text-muted">{t.workspace.closed}</span>
                 )}
               </span>
             </button>

@@ -5,6 +5,7 @@ import { useSession } from "@/lib/session";
 import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { AccountModal } from "@/components/onboarding/AccountModal";
+import { btn } from "@/lib/ds";
 
 /**
  * App-wide auth gate (public-web-auth-gate). There is NO `/login` page and NO route gate — the whole
@@ -130,7 +131,7 @@ export function AuthGateProvider({ children }: { children: ReactNode }) {
               <p className="text-body font-extrabold text-navy">{t.auth.finishTitle}</p>
               <p className="truncate text-meta text-muted">{t.auth.finishBody}</p>
             </div>
-            <button onClick={() => { setResume(true); setOpen(true); }} className="flex-none rounded-sm bg-brand px-3 py-2 text-meta font-semibold text-white transition">
+            <button onClick={() => { setResume(true); setOpen(true); }} className={btn("primary", "md", { className: "flex-none transition" })}>
               {t.auth.finishCta}
             </button>
             <button onClick={clearPending} aria-label={t.common.close} className="flex-none rounded-full p-1 text-muted hover:text-navy">

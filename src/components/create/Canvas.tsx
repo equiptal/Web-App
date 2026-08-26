@@ -25,6 +25,7 @@ import { CarryForwardModal } from "@/components/create/CarryForwardModal";
 import { PanelDot } from "@/components/create/Provenance";
 import { gateWhen, gateWhere, itemGaps, panelGaps, postableItems, requiredGaps, resolveRef, taxName, transportGaps } from "@/lib/contract";
 import type { RequiredGap } from "@/lib/contract";
+import { btn } from "@/lib/ds";
 
 /**
  * A gap's reason, in the renter's words.
@@ -385,7 +386,7 @@ export function Canvas() {
             onClick={advance}
             disabled={blockedBy != null}
             title={blockedBy ? gateReason(t, blockedBy.reason) : undefined}
-            className="inline-flex items-center gap-1.5 rounded-sm bg-brand px-5 py-2.5 text-body font-semibold text-brand-fg transition disabled:cursor-not-allowed disabled:bg-surface3 disabled:text-muted"
+            className={btn("primary", "md", { className: "transition" })}
           >
             {isLastItem ? t.create.reviewAndSend : t.create.nextEquipment}
             <Icon name="arrow_forward" size={16} className="rtl:rotate-180" />
@@ -414,7 +415,7 @@ export function Canvas() {
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             onClick={() => setConfirmReset(false)}
-            className="rounded-sm border border-border bg-surface px-4 py-2.5 text-body font-semibold text-navy-mid transition hover:bg-surface2"
+            className={btn("secondary", "md", { className: "transition" })}
           >
             {t.common.cancel}
           </button>
@@ -423,7 +424,7 @@ export function Canvas() {
               setConfirmReset(false);
               actions.reset();
             }}
-            className="rounded-sm bg-brand px-4 py-2.5 text-body font-semibold text-brand-fg transition"
+            className={btn("primary", "md", { className: "transition" })}
           >
             {t.create.startOver}
           </button>

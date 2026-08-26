@@ -33,6 +33,7 @@ import { formatSar } from "@/lib/pricing/rental";
 import { buildBidQuotationDoc, quotationSupplierInitials, quotationSupplierKey } from "@/lib/quotation/bid-quotation";
 import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
 import { quotationDownloadName } from "@/lib/compare/quotation-token";
+import { btn } from "@/lib/ds";
 
 type Tab = "cards" | "compare";
 
@@ -410,7 +411,7 @@ export function RequestsWorkspace() {
               setGroups(null);
               setReloads((n) => n + 1);
             }}
-            className="mt-3 rounded-full bg-brand px-4 py-2 text-meta font-semibold text-white"
+            className={btn("primary", "md", { pill: true, className: "mt-3" })}
           >
             {t.workspace.retry}
           </button>
@@ -493,7 +494,7 @@ export function RequestsWorkspace() {
               <button
                 type="button"
                 onClick={() => setBenched(new Set())}
-                className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-label font-semibold text-navy-mid transition hover:border-navy-mid"
+                className={btn("secondary", "md", { className: "transition" })}
               >
                 <Icon name="done_all" size={14} /> {fmt(t.workspace.selectAll, { n: String(benched.size) })}
               </button>
@@ -505,7 +506,7 @@ export function RequestsWorkspace() {
               type="button"
               disabled={shown.length === 0}
               onClick={() => (tab === "compare" ? printComparison() : void downloadQuotation())}
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-border bg-surface px-3 py-2 text-label font-semibold text-navy-mid transition hover:border-navy-mid hover:bg-surface2/60 disabled:bg-disabled-bg disabled:text-disabled-fg"
+              className={btn("secondary", "md", { className: "whitespace-nowrap transition" })}
             >
               {tab === "compare" ? t.workspace.exportComparison : t.workspace.downloadQuotation}{" "}
               <Icon name="download" size={14} />
@@ -596,7 +597,7 @@ export function RequestsWorkspace() {
               <button
                 type="button"
                 onClick={() => setTipOpen(true)}
-                className="inline-flex max-w-full items-center gap-2.5 rounded-full border border-border bg-surface py-2 pe-4 ps-2 transition hover:border-navy-mid/40"
+                className={btn("secondary", "md", { pill: true, full: true, className: "max- pe-4 ps-2 transition" })}
               >
                 <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface2 text-label font-semibold text-muted">✦</span>
                 <span className="flex-none text-label font-semibold text-navy-mid">{t.workspace.aiSuggestion}</span>
@@ -627,7 +628,7 @@ export function RequestsWorkspace() {
                 type="button"
                 onClick={() => void rank(shown)}
                 disabled={rankBusy}
-                className="inline-flex items-center gap-2.5 rounded-full border border-border bg-surface py-2 pe-4 ps-2 transition hover:border-navy-mid/40 disabled:bg-disabled-bg disabled:text-disabled-fg"
+                className={btn("secondary", "md", { pill: true, className: "pe-4 ps-2 transition" })}
               >
                 <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface2 text-label font-semibold text-muted">✦</span>
                 <span className="text-label font-semibold text-navy-mid">{t.workspace.aiSuggestion}</span>

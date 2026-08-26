@@ -121,7 +121,7 @@ export function BellIcon({ size = 20 }: { size?: number }) {
 export function CountBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span className="absolute -top-1.5 -end-2 flex h-[15px] min-w-[15px] items-center justify-center rounded-sm bg-brand px-1 text-[9.5px] font-semibold leading-none text-white">
+    <span className="absolute -top-1.5 -end-2 flex h-[15px] min-w-[15px] items-center justify-center rounded-sm bg-brand px-1 text-label font-semibold leading-none text-white">
       {count > 99 ? "99+" : count}
     </span>
   );

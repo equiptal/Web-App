@@ -9,6 +9,7 @@ import { Confirmation } from "@/components/screens/Confirmation";
 import { Canvas } from "@/components/create/Canvas";
 import { ReadyToSend } from "@/components/create/ReadyToSend";
 import { Icon } from "@/components/ui";
+import { btn } from "@/lib/ds";
 
 /**
  * The RFQ create surface. Guests can now run the WHOLE flow — the account gate moved to Submit
@@ -85,13 +86,13 @@ export function CreateSurface() {
             <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <button
                 onClick={() => actions.reset()}
-                className="rounded-sm border border-border bg-surface px-4 py-2.5 text-body font-semibold text-navy-mid transition hover:bg-surface2"
+                className={btn("secondary", "md", { className: "transition" })}
               >
                 {t.draftPrompt.startOver}
               </button>
               <button
                 onClick={() => actions.resumeDraft()}
-                className="rounded-sm bg-brand px-4 py-2.5 text-body font-semibold text-brand-fg transition"
+                className={btn("primary", "md", { className: "transition" })}
               >
                 {t.draftPrompt.continue}
               </button>

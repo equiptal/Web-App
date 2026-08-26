@@ -15,6 +15,7 @@ import {
 import { CompanyIdentityModal, type AuthorityRole, type CompanyIdentity } from "./CompanyIdentityModal";
 import { CompanyDocsConfirmDialog } from "./CompanyDocsConfirmDialog";
 import type { VerificationStatus } from "@/lib/contract/onboarding";
+import { btn } from "@/lib/ds";
 
 const ACCEPT = "image/jpeg,image/png,image/webp,application/pdf";
 
@@ -425,7 +426,7 @@ export function VerificationFlow() {
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={busy || files.length >= COMPANY_PILE_MAX_FILES}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-sm border border-brand bg-surface px-4 py-2 text-body font-semibold text-brand disabled:border-border disabled:text-muted"
+            className={btn("secondary", "md", { className: "mt-3" })}
           >
             <Icon name="add" size={16} />
             {files.length >= COMPANY_PILE_MAX_FILES
@@ -501,7 +502,7 @@ export function VerificationFlow() {
           type="button"
           onClick={onSend}
           disabled={busy || files.length === 0}
-          className="flex w-full items-center justify-center gap-2 rounded-sm border border-brand bg-brand px-6 py-3 text-subhead font-extrabold text-brand-fg transition disabled:cursor-not-allowed disabled:border-border disabled:bg-surface2 disabled:text-muted"
+          className={btn("primary", "lg", { full: true, className: "flex transition" })}
         >
           {!busy && <Icon name={failedIndexes.size > 0 ? "refresh" : "send"} size={18} />}
           {busy ? v.submitting : p.submit}

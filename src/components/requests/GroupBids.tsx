@@ -572,7 +572,7 @@
 //                 <div className="fp-h">{L("Bid source", "مصدر العرض")}</div>
 //                 {([
 //                   ["all", L("All sources", "كل المصادر"), null, ""],
-//                   ["link", L("Off your request link", "من رابط طلبك"), "link", "var(--action)"],
+//                   ["link", L("Off your request link", "من رابط طلبك"), "link", "var(--brand)"],
 //                   ["platform", L("On platform", "على المنصة"), "verified", "var(--success)"],
 //                 ] as const).map(([key, label, icon, color]) => (
 //                   <div key={key} className={`fp-opt${fSource === key ? " on" : ""}`} onClick={() => setFSource(key)}>
@@ -590,7 +590,7 @@
 //                     {PART_META.map((p) => (
 //                       <div key={p.key} className={`fp-opt fp-check${fqParts.has(p.key) ? " on" : ""}`} onClick={() => toggleQPart(p.key)}>
 //                         <span className="box"><span className="material-icons-outlined">check</span></span>
-//                         <span className="material-icons-outlined fp-ic" style={{ color: "var(--action)" }}>{p.icon}</span>{L(p.en, p.ar)}
+//                         <span className="material-icons-outlined fp-ic" style={{ color: "var(--brand)" }}>{p.icon}</span>{L(p.en, p.ar)}
 //                         <span className="fp-n">{qPartCount(p.key)}</span>
 //                       </div>
 //                     ))}

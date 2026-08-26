@@ -133,6 +133,56 @@
 /* The map dock's stream rhythm (`.bm-chat-body`): an 8px gap carries the spacing between bubbles, so
    the bubbles themselves have no margin. It was a 3px gap with `margin: 5px 0` on each bubble — the
    same total, reached two ways, which is why a card and a bubble sat differently in the two routes. */
+/* ── Where the conversation went (owner, 2026-08-26) ─────────────────────────────────────────────
+   *"i want this chat ui for all chat surfaces, no more this one … it is just chat"*.
+
+   This page's own chat is gone from the markup — thread, bubbles, composer, translate link — so the
+   only chat UI left in the app is the map dock's, and it holds no price bar and no negotiate flow.
+   What stands here instead is a pointer to it.
+
+   Quiet on purpose. It is a signpost on a page whose subject is the money, not a second headline
+   competing with the price bar above it. ── */
+.dlproto .dl-chat-away {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 18px;
+  padding: 13px 15px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.dlproto .dl-chat-away > .material-icons-outlined { font-size: 21px; color: var(--info); flex: 0 0 auto; }
+.dlproto .dl-chat-away-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.dlproto .dl-chat-away-txt b { font-size: 13px; font-weight: 800; color: var(--info-deep); }
+.dlproto .dl-chat-away-txt span { font-size: 12px; font-weight: 600; color: var(--muted); line-height: 1.5; }
+.dlproto .dl-chat-away-go {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--info);
+  color: var(--surface);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.dlproto .dl-chat-away-go .chev { font-size: 16px; }
+.dlproto .dl-chat-away-go:hover { filter: brightness(1.06); }
+
+/* ── DEAD from here to the composer's `.ro` variants (owner, 2026-08-26) ─────────────────────────
+   Everything below that styles a thread, a bubble, a message attachment or the composer's input row
+   has no markup left to style: the page renders none of it. It is left standing for ONE commit only
+   because this file is mid-migration from hex literals to tokens in another branch of work, and
+   deleting two hundred lines underneath that diff is how one of the two gets lost. Dead CSS renders
+   nothing, so it is safe to carry that long — but it should not survive past the migration.
+
+   KEEP when pruning: `.composer` itself, `.composer.ro`, `.ro-note` and `.composer.quote-bar`. The
+   quotation link and the closed/cancelled notes still use them, and they are not chat. ── */
 .dlproto .thread { flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 16px; background: var(--background); }
 /* ── the system line, measured against the app (`deal_system_events.dart`) ────────────────────────
    Same pill on both clients, down to the alphas: muted at 20% behind a 30% hairline, radius full,

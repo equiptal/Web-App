@@ -23,6 +23,7 @@ import {
   type CompanyResult,
 } from "@/lib/api/company-client";
 import type { CompanyMember, MyCompany } from "@/lib/contract/company";
+import { btn } from "@/lib/ds";
 
 /**
  * Company hub — the web twin of the app's `company_page.dart`
@@ -138,7 +139,7 @@ export function CompanyHub() {
           <p className="text-body font-semibold text-navy">{c.loadError}</p>
           <button
             onClick={() => void load()}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-sm bg-brand px-5 py-2.5 text-body font-semibold text-brand-fg transition"
+            className={btn("primary", "md", { className: "mt-4 transition" })}
           >
             <Icon name="refresh" size={16} /> {c.retry}
           </button>
@@ -286,7 +287,7 @@ function CreateOwnCompanyCard() {
   return (
     <button
       onClick={() => router.push("/verify")}
-      className="flex w-full items-center gap-3.5 rounded-sm border border-brand/30 bg-brand-soft p-5 text-start transition hover:border-brand"
+      className={btn("secondary", "md", { full: true, className: "flex text-start transition" })}
     >
       <span className="grid h-11 w-11 flex-none place-items-center rounded-sm bg-brand text-brand-fg">
         <Icon name="verified" size={22} />
@@ -377,7 +378,7 @@ function JoinForm({
         <button
           type="submit"
           disabled={busy || checking || !code.trim()}
-          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-sm bg-brand px-5 py-3 text-body font-semibold text-brand-fg transition disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
+          className={btn("primary", "lg", { full: true, className: "mt-4 transition" })}
         >
           {checking ? "…" : c.joinButton}
         </button>
@@ -419,7 +420,7 @@ function PendingPanel({
       <button
         onClick={onCancel}
         disabled={busy}
-        className="mt-6 inline-flex items-center gap-1.5 rounded-sm border border-border px-4 py-2.5 text-body font-semibold text-navy-mid transition hover:bg-surface2 disabled:bg-disabled-bg disabled:text-disabled-fg"
+        className={btn("secondary", "md", { className: "mt-6 transition" })}
       >
         <Icon name="undo" size={16} /> {c.cancelJoin}
       </button>
@@ -501,7 +502,7 @@ function ActiveCompany({
                   <button
                     onClick={() => onRemove(m)}
                     disabled={busy}
-                    className="flex-1 rounded-sm border border-danger px-3 py-2.5 text-body font-semibold text-danger transition hover:bg-danger-soft disabled:bg-disabled-bg disabled:text-disabled-fg"
+                    className={btn("secondary", "md", { className: "flex-1 transition" })}
                   >
                     {c.remove}
                   </button>
@@ -542,7 +543,7 @@ function ActiveCompany({
         <button
           onClick={onExit}
           disabled={busy}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-sm border border-danger px-5 py-3 text-body font-semibold text-danger transition hover:bg-danger-soft disabled:bg-disabled-bg disabled:text-disabled-fg"
+          className={btn("secondary", "lg", { full: true, className: "transition" })}
         >
           <Icon name="logout" size={17} className="rtl:scale-x-[-1]" />
           {company.activeMembers.length <= 1 ? c.dissolve : c.leave}

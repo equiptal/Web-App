@@ -151,7 +151,7 @@ export function MachineCard({
 
             {/* The prototype's inline −/×N/+ chip rather than the boxed Stepper, which is too tall
                 to sit on the panel without covering the machine. */}
-            <div className="flex flex-none items-center gap-2.5 rounded-sm bg-[#12263acc] px-2 py-1.5 text-meta text-white">
+            <div className="flex flex-none items-center gap-2.5 rounded-sm bg-[color-mix(in_srgb,var(--navy-deep)_80%,transparent)] px-2 py-1.5 text-meta text-white">
               <button
                 type="button"
                 aria-label={`${t.create.machineCard.quantity} −`}

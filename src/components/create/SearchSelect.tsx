@@ -127,7 +127,7 @@ export function SearchSelect({
           tone === "field"
             ? "border border-border bg-surface px-3 py-2.5 text-body text-navy"
             : tone === "overlay"
-              ? "bg-[#12263acc] px-3 py-2 text-meta font-semibold text-white"
+              ? "bg-[color-mix(in_srgb,var(--navy-deep)_80%,transparent)] px-3 py-2 text-meta font-semibold text-white"
               : "bg-brand-press px-3 py-2 text-body font-semibold text-white"
         }`}
       >

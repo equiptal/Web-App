@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui";
 import { postAuth, type AuthKind } from "@/components/auth/authClient";
 import { COUNTRY_CODES, SAUDI_DIAL } from "@/components/auth/PhoneEntry";
 import type { RenterUser } from "@/lib/contract/auth";
+import { btn } from "@/lib/ds";
 
 interface Opt {
   value: string;
@@ -317,7 +318,7 @@ export function OnboardingForm({
                 type="button"
                 onClick={sendPhoneCode}
                 disabled={phoneBusy || !phoneDigits.trim()}
-                className="mt-3 inline-flex items-center gap-1.5 rounded-sm border border-brand px-4 py-2 text-body font-semibold text-brand transition hover:bg-brand-soft disabled:bg-disabled-bg disabled:text-disabled-fg"
+                className={btn("secondary", "md", { className: "mt-3 transition" })}
               >
                 <Icon name="sms" size={16} /> {phoneBusy ? t.auth.sending : t.auth.sendCode}
               </button>
@@ -339,7 +340,7 @@ export function OnboardingForm({
                     type="button"
                     onClick={verifyPhone}
                     disabled={phoneBusy || otpCode.replace(/\D/g, "").length < 4}
-                    className="flex-none rounded-sm border border-brand bg-brand px-4 text-body font-semibold text-white transition disabled:bg-disabled-bg disabled:text-disabled-fg"
+                    className={btn("primary", "md", { className: "flex-none transition" })}
                   >
                     {phoneBusy ? t.auth.verifying : t.auth.verifyPhone}
                   </button>
@@ -427,7 +428,7 @@ export function OnboardingForm({
         <button
           type="submit"
           disabled={busy || (!!phoneVerify && !phoneVerified)}
-          className="flex w-full items-center justify-center gap-2 rounded-sm border border-brand bg-brand px-6 py-3 text-subhead font-extrabold text-brand-fg transition disabled:bg-disabled-bg disabled:text-disabled-fg"
+          className={btn("primary", "lg", { full: true, className: "flex transition" })}
         >
           {busy ? o.submitting : o.submit}
           {!busy && <Icon name="arrow_forward" size={18} className="rtl:scale-x-[-1]" />}
