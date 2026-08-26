@@ -59,7 +59,7 @@ export function RequestRail({
   //
   // What a tile actually occupies, from its highest ink to its lowest:
   //
-  //     2  the share badge's overhang above the ring
+  //     2  the share badge's overhang above the circle
   //   +56  the circle
   //   + 4  the gap under it
   //   +13  the name
@@ -117,16 +117,15 @@ export function RequestRail({
         {tiles.map((tile) => {
           const active = tile.key === activeKey;
           const img = publicTaxonomyUrl(tile.imageUrl);
-          /* ── The ring says ONE thing: whether this request is shut (owner, 2026-08-27) ──────────
-             ~~Brand while it is the one being read, green while bids are waiting on it, grey once
-             shut.~~ Three colours on a row of circles, and two of them competed: an active request
-             with bids waiting could not show both, so the orange won and the green news was lost on
-             the one tile the renter was actually looking at.
+          /* ── There is no ring (owner, 2026-08-27: "remove all outlines even grey") ───────────────
+             It was three colours — brand for the one being read, green for one with bids waiting,
+             grey for closed. Then it was grey alone. Now it is nothing: a row of pictures rather
+             than a row of framed pictures.
 
-             Grey when closed, nothing otherwise. Which tile is being read is carried by its full
-             opacity and by its caption going navy and semibold while the rest stay muted — the same
-             two signals the rail already used, now unaccompanied. */
-          const ring = tile.closed ? "bg-border" : "bg-transparent";
+             What the ring used to say is still said. **Closed** is the picture in greyscale, the
+             tile at half opacity, and «CLOSED» under the name. **Being read** is full opacity and a
+             navy semibold caption where the others are muted. Neither ever depended on the ring —
+             it was the third way of saying two things. */
           const dim = active ? "" : tile.closed ? "opacity-50" : "opacity-[.72]";
           const raised = fmtRaised(tile.createdAt, ar);
           return (
@@ -151,9 +150,13 @@ export function RequestRail({
                   44 / 40 / 36 are the numbers the percentages were computing anyway. Stated
                   outright there is nothing left to resolve, so the clip is 36px on every tile and
                   every machine, whatever its shape. */}
-              <span className={`grid h-14 w-14 flex-none place-items-center rounded-full p-1 ${ring}`}>
-                <span className="relative h-13 w-13 rounded-full border-2 border-surface">
-                  <span className={`grid h-12 w-12 place-items-center overflow-hidden rounded-full bg-surface3 ${tile.closed ? "grayscale" : ""}`}>
+              {/* Two spans where there were three. The outer one was the ring and the middle one the
+                  white band that separated it from the picture; with no ring the white band would
+                  simply have become the outline in its place. What is left is an anchor for the
+                  badges and the clip itself, both the full 56. */}
+              <span className="relative grid h-14 w-14 flex-none place-items-center rounded-full">
+                <span className="relative h-14 w-14 rounded-full">
+                  <span className={`grid h-14 w-14 place-items-center overflow-hidden rounded-full bg-surface3 ${tile.closed ? "grayscale" : ""}`}>
                     {img ? (
                       /* ── `contain`, not `cover` (owner, 2026-08-25: "the circles must fit any icon
                          + why some have floating icons") ──────────────────────────────────────────
@@ -181,7 +184,7 @@ export function RequestRail({
                          every machine whole. Reaching further needs a bigger circle, not less
                          padding. */
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={img} alt="" draggable={false} className="h-12 w-12 object-contain p-1" />
+                      <img src={img} alt="" draggable={false} className="h-14 w-14 object-contain p-1.5" />
                     ) : (
                       <Icon name="precision_manufacturing" size={20} className="text-muted" />
                     )}
