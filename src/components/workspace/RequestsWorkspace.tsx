@@ -22,6 +22,7 @@ import {
   type WorkspaceSelection,
 } from "@/lib/contract/workspace";
 import { RequestRail } from "@/components/workspace/RequestRail";
+import { hiddenRequests, hideRequest } from "@/lib/access/hidden-requests";
 import { RequestContextBar } from "@/components/workspace/RequestContextBar";
 import { BidCards } from "@/components/workspace/BidCards";
 import { CompareMatrix } from "@/components/workspace/CompareMatrix";
@@ -187,7 +188,22 @@ export function RequestsWorkspace() {
   const pickBid = useCallback((bidId: string) => setWanted((w) => ({ groupId: w.groupId, itemId: w.itemId, bidId })), []);
 
 
-  const tiles = useMemo(() => railTiles(groups ?? []), [groups]);
+  /**
+   * Requests this device has taken off the rail (owner, 2026-08-27) — closed ones only, and hidden
+   * rather than deleted. Read once on mount because `localStorage` is not available while the server
+   * renders, and a first paint that differs from the second is a hydration mismatch.
+   */
+  const [hidden, setHidden] = useState<string[]>([]);
+  useEffect(() => setHidden(hiddenRequests()), []);
+  const hide = useCallback((key: string) => setHidden(hideRequest(key)), []);
+
+  const tiles = useMemo(
+    // A hidden request whose circle is nonetheless the one being READ stays on the rail: taking the
+    // page's own subject out from under it would leave the workspace showing a request the renter
+    // cannot see the tile for.
+    () => railTiles(groups ?? []).filter((tl) => !hidden.includes(tl.key) || tl.key === resolved.groupId),
+    [groups, hidden, resolved.groupId],
+  );
 
   /**
    * Bids the renter has taken off the comparison. Owned here rather than inside the matrix so the
@@ -448,6 +464,7 @@ export function RequestsWorkspace() {
         activeKey={resolved.groupId}
         onPick={pickGroup}
         onShare={() => { setDrawerShare(true); setDrawerOpen(true); }}
+        onHide={hide}
       />
 
       <div className={`${PAGE_MX_BLEED} mt-2 flex min-h-0 flex-1 flex-col pb-2`}>

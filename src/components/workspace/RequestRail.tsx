@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import Link from "next/link";
-import { useT } from "@/lib/i18n";
+import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { PAGE_X_BLEED } from "@/components/AppShell";
 import { publicTaxonomyUrl } from "@/lib/contract/requests";
@@ -16,24 +16,34 @@ import { pin } from "@/lib/uiPins";
  * A closed request keeps its place in the rail rather than dropping out of it: its bids are still
  * worth reading, and a rail that silently loses rows teaches the renter not to trust it.
  *
- * **The ring is the state, and it is the only state.** Brand for the request being read, green for
- * one with bids waiting on it, grey for one that has closed — with the grey pair dimmed, so a live
- * request is the brightest thing on the row. It is the prototype's own rail (owner, 2026-08-25); the
- * ring carries what a second row of captions used to.
+ * **The ring says one thing: whether the request is shut** (owner, 2026-08-27). Grey for closed and
+ * dimmed with it; nothing at all otherwise. ~~Brand for the request being read, green for one with
+ * bids waiting.~~ Three colours on a row of circles, and two of them competed — an active request
+ * with bids waiting could not show both, so the orange won and the green news was lost on the one
+ * tile the renter was looking at. Which tile is being read is carried by its full opacity and its
+ * navy caption, which is what carried it alongside the ring anyway.
+ *
+ * A closed request keeps its place until the renter takes it off himself — the × on its circle hides
+ * it on this device and touches nothing else.
  */
 export function RequestRail({
   tiles,
   activeKey,
   onPick,
   onShare,
+  onHide,
 }: {
   tiles: RailTile[];
   activeKey: string | null;
   onPick: (key: string) => void;
   /** Share the request the rail is showing — the badge on its own tile (owner's reference). */
   onShare?: (() => void) | null;
+  /** Take a CLOSED request's circle off this device's rail. Absent → no × is drawn. */
+  onHide?: ((key: string) => void) | null;
 }) {
   const t = useT();
+  const { locale } = useLocale();
+  const ar = locale === "ar";
   const scroller = useRef<HTMLDivElement>(null);
 
   // Roughly three tiles a press — far enough to feel like progress, short enough to keep your place.
@@ -97,16 +107,25 @@ export function RequestRail({
         {tiles.map((tile) => {
           const active = tile.key === activeKey;
           const img = publicTaxonomyUrl(tile.imageUrl);
-          // Brand while it is the one being read, green while bids are waiting on it, grey once shut.
-          const ring = active ? "bg-gradient-to-br from-brand to-brand/60" : tile.closed ? "bg-border" : tile.bids > 0 ? "bg-ok" : "bg-border";
+          /* ── The ring says ONE thing: whether this request is shut (owner, 2026-08-27) ──────────
+             ~~Brand while it is the one being read, green while bids are waiting on it, grey once
+             shut.~~ Three colours on a row of circles, and two of them competed: an active request
+             with bids waiting could not show both, so the orange won and the green news was lost on
+             the one tile the renter was actually looking at.
+
+             Grey when closed, nothing otherwise. Which tile is being read is carried by its full
+             opacity and by its caption going navy and semibold while the rest stay muted — the same
+             two signals the rail already used, now unaccompanied. */
+          const ring = tile.closed ? "bg-border" : "bg-transparent";
           const dim = active ? "" : tile.closed ? "opacity-50" : "opacity-[.72]";
+          const raised = fmtRaised(tile.createdAt, ar);
           return (
             <button
               key={tile.key}
               type="button"
               onClick={() => onPick(tile.key)}
               aria-current={active ? "true" : undefined}
-              title={tile.label}
+              title={raised ? `${tile.label} · ${raised}` : tile.label}
               className={`flex max-w-[104px] flex-none flex-col items-center gap-1 text-center transition ${dim}`}
             >
               {/* ── Pixels, not percentages of percentages (owner, 2026-08-25) ────────────────────
@@ -167,6 +186,31 @@ export function RequestRail({
                       One request is being read at a time, and the link that invites bids onto it is
                       about THAT request — so it rides its own circle rather than waiting inside the
                       drawer. It appears on the active tile only, for the same reason. */}
+                  {/* ── Taking a finished request off the rail (owner, 2026-08-27) ──────────────
+                      A closed or expired request has nothing left to do but take up a circle. The ×
+                      hides it on this device — the request is untouched, nothing is told to the
+                      backend, and another member of the firm still sees it.
+
+                      **Only on a closed tile.** A live request that could be dismissed would be a
+                      request the renter cannot get back to, and there is no undo in the rail.
+
+                      It takes the place the share badge holds on the active tile, and the two can
+                      never both apply: sharing invites bids, which a shut request cannot take. */}
+                  {tile.closed && onHide && (
+                    <span
+                      role="button"
+                      tabIndex={-1}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onHide(tile.key);
+                      }}
+                      aria-label={t.workspace.hideRequest}
+                      title={t.workspace.hideRequest}
+                      className="absolute -end-1 -top-1 grid h-5 w-5 cursor-pointer place-items-center rounded-full border-2 border-surface bg-muted text-white transition hover:bg-navy"
+                    >
+                      <Icon name="close" size={11} />
+                    </span>
+                  )}
                   {active && onShare && (
                     <span
                       role="button"
@@ -211,8 +255,12 @@ export function RequestRail({
                 </span>
               </span>
               <span className="flex h-[22px] flex-col items-center">
+                {/* The DATE it was raised, not the code (owner, 2026-08-27). A row of circles is read
+                    in time order — the rail is newest-first — so the caption that helps is the one
+                    that places the request in that order. The code is what the tile answers to on
+                    hover, where it is there when it is wanted and takes no room when it is not. */}
                 <span className={`max-w-[104px] truncate text-label leading-[13px] ${active ? "font-semibold text-navy" : "font-semibold text-navy-mid"}`}>
-                  {tile.label}
+                  {raised ?? tile.label}
                 </span>
                 {tile.closed && (
                   <span className="text-label font-semibold uppercase leading-[9px] tracking-[.07em] text-muted">{t.workspace.closed}</span>
@@ -235,5 +283,20 @@ export function RequestRail({
         <Icon name="chevron_right" size={16} className="rtl:scale-x-[-1]" />
       </button>
     </div>
-  );
+  );}
+
+/**
+ * The day a request was raised, short. «14 Aug» inside the current year, «14 Aug 24» outside it —
+ * a caption on a 104px circle has room for one of those and not for both.
+ */
+function fmtRaised(iso: string | null, ar: boolean): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", {
+    day: "numeric",
+    month: "short",
+    ...(sameYear ? {} : { year: "2-digit" }),
+  });
 }

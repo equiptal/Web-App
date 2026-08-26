@@ -28,8 +28,17 @@ export interface WorkspaceBid {
 export interface RailTile {
   /** The group's id — what a selection stores. */
   key: string;
-  /** `RFQ-NNNNN` for a multi-item submission, `REQ-NNNNN` for a lone request. */
+  /**
+   * `RFQ-NNNNN` for a multi-item submission, `REQ-NNNNN` for a lone request.
+   *
+   * The rail no longer PRINTS it — the circle is captioned with the date the request was raised
+   * (owner, 2026-08-27), which is what a renter scanning a row of them is actually placing. The code
+   * stays here because it is what the tile answers to on hover, and it is the string he quotes down
+   * the phone.
+   */
   label: string;
+  /** When the request was raised, ISO. Null where the record did not carry one. */
+  createdAt: string | null;
   /**
    * Distinct LINE ITEMS in the group — different machines asked for, not copies of one.
    *
@@ -78,6 +87,7 @@ export function railTiles(groups: RequestGroup[]): RailTile[] {
     key: g.id,
     // The RFQ code is the group's own name; a lone request has none and answers to its REQ id.
     label: g.groupRef ?? g.items[0]?.displayId ?? g.id,
+    createdAt: g.createdAt,
     items: g.items.length,
     units: g.totalUnits,
     bids: g.totalBids,
