@@ -185,6 +185,7 @@ export const ar: Dictionary = {
     comingSoon: "قريباً",
     orUploadBelow: "أو ارفع ملفًا أدناه",
     attachDivider: "أو أرفق ملفًا",
+    or: "أو",
     browse: "تصفّح",
     dropSub: "أضف ما تشاء من الملفات — وسنقرؤها جميعًا",
     chars: "حرف",

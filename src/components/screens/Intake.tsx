@@ -144,108 +144,118 @@ export function Intake() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[920px]">
+    <div className="mx-auto w-full max-w-[1040px]">
       <h1 className="text-display font-extrabold leading-tight tracking-[-.02em] text-navy">{t.intake.heading}</h1>
       <p className="mb-7 mt-2 text-subhead leading-relaxed text-muted">{t.intake.subheading}</p>
 
-      {/* ── Describe ── */}
-      <div className="rounded-sm border border-border bg-surface">
-        <div className="flex items-center gap-2.5 px-5 pb-1 pt-4">
-          <span className="grid h-8 w-8 flex-none place-items-center rounded-sm bg-gradient-to-br from-brand-light to-brand text-white">
-            <Icon name="auto_awesome" size={16} />
-          </span>
-          <b className="whitespace-nowrap text-subhead font-extrabold text-navy">{t.intake.pasteLabel}</b>
-          <span className="whitespace-nowrap rounded-full bg-brand-soft px-2.5 py-1 text-label font-extrabold uppercase tracking-[.03em] text-warn">
-            {t.intake.beta}
-          </span>
-          <span className="min-w-0 flex-1" />
-          <span className="whitespace-nowrap text-meta font-semibold text-muted">
-            {state.text.length} {t.intake.chars}
-          </span>
-        </div>
-        <textarea
-          value={state.text}
-          onChange={(e) => actions.setText(e.target.value)}
-          placeholder={typed}
-          rows={4}
-          className="w-full resize-none border-0 bg-transparent px-5 pb-5 pt-2.5 text-subhead leading-relaxed text-navy outline-none placeholder:text-muted/70"
-        />
-      </div>
+      {/* ── ONE card, two ways in (owner's reference, 2026-08-26) ────────────────────────────────
+          It was two stacked cards with an «OR» rule between them, which read as two steps: write
+          this, then also attach that. Side by side under one border they read as what they are — the
+          same errand, done either way — and the OR sits ON the divider rather than across the page.
 
-      {/* ── or ── */}
-      <div className="my-5 flex items-center gap-3.5">
-        <span className="h-px flex-1 bg-border" />
-        <span className="text-meta font-extrabold uppercase tracking-[.04em] text-muted">{t.intake.attachDivider}</span>
-        <span className="h-px flex-1 bg-border" />
-      </div>
-
-      {/* ── Attach ── */}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-        onDragLeave={(e) => { e.preventDefault(); setDragging(false); }}
-        onDrop={(e) => { e.preventDefault(); setDragging(false); onFiles(e.dataTransfer.files); }}
-        className={`rounded-sm border bg-surface transition ${
-          dragging ? "border-[1.5px] border-brand" : "border-border"
-        }`}
-      >
-        <div className="flex items-center gap-2.5 px-5 pb-3.5 pt-4">
-          <span className="grid h-8 w-8 flex-none place-items-center rounded-sm bg-navy text-white">
-            <Icon name="upload" size={16} />
-          </span>
-          <b className="whitespace-nowrap text-subhead font-extrabold text-navy">{t.intake.attachTitle}</b>
+          The describe pane takes the width because it is the harder half: a renter who has not
+          written anything yet needs room to see that a sentence is enough. The attach pane needs only
+          to hold a target. */}
+      <div className="flex flex-col overflow-hidden rounded-lg border border-border bg-surface lg:flex-row">
+        {/* ── Describe ── */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex items-center gap-2.5 px-5 pb-1 pt-4">
+            <span className="grid h-8 w-8 flex-none place-items-center rounded-sm bg-gradient-to-br from-brand-light to-brand text-white">
+              <Icon name="auto_awesome" size={16} />
+            </span>
+            <b className="whitespace-nowrap text-subhead font-extrabold text-navy">{t.intake.pasteLabel}</b>
+            <span className="whitespace-nowrap rounded-full bg-brand-soft px-2.5 py-1 text-label font-extrabold uppercase tracking-[.03em] text-warn">
+              {t.intake.beta}
+            </span>
+            <span className="min-w-0 flex-1" />
+            <span className="whitespace-nowrap text-meta font-semibold text-muted">
+              {state.text.length} {t.intake.chars}
+            </span>
+          </div>
+          <textarea
+            value={state.text}
+            onChange={(e) => actions.setText(e.target.value)}
+            placeholder={typed}
+            className="min-h-[232px] w-full flex-1 resize-none border-0 bg-transparent px-5 pb-5 pt-2.5 text-subhead leading-relaxed text-navy outline-none placeholder:text-muted/70"
+          />
         </div>
 
+        {/* ── The divider, carrying the OR ─────────────────────────────────────────────────────────
+            One hairline with the word sitting on it, centred. On a phone the panes stack, so the
+            hairline turns horizontal with them and the word stays where the eye leaves the box. */}
+        <div className="relative flex-none border-border max-lg:border-t lg:border-s">
+          <span className="absolute start-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border bg-surface2 px-2 py-0.5 text-label font-extrabold uppercase tracking-[.04em] text-muted rtl:translate-x-1/2">
+            {t.intake.or}
+          </span>
+        </div>
+
+        {/* ── Attach ── */}
         <div
-          className={`mx-5 mb-4 rounded-sm border-[1.5px] border-dashed px-5 py-6 text-center transition ${
-            dragging ? "border-brand bg-brand-soft" : "border-brand/40 bg-brand-soft/45"
-          }`}
+          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={(e) => { e.preventDefault(); setDragging(false); }}
+          onDrop={(e) => { e.preventDefault(); setDragging(false); onFiles(e.dataTransfer.files); }}
+          className="flex w-full flex-none flex-col lg:w-[330px]"
         >
-          <span className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-sm border border-border bg-surface text-brand">
-            <Icon name="upload" size={19} />
-          </span>
-          <div className="text-body text-navy">
-            <b className="font-semibold">{t.intake.dropTitleNew}</b>{" "}
-            <button
-              type="button"
-              onClick={() => fileInput.current?.click()}
-              className="font-semibold text-brand underline underline-offset-2"
-            >
-              {t.intake.browse}
-            </button>
+          <div className="flex items-center gap-2.5 px-5 pb-3.5 pt-4">
+            <span className="grid h-8 w-8 flex-none place-items-center rounded-sm bg-navy text-white">
+              <Icon name="upload" size={16} />
+            </span>
+            <b className="whitespace-nowrap text-subhead font-extrabold text-navy">{t.intake.attachTitle}</b>
           </div>
-          <p className="mb-3.5 mt-1.5 text-meta text-muted">{t.intake.dropSub}</p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {FILE_CHIPS.map((c) => (
-              <span key={c} className="rounded-sm border border-border bg-surface px-3 py-1 text-label font-semibold text-navy-mid">
-                {c}
-              </span>
-            ))}
+
+          <div
+            className={`mx-5 mb-5 flex flex-1 flex-col items-center justify-center rounded-sm border-[1.5px] border-dashed px-4 py-6 text-center transition ${
+              dragging ? "border-brand bg-brand-soft" : "border-brand/40 bg-brand-soft/45"
+            }`}
+          >
+            <span className="mb-3 grid h-11 w-11 place-items-center rounded-sm border border-border bg-surface text-brand">
+              <Icon name="upload" size={19} />
+            </span>
+            <div className="text-body text-navy">
+              <b className="font-semibold">{t.intake.dropTitleNew}</b>{" "}
+              <button
+                type="button"
+                onClick={() => fileInput.current?.click()}
+                className="font-semibold text-brand underline underline-offset-2"
+              >
+                {t.intake.browse}
+              </button>
+            </div>
+            <p className="mb-3.5 mt-1.5 text-meta text-muted">{t.intake.dropSub}</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {FILE_CHIPS.map((c) => (
+                <span key={c} className="rounded-sm border border-border bg-surface px-3 py-1 text-label font-semibold text-navy-mid">
+                  {c}
+                </span>
+              ))}
+            </div>
           </div>
+
+          <input ref={fileInput} type="file" multiple accept={ACCEPT_ATTR} className="hidden" onChange={(e) => onFiles(e.target.files)} />
+
+          {rejected && <p className="px-5 pb-3.5 text-meta font-semibold text-danger">{t.intake.fileRejected}</p>}
+
+          {state.files.length > 0 && (
+            <div className="flex flex-col gap-2 px-5 pb-5">
+              {state.files.map((file, i) => (
+                <div key={`${file.name}-${i}`} className="flex items-center gap-2.5 rounded-sm border border-border bg-surface2/50 px-3.5 py-2.5">
+                  <Icon name="description" size={16} className="flex-none text-muted" />
+                  <span className="min-w-0 flex-1 truncate text-body font-semibold text-navy">{file.name}</span>
+                  <span className="flex-none text-meta text-muted">{sizeOf(file.data)}</span>
+                  <button
+                    onClick={() => actions.removeFile(i)}
+                    aria-label={t.common.close}
+                    className="grid h-6 w-6 flex-none place-items-center rounded-full text-muted transition hover:bg-surface2 hover:text-navy"
+                  >
+                    <Icon name="close" size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-
-        <input ref={fileInput} type="file" multiple accept={ACCEPT_ATTR} className="hidden" onChange={(e) => onFiles(e.target.files)} />
-
-        {rejected && <p className="px-5 pb-3.5 text-meta font-semibold text-danger">{t.intake.fileRejected}</p>}
-
-        {state.files.length > 0 && (
-          <div className="flex flex-col gap-2 px-5 pb-4">
-            {state.files.map((f, i) => (
-              <div key={`${f.name}-${i}`} className="flex items-center gap-2.5 rounded-sm border border-border bg-surface2/50 px-3.5 py-2.5">
-                <Icon name="description" size={16} className="flex-none text-muted" />
-                <span className="min-w-0 flex-1 truncate text-body font-semibold text-navy">{f.name}</span>
-                <span className="flex-none text-meta text-muted">{sizeOf(f.data)}</span>
-                <button
-                  onClick={() => actions.removeFile(i)}
-                  aria-label={t.common.close}
-                  className="grid h-6 w-6 flex-none place-items-center rounded-full text-muted transition hover:bg-surface2 hover:text-navy"
-                >
-                  <Icon name="close" size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
+
 
       {/* ── The way on ── */}
       <div className="mt-6 flex flex-wrap items-center justify-between gap-4">

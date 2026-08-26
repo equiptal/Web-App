@@ -188,6 +188,7 @@ export const en = {
     comingSoon: "Coming soon",
     orUploadBelow: "Or upload a file below",
     attachDivider: "or attach a file",
+    or: "or",
     browse: "browse",
     dropSub: "Add as many files as you like — we'll read them all",
     chars: "chars",
