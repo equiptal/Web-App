@@ -223,7 +223,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
             <button
               onClick={back}
               aria-label={locale === "ar" ? "رجوع" : "Back"}
-              className="grid h-[34px] w-[34px] flex-none place-items-center rounded-full border border-white/20 text-white/80 transition hover:bg-white/10 hover:text-white"
+              className="grid h-[34px] w-[34px] flex-none place-items-center rounded-full border border-white/20 text-white/80 transition hover:bg-surface/10 hover:text-white"
             >
               <ArrowBackIcon className="rtl:-scale-x-100" />
             </button>
@@ -235,7 +235,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
 
               No active ring on it, though it points at `/`: Dashboard names that destination in the
               row beside it and already carries the state. Two marks for one place is one too many. */}
-          <Link href="/" aria-label={t.shell.home} className="flex-none transition hover:opacity-80">
+          <Link href="/" aria-label={t.shell.home} className="flex-none transition">
             {/* ── 20px, matched to the owner's bar by SIZE, not by ratio (2026-08-26) ─────────────
                 His screenshot is a 34px bar carrying a 13px mark. Matching that PROPORTION on our
                 62px bar gave 24px — and he read it as still too big, which it is: the ratio holds
@@ -247,7 +247,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                 cluster opposite — a logo that undercuts the icons beside it stops reading as the
                 brand and starts reading as a favicon. Slimming the BAR is the other half of that
                 answer, and it is a change to every page's chrome, so it waits for the owner. */}
-            {/* The mark is one dark navy (#25384a) and would sink into the bar, so it is filtered to
+            {/* The mark is one dark navy (var(--navy)) and would sink into the bar, so it is filtered to
                 white rather than swapped for a second asset — one file, one logo, and no risk of the
                 two drifting. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -280,7 +280,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
 
           {/* 22px between the groups of this cluster is the prototype's spacing; a phone cannot spend
               it, so it opens up at `sm` where the language control also returns. */}
-          <div className="ms-auto flex flex-none items-center gap-3 text-[13px] font-semibold text-white/75 sm:gap-[22px]">
+          <div className="ms-auto flex flex-none items-center gap-3 text-body font-semibold text-white/75 sm:gap-6">
             {/* ── The language toggle steps out of the bar on a phone (owner, 2026-08-25) ──────────
                 It is ~70px of a 360px row and it is pressed roughly never — a reader picks a language
                 once. Below `sm` it moves into the nav sheet, under the three places, which is room
@@ -293,7 +293,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
             {status === "anon" && (
               <button
                 onClick={() => openAuth()}
-                className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3 py-1.5 text-[12.5px] font-bold text-white transition hover:brightness-105 sm:px-3.5"
+                className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3 py-1.5 text-meta font-semibold text-white transition sm:px-3.5"
               >
                 <Icon name="login" size={16} /> {t.shell.signIn}
               </button>
@@ -311,7 +311,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
 
                 No pill behind the active inbox any more. The prototype gives these icons no active
                 treatment at all, and a filled lozenge under a 1.7px hairline outline was the loudest
-                thing in the bar; the ink darkening to the prototype's own `#1f2d3a` says it instead. */}
+                thing in the bar; the ink darkening to the prototype's own `var(--navy-deep)` says it instead. */}
             {/* Their boxes TOUCH (`gap-0`) rather than sitting 14px apart. Each is 34px and the glyph
                 in it is 20px, so the two icons' CENTRES land 34px apart — exactly the 20 + 14 the
                 prototype spaces them by. Same picture, and a pressable target instead of a 20px one
@@ -352,7 +352,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                     where the tier nudge that explains them already lives. */}
                 <button
                   onClick={() => setMenuOpen((o) => !o)}
-                  className="relative grid h-[34px] w-[34px] place-items-center rounded-full border border-white/25 bg-white/15 text-[13px] font-bold text-white"
+                  className="relative grid h-[34px] w-[34px] place-items-center rounded-full border border-white/25 bg-white/15 text-body font-semibold text-white"
                   aria-haspopup="menu"
                   aria-expanded={menuOpen}
                   aria-label={tier === "verified" ? `${t.shell.account} · ${t.shell.tierVerified}` : t.shell.account}
@@ -361,9 +361,9 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                   {initials || <Icon name="account_circle" size={20} />}
                   {/* The prototype puts a plain green dot here. It stays a TICK: the owner asked for
                       one by name, and a bare dot on an avatar is the presence convention — online,
-                      not vetted. The prototype's green (#3fbf6f) and its 2px white ring are taken. */}
+                      not vetted. The prototype's green (var(--ok)) and its 2px white ring are taken. */}
                   {tier === "verified" && (
-                    <span className="absolute -end-0.5 -bottom-0.5 grid h-[15px] w-[15px] place-items-center rounded-full border-2 border-navy bg-[#3fbf6f] text-white">
+                    <span className="absolute -end-0.5 -bottom-0.5 grid h-[15px] w-[15px] place-items-center rounded-full border-2 border-navy bg-ok text-white">
                       <Icon name="check" size={9} />
                     </span>
                   )}
@@ -371,7 +371,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                 {menuOpen && (
                   <>
                     <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
-                    <div role="menu" className="absolute end-0 z-40 mt-1 w-[260px] overflow-hidden rounded-[12px] border border-border bg-surface py-1 shadow-lg">
+                    <div role="menu" className="absolute end-0 z-40 mt-1 w-[260px] overflow-hidden rounded-sm border border-border bg-surface py-1">
                       {/* The tier nudge (AC-06/08) came off the sidebar and landed here, where the rest
                           of the account already is. Verified accounts have nothing to be nudged towards,
                           so it renders only below that. */}
@@ -396,7 +396,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                           setMenuOpen(false);
                           router.push("/company");
                         }}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-[13px] font-semibold text-navy-mid hover:bg-surface2"
+                        className="flex w-full items-center gap-2 px-3 py-2 text-body font-semibold text-navy-mid hover:bg-surface2"
                       >
                         <Icon name="business_center" size={16} /> {t.shell.company}
                       </button>
@@ -413,14 +413,14 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                           setMenuOpen(false);
                           router.push("/profile");
                         }}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-[13px] font-semibold text-navy-mid hover:bg-surface2"
+                        className="flex w-full items-center gap-2 px-3 py-2 text-body font-semibold text-navy-mid hover:bg-surface2"
                       >
                         <Icon name="settings" size={16} /> {t.shell.settings}
                       </button>
                       <button
                         role="menuitem"
                         onClick={handleSignOut}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-[13px] font-semibold text-danger hover:bg-surface2"
+                        className="flex w-full items-center gap-2 px-3 py-2 text-body font-semibold text-danger hover:bg-surface2"
                       >
                         <Icon name="logout" size={16} /> {t.auth.signOut}
                       </button>
@@ -436,7 +436,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
 
                 It carries the language toggle down with it — see the note on that control above. */}
             <AppNavMobile items={navItems}>
-              <LocaleToggle locale={locale} setLocale={setLocale} />
+              <LocaleToggle locale={locale} setLocale={setLocale} tone="sheet" />
             </AppNavMobile>
           </div>
         </header>
@@ -469,56 +469,82 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
 }
 
 /**
- * The language control: EN · switch · عربي, drawn from the header prototype (owner, 2026-08-25).
+ * The language control: a globe, the language you are reading in, and a chevron (owner, 2026-08-26).
  *
- * It replaced a segmented EN/ع pair. The owner took the prototype's form here having been told the
- * objection — a switch reads as on/off, and a language is not off — and that call stands; the note
- * survives so the next reader knows it was weighed rather than missed.
+ * ── Why the switch went ─────────────────────────────────────────────────────────────────────────
+ * It was «EN ⬤ عربي» — a track with a knob — and a switch reads as ON or OFF. A language is neither,
+ * and the objection was on the record when the form was chosen. The owner's reference settles it: a
+ * small pill naming the CURRENT language, which is the one thing the old control never said out loud
+ * (it named both and left the knob to answer).
  *
- * ── One button, not three ───────────────────────────────────────────────────────────────────────
- * The prototype draws both words as inert spans. Making the WHOLE control one button costs nothing,
- * gives the labels a hit area they did not have, and keeps the bar to one tab stop. It is labelled
- * by its DESTINATION («Switch to Arabic») because that is what pressing it does — `aria-pressed`
- * would claim an on/off state the control does not have.
+ * ── Small on purpose ────────────────────────────────────────────────────────────────────────────
+ * 28px tall against the bar's 62 and ~92px wide, where the switch spent ~120px of a row that also
+ * carries three places, two icons and an account. The globe is the affordance every product uses for
+ * this, so the label can shrink to 12px without the control becoming a guess.
  *
- * ── The knob travels the right way in both directions ───────────────────────────────────────────
- * `start-0.5` is where EN sits, and EN is the FIRST child — so in Arabic, where the row mirrors, the
- * knob's rest position mirrors with it and stays under EN. The Arabic state then moves it toward the
- * LAST child, which is why the translate is signed per direction rather than shared.
- *
- * ── The colours are the prototype's too ────────────────────────────────────────────────────────
- * This first shipped on the app's own tokens, on the reasoning that one control in a second palette
- * would read as a patch. It did read as a patch — the wrong way round: `--surface3` is blue-tinted
- * and next to the prototype's grey track it looked like a different control (owner, 2026-08-25).
- * So the hexes are literal and exact: `#e5e8eb` track, `#1f2d3a` knob and active label, `#9aa2ab`
- * for the resting one. Geometry likewise — 40×22 track, 18px knob, 2px inset, 13px labels, 700 on
- * the active side and 600 on the other.
- *
- * Lifted out of the bar so the identical control renders in two places — the header on a tablet and
- * up, the nav sheet on a phone — without the markup being written twice and drifting apart.
+ * ── Two grounds, one component ──────────────────────────────────────────────────────────────────
+ * `tone` picks the skin, because the identical control renders on the navy bar and inside the light
+ * nav sheet on a phone. The reference draws both: an outline on light, a filled lozenge on dark.
  */
-function LocaleToggle({ locale, setLocale }: { locale: Locale; setLocale: (l: Locale) => void }) {
+function LocaleToggle({ locale, setLocale, tone = "bar" }: { locale: Locale; setLocale: (l: Locale) => void; tone?: "bar" | "sheet" }) {
   const t = useT();
+  const [open, setOpen] = useState(false);
   const ar = locale === "ar";
+  const onBar = tone === "bar";
+  const label = ar ? "العربية" : "English";
+
+  const pick = (l: Locale) => {
+    setOpen(false);
+    if (l !== locale) setLocale(l);
+  };
+
   return (
-    <button
-      type="button"
-      onClick={() => setLocale(ar ? "en" : "ar")}
-      aria-label={t.shell.switchLang}
-      className="inline-flex flex-none items-center gap-2 rounded-full text-[13px] leading-none"
-    >
-      {/* On the navy bar the two words and the track invert: the chosen language takes white, the
-          other white at a third, and the knob is white on a translucent track. */}
-      <span className={ar ? "font-semibold text-white/45" : "font-bold text-white"}>EN</span>
-      <span className="relative h-[22px] w-10 flex-none rounded-full bg-white/20">
-        <span
-          className={`absolute top-0.5 start-0.5 h-[18px] w-[18px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,.35)] transition-transform duration-200 ${
-            ar ? "ltr:translate-x-[18px] rtl:-translate-x-[18px]" : ""
-          }`}
-        />
-      </span>
-      <span className={ar ? "font-bold text-white" : "font-semibold text-white/45"}>عربي</span>
-    </button>
+    <div className="relative flex-none">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={t.shell.switchLang}
+        title={t.shell.switchLang}
+        className={`inline-flex h-7 flex-none items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-bold leading-none transition ${
+          onBar
+            ? "border-white/25 text-white hover:bg-white/10"
+            : "border-border text-navy hover:bg-surface2"
+        }`}
+      >
+        <Icon name="language" size={15} className={onBar ? "text-white/85" : "text-navy-mid"} />
+        {label}
+        <Icon name="expand_more" size={14} className={onBar ? "text-white/60" : "text-muted"} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          {/* The panel is a SURFACE wherever the control sits — a light menu on the navy bar reads as
+              the app answering, where a translucent one reads as part of the bar. */}
+          <div role="menu" className="absolute end-0 z-40 mt-1 w-[132px] overflow-hidden rounded-[10px] border border-border bg-surface py-1 shadow-[0_10px_28px_rgba(19,44,74,.18)]">
+            {([
+              ["en", "English"],
+              ["ar", "العربية"],
+            ] as [Locale, string][]).map(([code, name]) => (
+              <button
+                key={code}
+                role="menuitem"
+                type="button"
+                onClick={() => pick(code)}
+                aria-current={locale === code ? "true" : undefined}
+                className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-[12.5px] transition hover:bg-surface2 ${
+                  locale === code ? "font-extrabold text-navy" : "font-semibold text-navy-mid"
+                }`}
+              >
+                {name}
+                {locale === code && <Icon name="check" size={15} className="text-brand" />}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -533,14 +559,14 @@ function TierCard({ tier, onGo, onCompleteProfile }: { tier: string; onGo: (href
   const note = verified ? t.shell.verifiedNote : guest ? t.shell.stepsGuest : t.shell.stepsBasic;
 
   return (
-    <div className="rounded-[12px] bg-navy p-3.5 text-white">
-      <div className="flex items-center gap-1.5 text-[12.5px] font-extrabold">
-        <Icon name={verified ? "verified" : "workspace_premium"} size={17} className={verified ? "text-ok" : "text-[#FCD9A0]"} /> {label}
+    <div className="rounded-sm bg-navy p-3.5 text-white">
+      <div className="flex items-center gap-1.5 text-meta font-extrabold">
+        <Icon name={verified ? "verified" : "workspace_premium"} size={17} className={verified ? "text-ok" : "text-brand-pale"} /> {label}
       </div>
-      <div className="my-[11px] mb-1.5 h-[5px] overflow-hidden rounded-full bg-white/[.14]">
+      <div className="my-3 mb-1.5 h-[5px] overflow-hidden rounded-full bg-white/[.14]">
         <div className={`h-full rounded-full ${verified ? "bg-ok" : "bg-brand"}`} style={{ width: `${pct}%` }} />
       </div>
-      <small className="block text-[11px] leading-snug text-white/55">{note}</small>
+      <small className="block text-label leading-snug text-white/55">{note}</small>
       {!verified && (
         <button
           // Basic → /company (the hub: create your own company by verifying, OR join one with an
@@ -552,7 +578,7 @@ function TierCard({ tier, onGo, onCompleteProfile }: { tier: string; onGo: (href
           // /onboarding, which rendered the same form with `requireEmail` defaulted off — so the one
           // route that skipped the email requirement was the one the chrome linked to.
           onClick={() => (guest ? onCompleteProfile() : onGo("/company"))}
-          className="mt-[11px] w-full rounded-[10px] bg-brand px-3 py-2 text-[12px] font-bold text-white"
+          className="mt-3 w-full rounded-sm bg-brand px-3 py-2 text-meta font-semibold text-white"
         >
           {guest ? t.home.nudgeGuestCta : t.home.nudgeBasicCta}
         </button>
