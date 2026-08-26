@@ -32,6 +32,11 @@ import { PIN_BY_NUMBER, pinDepth, pinOrder, uiPinsAllowed } from "@/lib/uiPins";
  * dense screen, so the panel carries a depth control: **parts** shows everything, **surfaces** shows
  * only whole components. It opens on parts, because the detail is the reason to open it at all.
  *
+ * ── One number, several elements ────────────────────────────────────────────────────────────────
+ * A nav tab and a bid card are ONE component drawn many times, so their number appears many times on
+ * screen. Each occurrence gets its own badge and its own row, marked `2/4`; the number still names
+ * the component, which is what a restyle acts on.
+ *
  * ── What the detail card is for ─────────────────────────────────────────────────────────────────
  * Selecting a pin shows its file, the classes ACTUALLY on that element right now, and its measured
  * box. The class string is the useful one: it is what you would edit, read off the live element
@@ -63,6 +68,12 @@ const CYAN_SOFT = "rgba(0,179,200,.45)";
 
 type Measured = {
   n: string;
+  /** Unique per drawn badge. A repeated component — a nav tab, a bid card — shares ONE number, so the
+   *  number alone is not a key: React would collide and draw one of them. */
+  key: string;
+  /** 1-based position among the elements sharing this number, and how many there are in total. */
+  index: number;
+  count: number;
   el: HTMLElement;
   depth: number;
   top: number;
@@ -117,7 +128,7 @@ export function UiPins() {
   if (!ready || !allowed) return null;
 
   return (
-    <div dir="ltr" style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+    <div data-ui-pins="root" dir="ltr" style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
       {on && <PinLayer />}
       <button
         type="button"
@@ -155,6 +166,8 @@ function PinLayer() {
   /** 1 = whole surfaces only; 2 = surfaces and their parts. */
   const [maxDepth, setMaxDepth] = useState(2);
   const frame = useRef<number | null>(null);
+  /** Signature of the last measurement, so an identical one does not set state for nothing. */
+  const signature = useRef("");
 
   useEffect(() => {
     try {
@@ -174,31 +187,81 @@ function PinLayer() {
     }
   }, []);
 
+  /** Measure now. Callers go through {@link measure}, which decides when "now" is. */
+  const runMeasure = useCallback(() => {
+    const next: Measured[] = [];
+    const seen = new Map<string, number>();
+    document.querySelectorAll<HTMLElement>("[data-pin]").forEach((el) => {
+      const n = el.dataset.pin;
+      if (!n) return;
+      const r = el.getBoundingClientRect();
+      // Skip what is not on screen: a hidden panel would otherwise stack its badge in the top-left
+      // corner with every other hidden one.
+      if (r.width < 4 || r.height < 4) return;
+      if (r.bottom < 0 || r.top > window.innerHeight || r.right < 0 || r.left > window.innerWidth) return;
+      const index = (seen.get(n) ?? 0) + 1;
+      seen.set(n, index);
+      next.push({
+        n,
+        key: n + `::` + index,
+        index,
+        count: 0, // filled in below, once the total for this number is known
+        el,
+        depth: pinDepth(n),
+        top: r.top,
+        left: r.left,
+        width: r.width,
+        height: r.height,
+      });
+    });
+    for (const m of next) m.count = seen.get(m.n) ?? 1;
+    next.sort((a, b) => pinOrder(a.n, b.n) || a.index - b.index);
+
+    // Nothing moved? Then do not set state. Every render of this overlay mutates the DOM, and the
+    // MutationObserver below is watching the DOM — without this, a measurement that changed nothing
+    // would still feed the observer that triggers the next measurement.
+    const sig = next.map((m) => m.key + ":" + m.top + "," + m.left + "," + m.width + "," + m.height).join("|");
+    if (sig === signature.current) return;
+    signature.current = sig;
+    setPins(next);
+  }, []);
+
+  /**
+   * Coalesce the storm of scroll/mutation/resize events into one measurement per frame.
+   *
+   * With a fallback for a HIDDEN tab, which is not a corner case: a browser does not run
+   * `requestAnimationFrame` on a background tab, so the callback that clears `frame` never runs, and
+   * every later call returns at the guard. The overlay then stays empty until the tab is looked at
+   * again. Measuring straight through when the document is hidden costs nothing — nothing is
+   * animating there to coalesce.
+   */
   const measure = useCallback(() => {
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      runMeasure();
+      return;
+    }
     if (frame.current !== null) return; // one measurement per frame, however many events fired
     frame.current = window.requestAnimationFrame(() => {
       frame.current = null;
-      const next: Measured[] = [];
-      document.querySelectorAll<HTMLElement>("[data-pin]").forEach((el) => {
-        const n = el.dataset.pin;
-        if (!n) return;
-        const r = el.getBoundingClientRect();
-        // Skip what is not on screen: a hidden panel would otherwise stack its badge in the top-left
-        // corner with every other hidden one.
-        if (r.width < 4 || r.height < 4) return;
-        if (r.bottom < 0 || r.top > window.innerHeight || r.right < 0 || r.left > window.innerWidth) return;
-        next.push({ n, el, depth: pinDepth(n), top: r.top, left: r.left, width: r.width, height: r.height });
-      });
-      next.sort((a, b) => pinOrder(a.n, b.n));
-      setPins(next);
+      runMeasure();
     });
-  }, []);
+  }, [runMeasure]);
 
   useEffect(() => {
     measure();
     window.addEventListener("scroll", measure, { capture: true, passive: true });
     window.addEventListener("resize", measure);
-    const observer = new MutationObserver(measure);
+    // Ignore what the overlay itself changes. Its markers live in <body> like everything else, so an
+    // observer watching <body> sees every badge this component draws: measure → render → mutate →
+    // measure, forever, which locks the tab rather than merely wasting a frame.
+    const ours = (node: Node): boolean => {
+      const el = node instanceof Element ? node : node.parentElement;
+      return el?.closest("[data-ui-pins]") != null;
+    };
+    const observer = new MutationObserver((records) => {
+      if (records.every((r) => ours(r.target))) return;
+      measure();
+    });
     observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style", "data-pin"] });
     const timer = window.setInterval(measure, RESYNC_MS);
     return () => {
@@ -228,8 +291,8 @@ function PinLayer() {
     [visible],
   );
 
-  const selectedPin = selected === null ? null : (visible.find((p) => p.n === selected) ?? null);
-  const selectedEntry = selected === null ? null : PIN_BY_NUMBER.get(selected);
+  const selectedPin = selected === null ? null : (visible.find((p) => p.key === selected) ?? null);
+  const selectedEntry = selectedPin ? (PIN_BY_NUMBER.get(selectedPin.n) ?? null) : null;
   // Read off the LIVE element, so a class applied by state shows in the state you are looking at.
   const selectedClasses = selectedPin?.el.getAttribute("class") ?? "";
 
@@ -237,14 +300,14 @@ function PinLayer() {
     <>
       {/* The markers. The layer ignores the pointer so the app underneath stays usable; only the
           badges themselves take clicks. */}
-      <div style={{ position: "fixed", inset: 0, zIndex: 2147483646, pointerEvents: "none" }}>
+      <div data-ui-pins="markers" style={{ position: "fixed", inset: 0, zIndex: 2147483646, pointerEvents: "none" }}>
         {visible.map((p) => {
-          const isSelected = p.n === selected;
+          const isSelected = p.key === selected;
           const isPart = p.depth > 1;
           const hue = isPart ? CYAN : MAGENTA;
           const hueSoft = isPart ? CYAN_SOFT : MAGENTA_SOFT;
           return (
-            <div key={p.n} style={{ position: "absolute", top: p.top, left: p.left, width: p.width, height: p.height }}>
+            <div key={p.key} style={{ position: "absolute", top: p.top, left: p.left, width: p.width, height: p.height }}>
               <div
                 style={{
                   position: "absolute",
@@ -255,7 +318,7 @@ function PinLayer() {
               />
               <button
                 type="button"
-                onClick={() => setSelected(isSelected ? null : p.n)}
+                onClick={() => setSelected(isSelected ? null : p.key)}
                 title={PIN_BY_NUMBER.get(p.n)?.label ?? "unregistered pin"}
                 style={{
                   position: "absolute",
@@ -285,6 +348,7 @@ function PinLayer() {
       {/* The index. Numbers are only useful if you can read off which one is which without hunting
           for a badge that a dense screen has hidden under another. */}
       <div
+        data-ui-pins="panel"
         style={{
           position: "fixed",
           bottom: 12,
@@ -319,23 +383,24 @@ function PinLayer() {
               const isPart = p.depth > 1;
               return (
                 <button
-                  key={p.n}
+                  key={p.key}
                   type="button"
-                  onClick={() => setSelected(p.n === selected ? null : p.n)}
+                  onClick={() => setSelected(p.key === selected ? null : p.key)}
                   style={{
                     display: "block",
                     width: "100%",
                     textAlign: "left",
                     padding: isPart ? "3px 10px 3px 26px" : "4px 10px",
                     border: "none",
-                    background: p.n === selected ? "rgba(230,0,122,.25)" : "transparent",
+                    background: p.key === selected ? "rgba(230,0,122,.25)" : "transparent",
                     color: "#fff",
                     font: "inherit",
                     opacity: isPart ? 0.85 : 1,
                     cursor: "pointer",
                   }}
                 >
-                  <span style={{ color: isPart ? "#5fd8e6" : "#ff5fb8" }}>#{p.n}</span> {entry?.label ?? "(not in registry)"}
+                  <span style={{ color: isPart ? "#5fd8e6" : "#ff5fb8" }}>#{p.n}</span>
+                  {p.count > 1 && <span style={{ opacity: 0.5 }}> {p.index}/{p.count}</span>} {entry?.label ?? "(not in registry)"}
                 </button>
               );
             })}
@@ -348,6 +413,7 @@ function PinLayer() {
             {selectedPin && (
               <div style={{ opacity: 0.55 }}>
                 {Math.round(selectedPin.width)} × {Math.round(selectedPin.height)} px
+                {selectedPin.count > 1 && ` · instance ${selectedPin.index} of ${selectedPin.count}`}
               </div>
             )}
             {selectedClasses && (
