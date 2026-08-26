@@ -236,16 +236,22 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
               No active ring on it, though it points at `/`: Dashboard names that destination in the
               row beside it and already carries the state. Two marks for one place is one too many. */}
           <Link href="/" aria-label={t.shell.home} className="flex-none transition hover:opacity-80">
-            {/* ── 24px, measured off the owner's own bar (2026-08-26) ────────────────────────────
-                His screenshot: a 34px bar carrying a 13px mark — the logo is 38% of the bar's height,
-                and it sat at 32px here, half the bar and the loudest thing on it. 24px on our 62px bar
-                is the same proportion (0.387 against his 0.382), so the mark reads as a signature
-                rather than as a heading. */}
+            {/* ── 20px, matched to the owner's bar by SIZE, not by ratio (2026-08-26) ─────────────
+                His screenshot is a 34px bar carrying a 13px mark. Matching that PROPORTION on our
+                62px bar gave 24px — and he read it as still too big, which it is: the ratio holds
+                but the bar it is measured against is nearly twice as tall, so the mark lands twice
+                the size on the glass.
+
+                20px is the compromise the row can carry: visibly a signature, still legible at the
+                wordmark's 2.66 aspect (53px wide), and no smaller than the 20px glyphs in the icon
+                cluster opposite — a logo that undercuts the icons beside it stops reading as the
+                brand and starts reading as a favicon. Slimming the BAR is the other half of that
+                answer, and it is a change to every page's chrome, so it waits for the owner. */}
             {/* The mark is one dark navy (#25384a) and would sink into the bar, so it is filtered to
                 white rather than swapped for a second asset — one file, one logo, and no risk of the
                 two drifting. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/moedatech-logo.svg" alt="Moedatech" className="block h-6 w-auto brightness-0 invert" />
+            <img src="/moedatech-logo.svg" alt="Moedatech" className="block h-5 w-auto brightness-0 invert" />
           </Link>
 
           {/* ── The nav sits DEAD CENTRE of the bar, not after the title ────────────────────────────
