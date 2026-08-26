@@ -1149,6 +1149,7 @@ export const ar: Dictionary = {
     offers: "{supplier} يعرض",
     noBidSelected: "لم يُختَر أي عرض",
     noBidsYet: "لا عروض على هذا البند بعد",
+    equipmentAndDocs: "المعدّات والمستندات",
     reviewEquipment: "مراجعة المعدّات",
     viewDocuments: "عرض المستندات",
     docsShort: "المستندات",

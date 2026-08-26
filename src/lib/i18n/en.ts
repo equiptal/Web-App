@@ -1318,6 +1318,7 @@ export const en = {
     offers: "{supplier} offers",
     noBidSelected: "No bid selected",
     noBidsYet: "No bids on this item yet",
+    equipmentAndDocs: "Equipment & docs",
     reviewEquipment: "Review equipment",
     viewDocuments: "View documents",
     docsShort: "Documents",

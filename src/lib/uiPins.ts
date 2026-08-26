@@ -134,9 +134,9 @@ export const PIN_REGISTRY = {
   "request-rail": { n: "26", label: "Requests rail (full-bleed band)", file: "src/components/workspace/RequestRail.tsx" },
   "rail-create-tile": { n: "26.1", label: "Rail — create tile", file: "src/components/workspace/RequestRail.tsx" },
   "rail-tiles": { n: "26.2", label: "Rail — request tiles", file: "src/components/workspace/RequestRail.tsx" },
-  "request-strip": { n: "27", label: "Request strip", file: "src/components/workspace/RequestStrip.tsx" },
-  "strip-card": { n: "27.1", label: "Strip — card", file: "src/components/workspace/RequestStrip.tsx" },
-  "strip-ref-block": { n: "27.2", label: "Strip — navy ref block", file: "src/components/workspace/RequestStrip.tsx" },
+  // 27 was the request strip, a full-width band above the tabs. It is the context bar now — the
+  // location and the item, and the item switcher the strip used to carry as chips (owner, 2026-08-27).
+  "request-context": { n: "27", label: "Request context bar (location + item)", file: "src/components/workspace/RequestContextBar.tsx" },
   "request-drawer": { n: "28", label: "Request drawer — masthead", file: "src/components/workspace/RequestDrawer.tsx" },
   "workspace-bid-cards": { n: "29", label: "Bid cards", file: "src/components/workspace/BidCards.tsx" },
   "bid-card": { n: "29.1", label: "Bid card — one tile", file: "src/components/workspace/BidCards.tsx" },

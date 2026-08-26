@@ -22,7 +22,7 @@ import {
   type WorkspaceSelection,
 } from "@/lib/contract/workspace";
 import { RequestRail } from "@/components/workspace/RequestRail";
-import { RequestStrip } from "@/components/workspace/RequestStrip";
+import { RequestContextBar } from "@/components/workspace/RequestContextBar";
 import { BidCards } from "@/components/workspace/BidCards";
 import { CompareMatrix } from "@/components/workspace/CompareMatrix";
 import { RequestDrawer, type ShareLinkMeta } from "@/components/workspace/RequestDrawer";
@@ -239,7 +239,9 @@ export function RequestsWorkspace() {
   /** Everything the filter allows, benched or not — what the matrix needs to draw the bench itself. */
   const shownAll = useMemo(() => filterBySource(bids, source), [bids, source]);
   const counts = useMemo(() => sourceCounts(bids), [bids]);
-  const bid = useMemo(() => bids.find((b) => b.card.id === resolved.bidId)?.card ?? null, [bids, resolved.bidId]);
+  /* ~~The picked bid's card.~~ The strip drew it above the tabs — the machine offered, its yard
+     ribbon, its fact chips — which is the bid card's own job, done twice. With the strip gone
+     nothing at this level needs the bid itself; `resolved.bidId` still says which one is picked. */
 
   /** The export: the browser's own print dialog over the plain Moedatech sheet. */
   /**
@@ -448,23 +450,34 @@ export function RequestsWorkspace() {
         onShare={() => { setDrawerShare(true); setDrawerOpen(true); }}
       />
 
-      <RequestStrip
-        group={group}
-        item={item}
-        items={group.items}
-        bid={bid}
-        bidCount={bids.length}
-        onPickItem={pickItem}
-        onOpenRequest={() => { setDrawerShare(false); setDrawerOpen(true); }}
-        fetchedCode={fetchedCode}
-      />
-
       <div className={`${PAGE_MX_BLEED} mt-2 flex min-h-0 flex-1 flex-col pb-2`}>
-        {/* Tabs, and the export beside them. The open tab is part of the panel below it — it carries
-            the panel's own border and covers the hairline between them, which is why the panel's
-            top-start corner is square. */}
-        <div className="flex flex-none items-end gap-3 ps-3.5">
-          <div className="flex items-end gap-0.5">
+        {/* ── The row above the panel (owner, 2026-08-27) ─────────────────────────────────────────
+            Three things, and the tabs are the middle one so they sit under the eye rather than off
+            at the leading edge.
+
+            ~~The request strip stood above this row~~ — a full-width band carrying the request code,
+            the bid count, the date raised, the picked machine as a white card, a yard ribbon, three
+            fact chips and two controls. Every one of those already had a home: the drawer states the
+            request, the bid cards state the offers, and the map states the machines. What it uniquely
+            held was the item switcher, and that moved into the context bar, which is the thing that
+            names the current item anyway.
+
+            `items-end` because the open tab has to meet the panel's top edge; the bar and the export
+            sit on that same line. */}
+        <div className="flex flex-none items-end gap-3">
+          {/* The bar and the export take equal shares of what is left, so the tabs land on the row's
+              true centre rather than wherever the bar's width happens to leave them. A spacer on one
+              side only would centre them against the export alone. */}
+          <div className="mb-1 flex flex-1 justify-start">
+            <RequestContextBar
+              group={group}
+              item={item}
+              items={group.items}
+              onPickItem={pickItem}
+              onOpenRequest={() => { setDrawerShare(false); setDrawerOpen(true); }}
+            />
+          </div>
+          <div className="flex flex-none items-end gap-0.5">
             {(["cards", "compare"] as Tab[]).map((k) => {
               const on = tab === k;
               return (
@@ -484,8 +497,7 @@ export function RequestsWorkspace() {
               );
             })}
           </div>
-          <span className="flex-1" />
-          <div className="mb-2 flex items-center gap-2">
+          <div className="mb-2 flex flex-1 items-center justify-end gap-2">
             {/* ── «Select all» puts the whole comparison back (owner, 2026-08-25) ─────────────────
                 The export covers what the comparison covers, so putting a bid back on the table is
                 the same act as putting it back in the sheet — one concept, not two. It appears only

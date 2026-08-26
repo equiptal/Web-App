@@ -271,6 +271,27 @@ function BidCardTile({
         )}
       </div>
 
+      {/* ── The supplier's machines and their papers (owner, 2026-08-27) ────────────────────────────
+          ONE control, on the card of the supplier it is about. The request strip carried two —
+          «Review equipment» and «View documents» — and both pushed to `/bids/{id}/equipment`, the
+          same map, one of them with a panel open. Splitting it asked the renter to choose which half
+          of a page he wanted before he had seen either.
+
+          It sits above Terms because that is the order the questions come in: what is he offering,
+          then on what conditions. */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          router.push(`/bids/${encodeURIComponent(card.id)}/equipment`);
+        }}
+        className={btn("secondary", "md", { className: "flex flex-none text-start transition" })}
+      >
+        <Icon name="precision_manufacturing" size={16} className="flex-none text-muted" />
+        <span className="flex-1 text-body font-semibold text-navy">{t.workspace.equipmentAndDocs}</span>
+        <span className="text-label font-semibold text-info">{L("View", "عرض")} ›</span>
+      </button>
+
       {/* Terms: the dial says how much of them this supplier answered — never how good the offer is. */}
       <button
         type="button"
