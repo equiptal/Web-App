@@ -60,6 +60,7 @@ export const en = {
     tierGuest: "Guest",
     tierBasic: "Basic rentee",
     tierVerified: "Verified",
+    verifyNudge: "Verify",
     stepsGuest: "1 of 3 steps · complete your profile to unlock requests.",
     stepsBasic: "2 of 3 steps · verify your company to unlock unlimited requests.",
     verifiedNote: "Your company is verified.",

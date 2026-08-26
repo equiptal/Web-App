@@ -11,7 +11,7 @@ import type { Locale } from "@/lib/i18n/config";
 // import { SurveyProvider } from "@/components/surveys/SurveyProvider";
 import { AuthGateProvider, useAuthGate } from "@/components/auth/AuthGate";
 import { fetchDealRoomUnread } from "@/lib/api/client";
-import { OVERLAY, SCRIM } from "@/lib/ds";
+import { btn, OVERLAY, SCRIM } from "@/lib/ds";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { AppNav, AppNavMobile, type NavItem } from "@/components/AppNav";
 import { ArrowBackIcon, MailIcon, CountBadge } from "@/components/HeaderIcons";
@@ -283,7 +283,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
             {status === "anon" && (
               <button
                 onClick={() => openAuth()}
-                className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3 py-1.5 text-meta font-semibold text-white transition sm:px-3.5"
+                className={btn("primary", "sm", { pill: true, className: "transition" })}
               >
                 <Icon name="login" size={16} /> {t.shell.signIn}
               </button>
@@ -350,14 +350,32 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
             {status === "authed" && (
               <Link
                 href="/profile"
-                className="relative grid h-[34px] w-[34px] flex-none place-items-center rounded-full border border-white/25 bg-white/15 text-body font-semibold text-white transition hover:bg-white/25"
-                aria-label={tier === "verified" ? `${t.shell.settings} · ${t.shell.tierVerified}` : t.shell.settings}
+                className="flex flex-none items-center gap-1.5"
+                aria-label={tier === "verified" ? `${t.shell.settings} · ${t.shell.tierVerified}` : `${t.shell.settings} · ${t.shell.verifyNudge}`}
                 title={badge.label}
               >
+                <span className="relative grid h-[34px] w-[34px] flex-none place-items-center rounded-full border border-white/25 bg-white/15 text-body font-semibold text-white transition hover:bg-white/25">
                 {initials || <Icon name="account_circle" size={20} />}
-                {tier === "verified" && (
+                {/* ── Verified: a tick. Not verified: the word (owner, 2026-08-26) ──────────────────
+                    The tick is a statement — this account is vetted — and its absence used to be the
+                    whole message for the other two tiers. That was honest but silent: nothing told the
+                    reader there was something to DO, and the nudge that used to say so left with the
+                    account menu.
+
+                    So the unverified states carry «Verify» instead, on the brand ground the app uses
+                    for what it wants pressed. It rides BESIDE the avatar rather than on it: the house
+                    scale starts at 11px, and 11px of «Verify» is wider than the 34px circle — hung off
+                    it, the badge would either clip at the bar's edge or cover the reader's initials.
+                    Inside the same link, so it is one press to the same place. */}
+                {tier === "verified" ? (
                   <span className="absolute -end-0.5 -bottom-0.5 grid h-[15px] w-[15px] place-items-center rounded-full border-2 border-navy bg-ok text-white">
                     <Icon name="check" size={9} />
+                  </span>
+                ) : null}
+                </span>
+                {tier !== "verified" && (
+                  <span className="rounded-full bg-brand px-2 py-0.5 text-label font-semibold uppercase tracking-[0.05em] text-white">
+                    {t.shell.verifyNudge}
                   </span>
                 )}
               </Link>

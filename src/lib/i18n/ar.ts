@@ -59,6 +59,7 @@ export const ar: Dictionary = {
     tierGuest: "زائر",
     tierBasic: "مستأجر أساسي",
     tierVerified: "موثّق",
+    verifyNudge: "توثيق",
     stepsGuest: "١ من ٣ خطوات · أكمل ملفك الشخصي لفتح الطلبات.",
     stepsBasic: "٢ من ٣ خطوات · وثّق منشأتك لفتح طلبات غير محدودة.",
     verifiedNote: "تم توثيق منشأتك.",
