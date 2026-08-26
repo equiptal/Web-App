@@ -27,10 +27,19 @@ import { PIN_BY_NUMBER, pinDepth, pinOrder, uiPinsAllowed } from "@/lib/uiPins";
  * cards that all look alike. The numbers are fixed in `lib/uiPins.ts`, not counted from the DOM, so
  * the number in a note written today still points at the same thing next month.
  *
- * ── Two levels, and a filter for the second ─────────────────────────────────────────────────────
- * `17` is the machine card; `17.1` is its head row. Both draw at once, which is unreadable on a
- * dense screen, so the panel carries a depth control: **parts** shows everything, **surfaces** shows
- * only whole components. It opens on parts, because the detail is the reason to open it at all.
+ * ── Three levels, and a filter ──────────────────────────────────────────────────────────────────
+ * `17` is the machine card and `17.1` its head row — both written down in the registry, both fixed.
+ * `17.1.4` is the fourth ELEMENT inside that head row, and those are not written down anywhere: the
+ * overlay finds them by walking the selected surface, so every button, field, heading and box has a
+ * number without a single hand edit.
+ *
+ * The panel filters: **surfaces**, **parts**, **all**. Level three is scoped to the SELECTED pin,
+ * because numbering a whole page at that grain draws hundreds of badges over each other and answers
+ * no question. Select the surface you are working on, press all, and its insides are numbered.
+ *
+ * An element number is stable for as long as the surface keeps its shape, and no longer — it is a
+ * position, not a name. That is the right trade for "which of these four buttons": say it while it
+ * is on screen. A number you want to keep belongs in the registry, where the fixed ones live.
  *
  * ── One number, several elements ────────────────────────────────────────────────────────────────
  * A nav tab and a bid card are ONE component drawn many times, so their number appears many times on
@@ -65,6 +74,24 @@ const MAGENTA = "#e6007a";
 const MAGENTA_SOFT = "rgba(230,0,122,.45)";
 const CYAN = "#00b3c8";
 const CYAN_SOFT = "rgba(0,179,200,.45)";
+const SLATE = "#7c8794";
+const SLATE_SOFT = "rgba(124,135,148,.4)";
+
+/**
+ * What counts as an element worth numbering at level 3.
+ *
+ * Everything a hand can press, everything that says something, and everything drawn as a box. The
+ * box test is done on computed style rather than by class name, because a class name is exactly what
+ * is being changed while this is open — an element that has a ground or an edge of its own is a
+ * thing on the screen, whatever it is called this week.
+ */
+const CONTROL_SELECTOR =
+  'button, a[href], input, select, textarea, summary, [role="button"], [role="tab"], [role="switch"], [role="menuitem"], [role="checkbox"], [role="radio"]';
+const SAYS_SOMETHING = "h1, h2, h3, h4, h5, h6, label, img, svg";
+/** Below this, a badge is bigger than the thing it points at. */
+const MIN_ELEMENT_PX = 12;
+/** A ceiling, so one careless click on the app frame cannot draw a thousand badges. */
+const MAX_ELEMENTS = 240;
 
 type Measured = {
   n: string;
@@ -76,11 +103,31 @@ type Measured = {
   count: number;
   el: HTMLElement;
   depth: number;
+  /** A registry pin, or an element numbered underneath one at level 3. */
+  kind: "pin" | "element";
+  /** Elements are not in the registry, so they carry their own description. */
+  label: string;
+  /** For an element: the file of the registered surface it was found inside. */
+  file: string;
   top: number;
   left: number;
   width: number;
   height: number;
 };
+
+/**
+ * A one-line name for an element that has no registry entry: what it is, and enough of what it says
+ * to find it again on the screen. `button "Create request"` beats `div.flex.items-center`.
+ */
+function describe(el: HTMLElement): string {
+  const tag = el.tagName.toLowerCase();
+  const said =
+    el.getAttribute("aria-label") ??
+    (el.tagName === "IMG" ? el.getAttribute("alt") : null) ??
+    (el.childElementCount === 0 || tag === "button" || tag === "a" ? (el.textContent ?? "").trim() : "");
+  const trimmed = said.replace(/\s+/g, " ").slice(0, 40);
+  return trimmed ? tag + ' "' + trimmed + '"' : tag;
+}
 
 export function UiPins() {
   const [on, setOn] = useState(false);
@@ -163,16 +210,23 @@ function PinLayer() {
   const [pins, setPins] = useState<Measured[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [listOpen, setListOpen] = useState(true);
-  /** 1 = whole surfaces only; 2 = surfaces and their parts. */
+  /** 1 = whole surfaces; 2 = and their parts; 3 = and every element inside the selected one. */
   const [maxDepth, setMaxDepth] = useState(2);
   const frame = useRef<number | null>(null);
   /** Signature of the last measurement, so an identical one does not set state for nothing. */
   const signature = useRef("");
+  // The measurement reads the selection and the depth, but must not be REBUILT when either changes —
+  // it is the identity that every listener below is registered with. Refs, then, not dependencies.
+  const selectedRef = useRef<string | null>(null);
+  const depthRef = useRef(2);
 
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(DEPTH_KEY);
-      if (stored === "1" || stored === "2") setMaxDepth(Number(stored));
+      if (stored === "1" || stored === "2" || stored === "3") {
+        setMaxDepth(Number(stored));
+        depthRef.current = Number(stored);
+      }
     } catch {
       /* fall back to parts */
     }
@@ -180,6 +234,7 @@ function PinLayer() {
 
   const setDepth = useCallback((d: number) => {
     setMaxDepth(d);
+    depthRef.current = d;
     try {
       window.localStorage.setItem(DEPTH_KEY, String(d));
     } catch {
@@ -208,6 +263,9 @@ function PinLayer() {
         count: 0, // filled in below, once the total for this number is known
         el,
         depth: pinDepth(n),
+        kind: "pin",
+        label: PIN_BY_NUMBER.get(n)?.label ?? "(not in registry)",
+        file: PIN_BY_NUMBER.get(n)?.file ?? "",
         top: r.top,
         left: r.left,
         width: r.width,
@@ -216,6 +274,73 @@ function PinLayer() {
     });
     for (const m of next) m.count = seen.get(m.n) ?? 1;
     next.sort((a, b) => pinOrder(a.n, b.n) || a.index - b.index);
+
+    // ── Level 3: every element inside the SELECTED surface ────────────────────────────────────
+    // Scoped to a selection on purpose. Numbering the whole page at this grain draws hundreds of
+    // badges over each other and answers no question; numbering one surface answers "which button".
+    const host = selectedRef.current ? (next.find((m) => m.key === selectedRef.current) ?? null) : null;
+    if (host && depthRef.current >= 3) {
+      const seenEl = new Set<Element>();
+      const candidates: HTMLElement[] = [];
+      for (const el of host.el.querySelectorAll<HTMLElement>(CONTROL_SELECTOR + ", " + SAYS_SOMETHING)) {
+        if (!seenEl.has(el)) {
+          seenEl.add(el);
+          candidates.push(el);
+        }
+      }
+      // Boxes: anything with a ground or an edge of its own. Computed style is the honest test, and
+      // it is affordable here because the walk is one surface deep, not the document.
+      for (const el of host.el.querySelectorAll<HTMLElement>("*")) {
+        if (seenEl.has(el)) continue;
+        const cs = window.getComputedStyle(el);
+        const hasGround = cs.backgroundColor !== "rgba(0, 0, 0, 0)" && cs.backgroundColor !== "transparent";
+        const hasEdge = parseFloat(cs.borderTopWidth) > 0 || parseFloat(cs.borderBottomWidth) > 0;
+        if (!hasGround && !hasEdge) continue;
+        seenEl.add(el);
+        candidates.push(el);
+      }
+
+      // Back into document order, so the numbers run the way the eye reads the surface.
+      candidates.sort((a, b) =>
+        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
+      );
+
+      // A registered part already owns some numbers under this host — 10.1, 10.2 — so the element
+      // counter steps over them. Two different things answering to one number is the single thing
+      // this whole file exists to prevent.
+      const taken = new Set<string>();
+      for (const entry of PIN_BY_NUMBER.keys()) {
+        if (entry.startsWith(host.n + ".")) taken.add(entry);
+      }
+
+      let i = 0;
+      for (const el of candidates) {
+        if (i >= MAX_ELEMENTS) break;
+        if (el.closest("[data-ui-pins]")) continue; // never number the instrument
+        if (el.hasAttribute("data-pin")) continue; // it already has a number of its own
+        const r = el.getBoundingClientRect();
+        if (r.width < MIN_ELEMENT_PX || r.height < MIN_ELEMENT_PX) continue;
+        if (r.bottom < 0 || r.top > window.innerHeight || r.right < 0 || r.left > window.innerWidth) continue;
+        i += 1;
+        while (taken.has(host.n + "." + i)) i += 1;
+        const n = host.n + "." + i;
+        next.push({
+          n,
+          key: host.key + "/" + i,
+          index: 1,
+          count: 1,
+          el,
+          depth: 3,
+          kind: "element",
+          label: describe(el),
+          file: host.file,
+          top: r.top,
+          left: r.left,
+          width: r.width,
+          height: r.height,
+        });
+      }
+    }
 
     // Nothing moved? Then do not set state. Every render of this overlay mutates the DOM, and the
     // MutationObserver below is watching the DOM — without this, a measurement that changed nothing
@@ -246,6 +371,15 @@ function PinLayer() {
       runMeasure();
     });
   }, [runMeasure]);
+
+  // Selecting a surface (or changing the depth) is what decides which elements get numbered, so a
+  // fresh measurement has to follow. The signature guard would otherwise hold the old set.
+  useEffect(() => {
+    selectedRef.current = selected;
+    depthRef.current = maxDepth;
+    signature.current = "";
+    measure();
+  }, [selected, maxDepth, measure]);
 
   useEffect(() => {
     measure();
@@ -282,17 +416,11 @@ function PinLayer() {
   /** What is on screen right now, as lines you can paste into a message. */
   const asLines = useMemo(
     () =>
-      visible
-        .map((p) => {
-          const entry = PIN_BY_NUMBER.get(p.n);
-          return entry ? `#${p.n} ${entry.label} — ${entry.file}` : `#${p.n} (not in registry)`;
-        })
-        .join("\n"),
+      visible.map((p) => `#${p.n} ${p.label} — ${p.file}`).join("\n"),
     [visible],
   );
 
   const selectedPin = selected === null ? null : (visible.find((p) => p.key === selected) ?? null);
-  const selectedEntry = selectedPin ? (PIN_BY_NUMBER.get(selectedPin.n) ?? null) : null;
   // Read off the LIVE element, so a class applied by state shows in the state you are looking at.
   const selectedClasses = selectedPin?.el.getAttribute("class") ?? "";
 
@@ -303,9 +431,10 @@ function PinLayer() {
       <div data-ui-pins="markers" style={{ position: "fixed", inset: 0, zIndex: 2147483646, pointerEvents: "none" }}>
         {visible.map((p) => {
           const isSelected = p.key === selected;
-          const isPart = p.depth > 1;
-          const hue = isPart ? CYAN : MAGENTA;
-          const hueSoft = isPart ? CYAN_SOFT : MAGENTA_SOFT;
+          const isElement = p.kind === "element";
+          const isPart = p.depth > 1 && !isElement;
+          const hue = isElement ? SLATE : isPart ? CYAN : MAGENTA;
+          const hueSoft = isElement ? SLATE_SOFT : isPart ? CYAN_SOFT : MAGENTA_SOFT;
           return (
             <div key={p.key} style={{ position: "absolute", top: p.top, left: p.left, width: p.width, height: p.height }}>
               <div
@@ -319,12 +448,12 @@ function PinLayer() {
               <button
                 type="button"
                 onClick={() => setSelected(isSelected ? null : p.key)}
-                title={PIN_BY_NUMBER.get(p.n)?.label ?? "unregistered pin"}
+                title={p.label}
                 style={{
                   position: "absolute",
-                  top: 0,
-                  // A part's badge hangs on the opposite corner from a surface's, so the two do not
-                  // sit on top of each other when a part starts at its parent's own origin.
+                  // Three levels, three corners — so a part that starts at its surface's own origin,
+                  // and an element that fills its part, do not stack their badges on one spot.
+                  ...(isElement ? { bottom: 0, left: 0 } : { top: 0 }),
                   ...(isPart ? { right: 0 } : { left: 0 }),
                   pointerEvents: "auto",
                   minWidth: 20,
@@ -371,6 +500,14 @@ function PinLayer() {
             surfaces
           </button>
           <button type="button" onClick={() => setDepth(2)} style={{ ...panelBtn, ...(maxDepth === 2 ? panelBtnOn : null) }}>parts</button>
+          <button
+            type="button"
+            onClick={() => setDepth(3)}
+            title="Number every element inside the selected surface"
+            style={{ ...panelBtn, ...(maxDepth === 3 ? panelBtnOn : null) }}
+          >
+            all
+          </button>
           <button type="button" onClick={() => copy(asLines)} style={panelBtn}>copy</button>
           <button type="button" onClick={() => setListOpen((v) => !v)} style={panelBtn}>{listOpen ? "–" : "+"}</button>
         </div>
@@ -379,7 +516,6 @@ function PinLayer() {
           <div style={{ padding: "6px 0" }}>
             {visible.length === 0 && <div style={{ padding: "6px 10px", opacity: 0.6 }}>Nothing pinned on this screen yet.</div>}
             {visible.map((p) => {
-              const entry = PIN_BY_NUMBER.get(p.n);
               const isPart = p.depth > 1;
               return (
                 <button
@@ -390,7 +526,7 @@ function PinLayer() {
                     display: "block",
                     width: "100%",
                     textAlign: "left",
-                    padding: isPart ? "3px 10px 3px 26px" : "4px 10px",
+                    padding: p.depth === 3 ? "2px 10px 2px 42px" : isPart ? "3px 10px 3px 26px" : "4px 10px",
                     border: "none",
                     background: p.key === selected ? "rgba(230,0,122,.25)" : "transparent",
                     color: "#fff",
@@ -399,17 +535,20 @@ function PinLayer() {
                     cursor: "pointer",
                   }}
                 >
-                  <span style={{ color: isPart ? "#5fd8e6" : "#ff5fb8" }}>#{p.n}</span>
-                  {p.count > 1 && <span style={{ opacity: 0.5 }}> {p.index}/{p.count}</span>} {entry?.label ?? "(not in registry)"}
+                  <span style={{ color: p.kind === "element" ? "#b9c0c8" : isPart ? "#5fd8e6" : "#ff5fb8" }}>#{p.n}</span>
+                  {p.count > 1 && <span style={{ opacity: 0.5 }}> {p.index}/{p.count}</span>} {p.label}
                 </button>
               );
             })}
           </div>
         )}
 
-        {selectedEntry && (
+        {selectedPin && (
           <div style={{ padding: "8px 10px", borderTop: "1px solid rgba(255,255,255,.12)", display: "flex", flexDirection: "column", gap: 6 }}>
-            <div style={{ opacity: 0.75, wordBreak: "break-all" }}>{selectedEntry.file}</div>
+            <div style={{ opacity: 0.75, wordBreak: "break-all" }}>
+              {selectedPin.kind === "element" ? "inside " : ""}
+              {selectedPin.file || "(no file)"}
+            </div>
             {selectedPin && (
               <div style={{ opacity: 0.55 }}>
                 {Math.round(selectedPin.width)} × {Math.round(selectedPin.height)} px
@@ -431,11 +570,15 @@ function PinLayer() {
               </div>
             )}
             <div style={{ display: "flex", gap: 4 }}>
-              <button type="button" onClick={() => copy(selectedEntry.file)} style={panelBtn}>path</button>
+              <button type="button" onClick={() => copy(selectedPin.file)} style={panelBtn}>path</button>
               {selectedClasses && (
                 <button type="button" onClick={() => copy(selectedClasses)} style={panelBtn}>classes</button>
               )}
-              <button type="button" onClick={() => copy(`#${selectedEntry.n} ${selectedEntry.label} — ${selectedEntry.file}`)} style={panelBtn}>
+              <button
+                type="button"
+                onClick={() => copy(`#${selectedPin.n} ${selectedPin.label} — ${selectedPin.file}`)}
+                style={panelBtn}
+              >
                 line
               </button>
             </div>

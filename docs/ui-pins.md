@@ -4,9 +4,19 @@
 
 The number every surface answers to on staging. Toggle the overlay with `Ctrl+Shift+U`, or the small `#` button at the bottom-left.
 
-A whole component is one number (`17`); a named part of it carries a second segment (`17.1`). The overlay panel switches between **surfaces** (level one only) and **parts** (both).
+Three levels, and the panel switches between them.
 
-The registry is `src/lib/uiPins.ts` — it is the authority, this page is generated from it.
+| Level | Button | What is numbered | Where the number comes from |
+| --- | --- | --- | --- |
+| 1 | `surfaces` | whole components — `17` is the machine card | this registry, fixed |
+| 2 | `parts` | named parts — `17.1` is its head row | this registry, fixed |
+| 3 | `all` | every button, field, heading and box inside the **selected** pin — `17.1.4` | found by walking the DOM |
+
+Level 3 is scoped to a selection on purpose: numbering a whole page at that grain draws hundreds of badges over each other. Click the surface you are working on, press `all`, and its insides are numbered.
+
+A level-3 number is a position, not a name — it holds while the surface keeps its shape and no longer. Say it while it is on screen ("the third button in #17.1"), or use `copy` to send the list. A number worth keeping belongs in the table below.
+
+The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, and this table is generated from it.
 
 | # | What | File |
 | --- | --- | --- |
