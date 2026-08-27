@@ -92,6 +92,8 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
   const [server, setServer] = useState<IntercomServerIdentity | null>(null);
   /** Which user `server` describes, so a sign-out or an account switch cannot inherit it. */
   const serverFor = useRef<number | null>(null);
+  /** Whether the missing-secret warning below has already been said. */
+  const warned = useRef(false);
 
   useEffect(() => {
     if (status !== "authed" || !user) {
@@ -140,9 +142,26 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
     };
 
     // Still asking who this is — boot anonymous rather than waiting. Support is most useful to the
-    // person who cannot get in, and that person never reaches `authed`. `server` is part of the test
-    // because an identified boot without its signature is refused where verification is on.
-    if (status === "loading" || !user || !server) {
+    // person who cannot get in, and that person never reaches `authed`.
+    //
+    // An UNSIGNED identity counts as «still asking», which is the whole point of testing
+    // `server?.userHash` and not merely `server`. This workspace has identity verification switched
+    // on for web, and it refuses every boot that carries an identity without a valid `user_hash` —
+    // `user_id` and a bare `email` alike, with a 403 on `/messenger/web/ping` and a frame that reads
+    // «Something's gone wrong — content could not be loaded». There is no recovering from that: the
+    // launcher is gone until the page is reloaded. Anonymous costs a support agent the renter's name;
+    // refused costs the renter support altogether, so anonymous wins every time.
+    if (status === "loading" || !user || !server?.userHash) {
+      // Said once, and only for a SIGNED-IN renter whose route answered without a signature — a
+      // visitor who was never going to be identified sees nothing. Silence is what made this cost a
+      // debugging session: an anonymous messenger looks perfectly healthy from the outside.
+      if (server && !server.userHash && !warned.current) {
+        warned.current = true;
+        console.warn(
+          "[intercom] INTERCOM_IDENTITY_SECRET is unset, so this signed-in renter cannot be " +
+            "identified — the workspace refuses an unsigned boot. The messenger stays anonymous.",
+        );
+      }
       const wanted = "anon";
       if (identity.current === wanted && booted.current) return;
       // A signed-in messenger must be torn down before an anonymous one replaces it, or the previous
@@ -155,14 +174,21 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
     }
 
     const payload = { ...base, ...buildIntercomPayload({ user, locale, appVersion, server }) };
-    // The signature is in the key: a workspace that switches verification on mid-session must
-    // re-boot rather than keep an unsigned messenger it will refuse the next call from.
-    const wanted = `${user.id}:${user.tier}:${locale}:${server.userHash ?? "unsigned"}`;
+    // The signature is in the key: a workspace that rotates its secret mid-session must re-boot
+    // rather than keep a messenger signed under the old one.
+    const wanted = `${user.id}:${user.tier}:${locale}:${server.userHash}`;
     if (identity.current === wanted) return;
 
-    // `boot` the first time this browser meets the user, `update` for anything that changes after —
-    // a tier that moved, a language toggled. Booting twice over one identity restarts the session
-    // and loses the unread count.
+    // `update` for anything that changes WITHIN one identity — a tier that moved, a language
+    // toggled. Booting twice over one identity restarts the session and loses the unread count.
+    //
+    // Coming from the anonymous messenger is the other case, and it needs a SHUTDOWN first. A second
+    // `boot` over a live anonymous session does not promote it: the messenger keeps the anonymous
+    // session it already opened, the identified one it is handed does not match it, and the frame
+    // renders «Something's gone wrong — content could not be loaded» with no way back but a reload.
+    // Intercom's documented switch is teardown then boot, and it is what the sign-OUT path
+    // already does in the other direction, a few lines up.
+    if (identity.current === "anon") api("shutdown");
     api(identity.current && identity.current !== "anon" ? "update" : "boot", payload);
     booted.current = true;
     identity.current = wanted;
