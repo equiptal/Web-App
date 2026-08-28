@@ -491,8 +491,6 @@ export function RequestsWorkspace() {
             <RequestContextBar
               group={group}
               item={item}
-              items={group.items}
-              onPickItem={pickItem}
               onOpenRequest={() => { setDrawerShare(false); setDrawerOpen(true); }}
             />
           </div>
@@ -559,18 +557,22 @@ export function RequestsWorkspace() {
               rather than a row of pills, because it is a filter over the table, not an action on it.
               It appears only when there is a mix to narrow: with every bid from one source, three
               choices that change nothing are furniture. */}
-          {/* Centred, so it sits under the tabs rather than off at the leading edge while they are
-              in the middle (owner, 2026-08-27). */}
-          <div className="flex flex-none flex-wrap items-center justify-center gap-x-5 gap-y-1.5 border-b border-border px-3.5 py-1.5">
-              {/* The machines, on the same line as the source (owner, 2026-08-27). Both narrow the
-                  panel below — one by machine, one by where the bid came from — and asking one
-                  question in two rows is a screen that has not decided the question is one. */}
-              {group && group.items.length > 1 && (
-                <>
+          {/* ── The source keeps the centre, whatever else is on the line (owner, 2026-08-28) ──────
+              Three children: the machines, the source, and an empty third of equal weight. The two
+              flexible sides cancel out, so the source sits on the row's true centre — under the tabs
+              — and stays there whether or not this request has more than one machine. Putting the
+              machines beside it and letting the pair centre together would have moved the source
+              every time a request had a second item.
+
+              The machines take the leading edge, directly under the context bar, which is the same
+              fact one line up: that bar names the machine being read and this row is how it changes. */}
+          <div className="flex flex-none items-center gap-x-5 border-b border-border px-3.5 py-1.5">
+              <div className="flex min-w-0 flex-1 justify-start">
+                {group && group.items.length > 1 && (
                   <ItemTier items={group.items} activeId={resolved.itemId} onPick={pickItem} />
-                  <span className="h-4 w-px flex-none bg-border" />
-                </>
-              )}
+                )}
+              </div>
+              <div className="flex flex-none flex-wrap items-center justify-center gap-x-5 gap-y-1.5">
               <span className="inline-flex items-center gap-1.5 text-label font-extrabold uppercase tracking-wide text-muted">
                 <Icon name="filter_list" size={14} /> {t.workspace.source}
               </span>
@@ -594,6 +596,11 @@ export function RequestsWorkspace() {
                   <span className={source === key ? "text-muted" : "text-muted/70"}> {counts[key]}</span>
                 </button>
             ))}
+              </div>
+              {/* The third of the row that carries nothing. It exists so the middle one is the
+                  middle: without it the source would centre against the machines alone and shift
+                  every time a request had a second item. */}
+              <div className="min-w-0 flex-1" aria-hidden />
           </div>
 
           {/* ── Nothing on this page scrolls DOWNWARDS (owner, 2026-08-25: "i dont want scroll

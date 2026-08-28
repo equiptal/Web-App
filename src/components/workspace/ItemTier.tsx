@@ -23,8 +23,8 @@ const SHOWN = 3;
  * screen that has not decided the question is one.
  *
  * So this renders no chrome of its own — no background, no rule, no height. The source row owns
- * those, and this is a group inside it. The number after each name is that item's bid count, which
- * is what the source row counts too.
+ * those, and this is a group inside it. The number after each name is the UNITS asked for — this row
+ * is about the request, and what arrived against it is the source filter's business one group along.
  *
  * ── The chosen item is always among the three ─────────────────────────────────────────────────
  * The first three in the order the renter asked for them, except that a selection outside that slice
@@ -94,8 +94,12 @@ export function ItemTier({
             )}
           >
             {name(it)}
-            {/* The bid count, as the source row counts what each source sent. */}
-            <span className={on ? "text-muted" : "text-muted/70"}> {it.bidCount}</span>
+            {/* UNITS asked for, not bids received (owner, 2026-08-28). This row is about the request:
+                how many of this machine the renter wanted. What arrived against it is the panel's
+                business, and the source filter beside this one already counts that. */}
+            {(it.item?.qty ?? 1) > 1 && (
+              <span className={on ? "text-muted" : "text-muted/70"}> ×{it.item?.qty}</span>
+            )}
           </button>
         );
       })}
@@ -130,7 +134,9 @@ export function ItemTier({
               className="flex w-full items-center gap-2 rounded-sm px-2.5 py-1.5 text-start text-meta font-semibold text-navy-mid transition-colors hover:bg-surface2 hover:text-navy"
             >
               <span className="flex-1 truncate">{name(it)}</span>
-              <span className="flex-none text-label text-muted">{it.bidCount}</span>
+              {(it.item?.qty ?? 1) > 1 && (
+                <span className="flex-none text-label text-muted">×{it.item?.qty}</span>
+              )}
             </button>
           ))}
         </div>
