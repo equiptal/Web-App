@@ -31,7 +31,7 @@ const CSS = `
 @keyframes rlv-dropIn{0%{opacity:0;transform:translateY(-14px) scale(.96)}60%{transform:translateY(2px) scale(1.01)}100%{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes rlv-fillBar{from{width:0}to{width:var(--w)}}
 @keyframes rlv-pulse{0%,100%{}50%{outline: 8px solid color-mix(in srgb, var(--ok) 0%, transparent); outline-offset: 0}}
-.rlive-toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--navy-deep);color:var(--surface);font-size:13px;font-weight:700;padding:11px 18px;border-radius:12px;z-index:60;display:inline-flex;align-items:center;gap:8px;animation:rlv-fade .25s ease both}
+.rlive-toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--navy-deep);color:var(--surface);font-size:13px;font-weight:700;padding:11px 18px;border-radius: var(--radius-md);z-index:60;display:inline-flex;align-items:center;gap:8px;animation:rlv-fade .25s ease both}
 @media (prefers-reduced-motion: reduce){.rlive [style*="animation"]{animation:none!important}}
 `;
 
@@ -118,12 +118,12 @@ export function Confirmation() {
         </div>
 
         {/* ── one card, stacked: a compact horizontal share strip on top, the how-it-works demo below ── */}
-        <div style={{ marginTop: 14, background: "var(--navy-deep)", borderRadius: 22, overflow: "hidden", animation: "rlv-rise .55s ease .05s both" }}>
+        <div style={{ marginTop: 14, background: "var(--navy-deep)", borderRadius: "var(--radius-lg)", overflow: "hidden", animation: "rlv-rise .55s ease .05s both" }}>
 
           {/* share strip — invite line + inline link/copy/share/preview, kept to two tight rows */}
           <div style={{ padding: "16px 22px 16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 11, flexWrap: "wrap" }}>
-              <div style={{ width: 34, height: 34, borderRadius: 10, background: "color-mix(in srgb, var(--brand-light) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <div style={{ width: 34, height: 34, borderRadius: "var(--radius-md)", background: "color-mix(in srgb, var(--brand-light) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <Svg w={18} stroke="var(--brand-light)" sw={2.2}><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></Svg>
               </div>
               <div style={{ flex: 1, minWidth: 200 }}>
@@ -138,18 +138,18 @@ export function Confirmation() {
 
             {/* link + share + preview — one inline row */}
             <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <div style={{ flex: 1, minWidth: 240, display: "flex", alignItems: "center", gap: 9, background: "var(--navy-deep)", border: "1px solid var(--navy)", borderRadius: 12, padding: "7px 7px 7px 14px" }}>
+              <div style={{ flex: 1, minWidth: 240, display: "flex", alignItems: "center", gap: 9, background: "var(--navy-deep)", border: "1px solid var(--navy)", borderRadius: "var(--radius-md)", padding: "7px 7px 7px 14px" }}>
                 <Svg w={15} stroke="var(--muted)" sw={2} style={{ flexShrink: 0 }}><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" /><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" /></Svg>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: "var(--border-strong)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", direction: "ltr", textAlign: ar ? "right" : "left" }}>{linkDisplay}</span>
-                <button onClick={onCopy} disabled={!shareUrl} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: 9, border: "none", cursor: shareUrl ? "pointer" : "default", fontFamily: "inherit", fontWeight: 700, fontSize: 13, background: copied ? "var(--ok)" : "var(--background)", color: copied ? "var(--surface)" : "var(--navy-deep)", transition: "background .2s ease", whiteSpace: "nowrap", flexShrink: 0 }}>
+                <button onClick={onCopy} disabled={!shareUrl} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: "var(--radius-sm)", border: "none", cursor: shareUrl ? "pointer" : "default", fontFamily: "inherit", fontWeight: 700, fontSize: 13, background: copied ? "var(--ok)" : "var(--background)", color: copied ? "var(--surface)" : "var(--navy-deep)", transition: "background .2s ease", whiteSpace: "nowrap", flexShrink: 0 }}>
                   <span className="material-icons-outlined" style={{ fontSize: 16 }}>{copied ? "check" : "content_copy"}</span>{copied ? L("Copied", "تم النسخ") : L("Copy", "نسخ")}
                 </button>
               </div>
-              <button onClick={() => setShareOpen(true)} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 20px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 800, fontSize: 14, background: OR, color: "var(--surface)", whiteSpace: "nowrap" }}>
+              <button onClick={() => setShareOpen(true)} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 20px", borderRadius: "var(--radius-md)", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 800, fontSize: 14, background: OR, color: "var(--surface)", whiteSpace: "nowrap" }}>
                 <Svg w={17} stroke="currentColor" sw={2.3}><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" /><path d="M16 6l-4-4-4 4" /><path d="M12 2v13" /></Svg>
                 {L("Share link", "شارك الرابط")}
               </button>
-              <a href={formUrl} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 20px", borderRadius: 12, border: "1px solid var(--navy)", cursor: "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: 14, background: "var(--navy-deep)", color: "var(--border)", whiteSpace: "nowrap", textDecoration: "none" }}>
+              <a href={formUrl} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 20px", borderRadius: "var(--radius-md)", border: "1px solid var(--navy)", cursor: "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: 14, background: "var(--navy-deep)", color: "var(--border)", whiteSpace: "nowrap", textDecoration: "none" }}>
                 <Svg w={17} stroke="currentColor" sw={2.2}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></Svg>
                 {L("Preview form", "معاينة النموذج")}
               </a>
@@ -162,11 +162,11 @@ export function Confirmation() {
 
         {/* ── primary path ── */}
         <div style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 12, flexWrap: "wrap", animation: "rlv-rise .65s ease .15s both" }}>
-          <button onClick={onView} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "14px 26px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 800, fontSize: 15, background: "var(--navy-deep)", color: "var(--surface)" }}>
+          <button onClick={onView} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "14px 26px", borderRadius: "var(--radius-md)", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 800, fontSize: 15, background: "var(--navy-deep)", color: "var(--surface)" }}>
             {L("View request & bids", "عرض الطلب والعروض")}
             <span style={ar ? { transform: "scaleX(-1)", display: "inline-flex" } : { display: "inline-flex" }}><Svg w={17} stroke="currentColor" sw={2.4}><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></Svg></span>
           </button>
-          <button onClick={() => actions.reset()} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 22px", borderRadius: 12, border: "1px solid var(--border-strong)", cursor: "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: 15, background: "var(--surface)", color: "var(--navy-deep)" }}>
+          <button onClick={() => actions.reset()} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 22px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-strong)", cursor: "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: 15, background: "var(--surface)", color: "var(--navy-deep)" }}>
             <Svg w={16} stroke="currentColor" sw={2.4}><path d="M12 5v14M5 12h14" /></Svg>
             {L("New request", "طلب جديد")}
           </button>
@@ -212,7 +212,7 @@ function HowItWorks({ ar, L }: { ar: boolean; L: (e: string, a: string) => strin
   const sc = scenes[step];
 
   const dot = (i: number) => (
-    <button key={i} onClick={() => { setStep(i); }} style={{ border: "none", cursor: "pointer", height: 7, borderRadius: 5, padding: 0, transition: "all .3s ease", width: i === step ? 22 : 7, background: i === step ? OR : "var(--navy)" }} aria-label={`Step ${i + 1}`} />
+    <button key={i} onClick={() => { setStep(i); }} style={{ border: "none", cursor: "pointer", height: 7, borderRadius: "var(--radius-sm)", padding: 0, transition: "all .3s ease", width: i === step ? 22 : 7, background: i === step ? OR : "var(--navy)" }} aria-label={`Step ${i + 1}`} />
   );
   const navBtn = (dir: "prev" | "next") => (
     <button onClick={() => setStep((s) => (dir === "next" ? (s + 1) % 4 : (s + 3) % 4))} style={{ width: 30, height: 30, borderRadius: "50%", border: "1px solid var(--navy)", background: "var(--navy-deep)", color: "var(--muted-light)", cursor: "pointer", fontSize: 13, lineHeight: 1 }} aria-label={dir}>
@@ -224,25 +224,25 @@ function HowItWorks({ ar, L }: { ar: boolean; L: (e: string, a: string) => strin
     <div style={{ borderTop: "1px solid var(--navy)", padding: "16px 22px 18px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, padding: "0 2px", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <span style={{ width: 30, height: 30, borderRadius: 9, background: OR, color: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>▶</span>
+          <span style={{ width: 30, height: 30, borderRadius: "var(--radius-sm)", background: OR, color: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>▶</span>
           <div>
             <div style={{ fontSize: 14, fontWeight: 800, color: "var(--surface)", lineHeight: 1.1 }}>{L("How it works", "كيف تعمل")}</div>
             <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)" }}>{L(`Step ${step + 1} of 4`, `الخطوة ${step + 1} من ٤`)} · {sc.tag}</div>
           </div>
         </div>
-        <button onClick={() => setPlaying((p) => !p)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 9, border: "1px solid var(--navy)", background: "var(--navy-deep)", color: "var(--border)", fontFamily: "inherit", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+        <button onClick={() => setPlaying((p) => !p)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: "var(--radius-sm)", border: "1px solid var(--navy)", background: "var(--navy-deep)", color: "var(--border)", fontFamily: "inherit", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
           {playing ? `⏸ ${L("Pause", "إيقاف")}` : `▶ ${L("Play", "تشغيل")}`}
         </button>
       </div>
 
       {/* browser stage */}
-      <div style={{ background: "var(--navy-deep)", border: "1px solid var(--navy)", borderRadius: "13px 13px 0 0", padding: "8px 12px", display: "flex", alignItems: "center", gap: 7 }}>
+      <div style={{ background: "var(--navy-deep)", border: "1px solid var(--navy)", borderRadius: "var(--radius-lg) var(--radius-lg) 0 0", padding: "8px 12px", display: "flex", alignItems: "center", gap: 7 }}>
         <span style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--danger)" }} />
         <span style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--brand-light)" }} />
         <span style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--ok)" }} />
-        <div style={{ flex: 1, marginInlineStart: 6, background: "var(--navy-deep)", border: "1px solid var(--navy)", borderRadius: 6, padding: "4px 10px", fontSize: 11, fontWeight: 600, color: "var(--muted-light)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", direction: "ltr" }}>{sc.url}</div>
+        <div style={{ flex: 1, marginInlineStart: 6, background: "var(--navy-deep)", border: "1px solid var(--navy)", borderRadius: "var(--radius-sm)", padding: "4px 10px", fontSize: 11, fontWeight: 600, color: "var(--muted-light)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", direction: "ltr" }}>{sc.url}</div>
       </div>
-      <div style={{ height: 240, background: "var(--surface2)", border: "1px solid var(--navy)", borderTop: "none", borderRadius: "0 0 13px 13px", position: "relative", overflow: "hidden" }}>
+      <div style={{ height: 240, background: "var(--surface2)", border: "1px solid var(--navy)", borderTop: "none", borderRadius: "0 0 var(--radius-lg) var(--radius-lg)", position: "relative", overflow: "hidden" }}>
         {step === 0 && <SceneShare key="s0" ar={ar} L={L} />}
         {step === 1 && <SceneForm key="s1" ar={ar} L={L} />}
         {step === 2 && <SceneDone key="s2" ar={ar} L={L} />}
@@ -264,16 +264,16 @@ function SceneShare({ L }: { ar?: boolean; L: (e: string, a: string) => string }
   return (
     <div style={{ position: "absolute", inset: 0, padding: "18px 20px", animation: "rlv-fade .35s ease both" }}>
       <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".08em", color: "var(--muted)" }}>{L("REQUESTS FOR QUOTE", "طلبات عروض الأسعار")}</div>
-      <div style={{ marginTop: 10, background: "var(--navy-deep)", borderRadius: 14, padding: "15px 16px" }}>
+      <div style={{ marginTop: 10, background: "var(--navy-deep)", borderRadius: "var(--radius-lg)", padding: "15px 16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 14, fontWeight: 800, color: "var(--surface)" }}>{L("Riyadh — Qiddiya Project", "الرياض — مشروع القدية")}</span>
-          <span style={{ fontSize: 9, fontWeight: 800, color: "var(--ok-soft)", background: "color-mix(in srgb, var(--ok) 16%, transparent)", padding: "2px 7px", borderRadius: 20 }}>● {L("Open", "مفتوح")}</span>
+          <span style={{ fontSize: 9, fontWeight: 800, color: "var(--ok-soft)", background: "color-mix(in srgb, var(--ok) 16%, transparent)", padding: "2px 7px", borderRadius: "var(--radius-lg)" }}>● {L("Open", "مفتوح")}</span>
         </div>
         <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted-light)", marginTop: 3 }}>REQ-00196 · 1 Jul 2026</div>
-        <div style={{ marginTop: 13, display: "flex", alignItems: "center", gap: 8, background: "var(--navy-deep)", border: "1px solid var(--navy)", borderRadius: 10, padding: "6px 6px 6px 12px" }}>
+        <div style={{ marginTop: 13, display: "flex", alignItems: "center", gap: 8, background: "var(--navy-deep)", border: "1px solid var(--navy)", borderRadius: "var(--radius-md)", padding: "6px 6px 6px 12px" }}>
           <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: 600, color: "var(--border-strong)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", direction: "ltr" }}>rentbid.sa/r/00196</span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 12px", borderRadius: 8, background: OR, color: "var(--surface)", fontWeight: 800, fontSize: 11.5 }}>⤴ {L("Share", "مشاركة")}</span>
-          <span style={{ padding: "7px 11px", borderRadius: 8, background: "var(--navy-deep)", border: "1px solid var(--navy)", color: "var(--border)", fontWeight: 700, fontSize: 11.5, animation: "rlv-pulse 1.6s ease infinite" }}>⧉ {L("Copy", "نسخ")}</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 12px", borderRadius: "var(--radius-sm)", background: OR, color: "var(--surface)", fontWeight: 800, fontSize: 11.5 }}>⤴ {L("Share", "مشاركة")}</span>
+          <span style={{ padding: "7px 11px", borderRadius: "var(--radius-sm)", background: "var(--navy-deep)", border: "1px solid var(--navy)", color: "var(--border)", fontWeight: 700, fontSize: 11.5, animation: "rlv-pulse 1.6s ease infinite" }}>⧉ {L("Copy", "نسخ")}</span>
         </div>
       </div>
       <div style={{ marginTop: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
@@ -303,7 +303,7 @@ function SceneForm({ L }: { ar?: boolean; L: (e: string, a: string) => string })
   return (
     <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", animation: "rlv-fade .35s ease both" }}>
       <div style={{ background: "var(--surface)", borderBottom: "1px solid var(--surface3)", padding: "10px 18px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-        <span style={{ width: 32, height: 32, borderRadius: 8, background: "var(--info)", color: "var(--surface)", fontSize: 12, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>AB</span>
+        <span style={{ width: 32, height: 32, borderRadius: "var(--radius-sm)", background: "var(--info)", color: "var(--surface)", fontSize: 12, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>AB</span>
         <div>
           <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: ".06em", color: "var(--muted)" }}>{L("REQUEST FROM", "الطلب من")}</div>
           <div style={{ fontSize: 13, fontWeight: 800, color: "var(--navy-deep)" }}>{L("Al Bawani Contracting", "شركة البواني للمقاولات")}</div>
@@ -313,30 +313,30 @@ function SceneForm({ L }: { ar?: boolean; L: (e: string, a: string) => string })
         <div style={{ fontSize: 10, fontWeight: 800, color: "var(--muted-dark)", marginBottom: 8 }}>📋 {L("TERMS — CAN YOU MEET EACH?", "الشروط — هل يمكنك الالتزام؟")}</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
           {terms.map((t) => (
-            <div key={t.label} style={{ background: "var(--surface)", border: "1px solid var(--surface3)", borderRadius: 9, padding: "8px 9px", animation: `rlv-dropIn .45s ease ${t.delay} both` }}>
+            <div key={t.label} style={{ background: "var(--surface)", border: "1px solid var(--surface3)", borderRadius: "var(--radius-sm)", padding: "8px 9px", animation: `rlv-dropIn .45s ease ${t.delay} both` }}>
               <div style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: ".03em", color: "var(--muted)" }}>{t.label}</div>
               <div style={{ fontSize: 10, fontWeight: 600, color: "var(--muted-dark)", margin: "2px 0 6px" }}>{L("Wants", "يريد")}: <span style={{ color: "var(--navy-deep)", fontWeight: 800 }}>{t.want}</span></div>
               <div style={{ display: "flex", gap: 4 }}>
-                <span style={{ flex: 1, textAlign: "center", fontSize: 10, fontWeight: 800, padding: "3px 0", borderRadius: 5, background: "var(--ok-soft)", color: "var(--ok-deep)" }}>✓ {L("Yes", "نعم")}</span>
-                <span style={{ flex: 1, textAlign: "center", fontSize: 10, fontWeight: 800, padding: "3px 0", borderRadius: 5, background: "var(--background)", color: "var(--muted)" }}>{L("No", "لا")}</span>
+                <span style={{ flex: 1, textAlign: "center", fontSize: 10, fontWeight: 800, padding: "3px 0", borderRadius: "var(--radius-sm)", background: "var(--ok-soft)", color: "var(--ok-deep)" }}>✓ {L("Yes", "نعم")}</span>
+                <span style={{ flex: 1, textAlign: "center", fontSize: 10, fontWeight: 800, padding: "3px 0", borderRadius: "var(--radius-sm)", background: "var(--background)", color: "var(--muted)" }}>{L("No", "لا")}</span>
               </div>
             </div>
           ))}
         </div>
         <div style={{ fontSize: 10, fontWeight: 800, color: "var(--muted-dark)", margin: "13px 0 7px" }}>🧾 {L("PRICING", "التسعير")}</div>
-        <div style={{ background: "var(--surface)", border: "1px solid var(--surface3)", borderRadius: 9, overflow: "hidden" }}>
+        <div style={{ background: "var(--surface)", border: "1px solid var(--surface3)", borderRadius: "var(--radius-sm)", overflow: "hidden" }}>
           {pricing.map((p, i) => (
             <div key={p.item} style={{ display: "grid", gridTemplateColumns: "1.4fr .7fr .4fr 1fr", alignItems: "center", padding: "7px 11px", borderBottom: i < pricing.length - 1 ? "1px solid var(--background)" : "none", fontSize: 11 }}>
               <span style={{ fontWeight: 800, color: "var(--navy-deep)" }}>{p.item}</span>
               <span style={{ fontWeight: 600, color: "var(--muted)" }}>{p.unit}</span>
               <span style={{ fontWeight: 600, color: "var(--muted)" }}>×{p.qty}</span>
-              <span style={{ justifySelf: "end", fontWeight: 800, color: "var(--ok-deep)", background: "var(--ok-soft)", padding: "2px 9px", borderRadius: 5, animation: `rlv-dropIn .4s ease ${p.delay} both` }}>{p.price}</span>
+              <span style={{ justifySelf: "end", fontWeight: 800, color: "var(--ok-deep)", background: "var(--ok-soft)", padding: "2px 9px", borderRadius: "var(--radius-sm)", animation: `rlv-dropIn .4s ease ${p.delay} both` }}>{p.price}</span>
             </div>
           ))}
         </div>
       </div>
       <div style={{ padding: "0 18px 14px", flexShrink: 0 }}>
-        <div style={{ textAlign: "center", padding: 11, borderRadius: 10, background: OR, color: "var(--surface)", fontWeight: 800, fontSize: 13, animation: "rlv-pulse 1.6s ease infinite" }}>➤ {L("Submit bid", "إرسال العرض")}</div>
+        <div style={{ textAlign: "center", padding: 11, borderRadius: "var(--radius-md)", background: OR, color: "var(--surface)", fontWeight: 800, fontSize: 13, animation: "rlv-pulse 1.6s ease infinite" }}>➤ {L("Submit bid", "إرسال العرض")}</div>
       </div>
     </div>
   );
@@ -346,7 +346,7 @@ function SceneForm({ L }: { ar?: boolean; L: (e: string, a: string) => string })
 function SceneDone({ L }: { ar: boolean; L: (e: string, a: string) => string }) {
   return (
     <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, animation: "rlv-fade .35s ease both" }}>
-      <div style={{ background: "var(--surface)", border: "1px solid var(--surface3)", borderRadius: 16, padding: "28px 34px", textAlign: "center", }}>
+      <div style={{ background: "var(--surface)", border: "1px solid var(--surface3)", borderRadius: "var(--radius-lg)", padding: "28px 34px", textAlign: "center", }}>
         <div style={{ position: "relative", width: 54, height: 54, margin: "0 auto 14px" }}>
           <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "var(--ok)", opacity: 0.25, animation: "rlv-ringOut 1.1s ease-out .1s both" }} />
           <div style={{ position: "relative", width: 54, height: 54, borderRadius: "50%", background: "var(--ok-soft)", display: "flex", alignItems: "center", justifyContent: "center", animation: "rlv-popCheck .5s cubic-bezier(.2,1.3,.5,1) both" }}>
@@ -355,7 +355,7 @@ function SceneDone({ L }: { ar: boolean; L: (e: string, a: string) => string }) 
         </div>
         <div style={{ fontSize: 18, fontWeight: 800, color: "var(--navy-deep)" }}>{L("Bid submitted", "تم إرسال العرض")}</div>
         <div style={{ fontSize: 12.5, fontWeight: 500, color: "var(--muted-dark)", marginTop: 6, lineHeight: 1.5, maxWidth: 260 }}>{L("Their offer is now with you on Moedatech — ready to compare side by side.", "عرضهم الآن لديك على معداتك — جاهز للمقارنة جنباً إلى جنب.")}</div>
-        <div style={{ display: "inline-block", marginTop: 13, fontSize: 13, fontWeight: 800, color: "var(--navy-deep)", background: "var(--background)", padding: "7px 15px", borderRadius: 9 }}>💵 SAR 2,185</div>
+        <div style={{ display: "inline-block", marginTop: 13, fontSize: 13, fontWeight: 800, color: "var(--navy-deep)", background: "var(--background)", padding: "7px 15px", borderRadius: "var(--radius-sm)" }}>💵 SAR 2,185</div>
       </div>
     </div>
   );
@@ -372,19 +372,19 @@ function SceneCompare({ L }: { ar: boolean; L: (e: string, a: string) => string 
     <div style={{ position: "absolute", inset: 0, padding: "18px 20px", animation: "rlv-fade .35s ease both" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 11 }}>
         <span style={{ fontSize: 12, fontWeight: 800, color: "var(--navy-deep)" }}>{L("Forklift · 10 ton — 3 bids", "رافعة شوكية · ١٠ طن — ٣ عروض")}</span>
-        <span style={{ fontSize: 10, fontWeight: 800, color: "var(--ok-deep)", background: "var(--ok-soft)", padding: "3px 8px", borderRadius: 20 }}>{L("1/1 fulfilled", "١/١ مكتمل")}</span>
+        <span style={{ fontSize: 10, fontWeight: 800, color: "var(--ok-deep)", background: "var(--ok-soft)", padding: "3px 8px", borderRadius: "var(--radius-lg)" }}>{L("1/1 fulfilled", "١/١ مكتمل")}</span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {rows.map((c) => (
-          <div key={c.i} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: `1px solid ${c.border}`, borderRadius: 11, padding: "10px 12px" }}>
-            <span style={{ width: 32, height: 32, borderRadius: 8, background: c.avBg, color: c.avColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{c.i}</span>
+          <div key={c.i} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface)", border: `1px solid ${c.border}`, borderRadius: "var(--radius-md)", padding: "10px 12px" }}>
+            <span style={{ width: 32, height: 32, borderRadius: "var(--radius-sm)", background: c.avBg, color: c.avColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{c.i}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
                 <span style={{ fontSize: 12, fontWeight: 800, color: "var(--navy-deep)" }}>{c.name} {c.badge && <span style={{ color: "var(--ok-deep)" }}>{c.badge}</span>}</span>
                 <span style={{ fontSize: 12.5, fontWeight: 900, color: "var(--navy-deep)" }}>{c.price}</span>
               </div>
-              <div style={{ height: 6, borderRadius: 4, background: "var(--surface2)", overflow: "hidden" }}>
-                <div style={{ height: "100%", borderRadius: 4, background: c.barColor, "--w": c.pct, animation: `rlv-fillBar 1s ease ${c.delay} both` } as React.CSSProperties} />
+              <div style={{ height: 6, borderRadius: "var(--radius-sm)", background: "var(--surface2)", overflow: "hidden" }}>
+                <div style={{ height: "100%", borderRadius: "var(--radius-sm)", background: c.barColor, "--w": c.pct, animation: `rlv-fillBar 1s ease ${c.delay} both` } as React.CSSProperties} />
               </div>
             </div>
           </div>

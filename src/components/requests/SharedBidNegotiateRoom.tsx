@@ -12,13 +12,13 @@ type NegMsg = { text: string; at: string; pending?: boolean; failed?: boolean };
 const SBNR_CSS = `
 .sbnr-page{position:fixed;inset:0;z-index:1000;background:var(--surface2);overflow-y:auto;-webkit-overflow-scrolling:touch}
 .sbnr-topnav{position:sticky;top:0;z-index:12;display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border)}
-.sbnr-topnav .bk{width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--navy);display:grid;place-items:center;cursor:pointer;flex:0 0 auto}
+.sbnr-topnav .bk{width:38px;height:38px;border-radius: var(--radius-md);border:1px solid var(--border);background:var(--surface);color:var(--navy);display:grid;place-items:center;cursor:pointer;flex:0 0 auto}
 .sbnr-topnav .bk .material-icons-outlined{font-size:20px}
 .sbnr-topnav .tt{font-size:15px;font-weight:800;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sbnr-inner{padding:16px 16px 0}
 .sbnr-inner .dlproto{min-height:calc(100vh - 76px)}
 .sbnr-inner .ib.send.dis{opacity:.4;cursor:not-allowed}
-.sbnr-err{background:var(--danger-bg);color:var(--danger);font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:10px;margin:0 0 8px;display:flex;align-items:center;gap:6px}
+.sbnr-err{background:var(--danger-bg);color:var(--danger);font-size:12.5px;font-weight:700;padding:8px 14px;border-radius: var(--radius-md);margin:0 0 8px;display:flex;align-items:center;gap:6px}
 .sbnr-err .material-icons-outlined{font-size:15px}
 [dir=rtl] .sbnr-topnav .bk .material-icons-outlined{transform:scaleX(-1)}
 `;

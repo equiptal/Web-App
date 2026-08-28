@@ -139,7 +139,7 @@
   background: var(--surface);
   /* NO border — the prototype's label is a bare white chip on a shadow, and a hairline around it made
      it read as one more bordered control among the machine chips. */
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 2px 8px;
   font-size: 10px;
   font-weight: 700;
@@ -360,7 +360,7 @@
    colour, so the marker states its own colour in words and cannot be read off the legend alone. */
 .bm-pin .bm-pin-chip {
   margin-top: 6px;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   padding: 3px 10px;
   font-size: 10px;
   font-weight: 800;
@@ -386,7 +386,7 @@
   margin-top: 5px;
   background: var(--surface);
   border: 1px solid #e1e9f1;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 2px 8px;
   font-size: 9.5px;
   font-weight: 800;
@@ -423,7 +423,7 @@
   box-sizing: border-box;
   text-align: start;
   background: var(--surface);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   padding: 10px 12px;
 
   font-family: inherit;
@@ -466,7 +466,7 @@
   align-items: center;
   gap: 4px;
   border: 1px solid;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   padding: 2px 8px;
   font-size: 10.5px;
   font-weight: 800;
@@ -505,7 +505,7 @@
    the fill does: at 10 px the two grounds are close enough that colour alone would decide it, and a
    renter who cannot separate them would read a missing certificate as a present one. */
 .bm-pin .bm-pinfo-cert {
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   padding: 1px 7px;
   font-size: 10px;
   font-weight: 700;
@@ -536,7 +536,7 @@
 .bm-distchip > span {
   background: var(--surface);
   border: 1px solid #c8d8e8;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   padding: 2px 9px;
   font-size: 10px;
   font-weight: 800;
@@ -550,7 +550,7 @@
 .bm-distchip .bm-distfar {
   background: #fff6e8;
   border: 1px solid color-mix(in srgb, var(--warn) 25%, transparent);
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   padding: 2px 9px;
   font-size: 10px;
   font-weight: 800;
@@ -574,7 +574,7 @@
   gap: 8px;
   background: rgba(255, 255, 255, 0.97);
   border: 1px solid #e1e9f1;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   padding: 7px 13px;
   font-size: 10.5px;
   font-weight: 800;
@@ -603,7 +603,7 @@
   max-width: min(330px, calc(100% - 130px));
   background: rgba(255, 255, 255, 0.97);
   border: 1px solid #e1e9f1;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 10px 13px;
 }
 .bidmap .bm-info-t { font-size: 10.5px; font-weight: 800; color: #16304f; }
@@ -619,7 +619,7 @@
   max-width: 300px;
   background: rgba(255, 255, 255, 0.97);
   border: 1px solid #e1e9f1;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 10px 13px;
   font-size: 11px;
   font-weight: 700;
@@ -820,7 +820,7 @@
   gap: 5px;
   background: var(--surface);
   border: 1px solid #c8d8e8;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   padding: 5px 10px;
   font-size: 10.5px;
   font-weight: 800;
@@ -918,7 +918,7 @@
   padding: 5px 8px;
   background: color-mix(in srgb, var(--brand) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--brand) 32%, transparent);
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
 }
 /* The wrapper is `flex: 1` rather than the text itself, because the pending sentence below is OURS
    and can join it — see `.bm-short-s`. With nothing pending it collapses to exactly the prototype's
@@ -943,7 +943,7 @@
   background: var(--surface);
   border: 1px solid color-mix(in srgb, var(--info) 22%, transparent);
   color: #2563eb;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 4px 9px;
   font-size: 10px;
   font-weight: 800;
@@ -988,7 +988,7 @@
   background: var(--surface);
   border: 1.5px dashed #c8d8e8;
   color: var(--navy);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 11px;
   font-family: inherit;
   font-size: 12px;
@@ -1016,7 +1016,7 @@
   flex-shrink: 0;
   background: var(--surface);
   border: 1.5px solid #e1e9f1;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
 
   /* The prototype's `transition: .15s` — ALL properties, not a named pair. The card changes its
@@ -1218,14 +1218,14 @@
    nothing left to truncate FOR. */
 .bidmap .bm-eq .bm-eq-chip .bm-eq-chip-l { white-space: nowrap; }
 /* THE CONFIRMED CHIP IS A DIFFERENT SHAPE, on purpose (decoded 4014 vs 4015–4020). It is a small
-   squared label — `border-radius: 7px`, `padding: 2px 8px`, weight 700 — carrying a ✓ and **no dot**;
+   squared label — `border-radius: var(--radius-sm)`, `padding: 2px 8px`, weight 700 — carrying a ✓ and **no dot**;
    the unconfirmed one is a full capsule at weight 800 with a breathing dot. A settled fact and an open
    question should not be the same object in two colours: colour alone fails anyone reading the list
    with a red-green deficiency, and the shape difference is what makes the two states legible without
    it. This chip was drawn as the capsule with a green dot, which lost exactly that. */
 .bidmap .bm-eq .bm-eq-chip.ok {
   gap: 4px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   padding: 2px 8px;
   font-weight: 700;
   color: #16a34a;
@@ -1328,7 +1328,7 @@
   color: var(--warn-deep);
   background: color-mix(in srgb, var(--brand) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--brand) 32%, transparent);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   padding: 2px 8px;
   font-size: 10.5px;
   font-weight: 700;
@@ -1400,7 +1400,7 @@
   align-items: center;
   justify-content: center;
   border: 1px solid #e1e9f1;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--muted);
   cursor: pointer;
@@ -1487,7 +1487,7 @@
   align-items: center;
   justify-content: center;
   border: 1px solid #e1e9f1;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--muted);
   cursor: pointer;
@@ -1565,7 +1565,7 @@
   padding: 16px 14px;
   background: var(--surface);
   border: 1px solid #e6eef5;
-  border-radius: 13px;
+  border-radius: var(--radius-lg);
   text-align: start;
 }
 .bidmap .bm-eqfnone-t { font-size: 12px; font-weight: 800; color: #16304f; }
@@ -1575,7 +1575,7 @@
   background: #2563eb;
   border: 0;
   color: var(--surface);
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   padding: 7px 12px;
   font-size: 10.5px;
   font-weight: 800;
@@ -1605,7 +1605,7 @@
   color: #2563eb;
   background: color-mix(in srgb, var(--info) 8%, transparent);
   border: 1px solid color-mix(in srgb, var(--info) 22%, transparent);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   padding: 2px 7px;
 }
 .bidmap .bm-spacer { flex: 1; }
@@ -1618,7 +1618,7 @@
   background: color-mix(in srgb, var(--ok-deep) 9%, transparent);
   border: 1px solid color-mix(in srgb, var(--ok) 25%, transparent);
   color: #16a34a;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 3px 9px;
   font-size: 9.5px;
   font-weight: 800;
@@ -1631,13 +1631,13 @@
 .bidmap .bm-note { font-size: 9.5px; color: var(--muted); font-weight: 600; margin-top: 4px; line-height: 1.6; }
 
 /* Sort tabs — exactly two (D-D, AC-24). Rating is retired and there is no distance band (D-C). */
-.bidmap .bm-sorts { display: flex; gap: 5px; margin-top: 10px; background: var(--surface2); padding: 3px; border-radius: 10px; }
+.bidmap .bm-sorts { display: flex; gap: 5px; margin-top: 10px; background: var(--surface2); padding: 3px; border-radius: var(--radius-md); }
 .bidmap .bm-sort {
   flex: 1;
   background: transparent;
   border: 1px solid transparent;
   color: var(--muted);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 6px 4px;
   font-size: 10.5px;
   font-weight: 700;
@@ -1676,7 +1676,7 @@
   gap: 9px;
   background: var(--surface);
   border: 1.5px solid #e1e9f1;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   /* asymmetric on purpose: the extra inline-start padding is the accent bar's room */
   padding: 12px 13px 12px 17px;
   cursor: pointer;
@@ -1724,7 +1724,7 @@
   font-weight: 800;
   color: var(--surface);
   background: #16a34a;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   padding: 2px 8px;
 }
 
@@ -1750,7 +1750,7 @@
   color: var(--warn-deep);
   background: color-mix(in srgb, var(--warn) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--warn) 25%, transparent);
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   padding: 2px 7px;
 }
 
@@ -1768,7 +1768,7 @@
   margin-top: 3px;
   background: color-mix(in srgb, var(--ok) 9%, transparent);
   border: 1px solid color-mix(in srgb, var(--ok) 25%, transparent);
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   padding: 1px 7px;
 }
 .bidmap .bm-dist { text-align: end; flex-shrink: 0; }
@@ -1783,7 +1783,7 @@
   align-self: stretch;
   background: #f8fafc;
   border: 1px solid #e1e9f1;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 8px 9px;
 }
 .bidmap .bm-units .u-off { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; color: #16304f; }
@@ -1860,7 +1860,7 @@
   max-width: calc(100% - 130px);
   background: rgba(255, 255, 255, 0.97);
   border: 1px solid #e1e9f1;
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
 
   padding: 18px;
   text-align: center;
@@ -1883,7 +1883,7 @@
   flex-shrink: 0;
   margin: 9px 15px 0;
   padding: 8px 11px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--info) 6%, transparent);
   border: 1px solid color-mix(in srgb, var(--info) 20%, transparent);
   color: var(--navy);
@@ -1895,7 +1895,7 @@
   flex-shrink: 0;
   margin: 9px 15px 0;
   padding: 8px 11px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--danger) 7%, transparent);
   border: 1px solid color-mix(in srgb, var(--danger) 24%, transparent);
   color: #9a2820;
@@ -2009,7 +2009,7 @@
   overscroll-behavior: contain;
   box-sizing: border-box;
   padding: 12px 14px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: #12263a;
   border: 1px solid rgba(255, 255, 255, 0.14);
 }
@@ -2053,7 +2053,7 @@
   background: var(--surface);
   border: 1px solid var(--surface);
   color: #0f2238;
-  border-radius: 11px;
+  border-radius: var(--radius-md);
   /* Sized so the ENGLISH pair — «Counter this price» beside «Approve», the longer of the two — still
      shares one line with the hero rate inside the panel's 392px. Arabic has room to spare. */
   padding: 11px 16px;
@@ -2079,7 +2079,7 @@
 .bidmap .bm-foot-units {
   margin-top: 10px;
   padding: 7px 10px;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.14);
   font-size: 10px;
@@ -2158,7 +2158,7 @@
   width: min(320px, calc(100% - 130px));
   background: var(--surface);
   border: 1px solid var(--surface3);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 10px 12px;
   text-align: start;
 
@@ -2197,7 +2197,7 @@
   font-weight: 800;
   color: var(--notice-tone);
   background: var(--notice-tint);
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   padding: 2px 8px;
   white-space: nowrap;
 }
@@ -2361,7 +2361,7 @@
    call and kebab controls beside it for a band that is 64px tall. */
 .bidmap .bm-chat-who.is-link { cursor: pointer; }
 .bidmap .bm-chat-who.is-link:hover { text-decoration: underline; text-underline-offset: 3px; }
-.bidmap .bm-chat-who.is-link:focus-visible { outline: 2px solid #2f6fed; outline-offset: 3px; border-radius: 4px; }
+.bidmap .bm-chat-who.is-link:focus-visible { outline: 2px solid #2f6fed; outline-offset: 3px; border-radius: var(--radius-sm); }
 /* The tick the prototype writes as a bare '✓' after the name. A glyph rather than the panel's full
    «شركة موثّقة» chip: the panel two columns away already carries that chip, and repeating it here
    would state the same credential twice on one screen. Green, matching the avatar — it is the same
@@ -2378,7 +2378,7 @@
   flex-shrink: 0;
   width: 30px;
   height: 30px;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   border: 1.5px solid #c8d8e8;
   color: var(--muted);
@@ -2436,7 +2436,7 @@
   gap: 5px;
   background: var(--surface2);
   border: 1px solid #e1e9f1;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 5px 10px;
   font: inherit;
   font-size: 10.5px;
@@ -2447,7 +2447,7 @@
 }
 .bidmap .bm-chat-tab.is-on { background: color-mix(in srgb, var(--info) 10%, transparent); border-color: color-mix(in srgb, var(--info) 30%, transparent); color: #2563eb; }
 .bidmap .bm-chat-tab-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bidmap .bm-chat-tab-n { flex-shrink: 0; min-width: 15px; height: 15px; border-radius: 8px; background: #f3a77a; color: #3a1f0b; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
+.bidmap .bm-chat-tab-n { flex-shrink: 0; min-width: 15px; height: 15px; border-radius: var(--radius-sm); background: #f3a77a; color: #3a1f0b; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
 /* The stream's own values, from `pChat` (prototype 05:28): `padding: 16px`, `gap: 8px`, and a TINTED
    ground — the prototype's own `var(--surface3)`, not the panel's white and not the blue-leaning `var(--surface2)`
    this carried. The tint is what separates the conversation from the chrome around it; on white the
@@ -2507,7 +2507,7 @@
   background: var(--surface);
   border-top: 1px solid #e1e9f1;
 }
-.bidmap .bm-chat-input { flex: 1; min-width: 0; border: 1px solid #c8d8e8; border-radius: 20px; padding: 10px 14px; font: inherit; font-size: 12.5px; color: #16304f; background: #f8fafc; }
+.bidmap .bm-chat-input { flex: 1; min-width: 0; border: 1px solid #c8d8e8; border-radius: 999px; /* a capsule: this control is round by shape, not by scale */ padding: 10px 14px; font: inherit; font-size: 12.5px; color: #16304f; background: #f8fafc; }
 .bidmap .bm-chat-input:disabled { opacity: 0.65; }
 .bidmap .bm-chat-send { flex-shrink: 0; background: #2563eb; border: 0; color: var(--surface); border-radius: 50%; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .bidmap .bm-chat-send:disabled { opacity: 0.5; cursor: default; }
@@ -2666,7 +2666,7 @@
   background: var(--surface);
   border: 1px solid #c8d8e8;
   color: var(--navy);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 10px 11px;
   font-family: inherit;
   font-size: 12px;
@@ -2733,7 +2733,7 @@
   min-width: 200px;
   background: var(--surface);
   border: 1px solid #e1e9f1;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
 
   padding: 6px;
   display: grid;
@@ -2751,7 +2751,7 @@
   color: #16304f;
   background: none;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 9px 11px;
   cursor: pointer;
 }

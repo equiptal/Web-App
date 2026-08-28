@@ -28,7 +28,7 @@ export function QualityBadge({ quality, L, onClick }: { quality: BidQuality; L: 
       type="button"
       onClick={onClick}
       title={onClick ? `${title} — ${L("view the full submission", "عرض العرض المقدَّم كاملاً")}` : title}
-      style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 20, border: `1px solid ${t.bd}`, background: t.bg, color: c, fontSize: 11.5, fontWeight: 800, cursor: onClick ? "pointer" : "default", fontFamily: "inherit", whiteSpace: "nowrap" }}
+      style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: "var(--radius-lg)", border: `1px solid ${t.bd}`, background: t.bg, color: c, fontSize: 11.5, fontWeight: 800, cursor: onClick ? "pointer" : "default", fontFamily: "inherit", whiteSpace: "nowrap" }}
     >
       <span className="material-icons-outlined" style={{ fontSize: 14 }}>workspace_premium</span>
       <span style={{ fontVariantNumeric: "tabular-nums" }}>{score}%</span>

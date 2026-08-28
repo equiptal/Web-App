@@ -65,6 +65,19 @@ export const COLORS = {
   infoDeep: "#0e4f7e",
 } as const;
 
+/**
+ * The radius scale, as literals, for the same three surfaces.
+ *
+ * A clipboard card pasted into Gmail carries no stylesheet, so `border-radius: var(--radius-md)`
+ * there resolves to nothing and the card renders with square corners. Same reasoning as the colours
+ * above; `ds-colors.test.ts` checks these against globals.css too, so the two cannot drift.
+ */
+export const RADII = {
+  sm: "2px",
+  md: "4px",
+  lg: "6px",
+} as const;
+
 /** The CSS custom-property name each key maps to, so the test can check them pair by pair. */
 export const CSS_VAR_NAME: Record<keyof typeof COLORS, string> = {
   navyDeep: "--navy-deep",

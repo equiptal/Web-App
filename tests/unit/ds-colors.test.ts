@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { COLORS, CSS_VAR_NAME, DS_ROOT_CSS } from "@/lib/ds-colors";
+import { COLORS, CSS_VAR_NAME, DS_ROOT_CSS, RADII } from "@/lib/ds-colors";
 
 /**
  * `globals.css` and `ds-colors.ts` hold the same palette twice — the first for the app, the second
@@ -43,6 +43,17 @@ describe("the palette is defined once, in two places that must agree", () => {
     const known = new Set(Object.values(CSS_VAR_NAME));
     expect(colourVars.filter((v) => !known.has(v))).toEqual([]);
   });
+
+  it.each(Object.keys(RADII) as (keyof typeof RADII)[])(
+    "radius %s matches the scale in globals.css",
+    (step) => {
+      // The same duplication as the colours, for the same reason and with the same guard: the
+      // clipboard card has no stylesheet, so it carries the number rather than the token.
+      const m = GLOBALS.match(new RegExp("--radius-" + step + ":\s*([^;]+);"));
+      expect(m, "--radius-" + step + " is not defined in globals.css").not.toBeNull();
+      expect(m![1].trim()).toBe(RADII[step]);
+    },
+  );
 
   it("builds a :root block a standalone document can use", () => {
     expect(DS_ROOT_CSS.startsWith(":root{")).toBe(true);

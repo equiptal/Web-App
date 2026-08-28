@@ -637,7 +637,7 @@ export default function BidFormClient({ token }: { token: string }) {
                   <span className="item-ic"><ItemThumb src={it.imageUrl} name={rawLabel} /></span>
                   <div className="inm-wrap"><span className="inm">{label}</span>{size && <span className="imeta">· {size}</span>}
                     <span className={`units-chip${q > 1 ? " multi" : ""}`}><span className="msym">{q > 1 ? "layers" : "package_2"}</span>×{q} {q === 1 ? L("unit", "وحدة") : L("units", "وحدات")}</span>
-                    {fullyCovered && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 800, color: "var(--danger)", background: "var(--danger-soft)", border: "1px solid var(--danger-soft)", borderRadius: 20, padding: "2px 9px" }}><span className="material-icons-outlined" style={{ fontSize: 14 }}>lock</span>{L("Fully covered", "مُغطّى بالكامل")}</span>}</div>
+                    {fullyCovered && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 800, color: "var(--danger)", background: "var(--danger-soft)", border: "1px solid var(--danger-soft)", borderRadius: "var(--radius-lg)", padding: "2px 9px" }}><span className="material-icons-outlined" style={{ fontSize: 14 }}>lock</span>{L("Fully covered", "مُغطّى بالكامل")}</span>}</div>
                   <span className="ibadge">{L(`Item ${idx + 1} of ${data.items.length}`, `البند ${idx + 1} من ${data.items.length}`)}</span>
                 </div>
 
@@ -673,9 +673,9 @@ export default function BidFormClient({ token }: { token: string }) {
                         choose to supply fewer than the units still open. Capped at `remaining` (units not
                         already covered by others). Hidden when only 1 unit is left (no choice). */}
                     {remaining > 1 && (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 10, whiteSpace: "nowrap", background: "var(--surface)", border: "1px solid var(--brand-light)", borderRadius: 10, padding: "6px 12px" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 10, whiteSpace: "nowrap", background: "var(--surface)", border: "1px solid var(--brand-light)", borderRadius: "var(--radius-md)", padding: "6px 12px" }}>
                       <span style={{ fontSize: 12.5, fontWeight: 800, color: "var(--navy)" }}>{L("Units you can supply", "الوحدات المتاحة لديك")}</span>
-                      <span style={{ display: "inline-flex", alignItems: "center", border: "2px solid var(--brand)", borderRadius: 9, overflow: "hidden" }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", border: "2px solid var(--brand)", borderRadius: "var(--radius-sm)", overflow: "hidden" }}>
                         <button type="button" aria-label={L("Fewer units", "تقليل")} disabled={oq <= 1}
                           onClick={() => setOffered(it.requestItemId, String(Math.max(1, oq - 1)))}
                           style={{ width: 36, height: 36, border: "none", background: oq <= 1 ? "var(--brand-soft)" : "var(--brand-soft)", color: oq <= 1 ? "var(--brand-light)" : "var(--brand-deep)", fontSize: 22, fontWeight: 900, cursor: oq <= 1 ? "default" : "pointer", lineHeight: 1, fontFamily: "inherit" }}>−</button>
@@ -730,7 +730,7 @@ export default function BidFormClient({ token }: { token: string }) {
 
                 <div className="subhead"><span className="material-icons-outlined">request_quote</span>{L("Pricing", "التسعير")}
                   {/* Inline VAT toggle — clarifies right at the price box whether the entered prices include 15% VAT. */}
-                  <span style={{ marginInlineStart: "auto", display: "inline-flex", border: "1px solid var(--border)", borderRadius: 7, overflow: "hidden", textTransform: "none", letterSpacing: 0 }}>
+                  <span style={{ marginInlineStart: "auto", display: "inline-flex", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", overflow: "hidden", textTransform: "none", letterSpacing: 0 }}>
                     {([[false, L("Excl. VAT", "قبل الضريبة")], [true, L("Incl. VAT", "شامل الضريبة")]] as [boolean, string][]).map(([v, lab]) => (
                       <button key={String(v)} type="button" onClick={() => setVatIncluded(v)} style={{ border: "none", cursor: "pointer", font: "inherit", textTransform: "none", letterSpacing: 0, fontWeight: 800, fontSize: 10.5, padding: "3px 9px", background: vatIncluded === v ? "var(--navy)" : "var(--surface)", color: vatIncluded === v ? "var(--surface)" : "var(--muted)" }}>{lab}</button>
                     ))}

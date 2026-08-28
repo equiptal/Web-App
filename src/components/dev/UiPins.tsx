@@ -212,7 +212,7 @@ export function UiPins() {
           gap: 6,
           height: 32,
           padding: "0 12px",
-          borderRadius: 16,
+          borderRadius: "var(--radius-lg)",
           border: "1px solid rgba(255,255,255,.35)",
           background: on ? MAGENTA : "#14141a",
           color: "#fff",
@@ -511,7 +511,7 @@ function PinLayer() {
           overflow: "auto",
           background: "rgba(18,18,22,.94)",
           color: "#fff",
-          borderRadius: 8,
+          borderRadius: "var(--radius-sm)",
           border: "1px solid rgba(255,255,255,.15)",
           font: "12px/1.45 ui-monospace, Menlo, monospace",
         }}
@@ -584,7 +584,7 @@ function PinLayer() {
                   maxHeight: 90,
                   overflow: "auto",
                   padding: "5px 6px",
-                  borderRadius: 4,
+                  borderRadius: "var(--radius-sm)",
                   background: "rgba(255,255,255,.07)",
                   wordBreak: "break-word",
                 }}
@@ -615,7 +615,7 @@ function PinLayer() {
 const panelBtn: React.CSSProperties = {
   padding: "2px 6px",
   border: "1px solid rgba(255,255,255,.25)",
-  borderRadius: 4,
+  borderRadius: "var(--radius-sm)",
   background: "transparent",
   color: "#fff",
   font: "inherit",

@@ -126,13 +126,13 @@ export function SharedLinkBidCard({
   ];
 
   const rowSep = { borderTop: "1px solid var(--surface2)" } as const;
-  const iconBox = { width: 40, height: 40, borderRadius: 11, background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } as const;
+  const iconBox = { width: 40, height: 40, borderRadius: "var(--radius-md)", background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } as const;
   const blueLink = { background: "none", border: "none", color: "var(--info)", fontWeight: 800, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" } as const;
 
   return (
     <div
       onClick={picking ? onToggleSelect : undefined}
-      style={{ flex: cardFlex ?? "0 0 calc(44% - 8px)", minWidth: 0, scrollSnapAlign: "start", alignSelf: "flex-start", display: "flex", flexDirection: "column", position: "relative", background: "var(--surface)", border: `1px solid ${isSel ? "var(--brand)" : "var(--border)"}`, borderRadius: 18, overflow: "hidden", outline: isSel ? "2px solid var(--brand)" : "none", outlineOffset: 2, cursor: picking ? "pointer" : "default" }}
+      style={{ flex: cardFlex ?? "0 0 calc(44% - 8px)", minWidth: 0, scrollSnapAlign: "start", alignSelf: "flex-start", display: "flex", flexDirection: "column", position: "relative", background: "var(--surface)", border: `1px solid ${isSel ? "var(--brand)" : "var(--border)"}`, borderRadius: "var(--radius-lg)", overflow: "hidden", outline: isSel ? "2px solid var(--brand)" : "none", outlineOffset: 2, cursor: picking ? "pointer" : "default" }}
     >
       <div style={{ height: 4, background: "var(--warn)" }} />
       {/* off-platform banner — replaces a status pill + the old "submitted" footer line */}
@@ -144,7 +144,7 @@ export function SharedLinkBidCard({
         {/* Valid-until sits UP here next to "N days ago" so it doesn't add a line to the card body. */}
         <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0, whiteSpace: "nowrap" }}>
           {validUntil && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 800, color: validTone.c, background: validTone.bg, padding: "2px 8px", borderRadius: 20 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 800, color: validTone.c, background: validTone.bg, padding: "2px 8px", borderRadius: "var(--radius-lg)" }}>
               <span className="material-icons-outlined" style={{ fontSize: 12 }}>{expired ? "event_busy" : "schedule"}</span>
               {expired ? L("Expired", "منتهٍ") : L(`Valid until ${fmtDate(validUntil)}`, `صالح حتى ${fmtDate(validUntil)}`)}
             </span>
@@ -164,13 +164,13 @@ export function SharedLinkBidCard({
 
       {/* header */}
       <div style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "16px 16px 12px" }}>
-        <div style={{ width: 56, height: 56, borderRadius: 14, background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <div style={{ width: 56, height: 56, borderRadius: "var(--radius-lg)", background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <EquipImg src={itemImage ?? null} categoryId={categoryId ?? null} name={title} box="" img="h-10 w-10 object-contain" iconSize={36} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
             <span style={{ flex: "0 1 auto", minWidth: 0, fontSize: 13.5, fontWeight: 900, color: "var(--navy)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.25 }} title={title}>{title}</span>
-            <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: "var(--warn)", background: "var(--warn-soft)", padding: "1px 8px", borderRadius: 20 }}>×{offered}</span>
+            <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: "var(--warn)", background: "var(--warn-soft)", padding: "1px 8px", borderRadius: "var(--radius-lg)" }}>×{offered}</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 6 }}>
             <span style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--navy)", color: "var(--surface)", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(bid.supplierName || "S").charAt(0).toUpperCase()}</span>
@@ -180,7 +180,7 @@ export function SharedLinkBidCard({
                 solid band-coloured badge so it reads at a glance, without adding card height. */}
             {quality && (
               <span title={L(`Bid quality ${quality.score}% — terms match, documents & company details`, `جودة العرض ${quality.score}٪ — مطابقة الشروط والمستندات وبيانات الشركة`)}
-                style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 900, color: "var(--surface)", background: BAND_COLOR[quality.band], padding: "3px 9px", borderRadius: 20, fontVariantNumeric: "tabular-nums", }}>
+                style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 900, color: "var(--surface)", background: BAND_COLOR[quality.band], padding: "3px 9px", borderRadius: "var(--radius-lg)", fontVariantNumeric: "tabular-nums", }}>
                 <span className="material-icons-outlined" style={{ fontSize: 14 }}>workspace_premium</span>{quality.score}%
               </span>
             )}
@@ -189,10 +189,10 @@ export function SharedLinkBidCard({
       </div>
 
       {/* fulfillment band */}
-      <div style={{ margin: "0 16px 14px", padding: "10px 14px", borderRadius: 12, background: "var(--brand-soft)", display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ margin: "0 16px 14px", padding: "10px 14px", borderRadius: "var(--radius-md)", background: "var(--brand-soft)", display: "flex", alignItems: "center", gap: 12 }}>
         <span style={{ fontSize: 12, fontWeight: 800, color: "var(--navy)", whiteSpace: "nowrap" }}>{L(`Covers ${offered} of ${needed} units`, `يغطّي ${offered} من ${needed} وحدات`)}</span>
-        <div style={{ flex: 1, height: 8, borderRadius: 6, background: "color-mix(in srgb, var(--brand) 18%, transparent)", overflow: "hidden" }}>
-          <div style={{ height: "100%", borderRadius: 6, background: "var(--brand)", width: `${cover}%` }} />
+        <div style={{ flex: 1, height: 8, borderRadius: "var(--radius-sm)", background: "color-mix(in srgb, var(--brand) 18%, transparent)", overflow: "hidden" }}>
+          <div style={{ height: "100%", borderRadius: "var(--radius-sm)", background: "var(--brand)", width: `${cover}%` }} />
         </div>
         {bid.distanceKm != null && <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700, whiteSpace: "nowrap" }}>{Math.round(bid.distanceKm)} km</span>}
       </div>
@@ -239,9 +239,9 @@ export function SharedLinkBidCard({
         {priceOpen && !picking && (
           <div style={{ marginTop: 12 }}>
             {offered > 1 && (
-              <div style={{ display: "inline-flex", background: "var(--surface2)", borderRadius: 10, padding: 3, marginBottom: 12 }}>
+              <div style={{ display: "inline-flex", background: "var(--surface2)", borderRadius: "var(--radius-md)", padding: 3, marginBottom: 12 }}>
                 {([[false, L(`All ${offered} units`, `كل ${offered} وحدات`)], [true, L("Per unit", "لكل وحدة")]] as [boolean, string][]).map(([v, lab]) => (
-                  <button key={String(v)} onClick={() => setPerUnit(v)} style={{ padding: "6px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12.5, fontFamily: "inherit", background: perUnit === v ? "var(--navy)" : "transparent", color: perUnit === v ? "var(--surface)" : "var(--muted)" }}>{lab}</button>
+                  <button key={String(v)} onClick={() => setPerUnit(v)} style={{ padding: "6px 13px", borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12.5, fontFamily: "inherit", background: perUnit === v ? "var(--navy)" : "transparent", color: perUnit === v ? "var(--surface)" : "var(--muted)" }}>{lab}</button>
                 ))}
               </div>
             )}
@@ -262,7 +262,7 @@ export function SharedLinkBidCard({
                 <span style={{ fontSize: 13, fontWeight: 800, color: "var(--navy)", fontVariantNumeric: "tabular-nums" }}>{nf(val)}</span>
               </div>
             ))}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, padding: "12px 14px", borderRadius: 12, background: "var(--brand-soft)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, padding: "12px 14px", borderRadius: "var(--radius-md)", background: "var(--brand-soft)" }}>
               <span style={{ fontSize: 12.5, fontWeight: 800, color: "var(--navy)" }}>{L("Quoted total", "الإجمالي المُسعّر")}</span>
               <span style={{ fontSize: 16, fontWeight: 900, color: "var(--brand)" }}>{nf(grand)} {L("SAR", "ر.س")}</span>
             </div>
@@ -276,11 +276,11 @@ export function SharedLinkBidCard({
           <div style={{ display: "flex", gap: 8 }}>
             {/* When negotiate is hidden this is the sole CTA → filled navy (primary), matching the in-app
                 bid card. When negotiate shows (dev), it's outlined so the orange Negotiate reads as primary. */}
-            <button onClick={onViewSubmission} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px 10px", borderRadius: 14, ...(onNegotiate ? { border: "1.5px solid var(--navy)", background: "var(--surface)", color: "var(--navy)" } : { border: "none", background: "var(--navy)", color: "var(--surface)" }), fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+            <button onClick={onViewSubmission} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px 10px", borderRadius: "var(--radius-lg)", ...(onNegotiate ? { border: "1.5px solid var(--navy)", background: "var(--surface)", color: "var(--navy)" } : { border: "none", background: "var(--navy)", color: "var(--surface)" }), fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
               <span className="material-icons-outlined" style={{ fontSize: 18 }}>visibility</span>{L("View bid", "عرض العرض")}
             </button>
             {onNegotiate && (
-              <button onClick={onNegotiate} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px 10px", borderRadius: 14, border: "none", background: "var(--brand)", color: "var(--surface)", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit", }}>
+              <button onClick={onNegotiate} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px 10px", borderRadius: "var(--radius-lg)", border: "none", background: "var(--brand)", color: "var(--surface)", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit", }}>
                 <span className="material-icons-outlined" style={{ fontSize: 18 }}>forum</span>{L("Negotiate", "تفاوض")}
               </button>
             )}

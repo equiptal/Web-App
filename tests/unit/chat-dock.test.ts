@@ -920,7 +920,9 @@ describe("the dock's composer sends what the deal room sends, the way the deal r
     expect(send).toMatch(/width:\s*40px/);
     expect(send).toMatch(/height:\s*40px/);
     const input = cssBlockOf(cssSrc, ".bidmap .bm-chat-input {");
-    expect(input).toMatch(/border-radius:\s*20px/);
+    // A capsule, and it stays one: the radius scale sharpened on 2026-08-28 and this control is
+    // round by SHAPE rather than by a step on that scale.
+    expect(input).toMatch(/border-radius:\s*999px/);
     expect(input).toMatch(/padding:\s*10px 14px/);
     expect(input).toMatch(/font-size:\s*12\.5px/);
     expect(input.toLowerCase()).toContain("#f8fafc");

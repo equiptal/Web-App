@@ -276,7 +276,7 @@
   min-width: 17px;
   height: 17px;
   padding: 0 4px;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: var(--danger);
   color: var(--surface);
   font-size: 9.5px;
@@ -328,7 +328,7 @@
    the latter. `isOutOfCity` is the contract's (bid-map.ts) — presentation only, no filtering. */
 .mp-outcity {
   border: 1px solid color-mix(in srgb, var(--warn) 25%, transparent);
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   padding: 2px 8px;
   background: #fff6e8;
   color: var(--warn-deep);
@@ -396,7 +396,7 @@
 
 .mp-cell {
   border: 1px solid #e1e9f1;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 9px 10px;
   background: #edf2f7;
   min-width: 0;
@@ -559,7 +559,7 @@ button.mp-cell {
   gap: 10px;
   padding: 7px 10px;
   border: 1px solid #e1e9f1;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   margin-bottom: 6px;
   background: var(--surface);
 }
@@ -625,7 +625,7 @@ span.mp-rowopen { cursor: default; }
   height: 22px;
   padding: 0;
   border: 1.5px solid #c8d8e8;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--surface);
   font-family: inherit;
@@ -671,7 +671,7 @@ span.mp-rowopen { cursor: default; }
   width: 46px;
   height: 40px;
   border: 1px solid #e1e9f1;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   overflow: hidden;
   display: flex;
@@ -761,7 +761,7 @@ span.mp-rowopen { cursor: default; }
   align-items: center;
   justify-content: center;
   border: 1px solid color-mix(in srgb, var(--navy-deep) 22%, transparent);
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--navy-deep) 7%, transparent);
   color: #16304f;
   font-family: inherit;
@@ -804,7 +804,7 @@ span.mp-rowopen { cursor: default; }
   padding: 12px 10px;
   /* A border the colour of the fill, so the solid and the outline are exactly the same height. */
   border: 1px solid #c8d8e8;
-  border-radius: 11px;
+  border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--navy);
   font-family: inherit;
@@ -832,7 +832,7 @@ span.mp-rowopen { cursor: default; }
      The disabled one keeps its shape and only changes colour — a control that shrinks when it goes dead
      makes the panel move under the renter's first tick. */
   border: 1px solid var(--navy);
-  border-radius: 11px;
+  border-radius: var(--radius-md);
   background: var(--navy);
   color: var(--surface);
   font-family: inherit;
@@ -948,7 +948,7 @@ span.mp-rowopen { cursor: default; }
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: 11px;
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.13);
   font-size: 13px;
   font-weight: 800;

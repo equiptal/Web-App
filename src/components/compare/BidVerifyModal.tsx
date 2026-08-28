@@ -121,14 +121,14 @@ export function BidVerifyModal({
 
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "color-mix(in srgb, var(--info-deep) 50%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "min(960px, 96vw)", maxHeight: "94vh", display: "flex", flexDirection: "column", background: "var(--surface)", borderRadius: 16, overflow: "hidden", }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "min(960px, 96vw)", maxHeight: "94vh", display: "flex", flexDirection: "column", background: "var(--surface)", borderRadius: "var(--radius-lg)", overflow: "hidden", }}>
         {/* Header (renter-side chrome, not the public renter-identity bar) */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 20px", borderBottom: "1px solid var(--surface3)", flex: "0 0 auto" }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h3 style={{ margin: 0, fontSize: 17, fontWeight: 900, color: "var(--navy)" }}>{L("Verify the uploaded quote", "تحقّق من العرض المرفوع")}</h3>
             <p style={{ margin: "3px 0 0", fontSize: 12.5, color: "var(--muted)" }}>{L("We transformed the quote into your bid form — confirm, edit, or leave blank, then add it.", "حوّلنا العرض إلى نموذج عرضك — أكّد أو عدّل أو اترك فارغًا ثم أضِفه.")}</p>
           </div>
-          <button onClick={onClose} aria-label={L("Close", "إغلاق")} style={{ width: 34, height: 34, borderRadius: 9, border: "none", background: "var(--surface2)", color: "var(--muted)", cursor: "pointer", fontSize: 18 }}>✕</button>
+          <button onClick={onClose} aria-label={L("Close", "إغلاق")} style={{ width: 34, height: 34, borderRadius: "var(--radius-sm)", border: "none", background: "var(--surface2)", color: "var(--muted)", cursor: "pointer", fontSize: 18 }}>✕</button>
         </div>
 
         {/* Body — the bid form, styled with BID_FORM_CSS */}
@@ -200,7 +200,7 @@ export function BidVerifyModal({
 
                   {/* Pricing */}
                   <div className="subhead"><span className="material-icons-outlined">request_quote</span>{L("Pricing", "التسعير")}
-                    <span style={{ marginInlineStart: "auto", display: "inline-flex", border: "1px solid var(--border)", borderRadius: 7, overflow: "hidden", textTransform: "none", letterSpacing: 0 }}>
+                    <span style={{ marginInlineStart: "auto", display: "inline-flex", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", overflow: "hidden", textTransform: "none", letterSpacing: 0 }}>
                       {([["excl", L("Excl. VAT", "قبل الضريبة")], ["incl", L("Incl. VAT", "شامل الضريبة")]] as ["excl" | "incl", string][]).map(([v, lab]) => (
                         <button key={v} type="button" onClick={() => setVat(v)} style={{ border: "none", cursor: "pointer", font: "inherit", textTransform: "none", letterSpacing: 0, fontWeight: 800, fontSize: 10.5, padding: "3px 9px", background: vatMode === v ? "var(--navy)" : "var(--surface)", color: vatMode === v ? "var(--surface)" : "var(--muted)" }}>{lab}</button>
                       ))}
@@ -279,8 +279,8 @@ export function BidVerifyModal({
           <p style={{ margin: "0 0 8px", fontSize: 11.5, color: "var(--muted)" }}>{L("Anything unknown is left for you to fill — or leave it blank and add it now.", "كل ما هو غير معروف متروك لك لتعبئته — أو اتركه فارغًا وأضِفه الآن.")}</p>
           {err && <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 700, color: "var(--danger)" }}>{err}</p>}
           <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={onClose} style={{ flex: "0 0 auto", padding: "12px 18px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--navy)", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{L("Cancel", "إلغاء")}</button>
-            <button onClick={submit} disabled={submitting} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px", borderRadius: 10, border: "none", background: "var(--brand)", color: "var(--surface)", fontWeight: 800, fontSize: 15, cursor: submitting ? "default" : "pointer", opacity: submitting ? 0.7 : 1, fontFamily: "inherit" }}>
+            <button onClick={onClose} style={{ flex: "0 0 auto", padding: "12px 18px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--navy)", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{L("Cancel", "إلغاء")}</button>
+            <button onClick={submit} disabled={submitting} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px", borderRadius: "var(--radius-md)", border: "none", background: "var(--brand)", color: "var(--surface)", fontWeight: 800, fontSize: 15, cursor: submitting ? "default" : "pointer", opacity: submitting ? 0.7 : 1, fontFamily: "inherit" }}>
               <span className="material-icons-outlined" style={{ fontSize: 18 }}>{submitting ? "hourglass_top" : "add"}</span>{submitting ? L("Adding…", "جارٍ الإضافة…") : L("Add to comparison", "أضِف للمقارنة")}
             </button>
           </div>

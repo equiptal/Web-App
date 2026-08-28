@@ -213,7 +213,7 @@
 //           ) : (
 //             <span style={{ display: "inline-flex", gap: 6, alignItems: "center", marginInlineStart: "auto", flexWrap: "wrap" }}>
 //               <input type="datetime-local" value={dlInput} onChange={(e) => setDlInput(e.target.value)}
-//                 style={{ border: "1px solid var(--border)", borderRadius: 8, padding: "4px 8px", fontSize: 12.5 }} />
+//                 style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "4px 8px", fontSize: 12.5 }} />
 //               <button className="rt-copy" onClick={() => saveDl(false)}><span className="material-icons-outlined">check</span>{L("Save", "حفظ")}</button>
 //               {link?.bidDeadline && <button className="rt-copy" onClick={() => saveDl(true)}>{L("Clear", "مسح")}</button>}
 //               <button className="rt-copy" onClick={() => setDlEdit(false)}>{L("Cancel", "إلغاء")}</button>

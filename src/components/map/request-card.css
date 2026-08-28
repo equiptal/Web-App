@@ -32,7 +32,7 @@
   --rq-rule: color-mix(in srgb, var(--brand) 22%, transparent);
   background: var(--rq-tint);
   border: 1.5px solid var(--rq-edge);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
 }
 
@@ -114,7 +114,7 @@
   flex-shrink: 0;
   width: 40px;
   height: 40px;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   display: inline-flex;
   align-items: center;
@@ -175,7 +175,7 @@
   background: rgba(255, 255, 255, 0.6);
   border: 1px solid color-mix(in srgb, var(--muted) 22%, transparent);
   /* r12 and 8/3 — the app's doc-chip geometry. */
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 3px 8px;
 }
 /* **The sentence IS the ask** (app, owner 2026-08-15) — navy and heavy, the weightiest line on the
@@ -211,7 +211,7 @@
 .bm-rq-at { margin-top: 7px; text-align: end; font-size: 9px; font-weight: 700; color: var(--muted); }
 .bm-rq-acts { display: flex; gap: 8px; padding: 0 11px 11px; }
 .bm-rq-btn {
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 9px;
   font: inherit;
   font-size: 12px;

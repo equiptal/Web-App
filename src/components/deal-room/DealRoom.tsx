@@ -1152,7 +1152,7 @@ function RequestSummaryModal({ room, ar, L, onClose }: {
 
   return (
     <div dir={ar ? "rtl" : "ltr"} onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "color-mix(in srgb, var(--info-deep) 50%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, maxHeight: "88vh", display: "flex", flexDirection: "column", background: "var(--surface)", borderRadius: 20, overflow: "hidden", }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, maxHeight: "88vh", display: "flex", flexDirection: "column", background: "var(--surface)", borderRadius: "var(--radius-lg)", overflow: "hidden", }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "18px 20px", borderBottom: "1px solid var(--surface2)" }}>
           <span className="material-icons-outlined" style={{ color: "var(--navy)" }}>assignment</span>
           <span style={{ flex: 1, textAlign: ar ? "right" : "left" }}>
@@ -1174,7 +1174,7 @@ function RequestSummaryModal({ room, ar, L, onClose }: {
                   <span className="material-icons-outlined" style={{ fontSize: 16 }}>{sec.icon}</span>
                   <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: ".02em", textTransform: "uppercase" }}>{sec.title}</span>
                 </div>
-                <div style={{ display: "grid", gap: 1, background: "var(--surface2)", borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ display: "grid", gap: 1, background: "var(--surface2)", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
                   {rows.map(([k, v]) => (
                     <div key={k} style={{ display: "flex", gap: 12, justifyContent: "space-between", background: "var(--surface)", padding: "10px 12px" }}>
                       <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--muted)" }}>{k}</span>
@@ -1882,10 +1882,10 @@ function CounterFlow({
 
         {pendingEx && (
           <div className="qp-scrim" style={{ zIndex: 75 }} dir={ar ? "rtl" : "ltr"} onClick={() => setPendingEx(null)}>
-            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 400, background: "var(--surface)", borderRadius: 20, overflow: "hidden", padding: "22px 22px 20px", textAlign: "start" }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 400, background: "var(--surface)", borderRadius: "var(--radius-lg)", overflow: "hidden", padding: "22px 22px 20px", textAlign: "start" }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
                 <h3 style={{ fontSize: 16.5, fontWeight: 900, color: "var(--navy)", margin: 0, lineHeight: 1.45 }}>{pendingEx.title}</h3>
-                <span style={{ flexShrink: 0, display: "inline-flex", width: 42, height: 42, borderRadius: 12, background: "var(--brand-soft)", color: "var(--warn)", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ flexShrink: 0, display: "inline-flex", width: 42, height: 42, borderRadius: "var(--radius-md)", background: "var(--brand-soft)", color: "var(--warn)", alignItems: "center", justifyContent: "center" }}>
                   <span className="material-icons-outlined" style={{ fontSize: 24 }}>warning_amber</span>
                 </span>
               </div>
@@ -1893,8 +1893,8 @@ function CounterFlow({
                 {L("If you cancel, the supplier won't handle it — it becomes your responsibility: you arrange the transport and cover its cost, and it won't appear in the supplier's offer.", "عند الإلغاء لن يتكفّل المورد بها — تصبح على مسؤوليتك أنت: تنظّم النقل وتتحمّل تكلفته، ولن تظهر ضمن عرض المورد.")}
               </p>
               <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => setPendingEx(null)} style={{ flex: "0 0 auto", padding: "13px 22px", borderRadius: 13, border: "1.5px solid var(--border)", background: "var(--surface)", color: "var(--navy)", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>{L("Go back", "تراجع")}</button>
-                <button onClick={() => { pendingEx.onYes(); setPendingEx(null); }} style={{ flex: 1, padding: "13px 12px", borderRadius: 13, border: "none", background: "var(--danger)", color: "var(--surface)", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{L("Yes, cancel it — on me", "نعم، ألغِها — عليّ أنا")}</button>
+                <button onClick={() => setPendingEx(null)} style={{ flex: "0 0 auto", padding: "13px 22px", borderRadius: "var(--radius-lg)", border: "1.5px solid var(--border)", background: "var(--surface)", color: "var(--navy)", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>{L("Go back", "تراجع")}</button>
+                <button onClick={() => { pendingEx.onYes(); setPendingEx(null); }} style={{ flex: 1, padding: "13px 12px", borderRadius: "var(--radius-lg)", border: "none", background: "var(--danger)", color: "var(--surface)", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{L("Yes, cancel it — on me", "نعم، ألغِها — عليّ أنا")}</button>
               </div>
             </div>
           </div>

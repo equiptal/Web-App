@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { bidCardHtml, bidTokenFromUrl } from "@/lib/bidCardHtml";
-import { COLORS } from "@/lib/ds-colors";
+import { COLORS, RADII } from "@/lib/ds-colors";
 
 /**
  * The clipboard card. It exists because Gmail never builds a preview for a pasted URL — so the card
@@ -32,7 +32,7 @@ describe("bidCardHtml", () => {
     // The card is pasted into a mail client, which has none of our stylesheet, so it carries literal
     // values from `ds-colors` rather than `var(--border)`.
     expect(html).toContain(`border:1px solid ${COLORS.background}`);
-    expect(html).toContain("border-radius:10px");
+    expect(html).toContain(`border-radius:${RADII.md}`);
     expect(html).toContain("Forklift rental, 1 unit");
     expect(html).toContain("Riyadh · 30-day rental · Awaiting your response");
     expect(html).toContain("WEBSTAGING.MOEDATECH.NET");

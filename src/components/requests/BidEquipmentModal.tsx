@@ -86,7 +86,7 @@ export function BidEquipmentModal({
   const verified = bid.eqVerified || eq?.isVerified;
 
   const tile = (label: string, value: React.ReactNode, accent = false) => (
-    <div style={{ background: accent ? "var(--brand-soft)" : "var(--surface)", borderRadius: 12, padding: "11px 13px" }}>
+    <div style={{ background: accent ? "var(--brand-soft)" : "var(--surface)", borderRadius: "var(--radius-md)", padding: "11px 13px" }}>
       <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".05em", color: "var(--muted)" }}>{label}</div>
       <div style={{ fontSize: 16, fontWeight: 900, color: accent ? "var(--brand)" : "var(--navy)", marginTop: 4 }}>{value}</div>
     </div>
@@ -100,7 +100,7 @@ export function BidEquipmentModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ width: "100%", maxWidth: 440, maxHeight: "92vh", display: "flex", flexDirection: "column", background: "var(--surface)", borderRadius: 20, overflow: "hidden", }}
+        style={{ width: "100%", maxWidth: 440, maxHeight: "92vh", display: "flex", flexDirection: "column", background: "var(--surface)", borderRadius: "var(--radius-lg)", overflow: "hidden", }}
       >
         {/* header strip */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 16px" }}>
@@ -108,7 +108,7 @@ export function BidEquipmentModal({
             {bid.supplierName}
             {bid.verified && <span className="material-icons-outlined" style={{ fontSize: 16, color: "var(--ok)" }}>verified</span>}
           </span>
-          <button onClick={onClose} aria-label={L("Close", "إغلاق")} style={{ width: 34, height: 34, borderRadius: 10, border: "none", background: "var(--surface2)", color: "var(--muted)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <button onClick={onClose} aria-label={L("Close", "إغلاق")} style={{ width: 34, height: 34, borderRadius: "var(--radius-md)", border: "none", background: "var(--surface2)", color: "var(--muted)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <span className="material-icons-outlined" style={{ fontSize: 19 }}>close</span>
           </button>
         </div>
@@ -120,7 +120,7 @@ export function BidEquipmentModal({
             {certChips.length > 0 && (
               <div style={{ position: "absolute", bottom: 10, insetInlineStart: 14, display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {certChips.slice(0, 3).map((c, i) => (
-                  <span key={i} style={{ fontSize: 11.5, fontWeight: 800, color: "var(--ok)", background: "var(--ok-soft)", padding: "3px 9px", borderRadius: 20 }}>✓ {c}</span>
+                  <span key={i} style={{ fontSize: 11.5, fontWeight: 800, color: "var(--ok)", background: "var(--ok-soft)", padding: "3px 9px", borderRadius: "var(--radius-lg)" }}>✓ {c}</span>
                 ))}
               </div>
             )}
@@ -133,13 +133,13 @@ export function BidEquipmentModal({
             </div>
             {subtitle && <p style={{ fontSize: 13, color: "var(--muted)", fontWeight: 600, margin: "5px 0 0" }}>{subtitle}</p>}
             {verified && (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 10, fontSize: 12.5, fontWeight: 800, color: "var(--info)", background: "var(--info-soft)", padding: "5px 11px", borderRadius: 20 }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 10, fontSize: 12.5, fontWeight: 800, color: "var(--info)", background: "var(--info-soft)", padding: "5px 11px", borderRadius: "var(--radius-lg)" }}>
                 <span className="material-icons-outlined" style={{ fontSize: 15 }}>verified_user</span>{L("Facility verified", "منشأة موثّقة")}
               </span>
             )}
 
             {/* supplier-provided details disclaimer */}
-            <div style={{ marginTop: 14, background: "var(--brand-soft)", border: "1px solid var(--brand-pale)", borderRadius: 13, padding: "13px 14px" }}>
+            <div style={{ marginTop: 14, background: "var(--brand-soft)", border: "1px solid var(--brand-pale)", borderRadius: "var(--radius-lg)", padding: "13px 14px" }}>
               <div style={{ display: "flex", gap: 9 }}>
                 <span style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--brand)", color: "var(--surface)", fontSize: 13, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>i</span>
                 <div>
@@ -197,7 +197,7 @@ export function BidEquipmentModal({
                 <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".05em", color: "var(--muted)", marginBottom: 8 }}>{L("CERTIFICATES & OWNERSHIP ON FILE", "الشهادات والملكية المتوفّرة")}</div>
                 <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
                   {certChips.map((c, i) => (
-                    <span key={i} style={{ fontSize: 12.5, fontWeight: 800, color: "var(--ok)", background: "var(--ok-soft)", padding: "4px 11px", borderRadius: 20 }}>✓ {c}</span>
+                    <span key={i} style={{ fontSize: 12.5, fontWeight: 800, color: "var(--ok)", background: "var(--ok-soft)", padding: "4px 11px", borderRadius: "var(--radius-lg)" }}>✓ {c}</span>
                   ))}
                 </div>
               </div>
@@ -210,7 +210,7 @@ export function BidEquipmentModal({
           <button
             onClick={onRequestDetails}
             disabled={busy}
-            style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "14px", borderRadius: 14, border: "none", background: "var(--navy)", color: "var(--surface)", fontWeight: 800, fontSize: 15, cursor: busy ? "default" : "pointer", fontFamily: "inherit", opacity: busy ? 0.7 : 1 }}
+            style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "14px", borderRadius: "var(--radius-lg)", border: "none", background: "var(--navy)", color: "var(--surface)", fontWeight: 800, fontSize: 15, cursor: busy ? "default" : "pointer", fontFamily: "inherit", opacity: busy ? 0.7 : 1 }}
           >
             <span className="material-icons-outlined" style={{ fontSize: 18 }}>{busy ? "progress_activity" : bid.viaSharedLink ? "visibility" : "forum"}</span>
             {bid.viaSharedLink ? L("View bid submission", "عرض العرض المُقدَّم") : L("Request more details", "اطلب مزيد من التفاصيل")}

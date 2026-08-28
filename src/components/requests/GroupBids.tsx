@@ -499,10 +499,10 @@
 //   // 3+ take a fixed width so the third card peeks at the edge, hinting the horizontal scroll.
 //   const cardFlex = shown.length <= 2 ? "1 1 0" : "0 0 calc(44% - 8px)";
 //   // Toolbar chip styles (prototype bids-by-supplier).
-//   const supChip = (on: boolean): CSSProperties => ({ display: "flex", alignItems: "center", gap: 7, whiteSpace: "nowrap", flexShrink: 0, padding: "10px 14px", borderRadius: 22, cursor: "pointer", fontWeight: 800, fontSize: 13, fontFamily: "inherit", background: on ? "var(--navy)" : "var(--surface)", color: on ? "var(--surface)" : "var(--navy)", border: `1px solid ${on ? "var(--navy)" : "var(--border)"}` });
-//   const chipCount = (on: boolean): CSSProperties => ({ fontSize: 11, fontWeight: 800, background: on ? "rgba(255,255,255,.18)" : "var(--surface2)", color: on ? "var(--surface)" : "var(--muted)", padding: "1px 7px", borderRadius: 20 });
-//   const itemMenuRow = (on: boolean): CSSProperties => ({ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "start", padding: "9px 11px", borderRadius: 9, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 13, fontFamily: "inherit", background: on ? "var(--surface2)" : "transparent", color: "var(--navy)" });
-//   const menuCount: CSSProperties = { fontSize: 11, fontWeight: 800, color: "var(--muted)", background: "var(--background)", padding: "1px 8px", borderRadius: 20 };
+//   const supChip = (on: boolean): CSSProperties => ({ display: "flex", alignItems: "center", gap: 7, whiteSpace: "nowrap", flexShrink: 0, padding: "10px 14px", borderRadius: "var(--radius-lg)", cursor: "pointer", fontWeight: 800, fontSize: 13, fontFamily: "inherit", background: on ? "var(--navy)" : "var(--surface)", color: on ? "var(--surface)" : "var(--navy)", border: `1px solid ${on ? "var(--navy)" : "var(--border)"}` });
+//   const chipCount = (on: boolean): CSSProperties => ({ fontSize: 11, fontWeight: 800, background: on ? "rgba(255,255,255,.18)" : "var(--surface2)", color: on ? "var(--surface)" : "var(--muted)", padding: "1px 7px", borderRadius: "var(--radius-lg)" });
+//   const itemMenuRow = (on: boolean): CSSProperties => ({ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "start", padding: "9px 11px", borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer", fontWeight: 800, fontSize: 13, fontFamily: "inherit", background: on ? "var(--surface2)" : "transparent", color: "var(--navy)" });
+//   const menuCount: CSSProperties = { fontSize: 11, fontWeight: 800, color: "var(--muted)", background: "var(--background)", padding: "1px 8px", borderRadius: "var(--radius-lg)" };
 //
 //   return (
 //     <div>
@@ -528,19 +528,19 @@
 //         <div style={{ width: 1, height: 34, background: "var(--border)", flexShrink: 0 }} />
 //         {/* item picker */}
 //         <div style={{ position: "relative", flexShrink: 0 }}>
-//           <button onClick={() => { setItemMenuOpen((o) => !o); setFilterOpen(false); }} title={L("Filter by item", "تصفية حسب البند")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 11, border: "1.5px solid var(--navy)", background: "var(--navy)", color: "var(--surface)", fontWeight: 800, fontSize: 14, cursor: "pointer" }}>
-//             <span style={{ width: 28, height: 28, borderRadius: 8, background: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0, padding: 1 }}>
+//           <button onClick={() => { setItemMenuOpen((o) => !o); setFilterOpen(false); }} title={L("Filter by item", "تصفية حسب البند")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: "var(--radius-md)", border: "1.5px solid var(--navy)", background: "var(--navy)", color: "var(--surface)", fontWeight: 800, fontSize: 14, cursor: "pointer" }}>
+//             <span style={{ width: 28, height: 28, borderRadius: "var(--radius-sm)", background: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0, padding: 1 }}>
 //               {selItem
 //                 ? <EquipImg src={selItem.img} categoryId={selItem.categoryId} name={selItem.name} box="" img="h-[26px] w-[26px] object-contain" iconSize={24} />
 //                 : <span className="material-icons-outlined" style={{ fontSize: 20, color: "var(--navy)" }}>apps</span>}
 //             </span>
-//             <span style={{ fontSize: 11, fontWeight: 800, background: "rgba(255,255,255,.16)", color: "var(--brand-light)", padding: "1px 7px", borderRadius: 20 }}>{selItem ? selItem.count : allBids.length}</span>
+//             <span style={{ fontSize: 11, fontWeight: 800, background: "rgba(255,255,255,.16)", color: "var(--brand-light)", padding: "1px 7px", borderRadius: "var(--radius-lg)" }}>{selItem ? selItem.count : allBids.length}</span>
 //             <span className="material-icons-outlined" style={{ fontSize: 16, color: "var(--muted-light)" }}>expand_more</span>
 //           </button>
 //           {itemMenuOpen && (
 //             <>
 //               <div onClick={() => setItemMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
-//               <div style={{ position: "absolute", zIndex: 30, top: "100%", insetInlineEnd: 0, marginTop: 6, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 13, padding: 6, minWidth: 280, maxHeight: 360, overflowY: "auto" }}>
+//               <div style={{ position: "absolute", zIndex: 30, top: "100%", insetInlineEnd: 0, marginTop: 6, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 6, minWidth: 280, maxHeight: 360, overflowY: "auto" }}>
 //                 <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".06em", color: "var(--muted)", padding: "6px 9px 7px" }}>{L("VIEWING ITEM", "البند المعروض")}</div>
 //                 <button onClick={() => { setSelectedItem("all"); setItemMenuOpen(false); }} style={itemMenuRow(selectedItem === "all")}>
 //                   <span className="material-icons-outlined" style={{ fontSize: 18 }}>apps</span>
@@ -551,7 +551,7 @@
 //                   <button key={m.id} onClick={() => { setSelectedItem(m.id); setItemMenuOpen(false); }} style={itemMenuRow(selectedItem === m.id)}>
 //                     <EquipImg src={m.img} categoryId={m.categoryId} name={m.name} box="" img="h-4 w-4 object-contain" iconSize={18} />
 //                     <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</span>
-//                     {m.qty > 1 && <span style={{ fontSize: 10, fontWeight: 800, color: "var(--warn)", background: "var(--warn-soft)", padding: "1px 6px", borderRadius: 20 }}>×{m.qty}</span>}
+//                     {m.qty > 1 && <span style={{ fontSize: 10, fontWeight: 800, color: "var(--warn)", background: "var(--warn-soft)", padding: "1px 6px", borderRadius: "var(--radius-lg)" }}>×{m.qty}</span>}
 //                     <span style={menuCount}>{m.count}</span>
 //                   </button>
 //                 ))}
@@ -561,9 +561,9 @@
 //         </div>
 //         {/* filter icon */}
 //         <div style={{ position: "relative", flexShrink: 0 }}>
-//           <button onClick={() => { setFilterOpen((o) => !o); setItemMenuOpen(false); }} title={L("Filter bids", "تصفية العروض")} style={{ position: "relative", width: 42, height: 42, borderRadius: 11, border: `1.5px solid ${fActive ? "var(--brand)" : "var(--border)"}`, background: fActive ? "var(--brand-soft)" : "var(--surface)", color: fActive ? "var(--brand)" : "var(--navy)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+//           <button onClick={() => { setFilterOpen((o) => !o); setItemMenuOpen(false); }} title={L("Filter bids", "تصفية العروض")} style={{ position: "relative", width: 42, height: 42, borderRadius: "var(--radius-md)", border: `1.5px solid ${fActive ? "var(--brand)" : "var(--border)"}`, background: fActive ? "var(--brand-soft)" : "var(--surface)", color: fActive ? "var(--brand)" : "var(--navy)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
 //             <span className="material-icons-outlined" style={{ fontSize: 20 }}>filter_list</span>
-//             {fActive > 0 && <span style={{ position: "absolute", top: -6, insetInlineEnd: -6, fontSize: 10, fontWeight: 900, background: "var(--brand)", color: "var(--surface)", minWidth: 17, height: 17, borderRadius: 20, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--surface)" }}>{fActive}</span>}
+//             {fActive > 0 && <span style={{ position: "absolute", top: -6, insetInlineEnd: -6, fontSize: 10, fontWeight: 900, background: "var(--brand)", color: "var(--surface)", minWidth: 17, height: 17, borderRadius: "var(--radius-lg)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--surface)" }}>{fActive}</span>}
 //           </button>
 //           {filterOpen && (
 //             <>
@@ -633,7 +633,7 @@
 //           <button
 //             onClick={() => setSelectMode((m) => !m)}
 //             title={L("Pick bids to compare or export", "اختر عروضًا للمقارنة أو التصدير")}
-//             style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 11, padding: "10px 16px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", background: selectMode ? "var(--navy)" : "var(--surface)", color: selectMode ? "var(--surface)" : "var(--navy)", border: `1px solid ${selectMode ? "var(--navy)" : "var(--border)"}` }}
+//             style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: "var(--radius-md)", padding: "10px 16px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", background: selectMode ? "var(--navy)" : "var(--surface)", color: selectMode ? "var(--surface)" : "var(--navy)", border: `1px solid ${selectMode ? "var(--navy)" : "var(--border)"}` }}
 //           >
 //             <span className="material-icons-outlined" style={{ fontSize: 17 }}>compare_arrows</span>
 //             {selectMode ? L("Selecting", "جارٍ التحديد") : L("Compare / Export", "مقارنة / تصدير")}
@@ -646,7 +646,7 @@
 //           <span className="material-icons-outlined" style={{ fontSize: 36, color: "var(--muted-light)" }}>filter_alt_off</span>
 //           <div style={{ marginTop: 10, fontSize: 14.5, fontWeight: 800, color: "var(--navy)" }}>{L("No bids match these filters", "لا توجد عروض مطابقة لعوامل التصفية")}</div>
 //           <div style={{ marginTop: 4, fontSize: 12.5, fontWeight: 600, color: "var(--muted)" }}>{L("Adjust or clear the source / quality filters to see more.", "عدّل أو امسح عوامل تصفية المصدر / الجودة لعرض المزيد.")}</div>
-//           {fActive > 0 && <button onClick={() => { setFSource("all"); setFqParts(new Set()); setFVerified(false); setFKm(false); }} style={{ marginTop: 14, borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--navy)", fontWeight: 800, fontSize: 13, padding: "9px 16px", cursor: "pointer", fontFamily: "inherit" }}>{L("Clear filters", "مسح عوامل التصفية")}</button>}
+//           {fActive > 0 && <button onClick={() => { setFSource("all"); setFqParts(new Set()); setFVerified(false); setFKm(false); }} style={{ marginTop: 14, borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--navy)", fontWeight: 800, fontSize: 13, padding: "9px 16px", cursor: "pointer", fontFamily: "inherit" }}>{L("Clear filters", "مسح عوامل التصفية")}</button>}
 //         </div>
 //       )}
 //       <div className="bids-snap" data-select-ui>
@@ -748,7 +748,7 @@
 //           { label: L("Matched", "مطابق"), n: termCounts.matched, c: "var(--ok)" },
 //         ];
 //         const rowSep = { borderTop: "1px solid var(--surface2)" } as const;
-//         const iconBox = { width: 40, height: 40, borderRadius: 11, background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } as const;
+//         const iconBox = { width: 40, height: 40, borderRadius: "var(--radius-md)", background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } as const;
 //         const blueLink = { background: "none", border: "none", color: "var(--info)", fontWeight: 800, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" } as const;
 //         // Top banner = the bid's SOURCE only (2 values, app parity): on-platform bids are always
 //         // "Via Moedatech app" in BLUE; off-platform shared-link bids carry the ORANGE banner on their
@@ -758,7 +758,7 @@
 //           <div
 //             key={b.id}
 //             onClick={selectMode ? () => toggleSelect(b.id) : undefined}
-//             style={{ flex: cardFlex, minWidth: 0, scrollSnapAlign: "start", alignSelf: "flex-start", display: "flex", flexDirection: "column", position: "relative", background: isSel ? "var(--brand-soft)" : "var(--surface)", border: `1px solid ${isSel ? "var(--brand)" : "var(--border)"}`, borderRadius: 18, overflow: "hidden", boxShadow: isSel ? "inset 0 0 0 2px var(--brand)" : "0 1px 2px color-mix(in srgb, var(--info-deep) 4%, transparent)", cursor: selectMode ? "pointer" : "default" }}
+//             style={{ flex: cardFlex, minWidth: 0, scrollSnapAlign: "start", alignSelf: "flex-start", display: "flex", flexDirection: "column", position: "relative", background: isSel ? "var(--brand-soft)" : "var(--surface)", border: `1px solid ${isSel ? "var(--brand)" : "var(--border)"}`, borderRadius: "var(--radius-lg)", overflow: "hidden", boxShadow: isSel ? "inset 0 0 0 2px var(--brand)" : "0 1px 2px color-mix(in srgb, var(--info-deep) 4%, transparent)", cursor: selectMode ? "pointer" : "default" }}
 //           >
 //             <div style={{ height: 4, background: banner.c }} />
 //             {banner && (
@@ -774,13 +774,13 @@
 //
 //             {/* header */}
 //             <div style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "16px 16px 12px" }}>
-//               <div style={{ width: 56, height: 56, borderRadius: 14, background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+//               <div style={{ width: 56, height: 56, borderRadius: "var(--radius-lg)", background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
 //                 <EquipImg src={b.itemImage} categoryId={b.categoryId} name={ar ? b.itemLabelAr : b.itemLabel} box="" img="h-10 w-10 object-contain" iconSize={36} />
 //               </div>
 //               <div style={{ flex: 1, minWidth: 0 }}>
 //                 <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
 //                   <span style={{ flex: "0 1 auto", minWidth: 0, fontSize: 13.5, fontWeight: 900, color: "var(--navy)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.25 }} title={ar ? b.itemLabelAr : b.itemLabel}>{ar ? b.itemLabelAr : b.itemLabel}</span>
-//                   <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: "var(--warn)", background: "var(--warn-soft)", padding: "1px 8px", borderRadius: 20 }}>×{offered}</span>
+//                   <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: "var(--warn)", background: "var(--warn-soft)", padding: "1px 8px", borderRadius: "var(--radius-lg)" }}>×{offered}</span>
 //                 </div>
 //                 <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 6 }}>
 //                   <span style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--navy)", color: "var(--surface)", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(b.supplierName || "S").charAt(0).toUpperCase()}</span>
@@ -789,17 +789,17 @@
 //                 </div>
 //               </div>
 //               {!selectMode && (
-//                 <span style={{ whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "5px 11px", borderRadius: 20, background: sc.bg, color: sc.c, display: "inline-flex", alignItems: "center", gap: 6 }}>
+//                 <span style={{ whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "5px 11px", borderRadius: "var(--radius-lg)", background: sc.bg, color: sc.c, display: "inline-flex", alignItems: "center", gap: 6 }}>
 //                   {sc.dot && <span style={{ width: 6, height: 6, borderRadius: "50%", background: sc.c }} />}{ar ? sp.ar : sp.en}
 //                 </span>
 //               )}
 //             </div>
 //
 //             {/* fulfillment band */}
-//             <div style={{ margin: "0 16px 14px", padding: "10px 14px", borderRadius: 12, background: "var(--brand-soft)", display: "flex", alignItems: "center", gap: 12 }}>
+//             <div style={{ margin: "0 16px 14px", padding: "10px 14px", borderRadius: "var(--radius-md)", background: "var(--brand-soft)", display: "flex", alignItems: "center", gap: 12 }}>
 //               <span style={{ fontSize: 12, fontWeight: 800, color: "var(--navy)", whiteSpace: "nowrap" }}>{L(`Covers ${offered} of ${needed} units`, `يغطّي ${offered} من ${needed} وحدات`)}</span>
-//               <div style={{ flex: 1, height: 8, borderRadius: 6, background: "color-mix(in srgb, var(--brand) 18%, transparent)", overflow: "hidden" }}>
-//                 <div style={{ height: "100%", borderRadius: 6, background: "var(--brand)", width: `${cover}%` }} />
+//               <div style={{ flex: 1, height: 8, borderRadius: "var(--radius-sm)", background: "color-mix(in srgb, var(--brand) 18%, transparent)", overflow: "hidden" }}>
+//                 <div style={{ height: "100%", borderRadius: "var(--radius-sm)", background: "var(--brand)", width: `${cover}%` }} />
 //               </div>
 //               <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700, whiteSpace: "nowrap" }}>{[b.rating != null ? `★ ${b.rating.toFixed(1)}` : "", b.distanceKm != null ? `${Math.round(b.distanceKm)} km` : ""].filter(Boolean).join(" · ")}</span>
 //             </div>
@@ -869,9 +869,9 @@
 //               {priceOpen && !selectMode && (
 //                 <div style={{ marginTop: 12 }}>
 //                   {liveUnits > 1 && (
-//                     <div style={{ display: "inline-flex", background: "var(--surface2)", borderRadius: 10, padding: 3, marginBottom: 12 }}>
+//                     <div style={{ display: "inline-flex", background: "var(--surface2)", borderRadius: "var(--radius-md)", padding: 3, marginBottom: 12 }}>
 //                       {([[false, L(`All ${liveUnits} units`, `كل ${liveUnits} وحدات`)], [true, L("Per unit", "لكل وحدة")]] as [boolean, string][]).map(([v, lab]) => (
-//                         <button key={String(v)} onClick={() => setAllUnitsIds((s) => { const n = new Set(s); if (v) n.delete(b.id); else n.add(b.id); return n; })} style={{ padding: "6px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12.5, fontFamily: "inherit", background: perUnit === v ? "var(--navy)" : "transparent", color: perUnit === v ? "var(--surface)" : "var(--muted)" }}>{lab}</button>
+//                         <button key={String(v)} onClick={() => setAllUnitsIds((s) => { const n = new Set(s); if (v) n.delete(b.id); else n.add(b.id); return n; })} style={{ padding: "6px 13px", borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12.5, fontFamily: "inherit", background: perUnit === v ? "var(--navy)" : "transparent", color: perUnit === v ? "var(--surface)" : "var(--muted)" }}>{lab}</button>
 //                       ))}
 //                     </div>
 //                   )}
@@ -883,11 +883,11 @@
 //                     [L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"), vat, null],
 //                   ] as [string, number, string | null][]).map(([lab, val, note], i) => (
 //                     <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--background)" }}>
-//                       <span style={{ fontSize: 13.5, color: "var(--navy-mid)", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>{lab}{note ? <span style={{ fontSize: 11, color: "var(--muted)", background: "var(--surface2)", padding: "1px 7px", borderRadius: 20, whiteSpace: "nowrap" }}>{note}</span> : null}</span>
+//                       <span style={{ fontSize: 13.5, color: "var(--navy-mid)", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>{lab}{note ? <span style={{ fontSize: 11, color: "var(--muted)", background: "var(--surface2)", padding: "1px 7px", borderRadius: "var(--radius-lg)", whiteSpace: "nowrap" }}>{note}</span> : null}</span>
 //                       <span style={{ fontSize: 13, fontWeight: 800, color: "var(--navy)", fontVariantNumeric: "tabular-nums" }}>{nf(val)}</span>
 //                     </div>
 //                   ))}
-//                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "var(--surface)", border: "1.5px solid var(--navy)" }}>
+//                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, padding: "12px 14px", borderRadius: "var(--radius-md)", background: "var(--surface)", border: "1.5px solid var(--navy)" }}>
 //                     <span style={{ fontSize: 13, fontWeight: 800, color: "var(--navy)" }}>{L("Grand total", "الإجمالي الكلي")}</span>
 //                     <span style={{ fontSize: 18, fontWeight: 900, color: "var(--navy)" }}>{nf(grand)} <span style={{ color: "var(--brand)" }}>{L("SAR", "ر.س")}</span></span>
 //                   </div>
@@ -906,7 +906,7 @@
 //             {/* CTA */}
 //             {!selectMode && (
 //               <div style={{ marginTop: "auto", padding: "12px 16px 16px" }}>
-//                 <button disabled={disabled || busyId === b.id} onClick={() => startNegotiation(b)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "14px", borderRadius: 14, border: "none", background: disabled ? "var(--muted-light)" : "var(--navy)", color: "var(--surface)", fontWeight: 800, fontSize: 15, cursor: disabled ? "default" : "pointer", fontFamily: "inherit", opacity: busyId === b.id ? 0.7 : 1 }}>
+//                 <button disabled={disabled || busyId === b.id} onClick={() => startNegotiation(b)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "14px", borderRadius: "var(--radius-lg)", border: "none", background: disabled ? "var(--muted-light)" : "var(--navy)", color: "var(--surface)", fontWeight: 800, fontSize: 15, cursor: disabled ? "default" : "pointer", fontFamily: "inherit", opacity: busyId === b.id ? 0.7 : 1 }}>
 //                   <span className="material-icons-outlined" style={{ fontSize: 18 }}>{b.status === "ACCEPTED" ? "receipt_long" : "forum"}</span>{pillLabel(b.status, L)}{offerSuffix(b.uiState, L) ? ` · ${offerSuffix(b.uiState, L)}` : ""}
 //                 </button>
 //               </div>

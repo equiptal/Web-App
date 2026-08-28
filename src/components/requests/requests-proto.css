@@ -74,7 +74,7 @@
 .rproto .rq.asap .accent { background: linear-gradient(var(--danger), var(--warning)); }
 .rproto .rq-in { padding: 15px 16px 15px 19px; }
 .rproto .rq-head { display: flex; gap: 14px; align-items: flex-start; }
-.rproto .rq-thumb { width: 54px; height: 54px; border-radius: 12px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-size: 27px; background: var(--surface2); border: 1px solid var(--border); overflow: hidden; color: var(--navy-mid); }
+.rproto .rq-thumb { width: 54px; height: 54px; border-radius: var(--radius-md); flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-size: 27px; background: var(--surface2); border: 1px solid var(--border); overflow: hidden; color: var(--navy-mid); }
 .rproto .rq-thumb img { width: 34px; height: 34px; object-fit: contain; }
 .rproto .rq-thumb .material-icons-outlined { font-size: 28px; }
 .rproto .rq-h { flex: 1; min-width: 0; }
@@ -85,7 +85,7 @@
 .rproto .rq-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .rproto .rq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 14px; margin-top: 13px; padding-top: 13px; border-top: 1px solid var(--line); }
 .rproto .rq-cell { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--navy-mid); font-weight: 600; min-width: 0; }
-.rproto .rq-cell .ci { width: 28px; height: 28px; border-radius: 8px; flex: 0 0 auto; background: color-mix(in srgb, var(--brand) 10%, transparent); color: var(--action); display: flex; align-items: center; justify-content: center; }
+.rproto .rq-cell .ci { width: 28px; height: 28px; border-radius: var(--radius-sm); flex: 0 0 auto; background: color-mix(in srgb, var(--brand) 10%, transparent); color: var(--action); display: flex; align-items: center; justify-content: center; }
 .rproto .rq-cell .ci .material-icons-outlined { font-size: 16px; }
 .rproto .rq-cell .tx { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rproto .rq-cell .tx b { font-weight: 800; color: var(--navy); }
@@ -108,12 +108,12 @@
 .rproto .dcard { background: var(--surface1); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; }
 .rproto .ditem { display: flex; gap: 13px; padding: 15px 16px; border-bottom: 1px solid var(--line); }
 .rproto .ditem:last-child { border-bottom: 0; }
-.rproto .ditem .di { width: 38px; height: 38px; border-radius: 10px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-size: 21px; background: var(--surface2); color: var(--navy-mid); overflow: hidden; }
+.rproto .ditem .di { width: 38px; height: 38px; border-radius: var(--radius-md); flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-size: 21px; background: var(--surface2); color: var(--navy-mid); overflow: hidden; }
 .rproto .ditem .di .material-icons-outlined { color: var(--navy-mid); }
 .rproto .ditem .di img { width: 26px; height: 26px; object-fit: contain; }
 .rproto .ditem .dn { font-size: 14px; font-weight: 800; color: var(--navy); }
 .rproto .terms { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
-.rproto .tchip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--navy-mid); background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 4px 9px; }
+.rproto .tchip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--navy-mid); background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 9px; }
 .rproto .tchip .material-icons-outlined { font-size: 13px; color: var(--muted); }
 .rproto .tchip b { font-weight: 800; color: var(--navy); }
 .rproto .kv { display: grid; grid-template-columns: 160px 1fr; row-gap: 11px; padding: 16px; font-size: 13.5px; }
@@ -158,7 +158,7 @@
 .rproto .gctx .gx-track .gx-acts { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .rproto .gctx .gx-track .gx-acts .rt-share, .rproto .gctx .gx-track .gx-acts .rt-copy { margin-inline-start: 0; }
 .rproto .gctx .gx-track .gx-acts input[type="datetime-local"] { border: 0; border-radius: var(--r-sm); padding: 5px 8px; font: inherit; font-size: 12.5px; }
-.rproto .gctx .gx-ic { position: relative; width: 40px; height: 40px; border-radius: 10px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; background: var(--surface); }
+.rproto .gctx .gx-ic { position: relative; width: 40px; height: 40px; border-radius: var(--radius-md); flex: 0 0 auto; display: flex; align-items: center; justify-content: center; background: var(--surface); }
 .rproto .gctx .gx-ic .gx-more-badge { position: absolute; bottom: -5px; inset-inline-end: -5px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: var(--r-full); background: var(--action); color: var(--surface); font-size: 9.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid var(--navy-deep, #12263a); }
 .rproto .gctx .gx-main { flex: 1; min-width: 0; }
 .rproto .gctx .gx-title { font-size: 14.5px; font-weight: 900; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -180,7 +180,7 @@
 .rproto .ffgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(224px, 1fr)); gap: 10px; }
 .rproto .fftile { background: var(--surface1); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 13px; }
 .rproto .fftile .ff-tt { display: flex; align-items: center; gap: 10px; }
-.rproto .fftile .ff-th { width: 38px; height: 38px; border-radius: 9px; flex: 0 0 auto; background: var(--surface2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--navy-mid); overflow: hidden; }
+.rproto .fftile .ff-th { width: 38px; height: 38px; border-radius: var(--radius-sm); flex: 0 0 auto; background: var(--surface2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--navy-mid); overflow: hidden; }
 .rproto .fftile .ff-meta { min-width: 0; }
 .rproto .fftile .ff-nm { font-size: 13px; font-weight: 800; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rproto .fftile .ff-fr { font-size: 11.5px; color: var(--muted); font-weight: 600; margin-top: 1px; }
@@ -238,7 +238,7 @@
 .rproto .sup-docs .sd-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: var(--r-full); background: var(--success-bg); color: var(--success); }
 .rproto .sup-docs .sd-chip .material-icons-outlined { font-size: 11px; }
 .rproto .bid.sel::before { content: ""; position: absolute; inset-block: 0; inset-inline-start: 0; width: 4px; background: var(--navy); }
-.rproto .bid-check { width: 26px; height: 26px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--surface1); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; color: transparent; }
+.rproto .bid-check { width: 26px; height: 26px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: var(--surface1); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; color: transparent; }
 .rproto .bid-check.on { background: var(--navy); border-color: var(--navy); color: var(--surface); }
 .rproto .bid-check .material-icons-outlined { font-size: 18px; }
 .rproto .bid-head { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px 8px; }
@@ -246,7 +246,7 @@
 .rproto .bid-av .vchk { position: absolute; bottom: -2px; inset-inline-end: -2px; width: 14px; height: 14px; border-radius: 50%; background: var(--success); border: 1.5px solid var(--surface); display: flex; align-items: center; justify-content: center; }
 .rproto .bid-av .vchk .material-icons-outlined { font-size: 9px; color: var(--surface); }
 /* equipment-focused bid header (grouped My Bids) */
-.rproto .bid-eq { width: 46px; height: 46px; border-radius: 11px; background: var(--surface2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--navy-mid); flex: 0 0 auto; }
+.rproto .bid-eq { width: 46px; height: 46px; border-radius: var(--radius-md); background: var(--surface2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--navy-mid); flex: 0 0 auto; }
 .rproto .bid-eq .material-icons-outlined { font-size: 24px; }
 .rproto .bid-by { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 11.5px; font-weight: 700; color: var(--navy-mid); margin-top: 5px; }
 .rproto .bid-by > .material-icons-outlined { font-size: 13px; color: var(--muted); }
@@ -343,8 +343,8 @@
 
 /* Terms modal (013 AC-04/05) */
 .rproto .tm-overlay { position: fixed; inset: 0; z-index: 80; background: color-mix(in srgb, var(--navy-deep) 45%, transparent); display: flex; align-items: flex-end; justify-content: center; padding: 0; }
-.rproto .tm-modal { width: 100%; max-width: 520px; max-height: 86vh; overflow-y: auto; background: var(--surface1); border-radius: 18px 18px 0 0; }
-@media (min-width: 560px) { .rproto .tm-overlay { align-items: center; } .rproto .tm-modal { border-radius: 18px; } }
+.rproto .tm-modal { width: 100%; max-width: 520px; max-height: 86vh; overflow-y: auto; background: var(--surface1); border-radius: var(--radius-lg) 18px 0 0; }
+@media (min-width: 560px) { .rproto .tm-overlay { align-items: center; } .rproto .tm-modal { border-radius: var(--radius-lg); } }
 .rproto .tm-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface1); }
 .rproto .tm-head h3 { margin: 0; font-size: 16px; font-weight: 800; color: var(--navy); }
 .rproto .tm-head button { background: none; border: 0; cursor: pointer; color: var(--text-muted); display: flex; }
@@ -434,7 +434,7 @@
 .rproto .slb-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 800; border-radius: 100px; padding: 2px 9px; background: var(--action-dim); color: #8a5a06; border: 1px solid color-mix(in srgb, var(--brand) 35%, transparent); margin-inline-start: 6px; }
 .rproto .slb-pill .material-icons-outlined { font-size: 11px; color: var(--action); }
 .rproto .slb-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 9px; }
-.rproto .slb-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 800; border-radius: 8px; padding: 3px 8px; background: var(--surface2); color: var(--navy-mid); border: 1px solid var(--border); }
+.rproto .slb-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 800; border-radius: var(--radius-sm); padding: 3px 8px; background: var(--surface2); color: var(--navy-mid); border: 1px solid var(--border); }
 .rproto .slb-badge.ok { background: var(--success-bg); color: var(--success); border-color: color-mix(in srgb, var(--ok) 25%, transparent); }
 .rproto .slb-badge .material-icons-outlined { font-size: 12px; }
 .rproto .slb-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 12px; margin-top: 12px; border-top: 1px solid var(--surface3); }
@@ -498,7 +498,7 @@
 .rproto .fp-opt .fp-ic { font-size: 16px; }
 .rproto .fp-opt .fp-n { margin-inline-start: auto; font-size: 11px; font-weight: 700; background: var(--surface3); color: var(--navy-mid); border-radius: 100px; padding: 1px 8px; }
 .rproto .fp-div { height: 1px; background: var(--surface3); margin: 7px 6px; }
-.rproto .fp-check .box { width: 18px; height: 18px; border-radius: 5px; border: 2px solid var(--border); flex: 0 0 auto; display: grid; place-items: center; color: var(--surface); }
+.rproto .fp-check .box { width: 18px; height: 18px; border-radius: var(--radius-sm); border: 2px solid var(--border); flex: 0 0 auto; display: grid; place-items: center; color: var(--surface); }
 .rproto .fp-check.on .box { background: var(--rentee); border-color: var(--rentee); }
 .rproto .fp-check .box .material-icons-outlined { font-size: 14px; opacity: 0; }
 .rproto .fp-check.on .box .material-icons-outlined { opacity: 1; }

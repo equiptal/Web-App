@@ -181,11 +181,20 @@
   --font-weight-extrabold: 800;  /* titles, mastheads, big numbers */
 
   /* ── Radius ──────────────────────────────────────────────────────────────────────────────────
-     Four. `rounded-md` is the default; `rounded-lg` is the card skin. */
+     Four steps. `rounded-md` is the default; `rounded-lg` is the card skin.
+
+     **Sharp** (owner, 2026-08-28), from a console he sent as the reference. Its buttons measure a
+     1px corner inset — a 2px radius — so a control there reads as a rectangle with the corner taken
+     off rather than as a rounded thing. ~~8 / 10 / 14.~~
+
+     `rounded-full` is a separate utility and no part of this scale, which is why nothing round in
+     the app moved with it: the header's nav tabs, the status badges, the rail's request circles,
+     avatars, unread dots and the back arrow are all untouched. The reference draws its own status
+     pills round for the same reason — a pill is a shape, not a radius. */
   --radius-*: initial;
-  --radius-sm: 8px;    /* chips, tags, tight controls */
-  --radius-md: 10px;   /* inputs, buttons, list rows — the default */
-  --radius-lg: 14px;   /* cards, panels, sheets */
+  --radius-sm: 2px;    /* chips, tags, tight controls */
+  --radius-md: 4px;    /* inputs, buttons, list rows — the default */
+  --radius-lg: 6px;    /* cards, panels, sheets */
 
   /* ── Shadow ──────────────────────────────────────────────────────────────────────────────────
      There are none (owner, 2026-08-26). The whole namespace is cleared, so `shadow-sm` and its

@@ -20,7 +20,7 @@
  * 440px wide, a 160px image band, then title / description / source domain.
  */
 
-import { COLORS } from "@/lib/ds-colors";
+import { COLORS, RADII } from "@/lib/ds-colors";
 
 export interface BidCardPreview {
   title: string;
@@ -62,7 +62,7 @@ export function bidCardHtml(card: BidCardPreview, lang: "en" | "ar" = "en"): str
   const url = escapeHtml(card.url);
 
   return `<a href="${url}" style="text-decoration:none;color:inherit;display:block;max-width:440px;">
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="440" dir="${dir}" style="width:440px;max-width:100%;border:1px solid ${COLORS.background};border-radius:10px;border-collapse:separate;overflow:hidden;background:${COLORS.surface};font-family:'Segoe UI',Roboto,Arial,sans-serif;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="440" dir="${dir}" style="width:440px;max-width:100%;border:1px solid ${COLORS.background};border-radius:${RADII.md};border-collapse:separate;overflow:hidden;background:${COLORS.surface};font-family:'Segoe UI',Roboto,Arial,sans-serif;">
     <tr><td style="padding:0;line-height:0;">
       <img src="${escapeHtml(card.imageUrl)}" alt="" width="440" height="160" style="display:block;width:440px;max-width:100%;height:160px;border:0;outline:none;text-decoration:none;background-color:${COLORS.navy};">
     </td></tr>

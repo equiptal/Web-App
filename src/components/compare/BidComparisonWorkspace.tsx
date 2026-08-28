@@ -618,7 +618,7 @@
 //   const docChip = (c: BidColumn, label: string, has: boolean, hint: string, big = false) => {
 //     // small = supplier-header chip (10px); big = cert/ownership row chip (prototype 11.5px/800, pad 5px 10px, r8, bordered).
 //     const base = has ? { background: C.successBg, color: C.success } : { background: C.dangerBg, color: C.danger };
-//     const style = big ? { ...base, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${has ? "color-mix(in srgb, var(--ok) 30%, transparent)" : "color-mix(in srgb, var(--danger) 30%, transparent)"}` } : base;
+//     const style = big ? { ...base, fontWeight: 800, padding: "5px 10px", borderRadius: "var(--radius-sm)", border: `1px solid ${has ? "color-mix(in srgb, var(--ok) 30%, transparent)" : "color-mix(in srgb, var(--danger) 30%, transparent)"}` } : base;
 //     const cls = big ? "inline-flex items-center gap-1 text-label" : "inline-flex items-center gap-0.5 rounded-sm px-1.5 py-0.5 text-label font-semibold";
 //     // Off-platform: prefer the actual uploaded FILE (pre-loaded in bidDocs) when the supplier attached one;
 //     // else fall back to the captured VALUE (CR/VAT/national text they typed instead of a file).
@@ -636,7 +636,7 @@
 //   // Green ✓ / red × cert pill. `fileUrl` (off-platform operator cert) makes it a clickable eye that opens
 //   // the uploaded file; without it, it's a plain declared-cert pill (no file to open). Same weight as docChip.
 //   const certPill = (label: string, held: boolean, fileUrl?: string | null) => {
-//     const style = { background: held ? C.successBg : C.dangerBg, color: held ? C.success : C.danger, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${held ? "color-mix(in srgb, var(--ok) 30%, transparent)" : "color-mix(in srgb, var(--danger) 30%, transparent)"}` } as const;
+//     const style = { background: held ? C.successBg : C.dangerBg, color: held ? C.success : C.danger, fontWeight: 800, padding: "5px 10px", borderRadius: "var(--radius-sm)", border: `1px solid ${held ? "color-mix(in srgb, var(--ok) 30%, transparent)" : "color-mix(in srgb, var(--danger) 30%, transparent)"}` } as const;
 //     const inner = <><span className="material-icons-outlined" style={{ fontSize: 11 }}>{held ? "check" : "close"}</span>{label}{fileUrl && <span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>}</>;
 //     return fileUrl
 //       ? <button type="button" onClick={() => setDocView({ label, url: fileUrl, loading: false })} title={L("View document", "عرض المستند")} className="inline-flex items-center gap-1 text-label" style={style}>{inner}</button>
@@ -705,7 +705,7 @@
 //       : st.none ? { bg: C.dangerBg, c: C.danger, bd: "color-mix(in srgb, var(--danger) 30%, transparent)", icon: "close" }
 //       : { bg: "var(--warn-soft)", c: "var(--warn)", bd: "color-mix(in srgb, var(--warn) 35%, transparent)", icon: "remove" };
 //     const text = label + (!st.all && !st.none ? ` ${st.held}/${st.total}` : "");
-//     const style = { display: "inline-flex", alignItems: "center", gap: 4, fontSize: "11.5px", fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${tone.bd}`, background: tone.bg, color: tone.c } as const;
+//     const style = { display: "inline-flex", alignItems: "center", gap: 4, fontSize: "11.5px", fontWeight: 800, padding: "5px 10px", borderRadius: "var(--radius-sm)", border: `1px solid ${tone.bd}`, background: tone.bg, color: tone.c } as const;
 //     const inner = <><span className="material-icons-outlined" style={{ fontSize: 11 }}>{tone.icon}</span>{text}{st.url && <span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>}</>;
 //     return st.url
 //       ? <a href={st.url} target="_blank" rel="noopener noreferrer" style={style} title={L("View document", "عرض المستند")}>{inner}</a>
@@ -1042,7 +1042,7 @@
 //     const row = (label: string, fn: (c: BidColumn) => string) => `<tr><th class="lbl">${esc(label)}</th>${cols.map((c) => `<td>${fn(c)}</td>`).join("")}</tr>`;
 //     const pickName = cols.find((c) => c.bid.id === pickId)?.bid.supplierName;
 //     const html = `<!doctype html><html dir="${ar ? "rtl" : "ltr"}" lang="${ar ? "ar" : "en"}"><head><meta charset="utf-8"><title>${esc(itemName)} — ${L("Bid comparison", "مقارنة العروض")}</title>
-// <style>*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:var(--navy);margin:26px}h1{font-size:18px;margin:0 0 4px}.meta{color:var(--muted);font-size:12px;margin-bottom:12px}.pick{display:inline-block;background:var(--brand-soft);color:var(--brand-deep);border:1px solid var(--brand);border-radius:20px;padding:4px 12px;font-size:12px;font-weight:bold;margin-bottom:14px}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid var(--border);padding:8px 10px;text-align:${ar ? "right" : "left"};vertical-align:top}thead th{background:var(--navy);color:var(--surface)}th.lbl{background:var(--surface2);width:175px}.star{color:var(--brand-light)}.foot{margin-top:16px;color:var(--muted-light);font-size:10px}@media print{@page{margin:12mm}}</style></head><body>
+// <style>*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:var(--navy);margin:26px}h1{font-size:18px;margin:0 0 4px}.meta{color:var(--muted);font-size:12px;margin-bottom:12px}.pick{display:inline-block;background:var(--brand-soft);color:var(--brand-deep);border:1px solid var(--brand);border-radius: var(--radius-lg);padding:4px 12px;font-size:12px;font-weight:bold;margin-bottom:14px}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid var(--border);padding:8px 10px;text-align:${ar ? "right" : "left"};vertical-align:top}thead th{background:var(--navy);color:var(--surface)}th.lbl{background:var(--surface2);width:175px}.star{color:var(--brand-light)}.foot{margin-top:16px;color:var(--muted-light);font-size:10px}@media print{@page{margin:12mm}}</style></head><body>
 // <h1>${esc(itemName)} — ${L("Bid comparison", "مقارنة العروض")}</h1>
 // <div class="meta">${esc(group?.items[0]?.displayId ?? "")} · ${esc(loc?.label ?? "")} · ${esc(when)}${durationDays ? ` · ${durationDays} ${L("days", "يوم")}` : ""}${units > 1 ? ` · ${units} ${L("units", "وحدات")}` : ""}</div>
 // ${pickName ? `<div class="pick">★ ${L("AI pick", "اختيار المساعد")}: ${esc(pickName)}</div>` : ""}
@@ -1613,7 +1613,7 @@
 //                                 : side === "supplier" ? L("supplier", "المؤجّر") : side === "me" ? L("you", "أنت") : L("—", "—");
 //                               const entered = renterCosts[m.key];
 //                               return (
-//                                 <span key={m.key} className="inline-flex items-center gap-1 self-start px-2 py-1 text-label" style={{ background: bg, color: fg, fontWeight: 800, borderRadius: 7, border: `1px solid ${bd}` }}>
+//                                 <span key={m.key} className="inline-flex items-center gap-1 self-start px-2 py-1 text-label" style={{ background: bg, color: fg, fontWeight: 800, borderRadius: "var(--radius-sm)", border: `1px solid ${bd}` }}>
 //                                   {tone === "red" && <span className="material-icons-outlined" style={{ fontSize: 13 }}>warning_amber</span>}
 //                                   {ar ? m.ar : m.en}<span style={{ fontWeight: 700, opacity: 0.8 }}> · {owner}{entered != null ? ` · ~${sar} ${nf(entered)}` : ""}</span>
 //                                 </span>
@@ -1734,7 +1734,7 @@
 //                               <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
 //                                 {requiredEquipCerts.map((cert) => <span key={cert}>{docChip(c, certLabel(cert), codes.includes(cert), cert, true)}</span>)}
 //                                 {extras.map((cert) => (
-//                                   <span key={cert} className="inline-flex items-center gap-1 text-label" title={L("Held — not required", "متوفّرة — غير مطلوبة")} style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: "1px solid color-mix(in srgb, var(--info) 30%, transparent)" }}>
+//                                   <span key={cert} className="inline-flex items-center gap-1 text-label" title={L("Held — not required", "متوفّرة — غير مطلوبة")} style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: "var(--radius-sm)", border: "1px solid color-mix(in srgb, var(--info) 30%, transparent)" }}>
 //                                     <span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{certLabel(cert)}
 //                                   </span>
 //                                 ))}
@@ -1761,7 +1761,7 @@
 //                           if (!held) return <Td key={c.bid.id}><span style={{ color: C.muted }}>—</span></Td>;
 //                           return (
 //                             <Td key={c.bid.id}>
-//                               <button type="button" onClick={() => openDoc(c, doc.key, label)} title={L("View document", "عرض المستند")} className="inline-flex items-center gap-1 text-label" style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: "1px solid color-mix(in srgb, var(--info) 30%, transparent)" }}>
+//                               <button type="button" onClick={() => openDoc(c, doc.key, label)} title={L("View document", "عرض المستند")} className="inline-flex items-center gap-1 text-label" style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: "var(--radius-sm)", border: "1px solid color-mix(in srgb, var(--info) 30%, transparent)" }}>
 //                                 <span className="material-icons-outlined" style={{ fontSize: 11 }}>description</span>{label}<span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>
 //                               </button>
 //                             </Td>
@@ -1827,7 +1827,7 @@
 //                             <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
 //                               {certPill(req, met, opFile)}
 //                               {showExtra && (
-//                                 <span className="inline-flex items-center gap-1 text-label" title={L("Declared — doesn’t meet the requirement", "مُعلن — لا يفي بالمطلوب")} style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: "1px solid color-mix(in srgb, var(--info) 30%, transparent)" }}>
+//                                 <span className="inline-flex items-center gap-1 text-label" title={L("Declared — doesn’t meet the requirement", "مُعلن — لا يفي بالمطلوب")} style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: "var(--radius-sm)", border: "1px solid color-mix(in srgb, var(--info) 30%, transparent)" }}>
 //                                   <span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{declared}
 //                                 </span>
 //                               )}
@@ -1876,16 +1876,16 @@
 //                           <div className="flex flex-col gap-2">
 //                             {isAcceptedWinner ? (
 //                               /* Case A / C-bidder: finalized winner — a static "Accepted" badge, not a toggle. */
-//                               <span className="inline-flex w-full items-center justify-center gap-1.5 text-meta text-white" style={{ background: "var(--ok-deep)", padding: 9, borderRadius: 9, fontWeight: 800 }}>
+//                               <span className="inline-flex w-full items-center justify-center gap-1.5 text-meta text-white" style={{ background: "var(--ok-deep)", padding: 9, borderRadius: "var(--radius-sm)", fontWeight: 800 }}>
 //                                 <span className="material-icons-outlined" style={{ fontSize: 16 }}>check_circle</span>{decidedWord}
 //                               </span>
 //                             ) : (
 //                               /* Award = in-place toggle: "Award" (green) ⇄ "Awarded" (Case B, soft/reversible). Disabled once the request is decided elsewhere. */
-//                               <button onClick={() => toggleAward(c.bid)} disabled={blockedByAccept} title={isAwarded && !blockedByAccept ? L("Awarded — finalize in the deal room", "تمت الترسية — أتمِم في غرفة الصفقة") : undefined} className="inline-flex w-full items-center justify-center gap-1.5 text-meta text-white disabled:bg-disabled-bg disabled:text-disabled-fg disabled:cursor-default" style={{ background: isAwarded ? "var(--ok-deep)" : C.success, padding: 9, borderRadius: 9, fontWeight: 800 }}>
+//                               <button onClick={() => toggleAward(c.bid)} disabled={blockedByAccept} title={isAwarded && !blockedByAccept ? L("Awarded — finalize in the deal room", "تمت الترسية — أتمِم في غرفة الصفقة") : undefined} className="inline-flex w-full items-center justify-center gap-1.5 text-meta text-white disabled:bg-disabled-bg disabled:text-disabled-fg disabled:cursor-default" style={{ background: isAwarded ? "var(--ok-deep)" : C.success, padding: 9, borderRadius: "var(--radius-sm)", fontWeight: 800 }}>
 //                                 <span className="material-icons-outlined" style={{ fontSize: 16 }}>{isAwarded ? "check_circle" : "gavel"}</span>{isAwarded ? L("Awarded", "تمت الترسية") : L("Award", "ترسية")}
 //                               </button>
 //                             )}
-//                             <button onClick={() => goDealRoom(c.bid, isAcceptedWinner ? "award" : "negotiate")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 text-meta disabled:bg-disabled-bg disabled:text-disabled-fg" style={{ background: "var(--surface)", color: C.rentee, border: `1px solid color-mix(in srgb, var(--info) 35%, transparent)`, padding: 9, borderRadius: 9, fontWeight: 800 }}>
+//                             <button onClick={() => goDealRoom(c.bid, isAcceptedWinner ? "award" : "negotiate")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 text-meta disabled:bg-disabled-bg disabled:text-disabled-fg" style={{ background: "var(--surface)", color: C.rentee, border: `1px solid color-mix(in srgb, var(--info) 35%, transparent)`, padding: 9, borderRadius: "var(--radius-sm)", fontWeight: 800 }}>
 //                               <span className="material-icons-outlined" style={{ fontSize: 15 }}>{isAcceptedWinner ? "forum" : "swap_horiz"}</span>{isAcceptedWinner ? L("View deal room", "غرفة الصفقة") : L("Negotiate", "تفاوض")}
 //                             </button>
 //                           </div>

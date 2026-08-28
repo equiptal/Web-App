@@ -566,7 +566,7 @@ function RoCell({ k, children }: { k: string; children: React.ReactNode }) {
 
 /** Static read-only Yes/No chip — the supplier's confirmation for a term. */
 function RoAns({ ok, L }: { ok: boolean | undefined; L: (e: string, a: string) => string }) {
-  const base = { display: "inline-flex", alignItems: "center", gap: 4, borderRadius: 7, padding: "5px 11px", fontSize: 11.5, fontWeight: 800 } as const;
+  const base = { display: "inline-flex", alignItems: "center", gap: 4, borderRadius: "var(--radius-sm)", padding: "5px 11px", fontSize: 11.5, fontWeight: 800 } as const;
   if (ok === true) return <span style={{ ...base, color: "var(--surface)", background: "var(--success)" }}><span className="material-icons-outlined" style={{ fontSize: 14 }}>check</span>{L("Yes", "نعم")}</span>;
   if (ok === false) return <span style={{ ...base, color: "var(--surface)", background: "var(--danger)" }}><span className="material-icons-outlined" style={{ fontSize: 14 }}>close</span>{L("No", "لا")}</span>;
   return <span style={{ ...base, color: "var(--muted)", background: "var(--surface2)" }}>—</span>;

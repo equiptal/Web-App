@@ -65,7 +65,7 @@ export function CancelReasonsModal({ ar, L, busy, error, onSubmit, onClose }: {
                 onClick={() => setPicked(i)}
                 style={{
                   display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "inherit",
-                  padding: "12px 12px", borderRadius: 12, cursor: busy ? "default" : "pointer",
+                  padding: "12px 12px", borderRadius: "var(--radius-md)", cursor: busy ? "default" : "pointer",
                   background: on ? "color-mix(in srgb, var(--danger) 6%, transparent)" : "var(--background)",
                   border: `${on ? 1.5 : 1}px solid ${on ? "color-mix(in srgb, var(--danger) 40%, transparent)" : "color-mix(in srgb, var(--border-strong) 50%, transparent)"}`,
                 }}
@@ -84,7 +84,7 @@ export function CancelReasonsModal({ ar, L, busy, error, onSubmit, onClose }: {
             disabled={busy}
             onChange={(e) => setOther(e.target.value)}
             placeholder={L("Write the reason...", "اكتب السبب...")}
-            style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, background: "var(--background)", border: "1px solid color-mix(in srgb, var(--border-strong) 50%, transparent)", fontSize: 14, color: "var(--navy)", resize: "vertical" }}
+            style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: "var(--radius-md)", background: "var(--background)", border: "1px solid color-mix(in srgb, var(--border-strong) 50%, transparent)", fontSize: 14, color: "var(--navy)", resize: "vertical" }}
           />
         )}
 

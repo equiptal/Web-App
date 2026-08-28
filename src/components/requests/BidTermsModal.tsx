@@ -97,7 +97,7 @@ export function BidTermsModal({
               <button
                 key={t.key}
                 onClick={() => setActive(t.key)}
-                style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 8px", borderRadius: 11, border: `1.5px solid ${on ? t.c : "var(--surface3)"}`, background: on ? t.bg : "var(--surface)", color: on ? t.c : "var(--muted)", fontFamily: "inherit", fontWeight: 800, fontSize: 12.5, cursor: "pointer", whiteSpace: "nowrap" }}
+                style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 8px", borderRadius: "var(--radius-md)", border: `1.5px solid ${on ? t.c : "var(--surface3)"}`, background: on ? t.bg : "var(--surface)", color: on ? t.c : "var(--muted)", fontFamily: "inherit", fontWeight: 800, fontSize: 12.5, cursor: "pointer", whiteSpace: "nowrap" }}
               >
                 {t.label} <span className="font-extrabold">{n}</span>
               </button>
