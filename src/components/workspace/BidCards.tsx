@@ -9,6 +9,7 @@ import { btn } from "@/lib/ds";
 // (owner, 2026-08-25). The rules did not stop being true when their surface went away.
 import { bidCounterDelta } from "@/lib/contract/bid-counter-delta";
 import { distinctMachinesOffered, unitCountNotes } from "@/lib/contract/unit-count-notes";
+import { liveRentalUnits } from "@/lib/contract/comparison";
 import { computeQuoteTotals, computeRentalTotal, divisorNote, formatSar, headlineAmount, legDisplay } from "@/lib/pricing/rental";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { checkArcs, equipmentCheckOf, type BidCardCheck, type CheckTone } from "@/lib/contract/bid-card-checks";
@@ -61,10 +62,17 @@ export function BidCards({
   }
 
   return (
-    // `items-stretch`, not `items-start`: the pane now has a definite height, so every card takes
-    // all of it and they end on one line instead of stepping down with their content. The footer was
-    // already `mt-auto`, waiting for exactly this — the way on sits at the bottom of every card.
-    <div {...pin("workspace-bid-cards")} className="flex h-full snap-x items-stretch gap-5 overflow-x-auto p-3">
+    /* ── A card is as tall as what is in it (owner, 2026-08-28) ──────────────────────────────────
+       ~~`items-stretch`, so every card takes the pane's full height and they end on one line.~~ What
+       that produced was a bid with nothing left to say holding a column of empty white between its
+       total and its button, because FOUR things pulled the card open at once: the row stretched it,
+       the card was capped to the pane, the money block took `flex-1` of the leftover and could
+       scroll to hide it, and the footer was pushed down by `mt-auto`. Removing any one of them
+       leaves the gap; this removes all four.
+
+       `items-start` and each card ends where its content does. They no longer line up along the
+       bottom, which is the trade — a short bid now looks short, which is the true thing about it. */
+    <div {...pin("workspace-bid-cards")} className="flex h-full snap-x items-start gap-5 overflow-x-auto p-3">
       {bids.map((b) => (
         <BidCardTile
           key={b.card.id}
@@ -145,7 +153,17 @@ function BidCardTile({
   // ── The price block, built the way the app builds it ───────────────────────────────────────────
   // Mirrors `v3_bid_card.dart` + `price_expanded_breakdown.dart`, checked against the source on
   // 2026-08-12. Every row here is PER UNIT; a multi-unit offer adds an all-units row at the foot.
-  const units = card.unitsOffered > 0 ? card.unitsOffered : card.numberOfUnits > 0 ? card.numberOfUnits : 1;
+  //
+  // ── The count the money multiplies by is the DEAL ROOM's (owner, 2026-08-28) ─────────────────
+  // This card multiplied by `unitsOffered` — what the supplier put on the table — while the deal
+  // room and the app's own bid card multiply by the NEGOTIATED count (`agreedUnits`, then
+  // `currentRentalUnits`). On a four-unit offer cut to two, the deal room's quote panel said ×2 and
+  // this card said ×4: two totals for one bid, with nothing on either surface to say which was the
+  // price. `liveRentalUnits` is that shared rule (app parity, `v3_bid_card._liveRentalUnits`), and
+  // the comparison workspace was already using it.
+  const units = liveRentalUnits(card);
+  /** What the bid CLAIMS, which is a different question from what it prices — the note says so. */
+  const unitsOffered = card.unitsOffered > 0 ? card.unitsOffered : card.numberOfUnits > 0 ? card.numberOfUnits : 1;
 
 
   /**
@@ -158,8 +176,8 @@ function BidCardTile({
    * the money was built on. A bid offering five and naming three said nothing at all until now.
    */
   const countNotes = unitCountNotes({
-    priced: card.agreedUnits ?? card.currentRentalUnits ?? units,
-    offered: units,
+    priced: units,
+    offered: unitsOffered,
     machinesNamed: distinctMachinesOffered(card.offeredUnitsDetail),
   });
   // The rental is prorated: (rate ÷ 26 or ÷ 6) × billable days, Fridays excluded. With no duration
@@ -207,6 +225,9 @@ function BidCardTile({
    * agree to the riyal at one unit, so nothing is lost by asking the simpler question.
    */
   const accepted = card.status === "ACCEPTED" || card.wonViaSurvey === true;
+  /** The count actually taken, once a bid is accepted — the app's `agreedUnits ?? unitsOfferedCount`,
+   *  which is what turns the units badge from "offers 3" into "2 of 3 accepted". Null before then. */
+  const acceptedUnits = accepted ? (card.agreedUnits ?? unitsOffered) : null;
   const submitted = card.submittedAt
     ? new Date(card.submittedAt).toLocaleString(ar ? "ar" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
     : null;
@@ -229,7 +250,7 @@ function BidCardTile({
   return (
     <article {...pin("bid-card")}
       onClick={onSelect}
-      className={`flex max-h-full w-[344px] max-w-full flex-none snap-start cursor-pointer flex-col overflow-hidden rounded-lg border bg-surface transition ${
+      className={`flex w-[344px] max-w-full flex-none snap-start cursor-pointer flex-col overflow-hidden rounded-lg border bg-surface transition ${
         selected
           ? "border-brand"
           : "border-border hover:border-navy-mid/40"
@@ -263,27 +284,41 @@ function BidCardTile({
             {card.distanceKm != null ? ` · ${Math.round(card.distanceKm)} ${L("km", "كم")}` : ""}
           </div>
         </div>
-        {offline ? (
-          <span className="flex-none rounded-full border border-border px-2 py-1 text-label font-semibold text-muted">{t.workspace.notOnApp}</span>
-        ) : (
-          /* The conversation, as one round control: filled while there is something unread on it,
-             quiet while there is not. */
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              void openRoom();
-            }}
-            aria-label={t.workspace.openChat}
-            title={t.workspace.openChat}
-            className={`relative grid h-[34px] w-[34px] flex-none place-items-center rounded-full border transition disabled:bg-disabled-bg disabled:text-disabled-fg ${
-              unread > 0 ? "border-navy bg-navy text-white" : "border-border bg-surface2 text-muted hover:bg-surface3"
-            }`}
-          >
-            <Icon name="chat_bubble_outline" size={16} />
-            {unread > 0 && <span className="absolute -end-px -top-px h-[9px] w-[9px] rounded-full bg-brand ring-2 ring-surface" />}
-          </button>
-        )}
+        {/* ── The pill column, as the app builds it (`v3_bid_card._pillColumn`) ─────────────────
+            The control on top, the units badge under it, both against the card's trailing edge. */}
+        <div className="flex flex-none flex-col items-end gap-1.5">
+          {offline ? (
+            <span className="rounded-full border border-border px-2 py-1 text-label font-semibold text-muted">{t.workspace.notOnApp}</span>
+          ) : (
+            /* The conversation, as one round control: filled while there is something unread on it,
+               quiet while there is not. */
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                void openRoom();
+              }}
+              aria-label={t.workspace.openChat}
+              title={t.workspace.openChat}
+              className={`relative grid h-[34px] w-[34px] flex-none place-items-center rounded-full border transition disabled:bg-disabled-bg disabled:text-disabled-fg ${
+                unread > 0 ? "border-navy bg-navy text-white" : "border-border bg-surface2 text-muted hover:bg-surface3"
+              }`}
+            >
+              <Icon name="chat_bubble_outline" size={16} />
+              {unread > 0 && <span className="absolute -end-px -top-px h-[9px] w-[9px] rounded-full bg-brand ring-2 ring-surface" />}
+            </button>
+          )}
+          {/* ── What THIS bid covers (owner, 2026-08-28) ──────────────────────────────────
+              A renter reading four offers to a four-unit request had no way to tell a supplier
+              covering the whole of it from one covering a single machine — both cards looked the
+              same until he opened the price. The app has said it on the card since 2026-08-17
+              (`_OffersUnitsBadge`), and this is that badge: what was OFFERED, never the priced count
+              the totals multiply by, so the two numbers stay separate questions.
+
+              Gated on the REQUEST being multi-unit, the app's own gate: where the renter asked for
+              one machine every bid covers all of it and the badge states nothing. */}
+          {card.numberOfUnits > 1 && <OffersUnitsBadge offered={unitsOffered} accepted={acceptedUnits} />}
+        </div>
       </div>
 
       {/* ── The supplier's machines and their papers (owner, 2026-08-27) ────────────────────────────
@@ -331,7 +366,11 @@ function BidCardTile({
       </button>
 
       {/* The money. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto border-t border-border px-3.5 py-2.5">
+      {/* No `flex-1`: it took whatever height the stretch left over, which is what turned the card's
+          slack into a gap inside this block. No `overflow-y-auto` either — the page's own rule is
+          that nothing here scrolls downwards, and a block that cannot be over-filled needs no way to
+          hide what does not fit. */}
+      <div className="flex flex-col gap-2.5 border-t border-border px-3.5 py-2.5">
         {/* The headline: the rental type, and the rate or the total depending on the unit. An
             accepted bid is the only status that touches this block — green, and a tick. */}
         <button
@@ -404,11 +443,19 @@ function BidCardTile({
           </div>
 
           {/* Multi-unit: a second row in the SAME box, carrying the real all-units figure. It is not
-              the per-unit total × units — each transport leg carries its own count. */}
+              the per-unit total × units — each transport leg carries its own count.
+
+              The count is SPELLED (owner, 2026-08-28): «Overall total · 4» read as a line number, on
+              a row whose whole job is to say what the figure beside it was multiplied by. The
+              wording is the app's — `priceRowUnitsCountLabel`, «Units: 4», drawn as the caption under
+              the label exactly as `_GrandTotalCard` draws it. */}
           {units > 1 && (
             <div className="flex items-baseline justify-between gap-2 border-t border-border/70 pt-2.5">
-              <span className="text-meta font-extrabold text-brand">
-                {t.workspace.overallTotal} <span className="font-semibold text-muted">· {units}</span>
+              <span className="flex min-w-0 flex-col text-meta font-extrabold text-brand">
+                {t.workspace.overallTotal}
+                <span className="text-label font-semibold text-muted">
+                  {fmt(t.workspace.unitsCountLabel, { n: String(units) })}
+                </span>
               </span>
               <span className="flex-none">
                 <b className="text-subhead font-extrabold text-brand">{formatSar(totals.overall.total)}</b>{" "}
@@ -416,40 +463,44 @@ function BidCardTile({
               </span>
             </div>
           )}
+
+          {/* ── What the counts do not agree about (owner, 2026-08-25, moved 2026-08-28) ───────────
+              `unitCountNotes` is the app's rule, ported and tested and — until now — called by nothing.
+              Most bids say nothing here, which is the point: it speaks only where the three counts
+              genuinely diverge, and a bid that offers five units while naming three machines has been
+              silent about it on every surface this workspace replaced.
+
+              INSIDE the totals box, under the overall total, rather than loose beneath it. It is the
+              footnote to that multiplication — «priced on 2 of the 4 units offered» is why the row
+              above says · 2 units — and a note sitting outside the box read as a remark about the
+              card rather than about the figure it qualifies. */}
+          {!countNotes.isEmpty && (
+            <div className="flex flex-col gap-1 border-t border-border/70 pt-2.5 text-label font-semibold leading-snug text-muted">
+              {countNotes.hasPricedNote && (
+                <span>
+                  {fmt(
+                    countNotes.relation === "above" ? t.workspace.countPricedAbove : t.workspace.countPricedBelow,
+                    { priced: String(countNotes.priced), offered: String(countNotes.offered) },
+                  )}
+                </span>
+              )}
+              {countNotes.hasClaimedNote && (
+                <span className="text-brand">
+                  {fmt(t.workspace.countClaimed, {
+                    n: String(countNotes.claimedUnits),
+                    named: String(countNotes.machinesNamed),
+                  })}
+                </span>
+              )}
+            </div>
+          )}
         </div>
-
-        {/* ── What the counts do not agree about (owner, 2026-08-25) ────────────────────────────────
-            `unitCountNotes` is the app's rule, ported and tested and — until now — called by nothing.
-            Most bids say nothing here, which is the point: it speaks only where the three counts
-            genuinely diverge, and a bid that offers five units while naming three machines has been
-            silent about it on every surface this workspace replaced.
-
-            Placed UNDER the totals rather than beside the headline: it qualifies what the money was
-            built on, and a reader who has not reached the total has no use for it yet. */}
-        {!countNotes.isEmpty && (
-          <div className="mt-2 flex flex-col gap-1 text-label font-semibold leading-snug text-muted">
-            {countNotes.hasPricedNote && (
-              <span>
-                {fmt(
-                  countNotes.relation === "above" ? t.workspace.countPricedAbove : t.workspace.countPricedBelow,
-                  { priced: String(countNotes.priced), offered: String(countNotes.offered) },
-                )}
-              </span>
-            )}
-            {countNotes.hasClaimedNote && (
-              <span className="text-brand">
-                {fmt(t.workspace.countClaimed, {
-                  n: String(countNotes.claimedUnits),
-                  named: String(countNotes.machinesNamed),
-                })}
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
       {/* The way on. */}
-      <div className="mt-auto flex flex-none gap-2 px-3.5 pb-3.5 pt-0.5">
+      {/* ~~`mt-auto`.~~ It pushed the way on to the bottom of a card taller than its content; with
+          the card sized to its content there is no gap left for it to cross. */}
+      <div className="flex flex-none gap-2 px-3.5 pb-3.5 pt-0.5">
         {offline ? (
           <>
             {/* ── Invite him onto the app (owner, 2026-08-25) ────────────────────────────────────
@@ -595,6 +646,31 @@ function LegRow({ label, amount, excluded }: { label: string; amount: number | n
         )}
       </span>
     </div>
+  );
+}
+
+/**
+ * **The units badge** — the app's `_OffersUnitsBadge`, in the web card's own type scale.
+ *
+ * Blue and a crate while the offer is open; green and a tick once it is accepted, when it states how
+ * much of the offer was actually taken rather than how much was on the table. It reports the OFFER,
+ * so it stays put when the deal room negotiates the priced count down — that count is the totals'
+ * business, and the note under them says when the two diverge.
+ */
+function OffersUnitsBadge({ offered, accepted }: { offered: number; accepted: number | null }) {
+  const t = useT();
+  const isAccepted = accepted != null;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-sm px-2 py-0.5 text-label font-extrabold ${
+        isAccepted ? "bg-ok-soft text-ok" : "bg-info-soft text-info"
+      }`}
+    >
+      <Icon name={isAccepted ? "check_circle" : "inventory_2"} size={12} />
+      {isAccepted
+        ? fmt(t.workspace.acceptedUnits, { accepted: String(accepted), offered: String(offered) })
+        : fmt(t.workspace.offersUnits, { n: String(offered) })}
+    </span>
   );
 }
 
