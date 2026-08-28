@@ -11,6 +11,9 @@ import { bidCounterDelta } from "@/lib/contract/bid-counter-delta";
 import { distinctMachinesOffered, unitCountNotes } from "@/lib/contract/unit-count-notes";
 import { computeQuoteTotals, computeRentalTotal, divisorNote, formatSar, headlineAmount, legDisplay } from "@/lib/pricing/rental";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
+import { CheckRing } from "@/components/requests/BidCardChecks";
+import { equipmentCheckOf } from "@/lib/contract/bid-card-checks";
+import { computeBidReadiness } from "@/lib/contract/bid-readiness";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 import type { LinkBidSubmission } from "@/lib/contract/link-bids";
 import { termsDial, type WorkspaceBid } from "@/lib/contract/workspace";
@@ -111,6 +114,28 @@ function BidCardTile({
   const card = bid.card;
   const offline = bid.source === "offline";
   const dial = termsDial(card, bid.source);
+
+  /**
+   * The equipment half, the app's own model of it (`bid_card_checks.dart`, ported to
+   * `bid-card-checks.ts`). Requirement-level, not unit-level: a bid offering three machines that
+   * each want one more paper is «6 met · 3 missing», not «0 of 3 ready», which would read as total
+   * failure for a supplier who is one document short per machine.
+   *
+   * A bid nobody can act on any more draws a grey ring and says so rather than disappearing, which
+   * is the rule the negotiate footer already follows for the same two statuses.
+   */
+  const equipmentChecks = equipmentCheckOf(computeBidReadiness(card)?.units ?? [], {
+    dead: card.status === "EXPIRED" || card.status === "WITHDRAWN",
+  });
+  const equipmentStatus = equipmentChecks.dead
+    ? L("Not checked", "لم تُراجَع")
+    : equipmentChecks.allClear
+      ? L("All on file", "كل المستندات مكتملة")
+      : equipmentChecks.parts.length === 0
+        ? L("Nothing required", "لا متطلبات")
+        : equipmentChecks.parts
+            .map((p) => (p.tone === "good" ? L(`${p.count} met`, `${p.count} مكتمل`) : L(`${p.count} missing`, `${p.count} ناقص`)))
+            .join(" · ");
 
   /** Digits only — `wa.me` refuses a number carrying spaces, dashes or a leading `+`. */
   const invitePhone = (card.supplierPhone ?? "").replace(/\D/g, "") || null;
@@ -287,9 +312,21 @@ function BidCardTile({
         }}
         className="flex min-h-[var(--control-lg)] flex-none items-center gap-3 border-t border-border px-3.5 py-2 text-start transition-colors hover:bg-surface2/40"
       >
-        <Icon name="precision_manufacturing" size={16} className="flex-none text-muted" />
-        <span className="flex-1 text-body font-semibold text-navy">{t.workspace.equipmentAndDocs}</span>
-        <span className="text-label font-semibold text-info">{L("View", "عرض")} ›</span>
+        {/* ── The ring, not a glyph (owner, 2026-08-28) ────────────────────────────────────────────
+            A `precision_manufacturing` icon said "this row is about machines", which the label
+            already said. The ring says something the label cannot: how much of what this request
+            asked for is actually on file. It is the app's own — `CheckRing` over `equipmentCheckOf`,
+            the port of `bid_card_checks.dart` — so the two products draw one proportion the same way
+            rather than each inventing a picture of it.
+
+            It also matches the Terms row directly below: a dial there, a ring here, both stating how
+            far along their half is before the renter opens anything. */}
+        <CheckRing check={equipmentChecks} />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-body font-semibold text-navy">{t.workspace.equipmentAndDocs}</span>
+          <span className="text-label font-semibold text-muted">{equipmentStatus}</span>
+        </span>
+        <span className="flex-none text-label font-semibold text-info">{L("View", "عرض")} ›</span>
       </button>
 
       {/* Terms: the dial says how much of them this supplier answered — never how good the offer is. */}

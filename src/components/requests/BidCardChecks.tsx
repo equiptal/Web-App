@@ -29,7 +29,12 @@ const TONE_COLOUR: Record<CheckTone, string> = {
 };
 
 /** The ring, built from the arcs the model states. A dead or empty half draws one flat track. */
-function Ring({ check }: { check: BidCardCheck }) {
+/**
+ * Exported for the workspace bid card, which shows the equipment half on its own row rather than as
+ * one of a pair. The ring is the whole of what that row needed: same arcs, same tones, same tick and
+ * same news dot, so the two surfaces cannot start disagreeing about what a proportion looks like.
+ */
+export function CheckRing({ check }: { check: BidCardCheck }) {
   const arcs = checkArcs(check);
   const size = 34;
   const track = check.dead ? TONE_COLOUR.dead : check.allClear ? TONE_COLOUR.good : "var(--surface3)";
@@ -102,7 +107,7 @@ function Half({ check, title, allClearText, emptyText, L, action }: {
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
-      <Ring check={check} />
+      <CheckRing check={check} />
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 12.5, fontWeight: 800, color: "var(--navy)", whiteSpace: "nowrap" }}>{title}</div>
         <div style={{ marginTop: 2 }}>{line}</div>
