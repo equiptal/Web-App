@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { Dialog } from "@/components/Dialog";
 import { useRfq } from "@/lib/store/rfq-store";
 import { useT } from "@/lib/i18n";
 import { Intake } from "@/components/screens/Intake";
@@ -71,34 +72,37 @@ export function CreateSurface() {
         </div>
       )}
       {screen}
+      {/* The shared dialog, not a scrim of its own (owner, 2026-08-28: one design for every modal).
+          This drew `bg-black/50` where the system's scrim is navy at 45%, and its own panel and
+          heading with no way out but the two buttons — a prompt with no close is the one thing a
+          renter cannot escape by pressing Escape. `Dialog` gives it that for free.
+
+          `onClose` resumes rather than resets: dismissing a "you have a draft" prompt is not a
+          decision to throw the draft away, so the destructive branch stays a deliberate press. */}
       {state.draftPrompt && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-surface p-6">
-            <div className="flex items-start gap-3">
-              <span className="grid h-10 w-10 flex-none place-items-center rounded-sm bg-brand-soft text-brand">
-                <Icon name="drafts" size={22} />
-              </span>
-              <div>
-                <h2 className="text-title font-extrabold text-navy">{t.draftPrompt.title}</h2>
-                <p className="mt-1 text-body leading-relaxed text-muted">{t.draftPrompt.body}</p>
-              </div>
-            </div>
-            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button
-                onClick={() => actions.reset()}
-                className={btn("secondary", "md", { className: "transition" })}
-              >
+        <Dialog
+          open
+          onClose={() => actions.resumeDraft()}
+          size="sm"
+          icon={
+            <span className="grid h-[34px] w-[34px] flex-none place-items-center rounded-sm bg-brand-soft text-brand">
+              <Icon name="drafts" size={19} />
+            </span>
+          }
+          title={t.draftPrompt.title}
+          footer={
+            <>
+              <button onClick={() => actions.reset()} className={btn("secondary", "md", { className: "transition" })}>
                 {t.draftPrompt.startOver}
               </button>
-              <button
-                onClick={() => actions.resumeDraft()}
-                className={btn("primary", "md", { className: "transition" })}
-              >
+              <button onClick={() => actions.resumeDraft()} className={btn("primary", "md", { className: "transition" })}>
                 {t.draftPrompt.continue}
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <p className="text-body leading-relaxed text-muted">{t.draftPrompt.body}</p>
+        </Dialog>
       )}
     </>
   );

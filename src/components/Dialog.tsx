@@ -152,7 +152,7 @@ export function Dialog({
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         data-dialog-panel=""
-        className={`relative flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-sm sm:max-h-[calc(100dvh-2rem)] sm:rounded-sm ${PANEL} ${SIZE[size]}`}
+        className={`relative flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-lg sm:max-h-[calc(100dvh-2rem)] sm:rounded-lg ${PANEL} ${SIZE[size]}`}
       >
         {/* A dialog whose body supplies its own headings still needs a way out, so the close floats
             in the corner rather than being dropped along with the header. */}
@@ -163,7 +163,7 @@ export function Dialog({
         )}
 
         {(title || icon) && (
-          <div {...pin("dialog-header")} className={`flex flex-none items-start gap-3 px-5 py-3.5 ${flushHeader ? "" : "border-b border-border"}`}>
+          <div {...pin("dialog-header")} className={`flex flex-none items-start gap-3 bg-surface2 px-5 py-3.5 ${flushHeader ? "" : "border-b border-border"}`}>
             {icon && <span className="grid h-[34px] w-[34px] flex-none place-items-center">{icon}</span>}
             <div className="min-w-0 flex-1">
               {title && <h2 className="text-title font-extrabold leading-tight tracking-[-.2px] text-navy">{title}</h2>}

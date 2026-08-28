@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useState, type ReactNode } from "react";
+import { Dialog } from "@/components/Dialog";
 import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
@@ -297,34 +298,19 @@ export function ReadyToSend() {
       />
 
       {showLimit && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 sm:items-center"
-          dir={ar ? "rtl" : "ltr"}
-          onClick={(e) => e.target === e.currentTarget && setShowLimit(false)}
-        >
-          <div className="w-full max-w-[440px] rounded-t-lg bg-surface p-5 sm:rounded-lg">
-            <div className="flex items-start gap-3">
-              <span className="grid h-11 w-11 flex-none place-items-center rounded-full bg-warn-soft text-warn">
-                <Icon name="verified_user" size={24} />
-              </span>
-              <div className="flex-1">
-                <h3 className="text-title font-extrabold text-navy">{L("Request limit reached", "بلغت الحد الأقصى للطلبات")}</h3>
-                <p className="mt-1.5 text-body leading-relaxed text-muted">
-                  {L(
-                    "Basic accounts can post a limited number of requests. Get verified to post unlimited requests and unlock the full marketplace.",
-                    "تستطيع الحسابات الأساسية إرسال عدد محدود من الطلبات. وثّق حسابك لإرسال طلبات غير محدودة والاستفادة من المنصة بالكامل.",
-                  )}
-                </p>
-              </div>
-              <button onClick={() => setShowLimit(false)} className="grid h-8 w-8 flex-none place-items-center rounded-full text-muted hover:bg-surface2">
-                <Icon name="close" size={18} />
-              </button>
-            </div>
-            <div className="mt-5 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
-              <button
-                onClick={() => setShowLimit(false)}
-                className={btn("secondary", "md", { className: "transition" })}
-              >
+        <Dialog
+          open
+          onClose={() => setShowLimit(false)}
+          size="sm"
+          icon={
+            <span className="grid h-[34px] w-[34px] flex-none place-items-center rounded-full bg-warn-soft text-warn">
+              <Icon name="verified_user" size={19} />
+            </span>
+          }
+          title={L("Request limit reached", "بلغت الحد الأقصى للطلبات")}
+          footer={
+            <>
+              <button onClick={() => setShowLimit(false)} className={btn("secondary", "md", { className: "transition" })}>
                 {L("Not now", "ليس الآن")}
               </button>
               <button
@@ -336,9 +322,16 @@ export function ReadyToSend() {
               >
                 <Icon name="verified_user" size={17} /> {L("Get verified", "وثّق حسابك")}
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <p className="text-body leading-relaxed text-muted">
+            {L(
+              "Basic accounts can post a limited number of requests. Get verified to post unlimited requests and unlock the rest of the marketplace.",
+              "تستطيع الحسابات الأساسية إرسال عدد محدود من الطلبات. وثّق حسابك لإرسال طلبات بلا حدود.",
+            )}
+          </p>
+        </Dialog>
       )}
     </div>
   );

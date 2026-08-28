@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Dialog } from "@/components/Dialog";
 import { useT, useLocale, fmt } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Button, Icon } from "@/components/ui";
@@ -152,21 +153,17 @@ export function Processing() {
     const body = isEmpty ? t.errors.emptyBody : agentBusy ? t.errors.busyBody : agentDown ? t.errors.unavailableBody : t.errors.networkBody;
     const icon = isEmpty ? "search_off" : agentBusy ? "hourglass_empty" : agentDown ? "cloud_off" : "wifi_off";
     return (
-      <div
-        className="fixed inset-0 z-[70] flex items-center justify-center bg-navy/45 p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="proc-err-title"
-        onClick={(e) => { if (e.target === e.currentTarget) actions.goIntake(); }}
-      >
-        <div className="relative w-full max-w-sm rounded-lg bg-surface p-6 text-center">
-          <button
-            onClick={() => actions.goIntake()}
-            aria-label={t.common.close}
-            className="absolute end-3 top-3 grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface3 hover:text-navy"
-          >
-            <Icon name="close" size={18} />
-          </button>
+      /* ── The shared dialog, keeping its own shape (owner, 2026-08-28: one design for every modal)
+         ─────────────────────────────────────────────────────────────────────────────────────────
+         It drew its own scrim, panel, and close — and its own focus handling, which is to say none.
+         `Dialog` supplies all four.
+
+         It passes NO title, deliberately. A failure is read from the middle out: the glyph, then
+         what went wrong, then the way back. Putting that title into a header bar at the leading edge
+         would make this look like every panel and read like none of them. A title-less dialog floats
+         its close in the corner, which is exactly the control this was hand-rolling. */
+      <Dialog open onClose={() => actions.goIntake()} size="sm">
+        <div className="text-center">
           <div className={`mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full ${isEmpty || agentBusy ? "bg-warn-soft text-warn" : "bg-danger-soft text-danger"}`}>
             <Icon name={icon} size={34} />
           </div>
@@ -179,7 +176,7 @@ export function Processing() {
             <Icon name="refresh" size={19} /> {t.common.retry}
           </Button>
         </div>
-      </div>
+      </Dialog>
     );
   }
 
