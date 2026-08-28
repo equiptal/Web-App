@@ -11,8 +11,7 @@ import { bidCounterDelta } from "@/lib/contract/bid-counter-delta";
 import { distinctMachinesOffered, unitCountNotes } from "@/lib/contract/unit-count-notes";
 import { computeQuoteTotals, computeRentalTotal, divisorNote, formatSar, headlineAmount, legDisplay } from "@/lib/pricing/rental";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
-import { CheckRing } from "@/components/requests/BidCardChecks";
-import { equipmentCheckOf } from "@/lib/contract/bid-card-checks";
+import { checkArcs, equipmentCheckOf, type BidCardCheck, type CheckTone } from "@/lib/contract/bid-card-checks";
 import { computeBidReadiness } from "@/lib/contract/bid-readiness";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 import type { LinkBidSubmission } from "@/lib/contract/link-bids";
@@ -127,15 +126,6 @@ function BidCardTile({
   const equipmentChecks = equipmentCheckOf(computeBidReadiness(card)?.units ?? [], {
     dead: card.status === "EXPIRED" || card.status === "WITHDRAWN",
   });
-  const equipmentStatus = equipmentChecks.dead
-    ? L("Not checked", "لم تُراجَع")
-    : equipmentChecks.allClear
-      ? L("All on file", "كل المستندات مكتملة")
-      : equipmentChecks.parts.length === 0
-        ? L("Nothing required", "لا متطلبات")
-        : equipmentChecks.parts
-            .map((p) => (p.tone === "good" ? L(`${p.count} met`, `${p.count} مكتمل`) : L(`${p.count} missing`, `${p.count} ناقص`)))
-            .join(" · ");
 
   /** Digits only — `wa.me` refuses a number carrying spaces, dashes or a leading `+`. */
   const invitePhone = (card.supplierPhone ?? "").replace(/\D/g, "") || null;
@@ -312,21 +302,18 @@ function BidCardTile({
         }}
         className="flex min-h-[var(--control-lg)] flex-none items-center gap-3 border-t border-border px-3.5 py-2 text-start transition-colors hover:bg-surface2/40"
       >
-        {/* ── The ring, not a glyph (owner, 2026-08-28) ────────────────────────────────────────────
-            A `precision_manufacturing` icon said "this row is about machines", which the label
-            already said. The ring says something the label cannot: how much of what this request
-            asked for is actually on file. It is the app's own — `CheckRing` over `equipmentCheckOf`,
-            the port of `bid_card_checks.dart` — so the two products draw one proportion the same way
-            rather than each inventing a picture of it.
+        {/* ── One dial for both rows (owner, 2026-08-28) ──────────────────────────────────
+            This row and Terms below it answer the same question about two halves of one bid — how
+            much of what was asked for has been answered — so they now draw the same picture of it:
+            the Terms dial, at the Terms size, over `equipmentCheckOf`'s arcs. A donut here and a disc
+            there made two proportions look like two different kinds of fact.
 
-            It also matches the Terms row directly below: a dial there, a ring here, both stating how
-            far along their half is before the renter opens anything. */}
-        <CheckRing check={equipmentChecks} />
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="text-body font-semibold text-navy">{t.workspace.equipmentAndDocs}</span>
-          <span className="text-label font-semibold text-muted">{equipmentStatus}</span>
-        </span>
-        <span className="flex-none text-label font-semibold text-info">{L("View", "عرض")} ›</span>
+            The counts line under the label goes with it. «1 met · 11 missing» restated the dial in
+            words and made this row taller than the one it pairs with; the figures live behind
+            «View», on the verification map, where they can be acted on. */}
+        <DialGlyph slices={checkSlices(equipmentChecks)} />
+        <span className="flex-1 text-body font-semibold text-navy">{t.workspace.equipmentAndDocs}</span>
+        <span className="text-label font-semibold text-info">{L("View", "عرض")} ›</span>
       </button>
 
       {/* Terms: the dial says how much of them this supplier answered — never how good the offer is. */}
@@ -338,7 +325,7 @@ function BidCardTile({
         }}
         className="flex min-h-[var(--control-lg)] flex-none items-center gap-3 border-t border-border px-3.5 py-2 text-start transition-colors hover:bg-surface2/40"
       >
-        <TermsDialGlyph met={dial.met} against={dial.against} unanswered={dial.unanswered} />
+        <DialGlyph slices={termsSlices(dial)} />
         <span className="flex-1 text-body font-semibold text-navy">{L("Terms", "الشروط")}</span>
         <span className="text-label font-semibold text-info">{L("View", "عرض")} ›</span>
       </button>
@@ -611,20 +598,50 @@ function LegRow({ label, amount, excluded }: { label: string; amount: number | n
   );
 }
 
-/** Three arcs — met, against, unanswered — drawn as one ring. Empty terms render as a plain outline
- *  rather than a full circle of any colour, which would claim an answer that was never given. */
-function TermsDialGlyph({ met, against, unanswered }: { met: number; against: number; unanswered: number }) {
+/** One slice of a dial: a colour, and the share of the circle it holds (0–1). */
+type DialSlice = { colour: string; share: number };
+
+const CHECK_TONE_COLOUR: Record<CheckTone, string> = {
+  good: "var(--ok)",
+  bad: "var(--danger)",
+  warn: "var(--warn)",
+  dead: "var(--border-strong)",
+  none: "var(--border-strong)",
+};
+
+/** Terms: met, against, unanswered. */
+function termsSlices({ met, against, unanswered }: { met: number; against: number; unanswered: number }): DialSlice[] {
   const total = met + against + unanswered;
-  if (total === 0) return <span className="h-[18px] w-[18px] flex-none rounded-full border-2 border-border" />;
-  const pct = (n: number) => (n / total) * 360;
-  const a = pct(met);
-  const b = a + pct(against);
-  return (
-    <span
-      className="h-[18px] w-[18px] flex-none rounded-full"
-      style={{
-        background: `conic-gradient(var(--ok) 0deg ${a}deg, var(--danger) ${a}deg ${b}deg, var(--border) ${b}deg 360deg)`,
-      }}
-    />
-  );
+  if (total === 0) return [];
+  return [
+    { colour: "var(--ok)", share: met / total },
+    { colour: "var(--danger)", share: against / total },
+    { colour: "var(--border)", share: unanswered / total },
+  ];
+}
+
+/** Equipment: the app's own arcs (`bid_card_checks.dart`), in the tones that model states. Dead and
+ *  all-clear are one flat disc — the same two special cases `CheckRing` draws for the same states. */
+function checkSlices(check: BidCardCheck): DialSlice[] {
+  if (check.dead) return [{ colour: CHECK_TONE_COLOUR.dead, share: 1 }];
+  if (check.allClear) return [{ colour: CHECK_TONE_COLOUR.good, share: 1 }];
+  const arcs = checkArcs(check);
+  return check.parts
+    .map((p, i) => ({ colour: CHECK_TONE_COLOUR[p.tone], share: arcs[i] ?? 0 }))
+    .filter((s) => s.share > 0);
+}
+
+/** The dial both check rows draw. Nothing measured renders as a plain outline rather than a full
+ *  circle of any colour, which would claim an answer that was never given. */
+function DialGlyph({ slices }: { slices: DialSlice[] }) {
+  if (slices.length === 0) return <span className="h-[18px] w-[18px] flex-none rounded-full border-2 border-border" />;
+  const stops: string[] = [];
+  let at = 0;
+  slices.forEach((s, i) => {
+    // The last slice closes the circle: rounded shares can otherwise leave a hairline of nothing.
+    const end = i === slices.length - 1 ? 360 : at + s.share * 360;
+    stops.push(`${s.colour} ${at}deg ${end}deg`);
+    at = end;
+  });
+  return <span className="h-[18px] w-[18px] flex-none rounded-full" style={{ background: `conic-gradient(${stops.join(", ")})` }} />;
 }
