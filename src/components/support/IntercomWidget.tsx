@@ -85,15 +85,24 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
    * The signature, the real name and the email — everything only the server can answer.
    *
    * Fetched once per signed-in user, then held. Until it lands the messenger stays ANONYMOUS rather
-   * than booting on the session alone: an unsigned identified boot is refused outright by a workspace
-   * with identity verification switched on, and being briefly anonymous is recoverable where being
-   * refused is not. It also spares support a «User 42» contact that a second boot then renames.
+   * than booting on the session alone — that spares support a «User 42» contact which a second boot
+   * then renames, and it is what learns the yardstick `healthy` below is measured against.
+   *
+   * `userHash` may be null, and the messenger is booted identified anyway. That is the mobile app's
+   * own posture — `loginIdentifiedUser` sends no hash either — and one client should not describe a
+   * person differently from the other.
+   *
+   * That costs nothing only while identity verification is switched OFF for web in the Intercom
+   * dashboard. Switched on, the workspace answers an unsigned boot with a 403 on
+   * `/messenger/web/ping` and the frame reads «Something's gone wrong — content could not be
+   * loaded», with no way back but a reload. There is nothing this component can do about that: no
+   * callback fires, and the DOM a refused boot leaves — the bridge iframe and the lightweight
+   * launcher — is the SAME DOM a healthy unopened messenger leaves, so «did it render» cannot be
+   * asked. It is a dashboard setting, and `.env.example` records which way it has to be set.
    */
   const [server, setServer] = useState<IntercomServerIdentity | null>(null);
   /** Which user `server` describes, so a sign-out or an account switch cannot inherit it. */
   const serverFor = useRef<number | null>(null);
-  /** Whether the missing-secret warning below has already been said. */
-  const warned = useRef(false);
 
   useEffect(() => {
     if (status !== "authed" || !user) {
@@ -144,24 +153,7 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
     // Still asking who this is — boot anonymous rather than waiting. Support is most useful to the
     // person who cannot get in, and that person never reaches `authed`.
     //
-    // An UNSIGNED identity counts as «still asking», which is the whole point of testing
-    // `server?.userHash` and not merely `server`. This workspace has identity verification switched
-    // on for web, and it refuses every boot that carries an identity without a valid `user_hash` —
-    // `user_id` and a bare `email` alike, with a 403 on `/messenger/web/ping` and a frame that reads
-    // «Something's gone wrong — content could not be loaded». There is no recovering from that: the
-    // launcher is gone until the page is reloaded. Anonymous costs a support agent the renter's name;
-    // refused costs the renter support altogether, so anonymous wins every time.
-    if (status === "loading" || !user || !server?.userHash) {
-      // Said once, and only for a SIGNED-IN renter whose route answered without a signature — a
-      // visitor who was never going to be identified sees nothing. Silence is what made this cost a
-      // debugging session: an anonymous messenger looks perfectly healthy from the outside.
-      if (server && !server.userHash && !warned.current) {
-        warned.current = true;
-        console.warn(
-          "[intercom] INTERCOM_IDENTITY_SECRET is unset, so this signed-in renter cannot be " +
-            "identified — the workspace refuses an unsigned boot. The messenger stays anonymous.",
-        );
-      }
+    if (status === "loading" || !user || !server) {
       const wanted = "anon";
       if (identity.current === wanted && booted.current) return;
       // A signed-in messenger must be torn down before an anonymous one replaces it, or the previous
@@ -176,7 +168,7 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
     const payload = { ...base, ...buildIntercomPayload({ user, locale, appVersion, server }) };
     // The signature is in the key: a workspace that rotates its secret mid-session must re-boot
     // rather than keep a messenger signed under the old one.
-    const wanted = `${user.id}:${user.tier}:${locale}:${server.userHash}`;
+    const wanted = `${user.id}:${user.tier}:${locale}:${server.userHash ?? "unsigned"}`;
     if (identity.current === wanted) return;
 
     // `update` for anything that changes WITHIN one identity — a tier that moved, a language

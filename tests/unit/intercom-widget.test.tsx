@@ -4,16 +4,17 @@ import { IntercomWidget } from "@/components/support/IntercomWidget";
 import type { IntercomServerIdentity } from "@/lib/support/intercom";
 
 /**
- * The messenger must never be handed an identity the workspace will refuse.
+ * The messenger identifies a renter the way the mobile app does, and survives a workspace that says no.
  *
- * The `w17eryax` workspace has identity verification switched ON for web. Verified by hand on
- * 2026-08-27: an anonymous boot renders, and every boot carrying an identity — `user_id`, or even a
- * bare `email` — is refused with a 403 on `/messenger/web/ping`, after which the frame reads
- * «Something's gone wrong — content could not be loaded» and the launcher is gone until a reload.
+ * The app calls `loginIdentifiedUser` with no hash, so the web boots identified whether or not it has
+ * a signature — one client must not describe a person differently from the other.
  *
- * So an unsigned identity is worth less than no identity at all, and these tests pin that: the
- * widget boots identified only once the server has answered with a `user_hash`, and it tears the
- * anonymous messenger down first, because a second `boot` over a live session does not promote it.
+ * A workspace CAN refuse that, and `w17eryax` did on 2026-08-27, with identity verification switched
+ * on for web: an anonymous boot rendered, and every boot carrying an identity — `user_id`, or even a
+ * bare `email` — came back 403 on `/messenger/web/ping`, after which the frame read «Something's
+ * gone wrong — content could not be loaded». Nothing here can detect that (no callback fires, and a
+ * refused boot leaves the same two nodes an unopened healthy one does), so it is a dashboard setting
+ * and `.env.example` records which way it has to be set. These tests pin what the widget sends.
  */
 
 const session = vi.hoisted(() => ({ value: { status: "loading" as string, user: null as unknown } }));
@@ -82,17 +83,28 @@ describe("booting before anyone is identified", () => {
   });
 });
 
-describe("an identity the workspace would refuse", () => {
-  it("stays ANONYMOUS when the server has no signature to give", async () => {
+describe("identifying a renter", () => {
+  it("shuts the anonymous messenger down before booting identified", async () => {
     session.value = { status: "authed", user };
-    await renderWith(identity({ userHash: null, verified: false }));
-    // Nothing after the anonymous boot: no identified boot, signed or otherwise.
-    await waitFor(() => expect(commands()).toEqual(["boot"]));
-    expect(lastPayload()).not.toHaveProperty("user_id");
-    expect(lastPayload()).not.toHaveProperty("email");
+    await renderWith(identity());
+    // A second `boot` over a live anonymous session does not promote it — it kills it.
+    await waitFor(() => expect(commands()).toEqual(["boot", "shutdown", "boot"]));
+    const payload = lastPayload();
+    expect(payload.user_id).toBe("42");
+    expect(payload.user_hash).toBe("a".repeat(64));
   });
 
-  it("stays anonymous when the route fails outright", async () => {
+  it("boots identified WITHOUT a signature, as the mobile app does", async () => {
+    session.value = { status: "authed", user };
+    await renderWith(identity({ userHash: null, verified: false }));
+    await waitFor(() => expect(commands()).toEqual(["boot", "shutdown", "boot"]));
+    const payload = lastPayload();
+    expect(payload.user_id).toBe("42");
+    // Omitted, never null: Intercom reads the key's PRESENCE, so a null reads as a failed signature.
+    expect(payload).not.toHaveProperty("user_hash");
+  });
+
+  it("stays anonymous when the route fails outright — there is no identity to send", async () => {
     session.value = { status: "authed", user };
     await renderWith(null, false);
     await waitFor(() => expect(commands()).toEqual(["boot"]));
@@ -100,13 +112,3 @@ describe("an identity the workspace would refuse", () => {
   });
 });
 
-describe("a signed identity", () => {
-  it("shuts the anonymous messenger down before booting identified", async () => {
-    session.value = { status: "authed", user };
-    await renderWith(identity());
-    await waitFor(() => expect(commands()).toEqual(["boot", "shutdown", "boot"]));
-    const payload = lastPayload();
-    expect(payload.user_id).toBe("42");
-    expect(payload.user_hash).toBe("a".repeat(64));
-  });
-});
