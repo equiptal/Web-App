@@ -80,7 +80,11 @@ export function InboxView() {
   const ctaLabel = (b: InboxBid) => {
     if (b.supplierStarted) return L("Reply", "رد");
     if (b.dealRoomStatus === "CLOSED") return L("View deal", "عرض الصفقة");
-    if (b.dealRoomId) return L("Open chat", "فتح المحادثة");
+    // NOT «Open chat» (owner, 2026-08-28). This opens the deal room, and the deal room has carried no
+    // conversation since the chat moved to the map — the label was promising the one thing the
+    // destination no longer has. It is the negotiation, so it says so, and it pairs with the
+    // «Start negotiation» below it for a bid that has no room yet.
+    if (b.dealRoomId) return L("Continue negotiation", "متابعة التفاوض");
     return L("Start negotiation", "بدء التفاوض");
   };
 

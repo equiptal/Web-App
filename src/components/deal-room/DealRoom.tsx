@@ -441,6 +441,36 @@ export function DealRoom({ id, onTitle, initialFlow }: {
     setFlowMode(mode);
   }
 
+  /**
+   * Whether this visit exists only to host the sheet — `?act=` opened it, nobody asked for the room.
+   *
+   * A ref rather than state: closing reads it once and navigates, and nothing renders differently
+   * for it.
+   */
+  const arrivedForFlow = useRef(false);
+
+  /**
+   * Closing the sheet.
+   *
+   * Pressed from the room's own Negotiate or Accept, the X goes back to the room — that is where the
+   * renter was. Pressed on a room reached BY `?act=counter`, going back to the room means landing on
+   * a screen he never asked for and, until now, one still carrying a pointer to a chat that lives on
+   * the map (owner, 2026-08-28: *"that x button must just close it and return to existing screen
+   * before opening the 3 styles sheet"*). So the deep-linked case leaves the way it came.
+   *
+   * `history.length` guards the pasted URL: with nothing behind it `back()` leaves the renter
+   * wherever the browser decides, so that one falls through to the same place the header's own back
+   * arrow goes.
+   */
+  function closeFlow() {
+    if (busy) return;
+    setFlowMode(null);
+    if (!arrivedForFlow.current) return;
+    arrivedForFlow.current = false;
+    if (typeof window !== "undefined" && window.history.length > 1) router.back();
+    else router.push("/inbox");
+  }
+
   // ── The `?act=` deep link (owner, 2026-08-11) ───────────────────────────────────────────────────
   // Seeded ONCE per visit, through `openFlow` itself, so the flow keeps every guard it already had —
   // including the one this file states twice over: nothing opens before the room is here or while a
@@ -461,7 +491,11 @@ export function DealRoom({ id, onTitle, initialFlow }: {
     // the room: the same place a blocked accept leaves him, under the same strip.
     if (initialFlow === "accept" && !chatReady && STREAM_API_KEY) return;
     seededFlow.current = true; // whatever the verdict — closing the sheet must not reopen it
-    if (flowGate.current[initialFlow]) openFlow(initialFlow);
+    if (flowGate.current[initialFlow]) {
+      openFlow(initialFlow);
+      // The room was never the destination — see `closeFlow`.
+      arrivedForFlow.current = true;
+    }
     // `openFlow` is redeclared every render; the one-shot ref above is what actually bounds this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialFlow, room, busy, chatReady]);
@@ -948,13 +982,18 @@ export function DealRoom({ id, onTitle, initialFlow }: {
 
       {/* terms are negotiated inside the negotiation sheet (§6 step ②) — no standalone terms card here. */}
 
-      {/* ── The conversation is NOT here (owner, 2026-08-26) ─────────────────────────────────────
-          *"i want this chat ui for all chat surfaces, no more this one … it is just chat"*.
+      {/* ── No chat on this route, not even a pointer to one (owner, 2026-08-26, 2026-08-28) ─────
+          *"i want this chat ui for all chat surfaces, no more this one … it is just chat"*, and then
+          *"we decided to not include this chat view at all, our chat is now in the map, so this must
+          be removed from any route"*.
 
           This page carried a second chat — its own thread, its own bubbles, its own composer, its
           own `Translate` link — under a price bar with Negotiate and Accept on it. Two chat UIs in
           one app, and the one that lived here was the only place a conversation shared a screen
-          with a negotiation. Both are gone: chat is the map's dock, and this page is the act.
+          with a negotiation. That went on 08-26, and the signpost that replaced it («the
+          conversation lives with the machines», with an Open chat button onto the map) has now gone
+          too: a card advertising chat is still chat on a route that is meant to have none, and the
+          renter arrives here from the map he would be sent back to.
 
           The dock was ALREADY only chat and needed no change for this — `live: false` strips
           accept/counter from a rate card there (`ChatDock.tsx:1104`), "so there is exactly one
@@ -965,23 +1004,6 @@ export function DealRoom({ id, onTitle, initialFlow }: {
           `reconstructRounds(messages)` is what produces the live position and seeds the sheet's
           rate — so the messages are this page's ledger even with nothing rendering them. Only the
           rendering left. */}
-      <div className="dl-chat-away">
-        <span className="material-icons-outlined">forum</span>
-        <div className="dl-chat-away-txt">
-          <b>{L("The conversation lives with the machines", "المحادثة مع المعدات")}</b>
-          <span>{L("Messages, files and voice notes are in the chat on the map.", "الرسائل والملفات والملاحظات الصوتية في المحادثة على الخريطة.")}</span>
-        </div>
-        {room.bidId && (
-          <button
-            type="button"
-            className="dl-chat-away-go"
-            onClick={() => router.push(`/bids/${encodeURIComponent(room.bidId as string)}/equipment?chat=1`)}
-          >
-            {L("Open chat", "فتح المحادثة")}
-            <span className="material-icons-outlined chev">chevron_right</span>
-          </button>
-        )}
-      </div>
 
       {/* Footer — the quotation link, and the note a closed or cancelled room puts in its place.
           One sticky container: two `position: sticky; bottom: 0` siblings would both pin to the
@@ -1036,7 +1058,7 @@ export function DealRoom({ id, onTitle, initialFlow }: {
           hasDuration={hasDuration}
           units={units}
           messages={messages}
-          onClose={() => !busy && setFlowMode(null)}
+          onClose={closeFlow}
           onCounter={submitCounter}
           onAccept={doAccept}
         />
