@@ -356,18 +356,42 @@
   /* Part of the 2026-08-11 emphasis: at 18 px flat on the tiles the tick was a blue speck. It only
      ever renders selected, so the value moves here rather than into an `.is-on` rule of its own. */
 }
-/* ONE label, ONE fact: «مؤكّد توفرها» / «لم يؤكد توفرها بعد» (§6.8). Filled with the availability
-   colour, so the marker states its own colour in words and cannot be read off the legend alone. */
+/* ONE label, ONE fact — and since 2026-08-28 that fact is the DISTANCE (owner: *"dont show this not
+   confirmed or availability confirmed, show same distance color we have decided now on each
+   equipment"*). It is still filled with the availability colour, so the marker states its state; what
+   it no longer does is state it twice, once as a colour and once as a sentence. The words survive on
+   the label's `title`, so the state stays reachable on hover and to a reader who cannot separate the
+   two fills.
+
+   ~~The route carried a separate grey distance chip.~~ Gone with the same change: it printed this
+   figure a second time on the same canvas, in the copy without the colour. */
 .bm-pin .bm-pin-chip {
   margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   border-radius: var(--radius-lg);
   padding: 3px 10px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   white-space: nowrap;
   color: var(--surface);
 
   transition: transform 0.16s ease;
+}
+/* The numeral keeps the card's face: one column of distances, one shape to scan, whether the reader
+   is on the map or in the list. */
+.bm-pin .bm-pin-chip [dir="ltr"] { font-family: ui-monospace, monospace; letter-spacing: -0.3px; }
+/* «خارج المدينة» rides the label now that the route has no chip of its own. On a filled
+   availability pill it cannot be amber ink — nothing would read — so it is a white-on-white capsule
+   at low alpha: legible over either fill, and unmistakably not part of the number. */
+.bm-pin .bm-pin-chip .bm-pin-far {
+  border-radius: var(--radius-lg);
+  padding: 0 6px;
+  background: color-mix(in srgb, var(--surface) 26%, transparent);
+  border: 1px solid color-mix(in srgb, var(--surface) 55%, transparent);
+  font-size: 9.5px;
+  font-weight: 800;
 }
 /* The label joins the emphasis: a step of scale, and a WHITE keyline that lifts it off whatever tile
    it happens to land on. The keyline is a second shadow rather than a border — a border would change
@@ -457,21 +481,8 @@
   gap: 5px;
   margin-top: 6px;
 }
-/* The card's ONE state chip (RM3-AC-32), drawn as ink and a keyline. The colour is set INLINE from
-   `card.chip.colour` — the model stays the only authority on it, exactly as the card's own chip and
-   this marker's label do — so there is deliberately no `background` and no `color` here to override
-   it, and no green or red anywhere in this rule for a sweep to find. */
-.bm-pin .bm-pinfo-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 1px solid;
-  border-radius: var(--radius-lg);
-  padding: 2px 8px;
-  font-size: 10.5px;
-  font-weight: 800;
-  white-space: nowrap;
-}
+/* `.bm-pinfo-chip` is gone with the state row it drew (owner, 2026-08-28). The box states the
+   distance IN the availability colour instead of a number and a verdict on two lines. */
 /* «خارج المدينة» — a qualifier on the offer, in the same warm ink the card gives it. Never red: red on
    this canvas is availability's, and a distant yard is not an unavailable machine. */
 .bm-pin .bm-pinfo-far {
@@ -480,19 +491,22 @@
   color: var(--warn-deep);
   white-space: nowrap;
 }
+/* The distance, and the state it is only as good as. The `color` is set INLINE from
+   `card.chip.colour` — the model stays the only authority on it, exactly as the card's distance and
+   this marker's label do — so there is deliberately no colour here to override it, and no green or
+   red anywhere in this rule for a sweep to find. */
 .bm-pin .bm-pinfo-km {
   font-size: 11.5px;
-  font-weight: 700;
-  color: var(--muted);
+  font-weight: 800;
 }
 /* The numeral itself, which carries `dir="ltr"` in the markup — an Arabic-Indic figure inside an RTL
-   run still reads left to right. Same face and same weight the card's distance wears. */
+   run still reads left to right. Same face and same weight the card's distance wears, and now the
+   same ink: it inherits the row's availability colour rather than reverting to navy. */
 .bm-pin .bm-pinfo-km [dir="ltr"] {
   font-family: ui-monospace, monospace;
   font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.4px;
-  color: var(--navy);
 }
 .bm-pin .bm-pinfo-c {
   display: flex;
@@ -524,39 +538,9 @@
 /* `.bm-pinfo-none` is gone with the sentence it styled (owner, 2026-08-19): a machine whose request
    named no certificate draws no certificate row here at all, and `.bm-pinfo-c` is what disappears. */
 
-/* The distance chip riding the route (§6.8, AC-21). Non-interactive: it states the distance the card
-   already states, so it must never become a second way to select a machine. */
-.bm-distchip {
-  direction: rtl;
-  display: flex;
-  justify-content: center;
-  gap: 4px;
-  font-family: inherit;
-}
-.bm-distchip > span {
-  background: var(--surface);
-  border: 1px solid #c8d8e8;
-  border-radius: var(--radius-lg);
-  padding: 2px 9px;
-  font-size: 10px;
-  font-weight: 800;
-  color: #16304f;
-  white-space: nowrap;
-}
-/* The out-of-city flag, riding beside the distance (decoded 704). The number alone cannot say this:
-   95 km reads as a distance, «خارج المدينة» reads as a mobilisation to negotiate. Amber and never red
-   — red on this canvas belongs to availability alone, and a distant yard is not an unavailable
-   machine. Same threshold and same helper as the card's «· خارج المدينة», so the two cannot drift. */
-.bm-distchip .bm-distfar {
-  background: #fff6e8;
-  border: 1px solid color-mix(in srgb, var(--warn) 25%, transparent);
-  border-radius: var(--radius-lg);
-  padding: 2px 9px;
-  font-size: 10px;
-  font-weight: 800;
-  color: var(--warn-deep);
-  white-space: nowrap;
-}
+/* `.bm-distchip` and `.bm-distfar` are gone with the route's own distance chip (owner,
+   2026-08-28): the machine's label carries the distance, in its availability colour, and the
+   out-of-city flag rides that label. See `.bm-pin-chip` above. */
 
 /* The dotted route back to the project — round dots travelling toward the site, so it reads as a
    direction of travel rather than a static rule. */
@@ -937,7 +921,7 @@
    fixes one colour for every ask on this surface, and beside a red availability chip navy reads as
    disabled. Blue, not the alert's orange, for the reason the old comment here gave and which still
    holds — an action tinted with the warning it sits inside reads as part of the warning. The border
-   is the same .22 alpha the prototype uses, taken on the blue, exactly as `.bm-eq-ask` already does. */
+   is the same .22 alpha the prototype uses, taken on the blue. */
 .bidmap .bm-short-act {
   flex-shrink: 0;
   background: var(--surface);
@@ -1011,6 +995,15 @@
 /* EVERY card is the same height: four rows, and no row that appears or disappears with the data
    (RM3-AC-32). The resting shadow is a CUSTOM PROPERTY because V6's attention cue has to preserve it
    — see `bmCue` below. */
+/* ── The card, redesigned (owner, 2026-08-28) ────────────────────────────────────────────────────
+   Three things, in the order the renter asks them: how far, how sure, and what it is. Everything else
+   — the photo, the availability chip, the «in this offer» badge, the verified tick, the certificate
+   line, «Details ›» as a word — is gone. The badge went by name: a renter does not care that a
+   machine is *in the offer but unavailable*; he cares whether it is available, and a second
+   membership fact competed with the one state the card carries.
+
+   Every card is the same height because every card draws the same three blocks, none of which appear
+   or disappear with the data. */
 .bidmap .bm-eq {
   position: relative;
   flex-shrink: 0;
@@ -1020,27 +1013,39 @@
   overflow: hidden;
 
   /* The prototype's `transition: .15s` — ALL properties, not a named pair. The card changes its
-     background, its border and its shadow together on hover and on selection, and a transition that
+     background, its border and its ring together on hover and on selection, and a transition that
      names two of the three makes the third snap while the others ease. */
   transition: 0.15s;
   animation: dpCardIn 0.34s cubic-bezier(0.22, 0.9, 0.3, 1) both;
 }
-/* Hover and selection are told by the border and the fill, not by elevation — this app has no
-   shadows (owner, 2026-08-26). It used to lift on a two-shadow stack held in `--eq-rest` so the
-   attention cue could preserve the card's resting elevation mid-pulse; with no elevation to
-   preserve, the cue is simply a ring and the property is gone. */
-.bidmap .bm-eq:hover {border-color: #b9c9d8; }
-/* Selection is achromatic slate, NOT blue: on a card whose only other colour is its availability chip,
-   a saturated accent read as a third state. Selection is UI, so it stays neutral. */
-.bidmap .bm-eq.on {background: #f2f6fa; border-color: var(--navy); }
-.bidmap .bm-eq.on:hover {}
+.bidmap .bm-eq:hover { border-color: #b9c9d8; }
+
+/* ── SELECTED, and unmistakably so (owner, 2026-08-28) ───────────────────────────────────────────
+   ~~A navy border and a pale slate fill.~~ Withdrawn on sight: *"the selected card show navy borders
+   but it doesnt seem as selected"*. Two things were working against it. The border went from 1.5px
+   #e1e9f1 to 1.5px navy — a colour change at a width the eye reads as the card's outline either way
+   — and `#f2f6fa` against `var(--surface)` is a two-percent step that the panel's own background
+   already sits at. Nothing about the card CHANGED SHAPE, so nothing announced.
+
+   What announces now: the border doubles to 2.5px and takes an inset navy ring at .12, so the edge
+   thickens rather than merely recolours; the fill deepens; and the leading accent grows from 4px to
+   6px with a full-height gradient. The card is still achromatic slate — selection is UI, and this
+   surface's colours belong to the machines — it is simply louder in the one channel that reads as
+   chosen at a glance down a column. */
+.bidmap .bm-eq.on {
+  background: #eaf1f8;
+  border-color: var(--navy);
+  border-width: 2.5px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--navy) 12%, transparent);
+}
+.bidmap .bm-eq.on:hover { border-color: #16304f; }
 .bidmap .bm-eq .bm-eq-acc {
   position: absolute;
   z-index: 2;
   inset-inline-start: 0;
   top: 0;
   bottom: 0;
-  width: 4px;
+  width: 6px;
   /* Decoration over the stretched select button — it must never eat the click on the card's edge. */
   pointer-events: none;
   background: linear-gradient(180deg, var(--navy), #16304f);
@@ -1049,9 +1054,10 @@
      ran once, at list build, and never runs again. */
   animation: dpCardIn 0.22s ease both;
 }
-/* The whole card selects; «التفاصيل» and «اطلب التأكيد» are real buttons ABOVE it. A stretched button
-   under the content rather than a button wrapping it — a button inside a button is invalid markup, and
-   both inner controls have to stay reachable. */
+
+/* The whole card finds the machine on the map; the file icon and the distance chip are real buttons
+   ABOVE it. A stretched button under the content rather than one wrapping it — a button inside a
+   button is invalid markup, and both inner controls have to stay reachable. */
 .bidmap .bm-eq .bm-eq-select {
   position: absolute;
   inset: 0;
@@ -1063,51 +1069,143 @@
   font-family: inherit;
 }
 .bidmap .bm-eq .bm-eq-select:focus-visible { outline: 2px solid #16304f; outline-offset: -3px; }
-.bidmap .bm-eq .bm-eq-in { position: relative; z-index: 1; display: flex; align-items: stretch; pointer-events: none; }
 
-/* The photo cell SHIMMERS until the image decodes (decoded 3988–3990), so the card never shows a bare
-   grey rectangle while a machine's photo is on the wire. The gradient is the placeholder; a decoded
-   `<img>` covers it, and a machine with no photo at all keeps it under the «لا صورة» line, which is
-   the honest reading — nothing is arriving, but nothing is broken either.
-
-   (The prototype writes `backgroundImage` and then `background` in the same style object, so its own
-   shorthand wipes the gradient it just set. The intent is unmistakable from the `dpShimmer` beside it;
-   the shorthand is dropped here rather than the gradient.) */
-.bidmap .bm-eq .bm-eq-photo {
+/* `pointer-events: none` on the wrapper and `auto` on each real control — so everything that is not
+   a control falls through to the stretched select layer beneath. */
+.bidmap .bm-eq .bm-eq-in {
   position: relative;
-  flex-shrink: 0;
-  width: 104px;
-  min-height: 112px;
-  align-self: stretch;
-  overflow: hidden;
+  z-index: 1;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 13px 12px;
+}
+
+/* ── The corner: the file's completeness, and the way into it ────────────────────────────────────
+   Both are facts about the machine's PAPERS. They ride the top trailing edge together, small, and
+   the distance below gets the card's whole width because neither of them is on its line. */
+.bidmap .bm-eq .bm-eq-hd {
   display: flex;
   align-items: center;
-  justify-content: center;
-  background-color: var(--surface2);
-  background-image: linear-gradient(90deg, #e8eff6 20%, #f4f8fc 40%, #e8eff6 60%);
-  background-size: 220% 100%;
-  animation: dpShimmer 1.25s linear infinite;
-  border-inline-end: 1px solid #e1e9f1;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: 26px;
 }
-/* A machine with NO photo is not loading, so it does not shimmer. The prototype always has an image to
-   wait for and never meets this case; ours does, and a cell travelling forever under «لا صورة» claims
-   something is on its way that never will be. */
-.bidmap .bm-eq .bm-eq-photo.is-empty { background-image: none; animation: none; }
-.bidmap .bm-eq .bm-eq-art { width: 100%; height: 100%; object-fit: cover; transition: transform 0.35s cubic-bezier(0.22, 0.9, 0.3, 1); }
-.bidmap .bm-eq:hover .bm-eq-art { transform: scale(1.06); }
-.bidmap .bm-eq .bm-eq-nophoto { font-size: 9.5px; font-weight: 700; color: var(--muted); text-align: center; padding: 0 6px; }
-/* A hairline of the machine's own state down the photo's inner edge — the card's quietest signal, and
-   the same derivation as the chip and the pin (RM3-AC-19). */
-.bidmap .bm-eq .bm-eq-hair { position: absolute; inset-inline-end: 0; top: 0; bottom: 0; width: 3px; opacity: 0.85; }
+/* The readiness dots — the app's `done`/`total`, one dot each, filled for what is on file. The colour
+   is the READINESS band's, never the availability colour: the papers are a fact about the file, the
+   distance is a promise from the supplier, and reading one off the other is the mistake this card is
+   arranged to prevent. */
+.bidmap .bm-eq .bm-eq-rd { display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0; }
+.bidmap .bm-eq .bm-eq-rdot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  /* An unmet requirement is an empty socket, not a coloured one: the ring says "this is a slot" and
+     the fill says "it holds something". A red dot beside a green one would read as two verdicts. */
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px #c8d8e8;
+}
+.bidmap .bm-eq .bm-eq-rd.green .bm-eq-rdot.on { background: #16a34a; box-shadow: none; }
+.bidmap .bm-eq .bm-eq-rd.yellow .bm-eq-rdot.on { background: var(--warn-deep); box-shadow: none; }
+.bidmap .bm-eq .bm-eq-rd.red .bm-eq-rdot.on { background: #d9362a; box-shadow: none; }
+/* Past eight, dots stop being countable at a glance — the shape becomes a bar and the fraction does
+   not change. */
+.bidmap .bm-eq .bm-eq-rdbar { display: block; width: 46px; height: 5px; border-radius: 999px; background: #dbe6ef; overflow: hidden; }
+.bidmap .bm-eq .bm-eq-rdfill { display: block; height: 100%; border-radius: 999px; background: #c8d8e8; }
+.bidmap .bm-eq .bm-eq-rd.green .bm-eq-rdfill { background: #16a34a; }
+.bidmap .bm-eq .bm-eq-rd.yellow .bm-eq-rdfill { background: var(--warn-deep); }
+.bidmap .bm-eq .bm-eq-rd.red .bm-eq-rdfill { background: #d9362a; }
 
-.bidmap .bm-eq .bm-eq-tx { flex: 1; min-width: 0; padding: 11px 13px; display: flex; flex-direction: column; gap: 7px; }
-.bidmap .bm-eq .bm-eq-r1 { display: flex; align-items: center; gap: 8px; }
-/* Title and its verified mark travel together, so the mark sits against the end of the NAME rather
-   than against the far edge of the row (decoded 4004–4010). */
-.bidmap .bm-eq .bm-eq-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; }
-.bidmap .bm-eq .bm-eq-title {
-  min-width: 0;
-  font-size: 14px;
+/* «Details ›» as a word is gone (owner, 2026-08-28). The icon is the file under a magnifier, which is
+   what the control has always done, and it costs the card no line of its own. The ground it kept is
+   the one that cured the old pill's "floating": `var(--background)`'s pale slate under it, never white on white. */
+.bidmap .bm-eq .bm-eq-open {
+  pointer-events: auto;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: #f2f6fa;
+  border: 1px solid #dbe6ef;
+  border-radius: var(--radius-sm);
+  color: #16304f;
+  cursor: pointer;
+  font-family: inherit;
+}
+.bidmap .bm-eq .bm-eq-open:hover { background: #e6eef6; border-color: #c8d8e8; }
+/* On a selected card the ground IS `var(--background)`, so the tint above would vanish into it — the control
+   goes navy instead, which is the slate the accent bar already uses. */
+.bidmap .bm-eq.on .bm-eq-open { background: var(--navy); border-color: var(--navy); color: var(--surface); }
+.bidmap .bm-eq.on .bm-eq-open:hover { background: #16304f; border-color: #16304f; }
+
+/* ── The distance, and it IS the card ────────────────────────────────────────────────────────────
+   The dominant object, painted with the one thing that qualifies it: whether the supplier has
+   promised this machine for this offer. Green with a tick is settled and is not a control — there is
+   nothing left to ask. Red with a «?» is the open question, and pressing it explains what the colour
+   means before it asks anything. Red with a clock is the question already put.
+
+   Full width and left-aligned rather than a hugging pill: it is the card's subject, not a label on
+   it, and a chip that changed width with the number would make a column of distances ragged. */
+.bidmap .bm-eq .bm-eq-yard {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: start;
+  border-radius: var(--radius-md);
+  padding: 9px 11px;
+  border: 1.5px solid transparent;
+  font-family: inherit;
+}
+.bidmap .bm-eq .bm-eq-yard .material-icons-outlined { flex-shrink: 0; font-size: 20px; line-height: 1; }
+.bidmap .bm-eq .bm-eq-yard.ok {
+  color: #0d6c38;
+  background: color-mix(in srgb, var(--ok-deep) 10%, transparent);
+  border-color: color-mix(in srgb, var(--ok) 34%, transparent);
+}
+/* The unconfirmed and the asked states share a ground: the fact has not changed, only whether the
+   renter has already acted on it. What separates them is the glyph and the prompt at the end. */
+.bidmap .bm-eq .bm-eq-yard.no,
+.bidmap .bm-eq .bm-eq-yard.asked {
+  pointer-events: auto;
+  cursor: pointer;
+  color: #d9362a;
+  background: color-mix(in srgb, var(--danger-deep) 10%, transparent);
+  border-color: color-mix(in srgb, var(--danger-deep) 30%, transparent);
+}
+.bidmap .bm-eq .bm-eq-yard.no:hover,
+.bidmap .bm-eq .bm-eq-yard.asked:hover { background: color-mix(in srgb, var(--danger-deep) 16%, transparent); }
+.bidmap .bm-eq .bm-eq-yard.asked { color: #a82c22; }
+.bidmap .bm-eq .bm-eq-yard:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+
+.bidmap .bm-eq .bm-eq-dist { display: inline-flex; align-items: baseline; gap: 5px; min-width: 0; overflow: hidden; }
+/* The figure keeps the card's largest type: it is the fact the list is SORTED on. It takes the
+   chip's ink rather than navy, because the colour is the whole point — the number and its
+   trustworthiness are one statement, not a number with a verdict beside it. */
+.bidmap .bm-eq .bm-eq-km { font-family: ui-monospace, monospace; font-size: 19px; font-weight: 700; letter-spacing: -0.4px; color: currentColor; }
+.bidmap .bm-eq .bm-eq-kmu { font-size: 11px; font-weight: 700; opacity: 0.85; }
+/* The prompt at the trailing edge — «Ask him to confirm» / «Asked». Its ink is set INLINE from
+   `askAvailability.colour`, so the model stays the one authority on it (RM3-AC-33). */
+.bidmap .bm-eq .bm-eq-yardq {
+  margin-inline-start: auto;
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.bidmap .bm-eq .bm-eq-yard.asked .bm-eq-yardq { text-decoration: none; opacity: 0.75; }
+
+/* The machine itself — the caption on the distance, not the headline. No serial and no capacity
+   (AC-12): the serial identifies the machine to the system, not to a renter, and the size is already
+   stated once in the count pills above the list. */
+.bidmap .bm-eq .bm-eq-model {
+  font-size: 13px;
   font-weight: 800;
   line-height: 1.35;
   color: #16304f;
@@ -1115,246 +1213,73 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* The verified mark — 15 px green disc, decoded 4009. It says the PLATFORM has this machine's papers
-   on file, which is a different fact from whether it is available, and the two must not be read off
-   one another. Green here is `AVAILABILITY_COLOUR`'s over the prototype's `var(--ok-deep)`, the same palette
-   override the whole surface takes. */
-.bidmap .bm-eq .bm-eq-vd {
-  flex-shrink: 0;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: #16a34a;
-  color: var(--surface);
-  font-size: 9px;
-  font-weight: 900;
+/* «· Outside the city» — the yard sits beyond the request city's own radius, which is what turns a
+   delivery into a mobilisation worth asking about. It qualifies the distance, so it follows it. */
+.bidmap .bm-eq .bm-eq-far { font-size: 10.5px; font-weight: 700; color: var(--warn-deep); white-space: nowrap; }
+
+/* ── The layer behind a red distance ─────────────────────────────────────────────────────────────
+   `.bm-eqfp`'s geometry, with its own body: the head, the title and the X are all inherited, so this
+   and the filter panel are one idiom rather than two shapes that both mean "a second layer". */
+.bidmap .bm-eqyx-body { display: flex; flex-direction: column; gap: 12px; }
+.bidmap .bm-eqyx-eq {
   display: flex;
-  align-items: center;
-  justify-content: center;
-}
-/* ── «التفاصيل» — row 1's trailing edge, where the prototype puts it (owner, 2026-08-19) ──────────
-   `app-decoded.js:4009` draws it inside the title row: the name takes the slack, the pill keeps its
-   width, and the reader meets it exactly where their eye already is after reading the machine's name.
-
-   It spent 2026-08-11 → 08-19 on row 3 instead, and the reason it was moved is worth keeping because
-   the fix survived the move: as drawn then it was a WHITE pill on a WHITE card — no ground under it,
-   hung off the end of the title row, the one shape on the card that looked applied rather than built
-   in. What cured that was the `var(--background)` ground below, not the row. The ground stays; the row goes back.
-
-   Row 3 is now the distance ALONE, which is the arrangement both moves were reaching for: the row is
-   `nowrap`, and any control sharing it clipped the distance mid-word — and the distance is the fact
-   this list is sorted on.
-
-   The ask stays on row 2 beside the availability chip it answers (owner, 2026-08-11: *"for the asked
-   make it beside not confirmed"*), as an underlined link rather than a capsule — see `.bm-eq-ask`.
-   It is still a real button above the stretched open layer, which is RM3-AC-13: an unconfirmed machine
-   is askable without opening the detail. Nothing here costs height, so the card is still exactly four
-   rows and every card in the column is still one height (RM3-AC-32). */
-.bidmap .bm-eq .bm-eq-acts {
-  /* Pushes the cluster to the row's trailing edge in both scripts — a logical margin, so it is the
-     right edge in English and the left in Arabic without a second rule. */
-  margin-inline-start: auto;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.bidmap .bm-eq .bm-eq-details {
-  pointer-events: auto;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  /* `var(--background)`, not `var(--surface)`. A white control on a white card has no ground, which is the whole of
-     "floating"; the surface's own pale slate gives it one without adding a colour. */
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
   background: #f2f6fa;
   border: 1px solid #dbe6ef;
-  color: #16304f;
-  border-radius: 999px;
-  padding: 3px 9px;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1.5;
-  white-space: nowrap;
-  cursor: pointer;
-  font-family: inherit;
 }
-.bidmap .bm-eq .bm-eq-details:hover { background: #e6eef6; border-color: #c8d8e8; }
-/* On a selected card the ground IS `var(--background)`, so the tint above would vanish into it — the control
-   goes navy instead, which is the same slate the accent bar and the selected chip already use. */
-.bidmap .bm-eq.on .bm-eq-details { background: var(--navy); border-color: var(--navy); color: var(--surface); }
-.bidmap .bm-eq.on .bm-eq-details:hover { background: #16304f; border-color: #16304f; }
-
-/* Row 2 — ONE chip carrying availability AND commitment, never a chip plus a band (RM3-AC-32). The row
-   keeps its height whether or not the out-of-city qualifier is beside it. */
-/* **The row WRAPS, and the chip never gives** (owner, 2026-08-20: *"keep the not confirmed shown
-   totally, not stripped"*).
-   ~~One nowrap line where the chip was the only shrinkable thing on it.~~ `.bm-eq-ask` carries
-   `flex-shrink: 0`, so when «Ask him to confirm» and the chip could not both fit, the CHIP was what
-   truncated — «Not confirmed …» — on precisely the cards whose open question is whether the machine
-   is confirmed. That is the one word on the row that had to survive.
-   Now nothing on the row shrinks and the row wraps instead: at any width the chip reads whole, and
-   the ask drops to a second line rather than eating it. The `row-gap` is what keeps the two lines
-   from touching when it does. */
-.bidmap .bm-eq .bm-eq-r2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 19px; }
-.bidmap .bm-eq .bm-eq-chip {
-  display: inline-flex;
-  align-items: center;
+.bidmap .bm-eqyx-name { font-size: 12.5px; font-weight: 800; color: #16304f; }
+.bidmap .bm-eqyx-km { font-size: 11px; font-weight: 700; color: var(--muted); }
+.bidmap .bm-eqyx-p { margin: 0; font-size: 12px; font-weight: 600; line-height: 1.85; color: #16304f; }
+.bidmap .bm-eqyx-q {
+  display: flex;
+  flex-direction: column;
   gap: 5px;
-  border-radius: 999px;
-  padding: 3px 9px;
-  font-size: 10.5px;
-  font-weight: 800;
-  white-space: nowrap;
-  /* Never the thing that gives — see the row above. */
-  flex-shrink: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--info) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--info) 24%, transparent);
 }
-.bidmap .bm-eq .bm-eq-chip .bm-eq-dot { flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-/* The chip's WORDS, as their own element.
-   ~~`min-width: 0; overflow: hidden; text-overflow: ellipsis`~~ — the machinery that produced «Not
-   confirmed …». It was the right fix for the bug it was written against (the row's overflow cutting
-   the label mid-glyph, with no ellipsis because `text-overflow` cannot act on a flex container), and
-   it is the wrong outcome here: an ellipsis is still a stripped label. The row wraps now, so there is
-   nothing left to truncate FOR. */
-.bidmap .bm-eq .bm-eq-chip .bm-eq-chip-l { white-space: nowrap; }
-/* THE CONFIRMED CHIP IS A DIFFERENT SHAPE, on purpose (decoded 4014 vs 4015–4020). It is a small
-   squared label — `border-radius: var(--radius-sm)`, `padding: 2px 8px`, weight 700 — carrying a ✓ and **no dot**;
-   the unconfirmed one is a full capsule at weight 800 with a breathing dot. A settled fact and an open
-   question should not be the same object in two colours: colour alone fails anyone reading the list
-   with a red-green deficiency, and the shape difference is what makes the two states legible without
-   it. This chip was drawn as the capsule with a green dot, which lost exactly that. */
-.bidmap .bm-eq .bm-eq-chip.ok {
-  gap: 4px;
-  border-radius: var(--radius-sm);
-  padding: 2px 8px;
-  font-weight: 700;
-  color: #16a34a;
-  background: color-mix(in srgb, var(--ok-deep) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ok) 34%, transparent);
-}
-.bidmap .bm-eq .bm-eq-chip.no { color: #d9362a; background: color-mix(in srgb, var(--danger-deep) 10%, transparent); border: 1px solid color-mix(in srgb, var(--danger-deep) 30%, transparent); }
-/* «في هذا العرض» — the machine is on the offer. Still a BADGE and never a third chip colour (app
-   parity, 2026-08-17): it answers a different question from the chip, so painting it as an
-   availability state is what made one of the two lie. It wears `IN_OFFER_BADGE_COLOUR`, the hex the
-   shortfall alert also draws — one surface, one orange.
-
-   **ON THE PHOTO, not on the state row** (owner, 2026-08-19). Row 2 is 262px and the chip, this badge
-   and «اطلب التأكيد» need about 278, so the badge was costing the availability chip its words on
-   exactly the cards where availability is the open question. The photo is the card's only unused
-   surface, and this is a fact about the whole card rather than about the state line.
-
-   Opaque fill rather than the 10% tint it wore on white: over a photograph a translucent badge takes
-   the colour of whatever is behind it, and the shadow is what keeps its edge on a light machine
-   against a light sky. `z-index` clears the hairline; `pointer-events: none` keeps the whole cell one
-   target, since the photo opens the machine. */
-.bidmap .bm-eq .bm-eq-inoffer {
-  position: absolute;
-  z-index: 2;
-  top: 6px;
-  inset-inline-start: 6px;
-  pointer-events: none;
-  color: var(--warn-deep);
-  background: #fdf0dd;
-  border: 1px solid color-mix(in srgb, var(--brand) 45%, transparent);
-
-  border-radius: 999px;
-  padding: 2px 7px;
-  font-size: 9.5px;
-  font-weight: 800;
-  line-height: 1.5;
-  white-space: nowrap;
-  /* The cell is 104px wide; a long label is clipped rather than allowed to grow past the picture. */
-  max-width: calc(100% - 12px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-/* An unanswered question is live, not a closed verdict — so the unsettled dot breathes. */
-.bidmap .bm-eq .bm-eq-chip.no .bm-eq-dot { animation: dpDot 1.7s ease-in-out infinite; }
-/* «· خارج المدينة» (decoded 4026) — the yard is outside the request city's own radius, which is what
-   turns a delivery into a mobilisation worth asking about. Stated in the state row rather than beside
-   the distance: it qualifies the offer, not the number. Deliberately plain text, not a chip — the row
-   already carries one chip, and a second would read as a second availability state. */
-.bidmap .bm-eq .bm-eq-far { flex-shrink: 0; font-size: 10.5px; font-weight: 700; color: var(--warn-deep); white-space: nowrap; }
-/* BLUE, never navy (RM3-AC-33): beside a red chip, navy reads as disabled, and this is the one control
-   the renter is supposed to press.
-
-   **AN UNDERLINED WORD, not a tinted capsule** (owner, 2026-08-19 — the v3 prototype's own card,
-   `app-decoded.js:4024`). ~~It was given a `.08` fill and a `.22` hairline on 2026-08-11 so it would
-   match «التفاصيل» in height and radius and the two would read as one cluster.~~ Withdrawn with the
-   cluster itself: «التفاصيل» has gone back to row 1, so there is no pair here to match, and a second
-   capsule beside the availability chip put two pill-shaped objects on one row where only one of them
-   is pressable. A word with a rule under it is unmistakably a link and unmistakably not a chip.
-
-   `color` is still set INLINE from `askAvailability.colour`, so the model remains the one authority on
-   this control's colour; the rule under it borrows the same ink at `.34`. */
-.bidmap .bm-eq .bm-eq-ask {
-  pointer-events: auto;
-  flex-shrink: 0;
-  display: inline-flex;
+.bidmap .bm-eqyx-qh { font-size: 10px; font-weight: 800; letter-spacing: 0.02em; color: var(--muted); }
+.bidmap .bm-eqyx-qt { font-size: 12px; font-weight: 700; line-height: 1.7; color: #16304f; }
+.bidmap .bm-eqyx-foot {
+  display: flex;
   align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid #e1e9f1;
+}
+.bidmap .bm-eqyx-later {
+  flex-shrink: 0;
   background: none;
   border: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--info) 34%, transparent);
-  border-radius: 0;
-  padding: 0 0 1px;
-  color: #2563eb;
-  font-size: 10.5px;
-  font-weight: 800;
-  line-height: 1.5;
-  white-space: nowrap;
+  padding: 8px 4px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 700;
   cursor: pointer;
   font-family: inherit;
 }
-.bidmap .bm-eq .bm-eq-ask:hover:not(:disabled) { border-bottom-color: currentColor; }
-.bidmap .bm-eq .bm-eq-ask:disabled { cursor: default; opacity: 0.5; }
-
-/* Row 3 — the distance, ALONE (owner, 2026-08-19). Both controls have left it: the ask sits beside the
-   chip it answers on row 2, «التفاصيل» is back on the title row. The row is `nowrap`, and anything
-   sharing it clipped the distance mid-word on a 392px panel — which is why nothing shares it now.
-   `center`, not `baseline`: the figure's own pair keeps its baseline inside `.bm-eq-dist`. */
-.bidmap .bm-eq .bm-eq-r3 { display: flex; align-items: center; gap: 8px; min-height: 23px; white-space: nowrap; }
-.bidmap .bm-eq .bm-eq-dist { display: inline-flex; align-items: baseline; gap: 5px; min-width: 0; overflow: hidden; }
-.bidmap .bm-eq .bm-eq-km { font-family: ui-monospace, monospace; font-size: 17px; font-weight: 700; letter-spacing: -0.4px; color: var(--navy); }
-.bidmap .bm-eq .bm-eq-kmu { font-size: 11.5px; font-weight: 700; color: var(--muted); }
-
-/* Row 4 — the certificate line ALWAYS occupies its line, empty or not, so a machine with no
-   certificates is a shorter LINE and not a shorter CARD.
-
-   `min-height` is what holds it now, not a placeholder sentence: the row renders NOTHING when the
-   request named no certificate (owner, 2026-08-19). `.bm-eq-nocert` went with that sentence. */
-.bidmap .bm-eq .bm-eq-r4 { display: flex; align-items: center; gap: 5px; min-height: 19px; overflow: hidden; }
-.bidmap .bm-eq .bm-eq-cert {
-  flex-shrink: 0;
-  color: var(--warn-deep);
-  background: color-mix(in srgb, var(--brand) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--brand) 32%, transparent);
-  border-radius: var(--radius-sm);
-  padding: 2px 8px;
-  font-size: 10.5px;
-  font-weight: 700;
-  white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+/* BLUE, never navy (RM3-AC-33): this is the one control on the layer the renter is supposed to
+   press, and beside a red explanation navy reads as disabled. */
+.bidmap .bm-eqyx-cta {
+  margin-inline-start: auto;
+  flex: 1;
+  background: var(--info);
+  border: 0;
+  border-radius: var(--radius-md);
+  padding: 11px 14px;
+  color: var(--surface);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
 }
-/* Held vs missing (owner, 2026-08-11). The amber above survives only as the shared shape — every chip
-   this card renders is one the REQUEST named, so it is always one of these two.
+.bidmap .bm-eqyx-cta:hover:not(:disabled) { background: color-mix(in srgb, var(--info) 88%, var(--navy)); }
+.bidmap .bm-eqyx-cta:disabled { background: var(--disabled-bg); color: var(--disabled-fg); cursor: default; }
 
-   `var(--ok-deep)` / `var(--danger)` are the surface's own availability green and red (`AVAILABILITY_COLOUR`), not
-   a third pair invented for this line: on a card whose chip above is already one of those two, a
-   near-miss shade would read as a different KIND of state rather than the same one applied to a
-   certificate. Chip weights — a tenth of the ink for the fill, a third for the border — so the
-   certificate line never competes with the availability chip that governs the card. */
-.bidmap .bm-eq .bm-eq-cert.held {
-  color: #0d6c38;
-  background: color-mix(in srgb, var(--ok-deep) 10%, transparent);
-  border-color: color-mix(in srgb, var(--ok-deep) 32%, transparent);
-}
-.bidmap .bm-eq .bm-eq-cert.missing {
-  color: #a82c22;
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
-  border-color: color-mix(in srgb, var(--danger) 32%, transparent);
-}
 
 /* RM3-AC-26 — a price and a count were given, and that is the whole statement. No card furniture. */
 .bidmap .bm-eqnone { padding: 18px 6px; text-align: center; }
@@ -1931,8 +1856,9 @@
 
      **76px, the prototype's own footer geometry** (`app-decoded.js:2653`), matching the 64px header
      at the other end of the column: fixed height, 18px gutters, contents vertically centred.
-     `min-height` rather than `height` for exactly one reason — `.bm-foot-units` (RM3-AC-66), which
-     appears only when a negotiation moved the count and must not be clipped to hold a number. */
+     `min-height` rather than `height` because the breakdown now opens INSIDE this slab (owner,
+     2026-08-28): the bar keeps its 76px floor and the arithmetic unfolds under it, the way the bid
+     card and the deal room both do. Nothing is clipped to hold a number. */
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1986,32 +1912,19 @@
   cursor: pointer;
 }
 
-/* ── The breakdown, as a POPOVER above the slab (owner, 2026-08-19) ──────────────────────────────
-   It expanded the footer itself until this morning, which is why the bar carried a `max-height` cap,
-   an inner scroller and `overscroll-behavior` — all of it there to stop the rate being pushed off
-   screen by its own explanation. Opening OVER the list instead means the 76px floor never moves and
-   none of that comes back: the popover takes its own height, scrolls inside itself if a very short
-   panel demands it, and the bar below is untouched.
-
-   Anchored to `.bm-panel`, which is the positioned ancestor (the same one `.bm-eqfp` and `.mp-over`
-   use), so it spans the column rather than the footer's inner width. */
-/* FIXED, not absolute: the popover is anchored to the footer, so a scrim scoped to the footer would
-   cover only the bar it opened from and leave the list behind it pressable. */
-.bidmap .bm-foot-scrim { position: fixed; inset: 0; z-index: 40; }
+/* ── The breakdown, INSIDE the footer and under the bar (owner, 2026-08-28) ─────────────────────
+   It has been a growing bar, then a popover over the list, and is now simply the block under the
+   rate — which is what the bid card and the deal room both do, and what makes the three read alike.
+   The scrim and the `bottom: 100%` anchor are gone; the slab grows, which `min-height` always
+   allowed. Its own scroller stays for the rare very short panel. */
 .bidmap .bm-foot-break {
-  position: absolute;
-  z-index: 41;
-  inset-inline: 10px;
-  /* Sits on the footer's own top edge and grows upward. */
-  bottom: calc(100% - 6px);
-  max-height: 62vh;
+  margin-top: 11px;
+  padding-top: 11px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  max-height: 46vh;
   overflow-y: auto;
   overscroll-behavior: contain;
   box-sizing: border-box;
-  padding: 12px 14px;
-  border-radius: var(--radius-lg);
-  background: #12263a;
-  border: 1px solid rgba(255, 255, 255, 0.14);
 }
 /* «لكل وحدة» — the heading that makes the block under it readable on a multi-unit offer, and which a
    single-unit offer never draws because there would be nothing to distinguish it from. */
@@ -2039,6 +1952,13 @@
 .bidmap .bm-foot-row.is-overall { border-top-width: 2px; margin-top: 8px; padding-top: 11px; }
 .bidmap .bm-foot-row.is-overall .bm-foot-sub { display: block; margin: 2px 0 0; }
 .bidmap .bm-foot-row.is-muted .bm-foot-v { color: rgba(255, 255, 255, 0.55); font-weight: 600; }
+.bidmap .bm-foot-priced {
+  margin-top: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.62);
+  line-height: 1.7;
+}
 .bidmap .bm-foot-note { margin-top: 7px; font-size: 9.5px; font-weight: 600; color: rgba(255, 255, 255, 0.5); line-height: 1.7; }
 /* «اطلب سعراً أقل» — the WHITE button, and the loudest thing on the slab. The renter reached this
    footer to argue about a price; the app makes countering the obvious act and approving the quiet
@@ -2063,31 +1983,19 @@
   cursor: pointer;
   white-space: nowrap;
 }
-/* «اعتمد» — present, pressable, and deliberately quieter. It is no longer disabled when a room
-   exists: the room's own `canAccept` decides on arrival, so a control that used to grey out on a
-   rule it could not evaluate now simply asks the room. */
+/* «اعتمد» — GREEN, and only drawn when nothing is left to settle (owner, 2026-08-28).
+   It used to be a quiet ghost button that was always present and let the room refuse on arrival.
+   Now the footer answers the two halves of the rule it can see, and when it draws the button the
+   act is affirmative — so it wears the affirmative colour rather than borrowing the slab's white. */
 .bidmap .bm-foot-cta.is-confirm {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: rgba(255, 255, 255, 0.94);
-  font-weight: 700;
-  padding: 11px 14px;
+  background: var(--ok);
+  border-color: var(--ok);
+  color: #fff;
+  font-weight: 800;
+  padding: 11px 16px;
 }
+.bidmap .bm-foot-cta.is-confirm:hover { background: var(--ok-deep, #15803d); border-color: var(--ok-deep, #15803d); }
 .bidmap .bm-foot-cta:disabled { opacity: 0.55; cursor: default; }
-/* The one place the offered count and the agreed count are reconciled (RM3-AC-66). Neutral, because
-   a renegotiated count is not a problem — it is simply two correct numbers needing one sentence. */
-.bidmap .bm-foot-units {
-  margin-top: 10px;
-  padding: 7px 10px;
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  font-size: 10px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.8);
-  line-height: 1.6;
-}
-
 /* ── V12 · the chat dock (§6.9) ──────────────────────────────────────────────────────────────────
    Floating over the surface, on the inline-START edge — the panel owns the END edge, and a dock that
    shared it would sit on top of the price footer. There is no edge rail (RM3-AC-23). */
@@ -2620,7 +2528,6 @@
   .bidmap button, .bidmap .dpRow, .bidmap .dpCell { transition-property: background, border-color, color; }
   .bidmap button:not(:disabled):active { transform: none; }
   .bidmap .dpRow:hover, .bidmap .dpCell:hover { transform: none; }
-  .bidmap .bm-eq:hover .bm-eq-art { transform: none; }
 }
 
 /* ── The dark footer's own ink — DELETED, and deliberately not replaced (owner, 2026-08-11) ──────
@@ -2628,12 +2535,6 @@
    white. The footer's rules are dark-native now (see §6.10 above), so a second copy of its palette
    down here could only drift out of step with the first — and, sitting later in the file at equal
    specificity, it would silently win. Every declaration it carried now lives at the point of use. */
-
-/* The photo is a second way into the panel (owner, 2026-08-18), so it has to look pressable and take
-   a focus ring like the controls do. It sits ABOVE the stretched focus layer — the body flies the
-   camera, the picture opens the machine — which is why it needs its own stacking context. */
-.bidmap .bm-eq .bm-eq-photo.is-open { position: relative; z-index: 2; cursor: pointer; }
-.bidmap .bm-eq .bm-eq-photo.is-open:focus-visible { outline: 2px solid var(--action, #2563eb); outline-offset: 2px; }
 
 /* ── V18 · where the offer ends, and the control that reaches past it (owner, 2026-08-19) ────────
    The list opens on the machines this bid actually names; the rest of the supplier's matching fleet

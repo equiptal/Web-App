@@ -12,18 +12,17 @@
  * swept for what it renders only with a DOM harness, while a model can be swept for what it CARRIES
  * with `Object.keys`. Moving the derivation here is what turns those three from prose into assertions.
  *
- * It lives in `components/map/` rather than in `lib/contract/` for one reason: it needs
- * `certificateChips` and `heroPhotoUrl`, which are the panel's model and belong to the component tree.
- * A contract module reaching into `components/` would invert the dependency the other way round, and
- * the contract files carry a mechanical-Dart-port promise this one does not.
+ * It lives in `components/map/` rather than in `lib/contract/` because it reads `MatchRequest`, the
+ * panel's own shape, and belongs to the component tree with it. A contract module reaching into
+ * `components/` would invert the dependency the other way round, and the contract files carry a
+ * mechanical-Dart-port promise this one does not.
  */
 
-import { arabicIndicDigits, availabilityView, isInOffer, isOutOfCity, REQUEST_ACTION_COLOUR } from "@/lib/contract/bid-map";
+import { arabicIndicDigits, availabilityView, isOutOfCity, REQUEST_ACTION_COLOUR } from "@/lib/contract/bid-map";
 import type { Bilingual } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
-import { computeUnitReadiness, readinessInputsFor } from "@/lib/contract/bid-readiness";
-import { isEquipmentVerified } from "@/lib/contract/equipment-verification";
-import { heroPhotoUrl, type MatchRequest } from "@/components/map/panel/machine-panel-model";
+import { computeUnitReadiness, readinessInputsFor, type ReadinessBand } from "@/lib/contract/bid-readiness";
+import type { MatchRequest } from "@/components/map/panel/machine-panel-model";
 
 /**
  * **The card's ONE state chip** (RM3-AC-32).
@@ -72,6 +71,31 @@ export interface EquipmentCardCert {
 }
 
 /**
+ * **The machine's papers, as a proportion** — the app's own score, drawn as dots beside the file icon.
+ *
+ * ~~"No readiness band, no percent, no score on the card" (RM3-AC-29 / AC-32's second half).~~
+ * Withdrawn by the owner, 2026-08-28, with the card it was written about. That rule was written when
+ * the card carried an availability chip: a band beside it made the renter reconcile two summaries of
+ * one machine before reading either. The redesigned card has ONE state — the distance, painted with
+ * the availability it is only as good as — and the papers are a different question entirely, asked
+ * of the file rather than of the supplier. The dots answer it in the corner the file icon opens.
+ *
+ * `done` / `total` and `band` are `computeUnitReadiness`'s, scored with `scoreOwnership: true`
+ * because these rows are fleet rows — the app's `total` (`2 + certs`), which is what its own map
+ * panel reads (`bid_map.dart:470-473`). Never re-derived here: the card, the detail and the app all
+ * quote one fraction.
+ */
+export interface EquipmentCardReadiness {
+  /** Papers on file, of {@link total}. */
+  done: number;
+  /** Everything scored: the photos, the ownership paper, and one per requested certificate. */
+  total: number;
+  /** `bandOf(percent)` — green at 100, amber from 50, else red. The dots' colour, and nothing else's:
+   *  it must not be mistaken for the availability colour, which is a fact about the SUPPLIER. */
+  band: ReadinessBand;
+}
+
+/**
  * Everything one card states, and **nothing else**.
  *
  * What is deliberately absent, and why:
@@ -79,16 +103,21 @@ export interface EquipmentCardCert {
  *  - **the load capacity / measurement** (AC-12) — the type and the size are already stated once, in
  *    the count pills, and stating them again per card turns a scannable column into a spec sheet;
  *  - **any second commitment field** (AC-32) — see {@link EquipmentCardChip};
- *  - **a readiness band, a percent or a score** (RM3-AC-29) — the machine's documents are the
- *    detail's subject, and a number over them invites the renter to stop reading the evidence.
+ *  - **the photo, the verified mark and the «in this offer» badge** — dropped with the 2026-08-28
+ *    redesign. The renter does not care whether a machine is *in the offer but unavailable*; he cares
+ *    whether it is available, and the badge was a second membership fact competing with the one state
+ *    the card now carries. The picture and the platform's tick went with the rest of the furniture:
+ *    the card answers *how far, how sure, and how complete* in three lines, and everything else is
+ *    one press away in the file.
+ *
+ * ~~"no readiness band, no percent, no score" (RM3-AC-29)~~ — withdrawn with the same redesign; see
+ * {@link EquipmentCardReadiness} for why the rule died with the chip it was protecting.
  */
 export interface EquipmentCardModel {
   equipmentId: string;
   /** «Caterpillar 320D · 2022», falling back to the taxonomy word when the listing has no name. Both
    *  locales, so the component picks rather than this file reaching for one. */
   title: Bilingual;
-  /** The front photo, else any photo, else null — a card with none says so rather than shimmering. */
-  photo: string | null;
   chip: EquipmentCardChip;
   /**
    * Kilometres to the project **to one decimal**, or null. Never a 0 standing in for "unknown".
@@ -125,46 +154,10 @@ export interface EquipmentCardModel {
    * blank. That is a different sentence from "the machine has none" and the copy has to follow.
    */
   certs: EquipmentCardCert[];
-  /**
-   * **The platform verified THIS MACHINE's papers** — the green ✓ against the end of the title.
-   *
-   * ~~The card ticks when the request named any certificate.~~ Withdrawn (owner, 2026-08-11: *"for
-   * equipment verification ticked make sure it is read the equipment status is it verified really or
-   * not"*). The mark was rendered on `certs.length > 0`, and `certs` is one entry per **requested**
-   * certificate whether the machine holds it or not (`computeUnitReadiness` builds it straight off
-   * `reqEquipCerts.map`) — so the condition said nothing about the machine at all. It said *"this
-   * request asked for at least one certificate"*, which is a property of the REQUEST and therefore
-   * identical for every card in the list. On a request naming a TÜV, every machine in the supplier's
-   * fleet wore the platform's trust mark; on a request naming none, not one did — including machines
-   * the platform really had verified. Exactly the "one boolean, true for every row, painting
-   * everything green" this surface was bitten by before (`yardConfirmed`, RM3-AC-19), reached by a
-   * different road.
-   *
-   * It is now `isEquipmentVerified(machine.verificationStatus)` — `=== "VERIFIED"`, the app's
-   * `equipment_verification.dart` and nothing else. Deliberately NOT the backend's `ACCEPTED_STATUSES`
-   * fold (`VERIFIED` ∪ `ACCEPTED`, `repositories/equipment-where.ts`), which answers *"may renters see
-   * this listing at all"* and would tick 271 of staging's 1104 map-eligible machines that nobody
-   * verified.
-   *
-   * **Not a third commitment state** (RM3-AC-32). Availability is *did the supplier commit this
-   * machine to this bid*; this is *did the platform check its papers*. Different subjects, different
-   * owners — which is why the mark sits on the title while the chip sits on its own row, and why this
-   * field is a bare boolean carrying no colour for the AC-32 palette sweep to find.
-   *
-   * False when the status is absent: an unknown draws no tick, never an assumed one.
-   */
-  verified: boolean;
   /** Non-null **iff** {@link EquipmentCardChip.availability} is `unconfirmed` (AC-13). */
   askAvailability: EquipmentCardAsk | null;
-  /**
-   * **Is this machine on the offer?** — drawn as the «ضمن العرض» badge, never as a colour (app
-   * parity, 2026-08-17).
-   *
-   * A second, independent flag rather than a fourth chip state: a machine can be offered with no yard
-   * named yet, and a machine can stand in a named yard without being offered at all. The chip answers
-   * the yard; this answers the offer.
-   */
-  inOffer: boolean;
+  /** The machine's papers as a proportion — see {@link EquipmentCardReadiness}. */
+  readiness: EquipmentCardReadiness;
 }
 
 /**
@@ -187,6 +180,28 @@ export function equipmentCardModel(
   const chip = availabilityView(machine);
   const name = [machine.manufacturer, machine.modelName].filter(Boolean).join(" ").trim();
 
+  // ── ONE readiness call, read twice ───────────────────────────────────────────────
+  // The certificate list and the dots are two readings of the same score, so they are ONE call: the
+  // dots cannot say "3 of 4 on file" while the chips below them name a fifth certificate.
+  //
+  // **`scoreOwnership: true` because `machine` is a FLEET row** (owner's ruling, 2026-08-12: *"for the
+  // percentage use existing bid readiness in the app as source of truth"*). `supplier-fleet.service.ts`
+  // serves the map's rows unstripped, so proof of ownership is present and scoreable here — unlike the
+  // renter's bid projection, where `RENTEE_HIDDEN_DOC_TYPES` removes it. It is the app's own `total`
+  // (`2 + certs`), which is what its map panel reads (`bid_map.dart:470-473`) — never its `renteeTotal`.
+  // See `bid-readiness.ts`'s header and `machine-panel-model.FLEET_READINESS_OPTS`.
+  //
+  // Without a request there is nothing asked for, so the score is the photos and the ownership paper
+  // alone. That is a real reading, not a fallback: those two are facts about the machine's file and
+  // are true whether or not anyone named a certificate.
+  const readiness = computeUnitReadiness(
+    machine,
+    request ? readinessInputsFor(request).equipCerts : [],
+    [],
+    null,
+    { scoreOwnership: true },
+  );
+
   // The year is a numeral inside the title, so it takes the reader's digits — an Arabic-Indic figure
   // is not a translation of `2022`, it is the same number written the way the surrounding line is.
   const titleIn = (kind: string | null, year: string | null): string =>
@@ -201,7 +216,6 @@ export function equipmentCardModel(
         machine.year != null ? arabicIndicDigits(machine.year) : null,
       ),
     },
-    photo: heroPhotoUrl(machine),
     chip,
     // One decimal, and rounded to it rather than to a whole kilometre (owner, 2026-08-11) — see
     // `EquipmentCardModel.km`. `×10 / 10` rather than `toFixed`, because the model returns a NUMBER
@@ -211,27 +225,10 @@ export function equipmentCardModel(
         ? Math.round(machine.distanceKm * 10) / 10
         : null,
     outOfCity: isOutOfCity(machine.distanceKm),
-    // Scored by the SAME function the match grid and the readiness band use, fed the same request —
-    // so a certificate cannot read green on the card and red one screen deeper. `computeUnitReadiness`
-    // returns exactly one entry per REQUESTED cert with its `present` flag, which is precisely the
-    // list this line wants; nothing here re-derives what is asked for or what is held.
-    //
-    // **`scoreOwnership: true` because `machine` is a FLEET row** (owner's ruling, 2026-08-12: *"for the
-    // percentage use existing bid readiness in the app as source of truth"*). `supplier-fleet.service.ts`
-    // serves the map's rows unstripped, so proof of ownership is present and scoreable here — unlike the
-    // renter's bid projection, where `RENTEE_HIDDEN_DOC_TYPES` removes it. This card reads only
-    // `equipmentCerts`, so the flag moves no number ON THIS LINE today; it is passed anyway because the
-    // machine handed to the scorer is what decides the answer, and a fleet-backed call site that scores
-    // the rentee subset is a lie waiting for the first reader of `.percent`. The whole fleet family
-    // answers one way. See `bid-readiness.ts`'s header and `machine-panel-model.FLEET_READINESS_OPTS`.
-    certs: request
-      ? computeUnitReadiness(machine, readinessInputsFor(request).equipCerts, [], null, { scoreOwnership: true })
-          .equipmentCerts.map((c) => ({ code: c.code, label: { en: c.labelEn, ar: c.labelAr }, held: c.present }))
-      : [],
-    // The MACHINE's own verification, through the one helper that defines the word — never
-    // `certs.length`, never a document count, never "has any approved doc". See the field's comment.
-    verified: isEquipmentVerified(machine.verificationStatus),
+    // One entry per REQUESTED certificate with its `present` flag — exactly the list this field wants,
+    // off the shared score above, so a certificate cannot read held here and missing one screen deeper.
+    certs: readiness.equipmentCerts.map((c) => ({ code: c.code, label: { en: c.labelEn, ar: c.labelAr }, held: c.present })),
     askAvailability: chip.availability === "confirmed" ? null : { colour: REQUEST_ACTION_COLOUR },
-    inOffer: isInOffer(machine),
+    readiness: { done: readiness.done, total: readiness.total, band: readiness.band },
   };
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Icon } from "@/components/ui";
 import { useLocale, useT } from "@/lib/i18n";
 import type { RequestListItem } from "@/lib/contract/requests";
 import { cx, POPOVER } from "@/lib/ds";
@@ -75,8 +76,13 @@ export function ItemTier({
 
   return (
     <div {...pin("item-tier")} ref={boxRef} className="relative flex flex-wrap items-center gap-4">
-      <span className="flex-none text-label font-extrabold uppercase tracking-wide text-muted">
-        {t.workspace.itemsInRequest}
+      {/* The label wears an icon, exactly as SOURCE does one group along (owner, 2026-08-28).
+          The two groups share this row and narrow the same panel — one by machine, one by where the
+          bid came from — so they must read as a matched pair. A bare word beside an iconned one made
+          the source look like the row's only control. `precision_manufacturing` is the machine glyph
+          this workspace already uses for an item (`RequestDrawer`), at the same 14px. */}
+      <span className="inline-flex flex-none items-center gap-1.5 text-label font-extrabold uppercase tracking-wide text-muted">
+        <Icon name="precision_manufacturing" size={14} /> {t.workspace.itemsInRequest}
       </span>
 
       {shown.map((it) => {

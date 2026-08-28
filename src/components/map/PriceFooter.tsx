@@ -51,7 +51,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ensureDealRoom } from "@/lib/chat/ensure-deal-room";
-import type { BidCard } from "@/lib/contract/bids";
+import { bucketBidTerms, type BidCard } from "@/lib/contract/bids";
 import { priceFooterModel } from "@/lib/contract/price-footer";
 import { computeQuoteTotals } from "@/lib/pricing/rental";
 import { fmt, useLocale, useT } from "@/lib/i18n";
@@ -100,6 +100,19 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
   }).perUnit;
   /** Multi-unit is the only case where the two blocks differ, so the only case that draws both. */
   const multi = totals.rentalUnits > 1;
+
+  /**
+   * Is there anything left to settle? — the halves of the room's `canAccept` this surface can see.
+   *
+   * `bucketBidTerms` is the same tally the bid card prints ("Conflict N · Matched N"), so a bid the
+   * card calls conflicted cannot show an Accept here. The price half belongs to the room, which
+   * compares the last two rounds; this gate is therefore never stricter than the room's.
+   */
+  const termConflicts = bucketBidTerms(bid.terms, bid.negotiableTerms).counts.conflict;
+  /** RM3-AC-66 — read ONCE here. The gate below and the sentence in the breakdown share this one
+   *  binding, so the difference still has a single reader in this file. */
+  const unitsDiffer = model.unitsDiffer;
+  const canAccept = termConflicts === 0 && !unitsDiffer;
 
   /**
    * Money — **Latin digits, in both locales** (`formatSar`, `rental.ts:290`).
@@ -173,62 +186,15 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
 
   return (
     <footer {...pin("price-footer")} className="bm-foot">
-      {/* ── The breakdown, back — and as a POPOVER, not a growing bar (owner, 2026-08-19) ──────────
-          It was withdrawn this morning and is asked for again. What returns is not what left: the old
-          one expanded the footer itself, which is why the bar needed a `max-height` cap, an inner
-          scroller and `overscroll-behavior` just to keep the rate on screen on a short viewport.
+      {/* ── The breakdown opens BELOW the bar, inside this footer (owner, 2026-08-28) ────────────
+          It has been a growing bar, then a popover over the equipment list, and is now what the bid
+          card and the deal room both do: the rate stays put and the arithmetic unfolds under it, in
+          the same slab. The popover's machinery — the fixed scrim, the `bottom: 100%` anchor, the
+          62vh cap — is gone with it; the footer simply gets taller, which is what `min-height`
+          (never `height`) has always allowed for.
 
-          This opens ABOVE the slab and over the equipment list, the way the deal room's own
-          `.pb-breakdown` opens below its bar — so the 76px floor never moves, the rate never leaves,
-          and none of that machinery comes back with it. A scrim closes it, because a popover whose
-          only exit is the control that opened it is one the renter has to aim at twice.
-
-          The lines are the BID CARD's shape, per machine with the count applied once at the foot,
-          which is the arrangement the deal room took on this morning. Three surfaces, one reading. */}
-      {expanded && (
-        <>
-          <div className="bm-foot-scrim" onClick={() => setExpanded(false)} />
-          <div className="bm-foot-break" role="dialog" aria-label={t.priceFooter.showDetails}>
-            {multi && <div className="bm-foot-bhead">{t.priceFooter.perUnitHead}</div>}
-            <Line
-              label={t.priceFooter.rental}
-              sub={rentalBasis}
-              value={money(perUnit.rental)}
-              currency={t.priceFooter.currency}
-            />
-            <Line
-              label={t.priceFooter.mobilisation}
-              value={totals.mobExcluded ? t.priceFooter.excluded : money(perUnit.mob)}
-              currency={totals.mobExcluded ? undefined : t.priceFooter.currency}
-              muted={totals.mobExcluded}
-            />
-            <Line
-              label={t.priceFooter.demobilisation}
-              value={totals.demobExcluded ? t.priceFooter.excluded : money(perUnit.demob)}
-              currency={totals.demobExcluded ? undefined : t.priceFooter.currency}
-              muted={totals.demobExcluded}
-            />
-            <Line label={t.priceFooter.subtotal} value={money(perUnit.subtotal)} currency={t.priceFooter.currency} />
-            <Line label={t.priceFooter.vat} value={money(perUnit.vat)} currency={t.priceFooter.currency} />
-            <Line label={t.priceFooter.total} value={money(perUnit.total)} currency={t.priceFooter.currency} total />
-            {/* NOT per-unit × units: the transport legs carry their own negotiated counts, so the
-                overall figure is `computeDealTotals`' own and never a multiplication of the block
-                above it. The same rule, and the same wording, the deal room states. */}
-            {multi && (
-              <Line
-                label={t.priceFooter.overallTotal}
-                sub={fmt(t.priceFooter.unitsCount, { n: num(model.pricedUnits) })}
-                value={money(totals.grand)}
-                currency={t.priceFooter.currency}
-                total
-                overall
-              />
-            )}
-            {!totals.hasDuration && <div className="bm-foot-note">{t.priceFooter.noDuration}</div>}
-          </div>
-        </>
-      )}
-
+          The lines are the BID CARD's, per machine with the count applied once at the foot, and the
+          note under the overall total is the bid card's own sentence. Three surfaces, one reading. */}
       <div className="bm-foot-bar">
         <div className="bm-foot-figs">
           <div className="bm-foot-rate">
@@ -237,15 +203,10 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
             <span className="bm-foot-amt" dir="ltr">{money(totals.rate)}</span>
             <span className="bm-foot-unit">{fmt(t.priceFooter.perPeriod, { unit: periodWord(false) })}</span>
           </div>
-          {/* The SOURCE of the figure, not the state of the conversation. A room whose price nothing
-              has moved still reads as the opening offer — and beside it, the way into the arithmetic.
-
-              A text LINK naming the state it moves to, not a button with a chevron: it sits inches
-              from two real acts and must not carry a control's weight next to them. */}
+          {/* The way into the arithmetic, and nothing else. «From the deal room» / «Opening offer»
+              named where the figure came from, which is not a thing the renter is deciding about —
+              and it sat where the breakdown's own control belongs (owner, 2026-08-28). */}
           <div className="bm-foot-meta">
-            <span className="bm-foot-src">
-              {model.source === "opening_offer" ? t.priceFooter.openingOffer : t.priceFooter.fromDealRoom}
-            </span>
             <button
               type="button"
               className="bm-foot-det"
@@ -256,34 +217,82 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
             </button>
           </div>
         </div>
-        {/* TWO controls, always both — the deal room's own pair (`DealRoom.tsx:648`): Negotiate is
-            always available, Accept is always VISIBLE. One-or-the-other hid the act the renter was
-            looking for and made the surface decide for him.
+        {/* COUNTER is always available. ACCEPT appears only when there is nothing left to settle —
+            the app's own rule (`DealRoom.tsx:655`, `canAccept = termsMatched && priceMatches &&
+            unitsMatch`), applied here with the two halves this surface can actually see:
 
-            Neither is gated HERE any more, and that is the point of the deep link. This surface never
-            could evaluate `termsMatched && priceMatches && unitsMatch` — it fetches neither the terms
-            nor the last two rounds — so it used to disable Accept the moment a room existed. Now the
-            room evaluates its own rule on arrival: allowed, the sheet opens; blocked, the renter lands
-            on the room under the strip that names what is still unmatched. The rule never moved. */}
+              · no term is in CONFLICT — `bucketBidTerms`, the same tally the bid card prints
+              · the priced count and the offered count agree — the `unitsDiffer` flag
+
+            The price half stays the room's: it compares the last two rounds, which this footer does
+            not fetch. So the gate here is never STRICTER than the room's, only earlier — and the
+            room still evaluates its own `canAccept` on arrival, which is what the deep link is for.
+
+            Hidden rather than disabled, per the owner: a greyed Accept invites a press that cannot
+            land, and the reason lives two screens away. Counter is the act that resolves the block. */}
         <button type="button" className="bm-foot-cta" onClick={() => void handOff("counter")} disabled={busy}>
           {t.priceFooter.counterPrice}
         </button>
-        <button type="button" className="bm-foot-cta is-confirm" onClick={() => void handOff("accept")} disabled={busy}>
-          {t.priceFooter.confirmPrice}
-        </button>
+        {canAccept && (
+          <button type="button" className="bm-foot-cta is-confirm" onClick={() => void handOff("accept")} disabled={busy}>
+            {t.priceFooter.confirmPrice}
+          </button>
+        )}
       </div>
 
-      {/* The two numbers that are both correct (004a §4a.4). The count pills describe the OFFER; this
-          prices on the AGREED count — and where they differ it is said ONCE, here (RM3-AC-66). It
-          never follows `lastProposedRentalUnits`: `priceFooterModel` cannot even see that field.
-
-          **This is the one thing that can make the footer taller than 76px**, which is why `.bm-foot`
-          carries a `min-height` and not a `height`. A renegotiated count is rare and the sentence is
-          the only place the two figures are reconciled; clipping it to hold a number would be the
-          geometry deciding what the renter is allowed to know. */}
-      {model.unitsDiffer && (
-        <div className="bm-foot-units" role="note">
-          {fmt(t.priceFooter.unitsDiffer, { agreed: num(model.pricedUnits), offered: num(model.offeredUnits) })}
+      {expanded && (
+        <div className="bm-foot-break" role="group" aria-label={t.priceFooter.showDetails}>
+          {multi && <div className="bm-foot-bhead">{t.priceFooter.perUnitHead}</div>}
+          <Line
+            label={t.priceFooter.rental}
+            sub={rentalBasis}
+            value={money(perUnit.rental)}
+            currency={t.priceFooter.currency}
+          />
+          <Line
+            label={t.priceFooter.mobilisation}
+            value={totals.mobExcluded ? t.priceFooter.excluded : money(perUnit.mob)}
+            currency={totals.mobExcluded ? undefined : t.priceFooter.currency}
+            muted={totals.mobExcluded}
+          />
+          <Line
+            label={t.priceFooter.demobilisation}
+            value={totals.demobExcluded ? t.priceFooter.excluded : money(perUnit.demob)}
+            currency={totals.demobExcluded ? undefined : t.priceFooter.currency}
+            muted={totals.demobExcluded}
+          />
+          <Line label={t.priceFooter.subtotal} value={money(perUnit.subtotal)} currency={t.priceFooter.currency} />
+          <Line label={t.priceFooter.vat} value={money(perUnit.vat)} currency={t.priceFooter.currency} />
+          <Line label={t.priceFooter.total} value={money(perUnit.total)} currency={t.priceFooter.currency} total />
+          {/* NOT per-unit × units: the transport legs carry their own negotiated counts, so the
+              overall figure is `computeDealTotals`' own and never a multiplication of the block
+              above it. The same rule, and the same wording, the deal room states. */}
+          {multi && (
+            <Line
+              label={t.priceFooter.overallTotal}
+              sub={fmt(t.priceFooter.unitsCount, { n: num(model.pricedUnits) })}
+              value={money(totals.grand)}
+              currency={t.priceFooter.currency}
+              total
+              overall
+            />
+          )}
+          {/* ── The two counts, reconciled where the multiplication happens (RM3-AC-66) ───────────
+              UNDER the overall total, in the BID CARD's own sentence — `countPricedBelow` /
+              `countPricedAbove`, the strings `BidCards.tsx` prints under its own totals box. It used
+              to sit outside the footer's figures in wording of its own («Priced on 2 agreed units —
+              the offer was made of 4»), which said the same thing twice over in two voices and read
+              as a remark about the bid rather than a footnote to the figure above it. */}
+          {unitsDiffer && (
+            <div className="bm-foot-priced" role="note">
+              {fmt(
+                model.pricedUnits > model.offeredUnits
+                  ? t.workspace.countPricedAbove
+                  : t.workspace.countPricedBelow,
+                { priced: num(model.pricedUnits), offered: num(model.offeredUnits) },
+              )}
+            </div>
+          )}
         </div>
       )}
     </footer>

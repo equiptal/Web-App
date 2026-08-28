@@ -1,0 +1,903 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<title>Guest Home — Browse Suppliers</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=swap"
+  rel="stylesheet"
+/>
+
+<!--
+  ═══════════════════════════════════════════════════════════════════════════════
+  Moedatech — GUEST HOME · browse-first, Airbnb-shaped.
+
+  A signed-out visitor has no requests, no bids and no rooms. What he has is a
+  market. So the page is: a professional CTA, then the market itself —
+    · a category strip (real taxonomy subcategories, src/lib/taxonomy/fixture.ts)
+    · TOP STORES, 6 per row, 12 by default
+    · pick a category and the grid re-groups to the suppliers who carry it
+    · open a store and its equipment opens IN THE CATEGORY YOU CAME FROM,
+      with the store's other categories one tap away
+    · every "Request" is the account gate — the guest never loses his place
+
+  COLOUR (app parity, app_colors.dart): orange #F79009 is the BRAND ACTION and
+  nothing else. Warnings are light red #E2564A. Verified is green, info is blue.
+  ═══════════════════════════════════════════════════════════════════════════════
+-->
+
+<style>
+  :root{
+    color-scheme: light;
+    --navy:#1c3550; --navy-deep:#12263a; --navy-mid:#2a4f72; --muted:#6b8fa8; --faint:#9bb3c8;
+    --action:#f79009; --action-deep:#d97706; --action-dim:#fff4e5; --action-line:#f7c98b;
+    --good:#1daf58; --good-dim:#e7f7ee; --good-line:#a9dcbf;
+    --info:#1a7ec8; --info-dim:#e6f2fb; --info-line:#a9d0ec;
+    --warn:#e2564a; --warn-dim:#fdecea; --warn-line:#f4c4be;
+    --surface:#ffffff; --card:#ffffff; --sunk:#f5f9fc; --border:#dfe7ef; --line:#eaf0f6;
+    --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:22px; --r-pill:100px;
+    --shadow-sm:0 1px 2px rgba(18,38,58,.06);
+    --shadow-md:0 8px 26px -10px rgba(18,38,58,.28);
+    --shadow-lg:0 30px 70px -30px rgba(18,38,58,.45);
+    --ease:cubic-bezier(.32,.72,.24,1);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--surface);color:var(--navy);
+    font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  [dir="rtl"]{font-family:"IBM Plex Sans Arabic","Inter",sans-serif}
+  body.locked{overflow:hidden}
+  button{font:inherit;color:inherit;cursor:pointer}
+  a{color:inherit;text-decoration:none}
+  .icon{font-family:"Material Symbols Outlined";font-weight:normal;line-height:1;display:inline-block;
+    white-space:nowrap;direction:ltr;-webkit-font-feature-settings:"liga";user-select:none}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+  :focus-visible{outline:2px solid var(--action);outline-offset:2px;border-radius:4px}
+
+  .wrap{max-width:1440px;margin:0 auto;padding:0 28px}
+
+  /* ══ top bar ═══════════════════════════════════════════════════════════════ */
+  .bar{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  .barin{max-width:1440px;margin:0 auto;padding:0 28px;height:74px;display:flex;align-items:center;gap:16px}
+  .logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:16px;letter-spacing:-.02em;flex:none}
+  .logo .mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(140deg,#1e3a5f,#0f1e2e);
+    display:grid;place-items:center;color:#fff;font-size:16px}
+  .logo em{font-style:normal;color:var(--action)}
+
+  /* compact search that lives in the bar once the hero scrolls past */
+  .barsearch{display:none;align-items:center;gap:0;border:1px solid var(--border);border-radius:var(--r-pill);
+    box-shadow:var(--shadow-sm);height:46px;padding:0 6px 0 18px;margin-inline:auto;cursor:pointer}
+  .barsearch.show{display:flex}
+  .barsearch span{font-size:13px;font-weight:700;padding-inline-end:14px}
+  .barsearch .div{width:1px;height:22px;background:var(--line)}
+  .barsearch .muted{font-weight:500;color:var(--muted);padding-inline:14px}
+  .barsearch .go{width:34px;height:34px;border-radius:50%;background:var(--action);color:#fff;
+    display:grid;place-items:center;margin-inline-start:6px}
+  .barsearch .go .icon{font-size:18px}
+
+  .barnav{margin-inline-start:auto;display:flex;align-items:center;gap:8px;flex:none}
+  .ghostlink{padding:10px 14px;border-radius:var(--r-pill);font-size:13.5px;font-weight:700;color:var(--navy-mid)}
+  .ghostlink:hover{background:var(--sunk)}
+  .langtog{display:inline-flex;background:var(--sunk);border:1px solid var(--border);border-radius:var(--r-sm);padding:2px}
+  .langtog button{border:0;background:transparent;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:var(--muted)}
+  .langtog button.on{background:var(--card);color:var(--navy);box-shadow:var(--shadow-sm)}
+  .btn{display:inline-flex;align-items:center;gap:8px;border-radius:var(--r-pill);padding:11px 18px;
+    font-size:13.5px;font-weight:700;border:1px solid transparent;transition:transform .18s var(--ease),filter .18s}
+  .btn:hover{transform:translateY(-1px)}
+  .btn .icon{font-size:18px}
+  .btn-primary{background:var(--action);color:#fff}
+  .btn-primary:hover{filter:brightness(1.05)}
+  .btn-navy{background:var(--navy);color:#fff}
+  .btn-navy:hover{background:var(--navy-mid)}
+  .btn-outline{border-color:var(--border);background:var(--card);color:var(--navy)}
+  .btn-outline:hover{border-color:var(--navy-mid);background:var(--sunk)}
+
+  /* ══ hero ══════════════════════════════════════════════════════════════════ */
+  .hero{padding:44px 0 34px}
+  .heroin{background:linear-gradient(135deg,#1e3a5f,#0f1e2e);border-radius:26px;padding:52px 48px 44px;
+    position:relative;overflow:hidden;color:#fff}
+  .heroin::before{content:"";position:absolute;inset:0;
+    background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);
+    background-size:52px 52px;
+    -webkit-mask-image:radial-gradient(circle at 76% 26%,#000 26%,transparent 76%);
+    mask-image:radial-gradient(circle at 76% 26%,#000 26%,transparent 76%)}
+  .heroin::after{content:"";position:absolute;width:340px;height:340px;border-radius:50%;background:var(--action);
+    opacity:.17;filter:blur(90px);top:-140px;inset-inline-end:-60px}
+  .heroin > *{position:relative;z-index:1}
+  .eyebrow{display:inline-flex;align-items:center;gap:7px;background:rgba(247,144,9,.16);
+    border:1px solid rgba(247,144,9,.32);color:#fbbf6e;border-radius:var(--r-pill);padding:6px 13px;
+    font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+  .eyebrow .icon{font-size:14px}
+  .heroin h1{margin:16px 0 0;font-size:44px;line-height:1.1;font-weight:800;letter-spacing:-.03em;max-width:15ch}
+  .heroin h1 span{color:var(--action)}
+  .heroin p.lede{margin:14px 0 0;font-size:16px;line-height:1.6;color:rgba(255,255,255,.72);max-width:56ch}
+
+  /* the search rail — the Airbnb move, in procurement words */
+  .rail{margin-top:30px;background:#fff;border-radius:var(--r-pill);padding:7px 7px 7px 10px;display:flex;
+    align-items:center;gap:0;box-shadow:0 20px 50px -22px rgba(0,0,0,.5);max-width:880px;flex-wrap:wrap}
+  .rf{flex:1 1 190px;min-width:0;padding:8px 18px;border-radius:var(--r-pill);cursor:pointer;transition:background .16s}
+  .rf:hover{background:var(--sunk)}
+  .rf .k{font-size:11.5px;font-weight:800;color:var(--navy);letter-spacing:-.01em}
+  .rf .v{font-size:13px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rdiv{width:1px;height:34px;background:var(--line);flex:none}
+  .rgo{width:52px;height:52px;border-radius:50%;background:var(--action);color:#fff;display:grid;place-items:center;
+    border:0;flex:none;margin-inline-start:6px;transition:filter .16s,transform .16s}
+  .rgo:hover{filter:brightness(1.06);transform:scale(1.03)}
+  .rgo .icon{font-size:23px}
+
+  .trust{margin-top:24px;display:flex;gap:26px;flex-wrap:wrap;font-size:13px;color:rgba(255,255,255,.7)}
+  .trust b{color:#fff;font-weight:800;font-family:"IBM Plex Mono",monospace;font-size:15px;margin-inline-end:6px}
+  .trust span{display:inline-flex;align-items:center}
+
+  /* how it works — three steps, quiet */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:26px}
+  .step{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 18px;
+    display:flex;gap:13px;align-items:flex-start}
+  .step .num{width:28px;height:28px;border-radius:9px;background:var(--action-dim);color:var(--action-deep);
+    display:grid;place-items:center;font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:700;flex:none}
+  .step .t{font-size:13.5px;font-weight:800}
+  .step .s{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.5}
+
+  /* ══ category strip ════════════════════════════════════════════════════════ */
+  .strip{position:sticky;top:74px;z-index:30;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  .stripin{max-width:1440px;margin:0 auto;padding:0 28px;display:flex;align-items:center;gap:14px}
+  .cats{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:10px 0;flex:1}
+  .cats::-webkit-scrollbar{display:none}
+  .cat{border:0;background:transparent;border-radius:var(--r-md);padding:8px 12px 7px;display:flex;
+    flex-direction:column;align-items:center;gap:5px;min-width:78px;color:var(--muted);position:relative;flex:none}
+  .cat .icon{font-size:22px}
+  .cat span{font-size:11px;font-weight:700;white-space:nowrap}
+  .cat:hover{color:var(--navy);background:var(--sunk)}
+  .cat.on{color:var(--navy)}
+  .cat.on::after{content:"";position:absolute;inset-inline:8px;bottom:-11px;height:2px;background:var(--navy);border-radius:2px}
+  .stripin .filterbtn{flex:none;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);
+    background:var(--card);border-radius:var(--r-md);padding:9px 14px;font-size:12.5px;font-weight:700;color:var(--navy-mid)}
+  .stripin .filterbtn:hover{border-color:var(--navy-mid)}
+  .stripin .filterbtn .icon{font-size:17px}
+
+  /* ══ store grid ════════════════════════════════════════════════════════════ */
+  .sec{padding:26px 0 8px}
+  .sechead{display:flex;align-items:center;gap:11px;margin-bottom:16px;flex-wrap:wrap}
+  .sechead h2{margin:0;font-size:23px;font-weight:800;letter-spacing:-.03em;display:inline-flex;align-items:center;gap:10px}
+  .sechead h2 .arrow{width:26px;height:26px;border-radius:50%;background:var(--sunk);border:1px solid var(--border);
+    display:grid;place-items:center;color:var(--navy)}
+  .sechead h2 .arrow .icon{font-size:15px}
+  [dir="rtl"] .sechead h2 .arrow .icon{transform:scaleX(-1)}
+  .sechead .sub{font-size:13px;color:var(--muted)}
+  .sechead .spacer{flex:1}
+  .pager{display:flex;gap:7px}
+  .pager button{width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:var(--card);
+    display:grid;place-items:center;color:var(--navy-mid)}
+  .pager button:hover{background:var(--sunk);border-color:var(--navy-mid)}
+  .pager .icon{font-size:17px}
+  [dir="rtl"] .pager .icon{transform:scaleX(-1)}
+
+  .grid6{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:22px 18px}
+
+  .scard{cursor:pointer;display:block;position:relative}
+  .shot{position:relative;aspect-ratio:1/.92;border-radius:14px;overflow:hidden;background:var(--sunk)}
+  .shot .bg{position:absolute;inset:0;display:grid;place-items:center;transition:transform .5s var(--ease)}
+  .scard:hover .shot .bg{transform:scale(1.05)}
+  .shot .bg .icon{font-size:74px;color:rgba(255,255,255,.28)}
+  .shot .grain{position:absolute;inset:0;
+    background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);
+    background-size:22px 22px}
+  .shot .fade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.16),transparent 42%,rgba(0,0,0,.32))}
+  .tagpill{position:absolute;top:10px;inset-inline-start:10px;background:#fff;border-radius:var(--r-pill);
+    padding:5px 11px;font-size:11.5px;font-weight:700;color:var(--navy);box-shadow:var(--shadow-sm);
+    display:inline-flex;align-items:center;gap:5px}
+  .tagpill .icon{font-size:13px;color:var(--good)}
+  .heart{position:absolute;top:8px;inset-inline-end:8px;width:32px;height:32px;border:0;background:transparent;
+    color:#fff;display:grid;place-items:center;filter:drop-shadow(0 1px 3px rgba(0,0,0,.45))}
+  .heart .icon{font-size:22px;font-variation-settings:"FILL" 0}
+  .heart:hover .icon{transform:scale(1.08)}
+  .heart.on .icon{color:var(--action);font-variation-settings:"FILL" 1}
+  .shotfoot{position:absolute;inset-inline:10px;bottom:9px;display:flex;align-items:center;gap:6px;color:#fff}
+  .shotfoot .cnt{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:600}
+  .shotfoot .icon{font-size:14px;opacity:.85}
+
+  .sinfo{padding-top:10px}
+  .sinfo .n{font-size:14px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sinfo .m{font-size:13px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sinfo .p{font-size:13px;margin-top:3px}
+  .sinfo .p b{font-weight:700}
+  .sinfo .p .from{color:var(--muted);font-weight:500}
+  .sinfo .p .none{color:var(--muted)}
+
+  .more{display:flex;justify-content:center;padding:30px 0 10px}
+
+  /* ══ store detail (overlay) ════════════════════════════════════════════════ */
+  .veil{position:fixed;inset:0;background:rgba(12,26,40,.55);backdrop-filter:blur(3px);z-index:60;opacity:0;
+    pointer-events:none;transition:opacity .25s var(--ease)}
+  .veil.on{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;inset:22px;max-width:1180px;margin:0 auto;background:var(--card);border-radius:24px;
+    z-index:61;overflow:hidden auto;box-shadow:var(--shadow-lg);transform:translateY(18px) scale(.99);opacity:0;
+    pointer-events:none;transition:opacity .25s var(--ease),transform .25s var(--ease)}
+  .sheet.on{opacity:1;transform:none;pointer-events:auto}
+  .sheettop{position:sticky;top:0;z-index:5;background:rgba(255,255,255,.95);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);padding:12px 22px;display:flex;align-items:center;gap:12px}
+  .roundbtn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--card);
+    display:grid;place-items:center;color:var(--navy);flex:none}
+  .roundbtn:hover{background:var(--sunk)}
+  .roundbtn .icon{font-size:19px}
+  [dir="rtl"] .roundbtn.back .icon{transform:scaleX(-1)}
+  .sheettop .ttl{font-size:14.5px;font-weight:800;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sheettop .spacer{flex:1}
+
+  .banner{height:190px;position:relative;display:flex;align-items:flex-end;padding:0 26px}
+  .banner .bg{position:absolute;inset:0;background:linear-gradient(135deg,#1e3a5f,#0f1e2e)}
+  .banner .grain{position:absolute;inset:0;
+    background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);
+    background-size:34px 34px;
+    -webkit-mask-image:radial-gradient(circle at 80% 20%,#000 20%,transparent 74%);
+    mask-image:radial-gradient(circle at 80% 20%,#000 20%,transparent 74%)}
+  .banner .who{position:relative;display:flex;align-items:flex-end;gap:16px;padding-bottom:20px;color:#fff;width:100%}
+  .banner .lg{width:76px;height:76px;border-radius:18px;border:3px solid #fff;background:#fff;color:var(--navy);
+    display:grid;place-items:center;font-size:27px;font-weight:800;flex:none}
+  .banner h2{margin:0;font-size:26px;font-weight:800;letter-spacing:-.02em}
+  .banner .meta{display:flex;gap:16px;flex-wrap:wrap;margin-top:6px;font-size:13px;color:rgba(255,255,255,.78)}
+  .banner .meta span{display:inline-flex;align-items:center;gap:5px}
+  .banner .meta .icon{font-size:15px}
+  .vpill{display:inline-flex;align-items:center;gap:5px;background:var(--good);color:#fff;border-radius:var(--r-pill);
+    padding:4px 11px;font-size:11.5px;font-weight:700}
+  .vpill .icon{font-size:13px}
+
+  .sheetbody{padding:22px 26px 40px;display:grid;grid-template-columns:minmax(0,1fr) 322px;gap:26px;align-items:start}
+  .about{font-size:13.5px;color:var(--navy-mid);line-height:1.65;margin:0 0 18px;max-width:70ch}
+
+  .catbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--line)}
+  .catchip{border:1px solid var(--border);background:var(--card);border-radius:var(--r-pill);padding:8px 14px;
+    font-size:12.5px;font-weight:700;color:var(--navy-mid);display:inline-flex;align-items:center;gap:7px}
+  .catchip .icon{font-size:16px}
+  .catchip .c{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--faint)}
+  .catchip:hover{border-color:var(--navy-mid);background:var(--sunk)}
+  .catchip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+  .catchip.on .c{color:rgba(255,255,255,.65)}
+
+  .eqhead{display:flex;align-items:baseline;gap:10px;margin-bottom:13px;flex-wrap:wrap}
+  .eqhead h3{margin:0;font-size:17px;font-weight:800;letter-spacing:-.02em}
+  .eqhead .sub{font-size:12.5px;color:var(--muted)}
+  .eqgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:16px}
+  .eq{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;background:var(--card);
+    transition:transform .18s var(--ease),box-shadow .18s}
+  .eq:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
+  .eqshot{aspect-ratio:4/3;position:relative;display:grid;place-items:center;overflow:hidden}
+  .eqshot .icon{font-size:52px;color:rgba(255,255,255,.32)}
+  .eqshot .fade{position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.28))}
+  .eqshot .ver{position:absolute;top:8px;inset-inline-start:8px;background:#fff;border-radius:var(--r-pill);
+    padding:3px 9px;font-size:10.5px;font-weight:700;color:var(--good);display:inline-flex;align-items:center;gap:4px}
+  .eqshot .ver .icon{font-size:12px;color:var(--good)}
+  .eqbody{padding:12px 13px 13px}
+  .eqbody .n{font-size:13.5px;font-weight:700;letter-spacing:-.01em}
+  .eqbody .sp{font-size:12px;color:var(--muted);margin-top:3px;display:flex;gap:9px;flex-wrap:wrap}
+  .eqbody .sp span{display:inline-flex;align-items:center;gap:4px}
+  .eqbody .sp .icon{font-size:13px}
+  .eqprice{display:flex;align-items:baseline;gap:5px;margin-top:9px;padding-top:9px;border-top:1px solid var(--line)}
+  .eqprice .v{font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:600}
+  .eqprice .u{font-size:11.5px;color:var(--muted)}
+  .eqprice .ask{font-size:12.5px;font-weight:700;color:var(--muted)}
+  .eqprice .spacer{flex:1}
+  .reqbtn{border:1px solid var(--action-line);background:var(--action-dim);color:var(--action-deep);
+    border-radius:var(--r-pill);padding:6px 12px;font-size:11.5px;font-weight:700}
+  .reqbtn:hover{background:#ffeacc}
+
+  /* the quote panel — the listing page's booking card */
+  .quote{position:sticky;top:82px;border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;
+    box-shadow:var(--shadow-md)}
+  .quote .h{font-size:15.5px;font-weight:800;letter-spacing:-.01em}
+  .quote .s{font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.5}
+  .qfield{border:1px solid var(--border);border-radius:var(--r-md);padding:9px 12px;margin-top:11px}
+  .qfield .k{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+  .qfield .v{font-size:13px;font-weight:600;margin-top:3px;color:var(--navy)}
+  .qrow{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .quote .cta{width:100%;justify-content:center;margin-top:14px;padding:13px}
+  .quote .fine{font-size:11.5px;color:var(--muted);text-align:center;margin-top:10px;line-height:1.5}
+  .qsplit{margin-top:14px;padding-top:13px;border-top:1px solid var(--line);display:grid;gap:8px}
+  .qsplit div{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--navy-mid)}
+  .qsplit .icon{font-size:16px;color:var(--good)}
+
+  /* ══ account gate ══════════════════════════════════════════════════════════ */
+  .gate{position:fixed;inset:0;z-index:70;display:grid;place-items:center;padding:20px;opacity:0;pointer-events:none;
+    transition:opacity .2s var(--ease)}
+  .gate.on{opacity:1;pointer-events:auto}
+  .gate .bg{position:absolute;inset:0;background:rgba(12,26,40,.6);backdrop-filter:blur(3px)}
+  .gatebox{position:relative;background:var(--card);border-radius:20px;max-width:420px;width:100%;padding:26px;
+    box-shadow:var(--shadow-lg);text-align:center}
+  .gatebox .ic{width:52px;height:52px;border-radius:15px;background:var(--action-dim);color:var(--action-deep);
+    display:grid;place-items:center;margin:0 auto 14px}
+  .gatebox .ic .icon{font-size:26px}
+  .gatebox h3{margin:0;font-size:19px;font-weight:800;letter-spacing:-.02em}
+  .gatebox p{margin:9px 0 0;font-size:13.5px;color:var(--muted);line-height:1.6}
+  .gatebox .acts{display:grid;gap:9px;margin-top:18px}
+  .gatebox .btn{justify-content:center;padding:12px}
+  .gatebox .kept{margin-top:14px;font-size:11.5px;color:var(--faint);display:flex;align-items:center;gap:6px;justify-content:center}
+  .gatebox .kept .icon{font-size:14px}
+
+  /* ══ footer ════════════════════════════════════════════════════════════════ */
+  .foot{margin-top:44px;border-top:1px solid var(--line);padding:26px 0 40px;display:flex;gap:16px;
+    align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+  .foot .spacer{flex:1}
+  .foot .mono{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+
+  @media (max-width:1280px){ .grid6{grid-template-columns:repeat(4,minmax(0,1fr))} }
+  @media (max-width:1100px){ .sheetbody{grid-template-columns:minmax(0,1fr)} .quote{position:static} }
+  @media (max-width:900px){
+    .grid6{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .steps{grid-template-columns:1fr}
+    .heroin{padding:34px 24px 30px}
+    .heroin h1{font-size:32px}
+    .barsearch{display:none !important}
+  }
+  @media (max-width:640px){
+    .wrap,.barin,.stripin{padding-inline:14px}
+    .grid6{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 12px}
+    .hero{padding:20px 0 18px}
+    .heroin{border-radius:20px}
+    .heroin h1{font-size:27px}
+    .rail{border-radius:20px;padding:8px}
+    .rf{flex:1 1 100%}
+    .rdiv{display:none}
+    .rgo{width:100%;border-radius:var(--r-pill);height:46px}
+    .langtog,.ghostlink{display:none}
+    .sheet{inset:0;border-radius:0}
+    .banner{height:150px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ TOP BAR ═══════════════════════════════════════════════════════════════ -->
+<header class="bar">
+  <div class="barin">
+    <div class="logo"><span class="mark"><span class="icon">construction</span></span>moedatech<em>.</em></div>
+
+    <div class="barsearch" id="barsearch" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+      <span data-en="Any equipment" data-ar="أي معدّة">Any equipment</span>
+      <i class="div"></i>
+      <span class="muted" data-en="Anywhere" data-ar="أي مكان">Anywhere</span>
+      <i class="div"></i>
+      <span class="muted" data-en="Any dates" data-ar="أي تواريخ">Any dates</span>
+      <span class="go"><span class="icon">search</span></span>
+    </div>
+
+    <nav class="barnav">
+      <a class="ghostlink" href="#how" data-en="How it works" data-ar="كيف تعمل">How it works</a>
+      <div class="langtog">
+        <button class="on" onclick="setLang('en')">EN</button>
+        <button onclick="setLang('ar')">ع</button>
+      </div>
+      <button class="btn btn-outline" onclick="gate('signin')"><span data-en="Sign in" data-ar="تسجيل الدخول">Sign in</span></button>
+      <button class="btn btn-primary" onclick="gate('request')"><span class="icon">add</span><span data-en="Post a request" data-ar="انشر طلباً">Post a request</span></button>
+    </nav>
+  </div>
+</header>
+
+<!-- ══ HERO ══════════════════════════════════════════════════════════════════ -->
+<div class="wrap hero">
+  <div class="heroin">
+    <span class="eyebrow"><span class="icon">bolt</span><span data-en="Equipment rental marketplace · Saudi Arabia" data-ar="سوق تأجير المعدات · السعودية">Equipment rental marketplace · Saudi Arabia</span></span>
+    <h1 data-en="Rent the machine. <span>Not the search.</span>" data-ar="استأجر المعدّة. <span>لا تُضِع وقتك بالبحث.</span>">Rent the machine. <span>Not the search.</span></h1>
+    <p class="lede" data-en="Post what your site needs once. Verified suppliers across the Kingdom price it against each other, and you compare real offers side by side — papers, terms and all." data-ar="انشر ما يحتاجه موقعك مرة واحدة. مؤجّرون موثّقون في المملكة يتنافسون على تسعيره، وتقارن العروض الحقيقية جنباً إلى جنب — بالأوراق والشروط كاملة.">Post what your site needs once. Verified suppliers across the Kingdom price it against each other, and you compare real offers side by side — papers, terms and all.</p>
+
+    <div class="rail">
+      <div class="rf" onclick="gate('search')">
+        <div class="k" data-en="Equipment" data-ar="المعدّة">Equipment</div>
+        <div class="v" data-en="Excavator, crane, generator…" data-ar="حفّار، رافعة، مولّد…">Excavator, crane, generator…</div>
+      </div>
+      <i class="rdiv"></i>
+      <div class="rf" onclick="gate('search')">
+        <div class="k" data-en="Site" data-ar="الموقع">Site</div>
+        <div class="v" data-en="Riyadh, Jeddah, Dammam…" data-ar="الرياض، جدة، الدمام…">Riyadh, Jeddah, Dammam…</div>
+      </div>
+      <i class="rdiv"></i>
+      <div class="rf" onclick="gate('search')">
+        <div class="k" data-en="When" data-ar="متى">When</div>
+        <div class="v" data-en="Add your dates" data-ar="أضف التواريخ">Add your dates</div>
+      </div>
+      <i class="rdiv"></i>
+      <div class="rf" onclick="gate('search')">
+        <div class="k" data-en="How long" data-ar="المدة">How long</div>
+        <div class="v" data-en="Days, weeks or months" data-ar="أيام أو أسابيع أو أشهر">Days, weeks or months</div>
+      </div>
+      <button class="rgo" onclick="gate('search')" aria-label="search"><span class="icon">search</span></button>
+    </div>
+
+    <div class="trust">
+      <span><b>214</b><span data-en="verified suppliers" data-ar="مؤجّر موثّق">verified suppliers</span></span>
+      <span><b>4,860</b><span data-en="machines listed" data-ar="معدّة معروضة">machines listed</span></span>
+      <span><b>18</b><span data-en="cities covered" data-ar="مدينة مغطّاة">cities covered</span></span>
+      <span><b>36h</b><span data-en="median time to first offer" data-ar="وسيط الوقت لأول عرض">median time to first offer</span></span>
+    </div>
+  </div>
+
+  <div class="steps" id="how">
+    <div class="step"><span class="num">1</span><div><div class="t" data-en="Describe the need once" data-ar="صِف الحاجة مرة واحدة">Describe the need once</div>
+      <div class="s" data-en="Paste an email, upload a BOQ, or type it. It becomes a structured RFQ." data-ar="الصق بريداً، أو ارفع جدول كميات، أو اكتبه. يتحوّل إلى طلب تسعير منظّم.">Paste an email, upload a BOQ, or type it. It becomes a structured RFQ.</div></div></div>
+    <div class="step"><span class="num">2</span><div><div class="t" data-en="Suppliers price it against each other" data-ar="المؤجّرون يتنافسون على تسعيره">Suppliers price it against each other</div>
+      <div class="s" data-en="Only suppliers who hold the certificates your site demands can answer." data-ar="فقط المؤجّرون الحاملون للشهادات التي يطلبها موقعك يمكنهم الردّ.">Only suppliers who hold the certificates your site demands can answer.</div></div></div>
+    <div class="step"><span class="num">3</span><div><div class="t" data-en="Compare, negotiate, award" data-ar="قارن، فاوض، ثم أرسِ">Compare, negotiate, award</div>
+      <div class="s" data-en="Rates, mobilisation, fuel, operator and papers in one table — then settle it in the deal room." data-ar="الأسعار والنقل والوقود والمشغّل والأوراق في جدول واحد — ثم تُحسم في غرفة الصفقة.">Rates, mobilisation, fuel, operator and papers in one table — then settle it in the deal room.</div></div></div>
+  </div>
+</div>
+
+<!-- ══ CATEGORY STRIP ════════════════════════════════════════════════════════ -->
+<div class="strip">
+  <div class="stripin">
+    <div class="cats" id="cats"></div>
+    <button class="filterbtn" onclick="gate('filters')"><span class="icon">tune</span><span data-en="Filters" data-ar="تصفية">Filters</span></button>
+  </div>
+</div>
+
+<!-- ══ STORE GRID ════════════════════════════════════════════════════════════ -->
+<div class="wrap sec">
+  <div class="sechead">
+    <h2 id="gridtitle"></h2>
+    <span class="sub" id="gridsub"></span>
+    <span class="spacer"></span>
+    <div class="pager">
+      <button aria-label="prev"><span class="icon">chevron_left</span></button>
+      <button aria-label="next"><span class="icon">chevron_right</span></button>
+    </div>
+  </div>
+
+  <div class="grid6" id="grid"></div>
+
+  <div class="more">
+    <button class="btn btn-outline" onclick="showAll()"><span data-en="Show more suppliers" data-ar="اعرض مزيداً من المؤجّرين">Show more suppliers</span></button>
+  </div>
+
+  <div class="foot">
+    <span data-en="Moedatech · equipment rental marketplace" data-ar="معداتك · سوق تأجير المعدات">Moedatech · equipment rental marketplace</span>
+    <span class="spacer"></span>
+    <span class="mono">guest home · prototype</span>
+  </div>
+</div>
+
+<!-- ══ STORE DETAIL ══════════════════════════════════════════════════════════ -->
+<div class="veil" id="veil" onclick="closeStore()"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
+
+<!-- ══ ACCOUNT GATE ══════════════════════════════════════════════════════════ -->
+<div class="gate" id="gate">
+  <div class="bg" onclick="closeGate()"></div>
+  <div class="gatebox">
+    <span class="ic"><span class="icon" id="gateicon">lock_open</span></span>
+    <h3 id="gatetitle"></h3>
+    <p id="gatebody"></p>
+    <div class="acts">
+      <button class="btn btn-primary"><span data-en="Create a free account" data-ar="أنشئ حساباً مجانياً">Create a free account</span></button>
+      <button class="btn btn-outline"><span data-en="I already have one" data-ar="لديّ حساب بالفعل">I already have one</span></button>
+    </div>
+    <div class="kept"><span class="icon">bookmark</span><span id="gatekept"></span></div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   Taxonomy — the real subcategories from src/lib/taxonomy/fixture.ts.
+   ═══════════════════════════════════════════════════════════════════════════ */
+var CATS = [
+  {k:"top",            ic:"apartment",               en:"Top stores",     ar:"الأبرز"},
+  {k:"excavators",     ic:"agriculture",             en:"Excavators",     ar:"حفّارات"},
+  {k:"mobile-cranes",  ic:"precision_manufacturing", en:"Mobile cranes",  ar:"رافعات متحركة"},
+  {k:"telehandlers",   ic:"forklift",                en:"Telehandlers",   ar:"مناولات تلسكوبية"},
+  {k:"forklifts",      ic:"pallet",                  en:"Forklifts",      ar:"رافعات شوكية"},
+  {k:"wheel-loaders",  ic:"snowplow",                en:"Wheel loaders",  ar:"لوادر"},
+  {k:"bulldozers",     ic:"dozer",                   en:"Bulldozers",     ar:"بلدوزرات"},
+  {k:"generators",     ic:"bolt",                    en:"Generators",     ar:"مولّدات"},
+  {k:"compressors",    ic:"air",                     en:"Compressors",    ar:"ضواغط"},
+  {k:"light-towers",   ic:"flashlight_on",           en:"Light towers",   ar:"أبراج إنارة"},
+  {k:"boom-lifts",     ic:"elevator",                en:"Boom lifts",     ar:"مناولات أفراد"},
+  {k:"scissor-lifts",  ic:"stairs",                  en:"Scissor lifts",  ar:"مقصّات رفع"},
+  {k:"tippers",        ic:"local_shipping",          en:"Tippers",        ar:"قلّابات"},
+  {k:"water-trucks",   ic:"water_drop",              en:"Water trucks",   ar:"صهاريج ماء"},
+  {k:"trailers",       ic:"rv_hookup",               en:"Trailers",       ar:"مقطورات"},
+  {k:"concrete-pumps", ic:"foundation",              en:"Concrete pumps", ar:"مضخات خرسانة"},
+  {k:"concrete-mixers",ic:"cyclone",                 en:"Mixers",         ar:"خلّاطات"}
+];
+
+/* a muted, brand-safe wash per category — stands in for the photo */
+var WASH = {
+  excavators:"linear-gradient(140deg,#2a4f72,#12263a)",
+  "mobile-cranes":"linear-gradient(140deg,#37536b,#16202c)",
+  telehandlers:"linear-gradient(140deg,#31596d,#122530)",
+  forklifts:"linear-gradient(140deg,#3d5a76,#16232f)",
+  "wheel-loaders":"linear-gradient(140deg,#2f5266,#101f29)",
+  bulldozers:"linear-gradient(140deg,#28455c,#0f1c26)",
+  generators:"linear-gradient(140deg,#345b62,#10242a)",
+  compressors:"linear-gradient(140deg,#3a5566,#131f27)",
+  "light-towers":"linear-gradient(140deg,#425b6b,#151f27)",
+  "boom-lifts":"linear-gradient(140deg,#2d4f6b,#101e2b)",
+  "scissor-lifts":"linear-gradient(140deg,#33566e,#111f2b)",
+  tippers:"linear-gradient(140deg,#3b5468,#131e26)",
+  "water-trucks":"linear-gradient(140deg,#2d5a6b,#0f2028)",
+  trailers:"linear-gradient(140deg,#40566a,#161f27)",
+  "concrete-pumps":"linear-gradient(140deg,#3c5570,#141e2b)",
+  "concrete-mixers":"linear-gradient(140deg,#38506a,#131d29)",
+  top:"linear-gradient(140deg,#1e3a5f,#0f1e2e)"
+};
+var icOf = function(k){ var c = CATS.filter(function(x){ return x.k === k; })[0]; return c ? c.ic : "construction"; };
+var catName = function(k){ var c = CATS.filter(function(x){ return x.k === k; })[0]; return c ? L(c.en, c.ar) : k; };
+
+/* ═══ stores ══════════════════════════════════════════════════════════════
+   Fields mirror the store contract: name · city · isVerified ·
+   activeEquipmentCount · viewCount. `cats` = which subcategories the store
+   lists, with the count and the cheapest listing in each (both derivable from
+   GET /stores/{id}.equipment).                                              */
+var STORES = [
+  {n:"Zahid Tractor", nAr:"زاهد تراكتور", city:"Riyadh", cityAr:"الرياض", ver:true, eq:210, views:8420, since:1979,
+   dEn:"Caterpillar's dealer in the Kingdom since 1979. Earthmoving and lifting fleet with in-house maintenance and certified operators.",
+   dAr:"وكيل كاتربيلر في المملكة منذ ١٩٧٩. أسطول حفر ورفع مع صيانة داخلية ومشغّلين معتمدين.",
+   cats:{excavators:{n:48,p:8400},"wheel-loaders":{n:31,p:6900},bulldozers:{n:18,p:12400},telehandlers:{n:22,p:5600},generators:{n:26,p:3900},tippers:{n:35,p:4200}}},
+
+  {n:"Al-Rajhi Equipment Rental", nAr:"الراجحي لتأجير المعدات", city:"Riyadh", cityAr:"الرياض", ver:true, eq:128, views:6110, since:1994,
+   dEn:"Access and lifting specialist covering Riyadh and Qassim. Every platform carries a third-party inspection certificate.",
+   dAr:"متخصّص في معدات الوصول والرفع يغطي الرياض والقصيم. كل منصّة تحمل شهادة فحص طرف ثالث.",
+   cats:{"boom-lifts":{n:34,p:3400},"scissor-lifts":{n:29,p:2600},telehandlers:{n:19,p:5900},forklifts:{n:24,p:2900},generators:{n:22,p:4100}}},
+
+  {n:"United Rentals KSA", nAr:"يونايتد رنتلز السعودية", city:"Dammam", cityAr:"الدمام", ver:true, eq:96, views:4980, since:2008,
+   dEn:"Eastern Province fleet built for plant shutdowns — Aramco-approved crews and 24-hour breakdown response.",
+   dAr:"أسطول المنطقة الشرقية مُعدّ لأعمال الإيقاف — طواقم معتمدة من أرامكو واستجابة أعطال خلال ٢٤ ساعة.",
+   cats:{generators:{n:31,p:3600},compressors:{n:24,p:2200},"light-towers":{n:18,p:900},"boom-lifts":{n:23,p:3800}}},
+
+  {n:"Bin Quraya", nAr:"بن قريّة", city:"Dhahran", cityAr:"الظهران", ver:true, eq:143, views:7240, since:1985,
+   dEn:"Heavy lifting and power across the Eastern Province. Mobile cranes to 200 ton with lift-plan engineering included.",
+   dAr:"رفع ثقيل وطاقة في المنطقة الشرقية. رافعات متحركة حتى ٢٠٠ طن مع هندسة خطة الرفع.",
+   cats:{"mobile-cranes":{n:26,p:38000},generators:{n:44,p:3400},"water-trucks":{n:21,p:5200},tippers:{n:29,p:4400},trailers:{n:23,p:3100}}},
+
+  {n:"Almajdouie Equipment", nAr:"المجدوعي للمعدات", city:"Jeddah", cityAr:"جدة", ver:true, eq:87, views:5320, since:1965,
+   dEn:"Crane and transport house on the western coast. Project cargo, plant relocation and long-term crane hire.",
+   dAr:"بيت رافعات ونقل على الساحل الغربي. شحن المشاريع ونقل المصانع وتأجير الرافعات طويل الأمد.",
+   cats:{"mobile-cranes":{n:22,p:41000},trailers:{n:26,p:3400},tippers:{n:19,p:4600},telehandlers:{n:14,p:6200}}},
+
+  {n:"Saudi Diesel Equipment", nAr:"الديزل السعودية للمعدات", city:"Dammam", cityAr:"الدمام", ver:true, eq:174, views:9010, since:1976,
+   dEn:"Power and compressed air at scale — synchronised generator sets, load banks and site distribution.",
+   dAr:"طاقة وهواء مضغوط بحجم كبير — مولّدات متزامنة وبنوك أحمال وتوزيع للموقع.",
+   cats:{generators:{n:68,p:3200},compressors:{n:41,p:2100},"light-towers":{n:33,p:850},"water-trucks":{n:16,p:5750}}},
+
+  {n:"Nesma Rental", nAr:"نسما للتأجير", city:"Jeddah", cityAr:"جدة", ver:true, eq:118, views:4410, since:1979,
+   dEn:"Earthmoving fleet for infrastructure packages, with operators on the payroll rather than subcontracted.",
+   dAr:"أسطول حفر لأعمال البنية التحتية، بمشغّلين على كشوف الرواتب لا من الباطن.",
+   cats:{excavators:{n:39,p:8900},"wheel-loaders":{n:24,p:7200},bulldozers:{n:16,p:13100},tippers:{n:22,p:4300}}},
+
+  {n:"Arabian Machinery", nAr:"الآلات العربية", city:"Riyadh", cityAr:"الرياض", ver:true, eq:73, views:3120, since:2011,
+   dEn:"Compact plant for city sites — small excavators, mixers and pumps that fit a tight footprint.",
+   dAr:"معدات صغيرة لمواقع المدن — حفّارات صغيرة وخلّاطات ومضخات تناسب المساحات الضيّقة.",
+   cats:{excavators:{n:21,p:4200},"concrete-mixers":{n:18,p:5400},"concrete-pumps":{n:12,p:14800},generators:{n:14,p:3800}}},
+
+  {n:"Tawazun Heavy Equipment", nAr:"توازن للمعدات الثقيلة", city:"Riyadh", cityAr:"الرياض", ver:true, eq:88, views:2870, since:2016,
+   dEn:"Access and material handling for fit-out and maintenance contractors. Short-hire friendly.",
+   dAr:"معدات وصول ومناولة لمقاولي التشطيب والصيانة. مناسبة للإيجار القصير.",
+   cats:{"scissor-lifts":{n:26,p:2400},"boom-lifts":{n:19,p:3600},forklifts:{n:28,p:2700},telehandlers:{n:15,p:5800}}},
+
+  {n:"Rawabi Rentals", nAr:"روابي للتأجير", city:"Riyadh", cityAr:"الرياض", ver:false, eq:52, views:1240, since:2023,
+   dEn:"New on the platform. Access platforms and light power for interior contractors in Riyadh.",
+   dAr:"جديد على المنصّة. منصّات وصول وطاقة خفيفة لمقاولي التشطيبات الداخلية في الرياض.",
+   cats:{"scissor-lifts":{n:18,p:2300},"boom-lifts":{n:14,p:3300},"light-towers":{n:12,p:800},generators:{n:8,p:4300}}},
+
+  {n:"Gulf Lifting Co.", nAr:"الخليج للرفع", city:"Dammam", cityAr:"الدمام", ver:false, eq:41, views:980, since:2022,
+   dEn:"Lifting only — mobile cranes and telehandlers with certified riggers on call.",
+   dAr:"رفع فقط — رافعات متحركة ومناولات تلسكوبية مع رافعين معتمدين تحت الطلب.",
+   cats:{"mobile-cranes":{n:14,p:36500},telehandlers:{n:16,p:5400},forklifts:{n:11,p:3100}}},
+
+  {n:"Al Sulaiman Equipment", nAr:"السليمان للمعدات", city:"Riyadh", cityAr:"الرياض", ver:false, eq:64, views:1460, since:2021,
+   dEn:"Haulage and water supply for earthworks packages across the central region.",
+   dAr:"نقل وإمداد مياه لأعمال الحفر في المنطقة الوسطى.",
+   cats:{"water-trucks":{n:22,p:5100},tippers:{n:26,p:4100},trailers:{n:16,p:3000}}},
+
+  {n:"Riyadh Plant Services", nAr:"خدمات معدات الرياض", city:"Riyadh", cityAr:"الرياض", ver:true, eq:69, views:2210, since:2014,
+   dEn:"Concrete package specialist — line pumps, boom pumps and transit mixers with pour-day support.",
+   dAr:"متخصّص في أعمال الخرسانة — مضخات خطية وذراعية وخلّاطات نقل مع دعم يوم الصبّ.",
+   cats:{"concrete-pumps":{n:19,p:15600},"concrete-mixers":{n:27,p:5200},generators:{n:12,p:4000}}},
+
+  {n:"Hejaz Earthmovers", nAr:"معدات الحجاز", city:"Jeddah", cityAr:"جدة", ver:true, eq:102, views:3340, since:2003,
+   dEn:"Bulk earthworks fleet on the west coast — dozers, loaders and 30-ton tippers by the month.",
+   dAr:"أسطول حفريات ضخمة على الساحل الغربي — بلدوزرات ولوادر وقلّابات ٣٠ طناً شهرياً.",
+   cats:{bulldozers:{n:21,p:12800},"wheel-loaders":{n:28,p:7100},excavators:{n:33,p:8700},tippers:{n:20,p:4500}}},
+
+  {n:"Qassim Equipment House", nAr:"بيت معدات القصيم", city:"Buraydah", cityAr:"بريدة", ver:false, eq:47, views:760, since:2020,
+   dEn:"Regional fleet serving Qassim's agricultural and industrial projects.",
+   dAr:"أسطول إقليمي يخدم مشاريع القصيم الزراعية والصناعية.",
+   cats:{excavators:{n:14,p:7800},"wheel-loaders":{n:12,p:6400},generators:{n:11,p:3700},"water-trucks":{n:10,p:4900}}},
+
+  {n:"Yanbu Industrial Rentals", nAr:"ينبع الصناعية للتأجير", city:"Yanbu", cityAr:"ينبع", ver:true, eq:81, views:1890, since:2012,
+   dEn:"Refinery-grade plant on the Red Sea — hot-work compliant compressors, gensets and access.",
+   dAr:"معدات بمواصفات المصافي على البحر الأحمر — ضواغط ومولّدات ومعدات وصول مطابقة لأعمال الحرارة.",
+   cats:{compressors:{n:26,p:2300},generators:{n:29,p:3500},"boom-lifts":{n:15,p:3900},"light-towers":{n:11,p:880}}}
+];
+
+/* one plausible fleet row per (store, category) — mirrors EquipmentCard */
+var MAKES = {
+  excavators:[["Caterpillar","320D","20 ton"],["Komatsu","PC210","20 ton"],["Hitachi","ZX350","30 ton"],["Volvo","EC300","30 ton"],["Caterpillar","308","8 ton"],["JCB","JS205","20 ton"]],
+  "mobile-cranes":[["Liebherr","LTM 1100","100 ton"],["Grove","GMK4100","100 ton"],["Tadano","GT-550","50 ton"],["XCMG","QY25K","25 ton"],["Liebherr","LTM 1200","200 ton"]],
+  telehandlers:[["JCB","540-170","17 m"],["Manitou","MT 1440","14 m"],["Genie","GTH-1256","17 m"],["JLG","4017RS","17 m"]],
+  forklifts:[["Toyota","8FD30","3 ton"],["Hyster","H5.0FT","5 ton"],["Komatsu","FD100","10 ton"],["Linde","H35D","3 ton"]],
+  "wheel-loaders":[["Caterpillar","950 GC","3 m³"],["Volvo","L120H","3 m³"],["Komatsu","WA470","5 m³"],["SDLG","L956F","3 m³"]],
+  bulldozers:[["Caterpillar","D6","D6 class"],["Komatsu","D85","D8 class"],["Caterpillar","D8T","D8 class"]],
+  generators:[["Caterpillar","C15","500 kVA"],["FG Wilson","P250","250 kVA"],["Perkins","2506","500 kVA"],["Cummins","C1000","1000 kVA"],["FG Wilson","P110","100 kVA"]],
+  compressors:[["Atlas Copco","XAS 186","185 cfm"],["Ingersoll Rand","P375","375 cfm"],["Atlas Copco","XATS 750","750 cfm"]],
+  "light-towers":[["Generac","V20","4×1000W"],["Atlas Copco","HiLight V5","4×1000W"],["Wacker Neuson","LTV6","4×1000W"]],
+  "boom-lifts":[["Genie","Z-45","16 m"],["JLG","800AJ","28 m"],["Haulotte","HA16","16 m"],["Genie","S-85","28 m"]],
+  "scissor-lifts":[["Genie","GS-2632","8 m"],["JLG","4045R","12 m"],["Skyjack","SJ3219","8 m"]],
+  tippers:[["Mercedes-Benz","Actros 3341","30 ton"],["MAN","TGS 33.400","30 ton"],["Isuzu","FVZ","20 ton"]],
+  "water-trucks":[["Mercedes-Benz","Actros 2640","20,000 L"],["Isuzu","FVM","10,000 L"],["HOWO","ZZ1257","20,000 L"]],
+  trailers:[["Faymonville","Low-bed","Low-bed"],["Goldhofer","STZ-L","Low-bed"],["Local build","Flatbed","12 m flatbed"]],
+  "concrete-pumps":[["Putzmeister","M36-4","36 m boom"],["Schwing","S 36 X","36 m boom"],["Sany","SYG5230","Truck-mounted"]],
+  "concrete-mixers":[["Mercedes-Benz","Arocs 3336","6 m³"],["MAN","TGS 41.400","10 m³"],["HOWO","ZZ5257","6 m³"]]
+};
+var UNIT = { day:{en:"/ day", ar:"/ يوم"}, month:{en:"/ month", ar:"/ شهر"} };
+
+var lang = "en", cat = "top", limit = 12, openStore = null, sheetCat = null, saved = {};
+function L(en, ar){ return lang === "ar" ? ar : en; }
+function money(n){ return n.toLocaleString("en-US"); }
+
+/* ═══ category strip ══════════════════════════════════════════════════════ */
+function renderCats(){
+  document.getElementById("cats").innerHTML = CATS.map(function(c){
+    return '<button class="cat' + (cat === c.k ? " on" : "") + '" onclick="pickCat(\'' + c.k + '\')">'
+      + '<span class="icon">' + c.ic + '</span><span>' + L(c.en, c.ar) + '</span></button>';
+  }).join("");
+}
+
+function pickCat(k){
+  cat = k; limit = 12;
+  renderCats(); renderGrid();
+  var strip = document.querySelector(".strip");
+  var y = strip.getBoundingClientRect().top + window.scrollY - 74;
+  if (window.scrollY > y) window.scrollTo({ top: y, behavior: "smooth" });
+}
+
+/* ═══ store grid ══════════════════════════════════════════════════════════ */
+function storesFor(k){
+  if (k === "top") return STORES.slice();
+  return STORES.filter(function(s){ return s.cats[k]; })
+               .sort(function(a, b){ return b.cats[k].n - a.cats[k].n; });
+}
+
+function storeCard(s, i){
+  var k = cat === "top" ? null : cat;
+  var wash = WASH[k || "top"];
+  var ic = icOf(k || Object.keys(s.cats)[0]);
+  var line, price;
+
+  if (k){
+    line = s.cats[k].n + " " + catName(k).toLowerCase() + " · " + L(s.city, s.cityAr);
+    price = '<span class="from">' + L("from", "من") + '</span> <b>SAR ' + money(s.cats[k].p) + '</b> '
+          + '<span class="from">' + L(UNIT.month.en, UNIT.month.ar) + '</span>';
+  } else {
+    var keys = Object.keys(s.cats);
+    var cheapest = keys.reduce(function(m, x){ return s.cats[x].p < s.cats[m].p ? x : m; }, keys[0]);
+    line = s.eq + " " + L("machines", "معدّة") + " · " + L(s.city, s.cityAr);
+    price = '<span class="from">' + L("from", "من") + '</span> <b>SAR ' + money(s.cats[cheapest].p) + '</b> '
+          + '<span class="from">' + L(UNIT.month.en, UNIT.month.ar) + '</span>';
+  }
+
+  var badge = s.ver
+    ? '<span class="tagpill"><span class="icon">verified</span>' + L("Verified supplier", "مؤجّر موثّق") + '</span>'
+    : '<span class="tagpill" style="color:var(--info)"><span class="icon" style="color:var(--info)">fiber_new</span>' + L("New on Moedatech", "جديد على معداتك") + '</span>';
+
+  return '<div class="scard" onclick="showStore(' + i + ')">'
+    + '<div class="shot">'
+    +   '<div class="bg" style="background:' + wash + '"><span class="icon">' + ic + '</span></div>'
+    +   '<div class="grain"></div><div class="fade"></div>'
+    +   badge
+    +   '<button class="heart' + (saved[s.n] ? " on" : "") + '" onclick="event.stopPropagation();like(this,\'' + s.n.replace(/'/g, "\\'") + '\')" aria-label="save">'
+    +     '<span class="icon">favorite</span></button>'
+    +   '<div class="shotfoot"><span class="icon">visibility</span><span class="cnt">' + money(s.views) + '</span></div>'
+    + '</div>'
+    + '<div class="sinfo">'
+    +   '<div class="n">' + L(s.n, s.nAr) + '</div>'
+    +   '<div class="m">' + line + '</div>'
+    +   '<div class="p">' + price + '</div>'
+    + '</div></div>';
+}
+
+function renderGrid(){
+  var list = storesFor(cat);
+  var shown = list.slice(0, limit);
+  document.getElementById("grid").innerHTML = shown.map(function(s){
+    return storeCard(s, STORES.indexOf(s));
+  }).join("");
+
+  var title = cat === "top"
+    ? L("Top stores", "الأبرز")
+    : L(catName(cat) + " suppliers", "مؤجّرو " + catName(cat));
+  document.getElementById("gridtitle").innerHTML = title
+    + '<span class="arrow"><span class="icon">arrow_forward</span></span>';
+  document.getElementById("gridsub").textContent = cat === "top"
+    ? L(list.length + " verified and new suppliers across the Kingdom", list.length + " مؤجّراً موثّقاً وجديداً في المملكة")
+    : L(list.length + " suppliers carry this equipment", list.length + " مؤجّراً يوفّرون هذه المعدّة");
+  document.querySelector(".more").style.display = list.length > limit ? "flex" : "none";
+}
+
+function showAll(){ limit = 60; renderGrid(); }
+function like(el, name){ saved[name] = !saved[name]; el.classList.toggle("on", !!saved[name]); if (saved[name]) gate("save"); }
+
+/* ═══ store detail ════════════════════════════════════════════════════════ */
+function fleet(s, k, n){
+  var pool = MAKES[k] || [["Generic", "Unit", "Standard"]];
+  var rows = [];
+  var count = Math.min(n, 6);
+  for (var i = 0; i < count; i++){
+    var m = pool[i % pool.length];
+    var price = Math.round(s.cats[k].p * (1 + (i % 4) * 0.11));
+    rows.push({ make:m[0], model:m[1], spec:m[2], year:2019 + (i % 6), price:price, ver:s.ver && i % 5 !== 3 });
+  }
+  return rows;
+}
+
+function showStore(i){
+  openStore = i;
+  var s = STORES[i];
+  sheetCat = (cat !== "top" && s.cats[cat]) ? cat : Object.keys(s.cats)[0];
+  renderSheet();
+  document.getElementById("veil").classList.add("on");
+  document.getElementById("sheet").classList.add("on");
+  document.body.classList.add("locked");
+}
+
+function closeStore(){
+  openStore = null;
+  document.getElementById("veil").classList.remove("on");
+  document.getElementById("sheet").classList.remove("on");
+  document.body.classList.remove("locked");
+}
+
+function pickSheetCat(k){ sheetCat = k; renderSheet(); document.getElementById("sheet").scrollTo({ top: 320, behavior:"smooth" }); }
+
+function renderSheet(){
+  if (openStore === null) return;
+  var s = STORES[openStore], k = sheetCat;
+  var keys = Object.keys(s.cats);
+
+  var chips = keys.map(function(x){
+    return '<button class="catchip' + (x === k ? " on" : "") + '" onclick="pickSheetCat(\'' + x + '\')">'
+      + '<span class="icon">' + icOf(x) + '</span>' + catName(x)
+      + '<span class="c">' + s.cats[x].n + '</span></button>';
+  }).join("");
+
+  var rows = fleet(s, k, s.cats[k].n).map(function(m){
+    return '<article class="eq">'
+      + '<div class="eqshot" style="background:' + WASH[k] + '">'
+      +   '<span class="icon">' + icOf(k) + '</span><div class="fade"></div>'
+      +   (m.ver ? '<span class="ver"><span class="icon">verified</span>' + L("Verified", "موثّقة") + '</span>' : '')
+      + '</div>'
+      + '<div class="eqbody">'
+      +   '<div class="n">' + m.make + ' ' + m.model + '</div>'
+      +   '<div class="sp"><span><span class="icon">straighten</span>' + m.spec + '</span>'
+      +     '<span><span class="icon">calendar_today</span>' + m.year + '</span></div>'
+      +   '<div class="eqprice"><span class="v mono">' + money(m.price) + '</span>'
+      +     '<span class="u">SAR ' + L(UNIT.month.en, UNIT.month.ar) + '</span>'
+      +     '<span class="spacer"></span>'
+      +     '<button class="reqbtn" onclick="event.stopPropagation();gate(\'request\')">' + L("Request", "اطلبها") + '</button></div>'
+      + '</div></article>';
+  }).join("");
+
+  document.getElementById("sheet").innerHTML =
+      '<div class="sheettop">'
+    +   '<button class="roundbtn back" onclick="closeStore()" aria-label="back"><span class="icon">arrow_back</span></button>'
+    +   '<span class="ttl">' + L(s.n, s.nAr) + '</span><span class="spacer"></span>'
+    +   '<button class="roundbtn" onclick="gate(\'save\')" aria-label="save"><span class="icon">favorite</span></button>'
+    +   '<button class="roundbtn" onclick="closeStore()" aria-label="close"><span class="icon">close</span></button>'
+    + '</div>'
+
+    + '<div class="banner"><div class="bg"></div><div class="grain"></div><div class="who">'
+    +   '<span class="lg">' + L(s.n, s.nAr).trim().charAt(0) + '</span>'
+    +   '<div style="flex:1;min-width:0">'
+    +     (s.ver ? '<span class="vpill"><span class="icon">verified</span>' + L("Verified supplier", "مؤجّر موثّق") + '</span>' : '')
+    +     '<h2>' + L(s.n, s.nAr) + '</h2>'
+    +     '<div class="meta">'
+    +       '<span><span class="icon">location_on</span>' + L(s.city, s.cityAr) + '</span>'
+    +       '<span><span class="icon">business_center</span>' + s.eq + ' ' + L("machines listed", "معدّة معروضة") + '</span>'
+    +       '<span><span class="icon">visibility</span>' + money(s.views) + ' ' + L("views", "مشاهدة") + '</span>'
+    +       '<span><span class="icon">history</span>' + L("since", "منذ") + ' ' + s.since + '</span>'
+    +     '</div>'
+    +   '</div>'
+    + '</div></div>'
+
+    + '<div class="sheetbody">'
+    +   '<div>'
+    +     '<p class="about">' + L(s.dEn, s.dAr) + '</p>'
+    +     '<div class="catbar">' + chips + '</div>'
+    +     '<div class="eqhead"><h3>' + catName(k) + '</h3>'
+    +       '<span class="sub">' + L(s.cats[k].n + " listed · showing the first " + Math.min(s.cats[k].n, 6),
+                                     s.cats[k].n + " معروضة · تُعرض أول " + Math.min(s.cats[k].n, 6)) + '</span></div>'
+    +     '<div class="eqgrid">' + rows + '</div>'
+    +   '</div>'
+
+    +   '<aside class="quote">'
+    +     '<div class="h">' + L("Ask this supplier to price your job", "اطلب من هذا المؤجّر تسعير عملك") + '</div>'
+    +     '<div class="s">' + L("Your request also goes to every other verified supplier who carries it — so you get a market, not one quote.",
+                                "يذهب طلبك أيضاً لكل مؤجّر موثّق آخر يوفّرها — فتحصل على سوق لا على عرض واحد.") + '</div>'
+    +     '<div class="qfield"><div class="k">' + L("Equipment", "المعدّة") + '</div><div class="v">' + catName(k) + '</div></div>'
+    +     '<div class="qrow">'
+    +       '<div class="qfield"><div class="k">' + L("Units", "الوحدات") + '</div><div class="v">1</div></div>'
+    +       '<div class="qfield"><div class="k">' + L("Duration", "المدة") + '</div><div class="v">' + L("3 months", "٣ أشهر") + '</div></div>'
+    +     '</div>'
+    +     '<div class="qfield"><div class="k">' + L("Site", "الموقع") + '</div><div class="v">' + L(s.city, s.cityAr) + '</div></div>'
+    +     '<button class="btn btn-primary cta" onclick="gate(\'request\')">' + L("Request a quote", "اطلب عرض سعر") + '</button>'
+    +     '<div class="fine">' + L("Free. No card. You see the offers before anyone sees your name.",
+                                   "مجاناً. بدون بطاقة. ترى العروض قبل أن يرى أحد اسمك.") + '</div>'
+    +     '<div class="qsplit">'
+    +       '<div><span class="icon">verified_user</span>' + L("Papers checked before the machine ships", "الأوراق تُفحص قبل شحن المعدّة") + '</div>'
+    +       '<div><span class="icon">forum</span>' + L("Terms settled in writing, in the deal room", "الشروط تُحسم كتابةً في غرفة الصفقة") + '</div>'
+    +       '<div><span class="icon">payments</span>' + L("One rate card — mobilisation and fuel included", "بطاقة سعر واحدة — تشمل النقل والوقود") + '</div>'
+    +     '</div>'
+    +   '</aside>'
+    + '</div>';
+}
+
+/* ═══ account gate ════════════════════════════════════════════════════════ */
+var GATES = {
+  request:{ic:"send", tEn:"Create an account to send this request", tAr:"أنشئ حساباً لإرسال هذا الطلب",
+           bEn:"Suppliers price a named site, not an anonymous one. It takes a phone number and a minute — your draft is waiting on the other side.",
+           bAr:"المؤجّرون يسعّرون موقعاً معروفاً لا مجهولاً. يستغرق الأمر رقم جوال ودقيقة — ومسوّدتك بانتظارك بعدها."},
+  save:{ic:"favorite", tEn:"Save suppliers to your shortlist", tAr:"احفظ المؤجّرين في قائمتك",
+        bEn:"A free account keeps your shortlist, your requests and every offer you receive in one place.",
+        bAr:"الحساب المجاني يحفظ قائمتك وطلباتك وكل عرض يصلك في مكان واحد."},
+  search:{ic:"search", tEn:"Search the whole market", tAr:"ابحث في السوق كاملاً",
+          bEn:"Browsing is open to everyone. To search by dates and get real prices back, you need an account.",
+          bAr:"التصفّح متاح للجميع. للبحث بالتواريخ والحصول على أسعار حقيقية تحتاج حساباً."},
+  filters:{ic:"tune", tEn:"Filter by certificate, city and capacity", tAr:"صفِّ حسب الشهادة والمدينة والسعة",
+           bEn:"Aramco pass, third-party inspection, operator supply, capacity range — the filters that matter open with an account.",
+           bAr:"تصريح أرامكو، فحص طرف ثالث، توفير مشغّل، مدى السعة — التصفية المهمّة تُفتح بالحساب."},
+  signin:{ic:"login", tEn:"Welcome back", tAr:"أهلاً بعودتك",
+          bEn:"Sign in with your phone number. No password to remember.",
+          bAr:"سجّل الدخول برقم جوالك. لا كلمة مرور تتذكّرها."}
+};
+
+function gate(kind){
+  var g = GATES[kind] || GATES.request;
+  document.getElementById("gateicon").textContent = g.ic;
+  document.getElementById("gatetitle").textContent = L(g.tEn, g.tAr);
+  document.getElementById("gatebody").textContent = L(g.bEn, g.bAr);
+  document.getElementById("gatekept").textContent = L("Nothing you have opened is lost — you come back to this page.",
+                                                      "لا يضيع شيء ممّا فتحته — تعود إلى هذه الصفحة.");
+  document.getElementById("gate").classList.add("on");
+  document.body.classList.add("locked");
+}
+
+function closeGate(){
+  document.getElementById("gate").classList.remove("on");
+  if (openStore === null) document.body.classList.remove("locked");
+}
+
+document.addEventListener("keydown", function(e){
+  if (e.key !== "Escape") return;
+  if (document.getElementById("gate").classList.contains("on")) closeGate();
+  else if (openStore !== null) closeStore();
+});
+
+/* compact search appears once the hero rail scrolls out of view */
+window.addEventListener("scroll", function(){
+  document.getElementById("barsearch").classList.toggle("show", window.scrollY > 380);
+});
+
+/* ═══ language ════════════════════════════════════════════════════════════ */
+function setLang(l){
+  lang = l;
+  var root = document.documentElement;
+  root.setAttribute("lang", l);
+  root.setAttribute("dir", l === "ar" ? "rtl" : "ltr");
+  var nodes = document.querySelectorAll("[data-en]");
+  for (var i = 0; i < nodes.length; i++){
+    var v = nodes[i].getAttribute(l === "ar" ? "data-ar" : "data-en");
+    if (v != null) nodes[i].innerHTML = v;
+  }
+  var btns = document.querySelectorAll(".langtog button");
+  btns[0].classList.toggle("on", l === "en");
+  btns[1].classList.toggle("on", l === "ar");
+  renderCats(); renderGrid(); if (openStore !== null) renderSheet();
+}
+
+renderCats();
+renderGrid();
+</script>
+</body>
+</html>

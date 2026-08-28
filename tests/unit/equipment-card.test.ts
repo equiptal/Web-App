@@ -196,10 +196,16 @@ describe("the card's chip and the machine's marker are one derivation (RM3-AC-19
     expect(palette.filter((v) => v.toUpperCase() === IN_OFFER_BADGE_COLOUR.toUpperCase())).toHaveLength(0);
   });
 
-  it("says membership as a flag, not as a colour", () => {
-    // The badge is a boolean on the model. If it ever arrives carrying a hex, the split has collapsed.
-    expect(equipmentCardModel(trap).inOffer).toBe(true);
-    expect(equipmentCardModel({ ...trap, inBid: false }).inOffer).toBe(false);
+  /* ~~"says membership as a flag, not as a colour"~~ — withdrawn with the «in this offer» badge
+     itself (owner, 2026-08-28: *"remove this in this offer badge as renter doesnt care if a unit is
+     in the offer but not avaialbe so he cares only if available or not"*). The card carries no
+     membership field at all now, so there is no flag to keep off the palette.
+
+     The half of the rule that still bites is the one below and above: whatever the card carries, it
+     carries exactly ONE availability colour. Membership survives where it is still drawn — the map
+     pin's tag and the list's own "beyond this offer" divider, both off `isInOffer(machine)`. */
+  it("carries no membership field for a colour to leak into", () => {
+    expect(keysDeep(equipmentCardModel(trap)).filter((k) => /inOffer|inBid|member/i.test(k))).toEqual([]);
   });
 });
 
@@ -281,7 +287,7 @@ describe("the card states neither the serial number nor the load capacity (RM3-A
     // And the model really is populated, so the sweeps below are over something.
     expect(card.title.en).toContain("Caterpillar 320D");
     expect(card.certs.length).toBeGreaterThan(0);
-    expect(card.photo).not.toBeNull();
+    expect(card.readiness.total).toBeGreaterThan(0);
   });
 
   it("exposes no key that is or carries a serial or a capacity", () => {
@@ -377,8 +383,32 @@ describe("availability and commitment are ONE chip value (RM3-AC-32)", () => {
     expect(colours).toHaveLength(1);
   });
 
-  it("exposes no readiness band, no percent and no second commitment field", () => {
-    expect(keysDeep(card).filter((k) => /band|readiness|percent|score|commit|yardConfirmed|status/i.test(k))).toEqual([]);
+  /* ~~"exposes no readiness band, no percent and no score" (RM3-AC-29)~~ — withdrawn by the owner,
+     2026-08-28, with the chip it was protecting. The rule was written when the card carried an
+     availability chip: a band beside it made the renter reconcile two summaries of one machine before
+     reading either. The redesigned card has ONE state — the distance, painted with the availability
+     it is only as good as — and the papers are a different question, asked of the FILE rather than of
+     the supplier. The dots answer it in the corner the file icon opens.
+
+     What survives is the separation the old rule was really defending, and it is now the assertion:
+     the readiness band may not be an availability value, and it may not carry an availability colour. */
+  it("keeps the readiness band apart from the availability it sits beside", () => {
+    expect(["green", "yellow", "red"]).toContain(card.readiness.band);
+    // Not an availability word — the sweep above already counts those, and this must not add one.
+    expect(["confirmed", "unconfirmed", "absent"]).not.toContain(card.readiness.band as string);
+    // Not an availability colour either: `readiness` carries a band name, never a hex or a token.
+    expect(Object.keys(card.readiness).sort()).toEqual(["band", "done", "total"]);
+  });
+
+  it("scores the papers with the app's own fraction, ownership included (fleet rows)", () => {
+    // `total = 2 + certs` — photos, the ownership paper, and one per REQUESTED certificate. The
+    // fixture asks for two, so four; the app's map panel reads exactly this (`bid_map.dart:470-473`).
+    expect(card.readiness.total).toBe(2 + card.certs.length);
+    expect(card.readiness.done).toBeLessThanOrEqual(card.readiness.total);
+  });
+
+  it("exposes no second COMMITMENT field, which is the half of AC-32 that stands", () => {
+    expect(keysDeep(card).filter((k) => /commit|yardConfirmed|status/i.test(k))).toEqual([]);
   });
 
   it("has the chip it says it has — exactly two keys, and both are the chip's own", () => {
@@ -424,106 +454,40 @@ describe("row 4 lists the certificates the REQUEST asked for, held or not", () =
   });
 });
 
-/* ═════ the title's ✓ is the MACHINE's verification, not a proxy for it (owner, 2026-08-11) ═════
-   *"For equipment verification ticked make sure it is read the equipment status is it verified really
-   or not."*
+/* ═════ the platform's ✓ has left the card (owner, 2026-08-28) ═════════════════════════════════
+   ~~"The title's ✓ is the MACHINE's verification, not a proxy for it" (owner, 2026-08-11).~~ The RULE
+   is untouched and still lives in `equipment-verification.ts`, with its own tests; what is withdrawn
+   is the mark's place on this card, along with the photo, the availability chip, the «in this offer»
+   badge and the certificate line, in the redesign that made the distance the card's whole subject.
 
-   The defect: the mark was rendered on `certs.length > 0`. `certs` is one entry per certificate the
-   REQUEST named — held or not — so the condition was a fact about the request, identical for every
-   card in the list. A request that asked for a TÜV put the platform's trust mark on every machine in
-   the supplier's fleet, admin-REJECTED ones included; a request that asked for none left the mark off
-   machines the platform genuinely had verified. On staging (2026-08-11) 455 of the 1104 listings this
-   map is eligible to plot are not VERIFIED, so the wrong green was the common case, not the edge.
+   The defect the old block guarded is worth keeping on the record, because any surface that draws
+   this mark again can reach it the same way: the tick used to be rendered on `certs.length > 0`, and
+   `certs` is one entry per certificate the REQUEST named — held or not — so the condition was a fact
+   about the request, identical for every card in the list. A request naming a TÜV put the platform's
+   trust mark on every machine in the supplier's fleet, admin-REJECTED ones included; a request naming
+   none left it off machines the platform genuinely had verified. On staging (2026-08-11) 455 of the
+   1104 listings this map plots are not VERIFIED, so the wrong green was the common case.
 
-   Every test below is written so that the OLD rule fails it: each fixture's certificate list and each
-   fixture's verification state are set INDEPENDENTLY, and the two disagree. A card whose tick still
-   came from `certs` would go red here rather than pass on a fixture where the two happen to line up. */
+   The one assertion kept from that block is the one that is not about the card: the WIRE still has to
+   carry the status, because the moment any surface draws the mark again a dropped key would turn it
+   off everywhere with every other test still green. */
 
-describe("the verified mark reads `verificationStatus`, never the certificate line", () => {
-  it("has fixtures where the two really do disagree — the positive control", () => {
-    // Without this, "verified is false" below could be true because the card has no certs at all,
-    // and the test would prove nothing about which of the two it read.
-    const unverifiedButAsked = one({ id: "a", docs: ["tuv"], verificationStatus: "UNVERIFIED" }, ["tuv"]);
-    const verifiedButUnasked = one({ id: "b", docs: ["tuv"], verificationStatus: "VERIFIED" }, []);
-    expect(unverifiedButAsked.certs.length).toBeGreaterThan(0);
-    expect(verifiedButUnasked.certs).toEqual([]);
-  });
-
-  it("does NOT tick an UNVERIFIED machine, however many certificates the request named", () => {
-    // The exact shape of the bug: a full certificate line and no verification.
-    expect(one({ id: "a", docs: ["tuv"], verificationStatus: "UNVERIFIED" }, ["tuv", "spsp"]).verified).toBe(false);
-  });
-
-  it("DOES tick a VERIFIED machine on a request that named no certificate at all", () => {
-    // The other half, and the half a renter loses silently: the platform checked this machine's
-    // papers and the card said nothing, because the request happened to ask for nothing.
-    expect(one({ id: "b", docs: [], verificationStatus: "VERIFIED" }, []).verified).toBe(true);
-  });
-
-  it("ticks VERIFIED and nothing else — ACCEPTED is a shopfront stage, not a verdict on the papers", () => {
-    // `equipment-where.ts` folds VERIFIED ∪ ACCEPTED into `ACCEPTED_STATUSES`, but that fold answers
-    // "may renters see this listing"; borrowing it would put the trust mark on 271 of staging's
-    // map-eligible machines that nobody verified.
-    expect(verifiedOf("VERIFIED")).toBe(true);
-    for (const status of ["ACCEPTED", "PENDING_REVIEW", "UNVERIFIED", "REJECTED"]) {
-      expect(verifiedOf(status), status).toBe(false);
-    }
-  });
-
-  it("treats an absent status as NOT verified — an unknown draws no tick, never an assumed one", () => {
-    // Older projections and previews carry no status. "We don't know" and "we checked and it failed"
-    // render the same way, which is the only safe direction for a trust mark.
-    expect(verifiedOf(undefined)).toBe(false);
-    // …and it is not case-forgiving either: the parser passes the wire value through verbatim, so a
-    // lowercase spelling is an unrecognised state, not a quiet synonym.
-    expect(verifiedOf("verified")).toBe(false);
-  });
-
-  function verifiedOf(status?: string) {
-    return one({ id: "eq", docs: ["tuv"], verificationStatus: status }, ["tuv"]).verified;
-  }
-
-  it("varies machine by machine across one list — it is not a property of the request", () => {
-    // The mutation this catches and the per-machine assertions above do not: any rule derived from
-    // the REQUEST gives every card in a list the same answer. This list is read against ONE request
-    // and must still come back mixed.
-    const cards = fleet([
-      { id: "a", docs: ["tuv"], verificationStatus: "VERIFIED" },
-      { id: "b", docs: ["tuv"], verificationStatus: "UNVERIFIED" },
-      { id: "c", docs: ["tuv"], verificationStatus: "ACCEPTED" },
-      { id: "d", docs: ["tuv"], verificationStatus: "VERIFIED" },
-    ]).map((m) => equipmentCardModel(m, asking(["tuv"])));
-
-    expect(cards.map((c) => c.verified)).toEqual([true, false, false, true]);
-    // …and every one of them carries the SAME certificate line, so the old rule would have said
-    // `true` four times over.
-    expect(new Set(cards.map((c) => c.certs.length))).toEqual(new Set([1]));
-  });
-
-  it("survives the wire: `mapFleet` carries the status through, camel or snake", () => {
-    // The model can only be right if the parser hands it the field. `mapOfferedUnit` is where a
-    // dropped key would silently turn the whole map's ticks off with every unit test still green.
+describe("the wire carries `verificationStatus`, whatever draws it", () => {
+  it("survives `mapFleet`, camel or snake", () => {
     const [camel, snake] = mapFleet([
       { equipmentId: "a", inBid: true, verificationStatus: "VERIFIED", photoKeys: [], documentKeys: [] },
       { equipmentId: "b", inBid: true, verification_status: "VERIFIED", photoKeys: [], documentKeys: [] },
     ]);
     expect(camel.verificationStatus).toBe("VERIFIED");
     expect(snake.verificationStatus).toBe("VERIFIED");
-    expect(equipmentCardModel(camel).verified).toBe(true);
-    expect(equipmentCardModel(snake).verified).toBe(true);
   });
 
-  it("is decided in ONE place, and the card paints what it is handed", () => {
-    // The rule is not only "does not read `certs`" — it is "reads the one derivation", the same
-    // shape RM3-AC-19 is guarded in above. A component re-deriving `verificationStatus === "VERIFIED"`
-    // inline would satisfy the negative and still be a second spelling of the word.
+  it("is not something the card can reach for on its own", () => {
+    // The negative that outlives the mark: neither the model nor the renderer may re-derive a verdict
+    // on the papers. If the tick comes back it comes back through `isEquipmentVerified`, once.
     const model = stripComments(read("src/components/map/equipment-card-model.ts"));
-    expect(model).toMatch(/isEquipmentVerified\(/);
-    expect(model.match(/isEquipmentVerified\(/g) ?? []).toHaveLength(1);
-
     const list = stripComments(read("src/components/map/EquipmentList.tsx"));
-    // The renderer knows the WORD verified only as the model's field; it may not name the status,
-    // the enum members, or the helper.
+    expect(model).not.toMatch(/verificationStatus|VERIFIED/);
     expect(list).not.toMatch(/verificationStatus|VERIFIED|isEquipmentVerified/);
   });
 });

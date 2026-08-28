@@ -207,18 +207,26 @@ const PIN_STAGE_W = 96;
 const PIN_STAGE_H = 78;
 
 /**
- * How wide the availability label actually draws — **the number the old 74 px gap ignored**.
+ * How wide the marker's label actually draws — **the number the old 74 px gap ignored**.
  *
- * `.bm-pin-chip` is `white-space: nowrap` at 10 px / 800 with 10 px of padding a side, and the widest
- * string either locale puts in it is «Availability not confirmed yet» / «لم يؤكد توفرها بعد». It
- * therefore OVERFLOWS the 132 px box by design (it always has), which is why the marker's drawn width
+ * `.bm-pin-chip` is `white-space: nowrap` at 11 px / 800 with 10 px of padding a side. Since
+ * 2026-08-28 it carries the DISTANCE rather than the availability wording, and on a machine whose
+ * yard is out of city it carries the «· Outside the city» capsule beside it — which is the widest
+ * thing either locale puts here now that «Availability not confirmed yet» has gone.
+ *
+ * It still OVERFLOWS the 132 px box by design (it always has), which is why the marker's drawn width
  * is not `PIN_W` and why two markers separated by the box's width still overlapped where it counts.
+ *
+ * ~~156, sized for «Availability not confirmed yet».~~ 180: a four-digit distance and the out-of-city
+ * capsule together run past the old bound, and the fan has to clear the label it can actually draw.
+ * Erring wide costs a little extra separation between machines in one yard; erring narrow puts one
+ * label on top of another, which is the bug this constant exists for.
  *
  * It is a constant rather than a measurement because a `divIcon` has no layout to measure at the
  * moment its geometry is decided, and because a per-marker measurement would make the fan depend on
- * which machine happened to be unconfirmed — the arrangement has to stay deterministic (`decollide`).
+ * which machine happened to be far away — the arrangement has to stay deterministic (`decollide`).
  */
-const PIN_LABEL_W = 156;
+const PIN_LABEL_W = 180;
 
 /**
  * ── The machine grows as the renter zooms in (owner, 2026-08-11) ────────────────────────────────────
@@ -348,12 +356,13 @@ function FleetLayer({
   useMapTick();
 
   const zoom = map.getZoom();
-  /* How big every marker is being drawn at this zoom, decided once and used three times: the fan's
-     threshold, the distance chip's clearance test, and the `divIcon` itself. Deriving it separately in
-     any of the three is how a marker starts overlapping a chip that was measured against a smaller
-     machine. */
+  /* How big every marker is being drawn at this zoom — the fan's threshold, and the `divIcon`'s own
+     box. Derived once: computing it separately in the two is how a marker starts overlapping a
+     neighbour that was measured against a smaller machine.
+
+     (It had a third reader, the route chip's clearance test, until the chip was removed on
+     2026-08-28 — the machine's own label carries the distance now.) */
   const scale = pinScale(zoom);
-  const box = pinBox(scale);
   const placed = useMemo(
     () =>
       decollide<MachinePin>(
@@ -375,10 +384,6 @@ function FleetLayer({
   const routes = useMemo(() => {
     if (!site) return [];
     const s = map.project([site.lat, site.lng], zoom);
-    // Chips already laid down this pass — a second machine in the same direction must not stack its
-    // chip on the first one's.
-    const taken: { x: number; y: number }[] = [];
-
     return placed.map((p, i) => {
       const b = { x: p.x, y: p.y };
       const vx = b.x - s.x;
@@ -401,50 +406,9 @@ function FleetLayer({
         return { pts, opacity };
       });
 
-      // The chip rides the line, but every line ENDS inside the marker box (anchored bottom), so a
-      // fixed fraction lands on the machine whenever the line is short. Walk back from the site end
-      // until the point clears that box, then nudge perpendicular, then clear of other chips.
-      //
-      // Measured against the box AT THIS ZOOM, not against the resting 132×124: the machine grows as
-      // the renter zooms in, and a clearance test frozen at the small size would park the chip on top
-      // of the machine it is captioning at exactly the zoom he went in to read it.
-      let chip: { at: L.LatLng; km: number; far: boolean } | null = null;
-      if (p.point.distanceKm != null) {
-        const clears = (x: number, y: number) =>
-          Math.abs(x - b.x) >= box.w / 2 + 20 || b.y - y >= box.h + 12 || y - b.y >= 26;
-        let tt = 0.62;
-        let x = s.x + vx * tt;
-        let y = s.y + vy * tt;
-        for (let n = 0; n < 9 && !clears(x, y); n++) {
-          tt = Math.max(0.18, tt - 0.07);
-          x = s.x + vx * tt;
-          y = s.y + vy * tt;
-          if (tt === 0.18) break;
-        }
-        if (!clears(x, y)) {
-          x += (-vy / len) * 30;
-          y += (vx / len) * 30;
-        }
-        for (let g = 0; g < 6 && taken.some((q) => Math.abs(q.x - x) < 58 && Math.abs(q.y - y) < 24); g++) {
-          const off = (g % 2 ? -1 : 1) * (26 + 13 * Math.floor(g / 2));
-          x = s.x + vx * tt + (-vy / len) * off;
-          y = s.y + vy * tt + (vx / len) * off;
-        }
-        taken.push({ x, y });
-        chip = {
-          at: map.unproject([x, y], zoom),
-          // One decimal, the SAME arithmetic `equipmentCardModel` does — a chip and its card must
-          // not disagree about one machine by a rounding step (owner, 2026-08-11).
-          km: Math.round(p.point.distanceKm * 10) / 10,
-          // Read off the UNROUNDED distance, and off the same `isOutOfCity` the card's «· خارج
-          // المدينة» reads — the pill and the card line are one fact stated twice.
-          far: isOutOfCity(p.point.distanceKm),
-        };
-      }
-
-      return { id: p.point.id, segments, chip };
+      return { id: p.point.id, segments };
     });
-  }, [placed, site, map, zoom, box.w, box.h]);
+  }, [placed, site, map, zoom]);
 
   const src = safeImageUrl(imageUrl);
 
@@ -465,16 +429,6 @@ function FleetLayer({
               interactive={false}
             />
           ))}
-          {r.chip && (
-            <Marker
-              position={r.chip.at}
-              icon={distanceIcon(r.chip.km, r.chip.far, ar, t.bidMap.km, t.bidMap.mapOutOfCity)}
-              interactive={false}
-              // 700, the prototype's. Above the routes and the leader lines it rides, below the
-              // machines at 760 — a chip is a caption on a line, and it must never cover a marker.
-              zIndexOffset={700}
-            />
-          )}
         </Fragment>
       ))}
 
@@ -520,28 +474,6 @@ function useMapTick(): number {
   const bump = () => setTick((n) => n + 1);
   useMapEvents({ zoomend: bump, moveend: bump, resize: bump });
   return tick;
-}
-
-/**
- * The distance chip riding a route (§6.8). Non-interactive, and never a 0: a machine with no distance
- * gets no chip at all rather than a chip claiming it is at the project.
- *
- * **A second pill rides beside it when the yard is out of city** (decoded 701–705). That flag was
- * missing here entirely, and it is the one thing the number alone cannot say: 95 km reads as a
- * distance, «خارج المدينة» reads as a mobilisation to negotiate. Amber, never red — red on this canvas
- * is availability's and nothing else's, and a distant yard is not an unavailable machine.
- */
-function distanceIcon(km: number, far: boolean, ar: boolean, unit: string, farLabel: string): L.DivIcon {
-  return L.divIcon({
-    className: "",
-    iconSize: [150, 26],
-    iconAnchor: [75, 13],
-    html:
-      `<div class="bm-distchip" dir="rtl">` +
-      `<span><span dir="ltr">${esc(distanceDigits(km, ar))}</span> ${esc(unit)}</span>` +
-      (far ? `<span class="bm-distfar">${esc(farLabel)}</span>` : "") +
-      `</div>`,
-  });
 }
 
 /**
@@ -604,22 +536,26 @@ function hoverBoxHtml(card: EquipmentCardModel, ar: boolean, scale: number, t: R
   return (
     `<div class="bm-pinfo" aria-hidden="true" dir="${ar ? "rtl" : "ltr"}" style="inset-inline-start:calc(100% + ${clear}px)">` +
     `<div class="bm-pinfo-t">${esc(title)}</div>` +
-    // The card's ONE state chip (RM3-AC-32), in the card's own words and the model's own colour. Drawn
-    // as ink and a keyline rather than as a fill: on a white box a solid availability panel would be
-    // the loudest thing on the canvas, and the marker's own label already states this fact filled.
-    `<div class="bm-pinfo-r">` +
-    `<span class="bm-pinfo-chip" style="color:${card.chip.colour};border-color:${card.chip.colour}">` +
-    // Two states, two SHAPES as well as two colours — the card's rule, for the same reader.
-    `<span>${confirmed ? "✓" : "•"}</span>${esc(confirmed ? t.bidMap.eqChipConfirmed : t.bidMap.eqChipUnconfirmed)}` +
-    `</span>` +
-    (card.outOfCity ? `<span class="bm-pinfo-far">${esc(t.bidMap.eqOutOfCity)}</span>` : "") +
-    `</div>` +
-    // One decimal, always, through the one formatter (owner, 2026-08-11). An unknown distance is a
-    // sentence and never a 0.
-    `<div class="bm-pinfo-r bm-pinfo-km">` +
+    // ── The distance IS the state (owner, 2026-08-28) ──────────────────────────────────────────
+    // ~~A state chip on its own row — «Availability confirmed» / «Not confirmed yet» in the model's
+    // colour — with the distance in muted grey below it.~~ Withdrawn with the same ruling that
+    // changed the card and the marker's label: *"dont show this not confirmed or availability
+    // confirmed, show same distance color we have decided now on each equipment."*
+    //
+    // The two rows were one fact split in half: a number, and a verdict on whether to believe it.
+    // Joined, they are the card's own object — the distance in the availability colour — and the
+    // reader has one thing to read instead of two to reconcile.
+    //
+    // **The shape still carries the meaning as well as the fill** (the card's rule, for the same
+    // reader): ✓ for a settled fact, • for an open question, so a red-green deficiency does not cost
+    // the distinction. One decimal, always, through the one formatter (owner, 2026-08-11); an
+    // unknown distance is a sentence and never a 0.
+    `<div class="bm-pinfo-r bm-pinfo-km" style="color:${card.chip.colour}" title="${esc(confirmed ? t.bidMap.eqChipConfirmed : t.bidMap.eqChipUnconfirmed)}">` +
+    `<span>${confirmed ? "✓" : "•"}</span>` +
     (card.km != null
       ? `<span dir="ltr">${esc(distanceDigits(card.km, ar))}</span> ${esc(t.bidMap.eqDistanceUnit)}`
       : esc(t.bidMap.eqNoDistance)) +
+    (card.outOfCity ? `<span class="bm-pinfo-far">${esc(t.bidMap.eqOutOfCity)}</span>` : "") +
     `</div>` +
     // The certificates the REQUEST asked for, held or missing — the card's row 4, verbatim. The mark
     // is not decoration: at this size the two fills are close enough that colour alone would decide it.
@@ -719,16 +655,38 @@ function machineIcon(
     unconfirmed: "color-mix(in srgb, var(--danger) 32%, transparent)",
   }[pin.availability];
 
-  // «مؤكّد توفرها» / «لم يؤكد توفرها بعد». Both read as a STATE and neither carries a reason, a cause
-  // or a location-source explanation (AC-20, AC-30).
+  // ── The label under the machine is its DISTANCE, in its availability colour (owner, 2026-08-28) ──
+  // *"Dont show this not confirmed or availability confirmed, show same distance color we have
+  // decided now on each equipment."*
+  //
+  // The card had already made this move: the distance IS the state, because a distance nobody has
+  // promised is not the same fact as a distance the supplier has committed to — and printing the
+  // words as well put a second answer beside a colour that already said it. A red «15.5 km» says
+  // both things in the space one of them used to take, and the two surfaces now caption a machine
+  // the same way.
+  //
+  // The state is not lost, it is unprinted: `title` carries «Availability confirmed» / «Not confirmed
+  // yet» verbatim, so the words stay reachable on hover and to a reader who cannot separate the two
+  // fills. Both still read as a STATE and neither carries a reason, a cause or a location-source
+  // explanation (AC-20, AC-30).
   //
   // **No in-offer pin caption**, and that is a decision rather than an omission (app parity,
-  // `bid_map_strings.dart:708`): membership is a badge on the CARD. A pin caption saying it too would
-  // put a second answer on the surface for the reader to reconcile against the colour.
+  // `bid_map_strings.dart:708`): membership is a badge on the CARD.
   const state = {
     confirmed: t.bidMap.pinAvailable,
     unconfirmed: t.bidMap.pinUnconfirmed,
   }[pin.availability];
+  // The SAME arithmetic `equipmentCardModel` does — a label and its card must not disagree about one
+  // machine by a rounding step (owner, 2026-08-11). A machine with no distance says so rather than
+  // drawing a 0, which would read as "at the project".
+  const label =
+    pin.distanceKm != null && Number.isFinite(pin.distanceKm)
+      ? `${distanceDigits(Math.round(pin.distanceKm * 10) / 10, ar)} ${t.bidMap.km}`
+      : t.bidMap.eqNoDistance;
+  // «· Outside the city» rides the same label now that the route carries no chip of its own. It is
+  // the one thing the number cannot say: 95 km reads as a distance, out-of-city reads as a
+  // mobilisation to negotiate.
+  const far = isOutOfCity(pin.distanceKm);
 
   // The object's own motion. It used to carry a `drop-shadow` as well — the one shadow in the app
   // with a case for itself, since a marker on a map has terrain under it and the shadow is what said
@@ -790,7 +748,10 @@ function machineIcon(
       // The label's own selected treatment — the scale and the white keyline — moved to `.bm-pin.is-on
       // .bm-pin-chip`. An inline `transform` here could not be combined with the shadow the emphasis
       // also wants, and would have overridden the stylesheet rather than joining it.
-      `<div class="bm-pin-chip" style="background:${ring};border:1px solid ${ring}">${esc(state)}</div>` +
+      `<div class="bm-pin-chip" title="${esc(state)}" style="background:${ring};border:1px solid ${ring}">` +
+      `<span dir="ltr">${esc(label)}</span>` +
+      (far ? `<span class="bm-pin-far">${esc(t.bidMap.mapOutOfCity)}</span>` : "") +
+      `</div>` +
       /* Only the focused marker names itself — the map stays quiet until the renter has chosen
          (AC-34).
 

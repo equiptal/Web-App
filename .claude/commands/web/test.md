@@ -1,0 +1,175 @@
+---
+description: Run the test runbook against a chosen environment. Asks which environment (prod/staging/local), resolves what to test (a module, a new feature, or everything), then runs unit + API + browser layers and reports pass/fail per case. Mutates nothing on prod.
+---
+
+# /web:test — Runbook-driven testing
+
+You are running the **Moedatech renter web app** test runbook (`C:\Users\yaraf\OneDrive\Desktop\Web-App`, Next.js 15 App Router + TypeScript + vitest).
+
+The runbook has one ID space. Every case has an ID like `AUTH-03`. A case is covered by an automated spec or it is a manual check — never both, never neither. The report says which.
+
+Three layers, always in this order. Do not skip a cheap layer because a later one is more interesting.
+
+1. **Unit** — pure logic in memory (`npx vitest run`). Fast, no environment needed.
+2. **API** — the app's own route handlers, over HTTP, against the chosen environment.
+3. **Browser** — the rendered page. Playwright when installed, otherwise the Chrome tools.
+
+A green unit suite is **not** a passing run. It tested the source, not the environment.
+
+## Arguments
+
+`$ARGUMENTS` selects target and environment. Both may be omitted — then you ask.
+
+| Arg | Meaning |
+|---|---|
+| *(empty)* | Ask what to test, then ask the environment |
+| `<module>` | One module from the registry below (e.g. `/web:test deal-room`) |
+| `<module> <module> …` | Several modules |
+| `all` | Every module in the registry |
+| `feature <name>` | A new feature — no registry entry yet; derive cases from its spec or its diff |
+| `--env prod` / `--env staging` / `--env local` | Skip the environment question |
+| `--layer unit\|api\|browser` | Run only that layer |
+| `--manual` | Produce the manual checklist only, run nothing |
+| `--since <ref>` | Scope to modules touched since `<ref>` (default `origin/staging`) |
+
+Echo the resolved target, environment and layer set in one line before starting.
+
+---
+
+## Step 0 — Resolve the environment (ask, always)
+
+If `--env` was not passed, **ask before doing anything else**. Use `AskUserQuestion` with these options:
+
+- **staging** — full run, mutations allowed
+- **prod** — read-only run, mutations forbidden
+- **local** — `next dev` on this machine, mutations allowed
+
+| Environment | Base URL | Mutations |
+|---|---|---|
+| prod | _(unset — ask once and write it into this table)_ | **forbidden** |
+| staging | _(unset — ask once and write it into this table)_ | allowed |
+| local | `http://localhost:3000` | allowed |
+
+Once you learn a URL, edit this file so the next run does not ask again.
+
+### The prod rule
+
+On **prod** you may only read. No creating a request, no submitting a bid, no sending a quotation, no cancelling a deal room, no uploading a document, no editing a profile. Any case marked `mutating` in the registry is reported `SKIPPED (prod, mutating)`, not silently dropped. If the user asks for a mutating case on prod anyway, say plainly that it writes real data to a live tenant and get an explicit go-ahead first.
+
+On **local**, start the server yourself if it is not up: `npm run dev`, wait for the port, and stop it when done.
+
+## Step 1 — Resolve authentication
+
+Most cases need a signed-in renter. Login is OTP, so pick a strategy for the environment and say which one you used in the report — a run that silently tested logged-out pages is a false pass.
+
+1. **Reuse a session** — if a saved session cookie exists and still validates against `/api/auth/session`, use it.
+2. **Test account with a fixed code** — if the environment has one, log in through `/login` and `/verify`.
+3. **Stub the auth routes** — browser layer only, and only against `local`. Intercept `/api/auth/*` and `/api/me/*` with fixtures.
+
+If none is available, run the public surfaces (`/bid/[token]`, `/login`) and the unit layer, and report every authenticated case as `BLOCKED (no session)`. Do not invent a pass.
+
+## Step 2 — Resolve the target to cases
+
+**A registry module** — take its case table from `TESTING.md`.
+
+**A new feature** — there is no table yet. Build one:
+- read its spec (`docs/`) if it exists, else read the diff (`git diff origin/staging...HEAD`)
+- one case per acceptance criterion, plus the edge cases the criteria imply (empty state, error state, Arabic)
+- write the new table into `TESTING.md` under a new module heading before running it
+
+Print the resolved case list before running anything. The user sees what will be checked.
+
+## Step 3 — Layer 1 · Unit
+
+Run the module's mapped spec files:
+
+```bash
+npx vitest run <specs>
+```
+
+Report the actual failure line, never a paraphrase. A unit failure in the module under test is blocking — report it and stop that module's remaining layers, because the browser failure that follows is the same bug twice.
+
+## Step 4 — Layer 2 · API
+
+For each of the module's API cases, call the route on the resolved base URL with the session from Step 1. Check three things every time, not just the first:
+
+- **status** — the expected code, and that an unauthenticated call is refused
+- **shape** — the fields the UI actually reads are present and the right type
+- **content** — the values are right, not merely non-empty
+
+An endpoint that answers `200 {}` looks healthy and breaks the page. Say what you compared against.
+
+## Step 5 — Layer 3 · Browser
+
+If `@playwright/test` is in `devDependencies`, run its specs for the module:
+
+```bash
+npx playwright test tests/e2e/<module> --reporter=line
+```
+
+If Playwright is not installed, drive the Chrome tools instead (`mcp__claude-in-chrome__*`) and say in the report that the run was manual-driven and therefore not repeatable. Offer to install Playwright once; do not install it mid-run without asking.
+
+Every browser case checks the rendered content, not just that the route responded. An error boundary and an empty state both return 200.
+
+Run these on every module, not only the ones whose cases name them:
+
+- **Console clean** — `read_console_messages` after first paint. Hydration errors, missing chunks and CSP violations mean a broken page even when the HTML renders.
+- **Arabic** — repeat the module's primary journey with the locale set to `ar`. Check the direction flips and that no string falls back to English. Compare `src/lib/i18n/ar.ts` against `en.ts` for missing keys in the module's namespace.
+
+## Step 6 — Manual cases
+
+Some cases cannot be automated cheaply — a real OTP SMS, a document upload a human must eyeball, a map interaction, a payment. Output them as a checklist the user ticks:
+
+```
+[ ] DEAL-07 · Quotation PDF opens and the totals match the deal room · ar + en
+```
+
+Do not mark a manual case passed. It is `MANUAL (awaiting user)` until the user says otherwise.
+
+## Step 7 — Report
+
+One table, every case, in ID order:
+
+| ID | Case | Layer | Result | Evidence |
+|---|---|---|---|---|
+
+Results are `PASS`, `FAIL`, `SKIPPED (prod, mutating)`, `BLOCKED (no session)`, or `MANUAL (awaiting user)`. Nothing else. Evidence is a file:line, a status code, a quoted string, or a screenshot path — never "looks fine".
+
+Then, for failures only, one block each: what was expected, what happened, the shortest decisive output, and where the bug most likely lives. Rank by severity: money and contract terms first, then data loss, then access control, then journey blockers, then cosmetic.
+
+Close with the coverage line: how many cases are automated, how many are manual, and which cases have no coverage at all.
+
+## Step 8 — Persist
+
+Update `TESTING.md`:
+- the run date, the environment, and the pass/fail counts at the top of the module's section
+- any new cases discovered during the run, added to the table with no result yet
+- a manual case you automated this run flips to a spec path
+
+Fix nothing without approval. Report the failures, propose the fix, and wait — unless the user invoked this with an explicit instruction to fix.
+
+---
+
+## Module registry
+
+Ten modules. The case tables live in `TESTING.md` under the matching prefix; this table is only the routing — which name resolves to which routes, specs and risk.
+
+| Module | Prefix | Routes | Unit specs | Mutating |
+|---|---|---|---|---|
+| `guest` | `GUEST` | home while signed out, `api/agent/process`, middleware | `middleware.test.ts` (thin — `guest-quota-server.ts` has none) | no |
+| `auth` | `AUTH` | `/login`, `/verify`, `api/auth/*` | `auth-routes`, `auth-session`, `auth-i18n`, `session-user`, `onboarding` | yes |
+| `create` | `CREATE` | `/create`, `api/requests`, `api/taxonomy`, `api/agent/*` | `canvas-*`, `when-panel`, `where-panel`, `machine-panel`, `operator-rail`, `submit-payload`, `create-canvas-wiring`, `agent-*`, `ready-to-send` | yes |
+| `bid-in` | `BIDIN` | `/bid/[token]`, `/bid/[token]/og`, `api/bid-form/[token]` | `bid-form`, `bid-form-routes`, `bid-preview`, `bid-card-html`, `link-bids` | yes |
+| `bid-view` | `BIDVIEW` | `/bids/[bidId]`, `/bids/[bidId]/equipment`, `api/me/received-bids` | `bid-card-*`, `bids`, `bid-map`, `bid-equipment-access`, `equipment-*`, `cert-rule`, `fleet`, `availability-chip`, `price-footer`, `map-no-quality-score` | no |
+| `company` | `COMPANY` | `/company`, `/profile`, `api/verification/*`, `api/profile/*` | `company-documents`, `company-panel-source`, `company-pile`, `gates` | yes |
+| `request` | `REQ` | `/requests`, `/dashboard`, `/inbox`, `api/me/requests` | `requests`, `request-card`, `dashboard-access`, `page-back`, `deal-room-cancel`, `deal-system-event` | yes |
+| `deal-room` | `DEAL` | `/deal-room/[id]` | `deal-room-*`, `chat-dock`, `chat-attachments`, `stream-connection`, `rentee-request*` | yes |
+| `accept` | `ACCEPT` | `/deal-room/[id]` (accepted state), quotation link | `quotation-*`, `deal-room-quotation*` | yes |
+| `compare` | `COMPARE` | comparison workspace | `comparison`, `quick-compare`, `workspace`, `workspace-export` | no |
+| `off` | `OFF` | `api/me/surveys/*` | `survey`, `survey-routes` (both test the DISABLED state) | no |
+
+Cross-cutting specs that any module may pull in: `rental-pricing`, `vat-inclusive`, `charged-days`, `cycle-totals`, `labels`, `provenance`, `gates`.
+
+### Aliases
+
+`bids` ⇒ `bid-in` + `bid-view`. `verification` ⇒ `company`. `negotiation` ⇒ `deal-room`. `quotation` ⇒ `accept`. `agent` ⇒ `create`.

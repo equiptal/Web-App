@@ -1079,19 +1079,17 @@ export const en = {
     // availability and nothing else (RM3-AC-30 — no reason, no cause).
     //
     // «· in this offer» was dropped from the confirmed chip (owner, 2026-08-19). Offer membership is
-    // carried by the orange `pinInOffer` badge sitting beside this chip on the same row, so the chip was
-    // stating the same fact twice on one line.
+    // carried by the orange `pinInOffer` badge, so the chip was stating the same fact twice.
+    //
+    // **The MAP PIN is the only reader left** (owner, 2026-08-28). The card's own availability chip
+    // went with the redesign that made the distance the card's whole subject — the colour of the
+    // distance says what the chip said, on the object the renter is actually comparing. The pin's
+    // hover box still needs the words, so the keys stay.
     eqChipConfirmed: "Availability confirmed",
     eqChipUnconfirmed: "Not confirmed yet",
-    // Blue, never navy (RM3-AC-33) — beside a red chip, navy reads as disabled.
-    // A mark on the title: the platform CHECKED this equipment's papers (`verificationStatus ===
-    // "VERIFIED"`). A fact about the platform's verdict, not about whether it is available.
-    // ~~"Documented machine".~~ Two changes, one ruling (owner, 2026-08-11 — "make sure it is read
-    // the equipment status is it verified really or not"): the mark used to fire on "the request
-    // named a certificate", and "documented" was the honest word for that weaker claim. Now that it
-    // states verification, the copy has to as well — a renter reading "documented" beside a tick
-    // cannot tell whether anyone checked. ("equipment", never "machine", in English copy.)
-    eqVerifiedMachine: "Verified equipment",
+    // `eqVerifiedMachine` and `eqNoPhoto` deleted the same day, with the title's ✓ and the photo cell
+    // they labelled. `isEquipmentVerified` is untouched and still the one definition of the word; no
+    // surface draws its verdict today.
     // Qualifies the offer, not the number: the yard sits outside the request city's own radius, so
     // delivery is a mobilisation worth asking about.
     eqOutOfCity: "· Outside the city",
@@ -1108,7 +1106,29 @@ export const en = {
     // are left, so the key went with them.
     eqDistanceUnit: "km from your project",
     eqNoDistance: "Distance not known",
-    eqNoPhoto: "No photo",
+    // ── The distance chip, and the tutorial behind it (owner, 2026-08-28) ──────────────────
+    // The card's dominant fact is now the distance, painted with the availability it is only as good
+    // as. A red distance is not a bad distance — it is a distance nobody has promised — and that is
+    // exactly the sentence a renter could not get from a chip, so the first press explains it before
+    // it asks anything.
+    eqYardExplainTitle: "This distance is not confirmed",
+    eqYardExplainBody:
+      "It is where this machine stands today. The supplier has not named the yard it would move from for this offer, so nothing here promises it will come from that distance — or that it is free at all.",
+    eqYardExplainHow:
+      "Ask him to set the yard. Once he does, the distance turns green and this machine is confirmed for your offer.",
+    eqYardExplainCta: "Ask the supplier",
+    eqYardExplainLater: "Not now",
+    // The same surface, in the state where the question is already out. It shows what was asked and
+    // says it is waiting — never a second «Ask», which would put a duplicate card in the room.
+    eqYardAskedTitle: "You already asked about this machine",
+    eqYardAskedBody: "Your request is in the conversation with the supplier and has not been answered yet.",
+    eqYardAskedWhat: "What you asked",
+    // The chips' own explanations, on hover and to a screen reader.
+    eqYardConfirmedWhy: "The supplier named the yard this machine moves from, so this distance is confirmed for your offer.",
+    eqYardUnconfirmedWhy: "Not confirmed for this offer — press to see what that means and to ask.",
+    // The dots beside the file icon: the machine's papers, scored the way the app scores them.
+    eqReadinessOnFile: "{done} of {total} documents on file",
+    eqOpenFile: "Open this machine's file",
     eqSelect: "Show this equipment on the map",
     // RM3-AC-26 — a price and a count were given, and nothing else. No empty card furniture.
     eqNoneRegistered: "No equipment is registered in this offer",
@@ -1393,6 +1413,14 @@ export const en = {
     // Multi-unit only, in the same box: the true all-units figure, which is not the per-unit total
     // times the count — each transport leg carries its own unit count.
     overallTotal: "Overall total",
+    // The caption under it, in the app's own words (`priceRowUnitsCountLabel`): a bare «· 4» beside
+    // «Overall total» read as a line number rather than as what the figure was multiplied by.
+    unitsCountLabel: "Units: {n}",
+    // ── The offered-units badge (app parity: `bidOffersUnits` / `bidAcceptedUnits`) ─────────────
+    // Drawn only where the REQUEST asked for more than one unit, which is the app's own gate: on a
+    // single-unit request every bid covers the whole of it and the chip states nothing.
+    offersUnits: "{n} units",
+    acceptedUnits: "{accepted} of {offered} units accepted",
     // ── Off-platform pair ────────────────────────────────────────────────────────────────────────
     // The invite reaches the supplier through the renter's OWN WhatsApp, the way «Provide it for me?»
     // reaches support (owner, 2026-08-25) — so the message is written in the renter's voice and says

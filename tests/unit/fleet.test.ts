@@ -566,7 +566,7 @@ describe("the ownership option is wired at the call sites, not just offered", ()
 
   it("the equipment card and the filter groups — also fleet rows — pass it too", () => {
     expect(read("src/components/map/equipment-card-model.ts")).toMatch(
-      /computeUnitReadiness\(machine,[\s\S]{0,140}?\{ scoreOwnership: true \}\)/,
+      /computeUnitReadiness\(\s*machine,[\s\S]{0,220}?\{ scoreOwnership: true \},?\s*\)/,
     );
     expect(read("src/lib/contract/equipment-list.ts")).toMatch(
       /computeUnitReadiness\(m,[\s\S]{0,120}?\{ scoreOwnership: true \}\)/,
