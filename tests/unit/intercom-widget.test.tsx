@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { IntercomWidget } from "@/components/support/IntercomWidget";
 import type { IntercomServerIdentity } from "@/lib/support/intercom";
 
@@ -19,7 +20,8 @@ import type { IntercomServerIdentity } from "@/lib/support/intercom";
 
 const session = vi.hoisted(() => ({ value: { status: "loading" as string, user: null as unknown } }));
 vi.mock("@/lib/session", () => ({ useSession: () => session.value }));
-vi.mock("@/lib/i18n", () => ({ useLocale: () => ({ locale: "en", dir: "ltr" }) }));
+const locale = vi.hoisted(() => ({ value: { locale: "en", dir: "ltr" } }));
+vi.mock("@/lib/i18n", () => ({ useLocale: () => locale.value }));
 
 const user = { id: 42, phone: "+966501234567", tier: "basic" };
 
@@ -48,6 +50,7 @@ const lastPayload = () => calls()[calls().length - 1][1] as Record<string, unkno
 
 beforeEach(() => {
   session.value = { status: "loading", user: null };
+  locale.value = { locale: "en", dir: "ltr" };
   delete (window as { Intercom?: unknown }).Intercom;
   document.head.innerHTML = "";
 });
@@ -112,3 +115,29 @@ describe("identifying a renter", () => {
   });
 });
 
+
+/**
+ * The launcher is the app's bubble, not Intercom's.
+ *
+ * A renter who has used the app knows this control as an orange circle with a chat glyph in it;
+ * Intercom's own is a blue circle carrying Intercom's mark. Hiding theirs and drawing ours is the
+ * only way the two clients offer the same thing.
+ */
+describe("the launcher", () => {
+  it("hides Intercom's own, so there is never a second one", async () => {
+    await renderWith(null);
+    expect(lastPayload().hide_default_launcher).toBe(true);
+  });
+
+  it("opens the messenger when pressed", async () => {
+    const { getByRole } = await renderWith(null);
+    await userEvent.click(getByRole("button", { name: "Support" }));
+    expect(commands()).toContain("show");
+  });
+
+  it("follows the writing direction, as every other floating control does", async () => {
+    locale.value = { locale: "ar", dir: "rtl" };
+    const { getByRole } = await renderWith(null);
+    expect(getByRole("button", { name: "الدعم" })).toBeTruthy();
+  });
+});

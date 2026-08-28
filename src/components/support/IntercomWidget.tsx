@@ -21,8 +21,9 @@
  * has answered, and the queue stub below means calls made before the script lands are not lost.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale } from "@/lib/i18n";
+import { MIcon } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import {
   buildIntercomPayload,
@@ -148,6 +149,10 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
       api_base: INTERCOM_API_BASE,
       alignment: dir === "rtl" ? "left" : "right",
       language_override: locale,
+      // Intercom's blue circle is hidden and `Launcher` below takes its place, so the web reaches
+      // support through the same orange bubble the app does. `alignment` still stands: the messenger
+      // PANEL reads it, and it has to open on the side the bubble it came from sits on.
+      hide_default_launcher: true,
     };
 
     // Still asking who this is — boot anonymous rather than waiting. Support is most useful to the
@@ -186,5 +191,66 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
     identity.current = wanted;
   }, [status, user, locale, dir, appVersion, server]);
 
-  return null;
+  return <Launcher />;
+}
+
+/**
+ * The app's chat bubble, on the web.
+ *
+ * Drawn here rather than left to Intercom because Intercom's launcher is a blue circle with
+ * Intercom's own mark on it, and a renter who has used the app knows this control as an orange
+ * bubble. Same glyph, same gradient, same 56px circle as `chat_bubble.dart`:
+ *
+ * | `chat_bubble.dart` | here |
+ * |---|---|
+ * | 56×56 circle | the same |
+ * | `AppColors.orange` → `#D4570A`, top-left to bottom-right | `--brand` (the same #f79009) → `#d4570a` |
+ * | `Icons.chat_bubble_outline_rounded`, white, 28 | Material Symbols Rounded `chat_bubble` at FILL 0 — the same glyph from the same family |
+ * | unread badge, `AppColors.danger`, white, 11 | the same, on `--danger` |
+ * | `AppShadows.float` | NOTHING — this app has no shadows (`globals.css`, owner 2026-08-26) |
+ *
+ * The shadow is the one deliberate difference: the whole `--shadow-*` namespace is cleared here, and
+ * a floating control is not the place to reintroduce it. Separation comes from the gradient, which
+ * carries against every surface on the ramp.
+ *
+ * Not draggable, unlike the app's. The app moves it because a phone screen is small enough for a
+ * fixed bubble to sit on top of something that matters; at this width nothing is under it.
+ */
+function Launcher() {
+  const { dir } = useLocale();
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    const api = window.Intercom;
+    if (!api) return;
+    api("onUnreadCountChange", (count: unknown) => setUnread(typeof count === "number" ? count : 0));
+  }, []);
+
+  const open = useCallback(() => window.Intercom?.("show"), []);
+
+  if (!INTERCOM_APP_ID) return null;
+  return (
+    <button
+      type="button"
+      onClick={open}
+      aria-label={dir === "rtl" ? "الدعم" : "Support"}
+      className="fixed bottom-6 z-40 grid size-14 place-items-center rounded-full text-white transition-transform hover:scale-105 active:scale-95"
+      style={{
+        // Logical, not `right`: under Arabic every other floating control on this app sits on the
+        // left, and a bubble alone on the right reads as something bolted on.
+        insetInlineEnd: "1.5rem",
+        backgroundImage: "linear-gradient(135deg, var(--brand), var(--brand-press))",
+      }}
+    >
+      <MIcon name="chat_bubble" size={28} />
+      {unread > 0 && (
+        <span
+          className="absolute top-1.5 grid min-h-5 min-w-5 place-items-center rounded-full px-1.5 text-label font-semibold leading-none text-white"
+          style={{ insetInlineEnd: "0.375rem", background: "var(--danger)" }}
+        >
+          {unread > 99 ? "99+" : unread}
+        </span>
+      )}
+    </button>
+  );
 }
