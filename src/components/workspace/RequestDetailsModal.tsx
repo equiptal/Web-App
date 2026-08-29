@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { Dialog } from "@/components/Dialog";
@@ -12,7 +12,8 @@ import {
   setShareLinkLogo,
 } from "@/lib/api/client";
 import { CERT_LABEL } from "@/lib/contract/bids";
-import { publicTaxonomyUrl, type RequestGroup, type RequestListItem, type RequestRecord } from "@/lib/contract/requests";
+import { publicTaxonomyUrl, statusMeta, type RequestGroup, type RequestListItem, type RequestRecord } from "@/lib/contract/requests";
+import { itemDetailRows, requestDetailRows } from "@/lib/contract/request-fields";
 import { requestActions, type WorkspaceBid } from "@/lib/contract/workspace";
 import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
 import { ConfirmCancelModal, EditRequestModal } from "@/components/requests/RequestEditModals";
@@ -83,7 +84,41 @@ export function RequestDetailsModal({
     setLogoUrl(link?.logoUrl ?? null);
   }, [link]);
 
-  // The drawer acts on the item in focus: a group is a fan-out of single-item requests, and each one
+  /**
+   * The FULL record for every request in the group, keyed by id.
+   *
+   * The list payload the workspace runs on is a projection — id, status, dates, bid count, and the
+   * machine's name. It carries about a tenth of what a request stores. So the modal fetches the real
+   * records on open, and until they land it shows what it already has rather than a spinner: the
+   * dates, the site and the machines are all in the list payload and are what a renter opens this
+   * for first.
+   *
+   * ONE FETCH PER ITEM, in parallel. A multi-item submission is a fan-out of single-item requests:
+   * the request-level settings are copied across all of them, but the item-level ones — operator,
+   * fuel, who delivers — are per machine, and there is no endpoint that returns the set. A group is
+   * one submission's worth of machines, so this is a handful of calls, not a page of them.
+   */
+  const [records, setRecords] = useState<Record<string, RequestRecord>>({});
+  const [recordsFailed, setRecordsFailed] = useState(false);
+  const ids = group.items.map((it) => it.id).join(",");
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const settled = await Promise.allSettled(ids.split(",").filter(Boolean).map((id) => fetchRequestDetail(id)));
+      if (!alive) return;
+      const next: Record<string, RequestRecord> = {};
+      for (const r of settled) if (r.status === "fulfilled") next[r.value.id] = r.value;
+      setRecords(next);
+      // Only when EVERY one failed. A group where one call fell over still has details to show, and
+      // saying "could not load" over a list that is visibly populated is worse than saying nothing.
+      setRecordsFailed(settled.length > 0 && settled.every((r) => r.status === "rejected"));
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [ids]);
+
+  // The modal acts on the item in focus: a group is a fan-out of single-item requests, and each one
   // carries its own status, bid count and edit cap.
   const subject = item ?? group.items[0] ?? null;
   const actions = subject
@@ -96,11 +131,21 @@ export function RequestDetailsModal({
   const viaApp = bids.filter((b) => b.source === "app").length;
   const offline = bids.filter((b) => b.source === "offline").length;
   const certs = subject?.requiredCerts ?? [];
+  /** The request-level parameters. Read off the subject: the group copies them to every item. */
+  const subjectRecord = subject ? records[subject.id] ?? null : null;
+  const paramRows = subjectRecord ? requestDetailRows(subjectRecord, ar, L) : [];
+  const notes = typeof subjectRecord?.additionalNotes === "string" ? subjectRecord.additionalNotes.trim() : "";
   const shareUrl = typeof window !== "undefined" ? bidShareUrl(window.location.origin, group.id, link?.renterName) : "";
 
   /** Edit opens the same form the detail page used — the record has to be fetched in full first. */
   const openEdit = async () => {
     if (!subject || loadingEdit) return;
+    // Already fetched for the detail rows above — opening the form must not go and get it again.
+    const held = records[subject.id];
+    if (held) {
+      setEditing(held);
+      return;
+    }
     setLoadingEdit(true);
     try {
       setEditing(await fetchRequestDetail(subject.id));
@@ -171,71 +216,149 @@ export function RequestDetailsModal({
         }
       >
         <div {...pin("request-details")}>
-          {/* The items. On a group every line is listed; the one in focus is marked. */}
-          <div className="space-y-2">
-            {group.items.map((it) => {
-              const focused = it.id === subject?.id;
-              const img = publicTaxonomyUrl(it.item?.imageUrl ?? null);
-              return (
-                <div
-                  key={it.id}
-                  className={`flex items-center gap-3 rounded-md border px-3 py-2.5 ${
-                    focused ? "border-brand bg-brand-soft/40" : "border-border bg-surface2"
-                  }`}
-                >
-                  <span className="grid h-11 w-14 flex-none place-items-center overflow-hidden rounded-sm bg-surface3">
-                    {img ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={img} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <Icon name="precision_manufacturing" size={20} className="text-muted" />
-                    )}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-body font-extrabold text-navy">
-                      {it.item ? (ar ? it.item.nameAr || it.item.name : it.item.name) : it.displayId}
-                    </div>
-                    <div className="text-label font-semibold text-muted">
-                      {t.workspace.unitsCount.replace("{n}", String(it.item?.qty ?? 1))}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          {/* ── What the request IS ─────────────────────────────────────────────────────────────
+              Its state and its reach. Neither is a field the renter typed, which is why they were
+              missing — but "what did I ask for" includes whether it is still open and whether it went
+              to the market or to one supplier, and this modal is the only place that answers either.
 
-          <dl className="mt-4 divide-y divide-border">
-            <Fact label={t.workspace.factStarts} value={fmt(subject?.startDate ?? null)} />
-            <Fact
-              label={t.workspace.factDuration}
-              value={subject?.durationDays ? t.workspace.daysValue.replace("{n}", String(subject.durationDays)) : "—"}
-            />
-            <Fact label={t.workspace.factSite} value={group.address ?? group.locationLabel} />
-            <Fact label={t.workspace.factRequested} value={fmt(group.createdAt)} />
-            {/* Split by source, because "4 bids" hides that two of them were typed in by hand. */}
-            <Fact
-              label={t.workspace.factBidsIn}
-              value={
-                bids.length === 0
-                  ? t.workspace.noBidsYet
-                  : `${bids.length} · ${t.workspace.bidsSplit.replace("{app}", String(viaApp)).replace("{offline}", String(offline))}`
-              }
-            />
-          </dl>
+              Per ITEM, not per group: a fanned-out RFQ where one machine was accepted and the rest
+              are still open has no single status, and rolling them into one would say something
+              untrue about both. This states the item in focus, which is what the rest of the modal
+              is about. */}
+          <Section title={L("Request", "الطلب")}>
+            <dl className="divide-y divide-border">
+              {subject && (
+                <Fact label={L("Status", "الحالة")} value={ar ? statusMeta(subject.status).ar : statusMeta(subject.status).en} />
+              )}
+              <Fact
+                label={L("Reach", "نطاق الإرسال")}
+                value={
+                  (subject?.type ?? group.type) === "DIRECT"
+                    ? L("One supplier", "مؤجّر واحد")
+                    : L("Open to the market", "مفتوح للسوق")
+                }
+              />
+              <Fact label={L("Reference", "المرجع")} value={group.groupRef ?? subject?.displayId ?? group.id} />
+            </dl>
+          </Section>
+
+          {/* ── The machines, each with its own terms (owner, 2026-08-29) ────────────────────────
+              Every line of the group is listed and the one in focus is marked, as before — but a
+              machine's own parameters (operator, fuel, who delivers it, night shift) are per ITEM,
+              not per request, so they belong on the machine and nowhere else. They appear as the
+              records arrive; until then the row is what it always was. */}
+          <Section title={L("Equipment", "المعدات")}>
+            <div className="space-y-2">
+              {group.items.map((it) => {
+                const focused = it.id === subject?.id;
+                const img = publicTaxonomyUrl(it.item?.imageUrl ?? null);
+                const rec = records[it.id];
+                const rows = rec?.equipmentItems?.length ? itemDetailRows(rec.equipmentItems[0], ar, L) : [];
+                return (
+                  <div
+                    key={it.id}
+                    className={`rounded-md border ${focused ? "border-brand bg-brand-soft/40" : "border-border bg-surface2"}`}
+                  >
+                    <div className="flex items-center gap-3 px-3 py-2.5">
+                      <span className="grid h-11 w-14 flex-none place-items-center overflow-hidden rounded-sm bg-surface3">
+                        {img ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={img} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <Icon name="precision_manufacturing" size={20} className="text-muted" />
+                        )}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-body font-extrabold text-navy">
+                          {it.item ? (ar ? it.item.nameAr || it.item.name : it.item.name) : it.displayId}
+                        </div>
+                        <div className="text-label font-semibold text-muted">
+                          {t.workspace.unitsCount.replace("{n}", String(it.item?.qty ?? 1))}
+                        </div>
+                      </div>
+                    </div>
+                    {rows.length > 0 && (
+                      /* Inside the machine's own box, on a rule — these are ITS terms, and a list
+                         floating below the row would read as the request's. */
+                      <dl className="divide-y divide-border border-t border-border px-3">
+                        {rows.map(([label, value]) => (
+                          <Fact key={label} label={label} value={value} />
+                        ))}
+                      </dl>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Section>
+
+          {/* When and where. Duration sits with the dates it is derived from, which is why
+              `requestDetailRows` deliberately leaves it out — a field printed twice makes a reader
+              wonder which of the two is authoritative. */}
+          <Section title={L("Period and site", "المدة والموقع")}>
+            <dl className="divide-y divide-border">
+              <Fact label={t.workspace.factStarts} value={fmt(subject?.startDate ?? null)} />
+              {subject?.endDate && <Fact label={L("Ends", "ينتهي")} value={fmt(subject.endDate)} />}
+              <Fact
+                label={t.workspace.factDuration}
+                value={subject?.durationDays ? t.workspace.daysValue.replace("{n}", String(subject.durationDays)) : "—"}
+              />
+              <Fact label={t.workspace.factSite} value={group.address ?? group.locationLabel} />
+              <Fact label={t.workspace.factRequested} value={fmt(group.createdAt)} />
+              {/* Split by source, because "4 bids" hides that two of them were typed in by hand. */}
+              <Fact
+                label={t.workspace.factBidsIn}
+                value={
+                  bids.length === 0
+                    ? t.workspace.noBidsYet
+                    : `${bids.length} · ${t.workspace.bidsSplit.replace("{app}", String(viaApp)).replace("{offline}", String(offline))}`
+                }
+              />
+            </dl>
+          </Section>
+
+          {/* ── Everything else the request stores ──────────────────────────────────────────────
+              Roughly twenty parameters, and only the ones with a value are drawn — a list padded
+              with dashes reads as a broken fetch rather than as a request that simply left them
+              unset. The section itself disappears when the request set none of them. */}
+          {paramRows.length > 0 && (
+            <Section title={L("Terms and preferences", "الشروط والتفضيلات")}>
+              <dl className="divide-y divide-border">
+                {paramRows.map(([label, value]) => (
+                  <Fact key={label} label={label} value={value} />
+                ))}
+              </dl>
+            </Section>
+          )}
 
           {/* Required certificates, as the enum can name them. A requirement outside it is not
               rendered rather than guessed at. */}
           {certs.length > 0 && (
-            <div className="mt-4">
-              <div className="text-label font-extrabold uppercase tracking-wide text-muted">{t.workspace.certsRequired}</div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
+            <Section title={t.workspace.certsRequired}>
+              <div className="flex flex-wrap gap-1.5">
                 {certs.map((c) => (
                   <span key={c} className="rounded-full border border-brand/30 bg-brand-soft px-2.5 py-1 text-label font-semibold text-navy">
                     {ar ? CERT_LABEL[c].ar : CERT_LABEL[c].en}
                   </span>
                 ))}
               </div>
-            </div>
+            </Section>
+          )}
+
+          {/* What the renter wrote in their own words, so it is not folded into a row of enums. */}
+          {notes && (
+            <Section title={L("Notes", "ملاحظات")}>
+              <p className="whitespace-pre-line text-body leading-relaxed text-navy">{notes}</p>
+            </Section>
+          )}
+
+          {/* Said once, quietly, and only when NOTHING loaded — the dates, the site and the machines
+              above came from the list payload and are on screen regardless. */}
+          {recordsFailed && (
+            <p className="mt-4 text-meta text-muted">
+              {L("Some details could not be loaded. Close and reopen to try again.",
+                 "تعذّر تحميل بعض التفاصيل. أغلق النافذة وأعد فتحها للمحاولة مجددًا.")}
+            </p>
           )}
         </div>
 
@@ -314,6 +437,25 @@ export function RequestDetailsModal({
         />
       )}
     </>
+  );
+}
+
+/**
+ * A titled block of the modal.
+ *
+ * The body is long now — machines, dates, twenty terms, certificates, notes — and an unbroken
+ * column of label/value rows gives a reader no way to skim to the part they came for. The heading is
+ * the same small uppercase grey the certificate block already used, so this is the existing style
+ * applied consistently rather than a new one.
+ *
+ * `first:mt-0` so the top block sits against the panel's own padding instead of doubling it.
+ */
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="mt-5 first:mt-0">
+      <h3 className="text-label font-extrabold uppercase tracking-wide text-muted">{title}</h3>
+      <div className="mt-2">{children}</div>
+    </section>
   );
 }
 

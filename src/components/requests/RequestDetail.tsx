@@ -1,6 +1,11 @@
 // DISABLED — the per-request detail page, replaced by the requests workspace at /requests.
 // Nothing was deleted: every line below is the original, line-commented in place, so re-enabling
 // is a mechanical revert. See docs/requests-workspace-disabled.md.
+//
+// ONE EXCEPTION to "mechanical" (owner, 2026-08-29): `requestDetailRows` below, and the terms list
+// inside `Ditem`, now live for real in `lib/contract/request-fields.ts`, where the request details
+// modal reads them. Re-enabling this page means DELETING those two from here and importing them
+// from there — not restoring them — or the app carries the same field table twice and the two drift.
 // "use client";
 //
 // import { useEffect, useRef, useState, Fragment, type ReactNode } from "react";
