@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
-import { Dialog, DialogDrawer } from "@/components/Dialog";
-import { CloseIcon } from "@/components/HeaderIcons";
+import { Dialog } from "@/components/Dialog";
 import {
   bidShareUrl,
   cancelRequest,
@@ -28,8 +27,12 @@ export interface ShareLinkMeta {
 }
 
 /**
- * The request drawer — everything about the request itself, opened from the dark strip's site name
- * or its REQ id. It replaces the standalone detail pages.
+ * The request details modal — everything about the request itself, opened from the navy context bar
+ * above the bids. It replaces the standalone detail pages.
+ *
+ * It was a side drawer until 2026-08-29, on the reasoning that a request is read ALONGSIDE the bids
+ * it explains. The house rule outranks that: one modal shape for everything the app asks or answers,
+ * and the scrim dims those bids whichever edge the panel arrives from.
  *
  * **Editing mirrors the mobile app** (`request_detail_page.dart:165-174`, `638-674`), which the web
  * used to contradict by hiding Edit the moment a bid arrived. The rule is `requestActions`; this
@@ -42,7 +45,7 @@ export interface ShareLinkMeta {
  * Cancelling sits at the foot as a text link, away from the two buttons — it ends the request, and
  * should not be reachable by the same sweep of the hand that shares it.
  */
-export function RequestDrawer({
+export function RequestDetailsModal({
   group,
   item,
   bids,
@@ -123,42 +126,30 @@ export function RequestDrawer({
 
   return (
     <>
-      {/* A DRAWER rather than a centred dialog, and the content decides that: the request is read
-          ALONGSIDE the bids it explains, not answered and dismissed. `DialogDrawer` gives it the same
-          scrim, the same close and the same type as every other dialog; only the geometry differs.
+      {/* ── A dialog, like every other dialog (owner, 2026-08-29) ──────────────────────────────────
+          ~~A DRAWER rather than a centred dialog, because the request is read ALONGSIDE the bids it
+          explains.~~ That reasoning does not survive the house rule: one modal shape for everything,
+          and this is the surface a renter reaches most. A panel that slid in from the edge while
+          every other answer arrived in the middle was the odd one, and reading it alongside the bids
+          was never real — the scrim dims them either way.
 
-          It keeps its navy masthead through `header`, because that masthead is not chrome here — it
-          carries Share and Edit, which are what the drawer is for. */}
-      <DialogDrawer
+          The navy masthead goes with it. Navy is what this app paints a MASTHEAD in — something you
+          read — and the standard header is `bg-surface2` with the title, the reference under it, and
+          one ×. Share and Edit move to the `footer`, which is where a dialog keeps its actions and
+          where they stay put while the body scrolls. */}
+      <Dialog
         open
         onClose={onClose}
-        header={
-        <div {...pin("request-drawer")} className="flex-none bg-navy px-5 pb-5 pt-4 text-white">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-label font-extrabold uppercase tracking-wide text-white/55">
-                {group.groupRef ?? subject?.displayId ?? group.id}
-              </div>
-              <h2 className="mt-0.5 truncate text-display font-extrabold tracking-[-.3px]">{group.locationLabel}</h2>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label={t.common.close}
-              className="grid h-[34px] w-[34px] flex-none place-items-center rounded-full text-white/70 transition hover:bg-surface/10 hover:text-white"
-            >
-              <CloseIcon size={18} />
-            </button>
-          </div>
-
-          <div className="mt-3.5 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setShareOpen(true)}
-              className={btn("primary", "md", { className: "transition" })}
-            >
-              <Icon name="ios_share" size={16} /> {t.workspace.shareRequest}
-            </button>
+        size="lg"
+        title={group.locationLabel}
+        subtitle={group.groupRef ?? subject?.displayId ?? group.id}
+        footer={
+          <>
+            {/* Said out loud rather than left to a hover: a disabled button with no reason reads as
+                a bug. It leads the row, so the reason is read before the button it explains. */}
+            {actions.editCapUsed && (
+              <p className="me-auto text-label font-semibold text-muted">{t.workspace.editCapUsed}</p>
+            )}
             {actions.canEdit && (
               <button
                 type="button"
@@ -169,13 +160,17 @@ export function RequestDrawer({
                 {t.workspace.editRequest}
               </button>
             )}
-          </div>
-          {/* Said out loud rather than left to a hover: a disabled button with no reason reads as a bug. */}
-          {actions.editCapUsed && <p className="mt-2 text-label font-semibold text-white/60">{t.workspace.editCapUsed}</p>}
-        </div>
+            <button
+              type="button"
+              onClick={() => setShareOpen(true)}
+              className={btn("primary", "md", { className: "transition" })}
+            >
+              <Icon name="ios_share" size={16} /> {t.workspace.shareRequest}
+            </button>
+          </>
         }
       >
-        <div>
+        <div {...pin("request-details")}>
           {/* The items. On a group every line is listed; the one in focus is marked. */}
           <div className="space-y-2">
             {group.items.map((it) => {
@@ -244,8 +239,12 @@ export function RequestDrawer({
           )}
         </div>
 
+        {/* Cancelling ends the request, so it stays down here in the body and away from the two
+            buttons in the footer — it must not be reachable by the same sweep of the hand that
+            shares. `-mx-5` pulls the rule out to the panel's own edges; inside the body's padding it
+            was a short line floating in the middle of nothing. */}
         {actions.canCancel && (
-          <div className="border-t border-border px-5 py-3.5">
+          <div className="-mx-5 mt-4 border-t border-border px-5 pt-3.5">
             <button
               type="button"
               onClick={() => setConfirmCancel(true)}
@@ -255,7 +254,7 @@ export function RequestDrawer({
             </button>
           </div>
         )}
-      </DialogDrawer>
+      </Dialog>
 
       <ShareForBidsSheet
         open={shareOpen}

@@ -185,63 +185,6 @@ export function Dialog({
 }
 
 /**
- * A dialog that arrives from the trailing edge instead of the middle — for a surface you READ
- * alongside the page rather than answer and dismiss, which is the request drawer's whole job.
- *
- * Same scrim, same header, same footer, same type. Only the geometry differs, and it differs because
- * the content does.
- */
-export function DialogDrawer({
-  open,
-  onClose,
-  title,
-  subtitle,
-  header,
-  footer,
-  children,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title?: ReactNode;
-  subtitle?: ReactNode;
-  /** Replaces the standard header outright, for a drawer with a coloured masthead of its own. */
-  header?: ReactNode;
-  footer?: ReactNode;
-  children: ReactNode;
-}) {
-  const panel = useRef<HTMLElement>(null);
-  useDialogKeys(open, onClose, panel);
-  if (!open) return null;
-
-  return (
-    <>
-      <div className={SCRIM} onClick={onClose} />
-      <aside
-        ref={panel}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        className="fixed inset-y-0 end-0 z-[61] flex w-full max-w-[440px] flex-col border-s border-border bg-surface"
-      >
-        {header ?? (
-          (title || subtitle) && (
-            <div className="flex flex-none items-start gap-3 border-b border-border px-5 py-3.5">
-              <div className="min-w-0 flex-1">
-                {title && <h2 className="text-title font-extrabold leading-tight tracking-[-.2px] text-navy">{title}</h2>}
-                {subtitle && <p className="mt-0.5 text-meta leading-snug text-muted">{subtitle}</p>}
-              </div>
-              <DialogClose onClose={onClose} />
-            </div>
-          )
-        )}
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
-        {footer && <div className={cx(CARD_FOOTER, "flex-none")}>{footer}</div>}
-      </aside>
-    </>
-  );
-}
-
-/**
  * The close control, exported because a drawer with its own masthead still has to close the same way.
  *
  * 34px, and the same hairline glyph the top bar uses — a dialog is chrome, and the app has one set of

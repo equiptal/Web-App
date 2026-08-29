@@ -27,7 +27,7 @@ import { RequestContextBar } from "@/components/workspace/RequestContextBar";
 import { ItemTier } from "@/components/workspace/ItemTier";
 import { BidCards } from "@/components/workspace/BidCards";
 import { CompareMatrix } from "@/components/workspace/CompareMatrix";
-import { RequestDrawer, type ShareLinkMeta } from "@/components/workspace/RequestDrawer";
+import { RequestDetailsModal, type ShareLinkMeta } from "@/components/workspace/RequestDetailsModal";
 import { buildItemComparison } from "@/lib/contract/comparison";
 import { bidColumnToComputed } from "@/lib/contract/agent-bids";
 import { workspaceExportTotals } from "@/lib/contract/workspace-export";
@@ -705,7 +705,7 @@ export function RequestsWorkspace() {
       )}
 
       {drawerOpen && (
-        <RequestDrawer
+        <RequestDetailsModal
           group={group}
           item={item}
           bids={bids}

@@ -105,6 +105,7 @@ export const PIN_REGISTRY = {
   "home-hero": { n: "10.1", label: "Home — hero band", file: "src/components/home/HomeHub.tsx" },
   "home-hero-actions": { n: "10.2", label: "Home — hero action column", file: "src/components/home/HomeHub.tsx" },
   "home-tiles": { n: "10.3", label: "Home — activity tiles", file: "src/components/home/HomeHub.tsx" },
+  "home-requests": { n: "10.4", label: "Home — requests + bids rail", file: "src/components/home/HomeRequests.tsx" },
   "start-request-modal": { n: "11", label: "Start-your-request modal", file: "src/components/home/StartYourRequestModal.tsx" },
 
   /* ── 15–24  create ────────────────────────────────────────────────────────────────────────── */
@@ -138,7 +139,7 @@ export const PIN_REGISTRY = {
   // location and the item, and the item switcher the strip used to carry as chips (owner, 2026-08-27).
   "item-tier": { n: "26.3", label: "Item tier — one chip per machine", file: "src/components/workspace/ItemTier.tsx" },
   "request-context": { n: "27", label: "Request context bar (location + item)", file: "src/components/workspace/RequestContextBar.tsx" },
-  "request-drawer": { n: "28", label: "Request drawer — masthead", file: "src/components/workspace/RequestDrawer.tsx" },
+  "request-details": { n: "28", label: "Request details modal", file: "src/components/workspace/RequestDetailsModal.tsx" },
   "workspace-bid-cards": { n: "29", label: "Bid cards", file: "src/components/workspace/BidCards.tsx" },
   "bid-card": { n: "29.1", label: "Bid card — one tile", file: "src/components/workspace/BidCards.tsx" },
   "bid-card-header": { n: "29.2", label: "Bid card — header", file: "src/components/workspace/BidCards.tsx" },

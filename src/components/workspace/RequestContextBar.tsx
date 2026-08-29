@@ -56,17 +56,29 @@ export function RequestContextBar({
           `control-lg` is the same 44 the export button and the tabs carry — the row reads as one set
           of controls rather than three things that happen to be near each other.
 
-          It rounds on both ends now: the caret that used to close its trailing edge is gone. */}
+          ── Saying that it opens something (owner, 2026-08-29) ────────────────────────────────────
+          It was a navy block with two lines of text in it and nothing else, and a navy block is what
+          this app uses for a MASTHEAD — something you read, not something you press. Nobody found the
+          request behind it.
+
+          So it now carries the two marks this app already uses for "this goes somewhere": the
+          underline under the line you are meant to read, and a chevron at the trailing edge. Both,
+          not one. The chevron alone sits at the far end of a 30rem bar, too far from the words to
+          attach to them; the underline alone reads as emphasis. Together they say target.
+
+          `rtl:scale-x-[-1]` on the chevron, as every other one in this app has — an arrow that means
+          "onward" has to turn around when the reading does. */}
       <button
         type="button"
         onClick={() => onOpenRequest?.()}
         disabled={!onOpenRequest}
         title={group.address ?? group.locationLabel}
         className={cx(
-          "control-lg flex min-w-0 max-w-[30rem] flex-col justify-center gap-1 rounded-md border border-navy bg-navy !px-3 text-start transition-colors",
+          "group control-lg flex min-w-0 max-w-[30rem] items-center gap-2 rounded-md border border-navy bg-navy !px-3 text-start transition-colors",
           onOpenRequest ? "hover:bg-navy-mid" : "cursor-default",
         )}
       >
+        <span className="flex min-w-0 flex-1 flex-col justify-center gap-1">
         {/* ── The site leads, the machine follows (owner, 2026-08-27) ────────────────────────────
             The site is the 12.5px white and the machine the 11px grey under it. The item filter one
             row down names the machine in full and says which is being read, so the bar does not have
@@ -75,18 +87,36 @@ export function RequestContextBar({
             Both lines size to their content up to 30rem — they were capped at 170px each, which cut
             «Impact Hammer (Diesel/Hydraulic)» in half and a Riyadh address before its district.
             `min-w-0` is what lets `truncate` work inside a flex row at all. */}
-        <span className="flex min-w-0 items-center gap-1.5 text-meta font-semibold leading-[15px] text-white">
-          <Icon name="place" size={13} className="flex-none" />
-          <span className="truncate">{group.locationLabel}</span>
-        </span>
-        <span className="flex min-w-0 items-center gap-1.5 text-label font-semibold leading-[13px] text-white/60">
-          <span className="truncate">{label}</span>
-          {qty > 1 && (
-            <span className="flex-none rounded-full bg-white/15 px-1.5 text-label font-semibold text-white/70">
-              ×{qty}
+          <span className="flex min-w-0 items-center gap-1.5 text-meta font-semibold leading-[15px] text-white">
+            <Icon name="place" size={13} className="flex-none" />
+            {/* The underline sits on the WORDS, not the row: a rule running under the pin as well
+                would read as a divider. It is always drawn — a hover-only hint is no hint at all to
+                someone who has not hovered — and firms up under the pointer. */}
+            <span
+              className={cx(
+                "truncate",
+                onOpenRequest && "underline decoration-white/40 decoration-1 underline-offset-[3px] transition-colors group-hover:decoration-white",
+              )}
+            >
+              {group.locationLabel}
             </span>
-          )}
+          </span>
+          <span className="flex min-w-0 items-center gap-1.5 text-label font-semibold leading-[13px] text-white/60">
+            <span className="truncate">{label}</span>
+            {qty > 1 && (
+              <span className="flex-none rounded-full bg-white/15 px-1.5 text-label font-semibold text-white/70">
+                ×{qty}
+              </span>
+            )}
+          </span>
         </span>
+        {onOpenRequest && (
+          <Icon
+            name="chevron_right"
+            size={18}
+            className="flex-none text-white/50 transition-colors group-hover:text-white rtl:scale-x-[-1]"
+          />
+        )}
       </button>
     </div>
   );
