@@ -78,7 +78,13 @@ Open: whether the term also leaves the **supplier** side (`BidFormClient.tsx:104
 **Scope:** web-create
 **Files:** new `components/create/ProjectChips.tsx`; mount in `screens/Intake.tsx`
 
-Every project, most-recently-used first, capped at six with *All projects* beyond. **Ended ones sort last, tagged, never hidden** — hiding a project because a date passed would silently break a renter who extended verbally. Hidden entirely for guests.
+Every project, most-recently-used first, capped at six with *All projects* beyond. **Ended ones sort last, tagged, never hidden** — hiding a project because a date passed would silently break a renter who extended verbally.
+
+**The row renders nothing at all when there is nothing to show** — a guest, or a signed-in renter with no projects yet. Not an empty label, not a placeholder. A renter who has never made a project must see today's intake, unchanged, so nothing about this feature reaches someone who is not using it.
+
+**Given/When/Then**
+- Given a signed-in renter with zero projects / Then the intake screen is identical to today's, with no chip row and no caption.
+- Given a guest / Then the same.
 
 ### W-T8 — `ProjectPills` + the caption + the conflict
 **Scope:** web-create
@@ -230,6 +236,8 @@ The tier follows the **shape of the text**, not whether a project exists:
 | one equipment line | Tier 0 — the shared matcher, in the browser, no network |
 | a sentence with extras + a project | Tier 1 — `POST /api/agent/quick` → `{MANSOUR_URL}/rfq/quick` |
 | a paragraph, or no project | Tier 2 — today's path, **byte-identical** |
+
+**Nothing here changes `/rfq/jobs`.** The mobile app and the projectless web keep the same model, prompt content, few-shot window and polling they have today. The only shared-path change in the whole feature is the agent's prompt-block reorder (NA-T1), which ships alone and eval-gated before anything depends on it.
 
 Tier 1 falls back to the job path on non-2xx or timeout.
 
