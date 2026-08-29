@@ -1070,6 +1070,43 @@
 }
 .bidmap .bm-eq .bm-eq-select:focus-visible { outline: 2px solid #16304f; outline-offset: -3px; }
 
+/* ── The machine's own picture, back (owner, 2026-08-29) ───────────────────────────────
+   *"I want the images of the front image of equipment back."* It was cut on 08-28 as furniture and it
+   is not: a column of machines is a fleet, and a renter comparing three excavators recognises them by
+   sight before he reads a word of either title.
+
+   A BANNER across the top, not the 104px left cell it used to be: the distance is the card's subject
+   now and it wants the full width, and a side cell would have taken a quarter of that back. The
+   corner controls ride ON the picture, which is where a corner control belongs and is the width the
+   banner hands back.
+
+   The cell SHIMMERS until the image decodes, so the card never shows a bare grey rectangle while a
+   photo is on the wire. A machine with none is not loading, so `is-empty` stops it — a placeholder
+   travelling forever claims something is on its way that never will be. */
+.bidmap .bm-eq .bm-eq-photo {
+  position: relative;
+  z-index: 2;
+  display: block;
+  height: 116px;
+  overflow: hidden;
+  cursor: pointer;
+  background-color: var(--surface2);
+  background-image: linear-gradient(90deg, #e8eff6 20%, #f4f8fc 40%, #e8eff6 60%);
+  background-size: 220% 100%;
+  animation: dpShimmer 1.25s linear infinite;
+  border-bottom: 1px solid #e1e9f1;
+}
+.bidmap .bm-eq .bm-eq-photo.is-empty {
+  background-image: none;
+  animation: none;
+  display: grid;
+  place-items: center;
+}
+.bidmap .bm-eq .bm-eq-photo:focus-visible { outline: 2px solid var(--action, #2563eb); outline-offset: -3px; }
+.bidmap .bm-eq .bm-eq-art { width: 100%; height: 100%; object-fit: cover; transition: transform 0.35s cubic-bezier(0.22, 0.9, 0.3, 1); }
+.bidmap .bm-eq:hover .bm-eq-art { transform: scale(1.05); }
+.bidmap .bm-eq .bm-eq-nophoto { font-size: 10px; font-weight: 700; color: var(--muted); text-align: center; padding: 0 8px; }
+
 /* `pointer-events: none` on the wrapper and `auto` on each real control — so everything that is not
    a control falls through to the stretched select layer beneath. */
 .bidmap .bm-eq .bm-eq-in {
@@ -1079,18 +1116,28 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 10px 13px 12px;
+  padding: 11px 13px 12px;
 }
 
 /* ── The corner: the file's completeness, and the way into it ────────────────────────────────────
    Both are facts about the machine's PAPERS. They ride the top trailing edge together, small, and
    the distance below gets the card's whole width because neither of them is on its line. */
 .bidmap .bm-eq .bm-eq-hd {
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  inset-inline-end: 8px;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 8px;
   min-height: 26px;
+  /* A ground under both, so the dots and the icon read over a light machine against a light sky.
+     Opaque, not a tint: over a photograph a translucent plate takes the colour of whatever is behind
+     it, and the dots' own meaning is carried by their fill. */
+  padding: 4px 6px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid #dbe6ef;
 }
 /* The readiness dots — the app's `done`/`total`, one dot each, filled for what is on file. The colour
    is the READINESS band's, never the availability colour: the papers are a fact about the file, the
@@ -1162,10 +1209,24 @@
   font-family: inherit;
 }
 .bidmap .bm-eq .bm-eq-yard .material-icons-outlined { flex-shrink: 0; font-size: 20px; line-height: 1; }
+/* ── The state's tone is FIXED — selection may not touch it (owner, 2026-08-29) ──────────────
+   *"When a card is selected dont let the selection color affect the red or green color, red or green
+   tone is the same across all even if selected."*
+
+   These fills were `color-mix(…, transparent)` — a tint, which composites over whatever is behind
+   it. On a selected card that is `#eaf1f8` rather than white, so the same machine's green went one
+   step cooler the moment the renter pressed it, and a column with one card selected showed two
+   greens for one state. The reader then has to decide whether the difference means anything. It
+   does not: availability is a fact about the SUPPLIER, and selection is a fact about the renter's
+   attention.
+
+   Mixed into `var(--surface)` instead of into `transparent`: same colour on white, and now OPAQUE, so
+   the ground under it cannot reach through. Every other channel of selection — the border, the fill,
+   the accent bar, the file icon — is untouched and still says which card is chosen. */
 .bidmap .bm-eq .bm-eq-yard.ok {
   color: #0d6c38;
-  background: color-mix(in srgb, var(--ok-deep) 10%, transparent);
-  border-color: color-mix(in srgb, var(--ok) 34%, transparent);
+  background: color-mix(in srgb, var(--ok-deep) 10%, var(--surface));
+  border-color: color-mix(in srgb, var(--ok) 34%, var(--surface));
 }
 /* The unconfirmed and the asked states share a ground: the fact has not changed, only whether the
    renter has already acted on it. What separates them is the glyph and the prompt at the end. */
@@ -1174,11 +1235,11 @@
   pointer-events: auto;
   cursor: pointer;
   color: #d9362a;
-  background: color-mix(in srgb, var(--danger-deep) 10%, transparent);
-  border-color: color-mix(in srgb, var(--danger-deep) 30%, transparent);
+  background: color-mix(in srgb, var(--danger-deep) 10%, var(--surface));
+  border-color: color-mix(in srgb, var(--danger-deep) 30%, var(--surface));
 }
 .bidmap .bm-eq .bm-eq-yard.no:hover,
-.bidmap .bm-eq .bm-eq-yard.asked:hover { background: color-mix(in srgb, var(--danger-deep) 16%, transparent); }
+.bidmap .bm-eq .bm-eq-yard.asked:hover { background: color-mix(in srgb, var(--danger-deep) 16%, var(--surface)); }
 .bidmap .bm-eq .bm-eq-yard.asked { color: #a82c22; }
 .bidmap .bm-eq .bm-eq-yard:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 

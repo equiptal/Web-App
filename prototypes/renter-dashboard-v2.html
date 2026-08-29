@@ -44,10 +44,9 @@
     --danger:#d9362a; --danger-soft:#fcebea; --danger-deep:#b03636;
     --info:#1a7ec8; --info-soft:#e6f2fb; --info-deep:#0e4f7e;
     --t-label:11px; --t-meta:12.5px; --t-body:13px; --t-subhead:15px; --t-title:17px; --t-display:22px;
-    /* Square by decision — no rounded edges on cards, buttons, inputs, pills or
-       avatars. Only the small state dots stay round, because a 6px square reads
-       as a speck of dirt rather than an indicator. */
-    --r-sm:0; --r-md:0; --r-lg:0; --r-full:0;
+    /* The web's own cut (globals.css): a 1px corner inset rather than a true square —
+       the corner is taken off, not rounded. Pills stay pills; a pill is a shape, not a radius. */
+    --r-sm:2px; --r-md:4px; --r-lg:6px; --r-full:999px;
     --c-sm:30px; --c-md:34px; --c-lg:44px;
     --t:150ms cubic-bezier(.32,.72,.24,1);
   }
@@ -99,15 +98,17 @@
   /* ── section scaffolding ────────────────────────────────────────────────── */
   .sec{padding:20px 0 0}
   .sec + .sec{padding-top:28px}
-  /* Section header — a band, not a floating line. Navy edge, hairline under,
-     the same rhythm on all four sections so the page reads as one document. */
-  .shead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;
-    background:var(--surface);border:1px solid var(--border);border-inline-start:3px solid var(--navy);
-    padding:11px 14px}
-  .shead h2{font-size:var(--t-title);text-transform:uppercase;letter-spacing:.04em}
-  .shead h2::after{content:"";display:inline-block;width:1px;height:13px;background:var(--border);
-    margin-inline-start:12px;vertical-align:-2px}
-  .shead .sum{color:var(--muted);font-size:var(--t-meta);margin-inline-start:-4px}
+  /* Section header — option G (owner, 2026-08-29): a navy plate carrying the section's
+     glyph, the title over its summary, and the action on the trailing edge. No band and no
+     box: the page already has enough bordered rectangles, and the plate is what the eye
+     finds when scrolling rather than a fourth rule. */
+  .shead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .shead .plate{width:38px;height:38px;flex:none;background:var(--navy);color:#fff;
+    display:grid;place-items:center;border-radius:var(--r-sm)}
+  .shead .plate .icon{font-size:var(--t-display)}
+  .shead .txt{min-width:0}
+  .shead h2{font-size:var(--t-title)}
+  .shead .sum{display:block;color:var(--muted);font-size:var(--t-meta);margin-top:2px}
   .shead .sum b{color:var(--navy);font-weight:800}
   .shead .sum .risk{color:var(--danger-deep);font-weight:800}
   .shead .spacer{flex:1}
@@ -717,10 +718,11 @@ function renderRequests(){
   }).join("");
 
   document.getElementById("requests").innerHTML =
-      '<div class="shead"><h2>' + L("My Requests", "طلباتي") + '</h2>'
+      '<div class="shead"><span class="plate"><span class="icon" aria-hidden="true">assignment</span></span>'
+    +   '<span class="txt"><h2>' + L("My Requests", "طلباتي") + '</h2>'
     +   '<span class="sum"><b>' + open + '</b> ' + L("open", "مفتوح") + ' · <b>' + fresh + '</b> '
     +     L("new bids", "عرضاً جديداً") + (nobids ? ' · <span class="risk">' + nobids + ' '
-    +     L("with no bids", "بلا عروض") + '</span>' : '') + '</span>'
+    +     L("with no bids", "بلا عروض") + '</span>' : '') + '</span></span>'
     +   '<span class="spacer"></span>'
     +   '<button class="btn btn-primary"><span class="icon" aria-hidden="true">add</span>'
     +     L("New request", "طلب جديد") + '</button></div>'
@@ -950,10 +952,11 @@ function renderProjects(){
   }).join("");
 
   document.getElementById("projects").innerHTML =
-      '<div class="shead"><h2>' + L("My Projects", "مشاريعي") + '</h2>'
+      '<div class="shead"><span class="plate"><span class="icon" aria-hidden="true">apartment</span></span>'
+    +   '<span class="txt"><h2>' + L("My Projects", "مشاريعي") + '</h2>'
     +   '<span class="sum"><b>' + PROJECTS.length + '</b> ' + L("projects", "مشاريع") + ' · <b>'
     +     PROJECTS.reduce(function(n, x){ return n + x.units; }, 0) + '</b> '
-    +     L("units awarded", "وحدة مُرساة") + '</span></div>'
+    +     L("units awarded", "وحدة مُرساة") + '</span></span></div>'
     + '<div class="plane"><div class="prail">' + rail + '</div><div class="panel">'
     +   '<div class="pmeta">'
     +     '<div class="cell wide"><div class="k">' + L("Project title", "اسم المشروع") + '</div>'
@@ -1058,9 +1061,10 @@ function renderSuppliers(){
   }).join("");
 
   document.getElementById("suppliers").innerHTML =
-      '<div class="shead"><h2>' + L("My Suppliers", "مؤجّروني") + '</h2>'
+      '<div class="shead"><span class="plate"><span class="icon" aria-hidden="true">handshake</span></span>'
+    +   '<span class="txt"><h2>' + L("My Suppliers", "مؤجّروني") + '</h2>'
     +   '<span class="sum">' + L("what they did for you — Stores holds the public facts",
-                                 "ما فعلوه لك — المتاجر تحمل الحقائق العامة") + '</span></div>'
+                                 "ما فعلوه لك — المتاجر تحمل الحقائق العامة") + '</span></span></div>'
     + '<div class="panel"><div class="tscroll"><table><thead><tr>'
     +   '<th>' + L("Supplier", "المؤجّر") + '</th>'
     +   '<th>' + L("Your record", "سجلّك معهم") + '</th>'
@@ -1074,9 +1078,10 @@ function renderSuppliers(){
 /* ══ stores ═════════════════════════════════════════════════════════════════ */
 function renderStores(){
   document.getElementById("stores").innerHTML =
-      '<div class="shead"><h2>' + L("Stores", "المتاجر") + '</h2>'
+      '<div class="shead"><span class="plate"><span class="icon" aria-hidden="true">storefront</span></span>'
+    +   '<span class="txt"><h2>' + L("Stores", "المتاجر") + '</h2>'
     +   '<span class="sum">' + L("the market — what suppliers publish, the same for everyone",
-                                 "السوق — ما ينشره المؤجّرون، ذاته للجميع") + '</span>'
+                                 "السوق — ما ينشره المؤجّرون، ذاته للجميع") + '</span></span>'
     +   '<span class="spacer"></span><a class="link" href="#">' + L("Browse all 214", "تصفّح الكل ٢١٤")
     +   '<span class="icon" aria-hidden="true">arrow_forward</span></a></div>'
     + '<div class="scards">' + STORES.map(function(s){

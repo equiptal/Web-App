@@ -22,7 +22,7 @@ import { arabicIndicDigits, availabilityView, isOutOfCity, REQUEST_ACTION_COLOUR
 import type { Bilingual } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import { computeUnitReadiness, readinessInputsFor, type ReadinessBand } from "@/lib/contract/bid-readiness";
-import type { MatchRequest } from "@/components/map/panel/machine-panel-model";
+import { heroPhotoUrl, type MatchRequest } from "@/components/map/panel/machine-panel-model";
 
 /**
  * **The card's ONE state chip** (RM3-AC-32).
@@ -103,12 +103,14 @@ export interface EquipmentCardReadiness {
  *  - **the load capacity / measurement** (AC-12) — the type and the size are already stated once, in
  *    the count pills, and stating them again per card turns a scannable column into a spec sheet;
  *  - **any second commitment field** (AC-32) — see {@link EquipmentCardChip};
- *  - **the photo, the verified mark and the «in this offer» badge** — dropped with the 2026-08-28
- *    redesign. The renter does not care whether a machine is *in the offer but unavailable*; he cares
- *    whether it is available, and the badge was a second membership fact competing with the one state
- *    the card now carries. The picture and the platform's tick went with the rest of the furniture:
- *    the card answers *how far, how sure, and how complete* in three lines, and everything else is
- *    one press away in the file.
+ *  - **the verified mark and the «in this offer» badge** — dropped with the 2026-08-28 redesign. The
+ *    renter does not care whether a machine is *in the offer but unavailable*; he cares whether it is
+ *    available, and the badge was a second membership fact competing with the one state the card now
+ *    carries. The platform's tick went with the rest of the furniture: the card answers *how far, how
+ *    sure, and how complete*, and everything else is one press away in the file.
+ *
+ *    ~~The photo went with them.~~ Back on 2026-08-29 by the owner's word — see {@link
+ *    EquipmentCardModel.photo}. It is not furniture; it is how a renter tells three excavators apart.
  *
  * ~~"no readiness band, no percent, no score" (RM3-AC-29)~~ — withdrawn with the same redesign; see
  * {@link EquipmentCardReadiness} for why the rule died with the chip it was protecting.
@@ -118,6 +120,16 @@ export interface EquipmentCardModel {
   /** «Caterpillar 320D · 2022», falling back to the taxonomy word when the listing has no name. Both
    *  locales, so the component picks rather than this file reaching for one. */
   title: Bilingual;
+  /**
+   * The front photo, else any photo, else null — a card with none says so rather than shimmering.
+   *
+   * ~~Dropped with the 2026-08-28 redesign.~~ Back the next day, by name (owner: *"i want the images
+   * of the front image of equipment back"*). It was cut as furniture and it is not: the machines in a
+   * column are a fleet, and a renter comparing three excavators recognises them by sight before he
+   * reads a word of either title. Nothing else came back with it — the availability chip, the
+   * «in this offer» badge, the platform's tick and the certificate line all stay gone.
+   */
+  photo: string | null;
   chip: EquipmentCardChip;
   /**
    * Kilometres to the project **to one decimal**, or null. Never a 0 standing in for "unknown".
@@ -216,6 +228,7 @@ export function equipmentCardModel(
         machine.year != null ? arabicIndicDigits(machine.year) : null,
       ),
     },
+    photo: heroPhotoUrl(machine),
     chip,
     // One decimal, and rounded to it rather than to a whole kilometre (owner, 2026-08-11) — see
     // `EquipmentCardModel.km`. `×10 / 10` rather than `toFixed`, because the model returns a NUMBER

@@ -98,6 +98,22 @@ export const en = {
     suppliersTitle: "Suggested Suppliers",
     viewAll: "View all",
     showLess: "Show less",
+    // ── The dashboard's requests block (owner, 2026-08-29) ──────────────────────────────────────
+    // The column says how long suppliers can still ANSWER, not what the backend calls the row: the
+    // renter is deciding whether to chase, extend or award, and a status word answers none of that.
+    reqSummary: "{n} open · {bids} new bids",
+    reqMoreItems: "+{n} more",
+    reqDaysLeft: "{n} days left",
+    reqOneDayLeft: "1 day left",
+    reqToday: "Closes today",
+    reqExpired: "Expired",
+    compareBids: "Compare bids",
+    colSite: "Site",
+    colEquipment: "Equipment",
+    colBids: "Bids",
+    colCloses: "Closes",
+    newBidsCount: "{n} new bids",
+    noBidsYet: "No bids yet.",
     nudgeGuestTitle: "Complete your profile",
     nudgeGuestBody: "Add your details to unlock requests and bids.",
     nudgeGuestCta: "Complete profile",
@@ -1129,6 +1145,7 @@ export const en = {
     // The dots beside the file icon: the machine's papers, scored the way the app scores them.
     eqReadinessOnFile: "{done} of {total} documents on file",
     eqOpenFile: "Open this machine's file",
+    eqNoPhoto: "No photo",
     eqSelect: "Show this equipment on the map",
     // RM3-AC-26 — a price and a count were given, and nothing else. No empty card furniture.
     eqNoneRegistered: "No equipment is registered in this offer",

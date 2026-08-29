@@ -6,6 +6,7 @@ import { useT, useLocale } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { BrowseSurface } from "@/components/stores/BrowseSurface";
 import { fetchActivity, type ActivityCounts } from "@/lib/api/client";
+import { HomeRequests } from "@/components/home/HomeRequests";
 import { StartYourRequestModal, type StartRequestChoice } from "@/components/home/StartYourRequestModal";
 import { useStartRequestGate } from "@/lib/access/start-request-gate";
 import { btn } from "@/lib/ds";
@@ -139,6 +140,13 @@ export function HomeHub() {
           <Icon name="chevron_right" size={20} className="flex-none text-brand-light rtl:scale-x-[-1]" />
         </button>
       )}
+
+      {/* ── The requests, and the bids beside them (owner, 2026-08-29) ────────────────────────────
+          The dashboard's first block, above the activity tiles: what is out to the market, how long
+          each one still takes bids, and what has come back — the two halves of one question, on one
+          row. It draws nothing for a renter with no requests, so a new account still opens on the
+          hero and the suppliers. */}
+      <HomeRequests />
 
       {/* Activity cards. The bids and deals tabs are gone: the workspace shows a request and its
           bids together, so "bids" is not a separate destination, and completed deals live in the

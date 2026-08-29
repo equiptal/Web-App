@@ -46,8 +46,8 @@ If `--env` was not passed, **ask before doing anything else**. Use `AskUserQuest
 
 | Environment | Base URL | Mutations |
 |---|---|---|
-| prod | _(unset — ask once and write it into this table)_ | **forbidden** |
-| staging | _(unset — ask once and write it into this table)_ | allowed |
+| prod | `https://g0a44yhbki.execute-api.eu-central-1.amazonaws.com` | **forbidden** |
+| staging | `https://c4tupvmckc.execute-api.eu-central-1.amazonaws.com` | allowed |
 | local | `http://localhost:3000` | allowed |
 
 Once you learn a URL, edit this file so the next run does not ask again.
@@ -62,11 +62,23 @@ On **local**, start the server yourself if it is not up: `npm run dev`, wait for
 
 Most cases need a signed-in renter. Login is OTP, so pick a strategy for the environment and say which one you used in the report — a run that silently tested logged-out pages is a false pass.
 
-1. **Reuse a session** — if a saved session cookie exists and still validates against `/api/auth/session`, use it.
-2. **Test account with a fixed code** — if the environment has one, log in through `/login` and `/verify`.
-3. **Stub the auth routes** — browser layer only, and only against `local`. Intercept `/api/auth/*` and `/api/me/*` with fixtures.
+**staging — the known-good route.** Log in as the renter test account `0508150219` using the staging OTP bypass. Read `STAGING_OTP_BYPASS_CODE` from `Moedatech-App/apps/backend/.env.staging` at call time; never copy it into a file, a commit, or the transcript. The bypass skips Unifonic entirely (`auth.service.ts:204` — *"skip Unifonic to avoid sending SMS to real prod-snapshot phone numbers"*), so **no SMS is sent** to a real handset.
 
-If none is available, run the public surfaces (`/bid/[token]`, `/login`) and the unit layer, and report every authenticated case as `BLOCKED (no session)`. Do not invent a pass.
+```
+POST /auth/login      { phone: "0508150219", countryCode: "+966", role: "rentee", otpMethod: "SMS" }
+POST /auth/verify-otp { phone: "0508150219", code: <bypass code> }
+```
+
+Then send **`data.idToken`** as `Authorization: Bearer`. Two traps, both of which cost a run to rediscover:
+
+- **The access token is refused.** The API Gateway Cognito authorizer validates the ID token — it carries `aud` and `custom:dbUserId`. `accessToken` returns `401` on every endpoint. The web already gets this right (`app-backend-authed.ts:209`) and so does the app.
+- **Responses are gzipped.** A client that does not decompress fails with an invalid-UTF-8 error that looks like a server fault and is not.
+
+**prod — read-only, no session.** Do not log in to prod. Authentication is a write: it sends an SMS and can create an account. Probe prod with unauthenticated GETs only, and assert that renter endpoints answer `401`.
+
+**local** — auth has no mock (`appApiUrl` is the one service in `env.ts` with no stand-in), so authenticated journeys cannot run locally. Stub `/api/auth/*` and `/api/me/*` for browser cases, or point at staging.
+
+If no strategy is available, run the public surfaces and the unit layer, and report every authenticated case as `BLOCKED (no session)`. Do not invent a pass.
 
 ## Step 2 — Resolve the target to cases
 
@@ -128,23 +140,60 @@ Do not mark a manual case passed. It is `MANUAL (awaiting user)` until the user 
 
 ## Step 7 — Report
 
-One table, every case, in ID order:
+Three parts, in this order. Do not merge them — the first is what happened, the second is what to do, the third is what you could not reach.
+
+### 7a · Results, per module
+
+One table per module, cases in ID order:
 
 | ID | Case | Layer | Result | Evidence |
 |---|---|---|---|---|
 
 Results are `PASS`, `FAIL`, `SKIPPED (prod, mutating)`, `BLOCKED (no session)`, or `MANUAL (awaiting user)`. Nothing else. Evidence is a file:line, a status code, a quoted string, or a screenshot path — never "looks fine".
 
-Then, for failures only, one block each: what was expected, what happened, the shortest decisive output, and where the bug most likely lives. Rank by severity: money and contract terms first, then data loss, then access control, then journey blockers, then cosmetic.
+Head each module table with its counts: `AUTH — 11 pass · 2 fail · 3 blocked`.
 
-Close with the coverage line: how many cases are automated, how many are manual, and which cases have no coverage at all.
+### 7b · Fix list, per module
+
+**Every `FAIL` becomes a numbered fix entry, under the module it belongs to.** A failure with no fix entry is a report that tells the reader nothing they can act on. Each entry carries exactly these fields:
+
+| Field | What goes in it |
+|---|---|
+| **ID** | `FIX-<MODULE>-<n>`, e.g. `FIX-DEAL-2`. Stable across runs — a fix that reappears keeps its number. |
+| **Case** | The case ID(s) that failed. |
+| **Severity** | `blocker` · `major` · `minor`. See the scale below. |
+| **Where** | `file:line`. The line to change, not the file it was noticed in. |
+| **Expected / Actual** | Two concrete values. `81,000` vs `93,000`, not "wrong total". |
+| **Cause** | One sentence on why it happens. If unknown, write `unknown` — never guess in this field. |
+| **Fix** | The change, in one or two sentences. Name the function. |
+| **Risk** | What else the change touches. `none known` is a valid answer, but look first. |
+| **Ruling** | The `RULINGS.md` entry that makes this a defect rather than a preference, if there is one. |
+
+Severity scale, in order — the first one that applies wins:
+
+1. **blocker** — money is wrong, a contract term is wrong, data is lost, or someone sees another tenant's data.
+2. **major** — a renter cannot finish a journey, or two surfaces state different facts about the same thing.
+3. **minor** — cosmetic, copy, or a rough edge that does not change what the renter decides.
+
+Order the fix list by severity, then by module order. Put the total at the top: `7 fixes — 2 blocker, 3 major, 2 minor`.
+
+**A failure you have not confirmed is a `PLAUSIBLE` fix entry, marked as such.** Do not present a suspicion as a defect.
+
+### 7c · What this run could not prove
+
+Close with the honest edges, because a report that omits them reads as broader than it is:
+
+- cases `BLOCKED` and why (no session, no environment URL, mutating on prod)
+- cases with **no coverage at all** — the `—` rows
+- anything asserted by one surface only, where the agreement matrix has no second surface to compare against
 
 ## Step 8 — Persist
 
-Update `TESTING.md`:
-- the run date, the environment, and the pass/fail counts at the top of the module's section
-- any new cases discovered during the run, added to the table with no result yet
-- a manual case you automated this run flips to a spec path
+**`TESTING.md`** — the run date, the environment, and the pass/fail counts at the top of each module's section; any new case found during the run, added with no result yet; a manual case you automated this run flips to a spec path.
+
+**`FINDINGS.md`** — the fix list from 7b, and nothing else. It is the working queue for the fixing session that follows, so it holds only open entries. When a fix lands, strike the entry through with the commit that closed it rather than deleting it, so a reappearing defect is visibly a regression and not a new discovery.
+
+**`RULINGS.md`** — if the run turned up a question only a person can answer (two surfaces disagree and neither is obviously right; the app contradicts itself; a written spec and the code disagree), add it to the Open section rather than picking an answer. Check the app, the backend and git history first — most apparent open questions are already settled somewhere and only look open from the web alone.
 
 Fix nothing without approval. Report the failures, propose the fix, and wait — unless the user invoked this with an explicit instruction to fix.
 

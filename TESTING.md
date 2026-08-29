@@ -19,8 +19,8 @@ The single source of test cases for this app. Run it with `/web:test`.
 
 | Environment | Base URL | Mutations |
 |---|---|---|
-| prod | _(unset)_ | **forbidden** |
-| staging | _(unset)_ | allowed |
+| prod | `https://g0a44yhbki.execute-api.eu-central-1.amazonaws.com` | **forbidden** |
+| staging | `https://c4tupvmckc.execute-api.eu-central-1.amazonaws.com` | allowed |
 | local | `http://localhost:3000` | allowed |
 
 ## Modules

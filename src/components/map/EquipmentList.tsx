@@ -632,7 +632,7 @@ function EquipmentCard({
   // (AC-19), and the model carries no serial and no capacity for the card to reach for even by
   // accident (AC-12).
   const card = useMemo(() => equipmentCardModel(machine, request), [machine, request]);
-  const { chip, askAvailability, readiness } = card;
+  const { chip, photo, askAvailability, readiness } = card;
   /** Asked, and not yet answered. The workspace decides it — only it can see the conversation — and
    *  the card paints the answer. */
   const pending = askPending?.(machine) ?? false;
@@ -670,15 +670,53 @@ function EquipmentCard({
         onClick={() => onFocusMachine(machine.equipmentId)}
       />
 
-      <div className="bm-eq-in">
+      {/* ── The machine's own picture, back (owner, 2026-08-29) ───────────────────────────────────
+          *"I want the images of the front image of equipment back."*
+
+          It was cut on 08-28 as furniture, and it is not: a column of machines is a fleet, and a
+          renter comparing three excavators recognises them by sight before he reads a word of either
+          title. Nothing else came back with it — the availability chip, the «in this offer» badge,
+          the platform's tick and the certificate line all stay gone.
+
+          It sits as a banner across the card's top rather than as the 104px left cell it used to be.
+          The distance is the card's subject now and it wants the full width; a side cell would have
+          taken a quarter of that back and pushed the figure into a 250px column. The corner controls
+          ride ON the picture, which is where a corner control belongs and is the width the banner
+          hands back.
+
+          The cell shimmers while a photo decodes; `is-empty` stops it for a machine that has none,
+          because nothing is arriving and a placeholder travelling forever says otherwise.
+
+          It OPENS the detail, above the stretched find-on-map layer (owner, 2026-08-18): the picture
+          is the part of the card that is already about looking at the machine closely, so pressing it
+          to see it closely is not a rule the renter has to learn. */}
+      <span
+        role="button"
+        tabIndex={0}
+        aria-label={`${t.bidMap.eqOpenFile} — ${title}`}
+        className={`bm-eq-photo${photo ? "" : " is-empty"}`}
+        onClick={() => onOpenDetail(machine.equipmentId)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onOpenDetail(machine.equipmentId);
+          }
+        }}
+      >
+        {photo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={photo} alt="" className="bm-eq-art" />
+        ) : (
+          <span className="bm-eq-nophoto">{t.bidMap.eqNoPhoto}</span>
+        )}
+
         {/* ── The corner: how complete the file is, and the way into it (owner, 2026-08-28) ───────
             Both are facts about the machine's PAPERS, which is a different subject from the distance
             below and from the supplier's promise that colours it. They sit together, small, in the
             corner the reader's eye leaves the card by.
 
             «Details ›» is gone as a word. The icon is the file under a magnifier, which is what the
-            control has always done — look inside this machine's file — and it costs the row nothing,
-            so the distance below gets the card's whole width. */}
+            control has always done — look inside this machine's file. */}
         <div className="bm-eq-hd">
           <ReadinessDots
             readiness={readiness}
@@ -708,6 +746,9 @@ function EquipmentCard({
             </svg>
           </button>
         </div>
+      </span>
+
+      <div className="bm-eq-in">
 
         {/* ── The distance, and it IS the card (owner, 2026-08-28) ────────────────────────────────
             The dominant object, painted with the one thing that qualifies it: whether the supplier

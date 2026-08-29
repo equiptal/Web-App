@@ -342,9 +342,35 @@ describe("the card carries three things, and the ask is the largest of them", ()
     // The three blocks, and no fourth.
     for (const part of ["bm-eq-hd", "bm-eq-yard", "bm-eq-model"]) expect(list, part).toContain(part);
     // The old furniture, by name — a later edit that brings any of it back goes red here.
-    for (const gone of ["bm-eq-photo", "bm-eq-chip", "bm-eq-cert", "bm-eq-inoffer", "bm-eq-vd", "bm-eq-r1", "bm-eq-r4"]) {
+    // `bm-eq-photo` is deliberately NOT on this list: the picture came back on 2026-08-29 by the
+    // owner's word, as a banner with the corner controls riding it. Nothing else did.
+    for (const gone of ["bm-eq-chip", "bm-eq-cert", "bm-eq-inoffer", "bm-eq-vd", "bm-eq-r1", "bm-eq-r4"]) {
       expect(list, gone).not.toContain(gone);
     }
+  });
+
+  it("draws the machine's own photo, and lets it open the file", () => {
+    // *"I want the images of the front image of equipment back."* It is the model's `photo` — the
+    // front shot, else any shot, else null — and a machine with none says so rather than shimmering
+    // forever at something that will never arrive.
+    expect(list).toMatch(/className=\{`bm-eq-photo\$\{photo \? "" : " is-empty"\}`\}/);
+    expect(list).toMatch(/<img src=\{photo\}/);
+    expect(list).toContain("eqNoPhoto");
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-photo.is-empty {")).toMatch(/animation:\s*none/);
+  });
+
+  it("keeps the availability tone identical on a selected card (owner, 2026-08-29)", () => {
+    // *"When a card is selected dont let the selection color affect the red or green color."* The
+    // fills were `color-mix(…, transparent)`, which composites over the card's ground — and a
+    // selected card's ground is not white, so the same machine's green shifted the moment it was
+    // pressed. Mixed into `var(--surface)` they are opaque and identical either way.
+    for (const sel of [".bidmap .bm-eq .bm-eq-yard.ok {", ".bidmap .bm-eq .bm-eq-yard.no,"]) {
+      const block = cssBlock(css, sel);
+      expect(block, sel).toMatch(/background:\s*color-mix\(in srgb, var\(--\w[\w-]*\) \d+%, var\(--surface\)\)/);
+      expect(block, sel).not.toMatch(/background:\s*color-mix\([^;]*transparent\)/);
+    }
+    // …and no `.bm-eq.on` rule may reach the state object at all.
+    expect(css).not.toMatch(/\.bm-eq\.on[^{]*\.bm-eq-yard/);
   });
 
   it("drops the «in this offer» badge from the card without dropping the fact from the surface", () => {
