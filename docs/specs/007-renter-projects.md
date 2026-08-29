@@ -477,7 +477,13 @@ The project does not choose the tier. It only decides what fills the blanks afte
 
 ### 12.3 The prompt reorder — ships first, alone
 
-Today the system prompt is `buildRfqSystemPrompt(taxonomyBlock)` — **instructions then taxonomy, in one cached block** (`rfq.service.ts:819`). Prompt caching is **prefix**-matched, so a second instruction variant at the front would miss the cache the existing path depends on and make **both** paths slower.
+Today the system prompt is `buildRfqSystemPrompt(taxonomyBlock)` — **instructions then taxonomy, in one cached block** (`rfq.service.ts:819`).
+
+Prompt caching is **prefix**-matched, so a second instructions variant simply gets **its own** cached prefix. The full path is unaffected — it keeps its own entry. What the second prefix costs is that it carries its own copy of the taxonomy and is kept warm **only by its own traffic**, which is thin at launch — exactly when a renter is testing whether "one line, five seconds" is true.
+
+Reordering so the taxonomy is the shared head means every full-path call keeps the equipment-only path warm too, and the taxonomy is cached once rather than twice.
+
+**It is an optimisation, not a prerequisite.** If it does not come back clean it is dropped, and Tier 1 still ships on its own cached prefix with a colder first call. It goes first only because it is small and its eval is the cheapest place to catch a prompt regression.
 
 ```
 Block A   taxonomy                     ← large, rarely changes, shared by both scopes

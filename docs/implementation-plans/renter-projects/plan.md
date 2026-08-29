@@ -230,7 +230,7 @@ And one hook: **accepting a bid upserts a linked `renter_suppliers` row** (unreg
 
 | # | Work | Files |
 |---|---|---|
-| N1 | **Reorder the prompt blocks, alone, first.** A = taxonomy, B = scope instructions, C = learned rules + few-shot, each `cache_control`. Eval before and after; full-scope output must be unchanged (PROJ-AC-35). Nothing else in this phase is safe until it is green. | `services/rfq.service.ts:812-828`, `constants/rfq-prompt.ts` |
+| N1 | **Reorder the prompt blocks, alone, first.** A = taxonomy, B = scope instructions, C = learned rules + few-shot, each `cache_control`. Eval before and after; full-scope output must be unchanged (PROJ-AC-35). **An optimisation, not a blocker** — it makes every full-path call keep the equipment-only path warm, and caches the taxonomy once instead of twice. If it does not come back clean, drop it: Tier 1 still ships on its own cached prefix, with a colder first call. | `services/rfq.service.ts:812-828`, `constants/rfq-prompt.ts` |
 | N2 | **Tier 0** — `resolveEquipmentLine(text, taxonomy)`: strip a leading quantity, keyword-scan with `extractEquipmentKeywords()`, resolve `number + unit` to a measurement, and **refuse** on any ambiguity or leftover words (spec §12.2). No model, no job row. | new `services/equipment-quick-match.ts` |
 | N3 | **Tier 1** — `buildEquipmentOnlyInstructions()`: `line_items` only, no `rfq_header`, no header-level missing fields, no header notes. | `constants/rfq-prompt.ts` |
 | N4 | `scope` on the extraction input; branch prompt variant, model, `max_tokens`, few-shot limit. **No project context is accepted or required** (PROJ-AC-32). | `services/rfq.service.ts`, `types/rfq.types.ts` |
@@ -303,7 +303,7 @@ And one hook: **accepting a bid upserts a linked `renter_suppliers` row** (unreg
 
 ## Risks
 
-1. **N1 touches the path every request already uses.** It ships alone, behind the eval, before anything depends on it.
+1. **N1 touches the prompt every request already uses.** It ships alone and eval-gated — not because the rest depends on it (it does not), but because a prompt regression is cheapest to catch with nothing else in the diff.
 2. **Haiku match quality.** If N8 shows a drop, keep the scope and revert the model — the output cut alone is most of the win.
 3. **Tier 0 must be strict.** A wrong instant match is worse than a slow right one. Every refusal case in spec §12.2 is a test, not a guideline.
 4. **Two rows for one machine** (a work order also posted as a request) is intended, and will read as duplication to some renters. The header counts requests and work orders separately rather than adding them.

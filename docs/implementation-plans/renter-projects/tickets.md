@@ -237,7 +237,9 @@ The tier follows the **shape of the text**, not whether a project exists:
 | a sentence with extras + a project | Tier 1 — `POST /api/agent/quick` → `{MANSOUR_URL}/rfq/quick` |
 | a paragraph, or no project | Tier 2 — today's path, **byte-identical** |
 
-**Nothing here changes `/rfq/jobs`.** The mobile app and the projectless web keep the same model, prompt content, few-shot window and polling they have today. The only shared-path change in the whole feature is the agent's prompt-block reorder (NA-T1), which ships alone and eval-gated before anything depends on it.
+**Nothing here changes `/rfq/jobs`.** The mobile app and the projectless web keep the same model, prompt content, few-shot window and polling they have today.
+
+Two agent tickets touch shared code, and neither is a prerequisite for anything else: the prompt-block reorder (NA-T1), which is a cache optimisation and is dropped if its eval is not clean, and the dedup-hash fix (NA-T6), which is a bug fix the mobile app is exposed to today.
 
 Tier 1 falls back to the job path on non-2xx or timeout.
 
