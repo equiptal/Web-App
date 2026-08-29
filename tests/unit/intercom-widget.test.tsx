@@ -46,7 +46,22 @@ const identity = (over: Partial<IntercomServerIdentity> = {}): IntercomServerIde
  */
 const calls = () => (window.Intercom?.q ?? []) as unknown[][];
 const commands = () => calls().map((c) => c[0]);
-const lastPayload = () => calls()[calls().length - 1][1] as Record<string, unknown>;
+
+/**
+ * The BOOT-LIFECYCLE calls only — `boot`, `shutdown`, `update`.
+ *
+ * The widget also registers `onUnreadCountChange`, which is a subscription rather than a step in the
+ * lifecycle. Asserting on the raw list would tie every sequencing test below to where in the mount
+ * that subscription happens, which is not what any of them is about.
+ */
+const LIFECYCLE = new Set(["boot", "shutdown", "update"]);
+const lifecycle = () => commands().filter((c) => LIFECYCLE.has(c as string));
+
+/** The payload of the last lifecycle call — the one describing the messenger as it now stands. */
+const lastPayload = () => {
+  const last = calls().filter((c) => LIFECYCLE.has(c[0] as string)).pop();
+  return (last?.[1] ?? {}) as Record<string, unknown>;
+};
 
 beforeEach(() => {
   session.value = { status: "loading", user: null };
@@ -74,14 +89,14 @@ async function renderWith(body: IntercomServerIdentity | null, ok = true) {
 describe("booting before anyone is identified", () => {
   it("boots anonymous while the session is still resolving", async () => {
     await renderWith(null);
-    expect(commands()).toEqual(["boot"]);
+    expect(lifecycle()).toEqual(["boot"]);
     expect(lastPayload()).not.toHaveProperty("user_id");
   });
 
   it("stays anonymous for a visitor who never signs in", async () => {
     session.value = { status: "anon", user: null };
     await renderWith(null);
-    expect(commands()).toEqual(["boot"]);
+    expect(lifecycle()).toEqual(["boot"]);
     expect(lastPayload()).not.toHaveProperty("user_id");
   });
 });
@@ -91,7 +106,7 @@ describe("identifying a renter", () => {
     session.value = { status: "authed", user };
     await renderWith(identity());
     // A second `boot` over a live anonymous session does not promote it — it kills it.
-    await waitFor(() => expect(commands()).toEqual(["boot", "shutdown", "boot"]));
+    await waitFor(() => expect(lifecycle()).toEqual(["boot", "shutdown", "boot"]));
     const payload = lastPayload();
     expect(payload.user_id).toBe("42");
     expect(payload.user_hash).toBe("a".repeat(64));
@@ -100,7 +115,7 @@ describe("identifying a renter", () => {
   it("boots identified WITHOUT a signature, as the mobile app does", async () => {
     session.value = { status: "authed", user };
     await renderWith(identity({ userHash: null, verified: false }));
-    await waitFor(() => expect(commands()).toEqual(["boot", "shutdown", "boot"]));
+    await waitFor(() => expect(lifecycle()).toEqual(["boot", "shutdown", "boot"]));
     const payload = lastPayload();
     expect(payload.user_id).toBe("42");
     // Omitted, never null: Intercom reads the key's PRESENCE, so a null reads as a failed signature.
@@ -110,7 +125,7 @@ describe("identifying a renter", () => {
   it("stays anonymous when the route fails outright — there is no identity to send", async () => {
     session.value = { status: "authed", user };
     await renderWith(null, false);
-    await waitFor(() => expect(commands()).toEqual(["boot"]));
+    await waitFor(() => expect(lifecycle()).toEqual(["boot"]));
     expect(lastPayload()).not.toHaveProperty("user_id");
   });
 });
@@ -139,5 +154,43 @@ describe("the launcher", () => {
     locale.value = { locale: "ar", dir: "rtl" };
     const { getByRole } = await renderWith(null);
     expect(getByRole("button", { name: "الدعم" })).toBeTruthy();
+  });
+
+  /**
+   * The bubble and the panel it opens must sit on the SAME side.
+   *
+   * `LocaleProvider` starts on the default locale and restores the stored one in a mount effect, so
+   * the first boot always happens under a language the renter may not be reading. The anonymous
+   * branch used to key its cache on the bare string "anon", which named neither the locale nor the
+   * direction — so the flip that followed was compared, matched, and dropped. An Arabic renter got a
+   * launcher bottom-left and a messenger bottom-right (owner, 2026-08-29).
+   */
+  it("moves the messenger when the language changes under an anonymous visitor", async () => {
+    session.value = { status: "anon", user: null };
+    const { rerender } = await renderWith(null);
+    expect(lastPayload().alignment).toBe("right");
+    expect(lastPayload().language_override).toBe("en");
+
+    locale.value = { locale: "ar", dir: "rtl" };
+    rerender(<IntercomWidget />);
+
+    await waitFor(() => expect(lastPayload().alignment).toBe("left"));
+    expect(lastPayload().language_override).toBe("ar");
+    // `update`, not a second `boot`: it is the same anonymous conversation in a new language, and
+    // re-booting would restart the session and lose the unread count with it.
+    expect(lifecycle()).toEqual(["boot", "update"]);
+  });
+
+  /**
+   * The unread badge needs its subscription to actually be registered.
+   *
+   * It used to be registered inside the launcher, and React runs a child's effects BEFORE its
+   * parent's — so it ran before the snippet had installed its queueing stub, found no
+   * `window.Intercom`, and on an empty dependency array never tried again. The badge could not
+   * count, ever (owner, 2026-08-29).
+   */
+  it("subscribes to the unread count", async () => {
+    await renderWith(null);
+    expect(commands()).toContain("onUnreadCountChange");
   });
 });

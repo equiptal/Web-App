@@ -79,9 +79,22 @@ function loadIntercom(appId: string): void {
 export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) {
   const { status, user } = useSession();
   const { locale, dir } = useLocale();
-  const booted = useRef(false);
-  /** The identity the messenger currently holds, so a re-render does not re-send the same one. */
+  /**
+   * The messenger's current state, as one key.
+   *
+   * It has to name EVERY input to the boot object below — identity, locale AND direction — because
+   * this is the only thing standing between a re-render and a re-send. A key that omits an input is
+   * a change that never reaches Intercom: the anonymous branch used to key on the bare string
+   * "anon", so the locale flip on mount (`LocaleProvider` restores the stored language in an effect,
+   * after the first paint) was read, compared, and discarded. The messenger kept the alignment of a
+   * language nobody was reading, and an Arabic renter pressed a bubble on the left and got a panel
+   * on the right (owner, 2026-08-29).
+   */
   const identity = useRef<string | null>(null);
+  /** Anonymous or identified, which decides `update` against `shutdown` + `boot`. Null before either. */
+  const mode = useRef<"anon" | "user" | null>(null);
+  /** Intercom's unread count. Held HERE, not in `Launcher` — see the effect below. */
+  const [unread, setUnread] = useState(0);
   /**
    * The signature, the real name and the email — everything only the server can answer.
    *
@@ -132,6 +145,18 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
   useEffect(() => {
     if (!INTERCOM_APP_ID) return;
     loadIntercom(INTERCOM_APP_ID);
+    /**
+     * The unread subscription, registered HERE rather than in `Launcher`.
+     *
+     * React runs a child's effects BEFORE its parent's, so `Launcher`'s own mount effect ran before
+     * the line above had created the queue stub. It found no `window.Intercom`, returned, and — on
+     * an empty dependency array — never tried again. The badge could not count, ever. One line
+     * later, in the parent, the stub exists and the queue holds the call until the real client
+     * lands (owner, 2026-08-29).
+     */
+    window.Intercom?.("onUnreadCountChange", (count: unknown) =>
+      setUnread(typeof count === "number" ? count : 0),
+    );
   }, []);
 
   useEffect(() => {
@@ -159,13 +184,16 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
     // person who cannot get in, and that person never reaches `authed`.
     //
     if (status === "loading" || !user || !server) {
-      const wanted = "anon";
-      if (identity.current === wanted && booted.current) return;
+      // The locale and the direction are IN the key, not just in the dependency array. `base` reads
+      // both, so both have to be able to invalidate it — see the note on `identity`.
+      const wanted = `anon:${locale}:${dir}`;
+      if (identity.current === wanted) return;
       // A signed-in messenger must be torn down before an anonymous one replaces it, or the previous
-      // conversation stays attached to the next person at this browser.
-      if (identity.current && identity.current !== "anon") api("shutdown");
-      api(booted.current && identity.current === "anon" ? "update" : "boot", base);
-      booted.current = true;
+      // conversation stays attached to the next person at this browser. `mode`, not the key, decides
+      // that: two anonymous keys differing only by language are the same messenger in a new language.
+      if (mode.current === "user") api("shutdown");
+      api(mode.current === "anon" ? "update" : "boot", base);
+      mode.current = "anon";
       identity.current = wanted;
       return;
     }
@@ -173,7 +201,7 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
     const payload = { ...base, ...buildIntercomPayload({ user, locale, appVersion, server }) };
     // The signature is in the key: a workspace that rotates its secret mid-session must re-boot
     // rather than keep a messenger signed under the old one.
-    const wanted = `${user.id}:${user.tier}:${locale}:${server.userHash ?? "unsigned"}`;
+    const wanted = `${user.id}:${user.tier}:${locale}:${dir}:${server.userHash ?? "unsigned"}`;
     if (identity.current === wanted) return;
 
     // `update` for anything that changes WITHIN one identity — a tier that moved, a language
@@ -185,13 +213,13 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
     // renders «Something's gone wrong — content could not be loaded» with no way back but a reload.
     // Intercom's documented switch is teardown then boot, and it is what the sign-OUT path
     // already does in the other direction, a few lines up.
-    if (identity.current === "anon") api("shutdown");
-    api(identity.current && identity.current !== "anon" ? "update" : "boot", payload);
-    booted.current = true;
+    if (mode.current === "anon") api("shutdown");
+    api(mode.current === "user" ? "update" : "boot", payload);
+    mode.current = "user";
     identity.current = wanted;
   }, [status, user, locale, dir, appVersion, server]);
 
-  return <Launcher />;
+  return <Launcher unread={unread} />;
 }
 
 /**
@@ -216,15 +244,8 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
  * Not draggable, unlike the app's. The app moves it because a phone screen is small enough for a
  * fixed bubble to sit on top of something that matters; at this width nothing is under it.
  */
-function Launcher() {
+function Launcher({ unread }: { unread: number }) {
   const { dir } = useLocale();
-  const [unread, setUnread] = useState(0);
-
-  useEffect(() => {
-    const api = window.Intercom;
-    if (!api) return;
-    api("onUnreadCountChange", (count: unknown) => setUnread(typeof count === "number" ? count : 0));
-  }, []);
 
   const open = useCallback(() => window.Intercom?.("show"), []);
 
