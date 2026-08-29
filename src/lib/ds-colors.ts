@@ -21,9 +21,9 @@
 
 export const COLORS = {
   // Navy / neutral ramp
-  navyDeep: "#16263f",
-  navy: "#1c3550",
-  navyMid: "#2a4f72",
+  navyDeep: "#161c2c",
+  navy: "#1c2738",
+  navyMid: "#2a3a50",
   mutedDark: "#5a6b82",
   muted: "#6b8fa8",
   mutedLight: "#9aa7b8",
@@ -35,7 +35,7 @@ export const COLORS = {
   surface: "#ffffff",
   /** The default text colour. Deliberately the same value as `navy`, and named separately because
       a page sets its text colour without deciding it is drawing a navy block. */
-  foreground: "#1c3550",
+  foreground: "#1c2738",
 
   // Brand
   brandDeep: "#b45309",

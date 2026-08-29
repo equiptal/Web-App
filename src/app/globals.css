@@ -19,9 +19,16 @@
   /* ── Navy / neutral ramp ─────────────────────────────────────────────────────────────────────
      Twelve steps, dark to light. Eighty-seven distinct blues were doing this work before; each of
      these twelve has a job none of the others can do. */
-  --navy-deep: #16263f;      /* dark headers, overlay grounds — deeper than a navy block */
-  --navy: #1c3550;           /* foreground text, navy blocks */
-  --navy-mid: #2a4f72;       /* the navy gradient's partner */
+  /* The dark end was re-cut from a swatch the owner supplied (2026-08-29): #1c2738, a navy that is
+     both darker and much less saturated than the #1c3550 that stood here. Only `--navy` was asked
+     for; `--navy-deep` and `--navy-mid` follow it because a ramp is a set of distances, not three
+     independent colours — each keeps the exact channel ratio to `--navy` it already had, so the
+     steps are unchanged and only the family moved. Left alone, `--navy-deep` would have landed
+     within 1.5 points of relative luminance of the new `--navy` and flattened all six
+     `linear-gradient(var(--navy), var(--navy-deep))` surfaces into a solid block. */
+  --navy-deep: #161c2c;      /* dark headers, overlay grounds — deeper than a navy block */
+  --navy: #1c2738;           /* foreground text, navy blocks */
+  --navy-mid: #2a3a50;       /* the step up from navy: hover on a navy surface, secondary text */
   --muted-dark: #5a6b82;     /* secondary text that still has to carry weight */
   --muted: #6b8fa8;          /* secondary text */
   --muted-light: #9aa7b8;    /* tertiary text, placeholders, disabled */
@@ -31,7 +38,7 @@
   --surface2: #eff4f9;       /* inset panels, tinted fills, hover */
   --background: #f5f8fc;     /* the page ground */
   --surface: #ffffff;        /* cards, floating layers */
-  --foreground: #1c3550;
+  --foreground: #1c2738;   /* tracks `--navy` on purpose — see the note in `ds-colors.ts` */
 
   /* ── Brand ───────────────────────────────────────────────────────────────────────────────────
      #f79009 is the brand orange, confirmed against the mobile app (`apps/mobile/lib/core/theme/
