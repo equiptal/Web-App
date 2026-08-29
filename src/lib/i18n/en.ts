@@ -87,13 +87,18 @@ export const en = {
   },
   home: {
     title: "Home",
-    eyebrow: "Smart Equipment Marketplace",
     statSuppliers: "Verified Suppliers",
     statEquipment: "Equipment Listed",
     statCities: "Cities Covered",
-    bannerTitle: "Order your next equipment, faster than ever",
-    bannerSubtitle: "Post your request and get competitive bids from verified suppliers — or upload an RFQ and let your smart assistant build it automatically.",
     createRequest: "Create request",
+    // ── The CTA band (owner's comp, "Moedatech Create Request CTA", 2026-08-29) ─────────────
+    // The headline names the ACT, not the marketplace: the renter is not here to admire a platform,
+    // he is here to get a machine. «AI» is its own token so it can carry the brand's ink — the comp
+    // colours that one word and nothing else on the band.
+    ctaTitleBefore: "Let ",
+    ctaTitleAi: "AI",
+    ctaTitleAfter: " find your next equipment",
+    ctaSubtitle: "Describe what you need in plain words. Your smart assistant matches you with the right suppliers.",
     uploadRfq: "Upload RFQ",
     suppliersTitle: "Suggested Suppliers",
     viewAll: "View all",
@@ -107,6 +112,23 @@ export const en = {
     reqOneDayLeft: "1 day left",
     reqToday: "Closes today",
     reqExpired: "Expired",
+    // «Closed» is the STATUS speaking, and it outranks both dates: a request the backend has shut
+    // takes no more bids whatever its deadline said, so a countdown beside it would be a lie the
+    // renter acts on. Only when the row is still live do the two deadline sources get a say.
+    reqClosed: "Closed",
+    // The row's own actions, as the prototype carries them — share the bid link, edit the request,
+    // cancel it. Titles only: the icons are the control, and three labelled buttons on a dense row
+    // would be wider than the request they act on.
+    reqShare: "Share for bids",
+    reqEdit: "Edit request",
+    reqCancel: "Cancel request",
+    reqOpenDetails: "Open request details",
+    // The rail shows the newest five; the rest are one scroll away, and the strip says so rather
+    // than letting a cut-off row be the only hint that there are more.
+    moreBidsBelow: "{n} more — scroll",
+    // The table's own foot, mirroring the rail's. The header says «20 open» over five rows, and
+    // without this the reader's only reading of that gap is that the list is broken.
+    moreRequests: "{n} more requests",
     compareBids: "Compare bids",
     colSite: "Site",
     colEquipment: "Equipment",
@@ -1430,9 +1452,10 @@ export const en = {
     // Multi-unit only, in the same box: the true all-units figure, which is not the per-unit total
     // times the count — each transport leg carries its own unit count.
     overallTotal: "Overall total",
-    // The caption under it, in the app's own words (`priceRowUnitsCountLabel`): a bare «· 4» beside
-    // «Overall total» read as a line number rather than as what the figure was multiplied by.
-    unitsCountLabel: "Units: {n}",
+    // What the figure was multiplied by, INLINE with the label (owner, 2026-08-29) — a bare «· 4»
+    // read as a line number, and the app's stacked «Units: 4» caption spent a row of the totals box on
+    // four characters. Parenthesised, it is part of the phrase it qualifies.
+    unitsCountLabel: "({n} units)",
     // ── The offered-units badge (app parity: `bidOffersUnits` / `bidAcceptedUnits`) ─────────────
     // Drawn only where the REQUEST asked for more than one unit, which is the app's own gate: on a
     // single-unit request every bid covers the whole of it and the chip states nothing.

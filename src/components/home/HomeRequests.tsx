@@ -4,17 +4,32 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui";
 import { fetchAllMyRequests, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail } from "@/lib/api/client";
-import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
+import { cancellableItems, groupBiddingClosed, groupRequests, type RequestGroup } from "@/lib/contract/requests";
 import type { InboxBid } from "@/lib/contract/inbox";
 import { requestExpiry, expiryState, type ExpiryState } from "@/lib/contract/request-expiry";
 import { btn, CARD, cx } from "@/lib/ds";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { pin } from "@/lib/uiPins";
 
-/** The dashboard shows the newest few and hands the rest to the workspace. */
-const SHOWN = 3;
-/** The rail is the same height as the table beside it; more than this scrolls inside it. */
-const BIDS_SHOWN = 6;
+/**
+ * **Five and five** (owner, 2026-08-29).
+ *
+ * *"I want to show the bids latest 5 only with indication for more if exist to scroll, and then show
+ * the number of appropriate request that match and fit the bids card length."*
+ *
+ * So the two counts are not independent numbers to tune: the rail shows the newest five bids, and
+ * the table shows as many requests as stand level with them. Both rows are pinned to `ROW_H` and
+ * both headers to the same height, which is what makes "as many as fit" a fact the layout enforces
+ * rather than a guess two constants have to keep agreeing on. Change `BIDS_SHOWN` and the table
+ * follows.
+ *
+ * ~~Three requests, six bids.~~ Withdrawn with the same ruling: the header said «20 open» over a
+ * table showing three, which reads as a broken list rather than as a summary of one.
+ */
+const BIDS_SHOWN = 5;
+const SHOWN = BIDS_SHOWN;
+/** One height for a bid row and a request row alike — see {@link BIDS_SHOWN}. */
+const ROW_H = "h-[52px]";
 
 /**
  * **The renter's requests, and the bids that arrived against them** — the dashboard's first block.
@@ -23,18 +38,32 @@ const BIDS_SHOWN = 6;
  * They answer the two halves of one question — what did I ask for, and what came back — and a
  * dashboard that made the second a separate destination made the renter go and look for it.
  *
- * ── The expiry column ────────────────────────────────────────────────────────────────────────────
- * NOT the request's status. `REQUEST_STATUS` says what the backend calls the row; what a renter
- * standing here needs is how long suppliers can still answer it. That date has two sources and one
- * order, both held in `request-expiry.ts`:
+ * ── The row's actions live in the WORKSPACE, and are linked to (owner, 2026-08-29) ───────────────
+ * *"Where is the actions on the request that was in the prototype?"* — share, edit, cancel. Every
+ * one of them ends in machinery the details drawer already owns: the edit gate that reads
+ * `renteeEditUsed` and refuses before the form rather than at save, the share sheet that owns the
+ * bid link and its deadline, the cancel confirm. Rebuilding any of it here would be a second surface
+ * for one request, and the two would drift.
  *
+ * So each icon deep-links `/requests?g=<groupId>` with the door it wants — `share`, `cancel`, or
+ * `details` — and the row itself opens the details. One implementation, four ways in.
+ *
+ * ── The expiry column ────────────────────────────────────────────────────────────────────────────
+ * NOT the request's status — except when the status is the whole answer. Three sources, in order:
+ *
+ *   0. **the status**, when bidding is already shut (`groupBiddingClosed`). A deadline says when
+ *      bidding WOULD stop; the status says whether it already has, and they disagree often — a
+ *      request awarded on day one keeps a deadline three days out. «Closed», in red, outranks both
+ *      dates, because a countdown beside a shut request tells the renter to wait for offers that can
+ *      never arrive;
  *   1. the deadline the renter set himself on the shared bid link (`bidDeadline`), which is also the
  *      date the SUPPLIER's form closes on, so both sides read one date;
  *   2. failing that, the bid window chosen at creation (`offerDuration`) counted from `createdAt`.
  *
- * Neither is on the list payload, so each shown row is resolved with one call — and only for the
- * three rows actually drawn. The window fallback costs a second call, taken only when the renter set
- * no deadline. A row whose lookups fail simply shows no date rather than a wrong one.
+ * Neither date is on the list payload, so each shown row is resolved with one call — and only for
+ * the rows actually drawn, and only while they are still open, since a closed row has its answer
+ * already. The window fallback costs a second call, taken only when the renter set no deadline. A
+ * row whose lookups fail shows no date rather than a wrong one.
  */
 export function HomeRequests() {
   const t = useT();
@@ -60,13 +89,14 @@ export function HomeRequests() {
     };
   }, []);
 
-  /** Resolve the deadline for the rows on screen, link first and the window only if it is unset. */
+  /** Resolve the deadline for the rows on screen, link first and the window only if it is unset.
+   *  A row the status has already answered is skipped — there is nothing a date could add to it. */
   useEffect(() => {
     if (!groups) return;
     let live = true;
     for (const g of groups.slice(0, SHOWN)) {
       const first = g.items[0];
-      if (!first) continue;
+      if (!first || groupBiddingClosed(g.items)) continue;
       void (async () => {
         let bidDeadline: string | null = null;
         try {
@@ -98,11 +128,19 @@ export function HomeRequests() {
   const rows = (groups ?? []).slice(0, SHOWN);
   const fresh = bids.reduce((n, b) => n + (b.unreadCount || 0), 0);
   const newest = bids.slice(0, BIDS_SHOWN);
+  const restBids = Math.max(0, bids.length - BIDS_SHOWN);
 
   const money = (n: number | null): string => (n == null ? "—" : Math.round(n).toLocaleString("en-US"));
 
-  /** «3 days left» / «Today» / «Expired» — and nothing at all when the request has no deadline. */
-  const expiryWords = (s: ExpiryState | undefined) => {
+  /** Where a row's action lands: the workspace, on this request, at the door it names. */
+  const go = (id: string, door: "details" | "share" | "cancel") =>
+    router.push(`/requests?g=${encodeURIComponent(id)}&${door}=1`);
+
+  /** «Closed» / «3 days left» / «Today» / «Expired» — and nothing at all when there is no deadline
+   *  and no status to speak for it. `closed` is checked first; see the block comment above. */
+  const closesWords = (g: RequestGroup) => {
+    if (groupBiddingClosed(g.items)) return { label: t.home.reqClosed, tone: "danger" as const };
+    const s = expiry[g.id];
     if (!s || s.kind === "none") return null;
     if (s.kind === "expired") return { label: t.home.reqExpired, tone: "danger" as const };
     if (s.kind === "today") return { label: t.home.reqToday, tone: "warn" as const };
@@ -144,28 +182,47 @@ export function HomeRequests() {
                   {[t.home.colSite, t.home.colEquipment, t.home.colBids, t.home.colCloses].map((h) => (
                     <th
                       key={h}
-                      className="whitespace-nowrap border-b border-border px-3.5 py-2 text-start text-label font-extrabold uppercase tracking-wide text-muted-dark"
+                      className="h-[34px] whitespace-nowrap border-b border-border px-3.5 text-start text-label font-extrabold uppercase tracking-wide text-muted-dark"
                     >
                       {h}
                     </th>
                   ))}
-                  <th className="border-b border-border px-3.5 py-2" />
+                  <th className="h-[34px] border-b border-border px-3.5" />
                 </tr>
               </thead>
               <tbody>
                 {rows.map((g) => {
                   const item = g.items[0]?.item;
                   const name = item ? (ar ? item.nameAr || item.name : item.name) : g.groupRef || g.id;
-                  const words = expiryWords(expiry[g.id]);
+                  const words = closesWords(g);
+                  const canCancel = cancellableItems(g.items).length > 0;
                   return (
-                    <tr key={g.id} className="border-b border-border transition last:border-b-0 hover:bg-surface2">
-                      <td className="px-3.5 py-2.5">
+                    /* ── The row IS the way in (owner, 2026-08-29) ────────────────────────────────
+                       *"Clicking on a request row will open the request details."* The largest
+                       target on the row now does the most, and the icons beside it are shortcuts
+                       past the drawer's front page rather than the only way through it. Each of them
+                       stops the press from reaching the row, so a share never lands on details. */
+                    <tr
+                      key={g.id}
+                      onClick={() => go(g.id, "details")}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          go(g.id, "details");
+                        }
+                      }}
+                      title={t.home.reqOpenDetails}
+                      className={cx(ROW_H, "cursor-pointer border-b border-border transition last:border-b-0 hover:bg-surface2")}
+                    >
+                      <td className="px-3.5">
                         <span className="flex items-center gap-1.5 text-body font-extrabold text-navy">
                           <Icon name="location_on" size={16} className="flex-none text-muted" />
                           {g.locationLabel}
                         </span>
                       </td>
-                      <td className="px-3.5 py-2.5">
+                      <td className="px-3.5">
                         <span className="text-body font-semibold text-navy">{name}</span>
                         {g.items.length > 1 && (
                           <span className="text-meta text-muted">
@@ -174,12 +231,12 @@ export function HomeRequests() {
                           </span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-3.5 py-2.5">
+                      <td className="whitespace-nowrap px-3.5">
                         <span className={cx("text-subhead font-semibold tabular", g.totalBids ? "text-navy" : "text-danger")}>
                           {g.totalBids}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-3.5 py-2.5">
+                      <td className="whitespace-nowrap px-3.5">
                         {words ? (
                           <span
                             className={cx(
@@ -193,15 +250,34 @@ export function HomeRequests() {
                           <span className="text-meta text-muted-light">—</span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-3.5 py-2.5 text-end">
-                        <button
-                          type="button"
-                          onClick={() => router.push("/requests")}
-                          disabled={!g.totalBids}
-                          className={btn("primary", "sm")}
-                        >
-                          {t.home.compareBids}
-                        </button>
+                      <td className="whitespace-nowrap px-3.5 text-end">
+                        {/* ── The prototype's three, back on the row ────────────────────────────
+                            Share invites bids, Edit changes what was asked for, ✕ ends it. Icons
+                            rather than words: three labelled buttons would be wider than the request
+                            they act on, and each carries its sentence on `title`.
+
+                            ✕ renders only where the backend will actually take it
+                            (`cancellableItems`) — a control that exists and then refuses is worse
+                            than one that was never offered. «Compare bids» keeps its place as the
+                            row's one filled button: it is the thing the renter came to do. */}
+                        <span className="inline-flex items-center gap-1">
+                          <RowAction icon="ios_share" label={t.home.reqShare} onPress={() => go(g.id, "share")} />
+                          <RowAction icon="edit" label={t.home.reqEdit} onPress={() => go(g.id, "details")} />
+                          {canCancel && (
+                            <RowAction icon="close" label={t.home.reqCancel} tone="danger" onPress={() => go(g.id, "cancel")} />
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/requests?g=${encodeURIComponent(g.id)}`);
+                            }}
+                            disabled={!g.totalBids}
+                            className={cx(btn("primary", "sm"), "ms-1.5")}
+                          >
+                            {t.home.compareBids}
+                          </button>
+                        </span>
                       </td>
                     </tr>
                   );
@@ -216,11 +292,26 @@ export function HomeRequests() {
               </tbody>
             </table>
           </div>
+          {/* ── The rest, said rather than implied (owner, 2026-08-29) ────────────────────────
+              *"Why it only shows 3 request while there is 20 mentioned?"* — because the header
+              summarises the renter's whole account and the table shows the newest few, and nothing on
+              the block said so. The rail already had this problem and this is its answer, mirrored:
+              the remainder, on the card's own foot, as the way to the rest. */}
+          {groups && groups.length > SHOWN && (
+            <button
+              type="button"
+              onClick={() => router.push("/requests")}
+              className="flex flex-none items-center justify-center gap-1 border-t border-border bg-surface2 py-1.5 text-label font-extrabold text-muted-dark transition hover:bg-surface3 hover:text-navy"
+            >
+              {fmt(t.home.moreRequests, { n: String(groups.length - SHOWN) })}
+              <span aria-hidden="true">{ar ? "‹" : "›"}</span>
+            </button>
+          )}
         </div>
 
         {/* The bids rail — supplier, price, machine, site. One line of each, newest first. */}
         <aside className={cx(CARD, "flex min-h-0 flex-col overflow-hidden")}>
-          <div className="flex flex-none items-center gap-2 border-b border-brand-pale bg-brand-soft px-3 py-2">
+          <div className="flex h-[34px] flex-none items-center gap-2 border-b border-brand-pale bg-brand-soft px-3">
             <Icon name="gavel" size={16} className="text-brand-deep" />
             <h3 className="text-body font-extrabold text-brand-deep">
               {fmt(t.home.newBidsCount, { n: String(bids.length) })}
@@ -232,7 +323,7 @@ export function HomeRequests() {
                 key={b.bidId}
                 type="button"
                 onClick={() => router.push("/requests")}
-                className="flex w-full items-start gap-2.5 border-b border-border px-3 py-2 text-start transition last:border-b-0 hover:bg-surface2"
+                className={cx(ROW_H, "flex w-full items-center gap-2.5 border-b border-border px-3 text-start transition last:border-b-0 hover:bg-surface2")}
               >
                 <span className="grid size-7 flex-none place-items-center rounded-full border border-border bg-surface3 text-label font-extrabold text-navy">
                   {b.supplierName.trim().charAt(0) || "?"}
@@ -253,8 +344,56 @@ export function HomeRequests() {
               <p className="px-3 py-6 text-center text-meta text-muted">{t.home.noBidsYet}</p>
             )}
           </div>
+          {/* ── There are more, and the rail says so (owner, 2026-08-29) ─────────────────────────
+              A list cut off at five looks the same as a list of five. The strip is pinned under the
+              scroller rather than being its last row, so it does not scroll away at the moment it
+              becomes true — and it states the REMAINDER, since «5 shown» is a fact about the box and
+              «13 more» is a fact about the renter's bids. */}
+          {restBids > 0 && (
+            <div className="flex flex-none items-center justify-center gap-1 border-t border-border bg-surface2 py-1.5 text-label font-extrabold text-muted-dark">
+              <Icon name="keyboard_arrow_down" size={14} />
+              {fmt(t.home.moreBidsBelow, { n: String(restBids) })}
+            </div>
+          )}
         </aside>
       </div>
     </section>
+  );
+}
+
+/**
+ * One icon action on a request row.
+ *
+ * `stopPropagation` is the whole point of it existing as a component: every one of these sits inside
+ * a row that is itself a button into the details, and an action that let the press through would do
+ * two things at once.
+ */
+function RowAction({
+  icon,
+  label,
+  onPress,
+  tone,
+}: {
+  icon: string;
+  label: string;
+  onPress: () => void;
+  tone?: "danger";
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onPress();
+      }}
+      aria-label={label}
+      title={label}
+      className={cx(
+        "grid size-7 flex-none place-items-center rounded-sm border border-border bg-surface transition hover:bg-surface2",
+        tone === "danger" ? "text-danger hover:border-danger/40" : "text-navy hover:border-navy-mid/40",
+      )}
+    >
+      <Icon name={icon} size={15} />
+    </button>
   );
 }

@@ -500,8 +500,8 @@ export function EquipmentList({
                 }}
               >
                 {t.bidMap.eqYardExplainCta}
-              </button>
-            </div>
+                </button>
+          </div>
           )}
         </div>
       )}
@@ -670,139 +670,140 @@ function EquipmentCard({
         onClick={() => onFocusMachine(machine.equipmentId)}
       />
 
-      {/* ── The machine's own picture, back (owner, 2026-08-29) ───────────────────────────────────
-          *"I want the images of the front image of equipment back."*
-
-          It was cut on 08-28 as furniture, and it is not: a column of machines is a fleet, and a
-          renter comparing three excavators recognises them by sight before he reads a word of either
-          title. Nothing else came back with it — the availability chip, the «in this offer» badge,
-          the platform's tick and the certificate line all stay gone.
-
-          It sits as a banner across the card's top rather than as the 104px left cell it used to be.
-          The distance is the card's subject now and it wants the full width; a side cell would have
-          taken a quarter of that back and pushed the figure into a 250px column. The corner controls
-          ride ON the picture, which is where a corner control belongs and is the width the banner
-          hands back.
-
-          The cell shimmers while a photo decodes; `is-empty` stops it for a machine that has none,
-          because nothing is arriving and a placeholder travelling forever says otherwise.
-
-          It OPENS the detail, above the stretched find-on-map layer (owner, 2026-08-18): the picture
-          is the part of the card that is already about looking at the machine closely, so pressing it
-          to see it closely is not a rule the renter has to learn. */}
-      <span
-        role="button"
-        tabIndex={0}
-        aria-label={`${t.bidMap.eqOpenFile} — ${title}`}
-        className={`bm-eq-photo${photo ? "" : " is-empty"}`}
-        onClick={() => onOpenDetail(machine.equipmentId)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onOpenDetail(machine.equipmentId);
-          }
-        }}
-      >
-        {photo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={photo} alt="" className="bm-eq-art" />
-        ) : (
-          <span className="bm-eq-nophoto">{t.bidMap.eqNoPhoto}</span>
-        )}
-
-        {/* ── The corner: how complete the file is, and the way into it (owner, 2026-08-28) ───────
-            Both are facts about the machine's PAPERS, which is a different subject from the distance
-            below and from the supplier's promise that colours it. They sit together, small, in the
-            corner the reader's eye leaves the card by.
-
-            «Details ›» is gone as a word. The icon is the file under a magnifier, which is what the
-            control has always done — look inside this machine's file. */}
-        <div className="bm-eq-hd">
-          <ReadinessDots
-            readiness={readiness}
-            title={fmt(t.bidMap.eqReadinessOnFile, { done: num(readiness.done), total: num(readiness.total) })}
-          />
-          <button
-            type="button"
-            className="bm-eq-open"
-            aria-label={`${t.bidMap.eqOpenFile} — ${title}`}
-            title={t.bidMap.eqOpenFile}
-            onClick={() => onOpenDetail(machine.equipmentId)}
-          >
-            {/* Drawn rather than fetched: this surface loads no icon set of its own beyond the
-                material font, which has no file-under-a-magnifier, and an inline path cannot go
-                missing at runtime. */}
-            <svg viewBox="0 0 512 512" width="17" height="17" aria-hidden="true" focusable="false">
-              <path
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="34"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M379 236V25H27v462h352v-63M101 111h198M101 205h132M101 299h79M101 393h79"
-              />
-              <circle cx="325" cy="325" r="86" fill="none" stroke="currentColor" strokeWidth="34" />
-              <path fill="none" stroke="currentColor" strokeWidth="34" strokeLinecap="round" d="m389 389 74 74" />
-            </svg>
-          </button>
-        </div>
-      </span>
-
       <div className="bm-eq-in">
+        {/* ── The machine's own picture, back where it was (owner, 2026-08-29) ─────────────────────
+            *"I want the images of the front image of equipment back."* It was cut on 08-28 as
+            furniture and it is not: a column of machines is a fleet, and a renter comparing three
+            excavators recognises them by sight before he reads a word of either title.
 
-        {/* ── The distance, and it IS the card (owner, 2026-08-28) ────────────────────────────────
-            The dominant object, painted with the one thing that qualifies it: whether the supplier
-            has promised this machine for this offer.
+            ~~Brought back as a banner across the card's top.~~ Withdrawn the same day, on seeing it:
+            *"make the photo back in same place and design of previous card ui which was on the
+            side."* A full-width banner gave a 104px cell's worth of subject a 366px stage, so a
+            machine with no photo was a third of the card saying «No photo» — the exact "empty card
+            furniture" the surface's own empty state was written to avoid.
 
-            A red distance is not a bad distance. It is a distance nobody has promised — the machine
-            stands there today, and the supplier has not said it would come from there, or that it is
-            free at all. That sentence is what a renter could not get from a chip reading «Not
-            confirmed» beside a black number, and it is why pressing this opens an explanation before
-            it opens an ask: the first press teaches, every press after it asks.
+            So: the 104px side cell, stretched to the card's height, exactly as it was. The corner
+            controls go back inside the text column with it.
 
-            Green with a tick is the settled case, and it is not a control — there is nothing left to
-            ask. Red with a «?» is the question. Red with a clock is the question already put: it
-            still opens, and shows him what he asked rather than offering to ask again.
+            The cell shimmers while a photo decodes; `is-empty` stops it for a machine that has none,
+            because nothing is arriving and a placeholder travelling forever says otherwise.
 
-            AC-13 holds and is now stronger: an unconfirmed machine is askable without opening the
-            detail, and the ask is the largest object on the card rather than a 10px link beside a
-            chip. AC-33 too — the ask's ink is still `askAvailability.colour`, carried on the rule
-            under the prompt below. */}
-        {yard === "ok" ? (
-          <span className="bm-eq-yard ok" title={t.bidMap.eqYardConfirmedWhy}>
-            <span className="material-icons-outlined" aria-hidden="true">check_circle</span>
-            <Distance km={km} ar={ar} t={t} />
-          </span>
-        ) : (
-          <button
-            type="button"
-            className={`bm-eq-yard ${yard}`}
-            title={yard === "asked" ? t.bidMap.askPendingWhy : t.bidMap.eqYardUnconfirmedWhy}
-            onClick={() => onYardPress(machine, yard === "asked")}
-          >
-            <span className="material-icons-outlined" aria-hidden="true">
-              {yard === "asked" ? "schedule" : "help_outline"}
+            It OPENS the detail, above the stretched find-on-map layer (owner, 2026-08-18): the
+            picture is the part of the card already about looking at the machine closely, so pressing
+            it to see it closely is not a rule the renter has to learn. */}
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label={`${t.bidMap.eqOpenFile} — ${title}`}
+          className={`bm-eq-photo${photo ? "" : " is-empty"}`}
+          onClick={() => onOpenDetail(machine.equipmentId)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onOpenDetail(machine.equipmentId);
+            }
+          }}
+        >
+          {photo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={photo} alt="" className="bm-eq-art" />
+          ) : (
+            <span className="bm-eq-nophoto">{t.bidMap.eqNoPhoto}</span>
+          )}
+        </span>
+
+        <div className="bm-eq-tx">
+          {/* ── The corner: how complete the file is, and the way into it (owner, 2026-08-28) ─────
+              Both are facts about the machine's PAPERS, which is a different subject from the
+              distance below and from the supplier's promise that colours it. They sit together,
+              small, in the corner the reader's eye leaves the card by.
+
+              «Details ›» is gone as a word. The icon is the file under a magnifier, which is what the
+              control has always done — look inside this machine's file. */}
+          <div className="bm-eq-hd">
+            <ReadinessDots
+              readiness={readiness}
+              title={fmt(t.bidMap.eqReadinessOnFile, { done: num(readiness.done), total: num(readiness.total) })}
+            />
+            <button
+              type="button"
+              className="bm-eq-open"
+              aria-label={`${t.bidMap.eqOpenFile} — ${title}`}
+              title={t.bidMap.eqOpenFile}
+              onClick={() => onOpenDetail(machine.equipmentId)}
+            >
+              {/* Drawn rather than fetched: this surface loads no icon set of its own beyond the
+                  material font, which has no file-under-a-magnifier, and an inline path cannot go
+                  missing at runtime. */}
+              <svg viewBox="0 0 512 512" width="17" height="17" aria-hidden="true" focusable="false">
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="34"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M379 236V25H27v462h352v-63M101 111h198M101 205h132M101 299h79M101 393h79"
+                />
+                <circle cx="325" cy="325" r="86" fill="none" stroke="currentColor" strokeWidth="34" />
+                <path fill="none" stroke="currentColor" strokeWidth="34" strokeLinecap="round" d="m389 389 74 74" />
+              </svg>
+            </button>
+          </div>
+
+          {/* ── The distance, and it IS the card (owner, 2026-08-28) ────────────────────────────────
+              The dominant object, painted with the one thing that qualifies it: whether the supplier
+              has promised this machine for this offer.
+
+              A red distance is not a bad distance. It is a distance nobody has promised — the machine
+              stands there today, and the supplier has not said it would come from there, or that it is
+              free at all. That sentence is what a renter could not get from a chip reading «Not
+              confirmed» beside a black number, and it is why pressing this opens an explanation before
+              it opens an ask: the first press teaches, every press after it asks.
+
+              Green with a tick is the settled case, and it is not a control — there is nothing left to
+              ask. Red with a «?» is the question. Red with a clock is the question already put: it
+              still opens, and shows him what he asked rather than offering to ask again.
+
+              AC-13 holds and is now stronger: an unconfirmed machine is askable without opening the
+              detail, and the ask is the largest object on the card rather than a 10px link beside a
+              chip. AC-33 too — the ask's ink is still `askAvailability.colour`, carried on the rule
+              under the prompt below. */}
+          {yard === "ok" ? (
+            <span className="bm-eq-yard ok" title={t.bidMap.eqYardConfirmedWhy}>
+              <span className="material-icons-outlined" aria-hidden="true">check_circle</span>
+              <Distance km={km} ar={ar} t={t} />
             </span>
-            <Distance km={km} ar={ar} t={t} />
-            {/* The prompt under the number, in the ask's own ink (RM3-AC-33) — the model stays the
-                one authority on this control's colour. On an asked card it states that instead. */}
-            <span className="bm-eq-yardq" style={askAvailability ? { color: askAvailability.colour } : undefined}>
-              {yard === "asked" ? t.bidMap.eqAskAnotherSent : t.bidMap.eqAskConfirm}
-            </span>
-          </button>
-        )}
+          ) : (
+            <button
+              type="button"
+              className={`bm-eq-yard ${yard}`}
+              title={yard === "asked" ? t.bidMap.askPendingWhy : t.bidMap.eqYardUnconfirmedWhy}
+              onClick={() => onYardPress(machine, yard === "asked")}
+            >
+              <span className="material-icons-outlined" aria-hidden="true">
+                {yard === "asked" ? "schedule" : "help_outline"}
+              </span>
+              <Distance km={km} ar={ar} t={t} />
+              {/* The prompt under the number, in the ask's own ink (RM3-AC-33) — the model stays the
+                  one authority on this control's colour. On an asked card it states that instead. */}
+              <span className="bm-eq-yardq" style={askAvailability ? { color: askAvailability.colour } : undefined}>
+                {yard === "asked" ? t.bidMap.eqAskAnotherSent : t.bidMap.eqAskConfirm}
+              </span>
+            </button>
+          )}
 
-        {/* The machine itself — model and year, under the number they belong to. It is the caption on
-            the distance, not the headline: the renter is choosing between machines by where they are
-            and how sure that is, and the name is what he confirms once he has chosen.
+          {/* The machine itself — model and year, under the number they belong to. It is the caption on
+              the distance, not the headline: the renter is choosing between machines by where they are
+              and how sure that is, and the name is what he confirms once he has chosen.
 
-            No serial and no capacity (AC-12): the serial identifies the machine to the system, not to
-            a renter, and the size is already stated once in the count pills above the list. */}
-        <div className="bm-eq-model" title={title}>{title}</div>
+              No serial and no capacity (AC-12): the serial identifies the machine to the system, not to
+              a renter, and the size is already stated once in the count pills above the list. */}
+          <div className="bm-eq-model" title={title}>{title}</div>
 
-        {/* The yard is outside the request city's own radius — the fact that turns a delivery into a
-            mobilisation. It qualifies the distance, so it follows it. */}
-        {card.outOfCity && <div className="bm-eq-far">{t.bidMap.eqOutOfCity}</div>}
+          {/* The yard is outside the request city's own radius — the fact that turns a delivery into a
+              mobilisation. It qualifies the distance, so it follows it. */}
+          {card.outOfCity && <div className="bm-eq-far">{t.bidMap.eqOutOfCity}</div>}
+        </div>
       </div>
     </li>
   );

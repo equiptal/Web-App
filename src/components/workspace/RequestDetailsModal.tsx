@@ -54,6 +54,7 @@ export function RequestDetailsModal({
   onClose,
   onChanged,
   openShare,
+  openCancel,
 }: {
   group: RequestGroup;
   /** The item in focus — the drawer lists every item and marks this one. */
@@ -65,6 +66,9 @@ export function RequestDetailsModal({
   onChanged: () => void;
   /** Open straight onto the share sheet — the strip’s «Share» enters the drawer there. */
   openShare?: boolean;
+  /** Open straight onto the cancel confirm — the dashboard row's ✕ enters the drawer there, so the
+   *  one confirm that exists is the one the renter meets wherever he pressed it. */
+  openCancel?: boolean;
 }) {
   const t = useT();
   const { locale } = useLocale();
@@ -75,7 +79,7 @@ export function RequestDetailsModal({
   const [confirmEdit, setConfirmEdit] = useState(false);
   const [editing, setEditing] = useState<RequestRecord | null>(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
-  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(!!openCancel);
   const [busy, setBusy] = useState(false);
   const [deadline, setDeadline] = useState<string | null>(link?.bidDeadline ?? null);
   const [logoUrl, setLogoUrl] = useState<string | null>(link?.logoUrl ?? null);

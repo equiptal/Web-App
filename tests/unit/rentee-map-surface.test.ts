@@ -357,6 +357,11 @@ describe("the card carries three things, and the ask is the largest of them", ()
     expect(list).toMatch(/<img src=\{photo\}/);
     expect(list).toContain("eqNoPhoto");
     expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-photo.is-empty {")).toMatch(/animation:\s*none/);
+    // The 104px SIDE cell, not a banner (owner, 2026-08-29). A full-width picture gave a machine
+    // with no photo a third of the card to say «No photo» in.
+    const photo = cssBlock(css, ".bidmap .bm-eq .bm-eq-photo {");
+    expect(photo).toMatch(/width:\s*104px/);
+    expect(photo).toMatch(/align-self:\s*stretch/);
   });
 
   it("keeps the availability tone identical on a selected card (owner, 2026-08-29)", () => {
@@ -835,16 +840,26 @@ describe("no ask control on this surface writes — they compose (owner, 2026-08
 describe("the distance and its state read whole at any panel width", () => {
   const css = read(CSS);
 
-  it("gives the distance the card's full width, sharing its line with nothing", () => {
+  it("gives the distance the text column's full width, sharing its line with nothing", () => {
     const yard = cssBlock(css, ".bidmap .bm-eq .bm-eq-yard {");
     expect(yard).toMatch(/width:\s*100%/);
-    // A column, so the corner controls, the distance and the model each own their line.
-    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-in {")).toMatch(/flex-direction:\s*column/);
+    // The card is a row — the picture in its 104px cell, the text beside it — and the text column is
+    // the column: the corner controls, the distance and the model each own their line inside it.
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-in {")).toMatch(/align-items:\s*stretch/);
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-tx {")).toMatch(/flex-direction:\s*column/);
+    // …and it can shrink, which is what lets the model line ellipsise rather than widen the card.
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-tx {")).toMatch(/min-width:\s*0/);
   });
 
-  it("keeps the prompt beside it from ever eating the number", () => {
-    // «Ask him to confirm» / «Asked» rides the trailing edge and does not shrink — but it is on a row
-    // whose other child is the figure, and the figure is what `min-width: 0` protects.
+  it("wraps the prompt rather than letting it eat the number", () => {
+    // With the picture back in its cell the text column is ~262px, and the distance plus «Ask him to
+    // confirm» do not both fit — the same squeeze that used to truncate the old availability chip to
+    // «Not confirmed …». Nothing on the row shrinks and the row wraps instead, so the figure reads
+    // whole at every width.
+    const yard = cssBlock(css, ".bidmap .bm-eq .bm-eq-yard {");
+    expect(yard).toMatch(/flex-wrap:\s*wrap/);
+    // A row that wraps needs a row-gap, or the two lines touch.
+    expect(yard).toMatch(/gap:\s*\d+px\s+\d+px/);
     expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-yardq {")).toMatch(/flex-shrink:\s*0/);
     expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-yardq {")).toMatch(/white-space:\s*nowrap/);
   });

@@ -50,6 +50,29 @@ export function isCancellable(status: RequestStatus | null | undefined): boolean
   return status === "OPEN" || status === "ACTIVE";
 }
 
+/**
+ * **Can this request still take a bid?** — the question the dashboard's «Closes» column asks before
+ * it looks at any date (owner, 2026-08-29).
+ *
+ * A deadline says when bidding WOULD stop; the status says whether it already has. They disagree
+ * often — a request awarded on day one keeps a deadline three days out — and when they do, the
+ * status is the fact: a countdown beside a shut request tells the renter to wait for offers that can
+ * never arrive.
+ *
+ * `PARTIALLY_ACCEPTED` counts as OPEN, deliberately. A fanned-out RFQ with one item awarded still
+ * has siblings taking bids, which is the same reason {@link cancellableItems} works per item rather
+ * than off a group-level roll-up.
+ */
+export function isBiddingClosed(status: RequestStatus | null | undefined): boolean {
+  return !(status === "OPEN" || status === "ACTIVE" || status === "PARTIALLY_ACCEPTED");
+}
+
+/** A GROUP is closed only when every item in it is — one live sibling keeps the RFQ answerable. An
+ *  empty group is not closed: it is a group we know nothing about. */
+export function groupBiddingClosed(items: { status: RequestStatus }[]): boolean {
+  return items.length > 0 && items.every((i) => isBiddingClosed(i.status));
+}
+
 /** The members of a group the backend will actually cancel. Empty ⇒ nothing to cancel. */
 export function cancellableItems<T extends { status: RequestStatus }>(items: T[]): T[] {
   return items.filter((i) => isCancellable(i.status));

@@ -84,13 +84,15 @@ export const ar: Dictionary = {
   },
   home: {
     title: "الرئيسية",
-    eyebrow: "سوق المعدات الذكي",
     statSuppliers: "مؤجرون موثّقون",
     statEquipment: "معدات مدرجة",
     statCities: "مدن مغطاة",
-    bannerTitle: "اطلب معدتك القادمة، أسرع من أي وقت",
-    bannerSubtitle: "انشر طلبك واحصل على عروض تنافسية من مؤجرين موثّقين — أو ارفع طلب عروض ودع مساعدك الذكي ينشئه تلقائياً.",
     createRequest: "إنشاء طلب",
+    // ── شريط الدعوة للإجراء (مقارنة المالك، 2026-08-29) ────────────────────────────
+    ctaTitleBefore: "دع ",
+    ctaTitleAi: "الذكاء الاصطناعي",
+    ctaTitleAfter: " يجد معدّتك القادمة",
+    ctaSubtitle: "صف ما تحتاجه بكلماتك، ومساعدك الذكي يوصلك بالمؤجّرين المناسبين.",
     uploadRfq: "رفع طلب عروض",
     suppliersTitle: "مؤجرون مقترحون",
     viewAll: "عرض الكل",
@@ -101,6 +103,13 @@ export const ar: Dictionary = {
     reqOneDayLeft: "بقي يوم واحد",
     reqToday: "يغلق اليوم",
     reqExpired: "منتهي",
+    reqClosed: "مغلق",
+    reqShare: "مشاركة لطلب العروض",
+    reqEdit: "تعديل الطلب",
+    reqCancel: "إلغاء الطلب",
+    reqOpenDetails: "فتح تفاصيل الطلب",
+    moreBidsBelow: "{n} أخرى — مرّر",
+    moreRequests: "{n} طلبات أخرى",
     compareBids: "قارن العروض",
     colSite: "الموقع",
     colEquipment: "المعدّة",
@@ -1231,9 +1240,9 @@ export const ar: Dictionary = {
     grandTotal: "الإجمالي",
     grandTotalInclVat: "الإجمالي · شامل الضريبة",
     overallTotal: "الإجمالي الكلي",
-    // The caption under it, in the app's own words (`priceRowUnitsCountLabel`): a bare «· 4» beside
-    // «Overall total» read as a line number rather than as what the figure was multiplied by.
-    unitsCountLabel: "عدد الوحدات: {n}",
+    // ما ضُرب فيه الرقم، في سطر العنوان نفسه (المالك، 2026-08-29) — «· ٤» وحدها تُقرأ
+    // كرقم سطر، وشكل التطبيق المكدّس أنفق سطراً كاملاً على أربعة محارف.
+    unitsCountLabel: "({n} وحدة)",
     // ── شارة الوحدات المعروضة (مطابقة للتطبيق) ──────────────────────────────────────
     offersUnits: "{n} وحدة",
     acceptedUnits: "قُبلت {accepted} من {offered} وحدة",

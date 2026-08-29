@@ -1070,15 +1070,17 @@
 }
 .bidmap .bm-eq .bm-eq-select:focus-visible { outline: 2px solid #16304f; outline-offset: -3px; }
 
-/* ── The machine's own picture, back (owner, 2026-08-29) ───────────────────────────────
+/* ── The machine's own picture, back where it was (owner, 2026-08-29) ────────────────────
    *"I want the images of the front image of equipment back."* It was cut on 08-28 as furniture and it
    is not: a column of machines is a fleet, and a renter comparing three excavators recognises them by
    sight before he reads a word of either title.
 
-   A BANNER across the top, not the 104px left cell it used to be: the distance is the card's subject
-   now and it wants the full width, and a side cell would have taken a quarter of that back. The
-   corner controls ride ON the picture, which is where a corner control belongs and is the width the
-   banner hands back.
+   ~~Brought back as a banner across the card's top.~~ Withdrawn the same day, on seeing it: *"make
+   the photo back in same place and design of previous card ui which was on the side."* A full-width
+   banner gave a 104px cell's worth of subject a 366px stage — so a machine with no photo was a third
+   of the card saying «No photo», which is the "empty card furniture" RM3-AC-26 exists to refuse.
+
+   So: the 104px side cell, `align-self: stretch` to the card's height, exactly as it was.
 
    The cell SHIMMERS until the image decodes, so the card never shows a bare grey rectangle while a
    photo is on the wire. A machine with none is not loading, so `is-empty` stops it — a placeholder
@@ -1086,26 +1088,26 @@
 .bidmap .bm-eq .bm-eq-photo {
   position: relative;
   z-index: 2;
-  display: block;
-  height: 116px;
+  flex-shrink: 0;
+  width: 104px;
+  min-height: 112px;
+  align-self: stretch;
   overflow: hidden;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background-color: var(--surface2);
   background-image: linear-gradient(90deg, #e8eff6 20%, #f4f8fc 40%, #e8eff6 60%);
   background-size: 220% 100%;
   animation: dpShimmer 1.25s linear infinite;
-  border-bottom: 1px solid #e1e9f1;
+  border-inline-end: 1px solid #e1e9f1;
 }
-.bidmap .bm-eq .bm-eq-photo.is-empty {
-  background-image: none;
-  animation: none;
-  display: grid;
-  place-items: center;
-}
+.bidmap .bm-eq .bm-eq-photo.is-empty { background-image: none; animation: none; }
 .bidmap .bm-eq .bm-eq-photo:focus-visible { outline: 2px solid var(--action, #2563eb); outline-offset: -3px; }
 .bidmap .bm-eq .bm-eq-art { width: 100%; height: 100%; object-fit: cover; transition: transform 0.35s cubic-bezier(0.22, 0.9, 0.3, 1); }
-.bidmap .bm-eq:hover .bm-eq-art { transform: scale(1.05); }
-.bidmap .bm-eq .bm-eq-nophoto { font-size: 10px; font-weight: 700; color: var(--muted); text-align: center; padding: 0 8px; }
+.bidmap .bm-eq:hover .bm-eq-art { transform: scale(1.06); }
+.bidmap .bm-eq .bm-eq-nophoto { font-size: 9.5px; font-weight: 700; color: var(--muted); text-align: center; padding: 0 6px; }
 
 /* `pointer-events: none` on the wrapper and `auto` on each real control — so everything that is not
    a control falls through to the stretched select layer beneath. */
@@ -1114,30 +1116,29 @@
   z-index: 1;
   pointer-events: none;
   display: flex;
+  align-items: stretch;
+}
+/* The text column beside the picture. `min-width: 0` is what lets the model line ellipsise rather
+   than push the card wide — a flex child's default `min-width: auto` refuses to shrink below its
+   content. */
+.bidmap .bm-eq .bm-eq-tx {
+  flex: 1;
+  min-width: 0;
+  display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 11px 13px 12px;
+  padding: 10px 12px 11px;
 }
 
 /* ── The corner: the file's completeness, and the way into it ────────────────────────────────────
    Both are facts about the machine's PAPERS. They ride the top trailing edge together, small, and
    the distance below gets the card's whole width because neither of them is on its line. */
 .bidmap .bm-eq .bm-eq-hd {
-  position: absolute;
-  z-index: 3;
-  top: 8px;
-  inset-inline-end: 8px;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   min-height: 26px;
-  /* A ground under both, so the dots and the icon read over a light machine against a light sky.
-     Opaque, not a tint: over a photograph a translucent plate takes the colour of whatever is behind
-     it, and the dots' own meaning is carried by their fill. */
-  padding: 4px 6px;
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  border: 1px solid #dbe6ef;
 }
 /* The readiness dots — the app's `done`/`total`, one dot each, filled for what is on file. The colour
    is the READINESS band's, never the availability colour: the papers are a fact about the file, the
@@ -1200,7 +1201,13 @@
 .bidmap .bm-eq .bm-eq-yard {
   display: flex;
   align-items: center;
-  gap: 9px;
+  /* **The row WRAPS and the figure never gives.** With the picture back in its 104px cell the text
+     column is ~262px, and the distance plus «Ask him to confirm» do not both fit on one line at that
+     width — the same squeeze that used to truncate the old availability chip to «Not confirmed …».
+     Nothing here shrinks; the prompt drops to a second line instead, so the number reads whole at
+     every width. The `row-gap` is what keeps the two lines from touching when it does. */
+  flex-wrap: wrap;
+  gap: 4px 9px;
   width: 100%;
   text-align: start;
   border-radius: var(--radius-md);

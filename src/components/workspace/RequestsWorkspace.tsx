@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
@@ -73,6 +74,8 @@ export function RequestsWorkspace() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   // «Share» on the strip is the same drawer, entered at its share sheet.
   const [drawerShare, setDrawerShare] = useState(false);
+  // …and «Cancel» is the same drawer entered at its confirm step, for the dashboard's row action.
+  const [drawerCancel, setDrawerCancel] = useState(false);
   // The public bid link's own settings, which the share sheet edits.
   const [link, setLink] = useState<ShareLinkMeta | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -183,6 +186,30 @@ export function RequestsWorkspace() {
       live = false;
     };
   }, [status]);
+
+  /* ── Arriving from somewhere else, on a named request (owner, 2026-08-29) ─────────────────
+     The dashboard's request table has row actions — open, share, edit, cancel — and every one of
+     them ends in machinery that already lives HERE, in the details drawer: the edit gate that reads
+     `renteeEditUsed`, the share sheet that owns the bid link, the cancel confirm. Rebuilding any of
+     it on the dashboard would be a second surface for one request, drifting from this one.
+
+     So the dashboard links instead: `?g=<groupId>` chooses the request, and `share` / `cancel` /
+     `details` say which door of the drawer to come in by. Read ONCE, on arrival — the params are an
+     entry instruction, not state: re-applying them would drag the renter back to that request every
+     time he picked another. */
+  const params = useSearchParams();
+  const [entered, setEntered] = useState(false);
+  useEffect(() => {
+    if (entered || !groups?.length) return;
+    setEntered(true);
+    const g = params?.get("g");
+    if (g && groups.some((x) => x.id === g)) setWanted({ groupId: g, itemId: null, bidId: null });
+    const door = params?.get("share") ? "share" : params?.get("cancel") ? "cancel" : params?.get("details") ? "details" : null;
+    if (!door) return;
+    setDrawerShare(door === "share");
+    setDrawerCancel(door === "cancel");
+    setDrawerOpen(true);
+  }, [entered, groups, params]);
 
   const pickGroup = useCallback((groupId: string) => setWanted({ groupId, itemId: null, bidId: null }), []);
   const pickItem = useCallback((id: string) => setWanted((w) => ({ groupId: w.groupId, itemId: id, bidId: null })), []);
@@ -464,7 +491,7 @@ export function RequestsWorkspace() {
         tiles={tiles}
         activeKey={resolved.groupId}
         onPick={pickGroup}
-        onShare={() => { setDrawerShare(true); setDrawerOpen(true); }}
+        onShare={() => { setDrawerShare(true); setDrawerCancel(false); setDrawerOpen(true); }}
         onHide={hide}
       />
 
@@ -491,7 +518,7 @@ export function RequestsWorkspace() {
             <RequestContextBar
               group={group}
               item={item}
-              onOpenRequest={() => { setDrawerShare(false); setDrawerOpen(true); }}
+              onOpenRequest={() => { setDrawerShare(false); setDrawerCancel(false); setDrawerOpen(true); }}
             />
           </div>
           <div className="flex flex-none items-end gap-0.5">
@@ -711,6 +738,7 @@ export function RequestsWorkspace() {
           bids={bids}
           link={link}
           openShare={drawerShare}
+          openCancel={drawerCancel}
           onClose={() => setDrawerOpen(false)}
           // An edit or a cancellation changes the rail and the bids under it, so both are re-read
           // rather than patched in place — the page has one source for its data and keeps it.

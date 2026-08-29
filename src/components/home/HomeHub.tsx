@@ -21,17 +21,10 @@ import { pin } from "@/lib/uiPins";
  */
 const POPUP_SHOWN_KEY = "start-request-popup-shown";
 
-/** Gradient that darkens to the corner — shared by the hero and the store-card banners. */
-export const DARK_GRADIENT = "bg-gradient-to-br from-navy to-navy-deep";
-
-/** Subtle grid overlay with a radial mask — the "blended light" look from the login page. */
-const GRID_STYLE: React.CSSProperties = {
-  backgroundImage:
-    "linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px)",
-  backgroundSize: "46px 46px",
-  maskImage: "radial-gradient(circle at 75% 40%,#000 34%,transparent 82%)",
-  WebkitMaskImage: "radial-gradient(circle at 75% 40%,#000 34%,transparent 82%)",
-};
+/* ~~`DARK_GRADIENT` and `GRID_STYLE`.~~ Both went with the gradient hero the CTA band replaced
+   (owner's comp, 2026-08-29). The gradient had no reader outside this file, and the grid overlay's
+   other user — the login page — declares its own copy in `AuthBrand.tsx`, so nothing here was
+   shared with it. The band's ground is a photograph with two overlays; see the hero below. */
 
 /**
  * Renter web home hub (web-app/004, AC-04/05/07/10/25). A gradient-to-dark hero (pitch left, Create-
@@ -93,27 +86,91 @@ export function HomeHub() {
 
   return (
     <div {...pin("home-hub")} className="flex flex-col gap-7">
-      {/* Hero */}
-      <div {...pin("home-hero")} className={`relative overflow-hidden rounded-sm px-8 py-9 sm:px-10 ${DARK_GRADIENT}`}>
-        <div className="pointer-events-none absolute inset-0" style={GRID_STYLE} />
-        <span className="pointer-events-none absolute -top-[60px] end-[-40px] h-[260px] w-[260px] rounded-full bg-brand opacity-[0.20] blur-[80px]" />
-        <span className="pointer-events-none absolute -bottom-[90px] end-[120px] h-[280px] w-[280px] rounded-full opacity-20 blur-[80px]" style={{ background: "var(--info)" }} />
+      {/* ── The CTA band (owner's comp, «Moedatech Create Request CTA», 2026-08-29) ───────────────
+          ~~A 220px gradient block: an eyebrow pill, a hero-scale headline, a paragraph, and the
+          button stacked to its side.~~ Replaced by the comp, which says the same thing in 160px and
+          says it better.
 
-        <div className="relative z-10 flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex-1">
-            <span className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-brand/20 px-3 py-1 text-meta font-semibold uppercase tracking-wide text-brand-light">
-              <Icon name="bolt" size={13} /> {t.home.eyebrow}
-            </span>
-            <h1 className="text-display font-extrabold leading-tight text-white sm:text-hero">{t.home.bannerTitle}</h1>
-            <p className="mt-2.5 max-w-[520px] text-body leading-relaxed text-white/65">{t.home.bannerSubtitle}</p>
+          What the comp changes, and why each part earns its place:
+           · **A photograph, not a gradient.** The block is about equipment; a site at dusk says that
+             in the half-second before a word is read, and the old grid-and-blur said only "this is a
+             header". The image is 15% oversized and offset so `object-fit: cover` has slack to crop
+             from at any width without ever showing an edge.
+           · **Two overlays, not one.** A left-to-right gradient (94% → 42%) so the text sits on ink
+             and the machines stay visible on the trailing side, then a flat navy `multiply` at 35%
+             to pull the whole photograph's contrast down under the copy. One overlay dark enough for
+             the text would have flattened the picture to a texture.
+           · **The headline names the ACT.** «Let AI find your next equipment», with AI as its own
+             token in the brand's ink — the comp colours that one word and nothing else, which is
+             what makes it read as the subject rather than as decoration.
+           · **One button, and it is the block's only control.** «Upload RFQ» is not lost: the create
+             flow's own first step offers it, and a second button here made the renter choose between
+             two doors before he knew what was behind either.
+
+          The palette is the repo's tokens, not the comp's hexes: `--brand` for the button (the one
+          primary orange this app uses everywhere) and `--brand-light` for the word and the sparkle,
+          which is the accent the new-bids banner already wears on a dark ground. */}
+      <div
+        {...pin("home-hero")}
+        className="relative isolate flex h-[160px] items-center overflow-hidden rounded-sm px-6 sm:px-11"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/home-cta-site.webp"
+          alt=""
+          aria-hidden="true"
+          className="absolute -start-[7.5%] -top-[7.5%] -z-10 h-[115%] w-[115%] object-cover"
+          style={{ objectPosition: "center 55%" }}
+        />
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 -z-10"
+          style={{
+            background:
+              "linear-gradient(90deg, color-mix(in srgb, var(--navy) 94%, transparent) 0%, color-mix(in srgb, var(--navy) 75%, transparent) 45%, color-mix(in srgb, var(--navy) 42%, transparent) 100%)",
+          }}
+        />
+        {/* RTL takes the same gradient mirrored — the ink has to be under the words, and in Arabic
+            the words start on the other side. */}
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 -z-10 hidden rtl:block"
+          style={{
+            background:
+              "linear-gradient(270deg, color-mix(in srgb, var(--navy) 94%, transparent) 0%, color-mix(in srgb, var(--navy) 75%, transparent) 45%, color-mix(in srgb, var(--navy) 42%, transparent) 100%)",
+          }}
+        />
+        <span aria-hidden="true" className="absolute inset-0 -z-10 bg-navy opacity-[0.35] mix-blend-multiply" />
+
+        <div className="relative flex w-full items-center gap-6">
+          <div className="min-w-0 flex-1">
+            {/* A BLOCK, not a flex row: the three text nodes are one sentence, and as flex items the
+                spaces between them collapse and the row's own `gap` stands in for them — which sets
+                the word spacing of a headline from a layout property. Inline flow keeps the spaces
+                the copy actually carries, in both scripts. */}
+            <h1 className="text-title font-extrabold leading-tight tracking-[-0.2px] text-white sm:text-display">
+              {t.home.ctaTitleBefore}
+              <span className="text-brand-light">{t.home.ctaTitleAi}</span>
+              {t.home.ctaTitleAfter}
+              {/* The spark is the comp's own mark for "this is the assistant's doing". Inline rather
+                  than a font glyph: the material set has no four-point star at this weight, and one
+                  path cannot go missing at runtime. */}
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className="ms-2.5 inline-block align-[-0.1em]"
+              >
+                <path d="M12 3L13.9 9.1L20 11L13.9 12.9L12 19L10.1 12.9L4 11L10.1 9.1L12 3Z" fill="var(--brand-light)" />
+              </svg>
+            </h1>
+            <p className="mt-2 max-w-[440px] text-body leading-relaxed text-white/70">{t.home.ctaSubtitle}</p>
           </div>
 
           {/* Single entry into the RFQ input flow (web-app/002). */}
-          <div {...pin("home-hero-actions")} className="flex flex-none flex-col gap-3 sm:flex-row lg:flex-col lg:items-stretch">
-            <button
-              onClick={onCreateRequest}
-              className={btn("primary", "lg", { className: "transition" })}
-            >
+          <div {...pin("home-hero-actions")} className="flex-none">
+            <button onClick={onCreateRequest} className={btn("primary", "lg", { className: "transition" })}>
               <Icon name="add" size={16} /> {t.home.createRequest}
             </button>
           </div>

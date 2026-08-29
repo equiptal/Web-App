@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { AppShell } from "@/components/AppShell";
 import { useT } from "@/lib/i18n";
 import { RequestsWorkspace } from "@/components/workspace/RequestsWorkspace";
@@ -17,7 +18,11 @@ export default function RequestsPage() {
     // pins the shell to exactly the viewport; the workspace then owns its own scrolling region, so
     // the chrome stays put and only the bids move. It is the same treatment the bid map already has.
     <AppShell title={t.workspace.title} fullBleed>
-      <RequestsWorkspace />
+      {/* Suspense boundary: the workspace reads `useSearchParams` for the dashboard's row actions
+          (`?g=…&details=1`), and Next refuses to prerender a component that reads them without one. */}
+      <Suspense fallback={null}>
+        <RequestsWorkspace />
+      </Suspense>
     </AppShell>
   );
 }

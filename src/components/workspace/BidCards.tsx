@@ -446,14 +446,18 @@ function BidCardTile({
               the per-unit total × units — each transport leg carries its own count.
 
               The count is SPELLED (owner, 2026-08-28): «Overall total · 4» read as a line number, on
-              a row whose whole job is to say what the figure beside it was multiplied by. The
-              wording is the app's — `priceRowUnitsCountLabel`, «Units: 4», drawn as the caption under
-              the label exactly as `_GrandTotalCard` draws it. */}
+              a row whose whole job is to say what the figure beside it was multiplied by.
+
+              ~~The app's own two-line shape — the label, with «Units: 4» as a caption under it
+              (`_GrandTotalCard`).~~ INLINE (owner, 2026-08-29). Stacked, the count read as a second
+              row of the totals box rather than as part of the label it qualifies, and it spent a
+              whole line saying four characters. «Overall total (4 units)» is one phrase, so it gets
+              one line. */}
           {units > 1 && (
             <div className="flex items-baseline justify-between gap-2 border-t border-border/70 pt-2.5">
-              <span className="flex min-w-0 flex-col text-meta font-extrabold text-brand">
-                {t.workspace.overallTotal}
-                <span className="text-label font-semibold text-muted">
+              <span className="min-w-0 text-meta font-extrabold text-brand">
+                {t.workspace.overallTotal}{" "}
+                <span className="font-semibold text-muted">
                   {fmt(t.workspace.unitsCountLabel, { n: String(units) })}
                 </span>
               </span>
