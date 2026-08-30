@@ -84,7 +84,12 @@ export function RequestRail({
   // put both of them 2px low. Change any line above and every figure here moves with it; that is
   // the point of writing the sum down.
   return (
-    <div {...pin("request-rail")} className={`flex h-[96px] flex-none select-none items-center gap-4 overflow-hidden border-b border-border bg-surface3/60 ${PAGE_X}`}>
+    /* The band reaches the window on both sides — its ground and its rule are the page's own edge
+       (owner, 2026-08-30) — while the tiles inside it sit on the same cap and the same gutter as the
+       bids below and as every other page. Two elements, because those are two different jobs: one is
+       a surface, the other is a column of content. */
+    <div {...pin("request-rail")} className="flex-none border-b border-border bg-surface3/60">
+    <div className={`mx-auto flex h-[96px] w-full max-w-[1440px] select-none items-center gap-4 overflow-hidden ${PAGE_X}`}>
       <Link {...pin("rail-create-tile")} href="/create" className="group flex flex-none flex-col items-center gap-1">
         <span className="grid h-14 w-14 place-items-center rounded-full border-2 border-dashed border-border text-muted transition group-hover:border-brand group-hover:text-brand">
           <Icon name="add" size={20} />
@@ -301,6 +306,7 @@ export function RequestRail({
       >
         <Icon name="chevron_right" size={16} className="rtl:scale-x-[-1]" />
       </button>
+    </div>
     </div>
   );
 }

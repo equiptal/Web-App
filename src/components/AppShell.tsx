@@ -63,7 +63,7 @@ type AppShellProps = { children: ReactNode; title?: string; fullBleed?: boolean 
 /* The gutter lives in `@/lib/ds` now — placement is part of the design system, and a gutter
    declared here was a gutter no other file could find. Re-exported so existing callers are unmoved;
    `ds.ts` imports nothing, so there is no cycle. */
-export { PAGE_MAX, PAGE_MX, PAGE_X, PAGE_Y } from "@/lib/ds";
+export { PAGE_MAX, PAGE_X, PAGE_Y } from "@/lib/ds";
 
 /**
  * A page can show a Back arrow by registering a handler.
@@ -426,8 +426,17 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
              clearance, and the dock is gone. */
           className={cx(
             "mx-auto w-full",
-            PAGE_MAX,
-            fullBleed ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" : `${PAGE_Y} ${PAGE_X}`,
+            /* ── The cap belongs where the CONTENT is (owner, 2026-08-30) ─────────────────────
+               An ordinary page is one column, so capping the container caps the column. A full-bleed
+               surface is BANDS — the requests rail, the bid map — and a band is meant to reach the
+               window: *"for the top bar of the circles in requests keep it on whole screen with full
+               fit like it was before."* Capping the container cut those bands off at 1440 and left
+               page ground either side of them.
+
+               So it caps itself, one layer in: each band spans the window and puts `PAGE_MAX` +
+               `PAGE_X` on its own inner row, which is what keeps the rail's tiles on the same left
+               edge as the bids underneath and as every other page in the app. */
+            fullBleed ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" : `${PAGE_MAX} ${PAGE_Y} ${PAGE_X}`,
           )}
         >
           {/* ── Back, on the page (owner, 2026-08-26) ────────────────────────────────────────────

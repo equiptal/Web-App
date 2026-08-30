@@ -251,8 +251,9 @@ export const DIVIDER = "border-t border-border";
  */
 export const PAGE_X = "px-4 sm:px-6 lg:px-8 xl:px-10";
 
-/** The same step as a margin, for a band that insets a card rather than padding a row. */
-export const PAGE_MX = "mx-4 sm:mx-6 lg:mx-8 xl:mx-10";
+/* ~~`PAGE_MX`, the same step as a margin.~~ Its last reader was the requests body, which takes the
+   cap and the gutter as padding now like every other page. A gutter expressed twice is two things to
+   keep in step; deleted with the caller. */
 
 /**
  * **The content cap, every page** — the other half of "one margin".
