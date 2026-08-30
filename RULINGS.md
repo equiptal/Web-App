@@ -13,28 +13,6 @@ Two sections:
 
 ## Open rulings
 
-### R-P1 · An award may name an unregistered supplier — **spec and code disagree**
-
-`PROJ-AC-15` says *an award requires a vendor-registered supplier. Same rule for work orders and requests.*
-
-The code does the opposite, deliberately. `AwardDialog.tsx:123`:
-
-```tsx
-{/* Vendor registration is the renter's own gate, shown rather than enforced. */}
-{s.vendorRegistered ? "" : ` · ${a.notRegistered}`}
-```
-
-An unregistered supplier is labelled and still selectable.
-
-**Why this is not obviously wrong.** `GET /agents/renter-suppliers` does not exist yet, so today the picker falls back to a free-text name and there is no registration state to enforce against — enforcing AC-15 now would block every award. And AC-20 says the list *builds itself from real use* when a marketplace bid is accepted, which reads as registration following the work rather than gating it.
-
-**Why it cannot just be left.** The two say different things, and nothing records which is intended. A renter awarding to a supplier they have not registered is either a normal Tuesday or a violation of the feature's own rule, and the code and the spec each answer confidently.
-
-**What is needed:** either AC-15 is amended to *shown, not enforced*, or the picker gates on `vendorRegistered` once the endpoint ships. This is a product call about how much friction registration should add, not something the code can settle.
-
-Related: `docs/specs/007-renter-projects-audit.md`.
-
-
 ### R-01 · VAT is computed two different ways — **app checked**
 
 **The app computes VAT one way only: `subtotal × kVatRate`.** `core/utils/rental_pricing.dart:21`:
@@ -362,6 +340,32 @@ _Answer:_
 ---
 
 ## Settled rulings
+
+### R-P1 · An award may name an unregistered supplier — **ruled 2026-08-31 (owner)**
+
+> *"For now fine if not registered, later will select from a list so must be registered."*
+
+`PROJ-AC-15` says an award requires a vendor-registered supplier. The award dialog let an
+unregistered one be chosen, and the two disagreed.
+
+**The gate follows the list.** It is one rule with two states, not an exception to the criterion:
+
+| state | picker | registration |
+|---|---|---|
+| no registry endpoint (today) | free text + a datalist of names used before | not required |
+| `renter-suppliers` answers | a select of the renter's own suppliers | **required** |
+
+Enforcing it today would block every award on a feature that has not shipped, and `PROJ-AC-20` says
+the list builds itself from real use — a marketplace bid accepted upserts an unregistered row — so
+registration follows the work rather than gating it up front.
+
+Implemented in `AwardDialog.tsx`: an unregistered row is rendered **disabled**, not hidden. A renter
+looking for a supplier they have used before needs to find it and see why it cannot be picked, not
+wonder where it went. AC-15 therefore stands as written; it simply cannot bind before the endpoint
+exists.
+
+Related: `docs/specs/007-renter-projects-audit.md`.
+
 
 Recorded so a future change cannot silently reverse one. Each becomes an assertion.
 

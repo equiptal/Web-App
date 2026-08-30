@@ -3,8 +3,8 @@
 **Audited 2026-08-31**, criterion by criterion against the code, after the machine-terms editor was
 found missing during UAT. 58 criteria (`PROJ-AC-01`…`62`; 49–50 and 57–58 are unused numbers).
 
-**52 built · 6 not built.** None of the six is a surprise-in-hiding any more — each is named here
-with what it would take.
+**52 built · 5 not built · 1 ruled and now built.** None of the five is a surprise-in-hiding any
+more — each is named here with what it would take.
 
 ---
 
@@ -33,13 +33,13 @@ name with a datalist of names used before on that line.
 What that costs today: **two typings of the same supplier are two unrelated strings.** No dedupe, no
 per-supplier roll-up, and `supplierId` is always null.
 
-⚠️ **AC-15 is not merely unbuilt — the code contradicts it.** The spec says *an award requires a
-vendor-registered supplier*; `AwardDialog.tsx:123` carries the comment *"Vendor registration is the
-renter's own gate, shown rather than enforced"* and lets an unregistered supplier be chosen. That is
-a decision someone made against the written criterion, and it is not recorded anywhere as a ruling.
-**Raised in `RULINGS.md`** rather than resolved here — enforcing it would block awards on a registry
-that does not exist yet, and the marketplace path (AC-20) is supposed to build the list from real
-use rather than ask the renter to register anyone up front.
+**AC-15 is ruled, not broken.** The spec says an award requires a vendor-registered supplier; the
+dialog allowed an unregistered one. Owner's ruling, 2026-08-31: *the gate follows the list* — free
+text while there is no registry, and required the moment there is one to choose from. Now
+implemented: an unregistered row renders disabled rather than hidden, so a renter finds the supplier
+and sees why it cannot be picked. See `RULINGS.md` · R-P1.
+
+The other five wait on the endpoint.
 
 ### AC-09, AC-10, AC-11 · The operator-applicable flag
 

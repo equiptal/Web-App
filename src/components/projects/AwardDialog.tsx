@@ -117,10 +117,16 @@ export function AwardDialog({
                   }}
                 >
                   <option value="">—</option>
+                  {/* PROJ-AC-15, ruled by the owner 2026-08-31: **the gate follows the list.**
+                      While there is no registry to read, the branch below takes over and a renter
+                      types a name — refusing an unregistered supplier then would block every award
+                      on a feature that has not shipped. The moment a list exists, choosing from it
+                      means choosing a registered one, so an unregistered row is shown and disabled
+                      rather than hidden: a renter looking for a supplier they have used before needs
+                      to find it and see WHY it cannot be picked, not wonder where it went. */}
                   {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
+                    <option key={s.id} value={s.id} disabled={!s.vendorRegistered}>
                       {s.name}
-                      {/* Vendor registration is the renter's own gate, shown rather than enforced. */}
                       {s.vendorRegistered ? "" : ` · ${a.notRegistered}`}
                     </option>
                   ))}
