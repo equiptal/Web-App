@@ -130,8 +130,6 @@ export function ProjectForm({
   const eligible = useMemo(() => (rows ?? []).filter((r) => r.eligible), [rows]);
   const applyTo = useMemo(() => eligible.filter((r) => ticked.has(r.id)).map((r) => r.id), [eligible, ticked]);
 
-  /** Is there anything under this site that a save could reach? Decides the save button's wording. */
-  const hasApplicable = isEdit && (rows?.length ?? 0) > 0;
 
   const stateLabel: Record<PropagationRow["state"], string> = {
     free: t.projects.form.stateFree,
@@ -329,24 +327,19 @@ export function ProjectForm({
           {t.common.cancel}
         </Button>
 
-        {/* *Project only* only means something when there IS something else it could apply to.
-            On a site with nothing filed under it the phrase asked the renter to choose between one
-            option and nothing, which is how it read on staging: *"what does it mean, project only?"*
+        {/* ONE save, whose words follow the ticks (owner, 2026-08-31: *"why only project button, it
+            is not clear for user"*).
 
-            So the label follows the list: with rows, this is the safe half of a pair and stays navy
-            because the orange belongs to the button that also changes requests. With no rows it is
-            simply Save, and the only action, so it takes the orange. */}
-        <Button variant={hasApplicable ? "tinted" : "primary"} onClick={() => onSave(value, [])} disabled={!canSave}>
-          {hasApplicable ? t.projects.form.saveProjectOnly : t.common.save}
+            There used to be two — *Project only* beside *Save and apply to 2* — which asked the
+            renter to hold a distinction in their head that the list above already shows them. Worse,
+            *Project only* appeared even on a site with nothing filed under it, where it named a
+            choice against nothing.
+
+            The list is the control; the button reports what the list is set to. Untick everything
+            and it reads Save, and saves the site alone. */}
+        <Button variant="primary" onClick={() => onSave(value, applyTo)} disabled={!canSave}>
+          {applyTo.length > 0 ? t.projects.form.saveAndApply.replace("{n}", String(applyTo.length)) : t.common.save}
         </Button>
-
-        {/* Only when something is actually ticked — an always-present third button that sometimes
-            means the same as the second one teaches the renter to stop reading it. */}
-        {isEdit && applyTo.length > 0 && (
-          <Button onClick={() => onSave(value, applyTo)} disabled={!canSave}>
-            {t.projects.form.saveAndApply.replace("{n}", String(applyTo.length))}
-          </Button>
-        )}
       </div>
     </div>
   );
