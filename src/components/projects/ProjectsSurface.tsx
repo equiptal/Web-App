@@ -365,11 +365,11 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     }
   }
 
-  async function attach(doc: { kind: string; filename: string; data: string }) {
+  async function attach(file: File, kind: string) {
     if (!selected || !papers) return;
     setSaving(true);
     try {
-      await attachDocument(selected, papers.award.id, doc);
+      await attachDocument(selected, papers.award.id, version, file, kind);
       await refreshChart();
       // Re-read the award so the list in the open dialog shows what was just added.
       setPapers((cur) => (cur ? { ...cur, award: findAward(cur.award.id) ?? cur.award } : cur));
@@ -440,7 +440,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
         {notice && <p className="rounded-sm border border-danger/40 bg-danger/5 px-3 py-2 text-body text-danger">{notice}</p>}
 
         {/* The form still has to be reachable from here, or the button does nothing. */}
-        <Dialog open={!!editing} onClose={() => setEditing(null)} title={t.projects.surface.newProject}>
+        <Dialog open={!!editing} onClose={() => setEditing(null)} title={t.projects.surface.newProject} size="xl">
           {editing && (
             <ProjectForm
               value={editing.value}
@@ -578,7 +578,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
           onClose={() => setPapers(null)}
           award={papers.award}
           isRequest={papers.isRequest}
-          onAttach={(doc) => void attach(doc)}
+          onAttach={(file, kind) => void attach(file, kind)}
           onRemove={(id) => void detach(id)}
           busy={saving}
         />
@@ -686,6 +686,9 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
         open={!!editing}
         onClose={() => setEditing(null)}
         title={editing?.id ? t.projects.surface.editTitle : t.projects.surface.newProject}
+        /* Wide, so the four *When* fields — start · end · extendable · basis — stand on one row
+           instead of wrapping into what looks like a second question. */
+        size="xl"
       >
         {editing && (
           <ProjectForm

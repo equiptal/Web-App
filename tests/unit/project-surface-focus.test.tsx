@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { LocaleProvider } from "@/lib/i18n";
+// The dictionary, not the copy: a label rename is a product decision, not a broken test.
+import { en } from "@/lib/i18n/en";
 
 /**
  * Typing in the dialog on the DASHBOARD (reported 2026-08-30).
@@ -41,7 +43,7 @@ describe("the dialog on the dashboard", () => {
     const open = await screen.findByRole("button", { name: /new project/i });
     fireEvent.click(open);
 
-    const field = () => screen.getByLabelText(/name for this project/i) as HTMLInputElement;
+    const field = () => screen.getByLabelText(en.projects.form.title, { exact: false }) as HTMLInputElement;
     field().focus();
 
     for (let i = 1; i <= 3; i++) {

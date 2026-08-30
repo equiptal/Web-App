@@ -1111,11 +1111,31 @@ export function warmAgentCache(): void {
 export async function attachDocument(
   projectId: string,
   awardId: string,
-  doc: { kind: string; filename: string; data: string },
-): Promise<void> {
-  await projectFetch(`${projectPath(projectId)}/awards/${encodeURIComponent(awardId)}/documents`, {
+  expectedVersion: number,
+  file: File,
+  kind: string,
+): Promise<{ version: number }> {
+  // 1 · ask where to put it. The key is namespaced by project on the backend, so this app never
+  //     invents a path and cannot write one project's paper under another's prefix.
+  const presign = await projectFetch<{ key: string; url: string }>(`${projectPath(projectId)}/documents/upload-url`, {
     method: "POST",
-    body: doc,
+    body: { filename: file.name, contentType: file.type || "application/octet-stream" },
+  });
+
+  // 2 · the bytes go STRAIGHT to storage. Not through this app, not through the agents backend —
+  //     a 40 MB scan would otherwise be a 40 MB JSON body crossing two hops to reach the same place.
+  const put = await fetch(presign.url, {
+    method: "PUT",
+    headers: { "Content-Type": file.type || "application/octet-stream" },
+    body: file,
+  });
+  if (!put.ok) throw new ApiError("network", `upload failed (${put.status})`);
+
+  // 3 · only now does the award learn about it, by KEY. The version rides along because attaching
+  //     rewrites the awards blob like any other write.
+  return projectFetch<{ version: number }>(`${projectPath(projectId)}/awards/${encodeURIComponent(awardId)}/documents`, {
+    method: "POST",
+    body: { kind, key: presign.key, filename: file.name, expectedVersion },
   });
 }
 

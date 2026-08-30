@@ -52,7 +52,8 @@ export function DocumentsDialog({
   onClose: () => void;
   award: Award;
   isRequest: boolean;
-  onAttach: (doc: { kind: AwardDocumentKind; filename: string; data: string }) => void;
+  /** The File itself. The bytes go straight to storage; this app never carries them. */
+  onAttach: (file: File, kind: AwardDocumentKind) => void;
   onRemove: (docId: string) => void;
   busy?: boolean;
 }) {
@@ -71,10 +72,7 @@ export function DocumentsDialog({
       setError(d.tooBig.replace("{max}", "10 MB"));
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => onAttach({ kind, filename: file.name, data: String(reader.result) });
-    reader.onerror = () => setError(d.readFailed);
-    reader.readAsDataURL(file);
+    onAttach(file, kind);
   }
 
   return (
