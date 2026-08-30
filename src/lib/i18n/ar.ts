@@ -1366,6 +1366,19 @@ export const ar: Dictionary = {
   },
 
   projects: {
+    move: {
+      fileTitle: "ربط هذا بمشروع",
+      moveTitle: "نقل هذا إلى مشروع آخر",
+      changesNothing: "الربط لا يغير شيئًا في الطلب — ولا قيمة واحدة تتحرك، حتى لو اختلف الموقع الجديد. لذلك يعمل بعد وصول العروض ولا يكلفك تعديلًا.",
+      movingDropsAwards: "نقله إلى موقع آخر يُزيل الإرساءات المسجلة هنا مع علاماتها ومستنداتها. أما الطلب نفسه فلا يُمسّ.",
+      atThisAddress: "في {site}",
+      noneHere: "لا يوجد مشروع في {site} بعد.",
+      orAnother: "أو مشروع آخر",
+      chooseOne: "اختر مشروعًا",
+      file: "ربط",
+      move: "نقل",
+      removeFromProject: "إزالة من هذا المشروع",
+    },
     workOrder: {
       equipment: "ما هو موجود في الموقع",
       machine: "المعدة",

@@ -24,6 +24,8 @@ import {
   saveWorkOrder,
   deleteWorkOrder,
   fetchTaxonomy,
+  fetchAllMyRequests,
+  assignToProject,
   withFreshVersion,
   ProjectVersionConflict,
   type AwardInput,
@@ -41,6 +43,7 @@ import type { Award, ChartGroup, ChartItem } from "@/lib/contract/award";
 import { RowMenu } from "./RowMenu";
 import { AwardDialog, UnawardConfirm } from "./AwardDialog";
 import { WorkOrderForm, workOrderPayload, blankMachine, type WorkOrderDraft } from "./WorkOrderForm";
+import { MoveDialog } from "./MoveDialog";
 import { EMPTY_WHEN } from "@/lib/contract/work-order";
 import type { Taxonomy } from "@/lib/contract/taxonomy";
 
@@ -57,6 +60,8 @@ export function ProjectsSurface() {
   const [unawarding, setUnawarding] = useState<Award | null>(null);
   const [workOrder, setWorkOrder] = useState<WorkOrderDraft | null>(null);
   const [taxonomy, setTaxonomy] = useState<Taxonomy>([]);
+  const [unassigned, setUnassigned] = useState<ChartGroup[]>([]);
+  const [filing, setFiling] = useState<{ requestId: string; address: string | null; projectId: string | null } | null>(null);
   const [deleting, setDeleting] = useState<ProjectSummary | null>(null);
   const [created, setCreated] = useState<ProjectSummary | null>(null);
   const router = useRouter();
@@ -69,12 +74,55 @@ export function ProjectsSurface() {
     }
   }, []);
 
+  /**
+   * Requests filed nowhere.
+   *
+   * Read from the renter's own request list rather than from a projects endpoint, because "filed
+   * nowhere" is a fact about a request and there is no project to ask. They arrive shaped as chart
+   * groups so the rail and the board treat them like any other row - Unassigned is a place in the
+   * same page, not a second kind of screen.
+   */
+  const reloadUnassigned = useCallback(async () => {
+    try {
+      const { requests } = await fetchAllMyRequests();
+      setUnassigned(
+        requests
+          .filter((r) => r.projectId == null)
+          .map((r) => ({
+            kind: "request" as const,
+            id: r.id,
+            ref: r.displayId,
+            title: null,
+            status: r.status,
+            bidCount: r.bidCount,
+            renteeEditUsed: r.renteeEditUsed,
+            // No project means no inherited period, so no bar - which is why Unassigned has no chart.
+            when: null,
+            items: [
+              {
+                id: r.id,
+                label: r.item?.name ?? r.displayId,
+                labelAr: r.item?.nameAr ?? null,
+                quantity: r.item?.qty ?? 1,
+                awards: [],
+              },
+            ],
+            // Carried so the file dialog can lead with the sites at this row's own address.
+            address: r.city ?? null,
+          })),
+      );
+    } catch {
+      setUnassigned([]);
+    }
+  }, []);
+
   useEffect(() => {
     void reload();
     // The catalogue is fetched once for the whole surface rather than when the form opens, so a
     // renter adding a machine does not wait on a network round trip before the first dropdown works.
     fetchTaxonomy().then(setTaxonomy).catch(() => setTaxonomy([]));
-  }, [reload]);
+    void reloadUnassigned();
+  }, [reload, reloadUnassigned]);
 
   // Land on a site rather than an empty right-hand pane. The first is the most recently touched,
   // which is almost always the one the renter came back for.
@@ -153,6 +201,21 @@ export function ProjectsSurface() {
       // Someone else edited this site while the form was open. Say so plainly rather than
       // overwriting their change with a form that was filled in before it existed.
       setNotice(err instanceof ProjectVersionConflict ? t.projects.surface.stale : t.projects.surface.saveFailed);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function file(projectId: string | null) {
+    if (!filing) return;
+    setSaving(true);
+    try {
+      await assignToProject(filing.requestId, projectId);
+      setFiling(null);
+      await Promise.all([reload(), reloadUnassigned(), selected ? refreshChart() : Promise.resolve()]);
+      if (projectId) setSelected(projectId);
+    } catch {
+      setNotice(t.projects.surface.saveFailed);
     } finally {
       setSaving(false);
     }
@@ -273,7 +336,7 @@ export function ProjectsSurface() {
           chart={chart}
           /* W-T18 fills this from the requests list; until then the rail entry stays hidden, which
              is exactly what it should do when nothing is filed nowhere. */
-          unassigned={[]}
+          unassigned={unassigned}
           onEditProject={(p) => void openEdit(p)}
           rowMenu={(group, itemId, awardId) => {
             const item = group.items.find((i) => i.id === itemId);
@@ -320,6 +383,19 @@ export function ProjectsSurface() {
                           })
                       : undefined,
                   onDeleteWorkOrder: group.kind === "work_order" ? () => void removeOrder(group.id) : undefined,
+                  onRemoveFromProject:
+                    group.kind === "request"
+                      ? () => setFiling({ requestId: group.id, address: chart?.project.location.label ?? null, projectId: selected })
+                      : undefined,
+                  onFileInProject:
+                    group.kind === "request"
+                      ? () =>
+                          setFiling({
+                            requestId: group.id,
+                            address: (group as ChartGroup & { address?: string | null }).address ?? null,
+                            projectId: null,
+                          })
+                      : undefined,
                   // Remove from the project, the quotation and the deal room arrive with W-T18/W-T19.
                   // Left undefined rather than stubbed: an entry that does nothing when pressed is
                   // worse than one that is not there, because the renter tries it twice.
@@ -351,6 +427,18 @@ export function ProjectsSurface() {
           />
         )}
       </Dialog>
+
+      {filing && projects && (
+        <MoveDialog
+          open
+          onClose={() => setFiling(null)}
+          projects={projects}
+          address={filing.address}
+          currentProjectId={filing.projectId}
+          onFile={(id) => void file(id)}
+          busy={saving}
+        />
+      )}
 
       {awarding && (
         <AwardDialog

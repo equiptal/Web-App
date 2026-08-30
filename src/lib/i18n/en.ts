@@ -1627,6 +1627,19 @@ export const en = {
    * for now because other surfaces still read a handful of their labels.
    */
   projects: {
+    move: {
+      fileTitle: "File this in a project",
+      moveTitle: "Move this to another project",
+      changesNothing: "Filing changes nothing on the request — not one value moves, even where the new site says something different. That is why it works after bids and costs you no edit.",
+      movingDropsAwards: "Moving it to another site removes the awards recorded here, with their marks and documents. The request itself is untouched.",
+      atThisAddress: "At {site}",
+      noneHere: "No project at {site} yet.",
+      orAnother: "Or another project",
+      chooseOne: "Choose a project",
+      file: "File",
+      move: "Move",
+      removeFromProject: "Remove from this project",
+    },
     workOrder: {
       equipment: "What is on site",
       machine: "Machine",
