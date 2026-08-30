@@ -1,10 +1,13 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import { IBM_Plex_Sans, IBM_Plex_Sans_Arabic, Oswald } from "next/font/google";
 import "./globals.css";
 import { LocaleProvider } from "@/lib/i18n";
 import { SessionProvider } from "@/lib/session";
 import { IntercomWidget } from "@/components/support/IntercomWidget";
 import { UiPins } from "@/components/dev/UiPins";
+import { USER_COOKIE } from "@/lib/api/auth-server";
+import type { RenterUser } from "@/lib/contract/auth";
 
 // ── The Latin face is the SYSTEM font now (owner, 2026-08-30) ───────────────────────────────
 // ~~Nunito is the prototype's brand typeface, the default sans for the redesign, and Inter is the one
@@ -87,7 +90,31 @@ export const viewport: Viewport = {
   themeColor: "var(--navy)",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+/**
+ * The signed-in renter, read from the cookie the auth BFF wrote — on the SERVER, with no request.
+ *
+ * `GET /api/auth/session` does exactly this in its ordinary path, and the client was waiting a whole
+ * round trip for the answer before it could draw anything. Reading it here hands `SessionProvider`
+ * its opening state, so the first paint already knows who is looking.
+ *
+ * It does NOT replace that endpoint. This cookie is the identity; the access token beside it can have
+ * lapsed, and refreshing it is the endpoint's job. The provider still calls it on mount — what
+ * changes is that the page is not blank while it does.
+ *
+ * A malformed cookie reads as no session rather than throwing: the endpoint clears it on the next
+ * call, and a layout that 500s over a bad cookie takes the whole app down with it.
+ */
+async function sessionFromCookie(): Promise<RenterUser | null> {
+  try {
+    const raw = (await cookies()).get(USER_COOKIE)?.value;
+    return raw ? (JSON.parse(raw) as RenterUser) : null;
+  } catch {
+    return null;
+  }
+}
+
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const initialUser = await sessionFromCookie();
   return (
     <html lang="en">
       <head>
@@ -96,7 +123,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body className={`${oswald.variable} ${plex.variable} ${plexArabic.variable} antialiased`}>
         <LocaleProvider>
-          <SessionProvider>
+          <SessionProvider initialUser={initialUser}>
             {children}
             {/* Inside the providers because it reads the session and the locale, and at the root so the
                 launcher is on every page — support is least reachable exactly where it is most needed. */}

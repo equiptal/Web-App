@@ -47,9 +47,35 @@ interface SessionValue {
 
 const SessionContext = createContext<SessionValue | null>(null);
 
-export function SessionProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<SessionStatus>("loading");
-  const [user, setUser] = useState<RenterUser | null>(null);
+export function SessionProvider({
+  children,
+  initialUser,
+}: {
+  children: ReactNode;
+  /**
+   * **The session, read on the server** (owner, 2026-08-30: *"why is the dashboard slow to show the
+   * content — at first it shows empty data"*).
+   *
+   * The page could not draw anything until `GET /api/auth/session` came back, and only then did the
+   * dashboard's blocks start asking for their data — two strictly serial round trips before a single
+   * row appeared, with the empty state filling the gap. The first of them was avoidable: in the
+   * ordinary case that endpoint reads a cookie and returns it, and the layout is a Server Component
+   * that can read the same cookie with no request at all.
+   *
+   * So the provider starts `authed`/`anon` on the FIRST render, the dashboard draws immediately, and
+   * its fetches start at hydration instead of one round trip later.
+   *
+   * `undefined` (not `null`) means "the server did not say" — a caller that has not been converted
+   * still starts at `loading` and hydrates over the wire exactly as before. `null` means the server
+   * looked and there is no session, which is a different fact and is trusted as one.
+   *
+   * The revalidation below still runs: this cookie is the identity the BFF wrote, but the access
+   * token behind it can have lapsed, and only `/api/auth/session` can refresh it.
+   */
+  initialUser?: RenterUser | null;
+}) {
+  const [status, setStatus] = useState<SessionStatus>(initialUser === undefined ? "loading" : initialUser ? "authed" : "anon");
+  const [user, setUser] = useState<RenterUser | null>(initialUser ?? null);
 
   const refresh = useCallback(async () => {
     try {

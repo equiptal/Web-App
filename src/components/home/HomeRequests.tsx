@@ -81,7 +81,9 @@ export function HomeRequests() {
   const { sessionKey, status } = useSession();
 
   const [groups, setGroups] = useState<RequestGroup[] | null>(null);
-  const [bids, setBids] = useState<InboxBid[]>([]);
+  /** `null` until the read lands — an empty array is an ANSWER ("no bids"), and the rail must not
+   *  give that answer before it has one. See the rail's own note below. */
+  const [bids, setBids] = useState<InboxBid[] | null>(null);
   /** Keyed by group id — resolved after the rows are known, so the table paints before the dates do. */
   const [expiry, setExpiry] = useState<Record<string, ExpiryState>>({});
 
@@ -166,13 +168,13 @@ export function HomeRequests() {
     if (status === "loading") return;
     let live = true;
     setGroups(null);
-    setBids([]);
+    setBids(null);
     void fetchAllMyRequests()
       .then((r) => live && setGroups(groupRequests(r.requests)))
       .catch(() => live && setGroups([]));
     void fetchReceivedBids()
       .then((r) => live && setBids(r.bids))
-      .catch(() => {});
+      .catch(() => live && setBids([]));
     return () => {
       live = false;
     };
@@ -253,9 +255,10 @@ export function HomeRequests() {
      both count what is actually on screen. */
   const visible = (groups ?? []).filter((g) => !hidden.includes(g.id));
   const rows = allRequests ? visible : visible.slice(0, SHOWN);
-  const fresh = bids.reduce((n, b) => n + (b.unreadCount || 0), 0);
-  const newest = allBids ? bids : bids.slice(0, BIDS_SHOWN);
-  const restBids = Math.max(0, bids.length - BIDS_SHOWN);
+  const bidList = bids ?? [];
+  const fresh = bidList.reduce((n, b) => n + (b.unreadCount || 0), 0);
+  const newest = allBids ? bidList : bidList.slice(0, BIDS_SHOWN);
+  const restBids = Math.max(0, bidList.length - BIDS_SHOWN);
 
   const money = (n: number | null): string => (n == null ? "—" : Math.round(n).toLocaleString("en-US"));
 
@@ -483,13 +486,24 @@ export function HomeRequests() {
                     </tr>
                   );
                 })}
-                {!groups && (
-                  <tr>
-                    <td colSpan={5} className="px-3.5 py-8 text-center text-body text-muted">
-                      …
-                    </td>
-                  </tr>
-                )}
+                {/* ── Loading looks like loading, not like nothing (owner, 2026-08-30) ────────────
+                    ~~One cell with an ellipsis in it.~~ *"At first it shows empty data."* It did: a
+                    single centred «…» in a table of five empty rows is indistinguishable from a
+                    renter who has no requests, so the first thing the dashboard said was the wrong
+                    answer, and then it changed its mind.
+
+                    Rows of the real height, with the shape of the real content pulsing in them. The
+                    table does not resize when the data lands, and nobody reads it as an answer. */}
+                {!groups &&
+                  Array.from({ length: SHOWN }, (_, i) => (
+                    <tr key={`sk-${i}`} className={cx(ROW_H, "border-b border-border last:border-b-0")}>
+                      <td className="px-3.5"><span className="block h-3 w-40 animate-pulse rounded-sm bg-surface2" /></td>
+                      <td className="px-3.5"><span className="block h-3 w-32 animate-pulse rounded-sm bg-surface2" /></td>
+                      <td className="px-3.5"><span className="block h-3 w-6 animate-pulse rounded-sm bg-surface2" /></td>
+                      <td className="px-3.5"><span className="block h-3 w-16 animate-pulse rounded-sm bg-surface2" /></td>
+                      <td className="px-3.5"><span className="ms-auto block h-3 w-24 animate-pulse rounded-sm bg-surface2" /></td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
@@ -525,7 +539,7 @@ export function HomeRequests() {
           <div className="flex h-[34px] flex-none items-center gap-2 border-b border-brand-pale bg-brand-soft px-3">
             <Icon name="gavel" size={16} className="text-brand" />
             <h3 className="text-body font-extrabold text-navy">
-              {fmt(t.home.newBidsCount, { n: String(bids.length) })}
+              {fmt(t.home.newBidsCount, { n: String(bidList.length) })}
             </h3>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
@@ -551,7 +565,21 @@ export function HomeRequests() {
                 </span>
               </button>
             ))}
-            {!newest.length && (
+            {/* «No bids yet» is an ANSWER, so it waits until there is one (owner, 2026-08-30). While
+                the read was in flight `bids` was `[]`, which is indistinguishable from a renter who
+                has none — so the rail opened by telling every account it had nothing and then took
+                it back. It skeletons instead, at the row height it will fill. */}
+            {bids === null &&
+              Array.from({ length: BIDS_SHOWN }, (_, i) => (
+                <div key={`skb-${i}`} className={cx(ROW_H, "flex items-center gap-2.5 border-b border-border px-3 last:border-b-0")}>
+                  <span className="size-7 flex-none animate-pulse rounded-full bg-surface2" />
+                  <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+                    <span className="block h-3 w-28 animate-pulse rounded-sm bg-surface2" />
+                    <span className="block h-2.5 w-40 animate-pulse rounded-sm bg-surface2" />
+                  </span>
+                </div>
+              ))}
+            {bids !== null && !newest.length && (
               <p className="px-3 py-6 text-center text-meta text-muted">{t.home.noBidsYet}</p>
             )}
           </div>
