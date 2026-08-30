@@ -11,6 +11,11 @@ import { mapBidFormData, mapLinkSubmissions, type BidFormData, type LinkBidSubmi
 import type { InboxBid } from "@/lib/contract/inbox";
 import type { RenteeRequestDraft } from "@/lib/contract/rentee-request";
 import type { NotificationList, NotificationFilter } from "@/lib/contract/notifications";
+import type { Project, ProjectSummary } from "@/lib/contract/project";
+import { mapProjectSummary, projectToPayload } from "@/lib/contract/project";
+import type { Award, ChartGroup } from "@/lib/contract/award";
+import type { WorkOrderItem, WorkOrderGroup } from "@/lib/contract/work-order";
+import { groupWorkOrderItems } from "@/lib/contract/work-order";
 
 /** Body of POST /api/me/bids/recommend. user_id is attached server-side. */
 export interface RecommendPayload {
@@ -685,4 +690,303 @@ export async function setShareLinkLogo(requestId: string, logoUrl: string | null
 export function bidShareUrl(origin: string, requestId: string, renterName?: string | null): string {
   const slug = renterName ? renterName.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) : "";
   return `${origin}/bid/${slug ? `${slug}-` : ""}${requestId}`;
+}
+
+
+/* ============================================================================================== *
+ * PROJECTS — the renter's sites, their work orders, and who supplies what (web-app/007, W-T3)
+ * ============================================================================================== */
+
+/**
+ * Somebody else wrote to this site first.
+ *
+ * Awards live in one blob on the project row, so every write carries the `version` it read and the
+ * backend refuses a stale one. That is not an edge case to hide: two people share a site, and one
+ * person double-tapping Save or retrying a flaky request produces exactly the same thing.
+ *
+ * It carries `currentVersion` so a caller can re-read and re-apply rather than telling the renter
+ * "something went wrong" and leaving them to retry into the same wall.
+ */
+export class ProjectVersionConflict extends Error {
+  currentVersion: number | null;
+  constructor(currentVersion: number | null) {
+    super("project_version_stale");
+    this.name = "ProjectVersionConflict";
+    this.currentVersion = currentVersion;
+  }
+}
+
+/**
+ * The two other 409s an award write can answer with. Both are instructions, not dead ends:
+ * `units_exceed_quantity` means the line has fewer units left than were promised, and
+ * `request_not_filed` means the request has no site yet — so the UI opens the project picker
+ * instead of showing an error.
+ */
+export type AwardRefusal = "units_exceed_quantity" | "request_not_filed";
+
+export class AwardRefused extends Error {
+  reason: AwardRefusal;
+  details: unknown;
+  constructor(reason: AwardRefusal, details: unknown) {
+    super(reason);
+    this.name = "AwardRefused";
+    this.reason = reason;
+    this.details = details;
+  }
+}
+
+type ProjectFetchInit = { method?: "GET" | "POST" | "PATCH" | "DELETE"; body?: unknown };
+
+/**
+ * One fetch for every project call.
+ *
+ * It exists rather than reusing `postJsonMethod` for one reason: that helper collapses any failure
+ * into `ApiError("unknown")`, and here the backend's **code** is the whole message. A stale version,
+ * a units overrun and an unfiled request are three different things a renter can act on, and they
+ * all arrive as 409.
+ */
+async function projectFetch<T>(url: string, init: ProjectFetchInit = {}): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: init.method ?? "GET",
+      headers: init.body === undefined ? { Accept: "application/json" } : { "Content-Type": "application/json" },
+      body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    });
+  } catch {
+    throw new ApiError("network");
+  }
+
+  if (res.ok) return (await res.json()) as T;
+
+  let code: string | undefined;
+  let details: unknown;
+  try {
+    const body = (await res.json()) as { code?: string; error?: { code?: string }; details?: unknown };
+    code = body.code ?? body.error?.code;
+    details = body.details;
+  } catch {
+    /* non-JSON body */
+  }
+
+  if (res.status === 409) {
+    if (code === "PROJECT_VERSION_STALE") {
+      const current = (details as { currentVersion?: number } | undefined)?.currentVersion;
+      throw new ProjectVersionConflict(typeof current === "number" ? current : null);
+    }
+    if (code === "UNITS_EXCEED_QUANTITY") throw new AwardRefused("units_exceed_quantity", details);
+    if (code === "REQUEST_NOT_FILED") throw new AwardRefused("request_not_filed", details);
+  }
+
+  throw new ApiError(res.status >= 500 ? "network" : "unknown", `HTTP ${res.status}`, {
+    status: res.status,
+    backendCode: code,
+  });
+}
+
+const projectPath = (id: string) => `/api/projects/${encodeURIComponent(id)}`;
+
+/* ----------------------------- Sites ----------------------------- */
+
+/** Every site this company has, newest first, with the roll-up each card shows. */
+export async function listProjects(): Promise<ProjectSummary[]> {
+  const rows = await projectFetch<Record<string, unknown>[]>("/api/projects");
+  return rows.map(mapProjectSummary);
+}
+
+export async function fetchProject(id: string): Promise<ProjectSummary> {
+  return mapProjectSummary(await projectFetch<Record<string, unknown>>(projectPath(id)));
+}
+
+export async function createProject(p: Pick<Project, "title" | "location" | "defaults">): Promise<ProjectSummary> {
+  return mapProjectSummary(await projectFetch<Record<string, unknown>>("/api/projects", { method: "POST", body: projectToPayload(p) }));
+}
+
+/**
+ * Edit a site.
+ *
+ * `applyToRequests` is the renter's explicit tick, and the ONLY way a project edit reaches anything
+ * already filed under it. Left empty, nothing propagates — which is the point of the whole design:
+ * a request copied its values at submit and never reads its project again, so a site edited in
+ * November cannot silently rewrite an RFQ posted in September.
+ */
+export async function updateProject(
+  id: string,
+  p: Pick<Project, "title" | "location" | "defaults">,
+  applyToRequests: string[] = [],
+): Promise<ProjectSummary> {
+  const body = { ...projectToPayload(p), applyToRequests };
+  return mapProjectSummary(await projectFetch<Record<string, unknown>>(projectPath(id), { method: "PATCH", body }));
+}
+
+/** Refused with 409 while anything is filed under the site — never a cascade. */
+export async function deleteProject(id: string): Promise<void> {
+  await projectFetch(projectPath(id), { method: "DELETE" });
+}
+
+/**
+ * File a request under a site, move it between sites, or unfile it with `null`.
+ *
+ * **Filing changes no value on the request**, even where the new site says something different, and
+ * it is allowed after bids because it is not an edit. Moving between sites does drop the request's
+ * awards — name what is lost in the confirm before calling this.
+ */
+export async function assignToProject(requestId: string, projectId: string | null): Promise<void> {
+  // NOT `/api/me/requests/{id}` — that is the edit, which is refused after bids and spends the
+  // renter's one edit. Filing has its own route for exactly that reason.
+  await projectFetch(`/api/me/requests/${encodeURIComponent(requestId)}/project`, { method: "PATCH", body: { projectId } });
+}
+
+/* ----------------------------- The chart ----------------------------- */
+
+export interface ProjectChart {
+  project: ProjectSummary;
+  /** The version every award write must send back. Read it here, not from a stale card. */
+  version: number;
+  groups: ChartGroup[];
+}
+
+/** Everything the site's timeline draws, in one call. */
+export async function fetchChart(projectId: string): Promise<ProjectChart> {
+  const raw = await projectFetch<{ project: Record<string, unknown>; version?: number; groups?: ChartGroup[] }>(
+    `${projectPath(projectId)}/chart`,
+  );
+  return {
+    project: mapProjectSummary(raw.project),
+    version: typeof raw.version === "number" ? raw.version : (mapProjectSummary(raw.project).version ?? 1),
+    groups: raw.groups ?? [],
+  };
+}
+
+/* ----------------------------- Work orders ----------------------------- */
+
+/** The site's own machines, already grouped into work orders. */
+export async function listWorkOrders(projectId: string): Promise<WorkOrderGroup[]> {
+  const rows = await projectFetch<WorkOrderItem[]>(`${projectPath(projectId)}/work-orders`);
+  return groupWorkOrderItems(rows);
+}
+
+/**
+ * Save a work order — create when `groupId` is absent, edit when it is there.
+ *
+ * **Send every machine's `id`.** The backend upserts by id; a machine sent without one is created
+ * fresh, and the awards, marks and purchase orders keyed to the id it used to have are scrubbed —
+ * because the renter renamed it. This is the single most expensive mistake available on this call.
+ */
+export async function saveWorkOrder(
+  projectId: string,
+  body: { groupId?: string; title?: string | null; when?: unknown; whenConflictAck?: boolean; items: unknown[]; awards?: unknown[] },
+): Promise<void> {
+  if (body.groupId) {
+    await projectFetch(`/api/work-orders/${encodeURIComponent(body.groupId)}`, { method: "PATCH", body });
+    return;
+  }
+  await projectFetch(`${projectPath(projectId)}/work-orders`, { method: "POST", body });
+}
+
+/** Deletes the machines AND their awards. The confirm counts both before this is called. */
+export async function deleteWorkOrder(groupId: string): Promise<void> {
+  await projectFetch(`/api/work-orders/${encodeURIComponent(groupId)}`, { method: "DELETE" });
+}
+
+/* ----------------------------- Awards ----------------------------- */
+
+export interface AwardInput {
+  requestId?: string | null;
+  workOrderItemId?: string | null;
+  supplierId?: string | null;
+  supplierName: string;
+  units: number;
+  rentalBasis?: Award["rentalBasis"];
+  rateAmount?: number | null;
+}
+
+/** Every award write answers with the site's new version. Hold it — the next write sends it. */
+export interface AwardWriteResult {
+  award?: Award;
+  version: number;
+}
+
+export async function saveAward(projectId: string, expectedVersion: number, input: AwardInput): Promise<AwardWriteResult> {
+  return projectFetch<AwardWriteResult>(`${projectPath(projectId)}/awards`, {
+    method: "POST",
+    body: { ...input, expectedVersion },
+  });
+}
+
+/**
+ * Set or clear a mark. `mobilizedAt: null` undoes it.
+ *
+ * Dates, not flags, and no ordering rule between the two: *when* is the only thing the timeline can
+ * draw, and the only thing worth comparing against the date that was agreed.
+ */
+export async function markAward(
+  projectId: string,
+  awardId: string,
+  expectedVersion: number,
+  marks: { mobilizedAt?: string | null; demobilizedAt?: string | null },
+): Promise<AwardWriteResult> {
+  return projectFetch<AwardWriteResult>(`${projectPath(projectId)}/awards/${encodeURIComponent(awardId)}`, {
+    method: "PATCH",
+    body: { ...marks, expectedVersion },
+  });
+}
+
+/**
+ * Un-award. Never refused, including with documents attached — they go with it.
+ *
+ * The version rides in the query string because a `DELETE` body is not reliably forwarded by every
+ * layer between here and the backend.
+ */
+export async function deleteAward(projectId: string, awardId: string, expectedVersion: number): Promise<AwardWriteResult> {
+  return projectFetch<AwardWriteResult>(
+    `${projectPath(projectId)}/awards/${encodeURIComponent(awardId)}?expectedVersion=${expectedVersion}`,
+    { method: "DELETE" },
+  );
+}
+
+/**
+ * Run an award write, and re-run it once against a fresher version if somebody got there first.
+ *
+ * The retry is safe for the marks and for a delete, which land on the same value whatever order
+ * they arrive in. **It is not offered for creating an award**: replaying a create after someone
+ * else's write can promise the same units twice, so `saveAward` is called directly and its conflict
+ * is shown to the renter.
+ */
+export async function withFreshVersion<T>(
+  projectId: string,
+  version: number,
+  write: (version: number) => Promise<T>,
+): Promise<T> {
+  try {
+    return await write(version);
+  } catch (err) {
+    if (!(err instanceof ProjectVersionConflict)) throw err;
+    const fresh = err.currentVersion ?? (await fetchChart(projectId)).version;
+    return write(fresh);
+  }
+}
+
+/* ----------------------------- The supplier list ----------------------------- */
+
+export interface RenterSupplier {
+  id: string;
+  kind: "platform" | "own";
+  name: string;
+  vendorRegistered: boolean;
+}
+
+/**
+ * The renter's own suppliers, for the award picker.
+ *
+ * **Another feature owns this list**, and it ships before projects reach production. An empty array
+ * is a normal answer here, not a failure: the award dialog falls back to a typed supplier name,
+ * which is why an award always stores `supplierName` even when it has an id.
+ */
+export async function listRenterSuppliers(): Promise<RenterSupplier[]> {
+  try {
+    return await projectFetch<RenterSupplier[]>("/api/renter-suppliers");
+  } catch {
+    return [];
+  }
 }

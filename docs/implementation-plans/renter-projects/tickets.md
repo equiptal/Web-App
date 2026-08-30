@@ -24,19 +24,20 @@ Three levels: a **project** (the site), **work orders** (machines that never cam
 
 ### W-T1 — Contracts
 **Scope:** contract
-**Files:** new `src/lib/contract/project.ts`, `contract/work-order.ts`, `contract/supply-line.ts`; edit `contract/draft.ts`, `contract/requests.ts`, `contract/taxonomy.ts`, `contract/index.ts`
+**Files:** new `src/lib/contract/project.ts`, `contract/work-order.ts`, `contract/award.ts`; edit `contract/draft.ts`, `contract/requests.ts`, `contract/taxonomy.ts`, `contract/index.ts`
 
 - `Project` · `ProjectDefaults` · `ProjectSummary`. **Assemble `ProjectDefaults` from the existing `ProjectDetails` / `Preferences` pieces — never retype the fields**, or it drifts from `draft.ts`.
-- `WorkOrder` · `WorkOrderItem` · `MachineTerms` · `SupplyLine` · `ChartRow`.
-- `projectId` / `projectVersion` on the request contract and `RfqRequestPayload`.
-- `operatorApplicable` on `Subcategory` / `Category`.
+- `WorkOrderItem` · `MachineTerms` · `WorkOrderGroup` (derived) · `Award` · `AwardBook` · `ChartGroup`.
+- `isAward` / `mapAwardBook` — the JSON blob has no types, so a bad entry is dropped, never rendered.
+- `projectId` on the request contract and `RfqRequestPayload`.
+- `awards: AwardBook` and `version` on `Project`.
 
 **Given/When/Then**
 - Given `ProjectDefaults` / Then it carries exactly the seven fields in spec §5.1 — a test that fails if terrain, days-per-week, budget, payment method, maintenance, SLA, supplier filters or bid window creep back on.
 
 ### W-T2 — BFF routes
 **Scope:** api-integration
-**Files:** new `src/app/api/projects/**`, `api/work-orders/**`, `api/supply-lines/**`, `api/renter-suppliers/route.ts`; edit `api/requests/route.ts`
+**Files:** new `src/app/api/projects/**` (including `[id]/awards/**` and `[id]/chart`), `api/work-orders/**`, `api/renter-suppliers/route.ts`; edit `api/requests/route.ts`
 
 Guarded by `sessionUserId()` with **no `AGENTS_TEST_USER_ID` fallback** — the create route keeps one because there `userId` is *creator attribution*; here it is *authorization*, and a fallback would hand one company's projects to a session-less caller (see the comment at `api/requests/route.ts:31`). Fixture fallback when `useRealApp` is false, as `taxonomy/route.ts` does.
 
@@ -44,7 +45,9 @@ Guarded by `sessionUserId()` with **no `AGENTS_TEST_USER_ID` fallback** — the 
 **Scope:** api-integration
 **Files:** `src/lib/api/client.ts`, `lib/api/app-adapters.ts`
 
-`listProjects` · `createProject` · `updateProject` · `deleteProject` · `assignToProject` · `listWorkOrders` · `saveWorkOrder` · `deleteWorkOrder` · `saveSupplyLine` · `deleteSupplyLine` · `listRenterSuppliers` · `fetchChart`. Forward `projectId`/`projectVersion` through `draftToCreateRequest`.
+`listProjects` · `createProject` · `updateProject` · `deleteProject` · `assignToProject` · `listWorkOrders` · `saveWorkOrder` · `deleteWorkOrder` · `saveAward` · `deleteAward` · `listRenterSuppliers` · `fetchChart`.
+
+Every award call carries the project `version` it read and surfaces a 409 as *someone else changed this site — reloading*, then re-reads. Nothing else writes awards. Forward `projectId` through `draftToCreateRequest`.
 
 ### W-T4 — `applyProjectDefaults` + the `project` provenance
 **Scope:** contract
@@ -58,13 +61,14 @@ Add `"project"` to `FieldSource`; precedence `renter > agent > project > default
 - Given the agent set a start date / When a project is applied / Then the agent's value stands.
 - Given a generator / Then no operator term is written.
 
-### W-T5 — The operator rule
-**Scope:** web-create
-**Files:** `contract/taxonomy.ts`, `components/create/OperatorRail.tsx`, `create/Canvas.tsx`, `lib/api/app-adapters.ts`
+### W-T5 — ~~The operator rule~~ · DEFERRED
 
-`operatorApplies(ref, taxonomy)` reads the backend flag, with a small category-tag fallback for anything unrecognised (treated as applicable). Where false: `operatorNeeded` forced `"no"`, **`OperatorRail` does not render at all** — not the collapsed 72px strip, there is nothing to reopen — and `draftToCreateRequest` omits every operator field.
+**Not part of this feature** (ruled 2026-08-30). Hiding the operator fields for equipment that takes
+no operator is backend work landing separately. The web adds no taxonomy flag, reads none, and gates
+nothing — a generator request behaves exactly as it does today.
 
-The renter's own words still win: an explicit *"generator with operator"* shows the rail, with a note.
+`OPERATOR_DEFAULT_NO_SUBCATEGORIES` and the unused `defaultOperatorNeeded` in `options.ts` are left
+alone for whoever picks that work up.
 
 ### W-T6 — Hide the overtime rate
 **Scope:** web-create
@@ -156,7 +160,7 @@ Rail (projects, ended last and tagged · **Unassigned** when anything is filed n
 **Scope:** web-projects
 **Files:** new `components/projects/ChartRow.tsx`
 
-**One row per supply line**, not per item. An un-awarded item is one hatched row reading *awaiting award* — no marks, no papers, because there is no supply line to hang them on.
+**One row per award**, not per item. An un-awarded item is one hatched row reading *awaiting award* — no marks, no papers, because there is no supply line to hang them on.
 
 - Bar = `start → end`, **no state**. Solid navy awarded, hatched grey not.
 - **No legend.** Green mark = mobilized, orange = demobilized, unlabelled, on the bar's **top edge** — centred they cover the bar's own dates. Date in the tooltip.
@@ -193,7 +197,7 @@ Supplier · units · rate · start · end, with **Split across another supplier*
 2. **Machine terms** — shared by the order, and **overridable per machine** via *Different terms for this machine*, which reveals the same fields and tags the card. The **operator block is absent, not disabled**, when no machine takes one.
 3. **Supplier & period** — the order's own period (with the project-conflict warning), then per machine its supplier lines.
 
-Saving writes the order, its items **and one supply line per supplier line**.
+Saving writes the machines **and one award per supplier line**, in one call.
 
 **Editing the period** opens *Move the awards to the new period?* — one row per award, **pre-ticked only where the award still sits on the old period**; one with its own dates is listed unticked with those dates shown.
 
@@ -211,7 +215,7 @@ Filing changes **no value**, and the dialog says so.
 **Scope:** web-projects
 **Files:** new `components/projects/DocumentsDialog.tsx`
 
-PO · contract · supplier quotation · other, several per supply line, through the existing document storage. On marketplace rows, a line explaining that **our** quotation is generated rather than uploaded, with the download in the row menu.
+PO · contract · supplier quotation · other, several per award, through the existing document storage. On marketplace rows, a line explaining that **our** quotation is generated rather than uploaded, with the download in the row menu.
 
 ### W-T20 — The conflict dialog
 **Scope:** web-projects

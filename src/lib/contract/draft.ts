@@ -264,6 +264,21 @@ export interface RfqRequestPayload {
   /** Excludes items flagged not-available / removed (AC-33/34). */
   items: EquipmentItem[];
   preferences: Preferences;
+  /**
+   * PROJ — the site this was filed under, and which version of its terms it was posted with.
+   *
+   * A LABEL, nothing more. Every value above was already copied into this payload, so the request
+   * never reads its project again and a project edit cannot reach it silently.
+   *
+   * There is no `projectVersion`: the copies ARE the record of what the site's terms were at submit,
+   * held in full rather than by reference, so a version number would be a weaker second answer to a
+   * question already answered here.
+   *
+   * `workOrderGroupId` is provenance only — set when the renter started from one — and changes no
+   * rendering: a work order also posted as a request is deliberately two rows on the chart.
+   */
+  projectId?: string | null;
+  workOrderGroupId?: string | null;
 }
 
 /* ----------------------------- Defaults / factories ----------------------------- */

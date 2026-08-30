@@ -220,6 +220,18 @@ export interface RequestListItem {
   id: string;
   /** Multi-item submission group — all fanned-out requests from one submit share this (null = solo). */
   requestGroupId: string | null;
+  /**
+   * PROJ — the site this request is filed under, and which version of its terms it was posted with.
+   *
+   * A LABEL. Nothing in the marketplace branches on it: the request already holds its own copy of
+   * every value, so a project can be edited, emptied or deleted without touching it. Null means
+   * unfiled — either it predates projects, or the renter removed it from one, and both read the same
+   * because both are true in the same way.
+   *
+   * Distinct from `requestGroupId`, which is the fan-out group of ONE submission. A project spans
+   * many submissions over months; a group is three rows created in the same second.
+   */
+  projectId: string | null;
   /** What to PRINT wherever a label is required: the human code where the payload carries one, else a
    *  short stub of the id, so a list row is never blank. */
   displayId: string;
@@ -238,6 +250,15 @@ export interface RequestListItem {
   endDate: string | null;
   durationDays: number | null;
   createdAt: string | null;
+  /**
+   * When the request itself stops taking bids, as the BACKEND computes it.
+   *
+   * The authoritative deadline, and the only one that is reliably populated: `offerDuration` is not
+   * even returned on the list payload and is null on every request in staging, so the window fallback
+   * it feeds can never fire there. This arrives on every row of `my-requests`, which is why the
+   * expiry column can be filled without a per-row lookup.
+   */
+  expiresAt: string | null;
   bidCount: number;
   /**
    * The one post-bid edit has been spent. The cap is enforced server-side — `request.service.ts`
@@ -269,6 +290,8 @@ export interface RequestGroup {
   /** Full address (shown in the group context strip). */
   address: string | null;
   createdAt: string | null;
+  /** The EARLIEST `expiresAt` across the group's items — a group closes when its first item does. */
+  expiresAt: string | null;
   type: RequestType;
   totalBids: number;
   /** Sum of every item's unit count across the group ("N total equipment"). */
@@ -363,6 +386,7 @@ export function mapRequestListItem(r: RequestRecord): RequestListItem {
   return {
     id: r.id,
     requestGroupId: str(r.requestGroupId),
+    projectId: str(r.projectId),
     displayId: requestCodeOf(r as unknown as Record<string, unknown>) ?? shortRef(r.id),
     code: requestCodeOf(r as unknown as Record<string, unknown>),
     groupRef: groupRefOf(r),
@@ -376,6 +400,7 @@ export function mapRequestListItem(r: RequestRecord): RequestListItem {
     // Prefer the stored value; else derive from start/end (backend never computes it from the dates).
     durationDays: num(r.estimatedDurationDays) ?? durationDaysBetween(str(r.startDate), str(r.endDate)),
     createdAt: str(r.createdAt),
+    expiresAt: str(r.expiresAt),
     bidCount: num(r.bidCount) ?? 0,
     // `my-requests` spreads the whole request row, so this arrives already — it was simply never
     // read here, which is why the web had no idea the one post-bid edit had been spent.
@@ -439,6 +464,11 @@ export function groupRequests(items: RequestListItem[]): RequestGroup[] {
       locationLabel,
       address,
       createdAt: first.createdAt,
+      // Earliest wins: the group can only take bids for as long as its soonest-closing item can.
+      expiresAt: groupItems
+        .map((i) => i.expiresAt)
+        .filter((d): d is string => !!d)
+        .sort()[0] ?? null,
       type: first.type,
       totalBids: groupItems.reduce((s, i) => s + i.bidCount, 0),
       totalUnits: groupItems.reduce((s, i) => s + (i.item?.qty ?? 1), 0),

@@ -120,7 +120,9 @@ describe("mapRequestListItem — the request's code", () => {
 
 const li = (p: Partial<RequestListItem>): RequestListItem => ({
   id: "x",
+  expiresAt: null,
   requestGroupId: null,
+  projectId: null,
   groupRef: null,
   displayId: "REQ-1",
   code: "REQ-1",

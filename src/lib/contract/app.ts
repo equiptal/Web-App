@@ -97,6 +97,20 @@ export interface CreateRequestPayload {
   projectLat?: number;
   projectLng?: number;
   projectAddressLabel?: string;
+  /**
+   * PROJ - the site this request is filed under. **A LABEL, and nothing else.**
+   *
+   * Every value the project supplied was already copied into the fields above, in the browser,
+   * before this payload was built. The request never reads its project again, so editing the site
+   * next month cannot reach a request posted today - which is what lets a request and its project
+   * drift apart safely. There is no `projectVersion` beside it: the copies ARE the record of what
+   * the site's terms were at submit, held in full rather than by reference.
+   *
+   * Stamped on EVERY row of a fanned-out submission, never only the first.
+   */
+  projectId?: string;
+  /** Provenance only - the work order this request was started from. Changes no rendering. */
+  workOrderGroupId?: string;
   additionalNotes?: string;
   // §4.2 header fields (AC-15 hours/days/overtime, AC-27 access, AC-36/37 terms, AC-39/40 filters):
   workingHoursPerDay?: number; // int 1–24

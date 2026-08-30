@@ -49,12 +49,37 @@ What this builds on:
 PROJECT ──────────── location · when · payment terms   (seven fields, §5.1)
    │
    ├── WORK ORDER ── the renter's own record. Never reaches the marketplace.
-   │   │             machine terms + items. May carry its own when → conflict, never a block.
-   │   └── items ─── one machine line each
+   │   └── items ─── one machine each, sharing a group id. NO parent row — exactly how a
+   │                 multi-item RFQ is a `requestGroupId` shared by its fanned rows.
+   │                 Each machine carries its own COMPLETE terms.
    │
    └── REQUEST ───── the marketplace RFQ, as today, plus a project label
        └── items ─── the backend already fans out one request row per item
 ```
+
+**A work order has no row of its own.** It is a group id its machines share, and the header — title,
+period, which project it is filed under — is duplicated on each of them, following the pattern
+`EquipmentRequest` already uses for a fanned submission rather than inventing a second one.
+
+Three things fall out, and all three are improvements:
+
+- **A machine's terms are its own and complete.** With a parent row they were a shared blob plus a
+  sparse per-item patch, so every read had to overlay one on the other — a merge each surface had to
+  perform identically, and one of them eventually would not. The welder you collect yourself simply
+  has `delivery: "me"`; it is not an override of anything.
+- **`projectId` lives in one place.** With a parent it sat on the order *and* its items, and the two
+  had to be kept in step.
+- **Less to scrub.** A mistake in a write path costs one machine's awards, not the
+  whole order's.
+
+The cost: nothing in the database enforces that a group agrees about its title or period. The renter
+cannot cause that — the form writes every row together — but it makes one rule non-negotiable.
+**Every header write goes through one helper that updates the whole group in a transaction.** Five
+paths touch a header (create, edit, move, unfile, delete) and all five use it.
+
+- **PROJ-AC-61** — a work order is a group id on its machines; no parent row exists.
+- **PROJ-AC-62** — a change to a work order's title, period or project writes every row in the group,
+  in one transaction.
 
 Under every item sit **award allocations** — who supplies how many units. An allocation is the unit of tracking and the row on the chart (§8).
 
@@ -124,7 +149,7 @@ Stored on a work order and on a request. **This is the block the template copies
 
 **Shared, then overridable per machine.** On a work order the block is set once for the whole order, and any machine may differ — its card carries *Different terms for this machine*, which reveals the same fields as an override and marks the card with how many it holds. *Follow the shared terms* clears them.
 
-That is not a new idea: `draft.ts` already gives every request item overrides of the request-wide settings — `deliveryOverride`, `returnOverride`, `fuelResponsibilityOverride`, `safetyCertsOverride`, per-item `equipmentYear`, and a fully per-item operator block. The work order uses the same shape (`work_order_items.item_terms`), so a crane and a generator on one order can have different delivery and different certificates without being split into two orders.
+That is not a new idea: `draft.ts` already gives every request item overrides of the request-wide settings — `deliveryOverride`, `returnOverride`, `fuelResponsibilityOverride`, `safetyCertsOverride`, per-item `equipmentYear`, and a fully per-item operator block. The work order uses the same shape, held in `work_order_items.terms` — complete on every machine rather than a patch over a shared blob — so a crane and a generator on one order can have different delivery and different certificates without being split into two orders.
 
 - **PROJ-AC-43** — every machine-term field is overridable per machine, and an overridden machine says so on its card.
 - **PROJ-AC-44** — clearing an override returns that machine to the shared value; it never leaves a stale copy behind.
@@ -184,7 +209,19 @@ The dropdown is ordered most-recent-first, labelled `kind · ref · first machin
 
 ---
 
-## 7. The operator rule
+## 7. The operator rule — DEFERRED, not part of this feature
+
+> **Ruled 2026-08-30: out of scope here.** Hiding the operator fields for equipment that takes no
+> operator is backend work that will land separately, on its own terms. This feature does not add the
+> taxonomy flag, does not read it, and does not gate anything on it — a request for a generator keeps
+> today's behaviour exactly.
+>
+> The analysis below is kept because it is the reasoning whoever picks that work up will need. Nothing
+> in it is implemented.
+
+<details>
+<summary>The deferred design</summary>
+
 
 Machine terms include the operator policy. But an operator is meaningless for a generator, an air compressor or a light tower, and applying the policy there would put terms on the request that nobody meant and suppliers would price against.
 
@@ -193,6 +230,8 @@ Machine terms include the operator policy. But an operator is meaningless for a 
 - **PROJ-AC-09** — where the flag is false: `operatorNeeded` is forced to `"no"`, no operator term is copied or sent, and `OperatorRail` does not render at all — not even the 72px collapsed strip, since there is nothing to reopen.
 - **PROJ-AC-10** — the renter's own words still win: an explicit "generator with operator" shows the rail, with a note.
 - **PROJ-AC-11** — until the backend serves the flag, the web falls back to a small category-tag list and treats anything unrecognised as applicable.
+
+</details>
 
 ---
 
@@ -266,7 +305,7 @@ Every serious buyer keeps a **vendor master** — the list their finance system 
 
 So this is **a dependency, not a blocker**. We build against its contract from day one, and degrade cleanly while it is still in flight — which is a development condition, not a product decision.
 
-**A supply line records both:**
+**An award records both:**
 
 ```sql
 renter_supplier_id  uuid NULL      -- the link, once the registry answers

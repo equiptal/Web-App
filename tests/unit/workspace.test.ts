@@ -20,8 +20,10 @@ import type { BidCard, TermRow, TermState } from "@/lib/contract/bids";
 function item(id: string, status: RequestStatus = "OPEN", qty = 1, imageUrl: string | null = null): RequestListItem {
   return {
     id,
+    expiresAt: null,
     requestGroupId: null,
-    displayId: `REQ-${id}`,
+    projectId: null,
+      displayId: `REQ-${id}`,
     code: `REQ-${id}`,
     groupRef: null,
     type: "BROADCAST",
@@ -45,6 +47,7 @@ function item(id: string, status: RequestStatus = "OPEN", qty = 1, imageUrl: str
 function group(id: string, items: RequestListItem[], groupRef: string | null = null): RequestGroup {
   return {
     id,
+    expiresAt: null,
     groupRef,
     items,
     city: "Riyadh",

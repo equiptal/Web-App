@@ -20,7 +20,7 @@ Four phases, each shippable on its own:
 - **P0-1** — agree `operator_applicable` with whoever owns the taxonomy data, and set it for the obvious non-operator categories: generators, compressors, light towers, welding machines, tanks, scaffolding.
 - **P0-2** — one open item left in spec §15: whether the overtime term also leaves the **supplier** side. It blocks nothing here; it only decides whether Phase 4 gets a small extra ticket.
 - **P0-2b** — **The supplier registry must land before this ships to production.** Agree the date with whoever owns it. If it slips, the typed-name fallback ships and the vendor-registered gate is deferred — no other part of this feature changes, because the name is recorded either way (spec §9.2).
-- **P0-3** — **Ruled: reuse the existing document storage.** Confirm the agents-backend's document table can take `supply_line` as an owner type. Only if it genuinely cannot does a dedicated table become the fallback — never a JSON list, because a file needs an id you can presign, delete and audit by.
+- **P0-3** — **Ruled and confirmed.** `DocumentInstance` is already polymorphic (`entityType`/`entityId`), so an award is one new string value, `project_award`. No migration. Only if it genuinely cannot does a dedicated table become the fallback — never a JSON list, because a file needs an id you can presign, delete and audit by.
 
 ---
 
@@ -31,10 +31,10 @@ Four phases, each shippable on its own:
 | # | Work |
 |---|---|
 | A1 | `projects` — `id, company_id, owner_user_id, title, location_label, location_lat, location_lng, defaults jsonb, version, created_at, updated_at`. Index `(company_id, updated_at DESC)`. **No `status` column.** Archive is gone: a project reads as **ended** when the last date under it has passed — derived, never set — and ended projects sort last rather than hiding. Delete exists only for an empty project. `defaults` holds exactly seven fields (spec §5.1) — basis, extendable, start, end, hours/day, payment terms, plus the location columns — and **not** working-days-per-week, which the create flow never asks for — and **never** `estimatedDurationDays` or `urgency`, which the web derives at submit. Location stays in its own columns because it is read on every rail card and its lat/lng will be queried. |
-| A2 | `requests.project_id uuid NULL REFERENCES projects(id) ON DELETE SET NULL` + `requests.project_version int NULL`, indexed on `project_id`. **`SET NULL`, never cascade** — PROJ-AC-23 enforced by the database, not by code someone can forget. |
+| A2 | `requests.project_id uuid NULL REFERENCES projects(id) ON DELETE SET NULL`, indexed on `project_id`. **`SET NULL`, never cascade** — PROJ-AC-23 enforced by the database, not by code someone can forget. |
 | A3 | `GET/POST /agents/projects`, `GET/PATCH/DELETE /agents/projects/{id}`. **`DELETE` refuses (409) while anything is filed under the project** — the web offers no delete there either, so the refusal is a backstop, not the user's first news of it. The list returns the roll-up (`requestCount`, `workOrderCount`, `firstStart`, `lastEnd`, `unitsAwarded`) **computed server-side** — if the web computes it, one dashboard load fetches every request of every project. |
 | A4 | `PATCH` bumps `version` on any `defaults` change. Body takes `applyToRequests: uuid[]` — **an explicit list, never a boolean**; the renter already saw and approved exactly those. Response returns `applied[]` and `skipped[]` with a reason per skip (PROJ-AC-22). |
-| A5 | `POST /agents/requests` accepts `projectId` + `projectVersion` and stamps them on **every fanned-out row**. |
+| A5 | `POST /agents/requests` accepts `projectId` and stamps it on **every fanned-out row**. |
 | A8 | `GET /agents/renter-suppliers` — the read the award picker needs (spec §9.2). Writes and the registry itself are the suppliers feature's, not this one's. |
 | A6 | `PATCH /agents/requests/{id}` accepts `projectId` for assign/move — filing only, no value changes (PROJ-AC-21). |
 | A7 | Taxonomy: `operator_applicable boolean NULL` on subcategory (inherits category), served by `GET /agents/taxonomy`. |
@@ -46,10 +46,10 @@ Four phases, each shippable on its own:
 | # | Work | Files |
 |---|---|---|
 | B1 | `Project`, `ProjectDefaults`, `ProjectSummary`. `ProjectDefaults` is assembled from the existing `ProjectDetails` / `Preferences` pieces — **do not** define a parallel shape. | new `src/lib/contract/project.ts`, exported from `contract/index.ts` |
-| B2 | `projectId` / `projectVersion` on the request contract and `RfqRequestPayload`. | `contract/draft.ts`, `contract/requests.ts` |
+| B2 | `projectId` on the request contract and `RfqRequestPayload`. | `contract/draft.ts`, `contract/requests.ts` |
 | B3 | `operatorApplicable` on `Subcategory`/`Category` + `operatorApplies(ref, taxonomy)` with the fallback tag list (PROJ-AC-11). | `contract/taxonomy.ts` |
 | B4 | BFF: `src/app/api/projects/route.ts`, `src/app/api/projects/[id]/route.ts`. Guarded by `sessionUserId()` with **no `AGENTS_TEST_USER_ID` fallback** — unlike the create route, where the fallback is creator attribution rather than authorization (see the comment at `api/requests/route.ts:31`). Fixture fallback when `useRealApp` is false, as `taxonomy/route.ts` does. | new |
-| B5 | Forward `projectId`/`projectVersion` through submit. | `api/requests/route.ts`, `lib/api/app-adapters.ts` |
+| B5 | Forward `projectId` through submit. | `api/requests/route.ts`, `lib/api/app-adapters.ts` |
 | B6 | `listProjects`, `createProject`, `updateProject`, `deleteProject`, `assignToProject`. | `lib/api/client.ts` |
 
 ### 1C · Web-App — prefill, provenance, the operator rule
@@ -57,7 +57,7 @@ Four phases, each shippable on its own:
 | # | Work | Files |
 |---|---|---|
 | C1 | Add `"project"` to `FieldSource`; precedence `renter > agent > project > default > empty`. | `contract/provenance.ts`, `create/Provenance.tsx` |
-| C2 | Store: `projectId`, `projectVersion`, `projectDefaults` (resolved, including pill edits); actions `selectProject`, `clearProject`, `patchProjectOverride`. Persisted with the draft so a reload keeps the selection. | `store/rfq-store.tsx` |
+| C2 | Store: `projectId`, `projectDefaults` (resolved, including pill edits); actions `selectProject`, `clearProject`, `patchProjectOverride`. Persisted with the draft so a reload keeps the selection. | `store/rfq-store.tsx` |
 | C3 | **`applyProjectDefaults(draft, defaults, taxonomy)`** — pure. Must not touch any field the agent filled, and must skip the operator block for non-operator subtypes. Unit-tested in isolation; the whole feature's correctness sits here. | new `contract/project-apply.ts` |
 | C4 | `OperatorRail` does not render when `operatorApplies()` is false, and `operatorNeeded` is forced `"no"`. **Not** the collapsed 72px strip — there is nothing to reopen. | `create/OperatorRail.tsx`, `Canvas.tsx` |
 | C5 | `draftToCreateRequest` omits every operator field for non-operator items (PROJ-AC-09). | `lib/api/app-adapters.ts` |
@@ -92,28 +92,28 @@ Four phases, each shippable on its own:
 ### 2A · agents-backend
 
 ```sql
-CREATE TABLE work_orders (
+-- A WORK ORDER IS NOT A ROW. It is a group id its machines share — the same shape as a fanned-out
+-- RFQ, where one `request_group_id` is stamped on every row and no `request_groups` table exists.
+-- The header is duplicated across the group; `terms` is COMPLETE on each machine, never a sparse
+-- patch over a shared blob, so no surface has to merge two objects to know a machine's terms.
+CREATE TABLE work_order_items (
   id uuid PRIMARY KEY,
-  project_id uuid NULL REFERENCES projects(id) ON DELETE SET NULL,
+  work_order_group_id uuid NOT NULL,        -- THE work order. No row it points at.
+  sort_order integer NOT NULL DEFAULT 0,    -- the renter's order, and which row a header is READ from
   company_id uuid NULL REFERENCES companies(id),
   owner_user_id uuid NOT NULL REFERENCES users(id),
+
+  -- header: identical on every row of the group. One helper writes it, in one transaction.
+  project_id uuid NULL REFERENCES projects(id) ON DELETE SET NULL,
   title text NULL,
   -- own "when": NULL means inherit the project. Separate columns, not JSON, because
   -- "did this override the end date?" must have a straight answer — that is the conflict.
   rental_basis text NULL, extendable boolean NULL,
   start_date date NULL, end_date date NULL,
-  hours_per_day smallint NULL, working_days_per_week smallint NULL,
+  hours_per_day smallint NULL,
   when_conflict_ack boolean NOT NULL DEFAULT false,
-  terms jsonb NOT NULL DEFAULT '{}',        -- machine terms, shape follows draft.ts
-  notes text NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
 
-CREATE TABLE work_order_items (
-  id uuid PRIMARY KEY,
-  work_order_id uuid NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
-  project_id uuid NULL,                     -- denormalised: the chart is one union query
+  -- this machine
   -- Off-catalogue machines are legal HERE and nowhere else (spec §5.2.1): a work order
   -- never reaches a supplier, so it needs no id to bid against.
   category_id uuid NULL, subcategory_id uuid NULL, measurement_id uuid NULL,
@@ -124,11 +124,14 @@ CREATE TABLE work_order_items (
   quantity integer NOT NULL DEFAULT 1,
   attachment_ids jsonb NOT NULL DEFAULT '[]',
   custom_attachments jsonb NOT NULL DEFAULT '[]',
-  item_terms jsonb NOT NULL DEFAULT '{}',   -- per-item overrides of work_orders.terms
+  terms jsonb NOT NULL DEFAULT '{}',        -- this machine's own terms, complete
   notes text NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE INDEX work_order_items_group ON work_order_items (work_order_group_id, sort_order);
+CREATE INDEX work_order_items_project ON work_order_items (project_id);
+
 
 -- ANOTHER FEATURE'S, and it ships BEFORE this reaches production (spec §9.2). Shown here only
 -- because the award picker reads it. This feature builds ONE call against it —
@@ -152,40 +155,49 @@ CREATE UNIQUE INDEX renter_suppliers_platform_uq
   ON renter_suppliers (company_id, platform_supplier_id)
   WHERE platform_supplier_id IS NOT NULL;
 
--- Named `supply_lines`, not `awards`: "award" already means *accept a bid* in this product, and
--- this row deliberately is not that. One row = one supply line — who supplies how many, for how
--- long. The renter-facing word stays **Award**, which is what procurement calls it.
-CREATE TABLE supply_lines (
-  id uuid PRIMARY KEY,
-  -- SET NULL, not CASCADE: the tracking layer is the renter's own and never disappears with a
-  -- marketplace row. A hard-deleted request leaves its supply line standing, marks and papers intact.
-  request_id uuid NULL REFERENCES requests(id) ON DELETE SET NULL,
-  work_order_item_id uuid NULL REFERENCES work_order_items(id) ON DELETE CASCADE,
-  project_id uuid NULL,                     -- denormalised, same reason
-  -- Both, always. The link once the registry answers; the name as it stood at award time,
-  -- written even after the link exists. A row renders from the name it already holds, so it
-  -- survives the registry being unavailable, a supplier being removed, or a match never made.
-  renter_supplier_id uuid NULL REFERENCES renter_suppliers(id),
-  supplier_name      text NOT NULL,
-  platform_supplier_id uuid NULL REFERENCES suppliers(id),   -- known for free on a marketplace award
-  units integer NOT NULL CHECK (units > 0),
-  rate_amount numeric(12,2) NULL, rate_period text NULL, currency text NOT NULL DEFAULT 'SAR',
-  start_date date NULL, end_date date NULL,
-  mobilized_at timestamptz NULL, demobilized_at timestamptz NULL,
-  awarded_at timestamptz NOT NULL DEFAULT now(),
-  awarded_by uuid NOT NULL REFERENCES users(id),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  -- One parent at creation. It may later lose a hard-deleted request and stand alone.
-  CONSTRAINT one_parent CHECK (NOT (request_id IS NOT NULL AND work_order_item_id IS NOT NULL))
-);
+-- AWARDS ARE NOT A TABLE. They live in one JSON column on the project, as a DICTIONARY keyed by
+-- what is being supplied. The tracking layer is the project's, so it is held with the project.
+--
+-- Keyed rather than a flat list because a machine can be deleted — the work-order form removes any
+-- machine left out of its payload — and the award has to go with it. `delete
+-- awards.workOrderItems[id]` is one key, which is small enough to be impossible to half-do. A flat
+-- array would be a scan on every delete path, and one missed leaves an award naming a machine that
+-- is not there.
+--
+-- The renter-facing word is **Award**, which is what procurement calls it, even though *award* also
+-- means *accept a bid* elsewhere in the product. This reads nothing from the deal room and writes
+-- nothing to it.
+--
+-- ALTER TABLE projects ADD COLUMN awards jsonb NOT NULL DEFAULT '{}';
+--
+--   { "requests":       { "<requestId>":       [ award, … ] },
+--     "workOrderItems": { "<workOrderItemId>": [ award, … ] } }
+--
+--   award = { id, supplierId, supplierName, units, rentalBasis, rateAmount,
+--             mobilizedAt, demobilizedAt, awardedAt, awardedBy }
+--
+-- Nothing in the database validates any of that, so four things are the application's alone:
+--   1 · shape — every entry checked on read; a bad one is dropped, never half-drawn (`isAward`)
+--   2 · scrub — four paths delete a key: work-order PATCH (a machine omitted), work-order DELETE,
+--       a request moved to another site, project delete. All through one helper.
+--   3 · units — SUM(units) under a key may not exceed the item's quantity. Spans data the blob
+--       does not hold, so the item is read alongside.
+--   4 · concurrency — the blob is written whole, so every write carries the `projects.version` it
+--       read and a mismatch is 409, not a silently lost award.
+--
+-- `supplierName` is written even when `supplierId` is set: a row renders from a name it already
+-- holds, so it survives the registry being unavailable or a match never being confirmed.
+--
+-- `mobilizedAt` / `demobilizedAt` are DATES, not flags — a mark has to sit somewhere on the
+-- timeline. An award carries no period of its own; its bar comes from its request or work order,
+-- widened by those two marks.
 
 -- NO new document table. Papers attach through the document storage the product already has
--- (company documents, bid documents, the generated quotation) with the award as a new owner
--- type, so every file in the product stays one addressable, presignable, deletable thing.
---   documents: + owner_type 'supply_line', + owner_id, + kind 'po'|'contract'|'quotation'
+-- (company documents, bid documents, the generated quotation). `DocumentInstance` is already
+-- polymorphic, so an award is one new owner-type string and no migration at all.
+--   DocumentInstance: entityType 'project_award', entityId = award.id, kind po|contract|quotation
 
-ALTER TABLE requests ADD COLUMN work_order_id uuid NULL REFERENCES work_orders(id);  -- provenance only
+ALTER TABLE requests ADD COLUMN work_order_group_id uuid NULL;  -- provenance only; no FK, no row to point at
 ```
 
 Endpoints:
@@ -194,8 +206,8 @@ Endpoints:
 GET/POST         /agents/projects/{id}/work-orders
 GET/PATCH/DELETE /agents/work-orders/{id}
 GET              /agents/projects/{id}/chart        -- the union, one call
-POST/PATCH/DELETE/agents/supply-lines[/{id}]
-POST/DELETE      /agents/supply-lines/{id}/documents[/{docId}]   -- onto the existing document store
+POST/PATCH/DELETE/agents/projects/{id}/awards[/{awardId}]        -- every call carries `version`
+POST/DELETE      /agents/projects/{id}/awards/{awardId}/documents[/{docId}]
 GET              /agents/renter-suppliers           -- THE ONLY ONE WE BUILD (spec §9.2)
 -- POST / PATCH belong to the suppliers feature, not this one.
 ```
@@ -212,7 +224,7 @@ And one hook: **accepting a bid upserts a linked `renter_suppliers` row** (unreg
 | # | Work | Files |
 |---|---|---|
 | W1 | Contracts: `WorkOrder`, `WorkOrderItem`, `AwardAllocation`, `AllocationDocument`, `RenterSupplier`; `ChartRow` = the union shape the chart renders. | new `contract/work-order.ts`, `contract/award.ts` |
-| W2 | BFF relays for every endpoint above. | new `api/work-orders/**`, `api/supply-lines/**`, `api/renter-suppliers/**` |
+| W2 | BFF relays for every endpoint above. | new `api/projects/**`, `api/work-orders/**`, `api/renter-suppliers/**` |
 | W3 | **`ProjectsBoard`** — port the rail, meta bar and chart from `prototypes/renter-projects-v1.html` onto real data, including the **Unassigned** bucket and the ended-last ordering. The design is settled (spec §13); this is a port, not a redesign. | new `components/projects/ProjectsBoard.tsx` |
 | W4 | The chart row = **one allocation**. Un-awarded items draw one hatched row. **No legend.** Pins sit on the bar's **top edge**, unlabelled — **green** mobilized, **orange** demobilized, date in the tooltip. Documents render as **orange markers in the row's top corner**, `+N` past three. | `components/projects/ChartRow.tsx` |
 | W5 | Row menu by type (spec §8.4), including the generated-quotation link on marketplace rows only. | `components/projects/RowMenu.tsx` |
@@ -283,7 +295,7 @@ And one hook: **accepting a bid upserts a linked `renter_suppliers` row** (unreg
 | API | A work order delete cascades its items and allocations; there is no delete path for a request. |
 | Unit | `projectEnded()` — derived from the last date under the project, falling back to its own end date when nothing is filed. |
 | Unit | A work-order machine saves free-text with no taxonomy id; the same shape is rejected for a request. |
-| Unit | A per-machine override wins over the shared term; clearing it falls back, leaving no stale copy in `item_terms`. |
+| Unit | The form's shared block writes the same `terms` to every row; *Different terms for this machine* writes different values to one. Each row's `terms` is complete, so no read merges two objects. |
 | API | `PATCH /agents/work-orders/{id}` upserts items by id — an edit that renames a machine keeps every award, mark and document under it. |
 | API | Editing a work order's period moves only the awards the renter ticked; the rest keep their dates. |
 | API | Accepting a bid upserts a linked `renter_suppliers` row. |
@@ -341,7 +353,7 @@ owns it. This is the checklist an engineer works from and a reviewer signs off a
 |---|---|---|---|
 | W-1 | Create | Equipment first (cascade: category → subtype → size, each level disabled until its parent), then shared machine terms, then period + supplier lines. | `WorkOrderForm` |
 | W-1b | A machine we don't list | Typed in free-text instead of picked. Legal on a work order, never on a request (spec §5.2.1). Reads as operator-applicable. | `machineReady()` · `machineOperatorApplies()` |
-| W-2 | Several machines | One card each. Terms are shared at order level and **overridable per machine** — the card carries *Different terms for this machine* and counts how many it holds. Same shape as the request canvas's per-item overrides. | `termsFields()` · `item_terms` |
+| W-2 | Several machines | One card each. The form shows ONE shared terms block for typing convenience, which writes the same values to every row. *Different terms for this machine* writes different values to that row — an override of nothing, since each row's `terms` is complete. Same shape as the request canvas's per-item overrides. | `termsFields()` · `work_order_items.terms` |
 | W-3 | No machine takes an operator | The operator block is **absent**, not disabled, with one line saying why. | `operatorApplies()` |
 | W-4 | Own period differs from the project | Warned in the form, saved anyway, and the group header carries a *differs from the project* chip. Never a block. | `whenDiffers()` |
 | W-5 | Save | Writes the work order, its items **and one allocation per supplier line** — awarded the moment it exists. | `saveWorkOrder()` |
@@ -358,7 +370,7 @@ owns it. This is the checklist an engineer works from and a reviewer signs off a
 | R-1 | Intake · project + template | Project fills where/when/preferences, template fills machine terms, the text fills equipment. | `applyProjectDefaults()` |
 | R-2 | Intake · project, no template | Machine terms fall to today's defaults and the renter answers them on the canvas. | R-1 |
 | R-3 | Intake · no project | Today's flow exactly. After submit: if the stated place **already has a project**, the offer is to file it there (PROJ-AC-52/53); if not, the offer is to create one. | §11.3 · `matchingProjects()` |
-| R-4 | Submit | `projectId` + `projectVersion` stamped on **every fanned row**. | A5 |
+| R-4 | Submit | `projectId` stamped on **every fanned row**. | A5 |
 | R-5 | File an existing request | From Unassigned, or any row's menu. The picker **leads with the projects at that request's own site** — named cards, one click — with the rest in a select. That, not a second entry point, is what makes filing forty old requests survivable. | `projectsAtPlace()` · A6 |
 | R-6 | Move between projects | Filing only. Not one value changes, even where the new project differs. Allowed after bids. | A6 |
 | R-7 | Remove from a project | Unfiles. Award, marks and papers stay intact. | A6 |
@@ -389,7 +401,7 @@ owns it. This is the checklist an engineer works from and a reviewer signs off a
 | S-1 | Read the list | One call, `GET /agents/renter-suppliers`. **The only thing this feature builds against the registry** (spec §9.2). | `listRenterSuppliers()` |
 | S-2 | The award picker · endpoint answers | The supplier list, only **vendor-registered** selectable, the rest disabled with *Mark as vendor registered*. This is what production sees. | `AwardDialog` |
 | S-3 | The award picker · endpoint not there yet | A text field with autocomplete over names already used on this project. A development condition, not a product mode. | `AwardDialog` |
-| S-4 | Either way | `supplier_name` is written on the supply line, so the row renders from a name it holds. | `supply_lines` |
+| S-4 | Either way | `supplierName` is written on the award, so the row renders from a name it holds. | `Project.awards` |
 | S-5 | Adding · registering · managing · upsert-on-accept | **Out of scope.** The suppliers feature owns all of it, and ships first. | — |
 
 ## A6 · Intake & the agent
@@ -416,7 +428,7 @@ owns it. This is the checklist an engineer works from and a reviewer signs off a
 | X-1 | Provenance | New `project` source; precedence `renter > agent > project > default > empty`. | `provenance.ts` |
 | X-2 | Titles | Optional at all three levels; blank falls back and is marked *default*. | PROJ-AC-37 |
 | X-3 | Overtime | Hidden on every renter surface, data path untouched. | §5.4 |
-| X-4 | Denormalised `project_id` | On `work_order_items` and `supply_lines`. Moving a group updates its items **and their supply lines**, in one handler. | A6 |
+| X-4 | Scrubbing awards | Nothing in the database removes an award when its machine goes. Four paths delete a key, all through one helper, each in the transaction of the delete it follows. | A6 |
 | X-5 | Arabic / RTL | Every new string bilingual; the chart, pins and pills are logical-property based. | i18n |
 | X-6 | Empty states | No projects · project with nothing filed · Unassigned empty · no suppliers yet. | `ProjectsBoard` |
 
@@ -431,9 +443,12 @@ Found while walking the plan. None block Phase 1.
    *picking* — so the picker now leads with the projects at the row's own site (PROJ-AC-54), and most
    requests never reach Unassigned at all because they are offered a project at the moment they are
    posted (§11.3).
-2. ~~**`supply_lines.request_id ON DELETE CASCADE`.**~~ **Ruled:** the tracking layer is the renter's
-   own, so it never disappears with a marketplace row. `ON DELETE SET NULL` — the supply line survives
-   as a machine he recorded, with its marks and its papers intact.
+2. ~~**A `supply_lines` table.**~~ **Ruled 2026-08-30: awards live on the project**, in a keyed JSON
+   dictionary. The tracking layer is the project's, and at this scope a table's machinery does not
+   yet earn what it costs. What the table did for free — cascading an award away with its machine —
+   is bought back by keying the dictionary, at the price of four callers using one helper. Two
+   consequences were accepted with it: an award cannot exist for an unfiled request, and a request
+   moved to another site starts fresh there.
 3. **Templates from another project.** The dropdown lists only this project's. A renter's first request
    in a new site has nothing to copy, though their last site's terms are usually right. Add a second
    group — *…or from another project* — later, not in v1.

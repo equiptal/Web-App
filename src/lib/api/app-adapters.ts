@@ -216,6 +216,10 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
     projectLat: project.location.lat,
     projectLng: project.location.lng,
     projectAddressLabel: project.location.label ?? undefined,
+    // PROJ - the filing label, carried through untouched. Omitted rather than sent as null when the
+    // request belongs to no site, so an unfiled request's payload stays byte-identical to before.
+    projectId: draft.projectId ?? undefined,
+    workOrderGroupId: draft.workOrderGroupId ?? undefined,
     additionalNotes: mergedNotes,
     // §4.2 header fields:
     workingHoursPerDay: project.timing.hoursPerDay, // AC-14/15 (default 8)
