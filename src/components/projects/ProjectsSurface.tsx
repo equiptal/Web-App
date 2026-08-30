@@ -594,6 +594,10 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
         onClose={() => setWorkOrder(null)}
         title={workOrder?.groupId ? t.projects.menu.editWorkOrder : t.projects.created.workOrder}
         subtitle={t.projects.created.workOrderSub}
+        /* The project dialog's width, and for its reason: this one asks the same four-across period
+           question and carries wider supplier rows, and a narrower panel wraps both into what look
+           like separate questions. */
+        size="xl"
       >
         {workOrder && chart && (
           <WorkOrderForm
@@ -734,31 +738,25 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
             value={editing.value}
             onChange={(value) => setEditing((cur) => (cur ? { ...cur, value } : cur))}
             rows={editing.rows}
+            {...(() => {
+              /* Delete now lives inside the form's footer, so the surface hands it the action and
+                 the words. A site with rows still gets the control — it opens the panel that says
+                 what is filed, because a refusal a renter cannot open is a wall with no door. */
+              if (!editing.id) return {};
+              const p = projects?.find((x) => x.id === editing.id);
+              const empty = !!p && projectIsEmpty(p);
+              return {
+                onDelete: () => p && setDeleting(p),
+                deletable: empty,
+                deleteLabel: empty ? t.projects.del.confirmAction : t.projects.del.busyTitle,
+              };
+            })()}
             onCancel={() => setEditing(null)}
             onSave={(value, applyTo) => void save(value, applyTo)}
             saving={saving}
           />
         )}
 
-        {/* Delete lives here rather than on the card, because it is a thing you do to a project you
-            are already looking at — and because the panel it opens has to be able to say what is
-            filed, which is what the edit view has just loaded. */}
-        {editing?.id && (
-          <button
-            type="button"
-            onClick={() => {
-              const p = projects?.find((x) => x.id === editing.id);
-              if (p) setDeleting(p);
-            }}
-            className="mt-4 self-start text-meta font-semibold text-muted underline underline-offset-2 hover:text-danger"
-          >
-            {(() => {
-              const p = projects?.find((x) => x.id === editing.id);
-              // Not a disabled button: a project with rows gets an explanation, not a refusal.
-              return p && projectIsEmpty(p) ? t.projects.del.confirmAction : t.projects.del.busyTitle;
-            })()}
-          </button>
-        )}
       </Dialog>
     </div>
   );
