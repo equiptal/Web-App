@@ -102,6 +102,7 @@ export const PIN_REGISTRY = {
 
   /* ── 10–14  home ──────────────────────────────────────────────────────────────────────────── */
   "home-hub": { n: "10", label: "Home", file: "src/components/home/HomeHub.tsx" },
+  "browse-page": { n: "10.5", label: "Browse — banner + supplier directory", file: "src/components/stores/BrowsePage.tsx" },
   "home-hero": { n: "10.1", label: "Home — hero band", file: "src/components/home/HomeHub.tsx" },
   "home-hero-actions": { n: "10.2", label: "Home — hero action column", file: "src/components/home/HomeHub.tsx" },
   "home-requests": { n: "10.4", label: "Home — requests + bids rail", file: "src/components/home/HomeRequests.tsx" },

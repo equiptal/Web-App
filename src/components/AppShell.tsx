@@ -176,8 +176,15 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
   // NOT HERE, and each for its own reason: INBOX is an icon in the account cluster, because it
   // carries a count and a word cannot; PROFILE is the avatar beside it; SETTINGS is inside that
   // avatar's menu, next to Sign out, where a reader looks for it.
+  /* BROWSE leads for a guest, and follows Dashboard once there is an account (owner, 2026-08-30).
+     A visitor has no requests and no organization, so the first tab has to be the one with something
+     in it; a signed-in renter came for his own work, so his does. Same four destinations either way
+     — only the order moves, because a nav that gains and loses tabs on sign-in teaches nothing. */
+  const guest = status === "anon";
+  const dashboardTab: NavItem = { key: "dashboard", label: t.shell.dashboard, href: "/" };
+  const browseTab: NavItem = { key: "browse", label: t.shell.browse, href: "/browse" };
   const navItems: NavItem[] = [
-    { key: "dashboard", label: t.shell.dashboard, href: "/" },
+    ...(guest ? [browseTab, dashboardTab] : [dashboardTab, browseTab]),
     { key: "requests", label: t.shell.requests, href: "/requests" },
     { key: "company", label: t.shell.company, href: "/company" },
   ];
