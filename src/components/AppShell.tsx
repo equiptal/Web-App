@@ -178,10 +178,6 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
   // avatar's menu, next to Sign out, where a reader looks for it.
   const navItems: NavItem[] = [
     { key: "dashboard", label: t.shell.dashboard, href: "/" },
-    // PROJ — between Requests and Company on purpose. A project is what the requests are FOR, so
-    // it reads left-to-right as the renter's own hierarchy: everything, then one job, then the
-    // company behind them.
-    { key: "projects", label: t.shell.projects, href: "/projects" },
     { key: "requests", label: t.shell.requests, href: "/requests" },
     { key: "company", label: t.shell.company, href: "/company" },
   ];

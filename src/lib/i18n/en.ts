@@ -36,7 +36,6 @@ export const en = {
     preview: "Preview",
   },
   shell: {
-    projects: "Projects",
     home: "Home",
     profile: "Profile",
     requests: "Requests",

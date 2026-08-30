@@ -7,7 +7,7 @@ import { Icon } from "@/components/ui";
 import { BrowseSurface } from "@/components/stores/BrowseSurface";
 import { fetchActivity, type ActivityCounts } from "@/lib/api/client";
 import { HomeRequests } from "@/components/home/HomeRequests";
-import { HomeProjects } from "@/components/home/HomeProjects";
+import { ProjectsSurface } from "@/components/projects/ProjectsSurface";
 import { StartYourRequestModal, type StartRequestChoice } from "@/components/home/StartYourRequestModal";
 import { useStartRequestGate } from "@/lib/access/start-request-gate";
 import { btn, cx, PAGE_MAX, PAGE_X } from "@/lib/ds";
@@ -216,18 +216,21 @@ export function HomeHub() {
         </div>
       </div>
 
-      {/* ── The sites, above the requests ──────────────────────────────────────────────
-          A request is one shopping trip; a site is the thing the trips are for. It draws nothing for
-          a renter with no projects, so a new account is not asked to do a second thing beside the
-          one the hero already asks. */}
-      <HomeProjects />
-
       {/* ── The requests, and the bids beside them (owner, 2026-08-29) ────────────────────────────
           The dashboard's first block, above the activity tiles: what is out to the market, how long
           each one still takes bids, and what has come back — the two halves of one question, on one
           row. It draws nothing for a renter with no requests, so a new account still opens on the
           hero and the suppliers. */}
       <HomeRequests />
+
+      {/* ── The sites, under the requests (owner, 2026-08-30) ──────────────────────────────
+          Not a route of its own. A renter's sites are part of the picture the dashboard already
+          draws — what is out to the market, what came back, and what is standing on the ground — so
+          they sit in that column rather than behind a tab that has to be remembered.
+
+          It renders nothing for a guest or a renter with no sites, so a new account sees exactly
+          today's dashboard. */}
+      <ProjectsSurface embedded />
 
       {/* Suggested suppliers — filter bar always shown; View all only adds cards (AC-05/10/11/12/13) */}
       <BrowseSurface title={t.home.suppliersTitle} previewCount={8} />

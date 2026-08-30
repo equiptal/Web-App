@@ -52,7 +52,7 @@ import { projectTitle } from "@/lib/contract/project";
 import { EMPTY_WHEN } from "@/lib/contract/work-order";
 import type { Taxonomy } from "@/lib/contract/taxonomy";
 
-export function ProjectsSurface() {
+export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   const t = useT();
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [editing, setEditing] = useState<{ id: string | null; value: ProjectFormValue; rows?: PropagationRow[] } | null>(null);
@@ -358,11 +358,21 @@ export function ProjectsSurface() {
     }
   }
 
+  // Embedded, a renter with no sites sees exactly today's dashboard. Standalone, the empty state is
+  // the point of the page, so it still renders.
+  if (embedded && (!projects || projects.length === 0)) return null;
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-display font-extrabold leading-tight tracking-[-.02em] text-navy">{t.projects.surface.heading}</h1>
+          {/* A section of the dashboard, not a page of its own — so it takes a section's heading
+              level and weight, and sits in the same column as everything above it. */}
+          {embedded ? (
+            <h2 className="text-subhead font-extrabold text-navy">{t.projects.surface.heading}</h2>
+          ) : (
+            <h1 className="text-display font-extrabold leading-tight tracking-[-.02em] text-navy">{t.projects.surface.heading}</h1>
+          )}
           <p className="mt-1 text-body text-muted">{t.projects.surface.sub}</p>
         </div>
         <Button onClick={() => setEditing({ id: null, value: emptyProjectForm() })}>
