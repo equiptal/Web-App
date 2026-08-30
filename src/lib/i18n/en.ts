@@ -1820,6 +1820,7 @@ export const en = {
     del: {
       confirmTitle: "Delete this project?",
       confirmBody: "“{name}” has nothing filed under it, so nothing is lost. This cannot be undone.",
+      createdBy: "Created by {name}",
       confirmAction: "Delete project",
       busyTitle: "This project is in use",
       busyBody: "“{name}” cannot be deleted while these are filed under it:",

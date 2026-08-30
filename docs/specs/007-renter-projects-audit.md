@@ -3,8 +3,18 @@
 **Audited 2026-08-31**, criterion by criterion against the code, after the machine-terms editor was
 found missing during UAT. 58 criteria (`PROJ-AC-01`…`62`; 49–50 and 57–58 are unused numbers).
 
-**52 built · 5 not built · 1 ruled and now built.** None of the five is a surprise-in-hiding any
-more — each is named here with what it would take.
+**49 built · 9 deferred by the owner, 2026-08-31.** Nothing is a surprise-in-hiding any more: each
+remaining criterion is named here, with what it would take and whose call it is waiting on.
+
+| | criteria | |
+|---|---|---|
+| built | 49 | including AC-02 and AC-15, both closed on 2026-08-31 |
+| deferred · overtime is still on screen | AC-05 | 3 JSX deletions, unblocked |
+| deferred · operator-applicable flag | AC-09, 10, 11 | W-T5 |
+| later · the supplier registry, a feature of its own | AC-18, 19, 20, 59, 60 | one endpoint |
+
+*(The first pass of this audit said "52 built · 6 not built", which does not add to 58 — it counted
+the registry as one item in the total and as six in the body. Corrected here.)*
 
 ---
 
@@ -22,7 +32,10 @@ render it:
 | `RequestEditModals.tsx` | :227 | still present |
 
 Never started — no commit mentions it. The data path is meant to stay untouched (`"without"` keeps
-being sent), so this is three deletions of JSX and nothing else. **Small, and entirely unblocked.**
+being sent), so this is three deletions of JSX and nothing else.
+
+**Deferred by the owner, 2026-08-31** — *"AC-05 later."* Unblocked whenever it is wanted; nothing
+depends on it and nothing else is waiting behind it.
 
 ### AC-15, AC-18, AC-19, AC-20, AC-59, AC-60 · The supplier registry
 
@@ -39,7 +52,7 @@ text while there is no registry, and required the moment there is one to choose 
 implemented: an unregistered row renders disabled rather than hidden, so a renter finds the supplier
 and sees why it cannot be picked. See `RULINGS.md` · R-P1.
 
-The other five wait on the endpoint.
+**The other five are the supplier feature itself, confirmed by the owner as later work (2026-08-31).** They are not gaps in projects: `renter-suppliers` is a feature of its own, and this one already behaves correctly in its absence — the picker falls back to a typed name, and R-P1 makes the registration gate switch on by itself the moment the endpoint answers.
 
 ### AC-09, AC-10, AC-11 · The operator-applicable flag
 
@@ -50,18 +63,23 @@ winning (*"generator with operator"* shows the rail, with a note).
 Today the operator block shows for every machine. That is a visible-but-harmless default, not a
 wrong value.
 
+**Deferred by the owner, 2026-08-31** — *"AC-09–11 later, for operator settings."*
+
 **This is the dependency that cost the machine-terms editor.** W-T17 deferred the whole terms block
 over this one field's visibility, and the caveat lived only in a commit body. It is one condition in
-`TermsFields.tsx` when it lands.
+`TermsFields.tsx` when it lands — and this time the terms block is not waiting behind it.
 
-### AC-02 · Delete does not name the creator
+### ~~AC-02 · Delete does not name the creator~~ — built 2026-08-31
 
-*"A project's delete confirmation names its creator."* `ProjectDelete.tsx` names the **project** —
-`"{name}" has nothing filed under it` — and never the person who made it. `ownerName` is already on
-the payload, so this is one interpolation and one copy change.
+The confirmation named the **project** and never the person who made it. It now reads *Created by
+{name}* beneath the body.
 
-Matters on a shared company board, which is the whole premise of AC-01: on a site somebody else
-created, the confirmation should say so.
+It matters because of AC-01: every member of a company sees and may act on every site in it, so the
+site you are about to delete is often not yours. Deleting your own empty draft and deleting a
+colleague's are the same two clicks, and this line is the only thing that tells them apart.
+
+An owner the backend cannot resolve is left unsaid rather than filled with *Unknown*, which reads as
+a person a renter would then go looking for. Covered by `project-delete-owner` — 3 tests.
 
 ---
 

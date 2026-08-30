@@ -1556,6 +1556,7 @@ export const ar: Dictionary = {
     del: {
       confirmTitle: "حذف هذا المشروع؟",
       confirmBody: "«{name}» لا يحتوي على شيء، فلن يضيع شيء. لا يمكن التراجع عن ذلك.",
+      createdBy: "أنشأه {name}",
       confirmAction: "حذف المشروع",
       busyTitle: "هذا المشروع قيد الاستخدام",
       busyBody: "لا يمكن حذف «{name}» ما دام يضم:",

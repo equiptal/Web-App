@@ -54,6 +54,21 @@ export function ProjectDelete({
       {empty ? (
         <div className="flex flex-col gap-4">
           <p className="text-body text-navy">{d.confirmBody.replace("{name}", name)}</p>
+
+          {/* Who made it (PROJ-AC-02).
+              Every member of a company sees and may act on every site in it (AC-01), so the site
+              you are about to delete is often not yours. Saying whose it is turns a confirmation
+              into a decision: deleting your own empty draft and deleting a colleague's are the
+              same two clicks, and only this line tells them apart.
+
+              Shown only when the backend knows the name — an owner it cannot resolve is left
+              unsaid rather than filled with "Unknown", which reads as a person. */}
+          {project.ownerName && (
+            <p className="flex items-center gap-1.5 text-meta text-muted">
+              <Icon name="person" size={13} className="flex-none" />
+              {d.createdBy.replace("{name}", project.ownerName)}
+            </p>
+          )}
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={onClose} disabled={busy}>
               {t.common.cancel}
