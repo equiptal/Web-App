@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useT, useLocale } from "@/lib/i18n";
+import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { BrowseSurface } from "@/components/stores/BrowseSurface";
 import { fetchActivity, type ActivityCounts } from "@/lib/api/client";
@@ -28,13 +28,19 @@ const POPUP_SHOWN_KEY = "start-request-popup-shown";
 
 /**
  * Renter web home hub (web-app/004, AC-04/05/07/10/25). A gradient-to-dark hero (pitch left, Create-
- * request + Upload-RFQ buttons right), a row of activity cards (Your Requests / Price Bids /
- * Completed Deals — no web data/pages yet, coming-soon), then the suggested-suppliers surface.
+ * request + Upload-RFQ buttons right), then the requests-and-bids block and the suggested suppliers.
+ *
+ * ── Two blocks removed (owner, 2026-08-30) ──────────────────────────────────────────────────────
+ * The **activity tiles** (Your Requests / Price Bids / Completed Deals) and the **new-bids banner**
+ * are gone. Both counted the same things `HomeRequests` states directly one block below — the tiles
+ * as three numbers behind three links, all of which went to `/requests`, and the banner as a fourth
+ * copy of the bid count that went there too. A page that says the same number four times and offers
+ * the same door each time is not four features.
+ *
+ * `activity` is still fetched: `useStartRequestGate` reads `openRequests` from it.
  */
 export function HomeHub() {
   const t = useT();
-  const { locale } = useLocale();
-  const ar = locale === "ar";
   const router = useRouter();
   const [activity, setActivity] = useState<ActivityCounts | null>(null);
   const [startPopup, setStartPopup] = useState(false);
@@ -82,7 +88,6 @@ export function HomeHub() {
     router.push(`/create?mode=${choice}`);
   };
 
-  const newBids = activity?.newBids ?? 0;
 
   return (
     <div {...pin("home-hub")} className="flex flex-col gap-7">
@@ -200,42 +205,12 @@ export function HomeHub() {
         </div>
       </div>
 
-      {/* New-bids banner — mirrors the app's HomeNewBidsCard; shown only when unread bids exist. */}
-      {newBids > 0 && (
-        <button
-          type="button"
-          onClick={() => router.push("/requests")}
-          className={btn("secondary", "md", { className: "flex text-start transition" })}
-        >
-          <span className="relative grid h-9 w-9 flex-none place-items-center rounded-sm bg-brand-light/[0.14]">
-            <Icon name="gavel" size={20} className="text-brand-light" />
-            <span className="absolute -end-1.5 -top-1.5 grid min-w-[18px] place-items-center rounded-full bg-brand-light px-1 text-label font-semibold leading-[18px] text-white">{newBids}</span>
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-body font-semibold text-navy">
-              {ar ? `${newBids} ${newBids === 1 ? "عرض جديد" : "عروض جديدة"} على طلباتك` : `${newBids} new ${newBids === 1 ? "bid" : "bids"} on your requests`}
-            </span>
-            <span className="block text-body font-semibold text-brand-light">{ar ? "عرض العروض" : "View bids"}</span>
-          </span>
-          <Icon name="chevron_right" size={20} className="flex-none text-brand-light rtl:scale-x-[-1]" />
-        </button>
-      )}
-
       {/* ── The requests, and the bids beside them (owner, 2026-08-29) ────────────────────────────
           The dashboard's first block, above the activity tiles: what is out to the market, how long
           each one still takes bids, and what has come back — the two halves of one question, on one
           row. It draws nothing for a renter with no requests, so a new account still opens on the
           hero and the suppliers. */}
       <HomeRequests />
-
-      {/* Activity cards. The bids and deals tabs are gone: the workspace shows a request and its
-          bids together, so "bids" is not a separate destination, and completed deals live in the
-          Inbox with their rooms (docs/requests-workspace-disabled.md). */}
-      <div {...pin("home-tiles")} className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <ActivityCard accent="brand" icon="assignment" title={t.home.yourRequests} sub={t.home.reqSub} href="/requests" count={activity?.openRequests} />
-        <ActivityCard accent="info" icon="gavel" title={t.home.priceBids} sub={t.home.bidsSub} href="/requests" count={newBids} />
-        <ActivityCard accent="ok" icon="handshake" title={t.home.completedDeals} sub={t.home.dealsSub} href="/inbox" count={activity?.completedDeals} />
-      </div>
 
       {/* Suggested suppliers — filter bar always shown; View all only adds cards (AC-05/10/11/12/13) */}
       <BrowseSurface title={t.home.suppliersTitle} previewCount={8} />
@@ -246,49 +221,3 @@ export function HomeHub() {
   );
 }
 
-const ACCENT: Record<string, { iconBg: string; iconText: string; bar: string }> = {
-  brand: { iconBg: "bg-brand-soft", iconText: "text-brand", bar: "bg-brand" },
-  info: { iconBg: "bg-info-soft", iconText: "text-info", bar: "bg-info" },
-  ok: { iconBg: "bg-ok-soft", iconText: "text-ok", bar: "bg-ok" },
-};
-
-function ActivityCard({
-  accent,
-  icon,
-  title,
-  sub,
-  href,
-  count,
-}: {
-  accent: "brand" | "info" | "ok";
-  icon: string;
-  title: string;
-  sub: string;
-  href?: string;
-  count?: number;
-}) {
-  const router = useRouter();
-  const c = ACCENT[accent];
-  return (
-    <button
-      type="button"
-      onClick={() => href && router.push(href)}
-      className="group relative flex cursor-pointer flex-col gap-3.5 overflow-hidden rounded-sm border border-border bg-surface p-5 text-start transition"
-    >
-      <div className="flex items-start justify-between">
-        <span className={`relative grid h-11 w-11 place-items-center rounded-sm ${c.iconBg}`}>
-          <Icon name={icon} size={22} className={c.iconText} />
-          {count != null && count > 0 && (
-            <span className={`absolute -end-1.5 -top-1.5 grid min-w-[19px] place-items-center rounded-full px-1 text-label font-semibold leading-[19px] text-white ${c.bar}`}>{count}</span>
-          )}
-        </span>
-        <Icon name="chevron_right" size={20} className="text-muted/60 rtl:scale-x-[-1]" />
-      </div>
-      <div>
-        <div className="text-subhead font-extrabold text-navy">{title}</div>
-        <div className="mt-0.5 text-meta text-muted">{sub}</div>
-      </div>
-      <div className={`absolute inset-x-0 bottom-0 h-[3px] opacity-0 transition group- ${c.bar}`} />
-    </button>
-  );
-}

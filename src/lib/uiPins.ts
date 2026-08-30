@@ -104,7 +104,6 @@ export const PIN_REGISTRY = {
   "home-hub": { n: "10", label: "Home", file: "src/components/home/HomeHub.tsx" },
   "home-hero": { n: "10.1", label: "Home — hero band", file: "src/components/home/HomeHub.tsx" },
   "home-hero-actions": { n: "10.2", label: "Home — hero action column", file: "src/components/home/HomeHub.tsx" },
-  "home-tiles": { n: "10.3", label: "Home — activity tiles", file: "src/components/home/HomeHub.tsx" },
   "home-requests": { n: "10.4", label: "Home — requests + bids rail", file: "src/components/home/HomeRequests.tsx" },
   "start-request-modal": { n: "11", label: "Start-your-request modal", file: "src/components/home/StartYourRequestModal.tsx" },
 
