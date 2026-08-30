@@ -147,7 +147,17 @@ export function HomeHub() {
           src="/home-cta-site.webp"
           alt=""
           aria-hidden="true"
-          className="absolute -start-[7.5%] -top-[7.5%] -z-10 h-[115%] w-[115%] object-cover"
+          /* `max-w-none` is load-bearing (owner, 2026-08-30: *"why the image doesn't fit the full
+             width"*). Tailwind's Preflight sets `img, video { max-width: 100%; height: auto }`, and
+             a WIDTH utility cannot beat a MAX-WIDTH declaration — different property, so it clamps
+             whatever the layer order. `w-[115%]` was therefore rendering at 100%, and the `-7.5%`
+             offset pushed that 100% off the leading edge, leaving exactly 7.5% of the band bare on
+             the trailing side: 143px at a 1910px window. The overlays kept painting that strip, so
+             it read as a flat grey block rather than as a missing photograph.
+
+             The height never had this problem, which is why only one side showed it: `h-[115%]`
+             overrides `height: auto` because they ARE the same property. */
+          className="absolute -start-[7.5%] -top-[7.5%] -z-10 h-[115%] w-[115%] max-w-none object-cover"
           style={{ objectPosition: "center 55%" }}
         />
         <span
