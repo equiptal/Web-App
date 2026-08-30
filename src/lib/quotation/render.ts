@@ -106,7 +106,7 @@ export interface QuotationDoc {
 /** Formal quotation stylesheet — ported verbatim from prototypes/requests-grouped.html. */
 export const QUOTATION_STYLE = `${DS_ROOT_CSS}
   *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:'Inter','Segoe UI',Roboto,sans-serif;color:var(--navy);background:var(--background);-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  body{font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;color:var(--navy);background:var(--background);-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .q-doc{position:relative;max-width:780px;margin:18px auto;background:var(--surface);border-radius: var(--radius-lg);overflow:hidden;page-break-after:always;}
   .q-doc:last-child{page-break-after:auto;}
   /* DRAFT marking (pre-confirmation quotations) — amber badge in the header + a diagonal watermark

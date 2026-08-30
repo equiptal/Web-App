@@ -25,7 +25,7 @@
   flex-direction: column;
   min-height: calc(100vh - 140px);
   color: var(--navy);
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
 }
 .dlproto .mono { font-family: "IBM Plex Sans", monospace; }
 .dlproto .material-icons-outlined { font-family: "Material Icons Outlined"; line-height: 1; }
@@ -395,7 +395,7 @@
 .qp-scrim { position: fixed; inset: 0; z-index: 60; background: color-mix(in srgb, var(--navy-deep) 50%, transparent); display: flex; align-items: center; justify-content: center; padding: clamp(10px,3%,28px); }
 .qp-scrim .material-icons-outlined { font-family: "Material Icons Outlined"; line-height: 1; }
 .qp-sheet {--rentee: #2563eb; --action:var(--brand); --success:var(--ok); --success-bg:var(--ok-soft);--danger-bg:var(--danger-soft); --warning:var(--warn);--line:var(--surface3);--paper-2:var(--surface);
-  display: flex; flex-direction: column; width: 100%; max-width: 860px; max-height: 94vh; background: var(--surface); border-radius: var(--radius-lg); overflow: hidden; font-family: "Inter",-apple-system,"Segoe UI",Roboto,sans-serif; color: var(--navy); animation: dpModal .22s ease; }
+  display: flex; flex-direction: column; width: 100%; max-width: 860px; max-height: 94vh; background: var(--surface); border-radius: var(--radius-lg); overflow: hidden; font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; color: var(--navy); animation: dpModal .22s ease; }
 @keyframes dpModal { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: none; } }
 
 /* header — two rows */

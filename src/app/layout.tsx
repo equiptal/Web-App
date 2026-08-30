@@ -1,15 +1,23 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, IBM_Plex_Sans, IBM_Plex_Sans_Arabic, Nunito } from "next/font/google";
+import { IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from "next/font/google";
 import "./globals.css";
 import { LocaleProvider } from "@/lib/i18n";
 import { SessionProvider } from "@/lib/session";
 import { IntercomWidget } from "@/components/support/IntercomWidget";
 import { UiPins } from "@/components/dev/UiPins";
 
-// Nunito is the prototype's brand typeface (weights 400–900) — the default sans for the redesign, used
-// on every page → preload it. The other three are contextual (Inter on prototype screens, IBM Plex for
-// numerics, IBM Plex Sans Arabic for Arabic/RTL only), so `preload: false` avoids "preloaded but not
-// used" warnings — they still load on demand via their @font-face when a screen actually references them.
+// ── The Latin face is the SYSTEM font now (owner, 2026-08-30) ───────────────────────────────
+// ~~Nunito is the prototype's brand typeface, the default sans for the redesign, and Inter is the one
+// the prototype screens name.~~ Both are gone: `globals.css` sets Latin to `"Segoe UI", system-ui, …`,
+// which is what the supplier-OS prototypes have always used and what the owner asked the whole web to
+// match. Nothing reads `--font-nunito` or `--font-inter` any more, so loading them downloaded two
+// families to render none of them.
+//
+// This means the app takes the reader's own system face — Segoe UI on Windows, San Francisco on Apple,
+// Roboto on Android. That is the trade the owner chose knowingly: Segoe UI is not licensed as a webfont
+// and cannot be served, so matching it exactly everywhere was never on the table.
+//
+// The two that REMAIN are still real downloads, and each still earns it:
 //
 // ── The Arabic face is IBM Plex Sans Arabic, not Tajawal (owner, 2026-08-19) ─────────────────────
 // The prototype every RTL screen is drawn from sets `font-family:'IBM Plex Sans Arabic'` (`app.css:3`),
@@ -21,8 +29,6 @@ import { UiPins } from "@/components/dev/UiPins";
 //
 // It also puts the Arabic and the Latin on ONE superfamily: `--font-plex` was already the numeric face,
 // so a figure inside an Arabic run no longer changes typeface mid-line.
-const nunito = Nunito({ variable: "--font-nunito", subsets: ["latin"], weight: ["400", "500", "600", "700", "800", "900"] });
-const inter = Inter({ variable: "--font-inter", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], preload: false });
 const plex = IBM_Plex_Sans({ variable: "--font-plex", subsets: ["latin"], weight: ["400", "500", "600", "700"], preload: false });
 // 800 is carried because the surface asks for it (titles, chips, pills). Plex Arabic ships no 900; the
 // few 900s in the stylesheets fall back to 700 rather than being synthesised, which is the safe
@@ -73,7 +79,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,500,0,0" />
       </head>
-      <body className={`${nunito.variable} ${inter.variable} ${plex.variable} ${plexArabic.variable} antialiased`}>
+      <body className={`${plex.variable} ${plexArabic.variable} antialiased`}>
         <LocaleProvider>
           <SessionProvider>
             {children}

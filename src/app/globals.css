@@ -156,7 +156,7 @@
   --color-disabled-border: var(--disabled-border);
 
   /* ── Font families ───────────────────────────────────────────────────────────────────────── */
-  --font-sans: var(--font-nunito);
+  --font-sans: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
   --font-mono: var(--font-plex);
 }
 
@@ -215,7 +215,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-nunito), var(--font-inter), -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
   font-size: var(--text-body);
   /* ── So a band can reach the window's edge (owner, 2026-08-30) ─────────────────────────
      The home CTA is full-bleed: it escapes the page's 1440px cap and its gutter with the standard
@@ -235,7 +235,7 @@ body {
    Layout is RTL-capable via logical properties (AC-46, flag-gated). */
 :lang(ar) body,
 [dir="rtl"] body {
-  font-family: var(--font-arabic), var(--font-inter), sans-serif;
+  font-family: var(--font-arabic), "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
 }
 
 /* ── Focus ──────────────────────────────────────────────────────────────────────────────────────

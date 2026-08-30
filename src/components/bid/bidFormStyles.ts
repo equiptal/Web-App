@@ -5,8 +5,8 @@
  */
 export const BID_FORM_CSS = `
 .bidpage{--action:var(--brand);--action-dim:var(--brand-soft);--rentee:var(--info);--success:var(--ok);--success-bg:var(--ok-soft);--danger-bg:var(--danger-soft);--surface1:var(--surface);--line:var(--surface3);--r-md:10px;--r-lg:14px;--r-full:100px;
-  min-height:100vh;background:var(--surface2);color:var(--navy);font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
-.bidpage.rtl{font-family:"IBM Plex Sans Arabic","Inter",sans-serif}
+  min-height:100vh;background:var(--surface2);color:var(--navy);font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
+.bidpage.rtl{font-family:"IBM Plex Sans Arabic","Segoe UI",system-ui,sans-serif}
 .bidpage *{box-sizing:border-box}
 .bidpage .material-icons-outlined{font-family:'Material Icons Outlined';line-height:1}
 .pubbar{background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
