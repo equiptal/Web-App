@@ -1,12 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui";
-import { fetchAllMyRequests, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail } from "@/lib/api/client";
+import { cancelRequest, fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail } from "@/lib/api/client";
 import { cancellableItems, groupBiddingClosed, groupRequests, type RequestGroup } from "@/lib/contract/requests";
 import type { InboxBid } from "@/lib/contract/inbox";
 import { requestExpiry, expiryState, type ExpiryState } from "@/lib/contract/request-expiry";
+import { submissionToBidCard } from "@/lib/contract/link-bids";
+import type { WorkspaceBid } from "@/lib/contract/workspace";
+import { hiddenRequests, hideRequest, unhideRequest } from "@/lib/access/hidden-requests";
+import { RequestDetailsModal, type ShareLinkMeta } from "@/components/workspace/RequestDetailsModal";
+import { ConfirmCancelModal } from "@/components/requests/RequestEditModals";
+import { Dialog } from "@/components/Dialog";
 import { btn, CARD, cx } from "@/lib/ds";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { pin } from "@/lib/uiPins";
@@ -69,6 +75,7 @@ export function HomeRequests() {
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
+  const L = (en: string, arr: string) => (ar ? arr : en);
   const router = useRouter();
 
   const [groups, setGroups] = useState<RequestGroup[] | null>(null);
@@ -82,6 +89,69 @@ export function HomeRequests() {
    *  box he already scrolled to reach is two scrollbars for one list. */
   const [allRequests, setAllRequests] = useState(false);
   const [allBids, setAllBids] = useState(false);
+
+  /* ══ Everything below happens HERE, on the dashboard (owner, 2026-08-30) ═══════════════════════
+     *"why cancel or edit or share always show the details panel behind it"* — because every one of
+     them called `router.push('/requests?g=…&door=1')`. That navigated to the workspace and opened
+     the door there, so what sat behind the modal was the requests page the renter had just been
+     sent to, mid-load. He asked for a request, not for another page.
+
+     `RequestDetailsModal` is a component, so it is mounted here and the dashboard stays put. */
+
+  /** The group whose details are open, and whether it opened straight onto the share sheet. */
+  const [open, setOpen] = useState<{ group: RequestGroup; share: boolean } | null>(null);
+  /** The bids and the share-link settings the modal needs — fetched only once one is opened. */
+  const [openBids, setOpenBids] = useState<WorkspaceBid[]>([]);
+  const [openLink, setOpenLink] = useState<ShareLinkMeta | null>(null);
+
+  /** The group the ✕ is asking to cancel. Cancelling ALWAYS confirms — see the note on dismissal. */
+  const [cancelling, setCancelling] = useState<RequestGroup | null>(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
+  /** Groups this device has taken off the feed. Local, and reversible. */
+  const [hidden, setHidden] = useState<string[]>([]);
+  useEffect(() => setHidden(hiddenRequests()), []);
+  /** The group waiting on the one-time explainer before it is dismissed. */
+  const [explaining, setExplaining] = useState<RequestGroup | null>(null);
+  /** The last dismissal, offered back. Null once taken or once it times out. */
+  const [undo, setUndo] = useState<{ id: string; label: string } | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setOpenBids([]);
+      setOpenLink(null);
+      return;
+    }
+    const first = open.group.items[0];
+    if (!first) return;
+    let live = true;
+    void Promise.all([
+      fetchBids(first.id).catch(() => ({ bids: [] })),
+      fetchRequestSubmissions(first.id).catch(() => null),
+    ]).then(([app, link]) => {
+      if (!live) return;
+      // One card per item of a submission, as the workspace cuts them: an off-platform supplier can
+      // answer several lines of one RFQ, and each line is its own offer.
+      const offline = (link?.submissions ?? []).flatMap((sub) =>
+        (sub.items.length ? sub.items : [undefined]).map(
+          (it): WorkspaceBid => ({ card: submissionToBidCard(sub, it), source: "offline" }),
+        ),
+      );
+      setOpenBids([...app.bids.map((card): WorkspaceBid => ({ card, source: "app" })), ...offline]);
+      setOpenLink(link ? { renterName: link.renterName, bidDeadline: link.bidDeadline, logoUrl: link.logoUrl } : null);
+    });
+    return () => {
+      live = false;
+    };
+  }, [open]);
+
+  /** Re-read the requests after something changed them — an edit saved, a cancellation taken. */
+  const reload = useCallback(() => {
+    void fetchAllMyRequests()
+      .then((r) => setGroups(groupRequests(r.requests)))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let live = true;
@@ -167,16 +237,77 @@ export function HomeRequests() {
 
   if (groups && !groups.length) return null;
 
-  const rows = allRequests ? (groups ?? []) : (groups ?? []).slice(0, SHOWN);
+  /* Dismissed groups leave the feed here, at the last moment — so «+N more» and the summary above
+     both count what is actually on screen. */
+  const visible = (groups ?? []).filter((g) => !hidden.includes(g.id));
+  const rows = allRequests ? visible : visible.slice(0, SHOWN);
   const fresh = bids.reduce((n, b) => n + (b.unreadCount || 0), 0);
   const newest = allBids ? bids : bids.slice(0, BIDS_SHOWN);
   const restBids = Math.max(0, bids.length - BIDS_SHOWN);
 
   const money = (n: number | null): string => (n == null ? "—" : Math.round(n).toLocaleString("en-US"));
 
-  /** Where a row's action lands: the workspace, on this request, at the door it names. */
-  const go = (id: string, door: "details" | "share" | "cancel") =>
-    router.push(`/requests?g=${encodeURIComponent(id)}&${door}=1`);
+  /**
+   * The dismissal explainer, shown ONCE per device.
+   *
+   * Taking a closed request off the feed looks like deleting it, and it is not — the request stays
+   * in the account and on every other device. That is worth saying, and worth saying only the first
+   * time: a renter clearing six finished requests should not answer the same dialog six times.
+   *
+   * Cancellation is the opposite and always confirms, because it is a `DELETE` the backend has no
+   * inverse for. See `doCancel`.
+   */
+  const EXPLAINED_KEY = "mt-dismiss-explained";
+  const wasExplained = () => {
+    try {
+      return localStorage.getItem(EXPLAINED_KEY) === "1";
+    } catch {
+      return false; // storage refused — explain again rather than dismiss silently
+    }
+  };
+
+  /** Take a closed group off this device's feed, and offer it straight back. */
+  const dismiss = (g: RequestGroup) => {
+    setHidden(hideRequest(g.id));
+    setUndo({ id: g.id, label: g.locationLabel });
+    setExplaining(null);
+  };
+
+  /** The ✕ on a CLOSED row: explain the first time, dismiss every time after. */
+  const askDismiss = (g: RequestGroup) => {
+    if (wasExplained()) {
+      dismiss(g);
+      return;
+    }
+    setExplaining(g);
+  };
+
+  const confirmExplainer = (g: RequestGroup) => {
+    try {
+      localStorage.setItem(EXPLAINED_KEY, "1");
+    } catch {
+      /* storage refused — he will be told again, which is the safe direction */
+    }
+    dismiss(g);
+  };
+
+  const doCancel = async () => {
+    const g = cancelling;
+    if (!g || cancelBusy) return;
+    setCancelBusy(true);
+    setCancelError(null);
+    try {
+      // Every cancellable item of the group — the backend refuses the rest, and a partial group is
+      // a real state: one item accepted, the others still open.
+      await Promise.all(cancellableItems(g.items).map((i) => cancelRequest(i.id)));
+      setCancelling(null);
+      reload();
+    } catch {
+      setCancelError(L("That didn’t go through. Try again.", "لم يتمّ الإجراء. حاول مجددًا."));
+    } finally {
+      setCancelBusy(false);
+    }
+  };
 
   /** «Closed» / «3 days left» / «Today» / «Expired» — and nothing at all when there is no deadline
    *  and no status to speak for it. `closed` is checked first; see the block comment above. */
@@ -246,26 +377,32 @@ export function HomeRequests() {
                        stops the press from reaching the row, so a share never lands on details. */
                     <tr
                       key={g.id}
-                      onClick={() => go(g.id, "details")}
+                      onClick={() => setOpen({ group: g, share: false })}
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
-                          go(g.id, "details");
+                          setOpen({ group: g, share: false });
                         }
                       }}
                       title={t.home.reqOpenDetails}
                       className={cx(ROW_H, "cursor-pointer border-b border-border transition last:border-b-0 hover:bg-surface2")}
                     >
+                      {/* ── Nothing in a table row is bold (owner, 2026-08-30) ──────────────────
+                          Every column was carrying weight — extrabold sites, semibold machines,
+                          semibold counts, extrabold dates — and a row where everything is
+                          emphasised has nothing emphasised. Weight is now spent once, on the site,
+                          which is the column a renter scans down. The rest is regular, and colour
+                          alone carries urgency in CLOSES. */}
                       <td className="px-3.5">
-                        <span className="flex items-center gap-1.5 text-body font-extrabold text-navy">
+                        <span className="flex items-center gap-1.5 text-body font-semibold text-navy">
                           <Icon name="location_on" size={16} className="flex-none text-muted" />
                           {g.locationLabel}
                         </span>
                       </td>
                       <td className="px-3.5">
-                        <span className="text-body font-semibold text-navy">{name}</span>
+                        <span className="text-body text-navy">{name}</span>
                         {g.items.length > 1 && (
                           <span className="text-meta text-muted">
                             {" "}
@@ -274,7 +411,7 @@ export function HomeRequests() {
                         )}
                       </td>
                       <td className="whitespace-nowrap px-3.5">
-                        <span className={cx("text-subhead font-semibold tabular", g.totalBids ? "text-navy" : "text-danger")}>
+                        <span className={cx("text-subhead tabular", g.totalBids ? "text-navy" : "text-danger")}>
                           {g.totalBids}
                         </span>
                       </td>
@@ -282,7 +419,7 @@ export function HomeRequests() {
                         {words ? (
                           <span
                             className={cx(
-                              "text-meta font-extrabold",
+                              "text-meta font-semibold",
                               words.tone === "danger" ? "text-danger" : words.tone === "warn" ? "text-warn-deep" : "text-navy-mid",
                             )}
                           >
@@ -303,15 +440,25 @@ export function HomeRequests() {
                             than one that was never offered. «Compare bids» keeps its place as the
                             row's one filled button: it is the thing the renter came to do. */}
                         <span className="inline-flex items-center gap-1">
-                          <RowAction icon="ios_share" label={t.home.reqShare} onPress={() => go(g.id, "share")} />
-                          <RowAction icon="edit" label={t.home.reqEdit} onPress={() => go(g.id, "details")} />
-                          {canCancel && (
-                            <RowAction icon="close" label={t.home.reqCancel} tone="danger" onPress={() => go(g.id, "cancel")} />
+                          <RowAction icon="ios_share" label={t.home.reqShare} onPress={() => setOpen({ group: g, share: true })} />
+                          <RowAction icon="edit" label={t.home.reqEdit} onPress={() => setOpen({ group: g, share: false })} />
+                          {/* ── One ✕, two meanings, and the row's state decides which ─────────
+                              While the request can still be cancelled, ✕ cancels it. Once it is
+                              closed it can't be, and the ✕ takes it off the feed instead — which
+                              is the control that was missing: a finished request had no way off
+                              the dashboard at all. Both are destructive-looking, so both are
+                              labelled for what they actually do. */}
+                          {canCancel ? (
+                            <RowAction icon="close" label={t.home.reqCancel} tone="danger" onPress={() => setCancelling(g)} />
+                          ) : (
+                            <RowAction icon="close" label={L("Remove from this list", "إزالة من هذه القائمة")} onPress={() => askDismiss(g)} />
                           )}
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
+                              // The one action that IS another page: comparing bids is the
+                              // workspace's whole job, not a dialog's.
                               router.push(`/requests?g=${encodeURIComponent(g.id)}`);
                             }}
                             disabled={!g.totalBids}
@@ -339,7 +486,7 @@ export function HomeRequests() {
               summarises the renter's whole account and the table shows the newest few, and nothing on
               the block said so. The rail already had this problem and this is its answer, mirrored:
               the remainder, on the card's own foot, as the way to the rest. */}
-          {groups && groups.length > SHOWN && (
+          {visible.length > SHOWN && (
             <button
               type="button"
               onClick={() => setAllRequests((v) => !v)}
@@ -347,7 +494,7 @@ export function HomeRequests() {
               className="flex flex-none items-center justify-center gap-1 border-t border-border bg-surface2 py-1.5 text-label font-extrabold text-muted-dark transition hover:bg-surface3 hover:text-navy"
             >
               <Icon name={allRequests ? "keyboard_arrow_up" : "keyboard_arrow_down"} size={14} />
-              {allRequests ? t.home.showFewer : fmt(t.home.moreRequests, { n: String(groups.length - SHOWN) })}
+              {allRequests ? t.home.showFewer : fmt(t.home.moreRequests, { n: String(visible.length - SHOWN) })}
             </button>
           )}
         </div>
@@ -405,6 +552,108 @@ export function HomeRequests() {
           )}
         </aside>
       </div>
+      {/* ══ The dialogs, mounted HERE so the dashboard is what sits behind them ══════════════════ */}
+
+      {open && (
+        <RequestDetailsModal
+          group={open.group}
+          item={open.group.items[0] ?? null}
+          bids={openBids}
+          link={openLink}
+          openShare={open.share}
+          onClose={() => setOpen(null)}
+          onChanged={reload}
+        />
+      )}
+
+      {/* Cancelling ALWAYS asks, and asks in full. It is a `DELETE` the backend has no inverse for,
+          so this dialog is the only place it can still be stopped. */}
+      {cancelling && (
+        <ConfirmCancelModal
+          ar={ar}
+          L={L}
+          busy={cancelBusy}
+          error={cancelError}
+          scope={{
+            kind: "all",
+            idLabel: cancelling.groupRef ?? cancelling.items[0]?.displayId ?? cancelling.id,
+            total: cancellableItems(cancelling.items).length,
+          }}
+          onClose={() => {
+            setCancelling(null);
+            setCancelError(null);
+          }}
+          onConfirm={() => void doCancel()}
+        />
+      )}
+
+      {/* The one-time explainer. It says what dismissal is NOT, because ✕ on a row that a moment ago
+          meant «cancel» now means «hide», and the two are nothing alike. */}
+      {explaining && (
+        <Dialog
+          open
+          onClose={() => setExplaining(null)}
+          size="sm"
+          icon={
+            <span className="grid h-[34px] w-[34px] flex-none place-items-center rounded-sm bg-surface3 text-navy-mid">
+              <Icon name="visibility_off" size={19} />
+            </span>
+          }
+          title={L("Remove it from this list?", "إزالة من هذه القائمة؟")}
+          footer={
+            <>
+              <button onClick={() => setExplaining(null)} className={btn("secondary", "md", { className: "transition" })}>
+                {t.common.cancel}
+              </button>
+              <button onClick={() => confirmExplainer(explaining)} className={btn("primary", "md", { className: "transition" })}>
+                {L("Remove it", "إزالة")}
+              </button>
+            </>
+          }
+        >
+          <p className="text-body leading-relaxed text-muted">
+            {L(
+              "This only hides the request from your dashboard on this device. It is not cancelled, nothing is deleted, and it stays in your account and on your other devices. You can put it back straight after.",
+              "هذا يخفي الطلب من لوحتك على هذا الجهاز فقط. لم يُلغَ ولم يُحذف شيء، ويبقى في حسابك وعلى أجهزتك الأخرى. ويمكنك إعادته فورًا.",
+            )}
+          </p>
+          <p className="mt-2 text-meta text-muted-light">
+            {L("You won’t be asked this again.", "لن يُطرح عليك هذا السؤال مرة أخرى.")}
+          </p>
+        </Dialog>
+      )}
+
+      {/* The way back. It sits on the page rather than inside a dialog, because an undo the renter
+          has to dismiss a dialog to reach is not an undo. It stays until he takes it or closes it —
+          no timer, since a bar that disappears while he is reading it is the same as no bar. */}
+      {undo && (
+        <div
+          role="status"
+          className="fixed bottom-6 start-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-md border border-border bg-surface px-3.5 py-2.5 rtl:translate-x-1/2"
+        >
+          <span className="text-body text-navy">
+            {L(`“${undo.label}” removed from your list`, `تمت إزالة “${undo.label}” من قائمتك`)}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setHidden(unhideRequest(undo.id));
+              setUndo(null);
+            }}
+            className={btn("link", "sm")}
+          >
+            {L("Undo", "تراجع")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setUndo(null)}
+            aria-label={t.common.close}
+            className="grid size-6 flex-none place-items-center rounded-sm text-muted transition hover:bg-surface2 hover:text-navy"
+          >
+            <Icon name="close" size={15} />
+          </button>
+        </div>
+      )}
     </section>
   );
 }
