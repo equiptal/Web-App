@@ -5,7 +5,6 @@ import { postAuth, type AuthKind, type OtpChannel } from "./authClient";
 import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { PUBLIC_WEB_ENABLED } from "@/lib/flags";
-import { btn } from "@/lib/ds";
 import { authField, authFoot, authLabel, authSub, authSubmit, authTitle, type AuthTone } from "@/components/auth/AuthPanel";
 
 export const SAUDI_DIAL = "+966";
@@ -130,7 +129,9 @@ export function PhoneEntry({
       <button
         type="submit"
         disabled={busy || !digits.trim() || smsBlocked}
-        className={tone === "dark" ? authSubmit(tone) : btn("primary", "lg", { full: true, className: "mt-6 flex transition" })}
+        /* One call for both grounds: `authSubmit` returns the app's primary button either way, and
+           only its disabled skin differs — see the note on it. */
+        className={authSubmit(tone)}
       >
         <span>{busy ? a.sending : a.sendCode}</span>
         {!busy && <Icon name="arrow_forward" size={18} className="rtl:scale-x-[-1]" />}

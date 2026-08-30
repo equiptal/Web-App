@@ -6,7 +6,6 @@ import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { RestoreAccountPrompt } from "./RestoreAccountPrompt";
 import type { RenterUser } from "@/lib/contract/auth";
-import { btn } from "@/lib/ds";
 import { authSubmit, type AuthTone } from "@/components/auth/AuthPanel";
 
 const OTP_FONT: React.CSSProperties = { fontFamily: "var(--font-plex), monospace" };
@@ -188,7 +187,7 @@ export function CodeEntry({
       <button
         type="submit"
         disabled={busy || code.length < 4}
-        className={dark ? authSubmit("dark") : btn("primary", "lg", { full: true, className: "mt-6 flex transition" })}
+        className={authSubmit(tone)}
       >
         {!busy && <Icon name="check" size={18} />}
         <span>{busy ? a.verifying : verifyLabel ?? a.verify}</span>

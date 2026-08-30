@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { btn } from "@/lib/ds";
 
 /**
  * **The auth modal's dark shell** (owner's comp, 2026-08-30).
@@ -103,7 +104,12 @@ export function AuthToggle({
       type="button"
       onClick={() => onMode(m)}
       aria-pressed={mode === m}
-      className={`flex-1 rounded-full py-2.5 text-body font-extrabold transition ${
+      /* `rounded-md`, the app's own control radius, not the comp's capsule (owner, 2026-08-30: use
+         our theme). Every control in this product — button, field, chip — is `rounded-md`; a pair of
+         full capsules at the top of the one modal every user meets first taught a shape that appears
+         nowhere else in it. The weight stays `font-extrabold` — the scale has three (400/600/800) and
+         a control label is the top one. */
+      className={`flex-1 rounded-md py-2.5 text-body font-extrabold transition ${
         mode === m ? "bg-surface text-navy" : "text-white/70 hover:text-white"
       }`}
     >
@@ -111,7 +117,7 @@ export function AuthToggle({
     </button>
   );
   return (
-    <div className="flex gap-1 rounded-full border border-white/12 bg-white/[0.06] p-1">
+    <div className="flex gap-1 rounded-lg border border-white/12 bg-white/[0.06] p-1">
       {seg("phone", phoneLabel)}
       {seg("email", emailLabel)}
     </div>
@@ -130,7 +136,7 @@ export type AuthTone = "light" | "dark";
 
 export const authField = (tone: AuthTone): string =>
   tone === "dark"
-    ? "h-[52px] rounded-md border border-white/15 bg-white/[0.07] px-4 text-subhead font-semibold text-white outline-0 transition placeholder:font-semibold placeholder:text-white/35 focus:border-white/40 focus:bg-white/[0.1]"
+    ? "h-[var(--control-lg)] rounded-md border border-white/15 bg-white/[0.07] px-4 text-subhead font-semibold text-white outline-0 transition placeholder:font-semibold placeholder:text-white/35 focus:border-white/40 focus:bg-white/[0.1]"
     : "h-[50px] rounded-md border border-border bg-surface px-4 text-subhead font-semibold text-navy outline-0 placeholder:font-semibold placeholder:text-muted-light focus:border-brand";
 
 export const authLabel = (tone: AuthTone): string =>
@@ -150,14 +156,27 @@ export const authFoot = (tone: AuthTone): string =>
     : "mt-6 text-center text-body leading-[1.55] text-muted";
 
 /**
- * The step's own primary button.
+ * The step's own primary button — **the app's**, not a shape invented for this panel.
  *
- * On the dark ground it is `--surface` with navy ink, not `--brand`: the comp's one filled control is
- * the lightest thing on the panel, and on navy that is what reads as the way forward. `--brand` is
- * still this app's primary — it simply has no contrast to spend here, where everything around it is
- * already dark and the orange would land beside the logo rather than under the reader's eye.
+ * ~~`--surface` with navy ink, in a full capsule: the comp's one filled control is the lightest thing
+ * on it, and on navy that is what reads as the way forward.~~ Withdrawn (owner, 2026-08-30: use our
+ * theme). It was a white pill of a size and radius that exist nowhere else in the product, and its
+ * disabled state — the state a renter meets FIRST, before typing a digit — was a dead grey slab that
+ * was still the loudest object on the panel.
+ *
+ * It is `btn("primary", "lg", { full: true })` now: `--brand`, the app's one primary, at the app's
+ * radius, height and weight. The same button the home CTA band puts on the same navy.
+ *
+ * The one override is the DISABLED skin. `--disabled-bg` is `--surface2`, a pale slate meant for a
+ * white page; on navy it is a light block shouting from the middle of a dark panel. On this ground
+ * the disabled button recedes instead — a dimmed fill and dimmed ink, the treatment `MastheadPill`
+ * already uses for the same "this token has a dark counterpart" reason.
  */
 export const authSubmit = (tone: AuthTone): string =>
   tone === "dark"
-    ? "mt-6 flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-surface text-subhead font-extrabold text-navy transition hover:bg-white disabled:bg-white/25 disabled:text-white/50"
-    : "";
+    ? btn("primary", "lg", {
+        full: true,
+        className:
+          "mt-6 transition disabled:border-transparent disabled:bg-white/10 disabled:text-white/40",
+      })
+    : btn("primary", "lg", { full: true, className: "mt-6 flex transition" });
