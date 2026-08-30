@@ -23,6 +23,17 @@ The single source of test cases for this app. Run it with `/web:test`.
 | staging | `https://c4tupvmckc.execute-api.eu-central-1.amazonaws.com` | allowed |
 | local | `http://localhost:3000` | allowed |
 
+The table above is the **app backend** — where `/auth/*` lives. The API layer of a run does not call
+it directly: it calls the **web app's own routes**, which relay onward, because that is the path a
+renter's browser takes and the only one that exercises the BFF.
+
+| | URL | Session |
+|---|---|---|
+| web · staging | `https://webstaging.moedatech.net` | `mt_id` + `mt_refresh` cookies, from `POST /api/auth/request-code` then `POST /api/auth/verify` |
+
+Log in to the **web app**, not the app backend, and keep the cookie jar — the project routes read a
+session cookie, not a bearer token. The dashboard is served at `/`; `/dashboard` redirects to it.
+
 ## Modules
 
 | # | Module | Prefix |
@@ -310,6 +321,56 @@ The Outcome Survey was disabled in commit `2962151`. The code was **commented ou
 | OFF-01 | Survey never renders | No survey modal on any screen; `SurveyProvider` still commented out in `AppShell.tsx` | U | no | — |
 | OFF-02 | Survey pending endpoint | `GET /api/me/surveys/pending` ⇒ `404 {code:"not_found"}`, and the app backend is never called | A | no | — |
 | OFF-03 | Survey respond endpoint | `POST /api/me/surveys/[id]/respond` ⇒ refused, nothing written | A | no | — |
+
+## 12 · PROJ — renter projects (sites, work orders, awards)
+
+_Last run: 2026-08-30 · staging · **14 pass · 2 fail · 3 blocked**._
+
+A site holds the terms a renter would otherwise retype per request, and the chart of what is on it.
+Awards live in a keyed JSON dictionary on the project row — `awards.requests[requestId]` and
+`awards.workOrderItems[itemId]` — so there is no foreign key and deleting a machine means deleting a
+key. Every write carries `expectedVersion`.
+
+Two facts govern nearly every case here, and both cost a run to learn:
+
+- **`userId` goes in the query for GET and DELETE, and in the BODY for POST and PATCH.** The relay
+  sends both.
+- **Two 409 codes mean the same thing.** Awards answer `PROJECT_VERSION_STALE`; the project and
+  work-order writes answer `PROJECT_VERSION_CONFLICT`.
+
+| ID | Case | Expected | L | Mut | Coverage |
+|---|---|---|---|---|---|
+| PROJ-API-01 | List the renter's sites | `200`, array, each with `defaults` flat and `version` | A | no | PASS |
+| PROJ-API-02 | Create a site | `201`, `version: 1` | A | yes | PASS |
+| PROJ-API-03 | Read one back | `200`, `awards: {requests:{}, workOrderItems:{}}` | A | no | PASS |
+| PROJ-API-04 | Edit a site | `200` — needs `expectedVersion`, which is **required** | A | yes | PASS |
+| PROJ-API-05 | The chart | `200`, `{project, version, groups}` | A | no | PASS |
+| PROJ-API-06 | Work order **with** its awards | `201` | A | yes | **FAIL — FIX-PROJ-2** |
+| PROJ-API-06b | Work order without awards | `201`, `{workOrderGroupId, itemIds, version}` | A | yes | PASS |
+| PROJ-API-07 | Delete a work order | `200`, `{deletedMachines, scrubbedAwards}` | A | yes | PASS |
+| PROJ-API-09 | Award a machine | `201`, `{award, version}` | A | yes | **FAIL — FIX-PROJ-1** |
+| PROJ-API-10 | Award more units than the line holds | `409 UNITS_EXCEED_QUANTITY` | A | yes | BLOCKED by FIX-PROJ-1 |
+| PROJ-API-11 | Un-award | `200`, version moves | A | yes | BLOCKED by FIX-PROJ-1 |
+| PROJ-API-12 | Presign a document | `200`, `{key, url}`, key under `…/projects/{id}/documents/` | A | yes | PASS |
+| PROJ-API-13 | Attach the key to an award | `200` | A | yes | BLOCKED by FIX-PROJ-1 |
+| PROJ-API-14 | File a request under a site | `200`, `{projectId, scrubbedAwards, moved}` | A | yes | PASS |
+| PROJ-API-14b | Unfile it again (`projectId: null`) | `200`, `projectId: null` | A | yes | PASS |
+| PROJ-API-15 | Write with a stale version | `409 PROJECT_VERSION_CONFLICT` + `currentVersion` | A | yes | PASS |
+| PROJ-API-16 | No session | `401 {code:"unauthorized"}` | A | no | PASS |
+| PROJ-API-17 | Delete a site that still holds rows | `409 PROJECT_NOT_EMPTY` with the counts | A | yes | PASS |
+| PROJ-API-18 | Delete an empty site | `204`, and it leaves the list | A | yes | PASS (was FIX-PROJ-3) |
+| PROJ-UI-01 | Sites render on the dashboard, under My requests | Both on one page; no separate route | B | no | `tests/e2e/renter-projects.spec.ts` |
+| PROJ-UI-02 | The form is When, then Where, then Payment | Six fields, no hours/day; Save disabled with no location | B | no | `tests/e2e/renter-projects.spec.ts` |
+| PROJ-UI-03 | A site offers *Add work order* and *New request* | Both visible; no *Units awarded* roll-up | B | no | **BLOCKED — deploy pending** |
+| PROJ-UI-04 | Arabic | `dir="rtl"`, no English fallback in the namespace | B | no | `tests/e2e/renter-projects.spec.ts` |
+| PROJ-CT-01 | The contract matches the backend's own schemas | Paths, key sets, enums, required fields, both 409 codes | U | no | `tests/unit/agents-contract.test.ts` |
+
+**Not covered at all.** Moving a request between sites with awards attached (the scrub path);
+propagation of a site's defaults onto its filed requests; the *own dates* conflict dialog; the
+document list after an attach. Each needs an award to exist first, so all four are downstream of
+FIX-PROJ-1.
+
+---
 
 ---
 
