@@ -1627,6 +1627,31 @@ export const en = {
    * for now because other surfaces still read a handful of their labels.
    */
   projects: {
+    del: {
+      confirmTitle: "Delete this project?",
+      confirmBody: "“{name}” has nothing filed under it, so nothing is lost. This cannot be undone.",
+      confirmAction: "Delete project",
+      busyTitle: "This project is in use",
+      busyBody: "“{name}” cannot be deleted while these are filed under it:",
+      countRequests: "{n} requests",
+      countWorkOrders: "{n} work orders",
+      countUnits: "{n} units awarded, with their marks and documents",
+      finishedLead: "If the job is finished,",
+      finished: "you need do nothing. A site reads as ended on its own once its last date passes.",
+      wrongPlaceLead: "If one row is in the wrong place,",
+      wrongPlace: "use Remove from the project on that row. It keeps everything and simply stops being filed here.",
+      mistakeLead: "If the project was made by mistake,",
+      mistake: "remove what is filed under it and the delete appears.",
+    },
+    created: {
+      title: "“{name}” is ready",
+      sub: "What is on this site?",
+      workOrder: "Add a work order",
+      workOrderSub: "A machine already on site — your own, or a vendor you use. Private: no supplier ever sees it.",
+      request: "Post a new request",
+      requestSub: "Ask our suppliers. The site's terms are filled in already — you type the machine.",
+      later: "Not now",
+    },
     surface: {
         heading: "Your projects",
         sub: "A site you state once. Every request for it starts filled in.",

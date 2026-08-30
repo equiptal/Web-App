@@ -11,10 +11,12 @@ import { useCallback, useEffect, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { Icon, Button } from "@/components/ui";
 import { Dialog } from "@/components/Dialog";
+import { useRouter } from "next/navigation";
 import {
   listProjects,
   createProject,
   updateProject,
+  deleteProject,
   fetchChart,
   ProjectVersionConflict,
 } from "@/lib/api/client";
@@ -28,6 +30,7 @@ import {
   type PropagationRow,
 } from "@/lib/contract/project";
 import { ProjectForm, emptyProjectForm, projectToForm, type ProjectFormValue } from "./ProjectForm";
+import { ProjectDelete, ProjectCreated, projectIsEmpty } from "./ProjectDelete";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -37,6 +40,9 @@ export function ProjectsSurface() {
   const [editing, setEditing] = useState<{ id: string | null; value: ProjectFormValue; rows?: PropagationRow[] } | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<ProjectSummary | null>(null);
+  const [created, setCreated] = useState<ProjectSummary | null>(null);
+  const router = useRouter();
 
   const reload = useCallback(async () => {
     try {
@@ -83,10 +89,18 @@ export function ProjectsSurface() {
     setSaving(true);
     setNotice(null);
     try {
-      if (editing.id) await updateProject(editing.id, value, applyTo);
-      else await createProject(value);
-      setEditing(null);
-      await reload();
+      if (editing.id) {
+        await updateProject(editing.id, value, applyTo);
+        setEditing(null);
+        await reload();
+      } else {
+        // Straight into "what is on this site?" — an empty project does nothing for anybody, and
+        // both ways to fill one live somewhere the renter has not been yet.
+        const made = await createProject(value);
+        setEditing(null);
+        setCreated(made);
+        await reload();
+      }
     } catch (err) {
       // Someone else edited this site while the form was open. Say so plainly rather than
       // overwriting their change with a form that was filled in before it existed.
@@ -147,6 +161,38 @@ export function ProjectsSurface() {
         })}
       </div>
 
+      {deleting && (
+        <ProjectDelete
+          project={deleting}
+          open
+          onClose={() => setDeleting(null)}
+          busy={saving}
+          onDelete={async () => {
+            setSaving(true);
+            try {
+              await deleteProject(deleting.id);
+              setDeleting(null);
+              setEditing(null);
+              await reload();
+            } catch {
+              setNotice(t.projects.surface.saveFailed);
+            } finally {
+              setSaving(false);
+            }
+          }}
+        />
+      )}
+
+      {created && (
+        <ProjectCreated
+          project={created}
+          open
+          onClose={() => setCreated(null)}
+          onAddWorkOrder={() => router.push(`/projects/${created.id}?new=work-order`)}
+          onPostRequest={() => router.push("/create")}
+        />
+      )}
+
       <Dialog
         open={!!editing}
         onClose={() => setEditing(null)}
@@ -161,6 +207,26 @@ export function ProjectsSurface() {
             onSave={(value, applyTo) => void save(value, applyTo)}
             saving={saving}
           />
+        )}
+
+        {/* Delete lives here rather than on the card, because it is a thing you do to a project you
+            are already looking at — and because the panel it opens has to be able to say what is
+            filed, which is what the edit view has just loaded. */}
+        {editing?.id && (
+          <button
+            type="button"
+            onClick={() => {
+              const p = projects?.find((x) => x.id === editing.id);
+              if (p) setDeleting(p);
+            }}
+            className="mt-4 self-start text-meta font-semibold text-muted underline underline-offset-2 hover:text-danger"
+          >
+            {(() => {
+              const p = projects?.find((x) => x.id === editing.id);
+              // Not a disabled button: a project with rows gets an explanation, not a refusal.
+              return p && projectIsEmpty(p) ? t.projects.del.confirmAction : t.projects.del.busyTitle;
+            })()}
+          </button>
         )}
       </Dialog>
     </div>
