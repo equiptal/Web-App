@@ -6,23 +6,33 @@
  * page is indistinguishable, from their side, from one they filled in themselves — and they own the
  * result either way.
  *
- * Three sources collapse to the same stored value, so none of them can be told apart by reading the
+ * Four sources collapse to the same stored value, so none of them can be told apart by reading the
  * draft alone:
  *
  *  - **agent** — the parser extracted it from the renter's own words. `agentMatches` finds these by
  *    diffing against the `agentOrigin` snapshot the store keeps.
+ *  - **project** — the renter's SITE supplied it: they stated it once, months ago, for every request
+ *    on that job. Marked apart from `default` because the two are opposite in trust — *"Qiddiya runs
+ *    10-hour days"* is something the renter told us, and *"we guessed 10"* is not. Collapsing them
+ *    would hide which values are worth a second look.
  *  - **default** — we seeded it (`defaultProjectDetails`, `newManualItem`, `defaultOperatorDetails`).
  *    Delivery and return live here: both seed to "me", which assigns the renter both transport legs.
  *  - **renter** — they set it themselves, which `touchedFields` records at the moment it happens.
  *
- * `renter` wins over everything: once someone has answered a question, it stops being ours. A field
- * that is genuinely empty has no provenance at all and gets the required dot instead, if it is
- * required — the amber highlight never blocks (MREQ-AC-61).
+ * **Precedence: `renter > agent > project > default > empty`** (PROJ, spec §11.1).
+ *
+ * `renter` wins over everything: once someone has answered a question, it stops being ours. `agent`
+ * comes next because the renter's own words in THIS request beat a standing site value - if they
+ * wrote *"from Oct 1"* and the site says 1 September, the request keeps October. `project` beats
+ * `default` for the same reason a stated fact beats a guess.
+ *
+ * A field that is genuinely empty has no provenance at all and gets the required dot instead, if it
+ * is required - the amber highlight never blocks (MREQ-AC-61).
  */
 
 import type { RfqDraft } from "./draft";
 
-export type FieldSource = "agent" | "default" | "renter" | "empty";
+export type FieldSource = "agent" | "project" | "default" | "renter" | "empty";
 
 /**
  * True when a field's current value still equals what the agent originally filled in (and the agent
@@ -49,25 +59,39 @@ export interface SourceInput {
   agentOriginal?: unknown;
   /** The field's dotted path, as recorded in `touchedFields`. */
   key: string;
-  /** The draft, read only for `touchedFields`. */
-  draft: Pick<RfqDraft, "touchedFields">;
+  /** The draft, read only for `touchedFields` and `projectFields`. */
+  draft: Pick<RfqDraft, "touchedFields" | "projectFields">;
   /**
    * True when this field carries a seeded default even though it looks empty — the case for the
    * handful of fields whose default IS a value (delivery/return "me", quantity 1, fuel diesel).
    * Defaults to false, so an untouched empty field reads as `empty`, not `default`.
    */
   seeded?: boolean;
+  /**
+   * The paths a project filled, from `applyProjectDefaults`. Falls back to the draft's own
+   * `projectFields`, so a caller that already passes the draft does not have to thread it twice.
+   */
+  projectFields?: string[];
 }
 
-/** Which of the four states a field is in. */
-export function fieldSource({ current, agentOriginal, key, draft, seeded = false }: SourceInput): FieldSource {
+/** Which of the five states a field is in. */
+export function fieldSource({ current, agentOriginal, key, draft, seeded = false, projectFields }: SourceInput): FieldSource {
   if ((draft.touchedFields ?? []).includes(key)) return "renter";
   if (agentFilled(current, agentOriginal)) return "agent";
+  // A project value only counts while the field still HOLDS one. An emptied field is empty, not
+  // "from the project" - otherwise clearing a date would leave the note pointing at nothing.
+  if ((projectFields ?? draft.projectFields ?? []).includes(key) && hasValue(current)) return "project";
   if (hasValue(current) || seeded) return "default";
   return "empty";
 }
 
-/** Whether the amber highlight + badge should render (MREQ-AC-57/58). */
+/**
+ * Whether the amber highlight + badge should render (MREQ-AC-57/58).
+ *
+ * `project` is included: the renter did state it, but not here and not now, so a request that
+ * silently carries nine values from a site they set up in March is exactly the situation this mark
+ * exists for. What differs is the WORDING, not whether it shows - see `ProvenanceNote`.
+ */
 export function isSystemChosen(source: FieldSource): boolean {
-  return source === "agent" || source === "default";
+  return source === "agent" || source === "default" || source === "project";
 }

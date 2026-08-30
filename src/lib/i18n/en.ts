@@ -125,7 +125,9 @@ export const en = {
     reqOpenDetails: "Open request details",
     // The rail shows the newest five; the rest are one scroll away, and the strip says so rather
     // than letting a cut-off row be the only hint that there are more.
-    moreBidsBelow: "{n} more — scroll",
+    moreBidsBelow: "{n} more",
+    /** The toggle back, on both cards once they are open. */
+    showFewer: "Show fewer",
     // The table's own foot, mirroring the rail's. The header says «20 open» over five rows, and
     // without this the reader's only reading of that gap is that the list is broken.
     moreRequests: "{n} more requests",
@@ -1645,6 +1647,9 @@ export const en = {
     provenance: {
       agent: "AI selected",
       default: "AI selected",
+      // PROJ - deliberately NOT "AI selected". The renter chose this themselves, once, for the whole
+      // site; calling it the agent's would misattribute their own decision back to them.
+      project: "From your project",
       renter: "changed by you",
     },
     machineCard: {

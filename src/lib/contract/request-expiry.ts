@@ -47,8 +47,8 @@ export function windowDeadline(createdAt: string | null | undefined, offerDurati
   return new Date(start + span).toISOString();
 }
 
-/** Which of the two sources answered — worth keeping, because one is the renter's own decision. */
-export type ExpirySource = "link" | "window" | "none";
+/** Which source answered — worth keeping, because one of them is the renter's own decision. */
+export type ExpirySource = "link" | "request" | "window" | "none";
 
 export interface RequestExpiry {
   /** The date bidding closes, ISO — or null when the request has no deadline at all. */
@@ -57,18 +57,29 @@ export interface RequestExpiry {
 }
 
 /**
- * The effective deadline: the renter's link deadline if he set one, otherwise the bid window.
+ * The effective deadline, from three sources in order of authority.
  *
- * `bidDeadline` is taken as authoritative even when it falls outside the window, in either
- * direction: shortening it is the point of the control, and extending it is the renter deliberately
- * keeping a request open — the supplier's form honours the same field, so the two agree.
+ * 1. **`bidDeadline`** — the renter's own link deadline, authoritative even when it falls outside the
+ *    window in either direction: shortening it is the point of the control, and extending it is the
+ *    renter deliberately keeping a request open. The supplier's form honours the same field, so the
+ *    two sides agree.
+ * 2. **`expiresAt`** — the request's own expiry, as the backend computes and stores it. It arrives on
+ *    every row of `my-requests`, so this is the source that actually answers in practice.
+ * 3. **`offerDuration` + `createdAt`** — the bid window chosen at creation.
+ *
+ * The third was written as the fallback and cannot serve as one: `offerDuration` is absent from the
+ * list payload entirely and null on every request in staging, so the column it fed rendered a dash on
+ * every row while `expiresAt` sat unread beside it. It is kept because a request that carries a window
+ * and no `expiresAt` should still resolve, but it is no longer what the column depends on.
  */
 export function requestExpiry(input: {
   bidDeadline?: string | null;
+  expiresAt?: string | null;
   createdAt?: string | null;
   offerDuration?: string | null;
 }): RequestExpiry {
   if (ms(input.bidDeadline) != null) return { deadline: input.bidDeadline as string, source: "link" };
+  if (ms(input.expiresAt) != null) return { deadline: input.expiresAt as string, source: "request" };
   const w = windowDeadline(input.createdAt, input.offerDuration);
   return w ? { deadline: w, source: "window" } : { deadline: null, source: "none" };
 }

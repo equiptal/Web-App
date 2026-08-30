@@ -108,7 +108,8 @@ export const ar: Dictionary = {
     reqEdit: "تعديل الطلب",
     reqCancel: "إلغاء الطلب",
     reqOpenDetails: "فتح تفاصيل الطلب",
-    moreBidsBelow: "{n} أخرى — مرّر",
+    moreBidsBelow: "{n} أخرى",
+    showFewer: "عرض أقل",
     moreRequests: "{n} طلبات أخرى",
     compareBids: "قارن العروض",
     colSite: "الموقع",
@@ -1385,6 +1386,7 @@ export const ar: Dictionary = {
     provenance: {
       agent: "اختاره الذكاء الاصطناعي",
       default: "اختاره الذكاء الاصطناعي",
+      project: "من مشروعك",
       renter: "غيّرته بنفسك",
     },
     machineCard: {

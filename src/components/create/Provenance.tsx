@@ -20,6 +20,15 @@ import type { ReactNode } from "react";
 import { useT } from "@/lib/i18n";
 import { isSystemChosen, type FieldSource } from "@/lib/contract";
 
+/** The pin beside a value the renter's SITE supplied. Same size and colour as the sparkle. */
+function SitePin() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="var(--brand)" className="flex-none" aria-hidden>
+      <path d="M12 2a7 7 0 00-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 00-7-7zm0 9.5A2.5 2.5 0 1112 6.5a2.5 2.5 0 010 5z" />
+    </svg>
+  );
+}
+
 /** The sparkle the prototype puts beside an agent-chosen value. 11px, amber, decorative. */
 function Sparkle() {
   return (
@@ -39,14 +48,22 @@ export function ProvenanceNote({ source }: { source: FieldSource }) {
   const t = useT();
   if (!isSystemChosen(source)) return null;
   /**
-   * One label for both sources. From the renter's side "the agent read this from your words" and "we
-   * filled this in for you" are the same fact — nobody asked them — and splitting the wording made
-   * them look like two different states worth telling apart. The sparkle carries it either way.
+   * One label for `agent` and `default`. From the renter's side "the agent read this from your
+   * words" and "we filled this in for you" are the same fact — nobody asked them — and splitting the
+   * wording made them look like two different states worth telling apart.
+   *
+   * **`project` is the exception, and gets its own line.** The renter DID choose it: once, for the
+   * whole site. Labelling that "AI selected" hands their own decision back to them as ours, and the
+   * renter who reads it goes looking for a mistake that is not there. A pin instead of a sparkle,
+   * because nothing about it was generated.
    */
+  const fromProject = source === "project";
   return (
     <div className="mt-1.5 flex items-center gap-1">
-      <Sparkle />
-      <span className="whitespace-nowrap text-label font-semibold text-warn">{t.create.provenance.agent}</span>
+      {fromProject ? <SitePin /> : <Sparkle />}
+      <span className="whitespace-nowrap text-label font-semibold text-warn">
+        {fromProject ? t.create.provenance.project : t.create.provenance.agent}
+      </span>
     </div>
   );
 }

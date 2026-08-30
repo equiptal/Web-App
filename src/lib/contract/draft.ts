@@ -256,6 +256,19 @@ export interface RfqDraft {
    * again after a reload.
    */
   touchedFields?: string[];
+
+  /**
+   * PROJ - the dotted paths a PROJECT filled, so the canvas can say where a value came from.
+   *
+   * A fourth thing that is invisible in the value alone. `touchedFields` separates the renter from
+   * us and `agentMatches` separates the agent from us; this separates a value the SITE supplied from
+   * one we simply defaulted, which is the difference between *"Qiddiya runs 10-hour days"* and
+   * *"we guessed 10"*. A renter who cannot tell those apart cannot know which one is worth checking.
+   *
+   * Written once by `applyProjectDefaults`, from the `filled` list it returns. Persisted with the
+   * draft, and never read back by the project: the copy stands alone from the moment it is made.
+   */
+  projectFields?: string[];
 }
 
 /** Posted to /api/requests (AC-42/43). Mirrors the shared app request shape. */
@@ -265,7 +278,7 @@ export interface RfqRequestPayload {
   items: EquipmentItem[];
   preferences: Preferences;
   /**
-   * PROJ — the site this was filed under, and which version of its terms it was posted with.
+   * PROJ — the site this was filed under.
    *
    * A LABEL, nothing more. Every value above was already copied into this payload, so the request
    * never reads its project again and a project edit cannot reach it silently.

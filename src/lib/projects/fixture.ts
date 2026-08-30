@@ -105,7 +105,7 @@ const projects: RawProject[] = [
     locationLng: 46.5731,
     defaults: {
       timing: { rentalBasis: "monthly", extendable: true, startDate: "2026-09-01", endDate: "2026-12-31", hoursPerDay: 10 },
-      paymentTerms: "net_30",
+      paymentTerms: "net-30",
     },
     version: 4,
     awards: {
@@ -132,7 +132,7 @@ const projects: RawProject[] = [
     locationLng: 35.3,
     defaults: {
       timing: { rentalBasis: "monthly", extendable: false, startDate: "2026-03-01", endDate: "2026-07-31", hoursPerDay: 12 },
-      paymentTerms: "net_60",
+      paymentTerms: "net-60",
     },
     version: 1,
     awards: { requests: {}, workOrderItems: {} },
