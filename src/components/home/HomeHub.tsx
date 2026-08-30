@@ -210,12 +210,17 @@ export function HomeHub() {
             {/* Larger than the type scale's six sizes, and deliberately so (owner, 2026-08-30: *"you
                 can make the font bigger in the banner as we have space"*). The band is a fixed 160px
                 carrying two lines of copy, so `--text-display` (22px) left most of that height as
-                air. This is the ONE arbitrary size in the app; it is a hero, not a heading in a card,
-                and giving it a scale token would invite it into layouts where 30px is shouting.
+                air. ~~This is the ONE arbitrary size in the app.~~ It does not have to be: the scale
+                already carries `--text-hero` (32px), added for exactly this — display copy, and
+                nothing else. `text-[30px]` failed the design lint, and `next build` runs lint, so it
+                took the whole Amplify build down with it (owner, 2026-08-30).
+
+                32 rather than 30 is the only thing that moved, and it moves in the direction the
+                note above was already arguing for.
 
                 The sparkle that sat after the headline is gone on the same instruction. It marked
                 "the assistant did this", which the sentence already says in words. */}
-            <h1 className="text-[22px] font-extrabold leading-tight tracking-[-0.3px] text-white sm:text-[30px]">
+            <h1 className="text-display font-extrabold leading-tight tracking-[-0.3px] text-white sm:text-hero">
               {t.home.ctaTitleBefore}
               <span className="text-brand-light">{t.home.ctaTitleAi}</span>
               {t.home.ctaTitleAfter}
