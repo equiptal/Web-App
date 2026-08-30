@@ -13,6 +13,7 @@ import type { RenteeRequestDraft } from "@/lib/contract/rentee-request";
 import type { NotificationList, NotificationFilter } from "@/lib/contract/notifications";
 import type { Project, ProjectSummary } from "@/lib/contract/project";
 import { mapProjectSummary, projectToPayload } from "@/lib/contract/project";
+import { contentTypeFor } from "@/lib/contract/award";
 import type { Award, ChartGroup } from "@/lib/contract/award";
 import type { WorkOrderItem, WorkOrderGroup } from "@/lib/contract/work-order";
 import { groupWorkOrderItems, termsFromWire } from "@/lib/contract/work-order";
@@ -773,7 +774,13 @@ async function projectFetch<T>(url: string, init: ProjectFetchInit = {}): Promis
   }
 
   if (res.status === 409) {
-    if (code === "PROJECT_VERSION_STALE") {
+    /**
+     * TWO codes, one meaning. The awards handlers answer `PROJECT_VERSION_STALE`; `updateProject`
+     * and the two work-order writes answer `PROJECT_VERSION_CONFLICT`. Both carry `currentVersion`
+     * and both want the same response — re-read, re-apply — so both land here. Knowing only one of
+     * them turned "somebody saved first" into a bare unknown error with no way forward.
+     */
+    if (code === "PROJECT_VERSION_STALE" || code === "PROJECT_VERSION_CONFLICT") {
       const current = (details as { currentVersion?: number } | undefined)?.currentVersion;
       throw new ProjectVersionConflict(typeof current === "number" ? current : null);
     }
@@ -815,10 +822,16 @@ export async function createProject(p: Pick<Project, "title" | "location" | "def
  */
 export async function updateProject(
   id: string,
+  /**
+   * The version the form was opened on. **Required by the backend**, not optional — an edit without
+   * it fails its schema before any handler code runs, which is why every save of an existing site
+   * used to answer 422 while creating a new one worked.
+   */
+  expectedVersion: number,
   p: Pick<Project, "title" | "location" | "defaults">,
   applyToRequests: string[] = [],
 ): Promise<ProjectSummary> {
-  const body = { ...projectToPayload(p), applyToRequests };
+  const body = { ...projectToPayload(p), expectedVersion, applyToRequests };
   return mapProjectSummary(await projectFetch<Record<string, unknown>>(projectPath(id), { method: "PATCH", body }));
 }
 
@@ -876,15 +889,28 @@ export async function listWorkOrders(projectId: string): Promise<WorkOrderGroup[
  * fresh, and the awards, marks and purchase orders keyed to the id it used to have are scrubbed —
  * because the renter renamed it. This is the single most expensive mistake available on this call.
  */
+/**
+ * Create or update one work order.
+ *
+ * `groupId` decides the route and **never travels in the body**: both work-order schemas are
+ * `.strict()`, so an unknown key is a 422 rather than a field politely ignored. `expectedVersion` is
+ * required on create (the order writes awards into the project's blob) and absent on update (it does
+ * not). That asymmetry is the backend's, not ours — sending the field to the update would fail the
+ * same strict check.
+ */
 export async function saveWorkOrder(
   projectId: string,
-  body: { groupId?: string; title?: string | null; when?: unknown; whenConflictAck?: boolean; items: unknown[]; awards?: unknown[] },
+  expectedVersion: number,
+  payload: { groupId?: string; body: Record<string, unknown> },
 ): Promise<void> {
-  if (body.groupId) {
-    await projectFetch(`/api/work-orders/${encodeURIComponent(body.groupId)}`, { method: "PATCH", body });
+  if (payload.groupId) {
+    await projectFetch(`/api/work-orders/${encodeURIComponent(payload.groupId)}`, { method: "PATCH", body: payload.body });
     return;
   }
-  await projectFetch(`${projectPath(projectId)}/work-orders`, { method: "POST", body });
+  await projectFetch(`${projectPath(projectId)}/work-orders`, {
+    method: "POST",
+    body: { ...payload.body, expectedVersion },
+  });
 }
 
 /** Deletes the machines AND their awards. The confirm counts both before this is called. */
@@ -913,7 +939,13 @@ export interface AwardWriteResult {
 export async function saveAward(projectId: string, expectedVersion: number, input: AwardInput): Promise<AwardWriteResult> {
   return projectFetch<AwardWriteResult>(`${projectPath(projectId)}/awards`, {
     method: "POST",
-    body: { ...input, expectedVersion },
+    /**
+     * `rentalBasis` is REQUIRED and non-nullable on the way out, while the dialog lets it sit empty
+     * — a renter recording *who and how many* has often not been told *per what* yet. Monthly is the
+     * backend's own default for the same field on a work order, so an unanswered question reads the
+     * same on both paths instead of refusing the award outright.
+     */
+    body: { ...input, rentalBasis: input.rentalBasis ?? "monthly", expectedVersion },
   });
 }
 
@@ -1117,16 +1149,22 @@ export async function attachDocument(
 ): Promise<{ version: number }> {
   // 1 · ask where to put it. The key is namespaced by project on the backend, so this app never
   //     invents a path and cannot write one project's paper under another's prefix.
+  const contentType = contentTypeFor(file.name);
+  if (!contentType) throw new ApiError("unknown", `unsupported file type: ${file.name}`);
+
   const presign = await projectFetch<{ key: string; url: string }>(`${projectPath(projectId)}/documents/upload-url`, {
     method: "POST",
-    body: { filename: file.name, contentType: file.type || "application/octet-stream" },
+    // From the NAME, not `file.type`: the backend's enum has four entries and no fallback, and a
+    // file dragged in with an empty type would otherwise be announced as octet-stream and refused.
+    body: { filename: file.name, contentType },
   });
 
   // 2 · the bytes go STRAIGHT to storage. Not through this app, not through the agents backend —
   //     a 40 MB scan would otherwise be a 40 MB JSON body crossing two hops to reach the same place.
   const put = await fetch(presign.url, {
     method: "PUT",
-    headers: { "Content-Type": file.type || "application/octet-stream" },
+    // Must match what the URL was signed for, or storage rejects the PUT.
+    headers: { "Content-Type": contentType },
     body: file,
   });
   if (!put.ok) throw new ApiError("network", `upload failed (${put.status})`);

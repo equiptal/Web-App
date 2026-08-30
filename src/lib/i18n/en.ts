@@ -1669,6 +1669,7 @@ export const en = {
       removeNamed: "Remove {name}",
       oursIsGenerated: "Our quotation for this request is generated, not uploaded — download it from the row menu. The one here is the quotation the SUPPLIER sent you.",
       tooBig: "That file is over {max}. Attach a smaller one.",
+      badType: "PDF, JPG, PNG or WEBP. Convert it first, or take a photo of the page.",
       readFailed: "That file could not be read. Try another.",
     },
     conflict: {
@@ -1822,7 +1823,7 @@ export const en = {
         title: "Title",
         titlePlaceholder: "Optional",
         titleHint: "Leave it blank and we call it “{fallback}”.",
-        whenTitle: "When",
+        whenTitle: "When & terms",
         paymentTitle: "Payment",
         extendableLabel: "Extendable",
         extendableYes: "May be extended",

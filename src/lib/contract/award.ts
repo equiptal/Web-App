@@ -284,3 +284,27 @@ export function chartSpan(
   if (!dates.length) return null;
   return { from: dates.reduce((a, b) => (a < b ? a : b)), to: dates.reduce((a, b) => (a > b ? a : b)) };
 }
+
+/**
+ * What storage will accept — the backend's own closed list, by extension.
+ *
+ * It used to offer Word and Excel too. Those were refused on the way out with a bare validation
+ * error, so the renter picked a file, waited, and was told nothing useful. A format that cannot be
+ * stored should not be offered, and the file picker is the place to say so.
+ *
+ * Keyed by extension rather than by the browser's `file.type` because that string is empty often
+ * enough to matter — a PDF dragged from some mail clients arrives with no type at all.
+ */
+const ACCEPTED: Record<string, string> = {
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+};
+
+/** The content type storage will be told, or `null` when this file cannot be stored at all. */
+export function contentTypeFor(filename: string): string | null {
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+  return ACCEPTED[ext] ?? null;
+}

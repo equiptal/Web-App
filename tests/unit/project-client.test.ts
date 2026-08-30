@@ -120,10 +120,14 @@ describe("writes", () => {
     expect(Object.keys(created).sort()).toEqual(["defaults", "location", "title"]);
 
     calls.length = 0;
-    await updateProject("p1", p);
+    await updateProject("p1", 3, p);
     const edited = JSON.parse(String(calls[0].init?.body));
     // Empty, not absent: nothing propagates unless the renter ticked something.
     expect(edited.applyToRequests).toEqual([]);
+    /* An EDIT is a checked write and the backend requires the version — without it the schema
+       rejects the body before any handler runs, so every save of an existing site answered 422
+       while creating a new one worked. */
+    expect(edited.expectedVersion).toBe(3);
   });
 
   it("files through its own route, never through the request edit", async () => {
@@ -141,6 +145,9 @@ describe("writes", () => {
 
     await saveAward("p1", 7, { supplierName: "Zahid", units: 2, requestId: "r1" });
     expect(JSON.parse(String(calls[0].init?.body)).expectedVersion).toBe(7);
+    /* The field is required and non-nullable on the way out, while the dialog lets it sit empty.
+       Monthly is the backend's own default for the same field on a work order. */
+    expect(JSON.parse(String(calls[0].init?.body)).rentalBasis).toBe("monthly");
 
     await markAward("p1", "aw1", 8, { mobilizedAt: "2026-09-04" });
     expect(JSON.parse(String(calls[1].init?.body)).expectedVersion).toBe(8);
@@ -154,13 +161,19 @@ describe("writes", () => {
   it("PATCHes an existing work order by group id and POSTs a new one", async () => {
     stub(() => reply(200, {}));
 
-    await saveWorkOrder("p1", { groupId: "g1", items: [] });
+    await saveWorkOrder("p1", 4, { groupId: "g1", body: { items: [] } });
     expect(calls[0].url).toBe("/api/work-orders/g1");
     expect(calls[0].init?.method).toBe("PATCH");
+    const patched = JSON.parse(String(calls[0].init?.body));
+    // The update schema has no `expectedVersion` and is strict, so sending one would fail the save.
+    expect("expectedVersion" in patched).toBe(false);
+    expect("groupId" in patched).toBe(false);
 
-    await saveWorkOrder("p1", { items: [] });
+    await saveWorkOrder("p1", 4, { body: { items: [] } });
     expect(calls[1].url).toBe("/api/projects/p1/work-orders");
     expect(calls[1].init?.method).toBe("POST");
+    // Create writes awards into the project blob, so it IS a checked write.
+    expect(JSON.parse(String(calls[1].init?.body)).expectedVersion).toBe(4);
   });
 });
 

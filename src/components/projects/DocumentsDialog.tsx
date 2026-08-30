@@ -24,7 +24,7 @@ import { useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { Button, Icon } from "@/components/ui";
 import { Dialog } from "@/components/Dialog";
-import type { Award, AwardDocumentKind } from "@/lib/contract/award";
+import { contentTypeFor, type Award, type AwardDocumentKind } from "@/lib/contract/award";
 
 const KINDS: AwardDocumentKind[] = ["po", "contract", "quotation", "other"];
 
@@ -70,6 +70,11 @@ export function DocumentsDialog({
     if (file.size > MAX_BYTES) {
       // Said before the upload rather than after it fails on the way out.
       setError(d.tooBig.replace("{max}", "10 MB"));
+      return;
+    }
+    if (!contentTypeFor(file.name)) {
+      // Named formats, not "invalid file": the renter needs to know what to convert it to.
+      setError(d.badType);
       return;
     }
     onAttach(file, kind);
@@ -154,7 +159,7 @@ export function DocumentsDialog({
             ref={picker}
             type="file"
             className="hidden"
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+            accept=".pdf,.png,.jpg,.jpeg,.webp"
             onChange={(e) => pick(e.target.files?.[0])}
           />
           <Button variant="secondary" onClick={() => picker.current?.click()} disabled={busy}>

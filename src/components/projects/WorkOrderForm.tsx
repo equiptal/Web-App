@@ -422,37 +422,65 @@ function nameOf(m: MachineDraft, taxonomy: Taxonomy, locale: string): string {
  * created fresh, and the awards, marks and purchase orders keyed to the id it used to have are
  * scrubbed.
  */
-export function workOrderPayload(draft: WorkOrderDraft): {
-  groupId?: string;
-  title: string | null;
-  when: WorkOrderWhen;
-  items: unknown[];
-  awards: unknown[];
-} {
+/**
+ * The period, in the shape the wire takes it.
+ *
+ * `when` is `.partial().strict()` on the backend, and **partial means optional, not nullable**: a
+ * key sent as `null` is a validation failure, not an unanswered question. So an unset field is left
+ * out of the object entirely. The basis is upper-cased for the same reason the project's is — the
+ * work-order enum is `DAILY | WEEKLY | MONTHLY | PER_JOB | LONG_TERM`, and only the award enum is
+ * lower case.
+ */
+function whenToWire(w: WorkOrderWhen): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (w.rentalBasis) out.rentalBasis = w.rentalBasis.toUpperCase();
+  if (w.extendable !== null) out.extendable = w.extendable;
+  if (w.startDate) out.startDate = w.startDate;
+  if (w.endDate) out.endDate = w.endDate;
+  if (w.hoursPerDay !== null) out.hoursPerDay = w.hoursPerDay;
+  return out;
+}
+
+export function workOrderPayload(
+  draft: WorkOrderDraft,
+  /**
+   * Awards ride along on CREATE and cannot on update: only the create schema accepts
+   * `items[].supplyLines`, and the update schema is strict, so sending them there would fail the
+   * whole save. Editing an existing order's awards goes through the award dialog on the chart.
+   */
+  opts: { create: boolean },
+): { groupId?: string; body: Record<string, unknown> } {
   return {
+    // Route, not payload. Both schemas are strict and neither knows this key.
     groupId: draft.groupId,
-    title: draft.title.trim() || null,
-    when: draft.when,
-    items: draft.machines.map((m, sortOrder) => ({
-      id: m.id, // undefined for a new one — never invent it
-      sortOrder,
-      ref: refOf(m),
-      rawLabel: m.offCatalogue ? m.rawLabel.trim() || null : null,
-      rawSize: m.offCatalogue ? m.rawSize.trim() || null : null,
-      quantity: m.quantity,
-      notes: m.notes.trim() || null,
-    })),
-    awards: draft.machines.flatMap((m, sortOrder) =>
-      m.lines
-        .filter((l) => l.supplierName.trim())
-        .map((l) => ({
-          machineIndex: sortOrder,
-          supplierName: l.supplierName.trim(),
-          units: l.units,
-          rentalBasis: l.rentalBasis,
-          rateAmount: l.rateAmount ? Number(l.rateAmount) : null,
-        })),
-    ),
+    body: {
+      title: draft.title.trim() || null,
+      when: whenToWire(draft.when),
+      items: draft.machines.map((m) => {
+        const lines = m.lines
+          .filter((l) => l.supplierName.trim())
+          .map((l) => ({
+            supplierName: l.supplierName.trim(),
+            units: l.units,
+            // Same default the backend applies to this field, stated here so both paths agree.
+            rentalBasis: l.rentalBasis ?? "monthly",
+            rateAmount: l.rateAmount ? Number(l.rateAmount) : null,
+          }));
+
+        return {
+          // Only when it exists: the id is upserted, and `undefined` would be sent as an absent key
+          // anyway — but a `null` would be a strict failure, so the key is added or it is not.
+          ...(m.id ? { id: m.id } : {}),
+          // Flat, not nested under `ref` — the item schema names the three ids itself.
+          ...refOf(m),
+          rawLabel: m.offCatalogue ? m.rawLabel.trim() || null : null,
+          rawSize: m.offCatalogue ? m.rawSize.trim() || null : null,
+          quantity: m.quantity,
+          notes: m.notes.trim() || null,
+          ...(opts.create && lines.length > 0 ? { supplyLines: lines } : {}),
+        };
+      }),
+    },
   };
 }
 

@@ -89,7 +89,13 @@ function SectionHeader({ count, onNew }: { count: number; onNew: () => void }) {
 export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   const t = useT();
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
-  const [editing, setEditing] = useState<{ id: string | null; value: ProjectFormValue; rows?: PropagationRow[] } | null>(null);
+  /** `version` rides along on an EDIT: the backend requires the version the form was opened on. */
+  const [editing, setEditing] = useState<{
+    id: string | null;
+    version?: number;
+    value: ProjectFormValue;
+    rows?: PropagationRow[];
+  } | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -217,7 +223,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
    * are making it, not once it is already saved.
    */
   async function openEdit(p: ProjectSummary) {
-    setEditing({ id: p.id, value: projectToForm(p), rows: [] });
+    setEditing({ id: p.id, version: p.version, value: projectToForm(p), rows: [] });
     try {
       const chart = await fetchChart(p.id);
       const rows = chart.groups.map((g) =>
@@ -245,7 +251,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     setNotice(null);
     try {
       if (editing.id) {
-        await updateProject(editing.id, value, applyTo);
+        await updateProject(editing.id, editing.version ?? 1, value, applyTo);
         setEditing(null);
         await reload();
       } else {
@@ -343,7 +349,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     try {
       // `workOrderPayload` keeps each existing machine's id. Rebuilding the set without them
       // scrubs every award, mark and purchase order under the order.
-      await saveWorkOrder(selected, workOrderPayload(d));
+      await saveWorkOrder(selected, version, workOrderPayload(d, { create: !d.groupId }));
       setWorkOrder(null);
       await refreshChart();
     } catch {

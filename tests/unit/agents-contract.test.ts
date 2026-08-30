@@ -177,7 +177,7 @@ when("the award payload", () => {
 
 when("the document payload", () => {
   const attach = read("src/handlers/agents/projects/documents/attachDocument.ts");
-  const client = fs.readFileSync(path.resolve(process.cwd(), "src/lib/api/client.ts"), "utf8");
+  const client = code(path.resolve(process.cwd(), "src/lib/api/client.ts"));
   const ours = client.slice(client.indexOf("export async function attachDocument"), client.indexOf("export async function removeDocument"));
 
   it("takes a KEY from a presigned upload, and this app sends one", () => {
@@ -235,14 +235,148 @@ when("where userId is sent", () => {
     // If this is empty the parse broke, not the contract — fail loudly rather than pass vacuously.
     expect(fromBody.length, "no body-schema userId found; the parse above is wrong").toBeGreaterThan(0);
 
-    const relay = fs.readFileSync(path.resolve(process.cwd(), "src/lib/api/agents-relay.ts"), "utf8");
+    const relay = code(path.resolve(process.cwd(), "src/lib/api/agents-relay.ts"));
     expect(relay, "relay must add userId to the body on POST/PATCH").toMatch(/userId\s*\}\)|\.\.\.parsed,\s*userId/);
     expect(relay).toContain('method === "POST"');
     expect(relay).toContain('method === "PATCH"');
   });
 
   it("still puts it in the query, which is where reads and deletes look", () => {
-    const relay = fs.readFileSync(path.resolve(process.cwd(), "src/lib/api/agents-relay.ts"), "utf8");
+    const relay = code(path.resolve(process.cwd(), "src/lib/api/agents-relay.ts"));
     expect(relay).toContain("userId=${userId}");
+  });
+});
+
+/* ─────────────────────────── Required fields, read from the backend ─────────────────────────── */
+
+/**
+ * A file's CODE, with its comments removed.
+ *
+ * Every assertion below reads source as text, and a prose comment naming the very thing being
+ * checked will satisfy a `toContain` while the code does the opposite. That is not theoretical:
+ * deleting the handling of `PROJECT_VERSION_CONFLICT` left these tests green, because the comment
+ * explaining the two codes still mentioned it.
+ */
+function code(abs: string): string {
+  return fs
+    .readFileSync(abs, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+}
+
+/** One handler's zod body schema, as raw text. */
+function schemaOf(rel: string): string {
+  const src = fs.readFileSync(path.join(AGENTS, "src", "handlers", "agents", rel), "utf8");
+  const i = src.search(/const bodySchema\s*=/);
+  if (i === -1) return "";
+  return src.slice(i, src.indexOf("export const handler", i));
+}
+
+/** Is `field` required — present in the schema, and not marked optional on its own line? */
+function required(schema: string, field: string): boolean {
+  const line = new RegExp(String.raw`^\s*${field}\s*:.*$`, "m").exec(schema)?.[0];
+  return !!line && !line.includes(".optional()");
+}
+
+when("every required field is actually sent", () => {
+  const client = () => code(path.resolve(process.cwd(), "src/lib/api/client.ts"));
+
+  it("sends expectedVersion wherever the backend demands one", () => {
+    /* This is the fault that cost a day. `createProject` does not take a version and `updateProject`
+       does; the web sent neither, so making a site worked and editing one answered a bare 422. Read
+       the requirement off the schema rather than restating it. */
+    const cases: [string, RegExp][] = [
+      ["projects/updateProject.ts", /export async function updateProject\([^]*?expectedVersion[^]*?^}/m],
+      ["work-orders/createWorkOrder.ts", /export async function saveWorkOrder\([^]*?expectedVersion[^]*?^}/m],
+      ["projects/awards/createAward.ts", /export async function saveAward\([^]*?expectedVersion[^]*?^}/m],
+      ["projects/documents/attachDocument.ts", /export async function attachDocument\([^]*?expectedVersion[^]*?^}/m],
+    ];
+
+    for (const [handler, sends] of cases) {
+      const schema = schemaOf(handler);
+      if (!required(schema, "expectedVersion")) continue; // it stopped being required; nothing to check
+      expect(client(), `${handler} requires expectedVersion`).toMatch(sends);
+    }
+  });
+
+  it("never sends expectedVersion to the work-order update, whose schema is strict", () => {
+    const schema = schemaOf("work-orders/updateWorkOrder.ts");
+    expect(schema).toContain("strict()");
+    expect(schema, "if this gains expectedVersion, saveWorkOrder must send it").not.toMatch(/^\s*expectedVersion\s*:/m);
+  });
+});
+
+when("the strict schemas get no unknown keys", () => {
+  it("keeps groupId and awards out of the work-order body", () => {
+    const form = code(path.resolve(process.cwd(), "src/components/projects/WorkOrderForm.tsx"));
+    const payload = form.slice(form.indexOf("export function workOrderPayload"));
+
+    // `groupId` picks the route; it is not a field either schema knows.
+    expect(payload).toMatch(/groupId: draft\.groupId,/);
+    expect(payload).toContain("body: {");
+    // Awards hang on their machine as `supplyLines`. A top-level `awards` array is a 422.
+    expect(payload).toContain("supplyLines");
+    expect(payload, "a top-level awards array fails the strict schema").not.toMatch(/^\s*awards: draft\./m);
+  });
+
+  it("names the taxonomy ids the way the item schema does", () => {
+    const woSchema = fs.readFileSync(path.join(AGENTS, "src", "validators", "work-order.schema.ts"), "utf8");
+    const item = woSchema.slice(woSchema.indexOf("export const workOrderItemSchema"));
+    for (const key of ["categoryId", "subcategoryId", "measurementId"]) {
+      expect(item, `item schema should name ${key}`).toMatch(new RegExp(`${key}\s*:`));
+    }
+    // Flat, not nested: there is no `ref` key in the schema, so sending one is an unknown key.
+    expect(item.slice(0, item.indexOf("strict()"))).not.toMatch(/^\s*ref\s*:/m);
+  });
+});
+
+when("enums line up", () => {
+  const validators = () => fs.readFileSync(path.join(AGENTS, "src", "validators", "project.schema.ts"), "utf8");
+
+  it("keeps the award basis lower case and the period basis upper case", () => {
+    /* The same idea is spelled two ways in one feature, which is exactly the kind of thing a person
+       gets right once and wrong the second time. */
+    const src = validators();
+    expect(src).toMatch(/AWARD_RENTAL_BASIS = \['daily', 'weekly', 'monthly'\]/);
+    expect(src).toMatch(/PROJECT_RENTAL_BASIS = \['DAILY'/);
+
+    const form = code(path.resolve(process.cwd(), "src/components/projects/WorkOrderForm.tsx"));
+    expect(form, "the period's basis must be upper-cased on the way out").toContain("toUpperCase()");
+  });
+
+  it("offers only the file types storage will accept", () => {
+    const upload = fs.readFileSync(
+      path.join(AGENTS, "src", "handlers", "agents", "projects", "documents", "createUploadUrl.ts"),
+      "utf8",
+    );
+    const allowed = [...upload.matchAll(/'(application\/pdf|image\/\w+)'/g)].map((m) => m[1]);
+    expect(allowed.length, "parse the contentType enum").toBeGreaterThan(0);
+
+    const award = code(path.resolve(process.cwd(), "src/lib/contract/award.ts"));
+    const table = award.slice(award.indexOf("const ACCEPTED"), award.indexOf("export function contentTypeFor"));
+    for (const type of allowed) expect(table, `${type} should be offered`).toContain(type);
+    // Word and Excel were offered and refused on the way out, with nothing useful said.
+    expect(table).not.toMatch(/msword|spreadsheet|officedocument/);
+  });
+});
+
+when("409s keep their meaning", () => {
+  it("knows both version-conflict codes, which are two names for one thing", () => {
+    const codes = new Set<string>();
+    const walk = (d: string) => {
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        const full = path.join(d, e.name);
+        if (e.isDirectory()) { walk(full); continue; }
+        if (!e.name.endsWith(".ts")) continue;
+        for (const m of fs.readFileSync(full, "utf8").matchAll(/'(PROJECT_VERSION_[A-Z]+)'/g)) codes.add(m[1]);
+      }
+    };
+    walk(path.join(AGENTS, "src", "handlers", "agents"));
+    expect(codes.size, "parse the conflict codes").toBeGreaterThan(0);
+
+    const client = code(path.resolve(process.cwd(), "src/lib/api/client.ts"));
+    for (const code of codes) {
+      expect(client, `${code} must reach ProjectVersionConflict, not a bare unknown error`).toContain(code);
+    }
   });
 });
