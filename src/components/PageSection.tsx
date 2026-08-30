@@ -170,7 +170,15 @@ export function Section({
   return (
     <section {...pin("page-section")} className={cx("mt-5 first:mt-0", grow && "flex min-h-0 flex-1 flex-col")}>
       {(title || action) && (
-        <div className="mb-2 flex items-end justify-between gap-3 px-1">
+        /* ── One header height, so two columns start level (owner, 2026-08-30) ───────────────
+           *"Settings and profile don't have same start."* They did not, and the label was innocent:
+           a section carrying an ACTION has a `text-body` control in this row, a section without one
+           has only its `text-label` heading, and the two line boxes differ by a couple of pixels —
+           enough to push one column's card below the other's for the whole page.
+
+           `min-h` on the row rather than a height on either child: the heading and the action keep
+           their own type scales, and a section with a `hint` under its title still grows past it. */
+        <div className="mb-2 flex min-h-[24px] items-end justify-between gap-3 px-1">
           <div className="min-w-0">
             {title && <h2 className="text-label font-semibold uppercase tracking-wide text-muted">{title}</h2>}
             {hint && <p className="mt-1 text-meta leading-snug text-muted">{hint}</p>}

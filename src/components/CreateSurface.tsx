@@ -38,10 +38,10 @@ export function CreateSurface() {
          *
          * It used to cancel the shell's reading gutter with negative margins at every breakpoint and
          * put a tighter one back on, because 112px a side was the difference between the machine
-         * card, the operator rail and the schedule sharing a row and wrapping. The reason still
-         * holds; the mechanism does not. `/create` passes `wide`, and `wide` now means exactly those
-         * numbers (see `PAGE_X_WORKING`), so the page has the gutter it needs without a component
-         * inside it undoing its own container.
+         * card, the operator rail and the schedule sharing a row and wrapping. That was then fixed
+         * by `wide`, and `wide` is gone too: the shell has ONE gutter now (`PAGE_X`, 16/24/32/40),
+         * which is the tighter scale this canvas always wanted. The page gets the room it needs
+         * because every page does, and nothing inside it undoes its own container.
          */
         return state.readyToSend ? <ReadyToSend /> : <Canvas />;
       case "confirmation":

@@ -13,12 +13,12 @@ import { Field, FieldGrid, MastheadPill, PageMasthead, Row, RowList, Section } f
 import { EditProfileForm } from "./EditProfileForm";
 import { ChangePhoneModal } from "./ChangePhoneModal";
 import { DeleteAccountModal } from "./DeleteAccountModal";
+import { openSupportMessenger } from "@/components/support/IntercomWidget";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 
-const SUPPORT_URL = "https://moedatech.net/contact";
-const PRIVACY_URL = "https://moedatech.net/privacy";
-const TERMS_URL = "https://moedatech.net/terms";
+/* ~~`SUPPORT_URL`, `PRIVACY_URL`, `TERMS_URL` — three pages on the marketing site.~~ All three
+   404, and none of them is where the app sends anyone. See the rows in the settings list below. */
 
 /**
  * Profile tab (app parity: profile_page.dart + settings_page.dart) — navy header, tier banner, an
@@ -236,29 +236,11 @@ export function ProfileView() {
           </Section>
         )}
 
-        {/* ── The company lives on ITS OWN PAGE now (owner, 2026-08-26) ─────────────────────────────
-            Two cards used to sit here — one for verification state, one for the firm this account
-            belongs to — while /company carried the same facts a third time. A reader had to know which
-            of two pages held which half of one subject. This is a DOOR, not a summary: the state in a
-            line, and the page that owns it one tap away. */}
-        {!loading && profile && (
-          <Section title={t.shell.company}>
-            <Row
-              icon={verification === "verified" ? "verified" : "business_center"}
-              label={profile.companyName ?? p.companyNoneTitle}
-              hint={
-                verification === "verified"
-                  ? p.companyVerifiedTitle
-                  : verification === "pending"
-                    ? p.companyPendingTitle
-                    : verification === "rejected"
-                      ? p.companyRejectedTitle
-                      : p.companyNoneBody
-              }
-              onClick={() => router.push(verification === "rejected" ? "/verify" : "/company")}
-            />
-          </Section>
-        )}
+          {/* ~~The door to the organization page.~~ Removed (owner, 2026-08-30). The firm has its own
+            entry in the account menu and its own page; a row here was a third place the same subject
+            appeared, and it was the shortest of the three. Nothing became unreachable — the
+            «Get verified» nudge above still points at `/company`, and so does the menu. */}
+
         </div>
 
         <div className="flex min-w-0 flex-col">
@@ -280,9 +262,16 @@ export function ProfileView() {
                   </span>
                 </Row>
                 <Row icon="smartphone" label={p.changePhone} hint={p.changePhoneSub} onClick={() => setShowChangePhone(true)} />
-                <Row icon="shield" label={p.privacy} href={PRIVACY_URL} />
-                <Row icon="description" label={p.terms} href={TERMS_URL} />
-                <Row icon="support_agent" label={p.support} href={SUPPORT_URL} />
+                {/* ── The three that 404'd (owner, 2026-08-30) ───────────────────────────
+                    All three pointed at pages on the marketing site that do not exist —
+                    `moedatech.net/privacy`, `/terms`, `/contact` — and the app uses none of them. Its
+                    two legal routes render `GET /app/content/{key}` in-app, and every one of its
+                    support touchpoints goes through Intercom, which this web app has already booted
+                    against the same user id. So: the documents open on our own pages, reading the
+                    same rows the app reads, and Support raises the messenger. */}
+                <Row icon="shield" label={p.privacy} onClick={() => router.push("/legal/privacy-policy")} />
+                <Row icon="description" label={p.terms} onClick={() => router.push("/legal/terms-of-use")} />
+                <Row icon="support_agent" label={p.support} onClick={openSupportMessenger} />
               </RowList>
             </Section>
 

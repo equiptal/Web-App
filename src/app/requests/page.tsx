@@ -12,11 +12,15 @@ import { RequestsWorkspace } from "@/components/workspace/RequestsWorkspace";
 export default function RequestsPage() {
   const t = useT();
   return (
-    // `fullBleed`, not `wide` (owner, 2026-08-25: "make the /requests page appear fully without
-    // scrolling"). `wide` lets the page grow past the fold and hands the whole document to the
-    // browser's scrollbar, which takes the rail and the request strip off screen with it. Full-bleed
-    // pins the shell to exactly the viewport; the workspace then owns its own scrolling region, so
-    // the chrome stays put and only the bids move. It is the same treatment the bid map already has.
+    // `fullBleed` (owner, 2026-08-25: "make the /requests page appear fully without scrolling"). An
+    // ordinary page grows past the fold and hands the whole document to the browser's scrollbar,
+    // which takes the rail and the request strip off screen with it. Full-bleed pins the shell to
+    // exactly the viewport; the workspace then owns its own scrolling region, so the chrome stays put
+    // and only the bids move. It is the same treatment the bid map already has.
+    //
+    // It is NOT a claim about width: since 2026-08-30 a full-bleed page takes the same gutter and the
+    // same 1440 cap as every other one, and "full bleed" means only that it owns its height and its
+    // own bands inside that column.
     <AppShell title={t.workspace.title} fullBleed>
       {/* Suspense boundary: the workspace reads `useSearchParams` for the dashboard's row actions
           (`?g=…&details=1`), and Next refuses to prerender a component that reads them without one. */}

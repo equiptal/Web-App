@@ -26,8 +26,13 @@ export type ButtonVariant = "primary" | "secondary" | "tinted" | "ghost" | "dang
 export type ControlSize = "sm" | "md" | "lg";
 
 /** Shared by every button: the box, the type, the transition, and the disabled state. */
+/* `font-bold`, not `semibold` (owner, 2026-08-30). Checked against the reference CTA in the other
+   product: the family already matches — both sit on the same `--font-sans` system stack — but the
+   weight did not, and a 13px label at 600 on a saturated orange reads thinner than the same label on
+   a white ground. The size stays on `--text-body`: the scale has six sizes and no others, and a
+   button is not the place to add a seventh. */
 const BTN_BASE =
-  "inline-flex items-center justify-center gap-2 rounded-md text-body font-semibold " +
+  "inline-flex items-center justify-center gap-2 rounded-md text-body font-bold " +
   "transition-colors select-none " +
   "disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg " +
   "disabled:border-disabled-border disabled:pointer-events-none";
@@ -227,25 +232,37 @@ export const DIVIDER = "border-t border-border";
    of the system as colour, and two pages agreeing on a gutter by coincidence is not a rule. */
 
 /**
- * The side gutter, in two widths.
+ * **The side gutter. One scale, every page** (owner, 2026-08-30).
  *
- * A **reading** page — a form, an account page, the deal room — is a column of text and wants space
- * around it. A **working** surface — the map, the requests workspace, the compare matrix — is trying
- * to fit things on screen and wants that space back. Two scales because the two kinds of page have
- * genuinely different jobs, not because nobody could decide.
+ * ~~Three of them: a `READING` gutter for forms and account pages (24/48/80/112), a `WORKING` one
+ * for the map and the workspace (16/24/32/40), and a `BLEED` one for a viewport-pinned surface
+ * (16/24). The argument was that a column of text wants space around it and a dense surface wants
+ * that space back.~~ Withdrawn on the owner's audit: *"check the margin between the content and the
+ * edge of the screen in the dashboard, requests, create request, profile, organization — all are
+ * different, I want to unify it across all web pages."*
+ *
+ * They were different by 88px at `xl` between two pages a renter moves between in one errand, and
+ * the reading argument had stopped being true anyway: the account pages are two columns of fields
+ * now, and the home dashboard is a table beside a rail. None of them is a column of prose.
+ *
+ * So: one scale, and it is the tighter one. A page that wants a narrow measure gets it from a
+ * `max-w` on its own content, which is a decision about the CONTENT — not from a gutter that also
+ * moves every band and every full-width card on the page with it.
  */
-export const PAGE_X_READING = "px-6 sm:px-12 lg:px-20 xl:px-28";
-export const PAGE_X_WORKING = "px-4 sm:px-6 lg:px-8 xl:px-10";
+export const PAGE_X = "px-4 sm:px-6 lg:px-8 xl:px-10";
+
+/** The same step as a margin, for a band that insets a card rather than padding a row. */
+export const PAGE_MX = "mx-4 sm:mx-6 lg:mx-8 xl:mx-10";
 
 /**
- * A third, for a surface that owns the whole viewport (`fullBleed`) and whose bands set their own
- * edges. It is the working gutter's first two steps, which is why the requests rail and the strip
- * beneath it line up — at 16/26 against 12/20 they never did.
+ * **The content cap, every page** — the other half of "one margin".
+ *
+ * A gutter alone does not settle it: on a 1920 screen a capped page showed 352px of background
+ * beside an uncapped one showing 40, which is the same complaint by another road. Full-bleed
+ * surfaces are capped too; `fullBleed` means "pinned to the viewport's HEIGHT and owning its own
+ * bands", which is a different claim from "as wide as the monitor happens to be".
  */
-export const PAGE_X_BLEED = "px-4 sm:px-6";
-
-/** The same bleed step as a margin, for a band that insets a card rather than padding a row. */
-export const PAGE_MX_BLEED = "mx-4 sm:mx-6";
+export const PAGE_MAX = "max-w-[1440px]";
 
 /** The vertical rhythm of a page, which is one rule for all of them. */
 export const PAGE_Y = "py-6 sm:py-7";

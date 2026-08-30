@@ -4,7 +4,7 @@ import { useRef } from "react";
 import Link from "next/link";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
-import { PAGE_X_BLEED } from "@/components/AppShell";
+import { PAGE_X } from "@/components/AppShell";
 import { publicTaxonomyUrl } from "@/lib/contract/requests";
 import type { RailTile } from "@/lib/contract/workspace";
 import { pin } from "@/lib/uiPins";
@@ -84,7 +84,7 @@ export function RequestRail({
   // put both of them 2px low. Change any line above and every figure here moves with it; that is
   // the point of writing the sum down.
   return (
-    <div {...pin("request-rail")} className={`flex h-[96px] flex-none select-none items-center gap-4 overflow-hidden border-b border-border bg-surface3/60 ${PAGE_X_BLEED}`}>
+    <div {...pin("request-rail")} className={`flex h-[96px] flex-none select-none items-center gap-4 overflow-hidden border-b border-border bg-surface3/60 ${PAGE_X}`}>
       <Link {...pin("rail-create-tile")} href="/create" className="group flex flex-none flex-col items-center gap-1">
         <span className="grid h-14 w-14 place-items-center rounded-full border-2 border-dashed border-border text-muted transition group-hover:border-brand group-hover:text-brand">
           <Icon name="add" size={20} />
@@ -302,7 +302,8 @@ export function RequestRail({
         <Icon name="chevron_right" size={16} className="rtl:scale-x-[-1]" />
       </button>
     </div>
-  );}
+  );
+}
 
 /**
  * The day a request was raised, short. «14 Aug» inside the current year, «14 Aug 24» outside it —

@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
-import { PAGE_MX_BLEED } from "@/components/AppShell";
+import { PAGE_MX } from "@/components/AppShell";
 import { SignInPrompt } from "@/components/common/SignInPrompt";
 import { fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail, recommendBids } from "@/lib/api/client";
 import { groupRequests, requestCodeOf, type RequestGroup } from "@/lib/contract/requests";
@@ -530,7 +530,7 @@ export function RequestsWorkspace() {
       />
 
 
-      <div className={`${PAGE_MX_BLEED} mt-2 flex min-h-0 flex-1 flex-col pb-2`}>
+      <div className={`${PAGE_MX} mt-2 flex min-h-0 flex-1 flex-col pb-2`}>
         {/* ── The row above the panel (owner, 2026-08-27) ─────────────────────────────────────────
             Three things, and the tabs are the middle one so they sit under the eye rather than off
             at the leading edge.

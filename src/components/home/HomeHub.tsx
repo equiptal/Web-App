@@ -129,14 +129,17 @@ export function HomeHub() {
               margin, not `-ml`, so it escapes the same way in Arabic. `body { overflow-x: clip }`
               takes the scrollbar's width of overhang that `100vw` always carries; the rule there
               records why it is `clip` and not `hidden`.
-            · **Up** — `-mt-6 sm:-mt-7` cancels `PAGE_Y`'s top half exactly, so the band's edge meets
-              the header's border with no seam of page background between them. It is written against
-              `PAGE_Y`'s own numbers; if that rhythm changes, this follows it.
+            · **Up** — `PAGE_Y`'s top half, **plus one pixel** (owner, 2026-08-30: *"small white line
+              between the banner and the nav bar"*). Cancelling the padding alone leaves the header's
+              own `border-b border-white/10` drawing between the two: on a light page that border is
+              invisible, but against this dark band it is the only thing with any lightness in it, so
+              it reads as a seam. The extra pixel slides the band under it. Written against `PAGE_Y`'s
+              own numbers (1.5rem / 1.75rem); if that rhythm changes, this follows it.
 
            The rounding goes with the gutter: a radius on a band whose corners are off-screen draws a
            notch against the header and nothing else. The COPY keeps the page's reading gutter, so
            the headline still lines up with the blocks below it. */
-        className="relative isolate -mt-6 flex h-[160px] w-screen items-center overflow-hidden sm:-mt-7"
+        className="relative isolate -mt-[calc(1.5rem+1px)] flex h-[160px] w-screen items-center overflow-hidden sm:-mt-[calc(1.75rem+1px)]"
         /* `calc(50% - 50vw)`, and the 50% is of the CONTAINER — the padded, capped main. That centres a
            100vw child on a container which is itself centred in the viewport, which lands the band on
            the window's edges at every width. Inline because a Tailwind arbitrary value cannot mix the
@@ -187,24 +190,20 @@ export function HomeHub() {
                 spaces between them collapse and the row's own `gap` stands in for them — which sets
                 the word spacing of a headline from a layout property. Inline flow keeps the spaces
                 the copy actually carries, in both scripts. */}
-            <h1 className="text-title font-extrabold leading-tight tracking-[-0.2px] text-white sm:text-display">
+            {/* Larger than the type scale's six sizes, and deliberately so (owner, 2026-08-30: *"you
+                can make the font bigger in the banner as we have space"*). The band is a fixed 160px
+                carrying two lines of copy, so `--text-display` (22px) left most of that height as
+                air. This is the ONE arbitrary size in the app; it is a hero, not a heading in a card,
+                and giving it a scale token would invite it into layouts where 30px is shouting.
+
+                The sparkle that sat after the headline is gone on the same instruction. It marked
+                "the assistant did this", which the sentence already says in words. */}
+            <h1 className="text-[22px] font-extrabold leading-tight tracking-[-0.3px] text-white sm:text-[30px]">
               {t.home.ctaTitleBefore}
               <span className="text-brand-light">{t.home.ctaTitleAi}</span>
               {t.home.ctaTitleAfter}
-              {/* The spark is the comp's own mark for "this is the assistant's doing". Inline rather
-                  than a font glyph: the material set has no four-point star at this weight, and one
-                  path cannot go missing at runtime. */}
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                className="ms-2.5 inline-block align-[-0.1em]"
-              >
-                <path d="M12 3L13.9 9.1L20 11L13.9 12.9L12 19L10.1 12.9L4 11L10.1 9.1L12 3Z" fill="var(--brand-light)" />
-              </svg>
             </h1>
-            <p className="mt-2 max-w-[440px] text-body leading-relaxed text-white/70">{t.home.ctaSubtitle}</p>
+            <p className="mt-2.5 max-w-[480px] text-subhead leading-relaxed text-white/70">{t.home.ctaSubtitle}</p>
           </div>
 
           {/* Single entry into the RFQ input flow (web-app/002). */}

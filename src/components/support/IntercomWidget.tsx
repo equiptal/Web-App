@@ -42,6 +42,26 @@ declare global {
 }
 
 /**
+ * **Open the messenger** — the profile's «Support» row (owner, 2026-08-30).
+ *
+ * That row pointed at `moedatech.net/contact`, which 404s. The app never used a contact page either:
+ * every support touchpoint in it routes through `IntercomService` (`app_constants.dart` says so in
+ * as many words), and this web app has already booted the same messenger, against the same user id,
+ * so the agent's reply reaches the same person. The row simply raises it.
+ *
+ * `show` rather than `showNewMessage`: an existing conversation should reopen where it was left
+ * rather than starting a second thread beside it. Silent when Intercom has not loaded — blocked, or
+ * still in flight — rather than throwing at a renter who pressed a support link.
+ */
+export function openSupportMessenger(): void {
+  try {
+    window.Intercom?.("show");
+  } catch {
+    /* the messenger is not up; nothing to raise and nothing to report */
+  }
+}
+
+/**
  * Intercom's published snippet, typed.
  *
  * The stub matters: it queues every call made before the remote script arrives and the real client
