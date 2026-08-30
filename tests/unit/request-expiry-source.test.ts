@@ -17,17 +17,24 @@ import { groupRequests, mapRequestListItem } from "@/lib/contract/requests";
  * because the one populated field stopped being read.
  */
 
+/** A row shaped like the real `my-requests` payload — the fields this behaviour actually reads. */
 const LIST_ROW = {
   id: "req-1",
   displayId: "REQ-001",
   status: "ACTIVE",
+  type: "MARKETPLACE",
   createdAt: "2026-08-25T08:58:02.607Z",
   expiresAt: "2026-09-25T00:00:00.000Z",
   bidCount: 1,
   startDate: "2026-08-15",
   endDate: "2026-10-15",
   projectAddressLabel: "Riyadh — Al Wuroud District",
+  equipmentItems: [],
 };
+
+/** Raw payload rows in, grouped rows out — the same path the hub takes. */
+const group = (rows: (typeof LIST_ROW & { requestGroupId?: string })[]) =>
+  groupRequests(rows.map((r) => mapRequestListItem(r)));
 
 describe("which source answers", () => {
   it("prefers the renter's own link deadline", () => {
@@ -72,7 +79,7 @@ describe("the list payload alone is enough", () => {
 
   it("gives a group its earliest item expiry", () => {
     // A group can only take bids for as long as its soonest-closing item can.
-    const groups = groupRequests([
+    const groups = group([
       { ...LIST_ROW, id: "a", requestGroupId: "g1", expiresAt: "2026-09-25T00:00:00.000Z" },
       { ...LIST_ROW, id: "b", requestGroupId: "g1", expiresAt: "2026-09-14T00:00:00.000Z" },
     ]);
@@ -82,7 +89,7 @@ describe("the list payload alone is enough", () => {
 
   it("resolves a real staging row to a countdown with no further calls", () => {
     // The end-to-end shape of the bug: list row in, days-left out, nothing fetched.
-    const [g] = groupRequests([LIST_ROW]);
+    const [g] = group([LIST_ROW]);
     const state = expiryState(requestExpiry({ expiresAt: g.expiresAt, createdAt: g.createdAt }), Date.parse("2026-08-30T00:00:00.000Z"));
     expect(state.kind).toBe("left");
     expect(state.days).toBe(26);

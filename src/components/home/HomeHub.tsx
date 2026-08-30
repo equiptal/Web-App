@@ -161,7 +161,16 @@ export function HomeHub() {
 
              The height never had this problem, which is why only one side showed it: `h-[115%]`
              overrides `height: auto` because they ARE the same property. */
-          className="absolute -start-[7.5%] -top-[7.5%] -z-10 h-[115%] w-[115%] max-w-none object-cover"
+          /* ── Mirrored in Arabic, with the text (owner, 2026-08-30) ─────────────────────────
+             The gradients already flip — the ink has to stay under the words, and in Arabic the words
+             start on the other edge. The photograph did not, so the composition fought the copy: the
+             machines sat on the same side as the headline while the empty sky sat behind nothing.
+
+             `-scale-x-100` flips the picture itself, and `-start` is already logical, so the crop
+             offset follows the direction on its own. Safe to mirror because the frame carries no text
+             and no lettering on the machines — if a future photograph does, this has to go and the
+             image has to be re-shot for both directions instead. */
+          className="absolute -start-[7.5%] -top-[7.5%] -z-10 h-[115%] w-[115%] max-w-none object-cover rtl:-scale-x-100"
           style={{ objectPosition: "center 55%" }}
         />
         <span
