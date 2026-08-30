@@ -76,6 +76,13 @@ export function HomeRequests() {
   /** Keyed by group id — resolved after the rows are known, so the table paints before the dates do. */
   const [expiry, setExpiry] = useState<Record<string, ExpiryState>>({});
 
+  /** Both cards open in place rather than navigating away (owner, 2026-08-30). They grow to fit every
+   *  row: nothing is hidden behind an inner scrollbar, at the cost of the two cards no longer ending
+   *  level once one is open. That was the explicit choice — a list the renter has to scroll inside a
+   *  box he already scrolled to reach is two scrollbars for one list. */
+  const [allRequests, setAllRequests] = useState(false);
+  const [allBids, setAllBids] = useState(false);
+
   useEffect(() => {
     let live = true;
     void fetchAllMyRequests()
@@ -94,7 +101,17 @@ export function HomeRequests() {
   useEffect(() => {
     if (!groups) return;
     let live = true;
-    for (const g of groups.slice(0, SHOWN)) {
+    // Seed every row from `expiresAt`, which the list payload already carries — no call, no wait, and
+    // no dash on a request that has a perfectly good deadline. The lookups below can only refine this.
+    setExpiry((prev) => {
+      const seeded = { ...prev };
+      for (const g of groups) {
+        if (seeded[g.id] || !g.expiresAt) continue;
+        seeded[g.id] = expiryState(requestExpiry({ expiresAt: g.expiresAt, createdAt: g.createdAt }));
+      }
+      return seeded;
+    });
+    for (const g of (allRequests ? groups : groups.slice(0, SHOWN))) {
       const first = g.items[0];
       if (!first || groupBiddingClosed(g.items)) continue;
       void (async () => {
@@ -105,29 +122,54 @@ export function HomeRequests() {
           /* the link tracker is optional — fall through to the window */
         }
         let offerDuration: string | null = null;
+        /**
+         * The detail's OWN `expiresAt`, which is where this date actually lives (owner, 2026-08-30:
+         * *"why closes in request table still doesn't show anything"*).
+         *
+         * This call was already being made and only `offerDuration` was read off it — while
+         * `expiresAt`, the one field that answers the question, was taken from the LIST row instead
+         * and was null there. The mobile app reads it from exactly this response
+         * (`supplier_request_detail_page.dart:427`, `detail['expiresAt']`) and from no list, which
+         * is the tell: the list payload does not carry it.
+         *
+         * So all three sources came up empty and the column drew nothing on every row. Most renters
+         * never set a link deadline; `offerDuration` is null on every request in staging, as
+         * `request-expiry.ts` records in its own note. The seeding above still stands — it costs no
+         * call, and it will start answering the day the list payload does carry the field.
+         */
+        let detailExpiresAt: string | null = null;
         if (!bidDeadline) {
           try {
             const detail = await fetchRequestDetail(first.id);
             offerDuration = typeof detail.offerDuration === "string" ? detail.offerDuration : null;
+            detailExpiresAt = typeof detail.expiresAt === "string" ? detail.expiresAt : null;
           } catch {
             /* no window either — the row simply shows no date */
           }
         }
         if (!live) return;
-        const state = expiryState(requestExpiry({ bidDeadline, createdAt: g.createdAt, offerDuration }));
+        const state = expiryState(
+          requestExpiry({
+            bidDeadline,
+            // The detail's value first: the list's is a roll-up of a field the list may not carry.
+            expiresAt: detailExpiresAt ?? g.expiresAt,
+            createdAt: g.createdAt,
+            offerDuration,
+          }),
+        );
         setExpiry((prev) => ({ ...prev, [g.id]: state }));
       })();
     }
     return () => {
       live = false;
     };
-  }, [groups]);
+  }, [groups, allRequests]);
 
   if (groups && !groups.length) return null;
 
-  const rows = (groups ?? []).slice(0, SHOWN);
+  const rows = allRequests ? (groups ?? []) : (groups ?? []).slice(0, SHOWN);
   const fresh = bids.reduce((n, b) => n + (b.unreadCount || 0), 0);
-  const newest = bids.slice(0, BIDS_SHOWN);
+  const newest = allBids ? bids : bids.slice(0, BIDS_SHOWN);
   const restBids = Math.max(0, bids.length - BIDS_SHOWN);
 
   const money = (n: number | null): string => (n == null ? "—" : Math.round(n).toLocaleString("en-US"));
@@ -300,11 +342,12 @@ export function HomeRequests() {
           {groups && groups.length > SHOWN && (
             <button
               type="button"
-              onClick={() => router.push("/requests")}
+              onClick={() => setAllRequests((v) => !v)}
+              aria-expanded={allRequests}
               className="flex flex-none items-center justify-center gap-1 border-t border-border bg-surface2 py-1.5 text-label font-extrabold text-muted-dark transition hover:bg-surface3 hover:text-navy"
             >
-              {fmt(t.home.moreRequests, { n: String(groups.length - SHOWN) })}
-              <span aria-hidden="true">{ar ? "‹" : "›"}</span>
+              <Icon name={allRequests ? "keyboard_arrow_up" : "keyboard_arrow_down"} size={14} />
+              {allRequests ? t.home.showFewer : fmt(t.home.moreRequests, { n: String(groups.length - SHOWN) })}
             </button>
           )}
         </div>
@@ -350,10 +393,15 @@ export function HomeRequests() {
               becomes true — and it states the REMAINDER, since «5 shown» is a fact about the box and
               «13 more» is a fact about the renter's bids. */}
           {restBids > 0 && (
-            <div className="flex flex-none items-center justify-center gap-1 border-t border-border bg-surface2 py-1.5 text-label font-extrabold text-muted-dark">
-              <Icon name="keyboard_arrow_down" size={14} />
-              {fmt(t.home.moreBidsBelow, { n: String(restBids) })}
-            </div>
+            <button
+              type="button"
+              onClick={() => setAllBids((v) => !v)}
+              aria-expanded={allBids}
+              className="flex flex-none items-center justify-center gap-1 border-t border-border bg-surface2 py-1.5 text-label font-extrabold text-muted-dark transition hover:bg-surface3 hover:text-navy"
+            >
+              <Icon name={allBids ? "keyboard_arrow_up" : "keyboard_arrow_down"} size={14} />
+              {allBids ? t.home.showFewer : fmt(t.home.moreBidsBelow, { n: String(restBids) })}
+            </button>
           )}
         </aside>
       </div>
