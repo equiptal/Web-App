@@ -358,9 +358,45 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     }
   }
 
-  // Embedded, a renter with no sites sees exactly today's dashboard. Standalone, the empty state is
-  // the point of the page, so it still renders.
-  if (embedded && (!projects || projects.length === 0)) return null;
+  /**
+   * Embedded with no sites yet: one quiet row, not the whole board and not nothing.
+   *
+   * Rendering nothing here was a dead end — the only *New project* control lives inside the board
+   * below, so a renter with no sites could never make their first one. An empty block competing
+   * with the dashboard's hero was the thing to avoid; a feature nobody can start is worse.
+   *
+   * So it is a single line with the action on it, and it disappears the moment there is a real site
+   * to show instead.
+   */
+  if (embedded && projects && projects.length === 0) {
+    return (
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-dashed border-border px-4 py-3">
+        <span className="min-w-0">
+          <span className="block text-body font-semibold text-navy">{t.projects.surface.heading}</span>
+          <span className="block text-meta text-muted">{t.projects.surface.empty}</span>
+        </span>
+        <Button variant="secondary" onClick={() => setEditing({ id: null, value: emptyProjectForm() })}>
+          <Icon name="add" size={15} /> {t.projects.surface.newProject}
+        </Button>
+
+        {/* The form still has to be reachable from here, or the button does nothing. */}
+        <Dialog open={!!editing} onClose={() => setEditing(null)} title={t.projects.surface.newProject}>
+          {editing && (
+            <ProjectForm
+              value={editing.value}
+              onChange={(value) => setEditing((cur) => (cur ? { ...cur, value } : cur))}
+              onCancel={() => setEditing(null)}
+              onSave={(value, applyTo) => void save(value, applyTo)}
+              saving={saving}
+            />
+          )}
+        </Dialog>
+      </section>
+    );
+  }
+
+  // Still loading: nothing, rather than a flash of an empty state that is about to be wrong.
+  if (embedded && !projects) return null;
 
   return (
     <div className="flex flex-col gap-5">
