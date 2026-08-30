@@ -915,9 +915,6 @@ export const en = {
     companyRejectedBody: "Your submission wasn't approved. You can adjust your details and resubmit.",
     companyCta: "Start verification",
     companyResubmit: "Review & resubmit",
-    // Rewards
-    rewards: "Rewards & referrals",
-    comingSoon: "Coming soon",
     // Edit form
     firstName: "First name",
     lastName: "Last name",

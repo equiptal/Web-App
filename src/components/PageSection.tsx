@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Icon } from "@/components/ui";
+import { cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 
 /**
@@ -80,14 +81,22 @@ export function PageMasthead({
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <p className={`truncate text-title font-extrabold leading-tight ${plain ? "text-navy" : ""}`}>{title}</p>
+          {/* ── The badge is ON THE NAME (owner, 2026-08-30) ───────────────────────────────
+              ~~Under the name on the navy tone, and out at the row's trailing edge on the plain
+              one.~~ Both withdrawn. Out at the edge it was a floating pill with nothing under it,
+              separated from the only thing it is about by the whole width of the page — on a wide
+              account page that is 1200px of white between «EQ Rental» and «VERIFIED». Beneath the
+              subtitle it read as a fact about the subtitle.
+
+              Verified is a fact about the NAME, so it sits against it, the way a tick sits on a
+              handle. `min-w-0` on the name and `flex-none` on the badge, so a long company name
+              truncates and the badge never does. */}
+          <span className="flex items-center gap-2">
+            <span className={`min-w-0 truncate text-title font-extrabold leading-tight ${plain ? "text-navy" : ""}`}>{title}</span>
+            {badge && <span className="flex-none">{badge}</span>}
+          </span>
           {subtitle && <p className={`mt-0.5 truncate text-meta ${plain ? "text-muted" : "text-white/65"}`}>{subtitle}</p>}
-          {/* On the plain tone the badge takes the trailing edge instead of a third line under the
-              name: there is no dark field for it to sit quietly on, so beneath the subtitle it read
-              as a fact ABOUT the subtitle. */}
-          {badge && !plain && <span className="mt-2 inline-flex items-center gap-1">{badge}</span>}
         </div>
-        {badge && plain && <span className="flex-none">{badge}</span>}
       </div>
       {children && <div className="mt-4 flex flex-wrap gap-2">{children}</div>}
     </div>
@@ -134,6 +143,7 @@ export function Section({
   children,
   /** Off when the children draw their own boxes — a roster of rows, say. */
   boxed = true,
+  grow = false,
 }: {
   title?: ReactNode;
   hint?: ReactNode;
@@ -141,9 +151,24 @@ export function Section({
   action?: ReactNode;
   children: ReactNode;
   boxed?: boolean;
+  /**
+   * **This card takes the slack in its column** (owner, 2026-08-30).
+   *
+   * *"I want both columns in each page to have same length, same start and same end — fit both to
+   * the highest bound a card can reach in its height depending on content."*
+   *
+   * A two-column page ends level only if something absorbs the difference. The grid stretches both
+   * columns to the taller one's height; this is the card in each that grows into what is left, so
+   * the shorter column ends where the taller one does instead of stopping short with a strip of
+   * page under it.
+   *
+   * Set it on the card that can USE the height — a roster, a grid of fields — never on a card of
+   * one row, which would grow into a mostly-empty box. The column it sits in must be a flex column.
+   */
+  grow?: boolean;
 }) {
   return (
-    <section {...pin("page-section")} className="mt-5 first:mt-0">
+    <section {...pin("page-section")} className={cx("mt-5 first:mt-0", grow && "flex min-h-0 flex-1 flex-col")}>
       {(title || action) && (
         <div className="mb-2 flex items-end justify-between gap-3 px-1">
           <div className="min-w-0">
@@ -153,7 +178,7 @@ export function Section({
           {action && <div className="flex-none">{action}</div>}
         </div>
       )}
-      {boxed ? <div className={CARD}>{children}</div> : children}
+      {boxed ? <div className={cx(CARD, grow && "flex-1")}>{children}</div> : children}
     </section>
   );
 }

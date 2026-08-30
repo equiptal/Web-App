@@ -840,8 +840,6 @@ export const ar: Dictionary = {
     companyRejectedBody: "لم تتم الموافقة على طلبك. يمكنك تعديل بياناتك وإعادة الإرسال.",
     companyCta: "بدء التوثيق",
     companyResubmit: "مراجعة وإعادة الإرسال",
-    rewards: "المكافآت والإحالات",
-    comingSoon: "قريباً",
     firstName: "الاسم الأول",
     lastName: "اسم العائلة",
     city: "المدينة",

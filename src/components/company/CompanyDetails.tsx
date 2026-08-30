@@ -29,7 +29,11 @@ type CompanyInfo = {
   docs: { crDocUrl: string | null; vatDocUrl: string | null; nationalAddressDocUrl: string | null } | null;
 };
 
-export function CompanyDetails() {
+export function CompanyDetails({ grow = false }: {
+  /** Take the slack in this column, so the two columns of `/company` end level — see `Section.grow`.
+   *  The papers can use the height: the space lands under the documents, inside the card. */
+  grow?: boolean;
+} = {}) {
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
@@ -119,7 +123,7 @@ export function CompanyDetails() {
    * hairline — the facts above, the files below, each in the shape that suits it.
    */
   return (
-    <Section title={t.profile.companyVerifiedTitle}>
+    <Section title={t.profile.companyVerifiedTitle} grow={grow}>
       <FieldGrid>
         {facts.map((f) => (
           <Field key={f.label} icon={f.icon} label={f.label} value={f.value} />

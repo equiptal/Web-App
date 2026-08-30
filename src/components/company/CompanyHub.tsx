@@ -519,7 +519,7 @@ function ActiveCompany({
           </Section>
         )}
   
-        <Section title={c.team}>
+        <Section title={c.team} grow>
           {company.isOwner && company.inviteCode && (
             <div className="p-4 pb-0">
               <InviteCodeCard code={company.inviteCode} onCopied={onCopied} />
@@ -582,19 +582,23 @@ function ActiveCompany({
           it* are the page's two subjects, and stacking them made a reader scroll past the whole of
           one to reach the other on a screen with room for both.
 
-          `items-start`, so a short column stops where its content stops rather than stretching a
-          card's border down to match its neighbour.
+          ~~`items-start`, so a short column stops where its content stops.~~ Withdrawn (owner,
+          2026-08-30): *"I want both columns to have same length, same start and same end."* The
+          columns stretch to the taller one now, and one card in each is marked `grow` so it takes
+          the difference — the papers on the left, the roster on the right, both of which can use
+          the height. A column that stopped short left a strip of page under it beside a card that
+          ran on, which read as one of the two having failed to load.
 
           The split is gated on `isVerified` because that is exactly the condition the left column
           has anything to say under — `CompanyDetails` draws nothing for a firm with no verified
           submission, and a two-column grid with an empty half is worse than the single column it
           replaced. An unverified active company keeps the one column, with the team in it. */}
       {company.isVerified ? (
-        <div className="mt-5 grid items-start gap-5 lg:grid-cols-2">
-          <div className="min-w-0">
-            <CompanyDetails />
+        <div className="mt-5 grid gap-5 lg:grid-cols-2">
+          <div className="flex min-w-0 flex-col">
+            <CompanyDetails grow />
           </div>
-          <div className="min-w-0">{team}</div>
+          <div className="flex min-w-0 flex-col">{team}</div>
         </div>
       ) : (
         team

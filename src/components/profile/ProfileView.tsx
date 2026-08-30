@@ -176,10 +176,14 @@ export function ProfileView() {
           masthead and the verify nudge stay full width above: one is who the page is about, the
           other is the one thing on it that should not have to be found.
 
-          `items-start` so a short column ends where its content does, rather than a card's border
-          being stretched down to match its neighbour. */}
-      <div className="mt-5 grid items-start gap-5 lg:grid-cols-2">
-        <div className="min-w-0">
+          ~~`items-start` so a short column ends where its content does.~~ Withdrawn the same day:
+          *"I want both columns to have same length, same start and same end."* The columns stretch
+          to the taller of the two, and one card in each is marked `grow` so it absorbs the
+          difference — the field grid on the left, the settings rows on the right, both of which can
+          use the height. A column that stopped short left a strip of page under it beside a card
+          that ran on, which read as one of the two having failed to load. */}
+      <div className="mt-5 grid gap-5 lg:grid-cols-2">
+        <div className="flex min-w-0 flex-col">
         {!loading && profile && (
           <Section
             // The section names the SUBJECT and its action names the act; both read «Edit profile»
@@ -257,21 +261,17 @@ export function ProfileView() {
         )}
         </div>
 
-        <div className="min-w-0">
-        {/* Rewards — coming soon (grayed, app parity). */}
-        {!loading && (
-          <Section>
-            <div className="opacity-70">
-              <Row icon="star" label={p.rewards} hint={p.comingSoon} chevron={false} />
-            </div>
-          </Section>
-        )}
+        <div className="flex min-w-0 flex-col">
+        {/* ~~«Rewards & referrals — coming soon».~~ Removed (owner, 2026-08-30). A greyed row for a
+            thing that does not exist is a promise with no date on it: it took a card's worth of the
+            settings column, could not be pressed, and told the reader nothing they could act on. It
+            comes back when there is a rewards page to send them to. */}
 
         {/* SETTINGS is what the account menu calls this page, so it is a titled section OF it rather
             than a separate destination (owner, 2026-08-26). */}
         {!loading && (
           <>
-            <Section title={p.settings}>
+            <Section title={p.settings} grow>
               <RowList>
                 <Row icon="language" label={p.language} hint={ar ? p.arabic : p.english} chevron={false}>
                   <span className="flex flex-none overflow-hidden rounded-sm border border-border">
