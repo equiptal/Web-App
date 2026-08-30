@@ -10,8 +10,9 @@ import type { Taxonomy } from "@/lib/contract/taxonomy";
  * project exists.** A project does not make a parse cheaper — a paragraph is a paragraph either way.
  * What a project changes is that the renter no longer has to write the paragraph.
  *
- * The one thing a project does decide: Tier 1 answers with no header, so without a site there is
- * nothing to fill one from and the full path is the only correct answer.
+ * The one thing a project decides: Tier 1 needs one, Tier 0 does not. Tier 0 answers only when it
+ * consumed the whole line, so there is no header in it either way; Tier 1 fires on LEFTOVER words,
+ * which might be the header, and without a project nothing else would supply them.
  */
 
 const TAX: Taxonomy = [
@@ -52,10 +53,18 @@ describe("which path the text takes", () => {
     expect(decideTier({ ...base, text: long }).tier).toBe(2);
   });
 
-  it("no site → Tier 2, even for one clean line", () => {
-    // Tier 1 answers with no header. Without a project there is nothing to fill one from, so the
-    // renter gets exactly today's behaviour.
+  it("no site is NO obstacle to Tier 0 — this is the launch-day case", () => {
+    // The line is fully consumed, so there is no header in it for a model to find. The full path
+    // would return the same empty header four seconds later. Gating this on a project made
+    // "2 forklifts" slow for every renter who has not set one up yet.
     const d = decideTier({ ...base, hasProject: false, text: "2 crawler excavators 20t" });
+    expect(d.tier).toBe(0);
+  });
+
+  it("no site DOES stop Tier 1, because the leftovers might be the header", () => {
+    // "for two weeks" is a duration the equipment-only prompt would drop, and with no project
+    // nothing else supplies it. Losing something the renter typed is not worth a second.
+    const d = decideTier({ ...base, hasProject: false, text: "2 crawler excavators 20t for two weeks" });
     expect(d.tier).toBe(2);
     expect(d.reason).toBe("no_project");
   });
