@@ -30,15 +30,16 @@ import { pin } from "@/lib/uiPins";
  */
 export function BidCards({
   bids,
-  selectedId,
+  checked,
   unreadByBid,
   submissionsByBid,
   durationDays,
   startDate,
-  onSelect,
+  onToggle,
 }: {
   bids: WorkspaceBid[];
-  selectedId: string | null;
+  /** The bids ticked for the quotation download. */
+  checked: Set<string>;
   /** The request's duration and start date — what the rental is prorated across. */
   durationDays: number | null;
   startDate: string | null;
@@ -46,7 +47,7 @@ export function BidCards({
   unreadByBid: Record<string, number>;
   /** The raw submission behind an off-platform card, for the viewer. */
   submissionsByBid: Record<string, LinkBidSubmission>;
-  onSelect: (bidId: string) => void;
+  onToggle: (bidId: string) => void;
 }) {
   const t = useT();
 
@@ -62,27 +63,34 @@ export function BidCards({
   }
 
   return (
-    /* ── A card is as tall as what is in it (owner, 2026-08-28) ──────────────────────────────────
-       ~~`items-stretch`, so every card takes the pane's full height and they end on one line.~~ What
-       that produced was a bid with nothing left to say holding a column of empty white between its
-       total and its button, because FOUR things pulled the card open at once: the row stretched it,
-       the card was capped to the pane, the money block took `flex-1` of the leftover and could
-       scroll to hide it, and the footer was pushed down by `mt-auto`. Removing any one of them
-       leaves the gap; this removes all four.
+    /* ── One height for every card: the tallest card's (owner, 2026-08-30) ───────────────────────
+       Three settings have been tried here, and only the third is right.
 
-       `items-start` and each card ends where its content does. They no longer line up along the
-       bottom, which is the trade — a short bid now looks short, which is the true thing about it. */
-    <div {...pin("workspace-bid-cards")} className="flex h-full snap-x items-start gap-5 overflow-x-auto p-3">
+         1. `h-full` + `items-stretch` + `max-h-full` on the card — every card took the PANE's
+            height, so a short bid held a column of empty white between its total and its button.
+         2. `items-start` — each card ended where its content did, so the «Counter this price»
+            buttons stepped down the row and no two lined up.
+         3. THIS. `items-stretch` with NO height on the row: a flex line's cross size is its tallest
+            item, so the row is as tall as the fullest card and every card stretches to exactly
+            that. Nothing is capped to the pane, so nothing scrolls inside a card, and no card is
+            taller than the most it could ever have to say.
+
+       The slack a shorter card now carries sits above its footer, because the footer is `mt-auto`.
+       That is the point: the buttons line up. A card whose neighbour says «Priced on 1 of the 3
+       units offered» and which has nothing of the kind to say is genuinely shorter, and the only
+       question is where its spare room goes — under the price, or under the button. Under the price
+       is the answer that keeps the row readable across. */
+    <div {...pin("workspace-bid-cards")} className="flex snap-x items-stretch gap-5 overflow-x-auto p-3">
       {bids.map((b) => (
         <BidCardTile
           key={b.card.id}
           bid={b}
-          selected={b.card.id === selectedId}
+          selected={checked.has(b.card.id)}
           unread={unreadByBid[b.card.id] ?? 0}
           submission={submissionsByBid[b.card.id] ?? null}
           durationDays={durationDays}
           startDate={startDate}
-          onSelect={() => onSelect(b.card.id)}
+          onSelect={() => onToggle(b.card.id)}
         />
       ))}
     </div>
@@ -248,12 +256,14 @@ function BidCardTile({
   };
 
   return (
+    /* Not a control (owner, 2026-08-30: *"clicking on a card doesn't make anything"*). It carried
+       `onClick` and `cursor-pointer`, so it invited a press that only ever narrowed the quotation
+       download — an effect with no sign of itself anywhere on the card. The checkbox in the header
+       does that job now, and says so. What is left here is a container: no click, no pointer, and
+       the ring only when it IS checked. */
     <article {...pin("bid-card")}
-      onClick={onSelect}
-      className={`flex w-[344px] max-w-full flex-none snap-start cursor-pointer flex-col overflow-hidden rounded-lg border bg-surface transition ${
-        selected
-          ? "border-brand"
-          : "border-border hover:border-navy-mid/40"
+      className={`flex w-[344px] max-w-full flex-none snap-start flex-col overflow-hidden rounded-lg border bg-surface transition ${
+        selected ? "border-brand" : "border-border"
       }`}
     >
       {/* Where it came from, and when. */}
@@ -263,6 +273,17 @@ function BidCardTile({
         }`}
       >
         <span className="inline-flex items-center gap-2">
+          {/* A real `<input type=checkbox>`, not a styled span: it is the thing that decides what the
+              download contains, so it has to be reachable by keyboard and readable by a screen
+              reader without any of that being rebuilt by hand. `accent-brand` paints the native
+              control in the app's orange, which is all the styling it needs. */}
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onSelect}
+            aria-label={L(`Include ${card.supplierName} in the download`, `أدرج ${card.supplierName} في التنزيل`)}
+            className="size-3.5 flex-none cursor-pointer accent-brand"
+          />
           <Icon name={offline ? "drive_file_move" : "verified_user"} size={14} />
           {offline ? t.workspace.sourceOfflineLong : t.workspace.sourceAppLong}
         </span>
@@ -501,10 +522,11 @@ function BidCardTile({
         </div>
       </div>
 
-      {/* The way on. */}
-      {/* ~~`mt-auto`.~~ It pushed the way on to the bottom of a card taller than its content; with
-          the card sized to its content there is no gap left for it to cross. */}
-      <div className="flex flex-none gap-2 px-3.5 pb-3.5 pt-0.5">
+      {/* The way on, at the foot of every card.
+          `mt-auto` is back and now earns it: the cards are stretched to a COMMON height rather than
+          to the pane, so the slack it crosses is only ever the difference between this card and the
+          fullest one. That is what puts the buttons on one line. */}
+      <div className="mt-auto flex flex-none gap-2 px-3.5 pb-3.5 pt-0.5">
         {offline ? (
           <>
             {/* ── Invite him onto the app (owner, 2026-08-25) ────────────────────────────────────

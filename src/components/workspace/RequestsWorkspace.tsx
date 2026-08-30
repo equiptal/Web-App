@@ -215,6 +215,26 @@ export function RequestsWorkspace() {
   const pickItem = useCallback((id: string) => setWanted((w) => ({ groupId: w.groupId, itemId: id, bidId: null })), []);
   const pickBid = useCallback((bidId: string) => setWanted((w) => ({ groupId: w.groupId, itemId: w.itemId, bidId })), []);
 
+  /**
+   * Which bids the quotation download covers — by TICK, not by click (owner, 2026-08-30).
+   *
+   * It used to read `resolved.bidId`, the single bid a card-click set. That made the card a control
+   * whose only effect was invisible: pressing one silently narrowed a download the renter had not
+   * asked for yet, and there was no way to pick two. A checkbox says what it does and lets him take
+   * three of the five.
+   *
+   * `resolved.bidId` is untouched — the comparison matrix still uses it to decide which column is
+   * the subject, which is a genuinely single-valued question. Only the download changed hands.
+   */
+  const [checkedBids, setCheckedBids] = useState<Set<string>>(new Set());
+  const toggleBid = useCallback((bidId: string) => {
+    setCheckedBids((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(bidId)) next.add(bidId);
+      return next;
+    });
+  }, []);
+
 
   /**
    * Requests this device has taken off the rail (owner, 2026-08-27) — closed ones only, and hidden
@@ -282,6 +302,17 @@ export function RequestsWorkspace() {
   );
   /** Everything the filter allows, benched or not — what the matrix needs to draw the bench itself. */
   const shownAll = useMemo(() => filterBySource(bids, source), [bids, source]);
+
+  // A tick on a bid that is no longer on screen — the item changed, the source filter moved — must
+  // not silently ride along into the next download.
+  const shownIds = shown.map((b) => b.card.id).join(",");
+  useEffect(() => {
+    const live = new Set(shownIds.split(",").filter(Boolean));
+    setCheckedBids((prev) => {
+      const next = new Set([...prev].filter((id) => live.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [shownIds]);
   const counts = useMemo(() => sourceCounts(bids), [bids]);
   /* ~~The picked bid's card.~~ The strip drew it above the tabs — the machine offered, its yard
      ribbon, its fact chips — which is the bid card's own job, done twice. With the strip gone
@@ -305,7 +336,10 @@ export function RequestsWorkspace() {
    */
   const downloadQuotation = useCallback(async () => {
     if (typeof window === "undefined" || !item || shown.length === 0) return;
-    const chosen = resolved.bidId ? shown.filter((b) => b.card.id === resolved.bidId) : shown;
+    // Ticked bids, or every bid on screen when none is ticked. "None ticked" is the renter asking
+    // for the lot, not for nothing — the button is «Download quotation», and a download that
+    // silently produced an empty file would be the worse reading.
+    const chosen = checkedBids.size > 0 ? shown.filter((b) => checkedBids.has(b.card.id)) : shown;
     if (chosen.length === 0) return;
 
     const [rec, me] = await Promise.all([
@@ -381,7 +415,7 @@ export function RequestsWorkspace() {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
-  }, [ar, item, shown, resolved.bidId, fetchedCode, tier]);
+  }, [ar, item, shown, checkedBids, fetchedCode, tier]);
 
   const printComparison = useCallback(() => {
     if (typeof window === "undefined" || !item || shown.length === 0) return;
@@ -572,7 +606,14 @@ export function RequestsWorkspace() {
               onClick={() => (tab === "compare" ? printComparison() : void downloadQuotation())}
               className={btn("secondary", "lg", { className: "whitespace-nowrap transition" })}
             >
-              {tab === "compare" ? t.workspace.exportComparison : t.workspace.downloadQuotation}{" "}
+              {tab === "compare" ? t.workspace.exportComparison : t.workspace.downloadQuotation}
+              {/* The count, only once a tick narrows it. Silent while the button means "all of
+                  them", because a number there would read as a limit the renter had set. */}
+              {tab === "cards" && checkedBids.size > 0 && (
+                <span className="rounded-full bg-navy px-1.5 text-label font-semibold leading-[18px] text-white">
+                  {checkedBids.size}
+                </span>
+              )}{" "}
               <Icon name="download" size={14} />
             </button>
           </div>
@@ -644,12 +685,12 @@ export function RequestsWorkspace() {
           {tab === "cards" ? (
             <BidCards
               bids={shown}
-              selectedId={resolved.bidId}
+              checked={checkedBids}
               unreadByBid={unreadByBid}
               submissionsByBid={submissionsByBid}
               durationDays={item?.durationDays ?? null}
               startDate={item?.startDate ?? null}
-              onSelect={pickBid}
+              onToggle={toggleBid}
             />
           ) : (
             <CompareMatrix
