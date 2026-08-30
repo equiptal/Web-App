@@ -39,13 +39,13 @@ type RawProject = {
   locationLabel: string;
   locationLat: number | null;
   locationLng: number | null;
+  /** FLAT, and the basis is the request enum — this stands in for the wire, so it is the wire's
+   *  shape. A nested `timing` here would let the adapters pass in dev and 422 in production. */
   defaults: {
-    timing: {
-      rentalBasis: string | null;
-      extendable: boolean;
-      startDate: string | null;
-      endDate: string | null;
-    };
+    rentalBasis: string | null;
+    extendable: boolean;
+    startDate: string | null;
+    endDate: string | null;
     paymentTerms: string | null;
   };
   version: number;
@@ -103,7 +103,10 @@ const projects: RawProject[] = [
     locationLat: 24.6408,
     locationLng: 46.5731,
     defaults: {
-      timing: { rentalBasis: "monthly", extendable: true, startDate: "2026-09-01", endDate: "2026-12-31" },
+      rentalBasis: "MONTHLY",
+      extendable: true,
+      startDate: "2026-09-01",
+      endDate: "2026-12-31",
       paymentTerms: "net-30",
     },
     version: 4,
@@ -130,7 +133,10 @@ const projects: RawProject[] = [
     locationLat: 28.0,
     locationLng: 35.3,
     defaults: {
-      timing: { rentalBasis: "monthly", extendable: false, startDate: "2026-03-01", endDate: "2026-07-31" },
+      rentalBasis: "MONTHLY",
+      extendable: false,
+      startDate: "2026-03-01",
+      endDate: "2026-07-31",
       paymentTerms: "net-60",
     },
     version: 1,
@@ -176,7 +182,7 @@ const machines: RawMachine[] = [
  * than being clipped off its edge (see `chartSpan`).
  */
 function span(p: RawProject): { firstStart: string | null; lastEnd: string | null } {
-  const dates = [p.defaults.timing.startDate, p.defaults.timing.endDate];
+  const dates = [p.defaults.startDate, p.defaults.endDate];
   for (const m of machines.filter((x) => x.projectId === p.id)) dates.push(m.startDate, m.endDate);
   for (const list of [...Object.values(p.awards.requests), ...Object.values(p.awards.workOrderItems)]) {
     for (const a of list) dates.push(a.mobilizedAt, a.demobilizedAt);
@@ -257,9 +263,13 @@ export function createProjectFixture(body: ProjectBody) {
     locationLabel: body.location?.label ?? "",
     locationLat: body.location?.lat ?? null,
     locationLng: body.location?.lng ?? null,
-    defaults: body.defaults ?? {
-      timing: { rentalBasis: null, extendable: false, startDate: null, endDate: null },
+    defaults: {
+      rentalBasis: null,
+      extendable: false,
+      startDate: null,
+      endDate: null,
       paymentTerms: null,
+      ...(body.defaults ?? {}),
     },
     version: 1,
     awards: { requests: {}, workOrderItems: {} },

@@ -188,8 +188,13 @@ const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? 
  * older deploy is not corrupt — it is just older.
  */
 export function mapProject(raw: Record<string, unknown>): Project {
+  // The wire's `defaults` is FLAT — rentalBasis · extendable · startDate · endDate · paymentTerms —
+  // and its basis is the request enum (`MONTHLY`), because a site default that cannot be expressed
+  // as a request would be a default nothing can use. `timing` is this app's own grouping and never
+  // crosses the wire; `.strict()` on the backend rejects it outright, which is a 422 and not a
+  // dropped field, so the two shapes cannot quietly drift.
   const d = (raw.defaults ?? {}) as Record<string, unknown>;
-  const t = (d.timing ?? {}) as Record<string, unknown>;
+  const t = d;
   return {
     id: String(raw.id ?? ""),
     title: str(raw.title),
@@ -200,7 +205,7 @@ export function mapProject(raw: Record<string, unknown>): Project {
     },
     defaults: {
       timing: {
-        rentalBasis: (str(t.rentalBasis) as TimingHours["rentalBasis"]) ?? null,
+        rentalBasis: basisFromWire(str(t.rentalBasis)),
         extendable: t.extendable === true,
         startDate: str(t.startDate),
         endDate: str(t.endDate),
@@ -232,16 +237,47 @@ export function projectToPayload(p: Pick<Project, "title" | "location" | "defaul
   return {
     title: (p.title ?? "").trim() || null,
     location: { label: p.location.label, lat: p.location.lat, lng: p.location.lng },
-    defaults: {
-      timing: {
-        rentalBasis: p.defaults.timing.rentalBasis,
-        extendable: p.defaults.timing.extendable,
-        startDate: p.defaults.timing.startDate,
-        endDate: p.defaults.timing.endDate,
-      },
+    // Flat, and only the keys that have a value: the backend's schema is `.strict()`, so an extra
+    // key is a 422 rather than a silently ignored field, and a null where it wants a string is the
+    // same. Omitting is how "not set" is expressed on this wire.
+    defaults: prune({
+      rentalBasis: basisToWire(p.defaults.timing.rentalBasis),
+      extendable: p.defaults.timing.extendable,
+      startDate: p.defaults.timing.startDate,
+      endDate: p.defaults.timing.endDate,
       paymentTerms: p.defaults.paymentTerms,
-    },
+    }),
   };
+}
+
+/** Drop every key whose value is null or empty — see the note in {@link projectToPayload}. */
+function prune(o: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(o)) {
+    if (v === null || v === undefined || v === "") continue;
+    out[k] = v;
+  }
+  return out;
+}
+
+/**
+ * This app's basis (`monthly`) ↔ the wire's (`MONTHLY`).
+ *
+ * The wire uses the `RentalType` enum `equipment_requests` already stores, deliberately: a site
+ * default that could not be expressed as a request would be a default nothing can use.
+ */
+const BASIS_TO_WIRE: Record<string, string> = { daily: "DAILY", weekly: "WEEKLY", monthly: "MONTHLY" };
+
+export function basisToWire(b: string | null | undefined): string | null {
+  return b ? (BASIS_TO_WIRE[b] ?? null) : null;
+}
+
+export function basisFromWire(b: string | null | undefined): TimingHours["rentalBasis"] {
+  if (!b) return null;
+  const hit = Object.entries(BASIS_TO_WIRE).find(([, wire]) => wire === b.toUpperCase());
+  // An enum this app has no control for — PER_JOB, LONG_TERM — reads as unset rather than as a
+  // value no dropdown can show.
+  return (hit?.[0] as TimingHours["rentalBasis"]) ?? null;
 }
 
 
