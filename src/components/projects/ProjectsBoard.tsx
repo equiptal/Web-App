@@ -202,14 +202,6 @@ function SitePanel({
               {titleIsDerived(project) && (
                 <span className="flex-none text-meta font-normal text-muted">{t.projects.board.namedByUs}</span>
               )}
-              <button
-                type="button"
-                onClick={() => onEdit(project)}
-                aria-label={t.common.edit}
-                className="flex-none text-muted transition hover:text-brand"
-              >
-                <Icon name="edit" size={14} />
-              </button>
             </span>
           </Cell>
 
@@ -228,14 +220,47 @@ function SitePanel({
             </span>
           </Cell>
 
-          <Cell label={t.projects.board.firstStart}>{project.firstStart ?? "—"}</Cell>
-          <Cell label={t.projects.board.lastEnd}>{project.lastEnd ?? "—"}</Cell>
+          {/* The SITE's own dates, not a roll-up of what is filed under it (owner, 2026-08-31).
+              *"Show start and end date of the project here — why show empty."* They read as empty
+              because the roll-up had nothing to sum: a site with no requests and no work orders has
+              no first start, while the renter had just typed 1 Sep – 31 Dec into the form and could
+              see the cell contradict them.
+
+              The filed span is kept as the fallback, so a site whose period nobody stated still
+              answers the question from the only evidence there is, and a dash means genuinely
+              nothing is known. */}
+          <Cell label={t.projects.board.start}>{project.defaults.timing.startDate ?? project.firstStart ?? "—"}</Cell>
+          <Cell label={t.projects.board.end}>{project.defaults.timing.endDate ?? project.lastEnd ?? "—"}</Cell>
+
+          {/* What is filed, restored at the owner's request. It is a count, but not one the chart
+              repeats: the chart draws each row, and this says how many there are to expect — which is
+              what tells a renter the board finished loading rather than the site being empty. */}
+          <Cell label={t.projects.board.filedHere}>
+            {t.projects.board.filedCount
+              .replace("{r}", String(project.requestCount))
+              .replace("{w}", String(project.workOrderCount))}
+          </Cell>
         </dl>
       </div>
 
-      {/* Both orange: neither is the lesser act. A work order is a machine already on site and a
-          request goes to suppliers — different destinations, equal standing. */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* The actions, and the pen among them (owner, 2026-08-31).
+          *"Show the pencil edit beside the add work order and the request buttons, not on the
+          title. Make all the action buttons on the right, not left."*
+
+          It sat on the title because that is what it used to edit. It does not — it opens the whole
+          site — so it belongs with the other things you DO to a site rather than decorating its name.
+
+          Both orange: neither is the lesser act. A work order is a machine already on site and a
+          request goes to suppliers — different destinations, equal standing. The pen stays quiet
+          beside them, because editing is not the thing a renter came here to do. */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => onEdit(project)}
+          className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-body font-semibold text-navy-mid transition hover:border-brand hover:text-brand"
+        >
+          <Icon name="edit" size={14} /> {t.common.edit}
+        </button>
         <Button onClick={onNewWorkOrder}>
           <Icon name="handyman" size={14} /> {t.projects.board.addWorkOrder}
         </Button>

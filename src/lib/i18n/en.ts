@@ -1194,7 +1194,6 @@ export const en = {
     eqShowOfferOnly: "Show only what he offered",
     // The divider where the offer ends. It says these are the supplier's, not this offer's — without
     // it the extra cards read as offered machines that were hiding.
-    eqBeyondOffer: "Also in his fleet — not in this offer",
     backToEquipment: "Back to the equipment",
     // What the map is NOT showing, in words. Silence would read as "this supplier has no machines".
     //
@@ -1766,8 +1765,10 @@ export const en = {
       namedByUs: "named by us",
       project: "Project",
       location: "Location",
-      firstStart: "First start",
-      lastEnd: "Last end",
+      start: "Start",
+      end: "End",
+      filedHere: "Filed here",
+      filedCount: "{r} req · {w} WO",
       addWorkOrder: "Add work order",
       newRequest: "New request",
       whatIsHere: "What is on this site",
@@ -1827,13 +1828,11 @@ export const en = {
         titleHint: "Leave it blank and we call it “{fallback}”.",
         whenTitle: "When & terms",
         extendableLabel: "Extendable",
-        extendableYes: "May be extended",
         basis: "Rental basis",
         hours: "Hours per day",
         start: "Start date",
         end: "End date",
         paymentTerms: "Payment terms",
-        paymentHint: "Your finance team's terms — every machine on this site.",
         applyTitle: "What is already on this site",
         applyNote: "Nothing here changes unless you tick it. A request with bids has one edit left, and ticking it spends that edit.",
         stateFree: "no bids — free to edit",
