@@ -32,6 +32,7 @@
  */
 
 import type { RfqDraft, EquipmentItem, ProjectDetails } from "./draft";
+import { defaultProjectDetails } from "./draft";
 import type { MachineTerms } from "./work-order";
 import type { ProjectDefaults } from "./project";
 
@@ -51,6 +52,29 @@ function agentSet(v: unknown): boolean {
   if (typeof v === "string") return v.trim() !== "";
   if (Array.isArray(v)) return v.length === 0 ? false : true;
   return true;
+}
+
+/** Our own seeds, as `agentOutputToDraft` leaves them in the snapshot. */
+const SEED = defaultProjectDetails();
+
+/**
+ * True when the agent really STATED this, as opposed to our seed sitting in the snapshot.
+ *
+ * The snapshot is the draft the adapter produced, not the model's raw output, so a field whose
+ * default IS a value — `hoursPerDay: 10`, `extendable: false` — is always present in it. Read with
+ * {@link agentSet} alone, those fields look agent-supplied on every request, and a project could
+ * never fill them: a site that runs 12-hour days would silently post 10, marked as though the
+ * renter had said so.
+ *
+ * **Known limitation.** A renter who states exactly the seeded value (*"10 hours a day"*) while
+ * their site says 12 is indistinguishable from one who said nothing, so the site wins. The value is
+ * visible and marked *From your project*, so it is correctable rather than hidden — and the honest
+ * fix is for the adapter to record which fields the model actually returned, which is a change to
+ * `agentOutputToDraft` and not to this merge.
+ */
+function agentStated(v: unknown, seed: unknown): boolean {
+  if (!agentSet(v)) return false;
+  return JSON.stringify(v) !== JSON.stringify(seed);
 }
 
 export interface ApplyProjectResult {
@@ -99,7 +123,7 @@ export function applyProjectDefaults(
 
   /* ── When ── */
   const t = defaults.timing;
-  if (!agentSet(a?.timing?.rentalBasis) && t.rentalBasis != null) {
+  if (!agentStated(a?.timing?.rentalBasis, SEED.timing.rentalBasis) && t.rentalBasis != null) {
     next.project.timing.rentalBasis = t.rentalBasis;
     filled.push("timing.rental_basis");
   }
@@ -111,12 +135,13 @@ export function applyProjectDefaults(
     next.project.timing.endDate = t.endDate;
     filled.push("timing.end_date");
   }
-  if (!agentSet(a?.timing?.hoursPerDay) && t.hoursPerDay) {
+  if (!agentStated(a?.timing?.hoursPerDay, SEED.timing.hoursPerDay) && t.hoursPerDay) {
     next.project.timing.hoursPerDay = t.hoursPerDay;
     filled.push("timing.hours_per_day");
   }
-  // `extendable` is a flag on the basis, so it follows the basis rather than standing alone.
-  if (!agentSet(a?.timing?.rentalBasis)) {
+  // `extendable` is a flag on the basis, so it follows the basis rather than standing alone — and
+  // its own seed (`false`) is never evidence the agent said anything.
+  if (!agentStated(a?.timing?.rentalBasis, SEED.timing.rentalBasis)) {
     next.project.timing.extendable = t.extendable;
     filled.push("timing.extendable");
   }

@@ -20,6 +20,9 @@ import {
   postableItems,
 } from "@/lib/contract";
 import { ApiError, ApiErrorKind, fetchTaxonomy, postRfqCorrection, processRfq, submitRequest } from "@/lib/api/client";
+import type { SiteLocation, ProjectDefaults, ProjectSummary } from "@/lib/contract/project";
+import { projectTitle } from "@/lib/contract/project";
+import { applyProjectDefaults } from "@/lib/contract/project-apply";
 import { draftToRfqCorrection } from "@/lib/api/agent-adapters";
 import { useSession } from "@/lib/session";
 
@@ -100,6 +103,29 @@ export interface RfqState {
   isTrial: boolean;
   /** The trial's 60-min expiry, echoed by the backend on submit (null for a real request). */
   trialExpiresAt: string | null;
+
+  /* ── PROJ: the site this request is being written for ─────────────────────────────────── */
+
+  /**
+   * The site picked on the intake screen, held as a **request-local COPY**, never a reference.
+   *
+   * A copy because the pills edit it and the project must not move: change *hrs/day* to 12 here and
+   * Qiddiya still says 10. It is also what makes the feature safe to reason about — nothing flows
+   * back, and nothing flows down again once the copy is taken.
+   *
+   * Chosen BEFORE the agent runs, applied AFTER it returns. The agent is never sent one of these
+   * values and never returns one, so a site's terms cannot come back altered by a model that never
+   * saw them.
+   */
+  project: { id: string; title: string; location: SiteLocation; defaults: ProjectDefaults } | null;
+  /**
+   * Which pills the renter changed on this request. They render as changed, and the fields they
+   * cover read `renter` rather than `project` once the draft exists — once someone has answered a
+   * question, it stops being the site's answer.
+   */
+  projectDirty: string[];
+  /** Provenance only — the work order a template was copied from (W-T9). Changes no rendering. */
+  workOrderGroupId: string | null;
 }
 
 /** Exported alongside {@link reducer} so tests start from the real initial state. */
@@ -127,6 +153,9 @@ export const initialState: RfqState = {
   guestLimit: false,
   isTrial: false,
   trialExpiresAt: null,
+  project: null,
+  projectDirty: [],
+  workOrderGroupId: null,
 };
 
 type Action =
@@ -168,6 +197,11 @@ type Action =
   | { t: "REQUEST_SOURCING"; id: string }
   | { t: "PATCH_PREFERENCES"; patch: DeepPrefPatch }
   | { t: "SET_TRIAL"; isTrial: boolean }
+  | { t: "SELECT_PROJECT"; project: ProjectSummary }
+  | { t: "CLEAR_PROJECT" }
+  | { t: "PATCH_PROJECT_DEFAULTS"; patch: Partial<TimingHours>; keys: string[] }
+  | { t: "PATCH_PROJECT_SITE"; location: SiteLocation }
+  | { t: "SET_WORK_ORDER_SOURCE"; groupId: string | null }
   | { t: "SUBMIT_START" }
   | { t: "SUBMIT_SUCCESS"; requestId: string; requestIds: string[]; requestUuids: string[]; trialExpiresAt?: string | null }
   | { t: "SUBMIT_ERROR"; kind: ApiErrorKind; detail?: RfqState["errorDetail"] }
@@ -232,31 +266,87 @@ export function reducer(state: RfqState, a: Action): RfqState {
       // actually named and nothing more — an item the text said nothing about reaches Step 2 blank,
       // which is now also true of one created by hand.
       const seededItems = a.draft.items;
+      // Snapshot the agent's values (refs are safe — all edits are immutable copies). The SEEDED
+      // items are snapshotted, not the raw ones: the cert seed is our default, not a renter edit, so
+      // comparing against the raw items would mark every draft "edited" and fire a spurious
+      // web_review correction on every submit.
+      const origin = { project: a.draft.project, items: seededItems };
+
+      const parsed: RfqDraft = {
+        rfqId: a.draft.rfqId ?? null, // A5: anchor for the web_review correction fired at submit
+        project: a.draft.project,
+        items: seededItems,
+        preferences: a.draft.preferences ?? defaultPreferences(), // agent-inferred Step-3 prefs when present
+        detectedLocations: a.draft.detectedLocations,
+        summary: a.draft.summary,
+        justifications: a.draft.justifications ?? [],
+        fieldNotes: a.draft.fieldNotes ?? {},
+        // MREQ-AC-59 — a freshly parsed draft has been touched by nobody. Every value on it came
+        // from the agent or from our own seeds, and the canvas says so on each control.
+        touchedFields: [],
+      };
+
+      /* PROJ — the merge happens HERE: in the browser, after the parse, never before it.
+         `applyProjectDefaults` leaves alone every field the agent filled, so a renter who wrote
+         "from Oct 1" keeps October even though the site says 1 September. A pill they already
+         changed carries into `touchedFields`, so it reads as theirs and not as the site's. */
+      const draft: RfqDraft = state.project
+        ? (() => {
+            const applied = applyProjectDefaults(parsed, state.project.defaults, state.project.location, origin);
+            return {
+              ...applied.draft,
+              projectId: state.project.id,
+              workOrderGroupId: state.workOrderGroupId,
+              projectFields: applied.filled,
+              touchedFields: state.projectDirty,
+            };
+          })()
+        : parsed;
+
+      return { ...state, busy: false, error: null, draft, agentOrigin: origin, multiLocationDismissed: false };
+    }
+    /* ── PROJ ───────────────────────────────────────────────────────────────────
+       Selecting COPIES the site's values in; it never holds a reference. The pills edit that copy,
+       so changing hrs/day here cannot move the project.
+
+       Deselecting drops the copy WHOLE (PROJ-AC-26). There is no half state in which some prefills
+       outlive a project the renter has removed - which is the failure a partial reset would
+       produce, and the renter would have no way to see it. */
+    case "SELECT_PROJECT":
       return {
         ...state,
-        busy: false,
-        error: null,
-        draft: {
-          rfqId: a.draft.rfqId ?? null, // A5: anchor for the web_review correction fired at submit
-          project: a.draft.project,
-          items: seededItems,
-          preferences: a.draft.preferences ?? defaultPreferences(), // agent-inferred Step-3 prefs when present
-          detectedLocations: a.draft.detectedLocations,
-          summary: a.draft.summary,
-          justifications: a.draft.justifications ?? [],
-          fieldNotes: a.draft.fieldNotes ?? {},
-          // MREQ-AC-59 — a freshly parsed draft has been touched by nobody. Every value on it came
-          // from the agent or from our own seeds, and the canvas says so on each control.
-          touchedFields: [],
+        project: {
+          id: a.project.id,
+          title: projectTitle(a.project),
+          location: { ...a.project.location },
+          defaults: { timing: { ...a.project.defaults.timing }, paymentTerms: a.project.defaults.paymentTerms },
         },
-        // Snapshot the agent's values (refs are safe — all edits are immutable copies). The SEEDED
-        // items are snapshotted, not the raw ones: the cert seed is our default, not a renter edit, so
-        // comparing against the raw items would mark every draft "edited" and fire a spurious
-        // web_review correction on every submit.
-        agentOrigin: { project: a.draft.project, items: seededItems },
-        multiLocationDismissed: false,
+        projectDirty: [],
       };
-    }
+    case "CLEAR_PROJECT":
+      return { ...state, project: null, projectDirty: [], workOrderGroupId: null };
+    /* A pill edit. `keys` are the dotted paths it covers, recorded so the field reads `renter` on
+       the canvas afterwards rather than `project` - once someone answers a question it stops being
+       the site's answer. */
+    case "PATCH_PROJECT_DEFAULTS":
+      if (!state.project) return state;
+      return {
+        ...state,
+        project: {
+          ...state.project,
+          defaults: { ...state.project.defaults, timing: { ...state.project.defaults.timing, ...a.patch } },
+        },
+        projectDirty: [...new Set([...state.projectDirty, ...a.keys])],
+      };
+    case "PATCH_PROJECT_SITE":
+      if (!state.project) return state;
+      return {
+        ...state,
+        project: { ...state.project, location: a.location },
+        projectDirty: [...new Set([...state.projectDirty, "location.label"])],
+      };
+    case "SET_WORK_ORDER_SOURCE":
+      return { ...state, workOrderGroupId: a.groupId };
     case "PROCESS_ERROR":
       return { ...state, busy: false, error: a.kind, errorDetail: a.detail ?? null };
     case "ENTER_WIZARD":
@@ -536,6 +626,15 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
     addFiles: (files: { name: string; type: string; data?: string }[]) => dispatch({ t: "ADD_FILES", files }),
     removeFile: (index: number) => dispatch({ t: "REMOVE_FILE", index }),
     setSimulateError: (value: boolean) => dispatch({ t: "SET_SIMULATE_ERROR", value }),
+
+    /* PROJ — picking a site, and editing its values FOR THIS REQUEST ONLY. Nothing here writes to
+       the project: every one of these lands on a copy the intake screen holds. */
+    selectProject: (project: ProjectSummary) => dispatch({ t: "SELECT_PROJECT", project }),
+    clearProject: () => dispatch({ t: "CLEAR_PROJECT" }),
+    patchProjectDefaults: (patch: Partial<TimingHours>, keys: string[]) =>
+      dispatch({ t: "PATCH_PROJECT_DEFAULTS", patch, keys }),
+    patchProjectSite: (location: SiteLocation) => dispatch({ t: "PATCH_PROJECT_SITE", location }),
+    setWorkOrderSource: (groupId: string | null) => dispatch({ t: "SET_WORK_ORDER_SOURCE", groupId }),
 
     async process() {
       const s = getState();

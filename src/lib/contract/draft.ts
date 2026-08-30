@@ -269,6 +269,16 @@ export interface RfqDraft {
    * draft, and never read back by the project: the copy stands alone from the moment it is made.
    */
   projectFields?: string[];
+
+  /**
+   * PROJ - the site this draft is filed under, and the work order it was started from.
+   *
+   * Both are LABELS. Every value the site supplied was already copied into the fields above, so the
+   * draft never reads its project again and a site edited next month cannot reach a request written
+   * today. They ride to the backend on submit unchanged.
+   */
+  projectId?: string | null;
+  workOrderGroupId?: string | null;
 }
 
 /** Posted to /api/requests (AC-42/43). Mirrors the shared app request shape. */

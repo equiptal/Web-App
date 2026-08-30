@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
+import { ProjectChips } from "@/components/create/ProjectChips";
+import { ProjectPills } from "@/components/create/ProjectPills";
 import { useSession } from "@/lib/session";
 import { Button, Icon } from "@/components/ui";
 import { AccountModal } from "@/components/onboarding/AccountModal";
@@ -179,6 +181,13 @@ export function Intake() {
             placeholder={typed}
             className="min-h-[232px] w-full flex-1 resize-none border-0 bg-transparent px-5 pb-5 pt-2.5 text-subhead leading-relaxed text-navy outline-none placeholder:text-muted/70"
           />
+
+          {/* PROJ — the site strip, INSIDE the card and under the text, never in the textarea: that
+              is a native control and holds text only, and keeping it purely what the renter typed is
+              what keeps the agent's input small. Both render nothing at all when there is no site to
+              show, so a renter who has never made one sees today's screen unchanged. */}
+          <ProjectChips />
+          <ProjectPills />
         </div>
 
         {/* ── The divider, carrying the OR ─────────────────────────────────────────────────────────

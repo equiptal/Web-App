@@ -1626,6 +1626,29 @@ export const en = {
    * The request canvas (MREQ). Replaces the four-step wizard's own key groups; `step1`–`step3` stay
    * for now because other surfaces still read a handful of their labels.
    */
+  projects: {
+    chips: {
+      label: "Project",
+      ended: "ended",
+      all: "All projects",
+    },
+    pills: {
+      site: "site",
+      basis: "basis",
+      dates: "dates",
+      hours: "hrs/day",
+      noDates: "no dates yet",
+      more: "+ more project defaults",
+      paymentTerms: "Payment terms",
+      extendable: "Extendable",
+      sheetNote: "These are this project's values. Edit any of them on the next screen — changes stay on this request.",
+      conflict: "You wrote {spoken}, which is not this project's site.",
+      keepMine: "Keep what I wrote",
+      useProject: "Use the project's site",
+      captionLead: "You type the machine.",
+      caption: "What it is, its size, how many, and any accessory. Everything else above is filled in already.",
+    },
+  },
   create: {
     youWrote: "YOU WROTE",
     needsYou: "{n} things need you",
