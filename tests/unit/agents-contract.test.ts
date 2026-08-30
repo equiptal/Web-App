@@ -321,7 +321,9 @@ when("the strict schemas get no unknown keys", () => {
 
   it("names the taxonomy ids the way the item schema does", () => {
     const woSchema = fs.readFileSync(path.join(AGENTS, "src", "validators", "work-order.schema.ts"), "utf8");
-    const item = woSchema.slice(woSchema.indexOf("export const workOrderItemSchema"));
+    /* The KEYS live on the base object; `workOrderItemSchema` is now just the base wrapped in its
+       naming rule, so slicing from that name would find a one-line wrapper and no fields. */
+    const item = woSchema.slice(woSchema.indexOf("export const workOrderItemBase"));
     for (const key of ["categoryId", "subcategoryId", "measurementId"]) {
       expect(item, `item schema should name ${key}`).toMatch(new RegExp(`${key}\s*:`));
     }
@@ -378,5 +380,25 @@ when("409s keep their meaning", () => {
     for (const code of codes) {
       expect(client, `${code} must reach ProjectVersionConflict, not a bare unknown error`).toContain(code);
     }
+  });
+});
+
+when("the work-order item schema can actually hold supplyLines", () => {
+  it("widens the key set instead of intersecting a strict object with it", () => {
+    /* `workOrderItemSchema.and(z.object({ supplyLines }))` refused the key on every request: an
+       intersection parses against BOTH halves, and the left half is `.strict()`. Because the
+       refusal lands on the whole body, the work order, its machines and its period went with it.
+
+       Asserted from this repo because this repo is what breaks: `workOrderPayload` sends
+       `supplyLines` on create, and a silent revert there turns every populated work order into a
+       422 that names a key the web is right to be sending. */
+    const src = fs.readFileSync(
+      path.join(AGENTS, "src", "handlers", "agents", "work-orders", "createWorkOrder.ts"),
+      "utf8",
+    ).replace(/\/\*[\s\S]*?\*\//g, "");
+
+    const items = src.slice(src.indexOf("items: z"), src.indexOf("max(50)"));
+    expect(items, "supplyLines must be added by widening the item's own keys").toContain("extend(");
+    expect(items, "an intersection with a strict object can never accept the added key").not.toMatch(/\.and\(/);
   });
 });
