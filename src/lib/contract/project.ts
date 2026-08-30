@@ -234,3 +234,78 @@ export function projectToPayload(p: Pick<Project, "title" | "location" | "defaul
     },
   };
 }
+
+
+/* ----------------------------- Propagating an edit ----------------------------- */
+
+/**
+ * What one filed row can do with a project edit, and whether it starts ticked.
+ *
+ * **Nothing propagates on its own.** A request copied the site's values at submit and never reads
+ * its project again, so editing Qiddiya in November cannot reach an RFQ posted in September. The
+ * only way across is this list, and only for rows the renter explicitly ticks.
+ */
+export type PropagationState =
+  /** No bids yet. Edit freely, as often as you like. */
+  | "free"
+  /** Bids have landed. Editing spends the ONE post-bid edit the rules allow. */
+  | "costs_the_edit"
+  /** That one edit is already spent. The row cannot take the change at all. */
+  | "edit_used"
+  /** Closed or cancelled. Nothing reaches it. */
+  | "closed"
+  /** A work order goes to nobody, so it is always editable and costs nothing. */
+  | "work_order";
+
+export interface PropagationRow {
+  id: string;
+  kind: "request" | "work_order";
+  /** RFQ-1042, or the work order's title. */
+  ref: string;
+  state: PropagationState;
+  /** Can the renter tick it at all? */
+  eligible: boolean;
+  /**
+   * Ticked when the dialog opens.
+   *
+   * **Only the free ones and the work orders.** A pre-ticked request that has bids spends the
+   * renter's single post-bid edit on a change they came here to make to the SITE — and they would
+   * find out afterwards, on a row they were not looking at. Making them tick it themselves is the
+   * whole protection.
+   */
+  preTicked: boolean;
+}
+
+/** Classify one marketplace request, from the same rule the drawer's Edit button uses. */
+export function propagationForRequest(req: {
+  id: string;
+  ref: string;
+  status: string;
+  bidCount: number;
+  renteeEditUsed: boolean;
+}): PropagationRow {
+  const live = req.status === "OPEN" || req.status === "ACTIVE";
+  const hasBids = req.bidCount > 0;
+
+  const state: PropagationState = !live
+    ? "closed"
+    : !hasBids
+      ? "free"
+      : req.renteeEditUsed
+        ? "edit_used"
+        : "costs_the_edit";
+
+  return {
+    id: req.id,
+    kind: "request",
+    ref: req.ref,
+    state,
+    eligible: state === "free" || state === "costs_the_edit",
+    preTicked: state === "free",
+  };
+}
+
+/** A work order. Always editable, never pre-ticked away from the renter's attention. */
+export function propagationForWorkOrder(wo: { id: string; ref: string }): PropagationRow {
+  return { id: wo.id, kind: "work_order", ref: wo.ref, state: "work_order", eligible: true, preTicked: true };
+}
