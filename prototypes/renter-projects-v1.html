@@ -414,6 +414,14 @@
     padding:10px 13px;margin-bottom:14px;font-size:var(--t-meta);color:var(--muted-dark)}
   .banner b{color:var(--navy)}
   .banner .icon{font-size:var(--t-subhead);color:var(--brand);flex:none}
+  /* ── Embedded in the dashboard (?embed=1) ───────────────────────────────────────────────────
+     The dashboard already carries the app bar, the page gutters and its own section header, so
+     this file drops all three and renders only the projects surface. Its own height is posted to
+     the parent on every render, because an iframe cannot size itself. */
+  body.is-embed .appbar{display:none}
+  body.is-embed .wrap{padding:0;max-width:none}
+  body.is-embed .sec{padding:0}
+  body.is-embed #tab-projects > .shead{display:none}
 </style>
 </head>
 <body>
@@ -437,6 +445,26 @@
 <div class="scrim" id="scrim" onclick="if(event.target===this)closeModal()"></div>
 
 <script>
+
+/* ══ embed mode ════════════════════════════════════════════════════════════
+   Mounted inside the dashboard's projects section. The parent owns the chrome,
+   so this drops its own — and reports its height after every paint, since an
+   iframe has no way to size itself to its content. */
+var EMBED = /[?&]embed=1/.test(location.search);
+if (EMBED) document.body.classList.add("is-embed");
+
+function postHeight(){
+  if (!EMBED) return;
+  var h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+  try { parent.postMessage({ type: "moedatech:projects-height", height: h }, "*"); } catch (e) { /* no parent */ }
+}
+if (EMBED){
+  window.addEventListener("load", postHeight);
+  window.addEventListener("resize", postHeight);
+  /* Every render changes the height — the rail, the chart, an opened modal. */
+  new MutationObserver(postHeight).observe(document.body, { childList: true, subtree: true, attributes: true });
+}
+
 /* ══ language & tabs ════════════════════════════════════════════════════════ */
 var ar = false;
 function L(en, arr){ return ar ? arr : en; }
@@ -581,17 +609,17 @@ var ITEMS = [
   { id:"i8", gid:"g7", eqEn:"Wheel loader 3 m³", eqAr:"لودر بعجل ٣ م٣",        qty:1 }
 ];
 var ALLOCS = [
-  { id:"a1", iid:"i1", sid:"s1", units:2, rate:8600,  per:"month", start:"2026-09-01", end:"2026-12-31",
+  { id:"a1", iid:"i1", sid:"s1", units:2, rate:8600,  per:"month",
     mob:"2026-09-04", demob:null, docs:[{k:"po",n:"PO-88213.pdf"},{k:"contract",n:"Zahid-MSA.pdf"}] },
-  { id:"a2", iid:"i1", sid:"s2", units:1, rate:9100,  per:"month", start:"2026-10-05", end:"2026-12-31",
+  { id:"a2", iid:"i1", sid:"s2", units:1, rate:9100,  per:"month",
     mob:"2026-10-09", demob:null, docs:[] },
-  { id:"a3", iid:"i3", sid:"s4", units:1, rate:21000, per:"month", start:"2026-09-01", end:"2026-12-31",
+  { id:"a3", iid:"i3", sid:"s4", units:1, rate:21000, per:"month",
     mob:"2026-09-02", demob:null, docs:[{k:"contract",n:"DesertFleet-hire.pdf"}] },
-  { id:"a4", iid:"i4", sid:"s1", units:2, rate:3200,  per:"month", start:"2026-09-15", end:"2026-11-30",
+  { id:"a4", iid:"i4", sid:"s1", units:2, rate:3200,  per:"month",
     mob:"2026-09-18", demob:"2026-11-28", docs:[{k:"po",n:"PO-88240.pdf"}] },
-  { id:"a5", iid:"i5", sid:"s2", units:2, rate:5900,  per:"month", start:"2026-10-01", end:"2027-02-28",
+  { id:"a5", iid:"i5", sid:"s2", units:2, rate:5900,  per:"month",
     mob:null, demob:null, docs:[] },
-  { id:"a6", iid:"i6", sid:"s4", units:1, rate:4400,  per:"month", start:"2026-10-01", end:"2027-03-31",
+  { id:"a6", iid:"i6", sid:"s4", units:1, rate:4400,  per:"month",
     mob:"2026-10-03", demob:null, docs:[] }
 ];
 var seq = 100;
@@ -674,15 +702,35 @@ function whenDiffers(g){
   return out.length ? out : null;
 }
 
-/* Every date the chart has to be able to draw: each award's own period, and the period of any
-   work order or request that carries one — including ones nobody has awarded yet, whose ghost
-   bar still has to fit on the axis. */
+/* An AWARD HAS NO PERIOD OF ITS OWN. Ruled 2026-08-30 with the move to `projects.awards`: an
+   award records WHO supplies how many, and the two marks. Its bar is its parent's period, widened
+   by a mark that falls outside it.
+
+   What that gives up, stated rather than hidden: a hire renegotiated past a closed request's end
+   shows the original end until the machine is demobilized. What it buys is that there are two
+   levels of date instead of three, and no "which of these dates wins" question anywhere. */
+function awardWindow(g, a){
+  var w = g.when || proj(g.pid).when;
+  var st = w.start, en = w.end;
+  if (a.mob   && a.mob   < st) st = a.mob;     /* arrived before the period opened */
+  if (a.demob && a.demob > en) en = a.demob;   /* still standing there after it closed */
+  if (a.mob   && a.mob   > en) en = a.mob;
+  return { start: st, end: en };
+}
+
+/* Every date the chart has to be able to draw: the period of any work order or request that
+   carries one — including ones nobody has awarded yet, whose ghost bar still has to fit on the
+   axis — and every mark, since a machine that arrived late or has not left yet must stay on the
+   axis rather than being clipped off its edge. */
 function projectDates(pid){
   var out = [];
   groupsOf(pid).forEach(function(g){
     if (g.when){ out.push(g.when.start); out.push(g.when.end); }
     itemsOf(g.id).forEach(function(i){
-      allocsOf(i.id).forEach(function(a){ out.push(a.start); out.push(a.end); });
+      allocsOf(i.id).forEach(function(a){
+        if (a.mob) out.push(a.mob);
+        if (a.demob) out.push(a.demob);
+      });
     });
   });
   return out;
@@ -907,7 +955,8 @@ function openRowHtml(g, it, s, tp, tin){
 
 /* The award row — the real unit of this chart. */
 function allocRowHtml(g, it, a, s, tp, tin){
-  var x1 = Math.max(0, pct(d(a.start), s)), x2 = Math.min(100, pct(d(a.end), s));
+  var win = awardWindow(g, a);
+  var x1 = Math.max(0, pct(d(win.start), s)), x2 = Math.min(100, pct(d(win.end), s));
   var pins = "";
   if (a.mob) pins += '<span class="pin" style="inset-inline-start:' + pct(d(a.mob), s) + '%" title="'
     + L("Mobilized","تم التعبئة") + ' ' + a.mob + '"></span>';
@@ -936,7 +985,7 @@ function allocRowHtml(g, it, a, s, tp, tin){
     + '</div><div class="gtrack">'
     + (tin ? '<span class="gtoday" style="inset-inline-start:' + tp + '%"></span>' : '')
     + '<span class="bar awarded" style="inset-inline-start:' + x1 + '%;width:' + (x2-x1) + '%">'
-    +   a.start + ' → ' + a.end + '</span>'
+    +   win.start + ' → ' + win.end + '</span>'
     + pins
     + '</div></div>';
 }
@@ -1409,7 +1458,7 @@ function dlgAward(iid){
   openRow = null;
   var it = item(iid);
   draftAllocs = allocsOf(iid).map(function(a){
-    return { sid:a.sid, units:a.units, rate:a.rate, start:a.start, end:a.end, id:a.id }; });
+    return { sid:a.sid, units:a.units, rate:a.rate, id:a.id }; });
   if (!draftAllocs.length) draftAllocs = [{ sid:"", units:it.qty, rate:"", start:"", end:"", id:null }];
   paintAward(iid);
 }
@@ -1437,14 +1486,6 @@ function paintAward(iid){
       +     'onchange="setAlloc(' + ix + ',\'rate\',+this.value,\'' + iid + '\')" /></label>'
       +   '<button class="btn btn-ghost btn-sm" onclick="dropAlloc(' + ix + ',\'' + iid + '\')" style="padding:0 6px">'
       +     '<span class="icon">close</span></button>'
-      + '</div>'
-      + '<div class="frow" style="margin-top:8px">'
-      +   '<label class="fld"><span class="lbl">' + L("Start","البداية") + '</span>'
-      +     '<input type="date" value="' + (a.start || w.start) + '" '
-      +     'onchange="setAlloc(' + ix + ',\'start\',this.value,\'' + iid + '\')" /></label>'
-      +   '<label class="fld"><span class="lbl">' + L("End","النهاية") + '</span>'
-      +     '<input type="date" value="' + (a.end || w.end) + '" '
-      +     'onchange="setAlloc(' + ix + ',\'end\',this.value,\'' + iid + '\')" /></label>'
       + '</div></div>';
   }).join("");
 
@@ -1452,6 +1493,9 @@ function paintAward(iid){
       '<div class="infoline"><span class="icon">shield</span><span>'
     +   L("This award is the renter’s own record. It is not the marketplace accept and touches nothing in the deal room.",
         "هذا الإرساء سجلّ خاص بالمستأجر. ليس قبول العرض في السوق ولا يمسّ غرفة الصفقة.") + '</span></div>'
+    + '<div class="infoline"><span class="icon">event</span><span>'
+    +   L("No dates here. The bar comes from this request or work order, and moves out to meet a mobilized or demobilized mark that falls outside it — so “when” has two levels, not three.",
+        "لا تواريخ هنا. يأتي الشريط من هذا الطلب أو أمر العمل، ويتسع ليشمل علامة تعبئة أو تفكيك خارجه — فالمدة مستويان لا ثلاثة.") + '</span></div>'
     + '<fieldset class="fset"><legend>' + L("Supplier","المورّد") + '</legend>' + rows
     +   '<button class="btn btn-secondary btn-sm" style="margin-top:10px" onclick="addAlloc(\'' + iid + '\')">'
     +     '<span class="icon">add</span>' + L("Split across another supplier","وزّع على مورّد آخر") + '</button>'
@@ -1493,7 +1537,6 @@ function saveAward(iid){
     if (!a.sid) return;
     var old = a.id ? keep[a.id] : null;
     ALLOCS.push({ id:a.id || nid("a"), iid:iid, sid:a.sid, units:+a.units||1, rate:+a.rate||null, per:"month",
-      start:a.start || w.start, end:a.end || w.end,
       mob:old ? old.mob : null, demob:old ? old.demob : null, docs:old ? old.docs : [] });
   });
   closeModal(); render();
@@ -1630,7 +1673,6 @@ function newWoDraft(p){
     machines:[ newWoMachine() ],
     terms: defaultTerms(),
     when:{ basis:p.when.basis, start:p.when.start, end:p.when.end, hours:p.when.hours, days:p.when.days },
-    origWhen:null
   };
 }
 /* Editing loads the saved order back into the same draft shape — the same form, so there is
@@ -1646,11 +1688,10 @@ function loadWoDraft(g){
       return { id:it.id, cat:"", sub:"", size:"", custom:true, label:L(it.eqEn, it.eqAr), csize:"",
                qty:it.qty, acc:"", notes:"", over:(it.over || null),
                allocs: allocsOf(it.id).map(function(a){
-                 return { id:a.id, sid:a.sid, units:a.units, rate:a.rate, start:a.start, end:a.end, follow:null }; }) };
+                 return { id:a.id, sid:a.sid, units:a.units, rate:a.rate }; }) };
     }),
     terms: g.terms ? JSON.parse(JSON.stringify(g.terms)) : defaultTerms(),
     when: { basis:w.basis, start:w.start, end:w.end, hours:w.hours, days:w.days },
-    origWhen: { start:w.start, end:w.end }
   };
 }
 function dlgNewWorkOrder(){ woDraft = newWoDraft(proj(projSel)); paintWo(); }
@@ -1664,7 +1705,6 @@ function woAwards(){
   });
   return out;
 }
-function woSetFollow(i, j, v){ woDraft.machines[i].allocs[j].follow = v; paintWo(); }
 function woSet(path, v){
   var parts = path.split("."), o = woDraft;
   for (var i=0;i<parts.length-1;i++) o = o[parts[i]];
@@ -1919,35 +1959,11 @@ function paintWo(){
   var differs = w.when.start !== p.when.start || w.when.end !== p.when.end
              || w.when.basis !== p.when.basis || +w.when.hours !== +p.when.hours;
 
-  /* The order's period SEEDS its awards; each award then owns its own dates, because they
-     legitimately diverge — one machine arrives a month after the others. So changing the
-     period afterwards asks, per award, rather than moving them all or none. */
-  var periodMoved = editing && w.origWhen
-    && (w.when.start !== w.origWhen.start || w.when.end !== w.origWhen.end);
+  /* Changing the order's period simply changes every award's bar with it, because an award has
+     no period of its own any more. The whole "move the awards to the new period?" question was a
+     consequence of them having one, and it is gone with them. */
   var followList = "";
-  if (periodMoved){
-    var rows = woAwards().map(function(x){
-      var onOld = x.a.start === w.origWhen.start && x.a.end === w.origWhen.end;
-      if (x.a.follow === null) x.a.follow = onOld;      /* default: only the ones that tracked it */
-      return '<label class="applyrow' + (onOld ? "" : " blocked") + '">'
-        + '<input type="checkbox"' + (x.a.follow ? " checked" : "") + ' '
-        + 'onchange="woSetFollow(' + x.i + ',' + x.j + ',this.checked)" />'
-        + '<span class="nm">' + esc(machineLabel(x.m) || L("Machine","معدّة")) + ' ×' + x.a.units
-        + ' · ' + esc(supName(x.a.sid)) + '</span>'
-        + '<span class="why ' + (onOld ? "free" : "no") + '">'
-        + (onOld ? L("uses the old period","على المدة القديمة")
-                 : x.a.start + " → " + x.a.end + " · " + L("its own dates","تواريخها الخاصة")) + '</span></label>';
-    }).join("");
-    followList = '<fieldset class="fset"><legend>'
-      + L("Move the awards to the new period?","نقل الإرساءات إلى المدة الجديدة؟") + '</legend>'
-      + (rows ? '<div class="applylist">' + rows + '</div>'
-              : '<div class="hint">' + L("No awards yet.","لا إرساءات بعد.") + '</div>')
-      + '<div class="hint" style="margin-top:10px">'
-      +   L("Ticked awards move to ","تنتقل الإرساءات المحدّدة إلى ") + w.when.start + " → " + w.when.end
-      +   L(". Unticked ones keep the dates they have — an award that already ran to its own dates should usually keep them.",
-          ". وتبقى غير المحدّدة بتواريخها — والإرساء الذي له تواريخه الخاصة يُترك عادةً كما هو.") + '</div>'
-      + '</fieldset>';
-  }
+
 
   var body =
       '<div class="infoline"><span class="icon">lock</span><span>'
@@ -2048,15 +2064,13 @@ function saveWorkOrder(){
       var aid = a.id || nid("a");
       keptAllocs[aid] = true;
       var cur = alloc(aid);
-      /* A ticked award moves to the new period; an unticked one keeps what it has. */
-      var st = (a.follow ? w.when.start : (a.start || w.when.start));
-      var en = (a.follow ? w.when.end   : (a.end   || w.when.end));
+      /* Nothing about dates. Changing the order's period moves every bar under it, because an
+         award has none of its own to disagree with. */
       if (cur){
         cur.sid = a.sid; cur.units = +a.units||1; cur.rate = +a.rate||null;
-        cur.start = st; cur.end = en;
       } else {
         ALLOCS.push({ id:aid, iid:iid, sid:a.sid, units:+a.units||1, rate:+a.rate||null,
-          per:"month", start:st, end:en, mob:null, demob:null, docs:[] });
+          per:"month", mob:null, demob:null, docs:[] });
       }
     });
   });
@@ -2157,9 +2171,8 @@ function renderIntake(){
                     : L("I need 3 air compressors in Dammam for two weeks, with operators…",
                         "أحتاج ٣ ضواغط هواء في الدمام لأسبوعين، مع مشغّلين…"))
     +     '">' + esc(iText) + '</textarea>'
-    +   pills + tmpl
+    +   (iProject ? pills + tmpl : '<div class="chiprow">' + chips + '</div>')
     + '</div>'
-    + '<div class="chiprow">' + chips + '</div>'
     + '<div class="speed ' + t.cls + '"><span class="led"></span>'
     +   '<span><span class="nm">' + t.nm + '</span> <span class="why">' + t.why + '</span></span>'
     +   '<span class="ms">' + t.ms + '</span></div>'
