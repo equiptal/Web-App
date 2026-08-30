@@ -51,6 +51,7 @@ export function ProjectsBoard({
   chart,
   unassigned,
   onEditProject,
+  onOpenConflict,
   rowMenu,
 }: {
   projects: ProjectSummary[];
@@ -62,6 +63,8 @@ export function ProjectsBoard({
   /** Rows filed nowhere. The rail entry appears only when this is non-empty. */
   unassigned: ChartGroup[];
   onEditProject: (p: ProjectSummary) => void;
+  /** Pressed from the *own dates* chip on a group header. */
+  onOpenConflict?: (group: ChartGroup) => void;
   rowMenu?: (group: ChartGroup, itemId: string, awardId: string | null) => React.ReactNode;
 }) {
   const t = useT();
@@ -125,7 +128,14 @@ export function ProjectsBoard({
         {selectedId === null ? (
           <UnassignedPanel groups={unassigned} rowMenu={rowMenu} />
         ) : chart ? (
-          <SitePanel project={chart.project} groups={chart.groups} today={now} onEdit={onEditProject} rowMenu={rowMenu} />
+          <SitePanel
+            project={chart.project}
+            groups={chart.groups}
+            today={now}
+            onEdit={onEditProject}
+            onOpenConflict={onOpenConflict}
+            rowMenu={rowMenu}
+          />
         ) : (
           <p className="text-body text-muted">{t.projects.board.loading}</p>
         )}
@@ -141,12 +151,14 @@ function SitePanel({
   groups,
   today: now,
   onEdit,
+  onOpenConflict,
   rowMenu,
 }: {
   project: ProjectSummary;
   groups: ChartGroup[];
   today: string;
   onEdit: (p: ProjectSummary) => void;
+  onOpenConflict?: (group: ChartGroup) => void;
   rowMenu?: (group: ChartGroup, itemId: string, awardId: string | null) => React.ReactNode;
 }) {
   const t = useT();
@@ -209,8 +221,18 @@ function SitePanel({
                   <Icon name={g.kind === "work_order" ? "handyman" : "campaign"} size={13} className="flex-none text-muted" />
                   <span className="truncate text-meta font-semibold text-navy">{g.title?.trim() || g.ref}</span>
                   {g.kind === "request" && <span className="text-meta text-muted">{g.ref}</span>}
-                  {/* Its own period, kept and shown rather than resolved away. */}
-                  {g.when && <span className="text-meta font-semibold text-warn">{t.projects.board.ownPeriod}</span>}
+                  {/* Its own period, kept and shown rather than resolved away. A button, not a
+                      label: the renter presses it to see WHAT differs and decide, and a difference
+                      they cannot open is a warning they can only ignore. */}
+                  {g.when && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenConflict?.(g)}
+                      className="text-meta font-semibold text-warn underline underline-offset-2"
+                    >
+                      {t.projects.board.ownPeriod}
+                    </button>
+                  )}
                 </div>
 
                 {g.items.map((item) =>

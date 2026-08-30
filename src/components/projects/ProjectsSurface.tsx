@@ -26,6 +26,8 @@ import {
   fetchTaxonomy,
   fetchAllMyRequests,
   assignToProject,
+  attachDocument,
+  removeDocument,
   withFreshVersion,
   ProjectVersionConflict,
   type AwardInput,
@@ -44,6 +46,9 @@ import { RowMenu } from "./RowMenu";
 import { AwardDialog, UnawardConfirm } from "./AwardDialog";
 import { WorkOrderForm, workOrderPayload, blankMachine, type WorkOrderDraft } from "./WorkOrderForm";
 import { MoveDialog } from "./MoveDialog";
+import { DocumentsDialog } from "./DocumentsDialog";
+import { ConflictDialog, periodConflicts } from "./ConflictDialog";
+import { projectTitle } from "@/lib/contract/project";
 import { EMPTY_WHEN } from "@/lib/contract/work-order";
 import type { Taxonomy } from "@/lib/contract/taxonomy";
 
@@ -62,6 +67,8 @@ export function ProjectsSurface() {
   const [taxonomy, setTaxonomy] = useState<Taxonomy>([]);
   const [unassigned, setUnassigned] = useState<ChartGroup[]>([]);
   const [filing, setFiling] = useState<{ requestId: string; address: string | null; projectId: string | null } | null>(null);
+  const [papers, setPapers] = useState<{ award: Award; isRequest: boolean } | null>(null);
+  const [conflict, setConflict] = useState<ChartGroup | null>(null);
   const [deleting, setDeleting] = useState<ProjectSummary | null>(null);
   const [created, setCreated] = useState<ProjectSummary | null>(null);
   const router = useRouter();
@@ -297,6 +304,46 @@ export function ProjectsSurface() {
     }
   }
 
+  async function attach(doc: { kind: string; filename: string; data: string }) {
+    if (!selected || !papers) return;
+    setSaving(true);
+    try {
+      await attachDocument(selected, papers.award.id, doc);
+      await refreshChart();
+      // Re-read the award so the list in the open dialog shows what was just added.
+      setPapers((cur) => (cur ? { ...cur, award: findAward(cur.award.id) ?? cur.award } : cur));
+    } catch {
+      setNotice(t.projects.surface.saveFailed);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function detach(docId: string) {
+    if (!selected || !papers) return;
+    setSaving(true);
+    try {
+      await removeDocument(selected, papers.award.id, docId);
+      await refreshChart();
+      setPapers((cur) => (cur ? { ...cur, award: findAward(cur.award.id) ?? cur.award } : cur));
+    } catch {
+      setNotice(t.projects.surface.saveFailed);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** The award as the freshly-read chart holds it, so an open dialog is never a stale copy. */
+  function findAward(id: string): Award | null {
+    for (const g of chart?.groups ?? []) {
+      for (const it of g.items) {
+        const hit = it.awards.find((x) => x.id === id);
+        if (hit) return hit;
+      }
+    }
+    return null;
+  }
+
   async function unaward() {
     if (!selected || !unawarding) return;
     setSaving(true);
@@ -338,6 +385,7 @@ export function ProjectsSurface() {
              is exactly what it should do when nothing is filed nowhere. */
           unassigned={unassigned}
           onEditProject={(p) => void openEdit(p)}
+          onOpenConflict={setConflict}
           rowMenu={(group, itemId, awardId) => {
             const item = group.items.find((i) => i.id === itemId);
             if (!item) return null;
@@ -383,6 +431,7 @@ export function ProjectsSurface() {
                           })
                       : undefined,
                   onDeleteWorkOrder: group.kind === "work_order" ? () => void removeOrder(group.id) : undefined,
+                  onAttachDocument: a ? () => setPapers({ award: a, isRequest: group.kind === "request" }) : undefined,
                   onRemoveFromProject:
                     group.kind === "request"
                       ? () => setFiling({ requestId: group.id, address: chart?.project.location.label ?? null, projectId: selected })
@@ -427,6 +476,53 @@ export function ProjectsSurface() {
           />
         )}
       </Dialog>
+
+      {papers && (
+        <DocumentsDialog
+          open
+          onClose={() => setPapers(null)}
+          award={papers.award}
+          isRequest={papers.isRequest}
+          onAttach={(doc) => void attach(doc)}
+          onRemove={(id) => void detach(id)}
+          busy={saving}
+        />
+      )}
+
+      {conflict && chart && (
+        <ConflictDialog
+          open
+          onClose={() => setConflict(null)}
+          rowLabel={conflict.title?.trim() || conflict.ref}
+          projectLabel={projectTitle(chart.project)}
+          fields={periodConflicts(
+            conflict.when,
+            { startDate: chart.project.defaults.timing.startDate, endDate: chart.project.defaults.timing.endDate },
+            { start: t.projects.form.start, end: t.projects.form.end },
+          )}
+          /* A work order goes to nobody, so matching the project costs nothing and is never refused.
+             A request obeys the same edit rule the drawer's Edit button does. */
+          state={
+            conflict.kind === "work_order"
+              ? "work_order"
+              : propagationForRequest({
+                  id: conflict.id,
+                  ref: conflict.ref,
+                  status: conflict.status ?? "OPEN",
+                  bidCount: conflict.bidCount ?? 0,
+                  renteeEditUsed: conflict.renteeEditUsed ?? false,
+                }).state
+          }
+          onMatch={() => {
+            // The edit itself belongs to the work-order form and the request edit modal, which own
+            // the validation. This opens the right one rather than writing a second edit path.
+            setConflict(null);
+            if (conflict.kind === "work_order") setNotice(t.projects.conflict.openTheForm);
+            else router.push(`/requests/${conflict.id}`);
+          }}
+          busy={saving}
+        />
+      )}
 
       {filing && projects && (
         <MoveDialog

@@ -1627,6 +1627,32 @@ export const en = {
    * for now because other surfaces still read a handful of their labels.
    */
   projects: {
+    docs: {
+      title: "Papers for this award",
+      none: "Nothing attached yet.",
+      kind: "What is it",
+      kinds: {
+        po: "Purchase order",
+        contract: "Contract",
+        quotation: "Supplier's quotation",
+        other: "Other",
+      },
+      attach: "Attach a file",
+      removeNamed: "Remove {name}",
+      oursIsGenerated: "Our quotation for this request is generated, not uploaded — download it from the row menu. The one here is the quotation the SUPPLIER sent you.",
+      tooBig: "That file is over {max}. Attach a smaller one.",
+      readFailed: "That file could not be read. Try another.",
+    },
+    conflict: {
+      openTheForm: "Open the work order and change its dates there \u2014 that form owns the check that keeps a group\u2019s rows in step.",
+      title: "This runs to different dates",
+      intro: "Both are kept. Keeping the difference is usually right — a machine that stays longer than the site's own dates is a fact, not a mistake.",
+      keepDifferent: "Keep it different",
+      matchProject: "Match the project",
+      costsTheEdit: "This request has bids, so matching the project uses its one remaining edit.",
+      editUsed: "This request has already used its one post-bid edit, so it cannot be changed. The difference stays, and the chart keeps showing it.",
+      closed: "This request is closed, so nothing can change it now.",
+    },
     move: {
       fileTitle: "File this in a project",
       moveTitle: "Move this to another project",

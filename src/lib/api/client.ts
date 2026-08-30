@@ -1023,6 +1023,38 @@ export async function fetchTemplateTerms(projectId: string, option: TemplateOpti
   return item ? machineTermsOfRequestItem(item) : null;
 }
 
+/* ----------------------------- An award's papers ----------------------------- */
+
+/**
+ * Attach a paper to one award.
+ *
+ * `data` is a data URL. It rides in the JSON body rather than as multipart because every hop
+ * between here and storage already speaks JSON, and a purchase order is a page — the 10 MB ceiling
+ * the dialog enforces keeps that honest.
+ *
+ * These do NOT carry the project version. A document is its own row in the shared document store,
+ * keyed to the award's id; it never rewrites the awards blob, so there is nothing for a concurrent
+ * write to lose.
+ */
+export async function attachDocument(
+  projectId: string,
+  awardId: string,
+  doc: { kind: string; filename: string; data: string },
+): Promise<void> {
+  await projectFetch(`${projectPath(projectId)}/awards/${encodeURIComponent(awardId)}/documents`, {
+    method: "POST",
+    body: doc,
+  });
+}
+
+/** Removes the row AND the stored file. Nothing cascades here, so this is the only thing that does. */
+export async function removeDocument(projectId: string, awardId: string, docId: string): Promise<void> {
+  await projectFetch(
+    `${projectPath(projectId)}/awards/${encodeURIComponent(awardId)}/documents/${encodeURIComponent(docId)}`,
+    { method: "DELETE" },
+  );
+}
+
 /* ----------------------------- The supplier list ----------------------------- */
 
 export interface RenterSupplier {
