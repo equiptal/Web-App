@@ -203,3 +203,46 @@ when("the document payload", () => {
     expect(ours.includes('method: "PUT"')).toBe(true);
   });
 });
+
+/**
+ * WHERE the renter's id has to sit (reported 2026-08-30: every project save returned 422).
+ *
+ * The backend reads `userId` from whichever place suits each handler — `GET`s and `DELETE`s take it
+ * from the query string, `POST`s and `PATCH`es have it as a REQUIRED field inside their zod body
+ * schema. The relay only ever put it in the query, so every write failed its schema before reaching
+ * a line of handler code, and the renter saw a bare validation error naming no field.
+ *
+ * This reads the backend's own handlers to decide which is which, so the day one of them moves the
+ * read, this test fails rather than the save.
+ */
+when("where userId is sent", () => {
+  it("puts it in the BODY of every write the backend parses from the body", () => {
+    const dir = path.join(AGENTS, "src", "handlers", "agents", "projects");
+    const fromBody: string[] = [];
+
+    const walk = (d: string) => {
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        const full = path.join(d, e.name);
+        if (e.isDirectory()) { walk(full); continue; }
+        if (!e.name.endsWith(".ts")) continue;
+        const src = fs.readFileSync(full, "utf8");
+        // A body schema that names userId means the write must carry it in the JSON body.
+        if (/bodySchema\s*=\s*z\.object\(\{[^]*?userId\s*:/.test(src)) fromBody.push(e.name);
+      }
+    };
+    walk(dir);
+
+    // If this is empty the parse broke, not the contract — fail loudly rather than pass vacuously.
+    expect(fromBody.length, "no body-schema userId found; the parse above is wrong").toBeGreaterThan(0);
+
+    const relay = fs.readFileSync(path.resolve(process.cwd(), "src/lib/api/agents-relay.ts"), "utf8");
+    expect(relay, "relay must add userId to the body on POST/PATCH").toMatch(/userId\s*\}\)|\.\.\.parsed,\s*userId/);
+    expect(relay).toContain('method === "POST"');
+    expect(relay).toContain('method === "PATCH"');
+  });
+
+  it("still puts it in the query, which is where reads and deletes look", () => {
+    const relay = fs.readFileSync(path.resolve(process.cwd(), "src/lib/api/agents-relay.ts"), "utf8");
+    expect(relay).toContain("userId=${userId}");
+  });
+});

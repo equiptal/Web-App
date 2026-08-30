@@ -48,11 +48,38 @@ export async function relayAsRenter(path: string, init: RelayInit = {}): Promise
 
   const url = `${serverEnv.agentsApiUrl}/agents${path}${path.includes("?") ? "&" : "?"}userId=${userId}`;
 
+  /**
+   * The renter's id goes in the QUERY and, on a write, in the BODY as well.
+   *
+   * The backend reads it from whichever place suits the handler: `GET`s and `DELETE`s take it from
+   * the query string, while `POST`s and `PATCH`es have it inside their zod body schema as a required
+   * field. Sending it in one place only meant every write returned 422 with no clue which field was
+   * missing — the schema's own error, and correct, but the caller sees a generic validation failure.
+   *
+   * Adding it here rather than at each call site is deliberate: every write in this feature passes
+   * through this function, and a rule applied in one place cannot be forgotten in the twelfth.
+   *
+   * A body that already names a `userId` is left alone. Nothing does today, and if something ever
+   * needs to act for a different user this must not silently overwrite it.
+   */
+  const method = init.method ?? "GET";
+  let body = init.body;
+  if (body && (method === "POST" || method === "PATCH")) {
+    try {
+      const parsed = JSON.parse(body) as Record<string, unknown>;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && parsed.userId === undefined) {
+        body = JSON.stringify({ ...parsed, userId });
+      }
+    } catch {
+      // Not JSON. Pass it through untouched rather than guessing at its shape.
+    }
+  }
+
   try {
     const res = await fetch(url, {
-      method: init.method ?? "GET",
+      method,
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${serverEnv.agentsApiToken}` },
-      body: init.body,
+      body,
       cache: "no-store",
     });
 
