@@ -26,8 +26,8 @@ projects to start.
 | B2 | Save with a blank address | **Save is disabled.** Address is the one required field |
 | B3 | Drop a pin on the map | The address field fills itself from the pin |
 | B4 | Leave the title blank | Hint reads *"Leave it blank and we call it 'Qiddiya Zone 4'"* |
-| B5 | Fill basis · start · end · hours · payment terms, Save | Modal: **"'Qiddiya Zone 4' is ready"** with two choices and *Not now* |
-| B6 | Count the fields on the form | **Seven, no more.** No budget, no payment method, no maintenance, no SLA, no supplier filters, no bid window, no terrain, no days-per-week |
+| B5 | Fill basis · start · end · payment terms, Save | Modal: **"'Qiddiya Zone 4' is ready"** with two choices and *Not now* |
+| B6 | Count the fields on the form | **Six, no more.** No hours/day, no budget, no payment method, no maintenance, no SLA, no supplier filters, no bid window, no terrain, no days-per-week |
 | B7 | *Not now* | Dashboard now shows the board: rail on the left, the site selected |
 
 ---
@@ -38,11 +38,11 @@ projects to start.
 |---|---|---|
 | C1 | `/create` — look under the textarea | Chip row **inside the card**, showing *Qiddiya Zone 4* |
 | C2 | Click the chip | Chips are **replaced in place** by pills — nothing jumps |
-| C3 | Read the pills | site · basis · dates · hrs/day · *+ more* · and the caption *"You type the machine…"* |
+| C3 | Read the pills | site · basis · dates · *+ more* · and the caption *"You type the machine…"* |
 | C4 | Type `2 forklifts`, Continue | **Near-instant.** No processing screen. Canvas opens directly |
-| C5 | On the canvas, check the dates | Filled, marked with a pin and **"From your project"** — not "AI selected" |
-| C6 | Change *hrs/day* on a pill to 12, then Continue | Canvas shows 12, marked **"changed by you"**, not *from your project* |
-| C7 | Reopen the project on the dashboard | Still says **10**. The pill edit never touched the site |
+| C5 | On the canvas, check the dates | Filled, marked with a pin and **"From your project"** — not "AI selected". **Hours/day is NOT filled** — it stays in *More details* |
+| C6 | Change the end date on a pill, then Continue | Canvas shows the new date, marked **"changed by you"**, not *from your project* |
+| C7 | Reopen the project on the dashboard | Still the original end date. The pill edit never touched the site |
 | C8 | `/create`, type `2 forklifts for two weeks` | Slower than C4 (one call, no poll) but still no processing screen |
 | C9 | Type a full paragraph | Today's behaviour: processing screen after 8 s, full parse |
 | C10 | Deselect the site with the ✕ | Every prefill disappears at once — no half state |

@@ -20,7 +20,7 @@ const p = (id: string, label: string): ProjectSummary => ({
   title: null,
   location: { label, lat: null, lng: null },
   defaults: {
-    timing: { rentalBasis: null, extendable: false, startDate: null, endDate: null, hoursPerDay: 10 },
+    timing: { rentalBasis: null, extendable: false, startDate: null, endDate: null },
     paymentTerms: null,
   },
   version: 1,

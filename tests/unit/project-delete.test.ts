@@ -16,7 +16,7 @@ const p = (over: Partial<ProjectSummary> = {}): ProjectSummary => ({
   title: null,
   location: { label: "Qiddiya Zone 4, Riyadh 13513", lat: null, lng: null },
   defaults: {
-    timing: { rentalBasis: null, extendable: false, startDate: null, endDate: null, hoursPerDay: 10 },
+    timing: { rentalBasis: null, extendable: false, startDate: null, endDate: null },
     paymentTerms: null,
   },
   version: 1,
@@ -62,7 +62,7 @@ describe("ended, in place of an archive", () => {
   it("falls back to the site's own end date while nothing is filed yet", () => {
     const noRows = p({
       lastEnd: null,
-      defaults: { timing: { rentalBasis: null, extendable: false, startDate: null, endDate: "2026-01-01", hoursPerDay: 10 }, paymentTerms: null },
+      defaults: { timing: { rentalBasis: null, extendable: false, startDate: null, endDate: "2026-01-01" }, paymentTerms: null },
     });
     expect(projectEnded(noRows, TODAY)).toBe(true);
   });

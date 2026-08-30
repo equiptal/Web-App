@@ -22,7 +22,7 @@ const QIDDIYA: ProjectSummary = {
   title: null, // falls back to the site's short name
   location: { label: "Qiddiya Zone 4, Qiddiya City, Riyadh 13513", lat: 24.6408, lng: 46.5731 },
   defaults: {
-    timing: { rentalBasis: "monthly", extendable: true, startDate: "2026-09-01", endDate: "2026-12-31", hoursPerDay: 10 },
+    timing: { rentalBasis: "monthly", extendable: true, startDate: "2026-09-01", endDate: "2026-12-31" },
     paymentTerms: "net-30",
   },
   version: 4,
@@ -68,22 +68,21 @@ describe("selecting a site", () => {
     const s = pick(initialState);
     expect(s.project?.id).toBe("p_qiddiya");
     expect(s.project?.title).toBe("Qiddiya Zone 4");
-    expect(s.project?.defaults.timing.hoursPerDay).toBe(10);
     expect(s.projectDirty).toEqual([]);
   });
 
   it("holds a copy, not a reference — a pill edit cannot move the project", () => {
-    const s = reducer(pick(initialState), { t: "PATCH_PROJECT_DEFAULTS", patch: { hoursPerDay: 12 }, keys: ["timing.hours_per_day"] });
+    const s = reducer(pick(initialState), { t: "PATCH_PROJECT_DEFAULTS", patch: { endDate: "2027-03-31" }, keys: ["timing.end_date"] });
 
-    expect(s.project?.defaults.timing.hoursPerDay).toBe(12);
+    expect(s.project?.defaults.timing.endDate).toBe("2027-03-31");
     // The site itself is untouched. This is PROJ-AC-25, and it is structural: the reducer never
     // holds the object it was handed.
-    expect(QIDDIYA.defaults.timing.hoursPerDay).toBe(10);
-    expect(s.projectDirty).toContain("timing.hours_per_day");
+    expect(QIDDIYA.defaults.timing.endDate).toBe("2026-12-31");
+    expect(s.projectDirty).toContain("timing.end_date");
   });
 
   it("drops everything on deselect — no prefill outlives the project", () => {
-    const edited = reducer(pick(initialState), { t: "PATCH_PROJECT_DEFAULTS", patch: { hoursPerDay: 12 }, keys: ["timing.hours_per_day"] });
+    const edited = reducer(pick(initialState), { t: "PATCH_PROJECT_DEFAULTS", patch: { endDate: "2027-03-31" }, keys: ["timing.end_date"] });
     const cleared = reducer(edited, { t: "CLEAR_PROJECT" });
 
     // PROJ-AC-26. A half state here would leave the renter with values from a site they removed and
@@ -94,7 +93,7 @@ describe("selecting a site", () => {
   });
 
   it("ignores a pill edit when no site is selected", () => {
-    const s = reducer(initialState, { t: "PATCH_PROJECT_DEFAULTS", patch: { hoursPerDay: 12 }, keys: ["x"] });
+    const s = reducer(initialState, { t: "PATCH_PROJECT_DEFAULTS", patch: { endDate: "2027-03-31" }, keys: ["x"] });
     expect(s).toBe(initialState);
   });
 });
@@ -109,7 +108,6 @@ describe("what reaches the draft when the agent returns", () => {
 
     expect(s.draft?.project.timing.startDate).toBe("2026-09-01");
     expect(s.draft?.project.timing.endDate).toBe("2026-12-31");
-    expect(s.draft?.project.timing.hoursPerDay).toBe(10);
     expect(s.draft?.project.location.label).toBe(QIDDIYA.location.label);
     expect(s.draft?.preferences.payment.terms).toBe("net-30");
     expect(s.draft?.projectId).toBe("p_qiddiya");
@@ -127,16 +125,21 @@ describe("what reaches the draft when the agent returns", () => {
   });
 
   it("marks a pill the renter already changed as theirs, not the site's", () => {
-    const edited = reducer(pick(initialState), { t: "PATCH_PROJECT_DEFAULTS", patch: { hoursPerDay: 12 }, keys: ["timing.hours_per_day"] });
+    const edited = reducer(pick(initialState), { t: "PATCH_PROJECT_DEFAULTS", patch: { endDate: "2027-03-31" }, keys: ["timing.end_date"] });
     const s = parse(edited, agentDraft());
 
-    expect(s.draft?.project.timing.hoursPerDay).toBe(12);
-    expect(s.draft?.touchedFields).toContain("timing.hours_per_day");
+    expect(s.draft?.project.timing.endDate).toBe("2027-03-31");
+    expect(s.draft?.touchedFields).toContain("timing.end_date");
 
     // And the canvas agrees: renter beats project.
-    expect(
-      fieldSource({ current: 12, key: "timing.hours_per_day", draft: s.draft! }),
-    ).toBe("renter");
+    expect(fieldSource({ current: "2027-03-31", key: "timing.end_date", draft: s.draft! })).toBe("renter");
+  });
+
+  it("never fills hours per day — that is a per-hire question, not a site fact", () => {
+    // Ruled 2026-08-30. A crane on night shift and a generator running around the clock are the
+    // same site in the same week, so the site cannot answer it. It stays in *More details*.
+    const s = parse(pick(initialState), agentDraft());
+    expect(s.draft?.projectFields).not.toContain("timing.hours_per_day");
   });
 
   it("says `project` for a value the site supplied, and `default` for one it did not", () => {

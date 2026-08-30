@@ -19,7 +19,7 @@ import type { ProjectDefaults } from "@/lib/contract/project";
  */
 
 const QIDDIYA: ProjectDefaults = {
-  timing: { rentalBasis: "monthly", extendable: true, startDate: "2026-09-01", endDate: "2026-12-31", hoursPerDay: 10 },
+  timing: { rentalBasis: "monthly", extendable: true, startDate: "2026-09-01", endDate: "2026-12-31" },
   paymentTerms: "net-30",
 };
 

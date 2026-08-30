@@ -45,7 +45,6 @@ type RawProject = {
       extendable: boolean;
       startDate: string | null;
       endDate: string | null;
-      hoursPerDay: number | null;
     };
     paymentTerms: string | null;
   };
@@ -104,7 +103,7 @@ const projects: RawProject[] = [
     locationLat: 24.6408,
     locationLng: 46.5731,
     defaults: {
-      timing: { rentalBasis: "monthly", extendable: true, startDate: "2026-09-01", endDate: "2026-12-31", hoursPerDay: 10 },
+      timing: { rentalBasis: "monthly", extendable: true, startDate: "2026-09-01", endDate: "2026-12-31" },
       paymentTerms: "net-30",
     },
     version: 4,
@@ -131,7 +130,7 @@ const projects: RawProject[] = [
     locationLat: 28.0,
     locationLng: 35.3,
     defaults: {
-      timing: { rentalBasis: "monthly", extendable: false, startDate: "2026-03-01", endDate: "2026-07-31", hoursPerDay: 12 },
+      timing: { rentalBasis: "monthly", extendable: false, startDate: "2026-03-01", endDate: "2026-07-31" },
       paymentTerms: "net-60",
     },
     version: 1,
@@ -259,7 +258,7 @@ export function createProjectFixture(body: ProjectBody) {
     locationLat: body.location?.lat ?? null,
     locationLng: body.location?.lng ?? null,
     defaults: body.defaults ?? {
-      timing: { rentalBasis: null, extendable: false, startDate: null, endDate: null, hoursPerDay: 10 },
+      timing: { rentalBasis: null, extendable: false, startDate: null, endDate: null },
       paymentTerms: null,
     },
     version: 1,

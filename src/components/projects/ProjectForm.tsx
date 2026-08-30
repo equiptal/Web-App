@@ -175,17 +175,6 @@ export function ProjectForm({
             </select>
           </Field>
 
-          <Field label={t.projects.form.hours}>
-            <input
-              type="number"
-              min={1}
-              max={24}
-              className={input}
-              value={timing.hoursPerDay ?? ""}
-              onChange={(e) => patchTiming({ hoursPerDay: e.target.value ? Number(e.target.value) : undefined })}
-            />
-          </Field>
-
           {/* Dates stay empty rather than being invented. A site with no dates yet is honest. */}
           <Field label={t.projects.form.start}>
             <input type="date" className={input} value={timing.startDate ?? ""} onChange={(e) => patchTiming({ startDate: e.target.value || null })} />

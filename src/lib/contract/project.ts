@@ -5,16 +5,21 @@
  * December, monthly, 10 hours a day, 30-day payment. Only the machine changes. A project holds that
  * once and prefills it, so the next request is one line of typing.
  *
- * **It holds seven fields and nothing else** (spec §5.1), and the rule that decides membership is
- * narrow on purpose: *the project holds only what the create flow actually asks the renter for.* A
- * field the backend receives but nobody is ever shown is a silent default, and a project setting for
- * a question that is never put is a setting for nothing. That rule is what keeps three fields out:
+ * **It holds six fields and nothing else** (spec §5.1) — where · title · rental basis · start · end ·
+ * extendable · payment terms — and the rule that decides membership is narrow on purpose: *the
+ * project holds only what the create flow actually asks the renter for, AND only what is true of the
+ * place rather than of one hire.* A field the backend receives but nobody is ever shown is a silent
+ * default, and a project setting for a question that is never put is a setting for nothing. That
+ * rule is what keeps four fields out:
  *
  *  - `workingDaysPerWeek` — sent as part of the payload, but there is NO control for it anywhere in
  *    `/create`. It is seeded to 6 (`defaultProjectDetails`) and shipped silently.
  *  - `overtimeRate` — a real control today, being removed from every renter surface (spec §5.4).
  *  - `terrain` — `RequestRecord.terrainType` exists and the edit modal offers it, but the create
  *    payload never carries it, so a project default would have nothing to fill.
+ *  - `hoursPerDay` — **removed 2026-08-30.** It reads like a site fact and is not one: a crane on
+ *    night shift and a generator running around the clock are the same site in the same week. It
+ *    stays in the request's *More details*, beside the overtime rate it belongs with.
  *
  * Everything else a renter might expect to find here — budget, payment method, maintenance, SLA,
  * supplier filters, the bid window — belongs to the REQUEST. Those are decisions about one machine
@@ -53,7 +58,12 @@ export interface SiteLocation {
  * parallel shape here would drift from `draft.ts` the first time a field moves.
  */
 export interface ProjectDefaults {
-  timing: TimingHours;
+  /**
+   * Four of the five `TimingHours` values. `hoursPerDay` is omitted rather than left unset, so the
+   * type itself says a project does not answer that question — see the note at the top of this file.
+   * Still derived from `TimingHours` so the other four cannot drift from `draft.ts`.
+   */
+  timing: Omit<TimingHours, "hoursPerDay">;
   /** AC-36's payment term — the one commercial term a company applies to every machine on every
    *  site, because it comes from their finance department rather than from the equipment. */
   paymentTerms: PaymentTerm | null;
@@ -113,7 +123,8 @@ export interface ProjectSummary extends Project {
 /** A blank project. Dates stay null — a site with no dates yet is honest; inventing them is not. */
 export function defaultProjectDefaults(): ProjectDefaults {
   return {
-    timing: { rentalBasis: null, extendable: false, startDate: null, endDate: null, hoursPerDay: 10 },
+    // No hoursPerDay: it is a per-hire question, asked in the request's *More details*.
+    timing: { rentalBasis: null, extendable: false, startDate: null, endDate: null },
     paymentTerms: null,
   };
 }
@@ -193,7 +204,6 @@ export function mapProject(raw: Record<string, unknown>): Project {
         extendable: t.extendable === true,
         startDate: str(t.startDate),
         endDate: str(t.endDate),
-        hoursPerDay: num(t.hoursPerDay) ?? 10,
       },
       paymentTerms: (str(d.paymentTerms) as PaymentTerm | null) ?? null,
     },
@@ -228,7 +238,6 @@ export function projectToPayload(p: Pick<Project, "title" | "location" | "defaul
         extendable: p.defaults.timing.extendable,
         startDate: p.defaults.timing.startDate,
         endDate: p.defaults.timing.endDate,
-        hoursPerDay: p.defaults.timing.hoursPerDay,
       },
       paymentTerms: p.defaults.paymentTerms,
     },

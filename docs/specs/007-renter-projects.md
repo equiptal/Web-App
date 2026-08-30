@@ -46,7 +46,7 @@ What this builds on:
 ## 4. The three levels
 
 ```
-PROJECT ──────────── location · when · payment terms   (seven fields, §5.1)
+PROJECT ──────────── location · when · payment terms   (six fields, §5.1)
    │
    ├── WORK ORDER ── the renter's own record. Never reaches the marketplace.
    │   └── items ─── one machine each, sharing a group id. NO parent row — exactly how a
@@ -118,6 +118,7 @@ That rule removes three fields people expect to find here:
 
 | | Why not |
 |---|---|
+| **hours per day** | **Removed from the project 2026-08-30 (owner).** It reads like a site fact and is not one: a crane on night shift and a generator running around the clock are the same site in the same week. It stays in the request's *More details*, beside the overtime rate it belongs with. |
 | **working days per week** | sent as `workingDaysPerWeek`, but **no control exists anywhere in create** — seeded to 6 and shipped silently. (`hoursPerDay` at `WhenPanel.tsx:254`, `extendable` at `:179` and `paymentTerms` at `ReadyToSend.tsx:140` are all real controls; this one is not.) |
 | **overtime rate** | a real control today, being removed from every renter surface (§5.4) |
 | **terrain** | never in the create payload at all |
@@ -579,7 +580,7 @@ never added together, because a work order posted as a request is deliberately t
 
 **One form for New and for Defaults.** Same fields, same order; the edit variant adds the propagation
 section and nothing else. Sections: **Where** (map picker → address → title) and **When & terms**
-(basis · start · end · hours/day · extendable · payment terms). Two sections, seven fields — everything
+(basis · start · end · extendable · payment terms). Two sections, six fields — everything
 else a renter might expect to find here belongs to the request (§5.3), or is never asked at all (§5.1).
 
 - The **map** comes first and the address follows it: dropping a pin is how a site is chosen; typing an

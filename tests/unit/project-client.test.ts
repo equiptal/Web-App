@@ -50,7 +50,7 @@ const rawProject = {
   locationLat: 24.6,
   locationLng: 46.5,
   defaults: {
-    timing: { rentalBasis: "monthly", extendable: true, startDate: "2026-09-01", endDate: "2026-12-31", hoursPerDay: 10 },
+    timing: { rentalBasis: "monthly", extendable: true, startDate: "2026-09-01", endDate: "2026-12-31" },
     paymentTerms: "net_30",
   },
   version: 7,
@@ -76,7 +76,6 @@ describe("reads", () => {
     // `title` is null on the wire; the short site name is the fallback the UI shows.
     expect(p.title).toBeNull();
     expect(p.location.label).toBe("Qiddiya Zone 4, Riyadh 13513");
-    expect(p.defaults.timing.hoursPerDay).toBe(10);
     expect(p.unitsAwarded).toBe(4);
   });
 
@@ -111,7 +110,7 @@ describe("reads", () => {
 /* ----------------------------- Writes ----------------------------- */
 
 describe("writes", () => {
-  it("sends only the seven fields on create, plus an explicit empty propagation list on edit", async () => {
+  it("sends only the six fields on create, plus an explicit empty propagation list on edit", async () => {
     stub(() => reply(200, rawProject));
     const p = await fetchProject("p1");
 

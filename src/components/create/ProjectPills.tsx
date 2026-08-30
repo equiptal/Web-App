@@ -192,23 +192,6 @@ export function ProjectPills() {
 
         <Pill label={t.projects.pills.dates} value={dates} />
 
-        <Pill label={t.projects.pills.hours} value={timing.hoursPerDay ?? "—"} changed={dirty("timing.hours_per_day")}>
-          <input
-            type="number"
-            min={1}
-            max={24}
-            value={timing.hoursPerDay ?? ""}
-            step={1}
-            onChange={(e) =>
-              actions.patchProjectDefaults({ hoursPerDay: e.target.value ? Number(e.target.value) : undefined }, [
-                "timing.hours_per_day",
-              ])
-            }
-            aria-label={t.projects.pills.hours}
-            className="absolute inset-0 cursor-pointer opacity-0"
-          />
-        </Pill>
-
         <button
           type="button"
           onClick={() => setSheet((v) => !v)}

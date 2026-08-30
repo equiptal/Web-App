@@ -22,7 +22,7 @@ const QIDDIYA: ProjectSummary = {
   title: "Qiddiya Zone 4",
   location: { label: "Qiddiya Zone 4, Riyadh 13513", lat: 24.6, lng: 46.5 },
   defaults: {
-    timing: { rentalBasis: "monthly", extendable: true, startDate: "2026-09-01", endDate: "2026-12-31", hoursPerDay: 10 },
+    timing: { rentalBasis: "monthly", extendable: true, startDate: "2026-09-01", endDate: "2026-12-31" },
     paymentTerms: "net-30",
   },
   version: 1,

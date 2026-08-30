@@ -135,10 +135,10 @@ export function applyProjectDefaults(
     next.project.timing.endDate = t.endDate;
     filled.push("timing.end_date");
   }
-  if (!agentStated(a?.timing?.hoursPerDay, SEED.timing.hoursPerDay) && t.hoursPerDay) {
-    next.project.timing.hoursPerDay = t.hoursPerDay;
-    filled.push("timing.hours_per_day");
-  }
+  /* Hours per day is NOT a project field (ruled 2026-08-30). It sits with the overtime rate in the
+     request's *More details*, because a site does not have one working day — a crane on nights and a
+     generator running around the clock are the same site on the same week. Filling it from here
+     would answer a question per PLACE that is really asked per HIRE. */
   // `extendable` is a flag on the basis, so it follows the basis rather than standing alone — and
   // its own seed (`false`) is never evidence the agent said anything.
   if (!agentStated(a?.timing?.rentalBasis, SEED.timing.rentalBasis)) {
