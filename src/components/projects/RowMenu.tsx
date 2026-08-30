@@ -1,0 +1,193 @@
+"use client";
+
+/**
+ * The row menu — every action this chart has (W-T15 · spec §8.4).
+ *
+ * The bar itself carries no controls. Two pins is all it shows, and everything a renter can *do*
+ * lives here, so the chart stays a thing you read rather than a surface covered in targets.
+ *
+ * ── The list is different four ways, and each difference means something ─────────────────────────
+ *
+ * **A request that is not awarded yet** offers *Award* and the bids. There are no marks, because
+ * there is nothing to mark — nobody has said who is supplying it.
+ *
+ * **A work order is never awarded from here.** It is awarded on its own form, at the moment it is
+ * created, because a machine you already have on site was never waiting on anyone.
+ *
+ * **Only marketplace rows carry the three navigation links.** A work order has no request to open,
+ * no quotation, and no deal room — it went to nobody. Showing them greyed out would imply a renter
+ * could have had them.
+ *
+ * **An unfiled row says *File in a project*, not *Move to another project*.** It was never in one,
+ * and "move" asks the renter to remember a place it has never been.
+ *
+ * ── Our quotation is a download ──────────────────────────────────────────────────────────────────
+ *
+ * It opens the PDF this product already generates for that request. It is **not** an upload slot: a
+ * supplier's own quotation is a document the renter attaches to an award, and putting both behind
+ * one word would mean a renter attaching a supplier's paper and later finding ours.
+ */
+
+import { useEffect, useRef, useState } from "react";
+import { useT } from "@/lib/i18n";
+import { Icon } from "@/components/ui";
+import { POPOVER } from "@/lib/ds";
+import type { Award, ChartGroup } from "@/lib/contract/award";
+
+export interface RowMenuActions {
+  onAward?: () => void;
+  onChangeAward?: () => void;
+  onAttachDocument?: () => void;
+  onMark?: (which: "mobilizedAt" | "demobilizedAt", value: string | null) => void;
+  onOpenRequest?: () => void;
+  onQuotation?: () => void;
+  onDealRoom?: () => void;
+  onReviewBids?: () => void;
+  onEditWorkOrder?: () => void;
+  onDeleteWorkOrder?: () => void;
+  onRemoveFromProject?: () => void;
+  onFileInProject?: () => void;
+}
+
+interface Entry {
+  key: string;
+  label: string;
+  icon: string;
+  run: () => void;
+  danger?: boolean;
+}
+
+export function RowMenu({
+  group,
+  award,
+  /** True for a row that is filed nowhere — its action is *File in a project*. */
+  unfiled,
+  actions,
+  today = new Date().toISOString().slice(0, 10),
+}: {
+  group: Pick<ChartGroup, "kind">;
+  /** `null` for an item nobody has awarded yet. */
+  award: Award | null;
+  unfiled?: boolean;
+  actions: RowMenuActions;
+  today?: string;
+}) {
+  const t = useT();
+  const m = t.projects.menu;
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+
+  const isWorkOrder = group.kind === "work_order";
+  const a = actions;
+  const items: Entry[] = [];
+  const push = (key: string, label: string, icon: string, run: (() => void) | undefined, danger?: boolean) => {
+    if (run) items.push({ key, label, icon, run, danger });
+  };
+
+  if (!award) {
+    // Nothing is supplied yet, so there is nothing to mark and nothing to attach papers to.
+    if (!isWorkOrder) {
+      push("award", m.award, "handshake", a.onAward);
+      push("bids", m.reviewBids, "gavel", a.onReviewBids);
+    }
+  } else {
+    push("doc", m.attachDocument, "attach_file", a.onAttachDocument);
+
+    // ⇄ undo: the same entry sets the mark and clears it, because a mistyped date is the common
+    // case and a separate "undo" entry doubles the list to say the same thing.
+    if (a.onMark) {
+      push(
+        "mob",
+        award.mobilizedAt ? m.undoMobilized : m.markMobilized,
+        "login",
+        () => a.onMark!("mobilizedAt", award.mobilizedAt ? null : today),
+      );
+      push(
+        "demob",
+        award.demobilizedAt ? m.undoDemobilized : m.markDemobilized,
+        "logout",
+        () => a.onMark!("demobilizedAt", award.demobilizedAt ? null : today),
+      );
+    }
+  }
+
+  // Marketplace rows only — a work order went to nobody.
+  if (!isWorkOrder) {
+    push("open", m.openRequest, "open_in_new", a.onOpenRequest);
+    push("quote", m.ourQuotation, "download", a.onQuotation);
+    push("deal", m.openDealRoom, "forum", a.onDealRoom);
+  } else {
+    push("edit", m.editWorkOrder, "edit", a.onEditWorkOrder);
+  }
+
+  if (award) push("change", m.changeAward, "tune", a.onChangeAward);
+
+  push(
+    "file",
+    unfiled ? m.fileInProject : m.removeFromProject,
+    unfiled ? "playlist_add" : "playlist_remove",
+    unfiled ? a.onFileInProject : a.onRemoveFromProject,
+  );
+
+  // A work order is the renter's own record and nobody else's, so deleting one takes nothing from
+  // anyone. A request is never deleted from here — it is removed from the project and stays.
+  if (isWorkOrder) push("delete", m.deleteWorkOrder, "delete", a.onDeleteWorkOrder, true);
+
+  if (!items.length) return null;
+
+  return (
+    <div ref={box} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={m.label}
+        className="grid h-7 w-7 place-items-center rounded-sm text-muted transition hover:bg-surface2 hover:text-navy"
+      >
+        <Icon name="more_vert" size={16} />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          /* The house treatment for a popover. This app has no shadows — a floating layer is
+             separated by its border and the ground behind it (see OVERLAY / POPOVER in ds.ts). */
+          className={`${POPOVER} absolute end-0 top-8 flex w-[232px] flex-col p-1`}
+        >
+          {items.map((e) => (
+            <button
+              key={e.key}
+              role="menuitem"
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                e.run();
+              }}
+              className={`flex items-center gap-2 px-3 py-1.5 text-start text-body transition hover:bg-surface2 ${
+                e.danger ? "text-danger" : "text-navy"
+              }`}
+            >
+              <Icon name={e.icon} size={14} className={`flex-none ${e.danger ? "text-danger" : "text-muted"}`} />
+              {e.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

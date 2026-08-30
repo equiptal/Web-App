@@ -18,7 +18,12 @@ import {
   updateProject,
   deleteProject,
   fetchChart,
+  saveAward,
+  markAward,
+  deleteAward,
+  withFreshVersion,
   ProjectVersionConflict,
+  type AwardInput,
 } from "@/lib/api/client";
 import {
   propagationForRequest,
@@ -29,7 +34,9 @@ import {
 import { ProjectForm, emptyProjectForm, projectToForm, type ProjectFormValue } from "./ProjectForm";
 import { ProjectDelete, ProjectCreated, projectIsEmpty } from "./ProjectDelete";
 import { ProjectsBoard } from "./ProjectsBoard";
-import type { ChartGroup } from "@/lib/contract/award";
+import type { Award, ChartGroup, ChartItem } from "@/lib/contract/award";
+import { RowMenu } from "./RowMenu";
+import { AwardDialog, UnawardConfirm } from "./AwardDialog";
 
 export function ProjectsSurface() {
   const t = useT();
@@ -39,6 +46,9 @@ export function ProjectsSurface() {
   const [notice, setNotice] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [chart, setChart] = useState<{ project: ProjectSummary; groups: ChartGroup[] } | null>(null);
+  const [version, setVersion] = useState(1);
+  const [awarding, setAwarding] = useState<{ group: ChartGroup; item: ChartItem } | null>(null);
+  const [unawarding, setUnawarding] = useState<Award | null>(null);
   const [deleting, setDeleting] = useState<ProjectSummary | null>(null);
   const [created, setCreated] = useState<ProjectSummary | null>(null);
   const router = useRouter();
@@ -68,7 +78,13 @@ export function ProjectsSurface() {
     }
     let live = true;
     fetchChart(selected)
-      .then((c) => live && setChart({ project: c.project, groups: c.groups }))
+      .then((c) => {
+        if (!live) return;
+        setChart({ project: c.project, groups: c.groups });
+        // The version travels with the chart, not with the project card: a card can be stale while
+        // the chart was fetched a moment ago, and every award write sends this back.
+        setVersion(c.version);
+      })
       // A chart that will not load leaves the pane empty rather than half-drawn: a renter reading a
       // partial site cannot tell that is what they are looking at.
       .catch(() => live && setChart(null));
@@ -131,6 +147,67 @@ export function ProjectsSurface() {
     }
   }
 
+  /** Re-read after any award write, so the chart and the version move together. */
+  async function refreshChart() {
+    if (!selected) return;
+    const c = await fetchChart(selected);
+    setChart({ project: c.project, groups: c.groups });
+    setVersion(c.version);
+    await reload();
+  }
+
+  async function award(lines: AwardInput[]) {
+    if (!awarding || !selected) return;
+    const parent =
+      awarding.group.kind === "request"
+        ? { requestId: awarding.group.id, workOrderItemId: null }
+        : { requestId: null, workOrderItemId: awarding.item.id };
+    setSaving(true);
+    setNotice(null);
+    try {
+      // Sequential, and each call carries the version the previous one returned. A split is two
+      // writes to the same blob; firing them together would make the second one stale by definition.
+      let v = version;
+      for (const line of lines) {
+        const res = await saveAward(selected, v, { ...line, ...parent });
+        v = res.version;
+      }
+      setAwarding(null);
+      await refreshChart();
+    } catch (err) {
+      // NOT retried. Replaying a create after somebody else's write can promise the same units
+      // twice, so the renter is told and re-reads instead.
+      setNotice(err instanceof ProjectVersionConflict ? t.projects.surface.stale : t.projects.surface.saveFailed);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** Marks and un-awards land on the same result whatever order they arrive in, so these retry. */
+  async function mark(awardId: string, which: "mobilizedAt" | "demobilizedAt", value: string | null) {
+    if (!selected) return;
+    try {
+      await withFreshVersion(selected, version, (v) => markAward(selected, awardId, v, { [which]: value }));
+      await refreshChart();
+    } catch {
+      setNotice(t.projects.surface.saveFailed);
+    }
+  }
+
+  async function unaward() {
+    if (!selected || !unawarding) return;
+    setSaving(true);
+    try {
+      await withFreshVersion(selected, version, (v) => deleteAward(selected, unawarding.id, v));
+      setUnawarding(null);
+      await refreshChart();
+    } catch {
+      setNotice(t.projects.surface.saveFailed);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -158,7 +235,44 @@ export function ProjectsSurface() {
              is exactly what it should do when nothing is filed nowhere. */
           unassigned={[]}
           onEditProject={(p) => void openEdit(p)}
+          rowMenu={(group, itemId, awardId) => {
+            const item = group.items.find((i) => i.id === itemId);
+            if (!item) return null;
+            const a = awardId ? item.awards.find((x) => x.id === awardId) ?? null : null;
+            return (
+              <RowMenu
+                group={group}
+                award={a}
+                actions={{
+                  onAward: a ? undefined : () => setAwarding({ group, item }),
+                  onChangeAward: a ? () => setAwarding({ group, item }) : undefined,
+                  onMark: a ? (which, value) => void mark(a.id, which, value) : undefined,
+                  // Un-awarding is reached through Change the award's own confirm, so the menu
+                  // does not offer two doors to the same destructive act.
+                  onOpenRequest: group.kind === "request" ? () => router.push(`/requests/${group.id}`) : undefined,
+                  // Remove from the project, the quotation and the deal room arrive with W-T18/W-T19.
+                  // Left undefined rather than stubbed: an entry that does nothing when pressed is
+                  // worse than one that is not there, because the renter tries it twice.
+                }}
+              />
+            );
+          }}
         />
+      )}
+
+      {awarding && (
+        <AwardDialog
+          open
+          onClose={() => setAwarding(null)}
+          item={awarding.item}
+          defaultBasis={(chart?.project.defaults.timing.rentalBasis as Award["rentalBasis"]) ?? "monthly"}
+          onSave={(lines) => void award(lines)}
+          saving={saving}
+        />
+      )}
+
+      {unawarding && (
+        <UnawardConfirm open onClose={() => setUnawarding(null)} award={unawarding} onConfirm={() => void unaward()} busy={saving} />
       )}
 
       {deleting && (
