@@ -1023,6 +1023,78 @@ export async function fetchTemplateTerms(projectId: string, option: TemplateOpti
   return item ? machineTermsOfRequestItem(item) : null;
 }
 
+/* ----------------------------- The fast path ----------------------------- */
+
+/** What `/rfq/quick` answers with. `fallback` means take the job path instead. */
+export interface QuickRfqResult {
+  tier?: 0 | 1;
+  fallback?: boolean;
+  reason?: string;
+  line_items?: Array<Record<string, unknown>>;
+  missing_required_fields?: unknown[];
+  field_notes?: unknown[];
+  rfq_id?: string | null;
+}
+
+/**
+ * Tier 1 — the equipment-only parse, answered synchronously.
+ *
+ * **Never throws.** Any failure comes back as `{ fallback: true }` and the caller runs the job path,
+ * because a renter must not lose their request because an optimisation was unavailable: the worst
+ * outcome here is the speed we already have.
+ */
+export async function processQuick(input: {
+  text: string;
+  language?: string;
+}): Promise<QuickRfqResult> {
+  try {
+    const res = await fetch("/api/agent/quick", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: input.text, language: input.language, source: "web_rfq" }),
+    });
+    if (!res.ok) return { fallback: true, reason: `http_${res.status}` };
+    return (await res.json()) as QuickRfqResult;
+  } catch {
+    return { fallback: true, reason: "network" };
+  }
+}
+
+/**
+ * Tell the corpus about a match the BROWSER made. Fire-and-forget in the strict sense: it is never
+ * awaited and never surfaced.
+ *
+ * Without it a client-side match writes no row, and once the fast path takes its share half the
+ * traffic stops teaching the learned rules — a decline that arrives over months and that nothing in
+ * any log would attribute to this change.
+ */
+export function ingestClientMatch(text: string, lineItems: Array<Record<string, unknown>>): void {
+  void fetch("/api/agent/ingest", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: text, line_items: lineItems, source: "web_rfq" }),
+    keepalive: true, // survives the navigation into the canvas
+  }).catch(() => {});
+}
+
+/**
+ * Ask the agent to warm its prompt cache for the equipment-only path.
+ *
+ * A cache write costs more than a read, and the write happens on whichever call arrives first. If
+ * that is the renter's, they pay for it while watching a spinner; if it is this one, they do not.
+ *
+ * **Best-effort in the strict sense** — never awaited, never surfaced, and a failure changes
+ * nothing except that the renter pays today's price. It is an optimisation, and an optimisation
+ * that can make a request worse is not one.
+ */
+export function warmAgentCache(): void {
+  void fetch("/api/agent/quick", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: "warm", warm: true }),
+  }).catch(() => {});
+}
+
 /* ----------------------------- An award's papers ----------------------------- */
 
 /**

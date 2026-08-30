@@ -5,6 +5,7 @@ import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { ProjectChips } from "@/components/create/ProjectChips";
 import { ProjectPills } from "@/components/create/ProjectPills";
+import { warmAgentCache } from "@/lib/api/client";
 import { useSession } from "@/lib/session";
 import { Button, Icon } from "@/components/ui";
 import { AccountModal } from "@/components/onboarding/AccountModal";
@@ -59,7 +60,32 @@ function sizeOf(dataUrl: string | undefined): string {
  */
 export function Intake() {
   const t = useT();
+
   const { state, actions } = useRfq();
+
+  /**
+   * Hand over to the processing screen only if the parse is still running after 8 seconds (W-T23).
+   *
+   * Taking the whole page for something that finishes in 400 ms is a flash of a screen nobody had
+   * time to read; leaving a spinner in a corner for eleven seconds is a page that looks broken.
+   * Eight is past the fast paths and short of a renter deciding it has hung.
+   */
+  useEffect(() => {
+    if (!state.busy) return;
+    const id = setTimeout(() => actions.escalateProcessing(), 8000);
+    return () => clearTimeout(id);
+  }, [state.busy, actions]);
+
+  /**
+   * Warm the prompt cache when the screen opens with a site selected.
+   *
+   * Best-effort in the strict sense: never awaited, never blocking, never surfaced, and a failure is
+   * invisible. It buys a cache read instead of a write on the call the renter is about to make, and
+   * if it does not land they simply pay what they pay today.
+   */
+  useEffect(() => {
+    if (state.project) warmAgentCache();
+  }, [state.project]);
   const { status } = useSession();
   const [rejected, setRejected] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
@@ -276,9 +302,9 @@ export function Intake() {
         ) : (
           <span className="text-body text-muted">{canStart ? t.intake.readyToReview : t.intake.addSomething}</span>
         )}
-        <Button disabled={!canStart} onClick={runAgent} className="px-6 py-3 text-body">
-          {hasDraft ? t.intake.reAnalyze : t.intake.continueLabel}{" "}
-          <Icon name="arrow_forward" size={17} className="rtl:scale-x-[-1]" />
+        <Button disabled={!canStart || state.busy} onClick={runAgent} className="px-6 py-3 text-body">
+          {state.busy ? t.intake.reading : hasDraft ? t.intake.reAnalyze : t.intake.continueLabel}{" "}
+          <Icon name={state.busy ? "hourglass_empty" : "arrow_forward"} size={17} className={state.busy ? "" : "rtl:scale-x-[-1]"} />
         </Button>
       </div>
 

@@ -19,7 +19,18 @@ import {
   newManualItem,
   postableItems,
 } from "@/lib/contract";
-import { ApiError, ApiErrorKind, fetchTaxonomy, postRfqCorrection, processRfq, submitRequest } from "@/lib/api/client";
+import {
+  ApiError,
+  ApiErrorKind,
+  fetchTaxonomy,
+  postRfqCorrection,
+  processRfq,
+  processQuick,
+  ingestClientMatch,
+  submitRequest,
+} from "@/lib/api/client";
+import { decideTier } from "@/lib/agent/tier";
+import { quickResultToDraft, quickItemsToDraft } from "@/lib/agent/quick-draft";
 import type { SiteLocation, ProjectDefaults, ProjectSummary } from "@/lib/contract/project";
 import { projectTitle } from "@/lib/contract/project";
 import { applyProjectDefaults, applyMachineTerms } from "@/lib/contract/project-apply";
@@ -128,6 +139,15 @@ export interface RfqState {
   /** Provenance only — the work order a template was copied from (W-T9). Changes no rendering. */
   workOrderGroupId: string | null;
   /**
+   * When the current parse started, or null when nothing is running (W-T23).
+   *
+   * The intake screen keeps the renter in place while a parse is quick and hands over to the
+   * processing screen only when it is not. A full-screen takeover for something that finishes in
+   * 400 ms is a flash of a page nobody had time to read; a spinner in a corner for eleven seconds
+   * is a page that looks broken. The timestamp is what lets one surface decide between them.
+   */
+  processingSince: number | null;
+  /**
    * The machine terms lifted off a template, waiting for the agent to return.
    *
    * Held rather than applied, because at intake there are no draft lines to apply them to. A ONE-TIME
@@ -166,6 +186,7 @@ export const initialState: RfqState = {
   projectDirty: [],
   workOrderGroupId: null,
   templateTerms: null,
+  processingSince: null,
 };
 
 type Action =
@@ -175,6 +196,7 @@ type Action =
   | { t: "REMOVE_FILE"; index: number }
   | { t: "SET_SIMULATE_ERROR"; value: boolean }
   | { t: "PROCESS_START" }
+  | { t: "ESCALATE_PROCESSING" }
   | { t: "PROCESS_SUCCESS"; draft: AgentDraft }
   | { t: "PROCESS_ERROR"; kind: ApiErrorKind; detail?: RfqState["errorDetail"] }
   | { t: "GUEST_LIMIT" }
@@ -266,8 +288,25 @@ export function reducer(state: RfqState, a: Action): RfqState {
       return { ...state, files: state.files.filter((_, i) => i !== a.index) };
     case "SET_SIMULATE_ERROR":
       return { ...state, simulateError: a.value };
+    /**
+     * A parse begins, and the renter STAYS on the intake screen (W-T23).
+     *
+     * Taking the whole page for something that finishes in 400 ms is a flash of a screen nobody had
+     * time to read. `processingSince` is stamped so the surface can hand over to the processing
+     * screen if it turns out to be slow after all — see ESCALATE_PROCESSING.
+     */
     case "PROCESS_START":
-      return { ...state, phase: "processing", busy: true, error: null, errorDetail: null, guestLimit: false };
+      return {
+        ...state,
+        busy: true,
+        processingSince: Date.now(),
+        error: null,
+        errorDetail: null,
+        guestLimit: false,
+      };
+    /** It was not quick. Hand over, rather than leaving a spinner in a corner for eleven seconds. */
+    case "ESCALATE_PROCESSING":
+      return state.busy && state.phase === "intake" ? { ...state, phase: "processing" } : state;
     case "GUEST_LIMIT":
       // Signed-out visitor hit the server parse cap → back to intake with the flag set; Intake opens the
       // account modal (same UX as the client-side localStorage nudge), never an error screen.
@@ -321,7 +360,18 @@ export function reducer(state: RfqState, a: Action): RfqState {
         ? { ...applyMachineTerms(withProject, state.templateTerms, origin).draft, projectId: withProject.projectId, workOrderGroupId: withProject.workOrderGroupId, projectFields: withProject.projectFields, touchedFields: withProject.touchedFields }
         : withProject;
 
-      return { ...state, busy: false, error: null, draft, agentOrigin: origin, multiLocationDismissed: false };
+      return {
+        ...state,
+        busy: false,
+        processingSince: null,
+        error: null,
+        draft,
+        agentOrigin: origin,
+        multiLocationDismissed: false,
+        // Never escalated — so there is no processing screen to hand off from, and the canvas is
+        // where the renter is going. Escalated runs keep today's path: Processing calls enterWizard.
+        ...(state.phase === "intake" ? { phase: "wizard" as const, activeSection: "equipment" as const, itemIndex: 0 } : {}),
+      };
     }
     /* ── PROJ ───────────────────────────────────────────────────────────────────
        Selecting COPIES the site's values in; it never holds a reference. The pills edit that copy,
@@ -390,7 +440,8 @@ export function reducer(state: RfqState, a: Action): RfqState {
       return { ...state, templateTerms: a.terms, workOrderGroupId: a.groupId, project };
     }
     case "PROCESS_ERROR":
-      return { ...state, busy: false, error: a.kind, errorDetail: a.detail ?? null };
+      // Back to intake with the text intact (AC-10), wherever the failure happened.
+      return { ...state, busy: false, processingSince: null, phase: "intake", error: a.kind, errorDetail: a.detail ?? null };
     case "ENTER_WIZARD":
       return { ...state, phase: "wizard", activeSection: "equipment", itemIndex: 0, readyToSend: false };
     case "RESUME_WIZARD":
@@ -683,10 +734,56 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
       when: { startDate: string | null; endDate: string | null } | null,
     ) => dispatch({ t: "USE_TEMPLATE", terms, groupId, when }),
 
+    /**
+     * Parse the renter's text.
+     *
+     * Three paths, chosen by the SHAPE of what they typed — not by whether they have a project. A
+     * project does not make a parse cheaper; it makes short text the common case, and short text is
+     * what the fast paths are for.
+     *
+     * Every fast path falls back rather than failing. A renter must never lose their request
+     * because an optimisation was unavailable: the worst outcome is the speed we already have.
+     */
     async process() {
       const s = getState();
       dispatch({ t: "PROCESS_START" });
+
+      const decision = decideTier({
+        text: s.text,
+        hasProject: !!s.project,
+        hasFiles: s.files.length > 0,
+        taxonomy: s.taxonomy,
+      });
+
       try {
+        /* ── Tier 0 — no network at all ──
+           The taxonomy is already loaded for the dropdowns, so this is a string match against data
+           the browser is holding. It still reaches the corpus (fire-and-forget) or half the traffic
+           would stop teaching the learned rules. */
+        if (decision.tier === 0 && decision.match?.matched) {
+          const draft = quickResultToDraft(decision.match.item, s.taxonomy);
+          ingestClientMatch(s.text, draft.items.map((i) => ({
+            input_equipment: i.rawLabel ?? "",
+            category_id: i.ref.categoryId,
+            subtype_id: i.ref.subcategoryId,
+            capacity_id: i.ref.measurementId,
+            quantity: i.quantity,
+          })));
+          dispatch({ t: "PROCESS_SUCCESS", draft });
+          return;
+        }
+
+        /* ── Tier 1 — one synchronous call, no job row, no poll ── */
+        if (decision.tier === 1) {
+          const quick = await processQuick({ text: s.text });
+          if (!quick.fallback && quick.line_items?.length) {
+            dispatch({ t: "PROCESS_SUCCESS", draft: quickItemsToDraft(quick, s.taxonomy) });
+            return;
+          }
+          // Fell back: straight on to the job path below, with nothing shown to the renter. They
+          // asked for a parse, not for a report on which of our paths answered.
+        }
+
         const draft = await processRfq({ text: s.text, files: s.files, simulateError: s.simulateError });
         dispatch({ t: "PROCESS_SUCCESS", draft });
       } catch (e) {
@@ -699,6 +796,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
       }
     },
     enterWizard: () => dispatch({ t: "ENTER_WIZARD" }),
+    escalateProcessing: () => dispatch({ t: "ESCALATE_PROCESSING" }),
     resumeWizard: () => dispatch({ t: "RESUME_WIZARD" }),
     goIntake: () => dispatch({ t: "GO_INTAKE" }),
     resumeDraft: () => dispatch({ t: "RESUME_DRAFT" }),

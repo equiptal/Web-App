@@ -217,6 +217,7 @@ export const en = {
     close: "Close",
   },
   intake: {
+    reading: "Reading",
     heading: "How would you like to create your request?",
     subheading: "Start from an existing RFQ document, or fill it in manually. You'll review everything before it's sent.",
     optUploadTitle: "Write / Upload RFQ",
@@ -1624,6 +1625,31 @@ export const en = {
    * for now because other surfaces still read a handful of their labels.
    */
   projects: {
+    offer: {
+      alreadyTitle: "You already have a project at {site}",
+      alreadySub: "Add this request to it, or say it is a different site — two projects for one place split the site's picture in two.",
+      addTo: "Add it to {site}",
+      addToSub: "Nothing on the request changes. It just appears on that site's chart.",
+      different: "It's a different site",
+      differentSub: "Same address, different job. We make a second project and file this under it.",
+      createTitle: "Make a project from this request?",
+      createSub: "State the site once and your next request for it is one line of typing.",
+      savedHeading: "Saved as the project",
+      staysHeading: "Stays with this request",
+      fieldSite: "Site",
+      fieldDates: "Dates",
+      fieldBasis: "Rental basis",
+      fieldHours: "Hours per day",
+      fieldPayment: "Payment terms",
+      fieldEquipment: "Equipment",
+      fieldBudget: "Budget",
+      fieldMethod: "Payment method",
+      fieldSuppliers: "Supplier filters",
+      thisRequestOnly: "this request only",
+      verifiedOnly: "verified only",
+      createAction: "Make the project",
+      notNow: "Not now",
+    },
     docs: {
       title: "Papers for this award",
       none: "Nothing attached yet.",

@@ -8,6 +8,7 @@ import { postableItems } from "@/lib/contract";
 import { fetchRequestSubmissions, bidShareUrl, setBidDeadline, setShareLinkLogo } from "@/lib/api/client";
 import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
 import { pin } from "@/lib/uiPins";
+import { ProjectOffer } from "@/components/create/ProjectOffer";
 
 /**
  * AC-42 confirmation — "Your request is live" (prototype: Request Sent). Animated success hero,
@@ -188,6 +189,17 @@ export function Confirmation() {
         ar={ar}
         L={L}
       />
+      {/* PROJ (W-T24) — the offer, after a PROJECTLESS submit only. A renter who already filed
+          this under a site has been asked nothing and is asked nothing now. */}
+      {!draft?.projectId && draft && (
+        <div style={{ maxWidth: 720, margin: "18px auto 0" }}>
+          <ProjectOffer
+            requestId={state.requestUuids[0] ?? null}
+            project={draft.project}
+            preferences={draft.preferences}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -390,8 +402,7 @@ function SceneCompare({ L }: { ar: boolean; L: (e: string, a: string) => string 
           </div>
         ))}
       </div>
-      <div style={{ marginTop: 11, textAlign: "center", fontSize: 11, fontWeight: 700, color: "var(--muted)" }}>{L("Broadcast & shared-link bids, side by side", "عروض البث والرابط المشترك، جنباً إلى جنب")}</div>
-    </div>
+      <div style={{ marginTop: 11, textAlign: "center", fontSize: 11, fontWeight: 700, color: "var(--muted)" }}>{L("Broadcast & shared-link bids, side by side", "عروض البث والرابط المشترك، جنباً إلى جنب")}</div>    </div>
   );
 }
 
