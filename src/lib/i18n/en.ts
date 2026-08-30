@@ -1803,6 +1803,7 @@ export const en = {
       later: "Not now",
     },
     surface: {
+      summary: "{n} sites",
         heading: "Your projects",
         sub: "A site you state once. Every request for it starts filled in.",
         newProject: "New project",

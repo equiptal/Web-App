@@ -1543,6 +1543,7 @@ export const ar: Dictionary = {
       later: "ليس الآن",
     },
     surface: {
+      summary: "{n} مواقع",
         heading: "مشاريعك",
         sub: "موقع تذكره مرة واحدة، ثم يأتي كل طلب له معبّأً.",
         newProject: "مشروع جديد",

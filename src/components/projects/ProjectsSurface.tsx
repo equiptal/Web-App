@@ -54,6 +54,38 @@ import { projectTitle } from "@/lib/contract/project";
 import { EMPTY_WHEN } from "@/lib/contract/work-order";
 import type { Taxonomy } from "@/lib/contract/taxonomy";
 
+/**
+ * The section header, matching *My Requests* exactly (owner, 2026-08-30).
+ *
+ * A navy plate carrying the section's glyph, the title over its summary, the action on the trailing
+ * edge — and NO bordered box, because the page already has enough bordered rectangles and the plate
+ * is what the eye finds. Two sections in one column that announce themselves differently read as two
+ * pages accidentally stacked.
+ *
+ * The action is the PRIMARY button, not a quiet one: on an empty dashboard it is the only thing to
+ * do here, and a white button beside an orange one elsewhere on the page says this matters less.
+ */
+function SectionHeader({ count, onNew }: { count: number; onNew: () => void }) {
+  const t = useT();
+  return (
+    <div className="flex items-center gap-3">
+      <span className="grid size-[38px] flex-none place-items-center rounded-sm bg-navy text-surface">
+        <Icon name="place" size={22} />
+      </span>
+      <span className="min-w-0">
+        <h2 className="text-title font-extrabold text-navy">{t.projects.surface.heading}</h2>
+        <span className="mt-0.5 block text-meta text-muted">
+          {count > 0 ? t.projects.surface.summary.replace("{n}", String(count)) : t.projects.surface.empty}
+        </span>
+      </span>
+      <span className="flex-1" />
+      <Button onClick={onNew}>
+        <Icon name="add" size={16} /> {t.projects.surface.newProject}
+      </Button>
+    </div>
+  );
+}
+
 export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   const t = useT();
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
@@ -390,14 +422,8 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
    */
   if (embedded && projects && projects.length === 0) {
     return (
-      <section className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-dashed border-border px-4 py-3">
-        <span className="min-w-0">
-          <span className="block text-body font-semibold text-navy">{t.projects.surface.heading}</span>
-          <span className="block text-meta text-muted">{t.projects.surface.empty}</span>
-        </span>
-        <Button variant="secondary" onClick={() => setEditing({ id: null, value: emptyProjectForm() })}>
-          <Icon name="add" size={15} /> {t.projects.surface.newProject}
-        </Button>
+      <section className="flex flex-col gap-3">
+        <SectionHeader count={0} onNew={() => setEditing({ id: null, value: emptyProjectForm() })} />
 
         {/* The form still has to be reachable from here, or the button does nothing. */}
         <Dialog open={!!editing} onClose={() => setEditing(null)} title={t.projects.surface.newProject}>
@@ -420,21 +446,10 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          {/* A section of the dashboard, not a page of its own — so it takes a section's heading
-              level and weight, and sits in the same column as everything above it. */}
-          {embedded ? (
-            <h2 className="text-subhead font-extrabold text-navy">{t.projects.surface.heading}</h2>
-          ) : (
-            <h1 className="text-display font-extrabold leading-tight tracking-[-.02em] text-navy">{t.projects.surface.heading}</h1>
-          )}
-          <p className="mt-1 text-body text-muted">{t.projects.surface.sub}</p>
-        </div>
-        <Button onClick={() => setEditing({ id: null, value: emptyProjectForm() })}>
-          <Icon name="add" size={16} /> {t.projects.surface.newProject}
-        </Button>
-      </div>
+      <SectionHeader
+        count={projects?.length ?? 0}
+        onNew={() => setEditing({ id: null, value: emptyProjectForm() })}
+      />
 
       {notice && <p className="rounded-sm border border-danger/40 bg-danger/5 px-3 py-2 text-body text-danger">{notice}</p>}
 
