@@ -250,6 +250,15 @@ export function ProjectForm({
 
       {/* ── Three actions ── */}
       <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
+        {/* A disabled button with no reason beside it is indistinguishable from a broken one: the
+            renter presses it, nothing happens, and there is nowhere to look. This is the only thing
+            that can hold Save, so it names it. */}
+        {!canSave && !saving && (
+          <span className="me-auto flex items-center gap-1.5 text-meta font-semibold text-warn">
+            <Icon name="info" size={13} className="flex-none" />
+            {t.projects.form.addressRequired}
+          </span>
+        )}
         <Button variant="secondary" onClick={onCancel} disabled={saving}>
           {t.common.cancel}
         </Button>

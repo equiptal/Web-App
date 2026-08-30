@@ -41,6 +41,7 @@ export const en = {
     requests: "Requests",
     compare: "Compare bids",
     dashboard: "Dashboard",
+    browse: "Browse",
     surveys: "Surveys",
     inbox: "Inbox",
     request: "Request",
@@ -1814,7 +1815,8 @@ export const en = {
         saveFailed: "That did not save. Try again.",
       },
     form: {
-        whereTitle: "Where",
+        addressRequired: "Add the address first — drop a pin, or type it.",
+      whereTitle: "Where",
         address: "Address",
         addressPlaceholder: "Drop a pin above, or type the address",
         title: "Name for this project",

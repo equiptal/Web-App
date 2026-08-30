@@ -43,6 +43,7 @@ export const ar: Dictionary = {
     requests: "الطلبات",
     compare: "مقارنة العروض",
     dashboard: "الصفحة الرئيسية",
+    browse: "تصفّح",
     surveys: "الاستبيانات",
     inbox: "الوارد",
     request: "طلب",
@@ -1554,7 +1555,8 @@ export const ar: Dictionary = {
         saveFailed: "لم يتم الحفظ. حاول مرة أخرى.",
       },
     form: {
-        whereTitle: "الموقع",
+        addressRequired: "أضف العنوان أولاً — ضع دبوسًا أو اكتبه.",
+      whereTitle: "الموقع",
         address: "العنوان",
         addressPlaceholder: "ضع دبوسًا فوق، أو اكتب العنوان",
         title: "اسم المشروع",

@@ -259,7 +259,16 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     } catch (err) {
       // Someone else edited this site while the form was open. Say so plainly rather than
       // overwriting their change with a form that was filled in before it existed.
-      setNotice(err instanceof ProjectVersionConflict ? t.projects.surface.stale : t.projects.surface.saveFailed);
+      if (err instanceof ProjectVersionConflict) {
+        setNotice(t.projects.surface.stale);
+      } else {
+        // The code and status ride along. "That did not save" tells a renter nothing they can act
+        // on and tells us nothing we can debug — and this is the first thing a new renter does, so
+        // a failure here is the failure most likely to be reported and least likely to be
+        // reproducible without it.
+        const detail = err instanceof ApiError ? [err.backendCode, err.status].filter(Boolean).join(" · ") : "";
+        setNotice(detail ? `${t.projects.surface.saveFailed} (${detail})` : t.projects.surface.saveFailed);
+      }
     } finally {
       setSaving(false);
     }
@@ -424,6 +433,11 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     return (
       <section className="flex flex-col gap-3">
         <SectionHeader count={0} onNew={() => setEditing({ id: null, value: emptyProjectForm() })} />
+
+        {/* This branch returns early, so it needs its own copy of the notice. Without one a failed
+            save was completely silent — the renter pressed Save and nothing happened, which is
+            indistinguishable from a broken button. */}
+        {notice && <p className="rounded-sm border border-danger/40 bg-danger/5 px-3 py-2 text-body text-danger">{notice}</p>}
 
         {/* The form still has to be reachable from here, or the button does nothing. */}
         <Dialog open={!!editing} onClose={() => setEditing(null)} title={t.projects.surface.newProject}>
