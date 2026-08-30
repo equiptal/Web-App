@@ -170,7 +170,15 @@ export function HomeHub() {
              offset follows the direction on its own. Safe to mirror because the frame carries no text
              and no lettering on the machines — if a future photograph does, this has to go and the
              image has to be re-shot for both directions instead. */
-          className="absolute -start-[7.5%] -top-[7.5%] -z-10 h-[115%] w-[115%] max-w-none object-cover rtl:-scale-x-100"
+          /* ── Drawn at the band's own size, not 115% of it (owner, 2026-08-30: *"the image hd"*) ──
+             The oversize existed to give `object-fit: cover` slack to crop from. It never needed any:
+             `cover` scales the picture to fill the box and crops the overflow itself, which is the
+             whole of what it does. What the 115% actually bought was a 1.15× magnification on top of
+             the upscale the band already asks for — at a 1920 window the 1584px source was being
+             drawn at 2208px — and softness is exactly what that costs.
+
+             `inset-0 h-full w-full`: the smallest scale factor the band can be filled at. */
+          className="absolute inset-0 -z-10 h-full w-full max-w-none object-cover rtl:-scale-x-100"
           style={{ objectPosition: "center 55%" }}
         />
         <span
