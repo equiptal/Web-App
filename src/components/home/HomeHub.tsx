@@ -9,7 +9,7 @@ import { fetchActivity, type ActivityCounts } from "@/lib/api/client";
 import { HomeRequests } from "@/components/home/HomeRequests";
 import { StartYourRequestModal, type StartRequestChoice } from "@/components/home/StartYourRequestModal";
 import { useStartRequestGate } from "@/lib/access/start-request-gate";
-import { btn } from "@/lib/ds";
+import { btn, cx, PAGE_X_READING } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 
 /**
@@ -112,7 +112,30 @@ export function HomeHub() {
           which is the accent the new-bids banner already wears on a dark ground. */}
       <div
         {...pin("home-hero")}
-        className="relative isolate flex h-[160px] items-center overflow-hidden rounded-sm px-6 sm:px-11"
+        /* ── Full window, and flush under the nav bar (owner, 2026-08-30) ────────────────────
+           *"Set the cta width for full window fit and for height stick it to the nav bar, same as
+           prototype."*
+
+           Two escapes, because the shell wraps every page in both a cap and a gutter
+           (`max-w-[1440px] px-6 … xl:px-28`) and the comp's band has neither:
+
+            · **Across** — `w-screen` with `-ms-[50vw]` off the container's own midpoint. A logical
+              margin, not `-ml`, so it escapes the same way in Arabic. `body { overflow-x: clip }`
+              takes the scrollbar's width of overhang that `100vw` always carries; the rule there
+              records why it is `clip` and not `hidden`.
+            · **Up** — `-mt-6 sm:-mt-7` cancels `PAGE_Y`'s top half exactly, so the band's edge meets
+              the header's border with no seam of page background between them. It is written against
+              `PAGE_Y`'s own numbers; if that rhythm changes, this follows it.
+
+           The rounding goes with the gutter: a radius on a band whose corners are off-screen draws a
+           notch against the header and nothing else. The COPY keeps the page's reading gutter, so
+           the headline still lines up with the blocks below it. */
+        className="relative isolate -mt-6 flex h-[160px] w-screen items-center overflow-hidden sm:-mt-7"
+        /* `calc(50% - 50vw)`, and the 50% is of the CONTAINER — the padded, capped main. That centres a
+           100vw child on a container which is itself centred in the viewport, which lands the band on
+           the window's edges at every width. Inline because a Tailwind arbitrary value cannot mix the
+           two units, and logical (`marginInlineStart`) so it escapes the same way in Arabic. */
+        style={{ marginInlineStart: "calc(50% - 50vw)" }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -142,7 +165,7 @@ export function HomeHub() {
         />
         <span aria-hidden="true" className="absolute inset-0 -z-10 bg-navy opacity-[0.35] mix-blend-multiply" />
 
-        <div className="relative flex w-full items-center gap-6">
+        <div className={cx("relative mx-auto flex w-full max-w-[1440px] items-center gap-6", PAGE_X_READING)}>
           <div className="min-w-0 flex-1">
             {/* A BLOCK, not a flex row: the three text nodes are one sentence, and as flex items the
                 spaces between them collapse and the row's own `gap` stands in for them — which sets

@@ -217,6 +217,16 @@ body {
   color: var(--foreground);
   font-family: var(--font-nunito), var(--font-inter), -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: var(--text-body);
+  /* ── So a band can reach the window's edge (owner, 2026-08-30) ─────────────────────────
+     The home CTA is full-bleed: it escapes the page's 1440px cap and its gutter with the standard
+     `w-screen` + `-ms-[50vw]` pair. `100vw` INCLUDES the vertical scrollbar, so on a scrolling page
+     that pair overhangs by the scrollbar's width and the document grows a horizontal scrollbar it
+     has no content for.
+
+     `clip`, not `hidden`. `overflow: hidden` on the body makes it a scroll container, which breaks
+     `position: sticky` on the app header — the one thing on every page that must not come unstuck.
+     `clip` cuts the overhang without creating one. */
+  overflow-x: clip;
 }
 
 /* Arabic uses IBM Plex Sans Arabic — the prototype's own face (owner, 2026-08-19; `layout.tsx` carries
