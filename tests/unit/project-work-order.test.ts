@@ -1,5 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { workOrderPayload, blankMachine, type WorkOrderDraft } from "@/components/projects/WorkOrderForm";
+import {
+  workOrderPayload,
+  blankMachine,
+  blankTerms,
+  blankLine,
+  lineTotal,
+  machineTotal,
+  unitsAssigned,
+  overAssigned,
+  type WorkOrderDraft,
+} from "@/components/projects/WorkOrderForm";
 import { machineIsNamed, groupWorkOrderItems, EMPTY_WHEN, type WorkOrderItem } from "@/lib/contract/work-order";
 
 /**
@@ -13,6 +23,7 @@ import { machineIsNamed, groupWorkOrderItems, EMPTY_WHEN, type WorkOrderItem } f
 
 const draft = (over: Partial<WorkOrderDraft> = {}): WorkOrderDraft => ({
   title: "Own fleet — Qiddiya",
+  terms: blankTerms(),
   when: { ...EMPTY_WHEN },
   machines: [blankMachine()],
   ...over,
@@ -54,10 +65,10 @@ describe("the payload", () => {
           rawLabel: "Excavator",
           offCatalogue: true,
           lines: [
-            { supplierName: "Zahid Tractor", units: 2, rateAmount: "8600", rentalBasis: "monthly" },
-            { supplierName: "Al-Rajhi", units: 1, rateAmount: "", rentalBasis: "monthly" },
+            { supplierName: "Zahid Tractor", units: 2, rateAmount: "8600", mobAmount: "", demobAmount: "", rentalBasis: "monthly" },
+            { supplierName: "Al-Rajhi", units: 1, rateAmount: "", mobAmount: "", demobAmount: "", rentalBasis: "monthly" },
             // Own fleet: the renter provides it, so there is no supplier to record.
-            { supplierName: "  ", units: 1, rateAmount: "", rentalBasis: "monthly" },
+            { supplierName: "  ", units: 1, rateAmount: "", mobAmount: "", demobAmount: "", rentalBasis: "monthly" },
           ],
         },
       ],
@@ -81,7 +92,7 @@ describe("the payload", () => {
           ...blankMachine(),
           rawLabel: "Excavator",
           offCatalogue: true,
-          lines: [{ supplierName: "Zahid Tractor", units: 2, rateAmount: "8600", rentalBasis: "monthly" }],
+          lines: [{ supplierName: "Zahid Tractor", units: 2, rateAmount: "8600", mobAmount: "", demobAmount: "", rentalBasis: "monthly" }],
         },
       ],
     });
@@ -179,5 +190,92 @@ describe("reading a group back", () => {
       item({ id: "m2", workOrderGroupId: "g2", title: "Site power" }),
     ]);
     expect(groups.map((g) => g.id)).toEqual(["g1", "g2"]);
+  });
+});
+
+describe("what a supplier line costs", () => {
+  const line = (over: Partial<ReturnType<typeof blankLine>> = {}) => ({ ...blankLine("monthly"), ...over });
+
+  it("adds the haulage to the rate, then multiplies by units", () => {
+    /* (8600 + 1200 + 900) × 2. The owner asked for this shape because comparing suppliers on the
+       rate alone compares the wrong number — the cheaper monthly rate often carries the longer
+       haul. */
+    expect(lineTotal(line({ rateAmount: "8600", mobAmount: "1200", demobAmount: "900", units: 2 }))).toBe(21400);
+  });
+
+  it("treats an empty box as not recorded, not as zero", () => {
+    // Nothing priced at all has no total. A renter who has not been quoted yet must not read "0".
+    expect(lineTotal(line({ units: 3 }))).toBeNull();
+
+    // But a rate with no haulage quoted is still a total — of the part that IS known.
+    expect(lineTotal(line({ rateAmount: "1000", units: 2 }))).toBe(2000);
+  });
+
+  it("refuses to invent a number from something that is not one", () => {
+    expect(lineTotal(line({ rateAmount: "abc", units: 1 }))).toBeNull();
+  });
+
+  it("sums a machine across its suppliers, and stays null when nothing is priced", () => {
+    const m = {
+      ...blankMachine(),
+      lines: [line({ rateAmount: "1000", units: 2 }), line({ rateAmount: "500", mobAmount: "100", units: 1 })],
+    };
+    expect(machineTotal(m)).toBe(2600);
+    expect(machineTotal({ ...blankMachine(), lines: [line(), line()] })).toBeNull();
+  });
+});
+
+describe("units cannot outrun the machine's quantity", () => {
+  it("counts what is assigned, and flags one unit too many", () => {
+    const m = { ...blankMachine(), quantity: 3, lines: [blankLine("monthly"), blankLine("monthly")] };
+    m.lines[0].units = 2;
+    m.lines[1].units = 2;
+
+    expect(unitsAssigned(m)).toBe(4);
+    expect(overAssigned(m)).toBe(true);
+  });
+
+  it("allows assigning fewer than the quantity — the rest is simply not placed yet", () => {
+    const m = { ...blankMachine(), quantity: 3, lines: [blankLine("monthly")] };
+    m.lines[0].units = 1;
+    expect(overAssigned(m)).toBe(false);
+  });
+
+  it("allows exactly the quantity", () => {
+    const m = { ...blankMachine(), quantity: 2, lines: [blankLine("monthly")] };
+    m.lines[0].units = 2;
+    expect(overAssigned(m)).toBe(false);
+  });
+});
+
+describe("the order's terms", () => {
+  it("travel once, for the order, in the shape the wire takes", () => {
+    /* Order-level rather than per machine: the backend copies them onto every row that does not
+       carry its own, which is what makes the tenth machine free to add. */
+    const d = draft({ terms: { ...blankTerms(), deliveryOverride: "supplier", operatorNeeded: "no" } });
+    const wire = workOrderPayload(d, { create: true }).body.terms as Record<string, unknown>;
+
+    expect(wire.delivery).toBe("supplier");
+    expect(wire.operator).toBe("no");
+  });
+
+  it("sends the two haulage amounts only when they were recorded", () => {
+    const priced = draft({
+      machines: [
+        {
+          ...blankMachine(),
+          rawLabel: "Excavator",
+          offCatalogue: true,
+          lines: [{ ...blankLine("monthly"), supplierName: "Zahid", rateAmount: "8600", mobAmount: "1200" }],
+        },
+      ],
+    });
+
+    const row = (workOrderPayload(priced, { create: true }).body.items as Record<string, unknown>[])[0];
+    const sent = (row.supplyLines as Record<string, unknown>[])[0];
+
+    expect(sent.mobilizationAmount).toBe(1200);
+    // Absent, not null: an empty box means nobody has quoted the return haul, which is not free.
+    expect("demobilizationAmount" in sent).toBe(false);
   });
 });
