@@ -96,9 +96,9 @@ export const en = {
     // he is here to get a machine. «AI» is its own token so it can carry the brand's ink — the comp
     // colours that one word and nothing else on the band.
     ctaTitleBefore: "Let ",
-    ctaTitleAi: "AI",
+    ctaTitleAi: "our AI assistant",
     ctaTitleAfter: " find your next equipment",
-    ctaSubtitle: "Describe what you need in plain words. Your smart assistant matches you with the right suppliers.",
+    ctaSubtitle: "Describe what you need in plain words. Our AI assistant matches you with the right suppliers.",
     uploadRfq: "Upload RFQ",
     suppliersTitle: "Suggested Suppliers",
     viewAll: "View all",
@@ -146,7 +146,7 @@ export const en = {
     nudgeBasicCta: "Get verified",
     verifiedTitle: "You're verified",
     verifiedBody: "Your company is verified.",
-    yourRequests: "Your Requests",
+    yourRequests: "My Requests",
     priceBids: "Price Bids",
     completedDeals: "Completed Deals",
     soon: "Coming soon",
