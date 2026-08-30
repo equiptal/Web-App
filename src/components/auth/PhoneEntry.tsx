@@ -6,6 +6,7 @@ import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { PUBLIC_WEB_ENABLED } from "@/lib/flags";
 import { btn } from "@/lib/ds";
+import { authField, authFoot, authLabel, authSub, authSubmit, authTitle, type AuthTone } from "@/components/auth/AuthPanel";
 
 export const SAUDI_DIAL = "+966";
 
@@ -39,12 +40,16 @@ export function PhoneEntry({
   onUseEmail,
   title,
   subtitle,
+  tone = "light",
 }: {
   onCodeSent: (phone: string, channel: OtpChannel) => void;
   /** Non-Saudi → offer to switch Modal 1 to the Email tab (SMS can't reach them). */
   onUseEmail?: () => void;
   title?: string;
   subtitle?: string;
+  /** `dark` is the auth modal's navy panel (owner's comp, 2026-08-30). Everything else — the login
+   *  page, the inline verify inside Modal 2 — stays `light` and is untouched. */
+  tone?: AuthTone;
 }) {
   const t = useT();
   const a = t.auth;
@@ -70,29 +75,34 @@ export function PhoneEntry({
 
   return (
     <form onSubmit={submit} noValidate>
-      <h2 className="mb-2 text-center text-display font-extrabold tracking-[-.5px] text-navy">{title ?? a.signInTitle}</h2>
-      <p className="mb-6 text-center text-body leading-[1.55] text-muted">{subtitle ?? a.signInSub}</p>
+      <h2 className={authTitle(tone)}>{title ?? a.signInTitle}</h2>
+      <p className={authSub(tone)}>{subtitle ?? a.signInSub}</p>
 
-      <label className="mb-2 block text-meta font-semibold text-navy-mid">{a.phoneLabel}</label>
+      <label className={authLabel(tone)}>{a.phoneLabel}</label>
       <div className="flex gap-3" dir="ltr">
         {PUBLIC_WEB_ENABLED ? (
           <select
             aria-label={a.countryLabel}
             value={dial}
             onChange={(e) => setDial(e.target.value)}
-            className="h-[50px] rounded-sm border border-border bg-surface px-3 text-subhead font-extrabold text-navy outline-0 focus:border-brand"
+            /* `[&>option]:text-navy` — the field itself is white-on-navy, but the OPTION list is the
+               browser's own popup on its own white ground, and it inherits the control's colour. On
+               the dark tone that is white text on white. This is the one part of the skin the
+               stylesheet cannot reach from `authField`, so it is stated at the one control that has
+               a popup. */
+            className={`${authField(tone)} flex-none font-extrabold [&>option]:text-navy`}
           >
             {COUNTRY_CODES.map((c) => (
               <option key={c.dial} value={c.dial}>{c.flag} {c.dial}</option>
             ))}
           </select>
         ) : (
-          <div className="flex h-[50px] items-center gap-2 whitespace-nowrap rounded-sm border border-border bg-surface px-4 text-subhead font-extrabold text-navy">
+          <div className={`${authField(tone)} flex flex-none items-center gap-2 whitespace-nowrap font-extrabold`}>
             <span className="text-title">🇸🇦</span> +966
           </div>
         )}
         <input
-          className="h-[50px] min-w-0 flex-1 rounded-md border border-border bg-surface px-4 text-subhead font-semibold text-navy outline-0 placeholder:font-semibold placeholder:text-muted-light focus:border-brand"
+          className={`${authField(tone)} min-w-0 flex-1`}
           type="tel"
           inputMode="numeric"
           autoComplete="tel-national"
@@ -120,13 +130,13 @@ export function PhoneEntry({
       <button
         type="submit"
         disabled={busy || !digits.trim() || smsBlocked}
-        className={btn("primary", "lg", { full: true, className: "mt-6 flex transition" })}
+        className={tone === "dark" ? authSubmit(tone) : btn("primary", "lg", { full: true, className: "mt-6 flex transition" })}
       >
         <span>{busy ? a.sending : a.sendCode}</span>
         {!busy && <Icon name="arrow_forward" size={18} className="rtl:scale-x-[-1]" />}
       </button>
 
-      <div className="mt-6 text-center text-body leading-[1.55] text-muted">{a.signInFoot}</div>
+      <div className={authFoot(tone)}>{a.signInFoot}</div>
     </form>
   );
 }

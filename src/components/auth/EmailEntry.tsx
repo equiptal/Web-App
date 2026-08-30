@@ -5,6 +5,7 @@ import { postAuth, type AuthKind, type OtpChannel } from "./authClient";
 import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { btn } from "@/lib/ds";
+import { authField, authFoot, authLabel, authSub, authSubmit, authTitle, type AuthTone } from "@/components/auth/AuthPanel";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -19,12 +20,15 @@ export function EmailEntry({
   onUsePhone,
   title,
   subtitle,
+  tone = "light",
 }: {
   onCodeSent: (email: string, channel: OtpChannel) => void;
   /** email_ambiguous → offer to switch Modal 1 to the Phone tab. */
   onUsePhone?: () => void;
   title?: string;
   subtitle?: string;
+  /** `dark` is the auth modal's navy panel (owner's comp, 2026-08-30). */
+  tone?: AuthTone;
 }) {
   const t = useT();
   const a = t.auth;
@@ -51,12 +55,12 @@ export function EmailEntry({
 
   return (
     <form onSubmit={submit} noValidate>
-      <h2 className="mb-2 text-center text-display font-extrabold tracking-[-.5px] text-navy">{title ?? a.signInTitle}</h2>
-      <p className="mb-6 text-center text-body leading-[1.55] text-muted">{subtitle ?? a.signInSub}</p>
+      <h2 className={authTitle(tone)}>{title ?? a.signInTitle}</h2>
+      <p className={authSub(tone)}>{subtitle ?? a.signInSub}</p>
 
-      <label className="mb-2 block text-meta font-semibold text-navy-mid">{a.emailLabel}</label>
+      <label className={authLabel(tone)}>{a.emailLabel}</label>
       <input
-        className="h-[50px] w-full rounded-md border border-border bg-surface px-4 text-subhead font-semibold text-navy outline-0 placeholder:font-semibold placeholder:text-muted-light focus:border-brand"
+        className={`${authField(tone)} w-full`}
         type="email"
         dir="ltr"
         autoComplete="email"
@@ -82,13 +86,13 @@ export function EmailEntry({
       <button
         type="submit"
         disabled={busy || !email.trim()}
-        className={btn("primary", "lg", { full: true, className: "mt-6 flex transition" })}
+        className={tone === "dark" ? authSubmit(tone) : btn("primary", "lg", { full: true, className: "mt-6 flex transition" })}
       >
         <span>{busy ? a.sending : a.sendCode}</span>
         {!busy && <Icon name="arrow_forward" size={18} className="rtl:scale-x-[-1]" />}
       </button>
 
-      <div className="mt-6 text-center text-body leading-[1.55] text-muted">{a.signInFoot}</div>
+      <div className={authFoot(tone)}>{a.signInFoot}</div>
     </form>
   );
 }

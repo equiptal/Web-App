@@ -52,8 +52,19 @@ const SIZE: Record<DialogSize, string> = {
 /** The scrim, shared by the centred dialog and the side drawer so both dim the page identically. */
 const SCRIM = "fixed inset-0 z-[60] bg-navy/45";
 
-/** The panel's own skin — one radius, one border, one shadow. */
-const PANEL = "border border-border bg-surface";
+/** The panel's own skin — one radius, one border, one shadow.
+ *
+ *  `dark` is the SAME shell on the app's navy rather than a second dialog: the auth flow is the one
+ *  surface that sells before it asks (owner's comp, 2026-08-30), and it earns a dark ground the way
+ *  the home CTA band does. Everything else about the panel — the radius, the sheet behaviour on a
+ *  phone, the three ways out, the focus trap — is unchanged, which is the point of it being a tone
+ *  and not a new component. */
+const PANEL: Record<DialogTone, string> = {
+  default: "border border-border bg-surface",
+  dark: "border border-white/10 bg-navy-deep text-white",
+};
+
+export type DialogTone = "default" | "dark";
 
 /** Anything a keyboard can land on, in the order it would reach them. */
 const FOCUSABLE =
@@ -111,6 +122,7 @@ export function Dialog({
   /** Drops the header rule — for a dialog whose body starts with its own coloured band. */
   flushHeader = false,
   padded = true,
+  tone = "default",
 }: {
   open: boolean;
   onClose: () => void;
@@ -124,6 +136,8 @@ export function Dialog({
   flushHeader?: boolean;
   /** Off for a body that brings its own edges — a multi-step flow, or a document in an iframe. */
   padded?: boolean;
+  /** `dark` puts the same shell on navy — see {@link PANEL}. The floating close follows it. */
+  tone?: DialogTone;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   useDialogKeys(open, onClose, panel);
@@ -152,13 +166,13 @@ export function Dialog({
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         data-dialog-panel=""
-        className={`relative flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-lg sm:max-h-[calc(100dvh-2rem)] sm:rounded-lg ${PANEL} ${SIZE[size]}`}
+        className={`relative flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-lg sm:max-h-[calc(100dvh-2rem)] sm:rounded-lg ${PANEL[tone]} ${SIZE[size]}`}
       >
         {/* A dialog whose body supplies its own headings still needs a way out, so the close floats
             in the corner rather than being dropped along with the header. */}
         {!title && !icon && (
           <div className="absolute end-1.5 top-1.5 z-10">
-            <DialogClose onClose={onClose} />
+            <DialogClose onClose={onClose} tone={tone === "dark" ? "onDark" : "default"} />
           </div>
         )}
 

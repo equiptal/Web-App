@@ -8,6 +8,7 @@ import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
 import { PhoneEntry } from "@/components/auth/PhoneEntry";
 import { EmailEntry } from "@/components/auth/EmailEntry";
 import { CodeEntry } from "@/components/auth/CodeEntry";
+import { AuthPanel, AuthToggle } from "@/components/auth/AuthPanel";
 import { normalizeTier, type RenterUser } from "@/lib/contract/auth";
 import { updateProfile, type ProfileUpdatePayload } from "@/lib/api/profile-client";
 import { EMAIL_FIRST_AUTH_ENABLED } from "@/lib/flags";
@@ -35,15 +36,23 @@ function maskEmail(e: string): string {
  */
 export function AccountModal({ open, onClose, onCreated, title, subtitle, postHeadline, postSubhead, resumeToken, onNeedsSignup }: { open: boolean; onClose: () => void; onCreated: () => void; title?: string; subtitle?: string; postHeadline?: string; postSubhead?: string; resumeToken?: string; onNeedsSignup?: (token: string, email: string | null) => void }) {
   const { locale } = useLocale();
+  /** Which ground this open is drawing on — the flow tells the shell, so the two cannot disagree. */
+  const [dark, setDark] = useState(true);
   if (!open) return null;
   return (
     // No header of its own: the flow inside titles each of its four phases, and a second title above
     // that would name the container rather than the step. `Dialog` floats the close in the corner for
     // exactly this case, so the way out is where it is in every other dialog.
-    <Dialog open onClose={onClose} size="lg" padded={false}>
+    //
+    // ~~One white panel for all four phases.~~ The two IDENTITY steps — entry and code — now open on
+    // the navy panel of the owner's comp (2026-08-30); the profile form and the keep/switch question
+    // stay on `--surface`, because they are ordinary forms and a dark ground would make the app's one
+    // long form the only dark one in it. `AccountFlow` reports which it is drawing, so the shell and
+    // the step cannot disagree about the ground under them.
+    <Dialog open onClose={onClose} size="xl" padded={false} tone={dark ? "dark" : "default"}>
       <div {...pin("auth-gate")} dir={locale === "ar" ? "rtl" : "ltr"}>
         {/* Fresh mount each open → the flow always starts at the right step for the current session. */}
-        <AccountFlow onCreated={onCreated} title={title} subtitle={subtitle} postHeadline={postHeadline} postSubhead={postSubhead} resumeToken={resumeToken} onNeedsSignup={onNeedsSignup} />
+        <AccountFlow onCreated={onCreated} title={title} subtitle={subtitle} postHeadline={postHeadline} postSubhead={postSubhead} resumeToken={resumeToken} onNeedsSignup={onNeedsSignup} onGround={setDark} />
       </div>
     </Dialog>
   );
@@ -51,7 +60,7 @@ export function AccountModal({ open, onClose, onCreated, title, subtitle, postHe
 
 type Phase = "entry" | "code" | "profile" | "emailChoice";
 
-function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, resumeToken, onNeedsSignup }: { onCreated: () => void; title?: string; subtitle?: string; postHeadline?: string; postSubhead?: string; resumeToken?: string; onNeedsSignup?: (token: string, email: string | null) => void }) {
+function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, resumeToken, onNeedsSignup, onGround }: { onCreated: () => void; title?: string; subtitle?: string; postHeadline?: string; postSubhead?: string; resumeToken?: string; onNeedsSignup?: (token: string, email: string | null) => void; onGround?: (dark: boolean) => void }) {
   const t = useT();
   const { status, user, signIn } = useSession();
   // A guest-tier session with a phone is a phone-first user who verified but never finished the profile
@@ -79,6 +88,13 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
   useEffect(() => {
     if (alreadyComplete) onCreated();
   }, [alreadyComplete, onCreated]);
+
+  /* The two identity steps draw on the comp's navy panel; the profile form and the keep/switch
+     question are ordinary forms and stay white. Reported UP rather than decided in the shell, so the
+     one place that knows which step is on screen is the one that says what it stands on. */
+  useEffect(() => {
+    onGround?.(phase === "entry" || phase === "code");
+  }, [phase, onGround]);
 
   // Post-verify routing (existing session set): confirm the AUTHORITATIVE tier from /api/me (verify's
   // tier can be thin for a returning account), then continue / keep-switch / register.
@@ -110,33 +126,30 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
     // Email-first not enabled (backend still requires a phone) → phone-only entry, no toggle.
     if (!EMAIL_FIRST_AUTH_ENABLED) {
       return (
-        <div className="p-6">
+        <AuthPanel>
           <PhoneEntry
+            tone="dark"
             title={title ?? t.auth.entryTitle}
             subtitle={subtitle ?? t.auth.entrySub}
             onCodeSent={(p) => { setCodePhone(p); setCodeEmail(null); setPhase("code"); }}
           />
-        </div>
+        </AuthPanel>
       );
     }
-    const seg = (mode: "phone" | "email", label: string) => (
-      <button
-        type="button"
-        onClick={() => setEntryMode(mode)}
-        aria-pressed={entryMode === mode}
-        className={`flex-1 rounded-sm py-2 text-body font-semibold transition ${entryMode === mode ? "bg-surface text-navy" : "text-navy-mid"}`}
-      >
-        {label}
-      </button>
-    );
     return (
-      <div className="p-6">
-        <div className="mb-5 grid grid-cols-2 gap-2 rounded-sm border border-border bg-surface2 p-1">
-          {seg("phone", t.auth.withPhone)}
-          {seg("email", t.auth.withEmail)}
-        </div>
+      <AuthPanel
+        toggle={
+          <AuthToggle
+            mode={entryMode}
+            onMode={setEntryMode}
+            phoneLabel={t.auth.withPhone}
+            emailLabel={t.auth.withEmail}
+          />
+        }
+      >
         {entryMode === "phone" ? (
           <PhoneEntry
+            tone="dark"
             title={title ?? t.auth.entryTitle}
             subtitle={subtitle ?? t.auth.entrySub}
             onUseEmail={() => setEntryMode("email")}
@@ -144,13 +157,14 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
           />
         ) : (
           <EmailEntry
+            tone="dark"
             title={title ?? t.auth.entryTitle}
             subtitle={subtitle ?? t.auth.entrySub}
             onUsePhone={() => setEntryMode("phone")}
             onCodeSent={(em) => { setCodeEmail(em); setCodePhone(null); setPhase("code"); }}
           />
         )}
-      </div>
+      </AuthPanel>
     );
   }
 
@@ -159,8 +173,9 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
     const verifyPayload = codePhone ? { phone: codePhone } : { otpEmail: codeEmail };
     const resendPayload = codePhone ? { phone: codePhone, otpMethod: "SMS" } : { otpEmail: codeEmail, otpMethod: "EMAIL" };
     return (
-      <div className="p-6">
+      <AuthPanel>
         <CodeEntry
+          tone="dark"
           dest={codePhone ?? codeEmail ?? ""}
           verifyPayload={verifyPayload}
           resendPayload={resendPayload}
@@ -168,7 +183,7 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
           onNeedsSignup={(token, email) => { setOnboardingToken(token); onNeedsSignup?.(token, email); setPhase("profile"); }}
           onEditNumber={() => setPhase("entry")}
         />
-      </div>
+      </AuthPanel>
     );
   }
 

@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui";
 import { RestoreAccountPrompt } from "./RestoreAccountPrompt";
 import type { RenterUser } from "@/lib/contract/auth";
 import { btn } from "@/lib/ds";
+import { authSubmit, type AuthTone } from "@/components/auth/AuthPanel";
 
 const OTP_FONT: React.CSSProperties = { fontFamily: "var(--font-plex), monospace" };
 
@@ -27,6 +28,7 @@ export function CodeEntry({
   onNeedsSignup,
   onEditNumber,
   verifyLabel,
+  tone = "light",
 }: {
   dest: string;
   verifyPayload: Record<string, unknown>;
@@ -36,9 +38,13 @@ export function CodeEntry({
   onEditNumber: () => void;
   /** Override the verify button label (e.g. "Verify & create account" for the Modal-2 phone-add). */
   verifyLabel?: string;
+  /** `dark` is the auth modal's navy panel (owner's comp, 2026-08-30). The Modal-2 inline verify
+   *  stays `light` — it sits inside the ordinary white profile form. */
+  tone?: AuthTone;
 }) {
   const t = useT();
   const a = t.auth;
+  const dark = tone === "dark";
   const inputs = useRef<Array<HTMLInputElement | null>>([]);
   const [boxes, setBoxes] = useState(["", "", "", ""]);
   const [busy, setBusy] = useState(false);
@@ -134,16 +140,16 @@ export function CodeEntry({
       <button
         type="button"
         onClick={onEditNumber}
-        className="mb-5 inline-flex items-center gap-1 text-body font-semibold text-muted"
+        className={`mb-5 inline-flex items-center gap-1 text-body font-semibold ${dark ? "text-white/60 hover:text-white" : "text-muted"}`}
       >
         <Icon name="arrow_back" size={18} className="rtl:-scale-x-100" />
         {a.back}
       </button>
 
-      <h2 className="mb-2 text-display font-extrabold tracking-[-.5px] text-navy">{a.codeTitle}</h2>
-      <p className="mb-7 text-body leading-[1.55] text-muted">
+      <h2 className={`mb-2 text-display font-extrabold tracking-[-.5px] ${dark ? "text-white" : "text-navy"}`}>{a.codeTitle}</h2>
+      <p className={`mb-7 text-body leading-[1.55] ${dark ? "text-white/60" : "text-muted"}`}>
         {sentPre}
-        <b className="text-navy" dir="ltr">{dest}</b>
+        <b className={dark ? "text-white" : "text-navy"} dir="ltr">{dest}</b>
         {sentPost}
       </p>
 
@@ -163,9 +169,15 @@ export function CodeEntry({
             onPaste={onPaste}
             aria-label={`Digit ${i + 1}`}
             style={OTP_FONT}
-            className={`h-[60px] w-full rounded-md border-[1.5px] text-center text-display font-semibold text-navy outline-0 focus:border-brand ${
-              d ? "border-brand bg-brand-soft" : "border-border bg-surface"
-            }`}
+            className={
+              dark
+                ? `h-[60px] w-full rounded-md border-[1.5px] bg-white/[0.07] text-center text-display font-semibold text-white outline-0 transition focus:border-white/50 ${
+                    d ? "border-white/45" : "border-white/15"
+                  }`
+                : `h-[60px] w-full rounded-md border-[1.5px] text-center text-display font-semibold text-navy outline-0 focus:border-brand ${
+                    d ? "border-brand bg-brand-soft" : "border-border bg-surface"
+                  }`
+            }
           />
         ))}
       </div>
@@ -176,14 +188,14 @@ export function CodeEntry({
       <button
         type="submit"
         disabled={busy || code.length < 4}
-        className={btn("primary", "lg", { full: true, className: "mt-6 flex transition" })}
+        className={dark ? authSubmit("dark") : btn("primary", "lg", { full: true, className: "mt-6 flex transition" })}
       >
         {!busy && <Icon name="check" size={18} />}
         <span>{busy ? a.verifying : verifyLabel ?? a.verify}</span>
       </button>
 
-      <div className="mt-6 text-center text-body text-muted">
-        <button type="button" onClick={resend} className="font-semibold text-info">
+      <div className={`mt-6 text-center text-body ${dark ? "text-white/55" : "text-muted"}`}>
+        <button type="button" onClick={resend} className={`font-semibold ${dark ? "text-white underline underline-offset-4" : "text-info"}`}>
           {a.resend}
         </button>
       </div>
