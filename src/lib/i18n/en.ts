@@ -1627,6 +1627,29 @@ export const en = {
    * for now because other surfaces still read a handful of their labels.
    */
   projects: {
+    workOrder: {
+      equipment: "What is on site",
+      machine: "Machine",
+      category: "Category",
+      subtype: "Type",
+      size: "Size",
+      search: "Search…",
+      notInCatalogue: "Not in our catalogue — I will type the name",
+      rawLabelPlaceholder: "What it is, e.g. Welding machine",
+      rawSizePlaceholder: "Size, e.g. 400A",
+      quantity: "How many",
+      notes: "Notes",
+      addMachine: "Add another machine",
+      differentTerms: "Different terms for this machine",
+      termsComing: "Operator, delivery, fuel and certificates for this machine. Arriving with the terms editor.",
+      period: "How long it is here",
+      periodHint: "Leave these empty and the work order runs to the site's own dates.",
+      differs: "This runs to different dates from the site ({start} → {end}). That is allowed — both are kept, and the chart shows the difference.",
+      supplier: "Who provides it",
+      supplierHint: "A work order is awarded the moment it exists, because the machine is already here. Leave a supplier blank for your own fleet.",
+      supplierPlaceholder: "Supplier, or your own fleet",
+      unnamedMachine: "This machine",
+    },
     menu: {
       label: "Row actions",
       award: "Award",

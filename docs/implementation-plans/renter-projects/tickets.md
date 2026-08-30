@@ -196,11 +196,11 @@ Supplier · units · rate · rental basis, with **Split across another supplier*
 
 1. **Equipment** — one card per machine: category → subtype → size as a **cascade** (each level disabled until its parent; changing a parent clears the children), quantity, accessories, notes. Plus **Not in the catalogue** → free-text name and size, legal here and nowhere else.
 2. **Machine terms** — shared by the order, and **overridable per machine** via *Different terms for this machine*, which reveals the same fields and tags the card. The **operator block is absent, not disabled**, when no machine takes one.
-3. **Supplier & period** — the order's own period (with the project-conflict warning), then per machine its supplier lines.
+3. **Supplier & period** — the order's own period (with the project-conflict warning), then per machine its supplier lines. **A work order can only ever conflict on TIME**: its location is the site's, and the form offers no control that could change it.
 
 Saving writes the machines **and one award per supplier line**, in one call.
 
-**Editing the period** opens *Move the awards to the new period?* — one row per award, **pre-ticked only where the award still sits on the old period**; one with its own dates is listed unticked with those dates shown.
+~~**Editing the period** opens *Move the awards to the new period?*~~ **Gone with the dates ruling (2026-08-30).** An award has no period of its own, so changing the order's period simply moves every bar under it — there is nothing to ask about, and the whole fieldset existed only because awards had dates.
 
 **Editing must upsert items by id.** Rebuilding the list orphans every award through the cascade.
 

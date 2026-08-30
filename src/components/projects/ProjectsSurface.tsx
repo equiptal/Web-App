@@ -21,6 +21,9 @@ import {
   saveAward,
   markAward,
   deleteAward,
+  saveWorkOrder,
+  deleteWorkOrder,
+  fetchTaxonomy,
   withFreshVersion,
   ProjectVersionConflict,
   type AwardInput,
@@ -37,6 +40,9 @@ import { ProjectsBoard } from "./ProjectsBoard";
 import type { Award, ChartGroup, ChartItem } from "@/lib/contract/award";
 import { RowMenu } from "./RowMenu";
 import { AwardDialog, UnawardConfirm } from "./AwardDialog";
+import { WorkOrderForm, workOrderPayload, blankMachine, type WorkOrderDraft } from "./WorkOrderForm";
+import { EMPTY_WHEN } from "@/lib/contract/work-order";
+import type { Taxonomy } from "@/lib/contract/taxonomy";
 
 export function ProjectsSurface() {
   const t = useT();
@@ -49,6 +55,8 @@ export function ProjectsSurface() {
   const [version, setVersion] = useState(1);
   const [awarding, setAwarding] = useState<{ group: ChartGroup; item: ChartItem } | null>(null);
   const [unawarding, setUnawarding] = useState<Award | null>(null);
+  const [workOrder, setWorkOrder] = useState<WorkOrderDraft | null>(null);
+  const [taxonomy, setTaxonomy] = useState<Taxonomy>([]);
   const [deleting, setDeleting] = useState<ProjectSummary | null>(null);
   const [created, setCreated] = useState<ProjectSummary | null>(null);
   const router = useRouter();
@@ -63,6 +71,9 @@ export function ProjectsSurface() {
 
   useEffect(() => {
     void reload();
+    // The catalogue is fetched once for the whole surface rather than when the form opens, so a
+    // renter adding a machine does not wait on a network round trip before the first dropdown works.
+    fetchTaxonomy().then(setTaxonomy).catch(() => setTaxonomy([]));
   }, [reload]);
 
   // Land on a site rather than an empty right-hand pane. The first is the most recently touched,
@@ -194,6 +205,35 @@ export function ProjectsSurface() {
     }
   }
 
+  async function saveOrder(d: WorkOrderDraft) {
+    if (!selected) return;
+    setSaving(true);
+    setNotice(null);
+    try {
+      // `workOrderPayload` keeps each existing machine's id. Rebuilding the set without them
+      // scrubs every award, mark and purchase order under the order.
+      await saveWorkOrder(selected, workOrderPayload(d));
+      setWorkOrder(null);
+      await refreshChart();
+    } catch {
+      setNotice(t.projects.surface.saveFailed);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeOrder(groupId: string) {
+    setSaving(true);
+    try {
+      await deleteWorkOrder(groupId);
+      await refreshChart();
+    } catch {
+      setNotice(t.projects.surface.saveFailed);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function unaward() {
     if (!selected || !unawarding) return;
     setSaving(true);
@@ -250,6 +290,36 @@ export function ProjectsSurface() {
                   // Un-awarding is reached through Change the award's own confirm, so the menu
                   // does not offer two doors to the same destructive act.
                   onOpenRequest: group.kind === "request" ? () => router.push(`/requests/${group.id}`) : undefined,
+                  onEditWorkOrder:
+                    group.kind === "work_order"
+                      ? () =>
+                          setWorkOrder({
+                            groupId: group.id,
+                            title: group.title ?? "",
+                            when: {
+                              ...EMPTY_WHEN,
+                              startDate: group.when?.startDate ?? null,
+                              endDate: group.when?.endDate ?? null,
+                            },
+                            // Every existing machine carries its id through the form and back out.
+                            machines: group.items.map((it) => ({
+                              ...blankMachine(),
+                              id: it.id,
+                              offCatalogue: true,
+                              rawLabel: it.label,
+                              quantity: it.quantity,
+                              lines: it.awards.length
+                                ? it.awards.map((aw) => ({
+                                    supplierName: aw.supplierName,
+                                    units: aw.units,
+                                    rateAmount: aw.rateAmount != null ? String(aw.rateAmount) : "",
+                                    rentalBasis: aw.rentalBasis,
+                                  }))
+                                : blankMachine().lines,
+                            })),
+                          })
+                      : undefined,
+                  onDeleteWorkOrder: group.kind === "work_order" ? () => void removeOrder(group.id) : undefined,
                   // Remove from the project, the quotation and the deal room arrive with W-T18/W-T19.
                   // Left undefined rather than stubbed: an entry that does nothing when pressed is
                   // worse than one that is not there, because the renter tries it twice.
@@ -259,6 +329,28 @@ export function ProjectsSurface() {
           }}
         />
       )}
+
+      <Dialog
+        open={!!workOrder}
+        onClose={() => setWorkOrder(null)}
+        title={workOrder?.groupId ? t.projects.menu.editWorkOrder : t.projects.created.workOrder}
+        subtitle={t.projects.created.workOrderSub}
+      >
+        {workOrder && chart && (
+          <WorkOrderForm
+            taxonomy={taxonomy}
+            draft={workOrder}
+            onChange={setWorkOrder}
+            projectWhen={{
+              startDate: chart.project.defaults.timing.startDate,
+              endDate: chart.project.defaults.timing.endDate,
+            }}
+            onCancel={() => setWorkOrder(null)}
+            onSave={(d) => void saveOrder(d)}
+            saving={saving}
+          />
+        )}
+      </Dialog>
 
       {awarding && (
         <AwardDialog
@@ -302,7 +394,11 @@ export function ProjectsSurface() {
           project={created}
           open
           onClose={() => setCreated(null)}
-          onAddWorkOrder={() => router.push(`/projects/${created.id}?new=work-order`)}
+          onAddWorkOrder={() => {
+            setSelected(created.id);
+            setCreated(null);
+            setWorkOrder({ title: "", when: { ...EMPTY_WHEN }, machines: [blankMachine()] });
+          }}
           onPostRequest={() => router.push("/create")}
         />
       )}
