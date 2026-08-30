@@ -206,6 +206,39 @@ export interface ChartGroup {
 
 /* ----------------------------- Derivations ----------------------------- */
 
+/**
+ * The window one award's bar is drawn across.
+ *
+ * **An award has no period of its own.** It records who supplies how many, and the two marks. The
+ * bar is its parent's period — the request's or the work order's, or the site's where that group
+ * inherits — widened to meet a mark that falls outside it.
+ *
+ * Widening matters both ways and is not symmetric decoration: a machine that arrived before the
+ * period opened, and one still standing there after it closed, are both things the renter needs to
+ * see. Clipping either would draw a bar that contradicts a pin sitting next to it.
+ *
+ * The known cost, stated rather than hidden: a hire renegotiated past a closed request's end shows
+ * the original end until the machine is demobilized. What it buys is two levels of date instead of
+ * three, and no "which of these wins" question anywhere.
+ */
+export function awardWindow(
+  group: Pick<ChartGroup, "when">,
+  award: Pick<Award, "mobilizedAt" | "demobilizedAt">,
+  projectWindow: { startDate: string | null; endDate: string | null },
+): { start: string | null; end: string | null } {
+  let start = group.when?.startDate ?? projectWindow.startDate;
+  let end = group.when?.endDate ?? projectWindow.endDate;
+
+  const { mobilizedAt: mob, demobilizedAt: demob } = award;
+  if (mob && (!start || mob < start)) start = mob;
+  if (demob && (!end || demob > end)) end = demob;
+  // A mark past the far edge stretches the other end too, so a bar never ends before its own pin.
+  if (mob && end && mob > end) end = mob;
+  if (demob && start && demob < start) start = demob;
+
+  return { start, end };
+}
+
 /** Units already promised for an item — the guard, and the "×2 of 3" label. */
 export function awardedUnits(item: Pick<ChartItem, "awards">): number {
   return item.awards.reduce((n, a) => n + (a.units || 0), 0);

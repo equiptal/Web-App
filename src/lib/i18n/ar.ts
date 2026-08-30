@@ -1366,6 +1366,27 @@ export const ar: Dictionary = {
   },
 
   projects: {
+    board: {
+      railCounts: "{r} طلب · {w} أمر عمل",
+      unassigned: "غير مرتبط",
+      unassignedSub: "نُشرت قبل أن يكون لها موقع. ربطها بنقرة واحدة ولا يغير شيئًا في الطلب.",
+      loading: "جارٍ الفتح…",
+      namedByUs: "اسم تلقائي",
+      requests: "الطلبات",
+      workOrders: "أوامر العمل",
+      units: "الوحدات المسندة",
+      runs: "المدة",
+      whatIsHere: "ما في هذا الموقع",
+      ownPeriod: "تواريخ خاصة",
+      nothingYet: "لا شيء في هذا الموقع بعد. أضف أمر عمل لمعدة موجودة هنا، أو انشر طلبًا.",
+    },
+    chart: {
+      of: "من",
+      notAwarded: "لم يُرسَ بعد",
+      awaiting: "بانتظار الإرساء",
+      mobilized: "وصلت",
+      demobilized: "غادرت",
+    },
     del: {
       confirmTitle: "حذف هذا المشروع؟",
       confirmBody: "«{name}» لا يحتوي على شيء، فلن يضيع شيء. لا يمكن التراجع عن ذلك.",

@@ -1627,6 +1627,27 @@ export const en = {
    * for now because other surfaces still read a handful of their labels.
    */
   projects: {
+    board: {
+      railCounts: "{r} requests · {w} work orders",
+      unassigned: "Unassigned",
+      unassignedSub: "Posted before you had a site for them. Filing one takes a click and changes nothing about the request.",
+      loading: "Opening…",
+      namedByUs: "named by us",
+      requests: "Requests",
+      workOrders: "Work orders",
+      units: "Units awarded",
+      runs: "Runs",
+      whatIsHere: "What is on this site",
+      ownPeriod: "own dates",
+      nothingYet: "Nothing on this site yet. Add a work order for a machine already here, or post a request.",
+    },
+    chart: {
+      of: "of",
+      notAwarded: "not awarded yet",
+      awaiting: "awaiting award",
+      mobilized: "Arrived",
+      demobilized: "Left",
+    },
     del: {
       confirmTitle: "Delete this project?",
       confirmBody: "“{name}” has nothing filed under it, so nothing is lost. This cannot be undone.",

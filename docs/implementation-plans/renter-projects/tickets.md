@@ -160,9 +160,10 @@ Rail (projects, ended last and tagged · **Unassigned** when anything is filed n
 **Scope:** web-projects
 **Files:** new `components/projects/ChartRow.tsx`
 
-**One row per award**, not per item. An un-awarded item is one hatched row reading *awaiting award* — no marks, no papers, because there is no supply line to hang them on.
+**One row per award**, not per item. An un-awarded item is one hatched row reading *awaiting award* — no marks, no papers, because there is no award to hang them on.
 
-- Bar = `start → end`, **no state**. Solid navy awarded, hatched grey not.
+- **The bar is its PARENT's period**, widened to meet a mark that falls outside it (`awardWindow`). An award carries no dates of its own — ruled 2026-08-30 with the move to `projects.awards`. Known cost: a hire renegotiated past a closed request's end shows the original end until the machine is demobilized.
+- **No state** on the bar. Solid navy awarded, hatched grey not.
 - **No legend.** Green mark = mobilized, orange = demobilized, unlabelled, on the bar's **top edge** — centred they cover the bar's own dates. Date in the tooltip.
 - Documents as **orange markers in the row's top corner**, `+N` past three.
 - The axis holds every date under the project, including an un-awarded work order's own window.
@@ -179,7 +180,7 @@ An unfiled row's action reads **File in a project**, not *Move to another projec
 **Scope:** web-projects
 **Files:** new `components/projects/AwardDialog.tsx`
 
-Supplier · units · rate · start · end, with **Split across another supplier** and a running `used of quantity` counter that blocks Save when over.
+Supplier · units · rate · rental basis, with **Split across another supplier** and a running `used of quantity` counter that blocks Save when over. **No dates** — an award has none; a machine that arrives late says so with its mobilized mark.
 
 **The supplier control has two modes, chosen by whether `GET /agents/renter-suppliers` answers** — the real picker with the vendor-registered gate, or a text field with autocomplete over names already used. Production only sees the picker; the fallback exists so we are not blocked while the registry lands.
 

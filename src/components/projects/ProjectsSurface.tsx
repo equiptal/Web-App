@@ -21,9 +21,6 @@ import {
   ProjectVersionConflict,
 } from "@/lib/api/client";
 import {
-  projectTitle,
-  projectEnded,
-  endedLast,
   propagationForRequest,
   propagationForWorkOrder,
   type ProjectSummary,
@@ -31,8 +28,8 @@ import {
 } from "@/lib/contract/project";
 import { ProjectForm, emptyProjectForm, projectToForm, type ProjectFormValue } from "./ProjectForm";
 import { ProjectDelete, ProjectCreated, projectIsEmpty } from "./ProjectDelete";
-
-const today = () => new Date().toISOString().slice(0, 10);
+import { ProjectsBoard } from "./ProjectsBoard";
+import type { ChartGroup } from "@/lib/contract/award";
 
 export function ProjectsSurface() {
   const t = useT();
@@ -40,6 +37,8 @@ export function ProjectsSurface() {
   const [editing, setEditing] = useState<{ id: string | null; value: ProjectFormValue; rows?: PropagationRow[] } | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [chart, setChart] = useState<{ project: ProjectSummary; groups: ChartGroup[] } | null>(null);
   const [deleting, setDeleting] = useState<ProjectSummary | null>(null);
   const [created, setCreated] = useState<ProjectSummary | null>(null);
   const router = useRouter();
@@ -55,6 +54,28 @@ export function ProjectsSurface() {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  // Land on a site rather than an empty right-hand pane. The first is the most recently touched,
+  // which is almost always the one the renter came back for.
+  useEffect(() => {
+    if (selected === null && projects && projects.length > 0) setSelected(projects[0].id);
+  }, [projects, selected]);
+
+  useEffect(() => {
+    if (!selected) {
+      setChart(null);
+      return;
+    }
+    let live = true;
+    fetchChart(selected)
+      .then((c) => live && setChart({ project: c.project, groups: c.groups }))
+      // A chart that will not load leaves the pane empty rather than half-drawn: a renter reading a
+      // partial site cannot tell that is what they are looking at.
+      .catch(() => live && setChart(null));
+    return () => {
+      live = false;
+    };
+  }, [selected]);
 
   /**
    * Opening the edit form loads what is filed under the site, because the propagation list is part
@@ -110,8 +131,6 @@ export function ProjectsSurface() {
     }
   }
 
-  const ordered = projects ? endedLast(projects, today()) : [];
-
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -126,40 +145,21 @@ export function ProjectsSurface() {
 
       {notice && <p className="rounded-sm border border-danger/40 bg-danger/5 px-3 py-2 text-body text-danger">{notice}</p>}
 
-      {projects && ordered.length === 0 && <p className="text-body text-muted">{t.projects.surface.empty}</p>}
+      {projects && projects.length === 0 && <p className="text-body text-muted">{t.projects.surface.empty}</p>}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {ordered.map((p) => {
-          const ended = projectEnded(p, today());
-          return (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => void openEdit(p)}
-              className="flex flex-col gap-1.5 rounded-sm border border-border bg-surface p-4 text-start transition hover:border-brand"
-            >
-              <span className="flex items-center gap-1.5">
-                <Icon name="place" size={14} className="flex-none text-brand" />
-                <span className="min-w-0 flex-1 truncate text-subhead font-extrabold text-navy">{projectTitle(p)}</span>
-                {/* Tagged, never hidden — a date passing is not proof a site is finished. */}
-                {ended && <span className="flex-none text-meta font-semibold text-muted">{t.projects.chips.ended}</span>}
-              </span>
-              <span className="truncate text-meta text-muted">{p.location.label}</span>
-              <span className="mt-1 text-meta text-muted">
-                {t.projects.surface.counts
-                  .replace("{requests}", String(p.requestCount))
-                  .replace("{workOrders}", String(p.workOrderCount))
-                  .replace("{units}", String(p.unitsAwarded))}
-              </span>
-              {(p.firstStart || p.lastEnd) && (
-                <span className="text-meta text-muted">
-                  {p.firstStart ?? "—"} → {p.lastEnd ?? "—"}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      {projects && (
+        <ProjectsBoard
+          projects={projects}
+          selectedId={selected}
+          onSelect={setSelected}
+          onNewProject={() => setEditing({ id: null, value: emptyProjectForm() })}
+          chart={chart}
+          /* W-T18 fills this from the requests list; until then the rail entry stays hidden, which
+             is exactly what it should do when nothing is filed nowhere. */
+          unassigned={[]}
+          onEditProject={(p) => void openEdit(p)}
+        />
+      )}
 
       {deleting && (
         <ProjectDelete
