@@ -761,6 +761,11 @@ async function projectFetch<T>(url: string, init: ProjectFetchInit = {}): Promis
     throw new ApiError("network");
   }
 
+  /**
+   * A 204 has no body to parse. `deleteProject` answers one, and `res.json()` on an empty body
+   * rejects — so a delete that had already succeeded threw its way out as a network error.
+   */
+  if (res.status === 204) return undefined as T;
   if (res.ok) return (await res.json()) as T;
 
   let code: string | undefined;

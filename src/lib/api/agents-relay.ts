@@ -83,6 +83,19 @@ export async function relayAsRenter(path: string, init: RelayInit = {}): Promise
       cache: "no-store",
     });
 
+    /**
+     * A 204 carries no body, and `NextResponse.json` THROWS when handed one at that status.
+     *
+     * `deleteProject` answers 204. The throw landed in the catch below, so a delete that had already
+     * removed the row reported `upstream_unreachable` — the renter was told the server could not be
+     * reached by an action that had just succeeded, and a reload showed the site gone. Found by
+     * running the delete against staging; no amount of shape-checking would have caught it, because
+     * the shape was right and the STATUS was the problem.
+     */
+    if (res.status === 204 || res.status === 205 || res.status === 304) {
+      return new NextResponse(null, { status: res.status });
+    }
+
     const json: unknown = await res.json().catch(() => null);
 
     // Errors keep the backend's own status, code and details — see the note above about 409.

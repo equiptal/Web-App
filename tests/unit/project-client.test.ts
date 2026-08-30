@@ -130,6 +130,20 @@ describe("writes", () => {
     expect(edited.expectedVersion).toBe(3);
   });
 
+  it("treats a 204 as success, not as a network failure", async () => {
+    /* Found against staging, 2026-08-30. `deleteProject` answers 204 with no body. `res.json()` on
+       an empty body rejects, so a delete that HAD removed the row threw its way out as a network
+       error — the renter was told the server could not be reached by an action that had just
+       succeeded, and a reload showed the site gone.
+
+       The relay had the mirror of the same fault: `NextResponse.json` throws when handed a body at
+       204, and that throw landed in its catch as `upstream_unreachable`. */
+    stub(() => new Response(null, { status: 204 }));
+
+    await expect(deleteProject("p1")).resolves.toBeUndefined();
+    expect(calls[0].init?.method).toBe("DELETE");
+  });
+
   it("files through its own route, never through the request edit", async () => {
     stub(() => reply(200, { ok: true }));
     await assignToProject("r1", "p1");
