@@ -7,9 +7,10 @@ import { Icon } from "@/components/ui";
 import { BrowseSurface } from "@/components/stores/BrowseSurface";
 import { fetchActivity, type ActivityCounts } from "@/lib/api/client";
 import { HomeRequests } from "@/components/home/HomeRequests";
+import { HomeProjects } from "@/components/home/HomeProjects";
 import { StartYourRequestModal, type StartRequestChoice } from "@/components/home/StartYourRequestModal";
 import { useStartRequestGate } from "@/lib/access/start-request-gate";
-import { btn, cx, PAGE_X_READING } from "@/lib/ds";
+import { btn, cx, PAGE_MAX, PAGE_X } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 
 /**
@@ -122,7 +123,7 @@ export function HomeHub() {
            prototype."*
 
            Two escapes, because the shell wraps every page in both a cap and a gutter
-           (`max-w-[1440px] px-6 … xl:px-28`) and the comp's band has neither:
+           (`PAGE_MAX` and `PAGE_X`) and the comp's band has neither:
 
             · **Across** — `w-screen` with `-ms-[50vw]` off the container's own midpoint. A logical
               margin, not `-ml`, so it escapes the same way in Arabic. `body { overflow-x: clip }`
@@ -180,7 +181,7 @@ export function HomeHub() {
         />
         <span aria-hidden="true" className="absolute inset-0 -z-10 bg-navy opacity-[0.35] mix-blend-multiply" />
 
-        <div className={cx("relative mx-auto flex w-full max-w-[1440px] items-center gap-6", PAGE_X_READING)}>
+        <div className={cx("relative mx-auto flex w-full items-center gap-6", PAGE_MAX, PAGE_X)}>
           <div className="min-w-0 flex-1">
             {/* A BLOCK, not a flex row: the three text nodes are one sentence, and as flex items the
                 spaces between them collapse and the row's own `gap` stands in for them — which sets
@@ -214,6 +215,12 @@ export function HomeHub() {
           </div>
         </div>
       </div>
+
+      {/* ── The sites, above the requests ──────────────────────────────────────────────
+          A request is one shopping trip; a site is the thing the trips are for. It draws nothing for
+          a renter with no projects, so a new account is not asked to do a second thing beside the
+          one the hero already asks. */}
+      <HomeProjects />
 
       {/* ── The requests, and the bids beside them (owner, 2026-08-29) ────────────────────────────
           The dashboard's first block, above the activity tiles: what is out to the market, how long

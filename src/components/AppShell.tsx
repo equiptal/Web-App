@@ -11,7 +11,7 @@ import type { Locale } from "@/lib/i18n/config";
 // import { SurveyProvider } from "@/components/surveys/SurveyProvider";
 import { AuthGateProvider, useAuthGate } from "@/components/auth/AuthGate";
 import { fetchDealRoomUnread } from "@/lib/api/client";
-import { btn, cx, OVERLAY, PAGE_BACK, PAGE_X_BLEED, PAGE_X_READING, PAGE_X_WORKING, PAGE_Y, SCRIM } from "@/lib/ds";
+import { btn, cx, OVERLAY, PAGE_BACK, PAGE_MAX, PAGE_X, PAGE_Y, SCRIM } from "@/lib/ds";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { AppNav, AppNavMobile, type NavItem } from "@/components/AppNav";
 import { ArrowBackIcon, MailIcon, CountBadge } from "@/components/HeaderIcons";
@@ -35,7 +35,10 @@ import { pin } from "@/lib/uiPins";
  * The sidebar's other two jobs kept their newer homes: the tier-status nudge (AC-06/08) sits in the
  * account menu with the rest of the account, and the brand mark leads the nav row.
  */
-type AppShellProps = { children: ReactNode; title?: string; fullBleed?: boolean; wide?: boolean };
+/* ~~`wide`.~~ Removed with the second gutter it chose (owner, 2026-08-30): with one gutter and one
+   cap there is nothing left for it to select. Its one caller, `/create`, is unchanged on screen
+   except that it now sits at the same margin as every other page. */
+type AppShellProps = { children: ReactNode; title?: string; fullBleed?: boolean };
 
 /**
  * ── The page gutters, defined once (owner, 2026-08-25: "unify the margin - paddings for all
@@ -50,22 +53,17 @@ type AppShellProps = { children: ReactNode; title?: string; fullBleed?: boolean;
  *
  * Now there are two, and they are roles rather than accidents.
  *
- * READING is the default: a generous edge for a column of prose, a form, a list. Unchanged from what
- * every ordinary screen already had, so nothing on those screens moves.
- *
- * WORKING is for a screen that is CONTROLS rather than reading. The create canvas is three columns of
- * them, and at 112px a side the machine card, the operator rail and the schedule wrapped instead of
- * sharing a row. It is what `wide` now means — the prop already existed and only /create passes it,
- * so this replaces that page's negative-margin escape with the same numbers, declared.
- *
- * BLEED is for surfaces that own the whole viewport (`fullBleed`), whose bands set their own edges.
- * It is the working gutter's first two steps, which is why the requests rail and the strip beneath it
- * now line up — at 16/26 against 12/20 they never did.
+ * ~~Three of them — READING for prose, WORKING for a screen of controls, BLEED for a viewport-pinned
+ * surface.~~ One, since 2026-08-30, and `PAGE_X` in `@/lib/ds` carries the owner's audit that closed
+ * it. The short of it: the three put 112px, 40px and 24px of margin on pages a renter walks between
+ * in one errand, and the reading case had stopped being true — the account pages are two columns of
+ * fields and the home dashboard is a table beside a rail. A page that wants a narrow measure now
+ * takes it from a `max-w` on its own content, where it is a decision about the content.
  */
-/* The four gutters live in `@/lib/ds` now — placement is part of the design system, and a gutter
+/* The gutter lives in `@/lib/ds` now — placement is part of the design system, and a gutter
    declared here was a gutter no other file could find. Re-exported so existing callers are unmoved;
    `ds.ts` imports nothing, so there is no cycle. */
-export { PAGE_X_READING, PAGE_X_WORKING, PAGE_X_BLEED, PAGE_MX_BLEED, PAGE_Y } from "@/lib/ds";
+export { PAGE_MAX, PAGE_MX, PAGE_X, PAGE_Y } from "@/lib/ds";
 
 /**
  * A page can show a Back arrow by registering a handler.
@@ -105,7 +103,7 @@ export function AppShell(props: AppShellProps) {
   );
 }
 
-function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
+function AppShellInner({ children, title, fullBleed }: AppShellProps) {
   const { locale, setLocale } = useLocale();
   const t = useT();
   const { tier, status, refresh: refreshSession } = useSession();
@@ -180,6 +178,10 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
   // avatar's menu, next to Sign out, where a reader looks for it.
   const navItems: NavItem[] = [
     { key: "dashboard", label: t.shell.dashboard, href: "/" },
+    // PROJ — between Requests and Company on purpose. A project is what the requests are FOR, so
+    // it reads left-to-right as the renter's own hierarchy: everything, then one job, then the
+    // company behind them.
+    { key: "projects", label: t.shell.projects, href: "/projects" },
     { key: "requests", label: t.shell.requests, href: "/requests" },
     { key: "company", label: t.shell.company, href: "/company" },
   ];
@@ -408,19 +410,29 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
             last row — the wizard's Back/Next, a card's actions, the bid map's price bar. With the
             navigation in the header there is nothing down there to clear, so the reserve is gone and
             a full-bleed surface ends exactly where the viewport does.
-            One consistent page container across the app (T1/T2): My Requests' 1440px width and a
-            generous gutter. `wide` stays uncapped (My Requests caps itself at 1440 via .rproto). */}
+            One page container across the app: one width, one gutter, one cap — see the note on
+            `<main>` below. */}
         <main
           {...pin("page-main")}
-          className={
-            fullBleed
-              ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-              : // Vertical is ONE rule now: 24, then 28 from `sm` up. It read
-                // `py-6 pb-16 sm:pt-7 md:py-7`, where `md:py-7` silently overrode `pb-16` — so the
-                // foot of a page was 64px on a phone and 28px on a desktop, the opposite way round
-                // from what either wants. The 64 was `AppDock` clearance, and the dock is gone.
-                `mx-auto w-full ${PAGE_Y} ${wide ? `max-w-none ${PAGE_X_WORKING}` : `max-w-[1440px] ${PAGE_X_READING}`}`
-          }
+          /* ── ONE gutter and ONE cap, for every page (owner, 2026-08-30) ────────────────────
+             ~~Three gutters and two caps: `READING` + 1440 for account pages, `WORKING` + uncapped
+             for `wide`, nothing at all for `fullBleed`.~~ That put 112px, 40px and 24px of margin on
+             pages a renter walks between in one errand, and on a wide screen the caps widened the
+             gap again — 352px beside 40px at 1920.
+
+             The gutter and the cap are the shell's now, and they are the same on every page. What
+             `fullBleed` still means is real and unchanged: pinned to the viewport's HEIGHT, its own
+             scrolling region, and bands that draw their own edges inside this column.
+
+             Vertical is ONE rule too: 24, then 28 from `sm` up. It read `py-6 pb-16 sm:pt-7 md:py-7`,
+             where `md:py-7` silently overrode `pb-16` — so the foot of a page was 64px on a phone and
+             28px on a desktop, the opposite way round from what either wants. The 64 was `AppDock`
+             clearance, and the dock is gone. */
+          className={cx(
+            "mx-auto w-full",
+            PAGE_MAX,
+            fullBleed ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" : `${PAGE_Y} ${PAGE_X}`,
+          )}
         >
           {/* ── Back, on the page (owner, 2026-08-26) ────────────────────────────────────────────
               The shell draws it, not the page, so every screen that has one has it in the same place
@@ -429,7 +441,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
 
               A full-bleed surface has no gutter of its own to sit on, so the control brings one. */}
           {back && (
-            <div {...pin("page-back")} className={cx(PAGE_BACK, fullBleed && `${PAGE_X_BLEED} pt-4`)}>
+            <div {...pin("page-back")} className={cx(PAGE_BACK, fullBleed && `${PAGE_X} pt-4`)}>
               <button
                 onClick={back}
                 aria-label={locale === "ar" ? "رجوع" : "Back"}

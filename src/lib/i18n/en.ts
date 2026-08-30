@@ -36,6 +36,7 @@ export const en = {
     preview: "Preview",
   },
   shell: {
+    projects: "Projects",
     home: "Home",
     profile: "Profile",
     requests: "Requests",
@@ -1625,6 +1626,10 @@ export const en = {
    * for now because other surfaces still read a handful of their labels.
    */
   projects: {
+    home: {
+      viewAll: "All {n}",
+      onSite: "{n} units on site",
+    },
     offer: {
       alreadyTitle: "You already have a project at {site}",
       alreadySub: "Add this request to it, or say it is a different site — two projects for one place split the site's picture in two.",

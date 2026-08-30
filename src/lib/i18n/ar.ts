@@ -38,6 +38,7 @@ export const ar: Dictionary = {
     preview: "المراجعة",
   },
   shell: {
+    projects: "\u0627\u0644\u0645\u0634\u0627\u0631\u064a\u0639",
     home: "الرئيسية",
     profile: "الملف الشخصي",
     requests: "الطلبات",
@@ -1365,6 +1366,10 @@ export const ar: Dictionary = {
   },
 
   projects: {
+    home: {
+      viewAll: "\u0627\u0644\u0643\u0644 ({n})",
+      onSite: "{n} \u0648\u062d\u062f\u0629 \u0641\u064a \u0627\u0644\u0645\u0648\u0642\u0639",
+    },
     offer: {
       alreadyTitle: "لديك مشروع بالفعل في {site}",
       alreadySub: "أضف هذا الطلب إليه، أو قل إنه موقع مختلف — مشروعان لمكان واحد يقسمان صورة الموقع إلى نصفين.",
