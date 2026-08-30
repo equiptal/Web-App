@@ -157,6 +157,10 @@
 
   /* ── Font families ───────────────────────────────────────────────────────────────────────── */
   --font-sans: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  /* The CTA banner headline only. Oswald first; the Arabic face behind it, because Oswald has
+     no Arabic and an Arabic headline must not fall to the browser's guess. The system stack
+     closes it, so a blocked webfont degrades to the same face as the rest of the app. */
+  --font-hero: var(--font-oswald), var(--font-arabic), "Segoe UI", system-ui, sans-serif;
   --font-mono: var(--font-plex);
 }
 

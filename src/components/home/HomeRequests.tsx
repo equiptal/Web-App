@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui";
+import { useSession } from "@/lib/session";
 import { cancelRequest, fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail } from "@/lib/api/client";
 import { cancellableItems, groupBiddingClosed, groupRequests, type RequestGroup } from "@/lib/contract/requests";
 import type { InboxBid } from "@/lib/contract/inbox";
@@ -77,6 +78,7 @@ export function HomeRequests() {
   const ar = locale === "ar";
   const L = (en: string, arr: string) => (ar ? arr : en);
   const router = useRouter();
+  const { sessionKey, status } = useSession();
 
   const [groups, setGroups] = useState<RequestGroup[] | null>(null);
   const [bids, setBids] = useState<InboxBid[]>([]);
@@ -153,8 +155,18 @@ export function HomeRequests() {
       .catch(() => {});
   }, []);
 
+  /* Keyed on the ACCOUNT, not on mount (owner, 2026-08-30). Signing in through the modal does not
+     remount this page, so with `[]` a renter who arrived as a guest kept the guest's answers — no
+     requests, no bids — until they reloaded. `sessionKey` moves the moment the account does; its
+     note in `lib/session` says why it carries the tier and the status too.
+
+     `setGroups(null)` on the way in, so the table shows its loading state rather than the previous
+     account's rows while the new ones are on the wire. */
   useEffect(() => {
+    if (status === "loading") return;
     let live = true;
+    setGroups(null);
+    setBids([]);
     void fetchAllMyRequests()
       .then((r) => live && setGroups(groupRequests(r.requests)))
       .catch(() => live && setGroups([]));
@@ -164,7 +176,7 @@ export function HomeRequests() {
     return () => {
       live = false;
     };
-  }, []);
+  }, [sessionKey, status]);
 
   /** Resolve the deadline for the rows on screen, link first and the window only if it is unset.
    *  A row the status has already answered is skipped — there is nothing a date could add to it. */
@@ -501,9 +513,18 @@ export function HomeRequests() {
 
         {/* The bids rail — supplier, price, machine, site. One line of each, newest first. */}
         <aside className={cx(CARD, "flex min-h-0 flex-col overflow-hidden")}>
+          {/* ── One orange on the page (owner, 2026-08-30) ────────────────────────────────────────
+              ~~`text-brand-deep` on both.~~ #b45309 was a SECOND orange sitting beside the #f79009
+              buttons, and it existed for a good reason: the brand orange on this peach strip is
+              2.18:1, which is not readable at 13px. So the fix is not to force the brand orange onto
+              the text — that trades a colour clash for an unreadable heading.
+
+              The text goes navy instead: 13.1:1, and the strip keeps its ground. The GLYPH keeps the
+              orange, where a 2.18:1 contrast does not matter because nothing is being read — it is a
+              mark, and it is what ties the strip to the brand. One orange left on the page. */}
           <div className="flex h-[34px] flex-none items-center gap-2 border-b border-brand-pale bg-brand-soft px-3">
-            <Icon name="gavel" size={16} className="text-brand-deep" />
-            <h3 className="text-body font-extrabold text-brand-deep">
+            <Icon name="gavel" size={16} className="text-brand" />
+            <h3 className="text-body font-extrabold text-navy">
               {fmt(t.home.newBidsCount, { n: String(bids.length) })}
             </h3>
           </div>

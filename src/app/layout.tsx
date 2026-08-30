@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from "next/font/google";
+import { IBM_Plex_Sans, IBM_Plex_Sans_Arabic, Oswald } from "next/font/google";
 import "./globals.css";
 import { LocaleProvider } from "@/lib/i18n";
 import { SessionProvider } from "@/lib/session";
@@ -29,6 +29,21 @@ import { UiPins } from "@/components/dev/UiPins";
 //
 // It also puts the Arabic and the Latin on ONE superfamily: `--font-plex` was already the numeric face,
 // so a figure inside an Arabic run no longer changes typeface mid-line.
+/**
+ * Oswald — the CTA banner headline, and NOTHING else (owner, 2026-08-30).
+ *
+ * The app runs on the system face, so a webfont here is a deliberate exception and has to earn
+ * it. This one does: the banner is the first thing on the dashboard and it is about machinery,
+ * and a tall condensed grotesque is what site signage and equipment livery are actually set in.
+ * Segoe UI at 32px says "heading"; this says "yard".
+ *
+ * Preloaded, unlike the other two — it renders above the fold on the landing screen, so deferring
+ * it would swap the headline in front of the reader a beat after they arrived.
+ *
+ * Latin only. Oswald has no Arabic, and `--font-hero` in `globals.css` names the Arabic face
+ * behind it so an Arabic headline lands on Plex Arabic rather than on whatever the browser picks.
+ */
+const oswald = Oswald({ variable: "--font-oswald", subsets: ["latin"], weight: ["500", "600", "700"] });
 const plex = IBM_Plex_Sans({ variable: "--font-plex", subsets: ["latin"], weight: ["400", "500", "600", "700"], preload: false });
 // 800 is carried because the surface asks for it (titles, chips, pills). Plex Arabic ships no 900; the
 // few 900s in the stylesheets fall back to 700 rather than being synthesised, which is the safe
@@ -79,7 +94,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,500,0,0" />
       </head>
-      <body className={`${plex.variable} ${plexArabic.variable} antialiased`}>
+      <body className={`${oswald.variable} ${plex.variable} ${plexArabic.variable} antialiased`}>
         <LocaleProvider>
           <SessionProvider>
             {children}

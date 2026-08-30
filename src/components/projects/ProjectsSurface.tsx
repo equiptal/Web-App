@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useT } from "@/lib/i18n";
+import { useSession } from "@/lib/session";
 import { Icon, Button } from "@/components/ui";
 import { Dialog } from "@/components/Dialog";
 import { useRouter } from "next/navigation";
@@ -73,6 +74,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   const [deleting, setDeleting] = useState<ProjectSummary | null>(null);
   const [created, setCreated] = useState<ProjectSummary | null>(null);
   const router = useRouter();
+  const { sessionKey, status } = useSession();
 
   /**
    * `null` = not answered yet OR not ours to show. `[]` = answered, and this renter has no sites.
@@ -132,13 +134,22 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     }
   }, []);
 
+  /* Re-read when the ACCOUNT changes, not only on mount (owner, 2026-08-30): this surface sits on the
+     dashboard, and signing in through the modal never remounts the page — so the sites stayed the
+     guest's empty set until a reload. `sessionKey` is the one signal for that across the dashboard;
+     see its note in `lib/session`.
+
+     The taxonomy is not per-account and is deliberately left in here anyway: it is fetched once per
+     mount either way, and splitting it into its own effect to save a repeat that only happens on a
+     sign-in is a second effect to keep in step for nothing. */
   useEffect(() => {
+    if (status === "loading") return;
     void reload();
     // The catalogue is fetched once for the whole surface rather than when the form opens, so a
     // renter adding a machine does not wait on a network round trip before the first dropdown works.
     fetchTaxonomy().then(setTaxonomy).catch(() => setTaxonomy([]));
     void reloadUnassigned();
-  }, [reload, reloadUnassigned]);
+  }, [reload, reloadUnassigned, sessionKey, status]);
 
   // Land on a site rather than an empty right-hand pane. The first is the most recently touched,
   // which is almost always the one the renter came back for.

@@ -62,7 +62,7 @@ type Phase = "entry" | "code" | "profile" | "emailChoice";
 
 function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, resumeToken, onNeedsSignup, onGround }: { onCreated: () => void; title?: string; subtitle?: string; postHeadline?: string; postSubhead?: string; resumeToken?: string; onNeedsSignup?: (token: string, email: string | null) => void; onGround?: (dark: boolean) => void }) {
   const t = useT();
-  const { status, user, signIn } = useSession();
+  const { status, user, signIn, refresh } = useSession();
   // A guest-tier session with a phone is a phone-first user who verified but never finished the profile
   // → resume at Modal 2 (Case 2, email required). Already basic/verified → nothing to fill → continue.
   const hasGuestSession = status === "authed" && !!user?.phone && user?.tier === "guest";
@@ -117,8 +117,22 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
       setPhase("emailChoice");
       return;
     }
-    if (complete) onCreated();
-    else setPhase("profile"); // new PHONE user → Modal 2 Case 2 (email required; onboardingToken empty)
+    if (complete) {
+      /* ── Make the SESSION authoritative before the page reads it (owner, 2026-08-30) ──────────
+         `signIn(u)` above adopted verify's payload, whose tier "can be thin for a returning account"
+         — this function's own words, and the reason it asks `/api/me` at all. It corrected `tier`
+         locally for the routing and left the session holding the thin one, which is what
+         `canCreate` and the dashboard's blocks then read.
+
+         It matters now that the dashboard reloads on `sessionKey`: a returning `basic` account
+         arriving as `guest` in the session would refetch instantly and render the guest's answers,
+         which looks exactly like the bug this is meant to fix. `refresh()` re-reads
+         `/api/auth/session`, so the tier the page acts on is the server's. */
+      await refresh();
+      onCreated();
+      return;
+    }
+    setPhase("profile"); // new PHONE user → Modal 2 Case 2 (email required; onboardingToken empty)
   };
 
   // ── Modal 1 — get a code with phone OR email ──

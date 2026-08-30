@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useT } from "@/lib/i18n";
+import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import { BrowseSurface } from "@/components/stores/BrowseSurface";
 import { fetchActivity, type ActivityCounts } from "@/lib/api/client";
@@ -43,12 +44,21 @@ const POPUP_SHOWN_KEY = "start-request-popup-shown";
 export function HomeHub() {
   const t = useT();
   const router = useRouter();
+  const { sessionKey, status } = useSession();
   const [activity, setActivity] = useState<ActivityCounts | null>(null);
   const [startPopup, setStartPopup] = useState(false);
   // Reuses the activity count this screen already loads, so the gate costs one extra /api/me read.
   const offerStartChoice = useStartRequestGate(activity?.openRequests ?? null);
 
+  /* Re-read whenever the ACCOUNT changes, not only on mount (owner, 2026-08-30). Signing in through
+     the modal never remounts this page, so with `[]` the counts stayed the guest's — zero requests,
+     zero bids — until something forced a reload. `sessionKey` is that change; see its note in
+     `lib/session`.
+
+     Nothing is asked for while the session is still resolving: a call made then answers for nobody,
+     and the key moves again the moment it lands. */
   useEffect(() => {
+    if (status === "loading") return;
     let active = true;
     fetchActivity()
       .then((a) => active && setActivity(a))
@@ -56,7 +66,7 @@ export function HomeHub() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [sessionKey, status]);
 
   // mobile/016 (AC-01/22/23) — self-raise the pop-up once per tab on landing, mirroring the app's
   // cold-start trigger. The explicit "Create request" path below doesn't depend on this.
@@ -220,7 +230,15 @@ export function HomeHub() {
 
                 The sparkle that sat after the headline is gone on the same instruction. It marked
                 "the assistant did this", which the sentence already says in words. */}
-            <h1 className="text-display font-extrabold leading-tight tracking-[-0.3px] text-white sm:text-hero">
+            {/* `font-hero` is Oswald — a tall condensed grotesque, the only webfont on the app and used
+                on this one line. Site signage and equipment livery are set in faces like it, and the
+                banner is about machinery (owner, 2026-08-30).
+
+                It runs NARROW, so it takes the tracking back to normal: the -0.3px above was
+                pulling Segoe UI's wider letterforms together, and applying it to a condensed face
+                closes counters that are already tight. Weight 600 rather than 800 for the same
+                reason — Oswald at 800 fills its own counters at this size. */}
+            <h1 className="font-hero text-display font-semibold leading-tight text-white sm:text-hero">
               {t.home.ctaTitleBefore}
               <span className="text-brand-light">{t.home.ctaTitleAi}</span>
               {t.home.ctaTitleAfter}

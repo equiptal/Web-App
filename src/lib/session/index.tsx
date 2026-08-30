@@ -26,6 +26,23 @@ interface SessionValue {
   signOut: () => Promise<void>;
   /** Re-read the session from the server. */
   refresh: () => Promise<void>;
+  /**
+   * **A key that changes whenever the identity behind the page does** (owner, 2026-08-30).
+   *
+   * *"When I was in guest mode then logged in, I want to see the changes in the dashboard instantly
+   * without me clicking refresh."*
+   *
+   * The dashboard's blocks fetch on mount with `[]` deps, so signing in through the modal changed
+   * the session and nothing else: the page kept the guest's answers — no requests, no bids — until
+   * something forced a remount. Putting this in a block's dependency array re-runs its load the
+   * moment the account changes, which is what a reload was standing in for.
+   *
+   * It carries the TIER as well as the id, because a guest finishing their profile becomes `basic`
+   * without the id moving, and that is exactly a moment when the dashboard's answers change. And it
+   * carries `status`, so `loading → anon` re-runs too rather than leaving a block that fetched
+   * before the session resolved showing whatever it got.
+   */
+  sessionKey: string;
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -75,6 +92,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
       refresh,
+      // A string rather than an incrementing count: it is derived from the state it describes, so it
+      // cannot drift out of step with it, and two renders of the same identity produce the same key.
+      sessionKey: `${status}:${user?.id ?? ""}:${tier}`,
     };
   }, [status, user, signIn, signOut, refresh]);
 
