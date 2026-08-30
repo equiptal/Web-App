@@ -233,9 +233,331 @@
   .toast .ago{margin-inline-start:auto;flex:none;color:var(--muted-light);font-size:var(--t-label);white-space:nowrap}
   .toast .low{flex:none;display:inline-flex;align-items:center;gap:3px;background:var(--ok-soft);color:var(--ok-deep);
     border-radius:var(--r-full);padding:0 6px;font-size:10px;font-weight:800}
-  .toast .low .icon{font-size:11px}
+  .toast .low .icon{font-size:11px}
 
-  /* ── projects ───────────────────────────────────────────────────────────── */
+
+  #projects input, #projects select, #projects textarea{font:inherit;color:inherit}
+  @media (prefers-reduced-motion:reduce){
+  #projects *, #projects *::before, #projects *::after{transition:none !important} }
+  @media (min-width:640px){ }
+  @media (min-width:1280px){ }
+  #projects /* ── app bar ────────────────────────────────────────────────────────────── */
+  .appbar{position:sticky;top:0;z-index:40;height:62px;background:var(--navy);color:#fff;
+    display:flex;align-items:center;padding:0 24px;gap:18px}
+  #projects .langbtn:hover{background:rgba(255,255,255,.12)}
+  #projects /* ── section scaffolding ────────────────────────────────────────────────── */
+  .sec{padding:20px 0 40px}
+  #projects .shead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  #projects .shead .plate{width:38px;height:38px;flex:none;background:var(--navy);color:#fff;
+    display:grid;place-items:center;border-radius:var(--r-sm)}
+  #projects .shead .plate .icon{font-size:var(--t-display)}
+  #projects .shead h2{font-size:var(--t-title)}
+  #projects .shead .sum{display:block;color:var(--muted);font-size:var(--t-meta);margin-top:2px}
+  #projects .shead .sum b{color:var(--navy);font-weight:800}
+  #projects .shead .spacer{flex:1}
+  #projects .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--c-md);
+    border-radius:var(--r-md);padding:0 14px;font-size:var(--t-body);font-weight:700;
+    transition:background var(--t),border-color var(--t),color var(--t)}
+  #projects .btn .icon{font-size:var(--t-subhead)}
+  #projects .btn-primary{background:var(--brand);color:#fff}
+  #projects .btn-primary:hover{background:var(--brand-hover)}
+  #projects .btn-secondary{background:var(--surface);border:1px solid var(--border-strong);color:var(--navy)}
+  #projects .btn-secondary:hover{background:var(--surface2);border-color:var(--navy-mid)}
+  #projects .btn-ghost{color:var(--navy);border:1px solid transparent}
+  #projects .btn-ghost:hover{background:var(--surface2)}
+  #projects .btn-danger{background:var(--danger);color:#fff}
+  #projects .btn-danger:hover{background:var(--danger-deep)}
+  #projects .btn-sm{height:var(--c-sm);padding:0 11px;font-size:var(--t-meta)}
+  #projects .btn[disabled]{opacity:.45;cursor:not-allowed}
+  #projects /* ── projects ───────────────────────────────────────────────────────────── */
+  .plane{display:grid;grid-template-columns:264px minmax(0,1fr);gap:12px;align-items:start}
+  @media (max-width:980px){
+  #projects .plane{grid-template-columns:1fr} }
+  #projects .prail{display:grid;gap:6px}
+  #projects .pcard{text-align:start;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);
+    border-inline-start:3px solid var(--border-strong);padding:10px 12px;transition:background var(--t),border-color var(--t)}
+  #projects .pcard:hover{background:var(--surface2);border-color:var(--border-strong)}
+  #projects .pcard[aria-current="true"]{border-color:var(--navy);border-inline-start-color:var(--brand);background:var(--surface2)}
+  #projects .pcard.unfiled{border-inline-start-style:dashed}
+  #projects .pcard .n{display:flex;align-items:center;gap:6px;font-size:var(--t-body);font-weight:800}
+  #projects .pcard .m{display:block;color:var(--muted);font-size:var(--t-meta);margin-top:2px}
+  #projects .pcard .arch{font-size:var(--t-label);font-weight:800;text-transform:uppercase;letter-spacing:.04em;
+    color:var(--muted-light);border:1px solid var(--border);border-radius:var(--r-full);padding:0 6px}
+  #projects .railadd{border:1px dashed var(--border-strong);border-radius:var(--r-md);padding:10px 12px;color:var(--muted-dark);
+    font-weight:700;font-size:var(--t-meta);text-align:start;display:flex;align-items:center;gap:7px;transition:var(--t)}
+  #projects .railadd:hover{background:var(--surface2);color:var(--navy);border-color:var(--navy-mid)}
+  #projects .railadd .icon{font-size:var(--t-subhead)}
+  #projects .railfoot{display:flex;justify-content:center;padding-top:2px}
+  #projects .railfoot button{font-size:var(--t-meta);font-weight:700;color:var(--muted);padding:6px}
+  #projects .railfoot button:hover{color:var(--navy)}
+  #projects .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden}
+  #projects /* Unassigned draws no chart, #projects so nothing needs clipping — and clipping was cutting the row menu. */
+  .panel.loose{overflow:visible}
+  #projects .pmeta{display:flex;flex-wrap:wrap;align-items:stretch;border-bottom:1px solid var(--border)}
+  #projects .pmeta .cell{flex:none;padding:10px 14px;border-inline-end:1px solid var(--border);min-width:118px}
+  #projects .pmeta .wide{min-width:210px;max-width:330px}
+  #projects .pmeta .k{font-size:var(--t-label);font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  #projects .pmeta .v{font-size:var(--t-body);font-weight:800;margin-top:2px;display:flex;align-items:center;gap:6px}
+  #projects .pmeta .lock{font-size:11px;color:var(--muted-light)}
+  #projects .pmeta .addr{display:flex;align-items:center;gap:5px;max-width:300px;margin-top:3px;
+    color:var(--info-deep);font-size:var(--t-body);font-weight:700}
+  #projects .pmeta .addr .txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #projects .pmeta .addr .icon{font-size:var(--t-body);flex:none}
+  #projects .pmeta .auto{font-size:var(--t-label);font-weight:600;color:var(--muted-light)}
+  #projects .pmeta .spacer{flex:1;border:0;min-width:0;padding:0}
+  #projects .pmeta .go{flex:none;padding:8px 12px;display:flex;align-items:center;gap:8px;border-inline-start:1px solid var(--border)}
+  #projects .pmeta .go .btn{white-space:nowrap}
+  #projects .gantt{overflow-x:auto}
+  #projects .gmin{min-width:880px}
+  #projects .grow{display:flex;border-bottom:1px solid var(--border)}
+  #projects .grow:last-child{border-bottom:0}
+  #projects .gcol{width:300px;flex:none;padding:9px 14px 9px 34px;border-inline-end:1px solid var(--border);position:relative}
+  #projects .gcol .n{font-size:var(--t-body);font-weight:800}
+  #projects .gcol .m{color:var(--muted);font-size:var(--t-meta);margin-top:2px}
+  #projects .gcol .m b{font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--navy)}
+  #projects .gtrack{flex:1;position:relative;min-height:50px}
+  #projects .greq{display:flex;background:var(--surface2);border-bottom:1px solid var(--border)}
+  #projects .greq .gcol{display:flex;align-items:center;gap:8px;padding:6px 14px;flex-wrap:wrap}
+  #projects .greq .gtrack{min-height:0;display:flex;align-items:center;padding:0 12px}
+  #projects .greq .ref{font-family:"IBM Plex Mono",monospace;font-size:var(--t-meta);font-weight:600;
+    text-decoration:underline;text-underline-offset:3px}
+  #projects .greq .open{display:inline-flex;align-items:center;gap:5px;color:var(--navy)}
+  #projects .greq .open:hover{color:var(--brand-deep)}
+  #projects .greq .open .icon{font-size:var(--t-body);color:var(--muted)}
+  #projects .kind{display:inline-flex;align-items:center;gap:4px;border-radius:var(--r-full);padding:1px 8px;
+    font-size:var(--t-label);font-weight:800}
+  #projects .kind.wo{background:var(--surface3);color:var(--navy-mid)}
+  #projects .kind.rfq{background:var(--info-soft);color:var(--info-deep)}
+  #projects .greq .ttl{font-size:var(--t-meta);font-weight:700;color:var(--muted-dark)}
+  #projects .ghead .gcol{padding:7px 14px;font-size:var(--t-label);font-weight:800;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--muted)}
+  #projects .ghead .gtrack{min-height:30px}
+  #projects .gmonth{position:absolute;top:0;bottom:0;border-inline-start:1px solid var(--border);padding:7px 0 0 8px;
+    white-space:nowrap;font-size:var(--t-label);font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  [dir="rtl"] #projects .gmonth{padding:7px 8px 0 0}
+  #projects .gtoday{position:absolute;top:0;bottom:0;width:0;border-inline-start:2px dashed var(--brand);z-index:2}
+  #projects .gtoday span{position:absolute;top:4px;transform:translateX(-50%);background:var(--brand);color:#fff;
+    font-size:10px;font-weight:800;border-radius:var(--r-full);padding:2px 7px;white-space:nowrap}
+  [dir="rtl"] #projects .gtoday span{transform:translateX(50%)}
+  #projects /* The bar carries no state — only the span. */
+  .bar{position:absolute;top:50%;transform:translateY(-50%);height:22px;border-radius:var(--r-sm);
+    display:flex;align-items:center;padding:0 8px;font-size:var(--t-label);font-weight:800;
+    white-space:nowrap;overflow:hidden}
+  #projects .bar.awarded{background:var(--navy);color:#fff}
+  #projects .bar.open{background:repeating-linear-gradient(135deg,var(--surface2),var(--surface2) 6px,var(--surface3) 6px,var(--surface3) 12px);
+    color:var(--muted-dark);border:1px dashed var(--border-strong)}
+  #projects /* Pins: solid green for mobilized, #projects solid orange for demobilized. No caption — two
+     coloured marks on a date line do not need a legend to be read. */
+  .pin{position:absolute;top:calc(50% - 11px);width:12px;height:12px;
+    transform:translate(-50%,-50%) rotate(45deg);
+    background:var(--ok);border:2px solid #fff;box-shadow:0 0 0 1px var(--ok);z-index:4;cursor:default}
+  [dir="rtl"] #projects .pin{transform:translate(50%,-50%) rotate(45deg)}
+  #projects .pin.out{background:var(--brand);box-shadow:0 0 0 1px var(--brand)}
+  #projects /* Papers ride the row's top corner, #projects not a line of their own. */
+  .docpins{position:absolute;top:7px;inset-inline-end:9px;display:flex;gap:3px;z-index:2}
+  #projects .docpin{width:19px;height:19px;border-radius:var(--r-sm);display:grid;place-items:center;
+    background:var(--brand-soft);border:1px solid var(--brand-pale);color:var(--brand-deep)}
+  #projects .docpin .icon{font-size:12px}
+  #projects .docpin.more{width:auto;padding:0 5px;font-size:10px;font-weight:800}
+  #projects .diff{display:inline-flex;align-items:center;gap:4px;border-radius:var(--r-full);padding:1px 8px;
+    background:var(--warn-soft);color:var(--warn-deep);font-size:var(--t-label);font-weight:800;
+    border:1px solid var(--brand-pale)}
+  #projects .diff .icon{font-size:12px}
+  #projects .diff:hover{background:var(--brand-soft)}
+  #projects /* row menu */
+  .gmenu{position:absolute;inset-inline-start:6px;top:9px}
+  #projects .dots{width:24px;height:24px;border-radius:var(--r-sm);display:grid;place-items:center;color:var(--muted);
+    transition:background var(--t),color var(--t)}
+  #projects .dots:hover{background:var(--surface3);color:var(--navy)}
+  #projects .dots .icon{font-size:var(--t-subhead)}
+  #projects .gsheet{position:absolute;inset-inline-start:0;top:26px;z-index:30;min-width:250px;background:var(--surface);
+    border:1px solid var(--border);border-radius:var(--r-md);padding:4px;display:none;
+    box-shadow:0 8px 24px rgba(28,53,80,.14)}
+  #projects .gmenu.open .gsheet{display:block}
+  #projects .gsheet button{display:flex;align-items:center;gap:9px;width:100%;height:var(--c-md);border-radius:var(--r-sm);
+    padding:0 10px;font-size:var(--t-body);font-weight:600;color:var(--navy);text-align:start;transition:background var(--t)}
+  #projects .gsheet button:hover{background:var(--surface2)}
+  #projects .gsheet button .icon{font-size:var(--t-subhead);color:var(--muted)}
+  #projects .gsheet .rule{height:1px;background:var(--border);margin:4px 0}
+  #projects .gsheet .danger{color:var(--danger-deep)}
+  #projects .gsheet .danger .icon{color:var(--danger)}
+  #projects /* ── dialogs ────────────────────────────────────────────────────────────── */
+  .scrim{position:fixed;inset:0;z-index:60;background:rgba(28,53,80,.45);display:none;
+    align-items:flex-start;justify-content:center;padding:44px 16px;overflow-y:auto}
+  #projects .scrim.open{display:flex}
+  #projects .modal{width:100%;max-width:620px;background:var(--surface);border-radius:var(--r-lg);overflow:hidden}
+  #projects .modal.wide{max-width:820px}
+  #projects .mhead{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)}
+  #projects .mhead .plate{width:32px;height:32px;flex:none;border-radius:var(--r-sm);background:var(--brand-soft);
+    color:var(--brand-deep);display:grid;place-items:center}
+  #projects .mhead h3{font-size:var(--t-subhead)}
+  #projects .mhead .sub{font-size:var(--t-meta);color:var(--muted);font-weight:600}
+  #projects .mhead .x{margin-inline-start:auto;width:var(--c-sm);height:var(--c-sm);border-radius:var(--r-sm);
+    display:grid;place-items:center;color:var(--muted)}
+  #projects .mhead .x:hover{background:var(--surface2);color:var(--navy)}
+  #projects .mbody{padding:16px 18px;display:grid;gap:14px}
+  #projects .mfoot{display:flex;align-items:center;gap:8px;justify-content:flex-end;padding:12px 18px;
+    border-top:1px solid var(--border);background:var(--surface2)}
+  #projects .mfoot .spacer{flex:1}
+  #projects .fset{border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px}
+  #projects .fset > legend{font-size:var(--t-label);font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);padding:0 6px}
+  #projects .frow{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  #projects .fld{display:block}
+  #projects .fld .lbl{display:block;font-size:var(--t-label);font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--muted);margin-bottom:3px}
+  #projects .fld input, #projects .fld select{width:100%;height:var(--c-md);border:1px solid var(--border-strong);border-radius:var(--r-md);
+    background:var(--surface);padding:0 9px;font-size:var(--t-body);font-weight:600}
+  #projects .fld input:focus, #projects .fld select:focus{outline:2px solid var(--brand);outline-offset:-1px;border-color:var(--brand)}
+  #projects .fld select[disabled]{background:var(--surface2);color:var(--muted-light)}
+  #projects .hint{font-size:var(--t-meta);color:var(--muted)}
+  #projects .warnline, #projects .infoline, #projects .dangerline{display:flex;align-items:flex-start;gap:8px;border-radius:var(--r-md);
+    padding:8px 10px;font-size:var(--t-meta);font-weight:700}
+  #projects .warnline{background:var(--warn-soft);color:var(--warn-deep)}
+  #projects .infoline{background:var(--info-soft);color:var(--info-deep)}
+  #projects .dangerline{background:var(--danger-soft);color:var(--danger-deep)}
+  #projects .warnline .icon, #projects .infoline .icon, #projects .dangerline .icon{font-size:var(--t-subhead);flex:none}
+  #projects .alloc{display:grid;grid-template-columns:minmax(0,1.6fr) 76px minmax(0,1fr) 28px;gap:8px;align-items:end}
+  #projects .alloc + .alloc{margin-top:8px}
+  #projects .optrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media (max-width:620px){
+  #projects .optrow{grid-template-columns:1fr} }
+  #projects .optcard{display:grid;gap:6px;text-align:start;border:1px solid var(--border-strong);
+    border-radius:var(--r-md);background:var(--surface);padding:14px;transition:var(--t)}
+  #projects .optcard:hover{border-color:var(--navy-mid);background:var(--surface2)}
+  #projects .optcard .ic{width:34px;height:34px;border-radius:var(--r-sm);display:grid;place-items:center;
+    background:var(--surface3);color:var(--navy-mid)}
+  #projects .optcard .ic.brand{background:var(--brand-soft);color:var(--brand-deep)}
+  #projects .optcard .tt{font-size:var(--t-subhead);font-weight:800}
+  #projects .optcard .ds{font-size:var(--t-meta);color:var(--muted);font-weight:600;line-height:1.5}
+  #projects .mcard{border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);
+    padding:11px 12px;margin-top:9px}
+  #projects .mcard:first-of-type{margin-top:0}
+  #projects .mhd{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+  #projects .mhd b{font-size:var(--t-meta);font-weight:800}
+  #projects .mhd .spacer{flex:1}
+  #projects .tag{border-radius:var(--r-full);background:var(--surface3);color:var(--muted-dark);
+    padding:1px 8px;font-size:var(--t-label);font-weight:700}
+  #projects .tag.danger{background:var(--danger-soft);color:var(--danger-deep)}
+  #projects .overpanel{margin-top:10px;padding:11px 12px;border-radius:var(--r-md);background:var(--surface);
+    border:1px solid var(--brand-pale);border-inline-start:3px solid var(--brand)}
+  #projects .chipset{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}
+  #projects .tchip{height:28px;border-radius:var(--r-full);padding:0 12px;border:1px solid var(--border-strong);
+    background:var(--surface);font-size:var(--t-meta);font-weight:700;transition:var(--t)}
+  #projects .tchip:hover{border-color:var(--navy-mid)}
+  #projects .tchip[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+  #projects .chk{display:inline-flex;align-items:center;gap:7px;height:var(--c-md);font-size:var(--t-body);
+    font-weight:600;white-space:nowrap}
+  #projects .chk input{width:16px;height:16px;accent-color:var(--brand)}
+  #projects /* the map picker — a prototype surface, #projects not a real tile layer */
+  .mapbox{position:relative;height:190px;border:1px solid var(--border-strong);border-radius:var(--r-md);
+    overflow:hidden;cursor:crosshair;background:#eaf1f7}
+  #projects .mapbox .grid{position:absolute;inset:0;
+    background-image:linear-gradient(var(--border) 1px,transparent 1px),
+                     linear-gradient(90deg,var(--border) 1px,transparent 1px);
+    background-size:34px 34px;opacity:.75}
+  #projects .mapbox .road{position:absolute;background:#fff;box-shadow:0 0 0 1px var(--border)}
+  #projects .mapbox .r1{inset-inline-start:0;inset-inline-end:0;top:58%;height:12px}
+  #projects .mapbox .r2{top:0;bottom:0;inset-inline-start:38%;width:10px}
+  #projects .mapbox .blk{position:absolute;background:#dfe9f2;border:1px solid var(--border)}
+  #projects .mapbox .mappin{position:absolute;transform:translate(-50%,-100%);color:var(--danger);z-index:3;
+    filter:drop-shadow(0 2px 2px rgba(0,0,0,.25))}
+  [dir="rtl"] #projects .mapbox .mappin{transform:translate(50%,-100%)}
+  #projects .mapbox .mappin .icon{font-size:30px;font-variation-settings:"FILL" 1}
+  #projects .mapbox .coord{position:absolute;inset-inline-start:8px;bottom:8px;background:rgba(255,255,255,.92);
+    border:1px solid var(--border);border-radius:var(--r-sm);padding:2px 7px;font-size:var(--t-label);font-weight:700}
+  #projects .mapbox .tip{position:absolute;inset-inline-end:8px;top:8px;background:rgba(28,53,80,.82);color:#fff;
+    border-radius:var(--r-sm);padding:2px 8px;font-size:var(--t-label);font-weight:700}
+  #projects .applylist{display:grid;gap:4px}
+  #projects .applyrow{display:flex;align-items:center;gap:9px;border:1px solid var(--border);border-radius:var(--r-md);
+    padding:8px 10px;background:var(--surface)}
+  #projects .applyrow.blocked{background:var(--surface2);color:var(--muted)}
+  #projects .applyrow input[type="checkbox"]{width:16px;height:16px;accent-color:var(--brand);flex:none}
+  #projects .applyrow .nm{font-weight:800;font-size:var(--t-body);min-width:0}
+  #projects .applyrow .why{margin-inline-start:auto;font-size:var(--t-meta);font-weight:700;white-space:nowrap}
+  #projects .applyrow .why.free{color:var(--ok-deep)}
+  #projects .applyrow .why.cost{color:var(--warn-deep)}
+  #projects .applyrow .why.no{color:var(--muted)}
+  #projects /* ── intake ─────────────────────────────────────────────────────────────── */
+  .intake{max-width:1060px;margin:0 auto}
+  #projects .icard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+  #projects .ihead{display:flex;align-items:center;gap:10px;padding:14px 18px 6px}
+  #projects .ihead .plate{width:32px;height:32px;flex:none;border-radius:var(--r-sm);display:grid;place-items:center;
+    background:linear-gradient(135deg,#fbbf24,var(--brand));color:#fff}
+  #projects .ihead b{font-size:var(--t-subhead)}
+  #projects .ihead .beta{border-radius:var(--r-full);background:var(--brand-soft);color:var(--warn-deep);
+    padding:2px 8px;font-size:var(--t-label);font-weight:800;text-transform:uppercase}
+  #projects .ihead .spacer{flex:1}
+  #projects .ihead .cnt{font-size:var(--t-meta);color:var(--muted);font-weight:700}
+  #projects .icard textarea{width:100%;min-height:120px;resize:vertical;border:0;background:transparent;
+    padding:6px 18px 14px;font-size:var(--t-subhead);line-height:1.6;outline:none}
+  #projects .pillbar{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;border-top:1px solid var(--border);
+    background:var(--surface2)}
+  #projects .pill{display:inline-flex;align-items:center;gap:5px;height:28px;border-radius:var(--r-full);
+    padding:0 4px 0 11px;background:var(--surface);border:1px solid var(--border-strong);
+    font-size:var(--t-meta);font-weight:700;transition:var(--t)}
+  #projects .pill.pad{padding-inline-end:11px}
+  #projects .pill:hover{border-color:var(--navy-mid)}
+  #projects .pill.changed{border-color:var(--brand);background:var(--brand-soft);color:var(--brand-deep)}
+  #projects .pill.conflict{border-color:var(--danger);background:var(--danger-soft);color:var(--danger-deep)}
+  #projects .pill.lead{background:var(--navy);border-color:var(--navy);color:#fff}
+  #projects .pill select{height:22px;border:0;background:transparent;font-size:var(--t-meta);font-weight:800;
+    padding:0 2px;cursor:pointer;color:inherit}
+  #projects .pill input[type="date"]{border:0;background:transparent;font:inherit;font-weight:800;width:118px}
+  #projects .pill .x{width:20px;height:20px;border-radius:var(--r-full);display:grid;place-items:center;color:inherit;opacity:.75}
+  #projects .pill .x:hover{opacity:1;background:rgba(255,255,255,.18)}
+  #projects .pill .x .icon{font-size:13px}
+  #projects .pill .k{opacity:.7;font-weight:700}
+  #projects .morepill{height:28px;border-radius:var(--r-full);padding:0 11px;border:1px dashed var(--border-strong);
+    font-size:var(--t-meta);font-weight:700;color:var(--muted-dark)}
+  #projects .morepill:hover{border-color:var(--navy-mid);color:var(--navy)}
+  #projects .chiprow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:12px}
+  #projects .chiprow .k{font-size:var(--t-label);font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);margin-inline-end:2px}
+  #projects .chip{display:inline-flex;align-items:center;gap:6px;height:30px;border-radius:var(--r-full);padding:0 13px;
+    background:var(--surface);border:1px solid var(--border-strong);font-size:var(--t-meta);font-weight:700;
+    transition:var(--t)}
+  #projects .chip:hover{border-color:var(--navy-mid);background:var(--surface2)}
+  #projects .chip[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+  #projects .chip .arch{font-size:var(--t-label);font-weight:800;text-transform:uppercase;letter-spacing:.04em;
+    color:var(--muted-light);border:1px solid var(--border);border-radius:var(--r-full);padding:0 6px}
+  #projects .chip[aria-pressed="true"] .arch{color:rgba(255,255,255,.72);border-color:rgba(255,255,255,.35)}
+  #projects .chip .icon{font-size:var(--t-body);opacity:.7}
+  #projects .tmplbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:10px 14px;
+    border-top:1px solid var(--border);background:var(--surface)}
+  #projects .tmplbar .k{font-size:var(--t-label);font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  #projects .tmplbar select{height:var(--c-sm);border:1px solid var(--border-strong);border-radius:var(--r-md);
+    background:var(--surface);padding:0 8px;font-size:var(--t-meta);font-weight:700;min-width:250px}
+  #projects .tmplbar .note{font-size:var(--t-meta);color:var(--muted);font-weight:600}
+  #projects .youtype{display:flex;align-items:flex-start;gap:8px;padding:9px 14px;
+    border-top:1px solid var(--border);background:var(--brand-soft);
+    color:var(--brand-deep);font-size:var(--t-meta);font-weight:600}
+  #projects .youtype b{font-weight:800}
+  #projects .youtype .icon{font-size:var(--t-subhead);flex:none}
+  #projects .speed{display:flex;align-items:center;gap:9px;margin-top:12px;border:1px solid var(--border);
+    border-radius:var(--r-md);background:var(--surface);padding:10px 13px}
+  #projects .speed .led{width:9px;height:9px;border-radius:var(--r-full);flex:none;background:var(--ok)}
+  #projects .speed.t1 .led{background:var(--info)}
+  #projects .speed.t2 .led{background:var(--muted)}
+  #projects .speed .nm{font-weight:800;font-size:var(--t-body)}
+  #projects .speed .why{font-size:var(--t-meta);color:var(--muted);font-weight:600}
+  #projects .speed .ms{margin-inline-start:auto;font-family:"IBM Plex Mono",monospace;font-weight:700;
+    font-size:var(--t-meta);color:var(--navy)}
+  #projects .go{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;flex-wrap:wrap}
+  #projects .note{font-size:var(--t-meta);color:var(--muted)}
+  #projects .banner{display:flex;align-items:flex-start;gap:9px;border:1px solid var(--border);
+    border-inline-start:3px solid var(--brand);border-radius:var(--r-md);background:var(--surface);
+    padding:10px 13px;margin-bottom:14px;font-size:var(--t-meta);color:var(--muted-dark)}
+  #projects .banner b{color:var(--navy)}
+  #projects .banner .icon{font-size:var(--t-subhead);color:var(--brand);flex:none}
+  #projects /* ── Embedded in the dashboard (?embed=1) ───────────────────────────────────────────────────
+     The dashboard already carries the app bar, #projects the page gutters and its own section header, #projects so
+     this file drops all three and renders only the projects surface. Its own height is posted to
+     the parent on every render, #projects because an iframe cannot size itself. */
+  body.is-embed .appbar{display:none}
+
+
+  /* ── projects (the dashboard's own, superseded) ───────────────────────────────────────────────────────────── */
   .plane{display:grid;grid-template-columns:260px minmax(0,1fr);gap:12px;align-items:start}
   .prail{display:grid;gap:6px}
   .pcard{text-align:start;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);
@@ -864,174 +1186,18 @@ function projectTitle(p){
 }
 
 function renderProjects(){
-  var p = PROJECTS.filter(function(x){ return x.id === proj; })[0] || PROJECTS[0];
-  var s = span(p);
-  var moEn = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  var moAr = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
-
-  var months = "", cur = new Date(s.from.getFullYear(), s.from.getMonth(), 1);
-  while (cur < s.to){
-    var next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
-    months += '<span class="gmonth" style="inset-inline-start:' + pct(cur, s) + '%;width:'
-      + (pct(next, s) - pct(cur, s)) + '%">' + L(moEn[cur.getMonth()], moAr[cur.getMonth()])
-      + " " + String(cur.getFullYear()).slice(2) + '</span>';
-    cur = next;
+  /* A MOUNT POINT: the inlined surface writes into `#tab-projects` and its dialogs into
+     `#scrim`, exactly as they do in their own file. It draws its OWN header, so this adds none. */
+  var host = document.getElementById("projects");
+  if (!host.innerHTML){
+    host.innerHTML =
+        '<div id="tab-projects"></div>'
+      + '<div id="tab-intake" hidden></div>'
+      + '<button id="langbtn" hidden></button>'
+      + '<div class="scrim" id="scrim" onclick="if(event.target===this)PJ.closeModal()"></div>';
   }
-  var tp = pct(d(TODAY), s), tin = tp >= 0 && tp <= 100;
-
-  var rail = PROJECTS.map(function(x){
-    return '<button class="pcard' + (x.alert ? " alert" : "") + '" type="button" aria-current="' + (x.id === proj)
-      + '" onclick="pickProject(\'' + x.id + '\')"><span class="n">' + projectTitle(x) + '</span>'
-      + '<span class="m">' + (x.units ? x.units + ' ' + L("units awarded", "وحدة مُرساة")
-                                      : L("nothing awarded yet", "لا إرساء بعد"))
-      + ' · ' + x.reqs.length + ' ' + L("requests", "طلبات") + '</span></button>';
-  }).join("");
-
-  /* rows, grouped under the request they came from */
-  var groups = [], seen = {};
-  p.machines.forEach(function(m, i){
-    var k = m.from || "—";
-    if (!seen[k]){ seen[k] = { ref:k, rows:[] }; groups.push(seen[k]); }
-    seen[k].rows.push({ m:m, i:i });
-  });
-  var showHeaders = groups.length > 1;
-
-  function machineRow(m, i){
-    var chip = stateChip(m);
-    /* one bar, and it carries the state. Nothing on the chart until the request
-       is at least fulfilled — an empty track is the honest picture of "no bids". */
-    var track = "";
-    if (m.st){
-      var cls = { awarded:"awarded", contracted:"contracted",
-                  onrent:"rent", ended:"rent" }[m.st] || "plan";
-      track = bar(cls, m.rent, chip ? chip.txt : "", s) + bar("over", m.over, L("Past the agreed period", "بعد الفترة المتّفقة"), s);
-    } else if (m.bids && m.offered >= m.qty){
-      track = bar("s-full", m.want, chip ? chip.txt : L("Fulfilled", "مغطّى"), s);
-    }
-
-    return '<div class="grow"><div class="gcol hasmenu">'
-      + '<div class="gmenu' + (openRow === i ? " open" : "") + '">'
-      +   '<button class="dots" aria-label="' + L("Row actions", "إجراءات الصف") + '" '
-      +     'onclick="event.stopPropagation();toggleRow(' + i + ')"><span class="icon" aria-hidden="true">more_horiz</span></button>'
-      +   '<div class="gsheet">'
-      +     (m.st
-              ? '<button><span class="icon" aria-hidden="true">receipt_long</span>'
-                + L("Attach the PO / contract", "أرفق أمر الشراء / العقد") + '</button>'
-                + '<button><span class="icon" aria-hidden="true">local_shipping</span>'
-                + L("Mark as received", "سجّل الاستلام") + '</button>'
-                + '<button><span class="icon" aria-hidden="true">timer_off</span>'
-                + L("Request off-hire", "اطلب إنهاء الإيجار") + '</button>'
-                + '<div class="rule"></div>'
-                + '<button><span class="icon" aria-hidden="true">forum</span>'
-                + L("Open the deal room", "افتح غرفة الصفقة") + '</button>'
-              : '<button><span class="icon" aria-hidden="true">gavel</span>'
-                + (m.bids ? L("Review the bids", "راجع العروض")
-                          : L("No bids yet", "لا عروض بعد")) + '</button>'
-                + '<button><span class="icon" aria-hidden="true">assignment</span>'
-                + L("Open the request", "افتح الطلب") + '</button>')
-      +   '</div></div>'
-      + '<div class="n">' + L(m.eqEn, m.eqAr) + (m.units > 1 ? ' ×' + m.units : '') + '</div>'
-      + (m.supEn ? '<div class="m"><b>' + L(m.money, m.moneyAr) + '</b> · ' + L(m.supEn, m.supAr) + '</div>' : '')
-      + (!m.st ? '<button class="gx" title="' + L("Cancel the request", "ألغِ الطلب") + '" aria-label="'
-          + L("Cancel the request", "ألغِ الطلب") + '"><span class="icon" aria-hidden="true">close</span></button>' : '')
-      + '</div><div class="gtrack">'
-      + (tin ? '<span class="gtoday" style="inset-inline-start:' + tp + '%"></span>' : '')
-      + track
-      + '</div></div>';
-  }
-
-  var rows = groups.map(function(g){
-    var head = showHeaders
-      ? '<div class="greq"><div class="gcol">'
-        + '<button class="open" title="' + L("Open the request", "افتح الطلب") + '">'
-        + '<span class="ref">' + g.ref + '</span>'
-        + '<span class="icon" aria-hidden="true">north_east</span></button></div>'
-        + '<div class="gtrack"></div></div>'
-      : "";
-    return head + g.rows.map(function(x){ return machineRow(x.m, x.i); }).join("");
-  }).join("");
-
-  document.getElementById("projects").innerHTML =
-      '<div class="shead"><span class="plate"><span class="icon" aria-hidden="true">apartment</span></span>'
-    +   '<span class="txt"><h2>' + L("My Projects", "مشاريعي") + '</h2>'
-    +   '<span class="sum"><b>' + PROJECTS.length + '</b> ' + L("projects", "مشاريع") + ' · <b>'
-    +     PROJECTS.reduce(function(n, x){ return n + x.units; }, 0) + '</b> '
-    +     L("units awarded", "وحدة مُرساة") + '</span></span></div>'
-    + '<div class="plane"><div class="prail">' + rail + '</div><div class="panel">'
-    +   '<div class="pmeta">'
-    +     '<div class="cell wide"><div class="k">' + L("Project title", "اسم المشروع") + '</div>'
-    +       (editing === p.id
-              ? '<div class="titleedit">'
-                + '<input id="ptitle" value="' + projectTitle(p) + '" '
-                +   'aria-label="' + L("Project title", "اسم المشروع") + '" />'
-                + '<button class="btn btn-primary btn-sm" onclick="saveTitle()">' + L("Save", "حفظ") + '</button>'
-                + '<button class="btn btn-secondary btn-sm" onclick="editTitle(null)">' + L("Cancel", "إلغاء") + '</button>'
-                + '</div>'
-              : '<div class="v">' + projectTitle(p)
-                + '<button class="rename" onclick="editTitle(\'' + p.id + '\')" '
-                +   'title="' + L("Edit the project title", "عدّل اسم المشروع") + '">'
-                +   '<span class="icon" aria-hidden="true">edit</span>'
-                +   '<span class="lbl">' + L("Edit title", "تعديل الاسم") + '</span></button>'
-                + (L(p.nEn, p.nAr) ? '' : '<span class="auto">' + L("default", "افتراضي") + '</span>')
-                + '</div>') + '</div>'
-    +     '<div class="cell wide"><div class="k">' + L("Location", "الموقع") + '</div>'
-    +       '<a class="addr" href="https://maps.google.com/?q=' + (p.pin || '') + '" target="_blank" rel="noreferrer" '
-    +         'title="' + L(p.locEn, p.locAr) + '"><span class="icon" aria-hidden="true">location_on</span>'
-    +         '<span class="txt">' + L(p.locEn, p.locAr) + '</span>'
-    +         '<span class="icon" aria-hidden="true">open_in_new</span></a></div>'
-    +     '<div class="cell"><div class="k">' + L("First start", "أول بداية") + '</div><div class="v num">' + p.start + '</div></div>'
-    +     '<div class="cell"><div class="k">' + L("Last end", "آخر نهاية") + '</div><div class="v num">' + p.end + '</div></div>'
-    +     '<div class="cell spacer"></div>'
-    +     '<div class="cell tail"><div class="k">' + L("Requests", "الطلبات") + '</div>'
-    +       '<div class="v num">' + p.reqs.length + '</div></div>'
-    +     '<div class="go"><button class="btn btn-secondary btn-sm">'
-    +       '<span class="icon" aria-hidden="true">add</span>'
-    +       L("Assign new request", "أضف طلباً جديداً") + '</button></div>'
-    +   '</div>'
-    +   (p.noticeEn ? '<div class="notice ' + (p.alert ? "danger" : "warn") + '">'
-    +     '<span class="icon" aria-hidden="true">' + (p.alert ? "error" : "info") + '</span>'
-    +     L(p.noticeEn, p.noticeAr) + '</div>' : '')
-    +   '<div class="gantt"><div class="gmin">'
-    +     '<div class="grow ghead"><div class="gcol">' + L("Machine", "المعدّة") + '</div><div class="gtrack">'
-    +       months + (tin ? '<span class="gtoday" style="inset-inline-start:' + tp + '%"><span>'
-    +         + L("today", "اليوم") + '</span></span>' : '') + '</div></div>'
-    +     rows
-    +   '</div>'
-    +   '<div class="glegend">'
-    +     '<span class="k">' + L("States", "الحالات") + '</span>'
-    +     '<span><i class="sw" style="background:var(--info-soft);box-shadow:inset 0 0 0 1px var(--info)"></i>'
-    +       L("Fulfilled", "مغطّى") + '</span>'
-    +     '<span><i class="sw" style="background:var(--brand-soft);box-shadow:inset 0 0 0 1px var(--brand)"></i>'
-    +       L("Awarded", "مُرسَاة") + '</span>'
-    +     '<span><i class="sw" style="background:var(--navy)"></i>'
-    +       L("Contracted", "متعاقد") + '</span>'
-    +     '<span><i class="sw" style="background:var(--ok)"></i>' + L("On rent", "قيد الإيجار") + '</span>'
-    +     '<span><i class="sw" style="background:var(--danger-soft);box-shadow:inset 0 0 0 1px var(--danger)"></i>'
-    +       L("Ended — past the agreed period", "منتهية — بعد الفترة المتّفقة") + '</span>'
-    +   '</div></div>'
-    + '</div></div>';
+  if (window.PJ) PJ.render();
 }
-function pickProject(id){ proj = id; openRow = null; renderProjects(); }
-function editTitle(id){ editing = id; renderProjects();
-  var f = document.getElementById("ptitle"); if (f){ f.focus(); f.select(); } }
-
-function saveTitle(){
-  var f = document.getElementById("ptitle");
-  var p = PROJECTS.filter(function(x){ return x.id === editing; })[0];
-  if (f && p){
-    var v = f.value.trim();
-    /* Stored only when it actually differs from the location's own short name.
-       Empty, or the same as the default, means "keep using the location". The
-       title the renter SEES is never empty either way. */
-    var def = shortSite(L(p.locEn, p.locAr));
-    var own = (v && v !== def) ? v : null;
-    p.nEn = own; p.nAr = own;
-  }
-  editing = null; renderProjects();
-}
-
-function toggleRow(i){ openRow = openRow === i ? null : i; renderProjects(); }
-document.addEventListener("click", function(){ if (openRow !== null){ openRow = null; renderProjects(); } });
 
 /* ══ suppliers ══════════════════════════════════════════════════════════════ */
 function renderSuppliers(){
@@ -1099,6 +1265,2015 @@ function render(){
     try { fn(); } catch (e) { console.error(fn.name, e); }
   });
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   THE PROJECTS SURFACE — inlined from prototypes/renter-projects-v1.html (owner, 2026-08-30).
+
+   The agreed model: project → work order → request, awards as rows, renter-set mobilised and
+   demobilised pins, no state ramp. It shares 13 global names and 58 class names with this file,
+   so it runs inside this closure and its CSS is scoped under `#projects`. Nothing here reaches
+   the requests, suppliers or stores sections, and nothing there reaches in.
+
+   Its markup calls its own handlers by name, so the closure publishes exactly those on `PJ` and
+   the inline attributes were rewritten to `PJ.name(…)`. GENERATED — edit the other file and
+   re-run the merge rather than hand-keeping this block.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+(function () {
+
+
+/* ══ embed mode ════════════════════════════════════════════════════════════
+   Mounted inside the dashboard's projects section. The parent owns the chrome,
+   so this drops its own — and reports its height after every paint, since an
+   iframe has no way to size itself to its content. */
+var EMBED = false;
+if (EMBED) document.body.classList.add("is-embed");
+
+function postHeight(){
+  if (!EMBED) return;
+  var h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+  try { parent.postMessage({ type: "moedatech:projects-height", height: h }, "*"); } catch (e) { /* no parent */ }
+}
+if (EMBED){
+  window.addEventListener("load", postHeight);
+  window.addEventListener("resize", postHeight);
+  /* Every render changes the height — the rail, the chart, an opened modal. */
+  new MutationObserver(postHeight).observe(document.body, { childList: true, subtree: true, attributes: true });
+}
+
+/* ══ language & tabs ════════════════════════════════════════════════════════ */
+var ar = false;
+function L(en, arr){ return ar ? arr : en; }
+function toggleLang(){
+  ar = !ar;
+  document.documentElement.lang = ar ? "ar" : "en";
+  document.documentElement.dir  = ar ? "rtl" : "ltr";
+  document.getElementById("langbtn").textContent = ar ? "English" : "العربية";
+  render();
+}
+var tab = "projects";
+function pickTab(t){
+  tab = t;
+  document.querySelectorAll(".navtab").forEach(function(b){
+    if (b.dataset.tab === t) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current");
+  });
+  render();
+}
+
+/* ══ demo data ══════════════════════════════════════════════════════════════ */
+var TODAY = "2026-10-12";   /* pinned so the chart shows a project mid-flight */
+
+var SUPPLIERS = [
+  { id:"s1", nEn:"Zahid Tractor",      nAr:"زاهد للجرارات",   platform:true,  registered:true  },
+  { id:"s2", nEn:"Al-Rajhi Equipment", nAr:"الراجحي للمعدات", platform:true,  registered:true  },
+  { id:"s3", nEn:"Nesma Rentals",      nAr:"نسما للتأجير",    platform:true,  registered:false },
+  { id:"s4", nEn:"Desert Fleet Co.",   nAr:"أسطول الصحراء",   platform:false, registered:true  }
+];
+function sup(id){ for (var i=0;i<SUPPLIERS.length;i++) if (SUPPLIERS[i].id===id) return SUPPLIERS[i]; return null; }
+function supName(id){ var s = sup(id); return s ? L(s.nEn, s.nAr) : "—"; }
+
+/* A slice of the real taxonomy. `noOperator` mirrors the backend's `operator_applicable`. */
+var TAX = {
+  "Earthmoving": { ar:"أعمال الحفر", subs:{
+    "Excavator":    { ar:"حفّار",           sizes:["10 ton","20 ton","30 ton","45 ton"] },
+    "Wheel loader": { ar:"لودر بعجل",       sizes:["1.5 m³","3 m³","5 m³"] },
+    "Bulldozer":    { ar:"جرافة",           sizes:["D6","D8","D9"] } } },
+  "Lifting & Access": { ar:"الرفع والوصول", subs:{
+    "Tower crane":  { ar:"رافعة برجية",     sizes:["6 ton","8 ton","12 ton"] },
+    "Telehandler":  { ar:"مناولة تلسكوبية", sizes:["3 ton","4 ton","6 ton"] },
+    "Mobile crane": { ar:"رافعة متحركة",    sizes:["25 ton","50 ton","100 ton"] } } },
+  "Power & Light": { ar:"الطاقة والإنارة", subs:{
+    "Generator":      { ar:"مولّد",     sizes:["100 kVA","250 kVA","400 kVA","500 kVA"], noOperator:true },
+    "Light tower":    { ar:"برج إنارة", sizes:["4 × 1000 W"],                            noOperator:true },
+    "Air compressor": { ar:"ضاغط هواء", sizes:["185 cfm","375 cfm","750 cfm"],           noOperator:true } } }
+};
+function taxSubs(cat){ return TAX[cat] ? Object.keys(TAX[cat].subs) : []; }
+function taxSizes(cat, sub){ return (TAX[cat] && TAX[cat].subs[sub]) ? TAX[cat].subs[sub].sizes : []; }
+function taxOperatorApplies(cat, sub){
+  if (!cat || !sub) return true;                       /* unknown reads as applicable */
+  return !(TAX[cat] && TAX[cat].subs[sub] && TAX[cat].subs[sub].noOperator);
+}
+/* A work order may hold a machine our catalogue does not list — it is the renter's own
+   fleet, it never goes to a supplier, and it only has to be legible to them. A request
+   may not: suppliers bid against catalogue ids, so an unmatched machine has nothing to
+   bid on. An off-catalogue machine reads as operator-applicable, because we do not know. */
+function machineOperatorApplies(m){
+  return m.custom ? true : taxOperatorApplies(m.cat, m.sub);
+}
+function machineLabel(m){
+  if (m.custom) return ((m.label || "") + " " + (m.csize || "")).trim();
+  return taxLabel(m.cat, m.sub, m.size);
+}
+function machineReady(m){
+  return m.custom ? !!(m.label && m.label.trim()) : !!(m.cat && m.sub && m.size);
+}
+function taxLabel(cat, sub, size){
+  var s = sub ? (ar && TAX[cat] && TAX[cat].subs[sub] ? TAX[cat].subs[sub].ar : sub) : "";
+  return (s + (size ? " " + size : "")).trim();
+}
+
+var PARTY  = { supplier:["Supplier","المورّد"], me:["Me","أنا"] };
+var OPNEED = { yes:["Yes","نعم"], no:["No","لا"], optional:["Optional","اختياري"] };
+var NAT    = { any:["Any","أي"], restricted:["Restricted to…","مقيّدة بـ…"] };
+var OPCERT = { spsp:["SPSP","SPSP"], tuv:["TÜV","TÜV"] };
+var SAFETY = { aramco:["Aramco","أرامكو"], ce:["CE","CE"], iso:["ISO 9001","ISO 9001"] };
+var FUEL   = { diesel:["Diesel","ديزل"], petrol:["Petrol","بنزين"], electric:["Electric","كهربائي"] };
+var YEARS  = { any:["Any","أي"], "2015":["2015+","٢٠١٥+"], "2018":["2018+","٢٠١٨+"], "2021":["2021+","٢٠٢١+"] };
+var METHOD = { transfer:["Bank transfer","تحويل بنكي"], cheque:["Cheque","شيك"], lc:["Letter of credit","اعتماد مستندي"] };
+var MAINT  = { supplier:["Supplier","المورّد"], me:["Me","أنا"] };
+var SLA    = { "12h":["12 hours","١٢ ساعة"], "24h":["24 hours","٢٤ ساعة"], "48h":["48 hours","٤٨ ساعة"] };
+var WINDOW = { "24h":["24 hours","٢٤ ساعة"], "48h":["48 hours","٤٨ ساعة"], "72h":["72 hours","٧٢ ساعة"], "1w":["1 week","أسبوع"] };
+var BASIS  = { daily:["Daily","يومي"], weekly:["Weekly","أسبوعي"], monthly:["Monthly","شهري"] };
+var PAY    = { net30:["Net 30","٣٠ يوماً"], net45:["Net 45","٤٥ يوماً"], net60:["Net 60","٦٠ يوماً"], advance:["Advance","مقدماً"] };
+var PER    = { day:["/day","/يوم"], week:["/wk","/أسبوع"], month:["/mo","/شهر"] };
+var DOCK   = { po:["PO","أمر شراء"], contract:["Contract","عقد"], quotation:["Quotation","عرض سعر"], other:["File","ملف"] };
+
+var PROJECTS = [
+  { id:"p1", nEn:"Qiddiya Zone 4", nAr:"القدية المنطقة ٤",
+    locEn:"Qiddiya Zone 4, Qiddiya City, Riyadh 13513", locAr:"القدية المنطقة ٤، مدينة القدية، الرياض ١٣٥١٣",
+    lat:24.7136, lng:46.6753, mx:42, my:46,
+    when:{ basis:"monthly", start:"2026-09-01", end:"2026-12-31", hours:10, days:6, extendable:true },
+    prefs:{ pay:"net30", method:"transfer", maint:"supplier", sla:"24h", verified:true, sublet:false, window:"72h" },
+    terrainEn:"Rocky", terrainAr:"صخرية" },
+  { id:"p2", nEn:"Diriyah — packages 3 & 4", nAr:"الدرعية — الحزمتان ٣ و ٤",
+    locEn:"Diriyah Gate, Riyadh 13711", locAr:"بوابة الدرعية، الرياض ١٣٧١١",
+    lat:24.7370, lng:46.5760, mx:30, my:38,
+    when:{ basis:"monthly", start:"2026-10-01", end:"2027-03-31", hours:9, days:6, extendable:false },
+    prefs:{ pay:"net45", method:"transfer", maint:"supplier", sla:"48h", verified:true, sublet:true, window:"1w" },
+    terrainEn:"Sand", terrainAr:"رملية" },
+  { id:"p3", nEn:null, nAr:null,
+    locEn:"Aramco North Park, Dhahran 34465", locAr:"أرامكو الحديقة الشمالية، الظهران ٣٤٤٦٥",
+    lat:26.3160, lng:50.1500, mx:66, my:60,
+    when:{ basis:"weekly", start:"2026-11-01", end:"2026-12-15", hours:8, days:5, extendable:false },
+    prefs:{ pay:"net60", method:"transfer", maint:"me", sla:null, verified:true, sublet:false, window:"48h" },
+    terrainEn:"Mixed", terrainAr:"مختلطة" },
+  { id:"p4", nEn:"Jubail — phase 1", nAr:"الجبيل — المرحلة ١",
+    locEn:"Jubail Industrial City 35717", locAr:"مدينة الجبيل الصناعية ٣٥٧١٧",
+    lat:27.0046, lng:49.6460, mx:72, my:30,
+    when:{ basis:"monthly", start:"2026-02-01", end:"2026-06-30", hours:10, days:6, extendable:false },
+    prefs:{ pay:"net30", method:"transfer", maint:"supplier", sla:"24h", verified:false, sublet:false, window:"48h" },
+    terrainEn:"Flat", terrainAr:"مستوية" }
+];
+
+/* `pid:null` = filed nowhere. The rail shows those under Unassigned. */
+var GROUPS = [
+  { id:"g1", pid:"p1", kind:"rfq", ref:"RFQ-1042", tEn:"Bulk earthworks — phase 1", tAr:"أعمال حفر — المرحلة ١",
+    status:"OPEN", bids:4, editUsed:false, when:null },
+  { id:"g2", pid:"p1", kind:"wo",  ref:"WO-3", tEn:"Tower crane — own fleet", tAr:"رافعة برجية — أسطولنا",
+    when:{ basis:"monthly", start:"2026-09-01", end:"2026-12-31", hours:10, days:6 } },
+  { id:"g3", pid:"p1", kind:"rfq", ref:"RFQ-1051", tEn:null, tAr:null, status:"OPEN", bids:0, editUsed:false,
+    when:{ basis:"monthly", start:"2026-09-15", end:"2026-11-30", hours:10, days:6 } },
+  { id:"g4", pid:"p2", kind:"rfq", ref:"RFQ-1038", tEn:null, tAr:null, status:"OPEN", bids:2, editUsed:true, when:null },
+  { id:"g5", pid:"p2", kind:"wo",  ref:"WO-7", tEn:"Site power", tAr:"كهرباء الموقع",
+    when:{ basis:"monthly", start:"2026-10-01", end:"2027-03-31", hours:9, days:6 } },
+  { id:"g6", pid:"p3", kind:"rfq", ref:"RFQ-1063", tEn:null, tAr:null, status:"OPEN", bids:0, editUsed:false, when:null },
+  /* Posted before the project existed, so it is unfiled — but it still carries the site it
+     was posted with, which is what makes filing it a one-click job instead of a search. */
+  { id:"g7", pid:null, kind:"rfq", ref:"RFQ-1070", tEn:null, tAr:null, status:"OPEN", bids:1, editUsed:false,
+    when:null, loc:"Qiddiya Zone 4, Qiddiya City, Riyadh 13513" }
+];
+function grp(id){ for (var i=0;i<GROUPS.length;i++) if (GROUPS[i].id===id) return GROUPS[i]; return null; }
+
+var ITEMS = [
+  { id:"i1", gid:"g1", eqEn:"Excavator 20t",     eqAr:"حفّار ٢٠ طن",           qty:3 },
+  { id:"i2", gid:"g1", eqEn:"Telehandler 4t",    eqAr:"مناولة تلسكوبية ٤ طن",  qty:1 },
+  { id:"i3", gid:"g2", eqEn:"Tower crane 8t",    eqAr:"رافعة برجية ٨ طن",      qty:1 },
+  { id:"i4", gid:"g3", eqEn:"Generator 250 kVA", eqAr:"مولّد ٢٥٠ ك.ف.أ",       qty:2 },
+  { id:"i5", gid:"g4", eqEn:"Telehandler 4t",    eqAr:"مناولة تلسكوبية ٤ طن",  qty:2 },
+  { id:"i6", gid:"g5", eqEn:"Generator 400 kVA", eqAr:"مولّد ٤٠٠ ك.ف.أ",       qty:1 },
+  { id:"i7", gid:"g6", eqEn:"Air compressor",    eqAr:"ضاغط هواء",             qty:1 },
+  { id:"i8", gid:"g7", eqEn:"Wheel loader 3 m³", eqAr:"لودر بعجل ٣ م٣",        qty:1 }
+];
+var ALLOCS = [
+  { id:"a1", iid:"i1", sid:"s1", units:2, rate:8600,  per:"month",
+    mob:"2026-09-04", demob:null, docs:[{k:"po",n:"PO-88213.pdf"},{k:"contract",n:"Zahid-MSA.pdf"}] },
+  { id:"a2", iid:"i1", sid:"s2", units:1, rate:9100,  per:"month",
+    mob:"2026-10-09", demob:null, docs:[] },
+  { id:"a3", iid:"i3", sid:"s4", units:1, rate:21000, per:"month",
+    mob:"2026-09-02", demob:null, docs:[{k:"contract",n:"DesertFleet-hire.pdf"}] },
+  { id:"a4", iid:"i4", sid:"s1", units:2, rate:3200,  per:"month",
+    mob:"2026-09-18", demob:"2026-11-28", docs:[{k:"po",n:"PO-88240.pdf"}] },
+  { id:"a5", iid:"i5", sid:"s2", units:2, rate:5900,  per:"month",
+    mob:null, demob:null, docs:[] },
+  { id:"a6", iid:"i6", sid:"s4", units:1, rate:4400,  per:"month",
+    mob:"2026-10-03", demob:null, docs:[] }
+];
+var seq = 100;
+function nid(p){ return p + (++seq); }
+
+/* ══ helpers ════════════════════════════════════════════════════════════════ */
+function d(s){ var p = String(s).split("-"); return new Date(+p[0], +p[1]-1, +p[2]); }
+function money(n){ return n == null ? "—" : n.toLocaleString(ar ? "ar-EG" : "en-US"); }
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+  return ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" })[c]; }); }
+function plural(n, en1, enN, ar1, arN){ return n === 1 ? L(en1, ar1) : L(enN, arN); }
+
+var MO_EN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+var MO_AR = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+
+function proj(id){ for (var i=0;i<PROJECTS.length;i++) if (PROJECTS[i].id===id) return PROJECTS[i]; return null; }
+
+/* A project is ENDED when the last end date under it has passed. Derived from the rows
+   (falling back to the project's own end when nothing is filed) and never set by anyone —
+   which is why there is no archive. A site that stops being used stops being used. */
+function projectEnded(p){ return span(p).hi < TODAY; }
+/* Delete is offered only on an empty project: nothing filed, nothing to lose. Anything
+   with rows in it offers no delete — the renter unfiles them first, deliberately. */
+function projectEmpty(p){ return groupsOf(p.id).length === 0; }
+function shortSite(addr){
+  var first = String(addr||"").split(",")[0].trim();
+  return first.replace(/\s*\d{4,}\s*/g," ").trim() || addr;
+}
+function projectTitle(p){ return L(p.nEn, p.nAr) || shortSite(L(p.locEn, p.locAr)); }
+function groupTitle(g){
+  if (L(g.tEn, g.tAr)) return L(g.tEn, g.tAr);
+  if (g.kind === "rfq") return g.ref;
+  var first = itemsOf(g.id)[0];
+  return first ? L(first.eqEn, first.eqAr) : g.ref;
+}
+/* The site a row was posted with: its own, else its project's. */
+function groupPlace(g){
+  if (g.loc) return g.loc;
+  var p = g.pid ? proj(g.pid) : null;
+  return p ? L(p.locEn, p.locAr) : null;
+}
+/* Projects at that same site. This is what turns "pick one of forty" into "yes, that one". */
+function projectsAtPlace(place, excludeId){
+  if (!place) return [];
+  var key = shortSite(place).toLowerCase();
+  if (key.length < 3) return [];
+  return PROJECTS.filter(function(p){
+    if (p.id === excludeId) return false;
+    return ((p.locEn || "") + " " + (p.nEn || "")).toLowerCase().indexOf(key) >= 0;
+  });
+}
+
+function groupsOf(pid){ return GROUPS.filter(function(g){ return g.pid === pid; }); }
+function itemsOf(gid){ return ITEMS.filter(function(i){ return i.gid === gid; }); }
+function allocsOf(iid){ return ALLOCS.filter(function(a){ return a.iid === iid; }); }
+function item(iid){ for (var i=0;i<ITEMS.length;i++) if (ITEMS[i].id===iid) return ITEMS[i]; return null; }
+function alloc(aid){ for (var i=0;i<ALLOCS.length;i++) if (ALLOCS[i].id===aid) return ALLOCS[i]; return null; }
+function awardedUnits(iid){ return allocsOf(iid).reduce(function(n,a){ return n + a.units; }, 0); }
+
+/* The one exception to "nothing propagates": the request's own edit rule, mirrored
+   from src/lib/contract/workspace.ts:213. */
+function editability(g){
+  if (g.kind === "wo") return { ok:true,  cls:"free", why:L("work order — always editable","أمر عمل — قابل للتعديل دائماً") };
+  if (g.status !== "OPEN" && g.status !== "ACTIVE")
+    return { ok:false, cls:"no", why:L("closed — can’t change","مغلق — لا يمكن التغيير") };
+  if (g.bids === 0) return { ok:true,  cls:"free", why:L("no bids — free to edit","لا عروض — التعديل حر") };
+  if (!g.editUsed)  return { ok:true,  cls:"cost", why:L("has bids — uses its one post-bid edit","لديه عروض — يستهلك التعديل الوحيد بعد العروض") };
+  return { ok:false, cls:"no", why:L("post-bid edit already used","استُهلك التعديل بعد العروض") };
+}
+
+/* A group whose own period differs from its project's. Shown, never resolved. */
+function whenDiffers(g){
+  if (!g.when || !g.pid) return null;
+  var p = proj(g.pid); if (!p) return null;
+  var out = [];
+  if (g.when.start !== p.when.start) out.push(L("start","البداية"));
+  if (g.when.end   !== p.when.end)   out.push(L("end","النهاية"));
+  if (g.when.basis !== p.when.basis) out.push(L("basis","الأساس"));
+  if (+g.when.hours !== +p.when.hours) out.push(L("hours/day","ساعات/يوم"));
+  return out.length ? out : null;
+}
+
+/* An AWARD HAS NO PERIOD OF ITS OWN. Ruled 2026-08-30 with the move to `projects.awards`: an
+   award records WHO supplies how many, and the two marks. Its bar is its parent's period, widened
+   by a mark that falls outside it.
+
+   What that gives up, stated rather than hidden: a hire renegotiated past a closed request's end
+   shows the original end until the machine is demobilized. What it buys is that there are two
+   levels of date instead of three, and no "which of these dates wins" question anywhere. */
+function awardWindow(g, a){
+  var w = g.when || proj(g.pid).when;
+  var st = w.start, en = w.end;
+  if (a.mob   && a.mob   < st) st = a.mob;     /* arrived before the period opened */
+  if (a.demob && a.demob > en) en = a.demob;   /* still standing there after it closed */
+  if (a.mob   && a.mob   > en) en = a.mob;
+  return { start: st, end: en };
+}
+
+/* Every date the chart has to be able to draw: the period of any work order or request that
+   carries one — including ones nobody has awarded yet, whose ghost bar still has to fit on the
+   axis — and every mark, since a machine that arrived late or has not left yet must stay on the
+   axis rather than being clipped off its edge. */
+function projectDates(pid){
+  var out = [];
+  groupsOf(pid).forEach(function(g){
+    if (g.when){ out.push(g.when.start); out.push(g.when.end); }
+    itemsOf(g.id).forEach(function(i){
+      allocsOf(i.id).forEach(function(a){
+        if (a.mob) out.push(a.mob);
+        if (a.demob) out.push(a.demob);
+      });
+    });
+  });
+  return out;
+}
+/* The axis runs from the project's own window, widened to hold the earliest start and the
+   latest end anywhere under it — so a work order that runs three months past the site's end
+   is visible rather than clipped off the right edge. */
+function span(p){
+  var ds = projectDates(p.id);
+  var lo = ds.length ? ds.reduce(function(a,b){ return a<b?a:b; }) : p.when.start;
+  var hi = ds.length ? ds.reduce(function(a,b){ return a>b?a:b; }) : p.when.end;
+  if (p.when.start < lo) lo = p.when.start;
+  if (p.when.end   > hi) hi = p.when.end;
+  var from = d(lo), to = d(hi);
+  from = new Date(from.getFullYear(), from.getMonth(), 1);
+  to   = new Date(to.getFullYear(), to.getMonth()+1, 1);
+  return { from:from, to:to, lo:lo, hi:hi };
+}
+function pct(dt, s){ return ((dt - s.from) / (s.to - s.from)) * 100; }
+
+/* ══ state ══════════════════════════════════════════════════════════════════ */
+var projSel = "p1";        /* a project id, or "__none" for Unassigned */
+var openRow = null;
+var editingTitle = null;
+
+function render(){
+  document.getElementById("tab-projects").hidden = tab !== "projects";
+  document.getElementById("tab-intake").hidden   = tab !== "intake";
+  if (tab === "projects") renderProjects(); else renderIntake();
+}
+
+/* ══ PROJECTS ═══════════════════════════════════════════════════════════════ */
+function renderProjects(){
+  var unfiled = projSel === "__none";
+  var p = unfiled ? null : (proj(projSel) || PROJECTS[0]);
+  if (!unfiled && !p) { projSel = PROJECTS[0].id; p = PROJECTS[0]; }
+
+  /* ── rail ── */
+  /* Live sites first, ended ones after — no hiding. A renter who stops using a site
+     stops selecting it, and the intake chips are capped by recency anyway. */
+  var ordered = PROJECTS.slice().sort(function(a, b){
+    return (projectEnded(a) ? 1 : 0) - (projectEnded(b) ? 1 : 0);
+  });
+  var rail = ordered.map(function(x){
+    var gs = groupsOf(x.id);
+    var reqs = gs.filter(function(g){ return g.kind === "rfq"; }).length;
+    var wos  = gs.filter(function(g){ return g.kind === "wo";  }).length;
+    var units = 0;
+    gs.forEach(function(g){ itemsOf(g.id).forEach(function(i){ units += awardedUnits(i.id); }); });
+    return '<button class="pcard" type="button" aria-current="' + (x.id === projSel) + '" '
+      + 'onclick="PJ.pickProject(\'' + x.id + '\')">'
+      + '<span class="n">' + esc(projectTitle(x))
+      +   (projectEnded(x) ? ' <span class="arch">' + L("ended","منتهٍ") + '</span>' : '') + '</span>'
+      + '<span class="m">'
+      +   (units ? '<b>' + units + '</b> ' + L("units awarded","وحدة مُرساة") : L("nothing awarded yet","لا إرساء بعد"))
+      +   ' · ' + reqs + ' ' + plural(reqs, "request", "requests", "طلب", "طلبات")
+      +   ' · ' + wos  + ' ' + plural(wos, "work order", "work orders", "أمر عمل", "أوامر عمل")
+      + '</span></button>';
+  }).join("");
+
+  var noneCount = groupsOf(null).length;
+  if (noneCount){
+    rail += '<button class="pcard unfiled" type="button" aria-current="' + unfiled + '" onclick="PJ.pickProject(\'__none\')">'
+      + '<span class="n"><span class="icon" style="font-size:15px;color:var(--muted)">inbox</span>'
+      +   L("Unassigned","غير مُدرج") + '</span>'
+      + '<span class="m">' + noneCount + ' ' + plural(noneCount,"item","items","عنصر","عناصر") + ' '
+      +   L("filed nowhere","بلا مشروع") + '</span></button>';
+  }
+  rail += '<button class="railadd" type="button" onclick="PJ.dlgProjectForm(null)">'
+       +   '<span class="icon">add</span>' + L("New project","مشروع جديد") + '</button>';
+
+  /* ── the chart ── */
+  var s = unfiled ? null : span(p);
+  var months = "", todayMark = "", tp = 0, tin = false;
+  if (s){
+    var cur = new Date(s.from.getFullYear(), s.from.getMonth(), 1);
+    while (cur < s.to){
+      var next = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
+      months += '<span class="gmonth" style="inset-inline-start:' + pct(cur,s) + '%;width:'
+        + (pct(next,s) - pct(cur,s)) + '%">' + L(MO_EN[cur.getMonth()], MO_AR[cur.getMonth()])
+        + " " + String(cur.getFullYear()).slice(2) + '</span>';
+      cur = next;
+    }
+    tp = pct(d(TODAY), s); tin = tp >= 0 && tp <= 100;
+    todayMark = tin
+      ? '<span class="gtoday" style="inset-inline-start:' + tp + '%"><span>' + L("today","اليوم") + '</span></span>' : "";
+  }
+
+  var list = unfiled ? groupsOf(null) : groupsOf(p.id);
+  var rows = list.map(function(g){
+    var diff = whenDiffers(g);
+    var head = '<div class="greq"><div class="gcol">'
+      + '<span class="kind ' + g.kind + '"><span class="icon" style="font-size:12px">'
+      +   (g.kind === "wo" ? "assignment" : "gavel") + '</span>'
+      +   (g.kind === "wo" ? L("Work order","أمر عمل") : L("Request","طلب")) + '</span>'
+      + '<button class="open" type="button"'
+      +   (g.kind === "wo" ? ' onclick="PJ.dlgEditWorkOrder(\'' + g.id + '\')"' : '')
+      +   '><span class="ref">' + g.ref + '</span>'
+      +   '<span class="icon">north_east</span></button>'
+      + '<span class="ttl">' + esc(groupTitle(g)) + '</span>'
+      + '</div><div class="gtrack">'
+      + (diff
+        ? '<button class="diff" onclick="PJ.dlgConflict(\'' + g.id + '\')">'
+          + '<span class="icon">warning</span>'
+          + L("differs from the project: ","يختلف عن المشروع: ") + diff.join(" · ") + '</button>'
+        : '')
+      + '</div></div>';
+
+    var body = itemsOf(g.id).map(function(it){
+      var as = allocsOf(it.id);
+      if (!s) return unfiledRowHtml(g, it);
+      if (!as.length) return openRowHtml(g, it, s, tp, tin);
+      return as.map(function(a){ return allocRowHtml(g, it, a, s, tp, tin); }).join("");
+    }).join("");
+    return head + body;
+  }).join("");
+
+  var projCount = PROJECTS.filter(function(x){ return !projectEnded(x); }).length, totalUnits = 0;
+  PROJECTS.forEach(function(x){
+    groupsOf(x.id).forEach(function(g){ itemsOf(g.id).forEach(function(i){ totalUnits += awardedUnits(i.id); }); });
+  });
+
+  var metaHtml = unfiled
+    ? '<div class="pmeta"><div class="cell wide"><div class="k">' + L("Unassigned","غير مُدرج") + '</div>'
+      + '<div class="v">' + noneCount + ' ' + plural(noneCount,"item","items","عنصر","عناصر") + '</div></div>'
+      + '<div class="cell spacer"></div></div>'
+      + '<div class="banner" style="margin:12px">'
+      + '<span class="icon">info</span><span>'
+      + L("These were removed from a project, or never filed in one. Nothing about them changed — assign one from a row’s menu.",
+          "أُزيلت من مشروع أو لم تُدرج في أي مشروع. لم يتغيّر فيها شيء — أدرجها من قائمة الصف.")
+      + '</span></div>'
+    : '<div class="pmeta">'
+      + '<div class="cell wide"><div class="k">' + L("Project","المشروع") + '</div>'
+      +   (editingTitle === p.id
+          ? '<div class="v"><input id="ptitle" value="' + esc(projectTitle(p)) + '" style="height:26px;'
+            + 'border:1px solid var(--brand);border-radius:var(--r-md);padding:0 6px;min-width:150px" />'
+            + '<button class="btn btn-primary btn-sm" onclick="PJ.saveTitle()">' + L("Save","حفظ") + '</button></div>'
+          : '<div class="v">' + esc(projectTitle(p))
+            + '<button class="btn btn-ghost btn-sm" onclick="PJ.editTitle(\'' + p.id + '\')" style="padding:0 6px">'
+            +   '<span class="icon" style="font-size:14px">edit</span></button>'
+            + (L(p.nEn,p.nAr) ? '' : '<span class="auto">' + L("default","افتراضي") + '</span>')
+            + (projectEnded(p) ? '<span class="arch">' + L("ended","منتهٍ") + '</span>' : '') + '</div>')
+      + '</div>'
+      + '<div class="cell wide"><div class="k">' + L("Location","الموقع")
+      +   ' <span class="icon lock" title="' + L("Fixed for everything in this project","ثابت لكل ما في المشروع") + '">lock</span></div>'
+      +   '<div class="addr"><span class="icon">location_on</span>'
+      +     '<span class="txt" title="' + esc(L(p.locEn,p.locAr)) + '">' + esc(L(p.locEn,p.locAr)) + '</span></div></div>'
+      + '<div class="cell"><div class="k">' + L("First start","أول بداية") + '</div><div class="v num">' + s.lo + '</div></div>'
+      + '<div class="cell"><div class="k">' + L("Last end","آخر نهاية") + '</div><div class="v num">' + s.hi + '</div></div>'
+      + '<div class="cell"><div class="k">' + L("Filed here","المُدرج") + '</div><div class="v">'
+      +   list.filter(function(g){return g.kind==="rfq";}).length + ' ' + L("req","طلب") + ' · '
+      +   list.filter(function(g){return g.kind==="wo";}).length  + ' ' + L("WO","أمر") + '</div></div>'
+      + '<div class="cell spacer"></div>'
+      + '<div class="go">'
+      +   '<button class="btn btn-secondary btn-sm" onclick="PJ.dlgProjectForm(\'' + p.id + '\')">'
+      +     '<span class="icon">tune</span>' + L("Project defaults","افتراضيات المشروع") + '</button>'
+      +   '<button class="btn btn-secondary btn-sm" onclick="PJ.dlgNewWorkOrder()">'
+      +     '<span class="icon">assignment_add</span>' + L("Add work order","أضف أمر عمل") + '</button>'
+      +   '<button class="btn btn-primary btn-sm" onclick="PJ.pickTab(\'intake\')">'
+      +     '<span class="icon">add</span>' + L("New request","طلب جديد") + '</button>'
+      +   '<button class="btn btn-ghost btn-sm" onclick="PJ.dlgDeleteProject(\'' + p.id + '\')" title="'
+      +     (projectEmpty(p) ? L("Delete the project","احذف المشروع")
+                            : L("Only an empty project can be deleted","لا يُحذف إلا مشروع فارغ"))
+      +     '" style="padding:0 7px' + (projectEmpty(p) ? '' : ';opacity:.45') + '">'
+      +     '<span class="icon" style="color:var(--danger)">delete</span></button>'
+      + '</div></div>';
+
+  document.getElementById("tab-projects").innerHTML =
+      '<div class="shead">'
+    +   '<span class="plate"><span class="icon">location_city</span></span>'
+    +   '<span class="txt"><h2>' + L("My projects","مشاريعي") + '</h2>'
+    +     '<span class="sum"><b>' + projCount + '</b> ' + L("live projects","مشاريع جارية")
+    +       ' · <b>' + totalUnits + '</b> ' + L("units awarded","وحدة مُرساة") + '</span></span>'
+    + '</div>'
+    + '<div class="banner"><span class="icon">info</span><span>'
+    +   L("<b>Prototype.</b> A bar is only start → end — there are no states. Green marks the day it was mobilized, orange the day it left. Every row is one <b>award</b>. A project reads as <b>ended</b> once its last date has passed — nothing to archive, and it can only be deleted when empty.",
+        "<b>نموذج أوّلي.</b> الشريط هو المدة فقط — لا حالات. الأخضر يوم التعبئة، والبرتقالي يوم المغادرة. كل صف <b>إرساء</b> واحد. ويظهر المشروع <b>منتهياً</b> بعد آخر تاريخ فيه — لا أرشفة، ولا حذف إلا وهو فارغ.")
+    + '</span></div>'
+    + '<div class="plane"><div class="prail">' + rail + '</div><div class="panel'
+    +   (s ? '' : ' loose') + '">'
+    +   metaHtml
+    /* Unassigned has no chart, so it is not wrapped in the scrolling one — `overflow-x:auto`
+       clips vertically too, and it was cutting off the row menu. */
+    +   (s ? '<div class="gantt"><div class="gmin">'
+             + '<div class="grow ghead"><div class="gcol">' + L("Machine · supplier","المعدّة · المورّد") + '</div>'
+             + '<div class="gtrack">' + months + todayMark + '</div></div>'
+             + (rows || emptyRow())
+             + '</div></div>'
+           : '<div>' + (rows || emptyRow()) + '</div>')
+    + '</div></div>';
+}
+
+function emptyRow(){
+  return '<div class="grow"><div class="gcol"><div class="m">'
+    + L("Nothing filed here yet.","لا شيء مُدرج بعد.") + '</div></div><div class="gtrack"></div></div>';
+}
+
+/* Unassigned rows have no project, so no inherited dates and no chart. */
+function unfiledRowHtml(g, it){
+  return '<div class="grow"><div class="gcol">'
+    + rowMenu(g, it, null)
+    + '<div class="n">' + esc(L(it.eqEn,it.eqAr)) + ' ×' + it.qty + '</div>'
+    + '<div class="m">' + L("no project — no dates to draw","بلا مشروع — لا تواريخ للرسم") + '</div>'
+    + '</div><div class="gtrack"></div></div>';
+}
+
+/* An item nobody has awarded: one ghost bar over the inherited dates, no marks, no
+   papers. Award first — the model enforces it by having no row to hang them on. */
+function openRowHtml(g, it, s, tp, tin){
+  var p = proj(g.pid), w = g.when || p.when;
+  var x1 = Math.max(0, pct(d(w.start), s)), x2 = Math.min(100, pct(d(w.end), s));
+  return '<div class="grow"><div class="gcol">'
+    + rowMenu(g, it, null)
+    + '<div class="n">' + esc(L(it.eqEn,it.eqAr)) + ' ×' + it.qty + '</div>'
+    + '<div class="m">' + L("not awarded yet","لم يُرسَ بعد") + '</div>'
+    + '</div><div class="gtrack">'
+    + (tin ? '<span class="gtoday" style="inset-inline-start:' + tp + '%"></span>' : '')
+    + '<span class="bar open" style="inset-inline-start:' + x1 + '%;width:' + (x2-x1) + '%">'
+    +   L("awaiting award","بانتظار الإرساء") + '</span>'
+    + '</div></div>';
+}
+
+/* The award row — the real unit of this chart. */
+function allocRowHtml(g, it, a, s, tp, tin){
+  var win = awardWindow(g, a);
+  var x1 = Math.max(0, pct(d(win.start), s)), x2 = Math.min(100, pct(d(win.end), s));
+  var pins = "";
+  if (a.mob) pins += '<span class="pin" style="inset-inline-start:' + pct(d(a.mob), s) + '%" title="'
+    + L("Mobilized","تم التعبئة") + ' ' + a.mob + '"></span>';
+  if (a.demob) pins += '<span class="pin out" style="inset-inline-start:' + pct(d(a.demob), s) + '%" title="'
+    + L("Demobilized","تم التفكيك") + ' ' + a.demob + '"></span>';
+
+  var shown = a.docs.slice(0, 3);
+  var docs = a.docs.length
+    ? '<div class="docpins">'
+      + shown.map(function(x){
+          return '<span class="docpin" title="' + esc(L(DOCK[x.k][0], DOCK[x.k][1]) + " · " + x.n) + '">'
+            + '<span class="icon">' + (x.k === "po" ? "receipt_long" : x.k === "contract" ? "gavel" : "description")
+            + '</span></span>'; }).join("")
+      + (a.docs.length > 3 ? '<span class="docpin more">+' + (a.docs.length - 3) + '</span>' : '')
+      + '</div>'
+    : "";
+
+  return '<div class="grow"><div class="gcol">'
+    + docs + rowMenu(g, it, a)
+    + '<div class="n">' + esc(L(it.eqEn,it.eqAr)) + ' ×' + a.units
+    +   (awardedUnits(it.id) < it.qty || allocsOf(it.id).length > 1
+        ? ' <span class="auto" style="font-weight:600;color:var(--muted-light)">' + L("of","من") + ' ' + it.qty + '</span>' : '')
+    + '</div>'
+    + '<div class="m"><b>' + money(a.rate) + '</b> ' + L("SAR","ر.س") + L(PER[a.per][0], PER[a.per][1])
+    +   ' · ' + esc(supName(a.sid)) + '</div>'
+    + '</div><div class="gtrack">'
+    + (tin ? '<span class="gtoday" style="inset-inline-start:' + tp + '%"></span>' : '')
+    + '<span class="bar awarded" style="inset-inline-start:' + x1 + '%;width:' + (x2-x1) + '%">'
+    +   win.start + ' → ' + win.end + '</span>'
+    + pins
+    + '</div></div>';
+}
+
+/* The row menu — the actions this model has, by row type. */
+function rowMenu(g, it, a){
+  var key = a ? a.id : ("open-" + it.id);
+  var b = [];
+  if (!a){
+    b.push(mi("military_tech", L("Award","إرساء"), "dlgAward('" + it.id + "')"));
+    if (g.kind === "rfq") b.push(mi("gavel", L("Review the bids","راجع العروض"), ""));
+    b.push(rule());
+    b.push(mi("assignment", g.kind === "rfq" ? L("Open the request","افتح الطلب") : L("Edit the work order","عدّل أمر العمل"),
+              g.kind === "rfq" ? "" : "dlgEditWorkOrder('" + g.id + "')"));
+  } else {
+    b.push(mi("attach_file", L("Attach a document","أرفق مستنداً"), "dlgAttach('" + a.id + "')"));
+    b.push(mi(a.mob ? "undo" : "local_shipping",
+              a.mob ? L("Undo mobilized","تراجع عن التعبئة") : L("Mark as mobilized","سجّل التعبئة"),
+              "togglePin('" + a.id + "','mob')"));
+    b.push(mi(a.demob ? "undo" : "flag",
+              a.demob ? L("Undo demobilized","تراجع عن التفكيك") : L("Mark as demobilized","سجّل التفكيك"),
+              "togglePin('" + a.id + "','demob')"));
+    b.push(rule());
+    b.push(mi("military_tech", L("Change the award","غيّر الإرساء"), "dlgAward('" + it.id + "')"));
+    b.push(mi("undo", L("Un-award this row","ألغِ إرساء هذا الصف"), "dlgUnaward('" + a.id + "')"));
+    b.push(rule());
+    if (g.kind === "rfq"){
+      b.push(mi("assignment", L("Open the request","افتح الطلب"), ""));
+      b.push(mi("picture_as_pdf", L("Our quotation","عرض السعر الصادر منّا"), ""));
+      b.push(mi("forum", L("Open the deal room","افتح غرفة الصفقة"), ""));
+    } else {
+      b.push(mi("edit", L("Edit the work order","عدّل أمر العمل"), "dlgEditWorkOrder('" + g.id + "')"));
+    }
+  }
+  b.push(rule());
+  b.push(mi("drive_file_move",
+            g.pid ? L("Move to another project","انقل إلى مشروع آخر") : L("File in a project","أدرج في مشروع"),
+            "dlgMove('" + g.id + "')"));
+  if (g.pid) b.push(mi("link_off", L("Remove from the project","أزل من المشروع"), "dlgRemove('" + g.id + "')", true));
+  if (g.kind === "wo") b.push(mi("delete", L("Delete the work order","احذف أمر العمل"), "dlgDeleteWo('" + g.id + "')", true));
+
+  return '<div class="gmenu' + (openRow === key ? " open" : "") + '">'
+    + '<button class="dots" type="button" aria-label="' + L("Row actions","إجراءات الصف") + '" '
+    +   'onclick="event.stopPropagation();PJ.toggleRow(\'' + key + '\')"><span class="icon">more_horiz</span></button>'
+    + '<div class="gsheet" onclick="event.stopPropagation()">' + b.join("") + '</div></div>';
+}
+function mi(icon, label, fn, danger){
+  return '<button type="button"' + (danger ? ' class="danger"' : '')
+    + (fn ? ' onclick="' + fn + '"' : ' onclick="PJ.closeRow()"') + '>'
+    + '<span class="icon">' + icon + '</span>' + label + '</button>';
+}
+function rule(){ return '<div class="rule"></div>'; }
+
+function pickProject(id){ projSel = id; openRow = null; editingTitle = null; render(); }
+function toggleRow(k){ openRow = (openRow === k ? null : k); render(); }
+function closeRow(){ openRow = null; render(); }
+document.addEventListener("click", function(){ if (openRow !== null){ openRow = null; render(); } });
+
+function editTitle(id){
+  editingTitle = id; render();
+  var f = document.getElementById("ptitle"); if (f){ f.focus(); f.select(); }
+}
+function saveTitle(){
+  var f = document.getElementById("ptitle"), p = proj(editingTitle);
+  if (f && p){
+    var v = f.value.trim(), def = shortSite(L(p.locEn, p.locAr));
+    var own = (v && v !== def) ? v : null;
+    p.nEn = own; p.nAr = own;
+  }
+  editingTitle = null; render();
+}
+function togglePin(aid, which){
+  var a = alloc(aid); if (!a) return;
+  if (which === "mob")   a.mob   = a.mob   ? null : TODAY;
+  if (which === "demob") a.demob = a.demob ? null : TODAY;
+  openRow = null; render();
+}
+
+/* ══ dialog shell ═══════════════════════════════════════════════════════════ */
+function openModal(html){ var s = document.getElementById("scrim"); s.innerHTML = html; s.classList.add("open"); }
+function closeModal(){ var s = document.getElementById("scrim"); s.classList.remove("open"); s.innerHTML = ""; }
+function mshell(icon, title, sub, body, foot, wide){
+  return '<div class="modal' + (wide ? " wide" : "") + '" onclick="event.stopPropagation()">'
+    + '<div class="mhead"><span class="plate"><span class="icon">' + icon + '</span></span>'
+    +   '<span><h3>' + title + '</h3>' + (sub ? '<span class="sub">' + sub + '</span>' : '') + '</span>'
+    +   '<button class="x" onclick="PJ.closeModal()"><span class="icon">close</span></button></div>'
+    + '<div class="mbody">' + body + '</div>'
+    + '<div class="mfoot">' + foot + '</div></div>';
+}
+function confirmDlg(icon, title, sub, body, confirmLabel, fn, danger){
+  openModal(mshell(icon, title, sub, body,
+    '<span class="spacer"></span>'
+    + '<button class="btn btn-secondary" onclick="PJ.closeModal()">' + L("Cancel","إلغاء") + '</button>'
+    + '<button class="btn ' + (danger ? "btn-danger" : "btn-primary") + '" onclick="' + fn + '">'
+    + confirmLabel + '</button>'));
+}
+function sel(map, val, onchange, label){
+  return '<label class="fld"><span class="lbl">' + label + '</span><select onchange="' + onchange + '">'
+    + Object.keys(map).map(function(k){
+        return '<option value="' + k + '"' + (String(val)===k ? " selected" : "") + '>'
+          + L(map[k][0], map[k][1]) + '</option>'; }).join("")
+    + '</select></label>';
+}
+function selId(map, val, id, label){
+  return '<label class="fld"><span class="lbl">' + label + '</span><select id="' + id + '">'
+    + Object.keys(map).map(function(k){
+        return '<option value="' + k + '"' + (String(val)===k ? " selected" : "") + '>'
+          + L(map[k][0], map[k][1]) + '</option>'; }).join("")
+    + '</select></label>';
+}
+
+/* ══ the project form — one form for New and for Defaults ═══════════════════
+   New and Edit are the same fields; Edit adds the propagation section, which is
+   the ONLY place a project writes into what is already filed under it. */
+var mapPos = { x:42, y:46, lat:24.7136, lng:46.6753 };
+
+function mapPick(ev){
+  var box = ev.currentTarget.getBoundingClientRect();
+  var x = ((ev.clientX - box.left) / box.width) * 100;
+  var y = ((ev.clientY - box.top) / box.height) * 100;
+  mapPos.x = Math.max(2, Math.min(98, x));
+  mapPos.y = Math.max(6, Math.min(98, y));
+  /* a plausible Riyadh-area coordinate, so the readout moves with the pin */
+  mapPos.lat = +(24.55 + (100 - mapPos.y) * 0.006).toFixed(4);
+  mapPos.lng = +(46.45 + mapPos.x * 0.006).toFixed(4);
+  var pin = document.getElementById("mappin"), co = document.getElementById("mapcoord");
+  if (pin){ pin.style.insetInlineStart = mapPos.x + "%"; pin.style.top = mapPos.y + "%"; }
+  if (co) co.textContent = mapPos.lat + ", " + mapPos.lng;
+}
+function mapHtml(){
+  return '<div class="mapbox" onclick="PJ.mapPick(event)">'
+    + '<div class="grid"></div>'
+    + '<div class="blk" style="inset-inline-start:8%;top:8%;width:22%;height:34%"></div>'
+    + '<div class="blk" style="inset-inline-start:52%;top:14%;width:30%;height:28%"></div>'
+    + '<div class="blk" style="inset-inline-start:14%;top:70%;width:26%;height:22%"></div>'
+    + '<div class="road r1"></div><div class="road r2"></div>'
+    + '<span class="tip">' + L("click to drop the pin","انقر لوضع الدبوس") + '</span>'
+    + '<span class="mappin" id="mappin" style="inset-inline-start:' + mapPos.x + '%;top:' + mapPos.y + '%">'
+    +   '<span class="icon">location_on</span></span>'
+    + '<span class="coord num" id="mapcoord">' + mapPos.lat + ", " + mapPos.lng + '</span>'
+    + '</div>';
+}
+
+function dlgProjectForm(id){
+  var p = id ? proj(id) : null;
+  if (p){ mapPos = { x:p.mx, y:p.my, lat:p.lat, lng:p.lng }; }
+  else  { mapPos = { x:42, y:46, lat:24.7136, lng:46.6753 }; }
+
+  var applySection = "";
+  if (p){
+    var rows = groupsOf(p.id).map(function(g){
+      var e = editability(g);
+      return '<label class="applyrow' + (e.ok ? "" : " blocked") + '">'
+        + '<input type="checkbox" data-apply="' + g.id + '"' + (e.ok && e.cls !== "cost" ? " checked" : "")
+        + (e.ok ? "" : " disabled") + ' />'
+        + '<span class="nm">' + g.ref + ' · ' + esc(groupTitle(g)) + '</span>'
+        + '<span class="why ' + e.cls + '">' + e.why + '</span></label>';
+    }).join("");
+    applySection = '<fieldset class="fset"><legend>'
+      + L("Apply to what is already filed here?","تطبيق على المُدرج هنا؟") + '</legend>'
+      + (rows ? '<div class="applylist">' + rows + '</div>'
+              : '<div class="hint">' + L("Nothing is filed here yet.","لا شيء مُدرج هنا بعد.") + '</div>')
+      + '<div class="warnline" style="margin-top:10px"><span class="icon">warning</span><span>'
+      +   L("A request that already has bids can be edited once. Ticking it spends that edit. Anything left unticked keeps the values it was posted with.",
+          "الطلب الذي وصلته عروض يُعدَّل مرة واحدة. اختياره يستهلك ذلك التعديل. وما لا تختاره يبقى بقيمه كما أُرسل.")
+      + '</span></div></fieldset>';
+  }
+
+  var w = p ? p.when : { basis:"monthly", start:"", end:"", hours:10, days:6, extendable:false };
+  var pr = p ? p.prefs : { pay:"net30", method:"transfer", maint:"supplier", sla:"24h",
+                           verified:true, sublet:false, window:"72h" };
+
+  var body =
+      '<fieldset class="fset"><legend>' + L("Where","أين") + '</legend>'
+    +   mapHtml()
+    +   '<label class="fld" style="display:block;margin-top:10px"><span class="lbl">'
+    +     L("Address — required, and fixed for everything filed here","العنوان — مطلوب، وثابت لكل ما يُدرج هنا")
+    +     '</span><input id="np_loc" value="' + (p ? esc(L(p.locEn, p.locAr)) : "") + '" placeholder="'
+    +     L("Search the map or paste an address","ابحث في الخريطة أو الصق عنواناً") + '" /></label>'
+    +   '<div class="frow" style="margin-top:10px">'
+    +     '<label class="fld"><span class="lbl">' + L("Title — optional","الاسم — اختياري") + '</span>'
+    +       '<input id="np_title" value="' + (p ? esc(L(p.nEn, p.nAr) || "") : "") + '" placeholder="'
+    +       L("blank uses the location’s short name","الفراغ يستخدم اسم الموقع المختصر") + '" /></label>'
+    +   '</div>'
+    +   (p ? '<div class="hint" style="margin-top:9px">'
+        + L("Moving the pin changes the site for new requests. Existing ones keep the location they were posted with unless you tick them below.",
+            "تحريك الدبوس يغيّر الموقع للطلبات الجديدة. وتبقى الحالية بموقعها ما لم تخترها أدناه.") + '</div>' : '')
+    + '</fieldset>'
+    + '<fieldset class="fset"><legend>' + L("When & terms","المدة والشروط") + '</legend>'
+    +   '<div class="frow">'
+    +     selId(BASIS, w.basis, "np_basis", L("Rental basis","أساس الإيجار"))
+    +     '<label class="fld"><span class="lbl">' + L("Start","البداية") + '</span>'
+    +       '<input id="np_start" type="date" value="' + (w.start||"") + '" /></label>'
+    +     '<label class="fld"><span class="lbl">' + L("End","النهاية") + '</span>'
+    +       '<input id="np_end" type="date" value="' + (w.end||"") + '" /></label>'
+    +     '<label class="fld"><span class="lbl">' + L("Hours/day","ساعات/يوم") + '</span>'
+    +       '<input id="np_hours" type="number" min="1" max="24" value="' + w.hours + '" /></label>'
+    +   '</div>'
+    +   '<div class="frow" style="margin-top:9px">'
+    +     selId(PAY, pr.pay, "np_pay", L("Payment terms","شروط الدفع"))
+    +     '<label class="chk" style="align-self:end"><input id="np_ext" type="checkbox"'
+    +       (w.extendable ? " checked" : "") + ' />'
+    +       L("The period may be extended","المدة قابلة للتمديد") + '</label>'
+    +   '</div>'
+    +   '<div class="hint" style="margin-top:9px">'
+    +     L("A request may differ from any of these. The difference is shown, never overwritten. Payment terms is the only commercial term here — method, maintenance, SLA, budget, supplier filters and the bid window all belong to the request.",
+        "قد يختلف الطلب عن أيٍّ منها. يظهر الفرق ولا يُستبدل. شروط الدفع هي الشرط التجاري الوحيد هنا — والباقي يخصّ الطلب.") + '</div>'
+    + '</fieldset>'
+    + applySection
+    + '<div class="hint">'
+    +   L("No equipment and no machine terms here. The first request or work order in a project carries those, and everything after it can copy from them.",
+        "لا معدّات ولا شروط معدّة هنا. أول طلب أو أمر عمل يحملها، وكل ما بعده ينسخ منها.") + '</div>';
+
+  openModal(mshell(p ? "tune" : "add_location",
+    p ? L("Project defaults","افتراضيات المشروع") : L("New project","مشروع جديد"),
+    p ? esc(projectTitle(p)) : L("Where and when. Nothing about equipment.","أين ومتى. لا شيء عن المعدّات."),
+    body,
+    '<span class="spacer"></span>'
+    + '<button class="btn btn-secondary" onclick="PJ.closeModal()">' + L("Cancel","إلغاء") + '</button>'
+    + (p ? '<button class="btn btn-secondary" onclick="PJ.saveProjectForm(\'' + p.id + '\',false)">'
+           + L("Project only","المشروع فقط") + '</button>'
+           + '<button class="btn btn-primary" onclick="PJ.saveProjectForm(\'' + p.id + '\',true)">'
+           + L("Save and apply to the ticked","احفظ وطبّق على المحدّد") + '</button>'
+         : '<button class="btn btn-primary" onclick="PJ.saveProjectForm(null,false)">'
+           + L("Create the project","أنشئ المشروع") + '</button>'), true));
+}
+
+function saveProjectForm(id, applyToo){
+  function v(x){ var e = document.getElementById(x); return e ? e.value : ""; }
+  function c(x){ var e = document.getElementById(x); return !!(e && e.checked); }
+  var loc = v("np_loc").trim();
+  if (!loc){ var f = document.getElementById("np_loc"); if (f) f.focus(); return; }
+  var ttl = v("np_title").trim() || null;
+  /* No days-per-week: the create flow never asks for it (it is seeded to 6 and sent
+     silently), and the project holds only what a renter is actually asked. */
+  var when = { basis:v("np_basis"), start:v("np_start") || TODAY, end:v("np_end") || TODAY,
+               hours:+v("np_hours")||10, extendable:c("np_ext") };
+  /* Only payment terms is a project field now. The rest live on the request. */
+  var prev = id ? proj(id).prefs : { method:"transfer", maint:"supplier", sla:"24h",
+                                     verified:true, sublet:false, window:"72h" };
+  var prefs = { pay:v("np_pay"), method:prev.method, maint:prev.maint, sla:prev.sla,
+                verified:prev.verified, sublet:prev.sublet, window:prev.window };
+
+  if (!id){
+    var pid = nid("p");
+    PROJECTS.push({ id:pid, nEn:ttl, nAr:ttl, locEn:loc, locAr:loc,
+      lat:mapPos.lat, lng:mapPos.lng, mx:mapPos.x, my:mapPos.y,
+      when:when, prefs:prefs });
+    projSel = pid; render();
+    /* A project on its own is empty, and "Add work order" lives on a board the renter has
+       not seen yet. The choice belongs here, while they are still thinking about the site. */
+    dlgProjectCreated(pid); return;
+  }
+
+  var p = proj(id);
+  p.nEn = ttl; p.nAr = ttl; p.locEn = loc; p.locAr = loc;
+  p.lat = mapPos.lat; p.lng = mapPos.lng; p.mx = mapPos.x; p.my = mapPos.y;
+  p.when = when; p.prefs = prefs;
+
+  /* The one downward write, and only for the rows the renter ticked. A ticked request
+     with bids spends its single post-bid edit — which is what the dialog warned about. */
+  if (applyToo){
+    document.querySelectorAll('input[data-apply]').forEach(function(cb){
+      if (!cb.checked || cb.disabled) return;
+      var g = grp(cb.getAttribute("data-apply")); if (!g) return;
+      g.when = null;                                   /* it now follows the project */
+      if (g.kind === "rfq" && g.bids > 0) g.editUsed = true;
+    });
+  }
+  closeModal(); render();
+}
+
+/* Offered straight after a project is created — the two ways something gets onto a site,
+   named and told apart, rather than a board with an empty chart on it. */
+function dlgProjectCreated(pid){
+  var p = proj(pid);
+  openModal(mshell("check_circle", L("Project created","تم إنشاء المشروع"), esc(projectTitle(p)),
+      '<div class="infoline"><span class="icon">info</span><span>'
+    +   L("Nothing is on this site yet. Two things can go on it — and they are not the same thing.",
+        "لا شيء في هذا الموقع بعد. هناك أمران يمكن إضافتهما — وهما ليسا الشيء نفسه.") + '</span></div>'
+    + '<div class="optrow">'
+    +   '<button class="optcard" onclick="PJ.closeModal();PJ.dlgNewWorkOrder()">'
+    +     '<span class="ic"><span class="icon">assignment_add</span></span>'
+    +     '<span class="tt">' + L("Add a work order","أضف أمر عمل") + '</span>'
+    +     '<span class="ds">' + L("A machine already on site — your own fleet, or a vendor you already use. Private: no supplier ever sees it.",
+        "معدّة موجودة في الموقع — من أسطولك أو من مورّد تتعامل معه. خاصة بك: لا يراها أي مورّد.") + '</span></button>'
+    +   '<button class="optcard" onclick="PJ.closeModal();PJ.pickTab(\'intake\');PJ.pickIProject(\'' + pid + '\')">'
+    +     '<span class="ic brand"><span class="icon">bolt</span></span>'
+    +     '<span class="tt">' + L("Post a new request","أرسل طلباً جديداً") + '</span>'
+    +     '<span class="ds">' + L("Ask our suppliers for a machine. The site’s terms are filled in already — you type the machine and nothing else.",
+        "اطلب معدّة من مورّدينا. شروط الموقع مملوءة مسبقاً — تكتب المعدّة فقط.") + '</span></button>'
+    + '</div>'
+    + '<div class="hint">' + L("Both end up on the same chart, and you can add either at any time.",
+        "كلاهما ينتهي على المخطط نفسه، ويمكنك إضافة أيٍّ منهما في أي وقت.") + '</div>',
+    '<span class="spacer"></span><button class="btn btn-secondary" onclick="PJ.closeModal()">'
+    + L("Not now","ليس الآن") + '</button>'));
+}
+
+/* ══ conflicts — keep, or match the project ════════════════════════════════ */
+function dlgConflict(gid){
+  var g = grp(gid), p = proj(g.pid), e = editability(g);
+  var rows = [
+    [L("Rental basis","أساس الإيجار"), L(BASIS[g.when.basis][0],BASIS[g.when.basis][1]), L(BASIS[p.when.basis][0],BASIS[p.when.basis][1])],
+    [L("Start","البداية"), g.when.start, p.when.start],
+    [L("End","النهاية"), g.when.end, p.when.end],
+    [L("Hours/day","ساعات/يوم"), g.when.hours, p.when.hours]
+  ].filter(function(r){ return String(r[1]) !== String(r[2]); })
+   .map(function(r){
+     return '<div class="applyrow"><span class="nm">' + r[0] + '</span>'
+       + '<span style="font-weight:800;color:var(--warn-deep)">' + r[1] + '</span>'
+       + '<span class="why no">' + L("project: ","المشروع: ") + r[2] + '</span></div>';
+   }).join("");
+
+  openModal(mshell("warning", L("This differs from the project","يختلف هذا عن المشروع"),
+    g.ref + " · " + esc(projectTitle(p)),
+    '<div class="applylist">' + rows + '</div>'
+    + '<div class="infoline"><span class="icon">check_circle</span><span>'
+    +   L("Keeping it different is fine. Both values stay, and neither is overwritten.",
+        "إبقاؤه مختلفاً أمر سليم. تبقى القيمتان ولا تُستبدل أيّهما.") + '</span></div>'
+    + (e.ok ? '' : '<div class="warnline"><span class="icon">lock</span><span>'
+        + L("It cannot be matched to the project right now: ","لا يمكن مطابقته مع المشروع الآن: ") + e.why + '</span></div>')
+    + (e.cls === "cost" ? '<div class="warnline"><span class="icon">warning</span><span>'
+        + L("Matching it will spend this request’s one post-bid edit.","المطابقة ستستهلك التعديل الوحيد بعد العروض.")
+        + '</span></div>' : ''),
+    '<span class="spacer"></span>'
+    + '<button class="btn btn-secondary" onclick="PJ.closeModal()">' + L("Keep it different","أبقِه مختلفاً") + '</button>'
+    + '<button class="btn btn-primary"' + (e.ok ? "" : " disabled") + ' onclick="PJ.matchProject(\'' + gid + '\')">'
+    +   L("Match the project","طابِق المشروع") + '</button>'));
+}
+function matchProject(gid){
+  var g = grp(gid);
+  g.when = null;
+  if (g.kind === "rfq" && g.bids > 0) g.editUsed = true;
+  closeModal(); render();
+}
+
+/* ══ move · remove · delete ════════════════════════════════════════════════ */
+function dlgMove(gid){
+  openRow = null;
+  var g = grp(gid);
+  var place = groupPlace(g);
+  var near = projectsAtPlace(place, g.pid);
+  var rest = PROJECTS.filter(function(x){
+    return x.id !== g.pid && near.indexOf(x) < 0;
+  });
+
+  /* The projects at this row's own site come first, as cards, named. Forty projects is a
+     search; "the one you are obviously looking for, plus a list" is a decision. */
+  var suggestion = near.length
+    ? '<div class="infoline"><span class="icon">where_to_vote</span><span>'
+      +   L("This was posted at ","أُرسل هذا في ") + '<b>' + esc(shortSite(place)) + '</b>'
+      +   L(near.length > 1 ? ", and these projects are there." : ", and this project is there.",
+            near.length > 1 ? "، وهذه المشاريع هناك." : "، وهذا المشروع هناك.")
+      + '</span></div>'
+      + '<div class="optrow">'
+      + near.map(function(p){
+          var gs = groupsOf(p.id);
+          return '<button class="optcard" onclick="PJ.doMoveTo(\'' + gid + '\',\'' + p.id + '\')">'
+            + '<span class="ic"><span class="icon">where_to_vote</span></span>'
+            + '<span class="tt">' + esc(projectTitle(p)) + '</span>'
+            + '<span class="ds">' + esc(L(p.locEn, p.locAr)) + '<br>'
+            +   gs.length + ' ' + plural(gs.length,"item","items","عنصر","عناصر") + ' · '
+            +   L("same location","الموقع نفسه") + '</span></button>';
+        }).join("")
+      + '</div>'
+    : (place
+      ? '<div class="hint">' + L("Posted at ","أُرسل في ") + '<b>' + esc(shortSite(place)) + '</b>'
+        + L(" — none of your projects are there.", " — لا مشروع لك هناك.") + '</div>'
+      : '');
+
+  var restOpts = rest.map(function(x){
+    return '<option value="' + x.id + '">' + esc(projectTitle(x))
+      + (projectEnded(x) ? ' — ' + L("ended","منتهٍ") : '') + '</option>';
+  }).join("");
+
+  openModal(mshell("drive_file_move",
+    g.pid ? L("Move to another project","انقل إلى مشروع آخر") : L("File in a project","أدرج في مشروع"),
+    g.ref + " · " + esc(groupTitle(g)),
+    suggestion
+    + '<label class="fld"><span class="lbl">'
+    +   (near.length ? L("Or pick another project","أو اختر مشروعاً آخر") : L("Project","المشروع")) + '</span>'
+    +   '<select id="mv_pid"><option value="">' + L("Unassigned — file it nowhere","غير مُدرج — بلا مشروع") + '</option>'
+    +   restOpts + '</select></label>'
+    + '<div class="infoline"><span class="icon">shield</span><span>'
+    +   L("Filing only. Not one value on it changes — it keeps the terms it was posted with, even where the new project says something else.",
+        "إدراج فقط. لا تتغيّر أي قيمة — يحتفظ بشروطه كما أُرسل، حتى لو اختلف المشروع الجديد.") + '</span></div>',
+    '<span class="spacer"></span>'
+    + '<button class="btn btn-secondary" onclick="PJ.closeModal()">' + L("Cancel","إلغاء") + '</button>'
+    + '<button class="btn btn-primary" onclick="PJ.doMove(\'' + gid + '\')">'
+    +   (g.pid ? L("Move","انقل") : L("File it","أدرجه")) + '</button>', true));
+}
+function doMoveTo(gid, pid){ grp(gid).pid = pid; closeModal(); render(); }
+function doMove(gid){
+  var g = grp(gid), v = document.getElementById("mv_pid").value;
+  g.pid = v || null;
+  closeModal(); render();
+}
+function dlgRemove(gid){
+  openRow = null;
+  var g = grp(gid);
+  confirmDlg("link_off", L("Remove from the project","أزل من المشروع"), g.ref + " · " + esc(groupTitle(g)),
+    '<div class="infoline"><span class="icon">info</span><span>'
+    + L("It is unfiled, not deleted. It moves to Unassigned with every value, award, mark and document intact.",
+        "يُزال من المشروع ولا يُحذف. ينتقل إلى «غير مُدرج» بكل قيمه وإرسائه وعلاماته ومستنداته.") + '</span></div>',
+    L("Remove","أزل"), "doRemove('" + gid + "')");
+}
+function doRemove(gid){ grp(gid).pid = null; closeModal(); render(); }
+
+function dlgDeleteWo(gid){
+  openRow = null;
+  var g = grp(gid), its = itemsOf(g.id);
+  var n = its.reduce(function(t,i){ return t + allocsOf(i.id).length; }, 0);
+  confirmDlg("delete", L("Delete this work order?","حذف أمر العمل؟"), g.ref + " · " + esc(groupTitle(g)),
+    '<div class="dangerline"><span class="icon">warning</span><span>'
+    + its.length + ' ' + plural(its.length,"machine","machines","معدّة","معدّات") + ' ' + L("and","و") + ' '
+    + n + ' ' + plural(n,"award","awards","إرساء","إرساءات")
+    + L(" will be deleted with it. This cannot be undone."," ستُحذف معه. لا يمكن التراجع.") + '</span></div>',
+    L("Delete","احذف"), "doDeleteWo('" + gid + "')", true);
+}
+function doDeleteWo(gid){
+  var its = itemsOf(gid).map(function(i){ return i.id; });
+  ALLOCS = ALLOCS.filter(function(a){ return its.indexOf(a.iid) < 0; });
+  ITEMS  = ITEMS.filter(function(i){ return i.gid !== gid; });
+  GROUPS = GROUPS.filter(function(g){ return g.id !== gid; });
+  closeModal(); render();
+}
+
+function dlgDeleteProject(id){
+  var p = proj(id), gs = groupsOf(id);
+  var reqs = gs.filter(function(g){ return g.kind === "rfq"; }).length;
+  var wos  = gs.filter(function(g){ return g.kind === "wo";  }).length;
+
+  /* Not empty: no destructive action is offered at all. Deleting a used project would lose
+     which site its machines were on, and there is no undo for that. */
+  if (gs.length){
+    openModal(mshell("delete", L("This project isn’t empty","المشروع ليس فارغاً"), esc(projectTitle(p)),
+      '<div class="warnline"><span class="icon">warning</span><span>'
+      + reqs + ' ' + plural(reqs,"request","requests","طلب","طلبات") + ' ' + L("and","و") + ' '
+      + wos + ' ' + plural(wos,"work order","work orders","أمر عمل","أوامر عمل") + ' '
+      + L("are filed here. Only an empty project can be deleted.","مُدرجة هنا. لا يُحذف إلا مشروع فارغ.")
+      + '</span></div>'
+      + '<div class="infoline"><span class="icon">info</span><span>'
+      + L("A finished site does not need deleting — it reads as ended once its last date has passed, and drops down the list on its own.",
+          "الموقع المنتهي لا يحتاج حذفاً — يظهر «منتهٍ» بعد آخر تاريخ فيه وينزل في القائمة تلقائياً.")
+      + '</span></div>'
+      + '<div class="hint">'
+      + L("To delete it anyway, remove what is filed here first — each row’s menu has Remove from the project.",
+          "لحذفه رغم ذلك، أزل ما هو مُدرج هنا أولاً — في قائمة كل صف «أزل من المشروع».") + '</div>',
+      '<span class="spacer"></span><button class="btn btn-primary" onclick="PJ.closeModal()">'
+      + L("Got it","حسناً") + '</button>'));
+    return;
+  }
+
+  confirmDlg("delete", L("Delete this project?","حذف هذا المشروع؟"), esc(projectTitle(p)),
+    '<div class="infoline"><span class="icon">info</span><span>'
+    + L("Nothing is filed here, so nothing else is affected.","لا شيء مُدرج هنا، فلا يتأثر شيء آخر.") + '</span></div>'
+    + '<div class="hint">' + L("Created by Ahmed. Anyone in the company can delete it — the record of who made it is kept.",
+        "أنشأه أحمد. يمكن لأي عضو في الشركة حذفه — ويبقى سجل من أنشأه.") + '</div>',
+    L("Delete the project","احذف المشروع"), "doDeleteProject('" + id + "')", true);
+}
+function doDeleteProject(id){
+  PROJECTS = PROJECTS.filter(function(x){ return x.id !== id; });
+  projSel = PROJECTS.length ? PROJECTS[0].id : "__none";
+  closeModal(); render();
+}
+
+/* ══ award · un-award ══════════════════════════════════════════════════════ */
+var draftAllocs = [];
+function dlgAward(iid){
+  openRow = null;
+  var it = item(iid);
+  draftAllocs = allocsOf(iid).map(function(a){
+    return { sid:a.sid, units:a.units, rate:a.rate, id:a.id }; });
+  if (!draftAllocs.length) draftAllocs = [{ sid:"", units:it.qty, rate:"", start:"", end:"", id:null }];
+  paintAward(iid);
+}
+function paintAward(iid){
+  var it = item(iid), g = grp(it.gid), p = g.pid ? proj(g.pid) : null;
+  var w = g.when || (p ? p.when : { start:TODAY, end:TODAY });
+  var used = draftAllocs.reduce(function(n,a){ return n + (+a.units || 0); }, 0);
+  var over = used > it.qty;
+
+  var rows = draftAllocs.map(function(a, ix){
+    var opts = '<option value="">' + L("Pick a supplier…","اختر مورّداً…") + '</option>'
+      + SUPPLIERS.map(function(s){
+          return '<option value="' + s.id + '"' + (a.sid === s.id ? " selected" : "")
+            + (s.registered ? "" : " disabled") + '>' + esc(L(s.nEn,s.nAr))
+            + (s.registered ? "" : " — " + L("not vendor-registered","غير مسجّل كمورّد")) + '</option>'; }).join("");
+    return '<div class="mcard">'
+      + '<div class="alloc">'
+      +   '<label class="fld"><span class="lbl">' + L("Supplier","المورّد") + '</span>'
+      +     '<select onchange="PJ.setAlloc(' + ix + ',\'sid\',this.value,\'' + iid + '\')">' + opts + '</select></label>'
+      +   '<label class="fld"><span class="lbl">' + L("Units","الوحدات") + '</span>'
+      +     '<input type="number" min="1" value="' + (a.units||1) + '" '
+      +     'onchange="PJ.setAlloc(' + ix + ',\'units\',+this.value,\'' + iid + '\')" /></label>'
+      +   '<label class="fld"><span class="lbl">' + L("Rate SAR/mo","السعر ر.س/شهر") + '</span>'
+      +     '<input type="number" min="0" value="' + (a.rate||"") + '" '
+      +     'onchange="PJ.setAlloc(' + ix + ',\'rate\',+this.value,\'' + iid + '\')" /></label>'
+      +   '<button class="btn btn-ghost btn-sm" onclick="PJ.dropAlloc(' + ix + ',\'' + iid + '\')" style="padding:0 6px">'
+      +     '<span class="icon">close</span></button>'
+      + '</div></div>';
+  }).join("");
+
+  var body =
+      '<div class="infoline"><span class="icon">shield</span><span>'
+    +   L("This award is the renter’s own record. It is not the marketplace accept and touches nothing in the deal room.",
+        "هذا الإرساء سجلّ خاص بالمستأجر. ليس قبول العرض في السوق ولا يمسّ غرفة الصفقة.") + '</span></div>'
+    + '<div class="infoline"><span class="icon">event</span><span>'
+    +   L("No dates here. The bar comes from this request or work order, and moves out to meet a mobilized or demobilized mark that falls outside it — so “when” has two levels, not three.",
+        "لا تواريخ هنا. يأتي الشريط من هذا الطلب أو أمر العمل، ويتسع ليشمل علامة تعبئة أو تفكيك خارجه — فالمدة مستويان لا ثلاثة.") + '</span></div>'
+    + '<fieldset class="fset"><legend>' + L("Supplier","المورّد") + '</legend>' + rows
+    +   '<button class="btn btn-secondary btn-sm" style="margin-top:10px" onclick="PJ.addAlloc(\'' + iid + '\')">'
+    +     '<span class="icon">add</span>' + L("Split across another supplier","وزّع على مورّد آخر") + '</button>'
+    + '</fieldset>'
+    + '<div class="' + (over ? "warnline" : "hint") + '">' + (over ? '<span class="icon">warning</span>' : '')
+    +   '<span>' + used + ' ' + L("of","من") + ' ' + it.qty + ' ' + L("units allocated","وحدة موزّعة")
+    +   (over ? ' — ' + L("more than the item asks for","أكثر مما يطلبه البند") : '') + '</span></div>'
+    + '<div class="hint">' + L("Not seeing a supplier? They must be marked vendor-registered first.",
+        "لا ترى مورّداً؟ يجب تعليمه كمورّد مسجّل أولاً.")
+    +   ' <button class="btn btn-ghost btn-sm" onclick="PJ.dlgSuppliers()" style="padding:0 6px">'
+    +   L("Manage suppliers","إدارة المورّدين") + '</button></div>';
+
+  openModal(mshell("military_tech", L("Award","إرساء") + " · " + esc(L(it.eqEn,it.eqAr)),
+    g.ref + (p ? " · " + esc(projectTitle(p)) : ""), body,
+    '<span class="spacer"></span>'
+    + '<button class="btn btn-secondary" onclick="PJ.closeModal()">' + L("Cancel","إلغاء") + '</button>'
+    + '<button class="btn btn-primary"' + (over ? " disabled" : "") + ' onclick="PJ.saveAward(\'' + iid + '\')">'
+    +   L("Save the award","احفظ الإرساء") + '</button>', true));
+}
+function setAlloc(ix, k, v, iid){ draftAllocs[ix][k] = v; paintAward(iid); }
+function addAlloc(iid){
+  var it = item(iid);
+  var used = draftAllocs.reduce(function(n,a){ return n + (+a.units||0); }, 0);
+  draftAllocs.push({ sid:"", units:Math.max(1, it.qty - used), rate:"", start:"", end:"", id:null });
+  paintAward(iid);
+}
+function dropAlloc(ix, iid){
+  draftAllocs.splice(ix,1);
+  if (!draftAllocs.length) draftAllocs = [{ sid:"", units:1, rate:"", start:"", end:"", id:null }];
+  paintAward(iid);
+}
+function saveAward(iid){
+  var it = item(iid), g = grp(it.gid), p = g.pid ? proj(g.pid) : null;
+  var w = g.when || (p ? p.when : { start:TODAY, end:TODAY });
+  var keep = {};
+  ALLOCS.forEach(function(a){ if (a.iid === iid) keep[a.id] = a; });
+  ALLOCS = ALLOCS.filter(function(a){ return a.iid !== iid; });
+  draftAllocs.forEach(function(a){
+    if (!a.sid) return;
+    var old = a.id ? keep[a.id] : null;
+    ALLOCS.push({ id:a.id || nid("a"), iid:iid, sid:a.sid, units:+a.units||1, rate:+a.rate||null, per:"month",
+      mob:old ? old.mob : null, demob:old ? old.demob : null, docs:old ? old.docs : [] });
+  });
+  closeModal(); render();
+}
+
+/* Un-awarding is never blocked — but the papers go with it, so they are named. */
+function dlgUnaward(aid){
+  openRow = null;
+  var a = alloc(aid), it = item(a.iid);
+  var docLine = a.docs.length
+    ? '<div class="dangerline"><span class="icon">delete</span><span>'
+      + a.docs.length + ' ' + plural(a.docs.length,"document","documents","مستند","مستندات") + ' '
+      + L("will be deleted with this award: ","ستُحذف مع هذا الإرساء: ")
+      + a.docs.map(function(x){ return esc(x.n); }).join(", ") + '</span></div>'
+    : '<div class="hint">' + L("No documents are attached to this award.","لا مستندات مرفقة بهذا الإرساء.") + '</div>';
+  confirmDlg("undo", L("Un-award this row?","إلغاء إرساء هذا الصف؟"),
+    esc(L(it.eqEn,it.eqAr)) + " ×" + a.units + " · " + esc(supName(a.sid)),
+    docLine
+    + ((a.mob || a.demob) ? '<div class="warnline"><span class="icon">warning</span><span>'
+        + L("Its mobilized / demobilized marks go too.","تختفي أيضاً علامتا التعبئة والتفكيك.") + '</span></div>' : '')
+    + '<div class="infoline"><span class="icon">info</span><span>'
+    + L("The item goes back to awaiting an award. The request itself is untouched.",
+        "يعود البند إلى انتظار الإرساء. ولا يتأثر الطلب نفسه.") + '</span></div>',
+    L("Un-award","ألغِ الإرساء"), "doUnaward('" + aid + "')", true);
+}
+function doUnaward(aid){ ALLOCS = ALLOCS.filter(function(a){ return a.id !== aid; }); closeModal(); render(); }
+
+/* ══ suppliers ═════════════════════════════════════════════════════════════ */
+function dlgSuppliers(){
+  var rows = SUPPLIERS.map(function(s){
+    return '<div class="applyrow">'
+      + '<span class="icon" style="color:var(--muted)">' + (s.platform ? "verified" : "person") + '</span>'
+      + '<span class="nm">' + esc(L(s.nEn,s.nAr)) + '</span>'
+      + '<span class="hint">' + (s.platform ? L("on Moedatech","على منصّتنا") : L("added by you","أضفته أنت")) + '</span>'
+      + '<span class="why ' + (s.registered ? "free" : "no") + '">'
+      +   (s.registered ? L("vendor-registered","مورّد مسجّل") : L("not registered","غير مسجّل")) + '</span>'
+      + '<button class="btn btn-secondary btn-sm" onclick="PJ.toggleReg(\'' + s.id + '\')">'
+      +   (s.registered ? L("Unregister","إلغاء التسجيل") : L("Mark registered","علّم كمسجّل")) + '</button>'
+      + '</div>';
+  }).join("");
+  openModal(mshell("groups", L("Your suppliers","مورّدوك"),
+    L("Only vendor-registered suppliers can be awarded","لا يُرسى إلا لمورّد مسجّل"),
+    '<div class="applylist">' + rows + '</div>'
+    + '<fieldset class="fset"><legend>' + L("Add a supplier","أضف مورّداً") + '</legend>'
+    +   '<div class="frow"><label class="fld"><span class="lbl">' + L("Name","الاسم") + '</span>'
+    +     '<input id="newsup" placeholder="' + L("e.g. Desert Fleet Co.","مثال: أسطول الصحراء") + '" /></label>'
+    +     '<label class="fld"><span class="lbl">' + L("Phone","الجوال") + '</span><input placeholder="05…" /></label></div>'
+    +   '<div class="hint" style="margin-top:8px">'
+    +     L("We are not registering them — you are recording that they are already an approved vendor in your own system.",
+        "نحن لا نسجّلهم — أنت تسجّل أنهم مورّد معتمد لديك أصلاً.") + '</div>'
+    + '</fieldset>',
+    '<span class="spacer"></span><button class="btn btn-secondary" onclick="PJ.closeModal()">'
+    + L("Close","إغلاق") + '</button>'
+    + '<button class="btn btn-primary" onclick="PJ.addSupplier()">' + L("Add","أضف") + '</button>'));
+}
+function toggleReg(id){ sup(id).registered = !sup(id).registered; dlgSuppliers(); }
+function addSupplier(){
+  var f = document.getElementById("newsup");
+  if (f && f.value.trim())
+    SUPPLIERS.push({ id:nid("s"), nEn:f.value.trim(), nAr:f.value.trim(), platform:false, registered:false });
+  dlgSuppliers();
+}
+
+/* ══ documents ═════════════════════════════════════════════════════════════ */
+function dlgAttach(aid){
+  openRow = null;
+  var a = alloc(aid), it = item(a.iid), g = grp(it.gid);
+  var have = a.docs.length
+    ? '<div class="applylist">' + a.docs.map(function(x, i){
+        return '<div class="applyrow"><span class="icon" style="color:var(--muted)">description</span>'
+          + '<span class="nm">' + esc(x.n) + '</span>'
+          + '<span class="why no">' + L(DOCK[x.k][0], DOCK[x.k][1]) + '</span>'
+          + '<button class="btn btn-ghost btn-sm" onclick="PJ.dropDoc(\'' + aid + '\',' + i + ')">'
+          + '<span class="icon">delete</span></button></div>'; }).join("") + '</div>'
+    : '<div class="hint">' + L("Nothing attached yet.","لا مرفقات بعد.") + '</div>';
+
+  openModal(mshell("attach_file", L("Documents","المستندات"),
+    esc(L(it.eqEn,it.eqAr)) + " · " + esc(supName(a.sid)),
+    have
+    + '<fieldset class="fset"><legend>' + L("Upload","رفع") + '</legend>'
+    +   '<div class="frow"><label class="fld"><span class="lbl">' + L("Kind","النوع") + '</span>'
+    +     '<select id="dk"><option value="po">' + L("Purchase order","أمر شراء") + '</option>'
+    +       '<option value="contract">' + L("Contract","عقد") + '</option>'
+    +       '<option value="quotation">' + L("Supplier quotation","عرض سعر المورّد") + '</option>'
+    +       '<option value="other">' + L("Other","أخرى") + '</option></select></label>'
+    +     '<label class="fld"><span class="lbl">' + L("File","الملف") + '</span>'
+    +       '<input id="dn" placeholder="PO-88213.pdf" /></label></div>'
+    + '</fieldset>'
+    + (g.kind === "rfq"
+      ? '<div class="infoline"><span class="icon">picture_as_pdf</span><span>'
+        + L("Our own quotation for this request is generated, not uploaded — download it from the row menu.",
+            "عرض السعر الصادر منّا مُولَّد وليس مرفوعاً — نزّله من قائمة الصف.") + '</span></div>' : ''),
+    '<span class="spacer"></span><button class="btn btn-secondary" onclick="PJ.closeModal()">'
+    + L("Close","إغلاق") + '</button>'
+    + '<button class="btn btn-primary" onclick="PJ.addDoc(\'' + aid + '\')">' + L("Attach","أرفق") + '</button>'));
+}
+function addDoc(aid){
+  var a = alloc(aid), k = document.getElementById("dk").value, n = document.getElementById("dn").value.trim();
+  if (n) a.docs.push({ k:k, n:n });
+  dlgAttach(aid); render();
+}
+function dropDoc(aid, i){ alloc(aid).docs.splice(i,1); dlgAttach(aid); render(); }
+
+/* ══ new work order ════════════════════════════════════════════════════════
+   EQUIPMENT first — every field a machine line carries, plus the machine terms
+   the whole order shares — then SUPPLIER & PERIOD, which picks from the renter's
+   own list and may split a machine's units across more than one.
+
+   Saving writes the work order, its items AND one allocation per supplier line,
+   so a work order is awarded the moment it exists. */
+var woDraft = null;
+function newWoMachine(){
+  return { cat:"", sub:"", size:"", custom:false, label:"", csize:"",
+           qty:1, acc:"", notes:"", over:null,   /* null ⇒ follows the shared terms */
+           allocs:[{ sid:"", units:1, rate:"" }] };
+}
+/* Switching between the catalogue and free text clears the other side, so a machine is
+   never half one and half the other. */
+function woToggleCustom(i){
+  var m = woDraft.machines[i];
+  m.custom = !m.custom;
+  if (m.custom){ m.cat = ""; m.sub = ""; m.size = ""; }
+  else { m.label = ""; m.csize = ""; }
+  paintWo();
+}
+function defaultTerms(){
+  return { operator:"yes", nationality:"any", natCustom:"", opCerts:[], night:false,
+           fatFood:"supplier", fatAT:"supplier", safety:[], delivery:"supplier", ret:"me",
+           fuelResp:"me", year:"any", fuelType:"diesel" };
+}
+function newWoDraft(p){
+  return {
+    gid:null, pid:p.id, title:"",
+    machines:[ newWoMachine() ],
+    terms: defaultTerms(),
+    when:{ basis:p.when.basis, start:p.when.start, end:p.when.end, hours:p.when.hours, days:p.when.days },
+  };
+}
+/* Editing loads the saved order back into the same draft shape — the same form, so there is
+   one work-order form and not two. Item and allocation IDS ARE CARRIED, because the save
+   upserts by id: replacing the items would give them new ids and the cascade would take
+   every award, mark and document with them. */
+function loadWoDraft(g){
+  var p = proj(g.pid) || PROJECTS[0];
+  var w = g.when || p.when;
+  return {
+    gid: g.id, pid: g.pid, title: (L(g.tEn, g.tAr) || ""),
+    machines: itemsOf(g.id).map(function(it){
+      return { id:it.id, cat:"", sub:"", size:"", custom:true, label:L(it.eqEn, it.eqAr), csize:"",
+               qty:it.qty, acc:"", notes:"", over:(it.over || null),
+               allocs: allocsOf(it.id).map(function(a){
+                 return { id:a.id, sid:a.sid, units:a.units, rate:a.rate }; }) };
+    }),
+    terms: g.terms ? JSON.parse(JSON.stringify(g.terms)) : defaultTerms(),
+    when: { basis:w.basis, start:w.start, end:w.end, hours:w.hours, days:w.days },
+  };
+}
+function dlgNewWorkOrder(){ woDraft = newWoDraft(proj(projSel)); paintWo(); }
+function dlgEditWorkOrder(gid){ openRow = null; woDraft = loadWoDraft(grp(gid)); paintWo(); }
+
+/* Every award under the order, flattened — the list the period question is asked against. */
+function woAwards(){
+  var out = [];
+  woDraft.machines.forEach(function(m, i){
+    m.allocs.forEach(function(a, j){ if (a.id) out.push({ m:m, a:a, i:i, j:j }); });
+  });
+  return out;
+}
+function woSet(path, v){
+  var parts = path.split("."), o = woDraft;
+  for (var i=0;i<parts.length-1;i++) o = o[parts[i]];
+  o[parts[parts.length-1]] = v; paintWo();
+}
+function woSetMachine(i, k, v){
+  var m = woDraft.machines[i];
+  m[k] = v;
+  if (k === "cat"){ m.sub = ""; m.size = ""; }   /* cascade, like the canvas */
+  if (k === "sub"){ m.size = ""; }
+  paintWo();
+}
+function woToggle(listPath, val){
+  var parts = listPath.split("."), o = woDraft;
+  for (var i=0;i<parts.length-1;i++) o = o[parts[i]];
+  var arr = o[parts[parts.length-1]], ix = arr.indexOf(val);
+  if (ix >= 0) arr.splice(ix,1); else arr.push(val);
+  paintWo();
+}
+function woAddMachine(){ woDraft.machines.push(newWoMachine()); paintWo(); }
+function woDropMachine(i){
+  woDraft.machines.splice(i,1);
+  if (!woDraft.machines.length) woDraft.machines = [newWoMachine()];
+  paintWo();
+}
+function woAddAlloc(i){
+  var m = woDraft.machines[i];
+  var used = m.allocs.reduce(function(n,a){ return n + (+a.units||0); }, 0);
+  m.allocs.push({ sid:"", units:Math.max(1, m.qty - used), rate:"" });
+  paintWo();
+}
+function woDropAlloc(i, j){
+  var m = woDraft.machines[i];
+  m.allocs.splice(j,1);
+  if (!m.allocs.length) m.allocs = [{ sid:"", units:1, rate:"" }];
+  paintWo();
+}
+function woSetAlloc(i, j, k, v){ woDraft.machines[i].allocs[j][k] = v; paintWo(); }
+/* The shared block and a machine's override are the SAME fields. `i === null` is the
+   order-wide block; a number is machine i, whose value falls back to the shared one until
+   it is touched. Mirrors the request canvas, where every item overrides the request-wide
+   settings (`deliveryOverride`, `safetyCertsOverride`, per-item `equipmentYear`, …). */
+function termVal(i, key){
+  if (i === null) return woDraft.terms[key];
+  var m = woDraft.machines[i];
+  return (m.over && m.over[key] !== undefined) ? m.over[key] : woDraft.terms[key];
+}
+function setTerm(i, key, v){
+  if (i === null) woDraft.terms[key] = v;
+  else {
+    var m = woDraft.machines[i];
+    m.over = m.over || {};
+    m.over[key] = v;
+  }
+  paintWo();
+}
+function toggleTerm(i, key, val){
+  var cur = termVal(i, key), next = cur.slice(), ix = next.indexOf(val);
+  if (ix >= 0) next.splice(ix,1); else next.push(val);
+  setTerm(i, key, next);
+}
+function overrideCount(m){ return m.over ? Object.keys(m.over).length : 0; }
+function woStartOverride(i){ woDraft.machines[i].over = woDraft.machines[i].over || {}; paintWo(); }
+function woClearOverride(i){ woDraft.machines[i].over = null; paintWo(); }
+
+/* a <select> bound to the terms scope */
+function tsel(i, key, map, label){
+  return '<label class="fld"><span class="lbl">' + label + '</span>'
+    + '<select onchange="PJ.setTerm(' + (i === null ? "null" : i) + ',\'' + key + '\',this.value)">'
+    + Object.keys(map).map(function(k){
+        return '<option value="' + k + '"' + (String(termVal(i,key))===k ? " selected" : "") + '>'
+          + L(map[k][0], map[k][1]) + '</option>'; }).join("")
+    + '</select></label>';
+}
+function tchips(i, key, map, label){
+  var arr = termVal(i, key);
+  return '<div class="fld"><span class="lbl">' + label + '</span><div class="chipset">'
+    + Object.keys(map).map(function(k){
+        return '<button type="button" class="tchip" aria-pressed="' + (arr.indexOf(k)>=0)
+          + '" onclick="PJ.toggleTerm(' + (i === null ? "null" : i) + ',\'' + key + '\',\'' + k + '\')">'
+          + L(map[k][0], map[k][1]) + '</button>'; }).join("")
+    + '</div></div>';
+}
+
+/* The whole machine-terms block for one scope. `operatorOn` decides whether the operator
+   half appears at all — for a generator it is absent, not disabled. */
+function termsFields(i, operatorOn){
+  var ix = (i === null ? "null" : i);
+  return (operatorOn
+      ? '<div class="frow">'
+        +   tsel(i, "operator", OPNEED, L("Operator needed","المشغّل مطلوب"))
+        +   tsel(i, "nationality", NAT, L("Nationality","الجنسية"))
+        +   tsel(i, "fatFood", PARTY, L("F.A.T — food by","الإعاشة — الطعام من"))
+        +   tsel(i, "fatAT", PARTY, L("F.A.T — accommodation & transport by","السكن والنقل من"))
+        + '</div>'
+        + (termVal(i,"nationality") === "restricted"
+          ? '<div class="frow" style="margin-top:9px"><label class="fld"><span class="lbl">'
+            + L("Nationalities you allow","الجنسيات المسموحة") + '</span><input value="'
+            + esc(termVal(i,"natCustom")) + '" onchange="PJ.setTerm(' + ix + ',\'natCustom\',this.value)" /></label></div>'
+          : '')
+        + '<div class="frow" style="margin-top:9px">'
+        +   tchips(i, "opCerts", OPCERT, L("Operator certificates","شهادات المشغّل"))
+        +   '<div class="fld"><span class="lbl">' + L("Night shift","الوردية الليلية") + '</span>'
+        +     '<label class="chk"><input type="checkbox"' + (termVal(i,"night") ? " checked" : "")
+        +     ' onchange="PJ.setTerm(' + ix + ',\'night\',this.checked)" />' + L("Required","مطلوبة") + '</label></div>'
+        + '</div>'
+      : '<div class="hint">' + L("No operator fields — the catalogue says this equipment does not take one.",
+          "لا حقول مشغّل — الفهرس يقول إن هذه المعدّة لا تحتاج مشغّلاً.") + '</div>')
+    + '<div class="frow" style="margin-top:9px">'
+    +   tsel(i, "delivery", PARTY, L("Delivery to site by","التوصيل للموقع من"))
+    +   tsel(i, "ret", PARTY, L("Return from site by","الإرجاع من الموقع من"))
+    +   tsel(i, "fuelResp", PARTY, L("Fuel by","الوقود من"))
+    + '</div>'
+    + '<div class="frow" style="margin-top:9px">'
+    +   tsel(i, "year", YEARS, L("Min equipment year","أقدم سنة صنع"))
+    +   tsel(i, "fuelType", FUEL, L("Fuel type","نوع الوقود"))
+    + '</div>'
+    + '<div style="margin-top:9px">'
+    +   tchips(i, "safety", SAFETY, L("Equipment safety certificates","شهادات سلامة المعدّة"))
+    + '</div>';
+}
+
+function chips(map, arr, listPath, label){
+  return '<div class="fld"><span class="lbl">' + label + '</span><div class="chipset">'
+    + Object.keys(map).map(function(k){
+        return '<button type="button" class="tchip" aria-pressed="' + (arr.indexOf(k)>=0)
+          + '" onclick="PJ.woToggle(\'' + listPath + '\',\'' + k + '\')">'
+          + L(map[k][0], map[k][1]) + '</button>'; }).join("")
+    + '</div></div>';
+}
+
+function paintWo(){
+  var p = proj(woDraft.pid) || proj(projSel) || PROJECTS[0], w = woDraft;
+  var editing = !!w.gid;
+  var anyOperator = w.machines.some(machineOperatorApplies);
+
+  var machines = w.machines.map(function(m, i){
+    var catOpts = '<option value="">' + L("Category…","الفئة…") + '</option>'
+      + Object.keys(TAX).map(function(c){
+          return '<option value="' + c + '"' + (m.cat===c?" selected":"") + '>' + L(c, TAX[c].ar) + '</option>'; }).join("");
+    var subOpts = '<option value="">' + L("Subtype…","النوع…") + '</option>'
+      + taxSubs(m.cat).map(function(sb){
+          return '<option value="' + sb + '"' + (m.sub===sb?" selected":"") + '>'
+            + L(sb, TAX[m.cat].subs[sb].ar) + '</option>'; }).join("");
+    var sizeOpts = '<option value="">' + L("Size…","المقاس…") + '</option>'
+      + taxSizes(m.cat, m.sub).map(function(z){
+          return '<option value="' + z + '"' + (m.size===z?" selected":"") + '>' + z + '</option>'; }).join("");
+
+    var equipFields = m.custom
+      ? '<div class="frow">'
+        +   '<label class="fld"><span class="lbl">' + L("Machine name","اسم المعدّة") + '</span>'
+        +     '<input value="' + esc(m.label) + '" placeholder="'
+        +     L("e.g. Pipe fusion welder","مثال: ماكينة لحام أنابيب") + '" '
+        +     'onchange="PJ.woSetMachine(' + i + ',\'label\',this.value)" /></label>'
+        +   '<label class="fld"><span class="lbl">' + L("Size / capacity","المقاس / السعة") + '</span>'
+        +     '<input value="' + esc(m.csize) + '" placeholder="' + L("optional","اختياري") + '" '
+        +     'onchange="PJ.woSetMachine(' + i + ',\'csize\',this.value)" /></label>'
+        +   '<label class="fld"><span class="lbl">' + L("Quantity","الكمية") + '</span>'
+        +     '<input type="number" min="1" value="' + m.qty + '" '
+        +     'onchange="PJ.woSetMachine(' + i + ',\'qty\',+this.value)" /></label>'
+        + '</div>'
+      : '<div class="frow">'
+        +   '<label class="fld"><span class="lbl">' + L("Category","الفئة") + '</span>'
+        +     '<select onchange="PJ.woSetMachine(' + i + ',\'cat\',this.value)">' + catOpts + '</select></label>'
+        +   '<label class="fld"><span class="lbl">' + L("Subtype","النوع") + '</span>'
+        +     '<select ' + (m.cat ? '' : 'disabled ') + 'onchange="PJ.woSetMachine(' + i + ',\'sub\',this.value)">'
+        +     subOpts + '</select></label>'
+        +   '<label class="fld"><span class="lbl">' + L("Size","المقاس") + '</span>'
+        +     '<select ' + (m.sub ? '' : 'disabled ') + 'onchange="PJ.woSetMachine(' + i + ',\'size\',this.value)">'
+        +     sizeOpts + '</select></label>'
+        +   '<label class="fld"><span class="lbl">' + L("Quantity","الكمية") + '</span>'
+        +     '<input type="number" min="1" value="' + m.qty + '" '
+        +     'onchange="PJ.woSetMachine(' + i + ',\'qty\',+this.value)" /></label>'
+        + '</div>';
+
+    return '<div class="mcard">'
+      + '<div class="mhd"><b>' + L("Machine","معدّة") + ' ' + (i+1) + '</b>'
+      +   (machineOperatorApplies(m) ? ''
+          : '<span class="tag">' + L("no operator for this type","لا مشغّل لهذا النوع") + '</span>')
+      +   (m.custom ? '<span class="tag">' + L("not in the catalogue","خارج الفهرس") + '</span>' : '')
+      +   '<span class="spacer"></span>'
+      +   '<button class="btn btn-ghost btn-sm" onclick="PJ.woToggleCustom(' + i + ')" style="padding:0 7px">'
+      +     '<span class="icon" style="font-size:14px">' + (m.custom ? "list" : "edit_note") + '</span>'
+      +     (m.custom ? L("Pick from the catalogue","اختر من الفهرس")
+                      : L("Not in the catalogue","غير موجودة في الفهرس")) + '</button>'
+      +   (overrideCount(m)
+          ? '<span class="tag">' + overrideCount(m) + ' '
+            + plural(overrideCount(m),"own term","own terms","شرط خاص","شروط خاصة") + '</span>' : '')
+      +   (w.machines.length > 1
+          ? '<button class="btn btn-ghost btn-sm" onclick="PJ.woDropMachine(' + i + ')" style="padding:0 6px">'
+            + '<span class="icon">close</span></button>' : '')
+      + '</div>'
+      + equipFields
+      + '<div class="frow" style="margin-top:9px">'
+      +   '<label class="fld"><span class="lbl">' + L("Accessories","الملحقات") + '</span>'
+      +     '<input value="' + esc(m.acc) + '" placeholder="' + L("breaker, quick coupler…","كسّارة، وصلة سريعة…") + '" '
+      +     'onchange="PJ.woSetMachine(' + i + ',\'acc\',this.value)" /></label>'
+      +   '<label class="fld"><span class="lbl">' + L("Notes","ملاحظات") + '</span>'
+      +     '<input value="' + esc(m.notes) + '" onchange="PJ.woSetMachine(' + i + ',\'notes\',this.value)" /></label>'
+      + '</div>'
+      + (m.over
+        ? '<div class="overpanel">'
+          + '<div class="mhd"><b>' + L("Terms for this machine only","شروط هذه المعدّة وحدها") + '</b>'
+          +   '<span class="spacer"></span>'
+          +   '<button class="btn btn-ghost btn-sm" onclick="PJ.woClearOverride(' + i + ')" style="padding:0 7px">'
+          +     '<span class="icon" style="font-size:14px">undo</span>'
+          +     L("Follow the shared terms","اتبع الشروط المشتركة") + '</button></div>'
+          + termsFields(i, machineOperatorApplies(m))
+          + '</div>'
+        : '<button class="btn btn-ghost btn-sm" style="margin-top:9px;padding:0 7px" '
+          + 'onclick="PJ.woStartOverride(' + i + ')">'
+          + '<span class="icon" style="font-size:14px">tune</span>'
+          + L("Different terms for this machine","شروط مختلفة لهذه المعدّة") + '</button>')
+      + '</div>';
+  }).join("");
+
+  /* the operator half is not "disabled" for a generator — it is absent */
+  var sharedTerms = termsFields(null, anyOperator);
+
+  var suppliers = w.machines.map(function(m, i){
+    var used = m.allocs.reduce(function(n,a){ return n + (+a.units||0); }, 0);
+    var over = used > m.qty;
+    var rows = m.allocs.map(function(a, j){
+      var opts = '<option value="">' + L("Pick a supplier…","اختر مورّداً…") + '</option>'
+        + SUPPLIERS.map(function(sp){
+            return '<option value="' + sp.id + '"' + (a.sid===sp.id?" selected":"")
+              + (sp.registered ? "" : " disabled") + '>' + esc(L(sp.nEn, sp.nAr))
+              + (sp.registered ? "" : " — " + L("not vendor-registered","غير مسجّل كمورّد")) + '</option>'; }).join("");
+      return '<div class="alloc">'
+        + '<label class="fld"><span class="lbl">' + L("Supplier","المورّد") + '</span>'
+        +   '<select onchange="PJ.woSetAlloc(' + i + ',' + j + ',\'sid\',this.value)">' + opts + '</select></label>'
+        + '<label class="fld"><span class="lbl">' + L("Units","الوحدات") + '</span>'
+        +   '<input type="number" min="1" value="' + a.units + '" '
+        +   'onchange="PJ.woSetAlloc(' + i + ',' + j + ',\'units\',+this.value)" /></label>'
+        + '<label class="fld"><span class="lbl">' + L("Rate SAR/mo","السعر ر.س/شهر") + '</span>'
+        +   '<input type="number" min="0" value="' + (a.rate||"") + '" '
+        +   'onchange="PJ.woSetAlloc(' + i + ',' + j + ',\'rate\',+this.value)" /></label>'
+        + '<button class="btn btn-ghost btn-sm" onclick="PJ.woDropAlloc(' + i + ',' + j + ')" style="padding:0 6px">'
+        +   '<span class="icon">close</span></button></div>';
+    }).join("");
+    return '<div class="mcard">'
+      + '<div class="mhd"><b>' + (machineLabel(m) || (L("Machine","معدّة") + " " + (i+1)))
+      +   ' ×' + m.qty + '</b><span class="spacer"></span>'
+      +   '<span class="tag' + (over ? " danger" : "") + '">' + used + ' ' + L("of","من") + ' ' + m.qty + ' '
+      +   L("units","وحدة") + '</span></div>'
+      + rows
+      + '<button class="btn btn-secondary btn-sm" style="margin-top:9px" onclick="PJ.woAddAlloc(' + i + ')">'
+      +   '<span class="icon">add</span>' + L("Split across another supplier","وزّع على مورّد آخر") + '</button>'
+      + '</div>';
+  }).join("");
+
+  var differs = w.when.start !== p.when.start || w.when.end !== p.when.end
+             || w.when.basis !== p.when.basis || +w.when.hours !== +p.when.hours;
+
+  /* Changing the order's period simply changes every award's bar with it, because an award has
+     no period of its own any more. The whole "move the awards to the new period?" question was a
+     consequence of them having one, and it is gone with them. */
+  var followList = "";
+
+
+  var body =
+      '<div class="infoline"><span class="icon">lock</span><span>'
+    +   L("Location comes from the project and cannot be changed here: ","الموقع من المشروع ولا يمكن تغييره هنا: ")
+    +   '<b>' + esc(L(p.locEn, p.locAr)) + '</b></span></div>'
+    + '<fieldset class="fset"><legend>' + L("Equipment","المعدّة") + '</legend>'
+    +   '<label class="fld" style="display:block;margin-bottom:10px"><span class="lbl">'
+    +     L("Title — optional","الاسم — اختياري") + '</span><input value="' + esc(w.title)
+    +     '" placeholder="' + L("blank uses the first machine’s name","الفراغ يستخدم اسم أول معدّة")
+    +     '" onchange="PJ.woSet(\'title\',this.value)" /></label>'
+    +   machines
+    +   '<button class="btn btn-secondary btn-sm" style="margin-top:10px" onclick="PJ.woAddMachine()">'
+    +     '<span class="icon">add</span>' + L("Add another machine","أضف معدّة أخرى") + '</button>'
+    +   '<div class="hint" style="margin-top:9px">'
+    +     L("A machine we don’t list can be typed in — a work order never goes to a supplier, so it doesn’t need a catalogue match. A marketplace request does.",
+        "يمكن كتابة معدّة غير مدرجة لدينا — أمر العمل لا يذهب لمورّد، فلا يحتاج مطابقة في الفهرس. أما طلب السوق فيحتاجها.") + '</div>'
+    + '</fieldset>'
+    + '<fieldset class="fset"><legend>' + L("Machine terms — shared by every machine","شروط المعدّة — مشتركة لكل المعدّات") + '</legend>'
+    +   sharedTerms
+    +   '<div class="hint" style="margin-top:9px">'
+    +     L("Any machine can differ — its card has <b>Different terms for this machine</b>. These are copied onto a request that starts from this work order, never the equipment itself.",
+        "يمكن لأي معدّة أن تختلف — في بطاقتها <b>شروط مختلفة لهذه المعدّة</b>. وتُنسخ هذه الشروط إلى الطلب الذي يبدأ من أمر العمل، دون المعدّة نفسها.") + '</div>'
+    + '</fieldset>'
+    + '<fieldset class="fset"><legend>' + L("Supplier & period","المورّد والمدة") + '</legend>'
+    +   '<div class="frow">'
+    +     sel(BASIS, w.when.basis, "woSet('when.basis',this.value)", L("Rental basis","أساس الإيجار"))
+    +     '<label class="fld"><span class="lbl">' + L("Start","البداية") + '</span>'
+    +       '<input type="date" value="' + w.when.start + '" onchange="PJ.woSet(\'when.start\',this.value)" /></label>'
+    +     '<label class="fld"><span class="lbl">' + L("End","النهاية") + '</span>'
+    +       '<input type="date" value="' + w.when.end + '" onchange="PJ.woSet(\'when.end\',this.value)" /></label>'
+    +     '<label class="fld"><span class="lbl">' + L("Hours/day","ساعات/يوم") + '</span>'
+    +       '<input type="number" value="' + w.when.hours + '" onchange="PJ.woSet(\'when.hours\',+this.value)" /></label>'
+    +   '</div>'
+    +   (differs
+      ? '<div class="warnline" style="margin-top:10px"><span class="icon">warning</span><span>'
+        + L("This period differs from the project (","تختلف هذه المدة عن المشروع (")
+        + p.when.start + " → " + p.when.end + ")"
+        + L(". That is allowed — the work order keeps its own and the project is unchanged.",
+            ". هذا مسموح — يحتفظ أمر العمل بمدّته ويبقى المشروع كما هو.") + '</span></div>' : '')
+    +   '<div style="height:10px"></div>'
+    +   suppliers
+    +   '<div class="hint" style="margin-top:9px">'
+    +     L("Only vendor-registered suppliers can be picked.","لا يمكن اختيار إلا مورّد مسجّل.")
+    +     ' <button class="btn btn-ghost btn-sm" onclick="PJ.dlgSuppliers()" style="padding:0 6px">'
+    +     L("Manage suppliers","إدارة المورّدين") + '</button></div>'
+    + '</fieldset>'
+    + followList;
+
+  var ready = w.machines.every(machineReady)
+           && w.machines.every(function(m){
+                return m.allocs.some(function(a){ return a.sid; })
+                    && m.allocs.reduce(function(n,a){ return n + (+a.units||0); }, 0) <= m.qty; });
+
+  openModal(mshell("assignment_add",
+    editing ? L("Edit the work order","تعديل أمر العمل") : L("Add a work order","أضف أمر عمل"),
+    esc(projectTitle(p)) + " · " + L("your own record — never sent to suppliers","سجلّك الخاص — لا يُرسل للمورّدين"),
+    body,
+    '<span class="spacer"></span>'
+    + '<button class="btn btn-secondary" onclick="PJ.closeModal()">' + L("Cancel","إلغاء") + '</button>'
+    + '<button class="btn btn-primary"' + (ready ? "" : " disabled") + ' onclick="PJ.saveWorkOrder()">'
+    +   (editing ? L("Save the work order","احفظ أمر العمل") : L("Add the work order","أضف أمر العمل"))
+    + '</button>', true));
+}
+function saveWorkOrder(){
+  var w = woDraft, p = proj(w.pid) || proj(projSel);
+  var ttl = w.title.trim() || null;
+  var differs = w.when.start !== p.when.start || w.when.end !== p.when.end
+             || w.when.basis !== p.when.basis || +w.when.hours !== +p.when.hours;
+  var ownWhen = differs
+    ? { basis:w.when.basis, start:w.when.start, end:w.when.end, hours:w.when.hours, days:w.when.days } : null;
+
+  var gid = w.gid;
+  if (gid){
+    var g = grp(gid);
+    g.tEn = ttl; g.tAr = ttl; g.when = ownWhen; g.terms = w.terms;
+  } else {
+    gid = nid("g");
+    var n = GROUPS.filter(function(x){ return x.kind === "wo"; }).length + 1;
+    GROUPS.push({ id:gid, pid:p.id, kind:"wo", ref:"WO-" + (n + 10), tEn:ttl, tAr:ttl,
+      when:ownWhen, terms:w.terms });
+  }
+
+  /* Upsert by id. Anything the renter removed from the form goes, and with it its awards —
+     but a machine that merely changed keeps its id, so its awards, marks and papers survive. */
+  var keptItems = {}, keptAllocs = {};
+  w.machines.forEach(function(m){
+    var iid = m.id || nid("i");
+    keptItems[iid] = true;
+    var row = item(iid);
+    var fields = { gid:gid,
+      eqEn: m.custom ? machineLabel(m) : (m.sub + " " + m.size).trim(),
+      eqAr: machineLabel(m), custom:m.custom, qty:m.qty, over:m.over };
+    if (row){ for (var k in fields) row[k] = fields[k]; }
+    else { fields.id = iid; ITEMS.push(fields); }
+
+    m.allocs.forEach(function(a){
+      if (!a.sid) return;
+      var aid = a.id || nid("a");
+      keptAllocs[aid] = true;
+      var cur = alloc(aid);
+      /* Nothing about dates. Changing the order's period moves every bar under it, because an
+         award has none of its own to disagree with. */
+      if (cur){
+        cur.sid = a.sid; cur.units = +a.units||1; cur.rate = +a.rate||null;
+      } else {
+        ALLOCS.push({ id:aid, iid:iid, sid:a.sid, units:+a.units||1, rate:+a.rate||null,
+          per:"month", mob:null, demob:null, docs:[] });
+      }
+    });
+  });
+
+  if (w.gid){
+    var gone = itemsOf(gid).filter(function(it){ return !keptItems[it.id]; }).map(function(it){ return it.id; });
+    ITEMS  = ITEMS.filter(function(it){ return it.gid !== gid || keptItems[it.id]; });
+    ALLOCS = ALLOCS.filter(function(a){
+      if (gone.indexOf(a.iid) >= 0) return false;
+      return keptItems[a.iid] === undefined ? true : !!keptAllocs[a.id];
+    });
+  }
+  woDraft = null; closeModal(); render();
+}
+
+/* ══ INTAKE ═════════════════════════════════════════════════════════════════ */
+var iProject = null, iTemplate = "", iText = "", iOverrides = {}, iFocus = false;
+
+function renderIntake(){
+  var p = iProject ? proj(iProject) : null;
+  var live = PROJECTS.slice().sort(function(a, b){
+    return (projectEnded(a) ? 1 : 0) - (projectEnded(b) ? 1 : 0); });
+
+  var chips = '<span class="k">' + L("Your projects","مشاريعك") + '</span>'
+    + live.map(function(x){
+        return '<button class="chip" type="button" aria-pressed="' + (iProject === x.id) + '" '
+          + 'onclick="PJ.pickIProject(\'' + x.id + '\')"><span class="icon">location_city</span>'
+          + esc(projectTitle(x))
+          + (projectEnded(x) ? ' <span class="arch">' + L("ended","منتهٍ") + '</span>' : '')
+          + '</button>'; }).join("")
+    + (iProject ? '<button class="chip" type="button" onclick="PJ.pickIProject(null)">'
+        + '<span class="icon">close</span>' + L("No project","بدون مشروع") + '</button>' : '');
+
+  var pills = "";
+  if (p){
+    var basis = ov("basis", p.when.basis), st = ov("start", p.when.start), en = ov("end", p.when.end),
+        hr = ov("hours", p.when.hours), loc = ov("loc", L(p.locEn, p.locAr));
+    var conflict = detectConflict(p);
+    pills = '<div class="pillbar">'
+      + '<span class="pill lead"><span class="icon" style="font-size:14px">location_city</span>'
+      +   esc(projectTitle(p))
+      +   '<button class="x" onclick="PJ.pickIProject(null)"><span class="icon">close</span></button></span>'
+      + '<button class="pill pad' + (conflict ? " conflict" : "") + '"'
+      +   (conflict ? ' onclick="PJ.dlgIntakeConflict()"' : '') + '>'
+      +   '<span class="k">' + L("site","الموقع") + '</span>' + esc(shortSite(loc))
+      +   (conflict ? ' <span class="icon" style="font-size:14px">warning</span>' : '') + '</button>'
+      + pillSelect("basis", L("basis","الأساس"), basis,
+          Object.keys(BASIS).map(function(k){ return [k, L(BASIS[k][0], BASIS[k][1])]; }), p.when.basis)
+      + '<span class="pill pad' + (st !== p.when.start || en !== p.when.end ? " changed" : "") + '">'
+      +   '<span class="k">' + L("dates","التواريخ") + '</span>'
+      +   '<input type="date" value="' + st + '" onchange="PJ.setOv(\'start\',this.value)" />→'
+      +   '<input type="date" value="' + en + '" onchange="PJ.setOv(\'end\',this.value)" /></span>'
+      + pillSelect("hours", L("hrs/day","ساعة/يوم"), String(hr),
+          [["8","8"],["9","9"],["10","10"],["12","12"]], String(p.when.hours))
+      + '<button class="morepill" onclick="PJ.dlgMoreDefaults()">+ 2 '
+      +   L("more project defaults","افتراضيات أخرى") + '</button>'
+      + '</div>';
+  }
+
+  var tmpl = "";
+  if (p){
+    var opts = groupsOf(p.id).map(function(g){
+      var first = itemsOf(g.id)[0];
+      return '<option value="' + g.id + '"' + (iTemplate === g.id ? " selected" : "") + '>'
+        + (g.kind === "wo" ? L("Work order","أمر عمل") : L("Request","طلب")) + " · " + g.ref
+        + (first ? " · " + esc(L(first.eqEn, first.eqAr)) : "") + '</option>'; }).join("");
+    tmpl = '<div class="tmplbar"><span class="k">' + L("Start from","ابدأ من") + '</span>'
+      + '<select onchange="iTemplate=this.value;PJ.renderIntake()">'
+      +   '<option value="">' + L("Nothing — I’ll set the machine terms myself","لا شيء — سأضبط شروط المعدّة بنفسي") + '</option>'
+      +   opts + '</select>'
+      + '<span class="note">'
+      +   (iTemplate
+          ? L("Copies operator, certificates, delivery, fuel and year. Never the equipment — you type that.",
+              "ينسخ المشغّل والشهادات والتوصيل والوقود وسنة الصنع. لا ينسخ المعدّة أبداً — أنت تكتبها.")
+          : L("Pick a past request or work order to copy its machine terms.",
+              "اختر طلباً سابقاً أو أمر عمل لنسخ شروط معدّته."))
+      + '</span></div>'
+      /* The pills say what the project filled. Nothing says what it did not — and the one
+         thing left is the whole reason the renter is here. Name it. */
+      + '<div class="youtype"><span class="icon">edit</span><span>'
+      +   L("<b>You type the machine</b> — what it is, its size, how many, and any accessory. Everything else above is filled in already.",
+          "<b>اكتب المعدّة</b> — ما هي، ومقاسها، وكم عدد، وأي ملحق. وكل ما فوق مملوء مسبقاً.")
+      + '</span></div>';
+  }
+
+  var t = tier();
+  document.getElementById("tab-intake").innerHTML =
+      '<div class="intake">'
+    + '<div class="shead"><span class="plate"><span class="icon">bolt</span></span>'
+    +   '<span class="txt"><h2>' + L("What do you need?","ما الذي تحتاجه؟") + '</h2>'
+    +   '<span class="sum">' + L("Pick a project, then type only the machine.","اختر مشروعاً، ثم اكتب المعدّة فقط.") + '</span></span></div>'
+    + '<div class="icard">'
+    +   '<div class="ihead"><span class="plate"><span class="icon">auto_awesome</span></span>'
+    +     '<b>' + L("Describe it","صف طلبك") + '</b><span class="beta">' + L("beta","تجريبي") + '</span>'
+    +     '<span class="spacer"></span><span class="cnt">' + iText.length + ' ' + L("chars","حرف") + '</span></div>'
+    +   '<textarea id="itext" oninput="iFocus=true;iText=this.value;PJ.renderIntake()" placeholder="'
+    +     (iProject ? L("2 excavators 20t with a breaker","حفّارتان ٢٠ طن مع كسّارة")
+                    : L("I need 3 air compressors in Dammam for two weeks, with operators…",
+                        "أحتاج ٣ ضواغط هواء في الدمام لأسبوعين، مع مشغّلين…"))
+    +     '">' + esc(iText) + '</textarea>'
+    +   (iProject ? pills + tmpl : '<div class="chiprow">' + chips + '</div>')
+    + '</div>'
+    + '<div class="speed ' + t.cls + '"><span class="led"></span>'
+    +   '<span><span class="nm">' + t.nm + '</span> <span class="why">' + t.why + '</span></span>'
+    +   '<span class="ms">' + t.ms + '</span></div>'
+    + '<div class="go"><span class="note">'
+    +   (iText.trim() ? L("Ready to review","جاهز للمراجعة") : L("Type the machine you need","اكتب المعدّة التي تحتاجها"))
+    + '</span>'
+    +   '<button class="btn btn-primary" ' + (iText.trim() ? "" : "disabled") + ' onclick="PJ.dlgResult()">'
+    +     L("Continue","متابعة") + ' <span class="icon">arrow_forward</span></button></div>'
+    + '</div>';
+
+  /* the surface re-renders on every keystroke — put the caret back */
+  var ta = document.getElementById("itext");
+  if (ta && iFocus){ ta.focus(); ta.selectionStart = ta.selectionEnd = ta.value.length; }
+}
+function pillSelect(key, label, val, opts, dflt){
+  var changed = String(val) !== String(dflt);
+  return '<span class="pill' + (changed ? " changed" : "") + '"><span class="k">' + label + '</span>'
+    + '<select onchange="PJ.setOv(\'' + key + '\',this.value)">'
+    + opts.map(function(o){
+        return '<option value="' + o[0] + '"' + (String(val) === String(o[0]) ? " selected" : "") + '>'
+          + o[1] + '</option>'; }).join("")
+    + '</select></span>';
+}
+function ov(k, dflt){ return iOverrides[k] !== undefined ? iOverrides[k] : dflt; }
+function setOv(k, v){ iOverrides[k] = v; renderIntake(); }
+function pickIProject(id){ iProject = id; iTemplate = ""; iOverrides = {}; renderIntake(); }
+
+/* The agent reports any place it saw in the text; the WEB compares it with the
+   project. String comparison — no model is involved in raising the conflict. */
+var CITIES = [["dammam","الدمام"],["riyadh","الرياض"],["jeddah","جدة"],["dhahran","الظهران"],
+              ["qiddiya","القدية"],["diriyah","الدرعية"],["jubail","الجبيل"]];
+function detectConflict(p){
+  var hay = iText.toLowerCase(), site = (L(p.locEn,p.locAr) + " " + p.locEn).toLowerCase();
+  for (var i=0;i<CITIES.length;i++){
+    var c = CITIES[i];
+    if ((hay.indexOf(c[0]) >= 0 || iText.indexOf(c[1]) >= 0) && site.indexOf(c[0]) < 0)
+      return ar ? c[1] : c[0].charAt(0).toUpperCase() + c[0].slice(1);
+  }
+  return null;
+}
+function dlgIntakeConflict(){
+  var p = proj(iProject), stated = detectConflict(p);
+  openModal(mshell("warning", L("Two different places","موقعان مختلفان"), esc(projectTitle(p)),
+    '<div class="applylist">'
+    + '<div class="applyrow"><span class="nm">' + L("You wrote","كتبت") + '</span>'
+    +   '<span style="font-weight:800;color:var(--warn-deep)">' + esc(stated) + '</span></div>'
+    + '<div class="applyrow"><span class="nm">' + L("The project’s site","موقع المشروع") + '</span>'
+    +   '<span style="font-weight:800">' + esc(shortSite(L(p.locEn,p.locAr))) + '</span></div>'
+    + '</div>'
+    + '<div class="infoline"><span class="icon">info</span><span>'
+    +   L("Keeping your own is fine — this request will simply sit in the project with a different site, and the project is unchanged.",
+        "الإبقاء على ما كتبته سليم — سيبقى الطلب داخل المشروع بموقع مختلف، ويظل المشروع كما هو.") + '</span></div>',
+    '<span class="spacer"></span>'
+    + '<button class="btn btn-secondary" onclick="PJ.closeModal()">' + L("Keep what I wrote","أبقِ ما كتبت") + '</button>'
+    + '<button class="btn btn-primary" onclick="PJ.useProjectSite()">' + L("Use the project’s site","استخدم موقع المشروع") + '</button>'));
+}
+function useProjectSite(){
+  var p = proj(iProject);
+  CITIES.forEach(function(c){
+    iText = iText.replace(new RegExp("\\b(in|at)?\\s*" + c[0] + "\\b", "ig"), "").replace(/\s{2,}/g," ").trim();
+    iText = iText.split(c[1]).join("").replace(/\s{2,}/g," ").trim();
+  });
+  iText = iText.replace(/[,،]\s*$/,"");
+  closeModal(); renderIntake();
+}
+
+/* Which of the three speeds this text would take. The tier follows the SHAPE OF THE
+   TEXT, not whether a project exists — the project only fills the blanks afterwards. */
+function tier(){
+  var t = iText.trim();
+  var oneLine = t.length > 0 && t.length <= 42 && t.split(/\s+/).length <= 6
+             && !/[.,;]|\band\b|\bwith\b|\bو\b|\bمع\b/i.test(t);
+  if (!t) return { cls:"", nm:L("Waiting","بانتظار"), why:L("nothing typed yet","لم تكتب شيئاً"), ms:"—" };
+  if (oneLine) return { cls:"", nm:L("Instant match","مطابقة فورية"),
+    why:L("keyword + size against the catalogue — no model runs","كلمة مفتاحية + مقاس مقابل الفهرس — بلا نموذج"), ms:"~50 ms" };
+  if (iProject) return { cls:"t1", nm:L("Equipment-only agent","الوكيل — المعدّة فقط"),
+    why:L("small model, equipment output only, one round trip","نموذج صغير، مخرجات المعدّة فقط، طلب واحد"), ms:"< 5 s" };
+  return { cls:"t2", nm:L("Full agent","الوكيل الكامل"),
+    why:L("no project — the header has to be extracted too","لا مشروع — يجب استخراج الترويسة أيضاً"), ms:"30–60 s" };
+}
+
+function dlgResult(){
+  var p = iProject ? proj(iProject) : null;
+  var g = iTemplate ? grp(iTemplate) : null;
+  var conflict = p ? detectConflict(p) : null;
+  function line(src, label, value){
+    var color = src === "text" ? "var(--brand-deep)" : src === "tmpl" ? "var(--info-deep)" : "var(--muted-dark)";
+    var tag = src === "text" ? L("from your text","من نصّك")
+            : src === "tmpl" ? L("from the template","من القالب") : L("from the project","من المشروع");
+    return '<div class="applyrow"><span class="nm">' + label + '</span>'
+      + '<span style="font-weight:700">' + value + '</span>'
+      + '<span class="why" style="color:' + color + '">' + tag + '</span></div>';
+  }
+  var body = '<div class="applylist">'
+    + line("text", L("Equipment","المعدّة"), esc(iText.trim()) || "—")
+    + (p ? line("proj", L("Location","الموقع"), esc(shortSite(L(p.locEn,p.locAr)))) : "")
+    + (p ? line("proj", L("Basis","الأساس"),
+        L(BASIS[ov("basis",p.when.basis)][0], BASIS[ov("basis",p.when.basis)][1])) : "")
+    + (p ? line("proj", L("Dates","التواريخ"), ov("start",p.when.start) + " → " + ov("end",p.when.end)) : "")
+    + (p ? line("proj", L("Payment","الدفع"), L(PAY[p.prefs.pay][0], PAY[p.prefs.pay][1])) : "")
+    + (g ? line("tmpl", L("Machine terms","شروط المعدّة"),
+        L("operator, certificates, delivery, fuel, year","المشغّل، الشهادات، التوصيل، الوقود، السنة")) : "")
+    + '</div>'
+    + (conflict ? '<div class="warnline"><span class="icon">warning</span><span>'
+        + L("You wrote a different place from the project’s site. It stays as you wrote it unless you change it.",
+            "كتبت موقعاً مختلفاً عن موقع المشروع. سيبقى كما كتبته ما لم تغيّره.") + '</span></div>' : "")
+    + '<div class="hint">' + L("Nothing here is written back. The project and the template both stay exactly as they were.",
+        "لا شيء هنا يُكتب رجوعاً. يبقى المشروع والقالب كما هما تماماً.") + '</div>'
+    + (!p ? '<div class="infoline"><span class="icon">add_location</span><span>'
+        + L("After you post, we’ll offer to save these settings as a project.",
+            "بعد الإرسال، سنعرض حفظ هذه الإعدادات كمشروع.") + '</span></div>' : "");
+
+  openModal(mshell("preview", L("What the canvas gets","ما يصل إلى اللوحة"), tier().nm + " · " + tier().ms, body,
+    '<span class="spacer"></span>'
+    + '<button class="btn btn-secondary" onclick="PJ.closeModal()">' + L("Back","رجوع") + '</button>'
+    + '<button class="btn btn-primary" onclick="' + (p ? "closeModal()" : "dlgSaveAsProject()") + '">'
+    +   (p ? L("Open the canvas","افتح اللوحة") : L("Post it","أرسله")) + '</button>', true));
+}
+
+/* Offered AFTER a projectless submit — never before it, and never as a gate. */
+function detectedPlace(){
+  var hay = iText.toLowerCase();
+  for (var i=0;i<CITIES.length;i++){
+    if (hay.indexOf(CITIES[i][0]) >= 0 || iText.indexOf(CITIES[i][1]) >= 0)
+      return ar ? CITIES[i][1] : CITIES[i][0].charAt(0).toUpperCase() + CITIES[i][0].slice(1);
+  }
+  return null;
+}
+/* A request posted with no project, at a place the renter already has a project for, must
+   not be offered a second project for the same site — that is how two "Qiddiya Zone 4"s get
+   created. Offer to file it there instead. Matching is on the place, and it always ASKS:
+   filing is never automatic, because a same-city match is not the same site. */
+function matchingProjects(){
+  var place = detectedPlace();
+  if (!place) return [];
+  var key = place.toLowerCase();
+  return PROJECTS.filter(function(p){
+    return ((p.locEn || "") + " " + (p.nEn || "")).toLowerCase().indexOf(key) >= 0;
+  });
+}
+
+function summaryRow(k, v){
+  return '<div class="applyrow"><span class="nm">' + k + '</span>'
+    + '<span style="font-weight:700;margin-inline-start:auto;text-align:end">' + v + '</span></div>';
+}
+/* It shows the renter exactly what is about to be saved WHERE: the site's terms become the
+   project; the machine's terms stay on the request and come back by picking it under
+   "Start from". Two lists, so the split is learned once instead of guessed forever. */
+function dlgSaveAsProject(force){
+  var found = force ? [] : matchingProjects();
+  if (found.length) return dlgAttachToProject(found);
+  var place = detectedPlace();
+  var t = defaultTerms();
+  var projectRows =
+      summaryRow(L("Location","الموقع"), place ? esc(place) : L("the site you picked","الموقع الذي اخترته"))
+    + summaryRow(L("Rental basis","أساس الإيجار"), L("Monthly","شهري"))
+    + summaryRow(L("Dates","التواريخ"), "2026-11-01 → 2027-01-31")
+    + summaryRow(L("Hours per day","ساعات اليوم"), "10")
+    + summaryRow(L("Extendable","قابلة للتمديد"), L("No","لا"))
+    + summaryRow(L("Payment terms","شروط الدفع"), L("Net 30","٣٠ يوماً"));
+  var equipRows =
+      summaryRow(L("Operator","المشغّل"),
+        L(OPNEED[t.operator][0], OPNEED[t.operator][1]) + " · " + L(NAT[t.nationality][0], NAT[t.nationality][1]))
+    + summaryRow(L("F.A.T — food · accommodation","الإعاشة — طعام · سكن"),
+        L(PARTY[t.fatFood][0], PARTY[t.fatFood][1]) + " · " + L(PARTY[t.fatAT][0], PARTY[t.fatAT][1]))
+    + summaryRow(L("Delivery · return · fuel","التوصيل · الإرجاع · الوقود"),
+        L(PARTY[t.delivery][0], PARTY[t.delivery][1]) + " · " + L(PARTY[t.ret][0], PARTY[t.ret][1])
+        + " · " + L(PARTY[t.fuelResp][0], PARTY[t.fuelResp][1]))
+    + summaryRow(L("Min equipment year · fuel","أقدم سنة صنع · الوقود"),
+        L(YEARS[t.year][0], YEARS[t.year][1]) + " · " + L(FUEL[t.fuelType][0], FUEL[t.fuelType][1]));
+
+  openModal(mshell("add_location",
+    L("Create a project from this request?","إنشاء مشروع من هذا الطلب؟"),
+    L("Your request is posted — this changes nothing about it.","تم إرسال طلبك — وهذا لا يغيّر فيه شيئاً."),
+      '<div class="infoline"><span class="icon">check_circle</span><span>'
+    +   L("Save this site once, and every request or work order you add here afterwards starts from it — you type the machine and nothing else.",
+        "احفظ هذا الموقع مرة واحدة، ليبدأ منه كل طلب أو أمر عمل تضيفه هنا لاحقاً — تكتب المعدّة فقط.")
+    + '</span></div>'
+    + '<fieldset class="fset"><legend>'
+    +   L("Saved as the project — the site’s terms","يُحفظ كمشروع — شروط الموقع") + '</legend>'
+    +   '<div class="applylist">' + projectRows + '</div>'
+    +   '<div class="hint" style="margin-top:9px">'
+    +     L("These fill in by themselves on your next request here. You can change any of them at any time, and a request may always differ from them.",
+        "تُملأ هذه تلقائياً في طلبك التالي هنا. يمكنك تغييرها في أي وقت، ويمكن لأي طلب أن يختلف عنها.") + '</div>'
+    + '</fieldset>'
+    + '<fieldset class="fset"><legend>'
+    +   L("Stays with this request — the equipment’s terms","يبقى مع هذا الطلب — شروط المعدّة") + '</legend>'
+    +   '<div class="applylist">' + equipRows + '</div>'
+    +   '<div class="hint" style="margin-top:9px">'
+    +     L("These are about the machine, not the site, so they are not part of the project. Next time, pick this request under <b>Start from</b> and they copy across — the equipment itself never does, you always type that.",
+        "هذه تخصّ المعدّة لا الموقع، فليست جزءاً من المشروع. في المرة القادمة اختر هذا الطلب من <b>ابدأ من</b> فتُنسخ — أما المعدّة نفسها فلا تُنسخ أبداً، تكتبها دائماً.") + '</div>'
+    + '</fieldset>',
+    '<span class="spacer"></span>'
+    + '<button class="btn btn-secondary" onclick="PJ.closeModal()">' + L("No thanks","لا شكراً") + '</button>'
+    + '<button class="btn btn-primary" onclick="PJ.closeModal();PJ.pickTab(\'projects\');PJ.dlgProjectForm(null)">'
+    +   L("Create the project","أنشئ المشروع") + '</button>', true));
+}
+
+/* One match or several — the renter picks, or declines both. Filing changes NO value on the
+   request: if its terms differ from the project's, both stay as they are and the difference
+   is shown on the row. That is the same rule as moving a request between projects. */
+function dlgAttachToProject(found){
+  var place = detectedPlace();
+  /* Both ways out are the SAME kind of thing, so they are the same kind of control: cards,
+     side by side. A card for the site you already have, and a card for "no, this is a new
+     site" — because a place match is a guess, and the renter is the one who knows. */
+  var cards = found.map(function(p){
+    var gs = groupsOf(p.id);
+    return '<button class="optcard" onclick="PJ.attachToProject(\'' + p.id + '\')">'
+      + '<span class="ic"><span class="icon">where_to_vote</span></span>'
+      + '<span class="tt">' + L("Add it to ","أضفه إلى ") + esc(projectTitle(p)) + '</span>'
+      + '<span class="ds">' + esc(L(p.locEn, p.locAr)) + '<br>'
+      +   L(BASIS[p.when.basis][0], BASIS[p.when.basis][1]) + " · " + p.when.start + " → " + p.when.end
+      +   ' · ' + gs.length + ' ' + plural(gs.length,"item","items","عنصر","عناصر") + '</span></button>';
+  }).join("")
+  + '<button class="optcard" onclick="PJ.dlgSaveAsNewAnyway()">'
+  +   '<span class="ic brand"><span class="icon">add_location</span></span>'
+  +   '<span class="tt">' + L("It’s a different site","إنه موقع مختلف") + '</span>'
+  +   '<span class="ds">'
+  +     L("Create a new project from this request instead. Two sites can share a city — only you know.",
+        "أنشئ مشروعاً جديداً من هذا الطلب بدلاً من ذلك. قد يشترك موقعان في المدينة نفسها — وأنت وحدك تعرف.")
+  +   '</span></button>';
+
+  openModal(mshell("location_city",
+    found.length > 1
+      ? L("You already have projects here","لديك مشاريع في هذا الموقع")
+      : L("You already have a project here","لديك مشروع في هذا الموقع"),
+    L("Your request is posted — this changes nothing about it.","تم إرسال طلبك — وهذا لا يغيّر فيه شيئاً."),
+      '<div class="infoline"><span class="icon">info</span><span>'
+    +   L("You wrote ","كتبت ") + '<b>' + esc(place || "") + '</b>'
+    +   L(", and that is where this project already is. Filing it there keeps one picture of the site instead of two.",
+        "، وهناك يقع هذا المشروع بالفعل. إدراجه هناك يبقي صورة واحدة للموقع بدل صورتين.")
+    + '</span></div>'
+    + '<div class="optrow">' + cards + '</div>'
+    + '<div class="hint">'
+    +   L("Filing it changes nothing on the request — it keeps every term it was posted with. Where those differ from the project’s, both stay and the difference is shown on the row.",
+        "الإدراج لا يغيّر شيئاً في الطلب — يحتفظ بكل شروطه كما أُرسل. وحيث تختلف عن شروط المشروع، تبقى الاثنتان ويظهر الفرق على الصف.") + '</div>',
+    '<span class="spacer"></span>'
+    + '<button class="btn btn-secondary" onclick="PJ.closeModal()">' + L("Not now","ليس الآن") + '</button>', true));
+}
+function attachToProject(pid){ closeModal(); projSel = pid; pickTab('projects'); }
+/* The escape hatch: a same-city match is not the same site. */
+function dlgSaveAsNewAnyway(){ dlgSaveAsProject(true); }
+
+function dlgMoreDefaults(){
+  var p = proj(iProject);
+  var rows = [
+    [L("Extendable","قابلة للتمديد"), p.when.extendable ? L("Yes","نعم") : L("No","لا")],
+    [L("Payment terms","شروط الدفع"), L(PAY[p.prefs.pay][0], PAY[p.prefs.pay][1])]
+  ].map(function(r){
+    return '<div class="applyrow"><span class="nm">' + r[0] + '</span>'
+      + '<span class="why" style="color:var(--navy)">' + r[1] + '</span></div>'; }).join("");
+  openModal(mshell("tune", L("Project defaults","افتراضيات المشروع"),
+    L("Changing any of these changes this request only","تغيير أيٍّ منها يغيّر هذا الطلب فقط"),
+    '<div class="applylist">' + rows + '</div>'
+    + '<div class="hint">' + L("The project holds seven fields and no more. Budget, payment method, maintenance, breakdown response, supplier filters and the bid window all belong to the request — they are decisions about one machine, not about the site.",
+        "يحمل المشروع سبعة حقول فقط. الميزانية وطريقة الدفع والصيانة وزمن الاستجابة ومرشّحات المورّدين ونافذة العروض كلّها تخصّ الطلب.") + '</div>',
+    '<span class="spacer"></span><button class="btn btn-primary" onclick="PJ.closeModal()">' + L("Done","تم") + '</button>'));
+}
+
+/* boot removed by the merge — the dashboard mounts, then calls PJ.render() */
+
+  window.PJ = { addAlloc, addDoc, addSupplier, attachToProject, closeModal, closeRow, dlgAward, dlgConflict, dlgDeleteProject, dlgDeleteWo, dlgEditWorkOrder, dlgIntakeConflict, dlgMoreDefaults, dlgMove, dlgNewWorkOrder, dlgProjectForm, dlgRemove, dlgResult, dlgSaveAsNewAnyway, dlgSaveAsProject, dlgSuppliers, dlgUnaward, doDeleteProject, doDeleteWo, doMove, doMoveTo, doRemove, doUnaward, dropAlloc, dropDoc, editTitle, mapPick, matchProject, pickIProject, pickProject, pickTab, renderIntake, saveAward, saveProjectForm, saveTitle, saveWorkOrder, setAlloc, setOv, setTerm, togglePin, toggleLang, toggleReg, toggleRow, toggleTerm, useProjectSite, woAddAlloc, woAddMachine, woClearOverride, woDropAlloc, woDropMachine, woSet, woSetAlloc, woSetMachine, woStartOverride, woToggle, woToggleCustom, render: render, renderProjects: renderProjects,
+    setLang: function (l) { ar = l === 'ar'; render(); } };
+})();
+
 render();
 requestAnimationFrame(function(){ fitRows(); railOverflow(); });
 var fitTimer;

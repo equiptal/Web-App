@@ -102,11 +102,18 @@ export function ProfileView() {
 
 
   return (
-    /* ── One column, and it is the organization page's (owner, 2026-08-26) ────────────────────────
-       This page was full-width of the shell while `/company` was 672px centred, so the same card was
-       two different widths depending on which account page you were standing on — and the field grid
-       both pages now share broke to one column at a different viewport on each. */
-    <div {...pin("profile-view")} className="mx-auto max-w-2xl pb-10" dir={ar ? "rtl" : "ltr"}>
+    /* ── One WIDTH with the organization page, and now one SHAPE (owner, 2026-08-26 · 2026-08-30) ──
+       The two account pages were different widths, so the field grid they share broke to one column
+       at a different viewport on each. That is still fixed — what changed is the width they agree
+       on. ~~672px centred.~~ At 1440 that left two thirds of the row empty either side of a stack of
+       half-filled cards, and the reading argument for a narrow measure does not hold for fields and
+       rows. Both pages are the shell's width now, and both split in two at `lg`.
+
+       Here the split is *who you are* against *how this account behaves*: the profile and the door
+       to the firm on one side, the settings and the way out on the other. They are separate errands
+       — nobody edits their job title and changes the interface language in the same visit — and side
+       by side neither buries the other. */
+    <div {...pin("profile-view")} className="w-full pb-10" dir={ar ? "rtl" : "ltr"}>
       {/* ── One masthead shape across the account pages (owner, 2026-08-26) ──────────────────────
           Light, like the organization page's, and for the same reason: a navy slab directly above a
           white card makes the page read as stacked boxes rather than a person with their details
@@ -159,120 +166,139 @@ export function ProfileView() {
         </button>
       )}
 
-      {!loading && profile && (
-        <Section
-          // The section names the SUBJECT and its action names the act; both read «Edit profile»
-          // before, so the heading and the button on the same line said the same thing.
-          title={p.profileSection}
-          action={
-            !editing && (
-              /* Amber text, not a bordered button (owner reference, 2026-08-26). A section label is
-                 a quiet line and a boxed control beside it outweighed the heading it belonged to —
-                 the eye landed on «Edit profile» before «PROFILE». The act stays obvious without a
-                 border because it is the only coloured thing on that line. */
-              <button
-                onClick={() => setEditing(true)}
-                className="inline-flex items-center gap-1.5 text-body font-semibold text-brand transition hover:underline"
-              >
-                <Icon name="edit" size={15} /> {p.editProfile}
-              </button>
-            )
-          }
-        >
-          {savedToast && (
-            <p className="mx-4 mt-4 flex items-center gap-1.5 rounded-sm border border-ok/30 bg-ok-soft px-3 py-2 text-meta font-semibold text-ok">
-              <Icon name="check_circle" size={15} /> {p.saved}
-            </p>
-          )}
-          {/* ── Marked, and paired the way the reference pairs them (owner, 2026-08-26) ─────────
-              The same amber tiles the organization page gives a firm's particulars, so a person's
-              details and a company's read as one family of fact rather than two designs.
 
-              The order matters because the grid fills in rows: who and where, then what they do
-              and how to write to them, then which firm and which number. It used to run
-              name · city · job · company · email · whatsapp, which paired a job title with a
-              company name and left the two contact fields alone on the last row — a sensible list
-              and an odd table. And the name's label was «First name / Last name», a form's
-              question rather than a fact's name. */}
-          {editing ? (
-            <div className="p-4">
-              <EditProfileForm profile={profile} onSaved={onSaved} onCancel={() => setEditing(false)} />
-            </div>
-          ) : (
-            <FieldGrid>
-              <Field icon="person" label={p.name} value={fullName || "—"} />
-              <Field icon="location_on" label={p.city} value={profile.city || "—"} />
-              <Field icon="work" label={p.jobTitle} value={profile.jobTitle || "—"} />
-              <Field icon="mail" label={p.email} value={profile.email || "—"} ltr />
-              <Field icon="domain" label={p.companyName} value={profile.companyName || "—"} />
-              <Field icon="chat" label={p.whatsapp} value={profile.whatsapp || "—"} ltr />
-            </FieldGrid>
-          )}
-        </Section>
-      )}
+      {/* ── Two columns: who you are, and how the account behaves (owner, 2026-08-30) ─────────
+          *"Make one column for profile and redirect to the organisation, and other column for
+          settings."*
 
-      {/* ── The company lives on ITS OWN PAGE now (owner, 2026-08-26) ─────────────────────────────
-          Two cards used to sit here — one for verification state, one for the firm this account
-          belongs to — while /company carried the same facts a third time. A reader had to know which
-          of two pages held which half of one subject. This is a DOOR, not a summary: the state in a
-          line, and the page that owns it one tap away. */}
-      {!loading && profile && (
-        <Section title={t.shell.company}>
-          <Row
-            icon={verification === "verified" ? "verified" : "business_center"}
-            label={profile.companyName ?? p.companyNoneTitle}
-            hint={
-              verification === "verified"
-                ? p.companyVerifiedTitle
-                : verification === "pending"
-                  ? p.companyPendingTitle
-                  : verification === "rejected"
-                    ? p.companyRejectedTitle
-                    : p.companyNoneBody
+          They are separate errands — nobody edits their job title and changes the interface language
+          in the same visit — and stacked, the settings sat below a card most visits never touch. The
+          masthead and the verify nudge stay full width above: one is who the page is about, the
+          other is the one thing on it that should not have to be found.
+
+          `items-start` so a short column ends where its content does, rather than a card's border
+          being stretched down to match its neighbour. */}
+      <div className="mt-5 grid items-start gap-5 lg:grid-cols-2">
+        <div className="min-w-0">
+        {!loading && profile && (
+          <Section
+            // The section names the SUBJECT and its action names the act; both read «Edit profile»
+            // before, so the heading and the button on the same line said the same thing.
+            title={p.profileSection}
+            action={
+              !editing && (
+                /* Amber text, not a bordered button (owner reference, 2026-08-26). A section label is
+                   a quiet line and a boxed control beside it outweighed the heading it belonged to —
+                   the eye landed on «Edit profile» before «PROFILE». The act stays obvious without a
+                   border because it is the only coloured thing on that line. */
+                <button
+                  onClick={() => setEditing(true)}
+                  className="inline-flex items-center gap-1.5 text-body font-semibold text-brand transition hover:underline"
+                >
+                  <Icon name="edit" size={15} /> {p.editProfile}
+                </button>
+              )
             }
-            onClick={() => router.push(verification === "rejected" ? "/verify" : "/company")}
-          />
-        </Section>
-      )}
+          >
+            {savedToast && (
+              <p className="mx-4 mt-4 flex items-center gap-1.5 rounded-sm border border-ok/30 bg-ok-soft px-3 py-2 text-meta font-semibold text-ok">
+                <Icon name="check_circle" size={15} /> {p.saved}
+              </p>
+            )}
+            {/* ── Marked, and paired the way the reference pairs them (owner, 2026-08-26) ─────────
+                The same amber tiles the organization page gives a firm's particulars, so a person's
+                details and a company's read as one family of fact rather than two designs.
 
-      {/* Rewards — coming soon (grayed, app parity). */}
-      {!loading && (
-        <Section>
-          <div className="opacity-70">
-            <Row icon="star" label={p.rewards} hint={p.comingSoon} chevron={false} />
-          </div>
-        </Section>
-      )}
-
-      {/* SETTINGS is what the account menu calls this page, so it is a titled section OF it rather
-          than a separate destination (owner, 2026-08-26). */}
-      {!loading && (
-        <>
-          <Section title={p.settings}>
-            <RowList>
-              <Row icon="language" label={p.language} hint={ar ? p.arabic : p.english} chevron={false}>
-                <span className="flex flex-none overflow-hidden rounded-sm border border-border">
-                  <LangBtn active={!ar} disabled={langBusy} onClick={() => switchLang("en")}>EN</LangBtn>
-                  <LangBtn active={ar} disabled={langBusy} onClick={() => switchLang("ar")}>عر</LangBtn>
-                </span>
-              </Row>
-              <Row icon="smartphone" label={p.changePhone} hint={p.changePhoneSub} onClick={() => setShowChangePhone(true)} />
-              <Row icon="shield" label={p.privacy} href={PRIVACY_URL} />
-              <Row icon="description" label={p.terms} href={TERMS_URL} />
-              <Row icon="support_agent" label={p.support} href={SUPPORT_URL} />
-            </RowList>
+                The order matters because the grid fills in rows: who and where, then what they do
+                and how to write to them, then which firm and which number. It used to run
+                name · city · job · company · email · whatsapp, which paired a job title with a
+                company name and left the two contact fields alone on the last row — a sensible list
+                and an odd table. And the name's label was «First name / Last name», a form's
+                question rather than a fact's name. */}
+            {editing ? (
+              <div className="p-4">
+                <EditProfileForm profile={profile} onSaved={onSaved} onCancel={() => setEditing(false)} />
+              </div>
+            ) : (
+              <FieldGrid>
+                <Field icon="person" label={p.name} value={fullName || "—"} />
+                <Field icon="location_on" label={p.city} value={profile.city || "—"} />
+                <Field icon="work" label={p.jobTitle} value={profile.jobTitle || "—"} />
+                <Field icon="mail" label={p.email} value={profile.email || "—"} ltr />
+                <Field icon="domain" label={p.companyName} value={profile.companyName || "—"} />
+                <Field icon="chat" label={p.whatsapp} value={profile.whatsapp || "—"} ltr />
+              </FieldGrid>
+            )}
           </Section>
+        )}
 
-          {/* Leaving and deleting, together and last. Sign out sat among the links to privacy and
-              support, where it read as another page to visit rather than the end of a session. */}
-          <Section title={p.accountSection}>
-            <RowList>
-              <Row icon="logout" label={p.logout} onClick={doLogout} chevron={false} />
-              <Row icon="delete" label={p.deleteAccount} hint={p.deleteAccountSub} danger onClick={() => setShowDelete(true)} chevron={false} />
-            </RowList>
+        {/* ── The company lives on ITS OWN PAGE now (owner, 2026-08-26) ─────────────────────────────
+            Two cards used to sit here — one for verification state, one for the firm this account
+            belongs to — while /company carried the same facts a third time. A reader had to know which
+            of two pages held which half of one subject. This is a DOOR, not a summary: the state in a
+            line, and the page that owns it one tap away. */}
+        {!loading && profile && (
+          <Section title={t.shell.company}>
+            <Row
+              icon={verification === "verified" ? "verified" : "business_center"}
+              label={profile.companyName ?? p.companyNoneTitle}
+              hint={
+                verification === "verified"
+                  ? p.companyVerifiedTitle
+                  : verification === "pending"
+                    ? p.companyPendingTitle
+                    : verification === "rejected"
+                      ? p.companyRejectedTitle
+                      : p.companyNoneBody
+              }
+              onClick={() => router.push(verification === "rejected" ? "/verify" : "/company")}
+            />
           </Section>
-        </>
-      )}
+        )}
+        </div>
+
+        <div className="min-w-0">
+        {/* Rewards — coming soon (grayed, app parity). */}
+        {!loading && (
+          <Section>
+            <div className="opacity-70">
+              <Row icon="star" label={p.rewards} hint={p.comingSoon} chevron={false} />
+            </div>
+          </Section>
+        )}
+
+        {/* SETTINGS is what the account menu calls this page, so it is a titled section OF it rather
+            than a separate destination (owner, 2026-08-26). */}
+        {!loading && (
+          <>
+            <Section title={p.settings}>
+              <RowList>
+                <Row icon="language" label={p.language} hint={ar ? p.arabic : p.english} chevron={false}>
+                  <span className="flex flex-none overflow-hidden rounded-sm border border-border">
+                    <LangBtn active={!ar} disabled={langBusy} onClick={() => switchLang("en")}>EN</LangBtn>
+                    <LangBtn active={ar} disabled={langBusy} onClick={() => switchLang("ar")}>عر</LangBtn>
+                  </span>
+                </Row>
+                <Row icon="smartphone" label={p.changePhone} hint={p.changePhoneSub} onClick={() => setShowChangePhone(true)} />
+                <Row icon="shield" label={p.privacy} href={PRIVACY_URL} />
+                <Row icon="description" label={p.terms} href={TERMS_URL} />
+                <Row icon="support_agent" label={p.support} href={SUPPORT_URL} />
+              </RowList>
+            </Section>
+
+            {/* Leaving and deleting, together and last. Sign out sat among the links to privacy and
+                support, where it read as another page to visit rather than the end of a session. */}
+            <Section title={p.accountSection}>
+              <RowList>
+                <Row icon="logout" label={p.logout} onClick={doLogout} chevron={false} />
+                <Row icon="delete" label={p.deleteAccount} hint={p.deleteAccountSub} danger onClick={() => setShowDelete(true)} chevron={false} />
+              </RowList>
+            </Section>
+          </>
+        )}
+        </div>
+      </div>
+
 
       {showChangePhone && <ChangePhoneModal onClose={() => setShowChangePhone(false)} onReLogin={onReLogin} />}
       {showDelete && (

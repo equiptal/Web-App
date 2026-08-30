@@ -121,7 +121,15 @@ export function CompanyHub() {
   };
 
   return (
-    <div {...pin("company-hub")} className="mx-auto max-w-2xl pb-10" dir={ar ? "rtl" : "ltr"}>
+    /* ── The page is the page's width now (owner, 2026-08-30) ────────────────────────────
+       ~~`mx-auto max-w-2xl` — 672px centred, so the two account pages were one width (owner,
+       2026-08-26).~~ Withdrawn: at 1440 that left roughly two thirds of the row empty on either side
+       of a column of half-filled cards, and the reading argument for a narrow measure does not hold
+       here — these are FIELDS and rows, not prose. The unification survives; it is just that both
+       pages are now the shell's width and both split into two columns at `lg`.
+
+       The shell already caps at 1440 and owns the gutter, so this takes no width of its own. */
+    <div {...pin("company-hub")} className="w-full pb-10" dir={ar ? "rtl" : "ltr"}>
       {toast && (
         <p className="mb-4 flex items-center gap-2 rounded-sm border border-ok/30 bg-ok-soft px-3.5 py-2.5 text-body font-semibold text-ok">
           <Icon name="check_circle" size={16} /> {toast}
@@ -462,6 +470,97 @@ function ActiveCompany({
    * order a reader wants it in: who we are, what proves it, how to bring someone in, who is already
    * here, and — last and set apart — how to leave.
    */
+  /* The team block, held in a variable because the layout below places it in one of two
+     shapes: beside the papers on a verified firm, alone on one that is not. Building it twice
+     would be two rosters to keep in step. */
+  const team = (
+    <>
+        {/* ── One TEAM card (owner's reference, 2026-08-26) ────────────────────────────────────────
+            The invite code, the roster and the way out were three sections with three headings, and a
+            reader had to work out that they were all about the same thing: who is in this firm. They
+            are one card now — the code to bring someone in, the people already here, and the exit set
+            apart at its foot — which is the order the reference draws and the order the acts happen in.
+  
+            Pending joiners stay OUTSIDE it, above. An approval is a decision waiting on the owner
+            rather than a statement about the team, and burying it inside a card of settled facts is
+            how a join request goes unanswered for a week. */}
+  
+        {/* Pending join requests — owners approve or reject. */}
+        {company.isOwner && company.pendingMembers.length > 0 && (
+          <Section title={c.pendingJoiners} boxed={false}>
+            <div className="flex flex-col gap-2.5">
+              {company.pendingMembers.map((m) => (
+                <div key={m.userId} className={`${card} p-4`}>
+                  <p className="text-body font-semibold text-navy">{m.name}</p>
+                  {m.phone && (
+                    <p className="mt-0.5 text-meta text-muted" dir="ltr">
+                      {m.phone}
+                    </p>
+                  )}
+                  <div className="mt-3.5 flex gap-2.5">
+                    <button
+                      onClick={() => onRemove(m)}
+                      disabled={busy}
+                      className={btn("secondary", "md", { className: "flex-1 transition" })}
+                    >
+                      {c.remove}
+                    </button>
+                    <button
+                      onClick={() => onApprove(m)}
+                      disabled={busy}
+                      className="flex-1 rounded-sm bg-ok px-3 py-2.5 text-body font-semibold text-white transition disabled:bg-disabled-bg disabled:text-disabled-fg"
+                    >
+                      {c.approve}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+  
+        <Section title={c.team}>
+          {company.isOwner && company.inviteCode && (
+            <div className="p-4 pb-0">
+              <InviteCodeCard code={company.inviteCode} onCopied={onCopied} />
+            </div>
+          )}
+  
+          <div className="px-4 pt-3.5">
+            <h3 className="text-label font-semibold uppercase tracking-wide text-muted">{c.members}</h3>
+          </div>
+          <RowList>
+            {company.activeMembers.map((m) => (
+              <MemberRow
+                key={m.userId}
+                member={m}
+                company={company}
+                busy={busy}
+                onRemove={onRemove}
+                onPromote={onPromote}
+                onDemote={onDemote}
+              />
+            ))}
+          </RowList>
+  
+          {/* The way out, at the foot of the team it ends — and stated in red as what it is rather than
+              hidden in a neutral button, because leaving or dissolving is the one act on this page that
+              cannot be undone from this page. Centred and unboxed: it is the last thing here, not
+              another row of the roster. */}
+          <div className="border-t border-border px-4 py-3.5 text-center">
+            <button
+              onClick={onExit}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 text-body font-semibold text-danger transition hover:underline disabled:text-disabled-fg disabled:no-underline"
+            >
+              <Icon name="logout" size={17} className="rtl:scale-x-[-1]" />
+              {company.activeMembers.length <= 1 ? c.dissolve : c.leave}
+            </button>
+          </div>
+        </Section>
+    </>
+  );
+
   return (
     <div>
       <PageMasthead
@@ -478,94 +577,31 @@ function ActiveCompany({
         }
       />
 
-      {/* The papers. Renders nothing at all until the company is verified. */}
-      <CompanyDetails />
+      {/* ── Two columns, filling the page (owner, 2026-08-30) ───────────────────────────
+          The papers on one side, the people on the other: *what proves this firm* and *who is in
+          it* are the page's two subjects, and stacking them made a reader scroll past the whole of
+          one to reach the other on a screen with room for both.
 
-      {/* ── One TEAM card (owner's reference, 2026-08-26) ────────────────────────────────────────
-          The invite code, the roster and the way out were three sections with three headings, and a
-          reader had to work out that they were all about the same thing: who is in this firm. They
-          are one card now — the code to bring someone in, the people already here, and the exit set
-          apart at its foot — which is the order the reference draws and the order the acts happen in.
+          `items-start`, so a short column stops where its content stops rather than stretching a
+          card's border down to match its neighbour.
 
-          Pending joiners stay OUTSIDE it, above. An approval is a decision waiting on the owner
-          rather than a statement about the team, and burying it inside a card of settled facts is
-          how a join request goes unanswered for a week. */}
-
-      {/* Pending join requests — owners approve or reject. */}
-      {company.isOwner && company.pendingMembers.length > 0 && (
-        <Section title={c.pendingJoiners} boxed={false}>
-          <div className="flex flex-col gap-2.5">
-            {company.pendingMembers.map((m) => (
-              <div key={m.userId} className={`${card} p-4`}>
-                <p className="text-body font-semibold text-navy">{m.name}</p>
-                {m.phone && (
-                  <p className="mt-0.5 text-meta text-muted" dir="ltr">
-                    {m.phone}
-                  </p>
-                )}
-                <div className="mt-3.5 flex gap-2.5">
-                  <button
-                    onClick={() => onRemove(m)}
-                    disabled={busy}
-                    className={btn("secondary", "md", { className: "flex-1 transition" })}
-                  >
-                    {c.remove}
-                  </button>
-                  <button
-                    onClick={() => onApprove(m)}
-                    disabled={busy}
-                    className="flex-1 rounded-sm bg-ok px-3 py-2.5 text-body font-semibold text-white transition disabled:bg-disabled-bg disabled:text-disabled-fg"
-                  >
-                    {c.approve}
-                  </button>
-                </div>
-              </div>
-            ))}
+          The split is gated on `isVerified` because that is exactly the condition the left column
+          has anything to say under — `CompanyDetails` draws nothing for a firm with no verified
+          submission, and a two-column grid with an empty half is worse than the single column it
+          replaced. An unverified active company keeps the one column, with the team in it. */}
+      {company.isVerified ? (
+        <div className="mt-5 grid items-start gap-5 lg:grid-cols-2">
+          <div className="min-w-0">
+            <CompanyDetails />
           </div>
-        </Section>
+          <div className="min-w-0">{team}</div>
+        </div>
+      ) : (
+        team
       )}
-
-      <Section title={c.team}>
-        {company.isOwner && company.inviteCode && (
-          <div className="p-4 pb-0">
-            <InviteCodeCard code={company.inviteCode} onCopied={onCopied} />
-          </div>
-        )}
-
-        <div className="px-4 pt-3.5">
-          <h3 className="text-label font-semibold uppercase tracking-wide text-muted">{c.members}</h3>
-        </div>
-        <RowList>
-          {company.activeMembers.map((m) => (
-            <MemberRow
-              key={m.userId}
-              member={m}
-              company={company}
-              busy={busy}
-              onRemove={onRemove}
-              onPromote={onPromote}
-              onDemote={onDemote}
-            />
-          ))}
-        </RowList>
-
-        {/* The way out, at the foot of the team it ends — and stated in red as what it is rather than
-            hidden in a neutral button, because leaving or dissolving is the one act on this page that
-            cannot be undone from this page. Centred and unboxed: it is the last thing here, not
-            another row of the roster. */}
-        <div className="border-t border-border px-4 py-3.5 text-center">
-          <button
-            onClick={onExit}
-            disabled={busy}
-            className="inline-flex items-center gap-1.5 text-body font-semibold text-danger transition hover:underline disabled:text-disabled-fg disabled:no-underline"
-          >
-            <Icon name="logout" size={17} className="rtl:scale-x-[-1]" />
-            {company.activeMembers.length <= 1 ? c.dissolve : c.leave}
-          </button>
-        </div>
-      </Section>
     </div>
   );
+
 }
 
 function InviteCodeCard({ code, onCopied }: { code: string; onCopied: () => void }) {

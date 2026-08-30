@@ -124,6 +124,29 @@ Its comment forbids the multiply and gives a real reason — rows should reconci
 
 ---
 
+## Closed this session
+
+### ~~FIX-REQ-1 — the CLOSES column read two fields that are always empty~~ · fixed 2026-08-30
+
+| | |
+|---|---|
+| **Severity** | major — every row of the home hub showed `—` |
+| **Where** | `request-expiry.ts` · `requests.ts` · `HomeRequests.tsx` |
+
+**Cause.** The column resolved a deadline from `bidDeadline` (which the module's own comment says "most never" set) and, failing that, a window built from `offerDuration` + `createdAt`. On staging `offerDuration` is **absent from the list payload entirely** and null on every request, so the fallback could never fire. Meanwhile `expiresAt` — a real date 15 to 26 days out — sat on **20 of 20** list rows, unread.
+
+**Fix.** `expiresAt` is now a source in its own right, ranked between the link deadline and the creation window, and is carried through `RequestListItem` and `RequestGroup` (a group takes its earliest item expiry — it can only take bids for as long as its soonest-closing item can).
+
+**Bonus.** Because the field is on the list, the column now fills with **no network call at all**. The old per-row lookup (up to two calls per visible row) is reduced to a refinement on top of an answer that is already correct — which matters much more now that expanding shows every row rather than five.
+
+Pinned by `tests/unit/request-expiry-source.test.ts` (9 tests). The regression it guards is not "wrong dates" but the column going quiet again because the one populated field stopped being read.
+
+### Both home-hub cards expand in place · 2026-08-30
+
+"15 more requests" called `router.push("/requests")` — it navigated away rather than expanding, and the bids footer was an inert scroll hint. Both are now toggles that grow their card to show every row, with a "Show fewer" return. Owner chose growth over an inner scrollbar: a list you have to scroll inside a box you already scrolled to reach is two scrollbars for one list. The Arabic and English copy dropped "— scroll", which stopped being true.
+
+---
+
 ## Not defects — recorded so they are not "found" again
 
 **`comparison.ts:85` — PER_JOB shows a flat rate against a prorated one elsewhere.** Real, and left deliberately: PER_JOB is unreachable from either UI (`RentalBasis` offers daily/weekly/monthly only; the supplier never picks a unit), the app retired it 2026-08-05, and only the backend enum still admits it. Owner ruled: leave it. Affects legacy rows only. Revisit only if PER_JOB is revived — `RULINGS.md` R-03c records the `divisor === 0` overloading hazard that a revival would hit.
