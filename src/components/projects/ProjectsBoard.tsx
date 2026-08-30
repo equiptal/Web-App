@@ -22,7 +22,7 @@
  */
 
 import { useT } from "@/lib/i18n";
-import { Icon } from "@/components/ui";
+import { Button, Icon } from "@/components/ui";
 import { projectTitle, projectEnded, endedLast, titleIsDerived, type ProjectSummary } from "@/lib/contract/project";
 import { chartSpan, isUnawarded, type ChartGroup } from "@/lib/contract/award";
 import { AwardRow, AwaitingRow, pct, type Axis } from "./ChartRow";
@@ -51,6 +51,8 @@ export function ProjectsBoard({
   chart,
   unassigned,
   onEditProject,
+  onNewWorkOrder,
+  onNewRequest,
   onOpenConflict,
   rowMenu,
 }: {
@@ -63,6 +65,9 @@ export function ProjectsBoard({
   /** Rows filed nowhere. The rail entry appears only when this is non-empty. */
   unassigned: ChartGroup[];
   onEditProject: (p: ProjectSummary) => void;
+  /** Both live on the header — without them a site is a page with nothing to do on it. */
+  onNewWorkOrder: (p: ProjectSummary) => void;
+  onNewRequest: (p: ProjectSummary) => void;
   /** Pressed from the *own dates* chip on a group header. */
   onOpenConflict?: (group: ChartGroup) => void;
   rowMenu?: (group: ChartGroup, itemId: string, awardId: string | null) => React.ReactNode;
@@ -133,6 +138,8 @@ export function ProjectsBoard({
             groups={chart.groups}
             today={now}
             onEdit={onEditProject}
+            onNewWorkOrder={() => onNewWorkOrder(chart.project)}
+            onNewRequest={() => onNewRequest(chart.project)}
             onOpenConflict={onOpenConflict}
             rowMenu={rowMenu}
           />
@@ -151,6 +158,8 @@ function SitePanel({
   groups,
   today: now,
   onEdit,
+  onNewWorkOrder,
+  onNewRequest,
   onOpenConflict,
   rowMenu,
 }: {
@@ -158,6 +167,8 @@ function SitePanel({
   groups: ChartGroup[];
   today: string;
   onEdit: (p: ProjectSummary) => void;
+  onNewWorkOrder: () => void;
+  onNewRequest: () => void;
   onOpenConflict?: (group: ChartGroup) => void;
   rowMenu?: (group: ChartGroup, itemId: string, awardId: string | null) => React.ReactNode;
 }) {
@@ -169,32 +180,68 @@ function SitePanel({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* ── Meta ── */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="flex items-center gap-2 text-display font-extrabold leading-tight text-navy">
-            {projectTitle(project)}
-            {/* Marked as ours, so a renter knows the name is a fallback and not something they set. */}
-            {titleIsDerived(project) && <span className="text-meta font-semibold text-muted">{t.projects.board.namedByUs}</span>}
-            <button type="button" onClick={() => onEdit(project)} aria-label={t.common.edit} className="text-muted transition hover:text-brand">
-              <Icon name="edit" size={15} />
-            </button>
-          </h2>
-          <p className="mt-1 flex items-center gap-1.5 text-body text-muted">
-            <Icon name="place" size={14} className="flex-none" />
-            {project.location.label}
-            {/* The padlock: a work order under this site cannot have a location of its own. */}
-            <Icon name="lock" size={12} className="flex-none text-muted-light" />
-          </p>
-        </div>
+      {/* ── The site, and the two ways to put something on it ────────────────────────────
 
-        <dl className="flex flex-wrap gap-x-5 gap-y-1 text-meta">
-          <Stat label={t.projects.board.requests} value={project.requestCount} />
-          {/* Never summed with the requests — see the note at the top. */}
-          <Stat label={t.projects.board.workOrders} value={project.workOrderCount} />
-          <Stat label={t.projects.board.units} value={project.unitsAwarded} />
-          <Stat label={t.projects.board.runs} value={`${project.firstStart ?? "—"} → ${project.lastEnd ?? "—"}`} />
+          *"How to create a work order?"* — there was no way. The header stated four roll-ups and
+          offered no action at all, so a site you had just made was a page you could only look at.
+
+          The roll-ups are gone with it (owner, 2026-08-30). **Requests**, **work orders** and
+          **units awarded** each counted what the chart below draws in full, and a number that
+          disagrees with the picture under it is worse than no number. The two dates stay: they are
+          the site's span, which the chart shows as a shape rather than as a value you can read off.
+
+          The pen edits the whole site, not the name — there is no separate *Project defaults*
+          button. One door to one form: a renter who wants to change the payment terms and a renter
+          who wants to fix a typo both press the same thing. */}
+      <div className="overflow-hidden rounded-sm border border-border bg-surface">
+        <dl className="flex flex-wrap">
+          <Cell label={t.projects.board.project}>
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate">{projectTitle(project)}</span>
+              {/* Marked as ours, so a renter knows the name is a fallback and not something they set. */}
+              {titleIsDerived(project) && (
+                <span className="flex-none text-meta font-normal text-muted">{t.projects.board.namedByUs}</span>
+              )}
+              <button
+                type="button"
+                onClick={() => onEdit(project)}
+                aria-label={t.common.edit}
+                className="flex-none text-muted transition hover:text-brand"
+              >
+                <Icon name="edit" size={14} />
+              </button>
+            </span>
+          </Cell>
+
+          <Cell
+            label={
+              <span className="flex items-center gap-1">
+                {t.projects.board.location}
+                {/* The padlock: a work order under this site cannot have a location of its own. */}
+                <Icon name="lock" size={11} className="flex-none text-muted-light" />
+              </span>
+            }
+          >
+            <span className="flex min-w-0 items-center gap-1.5">
+              <Icon name="place" size={14} className="flex-none text-muted" />
+              <span className="truncate font-normal">{project.location.label}</span>
+            </span>
+          </Cell>
+
+          <Cell label={t.projects.board.firstStart}>{project.firstStart ?? "—"}</Cell>
+          <Cell label={t.projects.board.lastEnd}>{project.lastEnd ?? "—"}</Cell>
         </dl>
+      </div>
+
+      {/* Both orange: neither is the lesser act. A work order is a machine already on site and a
+          request goes to suppliers — different destinations, equal standing. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button onClick={onNewWorkOrder}>
+          <Icon name="handyman" size={14} /> {t.projects.board.addWorkOrder}
+        </Button>
+        <Button onClick={onNewRequest}>
+          <Icon name="add" size={14} /> {t.projects.board.newRequest}
+        </Button>
       </div>
 
       {/* ── Chart. `overflow-hidden` is for the bars; the row menu lives outside the track. ── */}
@@ -272,11 +319,17 @@ function SitePanel({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string | number }) {
+/**
+ * One labelled cell of the site strip.
+ *
+ * `border-s` rather than `border-l`, and `first:border-s-0` rather than a nth-child rule: the
+ * divider has to fall on the reading-start side, and in Arabic that is the right.
+ */
+function Cell({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col">
+    <div className="flex min-w-0 flex-1 basis-[160px] flex-col gap-0.5 border-s border-border px-3 py-2 first:border-s-0">
       <dt className="text-label font-semibold uppercase tracking-[.03em] text-muted">{label}</dt>
-      <dd className="text-body font-semibold text-navy tabular-nums">{value}</dd>
+      <dd className="min-w-0 truncate text-body font-semibold text-navy tabular-nums">{children}</dd>
     </div>
   );
 }

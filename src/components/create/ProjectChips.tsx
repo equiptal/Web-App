@@ -21,7 +21,7 @@
  * hiding instead: a site you stop using stops being picked, and drops off the six.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { useRfq } from "@/lib/store/rfq-store";
@@ -40,12 +40,33 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
   const { state, actions } = useRfq();
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
 
+  /* `actions` is rebuilt on every render of the store's provider. Listing it as a dependency would
+     re-run the fetch on each of those renders; leaving it out silently would age. Held in a ref, the
+     effect always calls the current one and still runs only when the user changes. */
+  const act = useRef(actions);
+  act.current = actions;
+
   useEffect(() => {
     // Guests have no sites, and asking on their behalf would 401 on every intake load.
     if (!user) return;
     let live = true;
     listProjects()
-      .then((rows) => live && setProjects(rows))
+      .then((rows) => {
+        if (!live) return;
+        setProjects(rows);
+
+        /* Arrived from a site's own *New request* button, which passes `?project=<id>`.
+         *
+         * Read off `window.location` rather than `useSearchParams`, which would oblige every page
+         * rendering the intake to carry a Suspense boundary for a convenience. This runs in an
+         * effect, so there is no server render to disagree with.
+         *
+         * An id that matches nothing is ignored in silence: a stale or hand-edited link should drop
+         * the renter into an ordinary intake, not an error about a site they never asked for. */
+        const wanted = new URLSearchParams(window.location.search).get("project");
+        const match = wanted ? rows.find((r) => r.id === wanted) : undefined;
+        if (match) act.current.selectProject(match);
+      })
       // A failed fetch renders the row away rather than an error. The renter came here to write a
       // request; a site is an optional convenience and must never stand in the way of that.
       .catch(() => live && setProjects([]))

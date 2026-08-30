@@ -342,6 +342,27 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     }
   }
 
+  /**
+   * A blank work order for this site, seeded with the site's own period.
+   *
+   * Seeded rather than empty because that is the whole point of a site holding defaults: a renter
+   * who set 1 Sep – 31 Dec once should not retype it per machine. They can still change it here,
+   * and the chart marks an order that ends up disagreeing with its site as having *own dates*.
+   */
+  function startWorkOrder(p: ProjectSummary) {
+    setWorkOrder({
+      title: "",
+      when: {
+        ...EMPTY_WHEN,
+        rentalBasis: p.defaults.timing.rentalBasis,
+        extendable: p.defaults.timing.extendable,
+        startDate: p.defaults.timing.startDate,
+        endDate: p.defaults.timing.endDate,
+      },
+      machines: [blankMachine()],
+    });
+  }
+
   async function saveOrder(d: WorkOrderDraft) {
     if (!selected) return;
     setSaving(true);
@@ -486,6 +507,8 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
              is exactly what it should do when nothing is filed nowhere. */
           unassigned={unassigned}
           onEditProject={(p) => void openEdit(p)}
+          onNewWorkOrder={startWorkOrder}
+          onNewRequest={(p) => router.push(`/create?project=${encodeURIComponent(p.id)}`)}
           onOpenConflict={setConflict}
           rowMenu={(group, itemId, awardId) => {
             const item = group.items.find((i) => i.id === itemId);
