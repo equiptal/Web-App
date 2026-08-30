@@ -71,8 +71,12 @@ POST /api/projects/{id}/awards
 **Evidence.** The identical request minus `supplyLines` returns `201 {"workOrderGroupId":"531556a4…","itemIds":["e9e3cdd9…"],"version":3}`.
 
 **Web already adapts.** `workOrderPayload(draft, { create })` sends `supplyLines` only on create, so
-once this lands the path works with no web change. Until then, awards entered in the work-order form
-are silently dropped — the order saves, the suppliers do not.
+once this lands the path works with no web change.
+
+**Until then the whole save fails, not just the awards.** `supplyLines` is sent only when the renter
+filled at least one supplier line, and the 422 refuses the entire request — so the work order, its
+machines and its period are all lost with it. A renter who leaves every supplier blank can still
+create the order; a renter who fills one in gets nothing saved.
 
 ---
 
