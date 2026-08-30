@@ -84,12 +84,20 @@ export function RequestRail({
   // put both of them 2px low. Change any line above and every figure here moves with it; that is
   // the point of writing the sum down.
   return (
-    /* The band reaches the window on both sides — its ground and its rule are the page's own edge
-       (owner, 2026-08-30) — while the tiles inside it sit on the same cap and the same gutter as the
-       bids below and as every other page. Two elements, because those are two different jobs: one is
-       a surface, the other is a column of content. */
-    <div {...pin("request-rail")} className="flex-none border-b border-border bg-surface3/60">
-    <div className={`mx-auto flex h-[96px] w-full max-w-[1440px] select-none items-center gap-4 overflow-hidden ${PAGE_X}`}>
+    /* ── The band is a card, not a full-bleed strip (owner, 2026-08-30) ──────────────────────────
+       *"Make the bar same width and margin as the requests parent card so all aligned."*
+
+       It used to reach the window on both sides while the tiles inside it sat on the page column, so
+       the grey ground and the content it carried disagreed about where the page begins — the rail
+       read as chrome bolted above the page rather than as the page's first block. Now the surface
+       takes the same cap, the same gutter and the same radius as the panel below it, and the two
+       edges line up down the whole screen.
+
+       Still three elements, because they are three jobs: the row's place in the column, the page's
+       own cap and gutter, and the card itself. */
+    <div {...pin("request-rail")} className="flex-none">
+    <div className={`mx-auto w-full max-w-[1440px] ${PAGE_X} pt-2`}>
+    <div className="flex h-[96px] select-none items-center gap-4 overflow-hidden rounded-lg border border-border bg-surface3/60 px-4">
       <Link {...pin("rail-create-tile")} href="/create" className="group flex flex-none flex-col items-center gap-1">
         <span className="grid h-14 w-14 place-items-center rounded-full border-2 border-dashed border-border text-muted transition group-hover:border-brand group-hover:text-brand">
           <Icon name="add" size={20} />
@@ -287,7 +295,16 @@ export function RequestRail({
                   {raised ?? tile.label}
                 </span>
                 {tile.closed && (
-                  <span className="text-label font-semibold uppercase leading-[9px] tracking-[.07em] text-muted">{t.workspace.closed}</span>
+                  /* Sentence case (owner, 2026-08-30: *"make closed smaller and not capitalized"*).
+                       Dropping the caps and the letter-spacing IS the reduction: `text-label` is the
+                       smallest of the scale's six steps, so there is no smaller size to take, and a
+                       lowercase word at 11px reads markedly smaller than the same word in tracked
+                       caps. The caps came with the token, which is a SECTION label — this is a
+                       footnote on a request nobody is bidding on. `leading-[9px]` is
+                       untouched on purpose: the label block is a fixed 13 + 9 = 22px so that every
+                       tile is the same height and one `items-center` lands every circle on the same
+                       line. Change the leading and the circles stop agreeing with each other. */
+                  <span className="text-label font-semibold leading-[9px] text-muted">{t.workspace.closed}</span>
                 )}
               </span>
             </button>
@@ -306,6 +323,7 @@ export function RequestRail({
       >
         <Icon name="chevron_right" size={16} className="rtl:scale-x-[-1]" />
       </button>
+    </div>
     </div>
     </div>
   );
