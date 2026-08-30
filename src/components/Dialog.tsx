@@ -79,6 +79,21 @@ const FOCUSABLE =
  * can guarantee.
  */
 function useDialogKeys(open: boolean, onClose: () => void, panel: React.RefObject<HTMLElement | null>) {
+  /**
+   * `onClose` is held in a ref and deliberately NOT a dependency below.
+   *
+   * Callers write `onClose={() => setThing(null)}`, which is a new function on every render — and a
+   * dialog containing a text field re-renders its parent on every keystroke. With `onClose` in the
+   * dependency list this effect tore down and re-ran each time: the cleanup handed focus back to the
+   * opener, the setup then focused the panel's first focusable, and the caret left the field after
+   * ONE character. Every dialog in the app with an input had it.
+   *
+   * The effect is about OPENING and CLOSING. Reading the latest handler through a ref says that,
+   * and asking callers to memoise theirs would only move the trap somewhere it is easier to forget.
+   */
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
   useEffect(() => {
     if (!open) return;
 
@@ -89,7 +104,7 @@ function useDialogKeys(open: boolean, onClose: () => void, panel: React.RefObjec
     (first ?? panel.current)?.focus?.();
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { onClose(); return; }
+      if (e.key === "Escape") { closeRef.current(); return; }
       if (e.key !== "Tab" || !panel.current) return;
       const items = Array.from(panel.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
         (el) => el.offsetParent !== null || el === document.activeElement,
@@ -107,7 +122,7 @@ function useDialogKeys(open: boolean, onClose: () => void, panel: React.RefObjec
       window.removeEventListener("keydown", onKey);
       opener?.focus?.();
     };
-  }, [open, onClose, panel]);
+  }, [open, panel]);
 }
 
 export function Dialog({
