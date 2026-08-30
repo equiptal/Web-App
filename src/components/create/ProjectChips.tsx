@@ -85,7 +85,9 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
   const rest = ordered.length - shown.length;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-t border-border px-5 py-3">
+    /* Same geometry as the pills that replace it — no rule, the card's padding — so picking a
+       site swaps the contents of the strip and moves nothing else. */
+    <div className="flex flex-wrap items-center gap-2 px-5 pb-4 pt-1">
       <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{t.projects.chips.label}</span>
 
       {shown.map((p) => {

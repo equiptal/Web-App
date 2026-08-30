@@ -91,10 +91,12 @@ const MapCanvas = dynamic(() => import("@/components/map/MapCanvas"), { ssr: fal
  * past this. Kept in step with `--bm-panel-w`'s fallback in `map-proto.css`; the two are the same
  * figure and a drift between them means the grip can drag below the width the cards are drawn for.
  *
- * ~~392, §5's figure.~~ **460 since 2026-08-20** (owner: *"make the cards and panel wider"*). See the
- * `.bm-panel` rule for what 392 had started costing the card.
+ * ~~392, §5's figure~~ → ~~460 since 2026-08-20~~ → **400 since 2026-08-31** (owner: *"reduce the
+ * cards width"*). 460 was bought to stop the old availability chip truncating; that chip and the
+ * distance's ask prompt are both gone, so the card's widest line is the figure itself. See the
+ * `.bm-panel` rule.
  */
-const PANEL_MIN_W = 460;
+const PANEL_MIN_W = 400;
 
 /** A bid this surface can resolve. v3 scopes the view to exactly ONE of these (spec 004 §4). */
 export type MapBid = BidCard & { itemLabel?: string; itemLabelAr?: string };

@@ -338,6 +338,23 @@ export function HomeRequests() {
     };
   };
 
+  /** The same sentence for ONE item of a multi-item group.
+   *
+   *  Each fanned-out item is its own request with its own `expiresAt` and its own status, so a group
+   *  whose crane is still taking bids and whose loader has been awarded must not be described by one
+   *  date. Read straight off the item — no lookup, because `expiresAt` rides on the list payload. */
+  const itemClosesWords = (it: RequestGroup["items"][number]) => {
+    if (groupBiddingClosed([it])) return { label: t.home.reqClosed, tone: "danger" as const };
+    const st = expiryState(requestExpiry({ expiresAt: it.expiresAt, createdAt: it.createdAt }));
+    if (st.kind === "none") return null;
+    if (st.kind === "expired") return { label: t.home.reqExpired, tone: "danger" as const };
+    if (st.kind === "today") return { label: t.home.reqToday, tone: "warn" as const };
+    return {
+      label: st.days === 1 ? t.home.reqOneDayLeft : fmt(t.home.reqDaysLeft, { n: String(st.days) }),
+      tone: st.days <= 2 ? ("warn" as const) : ("ok" as const),
+    };
+  };
+
   return (
     <section {...pin("home-requests")} className="flex flex-col gap-3">
       {/* Section header — the owner's option G (2026-08-29): a navy plate carrying the section's
@@ -380,10 +397,23 @@ export function HomeRequests() {
               </thead>
               <tbody>
                 {rows.map((g) => {
-                  const item = g.items[0]?.item;
-                  const name = item ? (ar ? item.nameAr || item.name : item.name) : g.groupRef || g.id;
-                  const words = closesWords(g);
+                  /* ── A multi-item request is a row per item (owner, 2026-08-30) ────────────────
+                     *"For a multi-item request show each item in a row inside the one request, and
+                     each row item has its bids and actions — so 2 subrows from the 1 location."*
+
+                     It used to be one row per GROUP: the first machine's name, `+1 more` beside it,
+                     and a single bid count that was the sum. A renter with a crane and a loader on
+                     one site could not see which of them had the two bids, and «Compare bids» took
+                     him to the group rather than to the machine he was reading.
+
+                     So the location spans, and each item states its own machine, its own count, its
+                     own deadline and its own controls. A single-item request is the same markup with
+                     a span of one, which is why there is no second branch here. */
                   const canCancel = cancellableItems(g.items).length > 0;
+                  return g.items.map((it, i) => {
+                  const name = it.item ? (ar ? it.item.nameAr || it.item.name : it.item.name) : it.code || it.displayId;
+                  // One item still reads as one request: the group's own line, not an item footnote.
+                  const words = g.items.length > 1 ? itemClosesWords(it) : closesWords(g);
                   return (
                     /* ── The row IS the way in (owner, 2026-08-29) ────────────────────────────────
                        *"Clicking on a request row will open the request details."* The largest
@@ -391,7 +421,7 @@ export function HomeRequests() {
                        past the drawer's front page rather than the only way through it. Each of them
                        stops the press from reaching the row, so a share never lands on details. */
                     <tr
-                      key={g.id}
+                      key={it.id}
                       onClick={() => setOpen({ group: g, share: false })}
                       role="button"
                       tabIndex={0}
@@ -410,24 +440,27 @@ export function HomeRequests() {
                           emphasised has nothing emphasised. Weight is now spent once, on the site,
                           which is the column a renter scans down. The rest is regular, and colour
                           alone carries urgency in CLOSES. */}
-                      <td className="px-3.5">
-                        <span className="flex items-center gap-1.5 text-body font-semibold text-navy">
-                          <Icon name="location_on" size={16} className="flex-none text-muted" />
-                          {g.locationLabel}
-                        </span>
-                      </td>
-                      <td className="px-3.5">
-                        <span className="text-body text-navy">{name}</span>
-                        {g.items.length > 1 && (
-                          <span className="text-meta text-muted">
-                            {" "}
-                            {fmt(t.home.reqMoreItems, { n: String(g.items.length - 1) })}
+                      {/* Drawn once and spanned down the group's items — the site is the one thing
+                          they genuinely share, and repeating it would read as several requests to the
+                          same place rather than one request for several machines. */}
+                      {i === 0 && (
+                        <td className="px-3.5 align-top" rowSpan={g.items.length}>
+                          <span className="flex items-center gap-1.5 pt-[18px] text-body font-semibold text-navy">
+                            <Icon name="location_on" size={16} className="flex-none text-muted" />
+                            {g.locationLabel}
                           </span>
+                        </td>
+                      )}
+                      <td className="px-3.5">
+                        {/* `+N more` is gone: the others are on the rows below, named. */}
+                        <span className="text-body text-navy">{name}</span>
+                        {(it.item?.qty ?? 1) > 1 && (
+                          <span className="text-meta text-muted"> ×{it.item?.qty}</span>
                         )}
                       </td>
                       <td className="whitespace-nowrap px-3.5">
-                        <span className={cx("text-subhead tabular", g.totalBids ? "text-navy" : "text-danger")}>
-                          {g.totalBids}
+                        <span className={cx("text-subhead tabular", it.bidCount ? "text-navy" : "text-danger")}>
+                          {it.bidCount}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-3.5">
@@ -463,7 +496,7 @@ export function HomeRequests() {
                               is the control that was missing: a finished request had no way off
                               the dashboard at all. Both are destructive-looking, so both are
                               labelled for what they actually do. */}
-                          {canCancel ? (
+                          {canCancel && cancellableItems([it]).length > 0 ? (
                             <RowAction icon="close" label={t.home.reqCancel} tone="danger" onPress={() => setCancelling(g)} />
                           ) : (
                             <RowAction icon="close" label={L("Remove from this list", "إزالة من هذه القائمة")} onPress={() => askDismiss(g)} />
@@ -474,9 +507,15 @@ export function HomeRequests() {
                               e.stopPropagation();
                               // The one action that IS another page: comparing bids is the
                               // workspace's whole job, not a dialog's.
-                              router.push(`/requests?g=${encodeURIComponent(g.id)}`);
+                              // `i` lands the workspace on THIS machine rather than the group's
+                              // first — the row the renter pressed is the one he wants open.
+                              router.push(
+                                g.items.length > 1
+                                  ? `/requests?g=${encodeURIComponent(g.id)}&i=${encodeURIComponent(it.id)}`
+                                  : `/requests?g=${encodeURIComponent(g.id)}`,
+                              );
                             }}
-                            disabled={!g.totalBids}
+                            disabled={!it.bidCount}
                             className={cx(btn("primary", "sm"), "ms-1.5")}
                           >
                             {t.home.compareBids}
@@ -485,6 +524,7 @@ export function HomeRequests() {
                       </td>
                     </tr>
                   );
+                  });
                 })}
                 {/* ── Loading looks like loading, not like nothing (owner, 2026-08-30) ────────────
                     ~~One cell with an ellipsis in it.~~ *"At first it shows empty data."* It did: a

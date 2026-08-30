@@ -628,21 +628,20 @@
      to change which edge it paints on is a large diff for a visual outcome. The cost is that keyboard
      order still follows the DOM — map, then panel. */
   order: -1;
-  /* **460px** — the width AND the floor. `--bm-panel-w` is set only once the renter drags the grip, so
-     an untouched surface is exactly this. The 62% cap is unchanged and the drag clamps to it, so
+  /* **400px** — the width AND the floor. `--bm-panel-w` is set only once the renter drags the grip,
+     so an untouched surface is exactly this. The 62% cap is unchanged and the drag clamps to it, so
      widening the panel can never leave the map narrower than the panel.
 
-     ~~392px, §5's figure.~~ Widened on 2026-08-20 (owner: *"make the cards and panel wider"*). 392
-     had become the binding constraint on the card rather than a spec to hold: the text column was
-     262px against roughly 278px of content, and what gave way was the availability chip — truncated
-     to «Not confirmed …» on exactly the cards where availability is the open question. Moving the
-     in-offer badge onto the photo bought some of it back; this buys the rest.
+     ~~392px, §5's figure~~ → ~~460px on 2026-08-20~~ → **400px on 2026-08-31** (owner: *"reduce the
+     cards width"*). 460 was bought to stop the old availability chip truncating; that chip is gone,
+     and with the ask prompt gone from the distance too (same day) the card's widest line is now the
+     number itself. What 460 bought is no longer needed, and the column was spending it on air —
+     every card carried a band of empty space to the right of a two-digit figure.
 
-     A DEPARTURE from §5, recorded as one. Every wrapping judgement made at 392 still holds — the
-     panel only got wider, and the rules that mattered are now enforced by the layout instead: the
-     chip cannot shrink and row 2 wraps, so no width can strip it again. */
-  flex: 0 0 var(--bm-panel-w, 460px);
-  width: var(--bm-panel-w, 460px);
+     A DEPARTURE from §5, recorded as one. The wrapping judgements 460 was chosen to protect are all
+     retired with the elements that made them: nothing on the card competes for a line any more. */
+  flex: 0 0 var(--bm-panel-w, 400px);
+  width: var(--bm-panel-w, 400px);
   max-width: 62%;
   display: flex;
   flex-direction: column;
@@ -1130,9 +1129,9 @@
   padding: 10px 12px 11px;
 }
 
-/* ── The corner: the file's completeness, and the way into it ────────────────────────────────────
-   Both are facts about the machine's PAPERS. They ride the top trailing edge together, small, and
-   the distance below gets the card's whole width because neither of them is on its line. */
+/* ── The corner: the way into the machine's file ─────────────────────────────────────────────────
+   The readiness left this row on 2026-08-31 for the card's FOOT (see `.bm-eq-ft`), so the corner
+   carries one control and the distance below still gets a line of its own. */
 .bidmap .bm-eq .bm-eq-hd {
   display: flex;
   align-items: center;
@@ -1140,34 +1139,29 @@
   gap: 8px;
   min-height: 26px;
 }
-/* The readiness dots — the app's `done`/`total`, one dot each, filled for what is on file. The colour
-   is the READINESS band's, never the availability colour: the papers are a fact about the file, the
-   distance is a promise from the supplier, and reading one off the other is the mistake this card is
-   arranged to prevent. */
-.bidmap .bm-eq .bm-eq-rd { display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0; }
-.bidmap .bm-eq .bm-eq-rdot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  /* An unmet requirement is an empty socket, not a coloured one: the ring says "this is a slot" and
-     the fill says "it holds something". A red dot beside a green one would read as two verdicts. */
-  background: transparent;
-  box-shadow: inset 0 0 0 1.5px #c8d8e8;
-}
-.bidmap .bm-eq .bm-eq-rd.green .bm-eq-rdot.on { background: #16a34a; box-shadow: none; }
-.bidmap .bm-eq .bm-eq-rd.yellow .bm-eq-rdot.on { background: var(--warn-deep); box-shadow: none; }
-.bidmap .bm-eq .bm-eq-rd.red .bm-eq-rdot.on { background: #d9362a; box-shadow: none; }
-/* Past eight, dots stop being countable at a glance — the shape becomes a bar and the fraction does
-   not change. */
-.bidmap .bm-eq .bm-eq-rdbar { display: block; width: 46px; height: 5px; border-radius: 999px; background: #dbe6ef; overflow: hidden; }
-.bidmap .bm-eq .bm-eq-rdfill { display: block; height: 100%; border-radius: 999px; background: #c8d8e8; }
+/* ── The card's foot: how complete this machine's file is ────────────────────────────────────────
+   Bottom trailing corner, out of the distance's way. A bar and its fraction rather than a row of
+   dots (owner, 2026-08-31): dots made the reader count sockets to learn «3 of 4», and the bar shows
+   how far along at a glance while the figure keeps both numbers.
+
+   The colour is the READINESS band's, never the availability colour: the papers are a fact about the
+   file, the distance is a promise from the supplier, and reading one off the other is the mistake
+   this card is arranged to prevent. */
+.bidmap .bm-eq .bm-eq-ft { display: flex; align-items: center; justify-content: flex-end; margin-top: auto; }
+.bidmap .bm-eq .bm-eq-rd { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.bidmap .bm-eq .bm-eq-rdbar { display: block; width: 54px; height: 5px; border-radius: 999px; background: #dbe6ef; overflow: hidden; }
+.bidmap .bm-eq .bm-eq-rdfill { display: block; height: 100%; border-radius: 999px; background: #c8d8e8; transition: width 0.25s ease; }
+.bidmap .bm-eq .bm-eq-rdn { font-size: 10px; font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; }
 .bidmap .bm-eq .bm-eq-rd.green .bm-eq-rdfill { background: #16a34a; }
 .bidmap .bm-eq .bm-eq-rd.yellow .bm-eq-rdfill { background: var(--warn-deep); }
 .bidmap .bm-eq .bm-eq-rd.red .bm-eq-rdfill { background: #d9362a; }
 
 /* «Details ›» as a word is gone (owner, 2026-08-28). The icon is the file under a magnifier, which is
-   what the control has always done, and it costs the card no line of its own. The ground it kept is
-   the one that cured the old pill's "floating": `var(--background)`'s pale slate under it, never white on white. */
+   what the control has always done, and it costs the card no line of its own.
+
+   Round, and the material set's own `find_in_page` (owner, 2026-08-31: *"make the icon nicer"*). The
+   glyph it replaces was a hand-drawn 512-viewBox path at a stroke width nothing else on the surface
+   used, in a hard-cornered box — it read as a stamp on the card rather than a control in it. */
 .bidmap .bm-eq .bm-eq-open {
   pointer-events: auto;
   flex-shrink: 0;
@@ -1178,13 +1172,15 @@
   height: 28px;
   padding: 0;
   background: #f2f6fa;
-  border: 1px solid #dbe6ef;
-  border-radius: var(--radius-sm);
-  color: #16304f;
+  border: 1px solid #e1e9f1;
+  border-radius: 999px;
+  color: #5b7794;
   cursor: pointer;
   font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
-.bidmap .bm-eq .bm-eq-open:hover { background: #e6eef6; border-color: #c8d8e8; }
+.bidmap .bm-eq .bm-eq-open .material-icons-outlined { font-size: 17px; line-height: 1; }
+.bidmap .bm-eq .bm-eq-open:hover { background: var(--surface); border-color: #c8d8e8; color: #16304f; }
 /* On a selected card the ground IS `var(--background)`, so the tint above would vanish into it — the control
    goes navy instead, which is the slate the accent bar already uses. */
 .bidmap .bm-eq.on .bm-eq-open { background: var(--navy); border-color: var(--navy); color: var(--surface); }
@@ -1196,22 +1192,24 @@
    nothing left to ask. Red with a «?» is the open question, and pressing it explains what the colour
    means before it asks anything. Red with a clock is the question already put.
 
-   Full width and left-aligned rather than a hugging pill: it is the card's subject, not a label on
-   it, and a chip that changed width with the number would make a column of distances ragged. */
+   ~~Full width and left-aligned.~~ **Centred, and it hugs the number** (owner, 2026-08-31). Full
+   width was bought for a second element on the line — «Ask him to confirm» — and that prompt is gone
+   with the same instruction: the glyph says the state and pressing it opens the tutorial that
+   explains it. What was left was a band of empty space with a two-digit figure at one end of it.
+
+   Ragged column edges were the reason it was stretched; centring answers that instead, and better —
+   every card's figure now sits on the same vertical axis whatever its width. */
 .bidmap .bm-eq .bm-eq-yard {
-  display: flex;
+  display: inline-flex;
+  align-self: center;
   align-items: center;
-  /* **The row WRAPS and the figure never gives.** With the picture back in its 104px cell the text
-     column is ~262px, and the distance plus «Ask him to confirm» do not both fit on one line at that
-     width — the same squeeze that used to truncate the old availability chip to «Not confirmed …».
-     Nothing here shrinks; the prompt drops to a second line instead, so the number reads whole at
-     every width. The `row-gap` is what keeps the two lines from touching when it does. */
-  flex-wrap: wrap;
-  gap: 4px 9px;
-  width: 100%;
-  text-align: start;
+  justify-content: center;
+  gap: 7px;
+  width: auto;
+  max-width: 100%;
+  text-align: center;
   border-radius: var(--radius-md);
-  padding: 9px 11px;
+  padding: 8px 16px;
   border: 1.5px solid transparent;
   font-family: inherit;
 }
@@ -1256,18 +1254,6 @@
    trustworthiness are one statement, not a number with a verdict beside it. */
 .bidmap .bm-eq .bm-eq-km { font-family: ui-monospace, monospace; font-size: 19px; font-weight: 700; letter-spacing: -0.4px; color: currentColor; }
 .bidmap .bm-eq .bm-eq-kmu { font-size: 11px; font-weight: 700; opacity: 0.85; }
-/* The prompt at the trailing edge — «Ask him to confirm» / «Asked». Its ink is set INLINE from
-   `askAvailability.colour`, so the model stays the one authority on it (RM3-AC-33). */
-.bidmap .bm-eq .bm-eq-yardq {
-  margin-inline-start: auto;
-  flex-shrink: 0;
-  font-size: 10.5px;
-  font-weight: 800;
-  white-space: nowrap;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.bidmap .bm-eq .bm-eq-yard.asked .bm-eq-yardq { text-decoration: none; opacity: 0.75; }
 
 /* The machine itself — the caption on the distance, not the headline. No serial and no capacity
    (AC-12): the serial identifies the machine to the system, not to a renter, and the size is already
@@ -1277,13 +1263,16 @@
   font-weight: 800;
   line-height: 1.35;
   color: #16304f;
+  /* Centred under the distance it captions — a left-aligned name under a centred figure reads as
+     two unrelated rows. */
+  text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 /* «· Outside the city» — the yard sits beyond the request city's own radius, which is what turns a
    delivery into a mobilisation worth asking about. It qualifies the distance, so it follows it. */
-.bidmap .bm-eq .bm-eq-far { font-size: 10.5px; font-weight: 700; color: var(--warn-deep); white-space: nowrap; }
+.bidmap .bm-eq .bm-eq-far { font-size: 10.5px; font-weight: 700; color: var(--warn-deep); white-space: nowrap; text-align: center; }
 
 /* ── The layer behind a red distance ─────────────────────────────────────────────────────────────
    `.bm-eqfp`'s geometry, with its own body: the head, the title and the X are all inherited, so this
@@ -1301,6 +1290,66 @@
 .bidmap .bm-eqyx-name { font-size: 12.5px; font-weight: 800; color: #16304f; }
 .bidmap .bm-eqyx-km { font-size: 11px; font-weight: 700; color: var(--muted); }
 .bidmap .bm-eqyx-p { margin: 0; font-size: 12px; font-weight: 600; line-height: 1.85; color: #16304f; }
+
+/* ── The tutorial (owner, 2026-08-31) ────────────────────────────────────────────────────────────
+   Two specimens of the SAME distance, before and after he answers, then three numbered steps. The
+   renter has the red one on the card in front of him; putting the green one beside it is what turns
+   "it turns green" from a promise in a paragraph into a thing he has seen. */
+.bidmap .bm-eqyx-demo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 10px;
+  border-radius: var(--radius-md);
+  background: #f4f8fc;
+  border: 1px solid #e1e9f1;
+}
+.bidmap .bm-eqyx-spec {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid transparent;
+}
+.bidmap .bm-eqyx-spec .material-icons-outlined { font-size: 17px; line-height: 1; }
+.bidmap .bm-eqyx-spec.no {
+  color: #d9362a;
+  background: color-mix(in srgb, var(--danger-deep) 10%, var(--surface));
+  border-color: color-mix(in srgb, var(--danger-deep) 30%, var(--surface));
+}
+.bidmap .bm-eqyx-spec.ok {
+  color: #0d6c38;
+  background: color-mix(in srgb, var(--ok-deep) 10%, var(--surface));
+  border-color: color-mix(in srgb, var(--ok) 34%, var(--surface));
+}
+.bidmap .bm-eqyx-specn { font-family: ui-monospace, monospace; font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+.bidmap .bm-eqyx-specu { font-size: 9.5px; font-weight: 700; opacity: 0.85; }
+.bidmap .bm-eqyx-arrow { color: var(--muted); font-size: 18px; }
+[dir="rtl"] .bidmap .bm-eqyx-arrow { transform: scaleX(-1); }
+
+.bidmap .bm-eqyx-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.bidmap .bm-eqyx-step { display: flex; align-items: flex-start; gap: 10px; }
+/* The number is the tutorial's whole claim — that this is a flow with a step 3 — so it is drawn as a
+   counter and not as a bullet. */
+.bidmap .bm-eqyx-stepn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--navy);
+  color: var(--surface);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+.bidmap .bm-eqyx-stept { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.bidmap .bm-eqyx-steph { font-size: 12.5px; font-weight: 800; color: #16304f; }
+.bidmap .bm-eqyx-stepb { font-size: 11.5px; font-weight: 600; line-height: 1.75; color: var(--muted); }
 .bidmap .bm-eqyx-q {
   display: flex;
   flex-direction: column;
@@ -2263,7 +2312,7 @@
 /* Fill: from the panel's edge to the far side. `--bm-panel-w` is the same variable `.bm-panel` sizes
    itself from, so dragging the grip moves this seam with it and the two never overlap. */
 .bidmap .bm-chat.is-fill {
-  inset-inline-start: var(--bm-panel-w, 460px);
+  inset-inline-start: var(--bm-panel-w, 400px);
   inset-inline-end: 0;
 }
 /* Mirror: `rDrawer`'s own resting width — **420px** (`04-machine-panel.js:20`, `w = drawerMax ?

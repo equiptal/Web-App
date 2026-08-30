@@ -203,7 +203,15 @@ export function RequestsWorkspace() {
     if (entered || !groups?.length) return;
     setEntered(true);
     const g = params?.get("g");
-    if (g && groups.some((x) => x.id === g)) setWanted({ groupId: g, itemId: null, bidId: null });
+    if (g && groups.some((x) => x.id === g)) {
+      // `i` picks ONE machine of a multi-item group (the dashboard's per-item rows link with it).
+      // Validated against the group it names rather than trusted: a stale or hand-edited id must
+      // open the group rather than an empty item panel.
+      const wantItem = params?.get("i");
+      const grp = groups.find((x) => x.id === g);
+      const itemId = wantItem && grp?.items.some((it) => it.id === wantItem) ? wantItem : null;
+      setWanted({ groupId: g, itemId, bidId: null });
+    }
     const door = params?.get("share") ? "share" : params?.get("cancel") ? "cancel" : params?.get("details") ? "details" : null;
     if (!door) return;
     setDrawerShare(door === "share");

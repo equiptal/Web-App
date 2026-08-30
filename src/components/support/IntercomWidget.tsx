@@ -1,5 +1,7 @@
 "use client";
 
+import { usePathname } from "next/navigation";
+
 /**
  * The Intercom messenger, and its floating launcher.
  *
@@ -272,12 +274,39 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
  * Not draggable, unlike the app's. The app moves it because a phone screen is small enough for a
  * fixed bubble to sit on top of something that matters; at this width nothing is under it.
  */
+/**
+ * The four destinations the nav bar names, and their subtrees.
+ *
+ * `/` is exact and the rest own their subtree — the same rule `AppNav.isActive` uses to decide which
+ * tab is lit, kept identical on purpose: the bubble is present exactly where a tab is highlighted, so
+ * "is support here?" has the same answer as "where am I?".
+ */
+const LAUNCHER_ROUTES = ["/", "/browse", "/requests", "/company"] as const;
+
 function Launcher({ unread }: { unread: number }) {
   const { dir } = useLocale();
+  // Null outside a route (and in a bare render): treat that as "not on a tab" rather than throwing.
+  const pathname = usePathname() ?? "";
 
   const open = useCallback(() => window.Intercom?.("show"), []);
 
   if (!INTERCOM_APP_ID) return null;
+
+  /* ── The bubble lives on the nav's four tabs, and nowhere else (owner, 2026-08-31) ─────────────
+     *"Remove the intercom icon from the map view, show it in the main 4 tabs of the nav bar only."*
+
+     It was mounted in the root layout, so it sat on every route the app has — including the
+     equipment map (`/bids/[id]/equipment`), which is a full-bleed canvas with its own floating
+     controls and a chat dock of its own. A second bubble there competes with the dock for the same
+     corner and for the same meaning, which is the exact problem the mobile app solved by hiding
+     Intercom's own launcher.
+
+     Gating the render rather than unmounting the widget: the messenger still boots, still identifies
+     the renter, and still counts unread on every page. Only the button is withheld, so a conversation
+     opened on the dashboard is still there when he comes back to it. */
+  const onTab = LAUNCHER_ROUTES.some((r) => (r === "/" ? pathname === "/" : pathname.startsWith(r)));
+  if (!onTab) return null;
+
   return (
     <button
       type="button"

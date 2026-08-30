@@ -426,7 +426,13 @@ export function EquipmentList({
           `role="dialog"` with a name and deliberately no `aria-modal`: nothing here traps focus, and
           `aria-modal` would tell a screen reader that everything else is hidden — a claim the
           keyboard disproves by tabbing straight out into the list behind it. */}
-      {yardExplain && (
+      {yardExplain && (() => {
+        /* One model call for the whole layer: the machine's name, and the number the two specimens
+           below are drawn with. The specimen shows THIS machine's distance in both colours — an
+           invented figure would be a screenshot of a different machine. */
+        const explainCard = equipmentCardModel(yardExplain.machine, request);
+        const sampleKm = explainCard.km != null ? distanceDigits(explainCard.km, ar) : "—";
+        return (
         <div className="bm-eqfp bm-eqyx" role="dialog" aria-label={yardExplain.asked ? t.bidMap.eqYardAskedTitle : t.bidMap.eqYardExplainTitle}>
           <div className="bm-eqfp-head">
             <span className="bm-eqfp-t">{yardExplain.asked ? t.bidMap.eqYardAskedTitle : t.bidMap.eqYardExplainTitle}</span>
@@ -445,19 +451,12 @@ export function EquipmentList({
             {/* The machine this is about, so a layer covering the column still says which card it
                 came off. */}
             <div className="bm-eqyx-eq">
-              {(() => {
-                const c = equipmentCardModel(yardExplain.machine, request);
-                return (
-                  <>
-                    <span className="bm-eqyx-name">{ar ? c.title.ar : c.title.en}</span>
-                    {c.km != null && (
-                      <span className="bm-eqyx-km">
-                        <span dir="ltr">{distanceDigits(c.km, ar)}</span> {t.bidMap.eqDistanceUnit}
-                      </span>
-                    )}
-                  </>
-                );
-              })()}
+              <span className="bm-eqyx-name">{ar ? explainCard.title.ar : explainCard.title.en}</span>
+              {explainCard.km != null && (
+                <span className="bm-eqyx-km">
+                  <span dir="ltr">{distanceDigits(explainCard.km, ar)}</span> {t.bidMap.eqDistanceUnit}
+                </span>
+              )}
             </div>
 
             {yardExplain.asked ? (
@@ -473,8 +472,44 @@ export function EquipmentList({
               </>
             ) : (
               <>
-                <p className="bm-eqyx-p">{t.bidMap.eqYardExplainBody}</p>
-                <p className="bm-eqyx-p">{t.bidMap.eqYardExplainHow}</p>
+                {/* ── The colour, shown rather than described ────────────────────────────────────
+                    Two specimens of the same distance, before and after he answers. The renter has
+                    the red one in front of him; putting the green one beside it is what makes
+                    «turns green» a thing he has seen rather than a promise in a paragraph. */}
+                <div className="bm-eqyx-demo" aria-hidden="true">
+                  <span className="bm-eqyx-spec no">
+                    <span className="material-icons-outlined">help_outline</span>
+                    <span className="bm-eqyx-specn" dir="ltr">{sampleKm}</span>
+                    <span className="bm-eqyx-specu">{t.bidMap.eqDistanceUnit}</span>
+                  </span>
+                  <span className="bm-eqyx-arrow material-icons-outlined">arrow_forward</span>
+                  <span className="bm-eqyx-spec ok">
+                    <span className="material-icons-outlined">check_circle</span>
+                    <span className="bm-eqyx-specn" dir="ltr">{sampleKm}</span>
+                    <span className="bm-eqyx-specu">{t.bidMap.eqDistanceUnit}</span>
+                  </span>
+                </div>
+
+                {/* ── Three steps, in the order they happen ──────────────────────────────────────
+                    A tutorial rather than two paragraphs (owner, 2026-08-31). The old copy said the
+                    same true things in prose, and prose is where a renter looking at a red number
+                    stops reading. Numbered steps say *this is a flow, you are at step 1, here is
+                    what step 3 gets you* — which is the question the colour actually raises. */}
+                <ol className="bm-eqyx-steps">
+                  {[
+                    { t: t.bidMap.eqYardStep1T, b: t.bidMap.eqYardStep1B },
+                    { t: t.bidMap.eqYardStep2T, b: t.bidMap.eqYardStep2B },
+                    { t: t.bidMap.eqYardStep3T, b: t.bidMap.eqYardStep3B },
+                  ].map((step, i) => (
+                    <li key={step.t} className="bm-eqyx-step">
+                      <span className="bm-eqyx-stepn" aria-hidden="true">{num(i + 1)}</span>
+                      <span className="bm-eqyx-stept">
+                        <b className="bm-eqyx-steph">{step.t}</b>
+                        <span className="bm-eqyx-stepb">{step.b}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
               </>
             )}
           </div>
@@ -500,11 +535,12 @@ export function EquipmentList({
                 }}
               >
                 {t.bidMap.eqYardExplainCta}
-                </button>
-          </div>
+              </button>
+            </div>
           )}
         </div>
-      )}
+        );
+      })()}
 
       {/* The filtered empty state NAMES what emptied it and offers the way out. Plain «لا توجد نتائج»
           would read as "this lessor has nothing" — a claim about him rather than about the chips, and
@@ -721,10 +757,6 @@ function EquipmentCard({
               «Details ›» is gone as a word. The icon is the file under a magnifier, which is what the
               control has always done — look inside this machine's file. */}
           <div className="bm-eq-hd">
-            <ReadinessDots
-              readiness={readiness}
-              title={fmt(t.bidMap.eqReadinessOnFile, { done: num(readiness.done), total: num(readiness.total) })}
-            />
             <button
               type="button"
               className="bm-eq-open"
@@ -732,21 +764,11 @@ function EquipmentCard({
               title={t.bidMap.eqOpenFile}
               onClick={() => onOpenDetail(machine.equipmentId)}
             >
-              {/* Drawn rather than fetched: this surface loads no icon set of its own beyond the
-                  material font, which has no file-under-a-magnifier, and an inline path cannot go
-                  missing at runtime. */}
-              <svg viewBox="0 0 512 512" width="17" height="17" aria-hidden="true" focusable="false">
-                <path
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="34"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M379 236V25H27v462h352v-63M101 111h198M101 205h132M101 299h79M101 393h79"
-                />
-                <circle cx="325" cy="325" r="86" fill="none" stroke="currentColor" strokeWidth="34" />
-                <path fill="none" stroke="currentColor" strokeWidth="34" strokeLinecap="round" d="m389 389 74 74" />
-              </svg>
+              {/* `find_in_page` — the material set's own file-under-a-magnifier, which is exactly
+                  what this control does. It replaces a hand-drawn 512-viewBox path that was heavier
+                  than every other glyph on the surface and lined up with none of them (owner,
+                  2026-08-31: *"make the icon nicer"*). */}
+              <span className="material-icons-outlined" aria-hidden="true">find_in_page</span>
             </button>
           </div>
 
@@ -778,17 +800,17 @@ function EquipmentCard({
               type="button"
               className={`bm-eq-yard ${yard}`}
               title={yard === "asked" ? t.bidMap.askPendingWhy : t.bidMap.eqYardUnconfirmedWhy}
+              /* The ask's ink is the MODEL's, not the stylesheet's (RM3-AC-33). It used to paint the
+                 «Ask him to confirm» prompt; with that prompt gone the control itself is the ask, so
+                 the ink lands on it — the CSS keeps the ground and the border, the model keeps the
+                 colour. */
+              style={askAvailability ? { color: askAvailability.colour } : undefined}
               onClick={() => onYardPress(machine, yard === "asked")}
             >
               <span className="material-icons-outlined" aria-hidden="true">
                 {yard === "asked" ? "schedule" : "help_outline"}
               </span>
               <Distance km={km} ar={ar} t={t} />
-              {/* The prompt under the number, in the ask's own ink (RM3-AC-33) — the model stays the
-                  one authority on this control's colour. On an asked card it states that instead. */}
-              <span className="bm-eq-yardq" style={askAvailability ? { color: askAvailability.colour } : undefined}>
-                {yard === "asked" ? t.bidMap.eqAskAnotherSent : t.bidMap.eqAskConfirm}
-              </span>
             </button>
           )}
 
@@ -803,6 +825,19 @@ function EquipmentCard({
           {/* The yard is outside the request city's own radius — the fact that turns a delivery into a
               mobilisation. It qualifies the distance, so it follows it. */}
           {card.outOfCity && <div className="bm-eq-far">{t.bidMap.eqOutOfCity}</div>}
+
+          {/* ── The foot: how complete this machine's file is (owner, 2026-08-31) ─────────────────
+              Bottom trailing corner, and a bar with its fraction beside it rather than a row of
+              dots: dots asked the reader to count them, and counting four sockets to learn that
+              three are filled is work a bar and «3/4» do for him. It sits at the card's end because
+              it is the last thing he needs — the distance is what he is comparing on. */}
+          <div className="bm-eq-ft">
+            <ReadinessBar
+              readiness={readiness}
+              label={`${num(readiness.done)}/${num(readiness.total)}`}
+              title={fmt(t.bidMap.eqReadinessOnFile, { done: num(readiness.done), total: num(readiness.total) })}
+            />
+          </div>
         </div>
       </div>
     </li>
@@ -822,37 +857,29 @@ function Distance({ km, ar, t }: { km: number | null; ar: boolean; t: ReturnType
 }
 
 /**
- * **How complete this machine's file is** — one dot per scored requirement, filled for what is on
- * file (owner, 2026-08-28). The fraction is the app's: `computeUnitReadiness`'s `done`/`total` with
- * ownership scored, which is exactly what the app's own map panel reads (`bid_map.dart:470-473`).
+ * **How complete this machine's file is** — a bar and its fraction (owner, 2026-08-31: the dots were
+ * *"clearer than dots"* territory). The figures are the app's: `computeUnitReadiness`'s
+ * `done`/`total` with ownership scored, which is exactly what the app's own map panel reads
+ * (`bid_map.dart:470-473`).
  *
- * Dots rather than a percentage, and one dot per requirement rather than a fixed five: the renter is
- * looking at a file with four things in it, and «75%» hides both how many there are and how close
- * three is. Past eight the dots stop being countable at a glance, so they become a bar of the same
- * colour — the shape changes, the fraction does not.
+ * ~~One dot per scored requirement.~~ Withdrawn. Dots kept the denominator honest — «75%» hides both
+ * how many requirements there are and how close three is — but they made the reader COUNT, twice,
+ * to learn a fraction. The bar shows how far along at a glance and «3/4» keeps the two numbers, so
+ * nothing the dots protected is lost and the counting is gone.
  *
  * The colour is the readiness band's and never the availability colour: the papers are a fact about
  * the FILE, the distance is a promise from the SUPPLIER, and reading one off the other is the whole
  * mistake this card is arranged to prevent.
  */
-function ReadinessDots({ readiness, title }: { readiness: EquipmentCardReadiness; title: string }) {
+function ReadinessBar({ readiness, label, title }: { readiness: EquipmentCardReadiness; label: string; title: string }) {
   const { done, total, band } = readiness;
   if (total <= 0) return null;
-  const cls = `bm-eq-rd ${band}`;
-  if (total > 8) {
-    return (
-      <span className={cls} title={title} aria-label={title} role="img">
-        <span className="bm-eq-rdbar">
-          <span className="bm-eq-rdfill" style={{ width: `${Math.round((done / total) * 100)}%` }} />
-        </span>
-      </span>
-    );
-  }
   return (
-    <span className={cls} title={title} aria-label={title} role="img">
-      {Array.from({ length: total }, (_, i) => (
-        <span key={i} className={`bm-eq-rdot${i < done ? " on" : ""}`} aria-hidden="true" />
-      ))}
+    <span className={`bm-eq-rd ${band}`} title={title} aria-label={title} role="img">
+      <span className="bm-eq-rdbar">
+        <span className="bm-eq-rdfill" style={{ width: `${Math.round((done / total) * 100)}%` }} />
+      </span>
+      <span className="bm-eq-rdn" dir="ltr">{label}</span>
     </span>
   );
 }

@@ -220,36 +220,31 @@ export const en = {
   intake: {
     reading: "Reading",
     heading: "How would you like to create your request?",
-    subheading: "Start from an existing RFQ document, or fill it in manually. You'll review everything before it's sent.",
+    subheading: "Describe your request, or upload an existing RFQ document. If it belongs to a project, its defaults fill themselves in.",
     optUploadTitle: "Write / Upload RFQ",
     optUploadDesc: "Write your request or upload a file — your AI assistant fills the form automatically.",
     recommended: "Recommended",
-    beta: "Beta",
     optManualTitle: "Fill Manually",
     optManualDesc: "Enter equipment details step by step using a guided form.",
     comingSoon: "Coming soon",
     orUploadBelow: "Or upload a file below",
     attachDivider: "or attach a file",
-    or: "or",
-    browse: "browse",
     dropSub: "Add as many files as you like — we'll read them all",
-    chars: "chars",
     tabRfq: "RFQ", // AC-01 tentative
     tabManual: "Manual", // AC-01 tentative
     tabLater: "LATER",
     manualNote: "Manual entry is coming in a later release.",
     pasteLabel: "Describe your request",
-    // The placeholder types itself through these in turn — the prototype's own examples. Short on
-    // purpose: a placeholder that runs to two lines reads as content rather than as an invitation.
-    placeholderExamples: [
-      "I want 30 forklifts delivered to Site B by Friday…",
-      "I need a 20-ton crane rental in Riyadh for 2 weeks…",
-      "Looking for 5 concrete mixers with operators included…",
-      "3 excavators, diesel included, starting next Sunday…",
+    // Each example is BOTH the sentence the placeholder types itself through and, shortened, a chip
+    // under the box that writes it in for real. Short on purpose: a placeholder that runs to two
+    // lines reads as content rather than as an invitation.
+    examples: [
+      { chip: "30 forklifts to Site B, 3 weeks", text: "I want 30 forklifts delivered to Site B by Friday, for 3 weeks" },
+      { chip: "Crane rental in Riyadh", text: "I need a 20-ton crane rental in Riyadh for 2 weeks" },
+      { chip: "Mixers with operators", text: "Looking for 5 concrete mixers with operators included" },
+      { chip: "Excavators with diesel included", text: "3 excavators, diesel included, starting next Sunday" },
     ],
-    attachTitle: "Attach RFQ files",
-    dropTitleNew: "Drop your RFQ files here",
-    readyToReview: "Ready to review",
+    uploadRfq: "Upload RFQ",
     addSomething: "Add a description or a file",
     continueLabel: "Continue",
     pastePlaceholder: "Write your request in plain words — e.g. “I need a 30-ton forklift at King Khalid Airport, Riyadh, for 3 weeks starting next Sunday, with an operator and diesel included, delivered to site.”\n\nYou can also paste an email, or an equipment list.",
@@ -1150,11 +1145,16 @@ export const en = {
     // as. A red distance is not a bad distance — it is a distance nobody has promised — and that is
     // exactly the sentence a renter could not get from a chip, so the first press explains it before
     // it asks anything.
-    eqYardExplainTitle: "This distance is not confirmed",
-    eqYardExplainBody:
-      "It is where this machine stands today. The supplier has not named the yard it would move from for this offer, so nothing here promises it will come from that distance — or that it is free at all.",
-    eqYardExplainHow:
-      "Ask him to set the yard. Once he does, the distance turns green and this machine is confirmed for your offer.",
+    eqYardExplainTitle: "How this distance works",
+    // Three steps, in the order they happen. It replaced two paragraphs that said the same true
+    // things in prose (owner, 2026-08-31) — prose is where a renter looking at a red number stops
+    // reading, and what he wants to know is where he is in a flow and what the end of it gets him.
+    eqYardStep1T: "Today it stands here",
+    eqYardStep1B: "This is the machine's own location right now, read off its file — not a delivery distance quoted for your job.",
+    eqYardStep2T: "Nobody has promised it",
+    eqYardStep2B: "The supplier hasn't named the yard this machine would move from for your offer, so red means unanswered — not refused, and not unavailable.",
+    eqYardStep3T: "Ask him, and it turns green",
+    eqYardStep3B: "The question goes into your chat with him, ready to send. When he names the yard, this distance turns green and the machine counts as confirmed for your offer.",
     eqYardExplainCta: "Ask the supplier",
     eqYardExplainLater: "Not now",
     // The same surface, in the state where the question is already out. It shows what was asked and
@@ -1857,13 +1857,11 @@ export const en = {
       kindRequest: "Request",
       site: "site",
       basis: "basis",
-      dates: "dates",
-      hours: "hrs/day",
-      noDates: "no dates yet",
-      more: "+ more project defaults",
-      paymentTerms: "Payment terms",
-      extendable: "Extendable",
-      sheetNote: "These are this project's values. Edit any of them on the next screen — changes stay on this request.",
+      start: "start",
+      end: "end",
+      paymentTerms: "payment",
+      extendable: "extendable",
+      editNote: "Every value above is this project's, and editing one here changes only this request.",
       conflict: "You wrote {spoken}, which is not this project's site.",
       keepMine: "Keep what I wrote",
       useProject: "Use the project's site",

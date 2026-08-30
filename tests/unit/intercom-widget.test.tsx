@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { IntercomWidget } from "@/components/support/IntercomWidget";
@@ -19,6 +19,10 @@ import type { IntercomServerIdentity } from "@/lib/support/intercom";
  */
 
 const session = vi.hoisted(() => ({ value: { status: "loading" as string, user: null as unknown } }));
+/** The route the launcher thinks it is on — it draws only on the nav's four tabs. */
+const route = { value: "/" };
+vi.mock("next/navigation", () => ({ usePathname: () => route.value }));
+
 vi.mock("@/lib/session", () => ({ useSession: () => session.value }));
 const locale = vi.hoisted(() => ({ value: { locale: "en", dir: "ltr" } }));
 vi.mock("@/lib/i18n", () => ({ useLocale: () => locale.value }));
@@ -192,5 +196,56 @@ describe("the launcher", () => {
   it("subscribes to the unread count", async () => {
     await renderWith(null);
     expect(commands()).toContain("onUnreadCountChange");
+  });
+});
+
+/**
+ * Where the bubble is allowed to appear (owner, 2026-08-31).
+ *
+ * It used to be mounted in the root layout and therefore drawn on every route the app has — including
+ * the equipment map, a full-bleed canvas that carries its own chat dock in the same corner. Two
+ * bubbles competing for one corner is the problem the mobile app solved by hiding Intercom's own
+ * launcher; the web had reintroduced it.
+ *
+ * The rule mirrors `AppNav.isActive` exactly — `/` matches only itself, the others own their subtree
+ * — so the bubble is present precisely where a nav tab is lit.
+ */
+describe("where the launcher draws", () => {
+  /** Render at `path`, answer whether the bubble is there, and take it back down.
+   *  Unmounted explicitly because these checks loop inside ONE test, and Testing Library's automatic
+   *  cleanup runs between tests — without this the second render finds two launchers in the DOM. */
+  const shows = async (path: string) => {
+    route.value = path;
+    const view = await renderWith(null);
+    const found = view.queryByRole("button", { name: "Support" }) !== null;
+    view.unmount();
+    return found;
+  };
+
+  afterEach(() => {
+    route.value = "/";
+  });
+
+  it("draws on each of the four nav tabs", async () => {
+    for (const path of ["/", "/browse", "/requests", "/company"]) {
+      expect(await shows(path), path).toBe(true);
+    }
+  });
+
+  it("draws on a tab's own subtree", async () => {
+    // `/requests?g=…` and `/company/documents` are still the tab the renter is on.
+    expect(await shows("/requests/abc")).toBe(true);
+    expect(await shows("/company/documents")).toBe(true);
+  });
+
+  it("does NOT draw on the equipment map", async () => {
+    // The route this change exists for: a full-bleed canvas with a chat dock of its own.
+    expect(await shows("/bids/abc/equipment")).toBe(false);
+  });
+
+  it("does not draw on the other routes outside the nav", async () => {
+    for (const path of ["/create", "/deal-room/abc", "/bid/tok", "/login", "/profile"]) {
+      expect(await shows(path), path).toBe(false);
+    }
   });
 });

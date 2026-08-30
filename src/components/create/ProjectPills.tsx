@@ -6,11 +6,26 @@
  * Replaces the chip row once a site is picked, in the same strip inside the intake card, so nothing
  * jumps when you choose one.
  *
+ * ── The strip belongs to the box you are typing in ───────────────────────────────────────────────
+ *
+ * No rule above it, the same ground as the textarea, and the card's own padding continued: it reads
+ * as the bottom of the compose field rather than as a separate panel that happens to sit under it
+ * (owner, 2026-08-30). The values are still NOT in the textarea — that is a native control holding
+ * the renter's own words, and keeping it to those words is what keeps the agent's input small.
+ *
+ * ── Every value is a control, and looks like one ─────────────────────────────────────────────────
+ *
+ * Basis, start, end, extendable and payment terms are each an editable pill with a caret or a date
+ * field, not text with an edit hidden behind a hover. A read-only summary sitting where the renter
+ * expects to be able to answer sends them hunting for the screen that owns it — so the pill IS the
+ * screen that owns it. The site pill is the one exception: changing where the work happens means
+ * choosing a different project, not typing over a label.
+ *
  * ── Every edit here is REQUEST-LOCAL ─────────────────────────────────────────────────────────────
  *
- * Change *hrs/day* to 12 and Qiddiya still says 10. The pills edit a copy the intake screen holds,
- * and the project is never written from this surface (PROJ-AC-25). Editing the site itself is a
- * separate, deliberate act on the project page, which then asks whether the change should reach
+ * Change the basis to weekly and Qiddiya still says monthly. The pills edit a copy the intake screen
+ * holds, and the project is never written from this surface (PROJ-AC-25). Editing the site itself is
+ * a separate, deliberate act on the project page, which then asks whether the change should reach
  * anything already filed under it.
  *
  * A changed pill is **marked**, and the field it covers reads `renter` rather than `project` on the
@@ -36,47 +51,121 @@ import { useRfq } from "@/lib/store/rfq-store";
 import { shortSite } from "@/lib/contract/project";
 import { listTemplates, fetchTemplateTerms } from "@/lib/api/client";
 import type { TemplateOption } from "@/lib/contract/project-apply";
-import { RENTAL_BASES, type RentalBasis } from "@/lib/contract/options";
+import { RENTAL_BASES, PAYMENT_TERMS, type RentalBasis, type PaymentTerm } from "@/lib/contract/options";
 import { Icon } from "@/components/ui";
 
 /* ----------------------------- One pill ----------------------------- */
 
+/** Three tones, and the same three wherever a pill appears in the strip. */
+function tone(changed?: boolean, conflict?: boolean) {
+  return conflict
+    ? "border-danger bg-danger/5 text-danger"
+    : changed
+      ? "border-brand bg-brand-soft text-navy"
+      : "border-border bg-surface text-navy";
+}
+
+const LABEL = "font-semibold uppercase tracking-[.03em] opacity-60";
+
+/** A pill that only reports. The site, and nothing else. */
 function Pill({
   label,
   value,
   changed,
   conflict,
-  onClick,
-  children,
 }: {
   label: string;
   value: ReactNode;
   changed?: boolean;
   conflict?: boolean;
-  onClick?: () => void;
-  children?: ReactNode;
 }) {
-  const tone = conflict
-    ? "border-danger bg-danger/5 text-danger"
-    : changed
-      ? "border-brand bg-brand-soft text-navy"
-      : "border-border bg-surface text-navy";
-
   return (
-    <span className={`relative flex items-center gap-1.5 rounded-full border px-3 py-1 text-label ${tone}`}>
-      <span className="font-semibold uppercase tracking-[.03em] opacity-60">{label}</span>
-      {onClick ? (
-        <button type="button" onClick={onClick} className="font-semibold underline-offset-2 hover:underline">
-          {value}
-        </button>
-      ) : (
-        <span className="font-semibold">{value}</span>
-      )}
-      {/* The changed dot. A renter scanning the strip has to be able to see, without opening
-          anything, which values are no longer their site's. */}
+    <span className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-label ${tone(changed, conflict)}`}>
+      <span className={LABEL}>{label}</span>
+      <span className="font-semibold">{value}</span>
       {changed && !conflict && <span aria-hidden className="text-meta leading-none text-brand">●</span>}
-      {children}
     </span>
+  );
+}
+
+/**
+ * A pill that is a dropdown.
+ *
+ * The native `select` covers the whole pill at zero opacity, so the whole thing is the hit target
+ * and the menu opens where the platform puts it — a custom menu here would be a second listbox to
+ * keyboard-support for the sake of matching a border radius. The caret is what says so before the
+ * renter clicks: without it this is text that happens to react.
+ */
+function PillSelect<T extends string>({
+  label,
+  value,
+  options,
+  optionLabel,
+  empty = "—",
+  changed,
+  onChange,
+}: {
+  label: string;
+  value: T | null;
+  options: readonly T[];
+  optionLabel?: (v: T) => string;
+  empty?: string;
+  changed?: boolean;
+  onChange: (v: T | null) => void;
+}) {
+  return (
+    <span className={`relative flex items-center gap-1.5 rounded-full border px-3 py-1 text-label transition hover:border-brand ${tone(changed)}`}>
+      <span className={LABEL}>{label}</span>
+      <span className="font-semibold">{value ? (optionLabel ? optionLabel(value) : value) : empty}</span>
+      {changed && <span aria-hidden className="text-meta leading-none text-brand">●</span>}
+      <Icon name="expand_more" size={13} className="flex-none opacity-60" />
+      <select
+        aria-label={label}
+        value={value ?? ""}
+        onChange={(e) => onChange((e.target.value || null) as T | null)}
+        className="absolute inset-0 cursor-pointer opacity-0"
+      >
+        <option value="">{empty}</option>
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {optionLabel ? optionLabel(o) : o}
+          </option>
+        ))}
+      </select>
+    </span>
+  );
+}
+
+/**
+ * A pill that is a date.
+ *
+ * The native date input sits IN the pill rather than under it: a date is typed or picked, so an
+ * overlay would have to reproduce a calendar. Its own picker glyph is the affordance, which is why
+ * this one carries no caret.
+ */
+function PillDate({
+  label,
+  value,
+  changed,
+  onChange,
+}: {
+  label: string;
+  value: string | null;
+  changed?: boolean;
+  onChange: (v: string | null) => void;
+}) {
+  return (
+    <label className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-label transition hover:border-brand ${tone(changed)}`}>
+      <span className={LABEL}>{label}</span>
+      <input
+        type="date"
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value || null)}
+        aria-label={label}
+        className="w-[112px] cursor-pointer bg-transparent font-semibold text-inherit outline-none"
+      />
+      {changed && <span aria-hidden className="text-meta leading-none text-brand">●</span>}
+    </label>
   );
 }
 
@@ -85,7 +174,6 @@ function Pill({
 export function ProjectPills() {
   const t = useT();
   const { state, actions } = useRfq();
-  const [sheet, setSheet] = useState(false);
   const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [picking, setPicking] = useState(false);
 
@@ -141,13 +229,10 @@ export function ProjectPills() {
   const conflict =
     spoken && shortSite(spoken).toLowerCase() !== shortSite(project.location.label).toLowerCase() ? spoken : null;
 
-  const dates =
-    timing.startDate && timing.endDate
-      ? `${timing.startDate} → ${timing.endDate}`
-      : (timing.startDate ?? timing.endDate ?? t.projects.pills.noDates);
-
   return (
-    <div className="flex flex-col gap-2 border-t border-border px-5 py-3">
+    /* No top border, and the card's own horizontal padding: the strip is the floor of the box the
+       renter is typing in, not a tray bolted under it. */
+    <div className="flex flex-col gap-2 px-5 pb-4 pt-1">
       <div className="flex flex-wrap items-center gap-2">
         {/* The site itself, with the way out. Deselecting drops every prefill (PROJ-AC-26). */}
         <span className="flex items-center gap-1.5 rounded-full border border-brand bg-brand-soft px-3 py-1 text-label font-semibold text-navy">
@@ -170,41 +255,56 @@ export function ProjectPills() {
           conflict={!!conflict}
         />
 
-        <Pill label={t.projects.pills.basis} value={timing.rentalBasis ?? "—"} changed={dirty("timing.rental_basis")}>
-          <select
-            value={timing.rentalBasis ?? ""}
-            onChange={(e) =>
-              actions.patchProjectDefaults({ rentalBasis: (e.target.value || null) as RentalBasis | null }, [
-                "timing.rental_basis",
-              ])
-            }
-            aria-label={t.projects.pills.basis}
-            className="absolute inset-0 cursor-pointer opacity-0"
-          >
-            <option value="">—</option>
-            {RENTAL_BASES.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-        </Pill>
+        {/* ── The period, in the order it is read: on what footing, from when, to when, and whether
+            the end is soft. Each one its own pill, because "dates: A → B" was a single value the
+            renter could not put a caret into. */}
+        <PillSelect<RentalBasis>
+          label={t.projects.pills.basis}
+          value={timing.rentalBasis}
+          options={RENTAL_BASES}
+          changed={dirty("timing.rental_basis")}
+          onChange={(v) => actions.patchProjectDefaults({ rentalBasis: v }, ["timing.rental_basis"])}
+        />
 
-        <Pill label={t.projects.pills.dates} value={dates} />
+        <PillDate
+          label={t.projects.pills.start}
+          value={timing.startDate}
+          changed={dirty("timing.start_date")}
+          onChange={(v) => actions.patchProjectDefaults({ startDate: v }, ["timing.start_date"])}
+        />
 
-        <button
-          type="button"
-          onClick={() => setSheet((v) => !v)}
-          className="rounded-full border border-dashed border-border px-3 py-1 text-label font-semibold text-muted transition hover:border-brand hover:text-brand"
-        >
-          {t.projects.pills.more}
-        </button>
+        <PillDate
+          label={t.projects.pills.end}
+          value={timing.endDate}
+          changed={dirty("timing.end_date")}
+          onChange={(v) => actions.patchProjectDefaults({ endDate: v }, ["timing.end_date"])}
+        />
+
+        {/* Yes/no as a dropdown rather than a checkbox, so it carries a label and a value like every
+            other pill beside it. A lone tickbox in a row of values reads as an action. */}
+        <PillSelect<"yes" | "no">
+          label={t.projects.pills.extendable}
+          value={timing.extendable ? "yes" : "no"}
+          options={["yes", "no"] as const}
+          optionLabel={(v) => (v === "yes" ? t.common.yes : t.common.no)}
+          empty={t.common.no}
+          changed={dirty("timing.extendable")}
+          onChange={(v) => actions.patchProjectDefaults({ extendable: v === "yes" }, ["timing.extendable"])}
+        />
+
+        <PillSelect<PaymentTerm>
+          label={t.projects.pills.paymentTerms}
+          value={project.defaults.paymentTerms}
+          options={PAYMENT_TERMS}
+          changed={dirty("preferences.payment_terms")}
+          onChange={(v) => actions.patchProjectTerms(v)}
+        />
 
         {/* Start from — copies how this renter HIRES at this site, and never what they are hiring.
             Rendered only when the site actually has something to copy. */}
         {templates.length > 0 && (
-          <label className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-label text-navy">
-            <span className="font-semibold uppercase tracking-[.03em] opacity-60">{t.projects.pills.startFrom}</span>
+          <label className="relative flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-label text-navy transition hover:border-brand">
+            <span className={LABEL}>{t.projects.pills.startFrom}</span>
             <select
               disabled={picking}
               value={state.workOrderGroupId ?? ""}
@@ -245,25 +345,12 @@ export function ProjectPills() {
         </div>
       )}
 
-      {/* The rest of the site's values, read-only here: they are ordinary request fields on the
-          canvas, which is where they are edited with their own labels and their own validation. */}
-      {sheet && (
-        <div className="grid gap-1.5 rounded-sm border border-border bg-surface2/50 px-3 py-2.5 text-meta text-navy sm:grid-cols-2">
-          <div>
-            <span className="text-muted">{t.projects.pills.paymentTerms}: </span>
-            {project.defaults.paymentTerms ?? "—"}
-          </div>
-          <div>
-            <span className="text-muted">{t.projects.pills.extendable}: </span>
-            {project.defaults.timing.extendable ? t.common.yes : t.common.no}
-          </div>
-          <div className="sm:col-span-2 text-muted">{t.projects.pills.sheetNote}</div>
-        </div>
-      )}
-
-      {/* Without this, a strip of filled values reads as a finished request. */}
+      {/* Two things at once: these came from the site and changing one here changes only this
+          request, and the machine is still the renter's to type. Without the second half a strip of
+          filled values reads as a finished request. */}
       <p className="text-meta text-muted">
-        <b className="font-semibold text-navy">{t.projects.pills.captionLead}</b> {t.projects.pills.caption}
+        <b className="font-semibold text-navy">{t.projects.pills.captionLead}</b> {t.projects.pills.caption}{" "}
+        {t.projects.pills.editNote}
       </p>
     </div>
   );

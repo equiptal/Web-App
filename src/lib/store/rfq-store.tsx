@@ -32,6 +32,7 @@ import {
 import { decideTier } from "@/lib/agent/tier";
 import { quickResultToDraft, quickItemsToDraft } from "@/lib/agent/quick-draft";
 import type { SiteLocation, ProjectDefaults, ProjectSummary } from "@/lib/contract/project";
+import type { PaymentTerm } from "@/lib/contract/options";
 import { projectTitle } from "@/lib/contract/project";
 import { applyProjectDefaults, applyMachineTerms } from "@/lib/contract/project-apply";
 import type { MachineTerms } from "@/lib/contract/work-order";
@@ -232,6 +233,7 @@ type Action =
   | { t: "SELECT_PROJECT"; project: ProjectSummary }
   | { t: "CLEAR_PROJECT" }
   | { t: "PATCH_PROJECT_DEFAULTS"; patch: Partial<TimingHours>; keys: string[] }
+  | { t: "PATCH_PROJECT_TERMS"; paymentTerms: PaymentTerm | null }
   | { t: "PATCH_PROJECT_SITE"; location: SiteLocation }
   | { t: "SET_WORK_ORDER_SOURCE"; groupId: string | null }
   | { t: "USE_TEMPLATE"; terms: MachineTerms | null; groupId: string | null; when: { startDate: string | null; endDate: string | null } | null }
@@ -408,6 +410,16 @@ export function reducer(state: RfqState, a: Action): RfqState {
           defaults: { ...state.project.defaults, timing: { ...state.project.defaults.timing, ...a.patch } },
         },
         projectDirty: [...new Set([...state.projectDirty, ...a.keys])],
+      };
+    /* The one commercial term, edited from the same strip and under the same rule. Its dirty key is
+       the draft path `applyProjectDefaults` fills, not a defaults path, because that is what
+       `touchedFields` is compared against on the canvas. */
+    case "PATCH_PROJECT_TERMS":
+      if (!state.project) return state;
+      return {
+        ...state,
+        project: { ...state.project, defaults: { ...state.project.defaults, paymentTerms: a.paymentTerms } },
+        projectDirty: [...new Set([...state.projectDirty, "preferences.payment_terms"])],
       };
     case "PATCH_PROJECT_SITE":
       if (!state.project) return state;
@@ -726,6 +738,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
     clearProject: () => dispatch({ t: "CLEAR_PROJECT" }),
     patchProjectDefaults: (patch: Partial<TimingHours>, keys: string[]) =>
       dispatch({ t: "PATCH_PROJECT_DEFAULTS", patch, keys }),
+    patchProjectTerms: (paymentTerms: PaymentTerm | null) => dispatch({ t: "PATCH_PROJECT_TERMS", paymentTerms }),
     patchProjectSite: (location: SiteLocation) => dispatch({ t: "PATCH_PROJECT_SITE", location }),
     setWorkOrderSource: (groupId: string | null) => dispatch({ t: "SET_WORK_ORDER_SOURCE", groupId }),
     useTemplate: (

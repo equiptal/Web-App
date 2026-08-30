@@ -407,7 +407,9 @@ describe("the card carries three things, and the ask is the largest of them", ()
   });
 
   it("still takes the ask's ink from the model, never from the stylesheet (RM3-AC-33)", () => {
-    // The control moved and grew; the one place its colour is decided did not.
+    // The prompt this ink used to paint is gone (owner, 2026-08-31) and the distance button IS the
+    // ask now — so the inline style moved onto the button. The one place the colour is decided did
+    // not move: a stylesheet-only red here would put the model out of the loop on AC-33.
     expect(list).toMatch(/style=\{askAvailability \? \{ color: askAvailability\.colour \} : undefined\}/);
   });
 
@@ -840,28 +842,37 @@ describe("no ask control on this surface writes — they compose (owner, 2026-08
 describe("the distance and its state read whole at any panel width", () => {
   const css = read(CSS);
 
-  it("gives the distance the text column's full width, sharing its line with nothing", () => {
+  it("centres the distance and lets it hug its own figure", () => {
+    // ~~Full width.~~ The prompt that shared this line is gone (owner, 2026-08-31), and a stretched
+    // block behind a two-digit figure was a band of empty card. It hugs and centres instead, so
+    // every card's number sits on one vertical axis whatever the panel's width.
     const yard = cssBlock(css, ".bidmap .bm-eq .bm-eq-yard {");
-    expect(yard).toMatch(/width:\s*100%/);
+    expect(yard).toMatch(/width:\s*auto/);
+    expect(yard).toMatch(/align-self:\s*center/);
+    expect(yard).toMatch(/justify-content:\s*center/);
+    // It may never widen the card: a long figure is capped by the column, not by the card growing.
+    expect(yard).toMatch(/max-width:\s*100%/);
     // The card is a row — the picture in its 104px cell, the text beside it — and the text column is
-    // the column: the corner controls, the distance and the model each own their line inside it.
+    // the column: the corner control, the distance, the model and the foot each own their line.
     expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-in {")).toMatch(/align-items:\s*stretch/);
     expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-tx {")).toMatch(/flex-direction:\s*column/);
     // …and it can shrink, which is what lets the model line ellipsise rather than widen the card.
     expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-tx {")).toMatch(/min-width:\s*0/);
   });
 
-  it("wraps the prompt rather than letting it eat the number", () => {
-    // With the picture back in its cell the text column is ~262px, and the distance plus «Ask him to
-    // confirm» do not both fit — the same squeeze that used to truncate the old availability chip to
-    // «Not confirmed …». Nothing on the row shrinks and the row wraps instead, so the figure reads
-    // whole at every width.
-    const yard = cssBlock(css, ".bidmap .bm-eq .bm-eq-yard {");
-    expect(yard).toMatch(/flex-wrap:\s*wrap/);
-    // A row that wraps needs a row-gap, or the two lines touch.
-    expect(yard).toMatch(/gap:\s*\d+px\s+\d+px/);
-    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-yardq {")).toMatch(/flex-shrink:\s*0/);
-    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-yardq {")).toMatch(/white-space:\s*nowrap/);
+  it("states the file's completeness as a bar in the card's trailing foot", () => {
+    // ~~One dot per requirement.~~ Dots made the reader count sockets to learn a fraction (owner,
+    // 2026-08-31). The bar shows how far along and the figure beside it keeps both numbers.
+    expect(css).not.toMatch(/\.bm-eq-rdot/);
+    const foot = cssBlock(css, ".bidmap .bm-eq .bm-eq-ft {");
+    expect(foot).toMatch(/justify-content:\s*flex-end/);
+    // `margin-top: auto` is what pins it to the BOTTOM of a text column whose card may be taller.
+    expect(foot).toMatch(/margin-top:\s*auto/);
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-rdbar {")).toMatch(/border-radius:\s*999px/);
+    // The colour is the readiness band's, never availability's — three bands, three fills.
+    for (const band of ["green", "yellow", "red"]) {
+      expect(css).toContain(`.bidmap .bm-eq .bm-eq-rd.${band} .bm-eq-rdfill`);
+    }
   });
 
   it("keeps the panel's width and the resize floor in step", () => {

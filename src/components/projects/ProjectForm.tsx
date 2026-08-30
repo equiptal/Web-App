@@ -107,7 +107,7 @@ export function ProjectForm({
   const patchTiming = (patch: Partial<ProjectDefaults["timing"]>) =>
     onChange({ ...value, defaults: { ...value.defaults, timing: { ...timing, ...patch } } });
 
-  /** The address is the one required field. A site with no place is not a site. */
+  /** The location is the one required field. A site with no place is not a site. */
   const canSave = value.location.label.trim().length > 0 && !saving;
 
   const eligible = useMemo(() => (rows ?? []).filter((r) => r.eligible), [rows]);
@@ -125,53 +125,11 @@ export function ProjectForm({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* ── 1 · When ──
-          Dates first, because a renter picking a site has usually just been told the dates — the
-          address they can point at on the map, but the schedule is the thing they were given.
-
-          Four fields on ONE row: start · end · extendable · basis. They are one question ("how long,
-          and on what footing?") and splitting them down a column made a two-field form look like a
-          six-field one. */}
-      <section className="flex flex-col gap-3">
-        <h3 className="text-subhead font-extrabold text-navy">{t.projects.form.whenTitle}</h3>
-
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label={t.projects.form.start}>
-            <input type="date" className={input} value={timing.startDate ?? ""} onChange={(e) => patchTiming({ startDate: e.target.value || null })} />
-          </Field>
-
-          {/* Dates stay empty rather than being invented. A site with no dates yet is honest. */}
-          <Field label={t.projects.form.end}>
-            <input type="date" className={input} value={timing.endDate ?? ""} onChange={(e) => patchTiming({ endDate: e.target.value || null })} />
-          </Field>
-
-          <Field label={t.projects.form.extendableLabel}>
-            {/* A control-height row so the checkbox lines up with the three inputs beside it rather
-                than floating against their labels. */}
-            <label className="flex h-[38px] items-center gap-2 rounded-sm border border-border bg-surface px-3 text-body text-navy">
-              <input type="checkbox" checked={timing.extendable} onChange={(e) => patchTiming({ extendable: e.target.checked })} />
-              {t.projects.form.extendableYes}
-            </label>
-          </Field>
-
-          <Field label={t.projects.form.basis}>
-            <select
-              className={input}
-              value={timing.rentalBasis ?? ""}
-              onChange={(e) => patchTiming({ rentalBasis: (e.target.value || null) as RentalBasis | null })}
-            >
-              <option value="">—</option>
-              {RENTAL_BASES.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-      </section>
-
-      {/* ── 2 · Where ── */}
+      {/* ── 1 · Where ──
+          The place leads, because the place is what a project IS: the dates can change and the
+          payment terms can change, but a project whose location moves is a different project. It is
+          also the only required field, so asking it first means the renter can never fill a screen
+          and then be told the one thing that mattered is still missing. */}
       <section className="flex flex-col gap-3">
         <h3 className="text-subhead font-extrabold text-navy">{t.projects.form.whereTitle}</h3>
 
@@ -201,35 +159,82 @@ export function ProjectForm({
         </Field>
       </section>
 
-      {/* ── 3 · Payment ──
-          Alone, because it is the one COMMERCIAL term a project holds and it comes from a different
-          part of the renter's company than the dates or the address do. Sitting it beside them
-          implied a fourth scheduling field. */}
-      <section className="flex flex-col gap-1.5">
-        <h3 className="text-subhead font-extrabold text-navy">{t.projects.form.paymentTitle}</h3>
+      {/* ── 2 · When & terms ──
+          One section, not two. The renter's own prototype (owner, 2026-08-30) puts the schedule and
+          the payment terms under a single heading, and it is right: both are *terms of the hire on
+          this site*, and splitting them made the dialog read as three questions when it asks two.
 
-        <div className="sm:max-w-[280px]">
-          <Field label={t.projects.form.paymentTerms}>
+          Four fields on ONE row — basis · start · end · extendable — because they are one question
+          ("how long, and on what footing?"). `extendable` takes the fourth slot beside END, where
+          the prototype had hours/day: it qualifies the end date, so it belongs next to it. The
+          dialog is sized to hold all four abreast (see the `xl` at the call site); a wrapped fourth
+          field reads as a separate question.
+
+          Payment terms drop to their own row rather than becoming a fifth column — they come from a
+          different part of the renter's company than the dates do, and a row of five would have
+          implied a fifth scheduling field. */}
+      <section className="flex flex-col gap-3">
+        <h3 className="text-subhead font-extrabold text-navy">{t.projects.form.whenTitle}</h3>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label={t.projects.form.basis}>
             <select
               className={input}
-              value={value.defaults.paymentTerms ?? ""}
-              onChange={(e) =>
-                onChange({ ...value, defaults: { ...value.defaults, paymentTerms: (e.target.value || null) as PaymentTerm | null } })
-              }
+              value={timing.rentalBasis ?? ""}
+              onChange={(e) => patchTiming({ rentalBasis: (e.target.value || null) as RentalBasis | null })}
             >
               <option value="">—</option>
-              {PAYMENT_TERMS.map((p) => (
-                <option key={p} value={p}>
-                  {p}
+              {RENTAL_BASES.map((b) => (
+                <option key={b} value={b}>
+                  {b}
                 </option>
               ))}
             </select>
           </Field>
+
+          <Field label={t.projects.form.start}>
+            <input type="date" className={input} value={timing.startDate ?? ""} onChange={(e) => patchTiming({ startDate: e.target.value || null })} />
+          </Field>
+
+          {/* Dates stay empty rather than being invented. A site with no dates yet is honest. */}
+          <Field label={t.projects.form.end}>
+            <input type="date" className={input} value={timing.endDate ?? ""} onChange={(e) => patchTiming({ endDate: e.target.value || null })} />
+          </Field>
+
+          <Field label={t.projects.form.extendableLabel}>
+            {/* A control-height row so the checkbox lines up with the three inputs beside it rather
+                than floating against their labels. */}
+            <label className="flex h-[38px] items-center gap-2 rounded-sm border border-border bg-surface px-3 text-body text-navy">
+              <input type="checkbox" checked={timing.extendable} onChange={(e) => patchTiming({ extendable: e.target.checked })} />
+              {t.projects.form.extendableYes}
+            </label>
+          </Field>
         </div>
 
-        {/* One line, never two. It sits under a 280px control on a much wider dialog, so it has the
-            room — and a hint that wraps reads as a warning rather than as a note. */}
-        <p className="overflow-hidden text-ellipsis whitespace-nowrap text-meta text-muted">{t.projects.form.paymentHint}</p>
+        <div className="flex flex-col gap-1.5">
+          <div className="sm:max-w-[280px]">
+            <Field label={t.projects.form.paymentTerms}>
+              <select
+                className={input}
+                value={value.defaults.paymentTerms ?? ""}
+                onChange={(e) =>
+                  onChange({ ...value, defaults: { ...value.defaults, paymentTerms: (e.target.value || null) as PaymentTerm | null } })
+                }
+              >
+                <option value="">—</option>
+                {PAYMENT_TERMS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          {/* One line, never two. It sits under a 280px control on a much wider dialog, so it has the
+              room — and a hint that wraps reads as a warning rather than as a note. */}
+          <p className="overflow-hidden text-ellipsis whitespace-nowrap text-meta text-muted">{t.projects.form.paymentHint}</p>
+        </div>
       </section>
 
       {/* ── What is already filed here (edit only) ── */}
