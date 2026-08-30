@@ -219,7 +219,12 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
             account controls take white at reduced strength, and the hairlines become white/15. Where a
             control keeps a light ground of its own — the account menu, the nav sheet — it stays light,
             because it is a surface, not part of the bar. */}
-        <header {...pin("app-header")} className="sticky top-0 z-30 flex h-[52px] items-center gap-3 border-b border-white/10 bg-navy px-4 text-white sm:px-7 relative">
+        {/* ~~`border-b border-white/10`.~~ Removed (owner, 2026-08-30). White at 10% over `--navy`
+            computes to #333d4c, and against the hero band directly beneath it that read as a thin
+            white hairline rather than as an edge. The bar does not need one: it is navy, the page
+            under it is not, and where the hero DOES sit under it the two navies meet and the join is
+            the point — a rule drawn across it is the only thing that ever made it visible. */}
+        <header {...pin("app-header")} className="sticky top-0 z-30 flex h-[52px] items-center gap-3 bg-navy px-4 text-white sm:px-7 relative">
           {/* ~~The Back arrow led this row.~~ It is on the PAGE now, under the bar (owner,
               2026-08-26) — see `usePageBack` and the block at the top of `<main>`. The bar carries
               only what is true of the app on every route; back is true of one page. */}

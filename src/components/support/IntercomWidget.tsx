@@ -252,14 +252,22 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
  * | `chat_bubble.dart` | here |
  * |---|---|
  * | 56×56 circle | the same |
- * | `AppColors.orange` → `#D4570A`, top-left to bottom-right | `--brand` (the same #f79009) → `#d4570a` |
+ * | `AppColors.orange` → `#D4570A`, top-left to bottom-right | **flat `--brand`** — see below |
  * | `Icons.chat_bubble_outline_rounded`, white, 28 | Material Symbols Rounded `chat_bubble` at FILL 0 — the same glyph from the same family |
  * | unread badge, `AppColors.danger`, white, 11 | the same, on `--danger` |
  * | `AppShadows.float` | NOTHING — this app has no shadows (`globals.css`, owner 2026-08-26) |
  *
- * The shadow is the one deliberate difference: the whole `--shadow-*` namespace is cleared here, and
- * a floating control is not the place to reintroduce it. Separation comes from the gradient, which
- * carries against every surface on the ramp.
+ * TWO deliberate differences from the app, both owner calls:
+ *
+ *  · **No shadow.** The whole `--shadow-*` namespace is cleared here, and a floating control is not
+ *    the place to reintroduce it.
+ *  · **No gradient** (2026-08-30). The app's bubble runs #f79009 → #D4570A; this one is flat
+ *    `--brand`, because the instruction was one orange for every control on the web and this bubble
+ *    was the only thing carrying a second. It is a knowing divergence from `chat_bubble.dart`, not
+ *    an oversight — if the two are ever reconciled, this is the line to change.
+ *
+ * Separation from the page comes from the size and the ground beneath it, both of which the app's
+ * own bubble also relies on once its shadow is taken away.
  *
  * Not draggable, unlike the app's. The app moves it because a phone screen is small enough for a
  * fixed bubble to sit on top of something that matters; at this width nothing is under it.
@@ -280,7 +288,12 @@ function Launcher({ unread }: { unread: number }) {
         // Logical, not `right`: under Arabic every other floating control on this app sits on the
         // left, and a bubble alone on the right reads as something bolted on.
         insetInlineEnd: "1.5rem",
-        backgroundImage: "linear-gradient(135deg, var(--brand), var(--brand-press))",
+        // ~~`linear-gradient(135deg, var(--brand), var(--brand-press))`.~~ Flat `--brand`, the one
+        // orange every other control on this app is painted in (owner, 2026-08-30: *"show one
+        // orange for all buttons"*). It was the ONLY orange here that was not #f79009 — the
+        // gradient ran down to #cc7207 — and a support bubble is not the place to introduce a
+        // second one. See the note below on what this now differs from.
+        backgroundColor: "var(--brand)",
       }}
     >
       <MIcon name="chat_bubble" size={28} />
