@@ -30,6 +30,7 @@ import {
   removeDocument,
   withFreshVersion,
   ProjectVersionConflict,
+  ApiError,
   type AwardInput,
 } from "@/lib/api/client";
 import {
@@ -73,11 +74,19 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   const [created, setCreated] = useState<ProjectSummary | null>(null);
   const router = useRouter();
 
+  /**
+   * `null` = not answered yet OR not ours to show. `[]` = answered, and this renter has no sites.
+   *
+   * The two must not collapse into one. A guest gets 401 here, and treating that as "no projects
+   * yet" puts a *Your projects · New project* row on a signed-out dashboard — a control that cannot
+   * work, offered to someone who was never asked (PROJ-AC-28).
+   */
   const reload = useCallback(async () => {
     try {
       setProjects(await listProjects());
-    } catch {
-      setProjects([]);
+    } catch (err) {
+      const status = err instanceof ApiError ? err.status : undefined;
+      setProjects(status === 401 || status === 403 ? null : []);
     }
   }, []);
 
