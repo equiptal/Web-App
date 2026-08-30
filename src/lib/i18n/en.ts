@@ -1633,6 +1633,11 @@ export const en = {
       all: "All projects",
     },
     pills: {
+      startFrom: "start from",
+      pickTemplate: "—",
+      templateApplied: "terms copied",
+      kindWorkOrder: "Work order",
+      kindRequest: "Request",
       site: "site",
       basis: "basis",
       dates: "dates",

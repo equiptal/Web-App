@@ -30,10 +30,12 @@
  * simply disagree. That is the point of the independence rule, not a state to resolve away.
  */
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { shortSite } from "@/lib/contract/project";
+import { listTemplates, fetchTemplateTerms } from "@/lib/api/client";
+import type { TemplateOption } from "@/lib/contract/project-apply";
 import { RENTAL_BASES, type RentalBasis } from "@/lib/contract/options";
 import { Icon } from "@/components/ui";
 
@@ -84,9 +86,45 @@ export function ProjectPills() {
   const t = useT();
   const { state, actions } = useRfq();
   const [sheet, setSheet] = useState(false);
+  const [templates, setTemplates] = useState<TemplateOption[]>([]);
+  const [picking, setPicking] = useState(false);
+
+  const projectId = state.project?.id ?? null;
+
+  useEffect(() => {
+    if (!projectId) {
+      setTemplates([]);
+      return;
+    }
+    let live = true;
+    // A site with nothing in it yet has nothing to copy, and that is the normal first case — so a
+    // failure and an empty list land in the same place: no control at all, rather than an error
+    // about a convenience the renter never asked for.
+    listTemplates(projectId)
+      .then((rows) => live && setTemplates(rows))
+      .catch(() => live && setTemplates([]));
+    return () => {
+      live = false;
+    };
+  }, [projectId]);
 
   const project = state.project;
   if (!project) return null;
+
+  async function applyTemplate(id: string) {
+    const option = templates.find((x) => x.id === id);
+    if (!option || !projectId) return;
+    setPicking(true);
+    try {
+      const terms = await fetchTemplateTerms(projectId, option);
+      actions.useTemplate(terms, option.kind === "work_order" ? option.id : null, option.when);
+    } catch {
+      // Nothing is applied and nothing is said. A template is a shortcut; failing to take one
+      // leaves the renter exactly where they were, which is a working request form.
+    } finally {
+      setPicking(false);
+    }
+  }
 
   const { timing } = project.defaults;
   const dirty = (key: string) => state.projectDirty.includes(key);
@@ -178,6 +216,27 @@ export function ProjectPills() {
         >
           {t.projects.pills.more}
         </button>
+
+        {/* Start from — copies how this renter HIRES at this site, and never what they are hiring.
+            Rendered only when the site actually has something to copy. */}
+        {templates.length > 0 && (
+          <label className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-label text-navy">
+            <span className="font-semibold uppercase tracking-[.03em] opacity-60">{t.projects.pills.startFrom}</span>
+            <select
+              disabled={picking}
+              value={state.workOrderGroupId ?? ""}
+              onChange={(e) => void applyTemplate(e.target.value)}
+              className="cursor-pointer bg-transparent font-semibold outline-none"
+            >
+              <option value="">{state.templateTerms ? t.projects.pills.templateApplied : t.projects.pills.pickTemplate}</option>
+              {templates.map((tpl) => (
+                <option key={tpl.id} value={tpl.id}>
+                  {`${tpl.kind === "work_order" ? t.projects.pills.kindWorkOrder : t.projects.pills.kindRequest} · ${tpl.ref}${tpl.machine ? ` · ${tpl.machine}` : ""}`}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
 
       {/* The conflict. Both values stay; the renter picks, and keeping theirs is a valid answer. */}

@@ -169,6 +169,25 @@ export function applyProjectDefaults(
  * nothing about the requests that started from it.
  */
 
+/**
+ * One thing the renter can start from: a work order on this site, or a request already posted for it.
+ *
+ * Labelled `kind · ref · first machine` because none of the three identifies it alone — two work
+ * orders on one site are routinely both called by the site's name, and an RFQ code means nothing
+ * until you see what was in it.
+ */
+export interface TemplateOption {
+  /** A work order's group id, or a request's id. */
+  id: string;
+  kind: "work_order" | "request";
+  /** RFQ-1042, or the work order's title. */
+  ref: string;
+  /** The first machine's name, so two orders with the same title are still told apart. */
+  machine: string;
+  /** The source's OWN period, when it had one. Copied with the terms; null means it inherited. */
+  when: { startDate: string | null; endDate: string | null } | null;
+}
+
 /** Lift the machine terms off an item — what a template stores when a request becomes one. */
 export function machineTermsOf(item: EquipmentItem): MachineTerms {
   return {
@@ -181,6 +200,47 @@ export function machineTermsOf(item: EquipmentItem): MachineTerms {
     fuelResponsibilityOverride: item.fuelResponsibilityOverride,
     safetyCertsOverride: item.safetyCertsOverride ?? null,
     safetyCertsOtherText: item.safetyCertsOtherText ?? null,
+  };
+}
+
+/**
+ * Lift machine terms off a REQUEST's stored item — a past request used as a template.
+ *
+ * The stored request keeps booleans where the draft keeps a party (`mobilizationByRentee: true`
+ * means *me*), so this is a translation and not a copy. Anything the record does not carry comes
+ * back null, which the merge reads as "say nothing" rather than as an answer.
+ */
+export function machineTermsOfRequestItem(item: {
+  operatorIncluded?: "YES" | "NO" | null;
+  operatorNationality?: string | null;
+  nightShiftRequired?: boolean | null;
+  fatRequired?: boolean | null;
+  fuelTypePreference?: string | null;
+  maxEquipmentAge?: number | null;
+  mobilizationByRentee?: boolean | null;
+  demobilizationByRentee?: boolean | null;
+  dieselIncluded?: boolean | null;
+  safetyCertifications?: string[] | null;
+}): MachineTerms {
+  const party = (byRentee: boolean | null | undefined) => (byRentee == null ? null : byRentee ? "me" : "supplier");
+  return {
+    operatorNeeded: (item.operatorIncluded === "YES" ? "yes" : item.operatorIncluded === "NO" ? "no" : null) as MachineTerms["operatorNeeded"],
+    operator: {
+      nationality: (item.operatorNationality ?? null) as MachineTerms["operator"]["nationality"],
+      nationalityCustom: "",
+      certificate: [] as MachineTerms["operator"]["certificate"],
+      certificateOther: "",
+      nightShift: item.nightShiftRequired === true,
+      fatFood: null,
+      fatAccommodationTransport: null,
+    } as MachineTerms["operator"],
+    fuelType: (item.fuelTypePreference ?? null) as MachineTerms["fuelType"],
+    equipmentYear: (item.maxEquipmentAge != null ? String(item.maxEquipmentAge) : null) as MachineTerms["equipmentYear"],
+    deliveryOverride: party(item.mobilizationByRentee) as MachineTerms["deliveryOverride"],
+    returnOverride: party(item.demobilizationByRentee) as MachineTerms["returnOverride"],
+    fuelResponsibilityOverride: (item.dieselIncluded == null ? null : item.dieselIncluded ? "supplier" : "me") as MachineTerms["fuelResponsibilityOverride"],
+    safetyCertsOverride: (item.safetyCertifications ?? null) as MachineTerms["safetyCertsOverride"],
+    safetyCertsOtherText: null,
   };
 }
 

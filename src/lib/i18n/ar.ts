@@ -1372,6 +1372,11 @@ export const ar: Dictionary = {
       all: "كل المشاريع",
     },
     pills: {
+      startFrom: "ابدأ من",
+      pickTemplate: "—",
+      templateApplied: "تم نسخ الشروط",
+      kindWorkOrder: "أمر عمل",
+      kindRequest: "طلب",
       site: "الموقع",
       basis: "الأساس",
       dates: "التواريخ",

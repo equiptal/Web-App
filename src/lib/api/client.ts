@@ -15,7 +15,10 @@ import type { Project, ProjectSummary } from "@/lib/contract/project";
 import { mapProjectSummary, projectToPayload } from "@/lib/contract/project";
 import type { Award, ChartGroup } from "@/lib/contract/award";
 import type { WorkOrderItem, WorkOrderGroup } from "@/lib/contract/work-order";
-import { groupWorkOrderItems } from "@/lib/contract/work-order";
+import { groupWorkOrderItems, termsFromWire } from "@/lib/contract/work-order";
+import type { TemplateOption } from "@/lib/contract/project-apply";
+import { machineTermsOfRequestItem } from "@/lib/contract/project-apply";
+import type { MachineTerms } from "@/lib/contract/work-order";
 
 /** Body of POST /api/me/bids/recommend. user_id is attached server-side. */
 export interface RecommendPayload {
@@ -965,6 +968,59 @@ export async function withFreshVersion<T>(
     const fresh = err.currentVersion ?? (await fetchChart(projectId)).version;
     return write(fresh);
   }
+}
+
+/* ----------------------------- Templates ----------------------------- */
+
+/**
+ * What this site can be started FROM: its work orders and the requests already posted for it.
+ *
+ * Read off the chart, which already carries both kinds with their refs, their first machine and
+ * their own period — so the picker costs the one call the page was going to make anyway.
+ *
+ * **Project-scoped.** A renter's first request on a new site has nothing to copy, even though their
+ * last site's terms are usually right. Cross-project templates are deliberately out of v1: the
+ * moment the list spans sites it needs grouping, search and a rule about which site's terms win,
+ * and none of that earns its place before anyone has asked for it.
+ */
+export async function listTemplates(projectId: string): Promise<TemplateOption[]> {
+  const chart = await fetchChart(projectId);
+  return chart.groups.map((g) => ({
+    id: g.id,
+    kind: g.kind,
+    ref: g.title?.trim() || g.ref,
+    machine: g.items[0]?.label ?? "",
+    when: g.when,
+  }));
+}
+
+/**
+ * The terms behind one template, fetched only when the renter actually picks it.
+ *
+ * **A one-time copy.** The source is never read again, so deleting that work order next month
+ * changes nothing about the requests that started from it.
+ *
+ * It copies the machine TERMS and nothing else. Never the equipment — category, subtype, size,
+ * quantity and accessories always come from the text the renter typed, because a template that
+ * silently added a machine would post an RFQ for something nobody asked for. And never the budget:
+ * a ceiling is a number about one hire, and a stale one filters out every real bid with no error
+ * shown to anyone.
+ */
+export async function fetchTemplateTerms(projectId: string, option: TemplateOption): Promise<MachineTerms | null> {
+  if (option.kind === "work_order") {
+    const groups = await listWorkOrders(projectId);
+    const group = groups.find((g) => g.id === option.id);
+    // The header row's terms. Machines in a group may legitimately differ; the first is the one the
+    // form shows as the shared block, so it is what "start from this order" means.
+    const first = group?.items[0];
+    return first ? termsFromWire(first.terms as unknown) : null;
+  }
+
+  const record = (await fetchRequestDetail(option.id)) as unknown as {
+    equipmentItems?: Parameters<typeof machineTermsOfRequestItem>[0][];
+  };
+  const item = record.equipmentItems?.[0];
+  return item ? machineTermsOfRequestItem(item) : null;
 }
 
 /* ----------------------------- The supplier list ----------------------------- */

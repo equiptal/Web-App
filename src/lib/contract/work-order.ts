@@ -64,6 +64,85 @@ export interface MachineTerms {
   safetyCertsOtherText: EquipmentItem["safetyCertsOtherText"];
 }
 
+/* ----------------------------- The wire shape ----------------------------- */
+
+/**
+ * `terms` **as the backend stores it** — a compact, closed key set, validated on write.
+ *
+ * It is deliberately not {@link MachineTerms}. The stored blob is terse and stable; the in-app
+ * shape mirrors `EquipmentItem` so the merge can write straight onto a draft line. Two names for
+ * one thing is a cost, but the alternative is worse in both directions: storing the app's shape
+ * makes the column follow every rename in `draft.ts`, and using the stored shape in the app makes
+ * every consumer translate it inline, differently, until one of them gets it wrong.
+ *
+ * So the translation happens exactly twice, here, and nowhere else.
+ */
+export interface WireTerms {
+  operator: "yes" | "no" | "optional" | null;
+  nationality: string | null;
+  natCustom: string;
+  opCerts: string[];
+  night: boolean;
+  fatRequired: boolean;
+  fatFood: string | null;
+  fatAT: string | null;
+  safety: string[] | null;
+  safetyOther: string;
+  delivery: string | null;
+  ret: string | null;
+  fuelResp: string | null;
+  year: string | null;
+  fuelType: string | null;
+}
+
+type Op = MachineTerms["operator"];
+
+/** Stored blob → the shape the merge writes onto a draft line. Tolerant: a missing key is absent. */
+export function termsFromWire(raw: unknown): MachineTerms {
+  const w = (raw ?? {}) as Partial<WireTerms>;
+  const operator = {
+    nationality: (w.nationality ?? null) as Op["nationality"],
+    nationalityCustom: w.natCustom ?? "",
+    certificate: (w.opCerts ?? []) as Op["certificate"],
+    certificateOther: "",
+    nightShift: w.night === true,
+    fatFood: (w.fatFood ?? null) as Op["fatFood"],
+    fatAccommodationTransport: (w.fatAT ?? null) as Op["fatAccommodationTransport"],
+  } as Op;
+  return {
+    operatorNeeded: (w.operator ?? null) as MachineTerms["operatorNeeded"],
+    operator,
+    fuelType: (w.fuelType ?? null) as MachineTerms["fuelType"],
+    equipmentYear: (w.year ?? null) as MachineTerms["equipmentYear"],
+    deliveryOverride: (w.delivery ?? null) as MachineTerms["deliveryOverride"],
+    returnOverride: (w.ret ?? null) as MachineTerms["returnOverride"],
+    fuelResponsibilityOverride: (w.fuelResp ?? null) as MachineTerms["fuelResponsibilityOverride"],
+    safetyCertsOverride: (w.safety ?? null) as MachineTerms["safetyCertsOverride"],
+    safetyCertsOtherText: w.safetyOther ?? null,
+  };
+}
+
+/** The shape the merge uses → the stored blob. The only place that writes the wire's key names. */
+export function termsToWire(t: MachineTerms): WireTerms {
+  return {
+    operator: (t.operatorNeeded ?? null) as WireTerms["operator"],
+    nationality: (t.operator?.nationality ?? null) as string | null,
+    natCustom: t.operator?.nationalityCustom ?? "",
+    opCerts: (t.operator?.certificate ?? []) as string[],
+    night: t.operator?.nightShift === true,
+    fatRequired: Boolean(t.operator?.fatFood || t.operator?.fatAccommodationTransport),
+    fatFood: (t.operator?.fatFood ?? null) as string | null,
+    fatAT: (t.operator?.fatAccommodationTransport ?? null) as string | null,
+    safety: (t.safetyCertsOverride ?? null) as string[] | null,
+    safetyOther: t.safetyCertsOtherText ?? "",
+    delivery: (t.deliveryOverride ?? null) as string | null,
+    ret: (t.returnOverride ?? null) as string | null,
+    fuelResp: (t.fuelResponsibilityOverride ?? null) as string | null,
+    year: (t.equipmentYear ?? null) as string | null,
+    fuelType: (t.fuelType ?? null) as string | null,
+  };
+}
+
 /* ----------------------------- The period ----------------------------- */
 
 /**

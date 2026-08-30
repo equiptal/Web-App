@@ -22,7 +22,8 @@ import {
 import { ApiError, ApiErrorKind, fetchTaxonomy, postRfqCorrection, processRfq, submitRequest } from "@/lib/api/client";
 import type { SiteLocation, ProjectDefaults, ProjectSummary } from "@/lib/contract/project";
 import { projectTitle } from "@/lib/contract/project";
-import { applyProjectDefaults } from "@/lib/contract/project-apply";
+import { applyProjectDefaults, applyMachineTerms } from "@/lib/contract/project-apply";
+import type { MachineTerms } from "@/lib/contract/work-order";
 import { draftToRfqCorrection } from "@/lib/api/agent-adapters";
 import { useSession } from "@/lib/session";
 
@@ -126,6 +127,14 @@ export interface RfqState {
   projectDirty: string[];
   /** Provenance only — the work order a template was copied from (W-T9). Changes no rendering. */
   workOrderGroupId: string | null;
+  /**
+   * The machine terms lifted off a template, waiting for the agent to return.
+   *
+   * Held rather than applied, because at intake there are no draft lines to apply them to. A ONE-TIME
+   * copy: the source is never read again, so deleting that work order next month changes nothing
+   * about this request.
+   */
+  templateTerms: MachineTerms | null;
 }
 
 /** Exported alongside {@link reducer} so tests start from the real initial state. */
@@ -156,6 +165,7 @@ export const initialState: RfqState = {
   project: null,
   projectDirty: [],
   workOrderGroupId: null,
+  templateTerms: null,
 };
 
 type Action =
@@ -202,6 +212,7 @@ type Action =
   | { t: "PATCH_PROJECT_DEFAULTS"; patch: Partial<TimingHours>; keys: string[] }
   | { t: "PATCH_PROJECT_SITE"; location: SiteLocation }
   | { t: "SET_WORK_ORDER_SOURCE"; groupId: string | null }
+  | { t: "USE_TEMPLATE"; terms: MachineTerms | null; groupId: string | null; when: { startDate: string | null; endDate: string | null } | null }
   | { t: "SUBMIT_START" }
   | { t: "SUBMIT_SUCCESS"; requestId: string; requestIds: string[]; requestUuids: string[]; trialExpiresAt?: string | null }
   | { t: "SUBMIT_ERROR"; kind: ApiErrorKind; detail?: RfqState["errorDetail"] }
@@ -290,7 +301,7 @@ export function reducer(state: RfqState, a: Action): RfqState {
          `applyProjectDefaults` leaves alone every field the agent filled, so a renter who wrote
          "from Oct 1" keeps October even though the site says 1 September. A pill they already
          changed carries into `touchedFields`, so it reads as theirs and not as the site's. */
-      const draft: RfqDraft = state.project
+      const withProject: RfqDraft = state.project
         ? (() => {
             const applied = applyProjectDefaults(parsed, state.project.defaults, state.project.location, origin);
             return {
@@ -302,6 +313,13 @@ export function reducer(state: RfqState, a: Action): RfqState {
             };
           })()
         : parsed;
+
+      /* The template, after the project and under the same rule: a line whose text said "with
+         operator" keeps what the agent read. It copies terms only — never the equipment, which
+         always comes from what the renter typed. */
+      const draft: RfqDraft = state.templateTerms
+        ? { ...applyMachineTerms(withProject, state.templateTerms, origin).draft, projectId: withProject.projectId, workOrderGroupId: withProject.workOrderGroupId, projectFields: withProject.projectFields, touchedFields: withProject.touchedFields }
+        : withProject;
 
       return { ...state, busy: false, error: null, draft, agentOrigin: origin, multiLocationDismissed: false };
     }
@@ -324,7 +342,10 @@ export function reducer(state: RfqState, a: Action): RfqState {
         projectDirty: [],
       };
     case "CLEAR_PROJECT":
-      return { ...state, project: null, projectDirty: [], workOrderGroupId: null };
+      // The template goes with the site. It was a thing INSIDE that project, so leaving its terms
+      // behind would carry values from a site the renter just removed, with nothing on screen
+      // saying where they came from.
+      return { ...state, project: null, projectDirty: [], workOrderGroupId: null, templateTerms: null };
     /* A pill edit. `keys` are the dotted paths it covers, recorded so the field reads `renter` on
        the canvas afterwards rather than `project` - once someone answers a question it stops being
        the site's answer. */
@@ -347,6 +368,27 @@ export function reducer(state: RfqState, a: Action): RfqState {
       };
     case "SET_WORK_ORDER_SOURCE":
       return { ...state, workOrderGroupId: a.groupId };
+    /* Start from. The terms wait for the agent; the source's OWN period lands on the project copy
+       now, so the pills show what this request will actually run to. It is not marked dirty — the
+       value still came from inside the site, not from the renter answering a question. */
+    case "USE_TEMPLATE": {
+      const when = a.when;
+      const project =
+        state.project && when
+          ? {
+              ...state.project,
+              defaults: {
+                ...state.project.defaults,
+                timing: {
+                  ...state.project.defaults.timing,
+                  startDate: when.startDate ?? state.project.defaults.timing.startDate,
+                  endDate: when.endDate ?? state.project.defaults.timing.endDate,
+                },
+              },
+            }
+          : state.project;
+      return { ...state, templateTerms: a.terms, workOrderGroupId: a.groupId, project };
+    }
     case "PROCESS_ERROR":
       return { ...state, busy: false, error: a.kind, errorDetail: a.detail ?? null };
     case "ENTER_WIZARD":
@@ -635,6 +677,11 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
       dispatch({ t: "PATCH_PROJECT_DEFAULTS", patch, keys }),
     patchProjectSite: (location: SiteLocation) => dispatch({ t: "PATCH_PROJECT_SITE", location }),
     setWorkOrderSource: (groupId: string | null) => dispatch({ t: "SET_WORK_ORDER_SOURCE", groupId }),
+    useTemplate: (
+      terms: MachineTerms | null,
+      groupId: string | null,
+      when: { startDate: string | null; endDate: string | null } | null,
+    ) => dispatch({ t: "USE_TEMPLATE", terms, groupId, when }),
 
     async process() {
       const s = getState();
