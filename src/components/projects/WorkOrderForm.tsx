@@ -38,12 +38,19 @@
 
 import { useState } from "react";
 import { useT, useLocale } from "@/lib/i18n";
-import { Button, Icon } from "@/components/ui";
+import { Button, Icon, Toggle } from "@/components/ui";
 import { SearchSelect } from "@/components/create/SearchSelect";
-import { SAFETY_CERTIFICATES, FUEL_TYPES, type Party, type OperatorNeeded } from "@/lib/contract/options";
+import { RENTAL_BASES, type RentalBasis } from "@/lib/contract/options";
+import { TermsFields, MachineTermsOverride } from "./TermsFields";
+// The SAME field chrome the project dialog is built from — see `Field`'s note there. Two dialogs
+// that open from one page and spell a label two ways read as two products.
+import { Field, input } from "./ProjectForm";
 import { taxName, type Taxonomy } from "@/lib/contract/taxonomy";
 import { machineIsNamed, termsToWire, type MachineTerms, type WorkOrderItem, type WorkOrderWhen } from "@/lib/contract/work-order";
 import type { Award } from "@/lib/contract/award";
+
+/* Re-exported: it lives with the fields it fills, and every caller already asks this file. */
+export { blankTerms } from "./TermsFields";
 
 /**
  * One supplier line on a machine — what becomes an award when the form saves.
@@ -77,6 +84,14 @@ export interface MachineDraft {
   offCatalogue: boolean;
   quantity: number;
   notes: string;
+  /**
+   * This machine's OWN complete terms, or `null` to follow the order's (spec §5.2 · AC-43).
+   *
+   * Complete rather than a patch: a crane and a generator on one order can differ on delivery and
+   * on certificates without the order forking, and clearing an override is then a deletion with
+   * nothing stale left behind (AC-44).
+   */
+  terms: MachineTerms | null;
   lines: SupplierLine[];
 }
 
@@ -98,32 +113,6 @@ export interface WorkOrderDraft {
   machines: MachineDraft[];
 }
 
-/** Nothing answered. Every field nullable, because "not stated" is a real answer here. */
-export function blankTerms(): MachineTerms {
-  return {
-    /* Not null: the type does not allow it, because every request has to answer this one. "yes" is
-       the app's own default for anything that is not a generator, compressor or light tower — see
-       `defaultOperatorNeeded`. A renter who needs no operator says so in one click. */
-    operatorNeeded: "yes",
-    operator: {
-      nationality: null,
-      nationalityCustom: "",
-      certificate: [],
-      certificateOther: "",
-      nightShift: false,
-      fatFood: null,
-      fatAccommodationTransport: null,
-    } as MachineTerms["operator"],
-    fuelType: "diesel",
-    equipmentYear: null,
-    deliveryOverride: null,
-    returnOverride: null,
-    fuelResponsibilityOverride: null,
-    safetyCertsOverride: null,
-    safetyCertsOtherText: null,
-  };
-}
-
 export function blankMachine(): MachineDraft {
   return {
     categoryId: null,
@@ -134,6 +123,8 @@ export function blankMachine(): MachineDraft {
     offCatalogue: false,
     quantity: 1,
     notes: "",
+    // Follows the order's until the renter says otherwise.
+    terms: null,
     lines: [blankLine("monthly")],
   };
 }
@@ -168,47 +159,6 @@ export function overAssigned(m: MachineDraft): boolean {
   return unitsAssigned(m) > m.quantity;
 }
 
-const input =
-  "w-full rounded-sm border border-border bg-surface px-3 py-2 text-body text-navy outline-none transition focus:border-brand";
-
-const OPERATOR_OPTS: OperatorNeeded[] = ["yes", "no"];
-const PARTY_OPTS: Party[] = ["me", "supplier"];
-
-/**
- * One labelled dropdown over a closed option list.
- *
- * Named `TermPick`, not `Pick` — `Pick` is a TypeScript built-in, and shadowing it in a `.tsx` file
- * gives an error about a type being used as a value, several lines from the real cause.
- */
-function TermPick({
-  label,
-  value,
-  options,
-  labels,
-  onPick,
-}: {
-  label: string;
-  value: string | null;
-  options: readonly string[];
-  /** The dictionary this option list reads from — shared with the rest of the app, not restated. */
-  labels: Record<string, string>;
-  onPick: (v: string | null) => void;
-}) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{label}</span>
-      <select className={input} value={value ?? ""} onChange={(e) => onPick(e.target.value || null)}>
-        <option value="">—</option>
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {labels[o] ?? o}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
 export function WorkOrderForm({
   taxonomy,
   draft,
@@ -239,8 +189,6 @@ export function WorkOrderForm({
     (draft.when.endDate != null && draft.when.endDate !== projectWhen.endDate);
 
   const [termsOpen, setTermsOpen] = useState(false);
-  const terms = draft.terms;
-  const patchTerms = (p: Partial<MachineTerms>) => onChange({ ...draft, terms: { ...draft.terms, ...p } });
 
   /* The rate is per WHAT — read off the order's own basis, which the site seeded. Showing "per
      month" beside the box is the difference between a number a renter can check and one they have
@@ -286,83 +234,8 @@ export function WorkOrderForm({
           <span className="text-meta font-normal text-muted">{w.termsSub}</span>
         </summary>
 
-        <div className="grid gap-2 border-t border-border px-3 py-3 sm:grid-cols-3">
-          <TermPick
-            label={w.operator}
-            value={terms.operatorNeeded}
-            options={OPERATOR_OPTS}
-            labels={{ yes: t.common.yes, no: t.common.no }}
-            onPick={(v) => patchTerms({ operatorNeeded: (v ?? "yes") as MachineTerms["operatorNeeded"] })}
-          />
-          <TermPick
-            label={w.delivery}
-            value={terms.deliveryOverride}
-            options={PARTY_OPTS}
-            labels={t.options.party}
-            onPick={(v) => patchTerms({ deliveryOverride: v as MachineTerms["deliveryOverride"] })}
-          />
-          <TermPick
-            label={w.ret}
-            value={terms.returnOverride}
-            options={PARTY_OPTS}
-            labels={t.options.party}
-            onPick={(v) => patchTerms({ returnOverride: v as MachineTerms["returnOverride"] })}
-          />
-          <TermPick
-            label={w.fuelResp}
-            value={terms.fuelResponsibilityOverride}
-            options={PARTY_OPTS}
-            labels={t.options.party}
-            onPick={(v) => patchTerms({ fuelResponsibilityOverride: v as MachineTerms["fuelResponsibilityOverride"] })}
-          />
-          <TermPick
-            label={w.fuelType}
-            value={terms.fuelType}
-            options={FUEL_TYPES}
-            labels={t.options.fuelType}
-            onPick={(v) => patchTerms({ fuelType: (v ?? "diesel") as MachineTerms["fuelType"] })}
-          />
-          <label className="flex flex-col gap-1">
-            <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{w.year}</span>
-            <input
-              className={input}
-              value={terms.equipmentYear ?? ""}
-              placeholder={w.yearPlaceholder}
-              onChange={(e) => patchTerms({ equipmentYear: (e.target.value || null) as MachineTerms["equipmentYear"] })}
-            />
-          </label>
-
-          {/* Certificates are a set, not a choice — a job can want TUV and Aramco both. */}
-          <fieldset className="sm:col-span-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <legend className="mb-1 text-label font-semibold uppercase tracking-[.03em] text-muted">{w.safety}</legend>
-            {SAFETY_CERTIFICATES.map((c) => {
-              const on = (terms.safetyCertsOverride ?? []).includes(c);
-              return (
-                <label key={c} className="flex items-center gap-1.5 text-body text-navy">
-                  <input
-                    type="checkbox"
-                    checked={on}
-                    onChange={() => {
-                      const now = terms.safetyCertsOverride ?? [];
-                      const next = on ? now.filter((x) => x !== c) : [...now, c];
-                      patchTerms({ safetyCertsOverride: (next.length ? next : null) as MachineTerms["safetyCertsOverride"] });
-                    }}
-                  />
-                  {t.options.safetyCert[c] ?? c}
-                </label>
-              );
-            })}
-            <label className="flex items-center gap-1.5 text-body text-navy">
-              <input
-                type="checkbox"
-                checked={terms.operator?.nightShift === true}
-                onChange={(e) =>
-                  patchTerms({ operator: { ...terms.operator, nightShift: e.target.checked } as MachineTerms["operator"] })
-                }
-              />
-              {w.night}
-            </label>
-          </fieldset>
+        <div className="border-t border-border px-3 py-3">
+          <TermsFields value={draft.terms} onChange={(terms) => onChange({ ...draft, terms })} />
         </div>
       </details>
 
@@ -372,6 +245,7 @@ export function WorkOrderForm({
             taxonomy={taxonomy}
             locale={locale}
             machine={m}
+            shared={draft.terms}
             onChange={(p) => patchMachine(i, p)}
             onRemove={draft.machines.length > 1 ? () => onChange({ ...draft, machines: draft.machines.filter((_, ix) => ix !== i) }) : undefined}
           />
@@ -386,14 +260,21 @@ export function WorkOrderForm({
         </button>
       </section>
 
-      {/* ── 3 · Period ── */}
+      {/* ── 3 · Period ──
+          The project dialog's own row, field for field: start · end · extendable · basis, four
+          across (owner, 2026-08-31: *"make it same width and layout as adding the project"*). A work
+          order asks the same question about time that a project does, and asking it in a different
+          shape one dialog later is how a renter starts reading the two as unrelated records.
+
+          Basis and extendable were already carried to the wire by `whenToWire` and had no control
+          here at all — the layout gave them one. The basis is not decoration either: it is what a
+          new supplier line's own basis is seeded from, and what the rate placeholder says «per». */}
       <section className="flex flex-col gap-3">
         <h3 className="text-subhead font-extrabold text-navy">{w.period}</h3>
         <p className="text-meta text-muted">{w.periodHint}</p>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1">
-            <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{t.projects.form.start}</span>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label={t.projects.form.start}>
             <input
               type="date"
               className={input}
@@ -401,9 +282,9 @@ export function WorkOrderForm({
               placeholder={projectWhen.startDate ?? ""}
               onChange={(e) => onChange({ ...draft, when: { ...draft.when, startDate: e.target.value || null } })}
             />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{t.projects.form.end}</span>
+          </Field>
+
+          <Field label={t.projects.form.end}>
             <input
               type="date"
               className={input}
@@ -411,7 +292,37 @@ export function WorkOrderForm({
               placeholder={projectWhen.endDate ?? ""}
               onChange={(e) => onChange({ ...draft, when: { ...draft.when, endDate: e.target.value || null } })}
             />
-          </label>
+          </Field>
+
+          <Field label={t.projects.form.extendableLabel}>
+            {/* Unanswered stays unanswered: `when.extendable` is `boolean | null` and `whenToWire`
+                omits the key while it is null, so a switch nobody has touched says nothing about
+                this order rather than asserting a false. Touching it writes a real boolean. */}
+            <div className="flex h-[38px] items-center rounded-sm border border-border bg-surface px-3">
+              <Toggle
+                checked={draft.when.extendable === true}
+                onChange={(v) => onChange({ ...draft, when: { ...draft.when, extendable: v } })}
+                label={<span className="text-body text-navy">{draft.when.extendable ? t.common.yes : t.common.no}</span>}
+              />
+            </div>
+          </Field>
+
+          <Field label={t.projects.form.basis}>
+            <select
+              className={input}
+              value={draft.when.rentalBasis ?? ""}
+              onChange={(e) =>
+                onChange({ ...draft, when: { ...draft.when, rentalBasis: (e.target.value || null) as RentalBasis | null } })
+              }
+            >
+              <option value="">—</option>
+              {RENTAL_BASES.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          </Field>
         </div>
 
         {/* Shown, never resolved. A work order may run to its own dates and keep them — the two
@@ -530,8 +441,18 @@ export function WorkOrderForm({
         ))}
       </section>
 
-      <div className="flex justify-end gap-2 border-t border-border pt-4">
-        <Button variant="secondary" onClick={onCancel} disabled={saving}>
+      {/* The project dialog's footer, to the letter: a GHOST way out — a white button beside a
+          coloured one reads as a second action of equal weight, and cancelling is not one — one
+          primary, and, when Save cannot fire, the reason on the opposite edge. A disabled button
+          with nothing beside it is indistinguishable from a broken one. */}
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
+        {!ready && !saving && (
+          <span className="me-auto flex items-center gap-1.5 text-meta font-semibold text-warn">
+            <Icon name="info" size={13} className="flex-none" />
+            {draft.machines.some(overAssigned) ? w.fixUnitsFirst : w.nameMachineFirst}
+          </span>
+        )}
+        <Button variant="ghost" onClick={onCancel} disabled={saving}>
           {t.common.cancel}
         </Button>
         <Button onClick={() => onSave(draft)} disabled={!ready || saving}>
@@ -548,18 +469,20 @@ function MachineCard({
   taxonomy,
   locale,
   machine,
+  shared,
   onChange,
   onRemove,
 }: {
   taxonomy: Taxonomy;
   locale: string;
   machine: MachineDraft;
+  /** The order's terms — what this machine follows, and what an override is seeded and compared against. */
+  shared: MachineTerms;
   onChange: (p: Partial<MachineDraft>) => void;
   onRemove?: () => void;
 }) {
   const t = useT();
   const w = t.projects.workOrder;
-  const [open, setOpen] = useState(false);
 
   const category = taxonomy.find((c) => c.id === machine.categoryId);
   const subcategory = category?.subcategories.find((s) => s.id === machine.subcategoryId);
@@ -645,8 +568,7 @@ function MachineCard({
       </label>
 
       <div className="grid gap-2 sm:grid-cols-[auto_1fr]">
-        <label className="flex flex-col gap-1">
-          <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{w.quantity}</span>
+        <Field label={w.quantity}>
           <input
             type="number"
             min={1}
@@ -654,27 +576,23 @@ function MachineCard({
             value={machine.quantity}
             onChange={(e) => onChange({ quantity: Math.max(1, Number(e.target.value) || 1) })}
           />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{w.notes}</span>
+        </Field>
+        <Field label={w.notes}>
           <input className={input} value={machine.notes} onChange={(e) => onChange({ notes: e.target.value })} />
-        </label>
+        </Field>
       </div>
 
-      {/* Machine terms. Shared by the order for typing convenience — the SAME values are written to
-          every row — and *Different terms for this machine* simply writes different ones here. Each
-          row's `terms` is complete, so this is never an override of anything.
+      {/* This machine's own terms (spec §5.2 · AC-43, AC-44).
+          Closed until asked for: the common case is that every machine on a site works the same way,
+          and eleven fields per machine on a five-machine order is a wall between the renter and what
+          they came to do. The badge is what makes closing safe — a machine that differs says so on
+          its face, so nothing hides behind a collapsed panel.
 
           The operator block would be hidden for equipment that takes no operator; that rule is
-          deferred (W-T5) and the block is shown for every machine until it lands. */}
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 self-start text-meta font-semibold text-brand"
-      >
-        <Icon name={open ? "expand_less" : "expand_more"} size={13} /> {w.differentTerms}
-      </button>
-      {open && <p className="rounded-sm border border-border bg-surface2/50 px-3 py-2 text-meta text-muted">{w.termsComing}</p>}
+          deferred (W-T5) and the block is shown for every machine until it lands. Deferring one
+          field's visibility is not a reason to defer eleven fields, which is what happened here
+          before. */}
+      <MachineTermsOverride terms={machine.terms} shared={shared} onChange={(terms) => onChange({ terms })} />
     </div>
   );
 }
@@ -764,6 +682,9 @@ export function workOrderPayload(
           rawSize: m.offCatalogue ? m.rawSize.trim() || null : null,
           quantity: m.quantity,
           notes: m.notes.trim() || null,
+          /* Sent only when this machine differs. An absent key is an empty blob on the backend, and
+             an empty blob is exactly what makes that row fall back to the order's terms. */
+          ...(m.terms ? { terms: termsToWire(m.terms) } : {}),
           ...(opts.create && lines.length > 0 ? { supplyLines: lines } : {}),
         };
       }),
