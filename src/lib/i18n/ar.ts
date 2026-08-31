@@ -1564,6 +1564,7 @@ export const ar: Dictionary = {
       start: "البداية",
       end: "النهاية",
       filedHere: "المدرج هنا",
+      siteSays: "الموقع يقول {date}",
       filedCount: "{r} طلب · {w} أمر",
       addWorkOrder: "إضافة أمر عمل",
       newRequest: "طلب جديد",

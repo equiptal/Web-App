@@ -28,7 +28,15 @@
 
 import { useT } from "@/lib/i18n";
 import { Button, Icon } from "@/components/ui";
-import { projectTitle, projectEnded, endedLast, titleIsDerived, periodDiffers, type ProjectSummary } from "@/lib/contract/project";
+import {
+  projectTitle,
+  projectEnded,
+  endedLast,
+  titleIsDerived,
+  periodDiffers,
+  siteSpan,
+  type ProjectSummary,
+} from "@/lib/contract/project";
 import { chartSpan, isUnawarded, type ChartGroup } from "@/lib/contract/award";
 import { AwardRow, AwaitingRow, pct, type Axis } from "./ChartRow";
 
@@ -216,6 +224,8 @@ function SitePanel({
   const t = useT();
   const projectWindow = { startDate: project.defaults.timing.startDate, endDate: project.defaults.timing.endDate };
   const axis = monthAxis(chartSpan(groups, projectWindow));
+  const span = siteSpan(project);
+  const siteSays = (d: string) => t.projects.board.siteSays.replace("{date}", d);
   const ticks = axis ? months(axis) : [];
   /** The same boundaries the header rules, handed to every row so the two cannot drift apart. */
   const grid = axis ? ticks.map((m) => pct(m.iso, axis)) : [];
@@ -308,8 +318,21 @@ function SitePanel({
               The filed span is kept as the fallback, so a site whose period nobody stated still
               answers the question from the only evidence there is, and a dash means genuinely
               nothing is known. */}
-          <Cell label={t.projects.board.start}>{project.defaults.timing.startDate ?? project.firstStart ?? "—"}</Cell>
-          <Cell label={t.projects.board.end}>{project.defaults.timing.endDate ?? project.lastEnd ?? "—"}</Cell>
+          {/* The span the site ACTUALLY runs, with the site's own date noted where it differs
+              (owner, 2026-08-31: *"the end or start date must show first start or last end if its
+              children have different values, with a note of the difference — we are not changing
+              project values, just viewing the latest ones"*).
+
+              It printed the site's stated dates and stopped, so a renter reading *ends 7 Oct* had no
+              way to know something on that site ran to December. A view, never a correction: the
+              site keeps saying what it was told to say, and changing it stays a deliberate act
+              through the pen. */}
+          <Cell label={t.projects.board.start} note={span.start.stated ? siteSays(span.start.stated) : undefined}>
+            {span.start.shown ?? "—"}
+          </Cell>
+          <Cell label={t.projects.board.end} note={span.end.stated ? siteSays(span.end.stated) : undefined}>
+            {span.end.shown ?? "—"}
+          </Cell>
 
           {/* ~~«Filed here — 0 req · 0 WO».~~ Removed (owner, 2026-08-31). It counted exactly what
               the chart below it draws in full, so on a site with rows it repeated them and on an
@@ -407,9 +430,22 @@ function SitePanel({
 
             {groups.map((g) => (
               <div key={g.id}>
-                <div className="flex items-center gap-2 border-t border-border bg-surface2/40 px-3 py-1.5">
-                  <Icon name={g.kind === "work_order" ? "handyman" : "campaign"} size={13} className="flex-none text-muted" />
-                  <span className="truncate text-meta font-semibold text-navy">{g.title?.trim() || g.ref}</span>
+                {/* ── The group header, and it must not look like a row (owner, 2026-08-31) ──────
+                    *"The headers must be shown different from the items."* Header and item sat on
+                    the same near-white ground at the same type size, so a chart of two requests read
+                    as five equal rows and the renter had to work out which lines were containers.
+
+                    It is now a navy-tinted band, a hair taller, with the KIND spelled out as a tag
+                    on the leading edge. ~~A `campaign` megaphone for a request and a `handyman`
+                    spanner for a work order.~~ Two unrelated glyphs at 13px, in a chart whose only
+                    other icons are the paper marks on an award, said less than the two words do
+                    (*"remove icon or use consistent one"*) — and the tag is the same shape for both
+                    kinds, which is what makes the two comparable at a glance. */}
+                <div className="flex items-center gap-2 border-t-2 border-border bg-navy/[.045] px-3 py-2">
+                  <span className="flex-none rounded-sm border border-border bg-surface px-1.5 py-px text-label font-extrabold uppercase tracking-[.03em] text-navy-mid">
+                    {g.kind === "work_order" ? t.projects.pills.kindWorkOrder : t.projects.pills.kindRequest}
+                  </span>
+                  <span className="truncate text-body font-extrabold text-navy">{g.title?.trim() || g.ref}</span>
                   {/* The ref, and only when the TITLE is something else (owner, 2026-08-31: *"why is
                       the request id repeated twice"*). A request with no title of its own falls back
                       to its ref above, and this line printed it a second time. */}
@@ -445,9 +481,15 @@ function SitePanel({
                     <button
                       type="button"
                       onClick={() => onOpenConflict?.(g)}
-                      className="text-meta font-semibold text-warn underline underline-offset-2"
+                      title={t.projects.board.ownPeriod}
+                      className="flex-none whitespace-nowrap text-meta font-semibold text-warn underline underline-offset-2 tabular-nums"
                     >
-                      {t.projects.board.ownPeriod}
+                      {/* ~~«own dates».~~ It says WHICH dates now (owner, 2026-08-31): the phrase
+                          told a renter that this row disagrees with the site and made them press to
+                          find out how, which is one click to read two dates they were already
+                          looking at a chart of. The words move to the `title`; the dates take the
+                          label. */}
+                      {g.when?.startDate ?? "—"} → {g.when?.endDate ?? "—"}
                     </button>
                   )}
                 </div>
@@ -497,13 +539,25 @@ function SitePanel({
  * `border-s` rather than `border-l`, and `first:border-s-0` rather than a nth-child rule: the
  * divider has to fall on the reading-start side, and in Arabic that is the right.
  */
-function Cell({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
+function Cell({
+  label,
+  children,
+  note,
+}: {
+  label: React.ReactNode;
+  children: React.ReactNode;
+  /** A second line under the value — what the site itself claims, when it differs. */
+  note?: string;
+}) {
   return (
     /* `basis-[150px]` and 6px of vertical padding: four cells and three buttons have to share one
        line on a laptop, and every pixel of this strip is a pixel the chart does not get. */
     <div className="flex min-w-0 flex-1 basis-[150px] flex-col justify-center gap-px border-s border-border px-3 py-1.5 first:border-s-0">
       <dt className="text-label font-semibold uppercase tracking-[.03em] text-muted">{label}</dt>
       <dd className="min-w-0 truncate text-body font-semibold text-navy tabular-nums">{children}</dd>
+      {/* Amber, not red: a machine that stays longer than the site's own dates is a fact, and the
+          renter is being informed rather than warned. */}
+      {note && <dd className="min-w-0 truncate text-meta font-semibold text-warn tabular-nums">{note}</dd>}
     </div>
   );
 }

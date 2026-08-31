@@ -1829,6 +1829,7 @@ export const en = {
       start: "Start",
       end: "End",
       filedHere: "Filed here",
+      siteSays: "site says {date}",
       filedCount: "{r} req · {w} WO",
       addWorkOrder: "Add work order",
       newRequest: "New request",

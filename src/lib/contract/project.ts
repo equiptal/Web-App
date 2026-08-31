@@ -354,6 +354,50 @@ export function propagationForRequest(req: {
 
 /* ─────────────────────────── What disagrees with the site ─────────────────────────── */
 
+/* ─────────────────────────── The span a site actually runs ─────────────────────────── */
+
+/** One end of a site's span: what is shown, and what the site itself says when the two differ. */
+export interface SpanEnd {
+  /** The date to show — the real one, across everything filed here. */
+  shown: string | null;
+  /** The site's own stated date, present ONLY when it differs from `shown`. */
+  stated: string | null;
+}
+
+/**
+ * What a site actually runs to, as opposed to what it says.
+ *
+ * A site states a period, and the things filed under it may reach past either end — a crane that
+ * stays two months longer is a fact, not a mistake. The header used to print the site's own dates
+ * and stop, so a renter reading *ends 7 Oct* had no way to know something on that site ran to
+ * December.
+ *
+ * ⚠️ **This is a VIEW, not a correction.** Nothing here writes anything. The site keeps saying what
+ * the renter told it to say, and `stated` carries that value so the header can show both: the date
+ * that is true, and the date the site claims. Changing the site is a separate, deliberate act — the
+ * pen, and the conflict step behind it.
+ *
+ * `firstStart` / `lastEnd` are the backend's roll-up across everything filed here. A site with
+ * nothing on it has neither, and then its own dates are the only answer there is.
+ */
+export function siteSpan(p: Pick<ProjectSummary, "defaults" | "firstStart" | "lastEnd">): {
+  start: SpanEnd;
+  end: SpanEnd;
+} {
+  const ownStart = p.defaults.timing.startDate;
+  const ownEnd = p.defaults.timing.endDate;
+
+  /* The EARLIEST start and the LATEST end — the outer edge on each side, which is what "when does
+     this site run" means. Compared as ISO strings, which sort correctly by date. */
+  const start = [ownStart, p.firstStart].filter((d): d is string => !!d).sort()[0] ?? null;
+  const end = [ownEnd, p.lastEnd].filter((d): d is string => !!d).sort().slice(-1)[0] ?? null;
+
+  return {
+    start: { shown: start, stated: start && ownStart && start !== ownStart ? ownStart : null },
+    end: { shown: end, stated: end && ownEnd && end !== ownEnd ? ownEnd : null },
+  };
+}
+
 /**
  * A row whose own dates differ from what the site is about to say.
  *

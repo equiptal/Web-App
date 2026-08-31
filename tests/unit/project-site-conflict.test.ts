@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { siteConflicts, periodDiffers } from "@/lib/contract/project";
+import { siteConflicts, periodDiffers, siteSpan } from "@/lib/contract/project";
 import { mapAwardBook } from "@/lib/contract/award";
 
 /**
@@ -179,5 +179,71 @@ describe("a row's own name", () => {
 
   it("trims, so a name is never stored with the renter's stray spaces", () => {
     expect(mapAwardBook({ labels: { r1: "  Crane  " } }).labels.r1).toBe("Crane");
+  });
+});
+
+describe("the span a site actually runs", () => {
+  /* Owner, 2026-08-31: *"the end or start date must show first start or last end if its children
+     have different values, with a note of the difference — we are not changing project values,
+     just viewing the latest ones."* A view, never a correction. */
+
+  const site = (over: Record<string, unknown> = {}) =>
+    ({
+      defaults: { timing: { rentalBasis: null, extendable: false, startDate: "2026-08-31", endDate: "2026-10-07" } },
+      firstStart: null,
+      lastEnd: null,
+      ...over,
+    }) as Parameters<typeof siteSpan>[0];
+
+  it("shows the site's own dates when nothing is filed under it", () => {
+    const s = siteSpan(site());
+    expect(s.start.shown).toBe("2026-08-31");
+    expect(s.end.shown).toBe("2026-10-07");
+    // No difference, so nothing to note — a note that always shows says nothing.
+    expect(s.start.stated).toBeNull();
+    expect(s.end.stated).toBeNull();
+  });
+
+  it("reaches past the site's end when something runs longer, and notes what the site says", () => {
+    const s = siteSpan(site({ firstStart: "2026-08-31", lastEnd: "2026-12-31" }));
+    expect(s.end.shown).toBe("2026-12-31");
+    expect(s.end.stated).toBe("2026-10-07");
+    // The start agreed, so the start says nothing.
+    expect(s.start.stated).toBeNull();
+  });
+
+  it("reaches back before the site's start too", () => {
+    const s = siteSpan(site({ firstStart: "2026-07-01", lastEnd: "2026-10-07" }));
+    expect(s.start.shown).toBe("2026-07-01");
+    expect(s.start.stated).toBe("2026-08-31");
+  });
+
+  it("keeps the site's own date when the children sit inside it", () => {
+    // Something that starts later and finishes earlier does not shrink the site.
+    const s = siteSpan(site({ firstStart: "2026-09-15", lastEnd: "2026-09-30" }));
+    expect(s.start.shown).toBe("2026-08-31");
+    expect(s.end.shown).toBe("2026-10-07");
+    expect(s.start.stated).toBeNull();
+    expect(s.end.stated).toBeNull();
+  });
+
+  it("falls back to the filed span on a site with no dates of its own", () => {
+    const s = siteSpan(site({
+      defaults: { timing: { rentalBasis: null, extendable: false, startDate: null, endDate: null } },
+      firstStart: "2026-09-01",
+      lastEnd: "2026-11-30",
+    }));
+    expect(s.start.shown).toBe("2026-09-01");
+    expect(s.end.shown).toBe("2026-11-30");
+    /* Nothing to note: the site never stated a date, so there is no difference to report — only an
+       absence, and "site says nothing" is not worth a line. */
+    expect(s.start.stated).toBeNull();
+    expect(s.end.stated).toBeNull();
+  });
+
+  it("answers null on a site that states nothing and holds nothing", () => {
+    const s = siteSpan(site({ defaults: { timing: { rentalBasis: null, extendable: false, startDate: null, endDate: null } } }));
+    expect(s.start.shown).toBeNull();
+    expect(s.end.shown).toBeNull();
   });
 });
