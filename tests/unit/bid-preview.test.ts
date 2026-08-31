@@ -78,9 +78,40 @@ describe("buildBidMetadata", () => {
 
     expect(m.title).toBe("Bid request");
     expect(m.description).toBe("Submit a bid on an equipment request — no account needed.");
-    // Branding survives an unreachable backend — and the fallback image is made absolute from the
-    // request host too, so it can never point at prod from a staging page.
-    expect((m.openGraph as { images?: { url: string }[] }).images?.[0].url).toBe(`${STAGING}/og-bid.png`);
+    /**
+     * ~~The generic file.~~ Even with no preview, THIS app's `og` route is the better picture: it
+     * draws the same card and re-fetches the preview itself, so a backend that answered late still
+     * produces a real card. It is absolute from the request host, so it can never point at prod from
+     * a staging page — which is what this test was written for.
+     */
+    expect((m.openGraph as { images?: { url: string }[] }).images?.[0].url).toBe(
+      `${STAGING}/bid/11111111-2222-3333-4444-555555555555/og`,
+    );
+  });
+
+  it("Given a preview with NO imageUrl, When building metadata, Then it uses our own card and not the generic file", () => {
+    /**
+     * SUP-T02, found in production. The backend's preview answers with a title and a description but
+     * no `imageUrl`, so every shared link fell through to `og-bid.png` — a picture that says nothing
+     * about the request — while `/bid/{slug}/og` sat there working. The link unfurled, which is why
+     * it looked right at a glance, and carried a picture of nothing, which is why it was not.
+     */
+    const m = buildBidMetadata({
+      preview: { ...preview, imageUrl: "" },
+      slug: "excavator-riyadh-11111111-2222-3333-4444-555555555555",
+      lang: "en",
+      origin: STAGING,
+    });
+    expect((m.openGraph as { images?: { url: string }[] }).images?.[0].url).toBe(
+      `${STAGING}/bid/excavator-riyadh-11111111-2222-3333-4444-555555555555/og`,
+    );
+  });
+
+  it("Given Arabic, When falling back to our own card, Then the card is asked for in Arabic too", () => {
+    const m = buildBidMetadata({ preview: null, slug: "abc-11111111-2222-3333-4444-555555555555", lang: "ar", origin: STAGING });
+    expect((m.openGraph as { images?: { url: string }[] }).images?.[0].url).toBe(
+      `${STAGING}/bid/abc-11111111-2222-3333-4444-555555555555/og?lang=ar`,
+    );
   });
 
   it("Given a staging host, When building metadata, Then no URL points at production", () => {

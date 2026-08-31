@@ -133,9 +133,24 @@ export function buildBidMetadata({
   const path = `/bid/${slug}${lang === "ar" ? "?lang=ar" : ""}`;
   // Absolute, from the host actually serving this page — never resolved through metadataBase.
   const canonical = origin ? `${origin}${path}` : path;
-  // The backend already returns an absolute, stage-correct image URL; the constant is the fallback
-  // for a failed fetch, and gets the same absolute treatment so it can't point at the wrong host.
-  const image = preview?.imageUrl || (origin ? `${origin}${OG_CARD_IMAGE}` : OG_CARD_IMAGE);
+  /**
+   * The card image, in order of how much it knows about THIS request.
+   *
+   * 1. `preview.imageUrl` — the backend's own rendering, absolute and stage-correct.
+   * 2. **This app's `og` route** — the same card, drawn here from the same preview.
+   * 3. `OG_CARD_IMAGE` — a generic picture that says nothing about the request.
+   *
+   * Step 2 was missing, and that is the whole of SUP-T02 (found in production, 2026-09-01). The
+   * backend's preview answers with title and description but no `imageUrl`, so every shared link fell
+   * straight to the generic file — while `/bid/{slug}/og` sat there working, returning a 37 KB card
+   * nobody was asking for. The link unfurled, which is why it looked fine at a glance, and carried a
+   * picture of nothing, which is why it did not.
+   *
+   * The generic file stays as the last resort for a caller with no origin to build an absolute URL
+   * from; a relative `og:image` is ignored by every unfurler.
+   */
+  const generated = origin ? `${origin}/bid/${slug}/og${lang === "ar" ? "?lang=ar" : ""}` : null;
+  const image = preview?.imageUrl || generated || OG_CARD_IMAGE;
 
   return {
     // The root layout's title template appends " — Moedatech", which is where the brand comes from.
