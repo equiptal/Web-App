@@ -114,9 +114,17 @@ export function applyProjectDefaults(
       label: location.label,
       lat: location.lat ?? undefined,
       lng: location.lng ?? undefined,
-      source: "manual",
-      // AC-16 stands: a location still has to be confirmed, whoever supplied it.
-      confirmed: next.project.location.confirmed,
+      /* `project`, not `manual` — the difference is a visible label. `Provenance` says *From your
+         project* for this source and stays silent for a manual entry, and the renter needs to know
+         which of the two they are looking at before they change it. */
+      source: "project",
+      /* CONFIRMED (owner, 2026-08-31: *"it must show it as confirmed and selected"*).
+         AC-16 says a location starts unconfirmed even when extracted, and that is right for a
+         location the AGENT read out of a sentence — nobody has looked at it yet. A project's
+         location is the opposite: the renter dropped that pin and saved it, on purpose, and being
+         asked to confirm it again on every request for that site is being asked to re-answer the
+         question projects exist to stop. */
+      confirmed: true,
     };
     filled.push("location.label");
   }

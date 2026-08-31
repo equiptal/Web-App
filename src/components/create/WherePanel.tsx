@@ -16,7 +16,8 @@ import dynamic from "next/dynamic";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Icon } from "@/components/ui";
-import { PanelDot } from "@/components/create/Provenance";
+import { PanelDot, ProvenanceNote } from "@/components/create/Provenance";
+import { useProvenance } from "@/components/create/hooks";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 
@@ -37,11 +38,23 @@ export function WherePanel({
 }) {
   const t = useT();
   const { state, actions } = useRfq();
+  // Above the early return: hooks run in the same order on every render, and `project` being absent
+  // is a render this component still performs.
+  const prov = useProvenance(null);
+
   const project = state.draft?.project;
   if (!project) return null;
 
   const loc = project.location;
   const conflictUnresolved = Boolean(loc.conflict && !loc.conflict.resolvedFrom);
+  /* Where the address came from, so the panel can say so (owner, 2026-08-31: *"any value —
+     location or dates or anything from project or work order — show the 'from your project' label
+     like the AI detected"*).
+
+     `Where` was the one panel with no provenance line at all: it had a completeness dot and nothing
+     else, so a location the site supplied looked identical to one the renter typed. */
+  const locationSource = prov.projectSource("location.label", loc.label, prov.agentProject?.location?.label);
+
   // AC-16 — a typed label is not a location. Confirming requires an actual point on the map.
   const hasLocation = loc.lat != null && loc.lng != null;
   const multi = (state.draft?.detectedLocations ?? []).filter(Boolean);
@@ -88,6 +101,10 @@ export function WherePanel({
             {loc.label ?? "—"}
             {hasLocation && <span className="ms-1.5 text-muted/70">{`${loc.lat?.toFixed(6)}, ${loc.lng?.toFixed(6)}`}</span>}
           </span>
+          {/* On the collapsed head, because that is where a renter reads the address without opening
+              anything — and the whole point of the label is to answer "where did this come from?"
+              before they wonder whether to change it. */}
+          <ProvenanceNote source={locationSource} />
         </span>
         <Icon name={open ? "expand_less" : "expand_more"} size={18} className="flex-none text-muted" />
       </button>

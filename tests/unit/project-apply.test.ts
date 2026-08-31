@@ -137,17 +137,47 @@ describe("nothing is written back", () => {
 });
 
 /* ============================================================================================== *
- * The confirmed flag, which a project must not grant
+ * The confirmed flag — which a PROJECT does grant, and the agent does not
  * ============================================================================================== */
 
-describe("a location still has to be confirmed", () => {
-  it("does not confirm the site's own address on the renter's behalf", () => {
+describe("a location from the project arrives confirmed", () => {
+  it("confirms it, and says where it came from", () => {
+    /* REVERSED by the owner on 2026-08-31: *"the location is not filled in the request from the
+       project — it must show it as confirmed and selected"*.
+
+       This file used to assert the opposite, on the reading that AC-16 stands whoever supplied the
+       pin. That reading was wrong about which risk it was guarding. AC-16 exists because a location
+       the AGENT read out of a sentence has never been looked at by anyone — nobody dropped that
+       pin. A project's location is the opposite case: the renter dropped it and saved it, on
+       purpose, and asking them to confirm it again on every request for that site is asking them to
+       re-answer the one question projects exist to stop asking. */
     const { draft, agentOrigin } = draftWith();
     const { draft: next } = applyProjectDefaults(draft, QIDDIYA, SITE, agentOrigin);
 
-    // AC-16 stands whoever supplied the pin. A project that confirmed its own address would let a
-    // stale site coordinate reach a supplier with nobody having looked at the map.
-    expect(next.project.location.confirmed).toBe(draft.project.location.confirmed);
+    expect(next.project.location.label).toBe(SITE.label);
+    expect(next.project.location.confirmed).toBe(true);
+
+    /* `project`, not `manual` — the difference is a visible label. `Provenance` renders *From your
+       project* for this source and nothing at all for a manual entry. */
+    expect(next.project.location.source).toBe("project");
+  });
+
+  it("still leaves a location the AGENT extracted alone, unconfirmed", () => {
+    // The guard AC-16 was actually written for: text nobody has checked against a map.
+    const { draft, agentOrigin } = draftWith();
+    const stated = {
+      ...agentOrigin,
+      project: { ...agentOrigin.project, location: { label: "Dammam industrial city", confirmed: false } },
+    } as typeof agentOrigin;
+
+    const { draft: next } = applyProjectDefaults(draft, QIDDIYA, SITE, stated);
+
+    /* The function does not WRITE the agent's value — it declines to overwrite it, and the draft
+       already holds whatever the agent put there. So the test is that the site's label did not
+       arrive, and that nothing was confirmed on the renter's behalf. */
+    expect(next.project.location.label).not.toBe(SITE.label);
+    expect(next.project.location.confirmed).toBe(false);
+    expect(next.project.location.source).not.toBe("project");
   });
 });
 

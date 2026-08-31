@@ -28,9 +28,23 @@ export interface ProjectLocation {
   label: string | null;
   lat?: number;
   lng?: number;
-  /** AC-16: always starts unconfirmed, even when extracted; renter must confirm to advance. */
+  /**
+   * AC-16: always starts unconfirmed, even when extracted; the renter must confirm to advance.
+   *
+   * ⚠️ **One exception, ruled by the owner 2026-08-31: a location that came from a project arrives
+   * confirmed.** The renter already dropped that pin and saved it, on the project, deliberately.
+   * Asking them to confirm it again on every request for that site is asking them to re-answer a
+   * question they answered once — which is the entire thing projects exist to stop.
+   */
   confirmed: boolean;
-  source?: "agent" | "gps" | "manual" | "map";
+  /**
+   * Where the value came from, and therefore what label sits under it.
+   *
+   * `project` is not a synonym for `manual`: `Provenance` renders *From your project* for it and
+   * nothing for a manual entry, because one is worth explaining and the other is the renter looking
+   * at what they just typed.
+   */
+  source?: "agent" | "gps" | "manual" | "map" | "project";
   /** AC-47: text↔file disagreement on the location, if any. */
   conflict?: ValueConflict<string>;
 }
