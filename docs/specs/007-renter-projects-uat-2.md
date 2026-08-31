@@ -33,10 +33,17 @@ Keyboard: tab to it once, then arrow keys move between the two.
 Open *Start from*. A site with a crane and a generator on ONE work order shows **two** entries, not
 one. Each reads `machine · kind ref`.
 
-**A6 ✅ Picking one copies its own terms.**
+**A6 ✅ Picking one copies its own terms. — VERIFIED 2026-08-31, after two fixes.**
 Pick the generator. The terms that appear are the **generator's**, not the crane's.
 
-**A7 ✅ The machine arrives as TEXT.**
+It failed twice on the way here, and both failures were silent. First the group ids were lost, so the
+lookup matched nothing and **no terms were ever copied** — the entire point of a template, and
+nothing said so. Fixing that exposed a double conversion that answered a **blank** terms object, so
+the pills rendered empty under a label reading *terms copied*, with OPERATOR showing *Yes* because
+the pill treats a null as yes. Both fixed (`74c9219`, `6511153`); the values now come back as stored:
+generator = delivery **Me**, year **2022**, operator **No**, no certificates.
+
+**A7 ✅ The machine arrives as TEXT. — VERIFIED 2026-08-31.** The box read `2 × Generator 250 kVA`.
 Picking a template writes `2 × Crawler Excavator 30 ton` into the **typing area**, not as a chip. You
 can edit or delete the words. It is **appended** — anything you already typed stays.
 
@@ -99,10 +106,17 @@ Machine quantity 3, promise 2 + 2 → *"4 of 3 assigned — 1 too many"* and **S
 **B11 ✅ A work order with suppliers saves.**
 This was the `422` that lost the whole order. Fill a supplier and save → it appears on the chart.
 
-**B12 ⛔ Reopening does not wipe the terms.**
-Save an order with terms, reopen it from ⋮ → *Edit the work order*. The terms should be **as you left
-them**. Needs the backend deploy; until then the form refuses to open and says why, rather than
-opening blank and destroying them on save.
+**B12 ✅ Reopening does not wipe the terms. — VERIFIED 2026-08-31. No backend deploy needed.**
+Save an order with terms, reopen it from ⋮ → *Edit the work order*. The terms come back **as you left
+them**.
+
+This was marked as blocked on the backend and was not. `getChart` sends no terms, but the
+**work-orders** endpoint does, and that is what the edit path reads — proven by a live round trip:
+two machines on one order given deliberately different terms, written and read back distinctly.
+
+On staging the form reopened with delivery **Supplier**, return **Me**, year **2019**, **TÜV** only,
+operator on, nationality **Restricted / "Saudi only"**, food and transport **Me** — every value as
+written. Machine 2's badge read **6 different**, counting the six it genuinely differs by.
 
 ---
 
@@ -140,8 +154,8 @@ No `Unassigned · 23` entry in the site rail.
 **C9 ✅ Rows can be renamed.**
 ✏ beside a row on the chart. A work order renames now.
 
-**C10 ⛔ A request can be renamed.**
-Same pen. Needs the backend deploy (the name is kept on the site's blob).
+**C10 ⛔ A request can be renamed.** Same pen. Confirmed still blocked 2026-08-31: `labels` is
+refused the same way as `marks` — `422 Unrecognized key(s) in object: 'labels'`.
 
 **C11 ✅ The own-dates warning only appears on a real difference.**
 A request whose dates match its site shows **no** *own dates* chip. It used to show on every request
@@ -149,7 +163,9 @@ and open a comparison with no rows in it.
 
 **C12 ✅ An unawarded row reads *pending*, not *not awarded yet*.**
 
-**C13 ⛔ The machine row is wider and shows its terms.**
+**C13 ⛔ The machine row is wider and shows its terms.** Confirmed still blocked 2026-08-31: the
+chart payload carries no `terms` at item level. The work-orders endpoint has them; `getChart` is the
+one that does not, and it is the one the chart reads.
 `TÜV + Aramco · with operator · year 2019` under the machine name, and only what is set. Work orders
 only; requests keep their answers in other columns and show one line.
 
@@ -161,22 +177,24 @@ only; requests keep their answers in other columns and show one line.
 ⋮ on a machine → *Award* → supplier, units, rate, mobilization, demobilization → the row appears
 awarded. **Verified end to end on staging, 2026-08-31.**
 
-**D2 ⏳ Award is offered on a work-order machine.**
+**D2 ✅ Award is offered on a work-order machine. — VERIFIED 2026-08-31, end to end.**
 Make an order and leave the supplier section **blank**. ⋮ on the machine → *Award* is there. It used
 to be marketplace-only, which left a blank order with no way to name a supplier afterwards.
 
 **D3 ✅ Over-awarding is refused.**
 Award 2 of 2, then try 1 more → `UNITS_EXCEED_QUANTITY`, and the dialog says *1 too many*.
 
-**D4 ✅ Mobilize and demobilize.**
+**D4 ✅ Mobilize and demobilize. — RE-VERIFIED 2026-08-31 through the UI.**
 ⋮ on an **awarded** row → *Mark mobilized* / *Mark demobilized*. Green pin on the bar, date in the
 tooltip.
 
-**D5 ✅ Undo clears only the one you undid.**
+**D5 ✅ Undo clears only the one you undid. — RE-VERIFIED 2026-08-31 through the UI.**
 Mark both, then *Undo mobilized* → mobilize clears, **demobilize stays**. Verified on staging.
 
-**D6 ⛔ Marks need no award, on either kind.**
-⋮ on a row nobody has awarded → the marks are there. No sequence to follow. Needs the backend deploy.
+**D6 ◑ Marks need no award, on either kind.** The menu half is **done and verified**: ⋮ on a row
+nobody has awarded offers *Mark mobilized* and *Mark demobilized*, with no sequence to follow. The
+write half is **still blocked** — `PATCH /api/projects/:id` answers `422 Unrecognized key(s) in
+object: 'marks'`, confirmed against the deployed backend on 2026-08-31.
 
 **D7 ✅ Papers hang on an award.**
 *Attach a document* appears only on an awarded row — there is no id to file one under before that.
@@ -221,18 +239,46 @@ There is no destination for them to follow.
 
 ---
 
+---
+
+## Found while running this pass — fixed, and worth a case of their own
+
+**F1 ✅ The row menu's last two entries were invisible.**
+⋮ on an awarded work-order machine, six entries. *Change the award* and the red *Remove from the
+project* were rendered, focusable by keyboard, and **below the chart's scroll box** — 725px and 756px
+against a container ending at 702px. The red remove is the entry that was asked for by name, so it
+was built and then hidden. Flipping upward could not fix it: a 207px list fits on neither side of a
+box leaving ~155px below the row and ~81px above. The menu is now a fixed layer that escapes the
+scroll box entirely (`1a51baf`). Re-check: open ⋮ on the **last** row of a full chart and count six.
+
+**F2 ✅ The award dialog could not record haulage money.**
+It asked for supplier, units, rate, basis. The work order's supplier row asks for rate,
+**mobilization** and **demobilization** with a line total. Same stored record, two entry paths, one
+lossy — and lossy exactly where it matters, because the chart's Award is the only path for a machine
+whose supplier section was left blank. Both boxes and the line total are there now (`d615634`), using
+the work order's own arithmetic so the two cannot drift. The deployed backend already stores them:
+`201`, read back `mobAmt=1200 demobAmt=800`.
+
+**F3 — three money defects, outside this feature.** The golden pricing set is red on three
+assertions, all predating renter-projects: the comparison prorates over calendar days (93,000 against
+the 81,000 every other surface shows, and it feeds `recommendBids`); `vatLines` derives VAT from a
+stored gross against ruling R-01b; cycle totals round each component then sum. See **FINDINGS.md ·
+Run 2026-08-31 · pricing golden set**. Not fixed — pricing moves every surface's numbers and the
+RMAP-AC-216 retirement rides with it, which is the owner's call.
+
 ## What is blocked, and on what
 
 **Backend — 5 files uncommitted in `Moedatech-App/apps/backend-agents`:**
 
 | file | unblocks |
 |---|---|
-| `validators/project.schema.ts` | C10, D6 (`labels`, `marks`) |
+| `validators/project.schema.ts` | C10, D6 (`labels`, `marks`). **Not** the haulage amounts — those are already deployed and verified. |
 | `handlers/agents/projects/updateProject.ts` | C10, D6 (the merge patches) |
-| `handlers/agents/projects/getChart.ts` | C3, C13, B12 (terms on the row) |
+| `handlers/agents/projects/getChart.ts` | C3, C13 (terms on the row). **Not B12** — the edit path reads the work-orders endpoint, which already carries terms. |
 | `handlers/agents/work-orders/updateWorkOrder.ts` | E9 (the move) |
 | `services/project-awards.service.ts` | E8 (`moveAwardsTo`) |
 
 Typecheck clean, 0 backend test failures.
 
-**Web — the last two commits** (`9bb7f08`, `42f16cb`) unblock D2 and E8's copy.
+**Web — deployed.** `9bb7f08` and `42f16cb` are live (D2 verified end to end; the move copy is in the
+served chunk). Since then: `74c9219`, `1a51baf`, `d615634`, `6511153`.

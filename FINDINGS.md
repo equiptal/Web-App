@@ -173,6 +173,71 @@ does, whichever way `vatLines` is written contradicts something in writing.
 
 ---
 
+---
+
+## Run · 2026-08-31 · renter projects, board + intake · staging, browser
+
+**3 fixes — 1 major, 2 minor. All three closed in this session.** Kept as struck entries rather than
+deleted, so any of them coming back reads as a regression.
+
+---
+
+### ~~FIX-PROJ-4 · The row menu's last two entries were rendered, focusable, and invisible~~ — closed by `1a51baf`
+
+| | |
+|---|---|
+| **Case** | UAT F1; blocks E7 and *Change the award* |
+| **Severity** | major — a renter could not reach a documented action, including the destructive one |
+| **Where** | `src/components/projects/RowMenu.tsx` |
+| **Expected** | six entries reachable, the red *Remove from the project* last |
+| **Actual** | four visible; *Change the award* at 725px and *Remove from the project* at 756px, inside a container ending at **702px** |
+| **Cause** | **confirmed.** The chart body is `max-h-[64vh] overflow-y-auto`. The menu was `absolute`, so that box clipped it, while the flip logic measured `window.innerHeight` — the wrong ruler. Flipping could not have saved it either: a 207px list fits on neither side of a box leaving ~155px below the row and ~81px above. |
+| **Fix** | `position: fixed`, placed from the trigger's rect, clamped to the viewport, inline-end aligned and mirrored for Arabic; re-placed on scroll (capture) and resize. |
+| **Risk** | `fixed` resolves against a transformed ancestor instead of the viewport. Checked on staging before writing it: nothing above the trigger sets `transform`, `filter`, `perspective`, `contain` or `will-change`. |
+| **Ruling** | none needed — the entries were asked for by name |
+
+**Why no test caught it.** The entries were in the DOM and had accessible names, so every existing
+assertion passed. Only geometry could see it. The new tests pin the layer as `fixed` and not
+`absolute`, which is the property that made the difference.
+
+---
+
+### ~~FIX-PROJ-5 · The award dialog could not record mobilization or demobilization~~ — closed by `d615634`
+
+| | |
+|---|---|
+| **Case** | UAT F2, D2 |
+| **Severity** | minor by the scale — no wrong number is shown; money simply cannot be entered |
+| **Where** | `src/components/projects/AwardDialog.tsx` |
+| **Expected** | the work order's three money boxes: rate, mobilization, demobilization, and a line total |
+| **Actual** | rate only |
+| **Cause** | **confirmed.** The dialog was written before the work order's supplier row gained the haulage fields and was never brought level. |
+| **Fix** | Both boxes plus the line total, importing `lineTotal` from `WorkOrderForm` rather than re-deriving `(rate + mob + demob) × units`. Amounts omitted when blank, never sent as 0. |
+| **Risk** | None known. The deployed backend already accepts and stores both — probed before the UI was written: `201`, read back `mobAmt=1200 demobAmt=800`. |
+| **Ruling** | the owner's own words: the award should open *"the supplier section that exists in the work modal"* |
+
+---
+
+### ~~FIX-PROJ-6 · A work-order template said "terms copied" and copied nothing~~ — closed by `6511153`
+
+| | |
+|---|---|
+| **Case** | UAT A6 |
+| **Severity** | minor by the scale, and the most dishonest of the three: it stated that it had done the thing it had not done |
+| **Where** | `src/lib/api/client.ts` — `listWorkOrders`, `fetchTemplateTerms` |
+| **Expected** | the generator's own answers: delivery **Me**, year **2022**, operator **No** |
+| **Actual** | four empty pills under a label reading *terms copied*, and OPERATOR showing **Yes** |
+| **Cause** | **confirmed, two bugs in a row.** (1) `listWorkOrders` handed the backend's already-grouped `{ workOrders: [...] }` to `groupWorkOrderItems`, which expects a flat array — every group id came back `undefined`, the lookup matched nothing, and `null` was returned, so no terms were ever copied. (2) Fixing that exposed a double conversion: `listWorkOrders` maps the blob into `MachineTerms` and `fetchTemplateTerms` ran `termsFromWire` over the result, reading wire keys off app-shaped data and answering a fully blank object. |
+| **Fix** | Read the real payload shape; return `row.terms` without converting twice. |
+| **Risk** | The same lookup feeds `startEditOrder`, which is why the refusal-to-open surfaced it at all. Both paths re-verified on staging. |
+| **Ruling** | none needed |
+
+**The second bug was mine, introduced by the first fix.** Worth recording as such: the blank object it
+produced was *worse* than the `null` it replaced, because `null` renders no pills and claims nothing
+while a blank renders four empty answers under a label saying they were copied. The tests added with
+it assert values rather than shape, and were confirmed to fail against the double conversion before
+being committed.
+
 ## Observed once, not reproduced — no fix entry
 
 **A single `403` on the dashboard's first paint** (PROJ-UI-01, first run). Four subsequent runs were
