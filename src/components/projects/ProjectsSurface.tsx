@@ -36,9 +36,9 @@ import {
 } from "@/lib/api/client";
 import {
   propagationForRequest,
-  propagationForWorkOrder,
+  siteConflicts,
   type ProjectSummary,
-  type PropagationRow,
+  type SiteConflict,
 } from "@/lib/contract/project";
 import { ProjectForm, emptyProjectForm, projectToForm, type ProjectFormValue } from "./ProjectForm";
 import { ProjectDelete, ProjectCreated, projectIsEmpty } from "./ProjectDelete";
@@ -46,6 +46,7 @@ import { ProjectsBoard } from "./ProjectsBoard";
 import type { Award, ChartGroup, ChartItem } from "@/lib/contract/award";
 import { RowMenu } from "./RowMenu";
 import { AwardDialog, UnawardConfirm } from "./AwardDialog";
+import { PeriodConflictDialog } from "./PeriodConflictDialog";
 import { WorkOrderForm, workOrderPayload, blankMachine, blankTerms, type WorkOrderDraft } from "./WorkOrderForm";
 import { MoveDialog } from "./MoveDialog";
 import { DocumentsDialog } from "./DocumentsDialog";
@@ -94,8 +95,12 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     id: string | null;
     version?: number;
     value: ProjectFormValue;
-    rows?: PropagationRow[];
+    /** The chart's rows, kept whole — the conflict check needs each one's own period. */
+    groups?: ChartGroup[];
   } | null>(null);
+
+  /** A save held back while the renter answers *keep these dates, or move them?* */
+  const [pending, setPending] = useState<{ value: ProjectFormValue; conflicts: SiteConflict[] } | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -223,35 +228,45 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
    * are making it, not once it is already saved.
    */
   async function openEdit(p: ProjectSummary) {
-    setEditing({ id: p.id, version: p.version, value: projectToForm(p), rows: [] });
+    setEditing({ id: p.id, version: p.version, value: projectToForm(p), groups: [] });
     try {
       const chart = await fetchChart(p.id);
-      const rows = chart.groups.map((g) =>
-        g.kind === "request"
-          ? propagationForRequest({
-              id: g.id,
-              ref: g.ref,
-              status: g.status ?? "OPEN",
-              bidCount: g.bidCount ?? 0,
-              renteeEditUsed: g.renteeEditUsed ?? false,
-            })
-          : propagationForWorkOrder({ id: g.id, ref: g.title?.trim() || g.ref }),
-      );
-      setEditing((cur) => (cur && cur.id === p.id ? { ...cur, rows } : cur));
+      /* The chart's groups are kept whole, not reduced to propagation rows: the conflict check
+         needs each row's own period, which is the one thing a `PropagationRow` throws away. */
+      setEditing((cur) => (cur && cur.id === p.id ? { ...cur, groups: chart.groups } : cur));
     } catch {
       // An empty list is the safe failure: the form still saves the project, and nothing propagates
       // silently to rows we could not read.
-      setEditing((cur) => (cur && cur.id === p.id ? { ...cur, rows: [] } : cur));
+      setEditing((cur) => (cur && cur.id === p.id ? { ...cur, groups: [] } : cur));
     }
   }
 
+  /**
+   * Save, asking first only if something under the site would now disagree with it.
+   *
+   * The ordinary edit — a typo in the title, a payment term — goes straight through and mentions
+   * nothing, because nothing is in question. The dialog exists for the one case where it is: a row
+   * carrying its own dates that the site is about to contradict.
+   */
   async function save(value: ProjectFormValue, applyTo: string[]) {
     if (!editing) return;
+
+    // Only on the first pass. Coming back from the dialog, `applyTo` is the renter's answer.
+    if (editing.id && applyTo.length === 0 && !pending) {
+      const site = { startDate: value.defaults.timing.startDate, endDate: value.defaults.timing.endDate };
+      const found = siteConflicts(editing.groups ?? [], site);
+      if (found.length > 0) {
+        setPending({ value, conflicts: found });
+        return;
+      }
+    }
+
     setSaving(true);
     setNotice(null);
     try {
       if (editing.id) {
         await updateProject(editing.id, editing.version ?? 1, value, applyTo);
+        setPending(null);
         setEditing(null);
         await reload();
       } else {
@@ -689,6 +704,31 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
         <UnawardConfirm open onClose={() => setUnawarding(null)} award={unawarding} onConfirm={() => void unaward()} busy={saving} />
       )}
 
+      {/* Raised only by `save`, and only when something would now read differently from the site. */}
+      {pending && (
+        <PeriodConflictDialog
+          open
+          conflicts={pending.conflicts}
+          site={{
+            startDate: pending.value.defaults.timing.startDate,
+            endDate: pending.value.defaults.timing.endDate,
+          }}
+          busy={saving}
+          onCancel={() => setPending(null)}
+          onKeep={() => {
+            const v = pending.value;
+            setPending(null);
+            // `[]` is the answer, not the absence of one — see the guard in `save`.
+            void save(v, []);
+          }}
+          onApply={(ids) => {
+            const v = pending.value;
+            setPending(null);
+            void save(v, ids);
+          }}
+        />
+      )}
+
       {deleting && (
         <ProjectDelete
           project={deleting}
@@ -737,7 +777,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
           <ProjectForm
             value={editing.value}
             onChange={(value) => setEditing((cur) => (cur ? { ...cur, value } : cur))}
-            rows={editing.rows}
+            isEdit={!!editing.id}
             {...(() => {
               /* Delete now lives inside the form's footer, so the surface hands it the action and
                  the words. A site with rows still gets the control — it opens the panel that says

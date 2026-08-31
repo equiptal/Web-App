@@ -351,6 +351,89 @@ export function propagationForRequest(req: {
 }
 
 /** A work order. Always editable, never pre-ticked away from the renter's attention. */
+
+/* ─────────────────────────── What disagrees with the site ─────────────────────────── */
+
+/**
+ * A row whose own dates differ from what the site is about to say.
+ *
+ * Editing a project is editing the PROJECT (owner, 2026-08-31). Nothing under it is mentioned, and
+ * nothing is ticked, because in the ordinary case there is nothing to decide: a work order with no
+ * period of its own already follows the site, and a request whose dates match it is not in
+ * disagreement with anything. Listing all of them anyway asked the renter to review a decision they
+ * did not have.
+ *
+ * What does need a decision is a row that will now say something different from its own site. That
+ * is what this finds, and it is the only thing the renter is asked about.
+ */
+export interface SiteConflict {
+  id: string;
+  kind: "request" | "work_order";
+  ref: string;
+  /** What the row says today. */
+  startDate: string | null;
+  endDate: string | null;
+  /** Can it be changed at all? A closed request, or one whose single post-bid edit is spent, cannot. */
+  editable: boolean;
+  /** Why not — shown instead of a choice, so the renter learns rather than being refused. */
+  reason: PropagationState;
+}
+
+/** Two periods, compared only on the fields a site actually states. */
+function periodDiffers(
+  own: { startDate: string | null; endDate: string | null } | null,
+  site: { startDate: string | null; endDate: string | null },
+): boolean {
+  // No period of its own means it follows the site, and cannot disagree with it.
+  if (!own) return false;
+  return (own.startDate ?? null) !== (site.startDate ?? null) || (own.endDate ?? null) !== (site.endDate ?? null);
+}
+
+/**
+ * Everything under this site that would now read differently from it.
+ *
+ * `groups` come from the chart, which already answers the one question that matters: a work order's
+ * `when` is `null` when it inherits, and a request's is always its own copy.
+ */
+export function siteConflicts(
+  groups: {
+    id: string;
+    kind: "request" | "work_order";
+    ref: string;
+    title?: string | null;
+    status?: string | null;
+    bidCount?: number | null;
+    renteeEditUsed?: boolean | null;
+    when: { startDate: string | null; endDate: string | null } | null;
+  }[],
+  site: { startDate: string | null; endDate: string | null },
+): SiteConflict[] {
+  return groups
+    .filter((g) => periodDiffers(g.when, site))
+    .map((g) => {
+      const row =
+        g.kind === "request"
+          ? propagationForRequest({
+              id: g.id,
+              ref: g.ref,
+              status: g.status ?? "OPEN",
+              bidCount: g.bidCount ?? 0,
+              renteeEditUsed: g.renteeEditUsed ?? false,
+            })
+          : propagationForWorkOrder({ id: g.id, ref: g.title?.trim() || g.ref });
+
+      return {
+        id: g.id,
+        kind: g.kind,
+        ref: row.ref,
+        startDate: g.when?.startDate ?? null,
+        endDate: g.when?.endDate ?? null,
+        editable: row.eligible,
+        reason: row.state,
+      };
+    });
+}
+
 export function propagationForWorkOrder(wo: { id: string; ref: string }): PropagationRow {
   return { id: wo.id, kind: "work_order", ref: wo.ref, state: "work_order", eligible: true, preTicked: true };
 }

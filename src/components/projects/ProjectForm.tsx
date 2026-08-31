@@ -24,13 +24,13 @@
  *
  * ── Three actions, not two ───────────────────────────────────────────────────────────────────────
  *
- * *Cancel · Project only · Save and apply to the ticked.* "Apply to what is already filed" is a
+ * *Cancel · Save.* What is filed under the site is no longer listed here — a
  * separate decision, not a checkbox riding on Save: it can spend a renter's one post-bid edit on a
  * request they are not looking at, so it has to be its own deliberate press.
  */
 
 import dynamic from "next/dynamic";
-import { useMemo, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useT } from "@/lib/i18n";
 import { Icon, Button, Toggle } from "@/components/ui";
 import {
@@ -39,7 +39,6 @@ import {
   type Project,
   type ProjectDefaults,
   type SiteLocation,
-  type PropagationRow,
 } from "@/lib/contract/project";
 import { RENTAL_BASES, PAYMENT_TERMS, type RentalBasis, type PaymentTerm } from "@/lib/contract/options";
 
@@ -91,7 +90,6 @@ export const input =
 export function ProjectForm({
   value,
   onChange,
-  rows,
   onDelete,
   deleteLabel,
   deletable,
@@ -102,7 +100,9 @@ export function ProjectForm({
   value: ProjectFormValue;
   onChange: (next: ProjectFormValue) => void;
   /** Edit only. What is already filed under this site — omit for a new one. */
-  rows?: PropagationRow[];
+  /** Editing rather than creating. The form itself no longer cares WHAT is filed — only the
+   *  conflict step does, and that lives in the surface. */
+  isEdit?: boolean;
   /** Editing only. Absent while creating — there is nothing yet to delete. */
   onDelete?: () => void;
   /** What the delete control should say: the plain action, or why it cannot happen yet. */
@@ -115,10 +115,7 @@ export function ProjectForm({
   saving?: boolean;
 }) {
   const t = useT();
-  const isEdit = !!rows;
 
-  // Pre-ticked comes from the row itself, never from "all of them": see `PropagationRow.preTicked`.
-  const [ticked, setTicked] = useState<Set<string>>(() => new Set((rows ?? []).filter((r) => r.preTicked).map((r) => r.id)));
 
   const { timing } = value.defaults;
   const patchTiming = (patch: Partial<ProjectDefaults["timing"]>) =>
@@ -127,17 +124,8 @@ export function ProjectForm({
   /** The location is the one required field. A site with no place is not a site. */
   const canSave = value.location.label.trim().length > 0 && !saving;
 
-  const eligible = useMemo(() => (rows ?? []).filter((r) => r.eligible), [rows]);
-  const applyTo = useMemo(() => eligible.filter((r) => ticked.has(r.id)).map((r) => r.id), [eligible, ticked]);
 
 
-  const stateLabel: Record<PropagationRow["state"], string> = {
-    free: t.projects.form.stateFree,
-    costs_the_edit: t.projects.form.stateCosts,
-    edit_used: t.projects.form.stateUsed,
-    closed: t.projects.form.stateClosed,
-    work_order: t.projects.form.stateWorkOrder,
-  };
 
   const hasPin = value.location.lat != null && value.location.lng != null;
 
@@ -260,37 +248,6 @@ export function ProjectForm({
         </div>
       </section>
 
-      {/* ── What is already filed here (edit only) ── */}
-      {isEdit && rows!.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <h3 className="text-subhead font-extrabold text-navy">{t.projects.form.applyTitle}</h3>
-          <p className="text-meta text-muted">{t.projects.form.applyNote}</p>
-
-          <div className="flex flex-col divide-y divide-border rounded-sm border border-border">
-            {rows!.map((r) => (
-              <label key={r.id} className={`flex items-center gap-2.5 px-3 py-2 text-body ${r.eligible ? "text-navy" : "text-muted"}`}>
-                <input
-                  type="checkbox"
-                  disabled={!r.eligible}
-                  checked={ticked.has(r.id)}
-                  onChange={(e) =>
-                    setTicked((prev) => {
-                      const next = new Set(prev);
-                      if (e.target.checked) next.add(r.id);
-                      else next.delete(r.id);
-                      return next;
-                    })
-                  }
-                />
-                <Icon name={r.kind === "work_order" ? "handyman" : "campaign"} size={14} className="flex-none text-muted" />
-                <span className="min-w-0 flex-1 truncate font-semibold">{r.ref}</span>
-                <span className={`flex-none text-meta ${r.state === "costs_the_edit" ? "text-warn" : "text-muted"}`}>{stateLabel[r.state]}</span>
-              </label>
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* ── Three actions ── */}
       <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
         {/* A disabled button with no reason beside it is indistinguishable from a broken one: the
@@ -337,8 +294,17 @@ export function ProjectForm({
 
             The list is the control; the button reports what the list is set to. Untick everything
             and it reads Save, and saves the site alone. */}
-        <Button variant="primary" onClick={() => onSave(value, applyTo)} disabled={!canSave}>
-          {applyTo.length > 0 ? t.projects.form.saveAndApply.replace("{n}", String(applyTo.length)) : t.common.save}
+        {/* One save, and it saves the SITE (owner, 2026-08-31).
+            *"Edit the project by default — no need to mention its sub children unless there is a
+            conflict."* The form used to list every request and work order with tick boxes on every
+            edit, which asked the renter to review a decision they mostly did not have: a work order
+            with no period of its own already follows the site, and a request whose dates already
+            match is not disagreeing with anything.
+
+            Anything that WOULD now read differently is raised after this, by
+            `PeriodConflictDialog`, and only then. */}
+        <Button variant="primary" onClick={() => onSave(value, [])} disabled={!canSave}>
+          {t.common.save}
         </Button>
       </div>
     </div>

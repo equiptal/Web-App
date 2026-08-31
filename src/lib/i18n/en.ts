@@ -1671,6 +1671,20 @@ export const en = {
       badType: "PDF, JPG, PNG or WEBP. Convert it first, or take a photo of the page.",
       readFailed: "That file could not be read. Try another.",
     },
+    periodConflict: {
+      title: "{n} things here keep different dates",
+      sub: "This site will say {period}.",
+      keep: "Keep their dates",
+      apply: "Change {n} too",
+      lockedNote: "{n} of these cannot change â they will keep the dates they have.",
+      locked: {
+        edit_used: "edit already used",
+        closed: "closed",
+        costs_the_edit: "has bids",
+        free: "",
+        work_order: "",
+      },
+    },
     conflict: {
       openTheForm: "Open the work order and change its dates there \u2014 that form owns the check that keeps a group\u2019s rows in step.",
       title: "This runs to different dates",
