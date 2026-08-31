@@ -127,7 +127,7 @@ export function RequestDetailsModal({
   const subject = item ?? group.items[0] ?? null;
   const actions = subject
     ? requestActions(subject)
-    : { canEdit: false, editCapUsed: false, editNeedsConfirm: false, canCancel: false };
+    : { canEdit: false, editCapUsed: false, editNeedsConfirm: false, canCancel: false, canShare: false };
 
   const fmt = (d: string | null) =>
     d ? new Date(d).toLocaleDateString(ar ? "ar" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
@@ -209,13 +209,19 @@ export function RequestDetailsModal({
                 {t.workspace.editRequest}
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => setShareOpen(true)}
-              className={btn("primary", "md", { className: "transition" })}
-            >
-              <Icon name="ios_share" size={16} /> {t.workspace.shareRequest}
-            </button>
+            {/* Only while it can still take a bid (owner, 2026-08-31). The link a share hands out is
+                an invitation to quote; on a shut request it leads to a form that refuses the
+                supplier, so the renter spends a contact and the supplier meets an error. The rail's
+                share badge follows the same rule, and gives the tile its ✕ instead. */}
+            {actions.canShare && (
+              <button
+                type="button"
+                onClick={() => setShareOpen(true)}
+                className={btn("primary", "md", { className: "transition" })}
+              >
+                <Icon name="ios_share" size={16} /> {t.workspace.shareRequest}
+              </button>
+            )}
           </>
         }
       >

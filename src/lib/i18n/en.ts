@@ -1471,9 +1471,12 @@ export const en = {
     inviteNoContact: "This bid carries no number to reach the supplier on.",
     inviteMessage:
       "Hello {supplier} — I received your bid through Moedatech. If you install the Moedatech app you'll see my requests directly and can bid on more of them. https://moedatech.net",
+    // The off-platform card's second control. What it opens is read-only by construction — the
+    // supplier's own submission through the shared link, in the bid form's own shape. ~~`editQuote`,
+    // "the renter typed this quote in himself, so it is his to correct".~~ Deleted with the label
+    // (owner, 2026-08-31): the renter did not type it, the supplier did, and the viewer edits
+    // nothing. One key for one button.
     viewQuote: "View quote",
-    // The renter typed an off-platform quote in himself, so it is his to correct.
-    editQuote: "Edit quote",
     // The next move on an off-platform row: get that supplier onto the app.
     offlineInvite: "Offline · invite ↗",
     notBuiltYet: "Not available yet.",

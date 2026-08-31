@@ -194,6 +194,16 @@ export interface RequestActions {
   /** Editing costs the one allowed post-bid edit, so it is confirmed first. */
   editNeedsConfirm: boolean;
   canCancel: boolean;
+  /**
+   * **Sharing is offered only while the request can still take a bid** (owner, 2026-08-31).
+   *
+   * The link a share hands out is an invitation to quote. On a request the backend has shut, that
+   * invitation leads to a form that refuses the supplier — so the renter spends a contact on a
+   * closed door, and the supplier's answer is an error page.
+   *
+   * The same `live` the other three read: OPEN or ACTIVE, and nothing else.
+   */
+  canShare: boolean;
 }
 
 /**
@@ -219,6 +229,7 @@ export function requestActions(req: Pick<RequestListItem, "status" | "bidCount" 
     editCapUsed: live && hasBids && req.renteeEditUsed,
     editNeedsConfirm: live && hasBids && !req.renteeEditUsed,
     canCancel: live,
+    canShare: live,
   };
 }
 

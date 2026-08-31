@@ -564,6 +564,15 @@ function BidCardTile({
                 {t.workspace.inviteToApp}
               </button>
             )}
+            {/* ── It VIEWS the bid; it never edited one (owner, 2026-08-31) ───────────────────
+                ~~«Edit quote».~~ What it opens is `SharedBidSubmissionModal`, which is read-only by
+                construction — the supplier's own answers laid out in the bid form's shape, Yes/No as
+                static chips and prices as static values. Nothing in it can be changed, and nothing
+                should be: this is what the SUPPLIER submitted through the shared link, and a renter
+                editing another firm's quote is not a thing the product does.
+
+                The label was describing a different button that never existed. It is «View quote»,
+                which is the key that was already sitting in the dictionary unused beside it. */}
             <button
               type="button"
               onClick={(e) => {
@@ -572,7 +581,7 @@ function BidCardTile({
               }}
               className={btn("secondary", "lg", { className: "transition" })}
             >
-              {t.workspace.editQuote}
+              {t.workspace.viewQuote}
             </button>
           </>
         ) : (

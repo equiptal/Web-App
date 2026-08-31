@@ -227,7 +227,13 @@ export function RequestRail({
                       request the renter cannot get back to, and there is no undo in the rail.
 
                       It takes the place the share badge holds on the active tile, and the two can
-                      never both apply: sharing invites bids, which a shut request cannot take. */}
+                      never both apply: sharing invites bids, which a shut request cannot take.
+
+                      ~~That last sentence was a claim, not a rule.~~ Both badges sat at the same
+                      `-end-1 -top-1`, so on a tile that was BOTH active and closed they stacked and
+                      share painted over the ✕ — the owner's screenshot, 2026-08-31: a request reading
+                      «Closed» offering to be shared for bids it can no longer receive. The share badge
+                      now carries `!tile.closed` so the rule is enforced where it is stated. */}
                   {tile.closed && onHide && (
                     <span
                       role="button"
@@ -243,7 +249,7 @@ export function RequestRail({
                       <Icon name="close" size={11} />
                     </span>
                   )}
-                  {active && onShare && (
+                  {active && !tile.closed && onShare && (
                     <span
                       role="button"
                       tabIndex={-1}
