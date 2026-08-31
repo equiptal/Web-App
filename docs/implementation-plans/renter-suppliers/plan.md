@@ -30,7 +30,11 @@ Settled with the owner, 2026-08-31. Each is load-bearing; changing one changes t
    route for this data — the clipboard is UTF-8, while Excel's *Save as CSV* on a Windows machine
    still writes Windows-1256 and mangles Arabic company names. An `.xlsx` chosen anyway is named and
    told what to do; it is never met with "we could not read that".
-7. **Recipients go in BCC**, capped at 25 per send. They are bidding against each other; **To** would hand every competitor the others' addresses, and that cannot be undone.
+7. **Every member of the company writes** (owner, 2026-09-01). No owner-only actions, including
+   delete. A firm's supplier list is a working document its team keeps together, and a permission
+   model exists to stop a stranger, not a colleague. If a deletion ever needs undoing, the answer is
+   an audit trail, not a lock.
+8. **Recipients go in BCC**, capped at 25 per send. They are bidding against each other; **To** would hand every competitor the others' addresses, and that cannot be undone.
 
 ---
 

@@ -216,8 +216,9 @@ Off-platform rows only, the renter's own voice (*my* requests), the second body 
 **Given/When/Then**
 - Given the invite is sent by WhatsApp and by email / Then the body is character-for-character the same, and only the subject line exists in one and not the other.
 
-### SUP-T43 — The card design
-**Scope:** design · **deferred, discuss before starting** · pairs with **SUP-BE-19**
+### SUP-T43 — The card design · **mocked, awaiting sign-off**
+**Scope:** design · pairs with **SUP-BE-19**
+**Prototype:** `prototypes/bid-link-card-v1.html` — both renderings, EN and AR, real wordmark
 
 The card carries the equipment, the place, the dates and three terms — fuel, mob & demob, payment — and the mail becomes the card with two names under it. **It must read correctly in WhatsApp, Apple Mail, new Outlook, Gmail, Slack and iMessage**, and the 880×320 image holds two short lines rather than a table. Whatever the image cannot hold must also live in the HTML card, or one link says two different things in two clients.
 
