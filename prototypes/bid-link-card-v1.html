@@ -107,7 +107,7 @@
   .shot.rtl { direction: rtl; font-family: 'Segoe UI', Tahoma, sans-serif; }
   .shot.rtl .join { text-align: left; }
   .shot.fallback h3 { font-size: 44px; color: rgba(255,255,255,0.9); }
-  .shot.closed .closes-img { color: #FF8A7A; }
+  .shot .closed-word { color: rgba(255,255,255,0.6); }
 
   /* ===== spec cards ===== */
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; margin-top: 24px; }
@@ -421,6 +421,10 @@ Duration :  1Month   &amp; extendable</p>
     A prototype that shows only the happy path gets built and then argued about, one missing field at a
     time. These eight are what the real data produces — <b style="color:#fff">every one of them drawn,
     not described</b>.
+    <br><br>
+    <b style="color:#fff">One rule runs through all of them: what is not set is not shown.</b> No
+    placeholder, no dash, no “not specified”. A row the request cannot answer does not exist on the
+    card, and when a whole band has nothing in it the band goes too.
   </div>
 
   <div class="cases">
@@ -511,20 +515,21 @@ Duration :  1Month   &amp; extendable</p>
     </div>
 
     <div class="case">
-      <h4>6 · Closed — deadline passed or request cancelled <span class="tag built">EXISTS</span></h4>
+      <h4>6 · Closed or expired <span class="tag new">CHANGED</span></h4>
       <div class="when">The link still resolves. Someone forwards it a week later.</div>
       
-        <div class="frame"><div class="shot closed">
+        <div class="frame"><div class="shot">
           <div class="head"><img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz48c3ZnIGlkPSJMYXllcl8xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1NjYuOTI5MTMgMjEzLjQ4NDEzIj48ZGVmcz48c3R5bGU+LmNscy0xe2ZpbGw6I2ZmZmZmZjt9PC9zdHlsZT48L2RlZnM+PGcgaWQ9Ik1vM2RhdGVjaExvZ28tbG9nbyI+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNTQ0LjQ4MjM1LDEzOS4xOTI2NGMtMTAuNjY1OTctMy41NDY3MS0zOC4yMzA0Ni0zLjE2NzkzLTQ4LjY5ODM5LDEuMTYyMTMtMTQuOTcwMjMsNi4xODk1My0yMC4xNDM5NSwyMS42MTU5OC0xOC44OTU3MSwzNi45NTYzNmgtNjQuNjQxMzN2LTMuOTA4MjVoNDkuMzc4NDV2LTM0LjU1NDZsLTEuMzUxNTQtMS4zNTE1NGgtNTQuNzU4NzdjLS43MjMxNCwwLTcuMjY1NTksMS44MzM2Mi04LjUwNTIyLDIuMjY0MDQtMTYuMTQwOTcsNS43MTYwNy0yMi4xMzI1MiwyMS45NjAzNC0yMC42NjkwNiwzOC4xMjcxNmgtMjkuMDYyMzZ2LTEwLjg4OThjMC0xMy4xNzk2NC0xNS42OTMzMS0zMC4wNjk1NS0yOS4xNzQyOC0zMC4wNjk1NWgtNjAuNTk1MzJ2MzUuODk3NTNoNTMuODYzNDV2NC40OTM2MmgtNTMuODYzNDV2MzUuODk3NTNsMjc5Ljk5MjA1LjI2Njg2YzMzLjY1OTI4LDAsNDEuNjczODEtNjIuNzczMyw2Ljk4MTUtNzQuMjkxNVpNNTMwLjc2ODk4LDE3Ny41ODY2aC0xNy45NDg3OXYtNC40OTM2MmgxNy45NDg3OXY0LjQ5MzYyWiIvPjxyZWN0IGNsYXNzPSJjbHMtMSIgeD0iMjEwLjE5NDI4IiB5PSI4Ny44MzQxOSIgd2lkdGg9IjM1LjkwNjE1IiBoZWlnaHQ9IjEyNS42NDk5NSIvPjxyZWN0IGNsYXNzPSJjbHMtMSIgeD0iOTAuMTYzNzIiIHk9IjE3OS40MzI4NSIgd2lkdGg9IjE3LjU1OTA4IiBoZWlnaHQ9Ii4wNjEzNiIvPjxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSIyMzQuMTYzOCAxNi40NDcxNSAyMzQuMTU4MjIgMTYuNDU4MzEgMjM0LjEwMjUxIDE2LjQzMDQyIDIzNC4xNjM4IDE2LjQ0NzE1Ii8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNTQxLjAzNjg1LDk5LjIzNzg1aC0xMy4zNTE4MnYxNS41NjQyMmwtLjc1NzU1LS4xODk0MWgtMTQuMzE1OTdjLTMuNjkzMDQsMC04LjQ1MzUyLDUuMTMwNy05LjExNjM5LDEwLjUzNjgyaDIzLjA1MzU4di4wMjU4NWgyMy4xNzQxN3YtMTcuMjUxNDVjMC0zLjk4NTc1LTQuNzA4ODktOC42ODYwMi04LjY4NjAyLTguNjg2MDJaTTUzOS4zNTgxNywxMTQuODAyMDdoLTEuMjk5ODl2LTUuMTkwOTZoMS4yOTk4OXY1LjE5MDk2WiIvPjxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSI1MTIuMDI2MTMgMTEwLjIzMTY4IDUxMi4wMjYxMyAxMTAuNDIxMDkgNTExLjI2ODU4IDExMC4yMzE2OCA1MTIuMDI2MTMgMTEwLjIzMTY4Ii8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMzMyLjc4MzA1LDM3LjQ1NzMzbC0xLjMzMTkyLTUuOTY5OTMsOC4wNDI2NywxLjQ0OTM1LDQuMTk1NTMsMTMuMTA5MTFjMTIuMjIzMDgsMS41ODcyNiw0MC45NDMzNSwxMS4zNzc3NywzOS4zMDIyNywzMi43MTU0Ni0xLjY0MTA4LDIxLjMzNzctMjQuNTMwNjEsMzYuMDgwMS0yNC41MzA2MSwzNi4wODAxLDAsMC0xNC4xMjgzMiw3LjQ3NDU1LTE5LjI1NTgyLDEwLjYxMzgyLDIuMDA3NDMtNC4wNzEyOSwxNy4zNTQxNy01NC4yNjMzNi04LjIwMzMtNzUuMDk1MjJsLTQyLjYyNDEyLTE3LjUyMzc2LDUuNTE3NzMtMTAuODEzMzEsMzguODg3NTYsMTUuNDM0MzhaIi8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMjI4Ljk0MTMyLDQzLjcwNTYybC0xNjEuNjEzODYsOTUuMTA2NDVoNDcuMTIxNDFjMTIuOTA1OTksMCwyOS4xNzIyNCwxNi4xNDM2NCwyOS4xNzIyNCwyOS4xNjY3M2wuMDIyMzEsOS43NTE5NSwxOS4wOTE1My0uMTQ1MDN2LTQwLjM4OTc3aDM0LjU1NTNsMS4zNDg1OCwxLjM0ODY1djc0LjkzOTUzTC4wMDA1LDIxMy40ODIxM2wuMDI0MzQtMzUuMTgyOTdoMTA3LjY5Nzk3di0zLjU4ODgySDB2LTM1LjQ0N0MzMS43MzAwNSwxMjMuNDg3NTgsMjM4Ljg4OTMsMCwyMzguODg5MywwbDUxLjMwNjQsMTkuNTU5NjhjLS4wMzkwMSwwLTUuNjUwNTcsOS44MjQzMy02LjE2MzIzLDEwLjc1NTAzbC00OS44Njg2Ny0xNS4wNjI2LS4wNjEyOS0uMDE2NzMuMDU1NzEuMDI3ODksOTIuNDcwNzYsNDAuMDcyMWMuNjQwODIsMi44NTg2NSw0LjM3NDQzLDE3Ljg4NzkxLDQuMzc0NDMsMTcuODg3OTFsLTEwMi4wNjIwOS0yOS41MTc2NloiLz48cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xNjYuOTkxODIsMTAwLjk5NDAxaDMyLjA0NTQ5djI0LjE4MTMxaC01Mi43NTA4MXYtMy40NzU5OWMwLTExLjQyNzU4LDkuMjc3NzQtMjAuNzA1MzIsMjAuNzA1MzItMjAuNzA1MzJaIi8+PC9nPjwvc3ZnPg==" alt="Moedatech"><span class="ref">REQ-00233</span></div>
           <div>
             <h3>Vacuum robot ×3</h3>
-            
-            
+            <p class="where">Riyadh · 2 weeks · 4 Aug → 18 Aug 2026</p>
+            <div class="terms"><div><span>MOB · DEMOB</span><b>Supplier</b></div><div><span>FUEL</span><b>Renter · diesel</b></div></div>
           </div>
-          <div class="foot"><span class="closes-img">This request is no longer accepting bids</span><span class="join"><b>GET THE APP</b><span>linktr.ee/moedatech</span></span></div>
+          <div class="foot"><span class="closes-img closed-word">Closed 21 Aug 2026</span><span class="join"><b>GET THE APP</b><span>linktr.ee/moedatech</span></span></div>
         </div></div>
-      <div class="rule"><b>The terms come off.</b> A card that lists fuel and mobilisation under “closed” is an invitation with the door locked. The request stays named so the reader knows which one it was, and the state is the loudest thing on it.</div>
-      <div class="body-note"><b>Card:</b> one sentence, no rows, no bid instruction. The app line <b>stays</b> — a supplier who arrives late is still worth inviting.</div>
+      <div class="rule"><b>The same card as any other</b> (owner, 2026-09-01). No stripped-down state, no banner: the card is a picture of the request, and <b>the link is what refuses the bid</b> — a supplier who opens it is told there, on the page, where there is room to say it properly.
+      <br><br>Today's behaviour is the opposite and worse: the closed sentence <i>replaces</i> the description, so a forwarded link loses the equipment, the site and the dates — the reader cannot even tell which request went by.</div>
+      <div class="body-note"><b>One word changes:</b> the date line reads <b>“Closed 21 Aug 2026”</b> instead of “Bidding closes”. Nothing is added, nothing is removed — the line was already there, and a card that says “closes” about a date in the past is a card that is wrong. <b>Say if you would rather drop the line entirely.</b></div>
     </div>
 
     <div class="case">
