@@ -1741,6 +1741,7 @@ export const en = {
       safetyOtherPlaceholder: "Name the certificate",
       overrideBadge: "{n} different",
       termsTitle: "Terms for this order",
+      termsUnreadable: "Could not read this order’s terms. Try again — opening it without them would overwrite what you entered.",
       sameAsFirst: "same as the first machine",
       orderTitle: "Name this order",
       orderTitleHint: "What you will call it on the chart.",

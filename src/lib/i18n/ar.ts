@@ -1476,6 +1476,7 @@ export const ar: Dictionary = {
       safetyOtherPlaceholder: "اكتب اسم الشهادة",
       overrideBadge: "{n} مختلف",
       termsTitle: "شروط هذا الأمر",
+      termsUnreadable: "تعذّرت قراءة شروط هذا الأمر. حاول مجدداً — فتحه بدونها سيمحو ما أدخلته.",
       sameAsFirst: "مطابق للمعدة الأولى",
       orderTitle: "اسم الأمر",
       orderTitleHint: "ما ستُسميه به في المخطط.",

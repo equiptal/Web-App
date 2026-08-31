@@ -18,6 +18,8 @@ const award = (over: Partial<Award> = {}): Award => ({
   supplierId: null,
   supplierName: "Zahid Tractor",
   units: 2,
+  mobilizationAmount: null,
+  demobilizationAmount: null,
   rentalBasis: "monthly",
   rateAmount: 8600,
   mobilizedAt: null,

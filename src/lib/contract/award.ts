@@ -78,6 +78,18 @@ export interface Award {
   rateAmount: number | null;
 
   /**
+   * What it costs to get the machine here, and away again — per unit, like the rate.
+   *
+   * Separate from `rateAmount` because they are separate negotiations, and because comparing two
+   * suppliers on the rate alone compares the wrong number: the cheaper monthly rate often carries
+   * the longer haul. A line comes to `(rate + mobilization + demobilization) × units`.
+   *
+   * `null` means nobody has quoted the haulage yet, which is not a haulage of zero.
+   */
+  mobilizationAmount: number | null;
+  demobilizationAmount: number | null;
+
+  /**
    * The two marks. **Dates, not flags.**
    *
    * A boolean would say it arrived; a date says *when*, which is the only thing that can be drawn —
@@ -147,6 +159,9 @@ function mapAward(raw: Record<string, unknown>): Award {
     units: Number(raw.units),
     rentalBasis: (raw.rentalBasis as Award["rentalBasis"]) ?? null,
     rateAmount: typeof raw.rateAmount === "number" ? raw.rateAmount : null,
+    // Absent reads as null, never 0 — "not quoted" and "free" are different answers.
+    mobilizationAmount: typeof raw.mobilizationAmount === "number" ? raw.mobilizationAmount : null,
+    demobilizationAmount: typeof raw.demobilizationAmount === "number" ? raw.demobilizationAmount : null,
     mobilizedAt: typeof raw.mobilizedAt === "string" ? raw.mobilizedAt : null,
     demobilizedAt: typeof raw.demobilizedAt === "string" ? raw.demobilizedAt : null,
     documents: docs.filter(isRecord).map((d) => ({

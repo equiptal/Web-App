@@ -27,6 +27,7 @@ import {
   fetchTaxonomy,
   fetchAllMyRequests,
   assignToProject,
+  listWorkOrders,
   renameRequestRow,
   attachDocument,
   removeDocument,
@@ -49,6 +50,7 @@ import { RowMenu } from "./RowMenu";
 import { AwardDialog, UnawardConfirm } from "./AwardDialog";
 import { PeriodConflictDialog } from "./PeriodConflictDialog";
 import { WorkOrderForm, workOrderPayload, blankMachine, type WorkOrderDraft } from "./WorkOrderForm";
+import { blankTerms } from "./TermsFields";
 import { FileRequestDialog } from "./FileRequestDialog";
 import { RenameDialog } from "./RenameDialog";
 import { MoveDialog } from "./MoveDialog";
@@ -319,6 +321,65 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
    * write yet. It is refused here with a plain sentence rather than a silent no-op: a pen that opens
    * a box, takes a name and loses it is worse than a pen that says it cannot.
    */
+  /**
+   * Open an existing work order for editing, with each machine's own terms read back.
+   *
+   * ⚠️ **The chart does not carry terms.** `getChart` returns a machine's name, quantity and awards
+   * and nothing else, so seeding the form from a chart row gave every machine a BLANK terms block —
+   * and since every machine now always sends its terms, saving wrote those blanks over whatever the
+   * renter had entered. Thirteen answers per machine, destroyed by opening a form and pressing save.
+   *
+   * `listWorkOrders` is where they live (the template reader already uses it for exactly this), so
+   * they are fetched and matched by machine id.
+   *
+   * ⚠️ **A failed fetch does not open the form.** Opening it with blanks is how the terms got wiped;
+   * refusing to open says so and costs the renter a retry, which is the cheaper of the two.
+   */
+  async function startEditOrder(group: ChartGroup) {
+    if (!selected) return;
+    setNotice(null);
+    try {
+      const orders = await listWorkOrders(selected);
+      const stored = orders.find((o) => o.id === group.id);
+      if (!stored) throw new Error("group not found");
+
+      const termsOf = (itemId: string) =>
+        stored.items.find((it) => it.id === itemId)?.terms ?? blankTerms();
+
+      setWorkOrder({
+        groupId: group.id,
+        title: group.title ?? "",
+        when: {
+          ...EMPTY_WHEN,
+          startDate: group.when?.startDate ?? null,
+          endDate: group.when?.endDate ?? null,
+        },
+        // Every existing machine carries its id AND its own terms through the form and back out.
+        machines: group.items.map((it) => ({
+          ...blankMachine(),
+          id: it.id,
+          offCatalogue: true,
+          rawLabel: it.label,
+          quantity: it.quantity,
+          terms: termsOf(it.id),
+          lines: it.awards.length
+            ? it.awards.map((aw) => ({
+                // Amounts the award does not carry read back empty, not zero.
+                mobAmount: aw.mobilizationAmount != null ? String(aw.mobilizationAmount) : "",
+                demobAmount: aw.demobilizationAmount != null ? String(aw.demobilizationAmount) : "",
+                supplierName: aw.supplierName,
+                units: aw.units,
+                rateAmount: aw.rateAmount != null ? String(aw.rateAmount) : "",
+                rentalBasis: aw.rentalBasis,
+              }))
+            : blankMachine().lines,
+        })),
+      });
+    } catch {
+      setNotice(t.projects.workOrder.termsUnreadable);
+    }
+  }
+
   async function rename(group: ChartGroup, title: string | null) {
     setSaving(true);
     setNotice(null);
@@ -674,37 +735,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
                   // does not offer two doors to the same destructive act.
                   onOpenRequest: group.kind === "request" ? () => router.push(requestUrl(group.id)) : undefined,
                   onEditWorkOrder:
-                    group.kind === "work_order"
-                      ? () =>
-                          setWorkOrder({
-                            groupId: group.id,
-                            title: group.title ?? "",
-                            when: {
-                              ...EMPTY_WHEN,
-                              startDate: group.when?.startDate ?? null,
-                              endDate: group.when?.endDate ?? null,
-                            },
-                            // Every existing machine carries its id through the form and back out.
-                            machines: group.items.map((it) => ({
-                              ...blankMachine(),
-                              id: it.id,
-                              offCatalogue: true,
-                              rawLabel: it.label,
-                              quantity: it.quantity,
-                              lines: it.awards.length
-                                ? it.awards.map((aw) => ({
-                                    // Amounts the award does not carry read back empty, not zero.
-                                    mobAmount: "",
-                                    demobAmount: "",
-                                    supplierName: aw.supplierName,
-                                    units: aw.units,
-                                    rateAmount: aw.rateAmount != null ? String(aw.rateAmount) : "",
-                                    rentalBasis: aw.rentalBasis,
-                                  }))
-                                : blankMachine().lines,
-                            })),
-                          })
-                      : undefined,
+                    group.kind === "work_order" ? () => void startEditOrder(group) : undefined,
                   onDeleteWorkOrder: group.kind === "work_order" ? () => void removeOrder(group.id) : undefined,
                   onAttachDocument: a ? () => setPapers({ award: a, isRequest: group.kind === "request" }) : undefined,
                   onRemoveFromProject:

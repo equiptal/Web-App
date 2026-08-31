@@ -100,9 +100,14 @@ function hasOpenEnd(groups: ChartGroup[], projectWindow: { startDate: string | n
 /**
  * The month ticks the axis is read against. One per month start inside the span.
  *
- * **The label carries the YEAR** — «Mar 26», not «Mar» (owner, 2026-08-31, with his own reference).
- * A chart running November to February showed «Nov Dec Jan Feb» and left the reader to work out
- * which of them had rolled over; two more characters answer it on every column.
+ * **The label carries the YEAR IN FULL** — «Oct 2026».
+ *
+ * ~~«Mar»~~ left the reader to work out which of Nov·Dec·Jan·Feb had rolled over. ~~«Oct 26»~~ was
+ * worse, and it is the fault the owner hit twice on 2026-08-31: *"I still don't understand how 16-10
+ * appears after 26 Oct."* There was nothing wrong with the chart — «Oct 26» is October 2026, but the
+ * only natural reading of those four characters is the 26th of October, so a bar ending on the 16th
+ * looked like it ran ten days past the column it sits in. A two-digit year in a chart whose bars are
+ * labelled with real dates cannot win that fight; the full year cannot be mistaken for a day.
  */
 function months(axis: Axis): { iso: string; label: string }[] {
   const out: { iso: string; label: string }[] = [];
@@ -111,7 +116,7 @@ function months(axis: Axis): { iso: string; label: string }[] {
   const cur = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), 1));
   while (cur <= to) {
     const iso = cur.toISOString().slice(0, 10);
-    out.push({ iso, label: cur.toLocaleDateString(undefined, { month: "short", year: "2-digit", timeZone: "UTC" }) });
+    out.push({ iso, label: cur.toLocaleDateString(undefined, { month: "short", year: "numeric", timeZone: "UTC" }) });
     cur.setUTCMonth(cur.getUTCMonth() + 1);
   }
   return out;

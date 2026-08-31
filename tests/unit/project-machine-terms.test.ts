@@ -100,3 +100,46 @@ describe("how many fields a machine states differently", () => {
     expect(countDifferences(mine, shared)).toBe(1);
   });
 });
+
+describe("reopening a work order must not blank its terms", () => {
+  /* The bug this guards, found by the owner asking *"what is the use of the info he entered per work
+     order if we don't consume it anywhere?"*:
+
+     `getChart` returns a machine's name, quantity and awards — and no terms. The edit path seeded
+     each machine from `blankMachine()`, and since every machine now ALWAYS sends its terms, saving
+     wrote those blanks over whatever the renter had entered. Thirteen answers per machine, destroyed
+     by opening a form and pressing save.
+
+     `listWorkOrders` is where the terms live, so `startEditOrder` fetches them and matches by
+     machine id. The payload assertion below is the part that bites: it is what turns a blank draft
+     into a destructive write. */
+
+  it("sends the terms it was given, not a blank block", () => {
+    const stored = { ...blankTerms(), deliveryOverride: "supplier" as const, equipmentYear: "2019" };
+    const d = draft({
+      groupId: "g1",
+      machines: [{ ...blankMachine(), id: "m1", rawLabel: "Welder", offCatalogue: true, terms: stored }],
+    });
+
+    const row = (workOrderPayload(d, { create: false }).body.items as Record<string, unknown>[])[0];
+    const sent = row.terms as Record<string, unknown>;
+
+    expect(sent.delivery).toBe("supplier");
+    expect(sent.year).toBe("2019");
+  });
+
+  it("would send blanks if the draft were seeded blank — which is why the fetch must not be skipped", () => {
+    /* Kept as a test rather than a comment: it states plainly that a blank draft IS a destructive
+       write, so nobody re-introduces a synchronous "just open the form" path. */
+    const d = draft({
+      groupId: "g1",
+      machines: [{ ...blankMachine(), id: "m1", rawLabel: "Welder", offCatalogue: true }],
+    });
+
+    const row = (workOrderPayload(d, { create: false }).body.items as Record<string, unknown>[])[0];
+    const sent = row.terms as Record<string, unknown>;
+
+    expect(sent.delivery, "a blank draft sends a blank term").toBeUndefined();
+    expect(sent.year).toBeUndefined();
+  });
+});
