@@ -1659,6 +1659,15 @@ export const en = {
         quotation: "Supplier's quotation",
         other: "Other",
       },
+      /* The same four, short enough for a pill beside a machine name. The chart has one line per
+         row and a filename eats all of it, so the row names the KIND and the filename rides the
+         hover — «PO» is what a renter is looking for when they scan a chart for one. */
+      kindShort: {
+        po: "PO",
+        contract: "Contract",
+        quotation: "Quotation",
+        other: "Doc",
+      },
       attach: "Attach a file",
       removeNamed: "Remove {name}",
       oursIsGenerated: "Our quotation for this request is generated, not uploaded — download it from the row menu. The one here is the quotation the SUPPLIER sent you.",
@@ -1867,9 +1876,8 @@ export const en = {
       openEnded: "open-ended",
       from: "from",
       noPeriod: "no dates yet",
-      mobilized: "Arrived",
-      demobilized: "Left",
-      marksAreEvents: "what happened — the bar is what was agreed",
+      mobilized: "Mobilized",
+      demobilized: "Demobilized",
     },
     del: {
       confirmTitle: "Delete this project?",

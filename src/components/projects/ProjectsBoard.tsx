@@ -592,9 +592,14 @@ function SitePanel({
                 themselves, same size and same rotation, because a legend drawn differently from the
                 thing it explains is a second thing to learn. */}
             <div className="flex items-center gap-4 border-t border-border px-3 py-2">
+              {/* ~~A grey line explaining that the marks are what happened and the bar is what was
+                  agreed.~~ Removed (owner, 2026-08-31). Two labelled shapes need no paragraph: the
+                  sentence was there to justify a design decision, which is what a commit message is
+                  for, not a chart. And the words are now the product's own — **Mobilized** and
+                  **Demobilized**, matching the menu that sets them, rather than *Arrived* and *Left*,
+                  which were a second vocabulary for one pair of facts. */}
               <LegendKey tone="in" label={t.projects.chart.mobilized} />
               <LegendKey tone="out" label={t.projects.chart.demobilized} />
-              <span className="text-meta text-muted-light">{t.projects.chart.marksAreEvents}</span>
             </div>
 
             {/* ~~A 96px spacer inside the scroller.~~ It went with the scroller: the room after the

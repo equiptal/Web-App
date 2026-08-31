@@ -108,47 +108,43 @@ export function AwardRow({
       {/* The label column: what this row is, its papers, and its menu. `pe-10` keeps the text clear
           of the menu's 28px target rather than letting a long machine name run under it. */}
       <div className="relative flex w-[340px] flex-none flex-col justify-center gap-0.5 py-2 pe-10 ps-3">
-        {/* ── The papers: one icon each, the NAME beside it, and pressable ──────────────────────
+        {/* ── The machine, and its papers on the SAME line ──────────────────────────────────────
 
-            ~~A per-kind glyph in the top corner, title-attribute only.~~ Three faults in one
-            control (owner, 2026-08-31: *"must be document icon for all types with the file name and
-            clicking it will open same view/download"*):
+            ~~The filenames stacked above the machine name, one line each.~~ Two rows of chrome for
+            what is one row of content (owner, 2026-08-31: *"show the title or label small in a pill
+            with doc icon like PO, all in the same row as the item name"*), and a filename is the
+            wrong thing to print: «WhatsApp Image 2026-08-30 at 6.21.44 PM (1).jpeg» filled the
+            column and said nothing a renter scanning a chart wants to know.
 
-              · Four glyphs to decode, and a renter does not scan papers by shape — they read the
-                name, which was hidden in a tooltip.
-              · A tooltip is not available on a phone at all, so on a phone the row said only that
-                *some* number of papers existed.
-              · Nothing happened when pressed, which is the worst of the three: the paper was
-                visible and unreachable.
+            The KIND is what they want — *is there a PO on this machine?* — so the pill names the
+            kind, short, and the filename rides the hover for when the answer is *which* PO. Pressing
+            still opens the paper.
 
-            Now: the house document icon for every kind, the filename next to it, and the whole
-            thing opens the paper — the same view-or-save the papers dialog gives, because there is
-            one right answer to «open this» and two doors to it would drift. */}
-        {award.documents.length > 0 && (
-          <span className="flex min-w-0 flex-col gap-0.5">
-            {docs.map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                onClick={() => onOpenDocument?.(d.id)}
-                disabled={!onOpenDocument}
-                title={d.filename}
-                className="flex min-w-0 items-center gap-1 text-start text-meta text-brand disabled:cursor-default"
-              >
-                <Icon name="description" size={12} className="flex-none" />
-                <span className="truncate underline decoration-border underline-offset-2">{d.filename}</span>
-              </button>
-            ))}
-            {/* The overflow count keeps its place rather than growing the row: three names is
-                already the most a 340px column reads at a glance, and the dialog holds the rest. */}
-            {extra > 0 && <span className="text-meta font-semibold text-muted">+{extra}</span>}
+            The pill is the boxed, barely-rounded shape the intake uses, so «a small labelled thing
+            you can press» reads the same in both places. */}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-body font-semibold text-navy">
+            {item.label} ×{award.units}
+            {/* "of 3" only when it is not the whole line — otherwise it is noise on every row. */}
+            {split && <span className="ms-1 font-semibold text-muted-light">{t.projects.chart.of} {item.quantity}</span>}
           </span>
-        )}
 
-        <span className="truncate text-body font-semibold text-navy">
-          {item.label} ×{award.units}
-          {/* "of 3" only when it is not the whole line — otherwise it is noise on every row. */}
-          {split && <span className="ms-1 font-semibold text-muted-light">{t.projects.chart.of} {item.quantity}</span>}
+          {docs.map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => onOpenDocument?.(d.id)}
+              disabled={!onOpenDocument}
+              /* The filename, because the pill deliberately does not print it. */
+              title={d.filename}
+              className="flex flex-none items-center gap-0.5 rounded-sm border border-brand/30 bg-brand-soft px-1.5 py-0.5 text-label font-semibold text-brand transition hover:border-brand disabled:cursor-default"
+            >
+              <Icon name="description" size={11} className="flex-none" />
+              {t.projects.docs.kindShort[d.kind] ?? t.projects.docs.kindShort.other}
+            </button>
+          ))}
+          {/* Three pills is what a 340px column holds beside a machine name; the dialog has the rest. */}
+          {extra > 0 && <span className="flex-none text-label font-semibold text-muted">+{extra}</span>}
         </span>
         <span className="truncate text-meta text-muted">
           {award.rateAmount != null && <b className="font-semibold text-navy-mid">{award.rateAmount.toLocaleString()} </b>}
