@@ -1407,12 +1407,13 @@ export async function removeDocument(projectId: string, awardId: string, docId: 
 
 /* ----------------------------- The supplier list ----------------------------- */
 
-export interface RenterSupplier {
-  id: string;
-  kind: "platform" | "own";
-  name: string;
-  vendorRegistered: boolean;
-}
+/**
+ * The shape moved to `contract/renter-suppliers.ts` (SUP-T11), where the whole feature reads it —
+ * the list screen, the share sheet's recipient picker and this file's own fetcher. It is re-exported
+ * here so `AwardDialog` and anything else importing it from the client keeps working.
+ */
+export type { RenterSupplier } from "@/lib/contract/renter-suppliers";
+import type { RenterSupplier } from "@/lib/contract/renter-suppliers";
 
 /**
  * The renter's own suppliers, for the award picker.

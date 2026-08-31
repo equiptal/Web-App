@@ -8,4 +8,5 @@ export * from "./charged-days";
 export * from "./project";
 export * from "./work-order";
 export * from "./award";
+export * from "./renter-suppliers";
 export * from "./project-apply";
