@@ -11,6 +11,7 @@ import { DeleteGroupDialog, GroupsMenu, NameGroupDialog, RenameGroupDialog } fro
 import { SupplierProfileDialog } from "./SupplierProfileDialog";
 import { SupplierBidsDialog } from "./SupplierBidsDialog";
 import { EditSupplierDialog } from "./EditSupplierDialog";
+import { InviteSupplierDialog } from "./InviteSupplierDialog";
 import { SuggestedBand } from "./SuggestedBand";
 import {
   bidCount,
@@ -75,6 +76,7 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [bidsId, setBidsId] = useState<string | null>(null);
   const [editing, setEditing] = useState<RenterSupplier | null>(null);
+  const [inviting, setInviting] = useState<RenterSupplier | null>(null);
 
   const load = useCallback(() => {
     listRenterSuppliers().then(setRows);
@@ -329,6 +331,7 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
                   onOpen={() => setProfileId(s.id)}
                   onOpenBids={() => setBidsId(s.id)}
                   onEdit={() => setEditing(s)}
+                  onInvite={() => setInviting(s)}
                 />
               ))}
             </tbody>
@@ -346,6 +349,8 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
           setToast(msg ?? c.added);
         }}
       />
+
+      <InviteSupplierDialog supplier={inviting} onClose={() => setInviting(null)} />
 
       <EditSupplierDialog
         key={editing?.id ?? "none"}
@@ -434,6 +439,7 @@ function Row({
   onOpen,
   onOpenBids,
   onEdit,
+  onInvite,
 }: {
   s: RenterSupplier;
   c: ReturnType<typeof useT>["suppliers"];
@@ -444,6 +450,7 @@ function Row({
   onOpen: () => void;
   onOpenBids: () => void;
   onEdit: () => void;
+  onInvite: () => void;
 }) {
   const platform = s.kind === "platform";
   const groups = groupsOf(s);
@@ -569,6 +576,18 @@ function Row({
 
       <td className="px-3 py-2.5">
         <span className="flex items-center justify-end">
+          {/* SUP-T42 — off-platform rows only. A supplier who already has an account has nothing to
+              be invited to, and offering it would be us not knowing our own users. */}
+          {!platform && (
+            <button
+              type="button"
+              onClick={onInvite}
+              title={c.inviteToApp}
+              className="grid h-[30px] w-[30px] place-items-center rounded-sm text-muted transition hover:bg-surface3 hover:text-navy"
+            >
+              <Icon name="ios_share" size={15} />
+            </button>
+          )}
           <button
             type="button"
             onClick={onEdit}
