@@ -290,15 +290,21 @@ _Last run: never._
 
 ## 10 · COMPARE — bid comparison
 
-_Last run: never._
+_Last run: 2026-08-31, unit — 10 pass · 1 fail (COMPARE-02) · 2 no coverage._
 
 The comparison must state the same numbers as the cards. A card saying one thing and a comparison row another is the bug this module exists to catch.
+
+⚠️ **And it did not catch it.** COMPARE-02 was listed as covered by `comparison.test.ts` and
+`bid-card-details.test.ts`, both green, while `buildItemComparison` reads 93,000 for a bid whose card
+reads 81,000 (**FIX-MONEY-1**). Neither spec compared the two surfaces on one bid — each checked its
+own side against its own expectation, so both agreed with themselves. `agreement-money.test.ts` now
+holds that cross-surface assertion; a case is only covered by a spec that could fail.
 
 | ID | Case | Expected | L | Mut | Coverage |
 |---|---|---|---|---|---|
 | COMPARE-01 | Compare two bids | Both columns render every compared field | U | no | `comparison.test.ts` |
-| COMPARE-02 | Compare rows match the cards | Every value equals the bid card's value | U | no | `comparison.test.ts`, `bid-card-details.test.ts` |
-| COMPARE-03 | Totals are comparable | All columns on the same VAT basis and the same day count | U | no | `vat-inclusive.test.ts`, `charged-days.test.ts` |
+| COMPARE-02 | Compare rows match the cards | Every value equals the bid card's value | U | no | `agreement-money.test.ts` — **FAIL**, FIX-MONEY-1 |
+| COMPARE-03 | Totals are comparable | All columns on the same VAT basis and the same day count | U | no | `vat-inclusive.test.ts`, `charged-days.test.ts`, `golden-pricing.test.ts` — VAT basis **FAIL**, FIX-MONEY-2 |
 | COMPARE-04 | Differing unit counts | The priced count is compared, and the difference is stated | U | no | `quick-compare.test.ts` |
 | COMPARE-05 | Missing field in one bid | Shown as absent, never as zero | U | no | `comparison.test.ts` |
 | COMPARE-06 | Quick compare | The quick view and the full view agree | U | no | `quick-compare.test.ts` |

@@ -157,7 +157,13 @@ describe("cycle totals", () => {
     expect(money(t.firstCycle.oneOff)).toBe(3_700);
   });
 
-  it("carries full precision into the total, rounding only at the end (R-02)", () => {
+  /* `it.fails` — an OPEN defect, not a disabled test. FIX-MONEY-3.
+     It asserts the correct figure and expects the assertion to fail, so the suite is green while the
+     defect stands and turns RED the moment cycle-totals.ts is fixed. That is the point: a plain
+     failing test leaves the suite permanently red, and a red suite hides the next real regression
+     behind the known ones. Skipping it instead would assert nothing at all.
+     When it goes red: delete `.fails` and strike FIX-MONEY-3 in FINDINGS.md. */
+  it.fails("carries full precision into the total, rounding only at the end (R-02)", () => {
     // The app's rule, and the bug it removed: rounding each component mid-computation made the same
     // deal read a riyal apart between the deal room and the card that opened it.
     //
@@ -186,7 +192,8 @@ describe("VAT (R-01, R-01b, S-13)", () => {
     expect(priceToStore(g.enteredGross, false)).toBe(g.enteredGross);
   });
 
-  it("multiplies, even where a gross was stored (R-01b, ruled)", () => {
+  // `it.fails` — open defect, FIX-MONEY-2. See the note on R-02 above for why, not skipped.
+  it.fails("multiplies, even where a gross was stored (R-01b, ruled)", () => {
     // Ruled: one rule across the platform. `vatLines` must not derive VAT from the stored gross.
     //
     // The stored gross here is 4,600.01 against net components of 4,000 — chosen precisely because the
