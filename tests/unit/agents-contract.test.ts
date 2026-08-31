@@ -110,7 +110,7 @@ when("the routes this app calls", () => {
    */
   const knownAbsent = new Set([
     // GET /agents/renter-suppliers is BUILT — the guard below caught the stale waiver.
-    "POST /agents/renter-suppliers",
+    // POST /agents/renter-suppliers is BUILT — caught by the guard, 2026-09-01.
     // GET /agents/renter-suppliers/{} is BUILT — caught by the guard below, 2026-09-01.
     "PATCH /agents/renter-suppliers/{}",
     "DELETE /agents/renter-suppliers/{}",

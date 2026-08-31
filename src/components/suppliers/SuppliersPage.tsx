@@ -4,12 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/ui";
 import { fmt, useT } from "@/lib/i18n";
 import { btn, cx } from "@/lib/ds";
-import { listRenterSuppliers, updateRenterSupplier } from "@/lib/api/client";
+import { deleteSupplierGroup, listRenterSuppliers, renameSupplierGroup, updateRenterSupplier } from "@/lib/api/client";
 import { AddSuppliersDialog } from "./AddSuppliersDialog";
+import { DeleteGroupDialog, GroupsMenu, NameGroupDialog, RenameGroupDialog } from "./SupplierGroups";
 import {
   bidCount,
   canBeEmailed,
   groupsOf,
+  groupsWithCounts,
   hasUnparsed,
   type RenterSupplier,
 } from "@/lib/contract/renter-suppliers";
@@ -45,6 +47,17 @@ export function SuppliersPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
 
+  /* Groups. `picking` is the only mode that shows checkboxes — a column of empty boxes on every row
+     implies bulk work this screen does not do, so it appears when a group is being made and goes
+     when it is done. */
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [groupFilter, setGroupFilter] = useState("");
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState<Record<string, boolean>>({});
+  const [naming, setNaming] = useState(false);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
   const load = useCallback(() => {
     listRenterSuppliers().then(setRows);
   }, []);
@@ -54,18 +67,21 @@ export function SuppliersPage() {
   }, [load]);
 
   const vendors = useMemo(() => (rows ?? []).filter((s) => s.vendorRegistered).length, [rows]);
+  const groups = useMemo(() => groupsWithCounts(rows ?? []), [rows]);
+  const pickedRows = useMemo(() => (rows ?? []).filter((s) => picked[s.id]), [rows, picked]);
 
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return (rows ?? []).filter((s) => {
       if (pill === "vendor" && !s.vendorRegistered) return false;
+      if (groupFilter && !groupsOf(s).includes(groupFilter)) return false;
       if (!needle) return true;
       // Everything a renter might half-remember: the firm, the person, either way of reaching them.
       return [s.name, s.contactName, s.email, s.phone, s.crNumber]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(needle));
     });
-  }, [rows, q, pill]);
+  }, [rows, q, pill, groupFilter]);
 
   /**
    * The flag flips on click and the request follows.
@@ -85,6 +101,47 @@ export function SuppliersPage() {
       setRows((list) => (list ?? []).map((s) => (s.id === row.id ? { ...s, vendorRegistered: !next } : s)));
       setToast(c.vendorFailed);
     }
+  };
+
+  /** Assigning a group is a write per row: a label lives on the supplier, not in a table of its own. */
+  const saveGroup = async (name: string) => {
+    const members = pickedRows;
+    try {
+      await Promise.all(
+        members.map((s) => updateRenterSupplier(s.id, { groups: [...new Set([...groupsOf(s), name])] })),
+      );
+      setToast(fmt(c.groupCreated, { name, n: members.length }));
+    } catch {
+      setToast(c.groupFailed);
+    }
+    setNaming(false);
+    setPicking(false);
+    setPicked({});
+    load();
+  };
+
+  const doRename = async (from: string, to: string) => {
+    setRenaming(null);
+    try {
+      await renameSupplierGroup(from, to);
+      if (groupFilter === from) setGroupFilter(to);
+      setToast(fmt(c.groupRenamed, { name: to }));
+    } catch {
+      setToast(c.groupFailed);
+    }
+    load();
+  };
+
+  const doDelete = async (name: string) => {
+    setDeleting(null);
+    try {
+      await deleteSupplierGroup(name);
+      if (groupFilter === name) setGroupFilter("");
+      setToast(c.groupDeleted);
+    } catch {
+      setToast(c.groupFailed);
+    }
+    load();
   };
 
   useEffect(() => {
@@ -128,7 +185,61 @@ export function SuppliersPage() {
           </span>
           <Pill on={pill === "all"} onClick={() => setPill("all")} label={c.all} n={rows?.length ?? 0} />
           <Pill on={pill === "vendor"} onClick={() => setPill("vendor")} label={c.registeredVendors} n={vendors} icon="verified" />
+          <span className="ms-auto">
+            <GroupsMenu
+              groups={groups}
+              active={groupFilter}
+              open={menuOpen}
+              total={rows?.length ?? 0}
+              onOpen={setMenuOpen}
+              onPick={(g) => {
+                setGroupFilter(g);
+                setMenuOpen(false);
+              }}
+              onRename={(g) => {
+                setMenuOpen(false);
+                setRenaming(g);
+              }}
+              onDelete={(g) => {
+                setMenuOpen(false);
+                setDeleting(g);
+              }}
+              onCreate={() => {
+                setMenuOpen(false);
+                setPicked({});
+                setPicking(true);
+              }}
+            />
+          </span>
         </div>
+
+        {/* Only while a group is being made. Pick, then name — a group with no members does not exist. */}
+        {picking && (
+          <div className="flex flex-wrap items-center gap-2.5 bg-navy px-3 py-2.5 text-meta font-extrabold text-surface">
+            <Icon name="label" size={15} />
+            <span>{pickedRows.length ? fmt(c.nSelectedFor, { n: pickedRows.length }) : c.pickMembers}</span>
+            <span className="ms-auto flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPicking(false);
+                  setPicked({});
+                }}
+                className="text-surface/75 transition hover:text-surface"
+              >
+                {t.common.cancel}
+              </button>
+              <button
+                type="button"
+                disabled={!pickedRows.length}
+                onClick={() => setNaming(true)}
+                className={btn("primary", "sm")}
+              >
+                {c.nameGroup}
+              </button>
+            </span>
+          </div>
+        )}
 
         {rows === null ? (
           <p className="p-8 text-center text-meta text-muted">{c.loading}</p>
@@ -138,6 +249,23 @@ export function SuppliersPage() {
           <table className="w-full border-collapse">
             <thead>
               <tr>
+                {picking && (
+                  <th className="w-[34px] border-b border-border bg-surface2 px-3 py-2">
+                    <input
+                      type="checkbox"
+                      aria-label={c.pickMembers}
+                      checked={visible.length > 0 && visible.every((s) => picked[s.id])}
+                      onChange={(e) =>
+                        setPicked((p) => {
+                          const next = { ...p };
+                          visible.forEach((s) => (e.target.checked ? (next[s.id] = true) : delete next[s.id]));
+                          return next;
+                        })
+                      }
+                      className="h-3.5 w-3.5 accent-brand"
+                    />
+                  </th>
+                )}
                 {[c.colSupplier, c.colVendor, c.colContact, c.colGroups, c.colBids].map((h) => (
                   <th
                     key={h}
@@ -150,7 +278,22 @@ export function SuppliersPage() {
             </thead>
             <tbody>
               {visible.map((s) => (
-                <Row key={s.id} s={s} c={c} onToggle={() => toggleVendor(s)} />
+                <Row
+                  key={s.id}
+                  s={s}
+                  c={c}
+                  onToggle={() => toggleVendor(s)}
+                  picking={picking}
+                  picked={!!picked[s.id]}
+                  onPick={(on) =>
+                    setPicked((p) => {
+                      const next = { ...p };
+                      if (on) next[s.id] = true;
+                      else delete next[s.id];
+                      return next;
+                    })
+                  }
+                />
               ))}
             </tbody>
           </table>
@@ -165,6 +308,25 @@ export function SuppliersPage() {
           setToast(c.added);
         }}
       />
+
+      <NameGroupDialog open={naming} members={pickedRows} onClose={() => setNaming(false)} onSave={saveGroup} />
+      {renaming !== null && (
+        <RenameGroupDialog
+          open
+          current={renaming}
+          onClose={() => setRenaming(null)}
+          onSave={(to) => doRename(renaming, to)}
+        />
+      )}
+      {deleting !== null && (
+        <DeleteGroupDialog
+          open
+          name={deleting}
+          count={groups.find((g) => g.name === deleting)?.count ?? 0}
+          onClose={() => setDeleting(null)}
+          onConfirm={() => doDelete(deleting)}
+        />
+      )}
 
       {toast && (
         <div
@@ -196,7 +358,21 @@ function Pill({ on, onClick, label, n, icon }: { on: boolean; onClick: () => voi
   );
 }
 
-function Row({ s, c, onToggle }: { s: RenterSupplier; c: ReturnType<typeof useT>["suppliers"]; onToggle: () => void }) {
+function Row({
+  s,
+  c,
+  onToggle,
+  picking,
+  picked,
+  onPick,
+}: {
+  s: RenterSupplier;
+  c: ReturnType<typeof useT>["suppliers"];
+  onToggle: () => void;
+  picking: boolean;
+  picked: boolean;
+  onPick: (on: boolean) => void;
+}) {
   const platform = s.kind === "platform";
   const groups = groupsOf(s);
   const bids = bidCount(s);
@@ -208,7 +384,18 @@ function Row({ s, c, onToggle }: { s: RenterSupplier; c: ReturnType<typeof useT>
   if (roll?.bidsLink) detail.push(fmt(c.viaLink, { n: roll.bidsLink }));
 
   return (
-    <tr className="border-b border-border last:border-b-0 hover:bg-surface2">
+    <tr className={cx("border-b border-border last:border-b-0", picked ? "bg-brand-soft" : "hover:bg-surface2")}>
+      {picking && (
+        <td className="px-3 py-2.5">
+          <input
+            type="checkbox"
+            aria-label={s.name}
+            checked={picked}
+            onChange={(e) => onPick(e.target.checked)}
+            className="h-3.5 w-3.5 accent-brand"
+          />
+        </td>
+      )}
       <td className="px-3 py-2.5">
         <span className="flex items-center gap-2.5">
           <span
