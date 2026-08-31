@@ -123,8 +123,12 @@ export function AwardRow({
             The pill is the boxed, barely-rounded shape the intake uses, so «a small labelled thing
             you can press» reads the same in both places. */}
         <span className="flex min-w-0 items-center gap-1.5">
-          <span className="truncate text-body font-semibold text-navy">
-            {item.label} ×{award.units}
+          {/* The NAME is the only part that truncates. The count was inside it and got cut the
+              moment two pills joined the line — «Crawler Excavator 30 ton …» with no ×1 of 3, which
+              is the one number on this row a renter cannot infer from anything else. */}
+          <span className="truncate text-body font-semibold text-navy">{item.label}</span>
+          <span className="flex-none text-body font-semibold text-navy">
+            ×{award.units}
             {/* "of 3" only when it is not the whole line — otherwise it is noise on every row. */}
             {split && <span className="ms-1 font-semibold text-muted-light">{t.projects.chart.of} {item.quantity}</span>}
           </span>
