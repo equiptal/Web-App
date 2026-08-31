@@ -206,6 +206,9 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
   const navItems: NavItem[] = [
     ...(guest ? [browseTab, dashboardTab] : [dashboardTab, browseTab]),
     { key: "requests", label: t.shell.requests, href: "/requests" },
+    // The renter's own list of firms — his, not the platform's. Beside Requests because that is where
+    // he is when he wants it: a request going out, and a question about who to send it to.
+    ...(guest ? [] : [{ key: "suppliers", label: t.suppliers.title, href: "/suppliers" } as NavItem]),
     { key: "company", label: t.shell.company, href: "/company" },
   ];
   const initials = (name.trim() ? name.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("") : "").toUpperCase();

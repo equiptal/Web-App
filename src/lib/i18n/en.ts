@@ -2144,6 +2144,55 @@ export const en = {
       notSet: "not set",
     },
   },
+  /**
+   * My Suppliers — the renter's own list (SUP-T13).
+   *
+   * Wording rule: this screen never speaks about the supplier's standing on the platform except as a
+   * fact ("On Moedatech"). "Registered vendor" is the RENTER's own label, and the copy says so where
+   * it could be mistaken for something the supplier earned.
+   */
+  suppliers: {
+    title: "My Suppliers",
+    summaryOne: "{n} supplier",
+    summaryMany: "{n} suppliers",
+    vendors: "{n} registered vendors",
+    search: "Search name, contact, email or phone",
+    all: "All",
+    registeredVendors: "Registered vendors",
+    colSupplier: "Supplier",
+    colVendor: "Vendor registration",
+    colContact: "Contact",
+    colGroups: "Groups",
+    colBids: "Bids",
+    onMoedatech: "On Moedatech",
+    noContactName: "no contact name",
+    registered: "Registered",
+    mark: "Mark",
+    markTitle: "Mark as a registered vendor — your own label, the supplier is never told",
+    unmarkTitle: "Registered vendor — click to unset",
+    notSet: "not set",
+    add: "add",
+    noGroup: "no group",
+    bidOne: "{n} bid",
+    bidMany: "{n} bids",
+    noBids: "No bids yet",
+    nothingShared: "nothing shared with them yet",
+    sharedNoAnswer: "{n} shared · no answer",
+    onApp: "{n} on Moedatech",
+    viaLink: "{n} via link",
+    awarded: "{n} awarded",
+    last: "last {when}",
+    couldNotRead: "We could not read that",
+    couldNotReadBody: "The value you sent is kept but cannot be used to reach them. Edit the row to correct it.",
+    emptyTitle: "Your list is empty",
+    emptyBody: "Moedatech has hundreds of suppliers — none of them are here until you add them.",
+    noMatchTitle: "No supplier matches",
+    noMatchBody: "Change the search or the filters.",
+    loading: "Loading your suppliers…",
+    vendorOn: "{name} is a registered vendor",
+    vendorOff: "{name} is no longer a registered vendor",
+    vendorFailed: "That did not save. Nothing changed.",
+  },
 };
 
 export type Dictionary = typeof en;
