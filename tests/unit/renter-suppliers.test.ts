@@ -4,6 +4,7 @@ import {
   canBeEmailed,
   canBeInvited,
   groupsOf,
+  hasUnparsed,
   groupsWithCounts,
   supplierTier,
   type RenterSupplier,
@@ -35,6 +36,22 @@ describe("who can be reached, and how", () => {
   it("a platform row with no contact is not reachable — the fields may be absent", () => {
     // SUP-BE-20 is provisional and switched. Nothing may assume the contact is there.
     expect(canBeEmailed(row({ kind: "platform", vendorRegistered: true }))).toBe(false);
+  });
+});
+
+describe("what the backend actually sends", () => {
+  it("a supplier id arrives as a NUMBER — compare with String() on both sides", () => {
+    // The backend serializes its own supplierUserId column, which is an integer. Typing it as a
+    // string here would be a lie of exactly the kind agents-contract.test.ts exists to catch.
+    const r = row({ supplierId: 882 });
+    expect(String(r.supplierId)).toBe("882");
+  });
+
+  it("unparsed is present only when something was dropped", () => {
+    expect(hasUnparsed(row())).toBe(false);
+    expect(hasUnparsed(row({ unparsed: {} }))).toBe(false);
+    // The key column stays null so no lookup is poisoned; the text survives so the renter can fix it.
+    expect(hasUnparsed(row({ phone: null, unparsed: { phone: "call the office" } }))).toBe(true);
   });
 });
 

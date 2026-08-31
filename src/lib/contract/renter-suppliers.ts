@@ -67,8 +67,15 @@ export interface RenterSupplier {
   /** The LINK's id — not the supplier's. */
   id: string;
   kind: RenterSupplierKind;
-  /** The Moedatech account behind the row. Null for `own`. */
-  supplierId?: string | null;
+  /**
+   * The Moedatech account behind the row. Null for `own`.
+   *
+   * **A number on the wire.** The backend serializes its own `supplierUserId` column, which is an
+   * integer — so anything comparing this to a store's id or to a picker value must `String()` both
+   * sides. Typed as it actually arrives rather than as we would have liked it, because a lie here is
+   * the exact class of bug the agents-contract test exists to catch.
+   */
+  supplierId?: string | number | null;
   /** The account's name for `platform`, the renter's own for `own`. */
   name: string;
   /** The renter's flag, and the renter's alone. */
@@ -99,6 +106,19 @@ export interface RenterSupplier {
   store?: boolean;
   /** Moedatech has verified the firm. `platform` only. */
   verified?: boolean;
+
+  /**
+   * What the renter typed that could not be turned into a key — a phone the parser refused, a CR
+   * that was prose.
+   *
+   * **Present only when something was dropped**, so the cell can be marked on presence alone. The key
+   * column itself stays null, deliberately: a raw value in `phone_e164` would poison every lookup.
+   * The text survives here so the renter does not silently lose a cell they believe they imported,
+   * and **nothing may ever match on it.**
+   */
+  unparsed?: Record<string, string>;
+  /** ISO. When this row last changed — the list is ordered by it. */
+  updatedAt?: string;
 
   rollup?: SupplierRollup;
 }
@@ -174,6 +194,15 @@ export const canBeEmailed = (s: RenterSupplier): boolean => !!s.email?.trim();
  * read as "we do not know who you are" to a firm that has been bidding in the app for a year.
  */
 export const canBeInvited = (s: RenterSupplier): boolean => s.kind === "own" && canBeEmailed(s);
+
+/**
+ * Something the renter typed was kept but could not be used as a key.
+ *
+ * The row is fine and the supplier is real; one cell needs correcting. The screen marks it and says
+ * what was sent, which is the only way the renter finds out — the value they typed is not in the
+ * field they typed it into.
+ */
+export const hasUnparsed = (s: RenterSupplier): boolean => !!s.unparsed && Object.keys(s.unparsed).length > 0;
 
 /** Groups, always an array — a row that carries none is ungrouped, not broken. */
 export const groupsOf = (s: RenterSupplier): string[] => arr(s.groups);

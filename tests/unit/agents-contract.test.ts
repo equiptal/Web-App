@@ -98,12 +98,28 @@ when("the routes this app calls", () => {
   /**
    * Routes this app calls that the backend has NOT built, on purpose.
    *
-   * `renter-suppliers` belongs to the suppliers feature and ships before this one reaches
-   * production (MA-T13). The award dialog already treats an empty answer as normal and falls back to
-   * a typed supplier name, so its absence is a development condition rather than a break — but it is
-   * listed here so it is a DECISION rather than a hole nobody noticed.
+   * My Suppliers (SUP) is built web-first: the contract, the BFF and the screens land before the
+   * table exists, so the work is reviewed against something real rather than a description. Until
+   * then the list read answers an empty array — the truth a renter sees either way — and every WRITE
+   * answers 503 rather than a false success.
+   *
+   * Each entry is a DECISION rather than a hole nobody noticed, and the test below keeps it that way:
+   * an entry the backend has since built fails until it is deleted from here.
+   *
+   * Owned by `docs/implementation-plans/renter-suppliers/backend-tickets.md` — SUP-BE-3…8, BE-14.
    */
-  const knownAbsent = new Set(["GET /agents/renter-suppliers"]);
+  const knownAbsent = new Set([
+    // GET /agents/renter-suppliers is BUILT — the guard below caught the stale waiver.
+    "POST /agents/renter-suppliers",
+    "GET /agents/renter-suppliers/{}",
+    "PATCH /agents/renter-suppliers/{}",
+    "DELETE /agents/renter-suppliers/{}",
+    "POST /agents/renter-suppliers/bulk",
+    "POST /agents/renter-suppliers/link",
+    "GET /agents/renter-suppliers/groups",
+    "PATCH /agents/renter-suppliers/groups",
+    "DELETE /agents/renter-suppliers/groups",
+  ]);
 
   it("all exist on the backend", () => {
     const have = new Set([...routes()].map(shape));
@@ -114,6 +130,19 @@ when("the routes this app calls", () => {
     // A relay to a path that does not exist is a 404 the renter reads as "it is broken", and it is
     // invisible here until someone opens the feature on a deployed environment.
     expect(missing, `not on the backend:\n  ${missing.join("\n  ")}`).toEqual([]);
+  });
+
+  /**
+   * A waiver outlives its reason unless something removes it.
+   *
+   * The day the backend builds one of these, the entry above stops describing reality and starts
+   * hiding a route nobody is checking any more. So an entry that HAS been built fails here until it
+   * is deleted — the list can only shrink, and only by hand, which is the point of it.
+   */
+  it("nothing waived above has since been built", () => {
+    const have = new Set([...routes()].map(shape));
+    const stale = [...knownAbsent].filter((r) => have.has(r));
+    expect(stale, `built now — delete from knownAbsent:\n  ${stale.join("\n  ")}`).toEqual([]);
   });
 });
 
