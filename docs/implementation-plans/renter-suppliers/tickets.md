@@ -158,11 +158,12 @@ Making a group is pick-then-name: the checkbox column appears only in that mode,
 
 The row's pen carries the supplier's groups: a chip each with its own ×, and an *Add to a group* select of every group they are not in. Removing the last chip leaves them ungrouped, and the hint says the group itself is untouched.
 
-### SUP-T23 — The sheet import
+### SUP-T23 — The sheet import · **done**
 **Scope:** feature
-**Files:** `src/components/suppliers/SheetImport.tsx`
+**Files:** `src/lib/contract/sheet-paste.ts`, `src/components/suppliers/ImportSuppliersDialog.tsx`
 
-Parse client-side (SheetJS), map columns, preview, `POST /bulk`. **Five mappable fields — company, contact, email, phone, CR number** — and every other column kept under `extra` as it is. A per-row vendor tick in the preview, on by default, with a master above. **Cap 500 rows / 2 MB, refused with the count, never truncated.**
+**Paste or CSV. No `.xlsx`, by decision** — see the plan's decision 6. Parse client-side with no
+dependency, map columns, preview, `POST /bulk`. **Five mappable fields — company, contact, email, phone, CR number** — and every other column kept under `extra` as it is. A per-row vendor tick in the preview, on by default, with a master above. **Cap 500 rows / 2 MB, refused with the count, never truncated.**
 
 ### SUP-T24 — Suggested
 **Scope:** feature

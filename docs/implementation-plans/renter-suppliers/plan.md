@@ -24,7 +24,13 @@ Settled with the owner, 2026-08-31. Each is load-bearing; changing one changes t
 3. **`NEW` is per USER** — "since *you* last looked". A shared list does not mean shared attention.
 4. **An award REQUIRES a supplier row.** The `AwardDialog` typed-name fallback is removed when this ships; it only ever existed because the registry did not (`client.ts:1217` comment). `supplierName` stays stored beside the id as a snapshot of the day, never as a lookup key. The award dialog gains an inline *add supplier* path so a renter mid-award is not sent away and back.
 5. **The email leaves from the renter's own address**, `mailto:`-filled with recipients, subject and body. No mailer, no SES, no DNS. We record a *declared share*, never a delivery.
-6. **Recipients go in BCC**, capped at 25 per send. They are bidding against each other; **To** would hand every competitor the others' addresses, and that cannot be undone.
+6. **No `.xlsx` upload — paste or CSV only** (owner, 2026-09-01). A spreadsheet parser is a megabyte
+   of dependency to unzip a container so we can read forty rows of text, and the renter has the file
+   open in Excel already: selecting the rows and copying is one keystroke. It is also the more correct
+   route for this data — the clipboard is UTF-8, while Excel's *Save as CSV* on a Windows machine
+   still writes Windows-1256 and mangles Arabic company names. An `.xlsx` chosen anyway is named and
+   told what to do; it is never met with "we could not read that".
+7. **Recipients go in BCC**, capped at 25 per send. They are bidding against each other; **To** would hand every competitor the others' addresses, and that cannot be undone.
 
 ---
 
