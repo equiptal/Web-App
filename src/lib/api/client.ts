@@ -14,7 +14,7 @@ import type { NotificationList, NotificationFilter } from "@/lib/contract/notifi
 import type { Project, ProjectSummary } from "@/lib/contract/project";
 import { mapProjectSummary, projectToPayload } from "@/lib/contract/project";
 import { contentTypeFor } from "@/lib/contract/award";
-import type { Award, ChartGroup } from "@/lib/contract/award";
+import type { Award, AwardDocument, ChartGroup } from "@/lib/contract/award";
 import type { WorkOrderItem, WorkOrderGroup } from "@/lib/contract/work-order";
 import { groupWorkOrderItems, termsFromWire } from "@/lib/contract/work-order";
 import type { TemplateOption } from "@/lib/contract/project-apply";
@@ -910,17 +910,29 @@ export interface ProjectChart {
   /** The version every award write must send back. Read it here, not from a stale card. */
   version: number;
   groups: ChartGroup[];
+  /**
+   * Papers filed against the SITE rather than any one award — a framework agreement, a permit.
+   *
+   * ⚠️ The backend has sent these since the chart existed and this client **dropped them on the
+   * floor**, so a paper filed at site level was invisible in the web: attachable through the API,
+   * listed nowhere. Nothing failed, which is why it lasted.
+   */
+  documents: AwardDocument[];
 }
 
 /** Everything the site's timeline draws, in one call. */
 export async function fetchChart(projectId: string): Promise<ProjectChart> {
-  const raw = await projectFetch<{ project: Record<string, unknown>; version?: number; groups?: ChartGroup[] }>(
-    `${projectPath(projectId)}/chart`,
-  );
+  const raw = await projectFetch<{
+    project: Record<string, unknown>;
+    version?: number;
+    groups?: ChartGroup[];
+    documents?: AwardDocument[];
+  }>(`${projectPath(projectId)}/chart`);
   return {
     project: mapProjectSummary(raw.project),
     version: typeof raw.version === "number" ? raw.version : (mapProjectSummary(raw.project).version ?? 1),
     groups: raw.groups ?? [],
+    documents: raw.documents ?? [],
   };
 }
 
@@ -1292,6 +1304,15 @@ export function warmAgentCache(): void {
  * keyed to the award's id; it never rewrites the awards blob, so there is nothing for a concurrent
  * write to lose.
  */
+/**
+ * `-` in the award slot files a paper against the SITE rather than one award.
+ *
+ * The backend has always accepted it (*"a framework agreement covering the whole job belongs to no
+ * single award"*); nothing in the web used it. It is what lets *Attach a document* be offered on a
+ * row nobody has awarded yet — see `SITE_LEVEL_AWARD` at the call site.
+ */
+export const SITE_DOCUMENT = "-";
+
 export async function attachDocument(
   projectId: string,
   awardId: string,
@@ -1327,6 +1348,26 @@ export async function attachDocument(
     method: "POST",
     body: { kind, key: presign.key, filename: file.name, expectedVersion },
   });
+}
+
+/**
+ * A short-lived link to one of the site's papers, for opening or saving it.
+ *
+ * ⚠️ **Fetched at the moment of the click, never held.** The URL is a credential with ten minutes on
+ * it: stored on the document row it would be stale by the time the renter pressed it, and rendered
+ * into the page it would sit in the DOM for anyone with the tab open. So this asks, and the caller
+ * uses the answer immediately.
+ *
+ * The DOCUMENT id goes out, never the S3 key — the chart does not publish the key, which is what
+ * made these papers write-only until the backend gained this endpoint.
+ */
+export async function documentUrl(projectId: string, docId: string): Promise<string> {
+  const res = await projectFetch<{ url?: string }>(
+    `${projectPath(projectId)}/documents/${encodeURIComponent(docId)}/url`,
+  );
+  const url = res?.url;
+  if (!url) throw new ApiError("unknown", "no url returned for document");
+  return url;
 }
 
 /** Removes the row AND the stored file. Nothing cascades here, so this is the only thing that does. */

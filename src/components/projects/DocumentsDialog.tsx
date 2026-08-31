@@ -28,12 +28,17 @@ import { contentTypeFor, type Award, type AwardDocumentKind } from "@/lib/contra
 
 const KINDS: AwardDocumentKind[] = ["po", "contract", "quotation", "other"];
 
-const ICON: Record<AwardDocumentKind, string> = {
-  po: "receipt_long",
-  contract: "gavel",
-  quotation: "request_quote",
-  other: "description",
-};
+/**
+ * ~~One icon per kind: a receipt for a PO, a gavel for a contract, a quote block for a quotation.~~
+ * **One icon for all of them** (owner, 2026-08-31: *"must be document icon for all types with the
+ * file name"*).
+ *
+ * The four glyphs were decoration pretending to be information. A renter does not scan a list of
+ * three papers by glyph — they read the filename, which is right beside it, and the kind is spelled
+ * out in words on the second line. Four shapes to learn bought nothing and cost the one thing an
+ * icon is good for here: reading as *a file, openable*.
+ */
+const DOC_ICON = "description";
 
 /** 10 MB. A PO is a page; anything larger is a scan nobody meant to attach at that size. */
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -45,7 +50,9 @@ export function DocumentsDialog({
   /** True for a marketplace row — only then is there a generated quotation to distinguish ours from. */
   isRequest,
   onAttach,
+  onOpen,
   onRemove,
+  siteLevel,
   busy,
 }: {
   open: boolean;
@@ -54,6 +61,10 @@ export function DocumentsDialog({
   isRequest: boolean;
   /** The File itself. The bytes go straight to storage; this app never carries them. */
   onAttach: (file: File, kind: AwardDocumentKind) => void;
+  /** Answers with a short-lived link for one document. Asked for per press, never held. */
+  onOpen: (docId: string) => Promise<string>;
+  /** True when the row has no award: the paper files against the SITE, and the dialog says so. */
+  siteLevel?: boolean;
   onRemove: (docId: string) => void;
   busy?: boolean;
 }) {
@@ -62,7 +73,31 @@ export function DocumentsDialog({
   const [kind, setKind] = useState<AwardDocumentKind>("po");
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [opening, setOpening] = useState<string | null>(null);
   const picker = useRef<HTMLInputElement>(null);
+
+  /**
+   * Opens one paper in a new tab.
+   *
+   * The link is asked for at the moment of the press and used at once — it is a credential with ten
+   * minutes on it, so holding one on the row would hand out a stale URL and rendering one into the
+   * page would leave it in the DOM. `noopener` because the tab is storage, not our app.
+   *
+   * A failure says so on the row rather than silently doing nothing: the renter's next move is to
+   * try again, and a dead press teaches them the paper is gone.
+   */
+  async function openDoc(docId: string) {
+    setError(null);
+    setOpening(docId);
+    try {
+      const url = await onOpen(docId);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch {
+      setError(d.openFailed);
+    } finally {
+      setOpening(null);
+    }
+  }
 
   function pick(file: File | undefined) {
     setError(null);
@@ -87,14 +122,31 @@ export function DocumentsDialog({
           <ul className="flex flex-col divide-y divide-border rounded-sm border border-border">
             {award.documents.map((doc) => (
               <li key={doc.id} className="flex items-center gap-2.5 px-3 py-2">
-                <Icon name={ICON[doc.kind] ?? "description"} size={15} className="flex-none text-brand" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-body font-semibold text-navy">{doc.filename}</span>
-                  <span className="block text-meta text-muted">
-                    {d.kinds[doc.kind]}
-                    {doc.uploadedAt ? ` · ${doc.uploadedAt.slice(0, 10)}` : ""}
+                {/* The whole row is the door, not a separate «view» control beside the name: the
+                    filename IS what a renter reaches for, and a paper you cannot open is a paper
+                    that may as well not be attached (owner, 2026-08-31). */}
+                <button
+                  type="button"
+                  onClick={() => void openDoc(doc.id)}
+                  disabled={opening === doc.id}
+                  title={d.openHint}
+                  className="flex min-w-0 flex-1 items-center gap-2.5 text-start"
+                >
+                  <Icon
+                    name={opening === doc.id ? "hourglass_top" : DOC_ICON}
+                    size={15}
+                    className="flex-none text-brand"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-body font-semibold text-navy underline decoration-border underline-offset-2">
+                      {doc.filename}
+                    </span>
+                    <span className="block text-meta text-muted">
+                      {d.kinds[doc.kind]}
+                      {doc.uploadedAt ? ` · ${doc.uploadedAt.slice(0, 10)}` : ""}
+                    </span>
                   </span>
-                </span>
+                </button>
 
                 {confirming === doc.id ? (
                   <span className="flex flex-none items-center gap-1.5">
@@ -129,6 +181,17 @@ export function DocumentsDialog({
           </ul>
         ) : (
           <p className="text-body text-muted">{d.none}</p>
+        )}
+
+        {/* Where the paper actually goes, when nobody has been awarded yet. Said plainly rather
+            than implied: the renter is looking at a machine's menu, and the paper will not be on the
+            machine. It is the site's, which is the right home for the agreement that usually exists
+            before any supplier is named. */}
+        {siteLevel && (
+          <p className="flex items-start gap-2 rounded-sm border border-border bg-surface2/50 px-3 py-2 text-meta text-navy-mid">
+            <Icon name="place" size={14} className="mt-px flex-none text-muted" />
+            {d.siteLevelNote}
+          </p>
         )}
 
         {/* Which quotation is which. Only on a marketplace row — a work order has no generated one. */}

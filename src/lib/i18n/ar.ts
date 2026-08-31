@@ -1393,6 +1393,9 @@ export const ar: Dictionary = {
       attach: "إرفاق ملف",
       removeNamed: "إزالة {name}",
       oursIsGenerated: "عرضنا السعري لهذا الطلب يُنشَأ تلقائيًا ولا يُرفع — حمّله من قائمة الصف. والموجود هنا هو عرض المورّد الذي أرسله لك.",
+      siteLevelNote: "لم يُسند أحد لهذه المعدة بعد، لذلك يُرفق المستند بالموقع — لا بمورّد.",
+      openHint: "فتح المستند",
+      openFailed: "تعذر فتح المستند. حاول مرة أخرى.",
       tooBig: "حجم الملف يتجاوز {max}. أرفق ملفًا أصغر.",
       badType: "ملف PDF أو JPG أو PNG أو WEBP. حوّل الملف أولاً، أو صوّر الصفحة.",
       readFailed: "تعذّر قراءة الملف. جرّب غيره.",
@@ -1598,6 +1601,7 @@ export const ar: Dictionary = {
       noPeriod: "لا تواريخ بعد",
       mobilized: "وصلت",
       demobilized: "غادرت",
+      marksAreEvents: "ما حدث فعلاً — الشريط هو ما اتفق عليه",
     },
     del: {
       confirmTitle: "حذف هذا المشروع؟",
@@ -1669,7 +1673,6 @@ export const ar: Dictionary = {
     },
     pills: {
       startFrom: "ابدأ من",
-      pickTemplate: "—",
       templateApplied: "تم نسخ الشروط",
       kindWorkOrder: "أمر عمل",
       kindRequest: "طلب",

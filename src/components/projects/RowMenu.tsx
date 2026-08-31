@@ -21,25 +21,27 @@
  * **An unfiled row says *File in a project*, not *Move to another project*.** It was never in one,
  * and "move" asks the renter to remember a place it has never been.
  *
- * ── It opens where there is ROOM, and it is not inside the chart's scroll box ─────────────────────
+ * ── It is ANCHORED to its row, and flips up when the window is short ─────────────────────────────
  *
- * Downward by default, upward when the viewport is short of it. A menu on the last row of a chart had
- * nothing below it to open into and was simply not there (owner, 2026-08-31). Measured from the
- * button's own rect at the moment of the press rather than guessed from the row index: the same row
- * is near the bottom or not depending on where the renter has scrolled to.
+ * `absolute` inside the trigger's own `relative` box: the menu is placed by layout, so it cannot come
+ * unstuck from the ⋮ it belongs to.
  *
- * ⚠️ **Flipping is not enough on its own, and measuring the viewport was the wrong ruler.** The chart
- * body is `max-h-[64vh] overflow-y-auto`, so an `absolute` menu is CLIPPED by that box long before it
- * reaches the bottom of the window. On a six-entry list the two last entries — *Change the award* and
- * the red *Remove from the project* — were rendered, focusable, and invisible: 725px and 756px
- * against a container that ends at 702px. Flipping up could not save it either, because a 207px menu
- * fits on neither side of a box that leaves ~155px below the row and ~81px above it.
+ * ~~`position: fixed`, placed from the trigger's rect and re-placed on every scroll and resize.~~
+ * Written on 2026-08-31 against a chart body that was `max-h-[64vh] overflow-y-auto` — a box that did
+ * clip an absolute menu, and the reason fixed was reached for. **The owner removed that box the same
+ * afternoon** (*"don't make the project scrollable, it will depend on the page scrolling"*), which
+ * left the measuring with nothing to buy and two costs of its own, both of which he then hit:
  *
- * So the menu is `position: fixed`, placed from the trigger's rect. Fixed escapes an ancestor's
- * overflow entirely — verified on staging that nothing above it sets `transform`, `filter`,
- * `perspective` or `contain`, any of which would make `fixed` resolve against that ancestor and put
- * the clipping straight back. It is re-placed on scroll (capture, so the chart's own scrolling counts)
- * and on resize, because a fixed layer does not travel with the row underneath it.
+ *   · **The menu opened away from its row.** Fixed coordinates are a snapshot. Any layout change
+ *     after the press — and opening a menu is one — leaves them pointing at where the row *was*, and
+ *     nothing re-places them until the next scroll event.
+ *   · **The page shook.** `setAt({…})` builds a NEW object, so every scroll event re-rendered the
+ *     row whether the numbers had changed or not, with a `scroll` listener in capture mode firing on
+ *     every scrollable ancestor.
+ *
+ * What survives is the part that was right: the FLIP. Down by default, up when the window has no room
+ * below the button — measured at the moment of the press, because the same row is near the bottom or
+ * not depending on where the renter has scrolled to.
  *
  * ── Our quotation is a download ──────────────────────────────────────────────────────────────────
  *
@@ -49,7 +51,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useLocale, useT } from "@/lib/i18n";
+import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { POPOVER } from "@/lib/ds";
 import type { Award, ChartGroup } from "@/lib/contract/award";
@@ -97,10 +99,9 @@ export function RowMenu({
 }) {
   const t = useT();
   const m = t.projects.menu;
-  const { dir } = useLocale();
   const [open, setOpen] = useState(false);
-  /** Viewport coordinates for the fixed layer. `null` until the button has been measured. */
-  const [at, setAt] = useState<{ top: number; left: number } | null>(null);
+  /** Which way the list opens. One boolean, decided at the press — see the note above. */
+  const [up, setUp] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
 
@@ -124,10 +125,22 @@ export function RowMenu({
 
     // Bids belong to the marketplace: a work order went out to nobody.
     if (!isWorkOrder) push("bids", m.reviewBids, "gavel", a.onReviewBids);
-  } else {
-    // Papers hang on an award — there is no id to file them under until one exists.
-    push("doc", m.attachDocument, "attach_file", a.onAttachDocument);
   }
+
+  /* ── The papers, whether or not anybody supplies it (owner, 2026-08-31) ───────────────────────
+   *
+   * *"attach must alwasy also shown like mebo/demo"*.
+   *
+   * ~~Papers hang on an award — there is no id to file them under until one exists.~~ True of the
+   * award's own papers, and false as a rule: the backend's attach endpoint has always read `-` in
+   * the award slot as *file this against the SITE*, written for exactly the paper that belongs to no
+   * single award. The framework agreement, the permit, the signed scope — those usually exist BEFORE
+   * anyone is named, which is precisely when this entry used to be missing.
+   *
+   * So it sits with the marks now: three things that are facts about the machine rather than facts
+   * about an award, and none of them waiting on a supplier. The dialog states where an unawarded
+   * row's paper is filed, rather than implying it lands on the machine. */
+  push("doc", m.attachDocument, "attach_file", a.onAttachDocument);
 
   /* ── The marks, whether or not anybody supplies it (owner, 2026-08-31) ────────────────────
 
@@ -184,29 +197,15 @@ export function RowMenu({
   /** Roughly what the list needs: one row is 31px, plus the 4px padding at each end. */
   const needed = items.length * 31 + 8;
 
-  const place = useCallback(() => {
+  /** Down unless down does not fit and up does. Never up into a worse fit. */
+  const decide = useCallback(() => {
     const r = trigger.current?.getBoundingClientRect();
     if (!r) return;
     const gap = 6;
-    const vh = window.innerHeight;
-    const vw = window.innerWidth;
-
-    /* Down unless down does not fit AND up does. Never up into a worse fit: on a short window the
-       clamp below keeps the whole list on screen either way. */
-    const downFits = r.bottom + gap + needed <= vh - 8;
+    const downFits = r.bottom + gap + needed <= window.innerHeight - 8;
     const upFits = r.top - gap - needed >= 8;
-    const top = downFits || !upFits ? r.bottom + gap : r.top - gap - needed;
-
-    /* The menu's inline-END edge lines up with the button's, so it opens back over the row it
-       belongs to rather than off the side of the chart. Mirrored, because in Arabic the row's
-       controls sit at the other end. */
-    const left = dir === "rtl" ? r.left : r.right - WIDTH;
-
-    setAt({
-      top: Math.max(8, Math.min(top, vh - needed - 8)),
-      left: Math.max(8, Math.min(left, vw - WIDTH - 8)),
-    });
-  }, [dir, needed]);
+    setUp(!downFits && upFits);
+  }, [needed]);
 
   useEffect(() => {
     if (!open) return;
@@ -214,19 +213,15 @@ export function RowMenu({
       if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
     };
     const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    /* Capture, so the CHART's scrolling counts and not just the window's — the row moves under a
-       fixed layer that would otherwise stay where it was opened. */
+    /* No scroll or resize listener. The menu travels with its row because layout places it, and a
+       listener that re-rendered the row on every scroll event is what made the page shake. */
     document.addEventListener("mousedown", away);
     document.addEventListener("keydown", esc);
-    window.addEventListener("scroll", place, true);
-    window.addEventListener("resize", place);
     return () => {
       document.removeEventListener("mousedown", away);
       document.removeEventListener("keydown", esc);
-      window.removeEventListener("scroll", place, true);
-      window.removeEventListener("resize", place);
     };
-  }, [open, place]);
+  }, [open]);
 
   if (!items.length) return null;
 
@@ -236,7 +231,7 @@ export function RowMenu({
         ref={trigger}
         type="button"
         onClick={() => {
-          place();
+          decide();
           setOpen((v) => !v);
         }}
         aria-haspopup="menu"
@@ -252,10 +247,11 @@ export function RowMenu({
           role="menu"
           /* The house treatment for a popover. This app has no shadows — a floating layer is
              separated by its border and the ground behind it (see OVERLAY / POPOVER in ds.ts). */
-          /* `fixed`, not `absolute`: see the note above — absolute is clipped by the chart's own
-             scroll box, which hid the last two entries outright. */
-          style={{ position: "fixed", top: at?.top ?? 0, left: at?.left ?? 0, width: WIDTH }}
-          className={`${POPOVER} z-50 flex flex-col p-1`}
+          /* `absolute`, anchored to the trigger — see the note above on why the fixed layer went.
+             Its inline-END edge lines up with the button's, so it opens back over the row it belongs
+             to rather than off the side of the chart; `end-0` mirrors that in Arabic on its own. */
+          style={{ width: WIDTH }}
+          className={`${POPOVER} absolute end-0 z-50 flex flex-col p-1 ${up ? "bottom-9" : "top-9"}`}
         >
           {items.map((e) => (
             <button

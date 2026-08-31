@@ -31,6 +31,8 @@ import {
   listWorkOrders,
   renameRequestRow,
   attachDocument,
+  documentUrl,
+  SITE_DOCUMENT,
   removeDocument,
   withFreshVersion,
   ProjectVersionConflict,
@@ -46,7 +48,7 @@ import {
 import { ProjectForm, emptyProjectForm, projectToForm, type ProjectFormValue } from "./ProjectForm";
 import { ProjectDelete, ProjectCreated, projectIsEmpty } from "./ProjectDelete";
 import { ProjectsBoard } from "./ProjectsBoard";
-import type { Award, ChartGroup, ChartItem } from "@/lib/contract/award";
+import type { Award, AwardDocument, ChartGroup, ChartItem } from "@/lib/contract/award";
 import { RowMenu } from "./RowMenu";
 import { AwardDialog, UnawardConfirm } from "./AwardDialog";
 import { PeriodConflictDialog } from "./PeriodConflictDialog";
@@ -124,6 +126,12 @@ function requestUrl(id: string, door: "details" | "edit" = "details"): string {
   return `/requests?g=${encodeURIComponent(id)}&${door}=1`;
 }
 
+/**
+ * The chart as this surface holds it: the site, its groups with our labels already applied, and the
+ * site's OWN papers — the ones filed against no single award.
+ */
+type Chart = { project: ProjectSummary; groups: ChartGroup[]; documents: AwardDocument[] };
+
 export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   const t = useT();
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
@@ -141,7 +149,8 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [chart, setChart] = useState<{ project: ProjectSummary; groups: ChartGroup[] } | null>(null);
+  /** Named, because `refreshChart` now hands one back and two functions take one as a parameter. */
+  const [chart, setChart] = useState<Chart | null>(null);
   const [version, setVersion] = useState(1);
   const [awarding, setAwarding] = useState<{ group: ChartGroup; item: ChartItem } | null>(null);
   const [unawarding, setUnawarding] = useState<Award | null>(null);
@@ -174,7 +183,8 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     address: string | null;
     projectId: string | null;
   } | null>(null);
-  const [papers, setPapers] = useState<{ award: Award; isRequest: boolean } | null>(null);
+  /** `siteLevel` means the row has no award: the paper files against the SITE, and the dialog says so. */
+  const [papers, setPapers] = useState<{ award: Award; isRequest: boolean; siteLevel?: boolean } | null>(null);
   const [conflict, setConflict] = useState<ChartGroup | null>(null);
   const [deleting, setDeleting] = useState<ProjectSummary | null>(null);
   const [created, setCreated] = useState<ProjectSummary | null>(null);
@@ -271,7 +281,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     fetchChart(selected)
       .then((c) => {
         if (!live) return;
-        setChart({ project: c.project, groups: named(c.groups, c.project) });
+        setChart({ project: c.project, groups: named(c.groups, c.project), documents: c.documents });
         // The version travels with the chart, not with the project card: a card can be stale while
         // the chart was fetched a moment ago, and every award write sends this back.
         setVersion(c.version);
@@ -554,12 +564,24 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   }
 
   /** Re-read after any award write, so the chart and the version move together. */
-  async function refreshChart() {
-    if (!selected) return;
+  /**
+   * Re-reads the chart, and RETURNS what it read.
+   *
+   * ⚠️ The return value is the point. `setChart` does not change the `chart` variable the calling
+   * function closed over, so anything reading state right after `await refreshChart()` reads the
+   * chart from BEFORE the write — which is exactly why the open papers dialog kept showing the old
+   * list after an attach and only caught up when it was closed and reopened (owner, 2026-08-31:
+   * *"when a document is attached must be shown here directly instantly"*). Callers that need the
+   * new data in the same tick take it from here rather than from state.
+   */
+  async function refreshChart(): Promise<Chart | null> {
+    if (!selected) return null;
     const c = await fetchChart(selected);
-    setChart({ project: c.project, groups: named(c.groups, c.project) });
+    const next = { project: c.project, groups: named(c.groups, c.project), documents: c.documents };
+    setChart(next);
     setVersion(c.version);
     await reload();
+    return next;
   }
 
   async function award(lines: AwardInput[]) {
@@ -655,9 +677,10 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     setSaving(true);
     try {
       await attachDocument(selected, papers.award.id, version, file, kind);
-      await refreshChart();
-      // Re-read the award so the list in the open dialog shows what was just added.
-      setPapers((cur) => (cur ? { ...cur, award: findAward(cur.award.id) ?? cur.award } : cur));
+      // The FRESH chart, not state: see the note on refreshChart. Reading state here is what made
+      // the new paper appear only after the dialog was closed and reopened.
+      const fresh = await refreshChart();
+      setPapers((cur) => (cur ? { ...cur, award: findAward(cur.award.id, fresh) ?? cur.award } : cur));
     } catch {
       setNotice(t.projects.surface.saveFailed);
     } finally {
@@ -670,8 +693,8 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     setSaving(true);
     try {
       await removeDocument(selected, papers.award.id, docId);
-      await refreshChart();
-      setPapers((cur) => (cur ? { ...cur, award: findAward(cur.award.id) ?? cur.award } : cur));
+      const fresh = await refreshChart();
+      setPapers((cur) => (cur ? { ...cur, award: findAward(cur.award.id, fresh) ?? cur.award } : cur));
     } catch {
       setNotice(t.projects.surface.saveFailed);
     } finally {
@@ -680,8 +703,51 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   }
 
   /** The award as the freshly-read chart holds it, so an open dialog is never a stale copy. */
-  function findAward(id: string): Award | null {
-    for (const g of chart?.groups ?? []) {
+  /**
+   * A stand-in award for a row nobody has awarded, so the papers dialog has something to render.
+   *
+   * It is NEVER written anywhere. Its id is `SITE_DOCUMENT` — the `-` the backend reads as *file this
+   * against the site* — so an attach from this row takes the site path and nothing invents a supplier
+   * the renter never named. The documents it lists are the site's own papers.
+   */
+  function siteLevelAward(item: ChartItem): Award {
+    return {
+      id: SITE_DOCUMENT,
+      supplierId: null,
+      // The machine's name, because the dialog's subtitle would otherwise read a supplier nobody named.
+      supplierName: item.label,
+      units: item.quantity,
+      mobilizationAmount: null,
+      demobilizationAmount: null,
+      rentalBasis: "monthly",
+      rateAmount: null,
+      mobilizedAt: null,
+      demobilizedAt: null,
+      documents: chart?.documents ?? [],
+      awardedAt: null,
+    };
+  }
+
+  /**
+   * Opens one paper in a new tab, from wherever its name was pressed.
+   *
+   * The link is fetched per press and used immediately — ten minutes of life, so it is never held on
+   * a row or rendered into the page. A failure surfaces as the row notice: the renter's next move is
+   * to try again, and a press that does nothing teaches them the paper is gone.
+   */
+  async function openPaper(docId: string) {
+    if (!selected) return;
+    try {
+      const url = await documentUrl(selected, docId);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch {
+      setNotice(t.projects.docs.openFailed);
+    }
+  }
+
+  /** `where` defaults to state; pass the value `refreshChart` returned to read what was just written. */
+  function findAward(id: string, where?: Chart | null): Award | null {
+    for (const g of (where ?? chart)?.groups ?? []) {
       for (const it of g.items) {
         const hit = it.awards.find((x) => x.id === id);
         if (hit) return hit;
@@ -780,6 +846,9 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
             setFilingInto({ projectId: p.id, label: projectTitle(p), address: p.location.label })
           }
           onRename={setRenaming}
+          /* One opener for both places a paper's name appears — the chart row and the papers dialog.
+             Two would drift, and «open this document» has one right answer. */
+          onOpenDocument={(docId) => void openPaper(docId)}
           onOpenConflict={setConflict}
           rowMenu={(group, itemId, awardId) => {
             const item = group.items.find((i) => i.id === itemId);
@@ -821,7 +890,21 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
                   /* No longer its own entry — deleting a work order IS removing it from the site,
                      and the dialog below says so. Kept undefined so the menu draws one door. */
                   onDeleteWorkOrder: undefined,
-                  onAttachDocument: a ? () => setPapers({ award: a, isRequest: group.kind === "request" }) : undefined,
+                  /* ALWAYS, like the marks (owner, 2026-08-31: *"attach must alwasy also shown like
+                     mebo/demo"*). It used to appear only on an awarded row, on the reasoning that a
+                     paper needs an award to hang on. The backend never agreed: its attach endpoint
+                     has always taken `-` in the award slot to file a paper against the SITE, for
+                     exactly the paper that belongs to no single award.
+
+                     So an unawarded row files against the site, and the dialog says so in one line
+                     rather than pretending the paper is on the machine. A framework agreement signed
+                     before anyone is named is the ordinary case, not an edge one. */
+                  onAttachDocument: () =>
+                    setPapers({
+                      award: a ?? siteLevelAward(item),
+                      isRequest: group.kind === "request",
+                      siteLevel: !a,
+                    }),
                   /* Both kinds now. A request is unfiled and stays; a work order is deleted — the
                      dialog is where that difference is stated, and where the move is offered
                      instead. */
@@ -885,7 +968,9 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
           award={papers.award}
           isRequest={papers.isRequest}
           onAttach={(file, kind) => void attach(file, kind)}
+          onOpen={(docId) => documentUrl(selected!, docId)}
           onRemove={(id) => void detach(id)}
+          siteLevel={papers.siteLevel}
           busy={saving}
         />
       )}

@@ -11,11 +11,15 @@
  * An item nobody has awarded draws **one hatched row** saying *awaiting award*, with no marks and no
  * documents — not because a rule forbids them, but because there is no award to hang them on.
  *
- * ── No legend ────────────────────────────────────────────────────────────────────────────────────
+ * ── There IS a legend now ───────────────────────────────────────────────────────────────────────
  *
- * A legend is a promise that the reader will look away from the chart to decode it, and they do not.
- * Green means arrived, orange means left, and the date is in the tooltip; a renter learns both in
- * one hover and never needs the key again.
+ * ~~A legend is a promise that the reader will look away from the chart to decode it, and they do
+ * not. Green means arrived, orange means left, and the date is in the tooltip.~~ Overruled by the
+ * owner on 2026-08-31: *"put legend for them"*.
+ *
+ * The old reasoning assumed a hover, and a hover is not available to a renter reading the chart on a
+ * phone or reading it over someone's shoulder. Two shapes with two meanings and nothing on the page
+ * naming either is a puzzle, not a chart. It lives in `ProjectsBoard`, under the rows, on one line.
  *
  * ── The marks sit on the bar's TOP EDGE ──────────────────────────────────────────────────────────
  *
@@ -74,6 +78,7 @@ export function AwardRow({
   today,
   grid,
   menu,
+  onOpenDocument,
 }: {
   group: ChartGroup;
   item: ChartItem;
@@ -85,6 +90,8 @@ export function AwardRow({
   grid?: number[];
   /** The row menu, rendered by the caller so this stays a drawing component. */
   menu?: React.ReactNode;
+  /** Opens one paper. Absent means the names still render, unpressable, rather than vanishing. */
+  onOpenDocument?: (docId: string) => void;
 }) {
   const t = useT();
   const win = awardWindow(group, award, projectWindow);
@@ -101,15 +108,40 @@ export function AwardRow({
       {/* The label column: what this row is, its papers, and its menu. `pe-10` keeps the text clear
           of the menu's 28px target rather than letting a long machine name run under it. */}
       <div className="relative flex w-[340px] flex-none flex-col justify-center gap-0.5 py-2 pe-10 ps-3">
-        {/* Papers in the top corner, out of the bar's way. */}
+        {/* ── The papers: one icon each, the NAME beside it, and pressable ──────────────────────
+
+            ~~A per-kind glyph in the top corner, title-attribute only.~~ Three faults in one
+            control (owner, 2026-08-31: *"must be document icon for all types with the file name and
+            clicking it will open same view/download"*):
+
+              · Four glyphs to decode, and a renter does not scan papers by shape — they read the
+                name, which was hidden in a tooltip.
+              · A tooltip is not available on a phone at all, so on a phone the row said only that
+                *some* number of papers existed.
+              · Nothing happened when pressed, which is the worst of the three: the paper was
+                visible and unreachable.
+
+            Now: the house document icon for every kind, the filename next to it, and the whole
+            thing opens the paper — the same view-or-save the papers dialog gives, because there is
+            one right answer to «open this» and two doors to it would drift. */}
         {award.documents.length > 0 && (
-          <span className="absolute end-10 top-1.5 flex items-center gap-0.5">
+          <span className="flex min-w-0 flex-col gap-0.5">
             {docs.map((d) => (
-              <span key={d.id} title={`${d.kind} · ${d.filename}`} className="text-brand">
-                <Icon name={d.kind === "po" ? "receipt_long" : d.kind === "contract" ? "gavel" : "description"} size={12} />
-              </span>
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => onOpenDocument?.(d.id)}
+                disabled={!onOpenDocument}
+                title={d.filename}
+                className="flex min-w-0 items-center gap-1 text-start text-meta text-brand disabled:cursor-default"
+              >
+                <Icon name="description" size={12} className="flex-none" />
+                <span className="truncate underline decoration-border underline-offset-2">{d.filename}</span>
+              </button>
             ))}
-            {extra > 0 && <span className="text-meta font-semibold text-brand">+{extra}</span>}
+            {/* The overflow count keeps its place rather than growing the row: three names is
+                already the most a 340px column reads at a glance, and the dialog holds the rest. */}
+            {extra > 0 && <span className="text-meta font-semibold text-muted">+{extra}</span>}
           </span>
         )}
 
@@ -219,12 +251,30 @@ function barShape(
   };
 }
 
-/** A pin on the bar's top edge. Unlabelled — the date is in the title. */
+/**
+ * One mark: a DIAMOND on the bar's top edge, at its own date.
+ *
+ * ~~A round dot.~~ A diamond, and the shape is doing work rather than decorating (owner,
+ * 2026-08-31, with the shape drawn out). A circle is what every other pin on every chart is; a
+ * diamond at 45° reads as an event on a timeline and cannot be mistaken for a bar cap or the today
+ * line. **Green arrived, orange left** — two hues, never the same one twice.
+ *
+ * It sits ON the top edge and is centred on its date, so it can fall OUTSIDE the bar and still be
+ * on the timeline: since the marks stopped widening the bar (see `awardWindow`), a diamond to the
+ * left of the bar is a machine that came early, and one past the right end is one still standing
+ * there. That picture is the whole point of separating the plan from what happened.
+ */
 function Mark({ at, axis, tone, title }: { at: string; axis: Axis; tone: "in" | "out"; title: string }) {
   return (
     <span
       title={title}
-      className={`absolute h-2.5 w-2.5 -translate-x-1/2 rounded-full border border-white ${tone === "in" ? "bg-ok" : "bg-warn"}`}
+      /* `rotate-45` on a square, corners left SHARP — a diamond with points, no SVG and no extra
+         element. The house radius steps start at 8px, which on a 10px square is a blob, so this one
+         takes none rather than an arbitrary hairline. The white border keeps it legible against both the navy bar and the pale
+         track it may land on when it sits outside the bar. */
+      className={`absolute h-2.5 w-2.5 -translate-x-1/2 rotate-45 border border-white ${
+        tone === "in" ? "bg-ok" : "bg-warn"
+      }`}
       style={{ insetInlineStart: `${pct(at, axis)}%`, top: "calc(50% - 11px)" }}
     />
   );

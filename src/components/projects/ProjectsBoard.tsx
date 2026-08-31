@@ -147,6 +147,7 @@ export function ProjectsBoard({
   onRename,
   onOpenConflict,
   rowMenu,
+  onOpenDocument,
 }: {
   projects: ProjectSummary[];
   /** `null` selects Unassigned. */
@@ -164,6 +165,8 @@ export function ProjectsBoard({
   /** Pressed from the *own dates* chip on a group header. */
   onOpenConflict?: (group: ChartGroup) => void;
   rowMenu?: (group: ChartGroup, itemId: string, awardId: string | null) => React.ReactNode;
+  /** Opens one paper, by document id — the same view-or-save the papers dialog uses. */
+  onOpenDocument?: (docId: string) => void;
 }) {
   const t = useT();
   const now = today();
@@ -224,6 +227,7 @@ export function ProjectsBoard({
             onRename={onRename}
             onOpenConflict={onOpenConflict}
             rowMenu={rowMenu}
+            onOpenDocument={onOpenDocument}
           />
         ) : (
           <p className="text-body text-muted">{t.projects.board.loading}</p>
@@ -245,6 +249,7 @@ function SitePanel({
   onRename,
   onOpenConflict,
   rowMenu,
+  onOpenDocument,
 }: {
   project: ProjectSummary;
   groups: ChartGroup[];
@@ -256,6 +261,8 @@ function SitePanel({
   onRename?: (group: ChartGroup) => void;
   onOpenConflict?: (group: ChartGroup) => void;
   rowMenu?: (group: ChartGroup, itemId: string, awardId: string | null) => React.ReactNode;
+  /** Opens one paper, by document id — the same view-or-save the papers dialog uses. */
+  onOpenDocument?: (docId: string) => void;
 }) {
   const t = useT();
   const projectWindow = { startDate: project.defaults.timing.startDate, endDate: project.defaults.timing.endDate };
@@ -564,12 +571,31 @@ function SitePanel({
                         today={todayIn}
                         grid={grid}
                         menu={rowMenu?.(g, item.id, a.id)}
+                        onOpenDocument={onOpenDocument}
                       />
                     ))
                   ),
                 )}
               </div>
             ))}
+
+            {/* ── The legend ──────────────────────────────────────────────────────────────────────
+
+                *"put legend for them"* (owner, 2026-08-31). `ChartRow` used to argue against one:
+                the date is in the tooltip, so a renter learns both marks in one hover. That assumed
+                a hover — no use on a phone, and no use to whoever is reading the chart over the
+                renter's shoulder. Two shapes carrying two meanings with nothing on the page naming
+                either is a puzzle.
+
+                One line, under the rows rather than above them, so it is the last thing on the panel
+                instead of chrome between the header and the subject. The swatches are the marks
+                themselves, same size and same rotation, because a legend drawn differently from the
+                thing it explains is a second thing to learn. */}
+            <div className="flex items-center gap-4 border-t border-border px-3 py-2">
+              <LegendKey tone="in" label={t.projects.chart.mobilized} />
+              <LegendKey tone="out" label={t.projects.chart.demobilized} />
+              <span className="text-meta text-muted-light">{t.projects.chart.marksAreEvents}</span>
+            </div>
 
             {/* ~~A 96px spacer inside the scroller.~~ It went with the scroller: the room after the
                 chart is now the page's own `pb-24` (see `ProjectsSurface`), which is what the owner
@@ -580,6 +606,26 @@ function SitePanel({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * One key in the legend — the mark itself, at the size it is drawn on the bar.
+ *
+ * Not an approximation of it: same square, same rotation, same two colours, so a renter matches the
+ * shape by looking rather than by reasoning about what the key probably means.
+ */
+function LegendKey({ tone, label }: { tone: "in" | "out"; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5 text-meta text-navy-mid">
+      <span
+        aria-hidden
+        className={`h-2.5 w-2.5 flex-none rotate-45 border border-white ${
+          tone === "in" ? "bg-ok" : "bg-warn"
+        }`}
+      />
+      {label}
+    </span>
   );
 }
 

@@ -1662,6 +1662,9 @@ export const en = {
       attach: "Attach a file",
       removeNamed: "Remove {name}",
       oursIsGenerated: "Our quotation for this request is generated, not uploaded — download it from the row menu. The one here is the quotation the SUPPLIER sent you.",
+      siteLevelNote: "Nobody is awarded this machine yet, so this paper is filed against the site — not against a supplier.",
+      openHint: "Open this paper",
+      openFailed: "Could not open that paper. Try again.",
       tooBig: "That file is over {max}. Attach a smaller one.",
       badType: "PDF, JPG, PNG or WEBP. Convert it first, or take a photo of the page.",
       readFailed: "That file could not be read. Try another.",
@@ -1867,6 +1870,7 @@ export const en = {
       noPeriod: "no dates yet",
       mobilized: "Arrived",
       demobilized: "Left",
+      marksAreEvents: "what happened — the bar is what was agreed",
     },
     del: {
       confirmTitle: "Delete this project?",
@@ -1938,7 +1942,6 @@ export const en = {
     },
     pills: {
       startFrom: "start from",
-      pickTemplate: "—",
       templateApplied: "terms copied",
       kindWorkOrder: "Work order",
       kindRequest: "Request",

@@ -309,33 +309,36 @@ export function termsSummary(
  * The window one award's bar is drawn across.
  *
  * **An award has no period of its own.** It records who supplies how many, and the two marks. The
- * bar is its parent's period — the request's or the work order's, or the site's where that group
- * inherits — widened to meet a mark that falls outside it.
+ * bar is its parent's PLANNED period — the request's or the work order's, or the site's where that
+ * group inherits — and nothing else moves it.
  *
- * Widening matters both ways and is not symmetric decoration: a machine that arrived before the
- * period opened, and one still standing there after it closed, are both things the renter needs to
- * see. Clipping either would draw a bar that contradicts a pin sitting next to it.
+ * ── The marks do NOT widen it ────────────────────────────────────────────────────────────────────
  *
- * The known cost, stated rather than hidden: a hire renegotiated past a closed request's end shows
- * the original end until the machine is demobilized. What it buys is two levels of date instead of
- * three, and no "which of these wins" question anywhere.
+ * ~~Widened to meet a mark falling outside it, so a bar never contradicts a pin beside it.~~
+ * Reversed by the owner on 2026-08-31: *"for mebo and demo doesnt change strat or end date of the
+ * work order or the request or the project so they are different dates in the chart"*.
+ *
+ * He is right, and the old behaviour was quietly destructive of meaning. Marking a machine as
+ * arrived on the 31st moved a bar that starts on the 1st, and the bar then PRINTED «2026-08-31 →
+ * 2026-12-31» — so a renter reading the chart saw the work order's period as a date nobody had
+ * agreed. What was planned and what happened are two different facts, and the bar is the first one.
+ *
+ * They are still both visible, and now legibly so: the bar is the plan, the two diamonds are the
+ * events, and a diamond outside the bar is exactly the picture a renter needs — *it came early*, *it
+ * is still standing there*. `chartDates` keeps every mark in the axis span, so a pin outside the bar
+ * still has room on the timeline rather than being clipped at its edge.
  */
 export function awardWindow(
   group: Pick<ChartGroup, "when">,
-  award: Pick<Award, "mobilizedAt" | "demobilizedAt">,
+  _award: Pick<Award, "mobilizedAt" | "demobilizedAt">,
   projectWindow: { startDate: string | null; endDate: string | null },
 ): { start: string | null; end: string | null } {
-  let start = group.when?.startDate ?? projectWindow.startDate;
-  let end = group.when?.endDate ?? projectWindow.endDate;
-
-  const { mobilizedAt: mob, demobilizedAt: demob } = award;
-  if (mob && (!start || mob < start)) start = mob;
-  if (demob && (!end || demob > end)) end = demob;
-  // A mark past the far edge stretches the other end too, so a bar never ends before its own pin.
-  if (mob && end && mob > end) end = mob;
-  if (demob && start && demob < start) start = demob;
-
-  return { start, end };
+  /* `_award` is kept in the signature deliberately. Every caller has the award in hand, and a
+     parameter list that stops asking for it is a parameter list somebody re-adds the widening to. */
+  return {
+    start: group.when?.startDate ?? projectWindow.startDate,
+    end: group.when?.endDate ?? projectWindow.endDate,
+  };
 }
 
 /** Units already promised for an item — the guard, and the "×2 of 3" label. */

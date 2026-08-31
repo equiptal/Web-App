@@ -52,24 +52,34 @@ describe("the window a bar is drawn across", () => {
     expect(awardWindow(own, award(), SITE)).toEqual({ start: "2026-10-01", end: "2027-03-31" });
   });
 
-  it("stretches back for a machine that arrived before the period opened", () => {
+  /* ── A mark never moves the bar ────────────────────────────────────────────────────────────────
+
+     ~~The bar stretched to meet a mark outside it, so it never contradicted a pin beside it.~~
+     Reversed by the owner on 2026-08-31: *"for mebo and demo doesnt change strat or end date of the
+     work order or the request or the project so they are different dates in the chart"*.
+
+     The old behaviour printed the moved dates on the bar, so marking a machine arrived on the 31st
+     made a work order starting on the 1st read «2026-08-31 → 2026-12-31» — a period nobody agreed
+     to. The plan and what happened are two facts; the bar is the first, the diamonds are the second.
+
+     These four cases are the old ones inverted, kept rather than deleted so the reversal is legible
+     to whoever reads them next. */
+
+  it("does not stretch back for a machine that arrived before the period opened", () => {
     const w = awardWindow(group(), award({ mobilizedAt: "2026-08-20" }), SITE);
-    // Clipping it would draw a bar starting after its own pin.
-    expect(w.start).toBe("2026-08-20");
-    expect(w.end).toBe("2026-12-31");
+    expect(w).toEqual({ start: "2026-09-01", end: "2026-12-31" });
   });
 
-  it("stretches forward for one still standing there after it closed", () => {
+  it("does not stretch forward for one still standing there after it closed", () => {
     const w = awardWindow(group(), award({ demobilizedAt: "2027-02-10" }), SITE);
-    expect(w.start).toBe("2026-09-01");
-    expect(w.end).toBe("2027-02-10");
+    expect(w).toEqual({ start: "2026-09-01", end: "2026-12-31" });
   });
 
-  it("never ends before its own mobilized mark", () => {
-    // The renegotiation case: the request said Sep–Dec, the machine arrived in February. The bar has
-    // to reach the pin even though nothing else moved.
+  it("keeps the planned end even when the machine arrived after it", () => {
+    // The renegotiation case: the request said Sep–Dec, the machine turned up in February. The bar
+    // still says Sep–Dec, because that is what was agreed; the diamond says February.
     const w = awardWindow(group(), award({ mobilizedAt: "2027-02-01" }), SITE);
-    expect(w.end).toBe("2027-02-01");
+    expect(w.end).toBe("2026-12-31");
   });
 
   it("leaves a mark inside the period alone", () => {
@@ -77,11 +87,24 @@ describe("the window a bar is drawn across", () => {
     expect(w).toEqual({ start: "2026-09-01", end: "2026-12-31" });
   });
 
-  it("survives a site with no dates at all", () => {
+  it("has no window at all on a site with no dates, mark or no mark", () => {
     const none = { startDate: null, endDate: null };
     expect(awardWindow(group(), award(), none)).toEqual({ start: null, end: null });
-    // A mark is then the only thing there is to draw from, and it still works.
-    expect(awardWindow(group(), award({ mobilizedAt: "2026-09-04" }), none).start).toBe("2026-09-04");
+    /* And a mark does NOT invent one. The row draws its *pending* chip plus the diamond, which is
+       honest: somebody has arrived, and nobody has said for how long. */
+    expect(awardWindow(group(), award({ mobilizedAt: "2026-09-04" }), none)).toEqual({ start: null, end: null });
+  });
+
+  it("still keeps every mark inside the AXIS, so a pin outside the bar has room", () => {
+    // This is what makes the reversal safe: the bar no longer moves, but the timeline still spans
+    // far enough to draw a diamond that falls outside it.
+    const g: ChartGroup = {
+      ...group(),
+      items: [
+        { id: "i1", label: "Excavator 20t", labelAr: null, quantity: 1, awards: [award({ demobilizedAt: "2027-02-10" })] },
+      ],
+    };
+    expect(chartDates([g])).toContain("2027-02-10");
   });
 });
 

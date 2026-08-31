@@ -80,8 +80,11 @@ describe("what the menu offers", () => {
     expect(items).toContain("Review the bids");
     expect(items).toContain("Mark mobilized");
     expect(items).toContain("Mark demobilized");
-    // Papers still need an award: there is no id to file one under until one exists.
-    expect(items).not.toContain("Attach a document");
+    /* ~~Papers still need an award: there is no id to file one under until one exists.~~ Reversed
+       the same day (*"attach must alwasy also shown like mebo/demo"*), and the old reason was only
+       half true — the backend's attach endpoint reads `-` in the award slot as *file this against
+       the site*, which is where the agreement that predates any supplier belongs. */
+    expect(items).toContain("Attach a document");
   });
 
   it("a work-order machine nobody supplies: the marks too", () => {
@@ -97,7 +100,7 @@ describe("what the menu offers", () => {
        without this the machine had no way to name a supplier later except by reopening the order. */
     expect(items).toContain("Award");
     // A paper still needs an award to hang on: there is no id to file one under yet.
-    expect(items).not.toContain("Attach a document");
+    expect(items).toContain("Attach a document"); // see the note above — it no longer waits on an award
   });
 
   it("an awarded request: marks, papers, and the three navigation links", () => {
@@ -190,14 +193,24 @@ describe("where the layer opens", () => {
      save it, because a 207px list fits on neither side of a box with ~155px below the row and ~81px
      above. Only leaving the scroll box does. */
 
-  it("is fixed, so an ancestor's overflow cannot clip it", () => {
+  it("is anchored to its row by layout, not by measured coordinates", () => {
+    /* ~~`position: fixed`, so an ancestor's overflow cannot clip it.~~ Reverted the same day, and
+       the revert is right: the chart body that clipped it (`max-h-[64vh] overflow-y-auto`) was
+       removed by the owner, so fixed had nothing left to buy and two costs of its own — a menu that
+       opened away from its row, because fixed coordinates are a snapshot taken before the layout
+       change that opening causes, and a shaking page, because re-placing on every captured scroll
+       event re-rendered the row whether the numbers moved or not.
+
+       So this pins the property that matters now: placed by LAYOUT, inside the trigger's own
+       relative box, where it cannot come unstuck from the ⋮ it belongs to. */
     mount(<RowMenu group={group("work_order")} award={award()} actions={all()} />);
     fireEvent.click(screen.getByRole("button", { name: /row actions/i }));
 
     const menu = screen.getByRole("menu");
-    expect(menu.style.position).toBe("fixed");
-    // And no `absolute`, which is the state this regressed from.
-    expect(menu.className).not.toMatch(/absolute/);
+    expect(menu.className).toMatch(/\babsolute\b/);
+    expect(menu.style.position).not.toBe("fixed");
+    // And its box is the trigger's, so the two move together.
+    expect(menu.closest("div.relative")).toBeTruthy();
   });
 
   it("shows every entry, with the destructive one last", () => {
@@ -208,5 +221,31 @@ describe("where the layer opens", () => {
 
     const last = screen.getByRole("menuitem", { name: "Remove from the project" });
     expect(last.className).toMatch(/text-danger/);
+  });
+});
+
+describe("attaching a paper", () => {
+
+  /* *"attach must alwasy also shown like mebo/demo"* (owner, 2026-08-31). It used to appear only on
+     an awarded row, because a paper hangs on an award. The backend never agreed: its attach endpoint
+     has always taken `-` in the award slot to file a paper against the SITE, for exactly the paper
+     that belongs to no single award — a framework agreement signed before anyone is named. */
+
+  it("is offered on a row nobody has awarded", () => {
+    const items = open(<RowMenu group={group("work_order")} award={null} actions={all()} />);
+    expect(items).toContain("Attach a document");
+  });
+
+  it("is offered on an unawarded request too", () => {
+    const items = open(<RowMenu group={group("request")} award={null} actions={all()} />);
+    expect(items).toContain("Attach a document");
+  });
+
+  it("sits with the marks, not behind them", () => {
+    // The three that no longer wait on an award, in one list.
+    const items = open(<RowMenu group={group("work_order")} award={null} actions={all()} />);
+    expect(items).toContain("Mark mobilized");
+    expect(items).toContain("Mark demobilized");
+    expect(items).toContain("Attach a document");
   });
 });
