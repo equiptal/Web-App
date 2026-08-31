@@ -138,17 +138,25 @@ export function ShareForBidsSheet({
   const lbl = "mb-2 text-label font-semibold uppercase tracking-wide text-muted";
 
   return (
-    <Dialog open onClose={onClose} size="md" padded={false}>
+    /* ── ONE header, and therefore ONE close (owner, 2026-08-31: *"why does the share open like
+       this"*) ──────────────────────────────────────────────────────────────────────────────────
+       It drew its own header row — mark, title, subtitle, close — inside a `Dialog` that had been
+       given no `title`. The shell's rule for a body that brings its own headings is to float a close
+       in the corner anyway, so the sheet opened with TWO X's a few pixels apart, one of them lying
+       half over the title.
+
+       The header is the shell's now: same title, same subtitle, the same brand mark passed as
+       `icon`. `padded={false}` stays — this body brings its own gutters and its own footer rule. */
+    <Dialog
+      open
+      onClose={onClose}
+      size="md"
+      padded={false}
+      icon={<span className="grid h-[34px] w-[34px] place-items-center rounded-sm bg-brand text-white"><Icon name="ios_share" size={18} /></span>}
+      title={L("Share for bids", "مشاركة لتلقّي العروض")}
+      subtitle={L("Send this link to suppliers — they bid without an account, even off-platform.", "أرسل هذا الرابط للمؤجّرين — يقدّمون عرضهم دون حساب، حتى خارج المنصة.")}
+    >
       <div {...pin("share-for-bids")} className="flex min-h-0 flex-1 flex-col text-start" dir={ar ? "rtl" : "ltr"}>
-        {/* header */}
-        <div className="flex items-start gap-3 border-b border-border px-5 py-4">
-          <span className="grid h-10 w-10 flex-none place-items-center rounded-sm bg-brand text-white"><Icon name="ios_share" size={20} /></span>
-          <div className="flex-1">
-            <h3 className="text-subhead font-extrabold text-navy">{L("Share for bids", "مشاركة لتلقّي العروض")}</h3>
-            <p className="mt-0.5 text-meta font-normal text-muted">{L("Send this link to suppliers — they bid without an account, even off-platform.", "أرسل هذا الرابط للمؤجّرين — يقدّمون عرضهم دون حساب، حتى خارج المنصة.")}</p>
-          </div>
-          <button onClick={onClose} className="grid h-8 w-8 flex-none place-items-center rounded-full text-muted hover:bg-surface2"><Icon name="close" size={18} /></button>
-        </div>
 
         <div className="flex flex-col gap-5 overflow-y-auto px-5 py-4">
           {/* link + copy */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CloseIcon } from "@/components/HeaderIcons";
 import { CARD_FOOTER, cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
@@ -51,6 +51,20 @@ const SIZE: Record<DialogSize, string> = {
 
 /** The scrim, shared by the centred dialog and the side drawer so both dim the page identically. */
 const SCRIM = "fixed inset-0 z-[60] bg-navy/45";
+
+/**
+ * How many dialogs are open, so a NESTED one does not dim the page twice.
+ *
+ * The share sheet opens from the request modal (owner, 2026-08-31: *"why does the share open like
+ * this"*). Two scrims at `navy/45` composite to about 70%: the dialog underneath went muddy, its
+ * text unreadable, and the whole surface looked broken rather than layered. The page is already
+ * dimmed by the first one — the second only needs to catch a backdrop click.
+ *
+ * A module counter rather than a context: the shell is used by six surfaces that do not know about
+ * each other, and a provider none of them render would dim twice again the day someone forgets it.
+ * Mount and unmount are balanced, so React's double-invoked effects in development cancel out.
+ */
+let openDialogs = 0;
 
 /** The panel's own skin — one radius, one border, one shadow.
  *
@@ -156,11 +170,23 @@ export function Dialog({
 }) {
   const panel = useRef<HTMLDivElement>(null);
   useDialogKeys(open, onClose, panel);
+
+  /** True when another dialog was already open when this one mounted — see {@link openDialogs}. */
+  const [nested, setNested] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    openDialogs += 1;
+    setNested(openDialogs > 1);
+    return () => {
+      openDialogs -= 1;
+    };
+  }, [open]);
+
   if (!open) return null;
 
   return (
     <div {...pin("dialog")}
-      className={`${SCRIM} flex items-end justify-center p-0 sm:items-center sm:p-4`}
+      className={`${nested ? "fixed inset-0 z-[60]" : SCRIM} flex items-end justify-center p-0 sm:items-center sm:p-4`}
       onClick={onClose}
       role="dialog"
       aria-modal="true"
