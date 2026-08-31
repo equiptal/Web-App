@@ -74,7 +74,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 // Two numeral formatters, and the split is deliberate: `arabicIndicDigits` truncates, which is what a
 // COUNT wants, and `distanceDigits` keeps one decimal, which is what a measured distance wants.
-import { arabicIndicDigits, distanceDigits, isInOffer } from "@/lib/contract/bid-map";
+import { arabicIndicDigits, distanceDigits } from "@/lib/contract/bid-map";
 import { listEmptyState, type EquipmentListView } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import { equipmentCardModel, type EquipmentCardReadiness } from "@/components/map/equipment-card-model";
@@ -563,15 +563,15 @@ export function EquipmentList({
         <ul className="bm-eqlist" ref={listRef}>
           {machines.map((m, i) => (
             <Fragment key={m.equipmentId}>
-              {/* Where the offer ends. Drawn once, before the first machine that is not in it, so the
-                  renter knows why the cards below appeared rather than finding them mixed in. The
-                  model orders the array offer-first, which is what makes "the first one that isn't"
-                  a real boundary rather than a guess. */}
-              {!isInOffer(m) && (i === 0 || isInOffer(machines[i - 1])) && (
-                <li className="bm-eqsplit" aria-hidden="true">
-                  <span>{t.bidMap.eqBeyondOffer}</span>
-                </li>
-              )}
+              {/* ~~«Also in his fleet — not in this offer», drawn once before the first machine that
+                  is not in the offer.~~ Removed by the owner (2026-08-31). It restated on the LIST a
+                  distinction the renter had already told us he does not act on — the same reasoning
+                  that took the «in this offer» badge off the card on 2026-08-19: what he is choosing
+                  between is machines that can be confirmed for him, and the sentence sorted them by
+                  a fact about paperwork instead.
+
+                  The ORDER is untouched — `listedMachines` still puts the offer first — and the map
+                  still tags membership on the pin, so nothing became unknowable. */}
             <EquipmentCard
               machine={m}
               index={i}
@@ -668,7 +668,7 @@ function EquipmentCard({
   // (AC-19), and the model carries no serial and no capacity for the card to reach for even by
   // accident (AC-12).
   const card = useMemo(() => equipmentCardModel(machine, request), [machine, request]);
-  const { chip, photo, askAvailability, readiness } = card;
+  const { chip, photo, readiness } = card;
   /** Asked, and not yet answered. The workspace decides it — only it can see the conversation — and
    *  the card paints the answer. */
   const pending = askPending?.(machine) ?? false;
@@ -757,6 +757,14 @@ function EquipmentCard({
               «Details ›» is gone as a word. The icon is the file under a magnifier, which is what the
               control has always done — look inside this machine's file. */}
           <div className="bm-eq-hd">
+            {/* How complete the file is, on the LEADING edge (owner, 2026-08-31) — the first thing
+                read on the card's first line, and it sits beside the control that opens the papers
+                it counts. */}
+            <ReadinessBar
+              readiness={readiness}
+              label={`${num(readiness.done)}/${num(readiness.total)}`}
+              title={fmt(t.bidMap.eqReadinessOnFile, { done: num(readiness.done), total: num(readiness.total) })}
+            />
             <button
               type="button"
               className="bm-eq-open"
@@ -764,11 +772,22 @@ function EquipmentCard({
               title={t.bidMap.eqOpenFile}
               onClick={() => onOpenDetail(machine.equipmentId)}
             >
-              {/* `find_in_page` — the material set's own file-under-a-magnifier, which is exactly
-                  what this control does. It replaces a hand-drawn 512-viewBox path that was heavier
-                  than every other glyph on the surface and lined up with none of them (owner,
-                  2026-08-31: *"make the icon nicer"*). */}
-              <span className="material-icons-outlined" aria-hidden="true">find_in_page</span>
+              {/* The owner's own glyph (2026-08-31) — a document with its lines, read under a
+                  magnifier, the document's edge broken where the lens crosses it. Drawn rather than
+                  fetched: the material set's `find_in_page` puts the lens INSIDE the page, which
+                  reads as a search box on a form; this reads as reviewing the papers. */}
+              <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M17.8 11.1V1.2H1.3v21.7h16.5v-3M4.7 5.2h9.3M4.7 9.6h6.2M4.7 14h3.7M4.7 18.4h3.7"
+                />
+                <circle cx="15.2" cy="15.2" r="4" fill="none" stroke="currentColor" strokeWidth="1.7" />
+                <path fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" d="m18.2 18.2 3.5 3.5" />
+              </svg>
             </button>
           </div>
 
@@ -800,11 +819,12 @@ function EquipmentCard({
               type="button"
               className={`bm-eq-yard ${yard}`}
               title={yard === "asked" ? t.bidMap.askPendingWhy : t.bidMap.eqYardUnconfirmedWhy}
-              /* The ask's ink is the MODEL's, not the stylesheet's (RM3-AC-33). It used to paint the
-                 «Ask him to confirm» prompt; with that prompt gone the control itself is the ask, so
-                 the ink lands on it — the CSS keeps the ground and the border, the model keeps the
-                 colour. */
-              style={askAvailability ? { color: askAvailability.colour } : undefined}
+              /* No inline ink. `askAvailability.colour` is the ASK's colour — `var(--info)`, blue —
+                 and it was right while it painted a separate «Ask him to confirm» prompt. With that
+                 prompt gone it would have painted the FIGURE blue, and the figure is availability's
+                 (owner, 2026-08-31: *"keep the font of distance red"*). RM3-AC-33 is satisfied on
+                 the surfaces that still render an ask CONTROL of their own; this one renders a
+                 distance whose colour is the availability, and one fact may only have one ink. */
               onClick={() => onYardPress(machine, yard === "asked")}
             >
               <span className="material-icons-outlined" aria-hidden="true">
@@ -825,19 +845,6 @@ function EquipmentCard({
           {/* The yard is outside the request city's own radius — the fact that turns a delivery into a
               mobilisation. It qualifies the distance, so it follows it. */}
           {card.outOfCity && <div className="bm-eq-far">{t.bidMap.eqOutOfCity}</div>}
-
-          {/* ── The foot: how complete this machine's file is (owner, 2026-08-31) ─────────────────
-              Bottom trailing corner, and a bar with its fraction beside it rather than a row of
-              dots: dots asked the reader to count them, and counting four sockets to learn that
-              three are filled is work a bar and «3/4» do for him. It sits at the card's end because
-              it is the last thing he needs — the distance is what he is comparing on. */}
-          <div className="bm-eq-ft">
-            <ReadinessBar
-              readiness={readiness}
-              label={`${num(readiness.done)}/${num(readiness.total)}`}
-              title={fmt(t.bidMap.eqReadinessOnFile, { done: num(readiness.done), total: num(readiness.total) })}
-            />
-          </div>
         </div>
       </div>
     </li>

@@ -319,3 +319,54 @@ test.describe("J · Language", () => {
     await expect(page.getByText(en.projects.board.whatIsHere, { exact: true })).toHaveCount(0);
   });
 });
+
+test.describe("C · A request built from what is already on the site", () => {
+  test("C6 · a work order on the site is offered as a template on the intake", async ({ page }) => {
+    /* Spec §6: the project holds no machine terms — *anything already in the project is a
+       template*. So the way to "make a request from a work order" is to pick that work order on the
+       intake and let it fill the terms, while the equipment still comes from the typed text
+       (PROJ-AC-06).
+
+       Built end to end here because the dropdown only appears when the site actually has something
+       in it, and a case that quietly skips on an empty site proves nothing. */
+    const title = `UAT template ${Date.now()}`;
+
+    const made = await page.request.post("/api/projects", {
+      data: {
+        title,
+        location: { label: "Qiddiya Zone 4, Riyadh", lat: 24.7136, lng: 46.6753 },
+        defaults: { rentalBasis: "MONTHLY", startDate: "2026-09-01", endDate: "2026-12-31" },
+      },
+    });
+    expect(made.status(), await made.text()).toBe(201);
+    const site = await made.json();
+
+    /* No supplier lines. `items[].supplyLines` is refused by the deployed backend — an intersection
+       over a strict schema — and the fix is written but not shipped. The template carries terms, not
+       awards, so this case does not need them. */
+    const wo = await page.request.post(`/api/projects/${site.id}/work-orders`, {
+      data: {
+        title: "Own fleet — welders",
+        when: { rentalBasis: "MONTHLY", startDate: "2026-09-01", endDate: "2026-12-31" },
+        items: [{ rawLabel: "Welding machine", quantity: 2 }],
+        expectedVersion: site.version,
+      },
+    });
+    expect(wo.status(), await wo.text()).toBe(201);
+
+    // Arrive the way the site's own *New request* button arrives.
+    await page.goto(`/create?project=${site.id}`, { waitUntil: "networkidle" });
+
+    // The site is already picked, so the pills have taken over from the chip row.
+    await expect(page.getByText(title, { exact: false }).first()).toBeVisible({ timeout: 15_000 });
+
+    /* The template dropdown lists the work order. Located by its option rather than by the select,
+       because the intake carries several selects and only this one knows the order's name. */
+    await expect(page.getByRole("option", { name: /Own fleet/ })).toBeAttached({ timeout: 10_000 });
+
+    // Cleanup: the work order first — a site holding one refuses to be deleted, correctly.
+    const group = (await wo.json()).workOrderGroupId;
+    await page.request.delete(`/api/work-orders/${group}`);
+    await page.request.delete(`/api/projects/${site.id}`);
+  });
+});

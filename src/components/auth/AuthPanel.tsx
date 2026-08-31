@@ -43,8 +43,10 @@ export interface AuthPanelProps {
 
 export function AuthPanel({ children, toggle, trust }: AuthPanelProps) {
   return (
-    <div className="grid min-h-[520px] lg:grid-cols-[minmax(0,1fr)_44%]">
-      <div className="flex flex-col gap-5 p-7 sm:p-9">
+    /* `relative isolate`, because the picture is no longer a COLUMN — it is a layer under the whole
+       panel, and the form sits on top of it. See the note on the picture below. */
+    <div className="relative isolate grid min-h-[520px] lg:grid-cols-[minmax(0,1fr)_44%]">
+      <div className="relative z-10 flex flex-col gap-5 p-7 sm:p-9">
         {/* The mark, in white. `brightness(0) invert(1)` rather than a second asset: one logo file,
             and a colourway that cannot fall out of step with it. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -59,26 +61,75 @@ export function AuthPanel({ children, toggle, trust }: AuthPanelProps) {
         )}
       </div>
 
-      {/* The picture. `isolate` so the gradient over it cannot reach the form column, and
-          `aria-hidden` because it says nothing a screen reader needs — the words are all on the left. */}
-      <div aria-hidden="true" className="relative isolate hidden overflow-hidden lg:block">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/auth-panel.webp" alt="" className="absolute inset-0 h-full w-full object-cover" />
-        {/* Carried into the ink rather than cut against it: the comp blends the photograph into the
-            panel over roughly a third of its width, which is what stops the split reading as two
-            pasted rectangles. Mirrored under `rtl:`, since the seam is on the other side there. */}
-        <span
-          className="absolute inset-0 rtl:hidden"
-          style={{ background: "linear-gradient(90deg, var(--navy-deep) 0%, color-mix(in srgb, var(--navy-deep) 55%, transparent) 22%, transparent 60%)" }}
-        />
-        <span
-          className="absolute inset-0 hidden rtl:block"
-          style={{ background: "linear-gradient(270deg, var(--navy-deep) 0%, color-mix(in srgb, var(--navy-deep) 55%, transparent) 22%, transparent 60%)" }}
-        />
-        {/* The same flat multiply the home band uses, so the two photographs sit at one depth. */}
-        <span className="absolute inset-0 bg-navy-deep opacity-30 mix-blend-multiply" />
+      {/* ── The picture (owner, 2026-08-31: blend it, do not butt it) ─────────────────────────────
+          ~~A grid column with a navy gradient painted OVER its leading edge.~~ That could never stop
+          reading as two pasted rectangles, and for a reason no gradient fixes: the column's own edge
+          is still there. A gradient over a photograph darkens the photograph; it does not remove it.
+          At the top and bottom of the panel, where the ramp had nothing dark of its own to hide, the
+          seam stayed visible as a hard vertical line.
+
+          So the photograph is MASKED instead, and it is a layer rather than a column. It reaches 62%
+          across the panel — wider than the 44% the form leaves free, so its faded half lies UNDER
+          the form's trailing edge — and its own alpha runs out before it gets there. What is left at
+          the join is the panel's navy, with no edge in it to see. The form sits above on `z-10`.
+
+          `WebkitMaskImage` alongside `maskImage`: Safari still ships the prefixed property, and an
+          unmasked photograph here is the hard seam back again rather than a small regression.
+
+          Mirrored under `rtl:` — the picture is on the other side there, so the ramp is too. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 hidden overflow-hidden lg:block">
+        <div className="absolute inset-y-0 end-0 w-[62%] rtl:hidden" style={MASK_LTR}>
+          <Photo />
+        </div>
+        <div className="absolute inset-y-0 end-0 hidden w-[62%] rtl:block" style={MASK_RTL}>
+          <Photo />
+        </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * The ramp, as a MASK on the photograph rather than a gradient over it.
+ *
+ * Four stops, not two: alpha reaches roughly a fifth by 30% of the layer's width and is not opaque
+ * until 78%, which is a long enough fade that the eye finds no boundary. A two-stop mask over the
+ * same distance still shows the moment it starts.
+ */
+const RAMP = "transparent 0%, rgba(0,0,0,0.06) 16%, rgba(0,0,0,0.22) 32%, rgba(0,0,0,0.62) 55%, #000 78%";
+const MASK_LTR: React.CSSProperties = {
+  maskImage: `linear-gradient(to right, ${RAMP})`,
+  WebkitMaskImage: `linear-gradient(to right, ${RAMP})`,
+};
+const MASK_RTL: React.CSSProperties = {
+  maskImage: `linear-gradient(to left, ${RAMP})`,
+  WebkitMaskImage: `linear-gradient(to left, ${RAMP})`,
+};
+
+/**
+ * The photograph and the two things sitting on it.
+ *
+ * Both live INSIDE the masked wrapper, so they fade out with it — an overlay outside the mask would
+ * paint its own rectangle across the join, which is the seam again in a different colour.
+ */
+function Photo() {
+  return (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/auth-panel.webp" alt="" className="absolute inset-0 h-full w-full object-cover" />
+      {/* The same flat multiply the home band uses, so the two photographs sit at one depth. */}
+      <span className="absolute inset-0 bg-navy-deep opacity-30 mix-blend-multiply" />
+      {/* Top and bottom, where the panel's corners are: the photograph is brightest at its own edges
+          and a lit strip running into a rounded navy corner is what made the old version look like a
+          window cut in the panel. */}
+      <span
+        className="absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(180deg, color-mix(in srgb, var(--navy-deep) 62%, transparent) 0%, transparent 18%, transparent 82%, color-mix(in srgb, var(--navy-deep) 62%, transparent) 100%)",
+        }}
+      />
+    </>
   );
 }
 

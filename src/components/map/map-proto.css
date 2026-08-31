@@ -1031,8 +1031,13 @@
    6px with a full-height gradient. The card is still achromatic slate — selection is UI, and this
    surface's colours belong to the machines — it is simply louder in the one channel that reads as
    chosen at a glance down a column. */
+/* **The fill is gone** (owner, 2026-08-31: *"selecting a card only highlight its borders but doesnt
+   make it grey"*). `#eaf1f8` under the content was the one channel of selection that touched what
+   the card SAYS — it greyed the photograph's surround and cooled every value on it, and the card's
+   own states are already carrying colour that must not move. The outline does the whole job: a
+   2.5px navy border, the accent bar down the leading edge, and the file control going navy. */
 .bidmap .bm-eq.on {
-  background: #eaf1f8;
+  background: var(--surface);
   border-color: var(--navy);
   border-width: 2.5px;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--navy) 12%, transparent);
@@ -1129,25 +1134,25 @@
   padding: 10px 12px 11px;
 }
 
-/* ── The corner: the way into the machine's file ─────────────────────────────────────────────────
-   The readiness left this row on 2026-08-31 for the card's FOOT (see `.bm-eq-ft`), so the corner
-   carries one control and the distance below still gets a line of its own. */
+/* ── The card's first line: how complete the file is, and the way into it ────────────────────────
+   The readiness on the LEADING edge, the control that opens the papers on the trailing one (owner,
+   2026-08-31). Both are facts about the machine's PAPERS, so they share a line and leave the
+   distance below a line of its own. */
 .bidmap .bm-eq .bm-eq-hd {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 8px;
   min-height: 26px;
 }
-/* ── The card's foot: how complete this machine's file is ────────────────────────────────────────
-   Bottom trailing corner, out of the distance's way. A bar and its fraction rather than a row of
-   dots (owner, 2026-08-31): dots made the reader count sockets to learn «3 of 4», and the bar shows
-   how far along at a glance while the figure keeps both numbers.
+/* ── How complete this machine's file is ─────────────────────────────────────────────────────────
+   A bar and its fraction rather than a row of dots (owner, 2026-08-31): dots made the reader count
+   sockets to learn «3 of 4», and the bar shows how far along at a glance while the figure keeps both
+   numbers. It rides the card's first line, on the leading edge.
 
    The colour is the READINESS band's, never the availability colour: the papers are a fact about the
    file, the distance is a promise from the supplier, and reading one off the other is the mistake
    this card is arranged to prevent. */
-.bidmap .bm-eq .bm-eq-ft { display: flex; align-items: center; justify-content: flex-end; margin-top: auto; }
 .bidmap .bm-eq .bm-eq-rd { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .bidmap .bm-eq .bm-eq-rdbar { display: block; width: 54px; height: 5px; border-radius: 999px; background: #dbe6ef; overflow: hidden; }
 .bidmap .bm-eq .bm-eq-rdfill { display: block; height: 100%; border-radius: 999px; background: #c8d8e8; transition: width 0.25s ease; }
@@ -1159,9 +1164,9 @@
 /* «Details ›» as a word is gone (owner, 2026-08-28). The icon is the file under a magnifier, which is
    what the control has always done, and it costs the card no line of its own.
 
-   Round, and the material set's own `find_in_page` (owner, 2026-08-31: *"make the icon nicer"*). The
-   glyph it replaces was a hand-drawn 512-viewBox path at a stroke width nothing else on the surface
-   used, in a hard-cornered box — it read as a stamp on the card rather than a control in it. */
+   The owner's own glyph, in a SQUARE box (2026-08-31: *"this icon for documents review and show it in
+   squared borders not rounded like now"*). The round pill it replaces read as an avatar; the square
+   reads as a document, which is what is behind it. */
 .bidmap .bm-eq .bm-eq-open {
   pointer-events: auto;
   flex-shrink: 0;
@@ -1173,13 +1178,12 @@
   padding: 0;
   background: #f2f6fa;
   border: 1px solid #e1e9f1;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   color: #5b7794;
   cursor: pointer;
   font-family: inherit;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
-.bidmap .bm-eq .bm-eq-open .material-icons-outlined { font-size: 17px; line-height: 1; }
 .bidmap .bm-eq .bm-eq-open:hover { background: var(--surface); border-color: #c8d8e8; color: #16304f; }
 /* On a selected card the ground IS `var(--background)`, so the tint above would vanish into it — the control
    goes navy instead, which is the slate the accent bar already uses. */
@@ -1263,16 +1267,19 @@
   font-weight: 800;
   line-height: 1.35;
   color: #16304f;
-  /* Centred under the distance it captions — a left-aligned name under a centred figure reads as
-     two unrelated rows. */
-  text-align: center;
+  /* ~~Centred under the distance.~~ The card's bottom LEADING corner (owner, 2026-08-31): the name
+     is what the renter reads last and quotes back, and a name on the reading edge is findable down a
+     column in a way a centred one is not. `margin-top: auto` is what pins it to the bottom of a text
+     column that may be taller than its content. */
+  margin-top: auto;
+  text-align: start;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 /* «· Outside the city» — the yard sits beyond the request city's own radius, which is what turns a
    delivery into a mobilisation worth asking about. It qualifies the distance, so it follows it. */
-.bidmap .bm-eq .bm-eq-far { font-size: 10.5px; font-weight: 700; color: var(--warn-deep); white-space: nowrap; text-align: center; }
+.bidmap .bm-eq .bm-eq-far { font-size: 10.5px; font-weight: 700; color: var(--warn-deep); white-space: nowrap; text-align: start; }
 
 /* ── The layer behind a red distance ─────────────────────────────────────────────────────────────
    `.bm-eqfp`'s geometry, with its own body: the head, the title and the X are all inherited, so this
@@ -2653,24 +2660,17 @@
    down here could only drift out of step with the first — and, sitting later in the file at equal
    specificity, it would silently win. Every declaration it carried now lives at the point of use. */
 
-/* ── V18 · where the offer ends, and the control that reaches past it (owner, 2026-08-19) ────────
+/* ── V18 · the control that reaches past the offer (owner, 2026-08-19) ───────────────────────────
    The list opens on the machines this bid actually names; the rest of the supplier's matching fleet
-   is one press away. When it arrives it arrives BELOW a stated boundary rather than mixed in — the
-   cards are identical in every other respect, so without the rule the renter cannot tell which of
-   them he is being sold. */
-.bidmap .bm-eqsplit {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin: 2px 0;
-  font-size: 10.5px;
-  font-weight: 800;
-  color: var(--muted);
-}
+   is one press away.
+
+   ~~When it arrives it arrives BELOW a stated boundary rather than mixed in.~~ The boundary — a
+   ruled «Also in his fleet — not in this offer» — was removed on 2026-08-31 with its `.bm-eqsplit`
+   rule and its string, on the same reasoning that took the «in this offer» badge off the card: the
+   renter chooses on whether a machine can be CONFIRMED for him, and membership was a second sort
+   order competing with that one. The order itself still puts the offer first. */
 /* Rules on BOTH sides, so the label reads as a divider rather than as a heading over the cards below
    — the machines under it are not a section of the offer, they are outside it. */
-.bidmap .bm-eqsplit::before,
-.bidmap .bm-eqsplit::after { content: ""; flex: 1; height: 1px; background: #d5e2ee; }
 
 /* Solid where `.bm-eqask` is dashed: this reveals machines that are already there, while the ask
    below it sends a message to a person. Two different kinds of act should not wear one shape. */

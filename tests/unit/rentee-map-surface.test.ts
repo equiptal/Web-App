@@ -378,13 +378,16 @@ describe("the card carries three things, and the ask is the largest of them", ()
     expect(css).not.toMatch(/\.bm-eq\.on[^{]*\.bm-eq-yard/);
   });
 
-  it("drops the «in this offer» badge from the card without dropping the fact from the surface", () => {
-    // The owner's words: *"remove this in this offer badge as renter doesnt care if a unit is in the
-    // offer but not avaialbe so he cares only if available or not."* The card says nothing about
-    // membership — but the MAP pin still tags it, and the list still draws the boundary where the
-    // offer ends, both off `isInOffer`. The fact did not become unknowable, it stopped competing.
+  it("says nothing about offer membership, on the card OR between the cards", () => {
+    // Two removals, one reason. *"Remove this in this offer badge as renter doesnt care if a unit is
+    // in the offer but not avaialbe so he cares only if available or not"* (2026-08-19) took the
+    // badge off the card; *"remove this Also in his fleet — not in this offer sentence"*
+    // (2026-08-31) took the divider out from between them. What he chooses on is whether a machine
+    // can be confirmed for him.
     expect(list).not.toContain("pinInOffer");
-    expect(list).toMatch(/isInOffer\(m\)/);
+    expect(list).not.toContain("eqBeyondOffer");
+    // The ORDER still puts the offer first — that is `listedMachines`, not this file — and the MAP
+    // still tags membership on the pin. Neither fact became unknowable.
     expect(strip(read("src/components/map/MapCanvas.tsx"))).toContain("pinInOffer");
   });
 
@@ -406,11 +409,16 @@ describe("the card carries three things, and the ask is the largest of them", ()
     expect(list).toMatch(/if \(asked\) \{ setYardExplain\(\{ machine, asked: true \}\); return; \}/);
   });
 
-  it("still takes the ask's ink from the model, never from the stylesheet (RM3-AC-33)", () => {
-    // The prompt this ink used to paint is gone (owner, 2026-08-31) and the distance button IS the
-    // ask now — so the inline style moved onto the button. The one place the colour is decided did
-    // not move: a stylesheet-only red here would put the model out of the loop on AC-33.
-    expect(list).toMatch(/style=\{askAvailability \? \{ color: askAvailability\.colour \} : undefined\}/);
+  it("paints the distance with AVAILABILITY's red, not with the ask's blue", () => {
+    // `askAvailability.colour` is `var(--info)` — the ASK's colour, and right while it painted a
+    // separate «Ask him to confirm» prompt. That prompt is gone (owner, 2026-08-31), and left on the
+    // button the same ink would have turned the FIGURE blue: *"keep the font of distance red"*. One
+    // fact, one ink — the number and how trustworthy it is are a single statement.
+    expect(list).not.toContain("askAvailability.colour");
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-yard.no,")).toMatch(/color:\s*#d9362a/);
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-yard.ok {")).toMatch(/color:\s*#0d6c38/);
+    // The figure itself never sets its own colour — it inherits the state's.
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-km {")).toMatch(/color:\s*currentColor/);
   });
 
   it("keeps every card one height, which is what makes the column scannable (RM3-AC-32)", () => {
@@ -860,19 +868,31 @@ describe("the distance and its state read whole at any panel width", () => {
     expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-tx {")).toMatch(/min-width:\s*0/);
   });
 
-  it("states the file's completeness as a bar in the card's trailing foot", () => {
-    // ~~One dot per requirement.~~ Dots made the reader count sockets to learn a fraction (owner,
-    // 2026-08-31). The bar shows how far along and the figure beside it keeps both numbers.
+  it("puts the file's completeness on the first line and the machine's name on the last", () => {
+    // ~~One dot per requirement~~ → a bar and its fraction (owner, 2026-08-31), and the corners the
+    // owner named: the readiness on the first line's leading edge beside the control that opens the
+    // papers it counts, the model and year in the bottom leading corner.
     expect(css).not.toMatch(/\.bm-eq-rdot/);
-    const foot = cssBlock(css, ".bidmap .bm-eq .bm-eq-ft {");
-    expect(foot).toMatch(/justify-content:\s*flex-end/);
-    // `margin-top: auto` is what pins it to the BOTTOM of a text column whose card may be taller.
-    expect(foot).toMatch(/margin-top:\s*auto/);
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-hd {")).toMatch(/justify-content:\s*space-between/);
     expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-rdbar {")).toMatch(/border-radius:\s*999px/);
+    const model = cssBlock(css, ".bidmap .bm-eq .bm-eq-model {");
+    expect(model).toMatch(/text-align:\s*start/);
+    // `margin-top: auto` is what pins the name to the BOTTOM of a text column that may be taller.
+    expect(model).toMatch(/margin-top:\s*auto/);
     // The colour is the readiness band's, never availability's — three bands, three fills.
     for (const band of ["green", "yellow", "red"]) {
       expect(css).toContain(`.bidmap .bm-eq .bm-eq-rd.${band} .bm-eq-rdfill`);
     }
+  });
+
+  it("marks a selected card by its OUTLINE, never by greying what it says", () => {
+    // *"Selecting a card only highlight its borders but doesnt make it grey"* (owner, 2026-08-31).
+    // The fill was the one channel of selection that touched the card's content — it cooled the
+    // photograph's surround and every value on it, and the states here carry colour that must not
+    // move. The border, the accent bar and the file control still say which card is chosen.
+    const on = cssBlock(css, ".bidmap .bm-eq.on {");
+    expect(on).toMatch(/background:\s*var\(--surface\)/);
+    expect(on).toMatch(/border-color:\s*var\(--navy\)/);
   });
 
   it("keeps the panel's width and the resize floor in step", () => {
