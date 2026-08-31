@@ -558,8 +558,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
              is exactly what it should do when nothing is filed nowhere. */
           onEditProject={(p) => void openEdit(p)}
           onNewWorkOrder={startWorkOrder}
-          onNewRequest={(p) => router.push(`/create?project=${encodeURIComponent(p.id)}`)}
-          onFileExisting={(p) => setFilingInto({ projectId: p.id, label: projectTitle(p) })}
+          onAddRequest={(p) => setFilingInto({ projectId: p.id, label: projectTitle(p) })}
           onOpenConflict={setConflict}
           rowMenu={(group, itemId, awardId) => {
             const item = group.items.find((i) => i.id === itemId);
@@ -746,6 +745,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
           siteLabel={filingInto.label}
           busy={saving}
           onFile={(requestId) => void fileExisting(requestId, filingInto.projectId)}
+          onNew={() => router.push(`/create?project=${encodeURIComponent(filingInto.projectId)}`)}
         />
       )}
 

@@ -51,8 +51,7 @@ export function ProjectsBoard({
   chart,
   onEditProject,
   onNewWorkOrder,
-  onNewRequest,
-  onFileExisting,
+  onAddRequest,
   onOpenConflict,
   rowMenu,
 }: {
@@ -66,9 +65,8 @@ export function ProjectsBoard({
   onEditProject: (p: ProjectSummary) => void;
   /** Both live on the header — without them a site is a page with nothing to do on it. */
   onNewWorkOrder: (p: ProjectSummary) => void;
-  onNewRequest: (p: ProjectSummary) => void;
-  /** Bring a request that already exists onto this site. */
-  onFileExisting: (p: ProjectSummary) => void;
+  /** Opens the picker: the site's unfiled requests, with *New request* at the top of them. */
+  onAddRequest: (p: ProjectSummary) => void;
   /** Pressed from the *own dates* chip on a group header. */
   onOpenConflict?: (group: ChartGroup) => void;
   rowMenu?: (group: ChartGroup, itemId: string, awardId: string | null) => React.ReactNode;
@@ -123,8 +121,7 @@ export function ProjectsBoard({
             today={now}
             onEdit={onEditProject}
             onNewWorkOrder={() => onNewWorkOrder(chart.project)}
-            onNewRequest={() => onNewRequest(chart.project)}
-            onFileExisting={() => onFileExisting(chart.project)}
+            onAddRequest={() => onAddRequest(chart.project)}
             onOpenConflict={onOpenConflict}
             rowMenu={rowMenu}
           />
@@ -144,8 +141,7 @@ function SitePanel({
   today: now,
   onEdit,
   onNewWorkOrder,
-  onNewRequest,
-  onFileExisting,
+  onAddRequest,
   onOpenConflict,
   rowMenu,
 }: {
@@ -154,8 +150,7 @@ function SitePanel({
   today: string;
   onEdit: (p: ProjectSummary) => void;
   onNewWorkOrder: () => void;
-  onNewRequest: () => void;
-  onFileExisting: () => void;
+  onAddRequest: () => void;
   onOpenConflict?: (group: ChartGroup) => void;
   rowMenu?: (group: ChartGroup, itemId: string, awardId: string | null) => React.ReactNode;
 }) {
@@ -241,33 +236,29 @@ function SitePanel({
           request goes to suppliers — different destinations, equal standing. The pen stays quiet
           beside them, because editing is not the thing a renter came here to do. */}
       <div className="flex flex-wrap items-center justify-end gap-2">
+        {/* The pen alone (owner, 2026-08-31). The word said what the icon already says, and it
+            competed for width with the two actions a renter actually came for. The label lives on
+            `aria-label`, so it is still announced and still a real target. */}
         <button
           type="button"
           onClick={() => onEdit(project)}
-          className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-body font-semibold text-navy-mid transition hover:border-brand hover:text-brand"
+          aria-label={t.common.edit}
+          title={t.common.edit}
+          className="flex h-[38px] w-[38px] items-center justify-center rounded-md border border-border text-navy-mid transition hover:border-brand hover:text-brand"
         >
-          <Icon name="edit" size={14} /> {t.common.edit}
+          <Icon name="edit" size={15} />
         </button>
         <Button onClick={onNewWorkOrder}>
           <Icon name="handyman" size={14} /> {t.projects.board.addWorkOrder}
         </Button>
-        <Button onClick={onNewRequest}>
-          <Icon name="add" size={14} /> {t.projects.board.newRequest}
+        {/* ONE request button (owner, 2026-08-31).
+            *New request* and *Add existing request* sat side by side asking the renter to know, in
+            advance, whether the thing they wanted already existed. It is the same intention either
+            way — put a request on this site — so it is one door, and the choice is made inside,
+            where the existing ones are visible and *New request* sits at the top of them. */}
+        <Button onClick={onAddRequest}>
+          <Icon name="add" size={14} /> {t.projects.board.addRequest}
         </Button>
-
-        {/* The third way to put something here: one that already exists (owner, 2026-08-31).
-            It used to live in a rail entry called *Unassigned*, which made "filed nowhere" look like
-            a place — a site sitting beside the real ones — and put the action on the request when
-            the renter's sentence is *"put that request on THIS site"*, said while looking at the
-            site. Quiet, like the pen: bringing an existing request here is a filing job, not the
-            thing a renter came to do. */}
-        <button
-          type="button"
-          onClick={onFileExisting}
-          className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-body font-semibold text-navy-mid transition hover:border-brand hover:text-brand"
-        >
-          <Icon name="playlist_add" size={14} /> {t.projects.board.fileExisting}
-        </button>
       </div>
 
       {/* ── Chart. `overflow-hidden` is for the bars; the row menu lives outside the track. ── */}

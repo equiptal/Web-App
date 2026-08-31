@@ -11,8 +11,11 @@
  * twenty-fourth site sitting beside the real ones — and it put the action on the request when the
  * renter's actual sentence is *"put that request on THIS site"*, said while looking at the site.
  *
- * So it moved into the site's own header, beside the two ways of making something new. Three ways to
- * put something on a site: make a work order, post a request, or bring one that already exists.
+ * So it moved onto the site itself. And then the two request buttons became ONE (owner, same day):
+ * *New request* beside *Add existing request* asked the renter to know, in advance, whether the thing
+ * they wanted already existed. It is the same intention either way — put a request on this site — so
+ * the header has one door and the choice is made in here, with the existing ones in front of them and
+ * *New request* at the top.
  *
  * ── It never offers a request that is already filed ──────────────────────────────────────────────
  *
@@ -33,6 +36,7 @@ export function FileRequestDialog({
   candidates,
   siteLabel,
   onFile,
+  onNew,
   busy,
 }: {
   open: boolean;
@@ -40,6 +44,8 @@ export function FileRequestDialog({
   candidates: (ChartGroup & { address?: string | null })[];
   siteLabel: string;
   onFile: (requestId: string) => void;
+  /** Post a new one instead — the intake, with this site already picked. */
+  onNew: () => void;
   busy?: boolean;
 }) {
   const t = useT();
@@ -59,6 +65,22 @@ export function FileRequestDialog({
   return (
     <Dialog open={open} onClose={onClose} title={f.title} subtitle={f.sub.replace("{site}", siteLabel)}>
       <div className="flex flex-col gap-3">
+        {/* At the TOP, and orange (owner, 2026-08-31).
+            The two used to be separate buttons on the header, which asked the renter to know in
+            advance whether what they wanted already existed. Here the answer is in front of them: if
+            it is in the list, press it; if it is not, press this. */}
+        <Button onClick={onNew} disabled={busy}>
+          <Icon name="add" size={14} /> {t.projects.board.newRequest}
+        </Button>
+
+        {candidates.length > 0 && (
+          <span className="flex items-center gap-2 text-meta font-semibold uppercase tracking-[.03em] text-muted">
+            <span className="h-px flex-1 bg-border" />
+            {f.orExisting}
+            <span className="h-px flex-1 bg-border" />
+          </span>
+        )}
+
         {candidates.length === 0 ? (
           /* Not an error, and not an empty box: every request this renter has is already on a site,
              which is the state the feature is trying to reach. */
