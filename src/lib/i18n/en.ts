@@ -1717,6 +1717,7 @@ export const en = {
       moveTitle: "Move this to another project",
       changesNothing: "Filing changes nothing on the request — not one value moves, even where the new site says something different. That is why it works after bids and costs you no edit.",
       movingDropsAwards: "Moving it to another site removes the awards recorded here, with their marks and documents. The request itself is untouched.",
+      movingCarries: "Its awards and papers move with it — nothing is lost.",
       movingDropsAwardsWorkOrder: "Moving this order leaves its awards behind — they belong to the site they were agreed on.",
       deleteWorkOrder: "Delete this work order",
       atThisAddress: "At {site}",

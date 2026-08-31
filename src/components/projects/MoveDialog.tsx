@@ -107,12 +107,18 @@ export function MoveDialog({
           </p>
         )}
 
-        {/* RED (owner, 2026-08-31). Moving drops the awards, and amber reads as *mind your step*
-            where this needs to read as *you will lose something*. Told before they choose. */}
+        {/* ~~RED: moving drops the awards.~~ It does not, any more (owner, 2026-08-31: *"can't they
+            only change the project id without other fields?"*). The awards and their papers are
+            carried across in the same transaction, because an award is about the ROW — the supplier
+            you chose for that welder is still supplying that welder — and the old site's blob was
+            only ever where a JSON column happened to keep it.
+
+            So the warning is gone rather than recoloured. A red note about a loss that no longer
+            happens is worse than no note: it teaches a renter to fear a safe action. */}
         {!unfiled && (
-          <p className="flex items-start gap-2 rounded-sm border border-danger/40 bg-danger/5 px-3 py-2 text-meta text-navy">
-            <Icon name="warning" size={14} className="mt-px flex-none text-danger" />
-            {destroys ? m.movingDropsAwardsWorkOrder : m.movingDropsAwards}
+          <p className="flex items-start gap-2 rounded-sm border border-border bg-surface2/50 px-3 py-2 text-meta text-navy-mid">
+            <Icon name="swap_horiz" size={14} className="mt-px flex-none text-muted" />
+            {m.movingCarries}
           </p>
         )}
 
