@@ -14,12 +14,32 @@
  * its **mobilized mark**, which is a fact about what happened rather than a second plan competing
  * with the request's. Two levels of date are answerable; three are not.
  *
- * ── The supplier control has two modes ───────────────────────────────────────────────────────────
+ * ── An award carries a supplier ROW ─────────────────────────────────────────────────────────────
  *
- * The picker when the renter's supplier list answers, a plain field with autocomplete over names
- * already used when it does not. Production only ever sees the picker — the registry ships first.
- * The fallback exists so this is not blocked while that lands, and it is why `supplierName` is
- * written either way: a row renders from a name it already holds.
+ * SUP-T18, decision 4. The supplier is picked from the renter's own list, and there is no longer a
+ * typed-name branch: a free-text supplier is a firm nothing can be looked up against, so its bids,
+ * its papers and its history all belong to a string. That branch existed only because the registry
+ * did not, and the note here said so.
+ *
+ * **`supplierName` is still stored beside the id** — as a snapshot of what the firm was called that
+ * day, never as a lookup key again. A row awarded to "Zahid Tractor" keeps saying so after the firm
+ * is renamed.
+ *
+ * **An empty list is not a dead end.** The picker carries its own *Add a supplier*: one row, the same
+ * write as *Add my own suppliers*, returning the new id straight into the dropdown. Without it a
+ * renter mid-award who finds his supplier missing has to leave the dialog and lose the award he was
+ * building.
+ *
+ * ── The vendor flag does not gate the award (owner, 2026-09-01) ─────────────────────────────────
+ *
+ * It used to: an unregistered row was shown and disabled. The rule was procurement's — you do not
+ * raise a PO to a firm you have not registered — but the list itself already IS the gate. Every row
+ * on it is a firm the renter put there, and a supplier who bid through a shared link and was added
+ * from the suggestions band arrives unregistered, so the old rule made him findable and unpickable
+ * for a reason the renter had not been told about at the moment he needed it.
+ *
+ * So the flag goes back to being what it says it is — a label the renter keeps and filters by — and
+ * anyone on his list can be awarded.
  *
  * ── The SAME money the work order asks for ──────────────────────────────────────────────────────
  *
@@ -39,12 +59,13 @@
  * backend refuses it anyway, and finding out after pressing is worse than being told before.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { Button, Icon } from "@/components/ui";
 import { Dialog } from "@/components/Dialog";
 import { Dropdown } from "@/components/Dropdown";
 import { listRenterSuppliers, type RenterSupplier, type AwardInput } from "@/lib/api/client";
+import { AddSuppliersDialog } from "@/components/suppliers/AddSuppliersDialog";
 import { awardedUnits, type Award, type ChartItem } from "@/lib/contract/award";
 /* The work order's arithmetic, not a second copy of it: (rate + mob + demob) × units, with
    "nothing recorded" kept distinct from "a total of zero". */
@@ -91,10 +112,14 @@ export function AwardDialog({
 
   const [lines, setLines] = useState<Line[]>([blank(defaultBasis)]);
   const [suppliers, setSuppliers] = useState<RenterSupplier[] | null>(null);
+  /* Which line asked for the add dialog — so whatever comes back is selected onto that line and not
+     onto the first one. */
+  const [addingOn, setAddingOn] = useState<number | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setLines([blank(defaultBasis)]);
+    setAddingOn(null);
     // An empty list is a normal answer here, not a failure — it puts the control in its typed mode.
     listRenterSuppliers().then(setSuppliers).catch(() => setSuppliers([]));
   }, [open, defaultBasis]);
@@ -103,12 +128,27 @@ export function AwardDialog({
   const asking = lines.reduce((n, l) => n + (Number(l.units) || 0), 0);
   const used = already + asking;
   const over = used > item.quantity;
-  const named = lines.every((l) => l.supplierName.trim().length > 0);
-
-  /** Names already used on this site, for the typed mode's autocomplete. */
-  const known = useMemo(() => [...new Set(item.awards.map((x) => x.supplierName))].filter(Boolean), [item.awards]);
+  // The id, not the name: an award without a row is refused here as well as by the backend.
+  const named = lines.every((l) => !!l.supplierId);
 
   const patch = (i: number, p: Partial<Line>) => setLines((prev) => prev.map((l, ix) => (ix === i ? { ...l, ...p } : l)));
+
+  /**
+   * Re-read the list after the add dialog wrote, and select what is new onto the line that asked.
+   *
+   * The dialog reports that it saved, not what it saved — it can write several rows at once and has
+   * no one id to hand back. So the new rows are whatever was not there before. Selecting the first
+   * of them is right for the case that matters (a renter adding the one firm he is awarding to) and
+   * harmless for the rest, since he can still change the pick.
+   */
+  const afterAdd = async (line: number) => {
+    const before = new Set((suppliers ?? []).map((x) => x.id));
+    const next = await listRenterSuppliers().catch(() => null);
+    if (!next) return;
+    setSuppliers(next);
+    const fresh = next.find((x) => !before.has(x.id));
+    if (fresh) patch(line, { supplierId: fresh.id, supplierName: fresh.name });
+  };
 
   return (
     <Dialog open={open} onClose={onClose} title={a.title} subtitle={`${item.label} ×${item.quantity}`}>
@@ -137,14 +177,12 @@ export function AwardDialog({
                 )}
               </div>
 
-              {suppliers && suppliers.length > 0 ? (
-                /* PROJ-AC-15, ruled by the owner 2026-08-31: **the gate follows the list.** While
-                   there is no registry to read, the branch below takes over and a renter types a
-                   name — refusing an unregistered supplier then would block every award on a feature
-                   that has not shipped. The moment a list exists, choosing from it means choosing a
-                   registered one, so an unregistered row is SHOWN AND DISABLED rather than hidden: a
-                   renter looking for a supplier they have used before needs to find it and see why
-                   it cannot be picked, not wonder where it went. */
+              {/* PROJ-AC-15, ruled by the owner 2026-08-31, and SUP-T18: **the gate follows the
+                  list.** Choosing from the list means choosing a registered supplier, so an
+                  unregistered row is SHOWN AND DISABLED rather than hidden — a renter looking for a
+                  supplier they have used before needs to find it and see why it cannot be picked,
+                  not wonder where it went. */}
+              {suppliers && suppliers.length > 0 && (
                 <Dropdown
                   label={a.supplier}
                   placeholder="—"
@@ -157,26 +195,30 @@ export function AwardDialog({
                   options={suppliers.map((sup) => ({
                     value: sup.id,
                     label: sup.name,
+                    // Shown, never a block: the renter knows which of his firms he has registered
+                    // without the picker deciding what he may do about it.
                     hint: sup.vendorRegistered ? undefined : a.notRegistered,
-                    disabled: !sup.vendorRegistered,
                   }))}
                 />
-              ) : (
-                <>
-                  <input
-                    list={`sup-${i}`}
-                    className="w-full rounded-sm border border-border bg-surface px-3 py-2 text-body text-navy outline-none focus:border-brand"
-                    value={l.supplierName}
-                    placeholder={a.supplierPlaceholder}
-                    onChange={(e) => patch(i, { supplierName: e.target.value, supplierId: null })}
-                  />
-                  <datalist id={`sup-${i}`}>
-                    {known.map((n) => (
-                      <option key={n} value={n} />
-                    ))}
-                  </datalist>
-                </>
               )}
+
+              {/* Empty list: say why there is nothing to choose, then offer the one thing that fixes
+                  it. A dropdown with no options and no explanation reads as a broken control. */}
+              {suppliers && suppliers.length === 0 && addingOn !== i && (
+                <p className="text-meta text-muted">{a.noSuppliers}</p>
+              )}
+
+              {/* The same dialog as *Add my own suppliers* (owner, 2026-09-01) — one door for one act,
+                  so a renter mid-award is not asked for a firm in a shape he has not seen before. It
+                  opens over this one and the award he was building is still here behind it. */}
+              <button
+                type="button"
+                onClick={() => setAddingOn(i)}
+                className="inline-flex w-fit items-center gap-1.5 text-meta font-semibold text-brand transition hover:text-brand-hover"
+              >
+                <Icon name="add" size={14} />
+                {a.addSupplier}
+              </button>
 
               <div className="grid gap-2 sm:grid-cols-5">
                 <label className="flex flex-col gap-1">
@@ -300,6 +342,17 @@ export function AwardDialog({
           </Button>
         </div>
       </div>
+
+      {/* Over the award, not instead of it — the line being built is still there when it closes. */}
+      <AddSuppliersDialog
+        open={addingOn !== null}
+        onClose={() => setAddingOn(null)}
+        onAdded={() => {
+          const line = addingOn;
+          setAddingOn(null);
+          if (line !== null) void afterAdd(line);
+        }}
+      />
     </Dialog>
   );
 }
