@@ -45,3 +45,6 @@ next-env.d.ts
 .impeccable/config.local.json
 .impeccable/live/
 .impeccable/*cache*
+
+# Editor/agent backups — never tracked. One was swept in by a `git add -A` on 2026-08-31.
+*.bak
