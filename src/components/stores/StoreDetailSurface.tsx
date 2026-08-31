@@ -2,38 +2,40 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import type { EquipmentCard, StoreDetail, TaxonomyNode } from "@/lib/contract/stores";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { BackArrowIcon, CheckIcon, CityTag, DocIcon, EyeIcon, PinIcon, SHOP_PAGE, VerifiedDot } from "@/components/stores/shop";
 
 /**
- * A supplier's profile: one card that says who they are, then their equipment.
+ * A supplier's profile — the approved prototype, matched value for value.
  *
- * Two stacked rows, not two columns. The description is the widest thing on the page (it is Arabic
- * prose in most stores, and prose set in a half-width column beside a document panel was the reason
- * this screen read as a form), and the documents sit under it as chips rather than behind a modal —
- * three labels and a status is not a dialog's worth of content.
+ * One column, 28px between its two rows: the store, then its equipment four to a row. The store card
+ * is a 14px-radius outline holding three bands separated by hairlines — identity (logo, name, tick,
+ * then city · count · views), About (RTL prose, the full width of the card), and the documents row.
+ * A machine is a photo at 16:11 with the tick top-right and the city bottom-left, then its category
+ * over its name, then a size chip and a year chip.
  *
- * AC-18 (info + verified badge only when verified + operators coming-soon), AC-19 (CR / VAT /
- * National Address, status only — never contents), AC-20 (equipment fields, price-on-request,
- * verification tick). Loading + error-with-retry (AC-23).
+ * ⚠️ **The prototype's equipment cards carry NO price**, and the profile shows no operators tile and
+ * no verification-status word. All three were on the previous build; they are gone because they are
+ * not in the reference (owner, 2026-09-01: *"match the prototype exactly in everything"*). The price
+ * still lives on the equipment sheet, which is where the reference puts it.
  *
- * Equipment cards LINK to `/equipment/[id]`; the sheet they used to open as a modal is a page now.
+ * The DATA stays the app's: the document chips are the store's own three (AC-19), not the
+ * prototype's ISTIMARA / COMMERCIAL REG. / TUV, and they still say status by colour alone —
+ * contents are never surfaced.
  */
 export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (name: string) => void }) {
   const t = useT();
-  const router = useRouter();
   const [detail, setDetail] = useState<StoreDetail | null>(null);
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [icons, setIcons] = useState<Record<string, string>>({});
 
-  // Taxonomy icons (shared bucket) → map node id → iconUrl, for equipment with no photo. The BFF
-  // answers a guest from the app's public taxonomy, so a signed-out visitor gets the same artwork
-  // rather than a grid of generic silhouettes.
+  // Taxonomy icons (shared bucket) → node id → iconUrl, for a machine with no photo. The BFF answers
+  // a guest from the app's public taxonomy, so a signed-out visitor gets the same artwork.
   useEffect(() => {
     fetch("/api/stores/taxonomy", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
@@ -68,178 +70,176 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
 
   if (error) {
     return (
-      <div className="rounded-lg border border-border bg-surface p-8 text-center text-body text-muted">
-        <Icon name="error_outline" size={22} className="mx-auto mb-2 text-muted" />
-        <p>{t.store.error}</p>
-        <button onClick={() => setReloadKey((k) => k + 1)} className={btn("secondary", "sm", { className: "mt-3" })}>
-          {t.store.retry}
-        </button>
+      <div className={SHOP_PAGE}>
+        <div className="rounded-shop-card border border-shop-line p-8 text-center text-shop-body text-shop-ink-3">
+          <Icon name="error_outline" size={22} className="mx-auto mb-2" />
+          <p>{t.store.error}</p>
+          <button onClick={() => setReloadKey((k) => k + 1)} className={btn("secondary", "sm", { className: "mt-3" })}>
+            {t.store.retry}
+          </button>
+        </div>
       </div>
     );
   }
-  if (!detail) return <div className="p-8 text-center text-body text-muted">{t.store.loading}</div>;
-
-  const docStatus = detail.isVerified ? t.store.statusVerified : t.store.statusPending;
+  if (!detail) {
+    return <div className={`${SHOP_PAGE} text-center text-shop-body text-shop-ink-3`}>{t.store.loading}</div>;
+  }
 
   return (
-    <div {...pin("store-detail")} className="flex flex-col gap-4">
-      <button onClick={() => router.back()} className="inline-flex w-fit items-center gap-1.5 text-meta font-semibold text-muted hover:text-navy">
-        <Icon name="arrow_back" size={16} className="rtl:scale-x-[-1]" /> {t.store.back}
-      </button>
+    <div {...pin("store-detail")} className={SHOP_PAGE}>
+      {/* Back to suppliers — 13.5px, the prototype's own grey, 20px of air under it. */}
+      <Link
+        href="/browse"
+        className="mb-5 inline-flex items-center gap-[7px] text-shop-body font-semibold text-shop-ink-3 transition hover:text-shop-amber"
+      >
+        <BackArrowIcon /> {t.store.backToSuppliers}
+      </Link>
 
-      {/* Who they are — one full-width card (AC-18/19). */}
-      <section className="rounded-sm border border-border bg-surface p-5">
-        <div className="flex items-start gap-3.5">
-          <div
-            className="grid h-[56px] w-[56px] flex-none place-items-center overflow-hidden rounded-sm border border-border bg-surface2 text-display font-extrabold text-navy"
-            style={detail.logoUrl ? { backgroundImage: `url("${detail.logoUrl}")`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
-          >
-            {!detail.logoUrl && (detail.name.trim()[0]?.toUpperCase() ?? "?")}
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="m-0 flex flex-wrap items-center gap-2 text-display font-extrabold tracking-[-.3px] text-navy">
-              {detail.name}
-              {detail.isVerified && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-ok-soft px-2 py-0.5 text-label font-extrabold text-ok">
-                  <Icon name="verified" size={13} /> {t.store.verified}
-                </span>
-              )}
-            </h2>
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-meta font-semibold text-muted">
-              {detail.city && (
-                <span className="inline-flex items-center gap-1.5">
-                  <Icon name="location_on" size={14} /> {detail.city}
-                </span>
-              )}
-              <span className="inline-flex items-center gap-1.5">
-                <Icon name="construction" size={14} /> {detail.activeEquipmentCount} {t.store.equipment}
+      <div className="flex flex-col gap-7">
+        {/* ── The store ─────────────────────────────────────────────────────────────────────── */}
+        <section className="rounded-shop-card border border-shop-line p-5">
+          <div className="flex items-center gap-3">
+            {detail.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={detail.logoUrl} alt={detail.name} className="h-14 w-14 flex-none rounded-shop-logo object-cover" />
+            ) : (
+              <span className="grid h-14 w-14 flex-none place-items-center rounded-shop-logo bg-shop-fill text-shop-name font-shop-bold text-shop-ink">
+                {detail.name.trim()[0]?.toUpperCase() ?? "?"}
               </span>
-              <span className="inline-flex items-center gap-1.5">
-                <Icon name="visibility" size={14} /> {detail.viewCount.toLocaleString()} {t.store.views}
-              </span>
+            )}
+            <div className="min-w-0">
+              <div className="flex items-center gap-[7px]">
+                <span className="truncate text-shop-name font-shop-bold text-shop-ink">{detail.name}</span>
+                {detail.isVerified && <VerifiedDot />}
+              </div>
+              <div className="mt-[7px] flex flex-wrap items-center gap-x-3.5 gap-y-1 text-shop-meta text-shop-ink-3">
+                {detail.city && (
+                  <span className="inline-flex items-center gap-[5px]">
+                    <span className="text-shop-ink-4">
+                      <PinIcon />
+                    </span>
+                    {detail.city}
+                  </span>
+                )}
+                <span>
+                  {detail.activeEquipmentCount} {t.browse.equipmentCount}
+                </span>
+                <span className="inline-flex items-center gap-[5px]">
+                  <span className="text-shop-ink-4">
+                    <EyeIcon />
+                  </span>
+                  {detail.viewCount.toLocaleString()} {t.store.views}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* About — the full width of the card. `dir="auto"` because most of these are Arabic. */}
-        {detail.description && (
-          <p className="mt-4 whitespace-pre-line text-body leading-relaxed text-navy-mid" dir="auto">
-            {detail.description}
-          </p>
-        )}
+          {/* About — the full width of the card, at the prototype's 1.85 line height. */}
+          {detail.description && (
+            <div className="mt-4 border-t border-shop-line-soft pt-4">
+              <h2 className="m-0 mb-2.5 text-shop-body font-shop-bold text-shop-ink">{t.store.about}</h2>
+              <p dir="auto" className="m-0 whitespace-pre-line text-end text-shop-body leading-[1.85] text-shop-ink-2">
+                {detail.description}
+              </p>
+            </div>
+          )}
 
-        {/* Documents (AC-19) — the three labels and their status. No contents, here or anywhere. */}
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
-          <span className="text-label font-semibold uppercase tracking-wide text-muted">{t.store.documents}</span>
-          {[t.store.docCR, t.store.docVAT, t.store.docNationalAddress].map((d) => (
-            <span
-              key={d}
-              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-label font-semibold ${
-                detail.isVerified ? "bg-ok-soft text-ok" : "bg-surface2 text-muted"
-              }`}
-            >
-              <Icon name={detail.isVerified ? "check_circle" : "schedule"} size={12} /> {d}
+          {/* Documents — the app's three (AC-19), status by colour, contents never. */}
+          <div className="mt-4 flex flex-wrap items-center gap-[9px] border-t border-shop-line-soft pt-4 text-shop-item font-semibold text-shop-ink">
+            <span className="text-shop-ink-3">
+              <DocIcon />
             </span>
-          ))}
-          <span className="text-label font-semibold text-muted">· {docStatus}</span>
-          {/* AC-18: operators are a stated absence, not a hidden one. */}
-          <span className="ms-auto inline-flex items-center gap-1 rounded-full bg-surface2 px-2.5 py-1 text-label font-semibold text-muted">
-            <Icon name="engineering" size={12} /> {t.store.operators} · {t.store.comingSoon}
-          </span>
-        </div>
-      </section>
+            {t.store.documents}
+            {[t.store.docCR, t.store.docVAT, t.store.docNationalAddress].map((doc) => (
+              <span
+                key={doc}
+                className={`inline-flex items-center gap-1 rounded-shop-pill px-[9px] py-[3px] text-shop-chip font-shop-bold ${
+                  detail.isVerified ? "bg-shop-ok-soft text-shop-ok" : "bg-shop-fill text-shop-ink-3"
+                }`}
+              >
+                {detail.isVerified && <CheckIcon size={10} strokeWidth={2.6} />}
+                {doc.toUpperCase()}
+              </span>
+            ))}
+          </div>
+        </section>
 
-      {/* What they have (AC-20). */}
-      <div className="flex items-center gap-2.5">
-        <h3 className="m-0 text-title font-extrabold tracking-[-.3px] text-navy">{t.store.equipment}</h3>
-        <span className="rounded-full bg-brand-soft px-2.5 py-0.5 text-meta font-extrabold text-brand-deep">{detail.activeEquipmentCount}</span>
+        {/* ── Its equipment ─────────────────────────────────────────────────────────────────── */}
+        {detail.equipment.length === 0 ? (
+          <div className="rounded-shop-card border border-shop-line p-8 text-center text-shop-body text-shop-ink-3">{t.store.noEquipment}</div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+            {detail.equipment.map((e) => (
+              <EquipmentTile
+                key={e.id}
+                eq={e}
+                storeId={id}
+                storeCity={detail.city}
+                storeVerified={detail.isVerified}
+                iconUrl={(e.subcategoryId && icons[e.subcategoryId]) || (e.measurementId && icons[e.measurementId]) || null}
+              />
+            ))}
+          </div>
+        )}
       </div>
-      {detail.equipment.length === 0 ? (
-        <div className="rounded-lg border border-border bg-surface p-8 text-center text-body text-muted">{t.store.noEquipment}</div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {detail.equipment.map((e) => (
-            <EquipmentTile
-              key={e.id}
-              eq={e}
-              storeId={id}
-              storeCity={detail.city}
-              iconUrl={(e.subcategoryId && icons[e.subcategoryId]) || (e.measurementId && icons[e.measurementId]) || null}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
 
-/**
- * One machine on the profile — the same face a category card wears on Browse: verified tick and city
- * tag on the image, the category above the name, size and year as chips.
- */
+/** One machine: a 16:11 photo, the category over the name, then size and year. */
 function EquipmentTile({
   eq,
   storeId,
   storeCity,
+  storeVerified,
   iconUrl,
 }: {
   eq: EquipmentCard;
   storeId: string;
   storeCity: string | null;
+  storeVerified: boolean;
   iconUrl: string | null;
 }) {
-  const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
   const category = ar ? eq.categoryAr : eq.category;
   const subcategory = ar ? eq.subcategoryAr : eq.subcategory;
   const measurement = ar ? eq.measurementAr : eq.measurement;
-  const title = [eq.make, eq.model].filter(Boolean).join(" ") || subcategory || category || measurement || "—";
+  // The prototype's `label` is the machine — "Crawler Excavator" under "EXCAVATOR". The subtype is
+  // that name; make/model stands in when a listing has no subtype to show.
+  const label = subcategory || [eq.make, eq.model].filter(Boolean).join(" ") || category || "—";
   const city = eq.city ?? storeCity;
-  const unit =
-    eq.priceUnit === "PER_WEEK" ? t.store.perWeek : eq.priceUnit === "PER_MONTH" ? t.store.perMonth : eq.priceUnit === "PER_JOB" ? t.store.perJob : t.store.perDay;
 
   return (
     <Link
       {...pin("store-equipment-card")}
       href={`/equipment/${encodeURIComponent(eq.id)}?storeId=${encodeURIComponent(storeId)}`}
-      className="block overflow-hidden rounded-sm border border-border bg-surface transition hover:border-brand/50"
+      className="block overflow-hidden rounded-shop-card border border-shop-line text-shop-ink transition hover:border-shop-amber"
     >
-      <div
-        className="relative grid h-[132px] place-items-center bg-gradient-to-br from-surface2 to-surface3"
-        style={eq.photoUrl ? { backgroundImage: `url("${eq.photoUrl}")`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
-      >
-        {!eq.photoUrl &&
-          (iconUrl ? (
-            <div className="h-full w-full bg-center bg-no-repeat" style={{ backgroundImage: `url("${iconUrl}")`, backgroundSize: "44px" }} />
-          ) : (
-            <Icon name="construction" size={40} className="text-muted" />
-          ))}
-        {eq.isVerified && (
-          <span className="absolute end-2.5 top-2.5 grid h-[22px] w-[22px] place-items-center rounded-full bg-ok text-white" title={t.store.verified}>
-            <Icon name="check" size={13} />
+      <div className="relative aspect-[16/11] w-full bg-shop-fill">
+        {eq.photoUrl ? (
+          <div className="h-full w-full bg-cover bg-center" style={{ backgroundImage: `url("${eq.photoUrl}")` }} />
+        ) : iconUrl ? (
+          <div className="h-full w-full bg-center bg-no-repeat" style={{ backgroundImage: `url("${iconUrl}")`, backgroundSize: "44px" }} />
+        ) : null}
+        {(eq.isVerified || storeVerified) && (
+          <span className="absolute end-2 top-2">
+            <VerifiedDot size={22} />
           </span>
         )}
-        {city && (
-          <span className="absolute bottom-2.5 start-2.5 inline-flex items-center gap-1 rounded-full bg-navy/85 px-2 py-0.5 text-label font-semibold text-white">
-            <Icon name="location_on" size={11} /> {city}
-          </span>
-        )}
+        {city && <CityTag city={city} />}
       </div>
-      <div className="px-3.5 pb-4 pt-3">
-        {category && <div className="text-label font-semibold uppercase tracking-wide text-muted">{category}</div>}
-        <div className="mt-0.5 truncate text-body font-extrabold text-navy">{title}</div>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {measurement && <span className="rounded-full bg-brand-soft px-2 py-0.5 text-label font-extrabold text-brand-deep">{measurement}</span>}
-          {eq.year != null && <span className="rounded-full bg-surface2 px-2 py-0.5 text-label font-semibold text-navy-mid">{eq.year}</span>}
+      <div className="px-3 pb-3 pt-2.5">
+        {category && <div className="text-shop-label font-shop-bold uppercase tracking-[0.3px] text-shop-ink-4">{category}</div>}
+        <div className="mt-1.5 text-shop-item font-semibold text-shop-ink">{label}</div>
+        <div className="mt-[5px] flex gap-1.5">
+          {measurement && (
+            <span className="rounded-shop-chip bg-shop-amber-soft px-[9px] py-[3px] text-shop-meta font-semibold text-shop-amber-deep">{measurement}</span>
+          )}
+          {eq.year != null && (
+            <span className="rounded-shop-chip bg-shop-fill px-[9px] py-[3px] text-shop-meta font-semibold text-shop-ink">{eq.year}</span>
+          )}
         </div>
-        {eq.price != null ? (
-          <div className="mt-2.5 text-body font-extrabold tabular-nums text-brand">
-            {eq.price.toLocaleString()} <span className="text-label font-semibold">SAR {unit}</span>
-          </div>
-        ) : (
-          <div className="mt-2.5 text-meta font-semibold italic text-muted">{t.store.priceOnRequest}</div>
-        )}
       </div>
     </Link>
   );

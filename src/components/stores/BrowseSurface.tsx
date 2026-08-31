@@ -8,6 +8,7 @@ import { StoreCard } from "@/components/stores/StoreCard";
 import type { StoreCard as StoreCardData, TaxonomyNode } from "@/lib/contract/stores";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { PinIcon } from "@/components/stores/shop";
 
 interface CityOpt {
   value: string;
@@ -122,9 +123,9 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
       {/* Section header + View-all / Show-less (count only — never touches the filters) */}
       {title && (
         <div className="flex items-center justify-between">
-          <h3 className="text-title font-extrabold tracking-[-.3px] text-navy">{title}</h3>
+          <h3 className="m-0 text-shop-name font-shop-bold text-shop-ink">{title}</h3>
           {canToggle && (
-            <button onClick={() => setExpanded((v) => !v)} className="inline-flex items-center gap-0.5 text-meta font-semibold text-info hover:underline">
+            <button onClick={() => setExpanded((v) => !v)} className="inline-flex items-center gap-0.5 text-shop-meta font-semibold text-shop-ink-3 hover:text-shop-amber">
               {expanded ? t.home.showLess : t.home.viewAll}
               <Icon name={expanded ? "expand_less" : "chevron_right"} size={16} className={expanded ? "" : "rtl:scale-x-[-1]"} />
             </button>
@@ -132,15 +133,23 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
         </div>
       )}
 
-      {/* Filter bar — always shown, in a card. Search row, then filters + verified toggle on one row. */}
-      <div className="flex flex-col gap-2.5 rounded-sm border border-border bg-surface p-4">
-        <div className="relative">
-          <Icon name="search" size={18} className="absolute start-3 top-1/2 -translate-y-1/2 text-muted" />
+      {/* Search and the city, on one row — the prototype's own two controls, at its own metrics.
+          The subtype, size and verified-only controls beside them are NOT in the prototype, which
+          draws a search field and a city menu. They stay because the directory's own acceptance
+          asks for them (AC-10–17) and dropping a working filter to match a picture is a loss the
+          picture was not making a case for; they wear the storefront's skin so the row still reads
+          as one. The menus themselves are the house `Dropdown`, unchanged — one control, one
+          behaviour, everywhere in the app. */}
+      <div className="flex flex-wrap items-center gap-2.5">
+        <div className="relative min-w-[240px] flex-1">
+          <span className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-shop-ink-4">
+            <SearchIcon />
+          </span>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t.browse.search}
-            className="h-[40px] w-full rounded-sm border border-border bg-surface2 ps-9 pe-3 text-body outline-0 focus:border-brand"
+            className="h-[42px] w-full rounded-shop-pill border border-shop-line bg-white ps-10 pe-3.5 text-shop-body text-shop-ink outline-0 placeholder:text-shop-ink-4 focus:border-shop-amber"
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -150,6 +159,7 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
           <Dropdown
             label={t.browse.anyCity}
             placeholder={t.browse.anyCity}
+            prefix={<PinIcon size={14} />}
             value={city || null}
             onChange={setCity}
             options={cities.map((c) => ({ value: c.value, label: c.label }))}
@@ -182,10 +192,10 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
           <button
             type="button"
             onClick={() => setVerifiedOnly((v) => !v)}
-            className="ms-1 inline-flex select-none items-center gap-2 text-body font-semibold text-navy-mid"
+            className="ms-1 inline-flex select-none items-center gap-2 text-shop-meta font-semibold text-shop-ink-3"
             aria-pressed={verifiedOnly}
           >
-            <span className={`relative h-[23px] w-[40px] flex-none rounded-full border transition ${verifiedOnly ? "border-ok bg-ok" : "border-border bg-surface3"}`}>
+            <span className={`relative h-[23px] w-[40px] flex-none rounded-full border transition ${verifiedOnly ? "border-shop-ok bg-shop-ok" : "border-shop-line bg-shop-fill"}`}>
               <span className={`absolute top-[2px] h-[17px] w-[17px] rounded-full bg-white transition-all ${verifiedOnly ? "start-[19px]" : "start-[2px]"}`} />
             </span>
             {t.browse.verifiedOnly}
@@ -196,7 +206,7 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
       {/* The categories, as pills — the same row signed in or out. Drawn only once the tree is in
           hand, so a slow reference call shows nothing rather than a lone «All» that grows. */}
       {taxonomy.length > 0 && (
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5">
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
           <Pill label={t.browse.allCategories} active={!categoryId} onClick={() => onCategory("")} />
           {taxonomy.map((c) => (
             <Pill key={c.id} label={tabel(c, ar)} active={categoryId === c.id} onClick={() => onCategory(c.id)} />
@@ -206,22 +216,24 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
 
       {/* Results (AC-16/17/23) */}
       {error ? (
-        <div className="rounded-lg border border-border bg-surface p-8 text-center text-body text-muted">
-          <Icon name="error_outline" size={22} className="mx-auto mb-2 text-muted" />
+        <div className="rounded-shop-card border border-shop-line p-8 text-center text-shop-body text-shop-ink-3">
+          <Icon name="error_outline" size={22} className="mx-auto mb-2" />
           <p>{t.browse.error}</p>
           <button onClick={() => setReloadKey((k) => k + 1)} className={btn("secondary", "sm", { className: "mt-3" })}>
             {t.browse.retry}
           </button>
         </div>
       ) : stores === null ? (
-        <div className="p-8 text-center text-body text-muted">{t.browse.loading}</div>
+        <div className="p-8 text-center text-shop-body text-shop-ink-3">{t.browse.loading}</div>
       ) : shown.length === 0 ? (
-        <div className="rounded-lg border border-border bg-surface p-8 text-center text-body text-muted">
-          <Icon name="storefront" size={22} className="mx-auto mb-2 text-muted" />
+        <div className="rounded-shop-card border border-shop-line p-8 text-center text-shop-body text-shop-ink-3">
+          <Icon name="storefront" size={22} className="mx-auto mb-2" />
           {t.browse.empty}
         </div>
       ) : (
-        <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(196px,1fr))]">
+        /* Six to a row at the prototype's 1360 (six 196px cards + five 16px gaps + the gutter),
+           stepping down rather than shrinking a card below the width its chips need. */
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
           {shown.map((s) => (
             <StoreCard key={s.id} store={s} />
           ))}
@@ -237,12 +249,22 @@ function Pill({ label, active, onClick }: { label: string; active: boolean; onCl
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`h-[32px] flex-none rounded-full border px-3.5 text-meta font-semibold transition ${
-        active ? "border-brand bg-brand-soft text-brand-deep" : "border-border bg-surface text-navy-mid hover:border-brand/50"
+      className={`h-[34px] flex-none rounded-shop-pill border px-3.5 text-shop-meta font-semibold transition ${
+        active ? "border-shop-amber-deep bg-shop-amber-soft text-shop-amber-deep" : "border-shop-line bg-white text-shop-ink-3 hover:border-shop-amber"
       }`}
     >
       {label}
     </button>
+  );
+}
+
+/** The prototype's magnifier — a font glyph could not carry its 1.8px stroke. */
+function SearchIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M16 16L21 21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
   );
 }
 

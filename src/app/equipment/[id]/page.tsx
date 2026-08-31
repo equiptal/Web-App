@@ -19,10 +19,14 @@ export default function EquipmentPage({ params }: { params: Promise<{ id: string
   const t = useT();
   const [title, setTitle] = useState("");
   return (
-    <AppShell title={title || t.store.equipment}>
-      <Suspense fallback={<div className="p-8 text-center text-body text-muted">{t.store.loading}</div>}>
-        <EquipmentBody id={id} onTitle={setTitle} />
-      </Suspense>
+    <AppShell title={title || t.store.equipment} fullBleed>
+      {/* The storefront's own column, as on the store profile — the shell's gutter would sit on top
+          of the prototype's 24px otherwise. */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <Suspense fallback={<div className="p-8 text-center text-shop-body text-shop-ink-3">{t.store.loading}</div>}>
+          <EquipmentBody id={id} onTitle={setTitle} />
+        </Suspense>
+      </div>
     </AppShell>
   );
 }

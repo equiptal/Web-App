@@ -16,8 +16,12 @@ import { BrowsePage } from "@/components/stores/BrowsePage";
  */
 export default function Browse() {
   return (
-    <AppShell>
-      <BrowsePage />
+    <AppShell fullBleed>
+      {/* `fullBleed` + an inner scroller, so the storefront's own 1360 column is the only gutter on
+          the page rather than the shell's on top of it. See the note in `/stores/[id]`. */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <BrowsePage />
+      </div>
     </AppShell>
   );
 }

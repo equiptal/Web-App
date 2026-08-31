@@ -7,6 +7,7 @@ import { BrowseSurface } from "@/components/stores/BrowseSurface";
 import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { pin } from "@/lib/uiPins";
+import { SHOP_PAGE } from "@/components/stores/shop";
 
 /**
  * Browse — the CTA banner, then every supplier.
@@ -49,8 +50,13 @@ export function BrowsePage() {
     if (arrived) router.replace("/");
   }, [status, router]);
 
+  /* The prototype's column — 1360, a 24px gutter, 80px of foot — matching the store profile and the
+     equipment sheet it links to (owner, 2026-09-01). The CTA banner above the directory is NOT in
+     the prototype, which models the storefront screens and imports only the header; it stays because
+     it is this page's own reason for existing (owner, 2026-08-30: the banner says a renter can ask
+     the market, the directory says who the market is). */
   return (
-    <div {...pin("browse-page")} className="flex flex-col gap-7">
+    <div {...pin("browse-page")} className={`${SHOP_PAGE} flex flex-col gap-7`}>
       <CtaBanner />
       <BrowseSurface title={t.home.suppliersTitle} />
     </div>

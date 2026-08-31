@@ -38,7 +38,7 @@
  *    highlight bar.
  */
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Icon } from "@/components/Icon";
 import { pin } from "@/lib/uiPins";
 
@@ -86,8 +86,14 @@ export function Dropdown({
    */
   label?: string;
   tone?: DropdownTone;
-  /** A small constant prefix inside the trigger, e.g. «BASIS monthly» in a value strip. */
-  prefix?: string;
+  /**
+   * A small constant prefix inside the trigger, e.g. «BASIS monthly» in a value strip.
+   *
+   * A node rather than a string since 2026-09-01: the storefront's city filter puts a pin there, and
+   * an icon is the same slot doing the same job — a constant mark that says what the menu is about
+   * before it says what is chosen.
+   */
+  prefix?: ReactNode;
   /**
    * The trigger's own skin, replacing the tone's.
    *

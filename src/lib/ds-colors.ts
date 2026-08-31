@@ -63,6 +63,23 @@ export const COLORS = {
   info: "#1a7ec8",
   infoSoft: "#e6f2fb",
   infoDeep: "#0e4f7e",
+
+  // Storefront — the supplier-facing three, matched to the approved prototype. A second neutral
+  // family (warm grey on white) rather than a re-tint of the ramp above; see the note in
+  // `globals.css`. Carried here for the same reason as everything else in this file: the three
+  // surfaces with no stylesheet cannot read a `var()`.
+  shopInk: "#1f2d3a",
+  shopInk2: "#3a4552",
+  shopInk3: "#5b6672",
+  shopInk4: "#8a929b",
+  shopLine: "#e3e6e9",
+  shopLineSoft: "#eceef0",
+  shopFill: "#f2f4f5",
+  shopOk: "#2f9e5c",
+  shopOkSoft: "#e9f7ee",
+  shopAmber: "#eda153",
+  shopAmberDeep: "#b5761a",
+  shopAmberSoft: "#fdf1e0",
 } as const;
 
 /**
@@ -116,6 +133,18 @@ export const CSS_VAR_NAME: Record<keyof typeof COLORS, string> = {
   info: "--info",
   infoSoft: "--info-soft",
   infoDeep: "--info-deep",
+  shopInk: "--shop-ink",
+  shopInk2: "--shop-ink-2",
+  shopInk3: "--shop-ink-3",
+  shopInk4: "--shop-ink-4",
+  shopLine: "--shop-line",
+  shopLineSoft: "--shop-line-soft",
+  shopFill: "--shop-fill",
+  shopOk: "--shop-ok",
+  shopOkSoft: "--shop-ok-soft",
+  shopAmber: "--shop-amber",
+  shopAmberDeep: "--shop-amber-deep",
+  shopAmberSoft: "--shop-amber-soft",
 };
 
 /**

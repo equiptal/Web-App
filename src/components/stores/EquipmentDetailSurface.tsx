@@ -11,6 +11,7 @@ import type { EquipmentDetail, StoreDetail } from "@/lib/contract/stores";
 import { cityCentroid } from "@/lib/contract/saudi-cities";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { BackArrowIcon, CheckIcon, CityTag, DocIcon, EyeIcon, PinIcon, SHOP_PAGE, VerifiedDot } from "@/components/stores/shop";
 
 const EquipmentLocationMap = dynamic(() => import("@/components/stores/EquipmentLocationMap"), { ssr: false });
 
@@ -157,48 +158,58 @@ export function EquipmentDetailSurface({
 
   if (error) {
     return (
-      <div className="rounded-lg border border-border bg-surface p-8 text-center text-body text-muted">
-        <Icon name="error_outline" size={22} className="mx-auto mb-2 text-muted" />
-        <p>{t.store.error}</p>
-        <button onClick={() => setReloadKey((k) => k + 1)} className={btn("secondary", "sm", { className: "mt-3" })}>
-          {t.store.retry}
-        </button>
+      <div className={SHOP_PAGE}>
+        <div className="rounded-shop-card border border-shop-line p-8 text-center text-shop-body text-shop-ink-3">
+          <Icon name="error_outline" size={22} className="mx-auto mb-2" />
+          <p>{t.store.error}</p>
+          <button onClick={() => setReloadKey((k) => k + 1)} className={btn("secondary", "sm", { className: "mt-3" })}>
+            {t.store.retry}
+          </button>
+        </div>
       </div>
     );
   }
-  if (!eq) return <div className="p-8 text-center text-body text-muted">{t.store.loading}</div>;
+  if (!eq) return <div className={`${SHOP_PAGE} text-center text-shop-body text-shop-ink-3`}>{t.store.loading}</div>;
 
   return (
-    <div {...pin("equipment-sheet")} className="flex flex-col gap-4">
+    <div {...pin("equipment-sheet")} className={`${SHOP_PAGE} flex flex-col gap-4`}>
       {/* Back — to the store when we came from one, else the browser's own history. */}
       <div className="flex items-center gap-2">
         {ownerStoreId ? (
-          <Link href={`/stores/${ownerStoreId}`} className="inline-flex items-center gap-1.5 text-meta font-semibold text-muted hover:text-navy">
-            <Icon name="arrow_back" size={16} className="rtl:scale-x-[-1]" /> {t.store.back}
+          <Link
+            href={`/stores/${ownerStoreId}`}
+            className="mb-1 inline-flex items-center gap-[7px] text-shop-body font-semibold text-shop-ink-3 transition hover:text-shop-amber"
+          >
+            <BackArrowIcon /> {t.store.back}
           </Link>
         ) : (
-          <button onClick={() => router.back()} className="inline-flex items-center gap-1.5 text-meta font-semibold text-muted hover:text-navy">
-            <Icon name="arrow_back" size={16} className="rtl:scale-x-[-1]" /> {t.store.back}
+          <button
+            onClick={() => router.back()}
+            className="mb-1 inline-flex items-center gap-[7px] text-shop-body font-semibold text-shop-ink-3 transition hover:text-shop-amber"
+          >
+            <BackArrowIcon /> {t.store.back}
           </button>
         )}
       </div>
 
       {/* Gallery (70%) + where it is (30%). Stacked below lg — a 30% map on a phone is a smear. */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[7fr_3fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[7fr_3fr]">
         <Gallery photos={photos} layout={galleryLayout} idx={idx} setIdx={setIdx} verified={eq.isVerified} city={city} t={t} />
-        <div className="relative min-h-[220px] overflow-hidden rounded-sm border border-border bg-surface2">
+        <div className="relative min-h-[240px] overflow-hidden rounded-shop-card border border-shop-line bg-shop-fill">
           {point ? (
             <EquipmentLocationMap lat={point.lat} lng={point.lng} label={city} precise={precise} />
           ) : (
-            <div className="grid h-full place-items-center p-4 text-center text-meta text-muted">
+            <div className="grid h-full place-items-center p-4 text-center text-shop-meta text-shop-ink-3">
               <span>
-                <Icon name="location_off" size={20} className="mb-1 block text-muted" />
+                <span className="mx-auto mb-1 block w-fit text-shop-ink-4">
+                  <PinIcon size={20} />
+                </span>
                 {t.store.noLocation}
               </span>
             </div>
           )}
           {point && !precise && (
-            <span className="pointer-events-none absolute bottom-2 start-2 z-[500] rounded-full bg-navy/85 px-2.5 py-1 text-label font-semibold text-white">
+            <span className="pointer-events-none absolute bottom-2 start-2 z-[500] rounded-shop-pill bg-shop-tag px-[9px] py-1 text-shop-tag font-shop-bold text-white">
               {t.store.approxLocation}
             </span>
           )}
@@ -209,33 +220,37 @@ export function EquipmentDetailSurface({
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
         <SupplierCard store={store} storeId={ownerStoreId} fallbackName={eq.storeName} t={t} />
 
-        <section className="rounded-sm border border-border bg-surface p-5">
+        <section className="rounded-shop-card border border-shop-line p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-              <h2 className="me-1 text-title font-extrabold tracking-[-.3px] text-navy">{title}</h2>
-              {eq.isVerified && <Icon name="verified" size={16} className="text-ok" />}
+            <div className="flex min-w-0 flex-wrap items-center gap-[7px]">
+              <h2 className="m-0 me-1 text-shop-name font-shop-bold text-shop-ink">{title}</h2>
+              {eq.isVerified && <VerifiedDot />}
               {subcategory && subcategory !== title && (
-                <span className="rounded-full bg-surface2 px-2.5 py-1 text-label font-semibold text-navy-mid">{subcategory}</span>
+                <span className="rounded-shop-chip bg-shop-fill px-[9px] py-[3px] text-shop-meta font-semibold text-shop-ink">{subcategory}</span>
               )}
-              {measurement && <span className="rounded-full bg-brand-soft px-2.5 py-1 text-label font-extrabold text-brand-deep">{measurement}</span>}
+              {measurement && (
+                <span className="rounded-shop-chip bg-shop-amber-soft px-[9px] py-[3px] text-shop-meta font-semibold text-shop-amber-deep">
+                  {measurement}
+                </span>
+              )}
             </div>
             <div className="text-end">
               {eq.price != null ? (
-                <div className="text-subhead font-extrabold tabular-nums text-brand">
-                  {eq.price.toLocaleString()} <span className="text-label font-semibold">SAR {unit}</span>
+                <div className="text-shop-name font-shop-bold tabular-nums text-shop-amber-deep">
+                  {eq.price.toLocaleString()} <span className="text-shop-tag font-semibold">SAR {unit}</span>
                 </div>
               ) : (
-                <div className="text-meta font-semibold italic text-muted">{t.store.priceOnRequest}</div>
+                <div className="text-shop-meta font-semibold text-shop-ink-3">{t.store.priceOnRequest}</div>
               )}
             </div>
           </div>
 
           <button onClick={requestThis} className={btn("primary", "md", { className: "mt-3.5 flex" })}>
-            <Icon name="send" size={16} /> {t.store.requestThis}
+            {t.store.requestThis}
           </button>
 
           {/* Specs — boxed grid or compact rows, same facts either way. */}
-          <div className={specStyle === "boxed" ? "mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3" : "mt-4 flex flex-col divide-y divide-border"}>
+          <div className={specStyle === "boxed" ? "mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3" : "mt-4 flex flex-col divide-y divide-shop-line-soft"}>
             <Spec style={specStyle} label={t.store.specManufacturer} value={eq.manufacturer} />
             <Spec style={specStyle} label={t.store.specModel} value={eq.modelName} />
             <Spec style={specStyle} label={t.store.specYear} value={eq.year != null ? String(eq.year) : null} />
@@ -246,17 +261,26 @@ export function EquipmentDetailSurface({
 
           {/* Photos + documents — counts and TYPES, never contents (AC-19). */}
           {(eq.docTypes.length > 0 || photos.length > 0) && (
-            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-sm border border-border bg-surface2/40 p-3.5">
-              <span className="inline-flex items-center gap-2 text-meta font-semibold text-navy">
-                <Icon name="photo_camera" size={16} className="text-muted" /> {t.store.photos}
-                <span className="rounded-full bg-surface3 px-2 py-0.5 text-label font-semibold text-muted">{photos.length}</span>
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-shop-line-soft pt-4 text-shop-item font-semibold text-shop-ink">
+              <span className="inline-flex items-center gap-[9px]">
+                <span className="text-shop-ink-3">
+                  <CameraIcon />
+                </span>
+                {t.store.photos}
+                <span className="rounded-shop-chip bg-shop-fill px-[9px] py-[3px] text-shop-chip font-shop-bold text-shop-ink-3">{photos.length}</span>
               </span>
               {eq.docTypes.length > 0 && (
-                <span className="inline-flex flex-wrap items-center gap-2 text-meta font-semibold text-navy">
-                  <Icon name="description" size={16} className="text-muted" /> {t.store.docsShort}
+                <span className="inline-flex flex-wrap items-center gap-[9px]">
+                  <span className="text-shop-ink-3">
+                    <DocIcon />
+                  </span>
+                  {t.store.docsShort}
                   {eq.docTypes.map((d) => (
-                    <span key={d} className="inline-flex items-center gap-0.5 rounded-full bg-ok-soft px-2 py-0.5 text-label font-semibold text-ok">
-                      <Icon name="check" size={12} /> {d.toUpperCase()}
+                    <span
+                      key={d}
+                      className="inline-flex items-center gap-1 rounded-shop-pill bg-shop-ok-soft px-[9px] py-[3px] text-shop-chip font-shop-bold text-shop-ok"
+                    >
+                      <CheckIcon size={10} strokeWidth={2.6} /> {d.toUpperCase()}
                     </span>
                   ))}
                 </span>
@@ -283,20 +307,22 @@ function SupplierCard({
 }) {
   const name = store?.name ?? fallbackName ?? "";
   return (
-    <section className="flex h-full flex-col rounded-sm border border-border bg-surface p-5">
+    <section className="flex h-full flex-col rounded-shop-card border border-shop-line p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div
-            className="grid h-[46px] w-[46px] flex-none place-items-center overflow-hidden rounded-sm border border-border bg-surface2 text-subhead font-extrabold text-navy"
-            style={store?.logoUrl ? { backgroundImage: `url("${store.logoUrl}")`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
-          >
-            {!store?.logoUrl && (name.trim()[0]?.toUpperCase() ?? "?")}
-          </div>
+          {store?.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={store.logoUrl} alt={name} className="h-14 w-14 flex-none rounded-shop-logo object-cover" />
+          ) : (
+            <span className="grid h-14 w-14 flex-none place-items-center rounded-shop-logo bg-shop-fill text-shop-name font-shop-bold text-shop-ink">
+              {name.trim()[0]?.toUpperCase() ?? "?"}
+            </span>
+          )}
           <div className="min-w-0">
-            <div className="text-label font-semibold uppercase tracking-wide text-muted">{t.store.suppliedBy}</div>
-            <div className="flex items-center gap-1.5">
-              <span className="truncate text-subhead font-extrabold text-navy">{name || "—"}</span>
-              {store?.isVerified && <Icon name="verified" size={15} className="flex-none text-ok" />}
+            <div className="text-shop-label font-shop-bold uppercase tracking-[0.3px] text-shop-ink-4">{t.store.suppliedBy}</div>
+            <div className="flex items-center gap-[7px]">
+              <span className="truncate text-shop-name font-shop-bold text-shop-ink">{name || "—"}</span>
+              {store?.isVerified && <VerifiedDot />}
             </div>
           </div>
         </div>
@@ -308,38 +334,50 @@ function SupplierCard({
       </div>
 
       {store && (
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-meta font-semibold text-muted">
+        <div className="mt-[7px] flex flex-wrap items-center gap-x-3.5 gap-y-1 text-shop-meta text-shop-ink-3">
           {store.city && (
-            <span className="inline-flex items-center gap-1.5">
-              <Icon name="location_on" size={14} /> {store.city}
+            <span className="inline-flex items-center gap-[5px]">
+              <span className="text-shop-ink-4">
+                <PinIcon />
+              </span>
+              {store.city}
             </span>
           )}
-          <span className="inline-flex items-center gap-1.5">
-            <Icon name="construction" size={14} /> {store.activeEquipmentCount} {t.store.equipment}
+          <span>
+            {store.activeEquipmentCount} {t.store.equipment}
           </span>
-          <span className="inline-flex items-center gap-1.5">
-            <Icon name="visibility" size={14} /> {store.viewCount.toLocaleString()} {t.store.views}
+          <span className="inline-flex items-center gap-[5px]">
+            <span className="text-shop-ink-4">
+              <EyeIcon />
+            </span>
+            {store.viewCount.toLocaleString()} {t.store.views}
           </span>
         </div>
       )}
 
       {store?.description && (
-        <p className="mt-3.5 whitespace-pre-line text-body leading-relaxed text-navy-mid" dir="auto">
-          {store.description}
-        </p>
+        <div className="mt-4 border-t border-shop-line-soft pt-4">
+          <p dir="auto" className="m-0 whitespace-pre-line text-end text-shop-body leading-[1.85] text-shop-ink-2">
+            {store.description}
+          </p>
+        </div>
       )}
 
       {store && (
-        <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
-          <span className="text-label font-semibold uppercase tracking-wide text-muted">{t.store.documents}</span>
+        <div className="mt-auto flex flex-wrap items-center gap-[9px] border-t border-shop-line-soft pt-4 text-shop-item font-semibold text-shop-ink">
+          <span className="text-shop-ink-3">
+            <DocIcon />
+          </span>
+          {t.store.documents}
           {[t.store.docCR, t.store.docVAT, t.store.docNationalAddress].map((d) => (
             <span
               key={d}
-              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-label font-semibold ${
-                store.isVerified ? "bg-ok-soft text-ok" : "bg-surface2 text-muted"
+              className={`inline-flex items-center gap-1 rounded-shop-pill px-[9px] py-[3px] text-shop-chip font-shop-bold ${
+                store.isVerified ? "bg-shop-ok-soft text-shop-ok" : "bg-shop-fill text-shop-ink-3"
               }`}
             >
-              <Icon name={store.isVerified ? "check_circle" : "schedule"} size={12} /> {d}
+              {store.isVerified && <CheckIcon size={10} strokeWidth={2.6} />}
+              {d.toUpperCase()}
             </span>
           ))}
         </div>
@@ -369,22 +407,18 @@ function Gallery({
   const overlays = (
     <>
       {verified && (
-        <span className="absolute end-2.5 top-2.5 grid h-6 w-6 place-items-center rounded-full bg-ok text-white" title={t.store.verified}>
-          <Icon name="check" size={14} />
+        <span className="absolute end-2 top-2" title={t.store.verified}>
+          <VerifiedDot size={22} />
         </span>
       )}
-      {city && (
-        <span className="absolute bottom-2.5 start-2.5 inline-flex items-center gap-1 rounded-full bg-navy/85 px-2.5 py-1 text-label font-semibold text-white">
-          <Icon name="location_on" size={12} /> {city}
-        </span>
-      )}
+      {city && <CityTag city={city} />}
     </>
   );
 
   if (photos.length === 0) {
     return (
-      <div className="relative grid min-h-[220px] place-items-center overflow-hidden rounded-sm border border-border bg-gradient-to-br from-surface2 to-surface3">
-        <Icon name="construction" size={48} className="text-muted" />
+      <div className="relative grid min-h-[240px] place-items-center overflow-hidden rounded-shop-card border border-shop-line bg-shop-fill">
+        <Icon name="construction" size={48} className="text-shop-ink-4" />
         {overlays}
       </div>
     );
@@ -395,11 +429,11 @@ function Gallery({
   if (layout === "grid" && photos.length > 1) {
     const rest = photos.slice(1, 5);
     return (
-      <div className="relative grid h-[320px] grid-cols-2 gap-2 overflow-hidden rounded-sm sm:grid-cols-4">
+      <div className="relative grid h-[340px] grid-cols-2 gap-2 overflow-hidden rounded-shop-card sm:grid-cols-4">
         <button
           type="button"
           onClick={() => setIdx(0)}
-          className="col-span-2 row-span-2 h-full w-full overflow-hidden rounded-sm border border-border bg-surface2 bg-cover bg-center"
+          className="col-span-2 row-span-2 h-full w-full overflow-hidden rounded-shop-card border border-shop-line bg-shop-fill bg-cover bg-center"
           style={{ backgroundImage: `url("${photos[0]}")` }}
           aria-label={`${t.store.photos} 1`}
         />
@@ -408,7 +442,7 @@ function Gallery({
             type="button"
             key={p}
             onClick={() => setIdx(i + 1)}
-            className="h-full w-full overflow-hidden rounded-sm border border-border bg-surface2 bg-cover bg-center"
+            className="h-full w-full overflow-hidden rounded-shop-card border border-shop-line bg-shop-fill bg-cover bg-center"
             style={{ backgroundImage: `url("${p}")` }}
             aria-label={`${t.store.photos} ${i + 2}`}
           />
@@ -421,21 +455,21 @@ function Gallery({
   return (
     <div className="flex flex-col gap-2">
       <div
-        className="relative h-[280px] overflow-hidden rounded-sm border border-border bg-surface2 bg-cover bg-center"
+        className="relative h-[300px] overflow-hidden rounded-shop-card border border-shop-line bg-shop-fill bg-cover bg-center"
         style={{ backgroundImage: `url("${photos[Math.min(idx, photos.length - 1)]}")` }}
       >
         {photos.length > 1 && (
           <>
             <button
               onClick={() => setIdx((idx - 1 + photos.length) % photos.length)}
-              className="absolute start-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-navy/50 text-white"
+              className="absolute start-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-shop-tag text-white"
               aria-label={t.store.prevPhoto}
             >
               <Icon name="chevron_left" size={20} className="rtl:scale-x-[-1]" />
             </button>
             <button
               onClick={() => setIdx((idx + 1) % photos.length)}
-              className="absolute end-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-navy/50 text-white"
+              className="absolute end-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-shop-tag text-white"
               aria-label={t.store.nextPhoto}
             >
               <Icon name="chevron_right" size={20} className="rtl:scale-x-[-1]" />
@@ -451,8 +485,8 @@ function Gallery({
               type="button"
               key={p}
               onClick={() => setIdx(i)}
-              className={`h-[58px] w-[84px] flex-none rounded-sm border bg-surface2 bg-cover bg-center transition ${
-                i === idx ? "border-brand" : "border-border"
+              className={`h-[58px] w-[84px] flex-none rounded-shop-chip border bg-shop-fill bg-cover bg-center transition ${
+                i === idx ? "border-shop-amber" : "border-shop-line"
               }`}
               style={{ backgroundImage: `url("${p}")` }}
               aria-label={`${t.store.photos} ${i + 1}`}
@@ -464,20 +498,30 @@ function Gallery({
   );
 }
 
+/** The prototype draws its own camera, at the same 1.7px stroke as the document and the pin. */
+function CameraIcon({ size = 17 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4 8H7L9 5H15L17 8H20C20.6 8 21 8.4 21 9V18C21 18.6 20.6 19 20 19H4C3.4 19 3 18.6 3 18V9C3 8.4 3.4 8 4 8Z" stroke="currentColor" strokeWidth="1.7" />
+      <circle cx="12" cy="13" r="3.5" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
 function Spec({ style, label, value }: { style: SpecStyle; label: string; value: string | null }) {
   if (!value) return null;
   if (style === "list") {
     return (
       <div className="flex items-baseline justify-between gap-3 py-2">
-        <span className="text-meta text-muted">{label}</span>
-        <span className="text-body font-semibold text-navy">{value}</span>
+        <span className="text-shop-meta text-shop-ink-3">{label}</span>
+        <span className="text-shop-item font-semibold text-shop-ink">{value}</span>
       </div>
     );
   }
   return (
-    <div className="rounded-sm border border-border bg-surface px-3 py-2">
-      <div className="text-label font-semibold uppercase tracking-wide text-muted">{label}</div>
-      <div className="mt-0.5 text-body font-semibold text-navy">{value}</div>
+    <div className="rounded-shop-chip border border-shop-line px-3 py-2">
+      <div className="text-shop-label font-shop-bold uppercase tracking-[0.3px] text-shop-ink-4">{label}</div>
+      <div className="mt-0.5 text-shop-item font-semibold text-shop-ink">{value}</div>
     </div>
   );
 }

@@ -86,6 +86,33 @@
   --info-soft: #e6f2fb;
   --info-deep: #0e4f7e;
 
+  /* ── Storefront ──────────────────────────────────────────────────────────────────────────────
+     The supplier-facing three — Browse, the equipment sheet, the store profile — drawn from the
+     approved prototype (`Zahid Tractor Store Profile`, owner, 2026-09-01) and matched to it exactly.
+
+     **A second neutral family, and that is the whole point of naming it.** The app's ramp above is
+     blue-tinted (`--border` #d4e0ec, `--muted` #6b8fa8); the prototype's is warm grey (#e3e6e9,
+     #8a929b) on white rather than on `--background`. Rendering the prototype through the app's ramp
+     is not the same design — it is a near miss, which is worse than either, so the values live here
+     under their own names instead of being written into three components or quietly overwriting the
+     app's ramp for every other screen.
+
+     Bounded on purpose: `shop-*` is reachable from the storefront surfaces and nothing else. If it
+     ever becomes the app's palette, that is a decision to make once, here, by moving these values up
+     into the ramp above — not by spreading them file by file. */
+  --shop-ink: #1f2d3a;        /* headings, names, the value in a chip */
+  --shop-ink-2: #3a4552;      /* prose — the About paragraph */
+  --shop-ink-3: #5b6672;      /* meta rows, the back link */
+  --shop-ink-4: #8a929b;      /* section labels, icon strokes */
+  --shop-line: #e3e6e9;       /* the card border */
+  --shop-line-soft: #eceef0;  /* a divider INSIDE a card */
+  --shop-fill: #f2f4f5;       /* image ground, the neutral chip */
+  --shop-ok: #2f9e5c;         /* the verified tick */
+  --shop-ok-soft: #e9f7ee;    /* a document chip's ground */
+  --shop-amber: #eda153;      /* link hover */
+  --shop-amber-deep: #b5761a; /* the size chip's text, a price */
+  --shop-amber-soft: #fdf1e0; /* the size chip's ground */
+
   /* ── Disabled ────────────────────────────────────────────────────────────────────────────────
      A state with its own colours rather than a faded copy of another one. `opacity: .5` over an
      orange or red fill produced a muddy tint nobody chose, and landed around 2.1:1 against white
@@ -111,6 +138,9 @@
      Nothing in this app casts a shadow. A modal, sheet, dropdown or tooltip is separated from the
      page by its own border and by the page dimming behind it. */
   --scrim: rgba(28, 53, 80, 0.45);
+  /* The location pill laid over a photo (storefront). Alpha, because it has to read on any image —
+     a solid navy would go black over a dark machine and disappear over a bright sky. */
+  --shop-tag: rgba(15, 23, 31, 0.62);
 }
 
 @theme inline {
@@ -151,6 +181,19 @@
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
   --color-info-deep: var(--info-deep);
+  --color-shop-ink: var(--shop-ink);
+  --color-shop-ink-2: var(--shop-ink-2);
+  --color-shop-ink-3: var(--shop-ink-3);
+  --color-shop-ink-4: var(--shop-ink-4);
+  --color-shop-line: var(--shop-line);
+  --color-shop-line-soft: var(--shop-line-soft);
+  --color-shop-fill: var(--shop-fill);
+  --color-shop-ok: var(--shop-ok);
+  --color-shop-ok-soft: var(--shop-ok-soft);
+  --color-shop-amber: var(--shop-amber);
+  --color-shop-amber-deep: var(--shop-amber-deep);
+  --color-shop-amber-soft: var(--shop-amber-soft);
+  --color-shop-tag: var(--shop-tag);
   --color-disabled-bg: var(--disabled-bg);
   --color-disabled-fg: var(--disabled-fg);
   --color-disabled-border: var(--disabled-border);
@@ -183,6 +226,19 @@
      headlines at a hardcoded 36px and 29px, which is the same debt with no name on it. */
   --text-hero: 32px;
 
+  /* The storefront's own steps (owner, 2026-09-01: match the prototype exactly). Seven sizes the
+     six above cannot express — 19 for a store's name, 13.5 for its prose, 12 for a card's category
+     label, 11.5 for a document chip. They are prefixed and belong to those three screens; the rule
+     that the app has six sizes is unchanged everywhere else, and this is the exception with a name
+     on it rather than thirty loose numbers. */
+  --text-shop-name: 19px;    /* the store's name */
+  --text-shop-body: 13.5px;  /* the About paragraph, the back link */
+  --text-shop-meta: 12.5px;  /* the city · count · views row, chip values */
+  --text-shop-item: 13px;    /* a machine's name on a card */
+  --text-shop-label: 12px;   /* THE CATEGORY OVER IT */
+  --text-shop-chip: 11.5px;  /* a document chip */
+  --text-shop-tag: 11px;     /* the location pill on a photo */
+
   /* ── Weight ──────────────────────────────────────────────────────────────────────────────────
      Three. `font-medium`, `font-bold` and `font-black` are cleared: five weights is not a
      hierarchy, it is one guess repeated across files. */
@@ -190,6 +246,11 @@
   --font-weight-normal: 400;     /* body copy, answers */
   --font-weight-semibold: 600;   /* labels, buttons, inline emphasis */
   --font-weight-extrabold: 800;  /* titles, mastheads, big numbers */
+  /* The storefront's bold (owner, 2026-09-01: match the prototype exactly). The prototype sets 700
+     for a store's name, a card's category label and a chip; 800 renders those visibly heavier and
+     600 visibly lighter, so neither is the reference. Named for those three screens, so the app's
+     three-weight rule stands everywhere else. */
+  --font-weight-shop-bold: 700;
 
   /* ── Radius ──────────────────────────────────────────────────────────────────────────────────
      Four steps. `rounded-md` is the default; `rounded-lg` is the card skin.
@@ -206,6 +267,12 @@
   --radius-sm: 2px;    /* chips, tags, tight controls */
   --radius-md: 4px;    /* inputs, buttons, list rows — the default */
   --radius-lg: 6px;    /* cards, panels, sheets */
+  /* The storefront's four, from the prototype. A shop is a softer object than a form row — the
+     reference the app's 2/4/6 came from is a console, and these three screens are a catalogue. */
+  --radius-shop-card: 14px;  /* the card skin */
+  --radius-shop-pill: 12px;  /* the location pill, a document chip */
+  --radius-shop-logo: 10px;  /* the store's logo square */
+  --radius-shop-chip: 8px;   /* a size / year chip */
 
   /* ── Shadow ──────────────────────────────────────────────────────────────────────────────────
      There are none (owner, 2026-08-26). The whole namespace is cleared, so `shadow-sm` and its
