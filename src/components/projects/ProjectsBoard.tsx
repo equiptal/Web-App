@@ -441,7 +441,7 @@ function SitePanel({
             {/* Not `sticky` any more: with no scroll box of its own it would pin to the VIEWPORT and
                 float the month row over whatever the renter scrolled past. */}
             <div className="flex items-stretch border-b border-border bg-surface2">
-              <div className="flex w-[340px] flex-none items-end px-3 pb-1.5 text-label font-semibold uppercase tracking-[.03em] text-muted">
+              <div className="flex w-[400px] flex-none items-end px-3 pb-1.5 text-label font-semibold uppercase tracking-[.03em] text-muted">
                 {t.projects.board.whatIsHere}
               </div>
 

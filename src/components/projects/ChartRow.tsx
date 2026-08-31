@@ -106,8 +106,13 @@ export function AwardRow({
   return (
     <div className="flex items-stretch border-t border-border">
       {/* The label column: what this row is, its papers, and its menu. `pe-10` keeps the text clear
-          of the menu's 28px target rather than letting a long machine name run under it. */}
-      <div className="relative flex w-[340px] flex-none flex-col justify-center gap-0.5 py-2 pe-10 ps-3">
+          of the menu's 28px target rather than letting a long machine name run under it.
+
+          400px, was 340. At 340 the name, the count and two paper pills did not fit and «Crawler
+          Excavator 30 ton» truncated to «Crawler Excavator…» — dropping the SIZE, which is half of
+          what a machine is on this chart. The 60px comes off the track, which loses nothing: the
+          track is a proportional axis, so every bar simply redraws at the same relative position. */}
+      <div className="relative flex w-[400px] flex-none flex-col justify-center gap-0.5 py-2 pe-10 ps-3">
         {/* ── The machine, and its papers on the SAME line ──────────────────────────────────────
 
             ~~The filenames stacked above the machine name, one line each.~~ Two rows of chrome for
@@ -314,7 +319,7 @@ export function AwaitingRow({
 
   return (
     <div className="flex items-stretch border-t border-border">
-      <div className="relative flex w-[340px] flex-none flex-col justify-center gap-0.5 py-2 pe-10 ps-3">
+      <div className="relative flex w-[400px] flex-none flex-col justify-center gap-0.5 py-2 pe-10 ps-3">
         <span className="truncate text-body font-semibold text-navy">
           {item.label} ×{item.quantity}
         </span>
