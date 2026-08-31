@@ -40,7 +40,7 @@ function item(id: string, status: RequestStatus = "OPEN", qty = 1, imageUrl: str
     requiredCerts: [],
     mobByRentee: null,
     demobByRentee: null,
-    item: { name: `item ${id}`, nameAr: "", qty, imageUrl, categoryId: null },
+    item: { name: `item ${id}`, nameAr: "", qty, imageUrl, imageIsPhoto: false, categoryId: null },
   };
 }
 

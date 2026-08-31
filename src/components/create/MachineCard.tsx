@@ -18,6 +18,7 @@
  * platform cannot resolve becomes a document demanded of every supplier who bids.
  */
 
+import { useState } from "react";
 import { fmt, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
@@ -56,6 +57,12 @@ export function MachineCard({
   const t = useT();
   const { state, actions } = useRfq();
   const tax = useItemTaxonomy(item, state.taxonomy);
+  /** The subtype's photograph, else the category's. Null on most rows — the glyph covers that. */
+  const photo = tax.subcategory?.equipmentImageUrl ?? tax.category?.equipmentImageUrl ?? null;
+  /** Set when that URL fails to load, so the panel falls back to the glyph. Keyed off the URL so
+   *  changing the subtype clears a previous failure rather than inheriting it. */
+  const [brokenPhoto, setBrokenPhoto] = useState<string | null>(null);
+  const photoBroken = brokenPhoto !== null && brokenPhoto === photo;
   const overrides = useItemOverrides(item, state.draft!.project);
   const attachments = useItemAttachments(item);
   const prov = useProvenance(item.id);
@@ -108,8 +115,35 @@ export function MachineCard({
       <div {...pin("machine-card-body")} className="grid gap-5 lg:grid-cols-[2fr_3fr] lg:items-stretch">
         {/* ---------------- The 450px panel, and the four controls on its corners ---------------- */}
         <div {...pin("machine-card-image")} className="relative h-full min-h-[450px] w-full min-w-0 rounded-md bg-surface2">
+          {/* ── The subtype's own photograph, where the admin panel has one (owner, 2026-08-31) ──
+              The panel drew a Material Symbol chosen by matching the subtype's NAME against a list of
+              words — «excavator» → the agriculture glyph — which is a reasonable guess and never the
+              machine the renter picked. `equipment_image_url` is the real thing, set per subcategory
+              from the admin panel and now carried through `nodesToTree`.
+
+              Three layers, in order, because each can be absent for an ordinary reason:
+                1. the subtype's photograph — null on most rows, which is expected
+                2. the category's, for a subtype whose parent is illustrated and it is not
+                3. the glyph, which is always available and never wrong-looking
+
+              `onError` is load-bearing rather than defensive: the taxonomy's photographs live in a
+              folder of the shared bucket that is not public-read on staging, so a well-formed URL can
+              answer 403. Without the catch the panel would draw a broken image where it used to draw
+              a glyph — worse than what it replaced. The backend warns of the same trap on its own
+              helper. */}
           <div className="grid h-full place-content-center justify-items-center gap-2 px-6 text-center">
-            <Icon name={equipmentIcon(tax.subtypeName || tax.categoryName)} size={132} className="text-navy/20" />
+            {photo && !photoBroken ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={photo}
+                alt=""
+                draggable={false}
+                onError={() => setBrokenPhoto(photo)}
+                className="max-h-[240px] w-full rounded-md object-contain"
+              />
+            ) : (
+              <Icon name={equipmentIcon(tax.subtypeName || tax.categoryName)} size={132} className="text-navy/20" />
+            )}
             {(tax.subtypeName || tax.categoryName) && (
               <p className="text-body font-semibold leading-snug text-navy/45">
                 {[tax.subtypeName || tax.categoryName, tax.sizeName].filter(Boolean).join(" · ")}

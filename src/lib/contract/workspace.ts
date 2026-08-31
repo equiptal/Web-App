@@ -52,6 +52,9 @@ export interface RailTile {
   /** Bids that have arrived on the group — the badge on the tile. Zero draws no badge. */
   bids: number;
   imageUrl: string | null;
+  /** True when `imageUrl` is a PHOTOGRAPH rather than a drawn icon — the two need opposite fits
+   *  inside a round mask. See `RequestListItem.item`. */
+  imageIsPhoto: boolean;
   /** Greyed and captioned in the rail; still selectable, because its bids are still worth reading. */
   closed: boolean;
 }
@@ -91,7 +94,11 @@ export function railTiles(groups: RequestGroup[]): RailTile[] {
     items: g.items.length,
     units: g.totalUnits,
     bids: g.totalBids,
-    imageUrl: g.items.find((i) => i.item?.imageUrl)?.item?.imageUrl ?? null,
+    // One lookup for both, so the flag can never describe a different item's picture than the URL.
+    ...(() => {
+      const withPic = g.items.find((i) => i.item?.imageUrl)?.item ?? null;
+      return { imageUrl: withPic?.imageUrl ?? null, imageIsPhoto: withPic?.imageIsPhoto ?? false };
+    })(),
     closed: isClosedGroup(g),
   }));
 }

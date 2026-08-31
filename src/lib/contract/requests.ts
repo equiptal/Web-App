@@ -283,7 +283,16 @@ export interface RequestListItem {
   mobByRentee: boolean | null;
   demobByRentee: boolean | null;
   /** The single fanned-out item (name + qty), used as the card title. */
-  item: { name: string; nameAr: string; qty: number; imageUrl: string | null; categoryId: string | null } | null;
+  /**
+   * The single fanned-out item (name + qty), used as the card title.
+   *
+   * `imageIsPhoto` says WHICH of the taxonomy's two picture kinds `imageUrl` is. They cannot be shown
+   * the same way: a photograph reaches its own edges and should fill a round mask by cropping, while
+   * an icon is a drawing with transparent margins built in and floats absurdly if cropped. Deciding
+   * that from the URL at the point of render would mean sniffing a bucket path; deciding it here,
+   * where the slot is chosen, costs a boolean and cannot go stale.
+   */
+  item: { name: string; nameAr: string; qty: number; imageUrl: string | null; imageIsPhoto: boolean; categoryId: string | null } | null;
 }
 
 /** A submission group — one or more single-item requests that share a `requestGroupId`. */
@@ -419,7 +428,14 @@ export function mapRequestListItem(r: RequestRecord): RequestListItem {
     mobByRentee: it?.mobilizationByRentee ?? null,
     demobByRentee: it?.demobilizationByRentee ?? null,
     item: it
-      ? { name: itemName(it, false), nameAr: itemName(it, true), qty: it.numberOfUnits ?? 1, imageUrl: publicTaxonomyUrl(it.subtypeEquipmentImageUrl ?? it.subtypeImageUrl ?? it.categoryImageUrl), categoryId: it.categoryId }
+      ? {
+          name: itemName(it, false),
+          nameAr: itemName(it, true),
+          qty: it.numberOfUnits ?? 1,
+          imageUrl: publicTaxonomyUrl(it.subtypeEquipmentImageUrl ?? it.subtypeImageUrl ?? it.categoryImageUrl),
+          imageIsPhoto: Boolean(it.subtypeEquipmentImageUrl),
+          categoryId: it.categoryId,
+        }
       : null,
   };
 }

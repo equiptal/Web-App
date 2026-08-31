@@ -232,6 +232,10 @@
   .sname .n .open{border-bottom:1px solid var(--border-strong)}
   .sname .n:hover .open{border-bottom-color:var(--navy)}
   .sname .n .icon{font-size:var(--t-body);color:var(--muted-light)}
+  /* On the name, because it is the supplier's own standing — not where this row came from. */
+  .nbadge{display:inline-flex;align-items:center;gap:3px;height:19px;padding:0 7px;border-radius:var(--r-full);
+    background:var(--navy);color:#fff;font-size:var(--t-label);font-weight:800;white-space:nowrap;flex:none}
+  .nbadge .icon{font-size:12px;color:#fff}
   .sname .c{display:block;color:var(--muted);font-size:var(--t-meta)}
   /* The source used to be a filled pill in a column of its own. The avatar already carries it —
      navy for an account, grey for one of the renter's own — so the word only has to confirm. */
@@ -971,7 +975,6 @@ function table(rows){
         + 'aria-label="' + L("Select all", "تحديد الكل") + '" /></th>'
       : "")
     + '<th>' + L("Supplier", "المورّد") + '</th>'
-    + '<th>' + L("Source", "المصدر") + '</th>'
     + '<th>' + L("Vendor registration", "اعتماد المورّد") + '</th>'
     + '<th>' + L("Contact", "الاتصال") + '</th>'
     + '<th>' + L("Groups", "المجموعات") + '</th>'
@@ -998,16 +1001,11 @@ function row(s){
     +   '<span style="min-width:0">'
     +     '<button class="n" onclick="dlgSupplier(\'' + id + '\')">'
     +       '<span class="open">' + esc(name(s)) + '</span>'
+    +       (off ? "" : '<span class="nbadge"><span class="icon" aria-hidden="true">verified_user</span>'
+                     + L("On Moedatech", "على مويداتك") + '</span>')
     +       '<span class="icon" aria-hidden="true">open_in_full</span></button>'
     +     '<span class="c">' + esc(s.contact || L("no contact name", "بدون اسم جهة اتصال")) + '</span>'
     +   '</span></span></td>'
-
-    /* Whether they have a Moedatech account. Its own column, because it governs what the rest of
-       the row can even mean. */
-    + '<td>' + (off
-        ? '<span class="src src-off">' + L("Off platform", "خارج المنصة") + '</span>'
-        : '<span class="src src-plat"><span class="icon" aria-hidden="true">verified_user</span>'
-          + L("On Moedatech", "على مويداتك") + '</span>') + '</td>'
 
     /* The renter's own flag, and a control rather than a label — so it keeps its word. */
     + '<td><button class="vtog" aria-pressed="' + s.vendor + '" onclick="toggleVendor(\'' + id + '\')">'

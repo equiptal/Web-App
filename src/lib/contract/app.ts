@@ -16,6 +16,15 @@ export interface TaxonomyNode {
   aliases: string[];
   tag: string | null;
   sort_order?: number;
+  /**
+   * A PHOTOGRAPH of real equipment for this node — `equipment_image_key` on the taxonomy row, set per
+   * subcategory from the admin panel and served from the shared editorial bucket.
+   *
+   * Optional because the fixture catalogue carries none and an older agents build sent none. Null is
+   * the ORDINARY case — most rows have no photograph — so every reader falls back to the flat icon or
+   * to the glyph rather than treating absence as an error.
+   */
+  equipment_image_url?: string | null;
 }
 
 export interface TaxonomyResponse {

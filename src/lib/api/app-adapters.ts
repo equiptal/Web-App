@@ -14,6 +14,9 @@ export function nodesToTree(nodes: TaxonomyNode[]): Taxonomy {
     id: c.id,
     name: c.name,
     nameAr: c.name_ar, // carry Arabic display names (was dropped) so the UI can render them by locale
+    // The equipment PHOTOGRAPH, where the admin panel has set one. Dropped here until 2026-08-31,
+    // which is why the create screen drew a glyph even for a subtype that had artwork.
+    equipmentImageUrl: c.equipment_image_url ?? null,
     // Carry the canonical group tag — the taxonomy's own grouping signal, returned verbatim by the
     // endpoint. It drives no cert default any more (the lifting → Aramco rule is withdrawn, in the app
     // first). Tags live on CATEGORY rows, so a subcategory inherits its parent's.
@@ -25,6 +28,7 @@ export function nodesToTree(nodes: TaxonomyNode[]): Taxonomy {
         id: s.id,
         name: s.name,
         nameAr: s.name_ar,
+        equipmentImageUrl: s.equipment_image_url ?? null,
         tag: s.tag ?? c.tag,
         measurements: meas
           .filter((m) => m.parent_id === s.id)

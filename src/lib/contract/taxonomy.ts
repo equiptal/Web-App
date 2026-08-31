@@ -20,6 +20,9 @@ export interface Subcategory {
   /** Canonical taxonomy group inherited from the parent category (see {@link Category.tag}). */
   tag?: string | null;
   measurements: Measurement[];
+  /** A photograph of real equipment for this node, when the admin panel has one.
+   *  Null/absent on most rows — callers fall back to the icon, then to a glyph. */
+  equipmentImageUrl?: string | null;
 }
 
 export interface Category {
@@ -30,6 +33,9 @@ export interface Category {
    *  CATEGORY rows, so a subcategory inherits its parent's. Display/grouping only — no cert rule reads it. */
   tag?: string | null;
   subcategories: Subcategory[];
+  /** A photograph of real equipment for this node, when the admin panel has one.
+   *  Null/absent on most rows — callers fall back to the icon, then to a glyph. */
+  equipmentImageUrl?: string | null;
 }
 
 export type Taxonomy = Category[];

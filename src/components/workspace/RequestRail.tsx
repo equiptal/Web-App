@@ -223,7 +223,25 @@ export function RequestRail({
                         alt=""
                         draggable={false}
                         onError={(e) => { e.currentTarget.style.display = "none"; setBroken((b) => new Set(b).add(tile.key)); }}
-                        className="h-12 w-12 object-contain p-1"
+                        /* ── Which fit, decided by which PICTURE it is (owner, 2026-08-31) ────────
+                           *"I want it zoomed in so it fits in a circle."*
+
+                           A photograph reaches its own edges, so `contain` left it as a 3:2 band
+                           across the middle of a round hole with tinted crescents above and below —
+                           the machine tiny, the circle mostly empty. `cover` fills the mask and crops
+                           the sides, which is what a photograph wants.
+
+                           The note above still holds for the OTHER kind, and this does not reverse
+                           it: an icon is a drawing carrying its own transparent margin, and cropping
+                           one enlarges the margin rather than the machine. What changed is that the
+                           two are now distinguishable — `imageIsPhoto` is set where the payload gave
+                           an equipment photograph — so each takes the fit it needs instead of one
+                           rule being wrong for half the catalogue. */
+                        className={
+                          tile.imageIsPhoto
+                            ? "h-12 w-12 rounded-full object-cover"
+                            : "h-12 w-12 object-contain p-1"
+                        }
                       />
                     ) : (
                       <Icon name="precision_manufacturing" size={20} className="text-muted" />
