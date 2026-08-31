@@ -80,6 +80,7 @@ export const COLORS = {
   shopAmber: "#eda153",
   shopAmberDeep: "#b5761a",
   shopAmberSoft: "#fdf1e0",
+  shopField: "#fafbfb",
 } as const;
 
 /**
@@ -145,6 +146,7 @@ export const CSS_VAR_NAME: Record<keyof typeof COLORS, string> = {
   shopAmber: "--shop-amber",
   shopAmberDeep: "--shop-amber-deep",
   shopAmberSoft: "--shop-amber-soft",
+  shopField: "--shop-field",
 };
 
 /**

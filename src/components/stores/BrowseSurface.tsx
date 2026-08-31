@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Dropdown } from "@/components/Dropdown";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
@@ -17,11 +17,20 @@ interface CityOpt {
 
 
 /**
- * Suggested-suppliers surface (web-app/004, AC-10–17, AC-23). The filter bar (search + city +
- * dependent category → subcategory → measurement + verified-only, all on one row) is ALWAYS shown.
- * When `previewCount` is set, only that many cards render with a View-all / Show-less toggle that
- * just changes how many cards are shown — it never affects the filters. The backend enforces
- * visibility + featured ordering.
+ * Suggested Suppliers (web-app/004, AC-10–17, AC-23) — the prototype's Stores Page, value for value.
+ *
+ * A title with the count beside it, one row carrying a search field and the city, a row of category
+ * pills, then five cards to a row. The card is where the category lands: no pill and it shows the
+ * shop; a pill and it shows that shop's matching machine (see `StoreCard`).
+ *
+ * ⚠️ **The subtype, size and verified-only filters are gone** (owner, 2026-09-01: follow the
+ * prototype). The reference draws two controls, and a filter row that grows to five is a different
+ * screen — the pills carry the narrowing now. `/api/stores` still accepts `subcategory`,
+ * `measurement` and `verified`, so the controls can come back as a second row without a contract
+ * change; nothing about the request path was removed.
+ *
+ * `previewCount` renders only that many cards with a View-all / Show-less toggle, which changes how
+ * many are shown and never what is asked for. The backend enforces visibility + featured ordering.
  */
 export function BrowseSurface({ title, previewCount }: { title?: string; previewCount?: number }) {
   const t = useT();
@@ -33,9 +42,6 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
 
   const [city, setCity] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [subcategoryId, setSubcategoryId] = useState("");
-  const [measurementId, setMeasurementId] = useState("");
-  const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
 
@@ -75,9 +81,6 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
       .catch(() => setTaxonomy([]));
   }, [ar]);
 
-  const subcategories = useMemo(() => taxonomy.find((c) => c.id === categoryId)?.children ?? [], [taxonomy, categoryId]);
-  const measurements = useMemo(() => subcategories.find((s) => s.id === subcategoryId)?.children ?? [], [subcategories, subcategoryId]);
-
   useEffect(() => {
     const id = setTimeout(() => setDebounced(search.trim()), 300);
     return () => clearTimeout(id);
@@ -89,10 +92,7 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
     const qs = new URLSearchParams();
     if (debounced) qs.set("search", debounced);
     if (city) qs.set("city", city);
-    const cat = subcategoryId || categoryId;
-    if (cat) qs.set("category", cat);
-    if (measurementId) qs.set("measurement", measurementId);
-    if (verifiedOnly) qs.set("verified", "true");
+    if (categoryId) qs.set("category", categoryId);
     qs.set("limit", "60");
     const ctrl = new AbortController();
     fetch(`/api/stores?${qs.toString()}`, { cache: "no-store", signal: ctrl.signal })
@@ -102,30 +102,31 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
         if (e?.name !== "AbortError") setError(true);
       });
     return () => ctrl.abort();
-  }, [debounced, city, categoryId, subcategoryId, measurementId, verifiedOnly, reloadKey]);
-
-  const onCategory = (v: string) => {
-    setCategoryId(v);
-    setSubcategoryId("");
-    setMeasurementId("");
-  };
-  const onSubcategory = (v: string) => {
-    setSubcategoryId(v);
-    setMeasurementId("");
-  };
+  }, [debounced, city, categoryId, reloadKey]);
 
   const all = stores ?? [];
   const canToggle = previewCount != null && all.length > previewCount;
   const shown = previewCount != null && !expanded ? all.slice(0, previewCount) : all;
 
   return (
-    <div {...pin("browse-surface")} className="flex flex-col gap-4">
-      {/* Section header + View-all / Show-less (count only — never touches the filters) */}
+    <div {...pin("browse-surface")} className="flex flex-col">
+      {/* The title, with the count beside it — «Suggested Suppliers · 13 stores across Saudi Arabia».
+          The View-all toggle is the preview's, and only a preview ever draws it. */}
       {title && (
-        <div className="flex items-center justify-between">
-          <h3 className="m-0 text-shop-name font-shop-bold text-shop-ink">{title}</h3>
+        <div className="mb-5 flex flex-wrap items-baseline justify-between gap-2.5">
+          <div className="flex flex-wrap items-baseline gap-2.5">
+            <h1 className="m-0 text-shop-h1 font-shop-bold text-shop-ink">{title}</h1>
+            {stores !== null && (
+              <span className="text-shop-item text-shop-ink-4">
+                {stores.length} {t.browse.storesAcross}
+              </span>
+            )}
+          </div>
           {canToggle && (
-            <button onClick={() => setExpanded((v) => !v)} className="inline-flex items-center gap-0.5 text-shop-meta font-semibold text-shop-ink-3 hover:text-shop-amber">
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              className="inline-flex items-center gap-0.5 text-shop-meta font-semibold text-shop-ink-3 hover:text-shop-amber"
+            >
               {expanded ? t.home.showLess : t.home.viewAll}
               <Icon name={expanded ? "expand_less" : "chevron_right"} size={16} className={expanded ? "" : "rtl:scale-x-[-1]"} />
             </button>
@@ -133,83 +134,37 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
         </div>
       )}
 
-      {/* Search and the city, on one row — the prototype's own two controls, at its own metrics.
-          The subtype, size and verified-only controls beside them are NOT in the prototype, which
-          draws a search field and a city menu. They stay because the directory's own acceptance
-          asks for them (AC-10–17) and dropping a working filter to match a picture is a loss the
-          picture was not making a case for; they wear the storefront's skin so the row still reads
-          as one. The menus themselves are the house `Dropdown`, unchanged — one control, one
-          behaviour, everywhere in the app. */}
-      <div className="flex flex-wrap items-center gap-2.5">
-        <div className="relative min-w-[240px] flex-1">
-          <span className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-shop-ink-4">
+      {/* Search and the city. Two controls, as the prototype draws them — the search takes the row
+          and the city sits at its end. */}
+      <div className="mb-[22px] flex items-center gap-3">
+        <div className="relative flex-1">
+          <span className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-shop-ink-4">
             <SearchIcon />
           </span>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t.browse.search}
-            className="h-[42px] w-full rounded-shop-pill border border-shop-line bg-white ps-10 pe-3.5 text-shop-body text-shop-ink outline-0 placeholder:text-shop-ink-4 focus:border-shop-amber"
+            className="w-full rounded-shop-control border border-shop-line bg-shop-field py-3 ps-10 pe-4 text-shop-control text-shop-ink outline-none placeholder:text-shop-ink-4 focus:border-shop-amber"
           />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* The house dropdown, not a native menu (owner, 2026-08-31): each system list opened in its
-              own style, and an empty option and the placeholder say the same thing here — a filter
-              that is not narrowed reads «All cities» on its own trigger. */}
-          <Dropdown
-            label={t.browse.anyCity}
-            placeholder={t.browse.anyCity}
-            prefix={<PinIcon size={14} />}
-            value={city || null}
-            onChange={setCity}
-            options={cities.map((c) => ({ value: c.value, label: c.label }))}
-          />
-          {/* The category level moved OUT of this row and onto the pills above the grid — it is the
-              choice that changes what a card even shows, and a choice that important should not be
-              one closed menu among four. Subtype and size stay menus, and appear only once a pill has
-              been pressed: a disabled dropdown saying «pick a category first» was a control that
-              existed to say it was unusable. */}
-          {categoryId && (
-            <>
-              <Dropdown
-                label={t.browse.anySubcategory}
-                placeholder={t.browse.anySubcategory}
-                value={subcategoryId || null}
-                onChange={onSubcategory}
-                options={subcategories.map((sc) => ({ value: sc.id, label: tabel(sc, ar) }))}
-              />
-              {subcategoryId && (
-                <Dropdown
-                  label={t.browse.anyMeasurement}
-                  placeholder={t.browse.anyMeasurement}
-                  value={measurementId || null}
-                  onChange={setMeasurementId}
-                  options={measurements.map((m) => ({ value: m.id, label: tabel(m, ar) }))}
-                />
-              )}
-            </>
-          )}
-          <button
-            type="button"
-            onClick={() => setVerifiedOnly((v) => !v)}
-            className="ms-1 inline-flex select-none items-center gap-2 text-shop-meta font-semibold text-shop-ink-3"
-            aria-pressed={verifiedOnly}
-          >
-            <span className={`relative h-[23px] w-[40px] flex-none rounded-full border transition ${verifiedOnly ? "border-shop-ok bg-shop-ok" : "border-shop-line bg-shop-fill"}`}>
-              <span className={`absolute top-[2px] h-[17px] w-[17px] rounded-full bg-white transition-all ${verifiedOnly ? "start-[19px]" : "start-[2px]"}`} />
-            </span>
-            {t.browse.verifiedOnly}
-          </button>
-        </div>
+        <Dropdown
+          label={t.browse.anyCity}
+          placeholder={t.browse.anyCity}
+          prefix={<PinIcon size={15} strokeWidth={1.8} />}
+          value={city || null}
+          onChange={setCity}
+          options={cities.map((c) => ({ value: c.value, label: c.label }))}
+        />
       </div>
 
-      {/* The categories, as pills — the same row signed in or out. Drawn only once the tree is in
-          hand, so a slow reference call shows nothing rather than a lone «All» that grows. */}
+      {/* The categories. «All» first, then the tree's top level — the pill that is on is the house
+          navy, filled, and every other is an outline. */}
       {taxonomy.length > 0 && (
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-          <Pill label={t.browse.allCategories} active={!categoryId} onClick={() => onCategory("")} />
+        <div className="-mx-1 mb-[26px] flex gap-2.5 overflow-x-auto px-1 pb-2">
+          <Pill label={t.browse.allCategories} active={!categoryId} onClick={() => setCategoryId("")} />
           {taxonomy.map((c) => (
-            <Pill key={c.id} label={tabel(c, ar)} active={categoryId === c.id} onClick={() => onCategory(c.id)} />
+            <Pill key={c.id} label={tabel(c, ar)} active={categoryId === c.id} onClick={() => setCategoryId(c.id)} />
           ))}
         </div>
       )}
@@ -231,9 +186,9 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
           {t.browse.empty}
         </div>
       ) : (
-        /* Six to a row at the prototype's 1360 (six 196px cards + five 16px gaps + the gutter),
-           stepping down rather than shrinking a card below the width its chips need. */
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+        /* Five to a row at the prototype's 1360, stepping down rather than shrinking a card below the
+           width its chips need. */
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {shown.map((s) => (
             <StoreCard key={s.id} store={s} />
           ))}
@@ -249,8 +204,8 @@ function Pill({ label, active, onClick }: { label: string; active: boolean; onCl
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`h-[34px] flex-none rounded-shop-pill border px-3.5 text-shop-meta font-semibold transition ${
-        active ? "border-shop-amber-deep bg-shop-amber-soft text-shop-amber-deep" : "border-shop-line bg-white text-shop-ink-3 hover:border-shop-amber"
+      className={`flex-none whitespace-nowrap rounded-shop-tab border px-[18px] py-[9px] text-shop-item transition ${
+        active ? "border-shop-ink bg-shop-ink font-semibold text-white" : "border-shop-line bg-white font-normal text-shop-ink-3 hover:border-shop-amber"
       }`}
     >
       {label}

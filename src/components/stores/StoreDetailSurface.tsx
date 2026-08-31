@@ -70,7 +70,7 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
 
   if (error) {
     return (
-      <div className={SHOP_PAGE}>
+      <div className={`${SHOP_PAGE} pt-6`}>
         <div className="rounded-shop-card border border-shop-line p-8 text-center text-shop-body text-shop-ink-3">
           <Icon name="error_outline" size={22} className="mx-auto mb-2" />
           <p>{t.store.error}</p>
@@ -82,11 +82,11 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
     );
   }
   if (!detail) {
-    return <div className={`${SHOP_PAGE} text-center text-shop-body text-shop-ink-3`}>{t.store.loading}</div>;
+    return <div className={`${SHOP_PAGE} pt-6 text-center text-shop-body text-shop-ink-3`}>{t.store.loading}</div>;
   }
 
   return (
-    <div {...pin("store-detail")} className={SHOP_PAGE}>
+    <div {...pin("store-detail")} className={`${SHOP_PAGE} pt-6`}>
       {/* Back to suppliers — 13.5px, the prototype's own grey, 20px of air under it. */}
       <Link
         href="/browse"

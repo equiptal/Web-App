@@ -112,6 +112,7 @@
   --shop-amber: #eda153;      /* link hover */
   --shop-amber-deep: #b5761a; /* the size chip's text, a price */
   --shop-amber-soft: #fdf1e0; /* the size chip's ground */
+  --shop-field: #fafbfb;      /* the search field, the one surface that is not white */
 
   /* ── Disabled ────────────────────────────────────────────────────────────────────────────────
      A state with its own colours rather than a faded copy of another one. `opacity: .5` over an
@@ -138,9 +139,13 @@
      Nothing in this app casts a shadow. A modal, sheet, dropdown or tooltip is separated from the
      page by its own border and by the page dimming behind it. */
   --scrim: rgba(28, 53, 80, 0.45);
-  /* The location pill laid over a photo (storefront). Alpha, because it has to read on any image —
-     a solid navy would go black over a dark machine and disappear over a bright sky. */
-  --shop-tag: rgba(15, 23, 31, 0.62);
+  /* The pills and controls laid over a photo (storefront). Alpha, because they have to read on any
+     image — a solid navy would go black over a dark machine and disappear over a bright sky. Four
+     strengths, and the prototype uses each for a different job. */
+  --shop-tag: rgba(15, 23, 31, 0.62);        /* the city pill on a photo */
+  --shop-tag-strong: rgba(15, 23, 31, 0.7);  /* the address label on the map */
+  --shop-tag-mid: rgba(15, 23, 31, 0.55);    /* the carousel's own arrows */
+  --shop-tag-light: rgba(255, 255, 255, 0.16); /* the city pill on the NAVY store tile */
 }
 
 @theme inline {
@@ -193,7 +198,11 @@
   --color-shop-amber: var(--shop-amber);
   --color-shop-amber-deep: var(--shop-amber-deep);
   --color-shop-amber-soft: var(--shop-amber-soft);
+  --color-shop-field: var(--shop-field);
   --color-shop-tag: var(--shop-tag);
+  --color-shop-tag-strong: var(--shop-tag-strong);
+  --color-shop-tag-mid: var(--shop-tag-mid);
+  --color-shop-tag-light: var(--shop-tag-light);
   --color-disabled-bg: var(--disabled-bg);
   --color-disabled-fg: var(--disabled-fg);
   --color-disabled-border: var(--disabled-border);
@@ -231,13 +240,19 @@
      label, 11.5 for a document chip. They are prefixed and belong to those three screens; the rule
      that the app has six sizes is unchanged everywhere else, and this is the exception with a name
      on it rather than thirty loose numbers. */
-  --text-shop-name: 19px;    /* the store's name */
+  --text-shop-page: 24px;    /* the machine's name on its own sheet */
+  --text-shop-h1: 22px;      /* «Suggested Suppliers» */
+  --text-shop-name: 19px;    /* a store's name, the machine's category */
+  --text-shop-lead: 17px;    /* «Supplied by Zahid Tractor» */
+  --text-shop-value: 14.5px; /* a spec's value, the supplier's prose on the sheet */
+  --text-shop-control: 14px; /* the search field, a button, a card's store name */
   --text-shop-body: 13.5px;  /* the About paragraph, the back link */
-  --text-shop-meta: 12.5px;  /* the city · count · views row, chip values */
-  --text-shop-item: 13px;    /* a machine's name on a card */
-  --text-shop-label: 12px;   /* THE CATEGORY OVER IT */
-  --text-shop-chip: 11.5px;  /* a document chip */
-  --text-shop-tag: 11px;     /* the location pill on a photo */
+  --text-shop-item: 13px;    /* a machine's name on a card, a pill, the city menu */
+  --text-shop-meta: 12.5px;  /* the city · count · views row, size and year chips */
+  --text-shop-label: 12px;   /* THE CATEGORY OVER A MACHINE (store profile) */
+  --text-shop-chip: 11.5px;  /* a document chip, a category chip */
+  --text-shop-tag: 11px;     /* the location pill on a photo, a spec's label */
+  --text-shop-micro: 10px;   /* the carousel's 1/2 counter */
 
   /* ── Weight ──────────────────────────────────────────────────────────────────────────────────
      Three. `font-medium`, `font-bold` and `font-black` are cleared: five weights is not a
@@ -269,10 +284,16 @@
   --radius-lg: 6px;    /* cards, panels, sheets */
   /* The storefront's four, from the prototype. A shop is a softer object than a form row — the
      reference the app's 2/4/6 came from is a console, and these three screens are a catalogue. */
-  --radius-shop-card: 14px;  /* the card skin */
-  --radius-shop-pill: 12px;  /* the location pill, a document chip */
-  --radius-shop-logo: 10px;  /* the store's logo square */
-  --radius-shop-chip: 8px;   /* a size / year chip */
+  --radius-shop-tab: 20px;      /* a category pill on Browse */
+  --radius-shop-media: 16px;    /* the gallery and the map */
+  --radius-shop-chip-lg: 16px;  /* the subtype / size chips on the sheet */
+  --radius-shop-card: 14px;     /* the card skin */
+  --radius-shop-pill: 12px;     /* the location pill, a document chip */
+  --radius-shop-control: 10px;  /* the search field, a button, a spec box, the map label */
+  --radius-shop-logo: 10px;     /* a store's logo square */
+  --radius-shop-logo-md: 9px;   /* the supplier's logo on the sheet */
+  --radius-shop-chip: 8px;      /* a size / year chip, a gallery thumbnail */
+  --radius-shop-logo-sm: 6px;   /* the 24px logo beside a name on a card */
 
   /* ── Shadow ──────────────────────────────────────────────────────────────────────────────────
      There are none (owner, 2026-08-26). The whole namespace is cleared, so `shadow-sm` and its

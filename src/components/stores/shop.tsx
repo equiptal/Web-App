@@ -12,8 +12,14 @@
  * These are decoration beside text that already says the thing, so each is `aria-hidden`.
  */
 
-/** The page column: 1360 capped, 24px gutter, 24 over and 80 under (prototype geometry). */
-export const SHOP_PAGE = "mx-auto w-full max-w-[1360px] px-6 pt-6 pb-20";
+/**
+ * The page column: 1360 capped, a 24px gutter, 80px of foot.
+ *
+ * The TOP is the caller's, because the reference does not use one number: the directory opens at 36
+ * and the two detail pages at 24 — a page that begins with a title needs more air over it than one
+ * that begins with a back link.
+ */
+export const SHOP_PAGE = "mx-auto w-full max-w-[1360px] px-6 pb-20";
 
 export function BackArrowIcon({ size = 16 }: { size?: number }) {
   return (
@@ -59,9 +65,47 @@ export function CheckIcon({ size = 10, strokeWidth = 3 }: { size?: number; strok
   );
 }
 
-/** The green disc with a white tick — 17px beside a name, 22px over a photo. */
+/** The price mark: a circled «i», because a price on request is a note rather than a number. */
+export function PriceIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 8V13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="12" cy="16" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** The shop, on the button that opens one. */
+export function StorefrontIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4 10V20H20V10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 10L4.5 4H19.5L21 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M3 10C3 11.4 4.1 12.5 5.5 12.5C6.9 12.5 8 11.4 8 10C8 11.4 9.1 12.5 10.5 12.5C11.9 12.5 13 11.4 13 10C13 11.4 14.1 12.5 15.5 12.5C16.9 12.5 18 11.4 18 10C18 11.4 19.1 12.5 20.5 12.5C21.4 12.5 22.2 12 22.6 11.3"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <path d="M10 20V15H14V20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** The camera, over a photo count. */
+export function CameraIcon({ size = 17 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.7" />
+      <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+/** The green disc with a white tick — 15px on the sheet, 17px beside a name, 22px over a photo. */
 export function VerifiedDot({ size = 17 }: { size?: number }) {
-  const inner = size >= 20 ? 12 : 10;
+  const inner = size >= 20 ? 12 : size <= 15 ? 9 : 10;
   return (
     <span
       className="inline-flex flex-none items-center justify-center rounded-full bg-shop-ok text-white"

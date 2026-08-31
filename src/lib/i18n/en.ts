@@ -178,6 +178,8 @@ export const en = {
     equipmentCount: "equipment",
     // The pill row's first pill — the shopfront view, before any category narrows the cards.
     allCategories: "All",
+    // Beside the page title: «13 stores across Saudi Arabia».
+    storesAcross: "stores across Saudi Arabia",
     empty: "No suppliers match your filters.",
     error: "We couldn't load suppliers.",
     retry: "Retry",
@@ -220,6 +222,7 @@ export const en = {
     close: "Close",
     suppliedBy: "Supplied by",
     backToSuppliers: "Back to suppliers",
+    backToResults: "Back to results",
     about: "About",
     viewStore: "View store",
     prevPhoto: "Previous",

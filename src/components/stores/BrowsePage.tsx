@@ -56,7 +56,7 @@ export function BrowsePage() {
      it is this page's own reason for existing (owner, 2026-08-30: the banner says a renter can ask
      the market, the directory says who the market is). */
   return (
-    <div {...pin("browse-page")} className={`${SHOP_PAGE} flex flex-col gap-7`}>
+    <div {...pin("browse-page")} className={`${SHOP_PAGE} flex flex-col gap-7 pt-9`}>
       <CtaBanner />
       <BrowseSurface title={t.home.suppliersTitle} />
     </div>
