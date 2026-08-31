@@ -9,6 +9,7 @@ import { AddSuppliersDialog } from "./AddSuppliersDialog";
 import { DeleteGroupDialog, GroupsMenu, NameGroupDialog, RenameGroupDialog } from "./SupplierGroups";
 import { SupplierProfileDialog } from "./SupplierProfileDialog";
 import { SupplierBidsDialog } from "./SupplierBidsDialog";
+import { EditSupplierDialog } from "./EditSupplierDialog";
 import {
   bidCount,
   canBeEmailed,
@@ -64,6 +65,7 @@ export function SuppliersPage() {
      Never both at once — a dialog stacked on a dialog has two ways to close and neither is obvious. */
   const [profileId, setProfileId] = useState<string | null>(null);
   const [bidsId, setBidsId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<RenterSupplier | null>(null);
 
   const load = useCallback(() => {
     listRenterSuppliers().then(setRows);
@@ -273,9 +275,9 @@ export function SuppliersPage() {
                     />
                   </th>
                 )}
-                {[c.colSupplier, c.colVendor, c.colContact, c.colGroups, c.colBids].map((h) => (
+                {[c.colSupplier, c.colVendor, c.colContact, c.colGroups, c.colBids, ""].map((h, hi) => (
                   <th
-                    key={h}
+                    key={h || hi}
                     className="border-b border-border bg-surface2 px-3 py-2 text-start text-label font-extrabold uppercase tracking-wide text-muted"
                   >
                     {h}
@@ -302,6 +304,7 @@ export function SuppliersPage() {
                   }
                   onOpen={() => setProfileId(s.id)}
                   onOpenBids={() => setBidsId(s.id)}
+                  onEdit={() => setEditing(s)}
                 />
               ))}
             </tbody>
@@ -315,6 +318,17 @@ export function SuppliersPage() {
         onAdded={() => {
           load();
           setToast(c.added);
+        }}
+      />
+
+      <EditSupplierDialog
+        key={editing?.id ?? "none"}
+        supplier={editing}
+        allGroups={groups.map((g) => g.name)}
+        onClose={() => setEditing(null)}
+        onSaved={(m) => {
+          setToast(m);
+          load();
         }}
       />
 
@@ -393,6 +407,7 @@ function Row({
   onPick,
   onOpen,
   onOpenBids,
+  onEdit,
 }: {
   s: RenterSupplier;
   c: ReturnType<typeof useT>["suppliers"];
@@ -402,6 +417,7 @@ function Row({
   onPick: (on: boolean) => void;
   onOpen: () => void;
   onOpenBids: () => void;
+  onEdit: () => void;
 }) {
   const platform = s.kind === "platform";
   const groups = groupsOf(s);
@@ -523,6 +539,19 @@ function Row({
             </span>
           </button>
         )}
+      </td>
+
+      <td className="px-3 py-2.5">
+        <span className="flex items-center justify-end">
+          <button
+            type="button"
+            onClick={onEdit}
+            title={c.edit}
+            className="grid h-[30px] w-[30px] place-items-center rounded-sm text-muted transition hover:bg-surface3 hover:text-navy"
+          >
+            <Icon name="edit" size={15} />
+          </button>
+        </span>
       </td>
     </tr>
   );
