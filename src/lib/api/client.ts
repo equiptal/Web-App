@@ -1413,7 +1413,7 @@ export async function removeDocument(projectId: string, awardId: string, docId: 
  * here so `AwardDialog` and anything else importing it from the client keeps working.
  */
 export type { RenterSupplier } from "@/lib/contract/renter-suppliers";
-import type { RenterSupplier } from "@/lib/contract/renter-suppliers";
+import type { RenterSupplier, SupplierProfile } from "@/lib/contract/renter-suppliers";
 
 /**
  * The renter's own suppliers, for the award picker.
@@ -1428,4 +1428,109 @@ export async function listRenterSuppliers(): Promise<RenterSupplier[]> {
   } catch {
     return [];
   }
+}
+
+/* ── the writes (SUP-T12) ──────────────────────────────────────────────────────────────────────
+ *
+ * Every one throws on failure — deliberately, and unlike the read above.
+ *
+ * A read that cannot reach the registry can honestly answer "you have no suppliers", because that is
+ * what the renter sees either way. A WRITE cannot: telling someone their supplier was saved when it
+ * was not is a lie they discover weeks later, from a firm that never got a request. So these surface
+ * the error and the screen says what happened. */
+
+/** The profile: the row, its bids, its awards, and what the renter sent it. */
+export async function getRenterSupplier(id: string): Promise<SupplierProfile> {
+  return projectFetch<SupplierProfile>(`/api/renter-suppliers/${encodeURIComponent(id)}`);
+}
+
+export interface NewRenterSupplier {
+  name: string;
+  contactName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  crNumber?: string | null;
+  vendorRegistered?: boolean;
+  groups?: string[];
+  extra?: Record<string, string>;
+}
+
+/**
+ * Add one supplier the renter typed in.
+ *
+ * A phone or CR already in the company's list comes back 409 with the id of the row that holds it —
+ * `alreadyLinkedId` reads it out, so the caller can say "already in your list" and open that row
+ * instead of reporting a failure for something that is simply already true.
+ */
+export async function addRenterSupplier(input: NewRenterSupplier): Promise<RenterSupplier> {
+  return projectFetch<RenterSupplier>("/api/renter-suppliers", { method: "POST", body: input });
+}
+
+/**
+ * True when a write was refused because that phone or CR is already in this company's list.
+ *
+ * Not a failure the renter should see as one: it means the supplier is already there. The caller says
+ * *"already in your list"* and opens the row rather than reporting an error for something true.
+ *
+ * The row's id would let us open it directly; `projectFetch` keeps only the code today, so the caller
+ * refetches the list and finds it by phone. Worth carrying the id through when a second caller needs
+ * it — one is not enough reason to widen `ApiError`.
+ */
+export function isAlreadyLinked(err: unknown): boolean {
+  return err instanceof ApiError && err.backendCode === "ALREADY_LINKED";
+}
+
+export interface BulkResult {
+  created: { row: number; id: string }[];
+  merged: { row: number; id: string; on: string }[];
+  rejected: { row: number; reason: string }[];
+}
+
+/** The spreadsheet import. Partial success is the normal outcome — read all three arrays. */
+export async function addRenterSuppliersBulk(rows: NewRenterSupplier[]): Promise<BulkResult> {
+  return projectFetch<BulkResult>("/api/renter-suppliers/bulk", { method: "POST", body: { rows } });
+}
+
+/** Link suppliers who already have accounts. One already linked is skipped, not an error. */
+export async function linkRenterSuppliers(
+  items: { supplierId: string; vendorRegistered: boolean }[],
+): Promise<{ created: { supplierId: string; id: string }[]; skipped: { supplierId: string }[] }> {
+  return projectFetch("/api/renter-suppliers/link", { method: "POST", body: { items } });
+}
+
+/** The vendor flag, the contact the renter keeps, the groups. Idempotent: the toggle fires twice. */
+export async function updateRenterSupplier(
+  id: string,
+  patch: Partial<Pick<RenterSupplier, "vendorRegistered" | "contactName" | "email" | "phone" | "crNumber" | "groups">>,
+): Promise<RenterSupplier> {
+  return projectFetch<RenterSupplier>(`/api/renter-suppliers/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: patch,
+  });
+}
+
+/** Removes the LINK. The account, the store, the bids and the awards all stay — and it says so. */
+export async function removeRenterSupplier(
+  id: string,
+): Promise<{ deleted: boolean; keptBids?: number; keptAwards?: number }> {
+  return projectFetch(`/api/renter-suppliers/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+/** Every group in the company's list, with its count. */
+export async function listSupplierGroups(): Promise<{ name: string; count: number }[]> {
+  try {
+    return await projectFetch<{ name: string; count: number }[]>("/api/renter-suppliers/groups");
+  } catch {
+    return [];
+  }
+}
+
+/** Rename one group across every row that carries it. */
+export async function renameSupplierGroup(from: string, to: string): Promise<{ updated: number }> {
+  return projectFetch("/api/renter-suppliers/groups", { method: "PATCH", body: { from, to } });
+}
+
+/** Remove the label. **Never a supplier** — the count is how many rows became ungrouped. */
+export async function deleteSupplierGroup(name: string): Promise<{ updated: number }> {
+  return projectFetch(`/api/renter-suppliers/groups?name=${encodeURIComponent(name)}`, { method: "DELETE" });
 }
