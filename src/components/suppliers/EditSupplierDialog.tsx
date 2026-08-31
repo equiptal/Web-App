@@ -40,7 +40,6 @@ export function EditSupplierDialog({
   const [contactName, setContactName] = useState(supplier?.contactName ?? "");
   const [email, setEmail] = useState(supplier?.email ?? "");
   const [phone, setPhone] = useState(supplier?.phone ?? "");
-  const [crNumber, setCrNumber] = useState(supplier?.crNumber ?? "");
   const [groups, setGroups] = useState<string[]>(groupsOf(supplier ?? ({} as RenterSupplier)));
   const [saving, setSaving] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -58,7 +57,6 @@ export function EditSupplierDialog({
         contactName: contactName.trim() || null,
         email: email.trim() || null,
         phone: phone.trim() || null,
-        crNumber: crNumber.trim() || null,
         groups,
       });
       onSaved(c.saved);
@@ -140,10 +138,11 @@ export function EditSupplierDialog({
           <Field label={c.fContact} value={contactName} onChange={setContactName} />
           <Field label={c.fEmail} value={email} onChange={setEmail} type="email" hint={c.emailHint} />
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={c.fPhone} value={phone} onChange={setPhone} placeholder="+966 5X XXX XXXX" />
-          <Field label={c.fCr} value={crNumber} onChange={setCrNumber} />
-        </div>
+        {/* ~~CR number.~~ Removed (owner, 2026-09-01): a renter does not hold his suppliers'
+            commercial registrations, so the field was either empty or filled from memory — and the CR
+            is the strongest key we have for matching an off-platform firm to an account, so a
+            remembered one matches the wrong company. It arrives on the supplier's own bid or not at all. */}
+        <Field label={c.fPhone} value={phone} onChange={setPhone} placeholder="+966 5X XXX XXXX" />
 
         <div className="grid gap-1.5">
           <span className="text-label font-extrabold uppercase tracking-wide text-muted">{c.colGroups}</span>

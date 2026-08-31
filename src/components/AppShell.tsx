@@ -206,9 +206,9 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
   const navItems: NavItem[] = [
     ...(guest ? [browseTab, dashboardTab] : [dashboardTab, browseTab]),
     { key: "requests", label: t.shell.requests, href: "/requests" },
-    // The renter's own list of firms — his, not the platform's. Beside Requests because that is where
-    // he is when he wants it: a request going out, and a question about who to send it to.
-    ...(guest ? [] : [{ key: "suppliers", label: t.suppliers.title, href: "/suppliers" } as NavItem]),
+    // ~~My Suppliers.~~ It is on the dashboard now, under the projects (owner, 2026-09-01) — a
+    // renter asks who to send a request to while he is looking at the request, and a fifth tab was
+    // one more thing to remember rather than one more thing to find.
     { key: "company", label: t.shell.company, href: "/company" },
   ];
   const initials = (name.trim() ? name.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("") : "").toUpperCase();

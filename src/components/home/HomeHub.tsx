@@ -6,6 +6,7 @@ import { useSession } from "@/lib/session";
 import { CtaBanner } from "@/components/home/CtaBanner";
 import { HomeRequests } from "@/components/home/HomeRequests";
 import { ProjectsSurface } from "@/components/projects/ProjectsSurface";
+import { SuppliersPage } from "@/components/suppliers/SuppliersPage";
 import { pin } from "@/lib/uiPins";
 /**
  * Renter web home hub (web-app/004, AC-04/05/07/10/25). A gradient-to-dark hero (pitch left, Create-
@@ -60,6 +61,14 @@ export function HomeHub() {
           It renders nothing for a guest or a renter with no sites, so a new account sees exactly
           today's dashboard. */}
       <ProjectsSurface embedded />
+
+      {/* My Suppliers, under the sites rather than behind a tab of its own (owner, 2026-09-01).
+
+          A renter asks "who do I send this to" while he is looking at the work that needs sending.
+          Behind a tab, the question and the answer were two navigations apart — and a tab that has to
+          be remembered is a tab that is not used. Under the projects because that is the order of the
+          thought: this is my work, and these are the firms I put on it. */}
+      <SuppliersPage embedded />
 
       {/* ~~Suggested suppliers.~~ They are the whole of BROWSE now (owner, 2026-08-30). The
           dashboard answers "what is mine and where does it stand"; a supplier directory answers

@@ -11,7 +11,6 @@ import { DeleteGroupDialog, GroupsMenu, NameGroupDialog, RenameGroupDialog } fro
 import { SupplierProfileDialog } from "./SupplierProfileDialog";
 import { SupplierBidsDialog } from "./SupplierBidsDialog";
 import { EditSupplierDialog } from "./EditSupplierDialog";
-import { ImportSuppliersDialog } from "./ImportSuppliersDialog";
 import { SuggestedBand } from "./SuggestedBand";
 import {
   bidCount,
@@ -42,8 +41,15 @@ import {
  * Whether a `platform` row carries the supplier's own email and phone is provisional and switched
  * server-side (SUP-BE-20). So the cell renders from what arrived: an address, or *not set · add*.
  * Turning that switch off must cost this screen nothing.
+ *
+ * ── On the dashboard, not behind a tab (owner, 2026-09-01) ──────────────────────────────────────
+ *
+ * `embedded` renders this under the projects surface on the renter's home, and the nav tab is gone.
+ * A renter asks "who do I send this to" while he is looking at the work that needs sending — not
+ * after remembering a tab exists. Standalone `/suppliers` stays for a direct link and for the
+ * dialogs to have a page of their own.
  */
-export function SuppliersPage() {
+export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
   const t = useT();
   const c = t.suppliers;
 
@@ -52,7 +58,6 @@ export function SuppliersPage() {
   const [pill, setPill] = useState<"all" | "vendor">("all");
   const [toast, setToast] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
-  const [importing, setImporting] = useState(false);
 
   /* Groups. `picking` is the only mode that shows checkboxes — a column of empty boxes on every row
      implies bulk work this screen does not do, so it appears when a group is being made and goes
@@ -90,7 +95,7 @@ export function SuppliersPage() {
       if (groupFilter && !groupsOf(s).includes(groupFilter)) return false;
       if (!needle) return true;
       // Everything a renter might half-remember: the firm, the person, either way of reaching them.
-      return [s.name, s.contactName, s.email, s.phone, s.crNumber]
+      return [s.name, s.contactName, s.email, s.phone]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(needle));
     });
@@ -164,24 +169,28 @@ export function SuppliersPage() {
   }, [toast]);
 
   return (
-    <div className="mx-auto w-full max-w-[1560px] px-4 py-5 sm:px-6 xl:px-8">
-      <header className="mb-3 flex flex-wrap items-center gap-3">
+    <div className={embedded ? "flex flex-col gap-3 pb-24" : "mx-auto w-full max-w-[1560px] px-4 py-5 sm:px-6 xl:px-8"}>
+      <header className={cx("flex flex-wrap items-center gap-3", !embedded && "mb-3")}>
         <span className="grid h-[38px] w-[38px] flex-none place-items-center rounded-sm bg-navy text-surface">
           <Icon name="groups" size={22} />
         </span>
         <div className="min-w-0">
-          <h1 className="text-title font-extrabold tracking-tight text-navy">{c.title}</h1>
+          {/* One heading level down inside the dashboard — the page already has an h1 above it. */}
+          {embedded ? (
+            <h2 className="text-title font-extrabold tracking-tight text-navy">{c.title}</h2>
+          ) : (
+            <h1 className="text-title font-extrabold tracking-tight text-navy">{c.title}</h1>
+          )}
           <p className="mt-0.5 text-meta text-muted">
             <b className="font-extrabold text-navy">{rows?.length ?? 0}</b>{" "}
             {(rows?.length ?? 0) === 1 ? fmt(c.summaryOne, { n: 1 }) : fmt(c.summaryMany, { n: rows?.length ?? 0 })}
             {vendors > 0 && <> · {fmt(c.vendors, { n: vendors })}</>}
           </p>
         </div>
+        {/* ~~A second «Import a list» button.~~ Removed (owner, 2026-09-01): two controls for one
+            intention made a renter with a file guess which door was his before either had told him
+            what it wanted. Uploading is now a tab inside this dialog. */}
         <span className="ms-auto flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => setImporting(true)} className={btn("secondary", "md")}>
-            <Icon name="table_view" size={15} />
-            {c.importSuppliers}
-          </button>
           <button type="button" onClick={() => setAdding(true)} className={btn("tinted", "md")}>
             <Icon name="person_add" size={15} />
             {c.addSupplier}
@@ -327,21 +336,14 @@ export function SuppliersPage() {
         )}
       </div>
 
+      {/* One dialog: typed rows or an uploaded list, chosen inside it. `msg` is the import's own
+          count — typed rows have nothing to count that the list below does not already show. */}
       <AddSuppliersDialog
         open={adding}
         onClose={() => setAdding(false)}
-        onAdded={() => {
+        onAdded={(msg) => {
           load();
-          setToast(c.added);
-        }}
-      />
-
-      <ImportSuppliersDialog
-        open={importing}
-        onClose={() => setImporting(false)}
-        onDone={(m) => {
-          setToast(m);
-          load();
+          setToast(msg ?? c.added);
         }}
       />
 
