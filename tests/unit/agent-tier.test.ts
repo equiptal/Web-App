@@ -296,3 +296,74 @@ describe("the cert the agent DID return", () => {
     expect(d.items[0].safetyCertsOverride).toBeNull();
   });
 });
+
+describe("every answer the fast lane gives", () => {
+  /* Asked directly: *"are you sure no field is lost?"* No — six were. This reader consumed seven
+     fields for as long as the lane emitted seven, and the lane emits more now. The certificate was
+     simply the one that got noticed.
+
+     Measured on staging with the line below: the agent answered all six and this dropped all six. */
+
+  const stated = {
+    tier: 1 as const,
+    line_items: [
+      {
+        input_equipment: "excavator 30 ton",
+        subtype: "Crawler Excavator",
+        capacity: "30 ton",
+        quantity: 1,
+        operator_included: "YES",
+        mobilization_by_rentee: false,
+        demobilization_by_rentee: false,
+        diesel_included: true,
+        fuel_type_preference: "PETROL",
+        minimum_equipment_year: 2019,
+        safety_certifications: ["TUV"],
+      },
+    ],
+  };
+
+  it("carries all six onto the draft", () => {
+    const it0 = quickItemsToDraft(stated as never, null, "x").items[0];
+    expect(it0.operatorNeeded).toBe("yes");
+    // `by_rentee: false` is the SUPPLIER — the same fold the full path does.
+    expect(it0.deliveryOverride).toBe("supplier");
+    expect(it0.returnOverride).toBe("supplier");
+    // diesel_included asks whether the SUPPLIER includes the fuel, so true = supplier pays.
+    expect(it0.fuelResponsibilityOverride).toBe("supplier");
+    /* NOT fuelType: the agent is no longer asked for it, and the app fills it. Asserted below as
+       the app's own default in both the stated and the silent case. */
+    expect(it0.equipmentYear).toBe("2019");
+    expect(it0.safetyCertsOverride).toEqual(["tuv"]);
+  });
+
+  it("leaves every one unset when the lane omitted it", () => {
+    /* Verified on staging that a silent line omits these, which is what makes the mapping safe: a
+       value present means the renter said it, so it outranks the project. If the lane started
+       inventing again, this mapping would carry the invention — hence the pairing with the
+       evidence-only flag on both halves of that lane. */
+    const silent = { tier: 1 as const, line_items: [{ subtype: "Crawler Excavator", capacity: "30 ton", quantity: 2 }] };
+    const it0 = quickItemsToDraft(silent as never, null, "2 crawler excavators 30 ton").items[0];
+    expect(it0.operatorNeeded ?? null).toBeNull();
+    expect(it0.deliveryOverride).toBeNull();
+    expect(it0.returnOverride).toBeNull();
+    expect(it0.fuelResponsibilityOverride).toBeNull();
+    expect(it0.equipmentYear).toBeNull();
+    expect(it0.safetyCertsOverride).toBeNull();
+    // Fuel type is the app's job now, not the agent's: it keeps the default either way.
+    expect(it0.fuelType).toBe("diesel");
+  });
+
+  it("ignores a fuel type even when one is sent", () => {
+    /* The agent is not asked for it any more (owner, 2026-08-31) — the fuel is a property of the
+       machine, and the app fills it. A stale build that still emits it must not be able to change
+       the answer, so this pins the app's default against a payload that names petrol. */
+    const it0 = quickItemsToDraft(stated as never, null, "x").items[0];
+    expect(it0.fuelType).toBe("diesel");
+  });
+
+  it("refuses a year that is not one", () => {
+    const bad = { tier: 1 as const, line_items: [{ subtype: "Crawler Excavator", capacity: "30 ton", quantity: 1, minimum_equipment_year: 12 }] };
+    expect(quickItemsToDraft(bad as never, null, "x").items[0].equipmentYear).toBeNull();
+  });
+});

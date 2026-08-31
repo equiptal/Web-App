@@ -40,6 +40,18 @@ function resolve(tree: Taxonomy | null | undefined, subtype: string | null, capa
  * things downstream: `null` lets a project or a template fill the field, and `[]` is the renter
  * saying *no certificate*.
  */
+/** `true` = the renter, `false` = the supplier, absent = not stated. The full path's own fold. */
+function party(byRentee: unknown): "me" | "supplier" | null {
+  return byRentee == null ? null : byRentee === true ? "me" : "supplier";
+}
+
+/** A year as this app stores it: a string, or null. Rejects anything that is not a plausible year. */
+function yearOf(raw: unknown): string | null {
+  const n = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
+  if (!Number.isFinite(n) || n < 1950 || n > new Date().getFullYear() + 1) return null;
+  return String(Math.trunc(n));
+}
+
 function certsOf(raw: unknown): EquipmentItem["safetyCertsOverride"] {
   const list = Array.isArray(raw) ? raw : typeof raw === "string" && raw.trim() ? [raw] : [];
   const codes = list
@@ -122,6 +134,49 @@ export function quickItemsToDraft(
       rawLabel: (r.input_equipment as string) ?? subtype ?? "",
       rawSize: capacity,
       quantity: typeof r.quantity === "number" && r.quantity > 0 ? r.quantity : 1,
+      /* ── EVERY answer the fast lane gives, not just the taxonomy ─────────────────────────────
+
+         This reader consumed seven fields for as long as the fast lane emitted seven. It emits more
+         now, and the gap between the two is silent loss — the certificate was only the one that got
+         noticed. Asked directly, *"are you sure no field is lost?"*: no, six were.
+
+         Measured on staging with «excavator 30 ton with tuv, with operator, delivery on the
+         supplier, they return it, supplier pays the fuel, 2019 or newer» — the agent answered
+         operator_included, mobilization_by_rentee, demobilization_by_rentee, diesel_included,
+         fuel_type_preference and minimum_equipment_year, and every one of them was dropped here.
+
+         Safe to trust, because this lane is evidence-only in BOTH halves now: verified on staging
+         that a line stating none of these omits all of them, so a value present means the renter
+         said it. That is what makes these `agent` values rather than guesses — they outrank the
+         project, which is the correct order for something the renter typed about THIS request.
+
+         The rest of the payload stays dropped on purpose: the five `*_match` verdicts, `verdict`,
+         the three Arabic names and the duplicate `category`. The app reads none of them. */
+      operatorNeeded: r.operator_included === "YES" ? "yes" : r.operator_included === "NO" ? "no" : null,
+      /* `by_rentee` is a boolean about WHO, and this app stores the party. `true` is the renter, so
+         "delivery on the supplier" arrives as false and becomes "supplier" — the same fold
+         `machineTermsOfRequestItem` does on the full path, not a second opinion about it. */
+      deliveryOverride: party(r.mobilization_by_rentee),
+      returnOverride: party(r.demobilization_by_rentee),
+      /* Reversed, and deliberately: `diesel_included` asks whether the SUPPLIER includes the fuel,
+         so true means the supplier pays. Staging confirms the polarity — "the supplier pays for
+         fuel" returns true. */
+      fuelResponsibilityOverride:
+        r.diesel_included == null ? null : r.diesel_included ? "supplier" : "me",
+      /* ~~`fuelType` from the agent, falling back to the app's default.~~ The agent is no longer
+         ASKED for it (owner, 2026-08-31: *"fuel type will be filled automatically by the system, no
+         need to spend time on it by the agent"*), so there is nothing to read: the field keeps the
+         app's own default, which is what `newManualItem` already put there.
+
+         Right call, and it is free speed. The fuel is a property of the MACHINE, not a term the
+         renter negotiates — a 30-ton crawler excavator runs on diesel whoever hires it — so deciding
+         it per request spent output tokens, the one thing this path is charged for, to restate a fact
+         about the catalogue. Who PAYS for the fuel is a different question and still read, below:
+         that one is money, and money is stated or it is not. */
+      /* The oldest model year they will accept. `minimum_equipment_year` is the field the fast lane
+         names; `max_equipment_age` carries the same number on the full path, so it is the fallback
+         rather than a competing answer. */
+      equipmentYear: yearOf(r.minimum_equipment_year ?? r.max_equipment_age),
       /* ⚠️ The certificate the agent read, PER ITEM — and this reader was ignoring it.
          The fast lane can answer certs now, and does: *"10 × Crawler Excavator 20 ton with 2 ×
          Crawler Excavator 30 ton with tuv"* comes back with `["TUV"]` on BOTH items, verified on
