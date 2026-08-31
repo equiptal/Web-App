@@ -181,3 +181,32 @@ describe("the marks toggle", () => {
     expect(actions.onMark).toHaveBeenCalledWith("mobilizedAt", null);
   });
 });
+
+describe("where the layer opens", () => {
+  /* Found on staging, 2026-08-31: the chart body is `max-h-[64vh] overflow-y-auto`, and an
+     `absolute` menu is clipped by THAT box, not by the window. On a six-entry list the last two
+     entries — *Change the award* and the red *Remove from the project* — sat at 725px and 756px
+     against a container ending at 702px: rendered, focusable, invisible. Flipping upward could not
+     save it, because a 207px list fits on neither side of a box with ~155px below the row and ~81px
+     above. Only leaving the scroll box does. */
+
+  it("is fixed, so an ancestor's overflow cannot clip it", () => {
+    mount(<RowMenu group={group("work_order")} award={award()} actions={all()} />);
+    fireEvent.click(screen.getByRole("button", { name: /row actions/i }));
+
+    const menu = screen.getByRole("menu");
+    expect(menu.style.position).toBe("fixed");
+    // And no `absolute`, which is the state this regressed from.
+    expect(menu.className).not.toMatch(/absolute/);
+  });
+
+  it("shows every entry, with the destructive one last", () => {
+    // The clipping hid exactly the tail of the list, so the tail is what this pins.
+    const items = open(<RowMenu group={group("work_order")} award={award()} actions={all()} />);
+    expect(items.at(-1)).toBe("Remove from the project");
+    expect(items).toContain("Change the award");
+
+    const last = screen.getByRole("menuitem", { name: "Remove from the project" });
+    expect(last.className).toMatch(/text-danger/);
+  });
+});

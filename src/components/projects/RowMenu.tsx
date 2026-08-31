@@ -21,12 +21,25 @@
  * **An unfiled row says *File in a project*, not *Move to another project*.** It was never in one,
  * and "move" asks the renter to remember a place it has never been.
  *
- * ── It opens where there is ROOM ─────────────────────────────────────────────────────────────────
+ * ── It opens where there is ROOM, and it is not inside the chart's scroll box ─────────────────────
  *
  * Downward by default, upward when the viewport is short of it. A menu on the last row of a chart had
  * nothing below it to open into and was simply not there (owner, 2026-08-31). Measured from the
  * button's own rect at the moment of the press rather than guessed from the row index: the same row
  * is near the bottom or not depending on where the renter has scrolled to.
+ *
+ * ⚠️ **Flipping is not enough on its own, and measuring the viewport was the wrong ruler.** The chart
+ * body is `max-h-[64vh] overflow-y-auto`, so an `absolute` menu is CLIPPED by that box long before it
+ * reaches the bottom of the window. On a six-entry list the two last entries — *Change the award* and
+ * the red *Remove from the project* — were rendered, focusable, and invisible: 725px and 756px
+ * against a container that ends at 702px. Flipping up could not save it either, because a 207px menu
+ * fits on neither side of a box that leaves ~155px below the row and ~81px above it.
+ *
+ * So the menu is `position: fixed`, placed from the trigger's rect. Fixed escapes an ancestor's
+ * overflow entirely — verified on staging that nothing above it sets `transform`, `filter`,
+ * `perspective` or `contain`, any of which would make `fixed` resolve against that ancestor and put
+ * the clipping straight back. It is re-placed on scroll (capture, so the chart's own scrolling counts)
+ * and on resize, because a fixed layer does not travel with the row underneath it.
  *
  * ── Our quotation is a download ──────────────────────────────────────────────────────────────────
  *
@@ -35,8 +48,8 @@
  * one word would mean a renter attaching a supplier's paper and later finding ours.
  */
 
-import { useEffect, useRef, useState } from "react";
-import { useT } from "@/lib/i18n";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { POPOVER } from "@/lib/ds";
 import type { Award, ChartGroup } from "@/lib/contract/award";
@@ -55,6 +68,9 @@ export interface RowMenuActions {
   onRemoveFromProject?: () => void;
   onFileInProject?: () => void;
 }
+
+/** One number for the layer's width: the placement maths and the element must not drift apart. */
+const WIDTH = 232;
 
 interface Entry {
   key: string;
@@ -81,25 +97,13 @@ export function RowMenu({
 }) {
   const t = useT();
   const m = t.projects.menu;
+  const { dir } = useLocale();
   const [open, setOpen] = useState(false);
-  /** Which way the list opens. Decided from the button's rect when it is pressed. */
-  const [up, setUp] = useState(false);
+  /** Viewport coordinates for the fixed layer. `null` until the button has been measured. */
+  const [at, setAt] = useState<{ top: number; left: number } | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
-    };
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", away);
-    document.addEventListener("keydown", esc);
-    return () => {
-      document.removeEventListener("mousedown", away);
-      document.removeEventListener("keydown", esc);
-    };
-  }, [open]);
 
   const isWorkOrder = group.kind === "work_order";
   const a = actions;
@@ -177,6 +181,53 @@ export function RowMenu({
     !unfiled,
   );
 
+  /** Roughly what the list needs: one row is 31px, plus the 4px padding at each end. */
+  const needed = items.length * 31 + 8;
+
+  const place = useCallback(() => {
+    const r = trigger.current?.getBoundingClientRect();
+    if (!r) return;
+    const gap = 6;
+    const vh = window.innerHeight;
+    const vw = window.innerWidth;
+
+    /* Down unless down does not fit AND up does. Never up into a worse fit: on a short window the
+       clamp below keeps the whole list on screen either way. */
+    const downFits = r.bottom + gap + needed <= vh - 8;
+    const upFits = r.top - gap - needed >= 8;
+    const top = downFits || !upFits ? r.bottom + gap : r.top - gap - needed;
+
+    /* The menu's inline-END edge lines up with the button's, so it opens back over the row it
+       belongs to rather than off the side of the chart. Mirrored, because in Arabic the row's
+       controls sit at the other end. */
+    const left = dir === "rtl" ? r.left : r.right - WIDTH;
+
+    setAt({
+      top: Math.max(8, Math.min(top, vh - needed - 8)),
+      left: Math.max(8, Math.min(left, vw - WIDTH - 8)),
+    });
+  }, [dir, needed]);
+
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    /* Capture, so the CHART's scrolling counts and not just the window's — the row moves under a
+       fixed layer that would otherwise stay where it was opened. */
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", esc);
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [open, place]);
+
   if (!items.length) return null;
 
   return (
@@ -185,10 +236,7 @@ export function RowMenu({
         ref={trigger}
         type="button"
         onClick={() => {
-          const rect = trigger.current?.getBoundingClientRect();
-          // Roughly what the list needs, capped. Overestimating is safe — it opens upward a little
-          // early, which is never wrong; underestimating puts the last entry under the fold.
-          if (rect) setUp(window.innerHeight - rect.bottom < Math.min(300, items.length * 34 + 24));
+          place();
           setOpen((v) => !v);
         }}
         aria-haspopup="menu"
@@ -204,7 +252,10 @@ export function RowMenu({
           role="menu"
           /* The house treatment for a popover. This app has no shadows — a floating layer is
              separated by its border and the ground behind it (see OVERLAY / POPOVER in ds.ts). */
-          className={`${POPOVER} absolute end-0 flex w-[232px] flex-col p-1 ${up ? "bottom-8" : "top-8"}`}
+          /* `fixed`, not `absolute`: see the note above — absolute is clipped by the chart's own
+             scroll box, which hid the last two entries outright. */
+          style={{ position: "fixed", top: at?.top ?? 0, left: at?.left ?? 0, width: WIDTH }}
+          className={`${POPOVER} z-50 flex flex-col p-1`}
         >
           {items.map((e) => (
             <button
