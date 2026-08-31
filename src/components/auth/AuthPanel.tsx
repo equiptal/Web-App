@@ -22,6 +22,14 @@ import { btn } from "@/lib/ds";
  * button already wear. A modal that introduced two new hexes would be a second palette living in the
  * one surface every user meets first.
  *
+ * ── The photograph is the owner's own comp ──────────────────────────────────────────────────────
+ *
+ * `/auth-panel.webp` is the excavator arm from his sign-in reference (2026-08-31), lifted out of the
+ * comp itself: the clean strip of frame to the right of the form panel, cropped clear of the close
+ * control, then doubled with a Lanczos resample for retina. It is a screenshot-sourced asset and
+ * therefore SOFTER than a real export would be — replacing this file with the original photograph
+ * changes nothing else, because nothing else references it.
+ *
  * ── What the comp has that this does not ────────────────────────────────────────────────────────
  * **The «5.0 ★★★★★ from 200+ reviews» row and its avatar stack.** Deliberately absent: we hold no
  * rating and no review count, and a number invented for a layout is a claim about the business that

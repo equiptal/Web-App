@@ -535,6 +535,37 @@
   .tlrow .t span{display:block;font-size:var(--t-meta);color:var(--muted)}
   .tlrow .when{font-size:var(--t-label);color:var(--muted-light);font-weight:700;white-space:nowrap;padding-top:3px}
   .tlrow .go{font-size:var(--t-meta);font-weight:800;color:var(--info-deep)}
+  /* One pill per paper: green when they have it, faint when they do not. The eye rides inside the
+     pill, and only on a paper the supplier handed over with their bid. */
+  .dpills{display:flex;flex-wrap:wrap;gap:6px}
+  .dpill{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;border-radius:var(--r-full);
+    font-size:var(--t-meta);font-weight:800;white-space:nowrap;
+    background:var(--ok-soft);color:var(--ok-deep);border:1px solid #b9e5cb}
+  .dpill.miss{background:transparent;color:var(--muted-light);border-style:dashed;border-color:var(--border-strong);
+    font-weight:700}
+  .dpill.soon{background:var(--warn-soft);color:var(--warn-deep);border-color:#f3d9a8}
+  .dpill .eye{display:grid;place-items:center;width:20px;height:20px;border-radius:var(--r-full);
+    margin-inline-end:-4px;color:inherit}
+  .dpill .eye:hover{background:rgba(21,128,61,.14)}
+  .dpill .eye .icon{font-size:14px}
+
+  /* An award is the most consequential thing in the file, so it gets rows and not a number. */
+  .awards{display:grid;gap:0;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden}
+  .awrow{display:flex;align-items:center;gap:10px;padding:9px 11px;border-bottom:1px solid var(--border)}
+  .awrow:last-child{border-bottom:0}
+  .awrow .dot{width:24px;height:24px;flex:none;border-radius:var(--r-full);display:grid;place-items:center;
+    background:var(--brand-soft);color:var(--brand-deep)}
+  .awrow .dot .icon{font-size:14px}
+  .awrow .t{flex:1;min-width:0}
+  .awrow .t b{display:block;font-size:var(--t-body);font-weight:800}
+  .awrow .t span{display:block;font-size:var(--t-meta);color:var(--muted)}
+  .awrow .money{font-family:"IBM Plex Mono",monospace;font-weight:700;font-size:var(--t-meta);white-space:nowrap}
+
+  .vbadge{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:var(--r-full);
+    background:var(--info-soft);color:var(--info-deep);border:1px solid #bfdcf3;
+    font-size:var(--t-label);font-weight:800}
+  .vbadge .icon{font-size:13px}
+
   .xtra{display:grid;gap:4px}
   .xtra .x{display:flex;gap:8px;font-size:var(--t-meta);padding:3px 0;border-bottom:1px dashed var(--border)}
   .xtra .x:last-child{border-bottom:0}
@@ -618,6 +649,21 @@ var SUPPLIERS = [
     email:"tenders@zahidtractor.com", phone:"+966 55 214 8890",
     vendor:true, groups:["Earthmoving","Riyadh"], source:"platform",
     rooms:3, awards:2,
+    verified:true,
+    /* A full read: the backend produced each row and presigned it, so every paper opens. */
+    docSrc:"profile",
+    docs:[ { k:"cr",   present:true,  exp:"2027-03-14", open:true },
+           { k:"vat",  present:true,  renews:true,      open:true },
+           { k:"addr", present:true,  exp:null,         open:true },
+           { k:"lc",   present:true,  exp:"2026-11-02", open:true },
+           { k:"saso", present:false } ],
+    awardList:[
+      { projEn:"Qiddiya Zone 4", projAr:"القدية المنطقة 4", eqEn:"Excavator 20t", eqAr:"حفارة 20 طن",
+        units:3, price:"8,400 SAR/mo", start:"2026-09-01", end:"2026-12-31" },
+      { projEn:"Diriyah — packages 3 & 4", projAr:"الدرعية — الحزم 3 و4", eqEn:"Manlift 16m", eqAr:"رافعة أفراد 16م",
+        units:2, price:"3,400 SAR/mo", start:"2026-07-20", end:"2026-10-20" }
+    ],
+
     bids:[
       { reqEn:"Excavator 20t", reqAr:"حفارة 20 طن", siteEn:"Qiddiya — Zone 4", siteAr:"القدية — المنطقة 4",
         price:"8,400 SAR/mo", when:"2026-08-29", via:"app", unseen:true },
@@ -637,6 +683,19 @@ var SUPPLIERS = [
     email:"bids@alrajhi-eq.sa", phone:"+966 50 771 2043",
     vendor:true, groups:["Earthmoving"], source:"platform",
     rooms:2, awards:1,
+    verified:true,
+    /* Presence only — the fallback built from the bid's booleans. We know they hold them; we have
+       no file to open, so no eye is drawn. */
+    docSrc:"profile",
+    docs:[ { k:"cr",   present:true,  exp:"2026-09-30" },
+           { k:"vat",  present:true,  renews:true },
+           { k:"addr", present:false },
+           { k:"lc",   present:false },
+           { k:"saso", present:false } ],
+    awardList:[
+      { projEn:"Diriyah — packages 3 & 4", projAr:"الدرعية — الحزم 3 و4", eqEn:"Manlift 16m", eqAr:"رافعة أفراد 16م",
+        units:2, price:"3,650 SAR/mo", start:"2026-07-20", end:"2026-10-20" }
+    ],
     bids:[
       { reqEn:"Excavator 20t", reqAr:"حفارة 20 طن", siteEn:"Qiddiya — Zone 4", siteAr:"القدية — المنطقة 4",
         price:"8,950 SAR/mo", when:"2026-08-24", via:"app" },
@@ -650,6 +709,14 @@ var SUPPLIERS = [
     email:null, phone:"+966 53 908 4417",
     vendor:true, groups:["Lifting"], source:"platform",
     rooms:1, awards:0,
+    verified:false,
+    docSrc:"profile",
+    docs:[ { k:"cr",   present:true,  exp:"2027-01-08", open:true },
+           { k:"vat",  present:true,  renews:true,      open:true },
+           { k:"addr", present:true,  exp:null },
+           { k:"lc",   present:false },
+           { k:"saso", present:false } ],
+    awardList:[],
     bids:[
       { reqEn:"Tower crane 8t", reqAr:"رافعة برجية 8 طن", siteEn:"King Khalid Airport", siteAr:"مطار الملك خالد",
         price:"46,000 SAR/mo", when:"2026-08-18", via:"app" }
@@ -661,6 +728,15 @@ var SUPPLIERS = [
     email:"ops@desertfleet.sa", phone:"+966 56 330 1180",
     vendor:true, groups:["Riyadh"], source:"manual",
     rooms:0, awards:0,
+    verified:false,
+    /* Off platform: they uploaded these on the shared bid form, so they are yours to open. */
+    docSrc:"bid",
+    docs:[ { k:"cr",   present:true,  exp:"2026-12-01", open:true },
+           { k:"vat",  present:true,  renews:true,      open:true },
+           { k:"addr", present:false },
+           { k:"lc",   present:false },
+           { k:"saso", present:false } ],
+    awardList:[],
     bids:[
       { reqEn:"Generator 250 kVA", reqAr:"مولد 250 ك.ف.أ", siteEn:"Aramco — Dhahran", siteAr:"أرامكو — الظهران",
         price:"13,900 SAR/mo", when:"2026-08-30", via:"link", unseen:true },
@@ -674,7 +750,10 @@ var SUPPLIERS = [
     email:null, phone:"+966 54 662 7301",
     vendor:false, groups:["Transport"], source:"sheet",
     extra:{ "CR number":"1010884213", "Payment terms":"30 days", "Account manager":"Nayef" },
-    rooms:0, awards:0, bids:[], sent:[] },
+    rooms:0, awards:0, bids:[], sent:[],
+    /* Never bid, so their papers are not readable at all — the panel says that rather than drawing
+       five empty rows. */
+    verified:false, docs:null, awardList:[] },
 
   { id:"l6", kind:"own", supplierId:null, store:false,
     nEn:"Gulf Power Rentals", nAr:"الخليج لتأجير المولدات", contact:"Ahmed Siddiqui",
@@ -682,6 +761,14 @@ var SUPPLIERS = [
     vendor:true, groups:["Power"], source:"sheet",
     extra:{ "CR number":"2050119887", "Payment terms":"45 days", "Account manager":"Ahmed" },
     rooms:0, awards:0,
+    verified:false,
+    docSrc:"bid",
+    docs:[ { k:"cr",   present:true,  exp:"2026-10-15", open:true },
+           { k:"vat",  present:false },
+           { k:"addr", present:false },
+           { k:"lc",   present:false },
+           { k:"saso", present:false } ],
+    awardList:[],
     bids:[
       { reqEn:"Generator 250 kVA", reqAr:"مولد 250 ك.ف.أ", siteEn:"Aramco — Dhahran", siteAr:"أرامكو — الظهران",
         price:"13,750 SAR/mo", when:"2026-08-20", via:"link" }
@@ -1050,7 +1137,7 @@ function acceptSuggestion(key){
     id:"l" + (SUPPLIERS.length + 1), kind:g.kind, supplierId:g.supplierId || null, store:false,
     nEn:g.nEn, nAr:g.nAr, contact:null, email:g.email, phone:g.phone,
     vendor:platform, groups:[], source:platform ? "platform" : "link_bid",
-    rooms:0, awards:0,
+    rooms:0, awards:0, verified:false, docs:null, awardList:[],
     bids:[ { reqEn:"Tower crane 8t", reqAr:"رافعة برجية 8 طن",
              siteEn:"King Khalid Airport", siteAr:"مطار الملك خالد",
              price:"44,900 SAR/mo", when:"2026-08-28", via:platform ? "app" : "link", unseen:true } ],
@@ -1189,7 +1276,7 @@ function saveDirectory(){
       id:"l" + (SUPPLIERS.length + 1 + added), kind:"platform", supplierId:d.supplierId, store:d.store,
       nEn:d.nEn, nAr:d.nAr, contact:null, email:null, phone:null,
       vendor:dirVend[d.supplierId] !== false, groups:[], source:"platform",
-      rooms:0, awards:0, bids:[], sent:[]
+      rooms:0, awards:0, bids:[], sent:[], verified:false, docs:null, awardList:[]
     });
     added++;
   });
@@ -1354,7 +1441,7 @@ function saveAdd(){
     SUPPLIERS.push({ id:"m" + (SUPPLIERS.length + 1 + i), kind:"own", supplierId:null, store:false,
       nEn:r.n.trim(), nAr:r.n.trim(), contact:r.c.trim() || null,
       email:r.e.trim() || null, phone:r.p.trim() || null,
-      vendor:r.v, groups:[], source:"manual", rooms:0, awards:0, bids:[], sent:[] });
+      vendor:r.v, groups:[], source:"manual", rooms:0, awards:0, bids:[], sent:[], verified:false, docs:null, awardList:[] });
   });
   closeModal();
   toast(rows.length === 1
@@ -1445,7 +1532,7 @@ function saveSupplier(id){
   } else {
     SUPPLIERS.push({ id:"l" + (SUPPLIERS.length + 1), kind:"own", supplierId:null, store:false,
       nEn:nm, nAr:nm, contact:ct || null, email:em || null, phone:ph || null,
-      vendor:addVendor, groups:[], source:"manual", rooms:0, awards:0, bids:[], sent:[] });
+      vendor:addVendor, groups:[], source:"manual", rooms:0, awards:0, bids:[], sent:[], verified:false, docs:null, awardList:[] });
   }
   closeModal();
   toast(id ? L("Saved", "تم الحفظ") : L(nm + " added", nm + " تمت الإضافة"));
@@ -1549,7 +1636,7 @@ function saveSheet(){
       email:(idx.email != null && r[idx.email]) ? r[idx.email] : null,
       phone:idx.phone != null ? r[idx.phone] : null,
       vendor:sheetV[n] !== false, groups:[], source:"sheet", extra:extra,
-      rooms:0, awards:0, bids:[], sent:[] });
+      rooms:0, awards:0, bids:[], sent:[], verified:false, docs:null, awardList:[] });
   });
   closeModal();
   var v = sheetV.filter(Boolean).length;
@@ -1760,6 +1847,8 @@ function dlgSupplier(id){
                   + L("On Moedatech", "على مويداتك") + '</span>')
     +     (s.store ? '<span class="src src-off"><span class="icon" aria-hidden="true">storefront</span>'
                      + L("Has a store", "لديه متجر") + '</span>' : "")
+    +     (s.verified ? '<span class="vbadge"><span class="icon" aria-hidden="true">verified</span>'
+                      + L("Verified by Moedatech", "موثّق من مويداتك") + '</span>' : "")
     +     '<button class="vtog" aria-pressed="' + s.vendor + '" onclick="toggleVendor(\'' + id + '\');dlgSupplier(\'' + id + '\')">'
     +       '<span class="icon" aria-hidden="true">' + (s.vendor ? "verified" : "add") + '</span>'
     +       (s.vendor ? L("Registered vendor", "مورّد معتمد") : L("Mark as registered vendor", "تعيين كمورّد معتمد"))
@@ -1808,6 +1897,12 @@ function dlgSupplier(id){
           + '<div class="kpi"><b>' + s.awards + '</b><span>' + L("awards", "ترسيات") + '</span></div>'
           + '</div></div>')
 
+    +   '<div class="field"><label>' + L("Company papers", "مستندات الشركة") + '</label>'
+    +     docsBlock(s) + '</div>'
+
+    +   '<div class="field"><label>' + L("Awarded to them", "ما رسّيته عليهم") + '</label>'
+    +     awardsBlock(s) + '</div>'
+
     +   '<div class="field"><label>' + L("What you sent them", "ما أرسلته لهم") + '</label>'
     +     (s.sent.length
           ? '<div class="sent">' + s.sent.map(function(e){
@@ -1855,6 +1950,66 @@ function dlgSupplier(id){
     +   '<span class="spacer"></span>'
     +   '<button class="btn btn-primary" onclick="closeModal()">' + L("Close", "إغلاق") + '</button>'
     + '</div></div>');
+}
+
+/* The company papers. Only ever readable through a bid — the backend derives the supplier FROM
+   the bid and re-checks `canAccessRequest`, so a supplier who has never bid has no papers to show
+   and we say that rather than drawing five empty rows. */
+var DOC_LABEL = {
+  cr:   ["CR", "السجل التجاري"],
+  vat:  ["VAT certificate", "شهادة القيمة المضافة"],
+  addr: ["National address", "العنوان الوطني"],
+  lc:   ["Local content", "المحتوى المحلي"],
+  saso: ["SASO", "ساسو"]
+};
+function docsBlock(s){
+  if (!s.docs) {
+    return '<div class="note calm"><span class="icon" aria-hidden="true">lock</span><span>'
+      + L("A supplier's papers reach you through a bid. They have not bid yet, so there is nothing to show.",
+           "تصلك مستندات المورّد عبر عرض يقدّمه. لم يقدّموا عرضاً بعد، فلا يوجد ما يُعرض.") + '</span></div>';
+  }
+  return '<div class="dpills">' + s.docs.map(function(d){
+    var lab = DOC_LABEL[d.k] || [d.k, d.k];
+    var soon = d.present && d.exp && (new Date(d.exp) - TODAY) < 60 * 86400000;
+    /* The expiry is a detail, not a headline — it rides in the title. */
+    var tip = !d.present ? L("not provided", "غير مُقدَّم")
+      : d.renews         ? L("reissued every year", "تُجدَّد سنوياً")
+      : d.exp            ? L("valid until " + fmtDate(d.exp), "سارية حتى " + fmtDate(d.exp))
+      :                    L("no expiry recorded", "بدون تاريخ انتهاء");
+    return '<span class="dpill' + (d.present ? (soon ? " soon" : "") : " miss") + '" title="'
+      + L(lab[0], lab[1]) + " — " + tip + '">'
+      + L(lab[0], lab[1])
+      + (d.present && d.open
+        ? '<button class="eye" title="' + L("View", "عرض") + '" onclick="viewDoc(\'' + s.id + '\',\'' + d.k + '\')">'
+          + '<span class="icon" aria-hidden="true">visibility</span></button>'
+        : "")
+      + '</span>';
+  }).join("") + '</div>';
+}
+
+function viewDoc(id, k){
+  var s = byId(id), lab = DOC_LABEL[k] || [k, k];
+  toast(s.docSrc === "bid"
+    ? L("Opens the " + lab[0] + " they uploaded with their bid", "يفتح " + lab[1] + " المرفوع مع عرضهم")
+    : L("Opens the " + lab[0] + " from their company profile", "يفتح " + lab[1] + " من ملف شركتهم"));
+}
+
+/* What the renter actually gave them. The most consequential thing in the file, so it gets rows. */
+function awardsBlock(s){
+  if (!s.awardList || !s.awardList.length) {
+    return '<div class="note calm"><span class="icon" aria-hidden="true">info</span><span>'
+      + L("You have not awarded them anything yet.", "لم تُرسِ عليهم شيئاً بعد.") + '</span></div>';
+  }
+  return '<div class="awards">' + s.awardList.map(function(w){
+    return '<div class="awrow">'
+      + '<span class="dot"><span class="icon" aria-hidden="true">workspace_premium</span></span>'
+      + '<span class="t"><b>' + esc(L(w.eqEn, w.eqAr)) + " ×" + w.units + '</b>'
+      + '<span>' + esc(L(w.projEn, w.projAr)) + " · " + fmtDate(w.start) + " → " + fmtDate(w.end) + '</span></span>'
+      + '<span class="money">' + esc(w.price) + '</span>'
+      + '<button class="btn btn-secondary btn-sm" onclick="toast(\''
+      +   L("Opens the project", "يفتح المشروع") + '\')">' + L("Project", "المشروع") + '</button>'
+      + '</div>';
+  }).join("") + '</div>';
 }
 
 /* The grade in words, so it is never something the renter has to take on trust. */

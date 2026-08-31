@@ -340,7 +340,18 @@ export function MachineTermsPanel({
 }) {
   const t = useT();
   const w = t.projects.workOrder;
-  const [open, setOpen] = useState(false);
+  /**
+   * **Open on machine 1, closed on the rest** (owner, 2026-08-31).
+   *
+   * The first machine's terms are the ones being ANSWERED — operator, delivery, certificates, model
+   * year — and every machine after it is seeded from them, so those panels hold answers the renter
+   * has already given. Opening all of them made a two-machine order an eleven-field form twice over;
+   * opening none of them hid the questions the order actually asks.
+   *
+   * `!first` is exactly "am I machine 1": the prop is machine 1's terms to compare against, and only
+   * machine 1 is given none. No second flag to keep in step with the first.
+   */
+  const [open, setOpen] = useState(!first);
   const n = first ? countDifferences(terms, first) : 0;
 
   return (

@@ -152,7 +152,17 @@ export interface RequestItem {
   subtypeNameAr: string | null;
   capacityName: string | null;
   capacityNameAr: string | null;
+  /** The flat editorial ICON for the subtype. Almost always present. */
   subtypeImageUrl: string | null;
+  /**
+   * A PHOTOGRAPH of real equipment for the subtype — `equipment_image_key` on the taxonomy row, set
+   * per subcategory from c-hub.
+   *
+   * A second, independent slot rather than a better `subtypeImageUrl`: the backend is explicit that
+   * "the two are different pictures for different places, and a consumer that wants the icon must
+   * keep getting the icon". Null on most rows, so every reader falls back to the icon.
+   */
+  subtypeEquipmentImageUrl: string | null;
   categoryImageUrl: string | null;
   numberOfUnits: number;
   operatorIncluded: "YES" | "NO" | null;
@@ -409,7 +419,7 @@ export function mapRequestListItem(r: RequestRecord): RequestListItem {
     mobByRentee: it?.mobilizationByRentee ?? null,
     demobByRentee: it?.demobilizationByRentee ?? null,
     item: it
-      ? { name: itemName(it, false), nameAr: itemName(it, true), qty: it.numberOfUnits ?? 1, imageUrl: publicTaxonomyUrl(it.subtypeImageUrl ?? it.categoryImageUrl), categoryId: it.categoryId }
+      ? { name: itemName(it, false), nameAr: itemName(it, true), qty: it.numberOfUnits ?? 1, imageUrl: publicTaxonomyUrl(it.subtypeEquipmentImageUrl ?? it.subtypeImageUrl ?? it.categoryImageUrl), categoryId: it.categoryId }
       : null,
   };
 }

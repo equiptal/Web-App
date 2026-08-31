@@ -202,16 +202,27 @@ export function WorkOrderForm({
     !draft.machines.some(overAssigned);
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* ── 1 · Equipment ── */}
-      {/* The name of the order (owner, 2026-08-31: *"add title, which is missing from the form"*).
-          It was in the payload and in the edit path, and no input ever set it — so every order made
-          here saved with no name and the backend fell back to the first machine's typed label. A
-          renter with three orders on one site then had three rows all called after a welder.
+    /* ── The shape of this form (owner, 2026-08-31: *"more structured, simpler, clearer"*) ────────
+       TWO sections, and the second repeats per machine:
 
-          First, because it is the sentence the renter already has in their head when they press
-          *Add work order*. */}
+         1 · THE ORDER — its name and its period. Facts about the whole order, asked once.
+         2 · WHAT IS ON SITE — one card per machine, and each card holds EVERYTHING about that
+             machine: what it is, how many, who supplies it and at what price, and its own terms.
+
+       ~~Four sections: title, equipment, period, then supplier-per-machine.~~ The machine appeared
+       in TWO of them, a screen apart: the renter described a crawler excavator, scrolled past the
+       dates, and priced the same crawler excavator again under a heading that repeated its name to
+       say which one this was. Pulling the supplier lines into the machine's own card deletes that
+       whole second pass, the duplicated heading, and the scrolling between them. */
+    <div className="flex flex-col gap-6">
+      {/* ── 1 · The order ────────────────────────────────────────────────────────────────────── */}
       <section className="flex flex-col gap-3">
+        <SectionHead n={1} title={w.orderSection} />
+
+        {/* The name of the order (owner, 2026-08-31: *"add title, which is missing from the form"*).
+            It was in the payload and in the edit path, and no input ever set it — so every order made
+            here saved with no name and the backend fell back to the first machine's typed label. A
+            renter with three orders on one site then had three rows all called after a welder. */}
         <Field label={w.orderTitle} hint={w.orderTitleHint}>
           <input
             className={input}
@@ -220,53 +231,14 @@ export function WorkOrderForm({
             onChange={(e) => onChange({ ...draft, title: e.target.value })}
           />
         </Field>
-      </section>
 
-      <section className="flex flex-col gap-3">
-        <h3 className="text-subhead font-extrabold text-navy">{w.equipment}</h3>
-
-  
-      {draft.machines.map((m, i) => (
-          <MachineCard
-            key={m.id ?? i}
-            taxonomy={taxonomy}
-            locale={locale}
-            machine={m}
-            first={i === 0 ? undefined : draft.machines[0]?.terms}
-            onChange={(p) => patchMachine(i, p)}
-            onRemove={draft.machines.length > 1 ? () => onChange({ ...draft, machines: draft.machines.filter((_, ix) => ix !== i) }) : undefined}
-          />
-        ))}
-
-        <button
-          type="button"
-          /* Seeded from the FIRST machine's terms, which is what makes the second one cheap to add:
-           the renter answered operator, delivery and certificates once, and this arrives already
-           answered with every field still editable. */
-        onClick={() =>
-          onChange({ ...draft, machines: [...draft.machines, blankMachine(draft.machines[0]?.terms)] })
-        }
-          className="flex items-center gap-1.5 self-start text-body font-semibold text-brand"
-        >
-          <Icon name="add" size={14} /> {w.addMachine}
-        </button>
-      </section>
-
-      {/* ── 3 · Period ──
-          The project dialog's own row, field for field: start · end · extendable · basis, four
-          across (owner, 2026-08-31: *"make it same width and layout as adding the project"*). A work
-          order asks the same question about time that a project does, and asking it in a different
-          shape one dialog later is how a renter starts reading the two as unrelated records.
-
-          Basis and extendable were already carried to the wire by `whenToWire` and had no control
-          here at all — the layout gave them one. The basis is not decoration either: it is what a
-          new supplier line's own basis is seeded from, and what the rate placeholder says «per». */}
-      <section className="flex flex-col gap-3">
-        <h3 className="text-subhead font-extrabold text-navy">{w.period}</h3>
-        <p className="text-meta text-muted">{w.periodHint}</p>
-
+        {/* The period, in the project dialog's own row: start · end · extendable · basis, four
+            across. A work order asks the same question about time that a project does, and asking it
+            in a different shape one dialog later is how a renter starts reading the two as unrelated
+            records. Basis and extendable were already carried to the wire by `whenToWire` and had no
+            control here at all — the layout gave them one. */}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label={t.projects.form.start}>
+          <Field label={t.projects.form.start} hint={draft.when.startDate ? undefined : w.periodHint}>
             <input
               type="date"
               className={input}
@@ -328,121 +300,38 @@ export function WorkOrderForm({
         )}
       </section>
 
-      {/* ── 2 · Supplier, per machine ── */}
+      {/* ── 2 · What is on site ──────────────────────────────────────────────────────────────── */}
       <section className="flex flex-col gap-3">
-        <h3 className="text-subhead font-extrabold text-navy">{w.supplier}</h3>
-        <p className="text-meta text-muted">{w.supplierHint}</p>
+        <SectionHead
+          n={2}
+          title={w.equipment}
+          note={draft.machines.length > 1 ? w.machineCount.replace("{n}", String(draft.machines.length)) : undefined}
+        />
 
         {draft.machines.map((m, i) => (
-          <div key={m.id ?? i} className="flex flex-col gap-2 rounded-sm border border-border p-3">
-            <span className="text-body font-semibold text-navy">{nameOf(m, taxonomy, locale) || w.unnamedMachine}</span>
-
-            {/* Column headings. Five boxes in a row with nothing above them is a puzzle — and three
-                of them are money, which is the worst thing to have to guess at. Hidden below `sm`,
-                where the grid stacks and each field is on its own line anyway. */}
-            <div className="hidden gap-2 text-label font-semibold uppercase tracking-[.03em] text-muted sm:grid sm:grid-cols-[2fr_4.5rem_1fr_1fr_1fr_auto]">
-              <span>{w.supplier}</span>
-              <span>{w.quantity}</span>
-              <span>{w.ratePer.replace("{basis}", basisWord)}</span>
-              <span>{w.mobAmount}</span>
-              <span>{w.demobAmount}</span>
-              <span />
-            </div>
-
-            {m.lines.map((l, li) => (
-              <div key={li} className="grid gap-2 sm:grid-cols-[2fr_4.5rem_1fr_1fr_1fr_auto]">
-                <input
-                  className={input}
-                  value={l.supplierName}
-                  placeholder={w.supplierPlaceholder}
-                  onChange={(e) =>
-                    patchMachine(i, { lines: m.lines.map((x, ix) => (ix === li ? { ...x, supplierName: e.target.value } : x)) })
-                  }
-                />
-                <input
-                  type="number"
-                  min={1}
-                  className={`${input} w-20`}
-                  value={l.units}
-                  onChange={(e) =>
-                    patchMachine(i, {
-                      lines: m.lines.map((x, ix) => (ix === li ? { ...x, units: Math.max(1, Number(e.target.value) || 1) } : x)),
-                    })
-                  }
-                />
-                <input
-                  type="number"
-                  min={0}
-                  className={input}
-                  value={l.rateAmount}
-                  placeholder={w.ratePer.replace("{basis}", basisWord)}
-                  onChange={(e) =>
-                    patchMachine(i, { lines: m.lines.map((x, ix) => (ix === li ? { ...x, rateAmount: e.target.value } : x)) })
-                  }
-                />
-                {/* Getting it here, and away again. Separate boxes because they are separate
-                    negotiations — and because the cheaper monthly rate is often the longer haul. */}
-                <input
-                  type="number"
-                  min={0}
-                  className={input}
-                  value={l.mobAmount}
-                  placeholder={w.mobAmount}
-                  onChange={(e) =>
-                    patchMachine(i, { lines: m.lines.map((x, ix) => (ix === li ? { ...x, mobAmount: e.target.value } : x)) })
-                  }
-                />
-                <input
-                  type="number"
-                  min={0}
-                  className={input}
-                  value={l.demobAmount}
-                  placeholder={w.demobAmount}
-                  onChange={(e) =>
-                    patchMachine(i, { lines: m.lines.map((x, ix) => (ix === li ? { ...x, demobAmount: e.target.value } : x)) })
-                  }
-                />
-                {m.lines.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => patchMachine(i, { lines: m.lines.filter((_, ix) => ix !== li) })}
-                    aria-label={t.common.remove}
-                    className="text-muted transition hover:text-danger"
-                  >
-                    <Icon name="close" size={14} />
-                  </button>
-                )}
-              </div>
-            ))}
-
-            {/* How many of the machine are spoken for, and what it comes to.
-                *"Selecting units from a supplier must not be more than the units set in the work
-                order settings."* Said as a count rather than by clamping the input: a renter who
-                typed 4 against a quantity of 3 usually meant to raise the quantity, and silently
-                rewriting their 4 to a 3 hides the decision they were about to make. */}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-meta">
-              <span className={overAssigned(m) ? "font-semibold text-danger" : "text-muted"}>
-                {w.assigned.replace("{n}", String(unitsAssigned(m))).replace("{q}", String(m.quantity))}
-                {overAssigned(m) && ` — ${w.tooMany.replace("{n}", String(unitsAssigned(m) - m.quantity))}`}
-              </span>
-              {machineTotal(m) !== null && (
-                <span className="text-muted">
-                  {w.machineTotal.replace("{amount}", machineTotal(m)!.toLocaleString())}
-                </span>
-              )}
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                patchMachine(i, { lines: [...m.lines, blankLine(draft.when.rentalBasis ?? "monthly")] })
-              }
-              className="flex items-center gap-1.5 self-start text-meta font-semibold text-brand"
-            >
-              <Icon name="add" size={13} /> {t.projects.award.split}
-            </button>
-          </div>
+          <MachineCard
+            key={m.id ?? i}
+            index={i}
+            taxonomy={taxonomy}
+            locale={locale}
+            machine={m}
+            basisWord={basisWord}
+            first={i === 0 ? undefined : draft.machines[0]?.terms}
+            onChange={(p) => patchMachine(i, p)}
+            onRemove={draft.machines.length > 1 ? () => onChange({ ...draft, machines: draft.machines.filter((_, ix) => ix !== i) }) : undefined}
+          />
         ))}
+
+        <button
+          type="button"
+          /* Seeded from the FIRST machine's terms, which is what makes the second one cheap to add:
+             the renter answered operator, delivery and certificates once, and this arrives already
+             answered with every field still editable. */
+          onClick={() => onChange({ ...draft, machines: [...draft.machines, blankMachine(draft.machines[0]?.terms)] })}
+          className="flex items-center gap-1.5 self-start rounded-sm border border-dashed border-brand px-3 py-2 text-body font-semibold text-brand transition hover:bg-brand-soft"
+        >
+          <Icon name="add" size={14} /> {w.addMachine}
+        </button>
       </section>
 
       {/* The project dialog's footer, to the letter: a GHOST way out — a white button beside a
@@ -467,19 +356,41 @@ export function WorkOrderForm({
   );
 }
 
+/**
+ * One numbered section heading.
+ *
+ * The form asks two things and the number says so — a stack of equal `h3`s left the renter counting
+ * headings to work out where they were. `note` carries a count when there is one worth stating.
+ */
+function SectionHead({ n, title, note }: { n: number; title: string; note?: string }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-navy text-label font-extrabold text-surface">{n}</span>
+      <h3 className="text-subhead font-extrabold text-navy">{title}</h3>
+      {note && <span className="text-meta text-muted">{note}</span>}
+    </div>
+  );
+}
+
 /* ----------------------------- One machine ----------------------------- */
 
 function MachineCard({
+  index,
   taxonomy,
   locale,
   machine,
+  basisWord,
   first,
   onChange,
   onRemove,
 }: {
+  /** Zero-based. The header counts from one — «Machine 2» is how a renter refers to it out loud. */
+  index: number;
   taxonomy: Taxonomy;
   locale: string;
   machine: MachineDraft;
+  /** The order's basis, for the rate column's «per week» — the one order-level fact a line needs. */
+  basisWord: string;
   /** Machine 1's terms, for the badge. Absent on machine 1 — it has nothing to differ from. */
   first?: MachineTerms;
   onChange: (p: Partial<MachineDraft>) => void;
@@ -494,17 +405,28 @@ function MachineCard({
   const opts = (list: { id: string; name: string; nameAr?: string | null }[] | undefined) =>
     (list ?? []).map((n) => ({ value: n.id, label: taxName(n, locale) }));
 
+  /** The line grid, declared once: the heading row and every line share it or they do not line up. */
+  const cols = "sm:grid-cols-[minmax(0,2fr)_4.5rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_1.25rem]";
+  const named = nameOf(machine, taxonomy, locale);
+
   return (
-    <div className="flex flex-col gap-2.5 rounded-sm border border-border p-3">
-      <div className="flex items-center gap-2">
-        <Icon name="handyman" size={14} className="flex-none text-muted" />
-        <span className="flex-1 text-label font-semibold uppercase tracking-[.03em] text-muted">{w.machine}</span>
+    <div className="flex flex-col rounded-sm border border-border bg-surface">
+      {/* The card's own head: WHICH machine this is, and its name as soon as there is one. It was an
+          anonymous «MACHINE» on every card, so a three-machine order had three identical headers and
+          the renter had to read the fields to tell them apart. */}
+      <div className="flex items-center gap-2 border-b border-border bg-surface2/50 px-3 py-2">
+        <span className="grid h-5 w-5 flex-none place-items-center rounded-full bg-navy-mid text-label font-extrabold text-surface">
+          {index + 1}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-body font-semibold text-navy">{named || w.machine}</span>
         {onRemove && (
-          <button type="button" onClick={onRemove} aria-label={t.common.remove} className="text-muted transition hover:text-danger">
+          <button type="button" onClick={onRemove} aria-label={t.common.remove} className="flex-none text-muted transition hover:text-danger">
             <Icon name="close" size={14} />
           </button>
         )}
       </div>
+
+      <div className="flex flex-col gap-2.5 p-3">
 
       {machine.offCatalogue ? (
         <div className="grid gap-2 sm:grid-cols-2">
@@ -586,6 +508,120 @@ function MachineCard({
         </Field>
       </div>
 
+      {/* ── Who supplies THIS machine ────────────────────────────────────────────────────────────
+          In the machine's own card (owner, 2026-08-31). It used to be a section of its own at the
+          bottom of the form, repeating each machine's name as a heading so the renter could tell
+          which block belonged to which machine — a heading that exists only because the two halves
+          were separated. Here the card is the answer to "which machine".
+
+          A work order is awarded the moment it exists, because the machine is already on site. Leave
+          a supplier blank for the renter's own fleet. */}
+      <div className="flex flex-col gap-2 rounded-sm border border-border bg-surface2/40 p-2.5">
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{w.supplier}</span>
+          <span className="text-meta text-muted">{w.supplierHint}</span>
+        </div>
+
+        {/* Column headings. Five boxes in a row with nothing above them is a puzzle — and three of
+            them are money, which is the worst thing to have to guess at. Hidden below `sm`, where the
+            grid stacks and each field is on its own line anyway. */}
+        <div className={`hidden gap-2 text-label font-semibold uppercase tracking-[.03em] text-muted sm:grid ${cols}`}>
+          <span>{w.supplierColumn}</span>
+          <span>{w.quantity}</span>
+          <span>{w.ratePer.replace("{basis}", basisWord)}</span>
+          <span>{w.mobAmount}</span>
+          <span>{w.demobAmount}</span>
+          <span />
+        </div>
+
+        {machine.lines.map((l, li) => (
+          <div key={li} className={`grid gap-2 ${cols}`}>
+            <input
+              className={input}
+              value={l.supplierName}
+              placeholder={w.supplierPlaceholder}
+              onChange={(e) => onChange({ lines: machine.lines.map((x, ix) => (ix === li ? { ...x, supplierName: e.target.value } : x)) })}
+            />
+            <input
+              type="number"
+              min={1}
+              className={input}
+              value={l.units}
+              onChange={(e) =>
+                onChange({
+                  lines: machine.lines.map((x, ix) => (ix === li ? { ...x, units: Math.max(1, Number(e.target.value) || 1) } : x)),
+                })
+              }
+            />
+            <input
+              type="number"
+              min={0}
+              className={input}
+              value={l.rateAmount}
+              placeholder={t.common.sar}
+              onChange={(e) => onChange({ lines: machine.lines.map((x, ix) => (ix === li ? { ...x, rateAmount: e.target.value } : x)) })}
+            />
+            {/* Getting it here, and away again. Separate boxes because they are separate
+                negotiations — and because the cheaper monthly rate is often the longer haul. */}
+            <input
+              type="number"
+              min={0}
+              className={input}
+              value={l.mobAmount}
+              placeholder={t.common.sar}
+              onChange={(e) => onChange({ lines: machine.lines.map((x, ix) => (ix === li ? { ...x, mobAmount: e.target.value } : x)) })}
+            />
+            <input
+              type="number"
+              min={0}
+              className={input}
+              value={l.demobAmount}
+              placeholder={t.common.sar}
+              onChange={(e) => onChange({ lines: machine.lines.map((x, ix) => (ix === li ? { ...x, demobAmount: e.target.value } : x)) })}
+            />
+            {machine.lines.length > 1 ? (
+              <button
+                type="button"
+                onClick={() => onChange({ lines: machine.lines.filter((_, ix) => ix !== li) })}
+                aria-label={t.common.remove}
+                className="grid h-[38px] w-5 place-items-center text-muted transition hover:text-danger"
+              >
+                <Icon name="close" size={14} />
+              </button>
+            ) : (
+              <span className="hidden sm:block" />
+            )}
+          </div>
+        ))}
+
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <button
+            type="button"
+            onClick={() => onChange({ lines: [...machine.lines, blankLine(machine.lines.at(-1)?.rentalBasis ?? "monthly")] })}
+            className="flex items-center gap-1.5 text-meta font-semibold text-brand"
+          >
+            <Icon name="add" size={13} /> {t.projects.award.split}
+          </button>
+
+          {/* How many of the machine are spoken for, and what it comes to.
+              *"Selecting units from a supplier must not be more than the units set in the work order
+              settings."* Said as a count rather than by clamping the input: a renter who typed 4
+              against a quantity of 3 usually meant to raise the quantity, and silently rewriting
+              their 4 to a 3 hides the decision they were about to make. */}
+          <span className="flex flex-wrap items-center gap-x-3 text-meta">
+            <span className={overAssigned(machine) ? "font-semibold text-danger" : "text-muted"}>
+              {w.assigned.replace("{n}", String(unitsAssigned(machine))).replace("{q}", String(machine.quantity))}
+              {overAssigned(machine) && ` — ${w.tooMany.replace("{n}", String(unitsAssigned(machine) - machine.quantity))}`}
+            </span>
+            {machineTotal(machine) !== null && (
+              <span className="font-semibold text-navy tabular-nums">
+                {w.machineTotal.replace("{amount}", machineTotal(machine)!.toLocaleString())}
+              </span>
+            )}
+          </span>
+        </div>
+      </div>
+
       {/* This machine's own terms (spec §5.2 · AC-43, AC-44).
           Closed until asked for: the common case is that every machine on a site works the same way,
           and eleven fields per machine on a five-machine order is a wall between the renter and what
@@ -597,6 +633,7 @@ function MachineCard({
           field's visibility is not a reason to defer eleven fields, which is what happened here
           before. */}
       <MachineTermsPanel terms={machine.terms} first={first} onChange={(terms) => onChange({ terms })} />
+      </div>
     </div>
   );
 }

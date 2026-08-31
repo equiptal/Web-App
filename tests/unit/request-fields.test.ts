@@ -140,7 +140,7 @@ const ITEM: RequestItem = {
   categoryName: "Excavator", categoryNameAr: null,
   subtypeName: "Crawler Excavator", subtypeNameAr: null,
   capacityName: "30 ton", capacityNameAr: null,
-  subtypeImageUrl: null, categoryImageUrl: null,
+  subtypeImageUrl: null, subtypeEquipmentImageUrl: null, categoryImageUrl: null,
   numberOfUnits: 2,
   operatorIncluded: "YES",
   fuelTypePreference: "DIESEL",

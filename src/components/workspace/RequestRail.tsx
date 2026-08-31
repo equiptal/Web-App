@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
@@ -26,6 +26,8 @@ import { pin } from "@/lib/uiPins";
  * A closed request keeps its place until the renter takes it off himself — the × on its circle hides
  * it on this device and touches nothing else.
  */
+/** Tiles whose artwork answered an error, so the next render draws the glyph instead. Keyed by tile
+ *  rather than by URL because the same subtype can appear on several rows and they fail together. */
 export function RequestRail({
   tiles,
   activeKey,
@@ -45,6 +47,8 @@ export function RequestRail({
   const { locale } = useLocale();
   const ar = locale === "ar";
   const scroller = useRef<HTMLDivElement>(null);
+  /** Tiles whose artwork failed to load — see the note on the `<img>` below. */
+  const [broken, setBroken] = useState<Set<string>>(() => new Set());
 
   // Roughly three tiles a press — far enough to feel like progress, short enough to keep your place.
   const scrollBy = (dir: 1 | -1) => scroller.current?.scrollBy({ left: dir * 300, behavior: "smooth" });
@@ -129,7 +133,7 @@ export function RequestRail({
       >
         {tiles.map((tile) => {
           const active = tile.key === activeKey;
-          const img = publicTaxonomyUrl(tile.imageUrl);
+          const img = broken.has(tile.key) ? null : publicTaxonomyUrl(tile.imageUrl);
           /* ── There is no ring (owner, 2026-08-27: "remove all outlines even grey") ───────────────
              It was three colours — brand for the one being read, green for one with bids waiting,
              grey for closed. Then it was grey alone. Now it is nothing: a row of pictures rather
@@ -202,8 +206,25 @@ export function RequestRail({
                          what a 36px box less 3px a side is. So 3 is the largest inset that shows
                          every machine whole. Reaching further needs a bigger circle, not less
                          padding. */
+                      /* ── A URL that fails falls back to the glyph (owner, 2026-08-31) ─────────
+                         The tile now prefers the equipment PHOTOGRAPH over the flat icon, and a
+                         photograph is the one of the two that can be absent from storage while its
+                         key is present in the row: the taxonomy's equipment objects are not
+                         public-read on staging, so the URL is well-formed and answers 403.
+
+                         Without this the circle drew a broken-image glyph — strictly worse than the
+                         icon it replaced. `onError` is the only signal available: nothing on the
+                         client can know an object is unreadable before asking for it. The backend
+                         names the same trap on its own helper: *"an `<img>` absorbs a 403 as 'no
+                         artwork'"* — which is true only where something catches it, as here. */
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={img} alt="" draggable={false} className="h-12 w-12 object-contain p-1" />
+                      <img
+                        src={img}
+                        alt=""
+                        draggable={false}
+                        onError={(e) => { e.currentTarget.style.display = "none"; setBroken((b) => new Set(b).add(tile.key)); }}
+                        className="h-12 w-12 object-contain p-1"
+                      />
                     ) : (
                       <Icon name="precision_manufacturing" size={20} className="text-muted" />
                     )}

@@ -41,12 +41,10 @@
  * simply disagree. That is the point of the independence rule, not a state to resolve away.
  */
 
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { shortSite } from "@/lib/contract/project";
-import { listTemplates, fetchTemplateTerms } from "@/lib/api/client";
-import type { TemplateOption } from "@/lib/contract/project-apply";
 import { RENTAL_BASES, PAYMENT_TERMS, type RentalBasis, type PaymentTerm, type Party } from "@/lib/contract/options";
 import { Icon } from "@/components/ui";
 
@@ -252,66 +250,11 @@ function PillDate({
 export function ProjectPills() {
   const t = useT();
   const { state, actions } = useRfq();
-  const [templates, setTemplates] = useState<TemplateOption[]>([]);
-  const [picking, setPicking] = useState(false);
-  /* Which MACHINE was picked. The store remembers the work order (it needs the group id at submit)
-     and not which row inside it, so the select needs its own memory or it would spring back to
-     "pick one" the moment the terms landed. */
-  const [picked, setPicked] = useState<string | null>(null);
-
-  const projectId = state.project?.id ?? null;
-
-  useEffect(() => {
-    if (!projectId) {
-      setTemplates([]);
-      return;
-    }
-    let live = true;
-    // A site with nothing in it yet has nothing to copy, and that is the normal first case — so a
-    // failure and an empty list land in the same place: no control at all, rather than an error
-    // about a convenience the renter never asked for.
-    listTemplates(projectId)
-      .then((rows) => live && setTemplates(rows))
-      .catch(() => live && setTemplates([]));
-    return () => {
-      live = false;
-    };
-  }, [projectId]);
-
+  /* ~~The template list, its fetch and `applyTemplate`.~~ All three moved to `ProjectChips` with
+     the control that used them (owner, 2026-08-31) — the dropdown belongs to the row that picks the
+     site. What a template LEAVES behind is still read here: see `terms` below. */
   const project = state.project;
   if (!project) return null;
-
-  async function applyTemplate(itemId: string) {
-    const option = templates.find((x) => x.itemId === itemId);
-    if (!option || !projectId) return;
-    setPicking(true);
-    setPicked(itemId);
-    try {
-      const terms = await fetchTemplateTerms(projectId, option);
-      actions.useTemplate(terms, option.kind === "work_order" ? option.id : null, option.when);
-
-      /* The MACHINE goes in as TEXT (owner, 2026-08-31: *"the machine
-         subcategory/category/size will be copied as text in the text area, not as chips — so the
-         user can rewrite it"*).
-
-         Terms become pills because they are a closed set of answers. Equipment is not: the renter
-         may want the same terms on a bigger excavator, and a chip they cannot retype would make
-         them delete it to say so. As text it is a starting sentence, which is what the box is for.
-
-         Appended, never replacing what is already typed — the renter may have written half a
-         request before reaching for a template. */
-      const line = `${option.quantity > 1 ? `${option.quantity} × ` : ""}${option.machine}`.trim();
-      if (line) {
-        const before = state.text.trimEnd();
-        actions.setText(before ? `${before}\n${line}` : line);
-      }
-    } catch {
-      // Nothing is applied and nothing is said. A template is a shortcut; failing to take one
-      // leaves the renter exactly where they were, which is a working request form.
-    } finally {
-      setPicking(false);
-    }
-  }
 
   const { timing } = project.defaults;
   /* The terms a template put on this request, if one did. Read from the store rather than held here:
@@ -345,62 +288,15 @@ export function ProjectPills() {
        shared with the textarea below instead, which is what makes them read as one field. */
     <div className="flex flex-col gap-2 px-5 pb-2 pt-4">
       <div className="flex flex-wrap items-center gap-2">
-        {/* ── The project, and it opens its own contents (owner, 2026-08-31) ────────────────────
-            *"I want the dropdown of the work orders or requests to be from the project itself
-            directly when clicked, so in the same project pill."*
+        {/* ~~The project itself, filled navy, carrying the dropdown of its work orders and
+            requests.~~ It moved OUT of the card on 2026-08-31 (owner: *"I want the dropdown of work
+            order and request of a project to open here in this rounded pill, not in the text
+            area"*) — to the `PROJECT` row under the box, where the site is chosen in the first
+            place. See `ProjectChips`.
 
-            ~~A «START FROM» pill at the far end of the strip.~~ It was a second control naming the
-            same site the first one names, eight pills apart: the renter had already told us which
-            project this is, and then had to find a different pill to ask what is in it. Pressing the
-            project now opens the list of its work orders and requests, which is what «the project»
-            means to a renter looking at one.
-
-            **Filled navy, alone in the strip.** Every other pill is a white box holding a value of
-            this request; this one is the site the whole request hangs off, so it is the one thing
-            here that is not a field (*"make the project pill appear different to distinguish it is
-            the project"*). The × still drops the site and every prefill with it (PROJ-AC-26) — it
-            sits ABOVE the select layer, or the press that clears would open the list instead. */}
-        <span className={`relative ${PILL} border-navy bg-navy font-semibold text-white`}>
-          <Icon name="place" size={13} className="flex-none text-white/70" />
-          <span className="truncate">{project.title}</span>
-          {templates.length > 0 && (
-            <>
-              {/* Applied is stated, not implied: a renter who has already copied a machine's terms
-                  should not have to open the list to find out. */}
-              {terms && <span className="text-white/70">· {t.projects.pills.templateApplied}</span>}
-              <Icon name="expand_more" size={14} className="-me-0.5 flex-none text-white/70" />
-              {/* Keyed by MACHINE id, not by the order it sits in — two machines on one order are two
-                  entries, and picking either copies its own answers. The machine's name leads,
-                  because that is what the renter is looking for; the kind and reference follow it to
-                  tell two of the same machine apart. */}
-              <select
-                aria-label={t.projects.pills.startFrom}
-                disabled={picking}
-                value={picked ?? ""}
-                onChange={(e) => void applyTemplate(e.target.value)}
-                className="absolute inset-0 cursor-pointer opacity-0"
-              >
-                <option value="">{t.projects.pills.startFrom}</option>
-                {templates.map((tpl) => (
-                  <option key={tpl.itemId} value={tpl.itemId}>
-                    {`${tpl.machine || tpl.ref} · ${
-                      tpl.kind === "work_order" ? t.projects.pills.kindWorkOrder : t.projects.pills.kindRequest
-                    } ${tpl.ref}`}
-                  </option>
-                ))}
-              </select>
-            </>
-          )}
-          <button
-            type="button"
-            onClick={actions.clearProject}
-            aria-label={t.common.close}
-            className="relative z-10 -me-0.5 grid h-5 w-5 place-items-center rounded-full text-white/70 transition hover:bg-white/15 hover:text-white"
-          >
-            <Icon name="close" size={12} />
-          </button>
-        </span>
-
+            What is left in here is what belongs here: the request's own VALUES. The site's identity
+            and the question "what have I already hired at this site?" are both answered in the row
+            that picks the site. */}
         <Pill
           label={t.projects.pills.site}
           value={shortSite(project.location.label)}
