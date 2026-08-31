@@ -1,8 +1,11 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { CtaBanner } from "@/components/home/CtaBanner";
 import { BrowseSurface } from "@/components/stores/BrowseSurface";
 import { useT } from "@/lib/i18n";
+import { useSession } from "@/lib/session";
 import { pin } from "@/lib/uiPins";
 
 /**
@@ -18,6 +21,34 @@ import { pin } from "@/lib/uiPins";
  */
 export function BrowsePage() {
   const t = useT();
+  const router = useRouter();
+  const { status } = useSession();
+
+  /* ── Signing in ends the visit here — on the TRANSITION, not on arrival (owner, 2026-08-31) ───
+     *"After I logged in I must be in dashboard route — browse is for guests before login."*
+
+     Half of that rule was already here and the other half was only claimed. `/` sends a guest to this
+     page; nothing sent him back. The header's Sign in opens the auth modal OVER whatever page raised
+     it, and with no follow-up action it simply closes — so a renter who signed in from here stayed on
+     the directory, which is the guest's answer to a question he no longer has.
+
+     But it cannot be "authed users are not allowed on /browse". Browse is a permanent nav tab for a
+     signed-in renter too — it moves from first to second and stays (owner, 2026-08-30: *"same four
+     destinations either way"*) — so a flat redirect would make that tab impossible to open. The rule
+     is about the MOMENT the account arrives, not about the page being forbidden.
+
+     Hence the ref: it fires on `anon`/`loading` → `authed` and never on a render where the renter was
+     already signed in when he got here. Clicking Browse from the nav leaves him on Browse.
+
+     `replace`, not `push`: this page is where he WAS as a guest, not somewhere he chose to be as an
+     account, so Back must not return him to it. */
+  const wasAuthed = useRef(status === "authed");
+  useEffect(() => {
+    const arrived = status === "authed" && !wasAuthed.current;
+    wasAuthed.current = status === "authed";
+    if (arrived) router.replace("/");
+  }, [status, router]);
+
   return (
     <div {...pin("browse-page")} className="flex flex-col gap-7">
       <CtaBanner />

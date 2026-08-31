@@ -10,7 +10,9 @@ import { BrowsePage } from "@/components/stores/BrowsePage";
  * answers "who is out there", which is the only question he actually has — and it is the question
  * the supplier directory was already answering, three blocks down a page he had no reason to scroll.
  *
- * `/` sends a guest here; see the redirect in `HomeHub`'s page. Signing in lands on `/` as before.
+ * `/` sends a guest here; see the redirect in `HomeHub`. The return leg is in `BrowsePage`: the
+ * moment the session becomes authed, this page hands him to `/`. It fires on that TRANSITION only —
+ * Browse stays a nav tab for a signed-in renter, so arriving here deliberately keeps him here.
  */
 export default function Browse() {
   return (
