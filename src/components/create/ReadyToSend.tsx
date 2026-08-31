@@ -36,6 +36,7 @@ import {
 import { arabicIndicDigits } from "@/lib/contract/bid-map";
 import { ACTIONS, btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { leftTheSite, projectTitle } from "@/lib/contract/project";
 
 export function ReadyToSend() {
   const t = useT();
@@ -44,6 +45,11 @@ export function ReadyToSend() {
   const L = (e: string, a: string) => (ar ? a : e);
   const router = useRouter();
   const { state, actions } = useRfq();
+  /* The same question the location panel asks, from the same helper — two answers to "is this still
+     the site's place?" would eventually disagree, and this one is the last word before sending. */
+  const unfiled = state.project && state.draft
+    ? leftTheSite(state.project.location, state.draft.project.location)
+    : false;
   const { tier } = useSession();
   const [showAccount, setShowAccount] = useState(false);
   const [showLimit, setShowLimit] = useState(false);
@@ -273,6 +279,27 @@ export function ReadyToSend() {
           <span className="text-navy-mid"> — {t.create.ready.inviteBody}</span>
         </p>
       </div>
+
+      {/* ── What this send will NOT do (owner, 2026-08-31) ────────────────────────────────────────
+          *"changing location will not be able to be part of the selected project beside the confirm
+          button so user know it is not included"*.
+
+          Beside the button rather than up in the summary table, because this is the last moment the
+          renter can change their mind and the summary is a thing they have already read past. Red,
+          not amber: amber is this app's «check this», and there is nothing to check — the request
+          will not be filed, and the only two answers are to accept that or go back and move the pin.
+
+          It says the site's name. *"Not part of the project"* invites the question «which one?» from
+          a renter who has three. */}
+      {unfiled && (
+        <div className="mb-3.5 flex items-start gap-3 rounded-sm border border-danger/40 bg-danger-soft px-4 py-3">
+          <Icon name="error_outline" size={18} className="mt-0.5 flex-none text-danger" />
+          <p className="text-body leading-relaxed text-danger">
+            <b className="font-semibold">{t.create.wherePanel.unfiledShort}</b>
+            <span> — {t.create.wherePanel.unfiledNote.replace("{project}", projectTitle(state.project!))}</span>
+          </p>
+        </div>
+      )}
 
       <div className={ACTIONS}>
         <button

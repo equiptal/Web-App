@@ -4,6 +4,7 @@ import type { AgentDraft } from "@/lib/contract";
 import { defaultProjectDetails, defaultPreferences, newManualItem } from "@/lib/contract";
 import type { ProjectSummary } from "@/lib/contract/project";
 import { fieldSource } from "@/lib/contract/provenance";
+import { filingFor, leftTheSite } from "@/lib/contract/project";
 
 /**
  * W-T7 / W-T8 — picking a site at intake, and what reaches the draft when the agent returns.
@@ -169,5 +170,71 @@ describe("what reaches the draft when the agent returns", () => {
     // the marks on the canvas would all be wrong.
     expect(s.agentOrigin?.project.timing.endDate).toBeNull();
     expect(s.draft?.project.timing.endDate).toBe("2026-12-31");
+  });
+});
+
+/* ============================================================================================== *
+ * The filing labels, and the one difference that cancels them
+ * ============================================================================================== */
+
+describe("what reaches the wire", () => {
+  /* ⚠️ These exist because the coverage above stopped ONE STEP SHORT of the wire.
+     `draft.projectId` was asserted and passed; the submit call never put it in the payload, so every
+     request created from a site was filed nowhere — all of them, not only the ones whose location
+     moved. Nothing failed: the chart simply never drew a row that had never been filed. */
+
+  it("carries the site id into the payload", () => {
+    const draft = {
+      projectId: "p_qiddiya",
+      workOrderGroupId: "wo_1",
+      project: { location: { ...QIDDIYA.location } },
+    };
+    expect(filingFor({ location: QIDDIYA.location }, draft)).toEqual({
+      projectId: "p_qiddiya",
+      workOrderGroupId: "wo_1",
+    });
+  });
+
+  it("sends nothing at all when the renter never picked a site", () => {
+    // The whole feature stays invisible to a renter not using it: the payload is byte-identical.
+    const draft = { project: { location: { label: "Al Malaz District, Riyadh", lat: 24.68, lng: 46.74 } } };
+    expect(filingFor(null, draft)).toEqual({});
+  });
+
+  it("unfiles it when the location moved, id or no id", () => {
+    const draft = {
+      projectId: "p_qiddiya",
+      workOrderGroupId: "wo_1",
+      project: { location: { label: "Al Malaz District, Riyadh", lat: 24.68, lng: 46.74 } },
+    };
+    expect(filingFor({ location: QIDDIYA.location }, draft)).toEqual({});
+  });
+
+  it("drops the filing when the renter moves the location off the site", () => {
+    /* A site IS a place. Every other value it supplies is a default a request may differ on, and the
+       chart shows the difference — but a request for Riyadh drawn on the Qiddiya timeline says a
+       machine is going somewhere it is not. The intake says so in the location panel and again beside
+       the send button before this runs, so nothing here is a surprise. */
+    const moved = leftTheSite(QIDDIYA.location, { label: "Al Malaz District, Riyadh", lat: 24.68, lng: 46.74 });
+    expect(moved).toBe(true);
+  });
+
+  it("does not call a nudged pin a different place", () => {
+    // ~90 m. A renter dragging a pin across a yard has not moved to another city, and re-geocoding
+    // the same point to a differently-worded address is common enough to matter.
+    const nudged = leftTheSite(QIDDIYA.location, {
+      label: "Qiddiya Zone 4, Qiddiya City",
+      lat: QIDDIYA.location.lat! + 0.0008,
+      lng: QIDDIYA.location.lng!,
+    });
+    expect(nudged).toBe(false);
+  });
+
+  it("falls back to the label only when there are no coordinates", () => {
+    const site = { label: "Qiddiya Zone 4, Riyadh 13513", lat: null, lng: null };
+    expect(leftTheSite(site, { label: "qiddiya zone 4,  riyadh 13513" })).toBe(false); // spacing and case
+    expect(leftTheSite(site, { label: "Al Malaz District, Riyadh" })).toBe(true);
+    // An emptied box is not a move: the renter has not said anywhere else yet.
+    expect(leftTheSite(site, { label: null })).toBe(false);
   });
 });

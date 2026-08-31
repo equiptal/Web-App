@@ -20,6 +20,7 @@ import { PanelDot, ProvenanceNote } from "@/components/create/Provenance";
 import { useProvenance } from "@/components/create/hooks";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { leftTheSite, projectTitle } from "@/lib/contract/project";
 
 // Client-only: the maps script touches `window` at import.
 const MapLocationPicker = dynamic(() => import("@/components/shared/GoogleMapLocationPicker"), { ssr: false });
@@ -54,6 +55,15 @@ export function WherePanel({
      `Where` was the one panel with no provenance line at all: it had a completeness dot and nothing
      else, so a location the site supplied looked identical to one the renter typed. */
   const locationSource = prov.projectSource("location.label", loc.label, prov.agentProject?.location?.label);
+
+  /* ── Moved off the site: the one difference that unfiles the request ────────────────────────────
+   *
+   * Every other value a site supplies is a default a request may differ on, and the chart shows the
+   * difference. A site IS a place, so this one is not a difference — it is a request that belongs to
+   * no site. It used to be settled silently at submit (owner, 2026-08-31: *"it is silently dropped
+   * from the project"*); now it is stated where the renter is doing the moving, and again beside the
+   * send button, before anything is decided for them. */
+  const unfiled = state.project ? leftTheSite(state.project.location, loc) : false;
 
   // AC-16 — a typed label is not a location. Confirming requires an actual point on the map.
   const hasLocation = loc.lat != null && loc.lng != null;
@@ -108,13 +118,34 @@ export function WherePanel({
           {/* On the collapsed head, because that is where a renter reads the address without opening
               anything — and the whole point of the label is to answer "where did this come from?"
               before they wonder whether to change it. */}
-          <ProvenanceNote source={locationSource} />
+          {/* The site's label is replaced by the consequence, not accompanied by it: «from your
+              project» beside «this is no longer your project's place» would be two claims in a row
+              contradicting each other. */}
+          {unfiled ? (
+            <span className="flex flex-none items-center gap-1 text-meta font-semibold text-danger">
+              <Icon name="error_outline" size={13} /> {t.create.wherePanel.unfiledShort}
+            </span>
+          ) : (
+            <ProvenanceNote source={locationSource} />
+          )}
         </span>
         <Icon name={open ? "expand_less" : "expand_more"} size={18} className="flex-none text-muted" />
       </button>
 
       {open && (
         <div {...pin("where-panel-body")} className="px-5 pb-5">
+          {/* Said in full where the renter is standing when they do it. Red rather than amber: amber
+              is this app's «check this», and there is nothing to check — the outcome is settled and
+              the renter's only choices are to accept it or move the pin back. */}
+          {unfiled && (
+            <p className="mb-3 flex items-start gap-2 rounded-sm border border-danger/40 bg-danger-soft px-3 py-2.5 text-body text-danger">
+              <Icon name="error_outline" size={16} className="mt-px flex-none" />
+              <span>
+                {t.create.wherePanel.unfiledNote.replace("{project}", projectTitle(state.project!))}
+              </span>
+            </p>
+          )}
+
           {/* AC-47 — a text↔file disagreement is settled before anything else; confirming over an
               unresolved conflict would pick a site by accident. */}
           {conflictUnresolved && loc.conflict && (

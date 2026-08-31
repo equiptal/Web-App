@@ -33,7 +33,7 @@ import { decideTier } from "@/lib/agent/tier";
 import { quickResultToDraft, quickItemsToDraft } from "@/lib/agent/quick-draft";
 import type { SiteLocation, ProjectDefaults, ProjectSummary } from "@/lib/contract/project";
 import type { PaymentTerm } from "@/lib/contract/options";
-import { projectTitle } from "@/lib/contract/project";
+import { projectTitle, filingFor } from "@/lib/contract/project";
 import { applyProjectDefaults, applyMachineTerms } from "@/lib/contract/project-apply";
 import type { MachineTerms } from "@/lib/contract/work-order";
 import { draftToRfqCorrection } from "@/lib/api/agent-adapters";
@@ -890,10 +890,36 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
         !!origin &&
         JSON.stringify([s.draft.project, finalItems]) !== JSON.stringify([origin.project, postableItems(origin.items)]);
       try {
+        /* ── The filing labels, which were never sent ──────────────────────────────────────────
+         *
+         * ⚠️ `projectId` and `workOrderGroupId` reach the DRAFT (see the merge above), ride through
+         * `draftToCreateRequest`, and are accepted and stored by the backend — and this call never
+         * put them in the payload. So **every** request created from a site was filed nowhere. Not
+         * only the ones whose location moved: all of them, silently, since the feature shipped.
+         *
+         * It was invisible from every side. The chart simply did not show a row that had never been
+         * filed, the draft carried the id so the confirmation screen said the right thing, and
+         * `project-intake.test.ts` asserted the id reaches `draft.projectId` — one step short of the
+         * wire, which is exactly where the fault was.
+         *
+         * Reported as *"i created a request from a project but changed the location, it is silently
+         * dropped from the project"* (owner, 2026-08-31). The location was a red herring; the id was
+         * never sent with or without one.
+         *
+         * ── And the location DOES decide, now that the id is sent ──────────────────────────────
+         *
+         * A site is a place. Every other value a project supplies is a default a request may
+         * legitimately differ on, and the chart shows the difference — but a request for Riyadh drawn
+         * on the Qiddiya timeline says a machine is going somewhere it is not. So a moved location
+         * unfiles it, and the intake says so twice before this point: in the location section and
+         * beside the send button. Nothing here is a surprise by the time it runs. */
+        const filing = filingFor(s.project, s.draft);
+
         const { requestId, requestIds, requestUuids, trialExpiresAt } = await submitRequest({
           project: s.draft.project,
           items: finalItems,
           preferences: s.draft.preferences,
+          ...filing,
           simulateError: s.simulateError,
           // mobile/016 — sent only for a trial run; a real request's payload is unchanged.
           ...(s.isTrial ? { isTrial: true } : {}),

@@ -144,9 +144,16 @@ export function FileRequestDialog({
                   <button
                     type="button"
                     disabled={busy}
-                    /* A mismatch is asked about, not blocked — see the note on `elsewhere`. The
-                       matching case files straight away: a question with one sensible answer is a
-                       click the renter did not need. */
+                    /* ~~A mismatch is asked about, not blocked.~~ **Blocked** (owner, 2026-08-31:
+                       *"red note will show different location, cant be part of this project"*), and
+                       the reversal makes the product coherent rather than merely stricter: the
+                       intake now refuses to file a request whose location was moved off the site, so
+                       a second door that allowed the same thing would have contradicted it.
+
+                       Pressing a mismatched row opens the panel below — which offers changing the
+                       REQUEST's location, the one move that makes filing possible — instead of
+                       filing it. The matching case files straight away: a question with one sensible
+                       answer is a click the renter did not need. */
                     onClick={() => (elsewhere(c) ? setAsking(c) : onFile(c.id))}
                     className="flex w-full items-center gap-2.5 px-3 py-2.5 text-start transition hover:bg-surface2 disabled:pointer-events-none"
                   >
@@ -159,12 +166,17 @@ export function FileRequestDialog({
                         {c.ref}
                         {c.address ? ` · ${c.address}` : ""}
                       </span>
-                      {/* Amber, and on the row rather than in a confirm: the renter is choosing
+                      {/* RED, and on the row rather than in a confirm: the renter is choosing
                           between requests, and the thing they need to know has to be visible while
-                          they choose rather than after. */}
+                          they choose rather than after.
+
+                          ~~Amber, saying filing it here changes nothing about it.~~ Both halves were
+                          wrong once filing became impossible: amber is this app's «check this», and
+                          the sentence answered a question nobody had while leaving the actual
+                          consequence unsaid. */}
                       {elsewhere(c) && (
-                        <span className="mt-0.5 flex items-center gap-1 text-meta font-semibold text-warn">
-                          <Icon name="info" size={12} className="flex-none" />
+                        <span className="mt-0.5 flex items-center gap-1 text-meta font-semibold text-danger">
+                          <Icon name="error_outline" size={12} className="flex-none" />
                           {f.elsewhere.replace("{site}", shortSite(siteAddress))}
                         </span>
                       )}
@@ -189,12 +201,12 @@ export function FileRequestDialog({
         {/* Asked here rather than in a second dialog: the renter is mid-choice, and a stacked
             modal would hide the list they were choosing from. */}
         {asking && (
-          <div className="flex flex-col gap-2 rounded-sm border border-warn/40 bg-warn/5 p-3">
-            <span className="flex items-start gap-2 text-body font-semibold text-navy">
-              <Icon name="info" size={15} className="mt-px flex-none text-warn" />
+          <div className="flex flex-col gap-2 rounded-sm border border-danger/40 bg-danger-soft p-3">
+            <span className="flex items-start gap-2 text-body font-semibold text-danger">
+              <Icon name="error_outline" size={15} className="mt-px flex-none" />
               {f.askTitle.replace("{there}", shortSite(asking.address)).replace("{here}", shortSite(siteAddress))}
             </span>
-            <p className="text-meta text-muted">{f.askBody}</p>
+            <p className="text-meta text-navy-mid">{f.askBody}</p>
 
             <div className="flex flex-wrap items-center justify-end gap-2">
               <Button variant="ghost" onClick={() => setAsking(null)} disabled={busy}>
@@ -212,16 +224,11 @@ export function FileRequestDialog({
                 <span className="text-meta font-semibold text-muted">{f.askNotEditable}</span>
               )}
 
-              <Button
-                onClick={() => {
-                  const id = asking.id;
-                  setAsking(null);
-                  onFile(id);
-                }}
-                disabled={busy}
-              >
-                {f.askContinue}
-              </Button>
+              {/* ~~«File it here anyway».~~ Gone (owner, 2026-08-31). There is no «anyway»: a site
+                  is a place, and a request for Riyadh drawn on the Qiddiya timeline says a machine is
+                  going somewhere it is not. The way forward is the button beside this one — move the
+                  REQUEST to this place — and if that is not available, the reason is printed there
+                  rather than a door that leads nowhere. */}
             </div>
           </div>
         )}

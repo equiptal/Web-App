@@ -442,6 +442,88 @@ export function periodDiffers(
 }
 
 /**
+ * Has the renter moved this request off the site it was started from?
+ *
+ * ── Why this decides whether it is filed at all ──────────────────────────────────────────────────
+ *
+ * **A site IS a place.** Everything else a project holds — the dates, the payment terms, the machine
+ * terms — is a default that a request may legitimately differ on, and the chart shows the difference.
+ * The location is the one field where differing makes the filing itself false: a request for Riyadh
+ * drawn on the Qiddiya timeline says a machine is going somewhere it is not.
+ *
+ * So a moved location is not a warning to be dismissed. It means the request belongs to no site, and
+ * the intake says so in the location section and again beside the send button (owner, 2026-08-31:
+ * *"changing location will not be able to be part of the selected project"*). It was **silently
+ * dropped** before, which is the same outcome reached without telling anyone.
+ *
+ * ── Coordinates first, label second ─────────────────────────────────────────────────────────────
+ *
+ * The same pin re-geocodes to a differently-worded address often enough that comparing labels alone
+ * would report a move the renter never made — «Qiddiya Zone 4, Riyadh 13513» against «Qiddiya Zone
+ * 4, Qiddiya City». So when both sides carry coordinates, those decide, with a tolerance of roughly
+ * a hundred metres: closer than that is the same site by any reading, and a renter nudging a pin
+ * across a yard has not moved to another city.
+ *
+ * Labels decide only when coordinates are missing, which is the typed-address case.
+ */
+export function leftTheSite(
+  site: { label: string | null; lat?: number | null; lng?: number | null } | null,
+  now: { label: string | null; lat?: number | null; lng?: number | null },
+): boolean {
+  // No site to leave.
+  if (!site) return false;
+
+  const hasCoords =
+    typeof site.lat === "number" && typeof site.lng === "number" &&
+    typeof now.lat === "number" && typeof now.lng === "number";
+
+  if (hasCoords) {
+    /* ~0.001° is about 110 m of latitude, and less of longitude at this latitude. One threshold for
+       both rather than a haversine: the question is "is this the same site", not "how far", and a
+       distance function here would invite tuning a number that has no right value. */
+    const TOL = 0.001;
+    return Math.abs(site.lat! - now.lat!) > TOL || Math.abs(site.lng! - now.lng!) > TOL;
+  }
+
+  const norm = (v: string | null) => (v ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  // An emptied label is not a move: the renter has not said anywhere else yet.
+  if (!norm(now.label)) return false;
+  return norm(site.label) !== norm(now.label);
+}
+
+/**
+ * The two filing labels a submitted request carries, or nothing.
+ *
+ * ⚠️ **They used to be carried by nobody.** `projectId` and `workOrderGroupId` reach the draft, ride
+ * through the app adapter, and are accepted and stored by the backend — and the submit call never put
+ * them in the payload, so EVERY request created from a site was filed nowhere. Not only the ones
+ * whose location had moved: all of them, since the feature shipped, in silence. It was invisible from
+ * every side, because a chart cannot draw a row that was never filed and the draft carried the id so
+ * every screen said the right thing.
+ *
+ * Pulled out of the store as a function so the rule can be read and tested on its own — the previous
+ * coverage asserted the id reaches `draft.projectId` and stopped one step short of the wire, which is
+ * exactly where the fault was.
+ *
+ * A moved location returns nothing: see `leftTheSite`.
+ */
+export function filingFor(
+  site: { location: { label: string | null; lat?: number | null; lng?: number | null } } | null,
+  draft: {
+    projectId?: string | null;
+    workOrderGroupId?: string | null;
+    project: { location: { label: string | null; lat?: number | null; lng?: number | null } };
+  },
+): { projectId?: string; workOrderGroupId?: string } {
+  if (!draft.projectId) return {};
+  if (leftTheSite(site?.location ?? null, draft.project.location)) return {};
+  return {
+    projectId: draft.projectId,
+    ...(draft.workOrderGroupId ? { workOrderGroupId: draft.workOrderGroupId } : {}),
+  };
+}
+
+/**
  * Everything under this site that would now read differently from it.
  *
  * `groups` come from the chart, which already answers the one question that matters: a work order's
