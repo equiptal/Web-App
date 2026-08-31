@@ -3,6 +3,8 @@
 import type { ReactNode, InputHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { useT } from "@/lib/i18n";
 import { Dialog } from "@/components/Dialog";
+import { Dropdown } from "@/components/Dropdown";
+import { Icon } from "@/components/Icon";
 import {
   btn,
   cx,
@@ -35,23 +37,9 @@ import {
 
 /* ------------------------------------ Icon ------------------------------------ */
 
-/** Material Icons Outlined glyph (loaded via globals.css). e.g. <Icon name="place" />. */
-export function Icon({ name, className = "", size }: { name: string; className?: string; size?: number }) {
-  return (
-    <span className={`material-icons-outlined ${className}`} style={size ? { fontSize: size } : undefined} aria-hidden>
-      {name}
-    </span>
-  );
-}
-
-/** Material Symbols Rounded glyph (for the triage filter nodes). */
-export function MIcon({ name, className = "", size }: { name: string; className?: string; size?: number }) {
-  return (
-    <span className={`material-symbols-rounded ${className}`} style={size ? { fontSize: size } : undefined} aria-hidden>
-      {name}
-    </span>
-  );
-}
+/* Defined in `@/components/Icon` and re-exported here, so every existing import keeps working —
+   see that file for why they had to leave this one. */
+export { Icon, MIcon } from "@/components/Icon";
 
 /* ------------------------------------ Button ------------------------------------ */
 
@@ -273,24 +261,17 @@ export function Select<T extends string>({
   placeholder?: string;
   disabled?: boolean;
 }) {
+  /* ── The house dropdown, under the old name (owner, 2026-08-31) ────────────────────────────────
+     Every caller of `Select` keeps its props; what changes is the list they open — the app's own
+     panel with a ticked row, rather than the operating system's menu. See `Dropdown`. */
   return (
-    <select
-      value={value ?? ""}
+    <Dropdown
+      value={value ?? null}
       disabled={disabled}
-      onChange={(e) => onChange(e.target.value as T)}
-      className={INPUT}
-    >
-      {placeholder && (
-        <option value="" disabled>
-          {placeholder}
-        </option>
-      )}
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+      placeholder={placeholder ?? "—"}
+      onChange={(v) => onChange(v as T)}
+      options={options.map((o) => ({ value: o.value, label: o.label }))}
+    />
   );
 }
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useT, useLocale } from "@/lib/i18n";
+import { Dropdown } from "@/components/Dropdown";
 import { Icon } from "@/components/ui";
 import { Dialog, DialogButton } from "@/components/Dialog";
 import { btn } from "@/lib/ds";
@@ -206,14 +207,13 @@ export function CompanyIdentityModal({
             <label className={labelCls}>
               {p.cityLabel} <span className="text-label font-semibold text-muted">— {t.verify.optional}</span>
             </label>
-            <select className={inputCls} value={city} onChange={(e) => setCity(e.target.value)}>
-              <option value="">{t.verify.cityPlaceholder}</option>
-              {cities.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {locale === "ar" ? c.ar : c.en}
-                </option>
-              ))}
-            </select>
+            <Dropdown
+              label={t.verify.cityPlaceholder}
+              placeholder={t.verify.cityPlaceholder}
+              value={city || null}
+              onChange={setCity}
+              options={cities.map((c) => ({ value: c.value, label: locale === "ar" ? c.ar : c.en }))}
+            />
           </div>
 
           <div>

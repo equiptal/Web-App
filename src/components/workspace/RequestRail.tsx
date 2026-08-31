@@ -103,7 +103,9 @@ export function RequestRail({
     <div className={`mx-auto w-full max-w-[1440px] ${PAGE_X} pt-2`}>
     <div className="flex h-[96px] select-none items-center gap-4 overflow-hidden rounded-lg border border-border bg-surface3/60 px-4">
       <Link {...pin("rail-create-tile")} href="/create" className="group flex flex-none flex-col items-center gap-1">
-        <span className="grid h-14 w-14 place-items-center rounded-full border-2 border-dashed border-border text-muted transition group-hover:border-brand group-hover:text-brand">
+        {/* The same hairline the real circles wear now, dashed — a 2px dash beside 1px solids read
+            as a different control rather than an empty slot in the same set. */}
+        <span className="grid h-14 w-14 place-items-center rounded-full border border-dashed border-border text-muted transition group-hover:border-brand group-hover:text-brand">
           <Icon name="add" size={20} />
         </span>
         <span className="flex h-[22px] flex-col items-center text-label font-semibold leading-[13px] text-muted">{t.workspace.newRequest}</span>
@@ -167,19 +169,22 @@ export function RequestRail({
                   44 / 40 / 36 are the numbers the percentages were computing anyway. Stated
                   outright there is nothing left to resolve, so the clip is 36px on every tile and
                   every machine, whatever its shape. */}
-              {/* ── The disc keeps its padding (owner, 2026-08-27) ────────────────────────────────
-                  Taking the ring off, I took the band under it off too, reasoning that with nothing
-                  to separate from it would become the outline in the ring's place. That was wrong,
-                  and the owner is the one who saw it: the band was not a frame, it was the disc's
-                  PADDING. Without it a photograph — and much of this artwork reaches its own edges —
-                  sits as a bare rectangle inside a round clip with nothing holding it.
+              {/* ── A HAIRLINE, not a white band (owner, 2026-08-31) ──────────────────────────────
+                  *"Remove the white outlines, they are too thick — keep a very thin border."*
 
-                  The padding is back and there is still no ring, because the pad and the clip share
-                  one background: no edge is drawn between them. One 56px tinted circle, with the
-                  picture inset inside it. */}
-              <span className="relative grid h-14 w-14 flex-none place-items-center rounded-full bg-surface p-1">
-                <span className="relative h-12 w-12 rounded-full">
-                  <span className={`grid h-12 w-12 place-items-center overflow-hidden rounded-full bg-surface3 ${tile.closed ? "grayscale" : ""}`}>
+                  The band was never a ring: it was the disc's own 4px padding, kept on 2026-08-27
+                  because a photograph that reaches its own edges needs something holding it inside
+                  the round clip. Both things are true, and 4px of white was the wrong amount of the
+                  right idea — on a rail of eighteen circles it read as eighteen thick outlines with
+                  the machines shrinking behind them.
+
+                  1px of padding and a 1px border in the app's own border colour: the picture is held,
+                  the circle has an edge, and the edge is a line rather than a band. The clip grows
+                  from 48 to 52 with the space that frees, so the machines got BIGGER as the outline
+                  got thinner. */}
+              <span className="relative grid h-14 w-14 flex-none place-items-center rounded-full border border-border bg-surface p-px">
+                <span className="relative h-[52px] w-[52px] rounded-full">
+                  <span className={`grid h-[52px] w-[52px] place-items-center overflow-hidden rounded-full bg-surface3 ${tile.closed ? "grayscale" : ""}`}>
                     {img ? (
                       /* ── `contain`, not `cover` (owner, 2026-08-25: "the circles must fit any icon
                          + why some have floating icons") ──────────────────────────────────────────
@@ -239,8 +244,8 @@ export function RequestRail({
                            rule being wrong for half the catalogue. */
                         className={
                           tile.imageIsPhoto
-                            ? "h-12 w-12 rounded-full object-cover"
-                            : "h-12 w-12 object-contain p-1"
+                            ? "h-[52px] w-[52px] rounded-full object-cover"
+                            : "h-[52px] w-[52px] object-contain p-1"
                         }
                       />
                     ) : (
@@ -283,7 +288,7 @@ export function RequestRail({
                       }}
                       aria-label={t.workspace.hideRequest}
                       title={t.workspace.hideRequest}
-                      className="absolute -end-1 -top-1 grid h-5 w-5 cursor-pointer place-items-center rounded-full border-2 border-surface bg-muted text-white transition hover:bg-navy"
+                      className="absolute -end-1 -top-1 grid h-5 w-5 cursor-pointer place-items-center rounded-full border border-surface bg-muted text-white transition hover:bg-navy"
                     >
                       <Icon name="close" size={11} />
                     </span>
@@ -298,9 +303,11 @@ export function RequestRail({
                       }}
                       aria-label={t.workspace.shareRequest}
                       title={t.workspace.shareRequest}
-                      className="absolute -end-1 -top-1 grid h-5 w-5 place-items-center rounded-full border-2 border-surface bg-navy text-white transition hover:bg-navy-mid"
+                      /* A hairline collar, like the circle's own edge — `border-2` put a 2px white
+                         ring on a 20px badge, which is a tenth of it. */
+                      className="absolute -end-1 -top-1 grid h-5 w-5 place-items-center rounded-full border border-surface bg-navy text-white transition hover:bg-navy-mid"
                     >
-                      <Icon name="ios_share" size={11} />
+                      <Icon name="ios_share" size={12} className="font-normal" />
                     </span>
                   )}
                   {/* ── Several MACHINES, or several of ONE (owner, 2026-08-26) ──────────────────
@@ -315,7 +322,10 @@ export function RequestRail({
                       carries the words, since neither badge is large enough to say them. */}
                   {tile.items > 1 ? (
                     <span
-                      className="absolute -bottom-px -end-px flex items-center gap-1 rounded-full border-2 border-surface bg-brand px-1 py-[1px] text-label font-extrabold leading-[13px] text-brand-fg"
+                      /* `font-semibold`, not `font-extrabold` (owner, 2026-08-31: *"the font for the
+                         unit or multi-item badge is thick, make it thinner"*). At 10px on a coloured
+                         pill, 800 renders as a blob; 600 is legible and stops shouting. */
+                      className="absolute -bottom-px -end-px flex items-center gap-1 rounded-full border border-surface bg-brand px-1 py-[1px] text-label font-semibold leading-[13px] text-brand-fg"
                       title={t.workspace.itemsBadge.replace("{n}", String(tile.items))}
                     >
                       <Icon name="layers" size={9} />
@@ -323,7 +333,7 @@ export function RequestRail({
                     </span>
                   ) : tile.units > 1 ? (
                     <span
-                      className="absolute -bottom-px -end-px min-w-[19px] rounded-full border-2 border-surface bg-navy px-1 text-label font-extrabold leading-[15px] text-white"
+                      className="absolute -bottom-px -end-px min-w-[19px] rounded-full border border-surface bg-navy px-1 text-label font-semibold leading-[15px] text-white"
                       title={t.workspace.unitsTitle.replace("{n}", String(tile.units))}
                     >
                       {t.workspace.unitsBadge.replace("{n}", String(tile.units))}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, Fragment } from "react";
+import { Dropdown } from "@/components/Dropdown";
 import { useRouter } from "next/navigation";
 import { type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
@@ -1722,10 +1723,13 @@ function CounterFlow({
                     <div key={t.key} className="qp-pay-row">
                       <span className="k">{ar ? t.labelAr : t.label}{termNotes(t)}</span>
                       {editable && !d.server ? (
-                        <select className="qp-sel" value={chosenSel(t)} onChange={(e) => pickTerm(t, e.target.value)}>
-                          <option value="__none">{L("— choose —", "— اختر —")}</option>
-                          {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
+                        <Dropdown
+                          label={ar ? t.labelAr : t.label}
+                          placeholder={L("— choose —", "— اختر —")}
+                          value={chosenSel(t) === "__none" ? null : chosenSel(t)}
+                          onChange={(v) => pickTerm(t, v)}
+                          options={opts.map((o) => ({ value: o.value, label: o.label }))}
+                        />
                       ) : <b style={{ flex: 1 }}>{tval(t, d.chosen ?? t.supplierDeclared)}</b>}
                       <span className={`qp-badge ${isSettled(d.badge) ? "match" : d.badge === "conflict" ? "diff" : "none"}`}>{badgeLabel(d.badge)}</span>
                     </div>
@@ -1755,10 +1759,13 @@ function CounterFlow({
                             <td className="lbl">{ar ? t.labelAr : t.label}{termNotes(t)}</td>
                             <td className="sup">{tval(t, t.supplierDeclared)}</td>
                             <td>{editable ? (
-                              <select className="qp-sel" value={chosenSel(t)} onChange={(e) => pickTerm(t, e.target.value)}>
-                                <option value="__none">{L("— choose —", "— اختر —")}</option>
-                                {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                              </select>
+                              <Dropdown
+                                label={ar ? t.labelAr : t.label}
+                                placeholder={L("— choose —", "— اختر —")}
+                                value={chosenSel(t) === "__none" ? null : chosenSel(t)}
+                                onChange={(v) => pickTerm(t, v)}
+                                options={opts.map((o) => ({ value: o.value, label: o.label }))}
+                              />
                             ) : <span className="sup">{tval(t, d.chosen)}</span>}</td>
                             <td><span className={`qp-ttbadge ${d.badge}`}>{badgeLabel(d.badge)}</span></td>
                           </tr>
@@ -1863,9 +1870,15 @@ function CounterFlow({
               {mode === "accept" && (
                 <label style={{ display: "block", marginTop: 16 }}>
                   <span style={{ fontSize: 12, fontWeight: 800, color: "var(--navy-mid,var(--navy-mid))" }}>{L("Contract type", "نوع العقد")}</span>
-                  <select value={contractType} onChange={(e) => setContractType(e.target.value)} className="qp-sel" style={{ marginTop: 5, width: "100%", height: 42 }}>
-                    {CONTRACT_TYPES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-                  </select>
+                  <div style={{ marginTop: 5 }}>
+                    <Dropdown
+                      label={L("Contract type", "نوع العقد")}
+                      placeholder="—"
+                      value={contractType}
+                      onChange={setContractType}
+                      options={CONTRACT_TYPES.map((c) => ({ value: c.value, label: c.label }))}
+                    />
+                  </div>
                 </label>
               )}
               {mode === "accept" && (

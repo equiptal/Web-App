@@ -44,6 +44,7 @@ import { MachineTermsPanel, blankTerms } from "./TermsFields";
 // The SAME field chrome the project dialog is built from — see `Field`'s note there. Two dialogs
 // that open from one page and spell a label two ways read as two products.
 import { Field, input } from "./ProjectForm";
+import { Dropdown } from "@/components/Dropdown";
 import { taxName, type Taxonomy } from "@/lib/contract/taxonomy";
 import { machineIsNamed, termsToWire, type MachineTerms, type WorkOrderItem, type WorkOrderWhen } from "@/lib/contract/work-order";
 import type { Award } from "@/lib/contract/award";
@@ -272,20 +273,13 @@ export function WorkOrderForm({
           </Field>
 
           <Field label={t.projects.form.basis}>
-            <select
-              className={input}
-              value={draft.when.rentalBasis ?? ""}
-              onChange={(e) =>
-                onChange({ ...draft, when: { ...draft.when, rentalBasis: (e.target.value || null) as RentalBasis | null } })
-              }
-            >
-              <option value="">—</option>
-              {RENTAL_BASES.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
+            <Dropdown
+              label={t.projects.form.basis}
+              placeholder="—"
+              value={draft.when.rentalBasis}
+              onChange={(v) => onChange({ ...draft, when: { ...draft.when, rentalBasis: (v || null) as RentalBasis | null } })}
+              options={RENTAL_BASES.map((b) => ({ value: b, label: b }))}
+            />
           </Field>
         </div>
 

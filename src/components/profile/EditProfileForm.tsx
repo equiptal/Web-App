@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useT, useLocale } from "@/lib/i18n";
+import { Dropdown } from "@/components/Dropdown";
 import { Icon } from "@/components/ui";
 import { updateProfile } from "@/lib/api/profile-client";
 import type { RenterProfile } from "@/lib/contract/onboarding";
@@ -170,22 +171,24 @@ export function EditProfileForm({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className={labelCls}>{p.city}</label>
-          <select className={inputCls} value={city} onChange={(e) => setCity(e.target.value)}>
-            <option value="">{p.selectCity}</option>
-            {withCurrent(cities, city).map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
+          <Dropdown
+            label={p.city}
+            placeholder={p.selectCity}
+            value={city || null}
+            onChange={setCity}
+            options={withCurrent(cities, city).map((c) => ({ value: c.value, label: c.label }))}
+          />
           {fe.city && <p className="mt-1 text-meta text-danger">{fe.city}</p>}
         </div>
         <div>
           <label className={labelCls}>{p.jobTitle}</label>
-          <select className={inputCls} value={jobTitle} onChange={(e) => setJobTitle(e.target.value)}>
-            <option value="">{p.selectJobTitle}</option>
-            {withCurrent(jobs, jobTitle).map((j) => (
-              <option key={j.value} value={j.value}>{j.label}</option>
-            ))}
-          </select>
+          <Dropdown
+            label={p.jobTitle}
+            placeholder={p.selectJobTitle}
+            value={jobTitle || null}
+            onChange={setJobTitle}
+            options={withCurrent(jobs, jobTitle).map((j) => ({ value: j.value, label: j.label }))}
+          />
           {fe.jobTitle && <p className="mt-1 text-meta text-danger">{fe.jobTitle}</p>}
         </div>
       </div>

@@ -26,6 +26,7 @@
 import { useState } from "react";
 import { useT } from "@/lib/i18n";
 import { Icon, Toggle } from "@/components/ui";
+import { Dropdown } from "@/components/Dropdown";
 import { SAFETY_CERTIFICATES, OPERATOR_CERTIFICATES, type Party } from "@/lib/contract/options";
 import type { MachineTerms } from "@/lib/contract/work-order";
 
@@ -131,14 +132,15 @@ function Pick({
   return (
     <label className="flex flex-col gap-1">
       <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{label}</span>
-      <select className={input} value={value ?? ""} onChange={(e) => onPick(e.target.value || null)}>
-        <option value="">—</option>
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {labels[o] ?? o}
-          </option>
-        ))}
-      </select>
+      {/* The house dropdown (owner, 2026-08-31). One `Pick` feeds eleven fields on a machine, so
+          this single swap is most of the work-order form's lists. */}
+      <Dropdown
+        label={label}
+        placeholder="—"
+        value={value ?? null}
+        onChange={(v) => onPick(v || null)}
+        options={options.map((o) => ({ value: o, label: labels[o] ?? o }))}
+      />
     </label>
   );
 }

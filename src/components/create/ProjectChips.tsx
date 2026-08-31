@@ -47,6 +47,7 @@ import { listProjects, listTemplates, fetchTemplateTerms } from "@/lib/api/clien
 import type { TemplateOption } from "@/lib/contract/project-apply";
 import { projectTitle, projectEnded, endedLast, type ProjectSummary } from "@/lib/contract/project";
 import { Icon } from "@/components/ui";
+import { Dropdown } from "@/components/Dropdown";
 
 /** Six, then a way to reach the rest. Enough to cover a renter's live jobs without becoming a list. */
 const VISIBLE = 6;
@@ -172,37 +173,41 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
           where the platform puts it, and the × stays above the layer so clearing the site cannot open
           the list by accident. */}
       {chosen && (
-        <span className="relative flex items-center gap-1.5 rounded-full border border-brand bg-brand-soft px-3 py-1 text-label font-semibold text-navy">
+        <span className="flex items-center gap-1.5 rounded-full border border-brand bg-brand-soft px-3 py-1 text-label font-semibold text-navy">
           <Icon name="place" size={13} className="flex-none text-brand" />
           {chosen.title}
+          {/* Applied is stated, not implied: a renter who has already copied a machine's terms
+              should not have to open the list to find out. */}
+          {state.templateTerms && <span className="font-normal text-muted">· {t.projects.pills.templateApplied}</span>}
+
+          {/* ── What is already filed at this site ────────────────────────────────────────────────
+              The house `Dropdown`, not a native `select` behind an invisible layer (owner,
+              2026-08-31). Two things it fixes on this control alone: the list is the app's own —
+              ticked row, our type, our border, instead of the OS menu's blue bar — and there is no
+              «start from» row at the top of it. That row was the placeholder a native select needs
+              to have nothing selected; it read as a fourth machine you could pick and it does
+              nothing. The invitation belongs on the trigger, which the pill already is.
+
+              Keyed by MACHINE id, not by the order it sits in — two machines on one order are two
+              entries, and picking either copies its own answers. The machine's name leads, because
+              that is what the renter is looking for; the kind and reference are the hint under it,
+              to tell two of the same machine apart. */}
           {templates.length > 0 && (
-            <>
-              {/* Applied is stated, not implied: a renter who has already copied a machine's terms
-                  should not have to open the list to find out. */}
-              {state.templateTerms && <span className="font-normal text-muted">· {t.projects.pills.templateApplied}</span>}
-              <Icon name="expand_more" size={14} className="-me-0.5 flex-none text-brand" />
-              {/* Keyed by MACHINE id, not by the order it sits in — two machines on one order are two
-                  entries, and picking either copies its own answers. The machine's name leads,
-                  because that is what the renter is looking for; the kind and reference follow it to
-                  tell two of the same machine apart. */}
-              <select
-                aria-label={t.projects.pills.startFrom}
-                disabled={picking}
-                value={picked ?? ""}
-                onChange={(e) => void applyTemplate(e.target.value)}
-                className="absolute inset-0 cursor-pointer opacity-0"
-              >
-                <option value="">{t.projects.pills.startFrom}</option>
-                {templates.map((tpl) => (
-                  <option key={tpl.itemId} value={tpl.itemId}>
-                    {`${tpl.machine || tpl.ref} · ${
-                      tpl.kind === "work_order" ? t.projects.pills.kindWorkOrder : t.projects.pills.kindRequest
-                    } ${tpl.ref}`}
-                  </option>
-                ))}
-              </select>
-            </>
+            <Dropdown
+              tone="bare"
+              label={t.projects.pills.startFrom}
+              placeholder=""
+              disabled={picking}
+              value={picked}
+              onChange={(v) => void applyTemplate(v)}
+              options={templates.map((tpl) => ({
+                value: tpl.itemId,
+                label: tpl.machine || tpl.ref,
+                hint: `${tpl.kind === "work_order" ? t.projects.pills.kindWorkOrder : t.projects.pills.kindRequest} ${tpl.ref}`,
+              }))}
+            />
           )}
+
           <button
             type="button"
             onClick={() => actions.clearProject()}

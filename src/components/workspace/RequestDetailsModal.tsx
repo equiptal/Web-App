@@ -76,6 +76,20 @@ export function RequestDetailsModal({
   const L = (en: string, arr: string) => (ar ? arr : en);
 
   const [shareOpen, setShareOpen] = useState(!!openShare);
+  /**
+   * **Entered on the share, and therefore the share is all there is** (owner, 2026-08-31: *"why does
+   * sharing a request open the details too?"*).
+   *
+   * The rail's share badge opens this component with `openShare`, which drew the whole request
+   * behind the sheet: one press, two stacked modals, and a details screen the renter did not ask
+   * for. Held at mount rather than read live, so pressing *Share request* in the FOOTER — a
+   * legitimate stacked case, from inside a details screen the renter did open — still layers the
+   * sheet over the details it belongs to.
+   *
+   * Closing the sheet on this path closes everything, for the same reason: revealing a screen nobody
+   * asked for is not a way out of one.
+   */
+  const [shareOnly] = useState(!!openShare);
   const [confirmEdit, setConfirmEdit] = useState(false);
   const [editing, setEditing] = useState<RequestRecord | null>(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
@@ -172,6 +186,34 @@ export function RequestDetailsModal({
       setConfirmCancel(false);
     }
   };
+
+  /* The share-only path. Rendered before the dialog so the details never mount behind it — see
+     `shareOnly`. Every prop is the same one the stacked sheet below receives. */
+  if (shareOnly && shareOpen) {
+    return (
+      <ShareForBidsSheet
+        open
+        onClose={() => {
+          setShareOpen(false);
+          onClose();
+        }}
+        shareUrl={shareUrl}
+        renterName={link?.renterName}
+        deadline={deadline}
+        onSaveDeadline={(iso) => {
+          setDeadline(iso);
+          void setBidDeadline(group.id, iso).catch(() => {});
+        }}
+        logoUrl={logoUrl}
+        onSaveLogo={(url) => {
+          setLogoUrl(url);
+          void setShareLinkLogo(group.id, url).catch(() => {});
+        }}
+        ar={ar}
+        L={L}
+      />
+    );
+  }
 
   return (
     <>

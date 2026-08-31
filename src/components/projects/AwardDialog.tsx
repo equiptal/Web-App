@@ -43,6 +43,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { Button, Icon } from "@/components/ui";
 import { Dialog } from "@/components/Dialog";
+import { Dropdown } from "@/components/Dropdown";
 import { listRenterSuppliers, type RenterSupplier, type AwardInput } from "@/lib/api/client";
 import { awardedUnits, type Award, type ChartItem } from "@/lib/contract/award";
 /* The work order's arithmetic, not a second copy of it: (rate + mob + demob) × units, with
@@ -137,30 +138,29 @@ export function AwardDialog({
               </div>
 
               {suppliers && suppliers.length > 0 ? (
-                <select
-                  className="w-full rounded-sm border border-border bg-surface px-3 py-2 text-body text-navy outline-none focus:border-brand"
-                  value={l.supplierId ?? ""}
-                  onChange={(e) => {
-                    const s = suppliers.find((x) => x.id === e.target.value);
+                /* PROJ-AC-15, ruled by the owner 2026-08-31: **the gate follows the list.** While
+                   there is no registry to read, the branch below takes over and a renter types a
+                   name — refusing an unregistered supplier then would block every award on a feature
+                   that has not shipped. The moment a list exists, choosing from it means choosing a
+                   registered one, so an unregistered row is SHOWN AND DISABLED rather than hidden: a
+                   renter looking for a supplier they have used before needs to find it and see why
+                   it cannot be picked, not wonder where it went. */
+                <Dropdown
+                  label={a.supplier}
+                  placeholder="—"
+                  value={l.supplierId ?? null}
+                  onChange={(v) => {
+                    const picked = suppliers.find((x) => x.id === v);
                     // The name is stored even when the id is — see the note at the top.
-                    patch(i, { supplierId: s?.id ?? null, supplierName: s?.name ?? "" });
+                    patch(i, { supplierId: picked?.id ?? null, supplierName: picked?.name ?? "" });
                   }}
-                >
-                  <option value="">—</option>
-                  {/* PROJ-AC-15, ruled by the owner 2026-08-31: **the gate follows the list.**
-                      While there is no registry to read, the branch below takes over and a renter
-                      types a name — refusing an unregistered supplier then would block every award
-                      on a feature that has not shipped. The moment a list exists, choosing from it
-                      means choosing a registered one, so an unregistered row is shown and disabled
-                      rather than hidden: a renter looking for a supplier they have used before needs
-                      to find it and see WHY it cannot be picked, not wonder where it went. */}
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id} disabled={!s.vendorRegistered}>
-                      {s.name}
-                      {s.vendorRegistered ? "" : ` · ${a.notRegistered}`}
-                    </option>
-                  ))}
-                </select>
+                  options={suppliers.map((sup) => ({
+                    value: sup.id,
+                    label: sup.name,
+                    hint: sup.vendorRegistered ? undefined : a.notRegistered,
+                    disabled: !sup.vendorRegistered,
+                  }))}
+                />
               ) : (
                 <>
                   <input
@@ -229,16 +229,17 @@ export function AwardDialog({
 
                 <label className="flex flex-col gap-1">
                   <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{a.basis}</span>
-                  <select
-                    className="w-full rounded-sm border border-border bg-surface px-3 py-2 text-body text-navy outline-none focus:border-brand"
-                    value={l.rentalBasis ?? ""}
-                    onChange={(e) => patch(i, { rentalBasis: (e.target.value || null) as Award["rentalBasis"] })}
-                  >
-                    <option value="">—</option>
-                    <option value="daily">{a.daily}</option>
-                    <option value="weekly">{a.weekly}</option>
-                    <option value="monthly">{a.monthly}</option>
-                  </select>
+                  <Dropdown
+                    label={a.basis}
+                    placeholder="—"
+                    value={l.rentalBasis ?? null}
+                    onChange={(v) => patch(i, { rentalBasis: (v || null) as Award["rentalBasis"] })}
+                    options={[
+                      { value: "daily", label: a.daily },
+                      { value: "weekly", label: a.weekly },
+                      { value: "monthly", label: a.monthly },
+                    ]}
+                  />
                 </label>
               </div>
 

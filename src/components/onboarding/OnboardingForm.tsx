@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useT, useLocale } from "@/lib/i18n";
+import { Dropdown } from "@/components/Dropdown";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import { postAuth, type AuthKind } from "@/components/auth/authClient";
@@ -291,17 +292,14 @@ export function OnboardingForm({
               {phoneVerified && <span className="ms-2 text-label font-semibold text-ok">✓ {t.auth.phoneVerified}</span>}
             </label>
             <div className="flex gap-3" dir="ltr">
-              <select
-                aria-label={t.auth.countryLabel}
+              <Dropdown
+                label={t.auth.countryLabel}
+                placeholder="—"
                 value={dial}
-                onChange={(e) => { setDial(e.target.value); resetPhone(); }}
                 disabled={phoneVerified}
-                className="h-[46px] rounded-sm border border-border bg-surface px-3 text-body font-semibold text-navy outline-0 focus:border-brand disabled:bg-disabled-bg disabled:text-disabled-fg"
-              >
-                {COUNTRY_CODES.map((c) => (
-                  <option key={c.dial} value={c.dial}>{c.flag} {c.dial}</option>
-                ))}
-              </select>
+                onChange={(v) => { setDial(v); resetPhone(); }}
+                options={COUNTRY_CODES.map((c) => ({ value: c.dial, label: `${c.flag} ${c.dial}` }))}
+              />
               <input
                 className={`${inputCls} flex-1 ${phoneVerified ? "bg-surface2 text-muted" : ""}`}
                 type="tel"
@@ -371,22 +369,24 @@ export function OnboardingForm({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className={labelCls}>{o.city}</label>
-            <select className={inputCls} value={city} onChange={(e) => setCity(e.target.value)}>
-              <option value="">{o.selectCity}</option>
-              {cities.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
+            <Dropdown
+              label={o.city}
+              placeholder={o.selectCity}
+              value={city || null}
+              onChange={setCity}
+              options={cities.map((c) => ({ value: c.value, label: c.label }))}
+            />
             {fe.city && <p className="mt-1 text-meta text-danger">{fe.city}</p>}
           </div>
           <div>
             <label className={labelCls}>{o.jobTitle}</label>
-            <select className={inputCls} value={jobTitle} onChange={(e) => setJobTitle(e.target.value)}>
-              <option value="">{o.selectJobTitle}</option>
-              {jobs.map((j) => (
-                <option key={j.value} value={j.value}>{j.label}</option>
-              ))}
-            </select>
+            <Dropdown
+              label={o.jobTitle}
+              placeholder={o.selectJobTitle}
+              value={jobTitle || null}
+              onChange={setJobTitle}
+              options={jobs.map((j) => ({ value: j.value, label: j.label }))}
+            />
             {fe.jobTitle && <p className="mt-1 text-meta text-danger">{fe.jobTitle}</p>}
           </div>
         </div>

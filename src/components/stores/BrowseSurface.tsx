@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Dropdown } from "@/components/Dropdown";
 import { useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
@@ -14,9 +15,6 @@ interface CityOpt {
   label: string;
 }
 
-// Filter pill — equal width so all filters are the same size.
-const selectCls =
-  "h-[40px] flex-1 min-w-[150px] rounded-sm border border-border bg-surface2 px-3 text-body font-semibold text-navy-mid outline-0 hover:border-navy-mid focus:border-brand";
 
 /**
  * Suggested-suppliers surface (web-app/004, AC-10–17, AC-23). The filter bar (search + city +
@@ -160,42 +158,41 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
           {/* City + Category cascade need authed reference data → shown to signed-in users only. */}
           {!anon && (
             <>
-              <select className={selectCls} value={city} onChange={(e) => setCity(e.target.value)}>
-                <option value="">{t.browse.anyCity}</option>
-                {cities.map((c) => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
-                ))}
-              </select>
-              <select className={selectCls} value={categoryId} onChange={(e) => onCategory(e.target.value)}>
-                <option value="">{t.browse.anyCategory}</option>
-                {taxonomy.map((c) => (
-                  <option key={c.id} value={c.id}>{tabel(c, ar)}</option>
-                ))}
-              </select>
-              <select className={selectCls} value={subcategoryId} onChange={(e) => onSubcategory(e.target.value)}>
-                {categoryId ? (
-                  <>
-                    <option value="">{t.browse.anySubcategory}</option>
-                    {subcategories.map((s) => (
-                      <option key={s.id} value={s.id}>{tabel(s, ar)}</option>
-                    ))}
-                  </>
-                ) : (
-                  <option value="">{t.browse.pickCategoryFirst}</option>
-                )}
-              </select>
-              <select className={selectCls} value={measurementId} onChange={(e) => setMeasurementId(e.target.value)}>
-                {subcategoryId ? (
-                  <>
-                    <option value="">{t.browse.anyMeasurement}</option>
-                    {measurements.map((m) => (
-                      <option key={m.id} value={m.id}>{tabel(m, ar)}</option>
-                    ))}
-                  </>
-                ) : (
-                  <option value="">{t.browse.pickSubcategoryFirst}</option>
-                )}
-              </select>
+              {/* The house dropdown on all four (owner, 2026-08-31). A cascade is where the old
+                  native menus hurt most: four of them in a row, each opening a differently-styled
+                  system list, and the two disabled ones saying «pick a category first» in a row the
+                  renter could still open. Empty options and the placeholder say the same thing here,
+                  so a filter that is not narrowed reads «Any city» on its own trigger. */}
+              <Dropdown
+                label={t.browse.anyCity}
+                placeholder={t.browse.anyCity}
+                value={city || null}
+                onChange={setCity}
+                options={cities.map((c) => ({ value: c.value, label: c.label }))}
+              />
+              <Dropdown
+                label={t.browse.anyCategory}
+                placeholder={t.browse.anyCategory}
+                value={categoryId || null}
+                onChange={onCategory}
+                options={taxonomy.map((c) => ({ value: c.id, label: tabel(c, ar) }))}
+              />
+              <Dropdown
+                label={t.browse.anySubcategory}
+                placeholder={categoryId ? t.browse.anySubcategory : t.browse.pickCategoryFirst}
+                disabled={!categoryId}
+                value={subcategoryId || null}
+                onChange={onSubcategory}
+                options={subcategories.map((sc) => ({ value: sc.id, label: tabel(sc, ar) }))}
+              />
+              <Dropdown
+                label={t.browse.anyMeasurement}
+                placeholder={subcategoryId ? t.browse.anyMeasurement : t.browse.pickSubcategoryFirst}
+                disabled={!subcategoryId}
+                value={measurementId || null}
+                onChange={setMeasurementId}
+                options={measurements.map((m) => ({ value: m.id, label: tabel(m, ar) }))}
+              />
             </>
           )}
           <button

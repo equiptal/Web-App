@@ -30,6 +30,7 @@ import { useMemo, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { Button, Icon } from "@/components/ui";
 import { Dialog } from "@/components/Dialog";
+import { Dropdown } from "@/components/Dropdown";
 import { projectTitle, projectEnded, shortSite, endedLast, type ProjectSummary } from "@/lib/contract/project";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -157,21 +158,19 @@ export function MoveDialog({
               {suggested.length > 0 ? m.orAnother : m.chooseOne}
             </h4>
             <div className="flex gap-2">
-              <select
-                className="w-full rounded-sm border border-border bg-surface px-3 py-2 text-body text-navy outline-none focus:border-brand"
-                value={picked}
-                onChange={(e) => setPicked(e.target.value)}
-              >
-                <option value="">—</option>
-                {rest.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {/* Ended ones are labelled rather than hidden: a date passing is not proof a
-                        site is finished, and a renter who extended verbally still needs it here. */}
-                    {projectTitle(p)}
-                    {projectEnded(p, today()) ? ` · ${t.projects.chips.ended}` : ""}
-                  </option>
-                ))}
-              </select>
+              {/* Ended sites are LABELLED rather than hidden: a date passing is not proof a site is
+                  finished, and a renter who extended verbally still needs it here. */}
+              <Dropdown
+                label={t.projects.move.moveTitle}
+                placeholder="—"
+                value={picked || null}
+                onChange={(v) => setPicked(v)}
+                options={rest.map((p) => ({
+                  value: p.id,
+                  label: projectTitle(p),
+                  hint: projectEnded(p, today()) ? t.projects.chips.ended : undefined,
+                }))}
+              />
               <Button disabled={!picked || busy} onClick={() => onFile(picked)}>
                 {unfiled ? m.file : m.move}
               </Button>

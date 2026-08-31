@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Dialog } from "@/components/Dialog";
+import { Dropdown } from "@/components/Dropdown";
 import { updateRequest } from "@/lib/api/client";
 import { type RequestRecord } from "@/lib/contract/requests";
 import "@/components/requests/requests-proto.css";
@@ -197,10 +198,15 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
   const lbl = "text-meta font-semibold text-navy-mid";
   const Sel = ({ label, value, onChange, opts }: { label: string; value: string; onChange: (v: string) => void; opts: Opt[] }) => (
     <label><span className={lbl}>{label}</span>
-      <select className={fld} value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">{L("—", "—")}</option>
-        {opts.map((o) => <option key={o.v} value={o.v}>{ar ? o.ar : o.en}</option>)}
-      </select>
+      {/* One `Sel` feeds every list in these modals, so this is the whole file's worth of
+          dropdowns (owner, 2026-08-31: one dropdown across the product). */}
+      <Dropdown
+        label={label}
+        placeholder="—"
+        value={value || null}
+        onChange={onChange}
+        options={opts.map((o) => ({ value: o.v, label: ar ? o.ar : o.en }))}
+      />
     </label>
   );
   const Num = ({ label, value, onChange, min, max }: { label: string; value: string; onChange: (v: string) => void; min?: number; max?: number }) => (

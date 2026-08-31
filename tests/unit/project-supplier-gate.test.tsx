@@ -41,19 +41,30 @@ function open() {
 describe("who may be awarded", () => {
   beforeEach(() => cleanup());
 
+  /* The list is the house `Dropdown` now, not a native `select` (owner, 2026-08-31: one dropdown
+     across the product), so its rows exist only while it is open — a native select keeps its
+     `<option>`s in the DOM whether or not the menu is showing. The RULE is unchanged and is what
+     these still pin: registered is pickable, unregistered is shown, labelled and refused. */
+  const openSupplierList = async () => {
+    const trigger = await screen.findByRole("combobox", { name: en.projects.award.supplier });
+    fireEvent.click(trigger);
+  };
+
   it("lets a registered supplier be chosen", async () => {
     suppliers.rows = [{ id: "s1", name: "Zahid Tractor", vendorRegistered: true }];
     open();
+    await openSupplierList();
 
-    const opt = (await screen.findByRole("option", { name: /Zahid Tractor/ })) as HTMLOptionElement;
+    const opt = (await screen.findByRole("option", { name: /Zahid Tractor/ })) as HTMLButtonElement;
     expect(opt.disabled).toBe(false);
   });
 
   it("shows an unregistered supplier, says so, and refuses it", async () => {
     suppliers.rows = [{ id: "s2", name: "Al-Rajhi", vendorRegistered: false }];
     open();
+    await openSupplierList();
 
-    const opt = (await screen.findByRole("option", { name: /Al-Rajhi/ })) as HTMLOptionElement;
+    const opt = (await screen.findByRole("option", { name: /Al-Rajhi/ })) as HTMLButtonElement;
     // Present, so it can be found — and disabled, so it cannot be picked.
     expect(opt.disabled).toBe(true);
     expect(opt.textContent).toContain(en.projects.award.notRegistered);

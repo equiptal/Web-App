@@ -33,6 +33,7 @@ import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
 import { useT } from "@/lib/i18n";
 import { Icon, Button, Toggle } from "@/components/ui";
+import { Dropdown } from "@/components/Dropdown";
 import {
   defaultProjectDefaults,
   shortSite,
@@ -242,37 +243,27 @@ export function ProjectForm({
           </Field>
 
           <Field label={t.projects.form.basis} flag={unset(!timing.rentalBasis)}>
-            <select
-              className={input}
-              value={timing.rentalBasis ?? ""}
-              onChange={(e) => patchTiming({ rentalBasis: (e.target.value || null) as RentalBasis | null })}
-            >
-              <option value="">—</option>
-              {RENTAL_BASES.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
+            <Dropdown
+              label={t.projects.form.basis}
+              placeholder="—"
+              value={timing.rentalBasis}
+              onChange={(v) => patchTiming({ rentalBasis: (v || null) as RentalBasis | null })}
+              options={RENTAL_BASES.map((b) => ({ value: b, label: b }))}
+            />
           </Field>
         </div>
 
         <div className="sm:max-w-[280px]">
           <Field label={t.projects.form.paymentTerms} flag={unset(!value.defaults.paymentTerms)}>
-            <select
-              className={input}
-              value={value.defaults.paymentTerms ?? ""}
-              onChange={(e) =>
-                onChange({ ...value, defaults: { ...value.defaults, paymentTerms: (e.target.value || null) as PaymentTerm | null } })
+            <Dropdown
+              label={t.projects.form.paymentTerms}
+              placeholder="—"
+              value={value.defaults.paymentTerms}
+              onChange={(v) =>
+                onChange({ ...value, defaults: { ...value.defaults, paymentTerms: (v || null) as PaymentTerm | null } })
               }
-            >
-              <option value="">—</option>
-              {PAYMENT_TERMS.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
+              options={PAYMENT_TERMS.map((p) => ({ value: p, label: p }))}
+            />
           </Field>
           {/* ~~«Your finance team's terms — every machine on this site.»~~ Removed by the owner
               (2026-08-31). The label already says *payment terms* and the section already says these

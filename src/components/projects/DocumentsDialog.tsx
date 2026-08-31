@@ -24,6 +24,7 @@ import { useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { Button, Icon } from "@/components/ui";
 import { Dialog } from "@/components/Dialog";
+import { Dropdown } from "@/components/Dropdown";
 import { contentTypeFor, type Award, type AwardDocumentKind } from "@/lib/contract/award";
 
 const KINDS: AwardDocumentKind[] = ["po", "contract", "quotation", "other"];
@@ -205,17 +206,13 @@ export function DocumentsDialog({
         <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
           <label className="flex flex-col gap-1">
             <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{d.kind}</span>
-            <select
-              className="rounded-sm border border-border bg-surface px-3 py-2 text-body text-navy outline-none focus:border-brand"
+            <Dropdown
+              label={d.kind}
+              placeholder="—"
               value={kind}
-              onChange={(e) => setKind(e.target.value as AwardDocumentKind)}
-            >
-              {KINDS.map((k) => (
-                <option key={k} value={k}>
-                  {d.kinds[k]}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setKind(v as AwardDocumentKind)}
+              options={KINDS.map((k) => ({ value: k, label: d.kinds[k] }))}
+            />
           </label>
 
           <input

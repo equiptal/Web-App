@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { Dropdown } from "@/components/Dropdown";
 import { postAuth, type AuthKind, type OtpChannel } from "./authClient";
 import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
@@ -80,21 +81,19 @@ export function PhoneEntry({
       <label className={authLabel(tone)}>{a.phoneLabel}</label>
       <div className="flex gap-3" dir="ltr">
         {PUBLIC_WEB_ENABLED ? (
-          <select
-            aria-label={a.countryLabel}
+          /* The house dropdown, wearing the auth field's skin (owner, 2026-08-31: one dropdown
+             across the product). ~~`[&>option]:text-navy`~~ went with the native popup it patched:
+             the browser's own list inherited this control's white-on-navy and rendered white text
+             on a white ground. The app's list is the app's list wherever it opens, so the class of
+             bug is gone rather than corrected. */
+          <Dropdown
+            label={a.countryLabel}
+            placeholder="—"
             value={dial}
-            onChange={(e) => setDial(e.target.value)}
-            /* `[&>option]:text-navy` — the field itself is white-on-navy, but the OPTION list is the
-               browser's own popup on its own white ground, and it inherits the control's colour. On
-               the dark tone that is white text on white. This is the one part of the skin the
-               stylesheet cannot reach from `authField`, so it is stated at the one control that has
-               a popup. */
-            className={`${authField(tone)} flex-none font-extrabold [&>option]:text-navy`}
-          >
-            {COUNTRY_CODES.map((c) => (
-              <option key={c.dial} value={c.dial}>{c.flag} {c.dial}</option>
-            ))}
-          </select>
+            onChange={setDial}
+            triggerClass={`${authField(tone)} flex-none font-extrabold`}
+            options={COUNTRY_CODES.map((c) => ({ value: c.dial, label: `${c.flag} ${c.dial}` }))}
+          />
         ) : (
           <div className={`${authField(tone)} flex flex-none items-center gap-2 whitespace-nowrap font-extrabold`}>
             <span className="text-title">🇸🇦</span> +966
