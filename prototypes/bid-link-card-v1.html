@@ -1,192 +1,177 @@
 <!doctype html>
-<html lang="en" dir="ltr">
+<html lang="en">
 <head>
-<meta charset="utf-8" />
-<title>The bid-link card — Moedatech</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link
-  href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=swap"
-  rel="stylesheet"
-/>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The bid-link card — before/after · dev spec</title>
 
 <!--
   Moedatech — THE BID-LINK CARD · SUP-T43
+  Same structure as `email-link-preview.html`, which specified the four-element card. This one
+  specifies the FIVE ROWS the owner asked for (2026-09-01), and marks what already exists.
 
-  The layout the owner specified (2026-09-01), five rows:
-
-    1  subcategory · size · operator        what machine, and does it come with a man
-    2  city · duration, start → end         where, and for how long
-    3  mobilisation · demobilisation        who moves it
-    4  FAT · fuel                           who feeds and fuels
-    5  download the app                     linktr.ee/moedatech
-
-  Every row is a field the request already carries, so none of it is typed: subcategory and
-  measurement from the taxonomy, the operator term, the site's city, the basis and dates,
-  `deliveryToSite` and the return party, `fatFood`/`fatTransport`, `fuelResponsibility` + `fuelType`.
-
-  ── The fifth row is the interesting one ────────────────────────────────────────────────────────
-  It turns every shared request into an invitation. A supplier who bids through the form is off
-  platform by definition — this is the moment he is most likely to join, because he is already
-  working. One link, `JOIN_URL`, the same constant the bid card's invite button uses.
-
-  ── Drawn twice, because two things render it ───────────────────────────────────────────────────
-    · THE IMAGE — 880×320, `/bid/[token]/og`. WhatsApp, Apple Mail, Outlook, Slack, iMessage.
-      A picture: nothing clickable, nothing selectable, and what does not fit is not there.
-    · THE HTML CARD — 440px, `bidCardHtml.ts`, mirrored by `renderBidLinkCard()` in backend-admin.
-      Gmail on paste, and app-sent mail. Real text, real links.
-
-  Demo values from a real renter's email, 18 Aug 2026.
+  Prototype for `docs/implementation-plans/renter-suppliers/plan.md` §T.
 -->
 
 <style>
-  :root{
-    --navy-deep:#16263f; --navy:#1c3550; --navy-mid:#2a4f72;
-    --muted-dark:#5a6b82; --muted:#6b8fa8; --muted-light:#9aa7b8;
-    --border-strong:#c3d2e0; --border:#d4e0ec;
-    --surface3:#e4edf5; --surface2:#eff4f9; --background:#f5f8fc; --surface:#ffffff;
-    --brand:#f79009; --brand-deep:#b45309; --brand-soft:#fff4e5; --brand-pale:#fde8cc;
-    --ok:#1daf58; --ok-soft:#e7f7ee; --ok-deep:#15803d;
-    --t-label:11px; --t-meta:12.5px; --t-body:13px; --t-subhead:15px; --t-title:17px;
-    --r-sm:2px; --r-md:4px; --r-lg:6px; --r-full:999px;
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #0C1A2E; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; color: #E6ECF3; }
+
+  .doc-header { max-width: 1400px; margin: 0 auto; padding: 28px 32px 16px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .doc-header .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .doc-header .brand img { height: 24px; width: auto; }
+  .doc-header h1 { margin: 0 0 8px; font-size: 24px; font-weight: 800; color: #fff; letter-spacing: -0.4px; }
+  .doc-header .sub { font-size: 13px; color: rgba(230,236,243,0.7); font-weight: 500; line-height: 1.65; max-width: 940px; }
+  .doc-header .sub b { color: #fff; }
+  .badge-note {
+    display: inline-block; margin-top: 10px; padding: 6px 12px; border-radius: 8px;
+    background: rgba(255,196,80,0.12); border: 1px solid rgba(255,196,80,0.3);
+    color: #FFC450; font-size: 11.5px; font-weight: 700;
   }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--background);color:var(--navy);
-    font-family:"Nunito",-apple-system,"Segoe UI",Roboto,sans-serif;font-size:var(--t-body);line-height:1.5;
-    -webkit-font-smoothing:antialiased}
-  [dir="rtl"] body{font-family:"IBM Plex Sans Arabic","Nunito",sans-serif}
-  h1,h2,h3{margin:0;line-height:1.25;font-weight:800;letter-spacing:-.02em}
-  p{margin:0}
-  .icon{font-family:"Material Symbols Rounded";line-height:1;display:inline-block;direction:ltr;
-    -webkit-font-feature-settings:"liga";user-select:none}
-  .ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; max-width: 1400px; margin: 16px auto 0; padding: 12px 32px; font-size: 11px; color: rgba(230,236,243,0.75); }
+  .legend .item { display: inline-flex; align-items: center; gap: 6px; }
+  .tag { padding: 3px 8px; border-radius: 4px; font-weight: 700; font-size: 9.5px; letter-spacing: 0.4px; white-space: nowrap; }
+  .tag.built { background: rgba(29,175,88,0.16); color: #6EE8A0; }
+  .tag.new { background: rgba(255,196,80,0.16); color: #FFC450; }
+  .tag.open { background: rgba(217,54,42,0.16); color: #FF8A7A; }
+  .tag.ref { background: rgba(140,200,255,0.16); color: #8CC8FF; }
 
-  .wrap{max-width:1180px;margin:0 auto;padding:26px 20px 60px}
-  header.top{display:flex;align-items:center;gap:14px;margin-bottom:5px}
-  header.top img{height:26px;width:auto}
-  header.top .sep{width:1px;height:20px;background:var(--border-strong)}
-  header.top h1{font-size:var(--t-title)}
-  .sub{color:var(--muted);font-size:var(--t-meta);margin-bottom:20px}
-  .lang{margin-inline-start:auto;display:flex;gap:4px}
-  .lang button{height:30px;padding:0 12px;border:1px solid var(--border-strong);background:var(--surface);
-    border-radius:var(--r-full);font:inherit;font-size:var(--t-meta);font-weight:800;color:var(--muted-dark);cursor:pointer}
-  .lang button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+  .section { max-width: 1400px; margin: 0 auto; padding: 26px 32px; }
+  .section-head { font-size: 11px; font-weight: 800; letter-spacing: 1.4px; color: rgba(255,235,122,0.8); margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px dashed rgba(255,255,255,0.1); }
 
-  .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);
-    padding:20px;margin-bottom:16px}
-  .panel > h2{font-size:var(--t-subhead);margin-bottom:3px}
-  .panel > .note{color:var(--muted);font-size:var(--t-meta);margin-bottom:16px;max-width:78ch}
-  .panel > .note b{color:var(--navy);font-weight:800}
-  .pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(452px,1fr));gap:22px;align-items:start}
-  .cap{font-size:var(--t-label);font-weight:800;letter-spacing:.06em;text-transform:uppercase;
-    color:var(--muted);margin-bottom:8px}
-  .cap span{font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted-light)}
+  /* ===== before/after email mocks ===== */
+  .compare-row { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+  @media (max-width: 1040px) { .compare-row { grid-template-columns: 1fr; } }
+  .mock-label { font-family: monospace; font-size: 10.5px; font-weight: 700; letter-spacing: 1px; color: rgba(230,236,243,0.55); margin-bottom: 8px; text-transform: uppercase; }
+  .mock-label.before { color: #FF8A7A; }
+  .mock-label.after { color: #6EE8A0; }
 
-  /* ── the image, 880×320, shown at half size ──────────────────────────────────────────────────── */
-  .shot-holder{height:160px;width:440px;overflow:hidden;border-radius:var(--r-md)}
-  .shot{width:880px;height:320px;transform-origin:top left;transform:scale(.5);background:var(--navy);
-    display:flex;flex-direction:column;justify-content:space-between;padding:38px 46px;color:#fff}
-  .shot .head{display:flex;align-items:center;justify-content:space-between}
-  .shot .head img{height:50px;width:auto}
-  .shot .ref{font-family:"IBM Plex Mono",monospace;font-size:25px;letter-spacing:2px;color:rgba(255,255,255,.6)}
-  .shot h3{font-size:56px;line-height:1.05;letter-spacing:-.03em;max-width:15ch}
-  .shot .where{font-size:30px;font-weight:600;color:rgba(255,255,255,.82);margin-top:12px}
-  .shot .terms{display:flex;gap:44px;margin-top:20px}
-  .shot .terms div span{display:block;font-size:20px;letter-spacing:1.4px;text-transform:uppercase;
-    color:rgba(255,255,255,.5);font-weight:800}
-  .shot .terms div b{display:block;font-size:28px;font-weight:700;margin-top:5px}
-  .shot .foot{display:flex;align-items:flex-end;justify-content:space-between}
-  .shot .pill{background:var(--brand);color:#fff;border-radius:999px;padding:9px 22px;font-weight:800;font-size:24px}
-  .shot .join{font-size:20px;color:rgba(255,255,255,.55);text-align:end;line-height:1.4}
-  .shot .join b{display:block;color:rgba(255,255,255,.85);font-weight:700;letter-spacing:1.2px}
+  .email-shell { background: #fff; border-radius: 12px; overflow: hidden; color: #1a1a1a; font-family: 'Segoe UI', Roboto, Arial, sans-serif; }
+  .email-chrome { background: #F5F5F7; padding: 12px 16px; border-bottom: 1px solid #E5E5E5; font-size: 12px; color: #6B7280; }
+  .email-chrome .subject { font-size: 14px; font-weight: 700; color: #1a1a1a; margin-bottom: 4px; }
+  .email-body { padding: 20px 18px; font-size: 13.5px; line-height: 1.7; color: #333; }
+  .email-body p { margin: 0 0 12px; }
+  .plain-link { color: #1a73e8; text-decoration: underline; word-break: break-all; }
+  .typed { background: #FFF8E1; border-left: 3px solid #FFC450; padding: 8px 10px; font-size: 12.5px; color: #5a4a1a; margin: 0 0 12px; white-space: pre-line; line-height: 1.55; }
 
-  /* ── the HTML card, 440px ─────────────────────────────────────────────────────────────────────── */
-  .mail{width:440px;max-width:100%;border:1px solid var(--border);border-radius:var(--r-md);
-    overflow:hidden;background:var(--surface);font-family:"Segoe UI",Roboto,Arial,sans-serif}
-  .mail .band{height:160px;background:var(--navy);overflow:hidden}
-  .mail .body{padding:14px 16px 16px}
-  .mail .title{font-size:14px;font-weight:700;color:var(--navy);line-height:1.35}
-  .mail .where{margin-top:5px;font-size:12px;color:var(--muted-dark);font-weight:600}
-  .mail .rows{margin-top:11px;border-top:1px solid var(--border);padding-top:9px;display:grid;gap:5px}
-  .mail .row{display:flex;gap:8px;font-size:11.5px;line-height:1.45}
-  .mail .row .k{width:118px;flex:none;color:var(--muted);font-weight:600}
-  .mail .row .v{color:var(--navy);font-weight:700}
-  .mail .cta{display:inline-block;margin-top:12px;background:var(--brand);color:#fff;text-decoration:none;
-    border-radius:var(--r-md);padding:9px 16px;font-size:12.5px;font-weight:800}
-  .mail .closes{margin-top:8px;font-size:11px;color:var(--muted)}
-  .mail .join{margin-top:11px;border-top:1px solid var(--border);padding-top:10px;font-size:11.5px;
-    color:var(--muted-dark);line-height:1.5}
-  .mail .join a{color:var(--brand-deep);font-weight:800;text-decoration:none}
-  .mail .host{margin-top:10px;font-size:10.5px;letter-spacing:.4px;color:var(--border-strong)}
+  /* the card itself */
+  .preview-card { border: 1px solid #E1E4E8; border-radius: 10px; overflow: hidden; margin-top: 8px; max-width: 440px; }
+  .pc-image { position: relative; height: 160px; overflow: hidden; background: #1c3550; }
+  .pc-body { padding: 14px 16px 16px; }
+  .pc-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 7px; }
+  .pc-row:last-child { margin-bottom: 0; }
+  .pc-title { font-size: 14px; font-weight: 700; color: #1a1a1a; line-height: 1.35; }
+  .pc-where { font-size: 12px; color: #5a6b82; font-weight: 600; }
+  .pc-terms { border-top: 1px solid #E1E4E8; margin-top: 10px; padding-top: 9px; }
+  .pc-term { display: flex; gap: 8px; font-size: 11.5px; line-height: 1.5; }
+  .pc-term .k { width: 116px; flex: none; color: #6B7280; font-weight: 600; }
+  .pc-term .v { color: #1c3550; font-weight: 700; }
+  .pc-cta { display: inline-block; margin-top: 12px; background: #f79009; color: #fff; text-decoration: none; border-radius: 4px; padding: 9px 16px; font-size: 12.5px; font-weight: 800; }
+  .pc-closes { margin-top: 8px; font-size: 11px; color: #6B7280; }
+  .pc-join { margin-top: 11px; border-top: 1px solid #E1E4E8; padding-top: 10px; font-size: 11.5px; color: #5a6b82; line-height: 1.5; }
+  .pc-join a { color: #b45309; font-weight: 800; text-decoration: none; }
+  .pc-domain { margin-top: 10px; font-size: 10.5px; color: #9AA0A6; text-transform: uppercase; letter-spacing: 0.4px; }
 
-  .rules{display:grid;gap:8px}
-  .rule{display:flex;gap:9px;font-size:var(--t-meta);color:var(--muted-dark);line-height:1.5}
-  .rule .icon{font-size:var(--t-subhead);color:var(--brand-deep);flex:none;margin-top:1px}
-  .rule b{color:var(--navy);font-weight:800}
+  .pin { position: absolute; width: 22px; height: 22px; border-radius: 11px; background: #FFC450; color: #16233A; font-weight: 900; font-size: 11px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px rgba(12,26,46,0.5); z-index: 3; }
+  .pin-inline { flex-shrink: 0; width: 20px; height: 20px; border-radius: 10px; background: #16233A; color: #FFC450; font-weight: 900; font-size: 10px; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
 
-  .fields{width:100%;border-collapse:collapse;font-size:var(--t-meta);margin-top:4px}
-  .fields th{text-align:start;font-size:var(--t-label);font-weight:800;letter-spacing:.06em;
-    text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);padding:6px 8px 6px 0}
-  .fields td{padding:6px 8px 6px 0;border-bottom:1px solid var(--border);vertical-align:top}
-  .fields td:first-child{font-weight:800;color:var(--navy);white-space:nowrap}
-  .fields code{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--navy-mid)}
+  /* the generated image, drawn at half scale inside the 440px band */
+  .shot { width: 880px; height: 320px; transform-origin: top left; transform: scale(.5); background: #1c3550; display: flex; flex-direction: column; justify-content: space-between; padding: 38px 46px; color: #fff; font-family: 'Nunito', 'Segoe UI', sans-serif; }
+  .shot .head { display: flex; align-items: center; justify-content: space-between; }
+  .shot .head img { height: 48px; width: auto; }
+  .shot .ref { font-family: monospace; font-size: 25px; letter-spacing: 2px; color: rgba(255,255,255,0.6); }
+  .shot h3 { margin: 0; font-size: 54px; line-height: 1.05; letter-spacing: -1.4px; font-weight: 800; max-width: 15ch; }
+  .shot .where { font-size: 29px; font-weight: 600; color: rgba(255,255,255,0.82); margin: 12px 0 0; }
+  .shot .terms { display: flex; gap: 44px; margin-top: 20px; }
+  .shot .terms span { display: block; font-size: 19px; letter-spacing: 1.4px; text-transform: uppercase; color: rgba(255,255,255,0.5); font-weight: 800; }
+  .shot .terms b { display: block; font-size: 27px; font-weight: 700; margin-top: 5px; }
+  .shot .foot { display: flex; align-items: flex-end; justify-content: space-between; }
+  .shot .pill { background: #f79009; border-radius: 999px; padding: 9px 22px; font-weight: 800; font-size: 23px; }
+  .shot .join { font-size: 19px; color: rgba(255,255,255,0.55); text-align: right; line-height: 1.4; }
+  .shot .join b { display: block; color: rgba(255,255,255,0.85); font-weight: 700; letter-spacing: 1.2px; }
+
+  /* ===== spec cards ===== */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; margin-top: 24px; }
+  .spec-card { display: grid; grid-template-columns: 30px 1fr auto; gap: 14px; align-items: start; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 16px 18px; }
+  .spec-card .num { width: 26px; height: 26px; border-radius: 13px; background: #FFC450; color: #16233A; font-weight: 900; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+  .spec-card .title-en { font-size: 13.5px; font-weight: 800; color: #fff; margin-bottom: 6px; }
+  .spec-card .desc { font-size: 12px; line-height: 1.6; color: rgba(230,236,243,0.78); }
+  .spec-card .desc b { color: #fff; }
+  .spec-card .desc code { font-family: monospace; font-size: 11px; color: #8CC8FF; }
+  .spec-card .tags { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+
+  /* ===== how blocks ===== */
+  .how-block { background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 18px 20px; margin-bottom: 14px; }
+  .how-block h3 { margin: 0 0 4px; font-size: 13.5px; font-weight: 800; color: #fff; }
+  .how-block .sub-desc { font-size: 11.5px; color: rgba(230,236,243,0.6); margin-bottom: 12px; line-height: 1.6; }
+  .how-steps { display: flex; flex-direction: column; gap: 10px; }
+  .how-step { display: grid; grid-template-columns: 20px 1fr; gap: 10px; font-size: 12px; line-height: 1.6; color: rgba(230,236,243,0.85); }
+  .how-step .n { color: #FFC450; font-weight: 800; }
+  .how-step b { color: #fff; }
+  .how-step code { font-family: monospace; font-size: 11px; color: #8CC8FF; }
 </style>
 </head>
-
 <body>
-<div class="wrap">
-  <header class="top">
-    <img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz48c3ZnIGlkPSJMYXllcl8xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1NjYuOTI5MTMgMjEzLjQ4NDEzIj48ZGVmcz48c3R5bGU+LmNscy0xe2ZpbGw6IzI1Mzg0YTt9PC9zdHlsZT48L2RlZnM+PGcgaWQ9Ik1vM2RhdGVjaExvZ28tbG9nbyI+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNTQ0LjQ4MjM1LDEzOS4xOTI2NGMtMTAuNjY1OTctMy41NDY3MS0zOC4yMzA0Ni0zLjE2NzkzLTQ4LjY5ODM5LDEuMTYyMTMtMTQuOTcwMjMsNi4xODk1My0yMC4xNDM5NSwyMS42MTU5OC0xOC44OTU3MSwzNi45NTYzNmgtNjQuNjQxMzN2LTMuOTA4MjVoNDkuMzc4NDV2LTM0LjU1NDZsLTEuMzUxNTQtMS4zNTE1NGgtNTQuNzU4NzdjLS43MjMxNCwwLTcuMjY1NTksMS44MzM2Mi04LjUwNTIyLDIuMjY0MDQtMTYuMTQwOTcsNS43MTYwNy0yMi4xMzI1MiwyMS45NjAzNC0yMC42NjkwNiwzOC4xMjcxNmgtMjkuMDYyMzZ2LTEwLjg4OThjMC0xMy4xNzk2NC0xNS42OTMzMS0zMC4wNjk1NS0yOS4xNzQyOC0zMC4wNjk1NWgtNjAuNTk1MzJ2MzUuODk3NTNoNTMuODYzNDV2NC40OTM2MmgtNTMuODYzNDV2MzUuODk3NTNsMjc5Ljk5MjA1LjI2Njg2YzMzLjY1OTI4LDAsNDEuNjczODEtNjIuNzczMyw2Ljk4MTUtNzQuMjkxNVpNNTMwLjc2ODk4LDE3Ny41ODY2aC0xNy45NDg3OXYtNC40OTM2MmgxNy45NDg3OXY0LjQ5MzYyWiIvPjxyZWN0IGNsYXNzPSJjbHMtMSIgeD0iMjEwLjE5NDI4IiB5PSI4Ny44MzQxOSIgd2lkdGg9IjM1LjkwNjE1IiBoZWlnaHQ9IjEyNS42NDk5NSIvPjxyZWN0IGNsYXNzPSJjbHMtMSIgeD0iOTAuMTYzNzIiIHk9IjE3OS40MzI4NSIgd2lkdGg9IjE3LjU1OTA4IiBoZWlnaHQ9Ii4wNjEzNiIvPjxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSIyMzQuMTYzOCAxNi40NDcxNSAyMzQuMTU4MjIgMTYuNDU4MzEgMjM0LjEwMjUxIDE2LjQzMDQyIDIzNC4xNjM4IDE2LjQ0NzE1Ii8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNTQxLjAzNjg1LDk5LjIzNzg1aC0xMy4zNTE4MnYxNS41NjQyMmwtLjc1NzU1LS4xODk0MWgtMTQuMzE1OTdjLTMuNjkzMDQsMC04LjQ1MzUyLDUuMTMwNy05LjExNjM5LDEwLjUzNjgyaDIzLjA1MzU4di4wMjU4NWgyMy4xNzQxN3YtMTcuMjUxNDVjMC0zLjk4NTc1LTQuNzA4ODktOC42ODYwMi04LjY4NjAyLTguNjg2MDJaTTUzOS4zNTgxNywxMTQuODAyMDdoLTEuMjk5ODl2LTUuMTkwOTZoMS4yOTk4OXY1LjE5MDk2WiIvPjxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSI1MTIuMDI2MTMgMTEwLjIzMTY4IDUxMi4wMjYxMyAxMTAuNDIxMDkgNTExLjI2ODU4IDExMC4yMzE2OCA1MTIuMDI2MTMgMTEwLjIzMTY4Ii8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMzMyLjc4MzA1LDM3LjQ1NzMzbC0xLjMzMTkyLTUuOTY5OTMsOC4wNDI2NywxLjQ0OTM1LDQuMTk1NTMsMTMuMTA5MTFjMTIuMjIzMDgsMS41ODcyNiw0MC45NDMzNSwxMS4zNzc3NywzOS4zMDIyNywzMi43MTU0Ni0xLjY0MTA4LDIxLjMzNzctMjQuNTMwNjEsMzYuMDgwMS0yNC41MzA2MSwzNi4wODAxLDAsMC0xNC4xMjgzMiw3LjQ3NDU1LTE5LjI1NTgyLDEwLjYxMzgyLDIuMDA3NDMtNC4wNzEyOSwxNy4zNTQxNy01NC4yNjMzNi04LjIwMzMtNzUuMDk1MjJsLTQyLjYyNDEyLTE3LjUyMzc2LDUuNTE3NzMtMTAuODEzMzEsMzguODg3NTYsMTUuNDM0MzhaIi8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMjI4Ljk0MTMyLDQzLjcwNTYybC0xNjEuNjEzODYsOTUuMTA2NDVoNDcuMTIxNDFjMTIuOTA1OTksMCwyOS4xNzIyNCwxNi4xNDM2NCwyOS4xNzIyNCwyOS4xNjY3M2wuMDIyMzEsOS43NTE5NSwxOS4wOTE1My0uMTQ1MDN2LTQwLjM4OTc3aDM0LjU1NTNsMS4zNDg1OCwxLjM0ODY1djc0LjkzOTUzTC4wMDA1LDIxMy40ODIxM2wuMDI0MzQtMzUuMTgyOTdoMTA3LjY5Nzk3di0zLjU4ODgySDB2LTM1LjQ0N0MzMS43MzAwNSwxMjMuNDg3NTgsMjM4Ljg4OTMsMCwyMzguODg5MywwbDUxLjMwNjQsMTkuNTU5NjhjLS4wMzkwMSwwLTUuNjUwNTcsOS44MjQzMy02LjE2MzIzLDEwLjc1NTAzbC00OS44Njg2Ny0xNS4wNjI2LS4wNjEyOS0uMDE2NzMuMDU1NzEuMDI3ODksOTIuNDcwNzYsNDAuMDcyMWMuNjQwODIsMi44NTg2NSw0LjM3NDQzLDE3Ljg4NzkxLDQuMzc0NDMsMTcuODg3OTFsLTEwMi4wNjIwOS0yOS41MTc2NloiLz48cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xNjYuOTkxODIsMTAwLjk5NDAxaDMyLjA0NTQ5djI0LjE4MTMxaC01Mi43NTA4MXYtMy40NzU5OWMwLTExLjQyNzU4LDkuMjc3NzQtMjAuNzA1MzIsMjAuNzA1MzItMjAuNzA1MzJaIi8+PC9nPjwvc3ZnPg==" alt="Moedatech" />
-    <span class="sep"></span>
-    <h1 id="pagetitle">The bid-link card</h1>
-    <span class="lang">
-      <button aria-pressed="true" onclick="setLang('en')">English</button>
-      <button aria-pressed="false" onclick="setLang('ar')">العربية</button>
-    </span>
-  </header>
-  <p class="sub" id="sub">Five rows, and every one is a field the request already carries — so none of it is typed twice.</p>
 
-  <section class="panel">
-    <h2 id="h1">The card</h2>
-    <p class="note" id="n1">
-      Drawn twice, because two different things render it. The <b>image</b> is what WhatsApp, Apple
-      Mail, Outlook and Slack show — a picture, nothing in it clickable. The <b>HTML card</b> is what
-      Gmail gets on paste, and what app-sent mail carries — real text, real links. They must never say
-      different things.
-    </p>
+<div class="doc-header">
+  <div class="brand"><img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz48c3ZnIGlkPSJMYXllcl8xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1NjYuOTI5MTMgMjEzLjQ4NDEzIj48ZGVmcz48c3R5bGU+LmNscy0xe2ZpbGw6I2ZmZmZmZjt9PC9zdHlsZT48L2RlZnM+PGcgaWQ9Ik1vM2RhdGVjaExvZ28tbG9nbyI+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNTQ0LjQ4MjM1LDEzOS4xOTI2NGMtMTAuNjY1OTctMy41NDY3MS0zOC4yMzA0Ni0zLjE2NzkzLTQ4LjY5ODM5LDEuMTYyMTMtMTQuOTcwMjMsNi4xODk1My0yMC4xNDM5NSwyMS42MTU5OC0xOC44OTU3MSwzNi45NTYzNmgtNjQuNjQxMzN2LTMuOTA4MjVoNDkuMzc4NDV2LTM0LjU1NDZsLTEuMzUxNTQtMS4zNTE1NGgtNTQuNzU4NzdjLS43MjMxNCwwLTcuMjY1NTksMS44MzM2Mi04LjUwNTIyLDIuMjY0MDQtMTYuMTQwOTcsNS43MTYwNy0yMi4xMzI1MiwyMS45NjAzNC0yMC42NjkwNiwzOC4xMjcxNmgtMjkuMDYyMzZ2LTEwLjg4OThjMC0xMy4xNzk2NC0xNS42OTMzMS0zMC4wNjk1NS0yOS4xNzQyOC0zMC4wNjk1NWgtNjAuNTk1MzJ2MzUuODk3NTNoNTMuODYzNDV2NC40OTM2MmgtNTMuODYzNDV2MzUuODk3NTNsMjc5Ljk5MjA1LjI2Njg2YzMzLjY1OTI4LDAsNDEuNjczODEtNjIuNzczMyw2Ljk4MTUtNzQuMjkxNVpNNTMwLjc2ODk4LDE3Ny41ODY2aC0xNy45NDg3OXYtNC40OTM2MmgxNy45NDg3OXY0LjQ5MzYyWiIvPjxyZWN0IGNsYXNzPSJjbHMtMSIgeD0iMjEwLjE5NDI4IiB5PSI4Ny44MzQxOSIgd2lkdGg9IjM1LjkwNjE1IiBoZWlnaHQ9IjEyNS42NDk5NSIvPjxyZWN0IGNsYXNzPSJjbHMtMSIgeD0iOTAuMTYzNzIiIHk9IjE3OS40MzI4NSIgd2lkdGg9IjE3LjU1OTA4IiBoZWlnaHQ9Ii4wNjEzNiIvPjxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSIyMzQuMTYzOCAxNi40NDcxNSAyMzQuMTU4MjIgMTYuNDU4MzEgMjM0LjEwMjUxIDE2LjQzMDQyIDIzNC4xNjM4IDE2LjQ0NzE1Ii8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNTQxLjAzNjg1LDk5LjIzNzg1aC0xMy4zNTE4MnYxNS41NjQyMmwtLjc1NzU1LS4xODk0MWgtMTQuMzE1OTdjLTMuNjkzMDQsMC04LjQ1MzUyLDUuMTMwNy05LjExNjM5LDEwLjUzNjgyaDIzLjA1MzU4di4wMjU4NWgyMy4xNzQxN3YtMTcuMjUxNDVjMC0zLjk4NTc1LTQuNzA4ODktOC42ODYwMi04LjY4NjAyLTguNjg2MDJaTTUzOS4zNTgxNywxMTQuODAyMDdoLTEuMjk5ODl2LTUuMTkwOTZoMS4yOTk4OXY1LjE5MDk2WiIvPjxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSI1MTIuMDI2MTMgMTEwLjIzMTY4IDUxMi4wMjYxMyAxMTAuNDIxMDkgNTExLjI2ODU4IDExMC4yMzE2OCA1MTIuMDI2MTMgMTEwLjIzMTY4Ii8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMzMyLjc4MzA1LDM3LjQ1NzMzbC0xLjMzMTkyLTUuOTY5OTMsOC4wNDI2NywxLjQ0OTM1LDQuMTk1NTMsMTMuMTA5MTFjMTIuMjIzMDgsMS41ODcyNiw0MC45NDMzNSwxMS4zNzc3NywzOS4zMDIyNywzMi43MTU0Ni0xLjY0MTA4LDIxLjMzNzctMjQuNTMwNjEsMzYuMDgwMS0yNC41MzA2MSwzNi4wODAxLDAsMC0xNC4xMjgzMiw3LjQ3NDU1LTE5LjI1NTgyLDEwLjYxMzgyLDIuMDA3NDMtNC4wNzEyOSwxNy4zNTQxNy01NC4yNjMzNi04LjIwMzMtNzUuMDk1MjJsLTQyLjYyNDEyLTE3LjUyMzc2LDUuNTE3NzMtMTAuODEzMzEsMzguODg3NTYsMTUuNDM0MzhaIi8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMjI4Ljk0MTMyLDQzLjcwNTYybC0xNjEuNjEzODYsOTUuMTA2NDVoNDcuMTIxNDFjMTIuOTA1OTksMCwyOS4xNzIyNCwxNi4xNDM2NCwyOS4xNzIyNCwyOS4xNjY3M2wuMDIyMzEsOS43NTE5NSwxOS4wOTE1My0uMTQ1MDN2LTQwLjM4OTc3aDM0LjU1NTNsMS4zNDg1OCwxLjM0ODY1djc0LjkzOTUzTC4wMDA1LDIxMy40ODIxM2wuMDI0MzQtMzUuMTgyOTdoMTA3LjY5Nzk3di0zLjU4ODgySDB2LTM1LjQ0N0MzMS43MzAwNSwxMjMuNDg3NTgsMjM4Ljg4OTMsMCwyMzguODg5MywwbDUxLjMwNjQsMTkuNTU5NjhjLS4wMzkwMSwwLTUuNjUwNTcsOS44MjQzMy02LjE2MzIzLDEwLjc1NTAzbC00OS44Njg2Ny0xNS4wNjI2LS4wNjEyOS0uMDE2NzMuMDU1NzEuMDI3ODksOTIuNDcwNzYsNDAuMDcyMWMuNjQwODIsMi44NTg2NSw0LjM3NDQzLDE3Ljg4NzkxLDQuMzc0NDMsMTcuODg3OTFsLTEwMi4wNjIwOS0yOS41MTc2NloiLz48cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xNjYuOTkxODIsMTAwLjk5NDAxaDMyLjA0NTQ5djI0LjE4MTMxaC01Mi43NTA4MXYtMy40NzU5OWMwLTExLjQyNzU4LDkuMjc3NzQtMjAuNzA1MzIsMjAuNzA1MzItMjAuNzA1MzJaIi8+PC9nPjwvc3ZnPg==" alt="Moedatech"></div>
+  <h1>The bid-link card — what a shared request looks like when it arrives</h1>
+  <div class="sub">
+    A renter shares a request with a supplier and the supplier gets a bare URL, so the renter retypes
+    the request underneath it — <b>by hand, in capitals, at 17:37</b>. Every line he types is already a
+    field on the request. This card carries them instead, in <b>five rows</b>, and the fifth one turns
+    every share into an invitation to join.
+  </div>
+  <div class="badge-note">Layout specified by the owner, 2026-09-01 · SUP-T43</div>
+</div>
 
-    <div class="pair">
-      <div>
-        <p class="cap" id="cap1">The image · 880×320 <span>· at half size, the way a chat app scales it</span></p>
-        <div class="shot-holder">
-          <div class="shot">
-            <div class="head">
-              <img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz48c3ZnIGlkPSJMYXllcl8xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1NjYuOTI5MTMgMjEzLjQ4NDEzIj48ZGVmcz48c3R5bGU+LmNscy0xe2ZpbGw6I2ZmZmZmZjt9PC9zdHlsZT48L2RlZnM+PGcgaWQ9Ik1vM2RhdGVjaExvZ28tbG9nbyI+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNTQ0LjQ4MjM1LDEzOS4xOTI2NGMtMTAuNjY1OTctMy41NDY3MS0zOC4yMzA0Ni0zLjE2NzkzLTQ4LjY5ODM5LDEuMTYyMTMtMTQuOTcwMjMsNi4xODk1My0yMC4xNDM5NSwyMS42MTU5OC0xOC44OTU3MSwzNi45NTYzNmgtNjQuNjQxMzN2LTMuOTA4MjVoNDkuMzc4NDV2LTM0LjU1NDZsLTEuMzUxNTQtMS4zNTE1NGgtNTQuNzU4NzdjLS43MjMxNCwwLTcuMjY1NTksMS44MzM2Mi04LjUwNTIyLDIuMjY0MDQtMTYuMTQwOTcsNS43MTYwNy0yMi4xMzI1MiwyMS45NjAzNC0yMC42NjkwNiwzOC4xMjcxNmgtMjkuMDYyMzZ2LTEwLjg4OThjMC0xMy4xNzk2NC0xNS42OTMzMS0zMC4wNjk1NS0yOS4xNzQyOC0zMC4wNjk1NWgtNjAuNTk1MzJ2MzUuODk3NTNoNTMuODYzNDV2NC40OTM2MmgtNTMuODYzNDV2MzUuODk3NTNsMjc5Ljk5MjA1LjI2Njg2YzMzLjY1OTI4LDAsNDEuNjczODEtNjIuNzczMyw2Ljk4MTUtNzQuMjkxNVpNNTMwLjc2ODk4LDE3Ny41ODY2aC0xNy45NDg3OXYtNC40OTM2MmgxNy45NDg3OXY0LjQ5MzYyWiIvPjxyZWN0IGNsYXNzPSJjbHMtMSIgeD0iMjEwLjE5NDI4IiB5PSI4Ny44MzQxOSIgd2lkdGg9IjM1LjkwNjE1IiBoZWlnaHQ9IjEyNS42NDk5NSIvPjxyZWN0IGNsYXNzPSJjbHMtMSIgeD0iOTAuMTYzNzIiIHk9IjE3OS40MzI4NSIgd2lkdGg9IjE3LjU1OTA4IiBoZWlnaHQ9Ii4wNjEzNiIvPjxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSIyMzQuMTYzOCAxNi40NDcxNSAyMzQuMTU4MjIgMTYuNDU4MzEgMjM0LjEwMjUxIDE2LjQzMDQyIDIzNC4xNjM4IDE2LjQ0NzE1Ii8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNTQxLjAzNjg1LDk5LjIzNzg1aC0xMy4zNTE4MnYxNS41NjQyMmwtLjc1NzU1LS4xODk0MWgtMTQuMzE1OTdjLTMuNjkzMDQsMC04LjQ1MzUyLDUuMTMwNy05LjExNjM5LDEwLjUzNjgyaDIzLjA1MzU4di4wMjU4NWgyMy4xNzQxN3YtMTcuMjUxNDVjMC0zLjk4NTc1LTQuNzA4ODktOC42ODYwMi04LjY4NjAyLTguNjg2MDJaTTUzOS4zNTgxNywxMTQuODAyMDdoLTEuMjk5ODl2LTUuMTkwOTZoMS4yOTk4OXY1LjE5MDk2WiIvPjxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSI1MTIuMDI2MTMgMTEwLjIzMTY4IDUxMi4wMjYxMyAxMTAuNDIxMDkgNTExLjI2ODU4IDExMC4yMzE2OCA1MTIuMDI2MTMgMTEwLjIzMTY4Ii8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMzMyLjc4MzA1LDM3LjQ1NzMzbC0xLjMzMTkyLTUuOTY5OTMsOC4wNDI2NywxLjQ0OTM1LDQuMTk1NTMsMTMuMTA5MTFjMTIuMjIzMDgsMS41ODcyNiw0MC45NDMzNSwxMS4zNzc3NywzOS4zMDIyNywzMi43MTU0Ni0xLjY0MTA4LDIxLjMzNzctMjQuNTMwNjEsMzYuMDgwMS0yNC41MzA2MSwzNi4wODAxLDAsMC0xNC4xMjgzMiw3LjQ3NDU1LTE5LjI1NTgyLDEwLjYxMzgyLDIuMDA3NDMtNC4wNzEyOSwxNy4zNTQxNy01NC4yNjMzNi04LjIwMzMtNzUuMDk1MjJsLTQyLjYyNDEyLTE3LjUyMzc2LDUuNTE3NzMtMTAuODEzMzEsMzguODg3NTYsMTUuNDM0MzhaIi8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMjI4Ljk0MTMyLDQzLjcwNTYybC0xNjEuNjEzODYsOTUuMTA2NDVoNDcuMTIxNDFjMTIuOTA1OTksMCwyOS4xNzIyNCwxNi4xNDM2NCwyOS4xNzIyNCwyOS4xNjY3M2wuMDIyMzEsOS43NTE5NSwxOS4wOTE1My0uMTQ1MDN2LTQwLjM4OTc3aDM0LjU1NTNsMS4zNDg1OCwxLjM0ODY1djc0LjkzOTUzTC4wMDA1LDIxMy40ODIxM2wuMDI0MzQtMzUuMTgyOTdoMTA3LjY5Nzk3di0zLjU4ODgySDB2LTM1LjQ0N0MzMS43MzAwNSwxMjMuNDg3NTgsMjM4Ljg4OTMsMCwyMzguODg5MywwbDUxLjMwNjQsMTkuNTU5NjhjLS4wMzkwMSwwLTUuNjUwNTcsOS44MjQzMy02LjE2MzIzLDEwLjc1NTAzbC00OS44Njg2Ny0xNS4wNjI2LS4wNjEyOS0uMDE2NzMuMDU1NzEuMDI3ODksOTIuNDcwNzYsNDAuMDcyMWMuNjQwODIsMi44NTg2NSw0LjM3NDQzLDE3Ljg4NzkxLDQuMzc0NDMsMTcuODg3OTFsLTEwMi4wNjIwOS0yOS41MTc2NloiLz48cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xNjYuOTkxODIsMTAwLjk5NDAxaDMyLjA0NTQ5djI0LjE4MTMxaC01Mi43NTA4MXYtMy40NzU5OWMwLTExLjQyNzU4LDkuMjc3NzQtMjAuNzA1MzIsMjAuNzA1MzItMjAuNzA1MzJaIi8+PC9nPjwvc3ZnPg==" alt="Moedatech" />
-              <span class="ref" id="s-ref">RFQ-40218</span>
-            </div>
-            <div>
-              <h3 id="s-head">Tower light 9m · with operator ×6</h3>
-              <p class="where" id="s-where">Riyadh · 1 month · 18 Aug → 17 Sep 2026</p>
-              <div class="terms">
-                <div><span id="s-k1">MOB · DEMOB</span><b id="s-v1">Supplier</b></div>
-                <div><span id="s-k2">FAT · FUEL</span><b id="s-v2">Supplier · renter</b></div>
-              </div>
-            </div>
-            <div class="foot">
-              <span class="pill" id="s-cta">Submit your bid</span>
-              <span class="join"><b id="s-join">GET THE APP</b><span id="s-joinurl">linktr.ee/moedatech</span></span>
-            </div>
-          </div>
+<div class="legend">
+  <span class="item"><span class="tag built">BUILT</span> exists today</span>
+  <span class="item"><span class="tag new">NEW</span> this card adds it</span>
+  <span class="item"><span class="tag open">OPEN</span> not yet decided</span>
+  <span class="item"><span class="tag ref">REF</span> where it comes from</span>
+</div>
+
+<!-- ══ A ══════════════════════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-head">A · WHAT THE SUPPLIER SEES</div>
+
+  <div class="compare-row">
+    <div>
+      <div class="mock-label before">Before — a real email, 18 Aug 2026</div>
+      <div class="email-shell">
+        <div class="email-chrome">
+          <div class="subject">100005706 Tower Light Diesel Project In rRyadh</div>
+          From: Mohammed Irfan Aazam &lt;irfan@sajco.com.sa&gt;
         </div>
+        <div class="email-body">
+          <p><a class="plain-link" href="#">https://web.moedatech.net/bid/shibh-al-jazeera-contracting-6ce618cf…</a></p>
+          <p class="typed">#urgent
 
-        <p class="cap" style="margin-top:20px" id="cap2">The HTML card · 440px <span>· table, inline styles</span></p>
-        <div class="mail">
-          <div class="band">
-            <div class="shot-holder" style="width:440px">
+PLEASE MENTION THE MODEL YEAR AND BRAND NAME OF THE EQUIPMENT.
+OTHERS TERMS :   DIESEL Is Sajco Scope
+Mob by &amp; demob By Supplier
+Duration :  1Month   &amp; extendable</p>
+          <p>Thank you &amp; Best Wishes<br>Mohammad Irfan Aazam<br>Shibh AL Jazira Contracting Company</p>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="mock-label after">After — target</div>
+      <div class="email-shell">
+        <div class="email-chrome">
+          <div class="subject">RFQ-40218 · Tower light 9m ×6 — Riyadh</div>
+          From: Mohammed Irfan Aazam &lt;irfan@sajco.com.sa&gt;
+        </div>
+        <div class="email-body">
+          <p>Hello,</p>
+          <div class="preview-card">
+            <div class="pc-image">
               <div class="shot">
                 <div class="head">
-                  <img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz48c3ZnIGlkPSJMYXllcl8xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1NjYuOTI5MTMgMjEzLjQ4NDEzIj48ZGVmcz48c3R5bGU+LmNscy0xe2ZpbGw6I2ZmZmZmZjt9PC9zdHlsZT48L2RlZnM+PGcgaWQ9Ik1vM2RhdGVjaExvZ28tbG9nbyI+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNTQ0LjQ4MjM1LDEzOS4xOTI2NGMtMTAuNjY1OTctMy41NDY3MS0zOC4yMzA0Ni0zLjE2NzkzLTQ4LjY5ODM5LDEuMTYyMTMtMTQuOTcwMjMsNi4xODk1My0yMC4xNDM5NSwyMS42MTU5OC0xOC44OTU3MSwzNi45NTYzNmgtNjQuNjQxMzN2LTMuOTA4MjVoNDkuMzc4NDV2LTM0LjU1NDZsLTEuMzUxNTQtMS4zNTE1NGgtNTQuNzU4NzdjLS43MjMxNCwwLTcuMjY1NTksMS44MzM2Mi04LjUwNTIyLDIuMjY0MDQtMTYuMTQwOTcsNS43MTYwNy0yMi4xMzI1MiwyMS45NjAzNC0yMC42NjkwNiwzOC4xMjcxNmgtMjkuMDYyMzZ2LTEwLjg4OThjMC0xMy4xNzk2NC0xNS42OTMzMS0zMC4wNjk1NS0yOS4xNzQyOC0zMC4wNjk1NWgtNjAuNTk1MzJ2MzUuODk3NTNoNTMuODYzNDV2NC40OTM2MmgtNTMuODYzNDV2MzUuODk3NTNsMjc5Ljk5MjA1LjI2Njg2YzMzLjY1OTI4LDAsNDEuNjczODEtNjIuNzczMyw2Ljk4MTUtNzQuMjkxNVpNNTMwLjc2ODk4LDE3Ny41ODY2aC0xNy45NDg3OXYtNC40OTM2MmgxNy45NDg3OXY0LjQ5MzYyWiIvPjxyZWN0IGNsYXNzPSJjbHMtMSIgeD0iMjEwLjE5NDI4IiB5PSI4Ny44MzQxOSIgd2lkdGg9IjM1LjkwNjE1IiBoZWlnaHQ9IjEyNS42NDk5NSIvPjxyZWN0IGNsYXNzPSJjbHMtMSIgeD0iOTAuMTYzNzIiIHk9IjE3OS40MzI4NSIgd2lkdGg9IjE3LjU1OTA4IiBoZWlnaHQ9Ii4wNjEzNiIvPjxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSIyMzQuMTYzOCAxNi40NDcxNSAyMzQuMTU4MjIgMTYuNDU4MzEgMjM0LjEwMjUxIDE2LjQzMDQyIDIzNC4xNjM4IDE2LjQ0NzE1Ii8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNTQxLjAzNjg1LDk5LjIzNzg1aC0xMy4zNTE4MnYxNS41NjQyMmwtLjc1NzU1LS4xODk0MWgtMTQuMzE1OTdjLTMuNjkzMDQsMC04LjQ1MzUyLDUuMTMwNy05LjExNjM5LDEwLjUzNjgyaDIzLjA1MzU4di4wMjU4NWgyMy4xNzQxN3YtMTcuMjUxNDVjMC0zLjk4NTc1LTQuNzA4ODktOC42ODYwMi04LjY4NjAyLTguNjg2MDJaTTUzOS4zNTgxNywxMTQuODAyMDdoLTEuMjk5ODl2LTUuMTkwOTZoMS4yOTk4OXY1LjE5MDk2WiIvPjxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSI1MTIuMDI2MTMgMTEwLjIzMTY4IDUxMi4wMjYxMyAxMTAuNDIxMDkgNTExLjI2ODU4IDExMC4yMzE2OCA1MTIuMDI2MTMgMTEwLjIzMTY4Ii8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMzMyLjc4MzA1LDM3LjQ1NzMzbC0xLjMzMTkyLTUuOTY5OTMsOC4wNDI2NywxLjQ0OTM1LDQuMTk1NTMsMTMuMTA5MTFjMTIuMjIzMDgsMS41ODcyNiw0MC45NDMzNSwxMS4zNzc3NywzOS4zMDIyNywzMi43MTU0Ni0xLjY0MTA4LDIxLjMzNzctMjQuNTMwNjEsMzYuMDgwMS0yNC41MzA2MSwzNi4wODAxLDAsMC0xNC4xMjgzMiw3LjQ3NDU1LTE5LjI1NTgyLDEwLjYxMzgyLDIuMDA3NDMtNC4wNzEyOSwxNy4zNTQxNy01NC4yNjMzNi04LjIwMzMtNzUuMDk1MjJsLTQyLjYyNDEyLTE3LjUyMzc2LDUuNTE3NzMtMTAuODEzMzEsMzguODg3NTYsMTUuNDM0MzhaIi8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMjI4Ljk0MTMyLDQzLjcwNTYybC0xNjEuNjEzODYsOTUuMTA2NDVoNDcuMTIxNDFjMTIuOTA1OTksMCwyOS4xNzIyNCwxNi4xNDM2NCwyOS4xNzIyNCwyOS4xNjY3M2wuMDIyMzEsOS43NTE5NSwxOS4wOTE1My0uMTQ1MDN2LTQwLjM4OTc3aDM0LjU1NTNsMS4zNDg1OCwxLjM0ODY1djc0LjkzOTUzTC4wMDA1LDIxMy40ODIxM2wuMDI0MzQtMzUuMTgyOTdoMTA3LjY5Nzk3di0zLjU4ODgySDB2LTM1LjQ0N0MzMS43MzAwNSwxMjMuNDg3NTgsMjM4Ljg4OTMsMCwyMzguODg5MywwbDUxLjMwNjQsMTkuNTU5NjhjLS4wMzkwMSwwLTUuNjUwNTcsOS44MjQzMy02LjE2MzIzLDEwLjc1NTAzbC00OS44Njg2Ny0xNS4wNjI2LS4wNjEyOS0uMDE2NzMuMDU1NzEuMDI3ODksOTIuNDcwNzYsNDAuMDcyMWMuNjQwODIsMi44NTg2NSw0LjM3NDQzLDE3Ljg4NzkxLDQuMzc0NDMsMTcuODg3OTFsLTEwMi4wNjIwOS0yOS41MTc2NloiLz48cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xNjYuOTkxODIsMTAwLjk5NDAxaDMyLjA0NTQ5djI0LjE4MTMxaC01Mi43NTA4MXYtMy40NzU5OWMwLTExLjQyNzU4LDkuMjc3NzQtMjAuNzA1MzIsMjAuNzA1MzItMjAuNzA1MzJaIi8+PC9nPjwvc3ZnPg==" alt="Moedatech" />
+                  <img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz48c3ZnIGlkPSJMYXllcl8xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1NjYuOTI5MTMgMjEzLjQ4NDEzIj48ZGVmcz48c3R5bGU+LmNscy0xe2ZpbGw6I2ZmZmZmZjt9PC9zdHlsZT48L2RlZnM+PGcgaWQ9Ik1vM2RhdGVjaExvZ28tbG9nbyI+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNTQ0LjQ4MjM1LDEzOS4xOTI2NGMtMTAuNjY1OTctMy41NDY3MS0zOC4yMzA0Ni0zLjE2NzkzLTQ4LjY5ODM5LDEuMTYyMTMtMTQuOTcwMjMsNi4xODk1My0yMC4xNDM5NSwyMS42MTU5OC0xOC44OTU3MSwzNi45NTYzNmgtNjQuNjQxMzN2LTMuOTA4MjVoNDkuMzc4NDV2LTM0LjU1NDZsLTEuMzUxNTQtMS4zNTE1NGgtNTQuNzU4NzdjLS43MjMxNCwwLTcuMjY1NTksMS44MzM2Mi04LjUwNTIyLDIuMjY0MDQtMTYuMTQwOTcsNS43MTYwNy0yMi4xMzI1MiwyMS45NjAzNC0yMC42NjkwNiwzOC4xMjcxNmgtMjkuMDYyMzZ2LTEwLjg4OThjMC0xMy4xNzk2NC0xNS42OTMzMS0zMC4wNjk1NS0yOS4xNzQyOC0zMC4wNjk1NWgtNjAuNTk1MzJ2MzUuODk3NTNoNTMuODYzNDV2NC40OTM2MmgtNTMuODYzNDV2MzUuODk3NTNsMjc5Ljk5MjA1LjI2Njg2YzMzLjY1OTI4LDAsNDEuNjczODEtNjIuNzczMyw2Ljk4MTUtNzQuMjkxNVpNNTMwLjc2ODk4LDE3Ny41ODY2aC0xNy45NDg3OXYtNC40OTM2MmgxNy45NDg3OXY0LjQ5MzYyWiIvPjxyZWN0IGNsYXNzPSJjbHMtMSIgeD0iMjEwLjE5NDI4IiB5PSI4Ny44MzQxOSIgd2lkdGg9IjM1LjkwNjE1IiBoZWlnaHQ9IjEyNS42NDk5NSIvPjxyZWN0IGNsYXNzPSJjbHMtMSIgeD0iOTAuMTYzNzIiIHk9IjE3OS40MzI4NSIgd2lkdGg9IjE3LjU1OTA4IiBoZWlnaHQ9Ii4wNjEzNiIvPjxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSIyMzQuMTYzOCAxNi40NDcxNSAyMzQuMTU4MjIgMTYuNDU4MzEgMjM0LjEwMjUxIDE2LjQzMDQyIDIzNC4xNjM4IDE2LjQ0NzE1Ii8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNTQxLjAzNjg1LDk5LjIzNzg1aC0xMy4zNTE4MnYxNS41NjQyMmwtLjc1NzU1LS4xODk0MWgtMTQuMzE1OTdjLTMuNjkzMDQsMC04LjQ1MzUyLDUuMTMwNy05LjExNjM5LDEwLjUzNjgyaDIzLjA1MzU4di4wMjU4NWgyMy4xNzQxN3YtMTcuMjUxNDVjMC0zLjk4NTc1LTQuNzA4ODktOC42ODYwMi04LjY4NjAyLTguNjg2MDJaTTUzOS4zNTgxNywxMTQuODAyMDdoLTEuMjk5ODl2LTUuMTkwOTZoMS4yOTk4OXY1LjE5MDk2WiIvPjxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSI1MTIuMDI2MTMgMTEwLjIzMTY4IDUxMi4wMjYxMyAxMTAuNDIxMDkgNTExLjI2ODU4IDExMC4yMzE2OCA1MTIuMDI2MTMgMTEwLjIzMTY4Ii8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMzMyLjc4MzA1LDM3LjQ1NzMzbC0xLjMzMTkyLTUuOTY5OTMsOC4wNDI2NywxLjQ0OTM1LDQuMTk1NTMsMTMuMTA5MTFjMTIuMjIzMDgsMS41ODcyNiw0MC45NDMzNSwxMS4zNzc3NywzOS4zMDIyNywzMi43MTU0Ni0xLjY0MTA4LDIxLjMzNzctMjQuNTMwNjEsMzYuMDgwMS0yNC41MzA2MSwzNi4wODAxLDAsMC0xNC4xMjgzMiw3LjQ3NDU1LTE5LjI1NTgyLDEwLjYxMzgyLDIuMDA3NDMtNC4wNzEyOSwxNy4zNTQxNy01NC4yNjMzNi04LjIwMzMtNzUuMDk1MjJsLTQyLjYyNDEyLTE3LjUyMzc2LDUuNTE3NzMtMTAuODEzMzEsMzguODg3NTYsMTUuNDM0MzhaIi8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMjI4Ljk0MTMyLDQzLjcwNTYybC0xNjEuNjEzODYsOTUuMTA2NDVoNDcuMTIxNDFjMTIuOTA1OTksMCwyOS4xNzIyNCwxNi4xNDM2NCwyOS4xNzIyNCwyOS4xNjY3M2wuMDIyMzEsOS43NTE5NSwxOS4wOTE1My0uMTQ1MDN2LTQwLjM4OTc3aDM0LjU1NTNsMS4zNDg1OCwxLjM0ODY1djc0LjkzOTUzTC4wMDA1LDIxMy40ODIxM2wuMDI0MzQtMzUuMTgyOTdoMTA3LjY5Nzk3di0zLjU4ODgySDB2LTM1LjQ0N0MzMS43MzAwNSwxMjMuNDg3NTgsMjM4Ljg4OTMsMCwyMzguODg5MywwbDUxLjMwNjQsMTkuNTU5NjhjLS4wMzkwMSwwLTUuNjUwNTcsOS44MjQzMy02LjE2MzIzLDEwLjc1NTAzbC00OS44Njg2Ny0xNS4wNjI2LS4wNjEyOS0uMDE2NzMuMDU1NzEuMDI3ODksOTIuNDcwNzYsNDAuMDcyMWMuNjQwODIsMi44NTg2NSw0LjM3NDQzLDE3Ljg4NzkxLDQuMzc0NDMsMTcuODg3OTFsLTEwMi4wNjIwOS0yOS41MTc2NloiLz48cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xNjYuOTkxODIsMTAwLjk5NDAxaDMyLjA0NTQ5djI0LjE4MTMxaC01Mi43NTA4MXYtMy40NzU5OWMwLTExLjQyNzU4LDkuMjc3NzQtMjAuNzA1MzIsMjAuNzA1MzItMjAuNzA1MzJaIi8+PC9nPjwvc3ZnPg==" alt="Moedatech">
                   <span class="ref">RFQ-40218</span>
                 </div>
                 <div>
@@ -202,138 +187,168 @@
                   <span class="join"><b>GET THE APP</b><span>linktr.ee/moedatech</span></span>
                 </div>
               </div>
+              <div class="pin" style="left: 300px; top: 12px;">6</div>
+            </div>
+            <div class="pc-body">
+              <div class="pc-row"><span class="pin-inline">1</span><div class="pc-title">Tower light 9m · with operator ×6</div></div>
+              <div class="pc-row"><span class="pin-inline">2</span><div class="pc-where">Riyadh · 1 month · 18 Aug → 17 Sep 2026</div></div>
+              <div class="pc-terms">
+                <div class="pc-row"><span class="pin-inline">3</span><div style="flex:1">
+                  <div class="pc-term"><span class="k">Mobilisation</span><span class="v">Supplier</span></div>
+                  <div class="pc-term"><span class="k">Demobilisation</span><span class="v">Supplier</span></div>
+                </div></div>
+                <div class="pc-row"><span class="pin-inline">4</span><div style="flex:1">
+                  <div class="pc-term"><span class="k">Food &amp; transport</span><span class="v">Supplier</span></div>
+                  <div class="pc-term"><span class="k">Fuel</span><span class="v">Shibh Al Jazira · diesel</span></div>
+                </div></div>
+              </div>
+              <a class="pc-cta" href="#">Submit your bid</a>
+              <div class="pc-closes">Bidding closes 21 Aug 2026.</div>
+              <div class="pc-row" style="margin-top:11px"><span class="pin-inline">5</span><div class="pc-join">
+                New to Moedatech? Bid from the app and see every request from this renter —
+                <a href="https://linktr.ee/moedatech">get the app</a>.
+              </div></div>
+              <div class="pc-domain">WEB.MOEDATECH.NET</div>
             </div>
           </div>
-          <div class="body">
-            <div class="title" id="m-title">Tower light 9m · with operator ×6</div>
-            <div class="where" id="m-where">Riyadh · 1 month · 18 Aug → 17 Sep 2026</div>
-            <div class="rows">
-              <div class="row"><span class="k" id="m-k1">Mobilisation</span><span class="v" id="m-v1">Supplier</span></div>
-              <div class="row"><span class="k" id="m-k2">Demobilisation</span><span class="v" id="m-v2">Supplier</span></div>
-              <div class="row"><span class="k" id="m-k3">Food &amp; transport</span><span class="v" id="m-v3">Supplier</span></div>
-              <div class="row"><span class="k" id="m-k4">Fuel</span><span class="v" id="m-v4">Moeda Contracting · diesel</span></div>
-            </div>
-            <a class="cta" href="#" id="m-cta">Submit your bid</a>
-            <div class="closes" id="m-closes">Bidding closes 21 Aug 2026.</div>
-            <div class="join" id="m-join">
-              New to Moedatech? Bid from the app and see every request from this renter —
-              <a href="https://linktr.ee/moedatech">get the app</a>.
-            </div>
-            <div class="host">WEB.MOEDATECH.NET</div>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <p class="cap" id="cap3">Where each row comes from</p>
-        <table class="fields">
-          <thead>
-            <tr><th id="th1">Row</th><th id="th2">Field on the request</th></tr>
-          </thead>
-          <tbody>
-            <tr><td id="f1a">Subcategory · size · operator</td><td id="f1b">taxonomy <code>subcategory</code> + <code>measurement</code>, and the operator term. The count is <code>numberOfUnits</code>.</td></tr>
-            <tr><td id="f2a">City · duration</td><td id="f2b">the site's city, the rental basis, <code>startDate</code> → <code>endDate</code>, and <code>extendable</code> when it is set.</td></tr>
-            <tr><td id="f3a">Mob · demob</td><td id="f3b"><code>deliveryToSite</code> and the return party. One row each in the card; one column in the image.</td></tr>
-            <tr><td id="f4a">FAT · fuel</td><td id="f4b"><code>fatFood</code>, <code>fatTransport</code>, then <code>fuelResponsibility</code> with <code>fuelType</code>.</td></tr>
-            <tr><td id="f5a">Get the app</td><td id="f5b"><code>JOIN_URL</code> — the same constant the bid card's invite button uses, so both paths move together.</td></tr>
-          </tbody>
-        </table>
-
-        <p class="cap" style="margin-top:20px" id="cap4">Rules this layout holds to</p>
-        <div class="rules">
-          <p class="rule"><span class="icon">rule</span><span id="r1"><b>A row appears only when the request carries it.</b> Never “Fuel: —”. An empty row teaches a supplier to skim the block, and then he skims the row that mattered.</span></p>
-          <p class="rule"><span class="icon">compress</span><span id="r2"><b>The image pairs what the card separates.</b> Mob and demob share a column, FAT and fuel share a column — four rows do not fit at 28px, and two labelled pairs do. The card keeps them apart because it has the room.</span></p>
-          <p class="rule"><span class="icon">person_add</span><span id="r3"><b>The fifth row makes every share an invitation.</b> A supplier bidding through the form is off platform by definition, and this is the moment he is most likely to join — he is already working.</span></p>
-          <p class="rule"><span class="icon">link_off</span><span id="r4"><b>In the image the app line is text, not a link.</b> Nothing in a picture is clickable, so the same offer is a real link in the card below it.</span></p>
-          <p class="rule"><span class="icon">visibility_off</span><span id="r5"><b>Everything else stays out.</b> Hours, nationality, certificates, night shift, overtime, payment terms — the bid form asks each one structurally and gets an answer back as data instead of prose.</span></p>
-          <p class="rule"><span class="icon">translate</span><span id="r6"><b>Arabic mirrors; numbers do not.</b> The layout flips, and the code, the dates and the count stay left-to-right.</span></p>
+          <p style="margin-top:12px">Thank you &amp; Best Wishes<br>Mohammad Irfan Aazam<br>Shibh AL Jazira Contracting Company</p>
         </div>
       </div>
     </div>
-  </section>
+  </div>
+
+  <div class="cards">
+    <div class="spec-card">
+      <div class="num">1</div>
+      <div>
+        <div class="title-en">Subcategory · size · operator</div>
+        <div class="desc">What machine, how big, and whether it comes with a man. From the taxonomy's <code>subcategory</code> and <code>measurement</code>, the operator term, and <code>numberOfUnits</code> for the count. <b>Replaces the renter's subject line</b>, which today is his own reference and a guess at the equipment name.</div>
+      </div>
+      <div class="tags"><span class="tag new">NEW</span></div>
+    </div>
+
+    <div class="spec-card">
+      <div class="num">2</div>
+      <div>
+        <div class="title-en">City · duration, start → end</div>
+        <div class="desc">Where and for how long. The site's city — <b>not the full address</b>, which a supplier does not need to price and should not have before he bids. Duration from the basis and dates, with <code>extendable</code> when set. Replaces <i>“Duration : 1Month &amp; extendable”</i>.</div>
+      </div>
+      <div class="tags"><span class="tag new">NEW</span></div>
+    </div>
+
+    <div class="spec-card">
+      <div class="num">3</div>
+      <div>
+        <div class="title-en">Mobilisation · demobilisation</div>
+        <div class="desc">Who moves the machine, each way. From <code>deliveryToSite</code> and the return party. Replaces <i>“Mob by &amp; demob By Supplier”</i>. <b>Two rows in the card, one column in the image</b> — four rows do not fit at 27px, and two labelled pairs do.</div>
+      </div>
+      <div class="tags"><span class="tag new">NEW</span></div>
+    </div>
+
+    <div class="spec-card">
+      <div class="num">4</div>
+      <div>
+        <div class="title-en">FAT · fuel</div>
+        <div class="desc">Who feeds the crew and who fuels the machine. From <code>fatFood</code>, <code>fatTransport</code>, then <code>fuelResponsibility</code> with <code>fuelType</code>. Replaces <i>“DIESEL Is Sajco Scope”</i> — and being a field rather than a sentence, it cannot say diesel while the request says petrol.</div>
+      </div>
+      <div class="tags"><span class="tag new">NEW</span></div>
+    </div>
+
+    <div class="spec-card">
+      <div class="num">5</div>
+      <div>
+        <div class="title-en">Get the app</div>
+        <div class="desc">Every shared request becomes an invitation. A supplier bidding through the form is <b>off platform by definition</b>, and this is the moment he is most likely to join — he is already working. One constant, <code>JOIN_URL</code> → <code>linktr.ee/moedatech</code>, shared with the bid card's invite button so both paths move together.</div>
+      </div>
+      <div class="tags"><span class="tag new">NEW</span><span class="tag ref">SUP-T01</span></div>
+    </div>
+
+    <div class="spec-card">
+      <div class="num">6</div>
+      <div>
+        <div class="title-en">The image, and the source domain</div>
+        <div class="desc">880×320, generated by <code>/bid/[token]/og</code> — what WhatsApp, Apple Mail, Outlook and Slack render. <b>Nothing in it is clickable</b>, so every instruction it carries also appears as text below. <code>WEB.MOEDATECH.NET</code> is the trust line: it says where the link goes.</div>
+      </div>
+      <div class="tags"><span class="tag built">BUILT</span></div>
+    </div>
+  </div>
 </div>
 
-<script>
-/* Arabic is the same card mirrored. The code, the dates and the counts stay left-to-right. */
-var AR = {
-  pagetitle: "بطاقة رابط العرض",
-  sub: "خمسة صفوف، وكل صف حقل يحمله الطلب بالفعل — فلا يُكتب شيء مرتين.",
-  h1: "البطاقة",
-  n1: "مرسومة مرتين، لأن شيئين مختلفين يعرضانها. <b>الصورة</b> هي ما يعرضه واتساب وأبل ميل وأوتلوك وسلاك — صورة، لا شيء فيها قابل للنقر. و<b>بطاقة HTML</b> هي ما يصل جيميل عند اللصق، وما يحمله البريد المُرسل من التطبيق — نص حقيقي وروابط حقيقية. ويجب ألا تقولا شيئين مختلفين.",
-  cap1: "الصورة · 880×320 <span>· بنصف الحجم، كما يعرضها تطبيق المحادثة</span>",
-  cap2: "بطاقة HTML · 440 بكسل <span>· جدول، بأنماط مضمّنة</span>",
-  cap3: "مصدر كل صف",
-  cap4: "قواعد يلتزم بها هذا التخطيط",
-  sHead: "برج إنارة 9م · مع مشغّل ×6",
-  sWhere: "الرياض · شهر واحد · 18 أغسطس ← 17 سبتمبر 2026",
-  sK1: "التوصيل · الإرجاع", sV1: "على المورّد",
-  sK2: "الإعاشة · الوقود", sV2: "المورّد · المستأجر",
-  sCta: "قدّم عرضك",
-  sJoin: "حمّل التطبيق",
-  mTitle: "برج إنارة 9م · مع مشغّل ×6",
-  mWhere: "الرياض · شهر واحد · 18 أغسطس ← 17 سبتمبر 2026",
-  mK1: "التوصيل", mV1: "على المورّد",
-  mK2: "الإرجاع", mV2: "على المورّد",
-  mK3: "الإعاشة والنقل", mV3: "على المورّد",
-  mK4: "الوقود", mV4: "على مويدا للمقاولات · ديزل",
-  mCta: "قدّم عرضك",
-  mCloses: "يغلق استقبال العروض في 21 أغسطس 2026.",
-  mJoin: 'جديد على مويداتك؟ قدّم عروضك من التطبيق وشاهد كل طلبات هذا المستأجر — <a href="https://linktr.ee/moedatech">حمّل التطبيق</a>.',
-  th1: "الصف", th2: "الحقل في الطلب",
-  f1a: "الفئة الفرعية · المقاس · المشغّل",
-  f1b: "من التصنيف: <code>subcategory</code> و<code>measurement</code>، وشرط المشغّل. والعدد من <code>numberOfUnits</code>.",
-  f2a: "المدينة · المدة",
-  f2b: "مدينة الموقع، وأساس الإيجار، و<code>startDate</code> ← <code>endDate</code>، و<code>extendable</code> عند تعيينه.",
-  f3a: "التوصيل · الإرجاع",
-  f3b: "<code>deliveryToSite</code> وجهة الإرجاع. صف لكل منهما في البطاقة، وعمود واحد في الصورة.",
-  f4a: "الإعاشة · الوقود",
-  f4b: "<code>fatFood</code> و<code>fatTransport</code>، ثم <code>fuelResponsibility</code> مع <code>fuelType</code>.",
-  f5a: "حمّل التطبيق",
-  f5b: "<code>JOIN_URL</code> — الثابت نفسه الذي يستخدمه زر الدعوة في بطاقة العرض، فيتحرك المساران معاً.",
-  r1: "<b>لا يظهر صف إلا إذا حمله الطلب.</b> لا «الوقود: —» أبداً. الصف الفارغ يعلّم المورّد أن يتصفّح الكتلة سريعاً، فيتخطّى الصف المهم.",
-  r2: "<b>الصورة تجمع ما تفصله البطاقة.</b> التوصيل والإرجاع في عمود، والإعاشة والوقود في عمود — أربعة صفوف لا تتّسع عند 28 بكسل، وزوجان معنونان يتّسعان. أما البطاقة فتفصلها لأن لديها المساحة.",
-  r3: "<b>الصف الخامس يجعل كل مشاركة دعوة.</b> المورّد الذي يقدّم عبر النموذج هو خارج المنصة بالتعريف، وهذه أنسب لحظة لانضمامه — فهو يعمل بالفعل.",
-  r4: "<b>في الصورة سطر التطبيق نص لا رابط.</b> لا شيء في صورة قابل للنقر، لذا يظهر العرض نفسه كرابط حقيقي في البطاقة تحتها.",
-  r5: "<b>وكل ما عدا ذلك يبقى خارجاً.</b> الساعات والجنسية والشهادات والعمل الليلي والعمل الإضافي وشروط الدفع — يسأل عنها نموذج العرض بشكل منظّم ويستعيدها كبيانات لا كنص.",
-  r6: "<b>العربية تنعكس، والأرقام لا.</b> ينعكس التخطيط، ويبقى الرقم والتواريخ والعدد من اليسار إلى اليمين."
-};
-var EN = null;
-var IDS = ["pagetitle","sub","h1","n1","cap1","cap2","cap3","cap4","s-head","s-where","s-k1","s-v1","s-k2","s-v2",
-           "s-cta","s-join","m-title","m-where","m-k1","m-v1","m-k2","m-v2","m-k3","m-v3","m-k4","m-v4","m-cta",
-           "m-closes","m-join","th1","th2","f1a","f1b","f2a","f2b","f3a","f3b","f4a","f4b","f5a","f5b",
-           "r1","r2","r3","r4","r5","r6"];
+<!-- ══ B ══════════════════════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-head">B · HOW TO BUILD IT — ONE DATA SOURCE, TWO RENDERINGS</div>
 
-function snapshot(){
-  var out = {};
-  IDS.forEach(function(id){ var el = document.getElementById(id); if (el) out[id] = el.innerHTML; });
-  return out;
-}
+  <div class="how-block">
+    <h3>Shared · the preview payload <span class="tag open" style="margin-left:8px">OPEN</span></h3>
+    <div class="sub-desc">Both renderings read the same place. Today it answers prose; it has to answer fields.</div>
+    <div class="how-steps">
+      <div class="how-step"><span class="n">•</span><div><b>Today</b> the preview returns <code>{ title, description, imageUrl, url }</code>, and the card reverse-engineers the details by splitting the description on a separator and guessing whether each part is a location or a rental basis.</div></div>
+      <div class="how-step"><span class="n">•</span><div><b>Five rows cannot survive that.</b> The payload becomes fields: <code>subcategory</code>, <code>measurement</code>, <code>operator</code>, <code>units</code>, <code>city</code>, <code>basis</code>, <code>start</code>, <code>end</code>, <code>extendable</code>, <code>mob</code>, <code>demob</code>, <code>fat</code>, <code>fuel</code>, <code>fuelType</code>, <code>closesAt</code>. Then both renderings format rather than parse.</div></div>
+      <div class="how-step"><span class="n">•</span><div><b><code>imageUrl</code> is empty in production.</b> Found against a real token, 2026-09-01. The web now falls back to its own <code>og</code> route instead of the generic file — so this is no longer blocking, but the field should still be filled or dropped deliberately.</div></div>
+    </div>
+  </div>
 
-function setLang(lang){
-  if (!EN) EN = snapshot();
-  var ar = lang === "ar";
-  document.documentElement.lang = ar ? "ar" : "en";
-  document.documentElement.dir = ar ? "rtl" : "ltr";
-  document.querySelectorAll(".lang button").forEach(function(b, i){
-    b.setAttribute("aria-pressed", String((i === 1) === ar));
-  });
+  <div class="how-block">
+    <h3>Rendering 1 · the image <span class="tag built" style="margin-left:8px">BUILT</span></h3>
+    <div class="sub-desc">880×320 from <code>/bid/[token]/og</code>. Works in production today; it needs the two new lines and the app line.</div>
+    <div class="how-steps">
+      <div class="how-step"><span class="n">1</span><div>Headline, then the city-and-duration line, then <b>two labelled pairs</b>: mob·demob and FAT·fuel.</div></div>
+      <div class="how-step"><span class="n">2</span><div>The app line is <b>text, not a link</b> — nothing in a picture is clickable. It is a reminder; the real link lives in the card.</div></div>
+      <div class="how-step"><span class="n">3</span><div>Arabic mirrors the layout and keeps the code, the dates and the count left-to-right. The renderer honours <code>direction: rtl</code> for text but not for flex, so the mirroring is explicit.</div></div>
+    </div>
+  </div>
 
-  var map = ar ? {
-    pagetitle:AR.pagetitle, sub:AR.sub, h1:AR.h1, n1:AR.n1, cap1:AR.cap1, cap2:AR.cap2, cap3:AR.cap3, cap4:AR.cap4,
-    "s-head":AR.sHead, "s-where":AR.sWhere, "s-k1":AR.sK1, "s-v1":AR.sV1, "s-k2":AR.sK2, "s-v2":AR.sV2,
-    "s-cta":AR.sCta, "s-join":AR.sJoin,
-    "m-title":AR.mTitle, "m-where":AR.mWhere, "m-k1":AR.mK1, "m-v1":AR.mV1, "m-k2":AR.mK2, "m-v2":AR.mV2,
-    "m-k3":AR.mK3, "m-v3":AR.mV3, "m-k4":AR.mK4, "m-v4":AR.mV4, "m-cta":AR.mCta, "m-closes":AR.mCloses,
-    "m-join":AR.mJoin, th1:AR.th1, th2:AR.th2,
-    f1a:AR.f1a, f1b:AR.f1b, f2a:AR.f2a, f2b:AR.f2b, f3a:AR.f3a, f3b:AR.f3b, f4a:AR.f4a, f4b:AR.f4b,
-    f5a:AR.f5a, f5b:AR.f5b, r1:AR.r1, r2:AR.r2, r3:AR.r3, r4:AR.r4, r5:AR.r5, r6:AR.r6
-  } : EN;
+  <div class="how-block">
+    <h3>Rendering 2 · the HTML card <span class="tag built" style="margin-left:8px">BUILT</span> <span class="tag new">NEEDS ROWS</span></h3>
+    <div class="sub-desc">440px from <code>bidCardHtml.ts</code>, mirrored by <code>renderBidLinkCard()</code> in backend-admin. Table-based with inline styles, because Outlook ignores flex and most clients strip a <code>&lt;style&gt;</code> block.</div>
+    <div class="how-steps">
+      <div class="how-step"><span class="n">1</span><div>It gains four term rows and the app line. <b>A row appears only when the request carries it</b> — never “Fuel: —”, because an empty row teaches a supplier to skim the block, and then he skims the row that mattered.</div></div>
+      <div class="how-step"><span class="n">2</span><div><b>Gmail never unfurls a pasted URL</b>, by design — it will not fetch the page. The only way this card reaches Gmail is on the clipboard as <code>text/html</code>, which <code>copyBidLink</code> already writes alongside the plain URL.</div></div>
+      <div class="how-step"><span class="n">3</span><div>The two renderings must never disagree. Whatever the image cannot hold appears in the card; nothing in the card contradicts the image.</div></div>
+    </div>
+  </div>
 
-  Object.keys(map).forEach(function(id){
-    var el = document.getElementById(id);
-    if (el) el.innerHTML = map[id];
-  });
-}
-</script>
+  <div class="how-block">
+    <h3>Who sends it <span class="tag open" style="margin-left:8px">OPEN</span></h3>
+    <div class="sub-desc">The original spec assumed Moedatech sends the mail. For a renter sharing his own request, that decision went the other way.</div>
+    <div class="how-steps">
+      <div class="how-step"><span class="n">•</span><div><b>Decided:</b> the share leaves from the renter's own address by <code>mailto:</code>, recipients in BCC. Replies reach him because it is his email.</div></div>
+      <div class="how-step"><span class="n">•</span><div><b>The cost:</b> <code>mailto:</code> cannot carry HTML, so the server cannot bake the card in. The renter gets <i>Copy the message</i>, which puts the card on the clipboard for a Gmail paste, and clients that unfurl do the rest.</div></div>
+      <div class="how-step"><span class="n">•</span><div><b>Still open:</b> whether an app-sent variant should exist. <code>backend-admin</code> already renders this card into mail it sends, so that path costs nothing but the from-address.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ C ══════════════════════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-head">C · WHAT STAYS OUT, AND WHY</div>
+  <div class="cards">
+    <div class="spec-card">
+      <div class="num">—</div>
+      <div>
+        <div class="title-en">Hours, nationality, certificates, night shift, overtime, SLA, payment</div>
+        <div class="desc">Each is a question the bid form asks structurally, and gets back <b>as data instead of prose</b>. Putting them in the card would be asking twice and reading once. The renter's own note still rides above the button for anything the request does not model.</div>
+      </div>
+      <div class="tags"><span class="tag ref">BY DESIGN</span></div>
+    </div>
+    <div class="spec-card">
+      <div class="num">—</div>
+      <div>
+        <div class="title-en">The full site address</div>
+        <div class="desc">The city is enough to price. The exact location is on the request once a supplier is in it — <b>a card is scraped without auth</b>, and a link forwarded twice should not put a customer's yard on a stranger's screen.</div>
+      </div>
+      <div class="tags"><span class="tag open">CONFIRM</span></div>
+    </div>
+    <div class="spec-card">
+      <div class="num">—</div>
+      <div>
+        <div class="title-en">“Please mention the model year and brand”</div>
+        <div class="desc">The renter typed this in capitals because he had no other way to ask. It is the <code>year</code> term and the form's own make and model fields — <b>set the term and the form asks for him</b>, and the answer comes back comparable instead of buried in a reply.</div>
+      </div>
+      <div class="tags"><span class="tag built">BUILT</span></div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
