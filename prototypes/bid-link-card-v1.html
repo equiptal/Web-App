@@ -234,7 +234,7 @@ Duration :  1Month   &amp; extendable</p>
       <div class="num">2</div>
       <div>
         <div class="title-en">City · duration, start → end</div>
-        <div class="desc">Where and for how long. The site's city — <b>not the full address</b>, which a supplier does not need to price and should not have before he bids. Duration from the basis and dates, with <code>extendable</code> when set. Replaces <i>“Duration : 1Month &amp; extendable”</i>.</div>
+        <div class="desc">Where and for how long. <b>The city only, taken as the last segment of <code>projectTerms.location</code></b> (owner, 2026-09-01) — a supplier does not need the yard to price a month of tower lights, and a card is scraped without auth, so a link forwarded twice should not carry a customer's site. Duration from the basis and dates. <code>extendable</code> is not on the public payload yet, so the word waits.</div>
       </div>
       <div class="tags"><span class="tag new">NEW</span></div>
     </div>
@@ -277,6 +277,124 @@ Duration :  1Month   &amp; extendable</p>
   </div>
 </div>
 
+
+<!-- ══ A2 ═════════════════════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-head">A2 · A REQUEST WITH MORE THAN ONE MACHINE</div>
+  <div class="sub" style="max-width:940px;margin-bottom:18px;font-size:12.5px;color:rgba(230,236,243,0.7);line-height:1.65">
+    Most requests carry one machine. The ones that carry three are the ones worth getting right, because
+    a card that names only the first one <b style="color:#fff">reads as a smaller job than it is</b> — and
+    a supplier who could have quoted all three quotes for one.
+    <br><br>
+    <b style="color:#fff">The image names the first and counts the rest. The card lists them all.</b>
+    That split is forced: the image has room for one headline at 54px, and the card has room for a list.
+  </div>
+
+  <div class="compare-row">
+    <div>
+      <div class="mock-label after">The image · first item, then the count</div>
+      <div style="height:160px;width:440px;overflow:hidden;border-radius:10px">
+        <div class="shot">
+          <div class="head">
+            <img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz48c3ZnIGlkPSJMYXllcl8xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1NjYuOTI5MTMgMjEzLjQ4NDEzIj48ZGVmcz48c3R5bGU+LmNscy0xe2ZpbGw6I2ZmZmZmZjt9PC9zdHlsZT48L2RlZnM+PGcgaWQ9Ik1vM2RhdGVjaExvZ28tbG9nbyI+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNTQ0LjQ4MjM1LDEzOS4xOTI2NGMtMTAuNjY1OTctMy41NDY3MS0zOC4yMzA0Ni0zLjE2NzkzLTQ4LjY5ODM5LDEuMTYyMTMtMTQuOTcwMjMsNi4xODk1My0yMC4xNDM5NSwyMS42MTU5OC0xOC44OTU3MSwzNi45NTYzNmgtNjQuNjQxMzN2LTMuOTA4MjVoNDkuMzc4NDV2LTM0LjU1NDZsLTEuMzUxNTQtMS4zNTE1NGgtNTQuNzU4NzdjLS43MjMxNCwwLTcuMjY1NTksMS44MzM2Mi04LjUwNTIyLDIuMjY0MDQtMTYuMTQwOTcsNS43MTYwNy0yMi4xMzI1MiwyMS45NjAzNC0yMC42NjkwNiwzOC4xMjcxNmgtMjkuMDYyMzZ2LTEwLjg4OThjMC0xMy4xNzk2NC0xNS42OTMzMS0zMC4wNjk1NS0yOS4xNzQyOC0zMC4wNjk1NWgtNjAuNTk1MzJ2MzUuODk3NTNoNTMuODYzNDV2NC40OTM2MmgtNTMuODYzNDV2MzUuODk3NTNsMjc5Ljk5MjA1LjI2Njg2YzMzLjY1OTI4LDAsNDEuNjczODEtNjIuNzczMyw2Ljk4MTUtNzQuMjkxNVpNNTMwLjc2ODk4LDE3Ny41ODY2aC0xNy45NDg3OXYtNC40OTM2MmgxNy45NDg3OXY0LjQ5MzYyWiIvPjxyZWN0IGNsYXNzPSJjbHMtMSIgeD0iMjEwLjE5NDI4IiB5PSI4Ny44MzQxOSIgd2lkdGg9IjM1LjkwNjE1IiBoZWlnaHQ9IjEyNS42NDk5NSIvPjxyZWN0IGNsYXNzPSJjbHMtMSIgeD0iOTAuMTYzNzIiIHk9IjE3OS40MzI4NSIgd2lkdGg9IjE3LjU1OTA4IiBoZWlnaHQ9Ii4wNjEzNiIvPjxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSIyMzQuMTYzOCAxNi40NDcxNSAyMzQuMTU4MjIgMTYuNDU4MzEgMjM0LjEwMjUxIDE2LjQzMDQyIDIzNC4xNjM4IDE2LjQ0NzE1Ii8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNTQxLjAzNjg1LDk5LjIzNzg1aC0xMy4zNTE4MnYxNS41NjQyMmwtLjc1NzU1LS4xODk0MWgtMTQuMzE1OTdjLTMuNjkzMDQsMC04LjQ1MzUyLDUuMTMwNy05LjExNjM5LDEwLjUzNjgyaDIzLjA1MzU4di4wMjU4NWgyMy4xNzQxN3YtMTcuMjUxNDVjMC0zLjk4NTc1LTQuNzA4ODktOC42ODYwMi04LjY4NjAyLTguNjg2MDJaTTUzOS4zNTgxNywxMTQuODAyMDdoLTEuMjk5ODl2LTUuMTkwOTZoMS4yOTk4OXY1LjE5MDk2WiIvPjxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSI1MTIuMDI2MTMgMTEwLjIzMTY4IDUxMi4wMjYxMyAxMTAuNDIxMDkgNTExLjI2ODU4IDExMC4yMzE2OCA1MTIuMDI2MTMgMTEwLjIzMTY4Ii8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMzMyLjc4MzA1LDM3LjQ1NzMzbC0xLjMzMTkyLTUuOTY5OTMsOC4wNDI2NywxLjQ0OTM1LDQuMTk1NTMsMTMuMTA5MTFjMTIuMjIzMDgsMS41ODcyNiw0MC45NDMzNSwxMS4zNzc3NywzOS4zMDIyNywzMi43MTU0Ni0xLjY0MTA4LDIxLjMzNzctMjQuNTMwNjEsMzYuMDgwMS0yNC41MzA2MSwzNi4wODAxLDAsMC0xNC4xMjgzMiw3LjQ3NDU1LTE5LjI1NTgyLDEwLjYxMzgyLDIuMDA3NDMtNC4wNzEyOSwxNy4zNTQxNy01NC4yNjMzNi04LjIwMzMtNzUuMDk1MjJsLTQyLjYyNDEyLTE3LjUyMzc2LDUuNTE3NzMtMTAuODEzMzEsMzguODg3NTYsMTUuNDM0MzhaIi8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMjI4Ljk0MTMyLDQzLjcwNTYybC0xNjEuNjEzODYsOTUuMTA2NDVoNDcuMTIxNDFjMTIuOTA1OTksMCwyOS4xNzIyNCwxNi4xNDM2NCwyOS4xNzIyNCwyOS4xNjY3M2wuMDIyMzEsOS43NTE5NSwxOS4wOTE1My0uMTQ1MDN2LTQwLjM4OTc3aDM0LjU1NTNsMS4zNDg1OCwxLjM0ODY1djc0LjkzOTUzTC4wMDA1LDIxMy40ODIxM2wuMDI0MzQtMzUuMTgyOTdoMTA3LjY5Nzk3di0zLjU4ODgySDB2LTM1LjQ0N0MzMS43MzAwNSwxMjMuNDg3NTgsMjM4Ljg4OTMsMCwyMzguODg5MywwbDUxLjMwNjQsMTkuNTU5NjhjLS4wMzkwMSwwLTUuNjUwNTcsOS44MjQzMy02LjE2MzIzLDEwLjc1NTAzbC00OS44Njg2Ny0xNS4wNjI2LS4wNjEyOS0uMDE2NzMuMDU1NzEuMDI3ODksOTIuNDcwNzYsNDAuMDcyMWMuNjQwODIsMi44NTg2NSw0LjM3NDQzLDE3Ljg4NzkxLDQuMzc0NDMsMTcuODg3OTFsLTEwMi4wNjIwOS0yOS41MTc2NloiLz48cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xNjYuOTkxODIsMTAwLjk5NDAxaDMyLjA0NTQ5djI0LjE4MTMxaC01Mi43NTA4MXYtMy40NzU5OWMwLTExLjQyNzU4LDkuMjc3NzQtMjAuNzA1MzIsMjAuNzA1MzItMjAuNzA1MzJaIi8+PC9nPjwvc3ZnPg==" alt="Moedatech">
+            <span class="ref">RFQ-40219</span>
+          </div>
+          <div>
+            <h3>Tower light 9m ×6 &nbsp;+2 more</h3>
+            <p class="where">Riyadh · 1 month · 18 Aug → 17 Sep 2026</p>
+            <div class="terms">
+              <div><span>MOB · DEMOB</span><b>Supplier</b></div>
+              <div><span>FOOD</span><b>Supplier</b></div>
+              <div><span>ACCOM &amp; TRANSPORT</span><b>Renter</b></div>
+              <div><span>FUEL</span><b>Renter · diesel</b></div>
+            </div>
+          </div>
+          <div class="foot">
+            <span class="closes-img">Bidding closes 21 Aug 2026</span>
+            <span class="join"><b>GET THE APP</b><span>linktr.ee/moedatech</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="mock-label" style="margin-top:14px">Why not all three in the image</div>
+      <div class="how-step" style="margin-top:6px"><span class="n">•</span><div>Three headlines at 54px do not fit, and shrinking them to fit makes the one a supplier is scanning for as small as the two he is not. <b>The count is the honest summary</b>: it says there is more without pretending to list it.</div></div>
+    </div>
+
+    <div>
+      <div class="mock-label after">The card · every item, then the shared terms</div>
+      <div class="preview-card">
+        <div class="pc-image">
+          <div class="shot">
+            <div class="head">
+              <img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz48c3ZnIGlkPSJMYXllcl8xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1NjYuOTI5MTMgMjEzLjQ4NDEzIj48ZGVmcz48c3R5bGU+LmNscy0xe2ZpbGw6I2ZmZmZmZjt9PC9zdHlsZT48L2RlZnM+PGcgaWQ9Ik1vM2RhdGVjaExvZ28tbG9nbyI+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNTQ0LjQ4MjM1LDEzOS4xOTI2NGMtMTAuNjY1OTctMy41NDY3MS0zOC4yMzA0Ni0zLjE2NzkzLTQ4LjY5ODM5LDEuMTYyMTMtMTQuOTcwMjMsNi4xODk1My0yMC4xNDM5NSwyMS42MTU5OC0xOC44OTU3MSwzNi45NTYzNmgtNjQuNjQxMzN2LTMuOTA4MjVoNDkuMzc4NDV2LTM0LjU1NDZsLTEuMzUxNTQtMS4zNTE1NGgtNTQuNzU4NzdjLS43MjMxNCwwLTcuMjY1NTksMS44MzM2Mi04LjUwNTIyLDIuMjY0MDQtMTYuMTQwOTcsNS43MTYwNy0yMi4xMzI1MiwyMS45NjAzNC0yMC42NjkwNiwzOC4xMjcxNmgtMjkuMDYyMzZ2LTEwLjg4OThjMC0xMy4xNzk2NC0xNS42OTMzMS0zMC4wNjk1NS0yOS4xNzQyOC0zMC4wNjk1NWgtNjAuNTk1MzJ2MzUuODk3NTNoNTMuODYzNDV2NC40OTM2MmgtNTMuODYzNDV2MzUuODk3NTNsMjc5Ljk5MjA1LjI2Njg2YzMzLjY1OTI4LDAsNDEuNjczODEtNjIuNzczMyw2Ljk4MTUtNzQuMjkxNVpNNTMwLjc2ODk4LDE3Ny41ODY2aC0xNy45NDg3OXYtNC40OTM2MmgxNy45NDg3OXY0LjQ5MzYyWiIvPjxyZWN0IGNsYXNzPSJjbHMtMSIgeD0iMjEwLjE5NDI4IiB5PSI4Ny44MzQxOSIgd2lkdGg9IjM1LjkwNjE1IiBoZWlnaHQ9IjEyNS42NDk5NSIvPjxyZWN0IGNsYXNzPSJjbHMtMSIgeD0iOTAuMTYzNzIiIHk9IjE3OS40MzI4NSIgd2lkdGg9IjE3LjU1OTA4IiBoZWlnaHQ9Ii4wNjEzNiIvPjxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSIyMzQuMTYzOCAxNi40NDcxNSAyMzQuMTU4MjIgMTYuNDU4MzEgMjM0LjEwMjUxIDE2LjQzMDQyIDIzNC4xNjM4IDE2LjQ0NzE1Ii8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNTQxLjAzNjg1LDk5LjIzNzg1aC0xMy4zNTE4MnYxNS41NjQyMmwtLjc1NzU1LS4xODk0MWgtMTQuMzE1OTdjLTMuNjkzMDQsMC04LjQ1MzUyLDUuMTMwNy05LjExNjM5LDEwLjUzNjgyaDIzLjA1MzU4di4wMjU4NWgyMy4xNzQxN3YtMTcuMjUxNDVjMC0zLjk4NTc1LTQuNzA4ODktOC42ODYwMi04LjY4NjAyLTguNjg2MDJaTTUzOS4zNTgxNywxMTQuODAyMDdoLTEuMjk5ODl2LTUuMTkwOTZoMS4yOTk4OXY1LjE5MDk2WiIvPjxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSI1MTIuMDI2MTMgMTEwLjIzMTY4IDUxMi4wMjYxMyAxMTAuNDIxMDkgNTExLjI2ODU4IDExMC4yMzE2OCA1MTIuMDI2MTMgMTEwLjIzMTY4Ii8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMzMyLjc4MzA1LDM3LjQ1NzMzbC0xLjMzMTkyLTUuOTY5OTMsOC4wNDI2NywxLjQ0OTM1LDQuMTk1NTMsMTMuMTA5MTFjMTIuMjIzMDgsMS41ODcyNiw0MC45NDMzNSwxMS4zNzc3NywzOS4zMDIyNywzMi43MTU0Ni0xLjY0MTA4LDIxLjMzNzctMjQuNTMwNjEsMzYuMDgwMS0yNC41MzA2MSwzNi4wODAxLDAsMC0xNC4xMjgzMiw3LjQ3NDU1LTE5LjI1NTgyLDEwLjYxMzgyLDIuMDA3NDMtNC4wNzEyOSwxNy4zNTQxNy01NC4yNjMzNi04LjIwMzMtNzUuMDk1MjJsLTQyLjYyNDEyLTE3LjUyMzc2LDUuNTE3NzMtMTAuODEzMzEsMzguODg3NTYsMTUuNDM0MzhaIi8+PHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMjI4Ljk0MTMyLDQzLjcwNTYybC0xNjEuNjEzODYsOTUuMTA2NDVoNDcuMTIxNDFjMTIuOTA1OTksMCwyOS4xNzIyNCwxNi4xNDM2NCwyOS4xNzIyNCwyOS4xNjY3M2wuMDIyMzEsOS43NTE5NSwxOS4wOTE1My0uMTQ1MDN2LTQwLjM4OTc3aDM0LjU1NTNsMS4zNDg1OCwxLjM0ODY1djc0LjkzOTUzTC4wMDA1LDIxMy40ODIxM2wuMDI0MzQtMzUuMTgyOTdoMTA3LjY5Nzk3di0zLjU4ODgySDB2LTM1LjQ0N0MzMS43MzAwNSwxMjMuNDg3NTgsMjM4Ljg4OTMsMCwyMzguODg5MywwbDUxLjMwNjQsMTkuNTU5NjhjLS4wMzkwMSwwLTUuNjUwNTcsOS44MjQzMy02LjE2MzIzLDEwLjc1NTAzbC00OS44Njg2Ny0xNS4wNjI2LS4wNjEyOS0uMDE2NzMuMDU1NzEuMDI3ODksOTIuNDcwNzYsNDAuMDcyMWMuNjQwODIsMi44NTg2NSw0LjM3NDQzLDE3Ljg4NzkxLDQuMzc0NDMsMTcuODg3OTFsLTEwMi4wNjIwOS0yOS41MTc2NloiLz48cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xNjYuOTkxODIsMTAwLjk5NDAxaDMyLjA0NTQ5djI0LjE4MTMxaC01Mi43NTA4MXYtMy40NzU5OWMwLTExLjQyNzU4LDkuMjc3NzQtMjAuNzA1MzIsMjAuNzA1MzItMjAuNzA1MzJaIi8+PC9nPjwvc3ZnPg==" alt="Moedatech">
+              <span class="ref">RFQ-40219</span>
+            </div>
+            <div>
+              <h3>Tower light 9m ×6 &nbsp;+2 more</h3>
+              <p class="where">Riyadh · 1 month · 18 Aug → 17 Sep 2026</p>
+              <div class="terms">
+                <div><span>MOB · DEMOB</span><b>Supplier</b></div>
+                <div><span>FOOD</span><b>Supplier</b></div>
+                <div><span>ACCOM &amp; TRANSPORT</span><b>Renter</b></div>
+                <div><span>FUEL</span><b>Renter · diesel</b></div>
+              </div>
+            </div>
+            <div class="foot">
+              <span class="closes-img">Bidding closes 21 Aug 2026</span>
+              <span class="join"><b>GET THE APP</b><span>linktr.ee/moedatech</span></span>
+            </div>
+          </div>
+        </div>
+        <div class="pc-body">
+          <div class="pc-title">3 machines · Riyadh</div>
+          <div class="pc-where">1 month · 18 Aug → 17 Sep 2026</div>
+          <div class="pc-terms">
+            <div class="pc-term"><span class="k">Tower light 9m</span><span class="v">×6 · with operator</span></div>
+            <div class="pc-term"><span class="k">Generator 250 kVA</span><span class="v">×2</span></div>
+            <div class="pc-term"><span class="k">Manlift 16m</span><span class="v">×1 · with operator</span></div>
+          </div>
+          <div class="pc-terms">
+            <div class="pc-term"><span class="k">Mobilisation</span><span class="v">Supplier</span></div>
+            <div class="pc-term"><span class="k">Demobilisation</span><span class="v">Supplier</span></div>
+            <div class="pc-term"><span class="k">Food</span><span class="v">Supplier</span></div>
+            <div class="pc-term"><span class="k">Accommodation &amp; transport</span><span class="v">Shibh Al Jazira</span></div>
+            <div class="pc-term"><span class="k">Fuel</span><span class="v">Shibh Al Jazira · diesel</span></div>
+          </div>
+          <div class="pc-closes">Bidding closes 21 Aug 2026.</div>
+          <div class="pc-join">New to Moedatech? Bid from the app and see every request from this renter — <a href="https://linktr.ee/moedatech">get the app</a>.</div>
+          <div class="pc-domain">WEB.MOEDATECH.NET</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="spec-card">
+      <div class="num">7</div>
+      <div>
+        <div class="title-en">The headline, when there is more than one machine</div>
+        <div class="desc"><b>First item, then “+n more”.</b> First by the request's own order, which is the order the renter entered them — not the largest count or the priciest, both of which would be us deciding what his job is about.</div>
+      </div>
+      <div class="tags"><span class="tag new">NEW</span></div>
+    </div>
+    <div class="spec-card">
+      <div class="num">8</div>
+      <div>
+        <div class="title-en">The item list, in the card only</div>
+        <div class="desc">Every machine with its size, count and whether it needs an operator. <b>The terms sit below the list, once</b> — mob, demob, food, accommodation and fuel are the request's, not each machine's, so repeating them per item would treble the block and say nothing new.</div>
+      </div>
+      <div class="tags"><span class="tag new">NEW</span></div>
+    </div>
+    <div class="spec-card">
+      <div class="num">9</div>
+      <div>
+        <div class="title-en">When a term differs per item</div>
+        <div class="desc">The request models delivery and return <b>per item</b>, so three machines can have three answers. When they agree the card shows one row; when they do not, the row reads <i>“varies by machine”</i> and the supplier finds the detail on the form. A card that shows one of three answers is worse than one that admits there are three.</div>
+      </div>
+      <div class="tags"><span class="tag open">CONFIRM</span></div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ B ══════════════════════════════════════════════════════════════════════════════════════ -->
 <div class="section">
   <div class="section-head">B · HOW TO BUILD IT — ONE DATA SOURCE, TWO RENDERINGS</div>
@@ -287,6 +405,7 @@ Duration :  1Month   &amp; extendable</p>
     <div class="how-steps">
       <div class="how-step"><span class="n">•</span><div><b>Today</b> the preview returns <code>{ title, description, imageUrl, url }</code>, and the card reverse-engineers the details by splitting the description on a separator and guessing whether each part is a location or a rental basis.</div></div>
       <div class="how-step"><span class="n">•</span><div><b>Five rows cannot survive that.</b> The payload becomes fields: <code>subcategory</code>, <code>measurement</code>, <code>operator</code>, <code>units</code>, <code>city</code>, <code>basis</code>, <code>start</code>, <code>end</code>, <code>extendable</code>, <code>mob</code>, <code>demob</code>, <code>fat</code>, <code>fuel</code>, <code>fuelType</code>, <code>closesAt</code>. Then both renderings format rather than parse.</div></div>
+      <div class="how-step"><span class="n">•</span><div><b>The card reads the wrong endpoint.</b> <code>/preview</code> answers prose — a title and a sentence — and the renderer splits that sentence and guesses whether each half is a location or a rental basis. Every term on this card was never in the string, which is why none of them ever appeared. <b><code>/public/bid-form/{token}</code> already carries all of them</b>, publicly and without auth, which is exactly what an unfurl bot needs.</div></div>
       <div class="how-step"><span class="n">•</span><div><b><code>imageUrl</code> is empty in production.</b> Found against a real token, 2026-09-01. The web now falls back to its own <code>og</code> route instead of the generic file — so this is no longer blocking, but the field should still be filled or dropped deliberately.</div></div>
     </div>
   </div>
