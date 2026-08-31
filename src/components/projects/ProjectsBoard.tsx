@@ -270,6 +270,9 @@ function SitePanel({
    * «Aug 26» and «Sep 26» printed over each other on any span where two month starts fell within a
    * label's width of one another. The last column runs to the end of the axis.
    */
+  /* ~~The final part-month column stated its day range («Oct 2026 · 1–16»).~~ Not taken (owner,
+     2026-08-31: the full year was the fix he wanted, and only that). The month name and the full
+     year are the whole label; the days live on the bars, where the renter reads them anyway. */
   const cols = axis
     ? grid.map((left, i) => ({ ...ticks[i], width: (i + 1 < grid.length ? grid[i + 1] : 100) - left }))
     : [];
@@ -420,7 +423,7 @@ function SitePanel({
 
                 `z-10`, not 20: an open row menu has to paint over this header (see `ChartRow`). */}
             <div className="sticky top-0 z-10 flex items-stretch border-b border-border bg-surface2">
-              <div className="flex w-[260px] flex-none items-end px-3 pb-1.5 text-label font-semibold uppercase tracking-[.03em] text-muted">
+              <div className="flex w-[340px] flex-none items-end px-3 pb-1.5 text-label font-semibold uppercase tracking-[.03em] text-muted">
                 {t.projects.board.whatIsHere}
               </div>
 

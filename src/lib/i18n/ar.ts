@@ -1584,6 +1584,11 @@ export const ar: Dictionary = {
     chart: {
       of: "من",
       pending: "قيد الانتظار",
+      ownFleet: "أسطولنا",
+      markFailed: "تعذّر التسجيل. حاول مجدداً.",
+      withOperator: "مع مشغّل",
+      noOperator: "بدون مشغّل",
+      year: "سنة",
       openEnded: "مفتوح المدة",
       from: "من",
       noPeriod: "لا تواريخ بعد",

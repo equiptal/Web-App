@@ -69,13 +69,31 @@ function open(ui: React.ReactElement): string[] {
 }
 
 describe("what the menu offers", () => {
-  it("a request nobody has awarded: award and the bids, and no marks", () => {
-    const items = open(<RowMenu group={group("request")} award={null} actions={all()} />);
+  it("a request nobody has awarded: award and the bids, and no papers", () => {
+    /* The CALLER decides whether a mark is possible, and for an unawarded request it is not: nobody
+       has been given the job, so there is no arrival to record. The surface passes no `onMark` for
+       that case, which is why this omits it rather than passing `all()`. */
+    const noMark = { ...all(), onMark: undefined };
+    const items = open(<RowMenu group={group("request")} award={null} actions={noMark} />);
 
     expect(items).toContain("Award");
     expect(items).toContain("Review the bids");
-    // Nothing is supplied yet, so there is nothing to mark and no paper to hang on it.
     expect(items.join("|")).not.toMatch(/mobilized/i);
+    // No award means no id to file a paper under.
+    expect(items).not.toContain("Attach a document");
+  });
+
+  it("a work-order machine nobody supplies: the marks, because it is the renter's own", () => {
+    /* Owner, 2026-08-31: *"I want them allowed even if no supplier is mentioned, so they are always
+       visible."* A work order with no supplier line IS the renter's own fleet, and their own
+       excavator still arrives on a Tuesday — hiding the mark behind an award made the one kind of
+       machine needing no supplier the one kind that could not be tracked. */
+    const items = open(<RowMenu group={group("work_order")} award={null} actions={all()} />);
+
+    expect(items).toContain("Mark mobilized");
+    expect(items).toContain("Mark demobilized");
+    // Still nothing to award and no paper to hang: those need a supplier and an id.
+    expect(items).not.toContain("Award");
     expect(items).not.toContain("Attach a document");
   });
 

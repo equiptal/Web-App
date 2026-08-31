@@ -380,6 +380,49 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     }
   }
 
+  /**
+   * Mark a machine as arrived or gone, whether or not a supplier is named.
+   *
+   * A mark lives on an award, and an award needs a supplier. A work order with no supplier line is
+   * the renter's own fleet, so the first mark on one records them as its supplier — which is what
+   * that row already means — and then marks it. From the renter's side it is one press.
+   *
+   * The whole quantity, because own fleet is not a split: if they later award part of it to a
+   * vendor, that is a change to the award they can make in the dialog.
+   */
+  async function markOrOwn(
+    group: ChartGroup,
+    item: ChartItem,
+    award: Award | null,
+    which: "mobilizedAt" | "demobilizedAt",
+    value: string | null,
+  ) {
+    if (award) {
+      await mark(award.id, which, value);
+      return;
+    }
+    if (!selected) return;
+
+    setSaving(true);
+    setNotice(null);
+    try {
+      const made = await withFreshVersion(selected, version, (v) =>
+        saveAward(selected, v, {
+          workOrderItemId: item.id,
+          supplierName: t.projects.chart.ownFleet,
+          units: item.quantity,
+          rentalBasis: null,
+        }),
+      );
+      if (made.award) await mark(made.award.id, which, value);
+      else await refreshChart();
+    } catch {
+      setNotice(t.projects.chart.markFailed);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function rename(group: ChartGroup, title: string | null) {
     setSaving(true);
     setNotice(null);
@@ -726,11 +769,20 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
                      with itself. */
                   onAward: () => setAwarding({ group, item }),
                   onChangeAward: () => setAwarding({ group, item }),
-                  // Guarded rather than defaulted: `RowMenu` only offers a mark on an awarded
-                  // row, and a mark on no award is a write with nothing to write to.
-                  onMark: (which, value) => {
-                    if (a) void mark(a.id, which, value);
-                  },
+                  /* A mark on a machine nobody supplies is a mark on the renter's OWN fleet.
+
+                     There is nowhere else to put it: a mark lives on an award, and an award needs a
+                     supplier name. So the first mark on an unawarded machine records the renter as
+                     the supplier of all of it — which is what a work order with no supplier line
+                     already means — and then marks that. One press from where they are standing.
+
+                     Only ever on a WORK ORDER. A marketplace request with no award has not been
+                     given to anyone yet, and inventing the renter as its supplier would say the
+                     opposite of what is true. */
+                  onMark:
+                    a || group.kind === "work_order"
+                      ? (which, value) => void markOrOwn(group, item, a, which, value)
+                      : undefined,
                   // Un-awarding is reached through Change the award's own confirm, so the menu
                   // does not offer two doors to the same destructive act.
                   onOpenRequest: group.kind === "request" ? () => router.push(requestUrl(group.id)) : undefined,

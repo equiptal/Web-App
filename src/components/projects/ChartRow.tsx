@@ -31,6 +31,7 @@
  */
 
 import { useT } from "@/lib/i18n";
+import { termsSummary } from "@/lib/contract/award";
 import { Icon } from "@/components/ui";
 import { awardWindow, awardedUnits, type Award, type ChartGroup, type ChartItem } from "@/lib/contract/award";
 
@@ -99,7 +100,7 @@ export function AwardRow({
     <div className="flex items-stretch border-t border-border">
       {/* The label column: what this row is, its papers, and its menu. `pe-10` keeps the text clear
           of the menu's 28px target rather than letting a long machine name run under it. */}
-      <div className="relative flex w-[260px] flex-none flex-col justify-center gap-0.5 py-2 pe-10 ps-3">
+      <div className="relative flex w-[340px] flex-none flex-col justify-center gap-0.5 py-2 pe-10 ps-3">
         {/* Papers in the top corner, out of the bar's way. */}
         {award.documents.length > 0 && (
           <span className="absolute end-10 top-1.5 flex items-center gap-0.5">
@@ -255,12 +256,29 @@ export function AwaitingRow({
   const end = group.when?.endDate ?? projectWindow.endDate;
   const shape = barShape(start, end, axis);
 
+  const summary = termsSummary(item.terms, (c) => (t.options.safetyCert as Record<string, string>)[c] ?? c, {
+    operator: t.projects.chart.withOperator,
+    noOperator: t.projects.chart.noOperator,
+    year: t.projects.chart.year,
+  });
+
   return (
     <div className="flex items-stretch border-t border-border">
-      <div className="relative flex w-[260px] flex-none flex-col justify-center gap-0.5 py-2 pe-10 ps-3">
+      <div className="relative flex w-[340px] flex-none flex-col justify-center gap-0.5 py-2 pe-10 ps-3">
         <span className="truncate text-body font-semibold text-navy">
           {item.label} ×{item.quantity}
         </span>
+        {/* What was asked for, on one line (owner, 2026-08-31: *"show some terms like cert,
+            operator, year if set — if not, just don't show"*).
+
+            Only the three a renter scans a board for, and only when set: a row of dashes teaches the
+            eye to skip the line that sometimes carries the answer. Requests carry nothing here yet
+            — they keep the same answers in ten columns under other names — so their rows show one
+            line, which is the stated behaviour. */}
+        {summary.length > 0 && (
+          <span className="truncate text-meta text-muted-light">{summary.join(" · ")}</span>
+        )}
+
         {/* ~~«pending» under the machine's name.~~ It moved ONTO the bar (owner, 2026-08-31), where
             the state belongs — the bar is the thing that shows a period, and a word about that
             period printed in the label column left the two saying the same thing twice. */}
@@ -270,11 +288,11 @@ export function AwaitingRow({
       <div className="relative min-w-0 flex-1 overflow-hidden py-3">
         <Grid at={grid} />
         {today && <TodayLine at={pct(today, axis)} />}
-        {/* The bar states its OWN period, like an awarded one does (owner, 2026-08-31: *"why is it
-            shown at this date for the end when the end is 7-10"* — it was not; the bar ended on the
-            7th, but a month-wide column has no day marks in it, so a bar ending a fifth of the way
-            into October reads as late October). A bar that prints its dates cannot be misread, and
-            the `title` carries them for the narrow bars that have to truncate. */}
+        {/* ~~The bar printed its own period.~~ One word again (owner, 2026-08-31): *"on the bar
+            don't show the date, just pending — and on hover it will show the date as it is now."*
+            Printing both ends inside every ghost bar made a column of them read as a table of dates
+            with a chart behind it, and the dates were already legible from where the bar starts and
+            stops. The `title` keeps them, in full, for the renter who wants the day. */}
         <span
           title={`${t.projects.chart.pending} · ${shape.title(t)}`}
           className={`absolute top-1/2 flex items-center gap-1 -translate-y-1/2 truncate rounded-sm border border-dashed border-border-strong bg-surface2 px-2 py-1 text-label font-semibold text-muted ${
@@ -286,7 +304,8 @@ export function AwaitingRow({
               awarded — it is waiting, which is the normal state for most of its life. Naming it by
               what has not happened yet made a healthy request read like a stalled one. */}
           {t.projects.chart.pending}
-          {shape.kind !== "none" && <span className="truncate font-normal">· {shape.label(t)}</span>}
+          {/* The cap, and the only thing besides the word: a bar that reaches the chart's trailing
+              edge has to say whether it ENDS there or runs past it. */}
           {shape.kind === "open" && <Icon name="chevron_right" size={13} className="flex-none rtl:scale-x-[-1]" />}
         </span>
       </div>

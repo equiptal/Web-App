@@ -221,6 +221,14 @@ export interface ChartItem {
   label: string;
   labelAr: string | null;
   quantity: number;
+  /**
+   * What was asked for on this machine, when the source stores it.
+   *
+   * Work orders do — the blob comes straight through. Requests keep the same answers in ten
+   * separate columns under different names, so their rows carry nothing here yet and show no terms
+   * line, which is the stated behaviour: show them when they are set, otherwise show nothing.
+   */
+  terms?: Record<string, unknown> | null;
   awards: Award[];
 }
 
@@ -237,6 +245,38 @@ export interface ChartGroup {
   /** Its own period, or `null` when it inherits the project's. */
   when: { startDate: string | null; endDate: string | null } | null;
   items: ChartItem[];
+}
+
+
+/**
+ * The few terms worth putting on a chart row.
+ *
+ * Certificates, operator and model year — the three a renter scans for when they look at a board
+ * (owner, 2026-08-31). Not the whole block: thirteen values on one line is a paragraph, and the row
+ * is there to be scanned rather than read.
+ *
+ * Only what is SET. An unanswered field contributes nothing rather than a dash, because a row of
+ * dashes teaches the eye to skip the line that sometimes carries the answer.
+ */
+export function termsSummary(
+  terms: Record<string, unknown> | null | undefined,
+  label: (code: string) => string,
+  words: { operator: string; noOperator: string; year: string },
+): string[] {
+  if (!terms) return [];
+  const out: string[] = [];
+
+  const certs = terms.safety;
+  if (Array.isArray(certs) && certs.length) out.push(certs.map((c) => label(String(c))).join(" + "));
+
+  // Both answers are worth saying: "no operator" is a decision, not a blank.
+  if (terms.operator === "yes") out.push(words.operator);
+  else if (terms.operator === "no") out.push(words.noOperator);
+
+  const year = terms.year;
+  if (typeof year === "string" && year.trim()) out.push(`${words.year} ${year.trim()}`);
+
+  return out;
 }
 
 /* ----------------------------- Derivations ----------------------------- */

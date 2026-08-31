@@ -109,30 +109,39 @@ export function RowMenu({
   };
 
   if (!award) {
-    // Nothing is supplied yet, so there is nothing to mark and nothing to attach papers to.
     if (!isWorkOrder) {
       push("award", m.award, "handshake", a.onAward);
       push("bids", m.reviewBids, "gavel", a.onReviewBids);
     }
   } else {
+    // Papers hang on an award — there is no id to file them under until one exists.
     push("doc", m.attachDocument, "attach_file", a.onAttachDocument);
+  }
 
-    // ⇄ undo: the same entry sets the mark and clears it, because a mistyped date is the common
-    // case and a separate "undo" entry doubles the list to say the same thing.
-    if (a.onMark) {
-      push(
-        "mob",
-        award.mobilizedAt ? m.undoMobilized : m.markMobilized,
-        "login",
-        () => a.onMark!("mobilizedAt", award.mobilizedAt ? null : today),
-      );
-      push(
-        "demob",
-        award.demobilizedAt ? m.undoDemobilized : m.markDemobilized,
-        "logout",
-        () => a.onMark!("demobilizedAt", award.demobilizedAt ? null : today),
-      );
-    }
+  /* ── The marks, whether or not anybody supplies it (owner, 2026-08-31) ────────────────────
+
+     *"For the mark as mobilized or demobilized, I want them allowed even if no supplier is
+     mentioned, so they are always visible."*
+
+     And they are right about the case: a work order with no supplier line is the renter's OWN fleet,
+     and their own excavator still arrives on a Tuesday. Hiding the mark behind an award made the one
+     kind of machine that needs no supplier the one kind that could not be tracked.
+
+     ⇄ undo: one entry sets the mark and clears it, because a mistyped date is the common case and a
+     separate *undo* doubles the list to say the same thing. */
+  if (a.onMark) {
+    push(
+      "mob",
+      award?.mobilizedAt ? m.undoMobilized : m.markMobilized,
+      "login",
+      () => a.onMark!("mobilizedAt", award?.mobilizedAt ? null : today),
+    );
+    push(
+      "demob",
+      award?.demobilizedAt ? m.undoDemobilized : m.markDemobilized,
+      "logout",
+      () => a.onMark!("demobilizedAt", award?.demobilizedAt ? null : today),
+    );
   }
 
   // Marketplace rows only — a work order went to nobody.

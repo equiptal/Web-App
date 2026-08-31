@@ -1849,6 +1849,11 @@ export const en = {
     chart: {
       of: "of",
       pending: "pending",
+      ownFleet: "Own fleet",
+      markFailed: "Could not record that. Try again.",
+      withOperator: "with operator",
+      noOperator: "no operator",
+      year: "year",
       openEnded: "open-ended",
       from: "from",
       noPeriod: "no dates yet",
