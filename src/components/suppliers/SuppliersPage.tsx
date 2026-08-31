@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/ui";
 import { fmt, useT } from "@/lib/i18n";
-import { cx } from "@/lib/ds";
+import { btn, cx } from "@/lib/ds";
 import { listRenterSuppliers, updateRenterSupplier } from "@/lib/api/client";
+import { AddSuppliersDialog } from "./AddSuppliersDialog";
 import {
   bidCount,
   canBeEmailed,
@@ -42,16 +43,15 @@ export function SuppliersPage() {
   const [q, setQ] = useState("");
   const [pill, setPill] = useState<"all" | "vendor">("all");
   const [toast, setToast] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  const load = useCallback(() => {
+    listRenterSuppliers().then(setRows);
+  }, []);
 
   useEffect(() => {
-    let live = true;
-    listRenterSuppliers().then((list) => {
-      if (live) setRows(list);
-    });
-    return () => {
-      live = false;
-    };
-  }, []);
+    load();
+  }, [load]);
 
   const vendors = useMemo(() => (rows ?? []).filter((s) => s.vendorRegistered).length, [rows]);
 
@@ -107,6 +107,12 @@ export function SuppliersPage() {
             {vendors > 0 && <> · {fmt(c.vendors, { n: vendors })}</>}
           </p>
         </div>
+        <span className="ms-auto flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => setAdding(true)} className={btn("tinted", "md")}>
+            <Icon name="person_add" size={15} />
+            {c.addSupplier}
+          </button>
+        </span>
       </header>
 
       <div className="rounded-md border border-border bg-surface">
@@ -150,6 +156,15 @@ export function SuppliersPage() {
           </table>
         )}
       </div>
+
+      <AddSuppliersDialog
+        open={adding}
+        onClose={() => setAdding(false)}
+        onAdded={() => {
+          load();
+          setToast(c.added);
+        }}
+      />
 
       {toast && (
         <div
