@@ -402,3 +402,76 @@ when("the work-order item schema can actually hold supplyLines", () => {
     expect(items, "an intersection with a strict object can never accept the added key").not.toMatch(/\.and\(/);
   });
 });
+
+/* ============================================================================================== *
+ * The web's evidence-only tag, checked across all three repos
+ * ============================================================================================== */
+
+/**
+ * `/rfq/jobs` is shared between this app and the mobile app, and they need OPPOSITE behaviour from
+ * it (owner, 2026-08-31: *"for app i want to have a tag or something for web to use this new
+ * approach and if on app will remain as it is now"*).
+ *
+ * The agent is instructed to fill every field, which is right for mobile — it has no project pills
+ * and no work-order templates, so an unstated responsibility has nowhere else to come from. On the
+ * web the same default overwrites a term the renter saved on their own site, and arrives looking
+ * exactly like something they just typed.
+ *
+ * Three facts have to hold together, in three repos, and no single repo can see all three. So this
+ * reads the other two rather than restating them.
+ */
+const AGENT = path.resolve(process.cwd(), "..", "Normalization-Agent");
+const MOBILE = path.resolve(process.cwd(), "..", "Moedatech-App", "apps", "mobile");
+
+const tagWhen = fs.existsSync(AGENT) ? describe : describe.skip;
+
+tagWhen("the evidence-only tag", () => {
+  const agentFile = (rel: string) => fs.readFileSync(path.join(AGENT, rel), "utf8");
+
+  it("this app sends it on every parse", () => {
+    const route = fs.readFileSync(
+      path.join(process.cwd(), "src", "app", "api", "agent", "process", "route.ts"),
+      "utf8",
+    );
+    expect(route).toMatch(/evidence_only:\s*true/);
+  });
+
+  it("the agent accepts it on the shared job route", () => {
+    const handler = agentFile(path.join("src", "handlers", "rfq", "jobs.handler.ts"));
+    expect(handler, "declared on the body it parses").toMatch(/evidence_only\?:\s*boolean/);
+    /* And in the dedup fingerprint. Two callers asking the same words for DIFFERENT answers must not
+       share a job: serving one the other's result hands back invented values to the caller that
+       opted out of them, or none to the caller that needs them. */
+    expect(handler, "part of the job fingerprint").toMatch(/evidence:\$\{/);
+  });
+
+  it("the agent only changes behaviour when it is set", () => {
+    const service = agentFile(path.join("src", "services", "rfq.service.ts"));
+    // The addendum is conditional, so an absent tag is today's prompt byte for byte. Substrings
+    // rather than a regex: the line contains escaped newlines, and a regex over those is a test
+    // that fails on its own quoting rather than on the code.
+    expect(service).toContain("evidenceOnly ?");
+    expect(service).toContain("EVIDENCE_ONLY_ADDENDUM : ''");
+  });
+
+  it("and it rides the volatile tail, not the cached prefix", () => {
+    const service = agentFile(path.join("src", "services", "rfq.service.ts"));
+    const tail = service.slice(service.indexOf("const volatileTail"), service.indexOf("const systemBlocks"));
+    expect(tail).toContain("EVIDENCE_ONLY_ADDENDUM");
+    /* A prefix that differs per caller is a prefix that is never a cache hit, and the instructions
+       plus the taxonomy are 26k tokens of it. */
+    expect(service.indexOf("EVIDENCE_ONLY_ADDENDUM", service.indexOf("const volatileTail"))).toBeLessThan(
+      service.indexOf("cache_control", service.indexOf("const systemBlocks")),
+    );
+  });
+});
+
+(fs.existsSync(MOBILE) ? describe : describe.skip)("the mobile app is left as it is", () => {
+  it("does not send the tag", () => {
+    const svc = fs.readFileSync(
+      path.join(MOBILE, "lib", "features", "equipment_requests", "data", "services", "rfq_parse_service.dart"),
+      "utf8",
+    );
+    expect(svc, "mobile keeps today's behaviour, which needs the defaults").not.toContain("evidence_only");
+  });
+});
