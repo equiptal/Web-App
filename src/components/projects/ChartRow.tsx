@@ -21,6 +21,13 @@
  *
  * Centred, they cover the bar's own dates — which is what the prototype did and what made it
  * unreadable at three rows. On the edge they are still unmistakably *on* that bar and cover nothing.
+ *
+ * ── The menu is on the ROW, not out at the end of the track ───────────────────────────────────────
+ *
+ * It rode a 36px cell after the timeline, which put it against the panel's clipped edge — so the one
+ * control on the row opened a menu nobody could see (owner, 2026-08-31: *"make it 3 dots on the
+ * request not on the bar"*). It now sits in the label column, beside the thing it acts on, and the
+ * TRACK is the only part of the row that clips.
  */
 
 import { useT } from "@/lib/i18n";
@@ -61,6 +68,8 @@ export function AwardRow({
   axis: Axis;
   projectWindow: { startDate: string | null; endDate: string | null };
   today?: string;
+  /** Month boundaries as axis percentages — the same ticks the header rules. */
+  grid?: number[];
   /** The row menu, rendered by the caller so this stays a drawing component. */
   menu?: React.ReactNode;
 }) {
@@ -77,10 +86,12 @@ export function AwardRow({
 
   return (
     <div className="flex items-stretch border-t border-border">
-      <div className="relative flex w-[260px] flex-none flex-col justify-center gap-0.5 px-3 py-2">
+      {/* The label column: what this row is, its papers, and its menu. `pe-10` keeps the text clear
+          of the menu's 28px target rather than letting a long machine name run under it. */}
+      <div className="relative flex w-[260px] flex-none flex-col justify-center gap-0.5 py-2 pe-10 ps-3">
         {/* Papers in the top corner, out of the bar's way. */}
         {award.documents.length > 0 && (
-          <span className="absolute end-2 top-1.5 flex items-center gap-0.5">
+          <span className="absolute end-10 top-1.5 flex items-center gap-0.5">
             {docs.map((d) => (
               <span key={d.id} title={`${d.kind} · ${d.filename}`} className="text-brand">
                 <Icon name={d.kind === "po" ? "receipt_long" : d.kind === "contract" ? "gavel" : "description"} size={12} />
@@ -100,10 +111,16 @@ export function AwardRow({
           {award.rateAmount != null && `${t.common.sar} · `}
           {award.supplierName}
         </span>
+
+        {/* The menu, on the row it acts on. */}
+        {menu && <span className="absolute end-1.5 top-1/2 -translate-y-1/2">{menu}</span>}
       </div>
 
-      <div className="relative min-w-0 flex-1 py-3">
-        {today && <span aria-hidden className="absolute inset-y-0 w-px bg-brand/40" style={{ insetInlineStart: `${pct(today, axis)}%` }} />}
+      {/* `overflow-hidden` HERE and nowhere else: a bar must not escape the track, and the panel
+          around it must not clip or the menus go with the bars. */}
+      <div className="relative min-w-0 flex-1 overflow-hidden py-3">
+        <Grid at={grid} />
+        {today && <TodayLine at={pct(today, axis)} />}
 
         <span
           className="absolute top-1/2 -translate-y-1/2 truncate rounded-sm bg-navy px-2 py-1 text-label font-semibold text-white"
@@ -119,10 +136,27 @@ export function AwardRow({
           <Mark at={award.demobilizedAt} axis={axis} tone="out" title={`${t.projects.chart.demobilized} ${award.demobilizedAt}`} />
         )}
       </div>
-
-      <div className="flex w-9 flex-none items-center justify-center">{menu}</div>
     </div>
   );
+}
+
+/** The month boundaries, carried down through every row so a bar can be read against them.
+ *  Hairlines at 60% of the border colour: a grid you notice is a grid competing with the bars. */
+function Grid({ at }: { at?: number[] }) {
+  if (!at?.length) return null;
+  return (
+    <>
+      {at.map((x) => (
+        <span key={x} aria-hidden className="absolute inset-y-0 w-px bg-border/60" style={{ insetInlineStart: `${x}%` }} />
+      ))}
+    </>
+  );
+}
+
+/** Today. Dashed rather than solid, so it reads as a marker across the chart and not as a bar of
+ *  its own — the header carries the date it stands for. */
+function TodayLine({ at }: { at: number }) {
+  return <span aria-hidden className="absolute inset-y-0 border-s border-dashed border-brand" style={{ insetInlineStart: `${at}%` }} />;
 }
 
 /** A pin on the bar's top edge. Unlabelled — the date is in the title. */
@@ -151,6 +185,7 @@ export function AwaitingRow({
   axis: Axis;
   projectWindow: { startDate: string | null; endDate: string | null };
   today?: string;
+  grid?: number[];
   menu?: React.ReactNode;
 }) {
   const t = useT();
@@ -163,15 +198,21 @@ export function AwaitingRow({
 
   return (
     <div className="flex items-stretch border-t border-border">
-      <div className="flex w-[260px] flex-none flex-col justify-center gap-0.5 px-3 py-2">
+      <div className="relative flex w-[260px] flex-none flex-col justify-center gap-0.5 py-2 pe-10 ps-3">
         <span className="truncate text-body font-semibold text-navy">
           {item.label} ×{item.quantity}
         </span>
-        <span className="truncate text-meta text-muted">{t.projects.chart.notAwarded}</span>
+        {/* *Pending*, not *not awarded yet* (owner, 2026-08-31).
+            A request that has just gone out has not failed to be awarded — it is waiting, which is
+            the normal and expected state for most of its life. Naming it by what has not happened
+            yet made a healthy request read like a stalled one. */}
+        <span className="truncate text-meta text-muted">{t.projects.chart.pending}</span>
+        {menu && <span className="absolute end-1.5 top-1/2 -translate-y-1/2">{menu}</span>}
       </div>
 
-      <div className="relative min-w-0 flex-1 py-3">
-        {today && <span aria-hidden className="absolute inset-y-0 w-px bg-brand/40" style={{ insetInlineStart: `${pct(today, axis)}%` }} />}
+      <div className="relative min-w-0 flex-1 overflow-hidden py-3">
+        <Grid at={grid} />
+        {today && <TodayLine at={pct(today, axis)} />}
         <span
           className="absolute top-1/2 -translate-y-1/2 truncate rounded-sm border border-dashed border-border-strong bg-surface2 px-2 py-1 text-label font-semibold text-muted"
           style={{ insetInlineStart: `${x1}%`, width: `${Math.max(x2 - x1, 2)}%` }}
@@ -179,8 +220,6 @@ export function AwaitingRow({
           {t.projects.chart.awaiting}
         </span>
       </div>
-
-      <div className="flex w-9 flex-none items-center justify-center">{menu}</div>
     </div>
   );
 }

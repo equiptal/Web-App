@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { siteConflicts } from "@/lib/contract/project";
+import { siteConflicts, periodDiffers } from "@/lib/contract/project";
 
 /**
  * Editing a site is editing the SITE (owner, 2026-08-31).
@@ -127,5 +127,29 @@ describe("a site with no dates of its own", () => {
 
   it("agrees with a work order that has none either", () => {
     expect(siteConflicts([wo()], { startDate: null, endDate: null })).toEqual([]);
+  });
+});
+
+describe("the chart's *own dates* chip", () => {
+  /* It asks `periodDiffers`, not "does this row hold a period". A request ALWAYS holds one — the
+     backend copies the site's onto it at submit and says so in `getChart` — so the old condition
+     put a warning on every request ever filed, and opening it showed a comparison with no rows in
+     it. Reported 2026-08-31: *"I created a project from this request directly, so how do they
+     differ in location? impossible."* */
+
+  it("stays away when the row's own copy matches the site", () => {
+    expect(periodDiffers({ startDate: "2026-08-31", endDate: "2026-10-07" }, { startDate: "2026-08-31", endDate: "2026-10-07" })).toBe(false);
+  });
+
+  it("appears when a date really differs", () => {
+    expect(periodDiffers({ startDate: "2026-08-31", endDate: "2026-12-31" }, { startDate: "2026-08-31", endDate: "2026-10-07" })).toBe(true);
+  });
+
+  it("stays away for a work order that inherits", () => {
+    expect(periodDiffers(null, { startDate: "2026-08-31", endDate: "2026-10-07" })).toBe(false);
+  });
+
+  it("treats an open-ended site and an open-ended row as agreeing", () => {
+    expect(periodDiffers({ startDate: null, endDate: null }, { startDate: null, endDate: null })).toBe(false);
   });
 });

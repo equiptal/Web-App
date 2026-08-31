@@ -23,7 +23,7 @@
 
 import { useT } from "@/lib/i18n";
 import { Button, Icon } from "@/components/ui";
-import { projectTitle, projectEnded, endedLast, titleIsDerived, type ProjectSummary } from "@/lib/contract/project";
+import { projectTitle, projectEnded, endedLast, titleIsDerived, periodDiffers, type ProjectSummary } from "@/lib/contract/project";
 import { chartSpan, isUnawarded, type ChartGroup } from "@/lib/contract/award";
 import { AwardRow, AwaitingRow, pct, type Axis } from "./ChartRow";
 
@@ -287,8 +287,13 @@ function SitePanel({
                   {g.kind === "request" && <span className="text-meta text-muted">{g.ref}</span>}
                   {/* Its own period, kept and shown rather than resolved away. A button, not a
                       label: the renter presses it to see WHAT differs and decide, and a difference
-                      they cannot open is a warning they can only ignore. */}
-                  {g.when && (
+                      they cannot open is a warning they can only ignore.
+
+                      Gated on the dates actually DIFFERING, not on the row holding a copy of them.
+                      A request always holds a copy — it took one at submit — so the old condition
+                      put this warning on every request ever filed, and the panel it opened had
+                      nothing to list. */}
+                  {periodDiffers(g.when, projectWindow) && (
                     <button
                       type="button"
                       onClick={() => onOpenConflict?.(g)}

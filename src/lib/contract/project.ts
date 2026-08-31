@@ -379,8 +379,16 @@ export interface SiteConflict {
   reason: PropagationState;
 }
 
-/** Two periods, compared only on the fields a site actually states. */
-function periodDiffers(
+/**
+ * Two periods, compared only on the fields a site actually states.
+ *
+ * Exported because the chart's *own dates* chip has to ask the same question. It used to ask a
+ * different one — *does this row carry a period at all* — and a request ALWAYS does: the backend
+ * copies one onto it at submit and says so in `getChart`. So every request on every site wore the
+ * warning, and opening it showed a comparison table with no rows in it (owner, 2026-08-31: *"I
+ * created a project from this request directly, so how do they differ in location? impossible"*).
+ */
+export function periodDiffers(
   own: { startDate: string | null; endDate: string | null } | null,
   site: { startDate: string | null; endDate: string | null },
 ): boolean {
