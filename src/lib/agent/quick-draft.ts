@@ -17,6 +17,7 @@ import { defaultProjectDetails, defaultPreferences, newManualItem } from "@/lib/
 import type { Taxonomy } from "@/lib/contract/taxonomy";
 import type { QuickMatch } from "./quick-match.generated";
 import type { QuickRfqResult } from "@/lib/api/client";
+import { SAFETY_CERTIFICATES } from "@/lib/contract/options";
 import { certsInText } from "./quick-certs";
 
 /** Find the ids for a name the agent returned, so a Tier-1 answer lands on real taxonomy rows. */
@@ -29,6 +30,22 @@ function resolve(tree: Taxonomy | null | undefined, subtype: string | null, capa
     }
   }
   return { categoryId: null, subcategoryId: null, measurementId: null };
+}
+
+/**
+ * The agent's `safety_certifications` → this app's chip codes, or `null` for "not stated".
+ *
+ * Upper-case on the wire (`"TUV"`), lower-case here (`"tuv"`) — the same fold `agent-adapters` does
+ * on the full path. `[]` becomes `null` rather than an empty array, because the two mean different
+ * things downstream: `null` lets a project or a template fill the field, and `[]` is the renter
+ * saying *no certificate*.
+ */
+function certsOf(raw: unknown): EquipmentItem["safetyCertsOverride"] {
+  const list = Array.isArray(raw) ? raw : typeof raw === "string" && raw.trim() ? [raw] : [];
+  const codes = list
+    .map((c) => String(c).trim().toLowerCase())
+    .filter((c) => (SAFETY_CERTIFICATES as readonly string[]).includes(c));
+  return codes.length ? (codes as EquipmentItem["safetyCertsOverride"]) : null;
 }
 
 function shell(items: EquipmentItem[]): AgentDraft {
@@ -105,6 +122,14 @@ export function quickItemsToDraft(
       rawLabel: (r.input_equipment as string) ?? subtype ?? "",
       rawSize: capacity,
       quantity: typeof r.quantity === "number" && r.quantity > 0 ? r.quantity : 1,
+      /* ⚠️ The certificate the agent read, PER ITEM — and this reader was ignoring it.
+         The fast lane can answer certs now, and does: *"10 × Crawler Excavator 20 ton with 2 ×
+         Crawler Excavator 30 ton with tuv"* comes back with `["TUV"]` on BOTH items, verified on
+         staging. Nothing here mapped it onto the draft, and `withCerts` below stood down precisely
+         because the agent HAD answered — so between the two of them the answer was dropped.
+         The renter's report was exact: detected without a project, lost with one, because a project
+         is what routes the line to this lane. */
+      safetyCertsOverride: certsOf(r.safety_certifications),
     } as EquipmentItem;
   });
 
@@ -112,23 +137,22 @@ export function quickItemsToDraft(
 }
 
 /**
- * Put the certificates the renter NAMED onto a fast-path draft.
+ * The BACKSTOP: certificates read off the renter's own text, when the response carries none.
  *
- * ⚠️ The equipment-only prompt is forbidden from emitting them — *"no equipment-age or
- * safety-certificate fields"*, appended last on purpose so it wins — so on that path
- * `safety_certifications` comes back as `[]` however plainly the renter wrote «with TÜV». Measured
- * on staging: 2.6 s and `[]` on the fast path, 28.0 s and `["tuv"]` on the full one, for the same
- * five words. This is what makes the fast answer a CORRECT fast answer.
+ * The equipment-only prompt used to be forbidden from emitting them, which is why this exists —
+ * measured then at 2.6 s with `[]` on the fast path against 28.0 s with `["tuv"]` on the full one.
+ * The agent answers them itself now, and `certsOf` above reads that answer, so on a good day this
+ * does nothing at all.
+ *
+ * It stays because it costs nothing and covers the case that actually bit: a lane that cannot answer the
+ * question, with no sign from the outside that it could not.
  *
  * ── It only ever fills a gap ────────────────────────────────────────────────────────────────────
  *
- * If the response carries a cert, that wins outright and this does nothing. The agent read the whole
- * sentence; `certsInText` read four words of it, and a narrow reader that overrules a broad one is
- * how a good extraction gets replaced by a keyword.
- *
- * Set on the ITEM, not the request: `agent-adapters` globalises a uniform per-item cert to the
- * request-wide default on the full path, and doing that here as well would put the same fact in two
- * shapes depending on which tier answered.
+ * If the response carries a cert on ANY item, this stands down entirely. The agent read the whole
+ * sentence and attributed the cert per machine; `certsInText` read four words and would put it on
+ * every one. A narrow reader that overrules a broad one is how a good extraction gets replaced by a
+ * keyword — and per-machine attribution is exactly what would be lost.
  */
 function withCerts(text: string, draft: AgentDraft, quick?: QuickRfqResult): AgentDraft {
   const returned = (quick?.line_items ?? []).some((li) => {

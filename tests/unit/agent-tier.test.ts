@@ -238,3 +238,61 @@ describe("the cert on a fast-path draft", () => {
     expect(d.items[0].safetyCertsOverride ?? null).toBeNull();
   });
 });
+
+describe("the cert the agent DID return", () => {
+  /* ⚠️ The bug the owner reported: *"I typed tuv in the text but it isn't detected when a project is
+     set — without a project it is detected."*
+
+     A project is what routes a line to the fast lane. The agent answers certs there now and does:
+     "10 × Crawler Excavator 20 ton with 2 × Crawler Excavator 30 ton with tuv" comes back with
+     ["TUV"] on BOTH items, verified on staging. This reader ignored the field, and the text backstop
+     stood down precisely BECAUSE the agent had answered — so between the two of them the answer was
+     dropped. Without a project the line took the full lane, whose adapter does read it. */
+
+  const twoMachines = (certs: unknown) => ({
+    tier: 1 as const,
+    line_items: [
+      { input_equipment: "Crawler Excavator 20 ton", subtype: "Crawler Excavator", capacity: "20 ton", quantity: 10, safety_certifications: certs },
+      { input_equipment: "Crawler Excavator 30 ton", subtype: "Crawler Excavator", capacity: "30 ton", quantity: 2, safety_certifications: certs },
+    ],
+  });
+
+  it("reads it onto every item it was returned for", () => {
+    const d = quickItemsToDraft(twoMachines(["TUV"]) as never, null, "10 x 20 ton with 2 x 30 ton with tuv");
+    expect(d.items.map((i) => i.safetyCertsOverride)).toEqual([["tuv"], ["tuv"]]);
+  });
+
+  it("folds the wire's case to this app's codes", () => {
+    // "TUV" on the wire, "tuv" in the chips — the same fold the full path does.
+    const d = quickItemsToDraft(twoMachines(["ARAMCO"]) as never, null, "x");
+    expect(d.items[0].safetyCertsOverride).toEqual(["aramco"]);
+  });
+
+  it("keeps per-machine attribution rather than flattening it", () => {
+    /* The agent attributes a cert to the machine it follows; the text backstop cannot, and would put
+       it on both. So when the agent has spoken, the backstop stays out of it. */
+    const mixed = {
+      tier: 1 as const,
+      line_items: [
+        { subtype: "Crawler Excavator", capacity: "20 ton", quantity: 1, safety_certifications: [] },
+        { subtype: "Crawler Excavator", capacity: "30 ton", quantity: 1, safety_certifications: ["TUV"] },
+      ],
+    };
+    const d = quickItemsToDraft(mixed as never, null, "20 ton and 30 ton with tuv");
+    expect(d.items[0].safetyCertsOverride).toBeNull();
+    expect(d.items[1].safetyCertsOverride).toEqual(["tuv"]);
+  });
+
+  it("turns an empty answer into null, not an empty set", () => {
+    /* `null` lets a project or a template fill the field; `[]` is the renter saying NO certificate.
+       Collapsing the two would let a site's cert overwrite a deliberate "none". */
+    const d = quickItemsToDraft(twoMachines([]) as never, null, "no cert mentioned here");
+    expect(d.items[0].safetyCertsOverride).toBeNull();
+  });
+
+  it("ignores a code this app does not have", () => {
+    // SPSP is an operator licence level here, not an equipment mark.
+    const d = quickItemsToDraft(twoMachines(["SPSP"]) as never, null, "x");
+    expect(d.items[0].safetyCertsOverride).toBeNull();
+  });
+});

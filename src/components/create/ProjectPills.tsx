@@ -45,8 +45,20 @@ import type { ReactNode } from "react";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { shortSite } from "@/lib/contract/project";
-import { RENTAL_BASES, PAYMENT_TERMS, type RentalBasis, type PaymentTerm, type Party } from "@/lib/contract/options";
+import {
+  RENTAL_BASES,
+  PAYMENT_TERMS,
+  SAFETY_CERTIFICATES,
+  type RentalBasis,
+  type PaymentTerm,
+  type Party,
+  type SafetyCertificate,
+} from "@/lib/contract/options";
 import { Icon } from "@/components/ui";
+import { Dropdown } from "@/components/Dropdown";
+
+/** «No certificate», as a value — the same sentinel `MachineCard` uses, because `[]` cannot say it. */
+const NO_CERT = "__none__";
 
 /* ----------------------------- One pill ----------------------------- */
 
@@ -128,24 +140,22 @@ function PillSelect<T extends string>({
   onChange: (v: T | null) => void;
 }) {
   return (
-    <span className={`relative ${PILL} ${EDITABLE} ${tone(changed)}`}>
-      <span className={LABEL}>{label}</span>
-      <span className={VALUE}>{value ? (optionLabel ? optionLabel(value) : value) : empty}</span>
-      {changed && <span aria-hidden className="text-meta leading-none text-brand">●</span>}
-      <Icon name="expand_more" size={14} className="-me-0.5 flex-none opacity-50" />
-      <select
-        aria-label={label}
-        value={value ?? ""}
-        onChange={(e) => onChange((e.target.value || null) as T | null)}
-        className="absolute inset-0 cursor-pointer opacity-0"
-      >
-        <option value="">{empty}</option>
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {optionLabel ? optionLabel(o) : o}
-          </option>
-        ))}
-      </select>
+    /* ── The house dropdown, worn as a pill (owner, 2026-08-31) ─────────────────────────────────
+       ~~A native `select` at zero opacity stretched over the pill.~~ It worked, and it opened the
+       operating system's own menu: a blue highlight bar, system type, and no way to tick the row
+       that is already chosen. One dropdown across the product means this one too — the pill IS the
+       trigger now, so there is no invisible layer to keep in register with it. */
+    <span className={`${PILL} ${tone(changed)} gap-0 p-0`}>
+      <Dropdown
+        tone="pill"
+        label={label}
+        prefix={label}
+        placeholder={empty}
+        value={value}
+        onChange={(v) => onChange((v || null) as T | null)}
+        options={options.map((o) => ({ value: o, label: optionLabel ? optionLabel(o) : o }))}
+      />
+      {changed && <span aria-hidden className="pe-2 text-meta leading-none text-brand">●</span>}
     </span>
   );
 }
@@ -394,15 +404,34 @@ export function ProjectPills() {
               onChange={(v) => actions.patchTerms({ operatorNeeded: v }, ["preferences.operator"])}
             />
 
-            {/* Certificates report rather than edit: the set lives in *More details*, where the
-                free-text «other» box lives with it, and a pill that opened a second multi-select
-                would be a third place to change one thing. */}
-            {!!terms.safetyCertsOverride?.length && (
-              <Pill
-                label={t.projects.pills.certs}
-                value={terms.safetyCertsOverride.map((c) => t.options.safetyCert[c] ?? c).join(", ")}
-              />
-            )}
+            {/* ── The certificate is EDITABLE, and shown whether or not it is set ──────────────
+                ~~Certificates report rather than edit: the set lives in *More details*.~~ Two faults
+                in one pill (owner, 2026-08-31: *"this is read only and cant be edited"*).
+
+                It could not be changed — every other term on this row can, so one that only reports
+                reads as a bug rather than as a pointer to somewhere else. And it appeared ONLY when
+                a certificate was already set, so a renter who wanted to ADD one had nothing to press
+                and no reason to think this row was where it lived.
+
+                One choice, not a multi-select: the machine card asks it exactly this way — no
+                certificate, TÜV, Aramco, Other — and two shapes for one question is how the two
+                surfaces drift. «Other» keeps its free-text box in *More details*, which is the one
+                thing a pill genuinely cannot hold. */}
+            <PillSelect<string>
+              label={t.projects.pills.certs}
+              value={terms.safetyCertsOverride?.[0] ?? (terms.safetyCertsOverride ? NO_CERT : null)}
+              options={[NO_CERT, ...SAFETY_CERTIFICATES]}
+              optionLabel={(v) => (v === NO_CERT ? t.create.machineCard.noCert : t.options.safetyCert[v as SafetyCertificate] ?? v)}
+              changed={dirty("preferences.certs")}
+              onChange={(v) =>
+                actions.patchTerms(
+                  {
+                    safetyCertsOverride: (v == null ? null : v === NO_CERT ? [] : [v as SafetyCertificate]),
+                  },
+                  ["preferences.certs"],
+                )
+              }
+            />
           </>
         )}
 
