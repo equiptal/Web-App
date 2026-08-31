@@ -80,8 +80,11 @@ The list belongs to the company, so any member can delete a supplier or rename a
 
 Supplier (name + `On Moedatech` badge + contact) · Vendor registration · Contact · Groups · Bids · row actions. Row and name open the profile; the bids cell opens the bids list. Search across name, contact, email and phone. Two pills: **All** and **Registered vendors**.
 
+**Contact shows what the RENTER entered, and nothing else.** A supplier added from the directory has no email or phone here until the renter types one — the cell reads *not set*, with *add* beside it, exactly as an off-platform row with a missing email does. **Their account details are never shown** (SUP-BE-20): the supplier gave Moedatech a number to sign in with, not to every renter who ticks him in a picker.
+
 **Given/When/Then**
 - Given a row whose supplier has no account / Then no badge is drawn — the absence is the state.
+- Given a platform supplier the renter has entered no contact for / Then the contact cell reads *not set · add*, and no account email or phone appears anywhere on the screen.
 - Given the list is empty / Then the empty state offers both ways of adding, and says Moedatech's own directory is not this list.
 
 ### SUP-T14 — Add from Moedatech
@@ -175,7 +178,12 @@ Recipients by group or individually → the request → an optional *your refere
 ### SUP-T42 — Invite to Moedatech
 **Scope:** feature
 
-Off-platform rows only, email and WhatsApp, the renter's own voice (*my* requests), the second body chosen automatically when they already bid through the link. Recorded through **SUP-BE-15**.
+Off-platform rows only, the renter's own voice (*my* requests), the second body chosen automatically when they already bid through the link. Recorded through **SUP-BE-15**.
+
+**One message, every channel.** WhatsApp, email, SMS and copy-to-clipboard all send the same body from the same key — `t.workspace.inviteMessage`, ending at `JOIN_URL` (**SUP-T01**). Email adds a subject and nothing else: a second body would be a second thing to keep true, and the first time one changed the two would start saying different things about the same product.
+
+**Given/When/Then**
+- Given the invite is sent by WhatsApp and by email / Then the body is character-for-character the same, and only the subject line exists in one and not the other.
 
 ### SUP-T43 — The card design
 **Scope:** design · **deferred, discuss before starting** · pairs with **SUP-BE-19**

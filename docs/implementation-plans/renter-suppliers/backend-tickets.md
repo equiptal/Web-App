@@ -83,6 +83,7 @@ The list. One row per link, with the roll-up computed here.
   "id": "…", "kind": "platform", "supplierId": "u_882",
   "name": "Zahid Tractor",          // live from the account for platform, stored for own
   "contactName": "Faisal Al-Otaibi",
+  // What the RENTER typed. Null until he does — never the supplier's account details (SUP-BE-20).
   "email": "tenders@zahidtractor.com", "phone": "+966552148890", "crNumber": "1010445521",
   "vendorRegistered": true, "groups": ["Earthmoving","Riyadh"],
   "store": true, "verified": true,
@@ -299,22 +300,38 @@ Two things are needed, and they are separable:
 
 ```
 GET /agents/suppliers?q=zahid&city=Riyadh&cursor=…
-→ { "items": [{ "supplierId":"u_882", "name":"Zahid Tractor", "city":"Riyadh",
-                "verified": true, "hasStore": true, "equipmentCount": 41 }],
+→ { "items": [{ "supplierId":"u_882",
+                "companyName":"Zahid Tractor Co.",   // the firm
+                "supplierName":"Zahid Tractor",      // the account's display name
+                "city":"Riyadh", "verified": true, "hasStore": true, "equipmentCount": 41 }],
     "next": "…" }
 ```
 
-Minimal fields — enough to recognise a firm and no more. No phone, no email, no CR: a renter must not be able to harvest contact details for suppliers he has never dealt with.
+**Scope: EVERY supplier account** — decided by the owner, 2026-08-31. Not only those with a store, and not only those this renter has met. A renter builds their list from the firms they already work with, and being unable to find one sends them to the keyboard to type a duplicate.
 
-**The exposure question this raises, and it needs an answer before the endpoint is written.** Stores is browsable because a store is a shopfront its owner chose to open. A supplier with no store never opted into being listed. So which of these is the directory?
+**Two names, deliberately.** `companyName` is the firm; `supplierName` is what the account calls itself. They differ often enough that showing only one makes a renter unsure he has the right company.
 
-1. **Every supplier account** — the most useful picker, and the largest exposure.
-2. **Suppliers with a store, plus any supplier this renter has already dealt with** — a bid, a deal room, an award. Nothing new is exposed: he has seen all of them already.
-3. **Stores only** — today's behaviour, and the one that sends renters to the keyboard.
+**And nothing else.** No phone, no email, no CR — see SUP-BE-20. A directory of every supplier is also a directory a renter could harvest, and the only defence is that there is nothing there to take.
 
-**Recommended: 2.** It covers the case that actually bites — a supplier who bid through a shared link and has no store — while exposing nobody the renter has not already met. Option 1 can follow if suppliers are asked to consent to being listed.
+**Done when:** a supplier with no store is findable by name, and the response carries no way to contact them.
 
-**Done when:** the exposure question has a written answer, and the endpoint returns store-less suppliers under it.
+---
+
+## SUP-BE-20 — A supplier's own contact details are never returned **[agents]**
+
+**The rule:** `email` and `phone` on a link row are what the RENTER typed. They are never filled from the supplier's account, in any read, for any row.
+
+A `platform` row a renter added from the directory therefore comes back with `email: null, phone: null` until he enters something himself — and the screen shows *not set*, not the supplier's account details.
+
+**Why this is a rule and not a preference.** The supplier gave Moedatech a phone to sign in with. He did not give it to every renter who ticks him in a picker. Serving it would turn the directory into a contact-harvesting tool, and it would do so silently, because the renter would never know the number was not his own note.
+
+Consequences, all intended:
+
+- A platform supplier with no renter-entered email **cannot be sent a shared request**. That is correct: the renter has no address for them, and the app is not going to supply one behind their back.
+- The **bid** is where a real contact appears — a bid the supplier chose to send carries what he chose to put on it, and it is already gated by `canAccessRequest`.
+- Matching (SUP-BE-9, BE-11) still uses the account's phone **server-side**. It compares; it never returns.
+
+**Done when:** a freshly linked platform supplier returns null contact fields, and no read anywhere in this feature can be made to return a supplier's account email or phone.
 
 ---
 
