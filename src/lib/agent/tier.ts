@@ -16,7 +16,8 @@
  *   one equipment line                    → Tier 0   the matcher, in the browser, no network
  *   a sentence with extras + a project    → Tier 1   POST /api/agent/quick, synchronous
  *   a paragraph, or extras with no project → Tier 2  today's path, byte-identical
- *   a line naming a TERM (TÜV, operator…) → Tier 2   because Tier 1's prompt drops those fields
+ *   a line naming a TERM (operator, fuel…) → Tier 2  because Tier 1's prompt drops those fields
+ *   a line naming a CERTIFICATE            → unchanged; `quick-certs.ts` reads it here instead
  */
 
 import type { Taxonomy } from "@/lib/contract/taxonomy";
@@ -36,7 +37,7 @@ const PARAGRAPH_CHARS = 180;
 /**
  * Words that mean the line carries a TERM, not just a machine — so the fast path would lose them.
  *
- * ⚠️ This is not a guess about the model. The equipment-only prompt forbids the fields outright:
+ * ⚠️ This is not a guess about the model. The equipment-only prompt forbids these fields outright:
  *
  *     • no operator, fuel, diesel, mobilization or demobilization fields
  *     • no equipment-age or safety-certificate fields
@@ -59,17 +60,22 @@ const PARAGRAPH_CHARS = 180;
  * term the renter typed and will not be told about. Both languages, because the intake takes both.
  */
 const TERM_WORDS = [
-  // Certificates — the reported case. Third-party marks a renter names by brand.
-  "tuv", "tüv", "aramco", "spsp", "saso", "cert", "certificate", "certified",
-  "شهاد", "أرامكو", "ارامكو",
-  // Operator, and the fields that hang off one.
+  /* ~~Certificates — "tuv", "aramco", "cert", "certified"…~~ **Off this list.** They were the
+     reported case and they are now read in the BROWSER (`quick-certs.ts`), because
+     `SAFETY_CERTIFICATES` is a closed list of two real marks and matching two words is not work for
+     a model. Routing them here bought the right answer at twenty-eight seconds instead of the wrong
+     one at three (owner, 2026-08-31: *"why is slow while i wrote only 2 fields"*) — both measured.
+     Now: three seconds, with the cert. */
+
+  // Operator, and the fields that hang off one — an open question the fast path answers with nothing.
   "operator", "driver", "مشغل", "مشغّل", "سائق",
   // Who moves it, who fuels it.
-  "delivery", "deliver", "return", "pickup", "pick up", "mobiliz", "demobiliz", "haulage",
+  "delivery", "deliver", "return", "pickup", "pick up", "haulage",
   "fuel", "diesel", "petrol",
   "تسليم", "استلام", "وقود", "ديزل", "نقل",
-  // How old it may be.
-  "model year", "year model", "newer", "moudel", "موديل", "سنة الصنع",
+  /* ~~Model year.~~ Also off: the fast path already emits `minimum_equipment_year` and
+     `max_equipment_age` — verified in its live response — so a year in the text has a field to land
+     in and there is nothing to rescue it from. */
 ] as const;
 
 /** Substring, lower-cased: «TÜV-certified» and «tuv cert» both have to count. */

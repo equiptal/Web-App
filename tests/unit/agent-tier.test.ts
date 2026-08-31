@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { decideTier } from "@/lib/agent/tier";
 import { matchInBrowser, toQuickTaxonomy, MATCHER_RULES_HASH } from "@/lib/agent/quick-match";
+import { certsInText } from "@/lib/agent/quick-certs";
+import { quickItemsToDraft } from "@/lib/agent/quick-draft";
 import type { Taxonomy } from "@/lib/contract/taxonomy";
 
 /**
@@ -121,46 +123,118 @@ describe("the browser matcher", () => {
  * ============================================================================================== */
 
 describe("terms in the text", () => {
-  /* ⚠️ Not a guess about the model. The equipment-only prompt forbids the fields in writing —
-     *"no equipment-age or safety-certificate fields"*, *"no operator, fuel, diesel, mobilization or
-     demobilization fields"* — and emits seven keys, which is what made the fast path fast.
+  /* ⚠️ Not a guess about the model. The equipment-only prompt forbids these fields in writing —
+     *"no operator, fuel, diesel, mobilization or demobilization fields"* — and that section is
+     appended LAST on purpose, so it beats the item rules above it that would otherwise map them.
 
-     So *"crawler excavator 30 ton with tuv"* came back as the excavator with the TÜV silently gone
-     and no field anywhere to show it in (owner, 2026-08-31: *"he just recognize the equipment not the
-     tuv"*). The length rule already stated the principle — losing what the renter wrote is worse than
-     the second it saves — and merely measured the wrong thing: 33 characters carry a term as easily
-     as 200. */
+     Certificates USED to be on this list and are not any more. Routing them here was right about the
+     loss and wrong about the price: measured on staging, the same five words cost 2.6 s with an empty
+     cert on the fast path and 28.0 s with the cert on the full one. `quick-certs.ts` reads them in
+     the browser instead, so the fast answer is now a correct fast answer. */
 
-  it("sends the reported line to the full path", () => {
-    const d = decideTier({ ...base, text: "crawler excavator 30 ton with tuv" });
+  it("sends an OPERATOR line to the full path — nothing else can answer it", () => {
+    const d = decideTier({ ...base, text: "crawler excavator 30 ton with operator" });
     expect(d.tier).toBe(2);
     expect(d.reason).toBe("terms_in_text");
   });
 
-  it("catches every family of term the fast path drops", () => {
+  it("catches every family of term the fast path still drops", () => {
     for (const text of [
-      "excavator 30 ton with tuv",
-      "excavator 30 ton aramco certified",
       "crane 50 ton with operator",
       "generator 250 kva, delivery by supplier",
       "excavator 20 ton, fuel on them",
-      "loader, 2019 model year or newer",
       "حفار 30 طن مع مشغل", // "excavator 30 ton with operator"
     ]) {
       expect(decideTier({ ...base, text }).tier, text).toBe(2);
     }
   });
 
+  it("no longer sends a CERTIFICATE line to the 28-second path", () => {
+    // The reported line. It is the fast path's again, and the cert is read in the browser.
+    const d = decideTier({ ...base, text: "crawler excavator 30 ton with tuv" });
+    expect(d.tier, "not the full path any more").not.toBe(2);
+  });
+
   it("still lets a bare machine line take the fast path", () => {
-    // The narrowness is the point: a false positive costs two seconds, a false negative loses a
-    // commercial term the renter typed and is never told about.
     const d = decideTier({ ...base, text: "2 crawler excavators 30 ton and a generator" });
-    expect(d.tier, "no term named, so nothing to lose").not.toBe(2);
+    expect(d.tier).not.toBe(2);
   });
 
   it("does not fire on a term-free line that the matcher consumed whole", () => {
-    // The wording the Tier 0 case above uses, so this asserts the term check and not the matcher.
     const d = decideTier({ ...base, text: "2 crawler excavators 20t" });
     expect(d.tier).toBe(0);
+  });
+});
+
+/* ============================================================================================== *
+ * The certificates, read in the browser
+ * ============================================================================================== */
+
+describe("certificates read in the browser", () => {
+  it("reads the two real equipment marks", () => {
+    expect(certsInText("crawler excavator 30 ton with tuv")).toEqual(["tuv"]);
+    expect(certsInText("excavator, TÜV certified")).toEqual(["tuv"]);
+    expect(certsInText("loader aramco approved")).toEqual(["aramco"]);
+    expect(certsInText("crane with tuv and aramco")).toEqual(["tuv", "aramco"]);
+  });
+
+  it("reads them in Arabic", () => {
+    expect(certsInText("حفار مع أرامكو")).toEqual(["aramco"]);
+  });
+
+  it("does not fire inside another word", () => {
+    // A plain substring test would read a supplier called «Tuvex» as a certificate.
+    expect(certsInText("2 excavators from Tuvex Rentals")).toEqual([]);
+    expect(certsInText("shipping to Tuvalu")).toEqual([]);
+  });
+
+  it("says nothing when nothing was named", () => {
+    expect(certsInText("2 crawler excavators 30 ton")).toEqual([]);
+    expect(certsInText("")).toEqual([]);
+  });
+
+  it("does not invent SPSP or SASO as equipment marks", () => {
+    /* They are OPERATOR licence levels in this product — `SAFETY_CERTIFICATES` holds tuv, aramco and
+       other — and putting an operator cert in an equipment field is the exact confusion the agent's
+       own rules spend a paragraph preventing. */
+    expect(certsInText("excavator with spsp")).toEqual([]);
+    expect(certsInText("excavator with saso")).toEqual([]);
+  });
+});
+
+/* ============================================================================================== *
+ * …and onto the draft the fast paths hand back
+ * ============================================================================================== */
+
+describe("the cert on a fast-path draft", () => {
+  const quick = (certs?: unknown) => ({
+    tier: 1 as const,
+    line_items: [
+      {
+        input_equipment: "crawler excavator 30 ton with tuv",
+        subtype: "Crawler Excavator",
+        capacity: "30 ton",
+        quantity: 1,
+        ...(certs === undefined ? {} : { safety_certifications: certs }),
+      },
+    ],
+  });
+
+  it("fills the gap the prompt leaves", () => {
+    // What the live fast path returns for this line: the key present, the value empty.
+    const d = quickItemsToDraft(quick([]) as never, null, "crawler excavator 30 ton with tuv");
+    expect(d.items[0].safetyCertsOverride).toEqual(["tuv"]);
+  });
+
+  it("defers to the agent when the agent answered", () => {
+    /* A narrow reader must never overrule a broad one: the agent read the whole sentence, this read
+       four words of it. If it comes back with a cert, that stands even where the two disagree. */
+    const d = quickItemsToDraft(quick(["aramco"]) as never, null, "crawler excavator with tuv");
+    expect(d.items[0].safetyCertsOverride).not.toEqual(["tuv"]);
+  });
+
+  it("leaves a cert-free line alone", () => {
+    const d = quickItemsToDraft(quick([]) as never, null, "2 crawler excavators 30 ton");
+    expect(d.items[0].safetyCertsOverride ?? null).toBeNull();
   });
 });

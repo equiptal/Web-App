@@ -835,7 +835,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
            the browser is holding. It still reaches the corpus (fire-and-forget) or half the traffic
            would stop teaching the learned rules. */
         if (decision.tier === 0 && decision.match?.matched) {
-          const draft = quickResultToDraft(decision.match.item, s.taxonomy);
+          const draft = quickResultToDraft(decision.match.item, s.taxonomy, s.text);
           ingestClientMatch(s.text, draft.items.map((i) => ({
             input_equipment: i.rawLabel ?? "",
             category_id: i.ref.categoryId,
@@ -853,7 +853,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
           const quick = await processQuick({ text: s.text });
           if (!quick.fallback && quick.line_items?.length) {
             await holdProcessing(startedAt);
-            dispatch({ t: "PROCESS_SUCCESS", draft: quickItemsToDraft(quick, s.taxonomy) });
+            dispatch({ t: "PROCESS_SUCCESS", draft: quickItemsToDraft(quick, s.taxonomy, s.text) });
             return;
           }
           // Fell back: straight on to the job path below, with nothing shown to the renter. They
