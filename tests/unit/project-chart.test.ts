@@ -178,3 +178,29 @@ describe("rows", () => {
     expect(isUnawarded({ awards: [award()] })).toBe(false);
   });
 });
+
+/* ============================================================================================== *
+ * The site's own papers, and the marks as events
+ * ============================================================================================== */
+
+describe("what the marks draw", () => {
+  /* The reversal, asserted at the level a reader will check it: the bar PRINTS its dates, so a bar
+     that moved was a bar that lied about the agreed period. */
+
+  it("keeps the bar on the agreed period while the marks sit at their own dates", () => {
+    const g = group({ startDate: "2026-09-01", endDate: "2026-12-31" });
+    const a = award({ mobilizedAt: "2026-08-20", demobilizedAt: "2027-01-15" });
+
+    // The bar: the plan, unmoved by either event.
+    expect(awardWindow(g, a, SITE)).toEqual({ start: "2026-09-01", end: "2026-12-31" });
+
+    // The axis: wide enough for both diamonds, so neither is clipped off an edge.
+    const withMarks: ChartGroup = {
+      ...g,
+      items: [{ id: "i1", label: "Excavator 20t", labelAr: null, quantity: 1, awards: [a] }],
+    };
+    const dates = chartDates([withMarks]);
+    expect(dates).toContain("2026-08-20");
+    expect(dates).toContain("2027-01-15");
+  });
+});

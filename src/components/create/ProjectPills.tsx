@@ -338,19 +338,64 @@ export function ProjectPills() {
        request, so they belong in the thing the request is written in — and the box is where a renter
        looks to see what they are about to send.
 
-       Its own bottom border, and the same 20px gutter as the textarea below, so the two read as one
-       control with a rule between them rather than as a card with a lid. */
-    <div className="flex flex-col gap-2 border-b border-border px-5 pb-3 pt-4">
+       ~~Its own bottom border.~~ Removed (owner, 2026-08-31: *"I want the focus on select for the
+       whole card, not like these — it feels sections"*). A rule under the strip and another over the
+       upload row cut the card into three panels, and on focus the card's border went brand while
+       those two stayed grey, so the one control looked like three that disagreed. The 20px gutter is
+       shared with the textarea below instead, which is what makes them read as one field. */
+    <div className="flex flex-col gap-2 px-5 pb-2 pt-4">
       <div className="flex flex-wrap items-center gap-2">
-        {/* The site itself, with the way out. Deselecting drops every prefill (PROJ-AC-26). */}
-        <span className={`${PILL} border-brand bg-brand-soft font-semibold text-navy`}>
-          <Icon name="place" size={13} className="flex-none text-brand" />
-          {project.title}
+        {/* ── The project, and it opens its own contents (owner, 2026-08-31) ────────────────────
+            *"I want the dropdown of the work orders or requests to be from the project itself
+            directly when clicked, so in the same project pill."*
+
+            ~~A «START FROM» pill at the far end of the strip.~~ It was a second control naming the
+            same site the first one names, eight pills apart: the renter had already told us which
+            project this is, and then had to find a different pill to ask what is in it. Pressing the
+            project now opens the list of its work orders and requests, which is what «the project»
+            means to a renter looking at one.
+
+            **Filled navy, alone in the strip.** Every other pill is a white box holding a value of
+            this request; this one is the site the whole request hangs off, so it is the one thing
+            here that is not a field (*"make the project pill appear different to distinguish it is
+            the project"*). The × still drops the site and every prefill with it (PROJ-AC-26) — it
+            sits ABOVE the select layer, or the press that clears would open the list instead. */}
+        <span className={`relative ${PILL} border-navy bg-navy font-semibold text-white`}>
+          <Icon name="place" size={13} className="flex-none text-white/70" />
+          <span className="truncate">{project.title}</span>
+          {templates.length > 0 && (
+            <>
+              {/* Applied is stated, not implied: a renter who has already copied a machine's terms
+                  should not have to open the list to find out. */}
+              {terms && <span className="text-white/70">· {t.projects.pills.templateApplied}</span>}
+              <Icon name="expand_more" size={14} className="-me-0.5 flex-none text-white/70" />
+              {/* Keyed by MACHINE id, not by the order it sits in — two machines on one order are two
+                  entries, and picking either copies its own answers. The machine's name leads,
+                  because that is what the renter is looking for; the kind and reference follow it to
+                  tell two of the same machine apart. */}
+              <select
+                aria-label={t.projects.pills.startFrom}
+                disabled={picking}
+                value={picked ?? ""}
+                onChange={(e) => void applyTemplate(e.target.value)}
+                className="absolute inset-0 cursor-pointer opacity-0"
+              >
+                <option value="">{t.projects.pills.startFrom}</option>
+                {templates.map((tpl) => (
+                  <option key={tpl.itemId} value={tpl.itemId}>
+                    {`${tpl.machine || tpl.ref} · ${
+                      tpl.kind === "work_order" ? t.projects.pills.kindWorkOrder : t.projects.pills.kindRequest
+                    } ${tpl.ref}`}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
           <button
             type="button"
             onClick={actions.clearProject}
             aria-label={t.common.close}
-            className="-me-0.5 grid h-5 w-5 place-items-center rounded-full text-muted transition hover:bg-surface hover:text-navy"
+            className="relative z-10 -me-0.5 grid h-5 w-5 place-items-center rounded-full text-white/70 transition hover:bg-white/15 hover:text-white"
           >
             <Icon name="close" size={12} />
           </button>
@@ -465,33 +510,6 @@ export function ProjectPills() {
           </>
         )}
 
-        {/* Start from — copies how this renter HIRES at this site, and never what they are hiring.
-            Rendered only when the site actually has something to copy. */}
-        {templates.length > 0 && (
-          <label className={`relative ${PILL} ${EDITABLE} border-border bg-surface text-navy`}>
-            <span className={LABEL}>{t.projects.pills.startFrom}</span>
-            {/* Keyed by MACHINE id, not by the order it sits in — two machines on one order are two
-                entries now, and picking either copies its own answers.
-
-                The machine's name leads, because that is what the renter is looking for. The kind and
-                the reference follow it, to tell two of the same machine apart. */}
-            <select
-              disabled={picking}
-              value={picked ?? ""}
-              onChange={(e) => void applyTemplate(e.target.value)}
-              className={`cursor-pointer bg-transparent outline-none focus-visible:outline-none ${VALUE}`}
-            >
-              <option value="">{state.templateTerms ? t.projects.pills.templateApplied : t.projects.pills.pickTemplate}</option>
-              {templates.map((tpl) => (
-                <option key={tpl.itemId} value={tpl.itemId}>
-                  {`${tpl.machine || tpl.ref} · ${
-                    tpl.kind === "work_order" ? t.projects.pills.kindWorkOrder : t.projects.pills.kindRequest
-                  } ${tpl.ref}`}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
       </div>
 
       {/* The conflict. Both values stay; the renter picks, and keeping theirs is a valid answer. */}

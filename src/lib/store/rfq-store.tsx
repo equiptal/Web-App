@@ -508,9 +508,17 @@ export function reducer(state: RfqState, a: Action): RfqState {
     case "PATCH_LOCATION":
       // AC-16: changing the location (map/search/GPS) invalidates a prior confirmation — require a
       // fresh confirm. The patch can still set `confirmed` explicitly (e.g. the "Change" button).
+      //
+      // It also RECORDS the field as the renter's (owner, 2026-08-31: *"if a user changes the
+      // location it no longer shows the 'from your project' label"*). Provenance reads
+      // `touchedFields`, so without this the panel went on crediting the site for a pin the renter
+      // had just dragged somewhere else — the one case where the label is actively wrong.
       return withDraft(state, (d) => ({
         ...d,
         project: { ...d.project, location: { ...d.project.location, ...a.patch, confirmed: a.patch.confirmed ?? false } },
+        touchedFields: (d.touchedFields ?? []).includes("location.label")
+          ? d.touchedFields
+          : [...(d.touchedFields ?? []), "location.label"],
       }));
     case "CONFIRM_LOCATION":
       return withDraft(state, (d) => ({ ...d, project: { ...d.project, location: { ...d.project.location, confirmed: true } } }));

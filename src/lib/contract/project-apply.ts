@@ -118,13 +118,23 @@ export function applyProjectDefaults(
          project* for this source and stays silent for a manual entry, and the renter needs to know
          which of the two they are looking at before they change it. */
       source: "project",
-      /* CONFIRMED (owner, 2026-08-31: *"it must show it as confirmed and selected"*).
+      /* CONFIRMED — **but only when the site actually carries a point** (owner, 2026-08-31: *"it
+         must show it as confirmed and selected"*, then *"I think there is a bug, it is stuck while
+         it is confirmed"*).
          AC-16 says a location starts unconfirmed even when extracted, and that is right for a
          location the AGENT read out of a sentence — nobody has looked at it yet. A project's
          location is the opposite: the renter dropped that pin and saved it, on purpose, and being
          asked to confirm it again on every request for that site is being asked to re-answer the
-         question projects exist to stop. */
-      confirmed: true,
+         question projects exist to stop.
+
+         The flag was unconditional, and that is the bug he hit. A project whose location is an
+         ADDRESS with no pin — typed into the project form, never pinned — filled `label` and left
+         `lat`/`lng` undefined, and then claimed to be confirmed. `gateWhere` refuses that on
+         `locationMissing` before it ever looks at `confirmed`, so the panel showed «Location
+         confirmed» beside «drop a pin where the machine goes» and *When* could not be opened: a
+         dead end with a green badge on it. Confirmation is a statement about a POINT; with no point
+         there is nothing to have confirmed. */
+      confirmed: location.lat != null && location.lng != null,
     };
     filled.push("location.label");
   }

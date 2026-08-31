@@ -723,9 +723,32 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
       rateAmount: null,
       mobilizedAt: null,
       demobilizedAt: null,
-      documents: chart?.documents ?? [],
+      documents: siteOnlyDocuments(),
       awardedAt: null,
     };
+  }
+
+  /**
+   * The site's papers that belong to no award.
+   *
+   * ⚠️ `chart.documents` is **every** document on the site, not only the unattached ones — the
+   * backend builds it from `Project.documents`, which is where an award's papers live too (an award
+   * holds only their ids). Handing that list to a row nobody has awarded would show the renter
+   * purchase orders belonging to other rows, in a dialog whose remove button files against `-`.
+   *
+   * So subtract what the awards claim. What is left is the framework agreement, the permit, the
+   * signed scope: the papers that are about the job rather than about one supplier.
+   */
+  function siteOnlyDocuments(): AwardDocument[] {
+    const claimed = new Set<string>();
+    for (const g of chart?.groups ?? []) {
+      for (const it of g.items) {
+        for (const a of it.awards) {
+          for (const doc of a.documents) claimed.add(doc.id);
+        }
+      }
+    }
+    return (chart?.documents ?? []).filter((d) => !claimed.has(d.id));
   }
 
   /**

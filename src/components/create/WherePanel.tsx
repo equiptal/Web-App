@@ -66,7 +66,11 @@ export function WherePanel({
    * to ride, so it falls to the row below beside the hint that says what to do. Building it once
    * keeps those two places from drifting into two different buttons.
    */
-  const confirmControl = loc.confirmed ? (
+  /* `hasLocation` as well as the flag: a `confirmed` with no point on the map is a state `gateWhere`
+     refuses outright, so a badge claiming it would be a green light on a dead end. Belt and braces —
+     the prefill no longer creates that state (see `applyProjectDefaults`), but this panel is the one
+     surface that must never say "confirmed" about a site the request cannot carry. */
+  const confirmControl = loc.confirmed && hasLocation ? (
     <span className="flex flex-none items-center gap-1.5 rounded-sm border border-ok/30 bg-ok-soft px-3 py-2 text-body font-semibold text-ok">
       <Icon name="check_circle" size={17} /> {t.step1.location.confirmed}
     </span>
@@ -166,8 +170,17 @@ export function WherePanel({
                   <span className="flex min-w-0 flex-1 items-start gap-1.5 rounded-sm border border-border bg-surface px-3 py-2">
                     <Icon name="location_on" size={15} className="mt-px flex-none text-brand" />
                     <span className="min-w-0">
-                      <span className="block text-body font-semibold leading-tight text-navy">
-                        {loc.label?.trim() || t.step1.location.mapPicker.pinnedNoAddress}
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="truncate text-body font-semibold leading-tight text-navy">
+                          {loc.label?.trim() || t.step1.location.mapPicker.pinnedNoAddress}
+                        </span>
+                        {/* On the address itself, not only on the collapsed head (owner, 2026-08-31:
+                            *"if the location is detected from the project it must be shown here"*).
+                            The head answers it before you open the panel; inside the panel this is
+                            the line a renter reads before deciding whether to move the pin, so the
+                            answer has to be on that line too. It disappears the moment they do move
+                            it — `PATCH_LOCATION` records the field as theirs. */}
+                        <ProvenanceNote source={locationSource} />
                       </span>
                       <span className="block text-label text-muted">
                         {(loc.lat as number).toFixed(6)}, {(loc.lng as number).toFixed(6)}
