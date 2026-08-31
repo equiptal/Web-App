@@ -27,6 +27,7 @@ import {
   fetchTaxonomy,
   fetchAllMyRequests,
   assignToProject,
+  renameRequestRow,
   attachDocument,
   removeDocument,
   withFreshVersion,
@@ -87,6 +88,22 @@ function SectionHeader({ count }: { count: number }) {
       </span>
     </div>
   );
+}
+
+/**
+ * Put each request's own name onto its chart row.
+ *
+ * `getChart` sends `title: null` for a request — it has no title column to read — so the name comes
+ * from the site's `awards.labels`, which the same payload already carries. Applied here rather than
+ * in the board, so every consumer of `chart.groups` sees the named row and nothing has to remember
+ * to look the name up a second time.
+ *
+ * A work order's title is left exactly as it arrived: that one is real, stored on the order.
+ */
+function named(groups: ChartGroup[], project: { awards?: { labels?: Record<string, string> } }): ChartGroup[] {
+  const labels = project.awards?.labels ?? {};
+  if (!Object.keys(labels).length) return groups;
+  return groups.map((g) => (g.kind === "request" && labels[g.id] ? { ...g, title: labels[g.id] } : g));
 }
 
 export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
@@ -225,7 +242,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     fetchChart(selected)
       .then((c) => {
         if (!live) return;
-        setChart({ project: c.project, groups: c.groups });
+        setChart({ project: c.project, groups: named(c.groups, c.project) });
         // The version travels with the chart, not with the project card: a card can be stale while
         // the chart was fetched a moment ago, and every award write sends this back.
         setVersion(c.version);
@@ -283,16 +300,19 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
    * a box, takes a name and loses it is worse than a pen that says it cannot.
    */
   async function rename(group: ChartGroup, title: string | null) {
-    if (group.kind === "request") {
-      setRenaming(null);
-      setNotice(t.projects.rename.requestUnsupported);
-      return;
-    }
-
     setSaving(true);
     setNotice(null);
     try {
-      await saveWorkOrder(selected ?? "", version, { groupId: group.id, body: { title } });
+      if (group.kind === "request") {
+        /* A request has no title column anywhere, so its name lives in the site's own blob, keyed by
+           request id — which means the name belongs to the FILING. Unfile the request and the name
+           goes with it. Ruled by the owner over a migration on `equipment_requests` for a nickname
+           that is only ever read on the board it was typed on. */
+        await renameRequestRow(selected ?? "", version, group.id, title);
+      } else {
+        // A work order has a title of its own, and the header write reaches every machine in it.
+        await saveWorkOrder(selected ?? "", version, { groupId: group.id, body: { title } });
+      }
       setRenaming(null);
       await refreshChart();
     } catch {
@@ -382,7 +402,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   async function refreshChart() {
     if (!selected) return;
     const c = await fetchChart(selected);
-    setChart({ project: c.project, groups: c.groups });
+    setChart({ project: c.project, groups: named(c.groups, c.project) });
     setVersion(c.version);
     await reload();
   }

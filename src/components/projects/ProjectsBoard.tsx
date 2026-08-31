@@ -35,6 +35,32 @@ import { AwardRow, AwaitingRow, pct, type Axis } from "./ChartRow";
 const today = () => new Date().toISOString().slice(0, 10);
 
 /**
+ * The axis, snapped OUT to whole months — first of the start month to last of the end month.
+ *
+ * `chartSpan` returns the exact min and max of the data, and a site running 31 Aug → 7 Oct therefore
+ * gave August a column 2.7% wide: its label had nowhere to sit and collided with September's or
+ * truncated to nothing, which is what the owner saw on 2026-08-31 (*"why does the chart only show 26
+ * Aug and 26 Oct"* — September was there, in a sliver two characters wide).
+ *
+ * Snapping is the fix rather than skipping crowded labels: a month axis whose first and last columns
+ * are part-months is a chart whose columns are not comparable, so a bar covering half of September
+ * and half of October looks like it covers most of the chart. Every column is now one month wide and
+ * the same width, which is what makes the shape of a bar mean something.
+ *
+ * Bars are unaffected — they position as a percentage of whatever axis they are given, and the
+ * clamp in `pct` still holds.
+ */
+function monthAxis(span: { from: string; to: string } | null): Axis | null {
+  if (!span) return null;
+  const f = new Date(span.from + "T00:00:00Z");
+  const t = new Date(span.to + "T00:00:00Z");
+  const from = new Date(Date.UTC(f.getUTCFullYear(), f.getUTCMonth(), 1));
+  // Day 0 of the NEXT month is the last day of this one — no month-length table.
+  const to = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0));
+  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+}
+
+/**
  * The month ticks the axis is read against. One per month start inside the span.
  *
  * **The label carries the YEAR** — «Mar 26», not «Mar» (owner, 2026-08-31, with his own reference).
@@ -189,7 +215,7 @@ function SitePanel({
 }) {
   const t = useT();
   const projectWindow = { startDate: project.defaults.timing.startDate, endDate: project.defaults.timing.endDate };
-  const axis = chartSpan(groups, projectWindow);
+  const axis = monthAxis(chartSpan(groups, projectWindow));
   const ticks = axis ? months(axis) : [];
   /** The same boundaries the header rules, handed to every row so the two cannot drift apart. */
   const grid = axis ? ticks.map((m) => pct(m.iso, axis)) : [];

@@ -841,6 +841,28 @@ export async function updateProject(
 }
 
 /** Refused with 409 while anything is filed under the site — never a cascade. */
+/**
+ * Name one row on a site's chart, or clear its name with `null`.
+ *
+ * A MERGE on the backend: only this key moves. Sending the whole map would let two renters renaming
+ * two different rows overwrite each other, and the version check could not tell — both writes are
+ * well formed.
+ *
+ * Work orders do NOT come through here: they have a title of their own, written by the work-order
+ * PATCH, which follows the order wherever it goes.
+ */
+export async function renameRequestRow(
+  projectId: string,
+  expectedVersion: number,
+  requestId: string,
+  title: string | null,
+): Promise<void> {
+  await projectFetch(projectPath(projectId), {
+    method: "PATCH",
+    body: { expectedVersion, labels: { [requestId]: title } },
+  });
+}
+
 export async function deleteProject(id: string): Promise<void> {
   await projectFetch(projectPath(id), { method: "DELETE" });
 }

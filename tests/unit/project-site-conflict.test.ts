@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { siteConflicts, periodDiffers } from "@/lib/contract/project";
+import { mapAwardBook } from "@/lib/contract/award";
 
 /**
  * Editing a site is editing the SITE (owner, 2026-08-31).
@@ -151,5 +152,32 @@ describe("the chart's *own dates* chip", () => {
 
   it("treats an open-ended site and an open-ended row as agreeing", () => {
     expect(periodDiffers({ startDate: null, endDate: null }, { startDate: null, endDate: null })).toBe(false);
+  });
+});
+
+describe("a row's own name", () => {
+  /* A request has no title column anywhere, so its name lives in the site's blob keyed by request
+     id. Owner's ruling, 2026-08-31, over a migration on `equipment_requests` for a nickname only
+     ever read on the board it was typed on — with the known cost that the name belongs to the
+     FILING and does not follow the request off the site. */
+
+  it("reads names out of the blob", () => {
+    const book = mapAwardBook({ requests: {}, workOrderItems: {}, labels: { r1: "Tower crane, north side" } });
+    expect(book.labels.r1).toBe("Tower crane, north side");
+  });
+
+  it("drops anything that is not a real name, rather than rendering it", () => {
+    // A row whose name did not survive is called by its reference — what it was called before.
+    const book = mapAwardBook({ labels: { a: "  ", b: 7, c: null, d: "Crane" } });
+    expect(Object.keys(book.labels)).toEqual(["d"]);
+  });
+
+  it("is empty on a blob that has never held one", () => {
+    expect(mapAwardBook({ requests: {}, workOrderItems: {} }).labels).toEqual({});
+    expect(mapAwardBook(null).labels).toEqual({});
+  });
+
+  it("trims, so a name is never stored with the renter's stray spaces", () => {
+    expect(mapAwardBook({ labels: { r1: "  Crane  " } }).labels.r1).toBe("Crane");
   });
 });

@@ -20,7 +20,7 @@ const site = (over: Partial<ProjectSummary> = {}): ProjectSummary =>
     location: { label: "Qiddiya", lat: null, lng: null },
     defaults: { timing: { rentalBasis: null, extendable: false, startDate: null, endDate: null }, paymentTerms: null },
     version: 1,
-    awards: { requests: {}, workOrderItems: {} },
+    awards: { requests: {}, workOrderItems: {}, labels: {} },
     documents: [],
     ownerUserId: "46",
     ownerName: "Yara",

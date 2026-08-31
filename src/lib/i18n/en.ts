@@ -1681,7 +1681,6 @@ export const en = {
       hint: "The reference {ref} does not change â it is what a supplier quotes back at you.",
       clear: "Remove the name",
       failed: "That did not rename. Try again.",
-      requestUnsupported: "A request cannot be renamed yet â only work orders can.",
     },
     periodConflict: {
       title: "{n} things here keep different dates",

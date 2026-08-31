@@ -24,7 +24,7 @@ const p = (id: string, label: string): ProjectSummary => ({
     paymentTerms: null,
   },
   version: 1,
-  awards: { requests: {}, workOrderItems: {} },
+  awards: { requests: {}, workOrderItems: {}, labels: {} },
   ownerUserId: null,
   ownerName: null,
   createdAt: null,

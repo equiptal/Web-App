@@ -100,9 +100,19 @@ export interface Award {
 export interface AwardBook {
   requests: Record<string, Award[]>;
   workOrderItems: Record<string, Award[]>;
+  /**
+   * The renter's own name for a row on the chart, keyed by request id.
+   *
+   * ⚠️ **Requests only.** A work order has `title` of its own, which belongs to the order and
+   * follows it anywhere. A request has no title column at all, so its name is kept here — which
+   * means it belongs to the FILING: unfile the request and the name goes with it. Ruled by the owner
+   * on 2026-08-31, over adding a column to `equipment_requests` for a nickname that is only ever
+   * read on the board it was typed on.
+   */
+  labels: Record<string, string>;
 }
 
-export const EMPTY_AWARD_BOOK: AwardBook = { requests: {}, workOrderItems: {} };
+export const EMPTY_AWARD_BOOK: AwardBook = { requests: {}, workOrderItems: {}, labels: {} };
 
 /* ----------------------------- Reading the blob ----------------------------- */
 
@@ -165,7 +175,17 @@ export function mapAwardBook(raw: unknown): AwardBook {
     }
     return out;
   };
-  return { requests: read(src.requests), workOrderItems: read(src.workOrderItems) };
+  /* Names, read the same defensive way as the awards: anything that is not a non-empty string is
+     dropped rather than rendered. A row whose name did not survive is called by its reference, which
+     is what it was called before anyone renamed it. */
+  const labels: Record<string, string> = {};
+  if (isRecord(src.labels)) {
+    for (const [rowId, name] of Object.entries(src.labels)) {
+      if (typeof name === "string" && name.trim()) labels[rowId] = name.trim();
+    }
+  }
+
+  return { requests: read(src.requests), workOrderItems: read(src.workOrderItems), labels };
 }
 
 /** Every award under a project, in no particular order — the roll-up and the "×2 of 3" counts. */
