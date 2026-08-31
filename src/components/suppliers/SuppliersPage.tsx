@@ -10,6 +10,7 @@ import { DeleteGroupDialog, GroupsMenu, NameGroupDialog, RenameGroupDialog } fro
 import { SupplierProfileDialog } from "./SupplierProfileDialog";
 import { SupplierBidsDialog } from "./SupplierBidsDialog";
 import { EditSupplierDialog } from "./EditSupplierDialog";
+import { ImportSuppliersDialog } from "./ImportSuppliersDialog";
 import {
   bidCount,
   canBeEmailed,
@@ -49,6 +50,7 @@ export function SuppliersPage() {
   const [pill, setPill] = useState<"all" | "vendor">("all");
   const [toast, setToast] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   /* Groups. `picking` is the only mode that shows checkboxes — a column of empty boxes on every row
      implies bulk work this screen does not do, so it appears when a group is being made and goes
@@ -174,6 +176,10 @@ export function SuppliersPage() {
           </p>
         </div>
         <span className="ms-auto flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => setImporting(true)} className={btn("secondary", "md")}>
+            <Icon name="table_view" size={15} />
+            {c.importSuppliers}
+          </button>
           <button type="button" onClick={() => setAdding(true)} className={btn("tinted", "md")}>
             <Icon name="person_add" size={15} />
             {c.addSupplier}
@@ -318,6 +324,15 @@ export function SuppliersPage() {
         onAdded={() => {
           load();
           setToast(c.added);
+        }}
+      />
+
+      <ImportSuppliersDialog
+        open={importing}
+        onClose={() => setImporting(false)}
+        onDone={(m) => {
+          setToast(m);
+          load();
         }}
       />
 
