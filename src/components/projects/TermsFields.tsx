@@ -38,7 +38,11 @@ const NATIONALITY_OPTS = ["any", "restricted"] as const;
 /** Nothing answered. The two non-nullable fields take the app's own defaults, not a lie about null. */
 export function blankTerms(): MachineTerms {
   return {
-    operatorNeeded: "yes",
+    /* ~~"yes"~~ — **off by default** (owner, 2026-08-31). It is the question most often answered
+       *no*, and a toggle that starts on asks a renter hiring a generator to turn something off
+       before they can move past four fields about operator nationality. Starting off means the four
+       appear only for the renter who actually wants them. */
+    operatorNeeded: "no",
     operator: {
       nationality: null,
       nationalityCustom: "",
@@ -83,9 +87,14 @@ export function countDifferences(machine: MachineTerms | null, shared: MachineTe
     return (a ?? "") === (b ?? "");
   };
 
-  /* Only fields a renter can actually set. Night shift, fuel type and fuel responsibility were
-     removed from the form (owner, 2026-08-31); comparing them would count a difference nobody
-     could see or undo, and the badge would say 1 with nothing to point at. */
+  /* Only fields a renter can actually set. Night shift and fuel TYPE were removed from the form
+     (owner, 2026-08-31); comparing them would count a difference nobody could see or undo, and the
+     badge would say 1 with nothing to point at.
+
+     Fuel RESPONSIBILITY is back — it was never meant to go with them. It is money, and the third leg
+     of the same who-covers-what question as delivery and return; the form asks it again, so the
+     badge has to count it. Left out, a machine differing only in who pays for the fuel read as
+     identical to the first one. */
   const pairs: [unknown, unknown][] = [
     [machine.operatorNeeded, shared.operatorNeeded],
     [machine.operator?.nationality, shared.operator?.nationality],
@@ -97,6 +106,7 @@ export function countDifferences(machine: MachineTerms | null, shared: MachineTe
     [machine.equipmentYear, shared.equipmentYear],
     [machine.deliveryOverride, shared.deliveryOverride],
     [machine.returnOverride, shared.returnOverride],
+    [machine.fuelResponsibilityOverride, shared.fuelResponsibilityOverride],
     [machine.safetyCertsOverride, shared.safetyCertsOverride],
     [machine.safetyCertsOtherText, shared.safetyCertsOtherText],
   ];
@@ -212,6 +222,17 @@ export function TermsFields({ value, onChange }: { value: MachineTerms; onChange
           labels={t.options.party}
           onPick={(v) => patch({ returnOverride: v as MachineTerms["returnOverride"] })}
         />
+        {/* ⚠️ WHO PAYS FOR THE FUEL — missing entirely until now (owner, 2026-08-31).
+            Not the same question as the fuel TYPE, which was removed on purpose: diesel-or-petrol is
+            a property of the machine, and this is money. It is the third leg of the same
+            who-covers-what question as delivery and return, and it belongs beside them. */}
+        <Pick
+          label={w.fuelResp}
+          value={value.fuelResponsibilityOverride}
+          options={PARTY_OPTS}
+          labels={t.options.party}
+          onPick={(v) => patch({ fuelResponsibilityOverride: v as MachineTerms["fuelResponsibilityOverride"] })}
+        />
         <label className="flex flex-col gap-1">
           <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{w.year}</span>
           <input
@@ -254,29 +275,13 @@ export function TermsFields({ value, onChange }: { value: MachineTerms; onChange
 
         {value.operatorNeeded !== "no" && (
           <div className="grid gap-2.5 sm:grid-cols-3">
-            <Pick
-              label={w.nationality}
-              value={op.nationality}
-              options={NATIONALITY_OPTS}
-              labels={{ any: w.natAny, restricted: w.natRestricted }}
-              onPick={(v) => patchOp({ nationality: v as never })}
-            />
-            {/* Which ones — asked only when the answer is *restricted*, because otherwise there is
-                no question. */}
-            {op.nationality === "restricted" ? (
-              <label className="flex flex-col gap-1 sm:col-span-2">
-                <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{w.natCustom}</span>
-                <input
-                  className={input}
-                  value={op.nationalityCustom ?? ""}
-                  placeholder={w.natCustomPlaceholder}
-                  onChange={(e) => patchOp({ nationalityCustom: e.target.value })}
-                />
-              </label>
-            ) : (
-              <span aria-hidden className="sm:col-span-2" />
-            )}
+            {/* ── Food, accommodation, nationality — one row, that order (owner, 2026-08-31) ─────
 
+                ~~Nationality alone on the first row, the two money questions below it.~~ It read as
+                the headline question and it is the least of the three: food and accommodation are
+                costs somebody pays every day the machine is on site, and nationality is a preference
+                that most renters leave at *any*. Money first, preference last, and all three fit the
+                row that was carrying one. */}
             <Pick
               label={w.fatFood}
               value={op.fatFood}
@@ -291,7 +296,27 @@ export function TermsFields({ value, onChange }: { value: MachineTerms; onChange
               labels={t.options.party}
               onPick={(v) => patchOp({ fatAccommodationTransport: v as never })}
             />
-            <span aria-hidden />
+            <Pick
+              label={w.nationality}
+              value={op.nationality}
+              options={NATIONALITY_OPTS}
+              labels={{ any: w.natAny, restricted: w.natRestricted }}
+              onPick={(v) => patchOp({ nationality: v as never })}
+            />
+
+            {/* Which nationalities — a full row of its own, and only when the answer is
+                *restricted*. Otherwise there is no question, so there is no field. */}
+            {op.nationality === "restricted" && (
+              <label className="flex flex-col gap-1 sm:col-span-3">
+                <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{w.natCustom}</span>
+                <input
+                  className={input}
+                  value={op.nationalityCustom ?? ""}
+                  placeholder={w.natCustomPlaceholder}
+                  onChange={(e) => patchOp({ nationalityCustom: e.target.value })}
+                />
+              </label>
+            )}
 
             <CertSet
               legend={w.opCerts}

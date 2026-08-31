@@ -143,3 +143,31 @@ describe("reopening a work order must not blank its terms", () => {
     expect(sent.year).toBeUndefined();
   });
 });
+
+/* ============================================================================================== *
+ * What the block asks, and in what order
+ * ============================================================================================== */
+
+describe("the terms a work order asks for", () => {
+  it("asks who pays for the fuel", () => {
+    /* Missing entirely until 2026-08-31, and it is money. Not the same question as the fuel TYPE,
+       which was removed deliberately: diesel-or-petrol is a property of the machine, while this is
+       the third leg of the same who-covers-what question as delivery and return. */
+    expect(blankTerms()).toHaveProperty("fuelResponsibilityOverride");
+    const withFuel = { ...blankTerms(), fuelResponsibilityOverride: "supplier" as const };
+    expect(countDifferences(withFuel, blankTerms())).toBe(1);
+  });
+
+  it("starts with the operator turned OFF", () => {
+    /* It is the question most often answered no. A toggle that starts on asks a renter hiring a
+       generator to switch something off before they can get past four questions about operator
+       nationality. The toggle IS the answer, so off means "no operator", not "unanswered". */
+    expect(blankTerms().operatorNeeded).toBe("no");
+  });
+
+  it("counts an operator turned ON as one difference from blank", () => {
+    // Machine 2 inherits machine 1's terms, so the badge has to notice this specific change.
+    const on = { ...blankTerms(), operatorNeeded: "yes" as const };
+    expect(countDifferences(on, blankTerms())).toBe(1);
+  });
+});
