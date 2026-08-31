@@ -14,6 +14,7 @@ import {
   deleteAward,
   withFreshVersion,
   listRenterSuppliers,
+  fetchTemplateTerms,
   ProjectVersionConflict,
   AwardRefused,
   ApiError,
@@ -323,5 +324,74 @@ describe("reading a project's work orders", () => {
     // Tolerant rather than brittle: a flat list is grouped the old way instead of dropped.
     stub(() => reply(200, []));
     await expect(listWorkOrders("p1")).resolves.toEqual([]);
+  });
+});
+
+/* ============================================================================================== *
+ * Copying a work order's terms onto a new request
+ * ============================================================================================== */
+
+describe("the terms a work-order template copies", () => {
+  /* Two bugs lived on this path, one behind the other.
+
+     First the group ids were lost, so the lookup matched nothing and this returned `null` — a
+     template that copied no terms at all, silently.
+
+     Fixing that exposed the second: `listWorkOrders` maps the stored blob into `MachineTerms`, and
+     this function ran `termsFromWire` over that result. Wire keys (`delivery`, `ret`, `operator`)
+     read off an object carrying the app's (`deliveryOverride`, `returnOverride`, `operatorNeeded`)
+     match nothing, so it answered a fully BLANK terms object. Non-null, so the intake rendered its
+     pills — every one of them empty, with OPERATOR reading *Yes* because the pill treats null as
+     yes, under a label saying «terms copied». Worse than the null it replaced.
+
+     So this asserts values, not merely that something came back. A shape-only check passes on both
+     bugs. */
+
+  const twoMachines = () =>
+    reply(200, {
+      version: 4,
+      workOrders: [
+        {
+          workOrderGroupId: "g1",
+          title: "Own fleet",
+          when: { rentalBasis: "MONTHLY" },
+          items: [
+            { id: "crawler", rawLabel: "Crawler Excavator 30 ton", quantity: 3,
+              terms: { delivery: "supplier", ret: "me", year: "2019", safety: ["tuv"], operator: "yes" } },
+            { id: "generator", rawLabel: "Generator 250 kVA", quantity: 2,
+              terms: { delivery: "me", ret: "me", year: "2022", safety: [], operator: "no" } },
+          ],
+        },
+      ],
+    });
+
+  it("copies THAT machine's answers, not the first machine's", async () => {
+    stub(twoMachines);
+    const terms = await fetchTemplateTerms("p1", { kind: "work_order", id: "g1", itemId: "generator", ref: "Own fleet", machine: "Generator 250 kVA", quantity: 2, when: null });
+
+    expect(terms).toBeTruthy();
+    expect(terms!.deliveryOverride, "the generator's own delivery, not the crawler's").toBe("me");
+    expect(terms!.equipmentYear).toBe("2022");
+    expect(terms!.operatorNeeded).toBe("no");
+    expect(terms!.safetyCertsOverride).toEqual([]);
+  });
+
+  it("copies the other machine's when the other is asked for", async () => {
+    stub(twoMachines);
+    const terms = await fetchTemplateTerms("p1", { kind: "work_order", id: "g1", itemId: "crawler", ref: "Own fleet", machine: "Crawler Excavator 30 ton", quantity: 3, when: null });
+
+    expect(terms!.deliveryOverride).toBe("supplier");
+    expect(terms!.equipmentYear).toBe("2019");
+    expect(terms!.operatorNeeded).toBe("yes");
+    expect(terms!.safetyCertsOverride).toEqual(["tuv"]);
+  });
+
+  it("answers null when the machine is gone, rather than a blank that reads as answered", async () => {
+    // `null` puts the intake back to no pills at all, which is honest. A blank object renders four
+    // empty pills under a label claiming the terms were copied.
+    stub(() => reply(200, { version: 4, workOrders: [] }));
+    await expect(
+      fetchTemplateTerms("p1", { kind: "work_order", id: "gone", itemId: "gone", ref: "gone", machine: "x", quantity: 1, when: null }),
+    ).resolves.toBeNull();
   });
 });

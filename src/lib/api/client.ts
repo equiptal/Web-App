@@ -1186,10 +1186,17 @@ export async function fetchTemplateTerms(projectId: string, option: TemplateOpti
        above returned undefined for months, because `listWorkOrders` re-grouped already-grouped data
        and lost every group id — so this returned null and a work-order template copied no terms at
        all, silently. The machine id is unique on its own; going through the group added a way to
-       fail and nothing else. */
+       fail and nothing else.
+
+       ⚠️ And NO second conversion. `listWorkOrders` already returns `MachineTerms`; this used to run
+       `termsFromWire` over that result, which reads WIRE keys (`delivery`, `ret`, `year`, `operator`)
+       off an object that carries the app's (`deliveryOverride`, `returnOverride`, …). It found none,
+       so it answered a fully blank terms object — non-null, so the intake's pills rendered, every
+       one of them empty, and OPERATOR read *Yes* because the pill treats a null as yes. Copying
+       nothing while saying «terms copied» is worse than the null it replaced. */
     const row =
       groups.flatMap((g) => g.items).find((it) => it.id === option.itemId) ?? group?.items[0];
-    return row ? termsFromWire(row.terms as unknown) : null;
+    return row ? row.terms : null;
   }
 
   const record = (await fetchRequestDetail(option.id)) as unknown as {
