@@ -229,8 +229,53 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
   } else if (!allSameSafety) {
     project.certificates.safety = []; // items differ → no request-wide default; per-item overrides kept
   }
+  /**
+   * ── Which of these values the agent GUESSED (owner, 2026-08-31) ──────────────────────────────
+   *
+   * *"The agent only reads the text… he will not send values other than the ones in the text."*
+   *
+   * It does send them, by instruction: *"try to fill EVERY field; null is the last resort"*. So a
+   * line that says nothing about haulage still returns `mobilization_by_rentee: true`, and the draft
+   * cannot tell that from a renter who wrote *"we'll collect it ourselves"*. `provenance.ts` then
+   * ranks it `agent`, which sits ABOVE the renter's own site — so a guess quietly beat a term they
+   * had actually stated, once, for every request on that job.
+   *
+   * The agent marks its own decisions in the two channels it already has: a `field_notes` entry on
+   * the field, or a `missing_required_fields` entry raising it as a question. The operator revert
+   * above has trusted exactly those two marks since 2026-08-26; this generalises it rather than
+   * inventing a second rule.
+   *
+   * `fuel_type_match: "defaulted"` is a third, stronger mark — the agent's own word for *"I filled
+   * this from the default map"* — and it is read here for the same reason.
+   *
+   * The VALUE is left alone. Clearing it would leave a required field unanswered, which is worse
+   * than a marked guess. Only the OWNERSHIP moves.
+   */
+  const assumedFields: string[] = [];
+  const guessed = (idx: number, field: string) =>
+    fieldNotes[`line_items[${idx}].${field}`] != null || mrf.some((m) => m?.field === `line_items[${idx}].${field}`);
+
+  (out.line_items ?? []).forEach((li, idx) => {
+    const it = items[idx];
+    if (!it) return;
+    /* Both keys per field: the request-wide one and the item's own. `reconcileRequestWide` above
+       lifts a uniform value to the request and clears the per-item override, so which key holds the
+       guess depends on whether the lines agreed — and marking a key that holds nothing costs
+       nothing, while missing the one that does costs the whole point of this. */
+    if (guessed(idx, "mobilization_by_rentee")) assumedFields.push("preferences.delivery", `line_items[${it.id}].delivery`);
+    if (guessed(idx, "demobilization_by_rentee")) assumedFields.push("preferences.return", `line_items[${it.id}].return`);
+    if (guessed(idx, "diesel_included")) assumedFields.push("preferences.fuel", `line_items[${it.id}].fuel`);
+    if (guessed(idx, "fuel_type_preference") || li.fuel_type_match === "defaulted") {
+      assumedFields.push(`line_items[${it.id}].fuel_type`);
+    }
+    if (guessed(idx, "max_equipment_age") || guessed(idx, "minimum_equipment_year")) {
+      assumedFields.push("advanced.equipment_year", `line_items[${it.id}].equipment_year`);
+    }
+  });
+
   return {
     rfqId: out.rfq_id ?? null, // A5: anchor for the web_review correction fired at submit
+    assumedFields: [...new Set(assumedFields)],
     project,
     items,
     preferences: toPreferences(out.rfq_header ?? {}), // AC-36/37/39/40: prefill Step-3 from the agent

@@ -57,3 +57,62 @@ describe("hasValue", () => {
     expect(hasValue(["tuv"])).toBe(true);
   });
 });
+
+/* ============================================================================================== *
+ * A guess is not an extraction
+ * ============================================================================================== */
+
+describe("what the agent GUESSED does not outrank the site", () => {
+  /* The rule was already written down here — renter > agent > project > default, with delivery and
+     return named as `default` values. The agent broke it from underneath: its instructions say
+     *"try to fill EVERY field; null is the last resort"*, so a line silent about haulage still comes
+     back with mobilization_by_rentee: true, and a guess then read as `agent` — above the renter's
+     own site.
+
+     Stated by the owner on 2026-08-31: *"the agent only reads the text… he will not send values
+     other than the ones in the text"*. `assumedFields` carries the agent's own marks so this
+     function can tell the two apart. */
+
+  const key = "preferences.delivery";
+
+  it("reads a guessed value as project when the site supplied one", () => {
+    const source = fieldSource({
+      current: "supplier",
+      agentOriginal: "supplier",
+      key,
+      draft: { assumedFields: [key], projectFields: [key] },
+    });
+    expect(source).toBe("project");
+  });
+
+  it("reads a guessed value as default when nothing else supplied it", () => {
+    const source = fieldSource({
+      current: "me",
+      agentOriginal: "me",
+      key,
+      draft: { assumedFields: [key] },
+    });
+    expect(source).toBe("default");
+  });
+
+  it("still reads a real extraction as agent", () => {
+    // The renter wrote "delivery on the supplier". The agent read it; that is not a guess.
+    const source = fieldSource({
+      current: "supplier",
+      agentOriginal: "supplier",
+      key,
+      draft: { assumedFields: [], projectFields: [key] },
+    });
+    expect(source).toBe("agent");
+  });
+
+  it("keeps the renter above everything, guessed or not", () => {
+    const source = fieldSource({
+      current: "me",
+      agentOriginal: "me",
+      key,
+      draft: { touchedFields: [key], assumedFields: [key], projectFields: [key] },
+    });
+    expect(source).toBe("renter");
+  });
+});

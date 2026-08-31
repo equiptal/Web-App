@@ -275,8 +275,14 @@ export function machineTermsOfRequestItem(item: {
 /**
  * Copy a template's machine terms onto the draft's items.
  *
- * Same rule as above: **the agent's own extraction wins.** A line whose text said "with operator"
- * keeps what the agent read; everything the agent was silent about takes the template's value.
+ * Same rule as above: **the agent's own extraction wins — an extraction, not a guess.** A line whose
+ * text said "with operator" keeps what the agent read; everything the agent was silent about, or
+ * filled from its own judgement, takes the template's value.
+ *
+ * The distinction is the whole point (owner, 2026-08-31). The agent is instructed to fill every
+ * field, so «silent» and «filled» look identical in the draft — and a guess that reads as an
+ * extraction outranks the site term the renter actually stated. `assumedFields` is how the agent's
+ * own marks reach this decision; see the note on it in `draft.ts`.
  */
 export function applyMachineTerms(
   draft: RfqDraft,
@@ -284,9 +290,13 @@ export function applyMachineTerms(
   agentOrigin: AgentSnapshot,
 ): ApplyProjectResult {
   const filled: string[] = [];
+  const assumed = new Set(draft.assumedFields ?? []);
   const items = draft.items.map((item) => {
     const agentItem = agentOrigin?.items.find((i) => i.id === item.id);
     const next: EquipmentItem = { ...item, operator: { ...item.operator } };
+    /** Did the agent fill this from judgement rather than from the text? Either key counts. */
+    const guessed = (field: string) =>
+      assumed.has(`line_items[${item.id}].${field}`) || assumed.has(`preferences.${field}`);
 
     if (!agentSet(agentItem?.operatorNeeded)) {
       next.operatorNeeded = terms.operatorNeeded;
@@ -313,17 +323,30 @@ export function applyMachineTerms(
     };
     filled.push(`line_items[${item.id}].operator`);
 
-    if (!agentSet(agentItem?.fuelType)) {
+    if (!agentSet(agentItem?.fuelType) || guessed("fuel_type")) {
       next.fuelType = terms.fuelType;
       filled.push(`line_items[${item.id}].fuel_type`);
     }
-    if (!agentSet(agentItem?.equipmentYear) && terms.equipmentYear) {
+    if ((!agentSet(agentItem?.equipmentYear) || guessed("equipment_year")) && terms.equipmentYear) {
       next.equipmentYear = terms.equipmentYear;
       filled.push(`line_items[${item.id}].equipment_year`);
     }
-    if (next.deliveryOverride == null) next.deliveryOverride = terms.deliveryOverride;
-    if (next.returnOverride == null) next.returnOverride = terms.returnOverride;
-    if (next.fuelResponsibilityOverride == null) next.fuelResponsibilityOverride = terms.fuelResponsibilityOverride;
+    /* A GUESSED value is treated as unset, so the site's own term fills over it.
+       The renter stated the template's delivery once, for every request on that job; the agent
+       filled this one because its instructions say to fill everything. A guess must not outrank a
+       stated fact — see `assumedFields`. */
+    if (next.deliveryOverride == null || guessed("delivery")) {
+      next.deliveryOverride = terms.deliveryOverride ?? next.deliveryOverride;
+      filled.push(`line_items[${item.id}].delivery`);
+    }
+    if (next.returnOverride == null || guessed("return")) {
+      next.returnOverride = terms.returnOverride ?? next.returnOverride;
+      filled.push(`line_items[${item.id}].return`);
+    }
+    if (next.fuelResponsibilityOverride == null || guessed("fuel")) {
+      next.fuelResponsibilityOverride = terms.fuelResponsibilityOverride ?? next.fuelResponsibilityOverride;
+      filled.push(`line_items[${item.id}].fuel`);
+    }
     if (next.safetyCertsOverride == null && terms.safetyCertsOverride) {
       next.safetyCertsOverride = [...terms.safetyCertsOverride];
       filled.push(`line_items[${item.id}].safety_certifications`);

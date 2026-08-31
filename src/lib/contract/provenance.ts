@@ -10,7 +10,9 @@
  * draft alone:
  *
  *  - **agent** — the parser extracted it from the renter's own words. `agentMatches` finds these by
- *    diffing against the `agentOrigin` snapshot the store keeps.
+ *    diffing against the `agentOrigin` snapshot the store keeps. A value the agent filled from its
+ *    own judgement rather than from the text is NOT this: see {@link RfqDraft.assumedFields}, which
+ *    demotes it so the project and the default below can have it.
  *  - **project** — the renter's SITE supplied it: they stated it once, months ago, for every request
  *    on that job. Marked apart from `default` because the two are opposite in trust — *"Qiddiya runs
  *    10-hour days"* is something the renter told us, and *"we guessed 10"* is not. Collapsing them
@@ -59,8 +61,8 @@ export interface SourceInput {
   agentOriginal?: unknown;
   /** The field's dotted path, as recorded in `touchedFields`. */
   key: string;
-  /** The draft, read only for `touchedFields` and `projectFields`. */
-  draft: Pick<RfqDraft, "touchedFields" | "projectFields">;
+  /** The draft, read only for `touchedFields`, `projectFields` and `assumedFields`. */
+  draft: Pick<RfqDraft, "touchedFields" | "projectFields" | "assumedFields">;
   /**
    * True when this field carries a seeded default even though it looks empty — the case for the
    * handful of fields whose default IS a value (delivery/return "me", quantity 1, fuel diesel).
@@ -77,7 +79,11 @@ export interface SourceInput {
 /** Which of the five states a field is in. */
 export function fieldSource({ current, agentOriginal, key, draft, seeded = false, projectFields }: SourceInput): FieldSource {
   if ((draft.touchedFields ?? []).includes(key)) return "renter";
-  if (agentFilled(current, agentOriginal)) return "agent";
+  /* A value the agent GUESSED is not `agent`. It said so itself — see `assumedFields` — and calling
+     a guess an extraction puts it above the renter's own site in the precedence above, which is
+     exactly backwards: they stated the site's terms, they did not state this. */
+  const assumed = (draft.assumedFields ?? []).includes(key);
+  if (!assumed && agentFilled(current, agentOriginal)) return "agent";
   // A project value only counts while the field still HOLDS one. An emptied field is empty, not
   // "from the project" - otherwise clearing a date would leave the note pointing at nothing.
   if ((projectFields ?? draft.projectFields ?? []).includes(key) && hasValue(current)) return "project";

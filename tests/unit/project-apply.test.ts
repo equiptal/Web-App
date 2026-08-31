@@ -280,3 +280,61 @@ describe("provenance", () => {
     }
   });
 });
+
+/* ============================================================================================== *
+ * The site's term beats the agent's guess
+ * ============================================================================================== */
+
+describe("a template term over a guessed one", () => {
+  const supplierTerms = {
+    ...machineTermsOf(newManualItem("i1")),
+    deliveryOverride: "supplier" as const,
+    returnOverride: "supplier" as const,
+    fuelResponsibilityOverride: "supplier" as const,
+  };
+
+  /* The renter's work order says the supplier delivers, returns and fuels it. Their sentence said
+     nothing about any of that, and the agent filled all three with "me" because it is told to fill
+     every field. Before this, the non-null guess blocked the template outright: the request went out
+     saying the renter hauls a machine their own site says the supplier hauls. */
+
+  const guessedItem = () =>
+    ({
+      ...newManualItem("i1"),
+      deliveryOverride: "me",
+      returnOverride: "me",
+      fuelResponsibilityOverride: "me",
+    }) as EquipmentItem;
+
+  it("fills over a guessed delivery, return and fuel", () => {
+    const base = blankDraft();
+    const draft: RfqDraft = {
+      ...base,
+      items: [guessedItem()],
+      assumedFields: ["preferences.delivery", "preferences.return", "preferences.fuel"],
+    };
+
+    const { draft: next } = applyMachineTerms(draft, supplierTerms, { project: base.project, items: draft.items });
+    expect(next.items[0].deliveryOverride).toBe("supplier");
+    expect(next.items[0].returnOverride).toBe("supplier");
+    expect(next.items[0].fuelResponsibilityOverride).toBe("supplier");
+  });
+
+  it("leaves a STATED delivery alone", () => {
+    // "we'll collect it ourselves" — their own words about THIS request beat a standing site term.
+    const base = blankDraft();
+    const draft: RfqDraft = { ...base, items: [guessedItem()], assumedFields: [] };
+
+    const { draft: next } = applyMachineTerms(draft, supplierTerms, { project: base.project, items: draft.items });
+    expect(next.items[0].deliveryOverride).toBe("me");
+  });
+
+  it("does not empty the field when the template has nothing to put there", () => {
+    const base = blankDraft();
+    const draft: RfqDraft = { ...base, items: [guessedItem()], assumedFields: ["preferences.delivery"] };
+    const bare = { ...supplierTerms, deliveryOverride: null };
+
+    const { draft: next } = applyMachineTerms(draft, bare, { project: base.project, items: draft.items });
+    expect(next.items[0].deliveryOverride).toBe("me");
+  });
+});

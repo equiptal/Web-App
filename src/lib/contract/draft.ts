@@ -222,6 +222,36 @@ export interface AgentDraft {
   /** Mansour's stored RFQ id (when parsed by the real agent) — anchors the web_review correction fired
    *  at submit if the renter edited the draft. null for the mock/manual flow. */
   rfqId?: string | null;
+  /**
+   * The paths the AGENT filled from its own judgement rather than from the renter's text.
+   *
+   * ── Why this exists ─────────────────────────────────────────────────────────────────────────────
+   *
+   * `provenance.ts` states the rule: **renter > agent > project > default**, and it names delivery and
+   * return as `default` values — *"both seed to «me», which assigns the renter both transport legs"*.
+   *
+   * The agent breaks that ordering from underneath. Its own instructions tell it to fill EVERY field
+   * — *"null is the last resort"* — so a line that says nothing about haulage still comes back with
+   * `mobilization_by_rentee: true`, and the draft cannot tell that from a renter who wrote *"we'll
+   * collect it ourselves"*. A guess then reads as `agent`, which outranks the renter's own SITE.
+   *
+   * That is the wrong way round (owner, 2026-08-31): *"the agent only reads the text… he will not
+   * send values other than the ones in the text"*. A project's standing answer must beat a guess.
+   *
+   * ── How the agent tells us ──────────────────────────────────────────────────────────────────────
+   *
+   * It says so itself, in the two channels it already has for *«I decided this, you did not»*: a
+   * `field_notes` entry on the field, or a `missing_required_fields` entry raising it as a question.
+   * `agent-adapters` already trusts exactly those two marks to un-assume an operator; this is the
+   * same rule, written down once and applied to every field that has a project-supplied counterpart.
+   *
+   * The VALUE stays — clearing it would leave a required field unanswered, which is a worse answer
+   * than a marked guess. What changes is who owns it: not the agent, so the project and the template
+   * can fill over it, and the badge stops crediting the renter's own words for something they never
+   * said.
+   */
+  assumedFields?: string[];
+
   project: ProjectDetails;
   items: EquipmentItem[];
   /** Step-3 preferences the agent inferred (payment/maintenance/budget/filters). Renter edits in Step 3. */
@@ -247,6 +277,9 @@ export interface RfqDraft {
   /** Mansour's stored RFQ id — see {@link AgentDraft.rfqId}. Persisted with the draft so a correction
    *  can be fired at submit even after a reload. */
   rfqId?: string | null;
+  /** See {@link AgentDraft.assumedFields}. Persisted with the draft. */
+  assumedFields?: string[];
+
   project: ProjectDetails;
   items: EquipmentItem[];
   preferences: Preferences;
