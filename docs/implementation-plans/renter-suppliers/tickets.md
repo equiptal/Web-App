@@ -111,6 +111,33 @@ One dialog, no tabs. Opens on a table of three blank rows — company · contact
 
 Optimistic: flips on click, reverts on failure with a toast. Nothing else on the row waits for the round trip. The toast says what changed, in the renter's terms — *"Zahid Tractor is a registered vendor"*.
 
+### SUP-T18 — The award picks from the list, and can add to it
+**Scope:** feature
+**Files:** `src/components/projects/AwardDialog.tsx`
+
+**The awarding flow is not built here — it exists.** What changes is who can be awarded.
+
+Today the dialog reads `listRenterSuppliers()` and, when the list is empty, falls back to a typed
+supplier name. That fallback exists only because this registry did not (`AwardDialog.tsx:140`, and the
+note beside it says so: *"the gate follows the list"*). Once the list is real:
+
+- **The typed-name branch goes.** An award carries a supplier row or it is not made — decision 4.
+- **`supplierName` is still stored** beside the id, as a snapshot of what the firm was called that day.
+  It is never a lookup key again.
+- **An unregistered supplier stays shown and disabled**, with the reason — a renter looking for a firm
+  he has used before must find it and see why it cannot be picked, not wonder where it went. That rule
+  is already in the dialog and does not change.
+- **An inline `Add supplier`** in the picker: one row, the same write as *Add my own suppliers*,
+  returning the new id straight into the dropdown. Without it, a renter mid-award who finds his
+  supplier missing has to leave the dialog, lose the award he was building, and come back.
+
+**Given/When/Then**
+- Given the list is empty / When the dialog opens / Then it offers *Add supplier*, not a free-text box.
+- Given a supplier is added inline / Then the dropdown selects them without the dialog reloading.
+- Given an award is submitted / Then it carries `supplierId`, and a submit without one is refused.
+
+**Depends on:** SUP-T15 (the add write) and **SUP-BE-17** (the backend requiring the id).
+
 ### SUP-T17 — Pin the screen
 **Scope:** chore
 **Files:** `src/lib/uiPins.ts`, `docs/ui-pins.md`
