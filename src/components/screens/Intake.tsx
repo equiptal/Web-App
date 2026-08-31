@@ -203,6 +203,17 @@ export function Intake() {
           dragging ? "border-brand ring-2 ring-brand/25" : "border-border"
         }`}
       >
+        {/* The site's values, INSIDE the box and above the line you type on (owner, 2026-08-31:
+            *"they will appear on the text area"*).
+
+            A native `<textarea>` holds text and nothing else, so a dropdown cannot sit among the
+            words — but it can sit in the same bordered container, which is what a renter means by
+            "in the box". Pills at the top, caret below, one border around both. The agent still
+            receives exactly what was typed and nothing else, which is what keeps its input small.
+
+            Renders nothing until a site is picked, so an untouched intake is still a plain box. */}
+        <ProjectPills />
+
         <textarea
           value={state.text}
           onChange={(e) => actions.setText(e.target.value)}
@@ -268,8 +279,10 @@ export function Intake() {
           `ProjectChips` renders until one is picked, `ProjectPills` after — the same strip, so
           choosing a site swaps its contents and moves nothing. Both render nothing at all when there
           is no site to show, so a renter who has never made one sees a plain box. */}
+      {/* `ProjectChips` stays here: it is a PICKER, not a value — a row of the renter's sites to
+          choose from, which reads better under the box than bolted inside it. Its values move into
+          the box the moment one is chosen, and `ProjectPills` renders up there instead. */}
       <ProjectChips />
-      <ProjectPills />
 
       {/* ── The way on ── */}
       <div className="mt-6 flex flex-wrap items-center justify-end gap-3">

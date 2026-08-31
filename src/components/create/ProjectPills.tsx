@@ -69,7 +69,16 @@ function tone(changed?: boolean, conflict?: boolean) {
  * wrapping row of eight controls look like one instrument rather than eight chips that happen to be
  * adjacent — and `h-8` is the app's own small-control height, not a number chosen here.
  */
-const PILL = "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-label";
+/**
+ * BOXED, not pill-shaped (owner, 2026-08-31: *"chips can be less rounded, like boxed, so these
+ * toggles fit inside"*).
+ *
+ * A capsule fights a square control: a segmented toggle inside a fully rounded chip leaves two
+ * crescents of dead space and reads as a badge with something stuck to it. `rounded-sm` is the same
+ * radius every field in the two dialogs uses, so a value you can change looks like a value you can
+ * change wherever you meet it.
+ */
+const PILL = "inline-flex h-8 items-center gap-1.5 rounded-sm border px-2.5 text-label";
 const EDITABLE = "transition hover:border-brand focus-within:border-brand";
 const LABEL = "font-semibold uppercase tracking-[.03em] opacity-55";
 const VALUE = "font-semibold tabular-nums";
@@ -139,6 +148,65 @@ function PillSelect<T extends string>({
           </option>
         ))}
       </select>
+    </span>
+  );
+}
+
+/**
+ * A pill whose value is one of two, both shown.
+ *
+ * *Delivery: Supplier ▾* makes a renter open a menu to learn that the other option is *Me*. With two
+ * options there is nothing to reveal — showing both and filling the chosen one turns a question into
+ * a glance, and answering it is one press instead of three.
+ *
+ * Radio inputs rather than buttons, so a keyboard lands on the group once and the arrow keys move
+ * inside it, and a screen reader is told these are two answers to one question.
+ */
+function PillSegment<T extends string>({
+  label,
+  value,
+  options,
+  optionLabel,
+  changed,
+  onChange,
+}: {
+  label: string;
+  value: T | null;
+  options: readonly [T, T];
+  optionLabel: (v: T) => string;
+  changed?: boolean;
+  onChange: (v: T) => void;
+}) {
+  const name = `${label}-${options.join("-")}`;
+  return (
+    <span className={`${PILL} ${tone(changed)} pe-0.5`}>
+      <span className={LABEL}>{label}</span>
+      {changed && <span aria-hidden className="text-meta leading-none text-brand">●</span>}
+
+      <span role="radiogroup" aria-label={label} className="ms-0.5 inline-flex overflow-hidden rounded-sm border border-border">
+        {options.map((o) => {
+          const on = value === o;
+          return (
+            <label
+              key={o}
+              className={`cursor-pointer px-2 py-0.5 text-label font-semibold transition ${
+                on ? "bg-brand text-brand-fg" : "bg-surface text-muted hover:text-navy"
+              }`}
+            >
+              <input
+                type="radio"
+                name={name}
+                checked={on}
+                onChange={() => onChange(o)}
+                /* Off-screen rather than `hidden`: a hidden input is not focusable, and this is the
+                   thing the keyboard has to land on. */
+                className="absolute h-0 w-0 opacity-0"
+              />
+              {optionLabel(o)}
+            </label>
+          );
+        })}
+      </span>
     </span>
   );
 }
@@ -240,10 +308,15 @@ export function ProjectPills() {
     spoken && shortSite(spoken).toLowerCase() !== shortSite(project.location.label).toLowerCase() ? spoken : null;
 
   return (
-    /* Under the box, not inside it (owner, 2026-08-31) — the row the example chips used to hold. A
-       strip of the renter's OWN values reads as things to pick from and edit when it stands on the
-       page; bolted inside the card it read as furniture. */
-    <div className="mt-3 flex flex-col gap-2">
+    /* INSIDE the box now, above the line you type on (owner, 2026-08-31: *"they will appear on the
+       text area"*). It sat under the card for a day on the reading that a strip of the renter's own
+       values reads better standing on the page. The owner's point is stronger: these values ARE the
+       request, so they belong in the thing the request is written in — and the box is where a renter
+       looks to see what they are about to send.
+
+       Its own bottom border, and the same 20px gutter as the textarea below, so the two read as one
+       control with a rule between them rather than as a card with a lid. */
+    <div className="flex flex-col gap-2 border-b border-border px-5 pb-3 pt-4">
       <div className="flex flex-wrap items-center gap-2">
         {/* The site itself, with the way out. Deselecting drops every prefill (PROJ-AC-26). */}
         <span className={`${PILL} border-brand bg-brand-soft font-semibold text-navy`}>
@@ -291,14 +364,16 @@ export function ProjectPills() {
           onChange={(v) => actions.patchProjectDefaults({ endDate: v }, ["timing.end_date"])}
         />
 
-        {/* Yes/no as a dropdown rather than a checkbox, so it carries a label and a value like every
-            other pill beside it. A lone tickbox in a row of values reads as an action. */}
-        <PillSelect<"yes" | "no">
+        {/* ~~A dropdown, so it carries a label and a value like every pill beside it.~~ Both answers
+            shown instead (owner, 2026-08-31). The old reasoning was right about the checkbox — a lone
+            tickbox in a row of values reads as an action — and wrong about the remedy: with exactly
+            two options there is nothing to reveal, and a menu made the renter open it to learn what
+            the other one was. */}
+        <PillSegment<"yes" | "no">
           label={t.projects.pills.extendable}
           value={timing.extendable ? "yes" : "no"}
           options={["yes", "no"] as const}
           optionLabel={(v) => (v === "yes" ? t.common.yes : t.common.no)}
-          empty={t.common.no}
           changed={dirty("timing.extendable")}
           onChange={(v) => actions.patchProjectDefaults({ extendable: v === "yes" }, ["timing.extendable"])}
         />
