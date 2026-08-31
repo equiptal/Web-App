@@ -1469,7 +1469,7 @@ export const en = {
     inviteSent: "Invite opened",
     inviteNoContact: "This bid carries no number to reach the supplier on.",
     inviteMessage:
-      "Hello {supplier} — I received your bid through Moedatech. If you install the Moedatech app you'll see my requests directly and can bid on more of them. https://moedatech.net",
+      "Hello {supplier} — I received your bid through Moedatech. If you install the Moedatech app you'll see my requests directly and can bid on more of them. {url}",
     // The off-platform card's second control. What it opens is read-only by construction — the
     // supplier's own submission through the shared link, in the bid form's own shape. ~~`editQuote`,
     // "the renter typed this quote in himself, so it is his to correct".~~ Deleted with the label

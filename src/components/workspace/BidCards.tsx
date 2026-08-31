@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { btn } from "@/lib/ds";
+import { JOIN_URL } from "@/lib/config/store-links";
 // Both were written and tested for the bid list this workspace retired, and have had no caller since
 // (owner, 2026-08-25). The rules did not stop being true when their surface went away.
 import { bidCounterDelta } from "@/lib/contract/bid-counter-delta";
@@ -544,6 +545,10 @@ function BidCardTile({
                 supplier from the renter's OWN account, which is what the owner asked for, and it
                 needs no endpoint and no projection: `supplierPhone` is already on the bid.
 
+                The destination is `JOIN_URL`, not a URL inside the sentence (SUP-T01) — the supplier
+                list sends this same invitation, and two copies of a link drift apart the first time
+                one of them moves.
+
                 Where we hold no number the control still renders, disabled, saying why — a button
                 that vanished would read as «this supplier cannot be invited», when the truth is only
                 that this bid arrived without a way to reach him. */}
@@ -552,7 +557,7 @@ function BidCardTile({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  const msg = fmt(t.workspace.inviteMessage, { supplier: card.supplierName });
+                  const msg = fmt(t.workspace.inviteMessage, { supplier: card.supplierName, url: JOIN_URL });
                   window.open(`https://wa.me/${invitePhone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
                   setInvited(true);
                 }}
