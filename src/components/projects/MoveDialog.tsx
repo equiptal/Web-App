@@ -54,7 +54,18 @@ export function MoveDialog({
   address,
   /** The site it is filed under now; `null` when it is filed nowhere. */
   currentProjectId,
+  /**
+   * What the destructive half of this dialog does.
+   *
+   * A REQUEST is unfiled: it stays a request, keeps every value, and can be filed again. A WORK ORDER
+   * is deleted — it exists nowhere but on the site it was made on, so removing it from the site
+   * removes it. The same door, two very different second halves, and a renter must be told which one
+   * they are standing in front of.
+   */
+  kind,
   onFile,
+  /** Unfile a request, or delete a work order. Red either way. */
+  onRemove,
   busy,
 }: {
   open: boolean;
@@ -62,7 +73,11 @@ export function MoveDialog({
   projects: ProjectSummary[];
   address: string | null | undefined;
   currentProjectId: string | null;
+  /** Which kind of row this is — it decides what the destructive half does. */
+  kind: "request" | "work_order";
   onFile: (projectId: string | null) => void;
+  /** Unfile a request, or delete a work order. */
+  onRemove: () => void;
   busy?: boolean;
 }) {
   const t = useT();
@@ -77,20 +92,27 @@ export function MoveDialog({
   );
 
   const unfiled = currentProjectId === null;
+  const destroys = kind === "work_order";
 
   return (
     <Dialog open={open} onClose={onClose} title={unfiled ? m.fileTitle : m.moveTitle}>
       <div className="flex flex-col gap-4">
-        <p className="flex items-start gap-2 rounded-sm border border-border bg-surface2/50 px-3 py-2 text-meta text-navy-mid">
-          <Icon name="lock_open" size={14} className="mt-px flex-none text-muted" />
-          {m.changesNothing}
-        </p>
+        {/* The reassurance belongs to a REQUEST only. A work order is not "just filed here" — this
+            site is the only place it exists — so telling a renter nothing moves would be a comfort
+            about the wrong thing. */}
+        {!destroys && (
+          <p className="flex items-start gap-2 rounded-sm border border-border bg-surface2/50 px-3 py-2 text-meta text-navy-mid">
+            <Icon name="lock_open" size={14} className="mt-px flex-none text-muted" />
+            {m.changesNothing}
+          </p>
+        )}
 
-        {/* Moving is not free, and the renter is told before they choose, not after. */}
+        {/* RED (owner, 2026-08-31). Moving drops the awards, and amber reads as *mind your step*
+            where this needs to read as *you will lose something*. Told before they choose. */}
         {!unfiled && (
-          <p className="flex items-start gap-2 rounded-sm border border-warn/40 bg-warn/5 px-3 py-2 text-meta text-navy">
-            <Icon name="warning" size={14} className="mt-px flex-none text-warn" />
-            {m.movingDropsAwards}
+          <p className="flex items-start gap-2 rounded-sm border border-danger/40 bg-danger/5 px-3 py-2 text-meta text-navy">
+            <Icon name="warning" size={14} className="mt-px flex-none text-danger" />
+            {destroys ? m.movingDropsAwardsWorkOrder : m.movingDropsAwards}
           </p>
         )}
 
@@ -152,19 +174,23 @@ export function MoveDialog({
         )}
 
         <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
-          {/* Unfiling is not a destructive act — the request keeps every value and simply stops
-              being filed here — so it sits quietly rather than as a red button. */}
+          {/* RED, and it says which of the two things it does (owner, 2026-08-31).
+              Unfiling a request destroys nothing — it keeps every value and can be filed again — but
+              it is still the one irreversible-looking act in this dialog, and a renter should not have
+              to work out which half they are pressing. Deleting a work order genuinely destroys it,
+              and that one says so outright. */}
           {!unfiled ? (
             <button
               type="button"
               disabled={busy}
-              onClick={() => onFile(null)}
-              className="text-meta font-semibold text-muted underline underline-offset-2 hover:text-navy"
+              onClick={onRemove}
+              className="me-auto flex items-center gap-1.5 text-meta font-semibold text-danger transition hover:underline"
             >
-              {m.removeFromProject}
+              <Icon name={destroys ? "delete" : "playlist_remove"} size={14} className="flex-none" />
+              {destroys ? m.deleteWorkOrder : m.removeFromProject}
             </button>
           ) : (
-            <span />
+            <span className="me-auto" />
           )}
           <Button variant="secondary" onClick={onClose} disabled={busy}>
             {t.common.cancel}

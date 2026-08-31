@@ -166,7 +166,13 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
 
   /** The chart row being renamed. */
   const [renaming, setRenaming] = useState<ChartGroup | null>(null);
-  const [filing, setFiling] = useState<{ requestId: string; address: string | null; projectId: string | null } | null>(null);
+  const [filing, setFiling] = useState<{
+    /** The request's id, or the work order's group id. */
+    rowId: string;
+    kind: "request" | "work_order";
+    address: string | null;
+    projectId: string | null;
+  } | null>(null);
   const [papers, setPapers] = useState<{ award: Award; isRequest: boolean } | null>(null);
   const [conflict, setConflict] = useState<ChartGroup | null>(null);
   const [deleting, setDeleting] = useState<ProjectSummary | null>(null);
@@ -390,6 +396,23 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
    * The whole quantity, because own fleet is not a split: if they later award part of it to a
    * vendor, that is a change to the award they can make in the dialog.
    */
+  /**
+   * The red half of the move dialog.
+   *
+   * A REQUEST is unfiled: it keeps every value and can be filed again, which is why this is the same
+   * call as filing it to nowhere. A WORK ORDER is deleted, because the site is the only place it
+   * exists — there is no "unfiled work order" to become.
+   */
+  async function removeRow() {
+    if (!filing) return;
+    if (filing.kind === "work_order") {
+      setFiling(null);
+      await removeOrder(filing.rowId);
+      return;
+    }
+    await file(null);
+  }
+
   async function markOrOwn(
     group: ChartGroup,
     item: ChartItem,
@@ -507,11 +530,25 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     }
   }
 
+  /**
+   * Move this row to another site — or, for a request, to no site at all.
+   *
+   * A request is re-filed; a work order is re-parented, which the backend now allows and which writes
+   * every machine in the group. Neither carries its awards: they are keyed inside the OLD site's
+   * blob, which belongs to that site. The dialog says so in red before the renter chooses.
+   */
   async function file(projectId: string | null) {
     if (!filing) return;
     setSaving(true);
     try {
-      await assignToProject(filing.requestId, projectId);
+      if (filing.kind === "work_order") {
+        // No destination means nothing to do — a work order cannot be filed nowhere, because the
+        // site is the only place it exists. The dialog offers deletion for that.
+        if (!projectId) return;
+        await saveWorkOrder(projectId, version, { groupId: filing.rowId, body: { projectId } });
+      } else {
+        await assignToProject(filing.rowId, projectId);
+      }
       setFiling(null);
       await Promise.all([reload(), reloadUnassigned(), selected ? refreshChart() : Promise.resolve()]);
       if (projectId) setSelected(projectId);
@@ -788,17 +825,26 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
                   onOpenRequest: group.kind === "request" ? () => router.push(requestUrl(group.id)) : undefined,
                   onEditWorkOrder:
                     group.kind === "work_order" ? () => void startEditOrder(group) : undefined,
-                  onDeleteWorkOrder: group.kind === "work_order" ? () => void removeOrder(group.id) : undefined,
+                  /* No longer its own entry — deleting a work order IS removing it from the site,
+                     and the dialog below says so. Kept undefined so the menu draws one door. */
+                  onDeleteWorkOrder: undefined,
                   onAttachDocument: a ? () => setPapers({ award: a, isRequest: group.kind === "request" }) : undefined,
-                  onRemoveFromProject:
-                    group.kind === "request"
-                      ? () => setFiling({ requestId: group.id, address: chart?.project.location.label ?? null, projectId: selected })
-                      : undefined,
+                  /* Both kinds now. A request is unfiled and stays; a work order is deleted — the
+                     dialog is where that difference is stated, and where the move is offered
+                     instead. */
+                  onRemoveFromProject: () =>
+                    setFiling({
+                      rowId: group.id,
+                      kind: group.kind,
+                      address: chart?.project.location.label ?? null,
+                      projectId: selected,
+                    }),
                   onFileInProject:
                     group.kind === "request"
                       ? () =>
                           setFiling({
-                            requestId: group.id,
+                            rowId: group.id,
+                            kind: group.kind,
                             address: (group as ChartGroup & { address?: string | null }).address ?? null,
                             projectId: null,
                           })
@@ -893,7 +939,9 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
           projects={projects}
           address={filing.address}
           currentProjectId={filing.projectId}
+          kind={filing.kind}
           onFile={(id) => void file(id)}
+          onRemove={() => void removeRow()}
           busy={saving}
         />
       )}

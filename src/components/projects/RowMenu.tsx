@@ -155,16 +155,20 @@ export function RowMenu({
 
   if (award) push("change", m.changeAward, "tune", a.onChangeAward);
 
+  /* ONE last entry, and it is RED (owner, 2026-08-31).
+
+     A work order used to carry two — *Remove from the project* and *Delete the work order* — which
+     asked the renter to know that for this kind of row those are the same act. They are: the site is
+     the only place a work order exists. So there is one door, it is red, and what it does is decided
+     inside, where there is room to say which of the two things will happen and to offer the move
+     instead. */
   push(
     "file",
     unfiled ? m.fileInProject : m.removeFromProject,
     unfiled ? "playlist_add" : "playlist_remove",
     unfiled ? a.onFileInProject : a.onRemoveFromProject,
+    !unfiled,
   );
-
-  // A work order is the renter's own record and nobody else's, so deleting one takes nothing from
-  // anyone. A request is never deleted from here — it is removed from the project and stays.
-  if (isWorkOrder) push("delete", m.deleteWorkOrder, "delete", a.onDeleteWorkOrder, true);
 
   if (!items.length) return null;
 

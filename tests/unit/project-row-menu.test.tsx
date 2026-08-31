@@ -119,7 +119,12 @@ describe("what the menu offers", () => {
     const items = open(<RowMenu group={group("work_order")} award={award()} actions={all()} />);
 
     expect(items).toContain("Edit the work order");
-    expect(items).toContain("Delete the work order");
+    /* ONE red door, not two (owner, 2026-08-31). A work order used to carry *Remove from the
+       project* AND *Delete the work order*, which asked the renter to know that for this kind of row
+       those are the same act — the site is the only place a work order exists. The dialog behind the
+       one entry is where that is said, and where the move is offered instead. */
+    expect(items).toContain("Remove from the project");
+    expect(items).not.toContain("Delete the work order");
     // It went to nobody. Showing these greyed out would imply the renter could have had them.
     expect(items).not.toContain("Open the request");
     expect(items).not.toContain("Our quotation");
