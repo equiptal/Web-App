@@ -11,7 +11,7 @@ import type { Locale } from "@/lib/i18n/config";
 // import { SurveyProvider } from "@/components/surveys/SurveyProvider";
 import { AuthGateProvider, useAuthGate } from "@/components/auth/AuthGate";
 import { fetchDealRoomUnread } from "@/lib/api/client";
-import { btn, cx, OVERLAY, PAGE_BACK, PAGE_MAX, PAGE_X, PAGE_Y, SCRIM } from "@/lib/ds";
+import { btn, cx, OVERLAY, PAGE_BACK, PAGE_MAX, PAGE_X, PAGE_Y, POPOVER, SCRIM } from "@/lib/ds";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { AppNav, AppNavMobile, type NavItem } from "@/components/AppNav";
 import { ArrowBackIcon, MailIcon, CountBadge } from "@/components/HeaderIcons";
@@ -106,7 +106,27 @@ export function AppShell(props: AppShellProps) {
 function AppShellInner({ children, title, fullBleed }: AppShellProps) {
   const { locale, setLocale } = useLocale();
   const t = useT();
-  const { tier, status, refresh: refreshSession } = useSession();
+  const { tier, status, signOut, refresh: refreshSession } = useSession();
+  /** The account menu: Profile, and the only door out of the app. */
+  const [accountOpen, setAccountOpen] = useState(false);
+  const accountBox = useRef<HTMLDivElement>(null);
+
+  /* Dismissed the way every popover in this app is: a press outside it, or Escape. Also closed on
+     every route change — the menu's own entries navigate, and a layer that outlives the page it was
+     opened over is a layer the reader has to dismiss on a screen that no longer explains it. */
+  useEffect(() => {
+    if (!accountOpen) return;
+    const away = (e: MouseEvent) => {
+      if (accountBox.current && !accountBox.current.contains(e.target as Node)) setAccountOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setAccountOpen(false);
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [accountOpen]);
   const { openAuth } = useAuthGate();
   const pathname = usePathname();
   const [name, setName] = useState("");
@@ -353,12 +373,21 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
                 are signed in as. */}
             {status === "authed" && <span aria-hidden="true" className="h-6 w-px flex-none bg-white/15" />}
 
-              {/* ── The avatar goes STRAIGHT to settings (owner, 2026-08-26) ─────────────────────────
-                  It opened a menu of three: «My Organization», «Settings», «Sign out». Two of those
-                  had a home already — My Organization is one of the three places in the bar, and Sign
-                  out is on the settings page the menu would have taken you to — so it mostly offered
-                  the reader a list of doors to the room he was standing in. One press, one
-                  destination: press your own face, land on your own settings.
+              {/* ── The avatar opens TWO doors (owner, 2026-08-31) ────────────────────────────────
+                  *"When clicking profile in the nav bar, show profile or logout."*
+
+                  ~~It goes straight to settings.~~ ~~It opened a menu of three: «My Organization»,
+                  «Settings», «Sign out».~~ Both were right about their own list and this is the
+                  narrow case between them.
+
+                  The menu of three failed because two of its entries were doors to the room you were
+                  already standing in: My Organization is one of the three places in the bar, and
+                  Settings was where the menu itself led. Removing it was correct.
+
+                  But it took Sign out with it, and Sign out has no other home in the bar. Leaving is
+                  a thing a reader does from anywhere, and it became: go to your profile, scroll to
+                  the bottom, find it under the legal links. So two entries, both of which are the
+                  only way to reach what they name.
 
                   The tick still says «verified», and only that state earns a mark: an absent tick is
                   the honest statement for the other two, where a grey «Guest» pill is a verdict
@@ -369,8 +398,12 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
                   settings page, and a second nudge up here would repeat the mistake the menu was
                   already making. Flagged for the owner rather than quietly kept. */}
             {status === "authed" && (
-              <Link {...pin("header-avatar")}
-                href="/profile"
+              <div ref={accountBox} className="relative flex-none">
+              <button {...pin("header-avatar")}
+                type="button"
+                onClick={() => setAccountOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={accountOpen}
                 className="flex flex-none items-center gap-1.5"
                 aria-label={tier === "verified" ? `${t.shell.settings} · ${t.shell.tierVerified}` : `${t.shell.settings} · ${t.shell.verifyNudge}`}
                 title={badge.label}
@@ -399,7 +432,43 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
                     {t.shell.verifyNudge}
                   </span>
                 )}
-              </Link>
+              </button>
+
+              {/* Two entries, and each is the only way to reach what it names. On a dark bar the
+                  popover keeps its own light ground — the same treatment the nav sheet gets — because
+                  a translucent panel over navy reads as part of the bar rather than as a layer above
+                  it. `end-0`, so it hangs inside the bar's trailing edge and mirrors in Arabic. */}
+              {accountOpen && (
+                <div
+                  role="menu"
+                  className={`${POPOVER} absolute end-0 top-11 flex w-[184px] flex-col p-1`}
+                >
+                  <Link
+                    role="menuitem"
+                    href="/profile"
+                    onClick={() => setAccountOpen(false)}
+                    className="flex items-center gap-2 rounded-sm px-3 py-2 text-start text-body text-navy transition hover:bg-surface2"
+                  >
+                    <Icon name="account_circle" size={15} className="flex-none text-muted" />
+                    {t.shell.profile}
+                  </Link>
+                  {/* Red, and last. Leaving is the destructive end of a short list, and the house
+                      rule for that is the same here as in the row menus on the chart. */}
+                  <button
+                    role="menuitem"
+                    type="button"
+                    onClick={() => {
+                      setAccountOpen(false);
+                      void signOut();
+                    }}
+                    className="flex items-center gap-2 rounded-sm px-3 py-2 text-start text-body text-danger transition hover:bg-surface2"
+                  >
+                    <Icon name="logout" size={15} className="flex-none" />
+                    {t.profile.logout}
+                  </button>
+                </div>
+              )}
+              </div>
             )}
 
             {/* ── Navigation, for a bar too narrow to lay it out (owner, 2026-08-25) ───────────────
