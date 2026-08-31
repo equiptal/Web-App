@@ -1674,6 +1674,15 @@ export const en = {
       note: "Filing changes nothing about the request â not its status, not its dates, not its terms.",
       failed: "That did not file. Try again.",
     },
+    rename: {
+      title: "Rename this row",
+      label: "Name",
+      placeholder: "A name you will recognise",
+      hint: "The reference {ref} does not change â it is what a supplier quotes back at you.",
+      clear: "Remove the name",
+      failed: "That did not rename. Try again.",
+      requestUnsupported: "A request cannot be renamed yet â only work orders can.",
+    },
     periodConflict: {
       title: "{n} things here keep different dates",
       sub: "This site will say {period}.",
@@ -1833,7 +1842,6 @@ export const en = {
     chart: {
       of: "of",
       pending: "pending",
-      awaiting: "awaiting award",
       mobilized: "Arrived",
       demobilized: "Left",
     },

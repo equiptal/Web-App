@@ -49,6 +49,7 @@ import { AwardDialog, UnawardConfirm } from "./AwardDialog";
 import { PeriodConflictDialog } from "./PeriodConflictDialog";
 import { WorkOrderForm, workOrderPayload, blankMachine, blankTerms, type WorkOrderDraft } from "./WorkOrderForm";
 import { FileRequestDialog } from "./FileRequestDialog";
+import { RenameDialog } from "./RenameDialog";
 import { MoveDialog } from "./MoveDialog";
 import { DocumentsDialog } from "./DocumentsDialog";
 import { ConflictDialog, periodConflicts } from "./ConflictDialog";
@@ -123,6 +124,9 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
 
   /** Which site is being filed into, while the picker is open. */
   const [filingInto, setFilingInto] = useState<{ projectId: string; label: string } | null>(null);
+
+  /** The chart row being renamed. */
+  const [renaming, setRenaming] = useState<ChartGroup | null>(null);
   const [filing, setFiling] = useState<{ requestId: string; address: string | null; projectId: string | null } | null>(null);
   const [papers, setPapers] = useState<{ award: Award; isRequest: boolean } | null>(null);
   const [conflict, setConflict] = useState<ChartGroup | null>(null);
@@ -268,6 +272,36 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
    * request leaves the unfiled set and appears on the site's chart, and a stale copy of either
    * would show it in two places at once.
    */
+  /**
+   * Rename a chart row.
+   *
+   * A work order carries a `title` of its own and the header write reaches every machine in the
+   * group, so this is the existing PATCH with one field in it.
+   *
+   * A request has no title anywhere — `EquipmentRequest` has no such column — so there is nothing to
+   * write yet. It is refused here with a plain sentence rather than a silent no-op: a pen that opens
+   * a box, takes a name and loses it is worse than a pen that says it cannot.
+   */
+  async function rename(group: ChartGroup, title: string | null) {
+    if (group.kind === "request") {
+      setRenaming(null);
+      setNotice(t.projects.rename.requestUnsupported);
+      return;
+    }
+
+    setSaving(true);
+    setNotice(null);
+    try {
+      await saveWorkOrder(selected ?? "", version, { groupId: group.id, body: { title } });
+      setRenaming(null);
+      await refreshChart();
+    } catch {
+      setNotice(t.projects.rename.failed);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function fileExisting(requestId: string, projectId: string) {
     setSaving(true);
     setNotice(null);
@@ -567,6 +601,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
           onEditProject={(p) => void openEdit(p)}
           onNewWorkOrder={startWorkOrder}
           onAddRequest={(p) => setFilingInto({ projectId: p.id, label: projectTitle(p) })}
+          onRename={setRenaming}
           onOpenConflict={setConflict}
           rowMenu={(group, itemId, awardId) => {
             const item = group.items.find((i) => i.id === itemId);
@@ -743,6 +778,16 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
 
       {unawarding && (
         <UnawardConfirm open onClose={() => setUnawarding(null)} award={unawarding} onConfirm={() => void unaward()} busy={saving} />
+      )}
+
+      {renaming && (
+        <RenameDialog
+          open
+          group={renaming}
+          busy={saving}
+          onClose={() => setRenaming(null)}
+          onSave={(title) => void rename(renaming, title)}
+        />
       )}
 
       {filingInto && (

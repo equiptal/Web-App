@@ -74,6 +74,7 @@ export function ProjectsBoard({
   onEditProject,
   onNewWorkOrder,
   onAddRequest,
+  onRename,
   onOpenConflict,
   rowMenu,
 }: {
@@ -89,6 +90,7 @@ export function ProjectsBoard({
   onNewWorkOrder: (p: ProjectSummary) => void;
   /** Opens the picker: the site's unfiled requests, with *New request* at the top of them. */
   onAddRequest: (p: ProjectSummary) => void;
+  onRename?: (group: ChartGroup) => void;
   /** Pressed from the *own dates* chip on a group header. */
   onOpenConflict?: (group: ChartGroup) => void;
   rowMenu?: (group: ChartGroup, itemId: string, awardId: string | null) => React.ReactNode;
@@ -149,6 +151,7 @@ export function ProjectsBoard({
             onEdit={onEditProject}
             onNewWorkOrder={() => onNewWorkOrder(chart.project)}
             onAddRequest={() => onAddRequest(chart.project)}
+            onRename={onRename}
             onOpenConflict={onOpenConflict}
             rowMenu={rowMenu}
           />
@@ -169,6 +172,7 @@ function SitePanel({
   onEdit,
   onNewWorkOrder,
   onAddRequest,
+  onRename,
   onOpenConflict,
   rowMenu,
 }: {
@@ -178,6 +182,8 @@ function SitePanel({
   onEdit: (p: ProjectSummary) => void;
   onNewWorkOrder: () => void;
   onAddRequest: () => void;
+  /** Rename one row on the chart — a work order or a request. */
+  onRename?: (group: ChartGroup) => void;
   onOpenConflict?: (group: ChartGroup) => void;
   rowMenu?: (group: ChartGroup, itemId: string, awardId: string | null) => React.ReactNode;
 }) {
@@ -187,6 +193,16 @@ function SitePanel({
   const ticks = axis ? months(axis) : [];
   /** The same boundaries the header rules, handed to every row so the two cannot drift apart. */
   const grid = axis ? ticks.map((m) => pct(m.iso, axis)) : [];
+  /**
+   * The months as COLUMNS — each one's own share of the axis.
+   *
+   * A cell cannot overlap its neighbour, which is what absolute labels at percentage offsets did:
+   * «Aug 26» and «Sep 26» printed over each other on any span where two month starts fell within a
+   * label's width of one another. The last column runs to the end of the axis.
+   */
+  const cols = axis
+    ? grid.map((left, i) => ({ ...ticks[i], width: (i + 1 < grid.length ? grid[i + 1] : 100) - left }))
+    : [];
   const todayIn = axis && now >= axis.from && now <= axis.to ? now : undefined;
 
   return (
@@ -288,46 +304,56 @@ function SitePanel({
       <div className="max-h-[64vh] overflow-y-auto rounded-sm border border-border bg-surface">
         {axis ? (
           <>
-            <div className="sticky top-0 z-20 flex items-stretch border-b border-border bg-surface2">
-              <div className="w-[260px] flex-none px-3 py-2 text-label font-semibold uppercase tracking-[.03em] text-muted">
+            {/* ── The axis header: two lines, and they cannot collide ─────────────────────────────
+                *"Why are dates on each other? Show the line clearly and today not overlapping any
+                date"* (owner, 2026-08-31). Both faults were the same mistake — absolute labels at
+                percentage offsets, free to sit on top of each other and on the today marker.
+
+                Line 1 is today's and nothing else's. Line 2 is the months, laid out as FLEX CELLS
+                one month wide rather than absolutely: two labels can no longer overlap because
+                neither can leave its own column, and a month too narrow for its label truncates
+                instead of running into its neighbour.
+
+                `z-10`, not 20: an open row menu has to paint over this header (see `ChartRow`). */}
+            <div className="sticky top-0 z-10 flex items-stretch border-b border-border bg-surface2">
+              <div className="flex w-[260px] flex-none items-end px-3 pb-1.5 text-label font-semibold uppercase tracking-[.03em] text-muted">
                 {t.projects.board.whatIsHere}
               </div>
-              {/* The reference's own arrangement (owner, 2026-08-31): a ruled column per month with
-                  its «Mar 26» sitting just inside the rule, and today marked with the date it is. */}
-              <div className="relative min-w-0 flex-1 py-2">
-                {ticks.map((m) => (
-                  <span
-                    key={m.iso}
-                    aria-hidden
-                    className="absolute inset-y-0 w-px bg-border/70"
-                    style={{ insetInlineStart: `${pct(m.iso, axis)}%` }}
-                  />
-                ))}
-                {ticks.map((m) => (
-                  <span
-                    key={`l-${m.iso}`}
-                    className="absolute top-1.5 ms-2 whitespace-nowrap text-label font-semibold text-navy-mid"
-                    style={{ insetInlineStart: `${pct(m.iso, axis)}%` }}
-                  >
-                    {m.label}
-                  </span>
-                ))}
-                {todayIn && (
-                  <>
+
+              <div className="relative min-w-0 flex-1">
+                {/* Today's own line. It sits ABOVE the months, so the chip has nothing to cover. */}
+                <div className="relative h-[18px]">
+                  {todayIn && (
                     <span
-                      aria-hidden
-                      className="absolute inset-y-0 border-s border-dashed border-brand"
-                      style={{ insetInlineStart: `${pct(todayIn, axis)}%` }}
-                    />
-                    {/* Centred on its own line and on the panel's ground, so it reads as a label ON
-                        the marker rather than as one more month. */}
-                    <span
-                      className="absolute -top-1 z-10 -translate-x-1/2 whitespace-nowrap rounded-sm bg-surface2 px-1.5 text-label font-extrabold text-brand rtl:translate-x-1/2"
+                      className="absolute top-0 -translate-x-1/2 whitespace-nowrap px-1 text-label font-extrabold text-brand rtl:translate-x-1/2"
                       style={{ insetInlineStart: `${pct(todayIn, axis)}%` }}
                     >
                       {t.projects.board.today} · {longDate(todayIn)}
                     </span>
-                  </>
+                  )}
+                </div>
+
+                {/* The months, one cell each. */}
+                <div className="flex h-[22px] items-end">
+                  {cols.map((c) => (
+                    <span
+                      key={c.iso}
+                      className="min-w-0 flex-none truncate border-s border-border/70 px-1.5 pb-1 text-label font-semibold text-navy-mid"
+                      style={{ width: `${c.width}%` }}
+                      title={c.label}
+                    >
+                      {c.label}
+                    </span>
+                  ))}
+                </div>
+
+                {/* The marker itself, over both lines. */}
+                {todayIn && (
+                  <span
+                    aria-hidden
+                    className="absolute inset-y-0 border-s border-dashed border-brand"
+                    style={{ insetInlineStart: `${pct(todayIn, axis)}%` }}
+                  />
                 )}
               </div>
             </div>
@@ -337,7 +363,29 @@ function SitePanel({
                 <div className="flex items-center gap-2 border-t border-border bg-surface2/40 px-3 py-1.5">
                   <Icon name={g.kind === "work_order" ? "handyman" : "campaign"} size={13} className="flex-none text-muted" />
                   <span className="truncate text-meta font-semibold text-navy">{g.title?.trim() || g.ref}</span>
-                  {g.kind === "request" && <span className="text-meta text-muted">{g.ref}</span>}
+                  {/* The ref, and only when the TITLE is something else (owner, 2026-08-31: *"why is
+                      the request id repeated twice"*). A request with no title of its own falls back
+                      to its ref above, and this line printed it a second time. */}
+                  {g.kind === "request" && !!g.title?.trim() && <span className="text-meta text-muted">{g.ref}</span>}
+
+                  {/* Rename it (owner, 2026-08-31).
+                      A renter reading their own board should not have to recognise ATC310894. The
+                      reference stays — it is what a supplier quotes back at them — but it stops being
+                      the only thing a row can be called.
+
+                      On every row, not only work orders: the request is the one that arrives with no
+                      name at all, so it is the one that needs this most. */}
+                  {onRename && (
+                    <button
+                      type="button"
+                      onClick={() => onRename(g)}
+                      aria-label={t.common.edit}
+                      title={t.common.edit}
+                      className="flex-none text-muted transition hover:text-brand"
+                    >
+                      <Icon name="edit" size={12} />
+                    </button>
+                  )}
                   {/* Its own period, kept and shown rather than resolved away. A button, not a
                       label: the renter presses it to see WHAT differs and decide, and a difference
                       they cannot open is a warning they can only ignore.

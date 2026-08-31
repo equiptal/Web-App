@@ -114,7 +114,7 @@ export function AwardRow({
         </span>
 
         {/* The menu, on the row it acts on. */}
-        {menu && <span className="absolute end-1.5 top-1/2 -translate-y-1/2">{menu}</span>}
+        {menu && <span className="absolute end-1.5 top-1/2 z-30 -translate-y-1/2">{menu}</span>}
       </div>
 
       {/* `overflow-hidden` HERE and nowhere else: a bar must not escape the track, and the panel
@@ -204,12 +204,10 @@ export function AwaitingRow({
         <span className="truncate text-body font-semibold text-navy">
           {item.label} ×{item.quantity}
         </span>
-        {/* *Pending*, not *not awarded yet* (owner, 2026-08-31).
-            A request that has just gone out has not failed to be awarded — it is waiting, which is
-            the normal and expected state for most of its life. Naming it by what has not happened
-            yet made a healthy request read like a stalled one. */}
-        <span className="truncate text-meta text-muted">{t.projects.chart.pending}</span>
-        {menu && <span className="absolute end-1.5 top-1/2 -translate-y-1/2">{menu}</span>}
+        {/* ~~«pending» under the machine's name.~~ It moved ONTO the bar (owner, 2026-08-31), where
+            the state belongs — the bar is the thing that shows a period, and a word about that
+            period printed in the label column left the two saying the same thing twice. */}
+        {menu && <span className="absolute end-1.5 top-1/2 z-30 -translate-y-1/2">{menu}</span>}
       </div>
 
       <div className="relative min-w-0 flex-1 overflow-hidden py-3">
@@ -219,7 +217,10 @@ export function AwaitingRow({
           className="absolute top-1/2 -translate-y-1/2 truncate rounded-sm border border-dashed border-border-strong bg-surface2 px-2 py-1 text-label font-semibold text-muted"
           style={{ insetInlineStart: `${x1}%`, width: `${Math.max(x2 - x1, 2)}%` }}
         >
-          {t.projects.chart.awaiting}
+          {/* *Pending*, not *awaiting award*: a request that has just gone out has not failed to be
+              awarded — it is waiting, which is the normal state for most of its life. Naming it by
+              what has not happened yet made a healthy request read like a stalled one. */}
+          {t.projects.chart.pending}
         </span>
       </div>
     </div>
