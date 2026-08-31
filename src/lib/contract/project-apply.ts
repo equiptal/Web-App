@@ -190,8 +190,18 @@ export interface TemplateOption {
   kind: "work_order" | "request";
   /** RFQ-1042, or the work order's title. */
   ref: string;
-  /** The first machine's name, so two orders with the same title are still told apart. */
+  /**
+   * ONE machine on that order or request — the row id, not the group's (owner, 2026-08-31).
+   *
+   * The list used to hold one entry per group and copy its first machine's terms, so a renter with a
+   * crane and a generator on one order could reach the crane and never the generator. A template is
+   * a machine, because terms are a machine's.
+   */
+  itemId: string;
+  /** This machine's name, as the chart draws it: category, subtype and size in one string. */
   machine: string;
+  /** How many of it, so the text written into the box says so. */
+  quantity: number;
   /** The source's OWN period, when it had one. Copied with the terms; null means it inherited. */
   when: { startDate: string | null; endDate: string | null } | null;
 }

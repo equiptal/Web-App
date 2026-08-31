@@ -47,7 +47,7 @@ import { useRfq } from "@/lib/store/rfq-store";
 import { shortSite } from "@/lib/contract/project";
 import { listTemplates, fetchTemplateTerms } from "@/lib/api/client";
 import type { TemplateOption } from "@/lib/contract/project-apply";
-import { RENTAL_BASES, PAYMENT_TERMS, type RentalBasis, type PaymentTerm } from "@/lib/contract/options";
+import { RENTAL_BASES, PAYMENT_TERMS, type RentalBasis, type PaymentTerm, type Party } from "@/lib/contract/options";
 import { Icon } from "@/components/ui";
 
 /* ----------------------------- One pill ----------------------------- */
@@ -254,6 +254,10 @@ export function ProjectPills() {
   const { state, actions } = useRfq();
   const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [picking, setPicking] = useState(false);
+  /* Which MACHINE was picked. The store remembers the work order (it needs the group id at submit)
+     and not which row inside it, so the select needs its own memory or it would spring back to
+     "pick one" the moment the terms landed. */
+  const [picked, setPicked] = useState<string | null>(null);
 
   const projectId = state.project?.id ?? null;
 
@@ -277,13 +281,30 @@ export function ProjectPills() {
   const project = state.project;
   if (!project) return null;
 
-  async function applyTemplate(id: string) {
-    const option = templates.find((x) => x.id === id);
+  async function applyTemplate(itemId: string) {
+    const option = templates.find((x) => x.itemId === itemId);
     if (!option || !projectId) return;
     setPicking(true);
+    setPicked(itemId);
     try {
       const terms = await fetchTemplateTerms(projectId, option);
       actions.useTemplate(terms, option.kind === "work_order" ? option.id : null, option.when);
+
+      /* The MACHINE goes in as TEXT (owner, 2026-08-31: *"the machine
+         subcategory/category/size will be copied as text in the text area, not as chips — so the
+         user can rewrite it"*).
+
+         Terms become pills because they are a closed set of answers. Equipment is not: the renter
+         may want the same terms on a bigger excavator, and a chip they cannot retype would make
+         them delete it to say so. As text it is a starting sentence, which is what the box is for.
+
+         Appended, never replacing what is already typed — the renter may have written half a
+         request before reaching for a template. */
+      const line = `${option.quantity > 1 ? `${option.quantity} × ` : ""}${option.machine}`.trim();
+      if (line) {
+        const before = state.text.trimEnd();
+        actions.setText(before ? `${before}\n${line}` : line);
+      }
     } catch {
       // Nothing is applied and nothing is said. A template is a shortcut; failing to take one
       // leaves the renter exactly where they were, which is a working request form.
@@ -293,6 +314,9 @@ export function ProjectPills() {
   }
 
   const { timing } = project.defaults;
+  /* The terms a template put on this request, if one did. Read from the store rather than held here:
+     they are part of the draft the renter is about to send, not a detail of this strip. */
+  const terms = state.templateTerms;
   const dirty = (key: string) => state.projectDirty.includes(key);
 
   /**
@@ -386,21 +410,83 @@ export function ProjectPills() {
           onChange={(v) => actions.patchProjectTerms(v)}
         />
 
+        {/* ── The machine's own terms, once one has been picked ──────────────────────────
+
+            Who delivers, who returns it, who pays for the fuel, and whether it needs an operator —
+            each as a value the renter can change here, on this request, without touching the machine
+            it was copied from (PROJ-AC-25).
+
+            Two-answer fields are segments rather than menus: with only *me* and *supplier* there is
+            nothing to reveal, and a renter comparing them should not have to open anything. */}
+        {terms && (
+          <>
+            <PillSegment<Party>
+              label={t.projects.pills.delivery}
+              value={terms.deliveryOverride ?? null}
+              options={["me", "supplier"] as const}
+              optionLabel={(v) => t.options.party[v]}
+              changed={dirty("preferences.delivery")}
+              onChange={(v) => actions.patchTerms({ deliveryOverride: v }, ["preferences.delivery"])}
+            />
+            <PillSegment<Party>
+              label={t.projects.pills.ret}
+              value={terms.returnOverride ?? null}
+              options={["me", "supplier"] as const}
+              optionLabel={(v) => t.options.party[v]}
+              changed={dirty("preferences.return")}
+              onChange={(v) => actions.patchTerms({ returnOverride: v }, ["preferences.return"])}
+            />
+            <PillSegment<Party>
+              label={t.projects.pills.fuelResp}
+              value={terms.fuelResponsibilityOverride ?? null}
+              options={["me", "supplier"] as const}
+              optionLabel={(v) => t.options.party[v]}
+              changed={dirty("preferences.fuel")}
+              onChange={(v) => actions.patchTerms({ fuelResponsibilityOverride: v }, ["preferences.fuel"])}
+            />
+            <PillSegment<"yes" | "no">
+              label={t.projects.pills.operator}
+              value={terms.operatorNeeded === "no" ? "no" : "yes"}
+              options={["yes", "no"] as const}
+              optionLabel={(v) => (v === "yes" ? t.common.yes : t.common.no)}
+              changed={dirty("preferences.operator")}
+              onChange={(v) => actions.patchTerms({ operatorNeeded: v }, ["preferences.operator"])}
+            />
+
+            {/* Certificates report rather than edit: the set lives in *More details*, where the
+                free-text «other» box lives with it, and a pill that opened a second multi-select
+                would be a third place to change one thing. */}
+            {!!terms.safetyCertsOverride?.length && (
+              <Pill
+                label={t.projects.pills.certs}
+                value={terms.safetyCertsOverride.map((c) => t.options.safetyCert[c] ?? c).join(", ")}
+              />
+            )}
+          </>
+        )}
+
         {/* Start from — copies how this renter HIRES at this site, and never what they are hiring.
             Rendered only when the site actually has something to copy. */}
         {templates.length > 0 && (
           <label className={`relative ${PILL} ${EDITABLE} border-border bg-surface text-navy`}>
             <span className={LABEL}>{t.projects.pills.startFrom}</span>
+            {/* Keyed by MACHINE id, not by the order it sits in — two machines on one order are two
+                entries now, and picking either copies its own answers.
+
+                The machine's name leads, because that is what the renter is looking for. The kind and
+                the reference follow it, to tell two of the same machine apart. */}
             <select
               disabled={picking}
-              value={state.workOrderGroupId ?? ""}
+              value={picked ?? ""}
               onChange={(e) => void applyTemplate(e.target.value)}
               className={`cursor-pointer bg-transparent outline-none focus-visible:outline-none ${VALUE}`}
             >
               <option value="">{state.templateTerms ? t.projects.pills.templateApplied : t.projects.pills.pickTemplate}</option>
               {templates.map((tpl) => (
-                <option key={tpl.id} value={tpl.id}>
-                  {`${tpl.kind === "work_order" ? t.projects.pills.kindWorkOrder : t.projects.pills.kindRequest} · ${tpl.ref}${tpl.machine ? ` · ${tpl.machine}` : ""}`}
+                <option key={tpl.itemId} value={tpl.itemId}>
+                  {`${tpl.machine || tpl.ref} · ${
+                    tpl.kind === "work_order" ? t.projects.pills.kindWorkOrder : t.projects.pills.kindRequest
+                  } ${tpl.ref}`}
                 </option>
               ))}
             </select>

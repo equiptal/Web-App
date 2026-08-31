@@ -1044,13 +1044,20 @@ export async function withFreshVersion<T>(
  */
 export async function listTemplates(projectId: string): Promise<TemplateOption[]> {
   const chart = await fetchChart(projectId);
-  return chart.groups.map((g) => ({
-    id: g.id,
-    kind: g.kind,
-    ref: g.title?.trim() || g.ref,
-    machine: g.items[0]?.label ?? "",
-    when: g.when,
-  }));
+  /* One entry per MACHINE. Per group, a renter with a crane and a generator on one order could
+     reach the crane and never the generator — and terms belong to a machine, not to the order it
+     happens to sit in. */
+  return chart.groups.flatMap((g) =>
+    g.items.map((it) => ({
+      id: g.id,
+      kind: g.kind,
+      ref: g.title?.trim() || g.ref,
+      itemId: it.id,
+      machine: it.label,
+      quantity: it.quantity,
+      when: g.when,
+    })),
+  );
 }
 
 /**
@@ -1069,16 +1076,19 @@ export async function fetchTemplateTerms(projectId: string, option: TemplateOpti
   if (option.kind === "work_order") {
     const groups = await listWorkOrders(projectId);
     const group = groups.find((g) => g.id === option.id);
-    // The header row's terms. Machines in a group may legitimately differ; the first is the one the
-    // form shows as the shared block, so it is what "start from this order" means.
-    const first = group?.items[0];
-    return first ? termsFromWire(first.terms as unknown) : null;
+    /* THAT machine's terms, by id — not the group's first. Machines on one order legitimately
+       differ, and copying the first one's answers while naming the second is worse than copying
+       nothing: the renter has no reason to doubt what they asked for. Falls back to the first only
+       when the id no longer resolves, which means the order changed under the list. */
+    const row = group?.items.find((it) => it.id === option.itemId) ?? group?.items[0];
+    return row ? termsFromWire(row.terms as unknown) : null;
   }
 
   const record = (await fetchRequestDetail(option.id)) as unknown as {
-    equipmentItems?: Parameters<typeof machineTermsOfRequestItem>[0][];
+    equipmentItems?: (Parameters<typeof machineTermsOfRequestItem>[0] & { id?: string })[];
   };
-  const item = record.equipmentItems?.[0];
+  const items = record.equipmentItems ?? [];
+  const item = items.find((it) => it.id === option.itemId) ?? items[0];
   return item ? machineTermsOfRequestItem(item) : null;
 }
 

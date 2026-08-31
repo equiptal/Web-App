@@ -156,3 +156,63 @@ describe("picking a template", () => {
     expect(cleared.workOrderGroupId).toBeNull();
   });
 });
+
+/* ============================================================================================== *
+ * Editing a copied term — this request only
+ * ============================================================================================== */
+
+describe("a term the template copied", () => {
+  const seed = (terms: MachineTerms) =>
+    reducer(initialState, { t: "USE_TEMPLATE", terms, groupId: "wo1", when: null });
+
+  const base = (): MachineTerms =>
+    termsFromWire({ operator: "yes", delivery: "supplier", ret: "supplier", fuelResp: "me" } as unknown as WireTerms);
+
+  it("can be changed, and the change lands on the request rather than the source", () => {
+    /* PROJ-AC-25: changing a pill changes THIS request only. `templateTerms` is what gets applied to
+       every line at submit, so editing it is editing the answer that will be sent — the machine it
+       was copied from is untouched. */
+    const withTemplate = seed(base());
+    const next = reducer(withTemplate, {
+      t: "PATCH_TEMPLATE_TERMS",
+      patch: { deliveryOverride: "me" },
+      keys: ["preferences.delivery"],
+    });
+
+    expect(next.templateTerms?.deliveryOverride).toBe("me");
+    // Everything else the template brought is still there — a patch, not a replacement.
+    expect(next.templateTerms?.returnOverride).toBe("supplier");
+    expect(next.workOrderGroupId).toBe("wo1");
+  });
+
+  it("marks the field, so the pill stops reading as the project's", () => {
+    const next = reducer(seed(base()), {
+      t: "PATCH_TEMPLATE_TERMS",
+      patch: { fuelResponsibilityOverride: "supplier" },
+      keys: ["preferences.fuel"],
+    });
+    expect(next.projectDirty).toContain("preferences.fuel");
+  });
+
+  it("does not record the same field twice", () => {
+    // Two edits to one pill are one changed field, and a list that grows on every keystroke is a
+    // leak nobody sees until it is long.
+    let st = seed(base());
+    for (const v of ["me", "supplier", "me"] as const) {
+      st = reducer(st, { t: "PATCH_TEMPLATE_TERMS", patch: { deliveryOverride: v }, keys: ["preferences.delivery"] });
+    }
+    expect(st.projectDirty.filter((k) => k === "preferences.delivery")).toHaveLength(1);
+  });
+
+  it("is ignored when no template has been picked", () => {
+    // There is nothing to patch, and inventing an empty terms object here would make a request claim
+    // answers nobody gave.
+    const next = reducer(initialState, {
+      t: "PATCH_TEMPLATE_TERMS",
+      patch: { deliveryOverride: "me" },
+      keys: ["preferences.delivery"],
+    });
+    expect(next.templateTerms).toBeNull();
+    expect(next).toBe(initialState);
+  });
+});

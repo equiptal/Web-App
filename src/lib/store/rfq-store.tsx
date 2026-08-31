@@ -237,6 +237,8 @@ type Action =
   | { t: "PATCH_PROJECT_SITE"; location: SiteLocation }
   | { t: "SET_WORK_ORDER_SOURCE"; groupId: string | null }
   | { t: "USE_TEMPLATE"; terms: MachineTerms | null; groupId: string | null; when: { startDate: string | null; endDate: string | null } | null }
+  /** Change one of the copied terms on THIS request. Marks the fields so the pill shows as changed. */
+  | { t: "PATCH_TEMPLATE_TERMS"; patch: Partial<MachineTerms>; keys: string[] }
   | { t: "SUBMIT_START" }
   | { t: "SUBMIT_SUCCESS"; requestId: string; requestIds: string[]; requestUuids: string[]; trialExpiresAt?: string | null }
   | { t: "SUBMIT_ERROR"; kind: ApiErrorKind; detail?: RfqState["errorDetail"] }
@@ -450,6 +452,25 @@ export function reducer(state: RfqState, a: Action): RfqState {
             }
           : state.project;
       return { ...state, templateTerms: a.terms, workOrderGroupId: a.groupId, project };
+    }
+
+    /**
+     * Edit a term the template copied.
+     *
+     * Changes THIS request and nothing else (PROJ-AC-25). `templateTerms` is what gets applied to
+     * every line at submit, so editing it here is editing the answer that will be sent — the machine
+     * it was copied from is untouched, and so is the site.
+     *
+     * The touched keys ride along, because a value the renter changed has to stop reading *from your
+     * project* and start reading as theirs.
+     */
+    case "PATCH_TEMPLATE_TERMS": {
+      if (!state.templateTerms) return state;
+      return {
+        ...state,
+        templateTerms: { ...state.templateTerms, ...a.patch },
+        projectDirty: [...new Set([...state.projectDirty, ...a.keys])],
+      };
     }
     case "PROCESS_ERROR":
       // Back to intake with the text intact (AC-10), wherever the failure happened.
@@ -746,6 +767,8 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
       groupId: string | null,
       when: { startDate: string | null; endDate: string | null } | null,
     ) => dispatch({ t: "USE_TEMPLATE", terms, groupId, when }),
+    patchTerms: (patch: Partial<MachineTerms>, keys: string[] = []) =>
+      dispatch({ t: "PATCH_TEMPLATE_TERMS", patch, keys }),
 
     /**
      * Parse the renter's text.
