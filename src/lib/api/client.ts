@@ -928,8 +928,78 @@ export async function fetchChart(projectId: string): Promise<ProjectChart> {
 
 /** The site's own machines, already grouped into work orders. */
 export async function listWorkOrders(projectId: string): Promise<WorkOrderGroup[]> {
-  const rows = await projectFetch<WorkOrderItem[]>(`${projectPath(projectId)}/work-orders`);
-  return groupWorkOrderItems(rows);
+  /**
+   * ⚠️ **The backend already groups these.** It answers
+   * `{ version, workOrders: [{ workOrderGroupId, title, when, items: [...] }] }`, and this function
+   * used to hand that OBJECT to `groupWorkOrderItems`, which expects a flat array of machines each
+   * carrying its own `workOrderGroupId`. So it re-grouped data that was already grouped, reading a
+   * key that does not exist at item level.
+   *
+   * The damage was quiet, which is why it lasted. Every group came back with `id: undefined`, so:
+   *
+   *  · `fetchTemplateTerms` looked its group up by id, never matched, and returned `null` — a
+   *    work-order template silently copied NO terms, which is exactly the thing a template is for.
+   *  · `startEditOrder` could not find the order either, and refused to open the form. That refusal
+   *    is what surfaced it (owner, 2026-08-31), because it is the one path that says so out loud
+   *    instead of quietly doing nothing.
+   *
+   * Read the shape the backend actually sends. `groupWorkOrderItems` stays for the callers that do
+   * receive a flat list.
+   */
+  const raw = await projectFetch<{ workOrders?: unknown[] } | unknown[]>(
+    `${projectPath(projectId)}/work-orders`,
+  );
+
+  // Tolerant of both shapes: a flat array is still grouped the old way rather than dropped.
+  if (Array.isArray(raw)) return groupWorkOrderItems(raw as WorkOrderItem[]);
+
+  const groups = Array.isArray(raw?.workOrders) ? raw.workOrders : [];
+
+  return groups.map((g) => {
+    const row = (g ?? {}) as Record<string, unknown>;
+    const when = (row.when ?? {}) as Record<string, unknown>;
+    const items = Array.isArray(row.items) ? (row.items as Record<string, unknown>[]) : [];
+    const groupId = String(row.workOrderGroupId ?? "");
+
+    const header: WorkOrderGroup["when"] = {
+      rentalBasis: (when.rentalBasis ?? null) as WorkOrderGroup["when"]["rentalBasis"],
+      extendable: (when.extendable ?? null) as boolean | null,
+      startDate: (when.startDate ?? null) as string | null,
+      endDate: (when.endDate ?? null) as string | null,
+      hoursPerDay: (when.hoursPerDay ?? null) as number | null,
+    };
+
+    return {
+      id: groupId,
+      projectId: (row.projectId ?? null) as string | null,
+      title: (row.title ?? null) as string | null,
+      when: header,
+      whenConflictAck: row.whenConflictAck === true,
+      items: items.map((it, i) => ({
+        id: String(it.id ?? ""),
+        // Restored from the group, which is the only place the backend puts it.
+        workOrderGroupId: groupId,
+        sortOrder: typeof it.sortOrder === "number" ? it.sortOrder : i,
+        projectId: (row.projectId ?? null) as string | null,
+        title: (row.title ?? null) as string | null,
+        when: header,
+        whenConflictAck: row.whenConflictAck === true,
+        ref: {
+          categoryId: (it.categoryId ?? null) as string | null,
+          subcategoryId: (it.subcategoryId ?? null) as string | null,
+          measurementId: (it.measurementId ?? null) as string | null,
+        },
+        rawLabel: (it.rawLabel ?? null) as string | null,
+        rawSize: (it.rawSize ?? null) as string | null,
+        quantity: typeof it.quantity === "number" ? it.quantity : 1,
+        attachmentIds: Array.isArray(it.attachmentIds) ? (it.attachmentIds as string[]) : [],
+        customAttachments: Array.isArray(it.customAttachments) ? (it.customAttachments as string[]) : [],
+        // The stored blob → the app's shape. This is the value the edit form reads back.
+        terms: termsFromWire(it.terms),
+        notes: (it.notes ?? null) as string | null,
+      })) as WorkOrderItem[],
+    };
+  });
 }
 
 /**
@@ -1101,9 +1171,15 @@ export async function fetchTemplateTerms(projectId: string, option: TemplateOpti
     const group = groups.find((g) => g.id === option.id);
     /* THAT machine's terms, by id — not the group's first. Machines on one order legitimately
        differ, and copying the first one's answers while naming the second is worse than copying
-       nothing: the renter has no reason to doubt what they asked for. Falls back to the first only
-       when the id no longer resolves, which means the order changed under the list. */
-    const row = group?.items.find((it) => it.id === option.itemId) ?? group?.items[0];
+       nothing: the renter has no reason to doubt what they asked for.
+
+       ⚠️ Looked up ACROSS every group rather than inside the one whose id matches. The group lookup
+       above returned undefined for months, because `listWorkOrders` re-grouped already-grouped data
+       and lost every group id — so this returned null and a work-order template copied no terms at
+       all, silently. The machine id is unique on its own; going through the group added a way to
+       fail and nothing else. */
+    const row =
+      groups.flatMap((g) => g.items).find((it) => it.id === option.itemId) ?? group?.items[0];
     return row ? termsFromWire(row.terms as unknown) : null;
   }
 

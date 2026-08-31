@@ -267,3 +267,61 @@ describe("withFreshVersion", () => {
     expect(write).toHaveBeenCalledTimes(1);
   });
 });
+
+/* ============================================================================================== *
+ * The work-order list, whose shape nobody was checking
+ * ============================================================================================== */
+
+describe("reading a project's work orders", () => {
+  /* The backend ALREADY groups these: `{ version, workOrders: [{ workOrderGroupId, items }] }`. The
+     client handed that object to `groupWorkOrderItems`, which expects a flat array of machines each
+     carrying its own `workOrderGroupId` — so it re-grouped grouped data and read a key that does not
+     exist at item level.
+
+     The damage was quiet, which is why it lasted: every group came back with no id, so
+     `fetchTemplateTerms` never matched one and a work-order template silently copied NO terms. It
+     surfaced only when `startEditOrder` refused to open the form, because that is the one path that
+     says so out loud rather than doing nothing. */
+
+  it("keeps the group id, and each machine's terms", async () => {
+    stub(() =>
+      reply(200, {
+        version: 3,
+        workOrders: [
+          {
+            workOrderGroupId: "g1",
+            projectId: "p1",
+            title: "Own fleet",
+            when: { rentalBasis: "MONTHLY", startDate: "2026-09-01", endDate: "2026-12-31" },
+            items: [
+              { id: "m1", rawLabel: "Excavator", quantity: 3, terms: { delivery: "supplier", year: "2019" } },
+              { id: "m2", rawLabel: "Generator", quantity: 2, terms: { delivery: "me" } },
+            ],
+          },
+        ],
+      }),
+    );
+
+    const groups = await listWorkOrders("p1");
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].id, "the group id is the ONLY place the backend puts it").toBe("g1");
+    expect(groups[0].title).toBe("Own fleet");
+    expect(groups[0].items.map((i) => i.id)).toEqual(["m1", "m2"]);
+
+    // Every machine carries the group id back, because callers key on it.
+    expect(groups[0].items.every((i) => i.workOrderGroupId === "g1")).toBe(true);
+
+    /* And the terms, per machine — the thing the edit form reads back and the template copies. Two
+       machines on one order legitimately differ. */
+    expect(groups[0].items[0].terms.deliveryOverride).toBe("supplier");
+    expect(groups[0].items[0].terms.equipmentYear).toBe("2019");
+    expect(groups[0].items[1].terms.deliveryOverride).toBe("me");
+  });
+
+  it("still groups a flat array, for whatever sends one", async () => {
+    // Tolerant rather than brittle: a flat list is grouped the old way instead of dropped.
+    stub(() => reply(200, []));
+    await expect(listWorkOrders("p1")).resolves.toEqual([]);
+  });
+});
