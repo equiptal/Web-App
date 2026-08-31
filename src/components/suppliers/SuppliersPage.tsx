@@ -7,6 +7,8 @@ import { btn, cx } from "@/lib/ds";
 import { deleteSupplierGroup, listRenterSuppliers, renameSupplierGroup, updateRenterSupplier } from "@/lib/api/client";
 import { AddSuppliersDialog } from "./AddSuppliersDialog";
 import { DeleteGroupDialog, GroupsMenu, NameGroupDialog, RenameGroupDialog } from "./SupplierGroups";
+import { SupplierProfileDialog } from "./SupplierProfileDialog";
+import { SupplierBidsDialog } from "./SupplierBidsDialog";
 import {
   bidCount,
   canBeEmailed,
@@ -57,6 +59,11 @@ export function SuppliersPage() {
   const [naming, setNaming] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+
+  /* Two doors, two jobs: the row opens the record, the bid count opens the route out to the request.
+     Never both at once — a dialog stacked on a dialog has two ways to close and neither is obvious. */
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [bidsId, setBidsId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     listRenterSuppliers().then(setRows);
@@ -293,6 +300,8 @@ export function SuppliersPage() {
                       return next;
                     })
                   }
+                  onOpen={() => setProfileId(s.id)}
+                  onOpenBids={() => setBidsId(s.id)}
                 />
               ))}
             </tbody>
@@ -306,6 +315,23 @@ export function SuppliersPage() {
         onAdded={() => {
           load();
           setToast(c.added);
+        }}
+      />
+
+      <SupplierProfileDialog
+        id={profileId}
+        onClose={() => setProfileId(null)}
+        onOpenBids={(x) => {
+          setProfileId(null);
+          setBidsId(x);
+        }}
+      />
+      <SupplierBidsDialog
+        id={bidsId}
+        onClose={() => setBidsId(null)}
+        onProfile={(x) => {
+          setBidsId(null);
+          setProfileId(x);
         }}
       />
 
@@ -365,6 +391,8 @@ function Row({
   picking,
   picked,
   onPick,
+  onOpen,
+  onOpenBids,
 }: {
   s: RenterSupplier;
   c: ReturnType<typeof useT>["suppliers"];
@@ -372,6 +400,8 @@ function Row({
   picking: boolean;
   picked: boolean;
   onPick: (on: boolean) => void;
+  onOpen: () => void;
+  onOpenBids: () => void;
 }) {
   const platform = s.kind === "platform";
   const groups = groupsOf(s);
@@ -384,7 +414,17 @@ function Row({
   if (roll?.bidsLink) detail.push(fmt(c.viaLink, { n: roll.bidsLink }));
 
   return (
-    <tr className={cx("border-b border-border last:border-b-0", picked ? "bg-brand-soft" : "hover:bg-surface2")}>
+    <tr
+      onClick={(e) => {
+        // Anything interactive keeps its own click: the vendor toggle, the checkbox, the bid count.
+        if ((e.target as HTMLElement).closest("button, input, a, select")) return;
+        onOpen();
+      }}
+      className={cx(
+        "cursor-pointer border-b border-border last:border-b-0",
+        picked ? "bg-brand-soft" : "hover:bg-surface2",
+      )}
+    >
       {picking && (
         <td className="px-3 py-2.5">
           <input
@@ -474,14 +514,14 @@ function Row({
             <span className="block text-label font-semibold text-muted">{c.nothingShared}</span>
           </>
         ) : (
-          <>
-            <span className="block text-body font-extrabold text-navy">
+          <button type="button" onClick={onOpenBids} className="block text-start">
+            <span className="block text-body font-extrabold text-navy underline decoration-border-strong underline-offset-2 hover:decoration-navy">
               {bids === 1 ? fmt(c.bidOne, { n: 1 }) : fmt(c.bidMany, { n: bids })}
             </span>
             <span className="block text-label font-semibold text-muted">
               {[...detail, roll?.awards ? fmt(c.awarded, { n: roll.awards }) : null].filter(Boolean).join(" · ")}
             </span>
-          </>
+          </button>
         )}
       </td>
     </tr>
