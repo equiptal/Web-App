@@ -7,6 +7,7 @@ import {
   mapTaxonomy,
   mapEquipmentDetail,
   mediaUrl,
+  supplierIdOf,
 } from "@/lib/contract/stores";
 import { en } from "@/lib/i18n/en";
 import { ar } from "@/lib/i18n/ar";
@@ -25,6 +26,9 @@ describe("stores mappers (web-app/004)", () => {
     });
     expect(card).toEqual({
       id: "s1",
+      // Null, and deliberately: this payload names no supplier, and the guard should fail the day
+      // one is added without a decision (SUP-T03).
+      supplierId: null,
       name: "Al Rajhi Equipment",
       logoUrl: "https://x/logo.png",
       isVerified: true,
@@ -208,6 +212,42 @@ describe("stores mappers (web-app/004)", () => {
     expect(tree).toHaveLength(1);
     expect(tree[0].children[0].id).toBe("s1");
     expect(tree[0].children[0].children[0].nameAr).toBe("20 طن");
+  });
+});
+
+/**
+ * SUP-T03 — the store id is not the supplier id.
+ *
+ * My Suppliers links a renter to a SUPPLIER. `StoreCard.id` is the shopfront, so linking on it would
+ * point at the wrong thing, and the mapper used to drop the supplier's id entirely — whatever the
+ * payload called it. These pin the tolerant read: every spelling the two projections have used, and
+ * null when there is none, because null is what lets the picker say it cannot link this store yet.
+ */
+describe("the supplier behind a store", () => {
+  const spellings = ["supplierId", "supplierUserId", "ownerId", "ownerUserId", "companyId"] as const;
+  for (const key of spellings) {
+    it(`reads ${key}`, () => {
+      expect(supplierIdOf({ id: "st_1", [key]: "u_882" })).toBe("u_882");
+    });
+  }
+
+  it("reads a nested supplier object", () => {
+    expect(supplierIdOf({ id: "st_1", supplier: { id: "u_882", name: "Zahid" } })).toBe("u_882");
+    expect(supplierIdOf({ id: "st_1", supplier: { userId: "u_419" } })).toBe("u_419");
+  });
+
+  it("is null when the payload names no supplier — never the store's own id", () => {
+    expect(supplierIdOf({ id: "st_1", name: "Zahid Tractor" })).toBeNull();
+  });
+
+  it("numbers survive as strings", () => {
+    expect(supplierIdOf({ id: "st_1", supplierId: 882 })).toBe("882");
+  });
+
+  it("rides on the card and the detail", () => {
+    expect(mapStoreCard({ id: "st_1", name: "Zahid", supplierId: "u_882" }).supplierId).toBe("u_882");
+    expect(mapStoreCard({ id: "st_1", name: "Zahid" }).supplierId).toBeNull();
+    expect(mapStoreDetail({ id: "st_1", name: "Zahid", ownerId: "u_733" }).supplierId).toBe("u_733");
   });
 });
 

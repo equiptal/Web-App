@@ -9,6 +9,17 @@
 /** A supplier store as shown on a browse/preview card (AC-16). */
 export interface StoreCard {
   id: string;
+  /**
+   * The SUPPLIER behind the store, when the payload names one — SUP-T03.
+   *
+   * `id` above is the store. My Suppliers links a renter to the supplier, so a store id is the wrong
+   * key: two stores could belong to one firm, and the link would point at a shopfront rather than a
+   * company. The mapper reads every spelling the two services have used and keeps null when none is
+   * there, which is `requestCodeOf`'s rule in `requests.ts` and for the same reason — a name we do
+   * not know is an id discarded, and the picker must be able to SAY it cannot link rather than link
+   * the wrong thing.
+   */
+  supplierId: string | null;
   name: string;
   logoUrl: string | null;
   isVerified: boolean;
@@ -46,6 +57,8 @@ export interface StoreDetail {
   bannerUrl: string | null;
   viewCount: number;
   isVerified: boolean;
+  /** The supplier behind the store — see `StoreCard.supplierId`. Null when the payload names none. */
+  supplierId: string | null;
   supplierName: string | null;
   city: string | null;
   activeEquipmentCount: number;
@@ -129,9 +142,33 @@ export function extractStoreList(raw: unknown): Raw[] {
   return [];
 }
 
+/**
+ * The supplier's id off a store payload, whatever it is called there.
+ *
+ * The authed and public store projections have not agreed on a name, and the field may not be sent
+ * at all — so this tries each spelling and answers null rather than inventing one. Null is a real
+ * answer: it means this store cannot be linked to a supplier yet, and the caller says so.
+ */
+export function supplierIdOf(raw: Raw): string | null {
+  // An id arrives as a number as often as a string — `id` above is already `String(...)`d for that
+  // reason, and a string-only read here would silently drop half the payloads it is meant to catch.
+  const id = (v: unknown): string | null =>
+    typeof v === "string" && v.trim() ? v : typeof v === "number" && Number.isFinite(v) ? String(v) : null;
+  const nested = raw.supplier && typeof raw.supplier === "object" ? (raw.supplier as Raw) : null;
+  return (
+    id(raw.supplierId) ??
+    id(raw.supplierUserId) ??
+    id(raw.ownerId) ??
+    id(raw.ownerUserId) ??
+    id(raw.companyId) ??
+    (nested ? id(nested.id) ?? id(nested.userId) : null)
+  );
+}
+
 export function mapStoreCard(raw: Raw): StoreCard {
   return {
     id: String(raw.id ?? ""),
+    supplierId: supplierIdOf(raw),
     // Authed `/stores` sends `name`; the public projection sends the supplier's `companyName`.
     name: str(raw.name) ?? str(raw.companyName) ?? "",
     logoUrl: mediaUrl(raw.logoUrl ?? raw.logoKey),
@@ -225,6 +262,7 @@ export function mapStoreDetail(raw: Raw): StoreDetail {
     bannerUrl: mediaUrl(store.bannerUrl ?? store.bannerKey),
     viewCount: num(store.viewCount) ?? 0,
     isVerified: bool(store.isVerified),
+    supplierId: supplierIdOf(store),
     supplierName: str(store.supplierName) ?? str(store.companyName),
     city,
     activeEquipmentCount: num(meta.total) ?? equipmentRaw.length,
