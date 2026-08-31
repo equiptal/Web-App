@@ -16,6 +16,7 @@
  *   one equipment line                    → Tier 0   the matcher, in the browser, no network
  *   a sentence with extras + a project    → Tier 1   POST /api/agent/quick, synchronous
  *   a paragraph, or extras with no project → Tier 2  today's path, byte-identical
+ *   a line naming a TERM (TÜV, operator…) → Tier 2   because Tier 1's prompt drops those fields
  */
 
 import type { Taxonomy } from "@/lib/contract/taxonomy";
@@ -31,6 +32,51 @@ export type Tier = 0 | 1 | 2;
  * full path just costs that second.
  */
 const PARAGRAPH_CHARS = 180;
+
+/**
+ * Words that mean the line carries a TERM, not just a machine — so the fast path would lose them.
+ *
+ * ⚠️ This is not a guess about the model. The equipment-only prompt forbids the fields outright:
+ *
+ *     • no operator, fuel, diesel, mobilization or demobilization fields
+ *     • no equipment-age or safety-certificate fields
+ *
+ * It emits seven keys and nothing else, by design — that trimming is what made the fast path fast.
+ * Which means a renter who types *"crawler excavator 30 ton with tuv"* gets the excavator and **loses
+ * the TÜV**, silently, with no field left anywhere to show it in (owner, 2026-08-31: *"he just
+ * recognize the equipment not the tuv"*).
+ *
+ * The length rule above already states the principle — *losing what the renter wrote is worse than
+ * the second it saves* — and simply measured the wrong thing. 33 characters can carry a term as
+ * easily as 200.
+ *
+ * So a line that mentions one goes to Tier 2, whose prompt does extract it. It costs the renter a
+ * couple of seconds on the lines where they asked for more, which is exactly the bargain they
+ * described: *"if user enters 2 then 2 will be processed only so quickly"* — enter more, and more is
+ * read.
+ *
+ * Kept deliberately narrow. A false positive costs two seconds; a false negative loses a commercial
+ * term the renter typed and will not be told about. Both languages, because the intake takes both.
+ */
+const TERM_WORDS = [
+  // Certificates — the reported case. Third-party marks a renter names by brand.
+  "tuv", "tüv", "aramco", "spsp", "saso", "cert", "certificate", "certified",
+  "شهاد", "أرامكو", "ارامكو",
+  // Operator, and the fields that hang off one.
+  "operator", "driver", "مشغل", "مشغّل", "سائق",
+  // Who moves it, who fuels it.
+  "delivery", "deliver", "return", "pickup", "pick up", "mobiliz", "demobiliz", "haulage",
+  "fuel", "diesel", "petrol",
+  "تسليم", "استلام", "وقود", "ديزل", "نقل",
+  // How old it may be.
+  "model year", "year model", "newer", "moudel", "موديل", "سنة الصنع",
+] as const;
+
+/** Substring, lower-cased: «TÜV-certified» and «tuv cert» both have to count. */
+export function mentionsTerms(text: string): boolean {
+  const t = text.toLowerCase();
+  return TERM_WORDS.some((w) => t.includes(w));
+}
 
 export interface TierDecision {
   tier: Tier;
@@ -67,6 +113,11 @@ export function decideTier(input: {
      The equipment-only prompt drops header extraction, so without a project nothing else supplies
      them and the renter silently loses something they typed. That is not a trade worth a second. */
   if (!input.hasProject) return { tier: 2, reason: "no_project" };
+
+  /* And the same argument applies to a TERM, which the fast path drops just as completely — see
+     `TERM_WORDS`. Checked AFTER Tier 0, because a line the matcher consumed whole has no term left
+     in it by definition. */
+  if (mentionsTerms(text)) return { tier: 2, reason: "terms_in_text" };
 
   return { tier: 1, reason: match.reason };
 }

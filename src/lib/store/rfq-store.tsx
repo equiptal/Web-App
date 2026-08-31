@@ -61,6 +61,35 @@ const LEGACY_DRAFT_STORAGE_KEYS = ["rfq-draft-v1"];
  * (and the agent actually supplied one). Drives the orange "AI" marker; returns false once the
  * renter edits the value (so the mark clears), or when the agent left the field empty.
  */
+/**
+ * How long the processing screen stays up at minimum.
+ *
+ * Long enough to register as a step that happened rather than a flicker; short enough that nobody
+ * reads it as slow. Tier 0 answers in ~50 ms, so on that path this is almost the whole visible
+ * duration — see `holdProcessing`.
+ */
+const FLOOR_MS = 700;
+
+/**
+ * Waits out whatever is LEFT of the processing floor, and nothing more.
+ *
+ * ⚠️ Tier 0 resolves with no `await` in it — a string match against a taxonomy the browser already
+ * holds — so `PROCESS_START` and `PROCESS_SUCCESS` land in the same React batch and the screen never
+ * paints. The parse worked; the renter saw a flicker and a filled form, which reads like a form that
+ * was always filled (owner, 2026-08-31: *"even if agent is too fast i still want to show the agent
+ * processing screen, just for the user to feel there is real agent"*).
+ *
+ * Not decoration: this product's claim is that something READ what they wrote, and this screen is
+ * the only moment that claim is visible.
+ *
+ * A floor rather than a delay, so a path that already spent longer waits for nothing — Tier 2 takes
+ * four seconds and needs no help feeling real. Nobody waits for the sake of waiting.
+ */
+async function holdProcessing(startedAt: number): Promise<void> {
+  const left = FLOOR_MS - (Date.now() - startedAt);
+  if (left > 0) await new Promise((r) => setTimeout(r, left));
+}
+
 export function agentMatches(current: unknown, original: unknown): boolean {
   if (original == null || original === "" || (Array.isArray(original) && original.length === 0)) return false;
   return JSON.stringify(current) === JSON.stringify(original);
@@ -791,6 +820,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
     async process() {
       const s = getState();
       dispatch({ t: "PROCESS_START" });
+      const startedAt = Date.now();
 
       const decision = decideTier({
         text: s.text,
@@ -813,6 +843,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
             capacity_id: i.ref.measurementId,
             quantity: i.quantity,
           })));
+          await holdProcessing(startedAt);
           dispatch({ t: "PROCESS_SUCCESS", draft });
           return;
         }
@@ -821,6 +852,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
         if (decision.tier === 1) {
           const quick = await processQuick({ text: s.text });
           if (!quick.fallback && quick.line_items?.length) {
+            await holdProcessing(startedAt);
             dispatch({ t: "PROCESS_SUCCESS", draft: quickItemsToDraft(quick, s.taxonomy) });
             return;
           }
@@ -829,8 +861,12 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
         }
 
         const draft = await processRfq({ text: s.text, files: s.files, simulateError: s.simulateError });
+        // Almost always a no-op here: this path has spent seconds already.
+        await holdProcessing(startedAt);
         dispatch({ t: "PROCESS_SUCCESS", draft });
       } catch (e) {
+        // Floored too: a failure that flashes past is a failure the renter cannot read.
+        await holdProcessing(startedAt);
         if (e instanceof ApiError && e.kind === "guest_limit") { dispatch({ t: "GUEST_LIMIT" }); return; }
         const detail =
           e instanceof ApiError

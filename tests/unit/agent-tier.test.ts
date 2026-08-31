@@ -41,7 +41,11 @@ describe("which path the text takes", () => {
   });
 
   it("a line with something extra → Tier 1", () => {
-    const d = decideTier({ ...base, text: "2 crawler excavators 20t with operator" });
+    /* ~~«2 crawler excavators 20t with operator».~~ Changed, because that example is now Tier 2 by
+       design: the equipment-only prompt emits no operator field, so the fast path would drop the one
+       word that made this line worth a second call. The extra here is a PERIOD, which Tier 1's
+       leftover words legitimately are — the header the project supplies. */
+    const d = decideTier({ ...base, text: "2 crawler excavators 20t for 3 weeks" });
     expect(d.tier).toBe(1);
     expect(d.reason).toBe("leftover_words");
   });
@@ -109,5 +113,54 @@ describe("the browser matcher", () => {
 
   it("carries the agent's rules hash, so a forked copy fails the build", () => {
     expect(MATCHER_RULES_HASH).toMatch(/^[0-9a-f]{12}$/);
+  });
+});
+
+/* ============================================================================================== *
+ * A line that names a TERM cannot take the fast path
+ * ============================================================================================== */
+
+describe("terms in the text", () => {
+  /* ⚠️ Not a guess about the model. The equipment-only prompt forbids the fields in writing —
+     *"no equipment-age or safety-certificate fields"*, *"no operator, fuel, diesel, mobilization or
+     demobilization fields"* — and emits seven keys, which is what made the fast path fast.
+
+     So *"crawler excavator 30 ton with tuv"* came back as the excavator with the TÜV silently gone
+     and no field anywhere to show it in (owner, 2026-08-31: *"he just recognize the equipment not the
+     tuv"*). The length rule already stated the principle — losing what the renter wrote is worse than
+     the second it saves — and merely measured the wrong thing: 33 characters carry a term as easily
+     as 200. */
+
+  it("sends the reported line to the full path", () => {
+    const d = decideTier({ ...base, text: "crawler excavator 30 ton with tuv" });
+    expect(d.tier).toBe(2);
+    expect(d.reason).toBe("terms_in_text");
+  });
+
+  it("catches every family of term the fast path drops", () => {
+    for (const text of [
+      "excavator 30 ton with tuv",
+      "excavator 30 ton aramco certified",
+      "crane 50 ton with operator",
+      "generator 250 kva, delivery by supplier",
+      "excavator 20 ton, fuel on them",
+      "loader, 2019 model year or newer",
+      "حفار 30 طن مع مشغل", // "excavator 30 ton with operator"
+    ]) {
+      expect(decideTier({ ...base, text }).tier, text).toBe(2);
+    }
+  });
+
+  it("still lets a bare machine line take the fast path", () => {
+    // The narrowness is the point: a false positive costs two seconds, a false negative loses a
+    // commercial term the renter typed and is never told about.
+    const d = decideTier({ ...base, text: "2 crawler excavators 30 ton and a generator" });
+    expect(d.tier, "no term named, so nothing to lose").not.toBe(2);
+  });
+
+  it("does not fire on a term-free line that the matcher consumed whole", () => {
+    // The wording the Tier 0 case above uses, so this asserts the term check and not the matcher.
+    const d = decideTier({ ...base, text: "2 crawler excavators 20t" });
+    expect(d.tier).toBe(0);
   });
 });
