@@ -40,11 +40,13 @@ The invite sent from an off-platform bid card points at `https://moedatech.net` 
 
 Everything in Phase 4 sits on the bid-link card, and it does not arrive in production mail today. Two faults wear the same symptom; establish which before touching code (plan §T1). Needs a **production** bid token — neither is diagnosable from staging.
 
-### SUP-T03 — Is a supplier id reachable from the stores payload?
-**Scope:** investigation · pairs with **SUP-BE-16**
+### SUP-T03 — Is a supplier id reachable from the stores payload? · **done**
+**Scope:** investigation · pairs with **SUP-BE-16a**
 **Files:** `src/lib/contract/stores.ts`
 
-`StoreCard.id` is a **store**. The link row needs a `supplierId`, and `StoreDetail` carries only `supplierName`. **This blocks `Add from Moedatech`**, Phase 1's main way in.
+`StoreCard.id` is a **store**. `supplierIdOf()` now reads the supplier's id under every spelling the two projections have used, flat or nested, string or number, and answers null when the payload names none — so the picker works the day the id is on the wire and says it cannot link when it is not.
+
+**What it did not solve, and could not:** stores are shopfronts. A supplier who has never opened one is absent from that list entirely, which is a different problem with a different fix — **SUP-BE-16b**.
 
 ### SUP-T04 — Who in a company may write?
 **Scope:** decision
@@ -83,9 +85,15 @@ Supplier (name + `On Moedatech` badge + contact) · Vendor registration · Conta
 - Given the list is empty / Then the empty state offers both ways of adding, and says Moedatech's own directory is not this list.
 
 ### SUP-T14 — Add from Moedatech
-**Scope:** feature · blocked by **SUP-T03**
+**Scope:** feature · needs **SUP-BE-16b**
 
 The directory picker: search, tick, add. Every tick is a registered vendor by default with a per-row untick, and a master tick above. The dialog states plainly that the supplier is not told and that their name, store and equipment stay theirs.
+
+**It browses SUPPLIERS, not stores.** A supplier with no shopfront is still a supplier — and the renter who cannot find him here types him in by hand, which makes a second row for a company that already has an account. Until `GET /agents/suppliers` exists, the picker reads stores and **says what it is missing**: one line under the search, *"Only suppliers with a store are listed here — add anyone else under Add my own suppliers."* An absence a renter can see is a limit; an absence he cannot is a bug.
+
+**Given/When/Then**
+- Given a supplier with no store / When the renter searches for them / Then either they are listed, or the dialog says why they are not — never a silent empty result.
+- Given a store row whose `supplierId` is null / Then it is listed but not selectable, with the reason, rather than linking the shopfront.
 
 ### SUP-T15 — Add my own suppliers
 **Scope:** feature

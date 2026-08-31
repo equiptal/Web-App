@@ -287,11 +287,34 @@ Invitations to join Moedatech are the same table with `kind: "invite"` and no re
 
 ---
 
-## SUP-BE-16 — The supplier id in the stores payload **[app]**
+## SUP-BE-16 — A supplier directory to pick from **[app]**
 
-`GET /stores` returns a store id; the link row needs the **supplier's** id, and the store detail carries only `supplierName`. **This blocks the directory picker**, which is the main way a renter builds their list.
+**The picker must browse SUPPLIERS, not stores.** `GET /stores` lists shopfronts, so a supplier who has never built one is invisible to it — and a renter who cannot find a firm he works with will type it in by hand, creating an `own` row for a company that already has an account. Matching repairs that later (SUP-BE-12), but the renter did work he should not have, and until the nightly pass runs his list is wrong.
 
-**Done when:** the stores list and detail both carry the supplier's id, or a written decision says the picker reads a different endpoint.
+Two things are needed, and they are separable:
+
+**a · The supplier's id on the stores payload.** `GET /stores` returns a store id; a link row needs the supplier's. The web already reads every plausible spelling and falls back to null (`supplierIdOf`), so **if the id is on the wire under any name, nothing more is required here** — confirm it, and say which name.
+
+**b · A directory read that includes suppliers with no store.**
+
+```
+GET /agents/suppliers?q=zahid&city=Riyadh&cursor=…
+→ { "items": [{ "supplierId":"u_882", "name":"Zahid Tractor", "city":"Riyadh",
+                "verified": true, "hasStore": true, "equipmentCount": 41 }],
+    "next": "…" }
+```
+
+Minimal fields — enough to recognise a firm and no more. No phone, no email, no CR: a renter must not be able to harvest contact details for suppliers he has never dealt with.
+
+**The exposure question this raises, and it needs an answer before the endpoint is written.** Stores is browsable because a store is a shopfront its owner chose to open. A supplier with no store never opted into being listed. So which of these is the directory?
+
+1. **Every supplier account** — the most useful picker, and the largest exposure.
+2. **Suppliers with a store, plus any supplier this renter has already dealt with** — a bid, a deal room, an award. Nothing new is exposed: he has seen all of them already.
+3. **Stores only** — today's behaviour, and the one that sends renters to the keyboard.
+
+**Recommended: 2.** It covers the case that actually bites — a supplier who bid through a shared link and has no store — while exposing nobody the renter has not already met. Option 1 can follow if suppliers are asked to consent to being listed.
+
+**Done when:** the exposure question has a written answer, and the endpoint returns store-less suppliers under it.
 
 ---
 
