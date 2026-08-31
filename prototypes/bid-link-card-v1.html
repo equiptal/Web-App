@@ -83,11 +83,11 @@
   .shot .ref { font-family: monospace; font-size: 25px; letter-spacing: 2px; color: rgba(255,255,255,0.6); }
   .shot h3 { margin: 0; font-size: 54px; line-height: 1.05; letter-spacing: -1.4px; font-weight: 800; max-width: 15ch; }
   .shot .where { font-size: 29px; font-weight: 600; color: rgba(255,255,255,0.82); margin: 12px 0 0; }
-  .shot .terms { display: flex; gap: 44px; margin-top: 20px; }
-  .shot .terms span { display: block; font-size: 19px; letter-spacing: 1.4px; text-transform: uppercase; color: rgba(255,255,255,0.5); font-weight: 800; }
-  .shot .terms b { display: block; font-size: 27px; font-weight: 700; margin-top: 5px; }
+  .shot .terms { display: flex; gap: 30px; margin-top: 18px; }
+  .shot .terms span { display: block; font-size: 17px; letter-spacing: 1.2px; text-transform: uppercase; color: rgba(255,255,255,0.5); font-weight: 800; white-space: nowrap; }
+  .shot .terms b { display: block; font-size: 24px; font-weight: 700; margin-top: 5px; white-space: nowrap; }
   .shot .foot { display: flex; align-items: flex-end; justify-content: space-between; }
-  .shot .pill { background: #f79009; border-radius: 999px; padding: 9px 22px; font-weight: 800; font-size: 23px; }
+  .shot .closes-img { font-size: 22px; font-weight: 700; color: rgba(255,255,255,0.75); }
   .shot .join { font-size: 19px; color: rgba(255,255,255,0.55); text-align: right; line-height: 1.4; }
   .shot .join b { display: block; color: rgba(255,255,255,0.85); font-weight: 700; letter-spacing: 1.2px; }
 
@@ -167,6 +167,7 @@ Duration :  1Month   &amp; extendable</p>
         </div>
         <div class="email-body">
           <p>Hello,</p>
+          <p>A request has been shared with you:</p>
           <div class="preview-card">
             <div class="pc-image">
               <div class="shot">
@@ -179,11 +180,13 @@ Duration :  1Month   &amp; extendable</p>
                   <p class="where">Riyadh · 1 month · 18 Aug → 17 Sep 2026</p>
                   <div class="terms">
                     <div><span>MOB · DEMOB</span><b>Supplier</b></div>
-                    <div><span>FAT · FUEL</span><b>Supplier · renter</b></div>
+                    <div><span>FOOD</span><b>Supplier</b></div>
+                    <div><span>ACCOM &amp; TRANSPORT</span><b>Renter</b></div>
+                    <div><span>FUEL</span><b>Renter · diesel</b></div>
                   </div>
                 </div>
                 <div class="foot">
-                  <span class="pill">Submit your bid</span>
+                  <span class="closes-img">Bidding closes 21 Aug 2026</span>
                   <span class="join"><b>GET THE APP</b><span>linktr.ee/moedatech</span></span>
                 </div>
               </div>
@@ -198,11 +201,11 @@ Duration :  1Month   &amp; extendable</p>
                   <div class="pc-term"><span class="k">Demobilisation</span><span class="v">Supplier</span></div>
                 </div></div>
                 <div class="pc-row"><span class="pin-inline">4</span><div style="flex:1">
-                  <div class="pc-term"><span class="k">Food &amp; transport</span><span class="v">Supplier</span></div>
+                  <div class="pc-term"><span class="k">Food</span><span class="v">Supplier</span></div>
+                  <div class="pc-term"><span class="k">Accommodation &amp; transport</span><span class="v">Shibh Al Jazira</span></div>
                   <div class="pc-term"><span class="k">Fuel</span><span class="v">Shibh Al Jazira · diesel</span></div>
                 </div></div>
               </div>
-              <a class="pc-cta" href="#">Submit your bid</a>
               <div class="pc-closes">Bidding closes 21 Aug 2026.</div>
               <div class="pc-row" style="margin-top:11px"><span class="pin-inline">5</span><div class="pc-join">
                 New to Moedatech? Bid from the app and see every request from this renter —
@@ -240,7 +243,7 @@ Duration :  1Month   &amp; extendable</p>
       <div class="num">3</div>
       <div>
         <div class="title-en">Mobilisation · demobilisation</div>
-        <div class="desc">Who moves the machine, each way. From <code>deliveryToSite</code> and the return party. Replaces <i>“Mob by &amp; demob By Supplier”</i>. <b>Two rows in the card, one column in the image</b> — four rows do not fit at 27px, and two labelled pairs do.</div>
+        <div class="desc">Who moves the machine, each way. From <code>deliveryToSite</code> and the return party. Replaces <i>“Mob by &amp; demob By Supplier”</i>. <b>Two rows in the card, one column in the image</b> — the two are almost always the same party, so the image pairs them and the card keeps them apart.</div>
       </div>
       <div class="tags"><span class="tag new">NEW</span></div>
     </div>
@@ -248,8 +251,8 @@ Duration :  1Month   &amp; extendable</p>
     <div class="spec-card">
       <div class="num">4</div>
       <div>
-        <div class="title-en">FAT · fuel</div>
-        <div class="desc">Who feeds the crew and who fuels the machine. From <code>fatFood</code>, <code>fatTransport</code>, then <code>fuelResponsibility</code> with <code>fuelType</code>. Replaces <i>“DIESEL Is Sajco Scope”</i> — and being a field rather than a sentence, it cannot say diesel while the request says petrol.</div>
+        <div class="title-en">Food · accommodation &amp; transport · fuel</div>
+        <div class="desc"><b>Three rows, not one.</b> The app already splits them — <code>fatFood</code> and <code>fatAccommodationTransport</code> are separate fields, because a renter who feeds the operator does not necessarily house him. Then <code>fuelResponsibility</code> with <code>fuelType</code>. Replaces <i>“DIESEL Is Sajco Scope”</i> — and being a field rather than a sentence, it cannot say diesel while the request says petrol.</div>
       </div>
       <div class="tags"><span class="tag new">NEW</span></div>
     </div>
@@ -267,7 +270,7 @@ Duration :  1Month   &amp; extendable</p>
       <div class="num">6</div>
       <div>
         <div class="title-en">The image, and the source domain</div>
-        <div class="desc">880×320, generated by <code>/bid/[token]/og</code> — what WhatsApp, Apple Mail, Outlook and Slack render. <b>Nothing in it is clickable</b>, so every instruction it carries also appears as text below. <code>WEB.MOEDATECH.NET</code> is the trust line: it says where the link goes.</div>
+        <div class="desc">880×320, generated by <code>/bid/[token]/og</code>. <b>This is not a thumbnail of a document — it is the card itself.</b> In WhatsApp, Apple Mail and Slack the image is nearly all the recipient sees, so it carries the request's own facts rather than a branded picture. The generic image survives only as the fallback for a request we cannot read. <code>WEB.MOEDATECH.NET</code> is the trust line: it says where the link goes.</div>
       </div>
       <div class="tags"><span class="tag built">BUILT</span></div>
     </div>
@@ -294,6 +297,7 @@ Duration :  1Month   &amp; extendable</p>
     <div class="how-steps">
       <div class="how-step"><span class="n">1</span><div>Headline, then the city-and-duration line, then <b>two labelled pairs</b>: mob·demob and FAT·fuel.</div></div>
       <div class="how-step"><span class="n">2</span><div>The app line is <b>text, not a link</b> — nothing in a picture is clickable. It is a reminder; the real link lives in the card.</div></div>
+      <div class="how-step"><span class="n">•</span><div><b>No button.</b> The whole card is already the link, so a button inside it is a second thing to aim at that does the same job — and in the image it is a picture of a button, which teaches a supplier to press something that cannot be pressed. The closing date takes its place.</div></div>
       <div class="how-step"><span class="n">3</span><div>Arabic mirrors the layout and keeps the code, the dates and the count left-to-right. The renderer honours <code>direction: rtl</code> for text but not for flex, so the mirroring is explicit.</div></div>
     </div>
   </div>
