@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { headers } from "next/headers";
 import type { Metadata } from "next";
 import BidFormClient from "./BidFormClient";
-import { buildBidMetadata, extractBidToken, fetchBidPreview } from "@/lib/api/bidPreview";
+import { buildBidMetadata, extractBidToken, fetchBidForm, fetchBidPreview } from "@/lib/api/bidPreview";
 
 /**
  * Server route for the public bid link. Exists so this URL can carry Open Graph tags — the form
@@ -46,8 +46,10 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   // Mirrors the form's own default (`?lang=ar` opts into Arabic, otherwise English), so the card and
   // the page a recipient lands on are in the same language.
   const lang = langOf(sp.lang);
-  const preview = await fetchBidPreview(extractBidToken(slug), lang);
-  return buildBidMetadata({ preview, slug, lang, origin });
+  const token = extractBidToken(slug);
+  // Both at once: an unfurl bot gives up fast, and these are two independent reads of the same link.
+  const [preview, form] = await Promise.all([fetchBidPreview(token, lang), fetchBidForm(token)]);
+  return buildBidMetadata({ preview, form, slug, lang, origin });
 }
 
 export default async function BidFormRoute({ params }: Props) {

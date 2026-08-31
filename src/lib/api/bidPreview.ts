@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { bidCardDescription, bidCardModel } from "@/lib/bidCardModel";
 import { serverEnv } from "@/lib/config/env";
+import { mapBidFormData, type BidFormData } from "@/lib/contract/link-bids";
 
 /**
  * Link-preview (Open Graph) data for the public bid link `/bid/{slug}-{groupId}`.
@@ -32,29 +33,6 @@ export function extractBidToken(slug: string): string {
   return slug.match(GROUP_ID_RE)?.[0] ?? slug;
 }
 
-/**
- * The request's details as fields rather than prose — SUP-BE-21, and absent until it deploys.
- *
- * Every value here is already computed inside the preview handler to build the two strings; this is
- * the same data before it is joined. Dates and durations arrive PRE-FORMATTED and localised because
- * the backend holds the Riyadh offset and the Arabic month names — formatting an ISO date in the
- * renderer's UTC would put a card a day out, which is worse than not showing the date.
- */
-export interface BidPreviewCard {
-  /** Every machine in the request's own order — the order the renter entered them. */
-  items: { label: string; size: string | null; units: number; operator: boolean }[];
-  /** The city only, never the full address: a card is scraped without auth. */
-  city: string | null;
-  /** `1 month` — the renter's stated length, or derived from the window. */
-  duration: string | null;
-  /** `18 Aug → 17 Sep 2026`. */
-  dateRange: string | null;
-  /** Mobilisation, demobilisation, food, accommodation & transport, fuel — localised, only when set. */
-  terms: { key: string; label: string; value: string }[];
-  /** `21 Aug 2026`, or null when the link carries no deadline. */
-  closesOn: string | null;
-}
-
 export interface BidPreview {
   token: string;
   url: string;
@@ -69,8 +47,6 @@ export interface BidPreview {
   reference?: string | null;
   /** The request the mobile app can be deep-linked to — `reqs[0]` for a multi-item group. */
   requestId?: string | null;
-  /** Absent until SUP-BE-21; the card falls back to splitting the strings. */
-  card?: BidPreviewCard | null;
 }
 
 /**
@@ -111,6 +87,40 @@ export async function fetchBidPreview(token: string, lang: "en" | "ar"): Promise
 }
 
 /**
+ * Fetch the request behind a link, for the card.
+ *
+ * `GET /public/bid-form/{token}` — public, no auth, and the same endpoint the bid form itself reads.
+ * It carries what the preview strings never did: the items with their sizes and counts, the project
+ * terms, the per-item required terms, the delivery and return party, the deadline.
+ *
+ * ⚠️ It **bumps `request_share_links.opened_count`**, so an unfurl bot counts as a supplier opening
+ * the link. Accepted deliberately (owner, 2026-09-01) — nothing reads that number today. If it ever
+ * becomes something a renter is shown, these fields move onto the read-only `/preview` endpoint and
+ * this function is the only thing that changes.
+ *
+ * Same rule as the preview: null on anything unexpected, and the card degrades rather than failing.
+ */
+export async function fetchBidForm(token: string): Promise<BidFormData | null> {
+  if (!serverEnv.agentsApiUrl) return null;
+  const base = serverEnv.agentsApiUrl.replace(/\/$/, "");
+  try {
+    const res = await fetch(`${base}/public/bid-form/${encodeURIComponent(token)}`, {
+      // Five minutes, like the preview: a newly set deadline reaches the card at the speed the text
+      // does, and a blast of shares does not hit the database once per recipient.
+      next: { revalidate: 300 },
+      signal: AbortSignal.timeout(PREVIEW_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const json: unknown = await res.json().catch(() => null);
+    const data = json && typeof json === "object" && "data" in json ? (json as { data: unknown }).data : json;
+    const mapped = data ? mapBidFormData(data) : null;
+    return mapped?.items?.length ? mapped : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The card image, served from this app's own `public/` — an opaque 1200×630 navy card with the logo
  * knocked out to white. **One image for every surface**: `preview.imageUrl` from the backend resolves
  * to this same file, and the emailed card renders it too, so a supplier who meets this link in Gmail
@@ -136,11 +146,14 @@ const FALLBACK = {
  */
 export function buildBidMetadata({
   preview,
+  form,
   slug,
   lang,
   origin,
 }: {
   preview: BidPreview | null;
+  /** The request itself, when it was readable — the source for everything but the reference. */
+  form?: BidFormData | null;
   slug: string;
   lang: "en" | "ar";
   /**
@@ -171,7 +184,7 @@ export function buildBidMetadata({
    * backend's own string replaces the whole description with "no longer accepting bids", so a link
    * forwarded a week later names the equipment and loses where and when it was: SUP-BE-21.
    */
-  const description = (preview?.card ? bidCardDescription(bidCardModel(preview, copy, lang)) : "") || copy.description;
+  const description = (form ? bidCardDescription(bidCardModel(preview, copy, lang, form)) : "") || copy.description;
   const path = `/bid/${slug}${lang === "ar" ? "?lang=ar" : ""}`;
   // Absolute, from the host actually serving this page — never resolved through metadataBase.
   const canonical = origin ? `${origin}${path}` : path;

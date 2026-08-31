@@ -25,7 +25,7 @@ describe("bidTokenFromUrl", () => {
 });
 
 describe("bidCardHtml", () => {
-  const html = bidCardHtml(card);
+  const html = bidCardHtml(card, null);
 
   it("renders the prototype's card: band, title, description, source domain", () => {
     expect(html).toContain('height="160"');                  // the band, per the prototype
@@ -52,12 +52,12 @@ describe("bidCardHtml", () => {
   });
 
   it("escapes request text rather than injecting it", () => {
-    const nasty = bidCardHtml({ ...card, title: 'Forklift <script>alert(1)</script>' });
+    const nasty = bidCardHtml({ ...card, title: 'Forklift <script>alert(1)</script>' }, null);
     expect(nasty).not.toContain("<script>");
     expect(nasty).toContain("&lt;script&gt;");
   });
 
   it("flips direction for Arabic", () => {
-    expect(bidCardHtml(card, "ar")).toContain('dir="rtl"');
+    expect(bidCardHtml(card, null, "ar")).toContain('dir="rtl"');
   });
 });

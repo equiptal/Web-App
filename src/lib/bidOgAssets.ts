@@ -57,4 +57,6 @@ export const OG_COLORS = {
   gold: COLORS.gold,
   amber: COLORS.brand,
   white: COLORS.surface,
+  /** The closed line. Navy is the ground here, so the danger token is the one that reads on it. */
+  closed: COLORS.dangerHover,
 } as const;

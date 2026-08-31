@@ -22,7 +22,7 @@
 
 import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
-import { extractBidToken, fetchBidPreview } from "@/lib/api/bidPreview";
+import { extractBidToken, fetchBidForm, fetchBidPreview } from "@/lib/api/bidPreview";
 import { bidCardModel } from "@/lib/bidCardModel";
 import { logoDataUri, OG_COLORS } from "@/lib/bidOgAssets";
 
@@ -72,7 +72,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
   const { token: slug } = await ctx.params;
   const lang = req.nextUrl.searchParams.get("lang") === "ar" ? "ar" : "en";
 
-  const preview = await fetchBidPreview(extractBidToken(slug), lang);
+  const token = extractBidToken(slug);
+  const [preview, form] = await Promise.all([fetchBidPreview(token, lang), fetchBidForm(token)]);
   const arabicFont = lang === "ar" ? await loadArabicFont() : null;
   // Arabic with no font would render as boxes — worse than English copy. Fall back rather than break.
   const effective = lang === "ar" && !arabicFont ? "en" : lang;
@@ -81,13 +82,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
     (effective === "ar" ? preview?.ar : preview?.en) ??
     (preview ? { title: preview.title, description: preview.description } : FALLBACK[effective]);
 
-  /**
-   * The structured card is localised by the `?lang` we asked for, so an Arabic preview rendered as
-   * English (no font) would put Arabic term labels on an English card. Drop it and take the string
-   * path, which carries both languages.
-   */
-  const source = effective === lang ? preview : preview ? { ...preview, card: null } : null;
-  const d = bidCardModel(source, copy, effective);
+  const d = bidCardModel(preview, copy, effective, form);
   const rtl = effective === "ar";
   const host = (preview?.url || "").replace(/^https?:\/\//, "").split("/")[0] || "web.moedatech.net";
 
@@ -155,7 +150,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
               fontWeight: 700,
               letterSpacing: 0.2,
               // A closed request is told at a glance and in a colour that is not the one that invites.
-              color: d.accepting ? OG_COLORS.amber : "#FF8A7A",
+              color: d.accepting ? OG_COLORS.amber : OG_COLORS.closed,
             }}
           >
             {d.cta}
