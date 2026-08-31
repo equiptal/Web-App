@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
+import { blankTerms } from "@/components/projects/TermsFields";
 import {
   workOrderPayload,
   blankMachine,
-  blankTerms,
+  // `blankTerms` lives with the fields it fills.
   blankLine,
   lineTotal,
   machineTotal,
@@ -23,7 +24,6 @@ import { machineIsNamed, groupWorkOrderItems, EMPTY_WHEN, type WorkOrderItem } f
 
 const draft = (over: Partial<WorkOrderDraft> = {}): WorkOrderDraft => ({
   title: "Own fleet — Qiddiya",
-  terms: blankTerms(),
   when: { ...EMPTY_WHEN },
   machines: [blankMachine()],
   ...over,
@@ -249,11 +249,24 @@ describe("units cannot outrun the machine's quantity", () => {
 });
 
 describe("the order's terms", () => {
-  it("travel once, for the order, in the shape the wire takes", () => {
-    /* Order-level rather than per machine: the backend copies them onto every row that does not
-       carry its own, which is what makes the tenth machine free to add. */
-    const d = draft({ terms: { ...blankTerms(), deliveryOverride: "supplier", operatorNeeded: "no" } });
-    const wire = workOrderPayload(d, { create: true }).body.terms as Record<string, unknown>;
+  it("travel with the MACHINE, not the order", () => {
+    /* There is no order-level block any more (owner, 2026-08-31): every machine states its own, and
+       a new machine is seeded from the first. A row that says what it means cannot be changed by
+       editing something else later. */
+    const d = draft({
+      machines: [
+        {
+          ...blankMachine(),
+          rawLabel: "Excavator",
+          offCatalogue: true,
+          terms: { ...blankTerms(), deliveryOverride: "supplier", operatorNeeded: "no" },
+        },
+      ],
+    });
+    const body = workOrderPayload(d, { create: true }).body;
+    expect("terms" in body, "the order itself no longer carries terms").toBe(false);
+
+    const wire = (body.items as Record<string, unknown>[])[0].terms as Record<string, unknown>;
 
     expect(wire.delivery).toBe("supplier");
     expect(wire.operator).toBe("no");

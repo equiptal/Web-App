@@ -23,6 +23,7 @@
  * simply always shown; when W-T5 decides otherwise it is a one-line condition here.
  */
 
+import { useState } from "react";
 import { useT } from "@/lib/i18n";
 import { Icon, Toggle } from "@/components/ui";
 import { SAFETY_CERTIFICATES, OPERATOR_CERTIFICATES, type Party } from "@/lib/contract/options";
@@ -311,58 +312,61 @@ export function TermsFields({ value, onChange }: { value: MachineTerms; onChange
 }
 
 /**
- * A machine's own terms — closed until the renter opens it (owner, 2026-08-31).
+ * One machine's terms, closed until asked for.
  *
- * Closed because the common case is that every machine works the same way, and eleven fields per
- * machine on a five-machine order is a wall between the renter and the thing they came to do. The
- * badge is what makes closing safe: a machine that differs says so on its face, so nothing hides.
+ * ── Why there is no shared block above this ──────────────────────────────────────────────────────
+ *
+ * There was one, and it existed to make the second machine cheap to add. Seeding buys the same thing
+ * for less: the renter answers once on machine 1, machine 2 arrives already answered, and changing
+ * it is a local edit rather than a fork of the order (owner, 2026-08-31). One concept instead of two,
+ * and no rule to learn about what a blank means.
+ *
+ * ── Closed, with a badge ─────────────────────────────────────────────────────────────────────────
+ *
+ * Thirteen fields per machine on a five-machine order is a wall between the renter and the thing
+ * they came to do, and the common case is that every machine works the same way. The badge is what
+ * makes closing safe: a machine that differs from the first one says how many fields it differs by,
+ * so nothing hides behind a collapsed panel.
  */
-export function MachineTermsOverride({
+export function MachineTermsPanel({
   terms,
-  shared,
+  /** Machine 1's terms — what this one is compared against. Absent on machine 1 itself. */
+  first,
   onChange,
 }: {
-  /** `null` means this machine follows the order's terms. */
-  terms: MachineTerms | null;
-  shared: MachineTerms;
-  onChange: (t: MachineTerms | null) => void;
+  terms: MachineTerms;
+  first?: MachineTerms;
+  onChange: (t: MachineTerms) => void;
 }) {
   const t = useT();
   const w = t.projects.workOrder;
-  const n = countDifferences(terms, shared);
-
-  if (!terms) {
-    return (
-      <button
-        type="button"
-        /* Seeded FROM the shared block, not from blank. Opening an override must not silently
-           discard the answers the renter already gave for the order. */
-        onClick={() => onChange({ ...shared, operator: { ...shared.operator } as MachineTerms["operator"] })}
-        className="flex items-center gap-1.5 self-start text-meta font-semibold text-brand"
-      >
-        <Icon name="tune" size={13} /> {w.overrideOpen}
-      </button>
-    );
-  }
+  const [open, setOpen] = useState(false);
+  const n = first ? countDifferences(terms, first) : 0;
 
   return (
-    <div className="flex flex-col gap-2 rounded-sm border border-border bg-surface2/40 p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{w.overrideTitle}</span>
+    <div className="flex flex-col gap-2 rounded-sm border border-border bg-surface2/40">
+      <button
+        type="button"
+        onClick={() => setOpen((v: boolean) => !v)}
+        className="flex items-center gap-2 px-3 py-2 text-start"
+      >
+        <Icon name={open ? "expand_more" : "chevron_right"} size={15} className="flex-none text-muted" />
+        <span className="text-body font-semibold text-navy">{w.termsTitle}</span>
         {n > 0 && (
           <span className="rounded-full bg-brand/10 px-2 py-0.5 text-meta font-semibold text-brand">
             {w.overrideBadge.replace("{n}", String(n))}
           </span>
         )}
-        <span className="flex-1" />
-        {/* A deletion, not a merge — the machine goes back to reading the shared block, and no stale
-            copy of the old override is left behind (AC-44). */}
-        <button type="button" onClick={() => onChange(null)} className="text-meta font-semibold text-muted underline underline-offset-2 hover:text-danger">
-          {w.followShared}
-        </button>
-      </div>
+        {/* Said only on a machine that is NOT the first and has not been touched — the one case where
+            a renter might wonder where these answers came from. */}
+        {!!first && n === 0 && <span className="text-meta text-muted">{w.sameAsFirst}</span>}
+      </button>
 
-      <TermsFields value={terms} onChange={onChange} />
+      {open && (
+        <div className="border-t border-border px-3 py-3">
+          <TermsFields value={terms} onChange={onChange} />
+        </div>
+      )}
     </div>
   );
 }

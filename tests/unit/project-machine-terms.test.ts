@@ -14,56 +14,48 @@ import { EMPTY_WHEN, termsToWire } from "@/lib/contract/work-order";
 
 const draft = (over: Partial<WorkOrderDraft> = {}): WorkOrderDraft => ({
   title: "Own fleet — Qiddiya",
-  terms: blankTerms(),
   when: { ...EMPTY_WHEN },
   machines: [blankMachine()],
   ...over,
 });
 
-describe("a machine follows the order unless it says otherwise", () => {
-  it("sends no terms of its own by default, which is what makes it inherit", () => {
-    /* An absent key parses to an empty blob on the backend, and an empty blob is exactly the
-       condition under which that row is given the ORDER's terms. Sending `{}` explicitly would work
-       too; sending a copy would not — it would freeze today's shared answer onto the row. */
+describe("every machine states its own terms", () => {
+  it("always sends them, so nothing depends on an order-level fallback", () => {
+    /* The backend still has a fallback for a machine with an empty terms blob. It is left unused
+       rather than relied on: a row that says what it means cannot be changed later by editing
+       something else. */
     const rows = workOrderPayload(draft(), { create: true }).body.items as Record<string, unknown>[];
-    expect("terms" in rows[0]).toBe(false);
+    expect("terms" in rows[0]).toBe(true);
   });
 
-  it("carries its own complete terms once it differs (AC-43)", () => {
-    const own = { ...blankTerms(), deliveryOverride: "me" as const };
-    const d = draft({
-      terms: { ...blankTerms(), deliveryOverride: "supplier" },
-      machines: [{ ...blankMachine(), rawLabel: "Crane 50t", offCatalogue: true, terms: own }],
-    });
+  it("gives a new machine the FIRST machine's terms, as a copy", () => {
+    /* This is what replaced the shared block (owner, 2026-08-31). The renter answers once and the
+       second machine arrives already answered — seeded, not linked, so editing one never edits the
+       other. */
+    const first = { ...blankTerms(), deliveryOverride: "supplier" as const };
+    const second = blankMachine(first);
 
-    const row = (workOrderPayload(d, { create: true }).body.items as Record<string, unknown>[])[0];
-    const sent = row.terms as Record<string, unknown>;
+    expect(second.terms.deliveryOverride).toBe("supplier");
 
-    // COMPLETE, not a patch: the row states its own delivery outright rather than "shared, except".
-    expect(sent.delivery).toBe("me");
-    for (const [k, v] of Object.entries(termsToWire(own))) {
-      if (v !== null) expect(sent[k], `missing ${k}`).toEqual(v);
-    }
-
-    /* And NOT ONE null. `workOrderTermsSchema` is `.partial().strict()`, where partial means
-       optional rather than nullable, so a single null fails the whole save. It did: a work order
-       with no suppliers on it at all was refused because the terms block travelled with fifteen
-       nulls in it. */
-    expect(Object.values(sent).filter((v) => v === null)).toEqual([]);
-
-    // And the order still says what it says — one machine differing does not fork the order.
-    expect((workOrderPayload(d, { create: true }).body.terms as Record<string, unknown>).delivery).toBe("supplier");
+    second.terms.deliveryOverride = "me";
+    expect(first.deliveryOverride, "the seed must not be shared by reference").toBe("supplier");
   });
 
-  it("goes back to the shared terms when the override is cleared, with nothing stale left (AC-44)", () => {
-    const d = draft({
-      terms: { ...blankTerms(), deliveryOverride: "supplier" },
-      machines: [{ ...blankMachine(), rawLabel: "Crane 50t", offCatalogue: true, terms: null }],
-    });
+  it("copies the nested operator block too, not just the flat fields", () => {
+    // A shallow copy would leave two machines sharing one operator object and editing each other.
+    const first = {
+      ...blankTerms(),
+      operator: { ...blankTerms().operator, fatFood: "supplier" } as ReturnType<typeof blankTerms>["operator"],
+    };
+    const second = blankMachine(first);
 
-    const row = (workOrderPayload(d, { create: true }).body.items as Record<string, unknown>[])[0];
-    // Not `terms: {}` and not a copy of the old override — the key is simply gone.
-    expect("terms" in row).toBe(false);
+    expect(second.terms.operator?.fatFood).toBe("supplier");
+    second.terms.operator!.fatFood = "me";
+    expect(first.operator?.fatFood).toBe("supplier");
+  });
+
+  it("starts blank when there is nothing to seed from", () => {
+    expect(blankMachine().terms).toEqual(blankTerms());
   });
 });
 

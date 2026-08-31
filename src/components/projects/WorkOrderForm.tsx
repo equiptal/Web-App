@@ -36,21 +36,17 @@
  * suppliers bid against ids and an unmatched machine has nothing to bid on.
  */
 
-import { useState } from "react";
 import { useT, useLocale } from "@/lib/i18n";
 import { Button, Icon, Toggle } from "@/components/ui";
 import { SearchSelect } from "@/components/create/SearchSelect";
 import { RENTAL_BASES, type RentalBasis } from "@/lib/contract/options";
-import { TermsFields, MachineTermsOverride } from "./TermsFields";
+import { MachineTermsPanel, blankTerms } from "./TermsFields";
 // The SAME field chrome the project dialog is built from — see `Field`'s note there. Two dialogs
 // that open from one page and spell a label two ways read as two products.
 import { Field, input } from "./ProjectForm";
 import { taxName, type Taxonomy } from "@/lib/contract/taxonomy";
 import { machineIsNamed, termsToWire, type MachineTerms, type WorkOrderItem, type WorkOrderWhen } from "@/lib/contract/work-order";
 import type { Award } from "@/lib/contract/award";
-
-/* Re-exported: it lives with the fields it fills, and every caller already asks this file. */
-export { blankTerms } from "./TermsFields";
 
 /**
  * One supplier line on a machine — what becomes an award when the form saves.
@@ -85,13 +81,18 @@ export interface MachineDraft {
   quantity: number;
   notes: string;
   /**
-   * This machine's OWN complete terms, or `null` to follow the order's (spec §5.2 · AC-43).
+   * This machine's own complete terms — always present, never a reference to somebody else's.
    *
-   * Complete rather than a patch: a crane and a generator on one order can differ on delivery and
-   * on certificates without the order forking, and clearing an override is then a deletion with
-   * nothing stale left behind (AC-44).
+   * ⚠️ **There is no shared block any more** (owner, 2026-08-31). It existed so a second machine
+   * cost nothing to add, and the cheaper way to buy that is to SEED the second machine from the
+   * first: the renter answers once, the next machine arrives already answered, and changing it is a
+   * local edit rather than a fork of the order. One concept instead of two, and no rule to learn
+   * about what a blank means.
+   *
+   * Complete rather than a patch, which is what lets a crane and a generator sit on one order with
+   * different delivery and different certificates.
    */
-  terms: MachineTerms | null;
+  terms: MachineTerms;
   lines: SupplierLine[];
 }
 
@@ -99,21 +100,16 @@ export interface WorkOrderDraft {
   groupId?: string;
   title: string;
   when: WorkOrderWhen;
-  /**
-   * The order's terms — operator, certificates, who delivers, who fuels.
-   *
-   * Held once for the ORDER rather than per machine, and the backend applies them to every machine
-   * that does not carry its own. That is what makes a second machine free to add: the renter states
-   * the site's working conditions once, and the tenth welder inherits them without a single click.
-   *
-   * A machine can still differ later — the stored shape is complete per row, so overriding one is a
-   * row-level edit, not a fork of the order.
-   */
-  terms: MachineTerms;
   machines: MachineDraft[];
 }
 
-export function blankMachine(): MachineDraft {
+/**
+ * A blank machine, optionally seeded with the terms of the one before it.
+ *
+ * The seed is a COPY, deep enough to cover the nested operator block: two machines sharing one
+ * object would edit each other, which is the bug this shape exists to avoid.
+ */
+export function blankMachine(seed?: MachineTerms): MachineDraft {
   return {
     categoryId: null,
     subcategoryId: null,
@@ -123,8 +119,7 @@ export function blankMachine(): MachineDraft {
     offCatalogue: false,
     quantity: 1,
     notes: "",
-    // Follows the order's until the renter says otherwise.
-    terms: null,
+    terms: seed ? { ...seed, operator: { ...seed.operator } as MachineTerms["operator"] } : blankTerms(),
     lines: [blankLine("monthly")],
   };
 }
@@ -191,7 +186,6 @@ export function WorkOrderForm({
   /* Open from the start (owner, 2026-08-31). These are the order's own terms and every machine
      inherits them, so they are part of filling the form in rather than something to go and find.
      The PER-MACHINE block stays closed — that one is the exception, and exceptions are rare. */
-  const [termsOpen, setTermsOpen] = useState(true);
 
   /* The rate is per WHAT — read off the order's own basis, which the site seeded. Showing "per
      month" beside the box is the difference between a number a renter can check and one they have
@@ -210,45 +204,35 @@ export function WorkOrderForm({
   return (
     <div className="flex flex-col gap-5">
       {/* ── 1 · Equipment ── */}
+      {/* The name of the order (owner, 2026-08-31: *"add title, which is missing from the form"*).
+          It was in the payload and in the edit path, and no input ever set it — so every order made
+          here saved with no name and the backend fell back to the first machine's typed label. A
+          renter with three orders on one site then had three rows all called after a welder.
+
+          First, because it is the sentence the renter already has in their head when they press
+          *Add work order*. */}
+      <section className="flex flex-col gap-3">
+        <Field label={w.orderTitle} hint={w.orderTitleHint}>
+          <input
+            className={input}
+            value={draft.title}
+            placeholder={w.orderTitlePlaceholder}
+            onChange={(e) => onChange({ ...draft, title: e.target.value })}
+          />
+        </Field>
+      </section>
+
       <section className="flex flex-col gap-3">
         <h3 className="text-subhead font-extrabold text-navy">{w.equipment}</h3>
 
   
-      {/* ── The order's terms, answered once (owner, 2026-08-31) ──────────────────────────────────
-          *"I couldn't set any machine settings — operator, cert, etc — all the machine terms which
-          will be copied to any other item added later for smoother experience."*
-
-          There was nowhere to say any of it. The backend has taken per-machine terms all along and
-          the form never asked, so every work order saved with an empty terms blob and a renter who
-          needed a certified operator had no way to write it down.
-
-          Asked for the ORDER, not per machine, and the backend copies them onto every row that does
-          not carry its own. That is what makes the tenth machine free to add. */}
-      <details className="rounded-sm border border-border bg-surface2/40" open={termsOpen}>
-        <summary
-          onClick={(e) => {
-            e.preventDefault();
-            setTermsOpen((v) => !v);
-          }}
-          className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-body font-semibold text-navy"
-        >
-          <Icon name={termsOpen ? "expand_more" : "chevron_right"} size={16} className="flex-none text-muted" />
-          {w.termsTitle}
-          <span className="text-meta font-normal text-muted">{w.termsSub}</span>
-        </summary>
-
-        <div className="border-t border-border px-3 py-3">
-          <TermsFields value={draft.terms} onChange={(terms) => onChange({ ...draft, terms })} />
-        </div>
-      </details>
-
       {draft.machines.map((m, i) => (
           <MachineCard
             key={m.id ?? i}
             taxonomy={taxonomy}
             locale={locale}
             machine={m}
-            shared={draft.terms}
+            first={i === 0 ? undefined : draft.machines[0]?.terms}
             onChange={(p) => patchMachine(i, p)}
             onRemove={draft.machines.length > 1 ? () => onChange({ ...draft, machines: draft.machines.filter((_, ix) => ix !== i) }) : undefined}
           />
@@ -256,7 +240,12 @@ export function WorkOrderForm({
 
         <button
           type="button"
-          onClick={() => onChange({ ...draft, machines: [...draft.machines, blankMachine()] })}
+          /* Seeded from the FIRST machine's terms, which is what makes the second one cheap to add:
+           the renter answered operator, delivery and certificates once, and this arrives already
+           answered with every field still editable. */
+        onClick={() =>
+          onChange({ ...draft, machines: [...draft.machines, blankMachine(draft.machines[0]?.terms)] })
+        }
           className="flex items-center gap-1.5 self-start text-body font-semibold text-brand"
         >
           <Icon name="add" size={14} /> {w.addMachine}
@@ -484,15 +473,15 @@ function MachineCard({
   taxonomy,
   locale,
   machine,
-  shared,
+  first,
   onChange,
   onRemove,
 }: {
   taxonomy: Taxonomy;
   locale: string;
   machine: MachineDraft;
-  /** The order's terms — what this machine follows, and what an override is seeded and compared against. */
-  shared: MachineTerms;
+  /** Machine 1's terms, for the badge. Absent on machine 1 — it has nothing to differ from. */
+  first?: MachineTerms;
   onChange: (p: Partial<MachineDraft>) => void;
   onRemove?: () => void;
 }) {
@@ -607,7 +596,7 @@ function MachineCard({
           deferred (W-T5) and the block is shown for every machine until it lands. Deferring one
           field's visibility is not a reason to defer eleven fields, which is what happened here
           before. */}
-      <MachineTermsOverride terms={machine.terms} shared={shared} onChange={(terms) => onChange({ terms })} />
+      <MachineTermsPanel terms={machine.terms} first={first} onChange={(terms) => onChange({ terms })} />
     </div>
   );
 }
@@ -685,10 +674,6 @@ export function workOrderPayload(
     body: {
       title: draft.title.trim() || null,
       when: whenToWire(draft.when),
-      /* Stated ONCE for the order. The backend copies these onto any machine that does not carry
-         its own, which is what makes the second machine free to add — the renter answers operator,
-         certificates and who fuels once, and every row inherits it. */
-      terms: termsForWire(draft.terms),
       items: draft.machines.map((m) => {
         const lines = m.lines
           .filter((l) => l.supplierName.trim())
@@ -715,9 +700,10 @@ export function workOrderPayload(
           rawSize: m.offCatalogue ? m.rawSize.trim() || null : null,
           quantity: m.quantity,
           notes: m.notes.trim() || null,
-          /* Sent only when this machine differs. An absent key is an empty blob on the backend, and
-             an empty blob is exactly what makes that row fall back to the order's terms. */
-          ...(m.terms ? { terms: termsForWire(m.terms) } : {}),
+          /* ALWAYS sent, because every machine now states its own. The backend's fallback to an
+             order-level block is left unused rather than relied on — a row that says what it means
+             cannot be changed by editing something else later. */
+          terms: termsForWire(m.terms),
           ...(opts.create && lines.length > 0 ? { supplyLines: lines } : {}),
         };
       }),

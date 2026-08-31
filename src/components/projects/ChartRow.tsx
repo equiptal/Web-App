@@ -34,6 +34,17 @@ import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { awardWindow, awardedUnits, type Award, type ChartGroup, type ChartItem } from "@/lib/contract/award";
 
+/**
+ * ── A bar knows three things about its period, and shows each differently ─────────────────────────
+ *
+ * **Both ends** — an ordinary bar, printing its own dates.
+ * **A start and no end** — it runs to the chart's trailing edge with a cap and says *open-ended*
+ *   (owner, 2026-08-31, with his own reference). Drawing it to the axis end WITHOUT the cap would
+ *   assert an end date the renter never gave.
+ * **Neither** — no bar at all, a chip on the leading edge saying *pending*. A zero-width bar at 0%
+ *   was indistinguishable from one starting on the axis's first day.
+ */
+
 /** The axis, as a pair of day numbers. Everything positions as a percentage between them. */
 export interface Axis {
   from: string;
@@ -76,8 +87,7 @@ export function AwardRow({
 }) {
   const t = useT();
   const win = awardWindow(group, award, projectWindow);
-  const x1 = pct(win.start, axis);
-  const x2 = pct(win.end, axis);
+  const shape = barShape(win.start, win.end, axis);
 
   const promised = awardedUnits(item);
   const split = item.awards.length > 1 || promised < item.quantity;
@@ -124,10 +134,16 @@ export function AwardRow({
         {today && <TodayLine at={pct(today, axis)} />}
 
         <span
-          className="absolute top-1/2 -translate-y-1/2 truncate rounded-sm bg-navy px-2 py-1 text-label font-semibold text-white"
-          style={{ insetInlineStart: `${x1}%`, width: `${Math.max(x2 - x1, 2)}%` }}
+          title={shape.title(t)}
+          className={`absolute top-1/2 flex items-center gap-1 -translate-y-1/2 truncate rounded-sm bg-navy px-2 py-1 text-label font-semibold text-white ${
+            shape.kind === "open" ? "rounded-e-none" : ""
+          }`}
+          style={shape.style}
         >
-          {win.start} → {win.end}
+          {shape.label(t)}
+          {/* The cap. A bar that reaches the chart's edge has to say whether it ENDS there or simply
+              runs past it, and this is the difference. */}
+          {shape.kind === "open" && <Icon name="chevron_right" size={13} className="flex-none rtl:scale-x-[-1]" />}
         </span>
 
         {award.mobilizedAt && (
@@ -158,6 +174,48 @@ function Grid({ at }: { at?: number[] }) {
  *  its own — the header carries the date it stands for. */
 function TodayLine({ at }: { at: number }) {
   return <span aria-hidden className="absolute inset-y-0 border-s border-dashed border-brand" style={{ insetInlineStart: `${at}%` }} />;
+}
+
+type Dict = ReturnType<typeof useT>;
+
+/**
+ * What to draw for one period, and what to call it.
+ *
+ * `closed` — both ends known: the bar spans them and prints them.
+ * `open`   — a start and no end: it runs to the axis end and is capped, because an uncapped bar that
+ *            happens to reach the edge is a claim that it ends there.
+ * `none`   — neither: a chip, not a bar. There is nothing to span.
+ */
+function barShape(
+  start: string | null,
+  end: string | null,
+  axis: Axis,
+): { kind: "closed" | "open" | "none"; style: React.CSSProperties; label: (t: Dict) => string; title: (t: Dict) => string } {
+  if (!start) {
+    return {
+      kind: "none",
+      // Hugs its own text at the leading edge: `width: auto` on an absolutely-placed element.
+      style: { insetInlineStart: 0 },
+      label: () => "",
+      title: (t) => t.projects.chart.noPeriod,
+    };
+  }
+  const x1 = pct(start, axis);
+  if (!end) {
+    return {
+      kind: "open",
+      style: { insetInlineStart: `${x1}%`, width: `${Math.max(100 - x1, 6)}%` },
+      label: (t) => t.projects.chart.openEnded,
+      title: (t) => `${t.projects.chart.openEnded} — ${t.projects.chart.from} ${start}`,
+    };
+  }
+  const x2 = pct(end, axis);
+  return {
+    kind: "closed",
+    style: { insetInlineStart: `${x1}%`, width: `${Math.max(x2 - x1, 2)}%` },
+    label: () => `${start} → ${end}`,
+    title: () => `${start} → ${end}`,
+  };
 }
 
 /** A pin on the bar's top edge. Unlabelled — the date is in the title. */
@@ -195,8 +253,7 @@ export function AwaitingRow({
   // end must be visible as a ghost, not clipped off the right edge.
   const start = group.when?.startDate ?? projectWindow.startDate;
   const end = group.when?.endDate ?? projectWindow.endDate;
-  const x1 = pct(start, axis);
-  const x2 = pct(end, axis);
+  const shape = barShape(start, end, axis);
 
   return (
     <div className="flex items-stretch border-t border-border">
@@ -213,14 +270,24 @@ export function AwaitingRow({
       <div className="relative min-w-0 flex-1 overflow-hidden py-3">
         <Grid at={grid} />
         {today && <TodayLine at={pct(today, axis)} />}
+        {/* The bar states its OWN period, like an awarded one does (owner, 2026-08-31: *"why is it
+            shown at this date for the end when the end is 7-10"* — it was not; the bar ended on the
+            7th, but a month-wide column has no day marks in it, so a bar ending a fifth of the way
+            into October reads as late October). A bar that prints its dates cannot be misread, and
+            the `title` carries them for the narrow bars that have to truncate. */}
         <span
-          className="absolute top-1/2 -translate-y-1/2 truncate rounded-sm border border-dashed border-border-strong bg-surface2 px-2 py-1 text-label font-semibold text-muted"
-          style={{ insetInlineStart: `${x1}%`, width: `${Math.max(x2 - x1, 2)}%` }}
+          title={`${t.projects.chart.pending} · ${shape.title(t)}`}
+          className={`absolute top-1/2 flex items-center gap-1 -translate-y-1/2 truncate rounded-sm border border-dashed border-border-strong bg-surface2 px-2 py-1 text-label font-semibold text-muted ${
+            shape.kind === "open" ? "rounded-e-none border-e-0" : ""
+          }`}
+          style={shape.style}
         >
           {/* *Pending*, not *awaiting award*: a request that has just gone out has not failed to be
               awarded — it is waiting, which is the normal state for most of its life. Naming it by
               what has not happened yet made a healthy request read like a stalled one. */}
           {t.projects.chart.pending}
+          {shape.kind !== "none" && <span className="truncate font-normal">· {shape.label(t)}</span>}
+          {shape.kind === "open" && <Icon name="chevron_right" size={13} className="flex-none rtl:scale-x-[-1]" />}
         </span>
       </div>
     </div>

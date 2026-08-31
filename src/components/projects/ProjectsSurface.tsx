@@ -48,7 +48,7 @@ import type { Award, ChartGroup, ChartItem } from "@/lib/contract/award";
 import { RowMenu } from "./RowMenu";
 import { AwardDialog, UnawardConfirm } from "./AwardDialog";
 import { PeriodConflictDialog } from "./PeriodConflictDialog";
-import { WorkOrderForm, workOrderPayload, blankMachine, blankTerms, type WorkOrderDraft } from "./WorkOrderForm";
+import { WorkOrderForm, workOrderPayload, blankMachine, type WorkOrderDraft } from "./WorkOrderForm";
 import { FileRequestDialog } from "./FileRequestDialog";
 import { RenameDialog } from "./RenameDialog";
 import { MoveDialog } from "./MoveDialog";
@@ -455,8 +455,6 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   function startWorkOrder(p: ProjectSummary) {
     setWorkOrder({
       title: "",
-      // Blank, and shared by every machine in the order — see `WorkOrderDraft.terms`.
-      terms: blankTerms(),
       when: {
         ...EMPTY_WHEN,
         rentalBasis: p.defaults.timing.rentalBasis,
@@ -656,11 +654,6 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
                           setWorkOrder({
                             groupId: group.id,
                             title: group.title ?? "",
-                            /* An existing order's terms are not read back into the form yet — the
-                               chart's group does not carry them. Editing one and saving would
-                               therefore blank them, so the draft starts from the same blank the
-                               backend treats as "no order-level terms" and each row keeps its own. */
-                            terms: blankTerms(),
                             when: {
                               ...EMPTY_WHEN,
                               startDate: group.when?.startDate ?? null,
@@ -889,7 +882,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
           onAddWorkOrder={() => {
             setSelected(created.id);
             setCreated(null);
-            setWorkOrder({ title: "", terms: blankTerms(), when: { ...EMPTY_WHEN }, machines: [blankMachine()] });
+            setWorkOrder({ title: "", when: { ...EMPTY_WHEN }, machines: [blankMachine()] });
           }}
           onPostRequest={() => router.push("/create")}
         />

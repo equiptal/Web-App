@@ -37,7 +37,7 @@ import {
   siteSpan,
   type ProjectSummary,
 } from "@/lib/contract/project";
-import { chartSpan, isUnawarded, type ChartGroup } from "@/lib/contract/award";
+import { awardWindow, chartSpan, isUnawarded, type ChartGroup } from "@/lib/contract/award";
 import { AwardRow, AwaitingRow, pct, type Axis } from "./ChartRow";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -58,14 +58,43 @@ const today = () => new Date().toISOString().slice(0, 10);
  * Bars are unaffected — they position as a percentage of whatever axis they are given, and the
  * clamp in `pct` still holds.
  */
-function monthAxis(span: { from: string; to: string } | null): Axis | null {
+function monthAxis(span: { from: string; to: string } | null, openEnded: boolean): Axis | null {
   if (!span) return null;
   const f = new Date(span.from + "T00:00:00Z");
   const t = new Date(span.to + "T00:00:00Z");
   const from = new Date(Date.UTC(f.getUTCFullYear(), f.getUTCMonth(), 1));
   // Day 0 of the NEXT month is the last day of this one — no month-length table.
-  const to = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0));
-  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+  const monthEnd = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0));
+  /**
+   * **The END is the last day of the WORK, not of its month** (owner, 2026-08-31: *"I still don't
+   * understand how 7-10 is shown after Oct 26 … it must clearly show the end with respect to the
+   * chart"*). Rounding the end out to 31 October put the site's last day a fifth of the way into a
+   * month-wide column with no day marks in it, so a bar that stopped on the 7th looked like it ran
+   * to the 20th. Ending the axis ON that day puts it against the chart's own trailing edge, where
+   * there is nothing to misread it against.
+   *
+   * The START still rounds out to the 1st: that fixed a real fault the other way, a first column two
+   * characters wide whose label collided with the next one.
+   *
+   * A chart holding an OPEN-ENDED row is the exception. Its longest bar has no end to reach, so the
+   * axis is given the rest of that month to run into — otherwise the open bar and the last closed
+   * one both end at 100% and look like the same statement.
+   */
+  const to = openEnded ? monthEnd : t;
+  // A single-day span would make every percentage 0 (see `pct`). Fall back to the month.
+  const usable = to > from ? to : monthEnd;
+  return { from: from.toISOString().slice(0, 10), to: usable.toISOString().slice(0, 10) };
+}
+
+/** Does anything on this site run without an end date? See {@link monthAxis}. */
+function hasOpenEnd(groups: ChartGroup[], projectWindow: { startDate: string | null; endDate: string | null }): boolean {
+  return groups.some((g) =>
+    g.items.some((it) =>
+      it.awards.length > 0
+        ? it.awards.some((a) => !awardWindow(g, a, projectWindow).end)
+        : !(g.when?.endDate ?? projectWindow.endDate),
+    ),
+  );
 }
 
 /**
@@ -223,7 +252,7 @@ function SitePanel({
 }) {
   const t = useT();
   const projectWindow = { startDate: project.defaults.timing.startDate, endDate: project.defaults.timing.endDate };
-  const axis = monthAxis(chartSpan(groups, projectWindow));
+  const axis = monthAxis(chartSpan(groups, projectWindow), hasOpenEnd(groups, projectWindow));
   const span = siteSpan(project);
   const siteSays = (d: string) => t.projects.board.siteSays.replace("{date}", d);
   const ticks = axis ? months(axis) : [];
@@ -435,16 +464,14 @@ function SitePanel({
                     the same near-white ground at the same type size, so a chart of two requests read
                     as five equal rows and the renter had to work out which lines were containers.
 
-                    It is now a navy-tinted band, a hair taller, with the KIND spelled out as a tag
-                    on the leading edge. ~~A `campaign` megaphone for a request and a `handyman`
-                    spanner for a work order.~~ Two unrelated glyphs at 13px, in a chart whose only
-                    other icons are the paper marks on an award, said less than the two words do
-                    (*"remove icon or use consistent one"*) — and the tag is the same shape for both
-                    kinds, which is what makes the two comparable at a glance. */}
+                    It is now a navy-tinted band, a hair taller, and the name on it is the whole
+                    label. ~~A `campaign` megaphone for a request and a `handyman` spanner for a work
+                    order~~ → ~~a «Request» / «Work order» tag~~ → nothing (owner, 2026-08-31, twice:
+                    *"remove icon or use consistent one"*, then *"remove this work order or request
+                    label"*). What a row IS shows in what it does: a work order is named by its own
+                    title and carries no bids, a request carries its reference. The band does not
+                    have to announce the category to be read. */}
                 <div className="flex items-center gap-2 border-t-2 border-border bg-navy/[.045] px-3 py-2">
-                  <span className="flex-none rounded-sm border border-border bg-surface px-1.5 py-px text-label font-extrabold uppercase tracking-[.03em] text-navy-mid">
-                    {g.kind === "work_order" ? t.projects.pills.kindWorkOrder : t.projects.pills.kindRequest}
-                  </span>
                   <span className="truncate text-body font-extrabold text-navy">{g.title?.trim() || g.ref}</span>
                   {/* The ref, and only when the TITLE is something else (owner, 2026-08-31: *"why is
                       the request id repeated twice"*). A request with no title of its own falls back
