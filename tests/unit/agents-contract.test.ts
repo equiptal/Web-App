@@ -115,7 +115,8 @@ when("the routes this app calls", () => {
     "PATCH /agents/renter-suppliers/{}",
     "DELETE /agents/renter-suppliers/{}",
     // POST /agents/renter-suppliers/bulk is BUILT — caught by the guard, 2026-09-01.
-    "POST /agents/renter-suppliers/link",
+    // POST /agents/renter-suppliers/link is BUILT — caught by the guard, 2026-09-01.
+    "GET /agents/renter-suppliers/suggestions",
     "GET /agents/renter-suppliers/groups",
     "PATCH /agents/renter-suppliers/groups",
     "DELETE /agents/renter-suppliers/groups",

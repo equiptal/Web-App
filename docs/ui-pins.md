@@ -46,6 +46,7 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**10.2** | Home — hero action column | `src/components/home/HomeHub.tsx` |
 | &nbsp;&nbsp;**10.3** | Home — activity tiles | `src/components/home/HomeHub.tsx` |
 | &nbsp;&nbsp;**10.4** | Home — requests + bids rail | `src/components/home/HomeRequests.tsx` |
+| &nbsp;&nbsp;**10.6** | My Suppliers — the list | `src/components/suppliers/SuppliersPage.tsx` |
 | **11** | Start-your-request modal | `src/components/home/StartYourRequestModal.tsx` |
 | **15** | Create — intake screen | `src/components/screens/Intake.tsx` |
 | **16** | Create canvas (3 columns) | `src/components/create/Canvas.tsx` |

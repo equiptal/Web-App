@@ -1516,6 +1516,30 @@ export async function removeRenterSupplier(
   return projectFetch(`/api/renter-suppliers/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
+/**
+ * A firm that bid but holds no row yet.
+ *
+ * `supplierId` is set when they have a Moedatech account, so adding them makes a linked row rather
+ * than a typed one.
+ */
+export interface SupplierSuggestion {
+  companyName: string;
+  phone?: string | null;
+  crNumber?: string | null;
+  supplierId?: string | number | null;
+  via: "app" | "link";
+  at?: string;
+}
+
+/** Suggestions are a courtesy: an empty answer hides the band, which is what "none" should look like. */
+export async function listSupplierSuggestions(): Promise<SupplierSuggestion[]> {
+  try {
+    return await projectFetch<SupplierSuggestion[]>("/api/renter-suppliers/suggestions");
+  } catch {
+    return [];
+  }
+}
+
 /** Every group in the company's list, with its count. */
 export async function listSupplierGroups(): Promise<{ name: string; count: number }[]> {
   try {

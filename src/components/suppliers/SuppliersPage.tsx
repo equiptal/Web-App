@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/ui";
 import { fmt, useT } from "@/lib/i18n";
 import { btn, cx } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 import { deleteSupplierGroup, listRenterSuppliers, renameSupplierGroup, updateRenterSupplier } from "@/lib/api/client";
 import { AddSuppliersDialog } from "./AddSuppliersDialog";
 import { DeleteGroupDialog, GroupsMenu, NameGroupDialog, RenameGroupDialog } from "./SupplierGroups";
@@ -11,6 +12,7 @@ import { SupplierProfileDialog } from "./SupplierProfileDialog";
 import { SupplierBidsDialog } from "./SupplierBidsDialog";
 import { EditSupplierDialog } from "./EditSupplierDialog";
 import { ImportSuppliersDialog } from "./ImportSuppliersDialog";
+import { SuggestedBand } from "./SuggestedBand";
 import {
   bidCount,
   canBeEmailed,
@@ -187,7 +189,14 @@ export function SuppliersPage() {
         </span>
       </header>
 
-      <div className="rounded-md border border-border bg-surface">
+      <SuggestedBand
+        onAdded={(m) => {
+          setToast(m);
+          load();
+        }}
+      />
+
+      <div {...pin("suppliers-list")} className="rounded-md border border-border bg-surface">
         <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
           <span className="flex h-[30px] min-w-[250px] items-center gap-2 rounded-md border border-border bg-surface2 px-2.5">
             <Icon name="search" size={15} className="text-muted" />

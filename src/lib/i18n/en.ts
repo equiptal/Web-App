@@ -2323,6 +2323,11 @@ export const en = {
     importedMixed: "{n} imported · {merged} already in your list · {rejected} refused",
     importFailed: "That did not import. Nothing was added.",
     importSuppliers: "Import a list",
+    suggestedTitle: "They bid on your requests but are not in your list",
+    suggestedViaLink: "via your link",
+    suggestedOnApp: "on Moedatech",
+    addToMySuppliers: "Add to my suppliers",
+    dismiss: "Dismiss",
     xlsxNotRead: "Excel files are not read directly. Open it, select the rows including the header, and paste them above — or save it as CSV.",
   },
 };

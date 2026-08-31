@@ -106,6 +106,7 @@ export const PIN_REGISTRY = {
   "home-hero": { n: "10.1", label: "Home — hero band", file: "src/components/home/HomeHub.tsx" },
   "home-hero-actions": { n: "10.2", label: "Home — hero action column", file: "src/components/home/HomeHub.tsx" },
   "home-requests": { n: "10.4", label: "Home — requests + bids rail", file: "src/components/home/HomeRequests.tsx" },
+  "suppliers-list": { n: "10.6", label: "My Suppliers — the list", file: "src/components/suppliers/SuppliersPage.tsx" },
   "start-request-modal": { n: "11", label: "Start-your-request modal", file: "src/components/home/StartYourRequestModal.tsx" },
 
   /* ── 15–24  create ────────────────────────────────────────────────────────────────────────── */
