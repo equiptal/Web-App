@@ -38,6 +38,7 @@ export function FileRequestDialog({
   siteLabel,
   siteAddress,
   onFile,
+  onEditRequest,
   onNew,
   busy,
 }: {
@@ -48,6 +49,8 @@ export function FileRequestDialog({
   /** The site's own address — what each request's address is compared against. */
   siteAddress: string | null;
   onFile: (requestId: string) => void;
+  /** Take the renter to this request's own edit, so they can change its location instead. */
+  onEditRequest: (requestId: string) => void;
   /** Post a new one instead — the intake, with this site already picked. */
   onNew: () => void;
   busy?: boolean;
@@ -56,6 +59,9 @@ export function FileRequestDialog({
   const f = t.projects.file;
   const { locale } = useLocale();
   const [query, setQuery] = useState("");
+
+  /** The request the renter picked whose address is somewhere else — held while they answer. */
+  const [asking, setAsking] = useState<(ChartGroup & { address?: string | null }) | null>(null);
 
   /**
    * Is this request's address somewhere else?
@@ -69,6 +75,19 @@ export function FileRequestDialog({
    * address. A machine really can be needed at a yard the site does not name, and refusing that
    * would be inventing a rule the product does not have.
    */
+  /**
+   * Can this request's own location still be changed?
+   *
+   * The same rule the propagation step uses, and for the same reason: a live request with no bids is
+   * free to edit, one with bids spends its single post-bid edit, and one that has spent it — or has
+   * closed — cannot be touched. Answered here so the panel can offer the edit or say why not,
+   * rather than sending the renter to a form that will refuse them.
+   */
+  const editable = (c: { status?: string | null; renteeEditUsed?: boolean | null }) => {
+    const live = c.status === "OPEN" || c.status === "ACTIVE";
+    return live && !c.renteeEditUsed;
+  };
+
   const here = shortSite(siteAddress).trim().toLowerCase();
   const elsewhere = (c: { address?: string | null }) => {
     const there = shortSite(c.address).trim().toLowerCase();
@@ -125,7 +144,10 @@ export function FileRequestDialog({
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => onFile(c.id)}
+                    /* A mismatch is asked about, not blocked — see the note on `elsewhere`. The
+                       matching case files straight away: a question with one sensible answer is a
+                       click the renter did not need. */
+                    onClick={() => (elsewhere(c) ? setAsking(c) : onFile(c.id))}
                     className="flex w-full items-center gap-2.5 px-3 py-2.5 text-start transition hover:bg-surface2 disabled:pointer-events-none"
                   >
                     <Icon name="campaign" size={14} className="flex-none text-muted" />
@@ -162,6 +184,46 @@ export function FileRequestDialog({
               {f.note}
             </p>
           </>
+        )}
+
+        {/* Asked here rather than in a second dialog: the renter is mid-choice, and a stacked
+            modal would hide the list they were choosing from. */}
+        {asking && (
+          <div className="flex flex-col gap-2 rounded-sm border border-warn/40 bg-warn/5 p-3">
+            <span className="flex items-start gap-2 text-body font-semibold text-navy">
+              <Icon name="info" size={15} className="mt-px flex-none text-warn" />
+              {f.askTitle.replace("{there}", shortSite(asking.address)).replace("{here}", shortSite(siteAddress))}
+            </span>
+            <p className="text-meta text-muted">{f.askBody}</p>
+
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button variant="ghost" onClick={() => setAsking(null)} disabled={busy}>
+                {t.common.cancel}
+              </Button>
+
+              {/* Offered only while the request can actually take an edit. A request whose one
+                  post-bid edit is spent, or that is closed, cannot — and a button that leads to a
+                  refusal is worse than none, so it says the reason instead. */}
+              {editable(asking) ? (
+                <Button variant="secondary" onClick={() => onEditRequest(asking.id)} disabled={busy}>
+                  {f.askEdit}
+                </Button>
+              ) : (
+                <span className="text-meta font-semibold text-muted">{f.askNotEditable}</span>
+              )}
+
+              <Button
+                onClick={() => {
+                  const id = asking.id;
+                  setAsking(null);
+                  onFile(id);
+                }}
+                disabled={busy}
+              >
+                {f.askContinue}
+              </Button>
+            </div>
+          </div>
         )}
 
         <div className="flex justify-end border-t border-border pt-3">

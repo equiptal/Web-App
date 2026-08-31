@@ -106,6 +106,21 @@ function named(groups: ChartGroup[], project: { awards?: { labels?: Record<strin
   return groups.map((g) => (g.kind === "request" && labels[g.id] ? { ...g, title: labels[g.id] } : g));
 }
 
+/**
+ * Where a request opens.
+ *
+ * ⚠️ **There is no `/requests/[id]` route** — `src/app/requests` holds one `page.tsx` and nothing
+ * else. Two places here pushed `/requests/${id}` and both were dead links: the row menu's *Open the
+ * request*, and the conflict dialog's fallback. Neither errored; Next simply served a 404 page,
+ * which is why it survived being clicked.
+ *
+ * The workspace opens one from a query instead — `?g=` names the group and `?details=1` picks the
+ * door (`RequestsWorkspace.tsx:205`). Built here once so the next caller cannot get it wrong again.
+ */
+function requestUrl(id: string, door: "details" | "edit" = "details"): string {
+  return `/requests?g=${encodeURIComponent(id)}&${door}=1`;
+}
+
 export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   const t = useT();
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
@@ -657,7 +672,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
                   },
                   // Un-awarding is reached through Change the award's own confirm, so the menu
                   // does not offer two doors to the same destructive act.
-                  onOpenRequest: group.kind === "request" ? () => router.push(`/requests/${group.id}`) : undefined,
+                  onOpenRequest: group.kind === "request" ? () => router.push(requestUrl(group.id)) : undefined,
                   onEditWorkOrder:
                     group.kind === "work_order"
                       ? () =>
@@ -782,7 +797,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
             // the validation. This opens the right one rather than writing a second edit path.
             setConflict(null);
             if (conflict.kind === "work_order") setNotice(t.projects.conflict.openTheForm);
-            else router.push(`/requests/${conflict.id}`);
+            else router.push(requestUrl(conflict.id));
           }}
           busy={saving}
         />
@@ -834,6 +849,9 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
           siteAddress={filingInto.address}
           busy={saving}
           onFile={(requestId) => void fileExisting(requestId, filingInto.projectId)}
+          /* Its own edit, where changing a location is already governed by the one-edit
+             rule — rather than a second place that decides what may be changed. */
+          onEditRequest={(requestId) => router.push(requestUrl(requestId, "edit"))}
           onNew={() => router.push(`/create?project=${encodeURIComponent(filingInto.projectId)}`)}
         />
       )}
