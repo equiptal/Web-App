@@ -6,17 +6,18 @@ import { Icon } from "@/components/ui";
 import { btn, cx } from "@/lib/ds";
 import { fmt, useT } from "@/lib/i18n";
 import { addRenterSuppliersBulk, type NewRenterSupplier } from "@/lib/api/client";
+import { AddFromMoedatechPanel } from "./AddFromMoedatechPanel";
 import { SupplierImportPanel } from "./SupplierImportPanel";
 
 /**
  * SUP-T15 — adding the suppliers a renter already works with.
  *
- * ── One door, two ways through it (owner, 2026-09-01) ───────────────────────────────────────────
+ * ── One door, three ways through it (owner, 2026-09-01) ─────────────────────────────────────────
  *
  * *Add* and *Import* used to be two buttons in the page header for one intention. A renter with a
  * file had to guess which one was his before either had told him what it wanted. So there is one
- * button, and the choice between typing the suppliers and uploading a list is made in here, where
- * both are visible at once and neither is a dead end.
+ * button, and the choice — type them, upload a list, or take one off Moedatech — is made in here,
+ * where all three are visible at once and none is a dead end.
  *
  * ── Rows, not a form ────────────────────────────────────────────────────────────────────────────
  *
@@ -61,7 +62,7 @@ const GRID = "grid grid-cols-[1.2fr_.9fr_1.2fr_.9fr_auto_28px] items-center gap-
 export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; onClose: () => void; onAdded: (msg?: string) => void }) {
   const t = useT();
   const c = t.suppliers;
-  const [mode, setMode] = useState<"type" | "file">("type");
+  const [mode, setMode] = useState<"type" | "file" | "app">("type");
   const [rows, setRows] = useState<Row[]>([blank()]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -109,7 +110,7 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
       /* The import panel carries its own actions — its primary button says how many rows will be
          written, which a fixed dialog footer cannot. */
       footer={
-        mode === "file" ? undefined : (
+        mode !== "type" ? undefined : (
           <div className="flex w-full items-center justify-end gap-2">
             {error && <span className="me-auto text-meta font-extrabold text-danger-deep">{error}</span>}
             <button type="button" onClick={close} className={btn("ghost", "md")}>
@@ -127,9 +128,19 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
         <div className="flex w-fit gap-0.5 rounded-md bg-surface2 p-0.5">
           <ModeTab on={mode === "type"} onClick={() => setMode("type")} icon="edit" label={c.modeType} />
           <ModeTab on={mode === "file"} onClick={() => setMode("file")} icon="table_view" label={c.modeFile} />
+          <ModeTab on={mode === "app"} onClick={() => setMode("app")} icon="storefront" label={c.modeApp} />
         </div>
 
-        {mode === "file" ? (
+        {mode === "app" ? (
+          <AddFromMoedatechPanel
+            typeTabLabel={c.modeType}
+            onDone={(msg) => {
+              onAdded(msg);
+              close();
+            }}
+            onCancel={close}
+          />
+        ) : mode === "file" ? (
           <SupplierImportPanel
             onDone={(msg) => {
               onAdded(msg);
