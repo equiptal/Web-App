@@ -93,8 +93,10 @@ describe("what the menu offers", () => {
 
     expect(items).toContain("Mark mobilized");
     expect(items).toContain("Mark demobilized");
-    // Still nothing to award and no paper to hang: those need a supplier and an id.
-    expect(items).not.toContain("Award");
+    /* And Award, because the supplier section can be left blank on the form (owner, 2026-08-31) —
+       without this the machine had no way to name a supplier later except by reopening the order. */
+    expect(items).toContain("Award");
+    // A paper still needs an award to hang on: there is no id to file one under yet.
     expect(items).not.toContain("Attach a document");
   });
 
@@ -132,11 +134,15 @@ describe("what the menu offers", () => {
     expect(items).not.toContain("Open the deal room");
   });
 
-  it("a work order with no award yet is never offered Award", () => {
-    // It is awarded on its own form, the moment it exists — a machine already on site was never
-    // waiting on anyone.
+  it("a work order with no award yet IS offered Award", () => {
+    /* ~~It is awarded on its own form, the moment it exists.~~ Only if the renter filled the
+       supplier section in (owner, 2026-08-31). Leaving it blank is normal — they may not know yet,
+       or it is their own fleet — and it left the machine with no way to name a supplier afterwards.
+       The dialog is the same *who supplies it* section the form carries. */
     const items = open(<RowMenu group={group("work_order")} award={null} actions={all()} />);
-    expect(items).not.toContain("Award");
+
+    expect(items).toContain("Award");
+    // Bids remain marketplace-only: a work order went out to nobody.
     expect(items).not.toContain("Review the bids");
   });
 

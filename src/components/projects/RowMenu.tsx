@@ -109,10 +109,17 @@ export function RowMenu({
   };
 
   if (!award) {
-    if (!isWorkOrder) {
-      push("award", m.award, "handshake", a.onAward);
-      push("bids", m.reviewBids, "gavel", a.onReviewBids);
-    }
+    /* Award, on EITHER kind (owner, 2026-08-31).
+     *
+     * ~~A work order is awarded the moment it exists, so there is nothing to award from here.~~ Only
+     * when the renter filled the supplier section in. Leaving it blank is normal — they may not know
+     * yet, or it is their own fleet — and it left the machine with no way to name a supplier later
+     * except by reopening the whole order. The dialog this opens is the same *who supplies it*
+     * section that lives in the form, so nothing new has to be learned. */
+    push("award", m.award, "handshake", a.onAward);
+
+    // Bids belong to the marketplace: a work order went out to nobody.
+    if (!isWorkOrder) push("bids", m.reviewBids, "gavel", a.onReviewBids);
   } else {
     // Papers hang on an award — there is no id to file them under until one exists.
     push("doc", m.attachDocument, "attach_file", a.onAttachDocument);
