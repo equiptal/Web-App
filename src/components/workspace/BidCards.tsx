@@ -308,9 +308,16 @@ function BidCardTile({
         {/* ── The pill column, as the app builds it (`v3_bid_card._pillColumn`) ─────────────────
             The control on top, the units badge under it, both against the card's trailing edge. */}
         <div className="flex flex-none flex-col items-end gap-1.5">
-          {offline ? (
-            <span className="rounded-full border border-border px-2 py-1 text-label font-semibold text-muted">{t.workspace.notOnApp}</span>
-          ) : (
+          {/* ~~«Not on the app», as a pill in the control's place on an off-platform card.~~ Removed
+              (owner, 2026-08-31): *"it is already labeled in the card header."* It is — the header
+              band is grey rather than blue and reads «Via an offline quote» across the top of the
+              card, which is the same fact stated first, larger, and where the reader meets it. The
+              pill restated it in the slot the chat control holds, so the eye went to a badge that
+              could not be pressed and said nothing new.
+
+              Nothing takes its place. An off-platform bid has no deal room to open, so that slot has
+              nothing to offer on this card; the units badge below it still draws. */}
+          {!offline && (
             /* The conversation, as one round control: filled while there is something unread on it,
                quiet while there is not. */
             <button

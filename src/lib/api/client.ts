@@ -1048,6 +1048,15 @@ export interface AwardInput {
   units: number;
   rentalBasis?: Award["rentalBasis"];
   rateAmount?: number | null;
+  /**
+   * Haulage, priced separately from the rental because it is charged once and the rate recurs.
+   *
+   * OMIT rather than send 0: the backend's schema is `.partial()`, and "not recorded" and "agreed,
+   * free" are different facts about a supplier. Declared here so the award dialog's two new boxes
+   * are typed rather than riding through on a spread that TypeScript does not check.
+   */
+  mobilizationAmount?: number | null;
+  demobilizationAmount?: number | null;
 }
 
 /** Every award write answers with the site's new version. Hold it — the next write sends it. */

@@ -14,16 +14,18 @@
  * It appears only when something is filed nowhere, and it is where filing actually happens — most
  * requests never reach it, because they are offered a project at the moment they are posted.
  *
- * ── Nothing clips but the TRACK ───────────────────────────────────────────────────────────────────
+ * ── Nothing clips and nothing scrolls but the PAGE ────────────────────────────────────────────────
  *
- * ~~The chart panel hid its overflow so a bar could not escape.~~ It swallowed the row menus with
- * them, which is the bug the owner reported on 2026-08-31: *"clicking on 3 dots opens a menu that is
- * hidden."* A bar cannot escape a track that clips itself, so the clip moved there (`ChartRow`) and
- * this panel has none.
+ * The row menu is a popover inside a row, and every ancestor that clips or scrolls is a way to lose
+ * it. Both were tried and both failed on 2026-08-31: `overflow-hidden` on the panel *"opens a menu
+ * that is hidden"*, and `max-h/overflow-y-auto` cut the list mid-entry and asked the renter to scroll
+ * the table to read a menu that closes when the table scrolls.
  *
- * The chart SCROLLS on its own rather than making the page taller, and its header stays put while it
- * does. A menu on the last row still has somewhere to go: it flips upward when the viewport is short
- * of room — see `RowMenu`.
+ * So the panel grows to its content and the page carries the scrollbar — *"it will depend on the page
+ * scrolling for larger data, so this menu must appear independent of the table scroll."* Only the
+ * TRACK inside each row clips (`ChartRow`), which is enough to keep a bar off the label column.
+ *
+ * A menu still flips upward when the viewport is short of room below it — see `RowMenu`.
  */
 
 import { useT } from "@/lib/i18n";
@@ -404,11 +406,18 @@ function SitePanel({
       </div>
 
       {/* ── Chart ──
-          NO `overflow-hidden` here (see the note at the top): the track clips itself, and this panel
-          clipping is what hid every row menu. It scrolls instead, so a long site does not stretch the
-          page — and the header stays while it does, because a month column whose label has scrolled
-          away is a column of nothing. */}
-      <div className="max-h-[64vh] overflow-y-auto rounded-sm border border-border bg-surface">
+          It CLIPS NOTHING and SCROLLS NOTHING (owner, 2026-08-31: *"don't make the project
+          scrollable, it will depend on the page scrolling for larger data — so this menu must appear
+          independent of the table scroll"*).
+
+          ~~`overflow-hidden`~~ hid every row menu. ~~`max-h-[64vh] overflow-y-auto`~~ replaced that
+          with a subtler version of the same bug: the menu escaped the panel's border but not its
+          scroll box, so a list opened near the bottom was cut off mid-entry and the renter had to
+          scroll the table to read a menu — which closes on the press that scrolls it.
+
+          A panel with neither grows to its content and the PAGE scrolls, which is the one scrollbar
+          a popover cannot be trapped by. The track still clips itself, so no bar escapes. */}
+      <div className="rounded-sm border border-border bg-surface">
         {axis ? (
           <>
             {/* ── The axis header: two lines, and they cannot collide ─────────────────────────────
@@ -422,7 +431,9 @@ function SitePanel({
                 instead of running into its neighbour.
 
                 `z-10`, not 20: an open row menu has to paint over this header (see `ChartRow`). */}
-            <div className="sticky top-0 z-10 flex items-stretch border-b border-border bg-surface2">
+            {/* Not `sticky` any more: with no scroll box of its own it would pin to the VIEWPORT and
+                float the month row over whatever the renter scrolled past. */}
+            <div className="flex items-stretch border-b border-border bg-surface2">
               <div className="flex w-[340px] flex-none items-end px-3 pb-1.5 text-label font-semibold uppercase tracking-[.03em] text-muted">
                 {t.projects.board.whatIsHere}
               </div>
@@ -560,15 +571,9 @@ function SitePanel({
               </div>
             ))}
 
-            {/* ── Room after the last row (owner, 2026-08-31) ────────────────────────────────────
-                *"Let users scroll for a space after the chart so the chart is not at the bottom."*
-                The last row sat flush against the panel's own border, which made a full chart look
-                cut off rather than finished — and a row menu opening downward on that row had
-                nothing to open into, so it flipped up over the rows the renter was comparing.
-
-                Inside the scroller, so it is scrollable space rather than a permanent gap: a chart
-                short enough to fit needs no scrollbar and shows none. */}
-            <div aria-hidden className="h-24 flex-none" />
+            {/* ~~A 96px spacer inside the scroller.~~ It went with the scroller: the room after the
+                chart is now the page's own `pb-24` (see `ProjectsSurface`), which is what the owner
+                asked for and does not leave an empty band inside the panel's border. */}
           </>
         ) : (
           <p className="px-3 py-6 text-center text-body text-muted">{t.projects.board.nothingYet}</p>

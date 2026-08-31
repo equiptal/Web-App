@@ -1429,7 +1429,6 @@ export const en = {
     // The card's source line, said in full. The header chip above is the short form.
     sourceAppLong: "Via Moedatech app",
     sourceOfflineLong: "Offline · added by you",
-    notOnApp: "Not on the app",
     openChat: "Open the conversation",
     // "{period}" is the rental period the bid quoted in — Monthly rental, Weekly rental, and so on.
     // The price block mirrors the app's bid card (`v3_bid_card.dart`, `price_expanded_breakdown.dart`,
@@ -1818,6 +1817,9 @@ export const en = {
       units: "Units",
       rate: "Rate",
       ratePlaceholder: "SAR, optional",
+      mobAmount: "Mobilization",
+      demobAmount: "Demobilization",
+      lineTotal: "Total {amount}",
       basis: "Per",
       daily: "day",
       weekly: "week",

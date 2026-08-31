@@ -1160,7 +1160,7 @@
 .bidmap .bm-eq .bm-eq-rd { display: flex; flex: 1; min-width: 0; align-items: center; gap: 8px; }
 .bidmap .bm-eq .bm-eq-rdbar { display: block; flex: 1; min-width: 24px; height: 5px; border-radius: 999px; background: #dbe6ef; overflow: hidden; }
 .bidmap .bm-eq .bm-eq-rdfill { display: block; height: 100%; border-radius: 999px; background: #c8d8e8; transition: width 0.25s ease; }
-.bidmap .bm-eq .bm-eq-rdn { font-size: 10px; font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; }
+.bidmap .bm-eq .bm-eq-rdn { font-size: 10px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
 .bidmap .bm-eq .bm-eq-rd.green .bm-eq-rdfill { background: #16a34a; }
 .bidmap .bm-eq .bm-eq-rd.yellow .bm-eq-rdfill { background: var(--warn-deep); }
 .bidmap .bm-eq .bm-eq-rd.red .bm-eq-rdfill { background: #d9362a; }
@@ -1259,15 +1259,24 @@
 /* The figure keeps the card's largest type: it is the fact the list is SORTED on. It takes the
    chip's ink rather than navy, because the colour is the whole point — the number and its
    trustworthiness are one statement, not a number with a verdict beside it. */
-.bidmap .bm-eq .bm-eq-km { font-family: ui-monospace, monospace; font-size: 19px; font-weight: 700; letter-spacing: -0.4px; color: currentColor; }
-.bidmap .bm-eq .bm-eq-kmu { font-size: 11px; font-weight: 700; opacity: 0.85; }
+/* ── Quieter (owner, 2026-08-31: *"the font is very bold and big, not nice"*) ────────────────────
+   19px monospace at 700 was set when the figure had to hold a full-width band on its own. It no
+   longer does — the band is one line among three — and a mono 700 at that size renders as a slab:
+   «15.5» came out wider than the four words after it, and «0.0» read as a headline.
+
+   The app's own face at 16/600 with `tabular-nums` keeps every digit on the same advance, which is
+   the ONE thing monospace was actually buying here: a column of distances that does not jitter. */
+.bidmap .bm-eq .bm-eq-km { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.1px; color: currentColor; }
+.bidmap .bm-eq .bm-eq-kmu { font-size: 10.5px; font-weight: 600; opacity: 0.8; }
 
 /* The machine itself — the caption on the distance, not the headline. No serial and no capacity
    (AC-12): the serial identifies the machine to the system, not to a renter, and the size is already
    stated once in the count pills above the list. */
 .bidmap .bm-eq .bm-eq-model {
-  font-size: 13px;
-  font-weight: 800;
+  /* 12.5/700, not 13/800. It is the CAPTION on the distance, and an extrabold caption competes with
+     the figure it is captioning (owner, 2026-08-31). */
+  font-size: 12.5px;
+  font-weight: 700;
   line-height: 1.35;
   color: #16304f;
   /* ~~Centred under the distance.~~ The card's bottom LEADING corner (owner, 2026-08-31): the name

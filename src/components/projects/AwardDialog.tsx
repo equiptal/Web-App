@@ -21,6 +21,17 @@
  * The fallback exists so this is not blocked while that lands, and it is why `supplierName` is
  * written either way: a row renders from a name it already holds.
  *
+ * ── The SAME money the work order asks for ──────────────────────────────────────────────────────
+ *
+ * Rate, mobilization and demobilization, and the line's total — the three boxes and the arithmetic
+ * from the work order's own supplier row, imported rather than re-typed so the two cannot drift.
+ *
+ * They were missing here (owner, 2026-08-31). An award recorded on the chart could hold no haulage
+ * money, while the identical award recorded through the work-order form could — same stored record,
+ * two entry paths, one of them lossy. The chart path is the ONLY one a renter has for a machine
+ * whose supplier section was left blank, so the money simply could not be recorded for exactly the
+ * case the chart's Award exists to serve.
+ *
  * ── The counter blocks Save, and says why before you press it ────────────────────────────────────
  *
  * A running *used of quantity* means a renter splitting three machines across two vendors can see
@@ -34,10 +45,29 @@ import { Button, Icon } from "@/components/ui";
 import { Dialog } from "@/components/Dialog";
 import { listRenterSuppliers, type RenterSupplier, type AwardInput } from "@/lib/api/client";
 import { awardedUnits, type Award, type ChartItem } from "@/lib/contract/award";
+/* The work order's arithmetic, not a second copy of it: (rate + mob + demob) × units, with
+   "nothing recorded" kept distinct from "a total of zero". */
+import { lineTotal } from "@/components/projects/WorkOrderForm";
 
-type Line = { supplierId: string | null; supplierName: string; units: number; rateAmount: string; rentalBasis: Award["rentalBasis"] };
+type Line = {
+  supplierId: string | null;
+  supplierName: string;
+  units: number;
+  rateAmount: string;
+  mobAmount: string;
+  demobAmount: string;
+  rentalBasis: Award["rentalBasis"];
+};
 
-const blank = (basis: Award["rentalBasis"]): Line => ({ supplierId: null, supplierName: "", units: 1, rateAmount: "", rentalBasis: basis });
+const blank = (basis: Award["rentalBasis"]): Line => ({
+  supplierId: null,
+  supplierName: "",
+  units: 1,
+  rateAmount: "",
+  mobAmount: "",
+  demobAmount: "",
+  rentalBasis: basis,
+});
 
 export function AwardDialog({
   open,
@@ -148,7 +178,7 @@ export function AwardDialog({
                 </>
               )}
 
-              <div className="grid gap-2 sm:grid-cols-3">
+              <div className="grid gap-2 sm:grid-cols-5">
                 <label className="flex flex-col gap-1">
                   <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{a.units}</span>
                   <input
@@ -174,6 +204,30 @@ export function AwardDialog({
                 </label>
 
                 <label className="flex flex-col gap-1">
+                  <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{a.mobAmount}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-full rounded-sm border border-border bg-surface px-3 py-2 text-body text-navy outline-none focus:border-brand"
+                    value={l.mobAmount}
+                    placeholder={a.ratePlaceholder}
+                    onChange={(e) => patch(i, { mobAmount: e.target.value })}
+                  />
+                </label>
+
+                <label className="flex flex-col gap-1">
+                  <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{a.demobAmount}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-full rounded-sm border border-border bg-surface px-3 py-2 text-body text-navy outline-none focus:border-brand"
+                    value={l.demobAmount}
+                    placeholder={a.ratePlaceholder}
+                    onChange={(e) => patch(i, { demobAmount: e.target.value })}
+                  />
+                </label>
+
+                <label className="flex flex-col gap-1">
                   <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{a.basis}</span>
                   <select
                     className="w-full rounded-sm border border-border bg-surface px-3 py-2 text-body text-navy outline-none focus:border-brand"
@@ -187,6 +241,15 @@ export function AwardDialog({
                   </select>
                 </label>
               </div>
+
+              {/* What this line comes to, where the renter can see it against the rate they typed.
+                  Absent rather than 0 when nothing is priced — a rate the renter has not agreed yet
+                  is not a free machine. */}
+              {lineTotal(l) !== null && (
+                <p className="text-meta tabular-nums text-muted">
+                  {a.lineTotal.replace("{amount}", lineTotal(l)!.toLocaleString())}
+                </p>
+              )}
             </div>
           ))}
         </div>
@@ -224,6 +287,10 @@ export function AwardDialog({
                   units: l.units,
                   rentalBasis: l.rentalBasis,
                   rateAmount: l.rateAmount ? Number(l.rateAmount) : null,
+                  /* Omitted rather than sent as 0: the backend's schema is `.partial()`, so an
+                     absent key is "not recorded" and 0 would be "agreed, free". */
+                  ...(l.mobAmount.trim() ? { mobilizationAmount: Number(l.mobAmount) } : {}),
+                  ...(l.demobAmount.trim() ? { demobilizationAmount: Number(l.demobAmount) } : {}),
                 })),
               )
             }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/react";
 import { LocaleProvider } from "@/lib/i18n";
 import { en } from "@/lib/i18n/en";
 import { AwardDialog } from "@/components/projects/AwardDialog";
@@ -70,5 +70,75 @@ describe("who may be awarded", () => {
     await waitFor(() => {
       expect(screen.getByPlaceholderText(en.projects.award.supplierPlaceholder)).toBeTruthy();
     });
+  });
+});
+
+/* ============================================================================================== *
+ * The money, which must be the same money the work order asks for
+ * ============================================================================================== */
+
+describe("what an award can record", () => {
+  beforeEach(() => cleanup());
+
+  /* The chart's Award is the ONLY path to a supplier for a machine whose supplier section was left
+     blank on the work order (owner, 2026-08-31). It carried rate but not mobilization or
+     demobilization, so the same stored record could hold haulage money through one entry path and
+     not the other — and lost it for exactly the case this dialog exists to serve. */
+
+  it("asks for mobilization and demobilization, like the work order does", async () => {
+    suppliers.rows = [];
+    open();
+    await waitFor(() => screen.getByPlaceholderText(en.projects.award.supplierPlaceholder));
+
+    // The work order's own labels, not near-synonyms — one vocabulary for one field.
+    expect(screen.getByText(en.projects.award.mobAmount)).toBeTruthy();
+    expect(screen.getByText(en.projects.award.demobAmount)).toBeTruthy();
+    expect(en.projects.award.mobAmount).toBe(en.projects.workOrder.mobAmount);
+    expect(en.projects.award.demobAmount).toBe(en.projects.workOrder.demobAmount);
+  });
+
+  it("sends them only when they were filled, and never as zero", async () => {
+    suppliers.rows = [];
+    const onSave = vi.fn();
+    render(
+      <LocaleProvider>
+        <AwardDialog open onClose={() => {}} item={item} onSave={onSave} />
+      </LocaleProvider>,
+    );
+    const name = await waitFor(() => screen.getByPlaceholderText(en.projects.award.supplierPlaceholder));
+    fireEvent.change(name, { target: { value: "Zahid Tractor" } });
+    fireEvent.click(screen.getByRole("button", { name: en.projects.award.save }));
+
+    const [lines] = onSave.mock.calls[0];
+    /* Absent, not 0. The backend schema is `.partial()`, so an omitted key means "not recorded"
+       while 0 would mean "agreed, and free" — a different fact about a supplier. */
+    expect("mobilizationAmount" in lines[0]).toBe(false);
+    expect("demobilizationAmount" in lines[0]).toBe(false);
+  });
+
+  it("totals the line the way the work order totals it", async () => {
+    suppliers.rows = [];
+    const onSave = vi.fn();
+    render(
+      <LocaleProvider>
+        <AwardDialog open onClose={() => {}} item={item} onSave={onSave} />
+      </LocaleProvider>,
+    );
+    const name = await waitFor(() => screen.getByPlaceholderText(en.projects.award.supplierPlaceholder));
+    fireEvent.change(name, { target: { value: "Zahid Tractor" } });
+
+    const boxes = screen.getAllByRole("spinbutton");
+    fireEvent.change(boxes[0], { target: { value: "2" } });     // units
+    fireEvent.change(boxes[1], { target: { value: "8000" } });  // rate
+    fireEvent.change(boxes[2], { target: { value: "1200" } });  // mobilization
+    fireEvent.change(boxes[3], { target: { value: "800" } });   // demobilization
+
+    // (8000 + 1200 + 800) × 2 = 20,000 — the work order's own arithmetic, imported not re-typed.
+    expect(screen.getByText(/20,000/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: en.projects.award.save }));
+    const [lines] = onSave.mock.calls[0];
+    expect(lines[0].mobilizationAmount).toBe(1200);
+    expect(lines[0].demobilizationAmount).toBe(800);
   });
 });
