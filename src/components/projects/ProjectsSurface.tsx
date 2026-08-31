@@ -632,9 +632,21 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
                 group={group}
                 award={a}
                 actions={{
-                  onAward: a ? undefined : () => setAwarding({ group, item }),
-                  onChangeAward: a ? () => setAwarding({ group, item }) : undefined,
-                  onMark: a ? (which, value) => void mark(a.id, which, value) : undefined,
+                  /* Handed over UNCONDITIONALLY, and `RowMenu` decides which of them to show.
+                     
+                     These used to be ternaries on the same `a` that is passed as `award`, so two
+                     places decided the same question and an entry disappeared whenever they
+                     disagreed. That is what hid *Award* and both marks on a row with no award: the
+                     menu asked "is there an award?" and the answer it got from `award` did not match
+                     the answer baked into the handlers. One decision, in one place, cannot disagree
+                     with itself. */
+                  onAward: () => setAwarding({ group, item }),
+                  onChangeAward: () => setAwarding({ group, item }),
+                  // Guarded rather than defaulted: `RowMenu` only offers a mark on an awarded
+                  // row, and a mark on no award is a write with nothing to write to.
+                  onMark: (which, value) => {
+                    if (a) void mark(a.id, which, value);
+                  },
                   // Un-awarding is reached through Change the award's own confirm, so the menu
                   // does not offer two doors to the same destructive act.
                   onOpenRequest: group.kind === "request" ? () => router.push(`/requests/${group.id}`) : undefined,
