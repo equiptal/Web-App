@@ -87,6 +87,12 @@ export interface CreateRequestItem {
 export interface CreateRequestPayload {
   userId: number; // agents-backend schema: z.number().int().positive()
   type: "BROADCAST" | "DIRECT";
+  /**
+   * The one supplier a DIRECT request goes to — an integer USER id, REQUIRED when `type` is DIRECT
+   * and rejected as a 400 without it (`createRequest.ts`: «supplierId is required for a DIRECT
+   * request»). Omitted for a broadcast, which fans out to every matching supplier instead.
+   */
+  supplierId?: number;
   rentalType: "DAILY" | "WEEKLY" | "MONTHLY" | "PER_JOB" | "LONG_TERM";
   /** Optional — omit and the server defaults to "now". Never invent one (ALIGNMENT rule 3). */
   startDate?: string;

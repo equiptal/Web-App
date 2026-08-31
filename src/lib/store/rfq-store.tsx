@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import {
   AgentDraft,
   Certificates,
+  DirectTarget,
   EquipmentItem,
   OperatorDetails,
   Preferences,
@@ -145,6 +146,17 @@ export interface RfqState {
   isTrial: boolean;
   /** The trial's 60-min expiry, echoed by the backend on submit (null for a real request). */
   trialExpiresAt: string | null;
+  /**
+   * The store this request was started from, when it was — it submits as DIRECT to that supplier
+   * alone (app parity, Epic 008) instead of broadcasting to everyone who matches.
+   *
+   * Set from `/create?supplierId=…`, and it rides with the draft so a reload mid-flow cannot quietly
+   * turn one supplier's request into a broadcast. A direct run also starts from a CLEAN draft: the
+   * mobile flow refuses to restore a stored draft into a direct request for the same reason — a
+   * broadcast the renter wrote for the whole market must not be re-addressed to one firm behind his
+   * back. The stored draft is left in place, unread, and is still there for his next broadcast.
+   */
+  direct: DirectTarget | null;
 
   /* ── PROJ: the site this request is being written for ─────────────────────────────────── */
 
@@ -212,6 +224,7 @@ export const initialState: RfqState = {
   guestLimit: false,
   isTrial: false,
   trialExpiresAt: null,
+  direct: null,
   project: null,
   projectDirty: [],
   workOrderGroupId: null,
@@ -259,6 +272,7 @@ type Action =
   | { t: "REQUEST_SOURCING"; id: string }
   | { t: "PATCH_PREFERENCES"; patch: DeepPrefPatch }
   | { t: "SET_TRIAL"; isTrial: boolean }
+  | { t: "SET_DIRECT"; direct: DirectTarget | null }
   | { t: "SELECT_PROJECT"; project: ProjectSummary }
   | { t: "CLEAR_PROJECT" }
   | { t: "PATCH_PROJECT_DEFAULTS"; patch: Partial<TimingHours>; keys: string[] }
@@ -744,6 +758,23 @@ export function reducer(state: RfqState, a: Action): RfqState {
       return { ...state, busy: true, error: null, errorDetail: null };
     case "SET_TRIAL":
       return { ...state, isTrial: a.isTrial };
+    case "SET_DIRECT": {
+      // Same target as the draft already carries → nothing to do (a re-render, a Back, a reload).
+      if ((state.direct?.supplierId ?? null) === (a.direct?.supplierId ?? null)) return { ...state, direct: a.direct };
+      // A different target (or none) → the draft in hand belongs to the other request. Drop it rather
+      // than re-address it; localStorage is untouched, so a broadcast draft survives for its own flow.
+      return {
+        ...state,
+        direct: a.direct,
+        draft: null,
+        agentOrigin: null,
+        draftPrompt: false,
+        phase: "intake",
+        readyToSend: false,
+        activeSection: null,
+        itemIndex: 0,
+      };
+    }
     case "SUBMIT_SUCCESS":
       return {
         ...state,
@@ -912,6 +943,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
 
     /** mobile/016 — enter/leave trial mode for this run (set from `/create?mode=trial`). */
     setTrial: (isTrial: boolean) => dispatch({ t: "SET_TRIAL", isTrial }),
+    setDirect: (direct: DirectTarget | null) => dispatch({ t: "SET_DIRECT", direct }),
 
     async submit() {
       const s = getState();
@@ -959,6 +991,9 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
           simulateError: s.simulateError,
           // mobile/016 — sent only for a trial run; a real request's payload is unchanged.
           ...(s.isTrial ? { isTrial: true } : {}),
+          // Started from a store → DIRECT to that supplier (app parity). Absent for a broadcast, so a
+          // normal request's payload is byte-identical to before.
+          ...(s.direct ? { direct: s.direct } : {}),
         });
         dispatch({
           t: "SUBMIT_SUCCESS",
@@ -1047,7 +1082,7 @@ export function RfqProvider({ children }: { children: ReactNode }) {
 
   // Persist the editable draft + position whenever they change (skip processing/confirmation phases).
   // Stamp the owning user id so a later session can tell whose draft this is.
-  const { phase, activeSection, itemIndex, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial } = state;
+  const { phase, activeSection, itemIndex, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial, direct } = state;
   useEffect(() => {
     try {
       if (draft && (phase === "intake" || phase === "wizard")) {
@@ -1069,6 +1104,9 @@ export function RfqProvider({ children }: { children: ReactNode }) {
             seq,
             agentOrigin,
             isTrial,
+            // The recipient rides with the draft: a reload mid-flow must not turn a request written
+            // for one supplier into a broadcast to the whole market.
+            direct,
             userId: user?.id ?? null,
           }),
         );
@@ -1078,7 +1116,7 @@ export function RfqProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore quota/availability errors */
     }
-  }, [phase, activeSection, itemIndex, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial, user]);
+  }, [phase, activeSection, itemIndex, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial, direct, user]);
 
   // ---- Browser history ⇄ canvas position (MREQ-AC-06/07).
   //

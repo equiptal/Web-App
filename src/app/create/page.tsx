@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { RfqProvider, useRfq } from "@/lib/store/rfq-store";
@@ -23,6 +23,7 @@ export default function CreatePage() {
   return (
     <RfqProvider>
       <Suspense fallback={null}>
+        <DirectRequestGate />
         <FirstRequestGate />
       </Suspense>
       <AppShell title={t.shell.request}>
@@ -30,6 +31,47 @@ export default function CreatePage() {
       </AppShell>
     </RfqProvider>
   );
+}
+
+/**
+ * The store entrance to this flow (app parity, Epic 008).
+ *
+ * `/create?supplierId=…&supplierName=…&storeId=…` means the renter pressed Request on one supplier's
+ * equipment. Everything about the form stays the same; only the recipient changes — it submits as a
+ * DIRECT request to that supplier instead of broadcasting to every firm that matches. The URL is the
+ * authority, exactly as `?mode=` is for a trial: a reload keeps the recipient, and arriving at
+ * `/create` with no `supplierId` clears one left over from a previous run rather than quietly
+ * re-addressing the next request.
+ *
+ * `?prefill=` carries the equipment's own words into the intake box (the app seeds the form with the
+ * machine the renter was looking at). It is a starting text, not a fact: the renter edits it, and the
+ * agent reads what he ends up with — the taxonomy is never forced behind him.
+ */
+function DirectRequestGate() {
+  const params = useSearchParams();
+  const { state, actions } = useRfq();
+  const supplierId = params.get("supplierId");
+  const supplierName = params.get("supplierName");
+  const storeId = params.get("storeId");
+  const prefill = params.get("prefill");
+  const { direct, draft, text } = state;
+  const seeded = useRef(false);
+
+  useEffect(() => {
+    const same = (direct?.supplierId ?? null) === (supplierId ?? null);
+    if (same) return;
+    actions.setDirect(supplierId ? { supplierId, supplierName, storeId } : null);
+    // The prefill seeds an EMPTY box only, and only once: a renter who has already typed owns what
+    // he wrote, and a re-render must not push his words back to the machine's name.
+    if (supplierId && prefill && !draft && !text.trim() && !seeded.current) {
+      seeded.current = true;
+      actions.setText(prefill);
+    }
+    // `actions` is rebuilt each render but only wraps dispatch; depending on it would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supplierId, supplierName, storeId, prefill, direct, draft, text]);
+
+  return null;
 }
 
 /**

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { bidCardDescription, bidCardModel } from "@/lib/bidCardModel";
 import { serverEnv } from "@/lib/config/env";
 
 /**
@@ -31,6 +32,29 @@ export function extractBidToken(slug: string): string {
   return slug.match(GROUP_ID_RE)?.[0] ?? slug;
 }
 
+/**
+ * The request's details as fields rather than prose — SUP-BE-21, and absent until it deploys.
+ *
+ * Every value here is already computed inside the preview handler to build the two strings; this is
+ * the same data before it is joined. Dates and durations arrive PRE-FORMATTED and localised because
+ * the backend holds the Riyadh offset and the Arabic month names — formatting an ISO date in the
+ * renderer's UTC would put a card a day out, which is worse than not showing the date.
+ */
+export interface BidPreviewCard {
+  /** Every machine in the request's own order — the order the renter entered them. */
+  items: { label: string; size: string | null; units: number; operator: boolean }[];
+  /** The city only, never the full address: a card is scraped without auth. */
+  city: string | null;
+  /** `1 month` — the renter's stated length, or derived from the window. */
+  duration: string | null;
+  /** `18 Aug → 17 Sep 2026`. */
+  dateRange: string | null;
+  /** Mobilisation, demobilisation, food, accommodation & transport, fuel — localised, only when set. */
+  terms: { key: string; label: string; value: string }[];
+  /** `21 Aug 2026`, or null when the link carries no deadline. */
+  closesOn: string | null;
+}
+
 export interface BidPreview {
   token: string;
   url: string;
@@ -41,6 +65,12 @@ export interface BidPreview {
   description: string;
   en: { title: string; description: string };
   ar: { title: string; description: string };
+  /** `EXC-170845` / `RFQ-00077`. Read straight, rather than parsed back out of the title. */
+  reference?: string | null;
+  /** The request the mobile app can be deep-linked to — `reqs[0]` for a multi-item group. */
+  requestId?: string | null;
+  /** Absent until SUP-BE-21; the card falls back to splitting the strings. */
+  card?: BidPreviewCard | null;
 }
 
 /**
@@ -128,8 +158,20 @@ export function buildBidMetadata({
    */
   origin: string | null;
 }): Metadata {
-  const title = preview?.title || FALLBACK[lang].title;
-  const description = preview?.description || FALLBACK[lang].description;
+  const copy = (lang === "ar" ? preview?.ar : preview?.en) ?? {
+    title: preview?.title || FALLBACK[lang].title,
+    description: preview?.description || FALLBACK[lang].description,
+  };
+  const title = copy.title;
+  /**
+   * The line under the title, and on WhatsApp, Slack and Apple Mail the ONLY prose the card gets.
+   *
+   * Built from the fields when they are there, so it carries the city, the dates, the terms and the
+   * deadline — and, on a closed request, says so BESIDE the request rather than instead of it. The
+   * backend's own string replaces the whole description with "no longer accepting bids", so a link
+   * forwarded a week later names the equipment and loses where and when it was: SUP-BE-21.
+   */
+  const description = (preview?.card ? bidCardDescription(bidCardModel(preview, copy, lang)) : "") || copy.description;
   const path = `/bid/${slug}${lang === "ar" ? "?lang=ar" : ""}`;
   // Absolute, from the host actually serving this page — never resolved through metadataBase.
   const canonical = origin ? `${origin}${path}` : path;

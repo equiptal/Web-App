@@ -9,10 +9,14 @@ import { extractStoreList, mapEquipmentDetail } from "@/lib/contract/stores";
  * `GET /equipment/{equipmentId}` (read-only); photos come back as backend-signed URLs, documents as
  * type labels only (no contents surfaced to the renter).
  *
- * Guests (public store browse, public-web-auth-and-stores / T7) have no token, and the backend has
- * no public equipment-detail route — so with `?storeId=` we resolve the listing out of the PII-safe
- * `GET /public/stores/{storeId}/equipment` projection instead of 401-ing the equipment modal. That
- * projection carries every detail field except `operatingHours` (absent → null for guests).
+ * Guests have no token, and read `GET /public/equipment/{id}` — the PII-safe projection (no account
+ * ids, no documents, no operating hours, city but no yard coordinates). `?storeId=` is no longer
+ * needed to answer them and is only a hint for the page's back link.
+ *
+ * ⚠️ The fallback below is the OLD guest path and stays until every environment has the public
+ * equipment route deployed: it resolves the listing by scanning that store's public equipment pages.
+ * It needs a `storeId`, reads up to 1000 rows to answer about one, and is why a shared equipment link
+ * without a store id used to 401. Delete it once staging and prod both answer `/public/equipment/{id}`.
  */
 const PUBLIC_LIMIT = 200; // the public equipment route caps `limit` at 200
 const PUBLIC_MAX_PAGES = 5; // 1000 listings; stop rather than page a huge store forever
@@ -22,8 +26,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const storeId = new URL(req.url).searchParams.get("storeId");
 
   if (!(await hasAppSession())) {
-    if (!storeId) return NextResponse.json({ code: "unauthorized" }, { status: 401 });
     const locale = localeFromRequest(req);
+    try {
+      const raw = await appPublicCall(`/public/equipment/${encodeURIComponent(id)}`, locale);
+      return NextResponse.json(mapEquipmentDetail(raw as Record<string, unknown>));
+    } catch {
+      // Not deployed yet (or a genuine 404) → the store-scan fallback, when we have a store to scan.
+      if (!storeId) return NextResponse.json({ code: "not_found" }, { status: 404 });
+    }
     const key = encodeURIComponent(storeId);
     try {
       for (let page = 1; page <= PUBLIC_MAX_PAGES; page++) {

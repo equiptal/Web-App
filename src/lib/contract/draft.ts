@@ -326,9 +326,26 @@ export interface RfqDraft {
    */
   projectId?: string | null;
   workOrderGroupId?: string | null;
+  /** Set when the flow was opened from a store — submits as DIRECT to that supplier alone. */
+  direct?: DirectTarget | null;
 }
 
 /** Posted to /api/requests (AC-42/43). Mirrors the shared app request shape. */
+/**
+ * The single supplier a request is addressed to, when it was started from a store.
+ *
+ * The app has had this since Epic 008: opening the create flow from a store carries the supplier, and
+ * the request is filed as DIRECT rather than broadcast — same form, same endpoint, one recipient. The
+ * web now enters through the same door, so `supplierId` here is the app's integer user id, carried as
+ * a string only because that is what the store payloads speak.
+ */
+export interface DirectTarget {
+  supplierId: string;
+  supplierName: string | null;
+  /** The store the renter came from — provenance, and where «back to the store» returns to. */
+  storeId: string | null;
+}
+
 export interface RfqRequestPayload {
   project: ProjectDetails;
   /** Excludes items flagged not-available / removed (AC-33/34). */
@@ -349,6 +366,8 @@ export interface RfqRequestPayload {
    */
   projectId?: string | null;
   workOrderGroupId?: string | null;
+  /** Present when the flow was opened from a store — the adapter files it as DIRECT to this supplier. */
+  direct?: DirectTarget | null;
 }
 
 /* ----------------------------- Defaults / factories ----------------------------- */

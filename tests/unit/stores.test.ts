@@ -34,8 +34,36 @@ describe("stores mappers (web-app/004)", () => {
       isVerified: true,
       activeEquipmentCount: 48,
       city: "Riyadh",
+      // Both empty, and empty is the answer: this projection sends no category list and no matched
+      // equipment, so the card draws no chip row and keeps its shopfront face.
+      categories: [],
+      matched: [],
     });
     expect(Object.keys(card)).not.toContain("rating");
+  });
+
+  it("maps the category chips and the matched equipment when the projection sends them", () => {
+    const card = mapStoreCard({
+      id: "s3",
+      name: "Zahid Tractor",
+      categories: [
+        { id: "c1", name: "Excavator", nameAr: "حفارة" },
+        { id: "c2", name: "Wheel Loader" },
+      ],
+      matched: [
+        { id: "e1", categoryId: "c1", subcategoryId: "sc1", categoryName: "Excavator", year: 2021, yardCity: "Dammam" },
+        { id: "e2", categoryId: "c1", measurementId: "m1", measurementName: "30 ton" },
+      ],
+    });
+    expect(card.categories).toEqual([
+      { id: "c1", name: "Excavator", nameAr: "حفارة" },
+      // No Arabic in the payload → the English name stands in, rather than an empty chip in Arabic.
+      { id: "c2", name: "Wheel Loader", nameAr: "Wheel Loader" },
+    ]);
+    expect(card.matched.map((e) => e.id)).toEqual(["e1", "e2"]);
+    expect(card.matched[0].categoryId).toBe("c1");
+    expect(card.matched[0].city).toBe("Dammam"); // the tag on the card image
+    expect(card.matched[1].city).toBeNull();
   });
 
   it("treats a non-verified supplier as New (isVerified false) and tolerates missing fields", () => {

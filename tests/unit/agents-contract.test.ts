@@ -112,11 +112,11 @@ when("the routes this app calls", () => {
     // GET /agents/renter-suppliers is BUILT — the guard below caught the stale waiver.
     // POST /agents/renter-suppliers is BUILT — caught by the guard, 2026-09-01.
     // GET /agents/renter-suppliers/{} is BUILT — caught by the guard below, 2026-09-01.
-    "PATCH /agents/renter-suppliers/{}",
-    "DELETE /agents/renter-suppliers/{}",
+    // PATCH /agents/renter-suppliers/{} is BUILT — caught by the guard, 2026-09-01.
+    // DELETE /agents/renter-suppliers/{} is BUILT — caught by the guard, 2026-09-01.
     // POST /agents/renter-suppliers/bulk is BUILT — caught by the guard, 2026-09-01.
     // POST /agents/renter-suppliers/link is BUILT — caught by the guard, 2026-09-01.
-    "GET /agents/renter-suppliers/suggestions",
+    // GET /agents/renter-suppliers/suggestions is BUILT — caught by the guard, 2026-09-01.
     "GET /agents/renter-suppliers/groups",
     "PATCH /agents/renter-suppliers/groups",
     "DELETE /agents/renter-suppliers/groups",

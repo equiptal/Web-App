@@ -23,7 +23,7 @@
 import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
 import { extractBidToken, fetchBidPreview } from "@/lib/api/bidPreview";
-import { bidCardDetails } from "@/lib/bidCardDetails";
+import { bidCardModel } from "@/lib/bidCardModel";
 import { logoDataUri, OG_COLORS } from "@/lib/bidOgAssets";
 
 export const runtime = "nodejs";
@@ -81,7 +81,13 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
     (effective === "ar" ? preview?.ar : preview?.en) ??
     (preview ? { title: preview.title, description: preview.description } : FALLBACK[effective]);
 
-  const d = bidCardDetails(copy, effective, preview?.status !== "closed");
+  /**
+   * The structured card is localised by the `?lang` we asked for, so an Arabic preview rendered as
+   * English (no font) would put Arabic term labels on an English card. Drop it and take the string
+   * path, which carries both languages.
+   */
+  const source = effective === lang ? preview : preview ? { ...preview, card: null } : null;
+  const d = bidCardModel(source, copy, effective);
   const rtl = effective === "ar";
   const host = (preview?.url || "").replace(/^https?:\/\//, "").split("/")[0] || "web.moedatech.net";
 
@@ -103,7 +109,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
           flexDirection: "column",
           justifyContent: "space-between",
           background: OG_COLORS.navy,
-          padding: "58px 68px",
+          padding: "62px 74px",
           fontFamily: rtl ? "Tajawal" : "sans-serif",
           direction: rtl ? "rtl" : "ltr",
         }}
@@ -113,90 +119,57 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={logoDataUri(OG_COLORS.white)} width={228} height={86} alt="" />
           {d.ref ? (
-            <div
-              style={{
-                display: "flex",
-                fontSize: 30,
-                fontWeight: 700,
-                letterSpacing: 1.5,
-                color: OG_COLORS.white,
-                background: "rgba(255,255,255,0.10)",
-                border: "1px solid rgba(255,255,255,0.22)",
-                borderRadius: 999,
-                padding: "12px 28px",
-              }}
-            >
+            <div style={{ display: "flex", fontSize: 34, letterSpacing: 2.5, color: "rgba(255,255,255,0.6)" }}>
               {d.ref}
             </div>
           ) : null}
         </div>
 
-        {/* The headline, then the details as columns — the prototype's rows, at a size that survives
-            being downscaled into a chat bubble. */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: alignEnd }}>
+        {/**
+         * The equipment, and one line asking for the bid. Nothing else (owner, 2026-09-01).
+         *
+         * Which MOVES the detail rather than deleting it: on WhatsApp, Apple Mail and Slack the
+         * recipient sees the image, the title and the description and no markup at all — so an image
+         * that says only what is being rented leaves `og:description` free to carry the city, the
+         * dates and the terms. Text reflows, text is selectable, and text survives a recipient who
+         * has images turned off. The picture stops trying to be a document.
+         */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: alignEnd, gap: 34 }}>
           <div
             style={{
               display: "flex",
-              fontSize: d.headline.length > 46 ? 58 : 70,
+              // A multi-item name is simply longer. Same style, smaller type — never a second layout.
+              fontSize: d.imageHeadline.length > 46 ? 56 : 78,
               fontWeight: 700,
               color: OG_COLORS.white,
-              lineHeight: 1.15,
+              lineHeight: 1.1,
+              letterSpacing: -1.5,
             }}
           >
-            {d.headline}
+            {d.imageHeadline}
           </div>
-
-          {d.rows.length > 0 ? (
-            <div style={{ display: "flex", flexDirection: row, gap: 72, marginTop: 44 }}>
-              {d.rows.map((r) => (
-                <div key={r.label} style={{ display: "flex", flexDirection: "column", alignItems: alignEnd }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      fontSize: 24,
-                      letterSpacing: rtl ? 0 : 2,
-                      textTransform: "uppercase",
-                      color: "rgba(255,255,255,0.52)",
-                    }}
-                  >
-                    {r.label}
-                  </div>
-                  <div style={{ display: "flex", fontSize: 40, fontWeight: 700, color: OG_COLORS.white, marginTop: 10 }}>
-                    {r.value}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : null}
+          <div
+            style={{
+              display: "flex",
+              fontSize: 37,
+              fontWeight: 700,
+              letterSpacing: 0.2,
+              // A closed request is told at a glance and in a colour that is not the one that invites.
+              color: d.accepting ? OG_COLORS.amber : "#FF8A7A",
+            }}
+          >
+            {d.cta}
+          </div>
         </div>
 
-        {/* The closing line — a deadline, an invitation, or the closed notice — and the source domain,
-            which is the card's trust signal (element 4 in the prototype). */}
-        <div style={{ display: "flex", flexDirection: row, alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", flexDirection: row, alignItems: "center" }}>
-            <div
-              style={{
-                display: "flex",
-                width: 14,
-                height: 14,
-                borderRadius: 999,
-                background: d.accepting ? OG_COLORS.amber : "rgba(255,255,255,0.34)",
-                // Logical margins are not supported by the renderer — the dot rendered flush against
-                // the text. Physical, and mirrored by hand.
-                ...(rtl ? { marginLeft: 16 } : { marginRight: 16 }),
-              }}
-            />
-            <div
-              style={{
-                display: "flex",
-                fontSize: 32,
-                fontWeight: 700,
-                color: d.accepting ? OG_COLORS.white : "rgba(255,255,255,0.62)",
-              }}
-            >
-              {d.status}
-            </div>
-          </div>
+        {/* The source domain — the card's trust signal (element 4 in the prototype). */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: row,
+            justifyContent: rtl ? "flex-start" : "flex-end",
+          }}
+        >
           <div style={{ display: "flex", fontSize: 24, letterSpacing: 2.5, color: "rgba(255,255,255,0.48)" }}>
             {host.toUpperCase()}
           </div>

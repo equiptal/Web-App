@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Dropdown } from "@/components/Dropdown";
 import { useLocale, useT } from "@/lib/i18n";
-import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import { StoreCard } from "@/components/stores/StoreCard";
 import type { StoreCard as StoreCardData, TaxonomyNode } from "@/lib/contract/stores";
@@ -26,13 +25,7 @@ interface CityOpt {
 export function BrowseSurface({ title, previewCount }: { title?: string; previewCount?: number }) {
   const t = useT();
   const { locale } = useLocale();
-  const { status } = useSession();
   const ar = locale === "ar";
-  // Guests browse the PUBLIC store directory (real data), but the City + Category filters source
-  // authed-only reference data (`/api/master-data/cities`, `/api/stores/taxonomy`). Rather than a
-  // public reference endpoint, we simply hide those two filters for guests (deferred, non-priority) —
-  // they still get Search + Verified. The filters return once signed in.
-  const anon = status === "anon";
 
   const [cities, setCities] = useState<CityOpt[]>([]);
   const [taxonomy, setTaxonomy] = useState<TaxonomyNode[]>([]);
@@ -50,14 +43,10 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
   const [reloadKey, setReloadKey] = useState(0);
   const [expanded, setExpanded] = useState(false);
 
-  // Master data for the filters (cities + taxonomy tree) — authed-only; skip for guests (their
-  // City/Category filters are hidden, so don't fire the calls that would 401).
+  // Master data for the filters (cities + taxonomy tree). Both BFF routes answer a guest from the
+  // app's PUBLIC twins now, so the City filter and the category pills are the same controls signed in
+  // or out — the directory is public, and a filter a visitor cannot use makes it less so.
   useEffect(() => {
-    if (anon) {
-      setCities([]);
-      setTaxonomy([]);
-      return;
-    }
     fetch("/api/master-data/cities", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
       .then((raw: unknown) => {
@@ -83,7 +72,7 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
       .then((d: { taxonomy: TaxonomyNode[] }) => setTaxonomy(d.taxonomy ?? []))
       .catch(() => setTaxonomy([]));
-  }, [ar, anon]);
+  }, [ar]);
 
   const subcategories = useMemo(() => taxonomy.find((c) => c.id === categoryId)?.children ?? [], [taxonomy, categoryId]);
   const measurements = useMemo(() => subcategories.find((s) => s.id === subcategoryId)?.children ?? [], [subcategories, subcategoryId]);
@@ -155,44 +144,39 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {/* City + Category cascade need authed reference data → shown to signed-in users only. */}
-          {!anon && (
+          {/* The house dropdown, not a native menu (owner, 2026-08-31): each system list opened in its
+              own style, and an empty option and the placeholder say the same thing here — a filter
+              that is not narrowed reads «All cities» on its own trigger. */}
+          <Dropdown
+            label={t.browse.anyCity}
+            placeholder={t.browse.anyCity}
+            value={city || null}
+            onChange={setCity}
+            options={cities.map((c) => ({ value: c.value, label: c.label }))}
+          />
+          {/* The category level moved OUT of this row and onto the pills above the grid — it is the
+              choice that changes what a card even shows, and a choice that important should not be
+              one closed menu among four. Subtype and size stay menus, and appear only once a pill has
+              been pressed: a disabled dropdown saying «pick a category first» was a control that
+              existed to say it was unusable. */}
+          {categoryId && (
             <>
-              {/* The house dropdown on all four (owner, 2026-08-31). A cascade is where the old
-                  native menus hurt most: four of them in a row, each opening a differently-styled
-                  system list, and the two disabled ones saying «pick a category first» in a row the
-                  renter could still open. Empty options and the placeholder say the same thing here,
-                  so a filter that is not narrowed reads «Any city» on its own trigger. */}
-              <Dropdown
-                label={t.browse.anyCity}
-                placeholder={t.browse.anyCity}
-                value={city || null}
-                onChange={setCity}
-                options={cities.map((c) => ({ value: c.value, label: c.label }))}
-              />
-              <Dropdown
-                label={t.browse.anyCategory}
-                placeholder={t.browse.anyCategory}
-                value={categoryId || null}
-                onChange={onCategory}
-                options={taxonomy.map((c) => ({ value: c.id, label: tabel(c, ar) }))}
-              />
               <Dropdown
                 label={t.browse.anySubcategory}
-                placeholder={categoryId ? t.browse.anySubcategory : t.browse.pickCategoryFirst}
-                disabled={!categoryId}
+                placeholder={t.browse.anySubcategory}
                 value={subcategoryId || null}
                 onChange={onSubcategory}
                 options={subcategories.map((sc) => ({ value: sc.id, label: tabel(sc, ar) }))}
               />
-              <Dropdown
-                label={t.browse.anyMeasurement}
-                placeholder={subcategoryId ? t.browse.anyMeasurement : t.browse.pickSubcategoryFirst}
-                disabled={!subcategoryId}
-                value={measurementId || null}
-                onChange={setMeasurementId}
-                options={measurements.map((m) => ({ value: m.id, label: tabel(m, ar) }))}
-              />
+              {subcategoryId && (
+                <Dropdown
+                  label={t.browse.anyMeasurement}
+                  placeholder={t.browse.anyMeasurement}
+                  value={measurementId || null}
+                  onChange={setMeasurementId}
+                  options={measurements.map((m) => ({ value: m.id, label: tabel(m, ar) }))}
+                />
+              )}
             </>
           )}
           <button
@@ -208,6 +192,17 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
           </button>
         </div>
       </div>
+
+      {/* The categories, as pills — the same row signed in or out. Drawn only once the tree is in
+          hand, so a slow reference call shows nothing rather than a lone «All» that grows. */}
+      {taxonomy.length > 0 && (
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5">
+          <Pill label={t.browse.allCategories} active={!categoryId} onClick={() => onCategory("")} />
+          {taxonomy.map((c) => (
+            <Pill key={c.id} label={tabel(c, ar)} active={categoryId === c.id} onClick={() => onCategory(c.id)} />
+          ))}
+        </div>
+      )}
 
       {/* Results (AC-16/17/23) */}
       {error ? (
@@ -226,13 +221,28 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
           {t.browse.empty}
         </div>
       ) : (
-        <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(240px,1fr))]">
+        <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(196px,1fr))]">
           {shown.map((s) => (
             <StoreCard key={s.id} store={s} />
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+function Pill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`h-[32px] flex-none rounded-full border px-3.5 text-meta font-semibold transition ${
+        active ? "border-brand bg-brand-soft text-brand-deep" : "border-border bg-surface text-navy-mid hover:border-brand/50"
+      }`}
+    >
+      {label}
+    </button>
   );
 }
 

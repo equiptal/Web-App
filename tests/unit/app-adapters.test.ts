@@ -32,6 +32,31 @@ function makeDraft(p?: Partial<{ project: ProjectDetails; items: EquipmentItem[]
   };
 }
 
+describe("draftToCreateRequest — a request started from a store (Epic 008 parity)", () => {
+  it("files it as DIRECT to that supplier alone", () => {
+    const out = draftToCreateRequest(
+      { ...makeDraft(), direct: { supplierId: "412", supplierName: "Zahid Tractor", storeId: "st-1" } },
+      "46",
+    );
+    expect(out.type).toBe("DIRECT");
+    expect(out.supplierId).toBe(412); // an INTEGER user id, which is what the backend validates
+  });
+
+  it("stays a BROADCAST when no store was involved, and sends no supplierId at all", () => {
+    const out = draftToCreateRequest(makeDraft(), "46");
+    expect(out.type).toBe("BROADCAST");
+    expect("supplierId" in out).toBe(false); // a broadcast's payload is byte-identical to before
+  });
+
+  it("refuses to address a request to an unusable id — it broadcasts rather than 400s", () => {
+    for (const supplierId of ["", "abc", "0", "-3", "12.5"]) {
+      const out = draftToCreateRequest({ ...makeDraft(), direct: { supplierId, supplierName: null, storeId: null } }, "46");
+      expect(out.type).toBe("BROADCAST");
+      expect(out.supplierId).toBeUndefined();
+    }
+  });
+});
+
 describe("draftToCreateRequest — ALIGNMENT rules", () => {
   it("rule 2: urgency derived from start date (mobile CR-017 parity)", () => {
     const at = (days: number | null) => {

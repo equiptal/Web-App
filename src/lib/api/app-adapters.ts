@@ -208,9 +208,18 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
     project.certificates.safety.includes("other") && safetyOtherText ? `Additional certificate required: ${safetyOtherText}` : "";
   const mergedNotes = [preferences.additionalNotes?.trim(), otherCertNote].filter(Boolean).join("\n") || undefined;
 
+  // A request started from a store goes to that supplier ALONE (app parity, Epic 008): same form,
+  // same endpoint, `type: DIRECT` + the supplier's integer user id. A `direct` target whose id is not
+  // an integer is dropped rather than sent — the backend 400s on a DIRECT without a usable
+  // `supplierId`, and a broadcast the renter did not ask for is the worse of the two failures, so we
+  // keep the request addressed or not at all (the caller checks the same id before offering the button).
+  const directSupplierId = Number(draft.direct?.supplierId);
+  const direct = draft.direct && Number.isInteger(directSupplierId) && directSupplierId > 0 ? directSupplierId : null;
+
   return {
     userId: Number(userId), // agents-backend requires an integer id
-    type: "BROADCAST", // web is broadcast-only (brief Non-goals)
+    type: direct ? "DIRECT" : "BROADCAST",
+    ...(direct ? { supplierId: direct } : {}),
     rentalType: (project.timing.rentalBasis && RENTAL_MAP[project.timing.rentalBasis]) || "DAILY",
     startDate: toIsoDateTime(project.timing.startDate), // optional; omitted when unset → server defaults to now
     endDate: toIsoDateTime(project.timing.endDate),

@@ -169,6 +169,9 @@ export const PIN_REGISTRY = {
   "browse-surface": { n: "61", label: "Browse stores", file: "src/components/stores/BrowseSurface.tsx" },
   "store-detail": { n: "62", label: "Store detail", file: "src/components/stores/StoreDetailSurface.tsx" },
   "store-card": { n: "63", label: "Store card", file: "src/components/stores/StoreCard.tsx" },
+  "store-card-equipment": { n: "64", label: "Store card (category)", file: "src/components/stores/StoreCard.tsx" },
+  "equipment-sheet": { n: "65", label: "Equipment sheet", file: "src/components/stores/EquipmentDetailSurface.tsx" },
+  "store-equipment-card": { n: "66", label: "Store equipment card", file: "src/components/stores/StoreDetailSurface.tsx" },
 
   /* ── 70–89  profile, company, auth, onboarding ────────────────────────────────────────────── */
   "profile-view": { n: "70", label: "Profile", file: "src/components/profile/ProfileView.tsx" },

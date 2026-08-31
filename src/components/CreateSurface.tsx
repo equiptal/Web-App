@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@/components/Dialog";
 import { useRfq } from "@/lib/store/rfq-store";
@@ -68,6 +69,27 @@ export function CreateSurface() {
             >
               {t.startRequest.modeBannerSwitch}
             </button>
+          )}
+        </div>
+      )}
+      {/* Started from a store → this goes to ONE supplier. Said above every phase, in the ribbon slot
+          the trial banner uses, because «who receives this» is the one thing a renter cannot check
+          anywhere else in the form — the fields look identical to a broadcast's. */}
+      {state.direct && (
+        <div className="mb-4 flex flex-wrap items-center gap-2.5 rounded-sm border border-brand/35 bg-brand-soft px-4 py-3">
+          <span className="grid h-7 w-7 flex-none place-items-center rounded-sm bg-brand/15 text-brand-deep">
+            <Icon name="storefront" size={17} />
+          </span>
+          <span className="min-w-0 flex-1 text-body font-semibold text-navy">
+            {t.store.directBanner.replace("{name}", state.direct.supplierName ?? t.store.directSupplierFallback)}
+          </span>
+          {state.direct.storeId && state.phase !== "confirmation" && (
+            <Link
+              href={`/stores/${state.direct.storeId}`}
+              className="text-meta font-semibold text-brand underline decoration-brand/40 underline-offset-2 transition hover:decoration-brand"
+            >
+              {t.store.directBannerBack}
+            </Link>
           )}
         </div>
       )}

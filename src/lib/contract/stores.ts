@@ -25,11 +25,27 @@ export interface StoreCard {
   isVerified: boolean;
   activeEquipmentCount: number;
   city: string | null;
+  /**
+   * The equipment categories this store actually lists, for the card's chips (2 + «+n»).
+   *
+   * The backend owns the list — a store's categories are a fact about its equipment, and the web
+   * knows only the cards. Absent from a projection that has not shipped it yet, which is a real
+   * answer: `[]` means «not told», and the card draws no chip row rather than a wrong one.
+   */
+  categories: { id: string; name: string; nameAr: string }[];
+  /**
+   * The store's equipment MATCHING the active category filter (browse's category tab shows the
+   * machine, not the shopfront). Sent only when `?category=` narrowed the query; `[]` otherwise, and
+   * the card falls back to its store face.
+   */
+  matched: EquipmentCard[];
 }
 
 /** One equipment listing on a store detail (AC-20). Localized names carried as en + ar. */
 export interface EquipmentCard {
   id: string;
+  /** Taxonomy CATEGORY id — the level the browse pills filter on, and `categoryId` on a direct request. */
+  categoryId: string | null;
   subcategoryId: string | null;
   measurementId: string | null;
   category: string | null;
@@ -46,6 +62,8 @@ export interface EquipmentCard {
   priceUnit: string | null; // e.g. PER_DAY
   isVerified: boolean; // verificationStatus === 'VERIFIED'
   photoUrl: string | null; // first photoKeys entry (pre-signed)
+  /** The yard's city — the location tag on the card image. Null when the projection omits the yard. */
+  city: string | null;
 }
 
 /** A store detail surface (AC-18/19/20). */
@@ -68,6 +86,16 @@ export interface StoreDetail {
 /** Full equipment detail (the app's public equipment sheet — GET /equipment/{id}). */
 export interface EquipmentDetail {
   id: string;
+  /**
+   * The taxonomy triple, by id.
+   *
+   * Names are for reading; these are what a DIRECT request is built from (`categoryId` / `subtypeId`
+   * / `capacityId` on `POST /agents/requests`). The backend already sends all three on the equipment
+   * detail — the mapper simply kept none of them until the Request button needed them.
+   */
+  categoryId: string | null;
+  subcategoryId: string | null;
+  measurementId: string | null;
   category: string | null;
   categoryAr: string | null;
   subcategory: string | null;
@@ -86,7 +114,17 @@ export interface EquipmentDetail {
   docTypes: string[]; // document types present (e.g. tuv/spsp/saso) — status only, no contents
   yardName: string | null;
   yardCity: string | null;
+  /** Yard coordinates, when the payload carries them — the map pin. Null → the city decides the view. */
+  yardLat: number | null;
+  yardLng: number | null;
+  storeId: string | null;
   storeName: string | null;
+  /**
+   * The SUPPLIER behind the listing — the recipient of a direct request (`supplierId`, an integer
+   * user id). Null when the payload names none, and the Request button then falls back to the store
+   * detail's own `supplierId` rather than guessing.
+   */
+  supplierId: string | null;
 }
 
 /** A node in the equipment taxonomy tree used by the browse filters (AC-11/24). */
@@ -160,6 +198,10 @@ export function supplierIdOf(raw: Raw): string | null {
     id(raw.supplierUserId) ??
     id(raw.ownerId) ??
     id(raw.ownerUserId) ??
+    // The authed equipment detail names the owning supplier plainly as `userId`, and a store row's
+    // `userId` is its owner — the same person either way. Read late, after every explicit spelling,
+    // so a payload that says `supplierId` is never overruled by an id that happens to sit beside it.
+    id(raw.userId) ??
     id(raw.companyId) ??
     (nested ? id(nested.id) ?? id(nested.userId) : null)
   );
@@ -175,12 +217,37 @@ export function mapStoreCard(raw: Raw): StoreCard {
     isVerified: bool(raw.isVerified),
     activeEquipmentCount: num(raw.activeEquipmentCount) ?? 0,
     city: str(raw.city),
+    categories: mapCardCategories(raw.categories ?? raw.equipmentCategories),
+    matched: mapCardMatches(raw.matched ?? raw.matchedEquipment ?? raw.equipment),
   };
 }
 
+/** Category chips off a store card payload; `[]` when the projection sends none. */
+function mapCardCategories(v: unknown): { id: string; name: string; nameAr: string }[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .map((c): { id: string; name: string; nameAr: string } | null => {
+      if (typeof c === "string") return c.trim() ? { id: c, name: c, nameAr: c } : null;
+      if (!c || typeof c !== "object") return null;
+      const o = c as Raw;
+      const name = str(o.name) ?? str(o.categoryName) ?? "";
+      if (!name) return null;
+      return { id: String(o.id ?? o.categoryId ?? name), name, nameAr: str(o.nameAr) ?? str(o.categoryNameAr) ?? name };
+    })
+    .filter((x): x is { id: string; name: string; nameAr: string } => !!x);
+}
+
+/** The matched-equipment preview on a category-filtered store card; `[]` when the projection sends none. */
+function mapCardMatches(v: unknown): EquipmentCard[] {
+  if (!Array.isArray(v)) return [];
+  return (v as Raw[]).filter((e) => e && typeof e === "object").map(mapEquipment);
+}
+
 export function mapEquipment(raw: Raw): EquipmentCard {
+  const yard = raw.yard && typeof raw.yard === "object" ? (raw.yard as Raw) : {};
   return {
     id: String(raw.id ?? ""),
+    categoryId: str(raw.categoryId),
     subcategoryId: str(raw.subcategoryId),
     measurementId: str(raw.measurementId),
     category: str(raw.categoryName),
@@ -197,6 +264,7 @@ export function mapEquipment(raw: Raw): EquipmentCard {
     priceUnit: str(raw.priceUnit),
     isVerified: raw.verificationStatus === "VERIFIED",
     photoUrl: firstPhotoUrl(raw.photoKeys),
+    city: str(raw.yardCity) ?? str(yard.city) ?? str(raw.city),
   };
 }
 
@@ -224,6 +292,9 @@ export function mapEquipmentDetail(raw: Raw): EquipmentDetail {
   const yard = raw.yard && typeof raw.yard === "object" ? (raw.yard as Raw) : {};
   return {
     id: String(raw.id ?? ""),
+    categoryId: str(raw.categoryId),
+    subcategoryId: str(raw.subcategoryId),
+    measurementId: str(raw.measurementId),
     category: str(raw.categoryName),
     categoryAr: str(raw.categoryNameAr),
     subcategory: str(raw.subcategoryName),
@@ -242,7 +313,11 @@ export function mapEquipmentDetail(raw: Raw): EquipmentDetail {
     docTypes: keyField(raw.documentKeys, "type"),
     yardName: str(raw.yardName) ?? str(yard.name),
     yardCity: str(raw.yardCity) ?? str(yard.city),
+    yardLat: num(raw.yardLat) ?? num(yard.latitude) ?? num(yard.lat),
+    yardLng: num(raw.yardLng) ?? num(yard.longitude) ?? num(yard.lng),
+    storeId: str(store.id) ?? str(raw.storeId),
     storeName: str(store.name) ?? str(store.companyName) ?? str(raw.storeName),
+    supplierId: supplierIdOf(store) ?? supplierIdOf(raw),
   };
 }
 

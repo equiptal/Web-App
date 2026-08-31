@@ -176,6 +176,8 @@ export const en = {
     pickSubcategoryFirst: "Select a subcategory first",
     newLabel: "New",
     equipmentCount: "equipment",
+    // The pill row's first pill — the shopfront view, before any category narrows the cards.
+    allCategories: "All",
     empty: "No suppliers match your filters.",
     error: "We couldn't load suppliers.",
     retry: "Retry",
@@ -216,6 +218,17 @@ export const en = {
     photos: "Photos",
     docsShort: "Documents",
     close: "Close",
+    suppliedBy: "Supplied by",
+    viewStore: "View store",
+    prevPhoto: "Previous",
+    nextPhoto: "Next",
+    // The map says what it actually knows: a yard's coordinates, or only the city.
+    approxLocation: "Approximate — city only",
+    noLocation: "No location on this listing",
+    // The recipient ribbon on the create flow, when the request was started from a store.
+    directBanner: "This request goes to {name} only — no other supplier sees it.",
+    directBannerBack: "Back to the store",
+    directSupplierFallback: "this supplier",
   },
   intake: {
     reading: "Reading",
