@@ -348,6 +348,18 @@ export function WorkOrderForm({
           <div key={m.id ?? i} className="flex flex-col gap-2 rounded-sm border border-border p-3">
             <span className="text-body font-semibold text-navy">{nameOf(m, taxonomy, locale) || w.unnamedMachine}</span>
 
+            {/* Column headings. Five boxes in a row with nothing above them is a puzzle — and three
+                of them are money, which is the worst thing to have to guess at. Hidden below `sm`,
+                where the grid stacks and each field is on its own line anyway. */}
+            <div className="hidden gap-2 text-label font-semibold uppercase tracking-[.03em] text-muted sm:grid sm:grid-cols-[2fr_4.5rem_1fr_1fr_1fr_auto]">
+              <span>{w.supplier}</span>
+              <span>{w.quantity}</span>
+              <span>{w.ratePer.replace("{basis}", basisWord)}</span>
+              <span>{w.mobAmount}</span>
+              <span>{w.demobAmount}</span>
+              <span />
+            </div>
+
             {m.lines.map((l, li) => (
               <div key={li} className="grid gap-2 sm:grid-cols-[2fr_4.5rem_1fr_1fr_1fr_auto]">
                 <input
@@ -640,6 +652,24 @@ function whenToWire(w: WorkOrderWhen): Record<string, unknown> {
   return out;
 }
 
+/**
+ * `terms` on the wire, with every unanswered field left OUT.
+ *
+ * `workOrderTermsSchema` is `.partial().strict()`, and partial means **optional, not nullable** — a
+ * key sent as `null` fails validation rather than reading as "not stated". `termsToWire` emits the
+ * complete shape with nulls in the gaps, which is right for the app and wrong for the wire, so the
+ * nulls are dropped here.
+ *
+ * This is the same trap `whenToWire` was already written around, and it cost a work-order save with
+ * no suppliers on it at all: the terms block began travelling and took fifteen nulls with it.
+ * Booleans and empty strings and empty arrays all stay — `false`, `""` and `[]` are answers the
+ * schema accepts, and only `null` is not.
+ */
+function termsForWire(t: MachineTerms): Record<string, unknown> {
+  const wire = termsToWire(t) as unknown as Record<string, unknown>;
+  return Object.fromEntries(Object.entries(wire).filter(([, v]) => v !== null));
+}
+
 export function workOrderPayload(
   draft: WorkOrderDraft,
   /**
@@ -658,7 +688,7 @@ export function workOrderPayload(
       /* Stated ONCE for the order. The backend copies these onto any machine that does not carry
          its own, which is what makes the second machine free to add — the renter answers operator,
          certificates and who fuels once, and every row inherits it. */
-      terms: termsToWire(draft.terms),
+      terms: termsForWire(draft.terms),
       items: draft.machines.map((m) => {
         const lines = m.lines
           .filter((l) => l.supplierName.trim())
@@ -687,7 +717,7 @@ export function workOrderPayload(
           notes: m.notes.trim() || null,
           /* Sent only when this machine differs. An absent key is an empty blob on the backend, and
              an empty blob is exactly what makes that row fall back to the order's terms. */
-          ...(m.terms ? { terms: termsToWire(m.terms) } : {}),
+          ...(m.terms ? { terms: termsForWire(m.terms) } : {}),
           ...(opts.create && lines.length > 0 ? { supplyLines: lines } : {}),
         };
       }),

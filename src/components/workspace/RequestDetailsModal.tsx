@@ -307,7 +307,36 @@ export function RequestDetailsModal({
                 label={t.workspace.factDuration}
                 value={subject?.durationDays ? t.workspace.daysValue.replace("{n}", String(subject.durationDays)) : "—"}
               />
-              <Fact label={t.workspace.factSite} value={group.address ?? group.locationLabel} />
+              {/* The site, as a link to Google Maps (owner, 2026-08-31).
+                  A renter reading a request wants to know where it is, and an address they cannot
+                  press is an address they retype into another tab.
+
+                  A SEARCH on the address, not a pin: the my-requests payload carries no coordinates
+                  — checked against staging, there is no lat/lng on the wire — and the full stored
+                  address is what a person would paste into Maps themselves. The supplier-facing bid
+                  form links by lat/lng because its payload has them; this one cannot, and inventing
+                  a point from a label would put a pin somewhere nobody agreed to.
+
+                  Text-only when there is no address at all, rather than a link that searches for
+                  nothing. */}
+              <Fact
+                label={t.workspace.factSite}
+                value={(() => {
+                  const where = group.address ?? group.locationLabel;
+                  if (!where?.trim()) return "—";
+                  return (
+                    <a
+                      className="inline-flex items-center gap-1 underline decoration-border underline-offset-2 hover:text-brand"
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(where)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {where}
+                      <span className="material-icons-outlined text-label">place</span>
+                    </a>
+                  );
+                })()}
+              />
               <Fact label={t.workspace.factRequested} value={fmt(group.createdAt)} />
               {/* Split by source, because "4 bids" hides that two of them were typed in by hand. */}
               <Fact
@@ -463,7 +492,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
+function Fact({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-4 py-2.5">
       <dt className="text-label font-extrabold uppercase tracking-wide text-muted">{label}</dt>

@@ -257,6 +257,11 @@ describe("the order's terms", () => {
 
     expect(wire.delivery).toBe("supplier");
     expect(wire.operator).toBe("no");
+
+    /* Not one null. `workOrderTermsSchema` is `.partial().strict()` — partial is optional, not
+       nullable — so a single null refuses the whole save, and it did: a work order with no
+       suppliers at all was rejected because the terms block carried fifteen of them. */
+    expect(Object.values(wire).filter((v) => v === null)).toEqual([]);
   });
 
   it("sends the two haulage amounts only when they were recorded", () => {

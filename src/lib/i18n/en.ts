@@ -229,20 +229,20 @@ export const en = {
     comingSoon: "Coming soon",
     orUploadBelow: "Or upload a file below",
     attachDivider: "or attach a file",
-    dropSub: "Add as many files as you like — we'll read them all",
     tabRfq: "RFQ", // AC-01 tentative
     tabManual: "Manual", // AC-01 tentative
     tabLater: "LATER",
     manualNote: "Manual entry is coming in a later release.",
     pasteLabel: "Describe your request",
-    // Each example is BOTH the sentence the placeholder types itself through and, shortened, a chip
-    // under the box that writes it in for real. Short on purpose: a placeholder that runs to two
-    // lines reads as content rather than as an invitation.
+    // The sentences the placeholder types itself through, in turn. ~~Each one also carried a short
+    // `chip` label for a row of pressable examples under the box~~ — that row is the renter's own
+    // projects now (owner, 2026-08-31), so the labels went with it. Short on purpose: a placeholder
+    // that runs to two lines reads as content rather than as an invitation.
     examples: [
-      { chip: "30 forklifts to Site B, 3 weeks", text: "I want 30 forklifts delivered to Site B by Friday, for 3 weeks" },
-      { chip: "Crane rental in Riyadh", text: "I need a 20-ton crane rental in Riyadh for 2 weeks" },
-      { chip: "Mixers with operators", text: "Looking for 5 concrete mixers with operators included" },
-      { chip: "Excavators with diesel included", text: "3 excavators, diesel included, starting next Sunday" },
+      "I want 30 forklifts delivered to Site B by Friday, for 3 weeks",
+      "I need a 20-ton crane rental in Riyadh for 2 weeks",
+      "Looking for 5 concrete mixers with operators included",
+      "3 excavators, diesel included, starting next Sunday",
     ],
     uploadRfq: "Upload RFQ",
     addSomething: "Add a description or a file",
@@ -1762,7 +1762,7 @@ export const en = {
       notInCatalogue: "Not in our catalogue — I will type the name",
       rawLabelPlaceholder: "What it is, e.g. Welding machine",
       rawSizePlaceholder: "Size, e.g. 400A",
-      quantity: "How many",
+      quantity: "Units",
       notes: "Notes",
       addMachine: "Add another machine",
       differentTerms: "Different terms for this machine",
@@ -1922,12 +1922,9 @@ export const en = {
       end: "end",
       paymentTerms: "payment",
       extendable: "extendable",
-      editNote: "Every value above is this project's, and editing one here changes only this request.",
       conflict: "You wrote {spoken}, which is not this project's site.",
       keepMine: "Keep what I wrote",
       useProject: "Use the project's site",
-      captionLead: "You type the machine.",
-      caption: "What it is, its size, how many, and any accessory. Everything else above is filled in already.",
     },
   },
   create: {

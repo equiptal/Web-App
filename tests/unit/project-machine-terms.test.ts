@@ -40,8 +40,16 @@ describe("a machine follows the order unless it says otherwise", () => {
     const sent = row.terms as Record<string, unknown>;
 
     // COMPLETE, not a patch: the row states its own delivery outright rather than "shared, except".
-    expect(sent).toEqual(termsToWire(own));
     expect(sent.delivery).toBe("me");
+    for (const [k, v] of Object.entries(termsToWire(own))) {
+      if (v !== null) expect(sent[k], `missing ${k}`).toEqual(v);
+    }
+
+    /* And NOT ONE null. `workOrderTermsSchema` is `.partial().strict()`, where partial means
+       optional rather than nullable, so a single null fails the whole save. It did: a work order
+       with no suppliers on it at all was refused because the terms block travelled with fifteen
+       nulls in it. */
+    expect(Object.values(sent).filter((v) => v === null)).toEqual([]);
 
     // And the order still says what it says — one machine differing does not fork the order.
     expect((workOrderPayload(d, { create: true }).body.terms as Record<string, unknown>).delivery).toBe("supplier");
