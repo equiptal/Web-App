@@ -14,11 +14,16 @@
  * It appears only when something is filed nowhere, and it is where filing actually happens — most
  * requests never reach it, because they are offered a project at the moment they are posted.
  *
- * ── The panel clips, and Unassigned must not ─────────────────────────────────────────────────────
+ * ── Nothing clips but the TRACK ───────────────────────────────────────────────────────────────────
  *
- * The chart panel hides its overflow so a bar cannot escape the track. Unassigned has no chart, and
- * with the same rule its row menu was cut in half in the prototype. The class is applied to the
- * chart panel only.
+ * ~~The chart panel hid its overflow so a bar could not escape.~~ It swallowed the row menus with
+ * them, which is the bug the owner reported on 2026-08-31: *"clicking on 3 dots opens a menu that is
+ * hidden."* A bar cannot escape a track that clips itself, so the clip moved there (`ChartRow`) and
+ * this panel has none.
+ *
+ * The chart SCROLLS on its own rather than making the page taller, and its header stays put while it
+ * does. A menu on the last row still has somewhere to go: it flips upward when the viewport is short
+ * of room — see `RowMenu`.
  */
 
 import { useT } from "@/lib/i18n";
@@ -29,7 +34,13 @@ import { AwardRow, AwaitingRow, pct, type Axis } from "./ChartRow";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-/** The month ticks the axis is read against. One label per month start inside the span. */
+/**
+ * The month ticks the axis is read against. One per month start inside the span.
+ *
+ * **The label carries the YEAR** — «Mar 26», not «Mar» (owner, 2026-08-31, with his own reference).
+ * A chart running November to February showed «Nov Dec Jan Feb» and left the reader to work out
+ * which of them had rolled over; two more characters answer it on every column.
+ */
 function months(axis: Axis): { iso: string; label: string }[] {
   const out: { iso: string; label: string }[] = [];
   const from = new Date(axis.from + "T00:00:00Z");
@@ -37,10 +48,21 @@ function months(axis: Axis): { iso: string; label: string }[] {
   const cur = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), 1));
   while (cur <= to) {
     const iso = cur.toISOString().slice(0, 10);
-    out.push({ iso, label: cur.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" }) });
+    out.push({ iso, label: cur.toLocaleDateString(undefined, { month: "short", year: "2-digit", timeZone: "UTC" }) });
     cur.setUTCMonth(cur.getUTCMonth() + 1);
   }
   return out;
+}
+
+/** «Aug 31, 2026» — the today marker's own date, spelled out once at the top of its line. The month
+ *  columns give the shape; this gives the renter the one date they are reading everything against. */
+function longDate(iso: string): string {
+  return new Date(iso + "T00:00:00Z").toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 export function ProjectsBoard({
@@ -103,10 +125,15 @@ export function ProjectsBoard({
           );
         })}
 
+        {/* The ONE way to make a project (owner, 2026-08-31). The section header carried a second,
+            identical button; two controls for one act, eighty pixels apart, teach a renter that one
+            of them must do something else. This is the one that survives — it sits at the end of the
+            list it adds to — and it wears the brand's border so it reads as an action rather than as
+            an empty slot in the rail. */}
         <button
           type="button"
           onClick={onNewProject}
-          className="flex min-w-[180px] items-center gap-1.5 rounded-sm border border-dashed border-border px-3 py-2 text-start text-body font-semibold text-muted transition hover:border-brand hover:text-brand"
+          className="flex min-w-[180px] items-center gap-1.5 rounded-sm border border-dashed border-brand px-3 py-2 text-start text-body font-semibold text-brand transition hover:bg-brand-soft"
         >
           <Icon name="add" size={14} /> {t.projects.surface.newProject}
         </button>
@@ -158,6 +185,8 @@ function SitePanel({
   const projectWindow = { startDate: project.defaults.timing.startDate, endDate: project.defaults.timing.endDate };
   const axis = chartSpan(groups, projectWindow);
   const ticks = axis ? months(axis) : [];
+  /** The same boundaries the header rules, handed to every row so the two cannot drift apart. */
+  const grid = axis ? ticks.map((m) => pct(m.iso, axis)) : [];
   const todayIn = axis && now >= axis.from && now <= axis.to ? now : undefined;
 
   return (
@@ -175,8 +204,13 @@ function SitePanel({
           The pen edits the whole site, not the name — there is no separate *Project defaults*
           button. One door to one form: a renter who wants to change the payment terms and a renter
           who wants to fix a typo both press the same thing. */}
-      <div className="overflow-hidden rounded-sm border border-border bg-surface">
-        <dl className="flex flex-wrap">
+      {/* ── The site, and its actions, on ONE line (owner, 2026-08-31) ──────────────────────────
+          *"Make the header shorter so the 3 buttons below fit in it so it becomes all in one row."*
+          They were a second row floating under the strip, right-aligned against nothing — two bands
+          of chrome above a chart that is the actual subject of the page. The strip is shorter now
+          (one line per cell, tighter padding) and the three controls ride its trailing edge. */}
+      <div className="flex flex-wrap items-stretch gap-y-2 overflow-hidden rounded-sm border border-border bg-surface">
+        <dl className="flex min-w-0 flex-1 flex-wrap">
           <Cell label={t.projects.board.project}>
             <span className="flex min-w-0 items-center gap-1.5">
               <span className="truncate">{projectTitle(project)}</span>
@@ -214,69 +248,88 @@ function SitePanel({
           <Cell label={t.projects.board.start}>{project.defaults.timing.startDate ?? project.firstStart ?? "—"}</Cell>
           <Cell label={t.projects.board.end}>{project.defaults.timing.endDate ?? project.lastEnd ?? "—"}</Cell>
 
-          {/* What is filed, restored at the owner's request. It is a count, but not one the chart
-              repeats: the chart draws each row, and this says how many there are to expect — which is
-              what tells a renter the board finished loading rather than the site being empty. */}
-          <Cell label={t.projects.board.filedHere}>
-            {t.projects.board.filedCount
-              .replace("{r}", String(project.requestCount))
-              .replace("{w}", String(project.workOrderCount))}
-          </Cell>
+          {/* ~~«Filed here — 0 req · 0 WO».~~ Removed (owner, 2026-08-31). It counted exactly what
+              the chart below it draws in full, so on a site with rows it repeated them and on an
+              empty site it said «0 req · 0 WO» beside a panel already saying so in words. The rail
+              still carries the count, which is where a renter compares sites. */}
         </dl>
+
+        {/* The actions, inside the strip. The pen edits the whole site rather than its name, so it
+            belongs with the things you DO to a site — quiet, beside the two that are the reason a
+            renter came: a work order for a machine already here, a request for one that is not.
+            Both orange: different destinations, equal standing. */}
+        <div className="flex flex-none items-center gap-2 border-s border-border px-3 py-2">
+          <button
+            type="button"
+            onClick={() => onEdit(project)}
+            aria-label={t.common.edit}
+            title={t.common.edit}
+            className="flex h-[34px] w-[34px] items-center justify-center rounded-md border border-border text-navy-mid transition hover:border-brand hover:text-brand"
+          >
+            <Icon name="edit" size={15} />
+          </button>
+          <Button size="sm" onClick={onNewWorkOrder}>
+            <Icon name="handyman" size={14} /> {t.projects.board.addWorkOrder}
+          </Button>
+          {/* ONE request button: *New request* and *Add existing request* used to sit side by side
+              asking the renter to know in advance whether the thing they wanted already existed. It
+              is the same intention either way, so it is one door and the choice is made inside. */}
+          <Button size="sm" onClick={onAddRequest}>
+            <Icon name="add" size={14} /> {t.projects.board.addRequest}
+          </Button>
+        </div>
       </div>
 
-      {/* The actions, and the pen among them (owner, 2026-08-31).
-          *"Show the pencil edit beside the add work order and the request buttons, not on the
-          title. Make all the action buttons on the right, not left."*
-
-          It sat on the title because that is what it used to edit. It does not — it opens the whole
-          site — so it belongs with the other things you DO to a site rather than decorating its name.
-
-          Both orange: neither is the lesser act. A work order is a machine already on site and a
-          request goes to suppliers — different destinations, equal standing. The pen stays quiet
-          beside them, because editing is not the thing a renter came here to do. */}
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {/* The pen alone (owner, 2026-08-31). The word said what the icon already says, and it
-            competed for width with the two actions a renter actually came for. The label lives on
-            `aria-label`, so it is still announced and still a real target. */}
-        <button
-          type="button"
-          onClick={() => onEdit(project)}
-          aria-label={t.common.edit}
-          title={t.common.edit}
-          className="flex h-[38px] w-[38px] items-center justify-center rounded-md border border-border text-navy-mid transition hover:border-brand hover:text-brand"
-        >
-          <Icon name="edit" size={15} />
-        </button>
-        <Button onClick={onNewWorkOrder}>
-          <Icon name="handyman" size={14} /> {t.projects.board.addWorkOrder}
-        </Button>
-        {/* ONE request button (owner, 2026-08-31).
-            *New request* and *Add existing request* sat side by side asking the renter to know, in
-            advance, whether the thing they wanted already existed. It is the same intention either
-            way — put a request on this site — so it is one door, and the choice is made inside,
-            where the existing ones are visible and *New request* sits at the top of them. */}
-        <Button onClick={onAddRequest}>
-          <Icon name="add" size={14} /> {t.projects.board.addRequest}
-        </Button>
-      </div>
-
-      {/* ── Chart. `overflow-hidden` is for the bars; the row menu lives outside the track. ── */}
-      <div className="overflow-hidden rounded-sm border border-border bg-surface">
+      {/* ── Chart ──
+          NO `overflow-hidden` here (see the note at the top): the track clips itself, and this panel
+          clipping is what hid every row menu. It scrolls instead, so a long site does not stretch the
+          page — and the header stays while it does, because a month column whose label has scrolled
+          away is a column of nothing. */}
+      <div className="max-h-[64vh] overflow-y-auto rounded-sm border border-border bg-surface">
         {axis ? (
           <>
-            <div className="flex items-stretch bg-surface2/60">
-              <div className="w-[260px] flex-none px-3 py-1.5 text-label font-semibold uppercase tracking-[.03em] text-muted">
+            <div className="sticky top-0 z-20 flex items-stretch border-b border-border bg-surface2">
+              <div className="w-[260px] flex-none px-3 py-2 text-label font-semibold uppercase tracking-[.03em] text-muted">
                 {t.projects.board.whatIsHere}
               </div>
-              <div className="relative min-w-0 flex-1 py-1.5">
+              {/* The reference's own arrangement (owner, 2026-08-31): a ruled column per month with
+                  its «Mar 26» sitting just inside the rule, and today marked with the date it is. */}
+              <div className="relative min-w-0 flex-1 py-2">
                 {ticks.map((m) => (
-                  <span key={m.iso} className="absolute text-label font-semibold text-muted" style={{ insetInlineStart: `${pct(m.iso, axis)}%` }}>
+                  <span
+                    key={m.iso}
+                    aria-hidden
+                    className="absolute inset-y-0 w-px bg-border/70"
+                    style={{ insetInlineStart: `${pct(m.iso, axis)}%` }}
+                  />
+                ))}
+                {ticks.map((m) => (
+                  <span
+                    key={`l-${m.iso}`}
+                    className="absolute top-1.5 ms-2 whitespace-nowrap text-label font-semibold text-navy-mid"
+                    style={{ insetInlineStart: `${pct(m.iso, axis)}%` }}
+                  >
                     {m.label}
                   </span>
                 ))}
+                {todayIn && (
+                  <>
+                    <span
+                      aria-hidden
+                      className="absolute inset-y-0 border-s border-dashed border-brand"
+                      style={{ insetInlineStart: `${pct(todayIn, axis)}%` }}
+                    />
+                    {/* Centred on its own line and on the panel's ground, so it reads as a label ON
+                        the marker rather than as one more month. */}
+                    <span
+                      className="absolute -top-1 z-10 -translate-x-1/2 whitespace-nowrap rounded-sm bg-surface2 px-1.5 text-label font-extrabold text-brand rtl:translate-x-1/2"
+                      style={{ insetInlineStart: `${pct(todayIn, axis)}%` }}
+                    >
+                      {t.projects.board.today} · {longDate(todayIn)}
+                    </span>
+                  </>
+                )}
               </div>
-              <div className="w-9 flex-none" />
             </div>
 
             {groups.map((g) => (
@@ -313,6 +366,7 @@ function SitePanel({
                       axis={axis}
                       projectWindow={projectWindow}
                       today={todayIn}
+                      grid={grid}
                       menu={rowMenu?.(g, item.id, null)}
                     />
                   ) : (
@@ -325,6 +379,7 @@ function SitePanel({
                         axis={axis}
                         projectWindow={projectWindow}
                         today={todayIn}
+                        grid={grid}
                         menu={rowMenu?.(g, item.id, a.id)}
                       />
                     ))
@@ -349,7 +404,9 @@ function SitePanel({
  */
 function Cell({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-1 basis-[160px] flex-col gap-0.5 border-s border-border px-3 py-2 first:border-s-0">
+    /* `basis-[150px]` and 6px of vertical padding: four cells and three buttons have to share one
+       line on a laptop, and every pixel of this strip is a pixel the chart does not get. */
+    <div className="flex min-w-0 flex-1 basis-[150px] flex-col justify-center gap-px border-s border-border px-3 py-1.5 first:border-s-0">
       <dt className="text-label font-semibold uppercase tracking-[.03em] text-muted">{label}</dt>
       <dd className="min-w-0 truncate text-body font-semibold text-navy tabular-nums">{children}</dd>
     </div>

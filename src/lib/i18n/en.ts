@@ -1826,6 +1826,7 @@ export const en = {
       newRequest: "New request",
       addRequest: "Add request",
       whatIsHere: "What is on this site",
+      today: "Today",
       ownPeriod: "own dates",
       nothingYet: "Nothing on this site yet. Add a work order for a machine already here, or post a request.",
     },

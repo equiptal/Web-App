@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
-import { Icon, Button } from "@/components/ui";
+import { Icon } from "@/components/ui";
 import { Dialog } from "@/components/Dialog";
 import { useRouter } from "next/navigation";
 import {
@@ -67,9 +67,13 @@ import type { Taxonomy } from "@/lib/contract/taxonomy";
  * The action is the PRIMARY button, not a quiet one: on an empty dashboard it is the only thing to
  * do here, and a white button beside an orange one elsewhere on the page says this matters less.
  */
-function SectionHeader({ count, onNew }: { count: number; onNew: () => void }) {
+function SectionHeader({ count }: { count: number }) {
   const t = useT();
   return (
+    /* ~~A «New project» button on the trailing edge.~~ Removed (owner, 2026-08-31): the rail already
+       ends with one, and two identical controls for one act — a heading apart — make a renter wonder
+       which of them does something else. The rail's is the one that stays, because it sits at the end
+       of the list it adds to. */
     <div className="flex items-center gap-3">
       <span className="grid size-[38px] flex-none place-items-center rounded-sm bg-navy text-surface">
         <Icon name="place" size={22} />
@@ -80,10 +84,6 @@ function SectionHeader({ count, onNew }: { count: number; onNew: () => void }) {
           {count > 0 ? t.projects.surface.summary.replace("{n}", String(count)) : t.projects.surface.empty}
         </span>
       </span>
-      <span className="flex-1" />
-      <Button onClick={onNew}>
-        <Icon name="add" size={16} /> {t.projects.surface.newProject}
-      </Button>
     </div>
   );
 }
@@ -510,7 +510,18 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   if (embedded && projects && projects.length === 0) {
     return (
       <section className="flex flex-col gap-3">
-        <SectionHeader count={0} onNew={() => setEditing({ id: null, value: emptyProjectForm() })} />
+        <SectionHeader count={0} />
+
+        {/* The board is not rendered on this branch, so the rail's *New project* is not there either
+            — this row carries its own copy, in the same dashed brand outline, or a renter with no
+            sites could never make their first one. */}
+        <button
+          type="button"
+          onClick={() => setEditing({ id: null, value: emptyProjectForm() })}
+          className="flex items-center gap-1.5 self-start rounded-sm border border-dashed border-brand px-3 py-2 text-body font-semibold text-brand transition hover:bg-brand-soft"
+        >
+          <Icon name="add" size={14} /> {t.projects.surface.newProject}
+        </button>
 
         {/* This branch returns early, so it needs its own copy of the notice. Without one a failed
             save was completely silent — the renter pressed Save and nothing happened, which is
@@ -538,10 +549,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
 
   return (
     <div className="flex flex-col gap-5">
-      <SectionHeader
-        count={projects?.length ?? 0}
-        onNew={() => setEditing({ id: null, value: emptyProjectForm() })}
-      />
+      <SectionHeader count={projects?.length ?? 0} />
 
       {notice && <p className="rounded-sm border border-danger/40 bg-danger/5 px-3 py-2 text-body text-danger">{notice}</p>}
 

@@ -21,6 +21,13 @@
  * **An unfiled row says *File in a project*, not *Move to another project*.** It was never in one,
  * and "move" asks the renter to remember a place it has never been.
  *
+ * ── It opens where there is ROOM ─────────────────────────────────────────────────────────────────
+ *
+ * Downward by default, upward when the viewport is short of it. A menu on the last row of a chart had
+ * nothing below it to open into and was simply not there (owner, 2026-08-31). Measured from the
+ * button's own rect at the moment of the press rather than guessed from the row index: the same row
+ * is near the bottom or not depending on where the renter has scrolled to.
+ *
  * ── Our quotation is a download ──────────────────────────────────────────────────────────────────
  *
  * It opens the PDF this product already generates for that request. It is **not** an upload slot: a
@@ -75,7 +82,10 @@ export function RowMenu({
   const t = useT();
   const m = t.projects.menu;
   const [open, setOpen] = useState(false);
+  /** Which way the list opens. Decided from the button's rect when it is pressed. */
+  const [up, setUp] = useState(false);
   const box = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -152,8 +162,15 @@ export function RowMenu({
   return (
     <div ref={box} className="relative">
       <button
+        ref={trigger}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          const rect = trigger.current?.getBoundingClientRect();
+          // Roughly what the list needs, capped. Overestimating is safe — it opens upward a little
+          // early, which is never wrong; underestimating puts the last entry under the fold.
+          if (rect) setUp(window.innerHeight - rect.bottom < Math.min(300, items.length * 34 + 24));
+          setOpen((v) => !v);
+        }}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={m.label}
@@ -167,7 +184,7 @@ export function RowMenu({
           role="menu"
           /* The house treatment for a popover. This app has no shadows — a floating layer is
              separated by its border and the ground behind it (see OVERLAY / POPOVER in ds.ts). */
-          className={`${POPOVER} absolute end-0 top-8 flex w-[232px] flex-col p-1`}
+          className={`${POPOVER} absolute end-0 flex w-[232px] flex-col p-1 ${up ? "bottom-8" : "top-8"}`}
         >
           {items.map((e) => (
             <button

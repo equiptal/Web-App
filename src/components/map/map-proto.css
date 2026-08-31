@@ -1153,8 +1153,12 @@
    The colour is the READINESS band's, never the availability colour: the papers are a fact about the
    file, the distance is a promise from the supplier, and reading one off the other is the mistake
    this card is arranged to prevent. */
-.bidmap .bm-eq .bm-eq-rd { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.bidmap .bm-eq .bm-eq-rdbar { display: block; width: 54px; height: 5px; border-radius: 999px; background: #dbe6ef; overflow: hidden; }
+/* It STRETCHES (owner, 2026-08-31, with his own reference): the bar runs from the card's own start
+   edge to the fraction, and the fraction sits against the file control. Every line in the text
+   column then begins and ends on the same two verticals, which is the whole point of the layout —
+   a 54px bar floating mid-row was a third alignment in a column that has two. */
+.bidmap .bm-eq .bm-eq-rd { display: flex; flex: 1; min-width: 0; align-items: center; gap: 8px; }
+.bidmap .bm-eq .bm-eq-rdbar { display: block; flex: 1; min-width: 24px; height: 5px; border-radius: 999px; background: #dbe6ef; overflow: hidden; }
 .bidmap .bm-eq .bm-eq-rdfill { display: block; height: 100%; border-radius: 999px; background: #c8d8e8; transition: width 0.25s ease; }
 .bidmap .bm-eq .bm-eq-rdn { font-size: 10px; font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; }
 .bidmap .bm-eq .bm-eq-rd.green .bm-eq-rdfill { background: #16a34a; }
@@ -1196,24 +1200,23 @@
    nothing left to ask. Red with a «?» is the open question, and pressing it explains what the colour
    means before it asks anything. Red with a clock is the question already put.
 
-   ~~Full width and left-aligned.~~ **Centred, and it hugs the number** (owner, 2026-08-31). Full
-   width was bought for a second element on the line — «Ask him to confirm» — and that prompt is gone
-   with the same instruction: the glyph says the state and pressing it opens the tutorial that
-   explains it. What was left was a band of empty space with a two-digit figure at one end of it.
+   ~~Full width~~ → ~~centred and hugging the figure~~ → **full width again, content at the start
+   edge** (owner, 2026-08-31, second pass, with his own reference: *"so all aligned in same start and
+   end so it is organized"*). The hug fixed the wrong problem: the band of empty space to the right
+   of a two-digit figure was not waste, it was the card's own right margin, and shrinking the band to
+   its content gave the text column three different left edges — the readiness, the distance and the
+   model each starting somewhere else.
 
-   Ragged column edges were the reason it was stretched; centring answers that instead, and better —
-   every card's figure now sits on the same vertical axis whatever its width. */
+   One start, one end, three lines. The figure reads first because it is first on its line. */
 .bidmap .bm-eq .bm-eq-yard {
-  display: inline-flex;
-  align-self: center;
+  display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 7px;
-  width: auto;
-  max-width: 100%;
-  text-align: center;
+  width: 100%;
+  text-align: start;
   border-radius: var(--radius-md);
-  padding: 8px 16px;
+  padding: 8px 11px;
   border: 1.5px solid transparent;
   font-family: inherit;
 }

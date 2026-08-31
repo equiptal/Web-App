@@ -60,6 +60,7 @@ export function AwardRow({
   axis,
   projectWindow,
   today,
+  grid,
   menu,
 }: {
   group: ChartGroup;
@@ -178,6 +179,7 @@ export function AwaitingRow({
   axis,
   projectWindow,
   today,
+  grid,
   menu,
 }: {
   group: ChartGroup;

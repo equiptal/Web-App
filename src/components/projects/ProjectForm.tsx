@@ -71,10 +71,23 @@ export function projectToForm(p: Pick<Project, "title" | "location" | "defaults"
  * it same width and layout as adding the project"*) — two dialogs that open from the same page and
  * spell a label two ways read as two products.
  */
-export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+export function Field({ label, hint, flag, children }: { label: string; hint?: string; flag?: string; children: ReactNode }) {
   return (
     <label className="flex min-w-0 flex-col gap-1">
-      <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{label}</span>
+      <span className="flex items-center gap-1.5">
+        <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{label}</span>
+        {/* An INDICATOR, never a requirement (owner, 2026-08-31). The dot and the word sit beside the
+            label in the brand's amber, which everywhere else in this product means "this is worth
+            your attention" — not `text-danger`, which would read as an error on a field the renter
+            is allowed to leave alone. Nothing about Save changes: the location is still the only
+            thing that can hold it. */}
+        {flag && (
+          <span className="flex items-center gap-1 text-label font-semibold text-warn">
+            <span aria-hidden className="text-meta leading-none">●</span>
+            {flag}
+          </span>
+        )}
+      </span>
       {children}
       {hint && <span className="text-meta text-muted">{hint}</span>}
     </label>
@@ -96,6 +109,7 @@ export function ProjectForm({
   onCancel,
   onSave,
   saving,
+  markUnset,
 }: {
   value: ProjectFormValue;
   onChange: (next: ProjectFormValue) => void;
@@ -113,6 +127,18 @@ export function ProjectForm({
   /** `applyTo` is the explicit id list. Empty means *project only*. */
   onSave: (value: ProjectFormValue, applyTo: string[]) => void;
   saving?: boolean;
+  /**
+   * Mark the values this form has NOT been given (owner, 2026-08-31).
+   *
+   * For the form opened from *Make a project from this request?*: the request supplies a site and
+   * usually its dates, and leaves the title and the payment terms empty — so the renter is shown
+   * exactly which two are blank while their own request is still in mind. An indicator, not a rule:
+   * every one of them is optional and Save is untouched.
+   *
+   * Off for the ordinary new/edit dialog, where a blank field is a blank field and flagging five of
+   * them on open would read as five errors.
+   */
+  markUnset?: boolean;
 }) {
   const t = useT();
 
@@ -123,6 +149,9 @@ export function ProjectForm({
 
   /** The location is the one required field. A site with no place is not a site. */
   const canSave = value.location.label.trim().length > 0 && !saving;
+
+  /** The flag for one optional field: the word when it is empty and we were asked to mark it. */
+  const unset = (empty: boolean) => (markUnset && empty ? t.projects.form.unsetFlag : undefined);
 
 
 
@@ -155,7 +184,11 @@ export function ProjectForm({
           />
         </Field>
 
-        <Field label={t.projects.form.title} hint={t.projects.form.titleHint.replace("{fallback}", shortSite(value.location.label) || "—")}>
+        <Field
+          label={t.projects.form.title}
+          flag={unset(!value.title)}
+          hint={t.projects.form.titleHint.replace("{fallback}", shortSite(value.location.label) || "—")}
+        >
           <input
             className={input}
             value={value.title ?? ""}
@@ -184,12 +217,12 @@ export function ProjectForm({
         <h3 className="text-subhead font-extrabold text-navy">{t.projects.form.whenTitle}</h3>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label={t.projects.form.start}>
+          <Field label={t.projects.form.start} flag={unset(!timing.startDate)}>
             <input type="date" className={input} value={timing.startDate ?? ""} onChange={(e) => patchTiming({ startDate: e.target.value || null })} />
           </Field>
 
           {/* Dates stay empty rather than being invented. A site with no dates yet is honest. */}
-          <Field label={t.projects.form.end}>
+          <Field label={t.projects.form.end} flag={unset(!timing.endDate)}>
             <input type="date" className={input} value={timing.endDate ?? ""} onChange={(e) => patchTiming({ endDate: e.target.value || null })} />
           </Field>
 
@@ -208,7 +241,7 @@ export function ProjectForm({
             </div>
           </Field>
 
-          <Field label={t.projects.form.basis}>
+          <Field label={t.projects.form.basis} flag={unset(!timing.rentalBasis)}>
             <select
               className={input}
               value={timing.rentalBasis ?? ""}
@@ -225,7 +258,7 @@ export function ProjectForm({
         </div>
 
         <div className="sm:max-w-[280px]">
-          <Field label={t.projects.form.paymentTerms}>
+          <Field label={t.projects.form.paymentTerms} flag={unset(!value.defaults.paymentTerms)}>
             <select
               className={input}
               value={value.defaults.paymentTerms ?? ""}

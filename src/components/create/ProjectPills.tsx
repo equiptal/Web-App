@@ -6,12 +6,14 @@
  * Replaces the chip row once a site is picked, in the same strip inside the intake card, so nothing
  * jumps when you choose one.
  *
- * ── The strip belongs to the box you are typing in ───────────────────────────────────────────────
+ * ── The strip sits UNDER the box, in the row the examples had ─────────────────────────────────────
  *
- * No rule above it, the same ground as the textarea, and the card's own padding continued: it reads
- * as the bottom of the compose field rather than as a separate panel that happens to sit under it
- * (owner, 2026-08-30). The values are still NOT in the textarea — that is a native control holding
- * the renter's own words, and keeping it to those words is what keeps the agent's input small.
+ * ~~On the floor of the compose field, inside the card.~~ Moved out on 2026-08-31 (owner: *"projects
+ * will be in the place of these suggestions"*) — the example-sentence chips are gone and the sites
+ * have their row. Inside the card the values read as furniture; on the page they read as what they
+ * are, things to pick from and edit. The values were never IN the textarea and still are not: that
+ * is a native control holding the renter's own words, and keeping it to those words is what keeps
+ * the agent's input small.
  *
  * ── Every value is a control, and looks like one ─────────────────────────────────────────────────
  *
@@ -30,12 +32,6 @@
  *
  * A changed pill is **marked**, and the field it covers reads `renter` rather than `project` on the
  * canvas afterwards: once someone has answered a question it stops being the site's answer.
- *
- * ── The caption is not decoration ────────────────────────────────────────────────────────────────
- *
- * A strip of filled values implies the whole request is filled. It is not: the renter still has to
- * say what the machine is. Without the line saying so, a screen that looks finished invites Continue
- * on an empty request.
  *
  * ── Conflict ─────────────────────────────────────────────────────────────────────────────────────
  *
@@ -65,7 +61,18 @@ function tone(changed?: boolean, conflict?: boolean) {
       : "border-border bg-surface text-navy";
 }
 
-const LABEL = "font-semibold uppercase tracking-[.03em] opacity-60";
+/**
+ * ONE geometry for every pill in the strip (owner, 2026-08-31: *"make these nicer"*).
+ *
+ * They were `py-1` on their own content, so a pill holding a date input stood a pixel or two taller
+ * than one holding text and the row read as hand-set. A fixed `h-8` and one radius is what makes a
+ * wrapping row of eight controls look like one instrument rather than eight chips that happen to be
+ * adjacent — and `h-8` is the app's own small-control height, not a number chosen here.
+ */
+const PILL = "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-label";
+const EDITABLE = "transition hover:border-brand focus-within:border-brand";
+const LABEL = "font-semibold uppercase tracking-[.03em] opacity-55";
+const VALUE = "font-semibold tabular-nums";
 
 /** A pill that only reports. The site, and nothing else. */
 function Pill({
@@ -80,9 +87,9 @@ function Pill({
   conflict?: boolean;
 }) {
   return (
-    <span className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-label ${tone(changed, conflict)}`}>
+    <span className={`${PILL} ${tone(changed, conflict)}`}>
       <span className={LABEL}>{label}</span>
-      <span className="font-semibold">{value}</span>
+      <span className={VALUE}>{value}</span>
       {changed && !conflict && <span aria-hidden className="text-meta leading-none text-brand">●</span>}
     </span>
   );
@@ -114,11 +121,11 @@ function PillSelect<T extends string>({
   onChange: (v: T | null) => void;
 }) {
   return (
-    <span className={`relative flex items-center gap-1.5 rounded-full border px-3 py-1 text-label transition hover:border-brand ${tone(changed)}`}>
+    <span className={`relative ${PILL} ${EDITABLE} ${tone(changed)}`}>
       <span className={LABEL}>{label}</span>
-      <span className="font-semibold">{value ? (optionLabel ? optionLabel(value) : value) : empty}</span>
+      <span className={VALUE}>{value ? (optionLabel ? optionLabel(value) : value) : empty}</span>
       {changed && <span aria-hidden className="text-meta leading-none text-brand">●</span>}
-      <Icon name="expand_more" size={13} className="flex-none opacity-60" />
+      <Icon name="expand_more" size={14} className="-me-0.5 flex-none opacity-50" />
       <select
         aria-label={label}
         value={value ?? ""}
@@ -155,14 +162,17 @@ function PillDate({
   onChange: (v: string | null) => void;
 }) {
   return (
-    <label className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-label transition hover:border-brand ${tone(changed)}`}>
+    <label className={`${PILL} ${EDITABLE} ${tone(changed)}`}>
       <span className={LABEL}>{label}</span>
+      {/* The native control, stripped to its text and its picker glyph. `focus-visible:outline-none`
+          because the pill itself takes the focus ring now (see `EDITABLE`) — the global 2px brand
+          outline drawn around an input inside a bordered pill was two rings, one inside the other. */}
       <input
         type="date"
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value || null)}
         aria-label={label}
-        className="w-[112px] cursor-pointer bg-transparent font-semibold text-inherit outline-none"
+        className={`w-[104px] cursor-pointer bg-transparent text-inherit outline-none focus-visible:outline-none ${VALUE}`}
       />
       {changed && <span aria-hidden className="text-meta leading-none text-brand">●</span>}
     </label>
@@ -230,21 +240,22 @@ export function ProjectPills() {
     spoken && shortSite(spoken).toLowerCase() !== shortSite(project.location.label).toLowerCase() ? spoken : null;
 
   return (
-    /* No top border, and the card's own horizontal padding: the strip is the floor of the box the
-       renter is typing in, not a tray bolted under it. */
-    <div className="flex flex-col gap-2 px-5 pb-4 pt-1">
+    /* Under the box, not inside it (owner, 2026-08-31) — the row the example chips used to hold. A
+       strip of the renter's OWN values reads as things to pick from and edit when it stands on the
+       page; bolted inside the card it read as furniture. */
+    <div className="mt-3 flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         {/* The site itself, with the way out. Deselecting drops every prefill (PROJ-AC-26). */}
-        <span className="flex items-center gap-1.5 rounded-full border border-brand bg-brand-soft px-3 py-1 text-label font-semibold text-navy">
+        <span className={`${PILL} border-brand bg-brand-soft font-semibold text-navy`}>
           <Icon name="place" size={13} className="flex-none text-brand" />
           {project.title}
           <button
             type="button"
             onClick={actions.clearProject}
             aria-label={t.common.close}
-            className="grid h-4 w-4 place-items-center rounded-full text-muted transition hover:bg-surface hover:text-navy"
+            className="-me-0.5 grid h-5 w-5 place-items-center rounded-full text-muted transition hover:bg-surface hover:text-navy"
           >
-            <Icon name="close" size={11} />
+            <Icon name="close" size={12} />
           </button>
         </span>
 
@@ -303,13 +314,13 @@ export function ProjectPills() {
         {/* Start from — copies how this renter HIRES at this site, and never what they are hiring.
             Rendered only when the site actually has something to copy. */}
         {templates.length > 0 && (
-          <label className="relative flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-label text-navy transition hover:border-brand">
+          <label className={`relative ${PILL} ${EDITABLE} border-border bg-surface text-navy`}>
             <span className={LABEL}>{t.projects.pills.startFrom}</span>
             <select
               disabled={picking}
               value={state.workOrderGroupId ?? ""}
               onChange={(e) => void applyTemplate(e.target.value)}
-              className="cursor-pointer bg-transparent font-semibold outline-none"
+              className={`cursor-pointer bg-transparent outline-none focus-visible:outline-none ${VALUE}`}
             >
               <option value="">{state.templateTerms ? t.projects.pills.templateApplied : t.projects.pills.pickTemplate}</option>
               {templates.map((tpl) => (
@@ -345,13 +356,12 @@ export function ProjectPills() {
         </div>
       )}
 
-      {/* Two things at once: these came from the site and changing one here changes only this
-          request, and the machine is still the renter's to type. Without the second half a strip of
-          filled values reads as a finished request. */}
-      <p className="text-meta text-muted">
-        <b className="font-semibold text-navy">{t.projects.pills.captionLead}</b> {t.projects.pills.caption}{" "}
-        {t.projects.pills.editNote}
-      </p>
+      {/* ~~Three sentences under the strip: «You type the machine.» + what to type + «every value
+          above is this project's, and editing one here changes only this request».~~ All removed
+          (owner, 2026-08-31). Two of the three were teaching the strip, and a strip that needs three
+          lines of instruction under it is the wrong strip: the pills now carry their own labels, a
+          caret each, and the amber dot on anything the renter has changed. The third named what to
+          write in a box whose own placeholder types four examples of exactly that. */}
     </div>
   );
 }

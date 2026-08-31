@@ -54,13 +54,14 @@ function sizeOf(dataUrl: string | undefined): string {
  * box gets the whole width. Dropping a file anywhere on the card still works and the file list still
  * appears inside it: the capability did not shrink, only its footprint.
  *
- * ── The examples are clickable now ──────────────────────────────────────────────────────────────
+ * ── What sits under the box ─────────────────────────────────────────────────────────────────────
  *
- * The placeholder still TYPES ITSELF through them — this screen's whole difficulty is that a renter
- * does not know how much to write, and a real sentence answers that faster than any instruction —
- * but the same examples also sit under the box as chips that write themselves in. A placeholder
- * cannot be accepted; a chip can, and the renter who was going to type that sentence anyway now
- * presses it and edits.
+ * The renter's own SITES, and nothing else (owner, 2026-08-31). ~~A row of example sentences that
+ * wrote themselves in.~~ Withdrawn: the placeholder already types itself through those examples —
+ * this screen's whole difficulty is that a renter does not know how much to write, and a real
+ * sentence answers that faster than any instruction — so the chips repeated the lesson for one press
+ * a renter makes on their first visit and never again. A site fills in half the request, every visit
+ * after the first.
  *
  * Files can be DROPPED, not only browsed — a card that rejects a dragged file is a worse lie than
  * no target at all.
@@ -110,7 +111,7 @@ export function Intake() {
     let timer: ReturnType<typeof setTimeout>;
     const tick = () => {
       const c = cursor.current;
-      const phrase = examples[c.phrase % examples.length].text;
+      const phrase = examples[c.phrase % examples.length];
       let delay = 45;
       if (!c.deleting) {
         c.char++;
@@ -193,7 +194,12 @@ export function Intake() {
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={(e) => { e.preventDefault(); setDragging(false); }}
         onDrop={(e) => { e.preventDefault(); setDragging(false); onFiles(e.dataTransfer.files); }}
-        className={`flex flex-col overflow-hidden rounded-lg border bg-surface transition ${
+        /* The BOX takes the focus, not the field inside it. The global `:focus-visible` rule draws a
+           2px brand outline on everything focusable, and on a textarea filling a card with
+           `overflow-hidden` that outline was clipped to a single orange bar across the card's floor
+           (owner, 2026-08-31: remove it). Moved to the card's own border, which is one line in the
+           place a border belongs — and a keyboard user still sees where they are. */
+        className={`flex flex-col overflow-hidden rounded-lg border bg-surface transition focus-within:border-brand ${
           dragging ? "border-brand ring-2 ring-brand/25" : "border-border"
         }`}
       >
@@ -202,19 +208,14 @@ export function Intake() {
           onChange={(e) => actions.setText(e.target.value)}
           placeholder={typed}
           aria-label={t.intake.pasteLabel}
-          className="min-h-[188px] w-full flex-1 resize-none border-0 bg-transparent px-5 pb-2 pt-5 text-subhead leading-relaxed text-navy outline-none placeholder:text-muted/70"
+          className="min-h-[188px] w-full flex-1 resize-none border-0 bg-transparent px-5 pb-2 pt-5 text-subhead leading-relaxed text-navy outline-none placeholder:text-muted/70 focus-visible:outline-none"
         />
 
-        {/* PROJ — the site strip, and it belongs to the box above it: no rule between them, the
-            same ground, the same padding, so the pills read as the floor of the field the renter is
-            typing in (owner, 2026-08-30). They are still not IN the textarea — that is a native
-            control holding text only, and keeping it purely what the renter typed is what keeps the
-            agent's input small. Both render nothing at all when there is no site to show, so a
-            renter who has never made one sees today's screen unchanged. */}
-        <ProjectChips />
-        <ProjectPills />
-
-        {/* ── The floor: the one control the dropzone became ── */}
+        {/* ── The floor: the one control the dropzone became ──
+            The button alone. «Add as many files as you like — we'll read them all» stood beside it
+            until 2026-08-31 (owner: remove it): no limit is stated anywhere, so a line promising
+            there is none was answering a question nobody had asked, and the button already says
+            what it does. */}
         <div className="flex flex-wrap items-center gap-2.5 px-5 pb-4 pt-1">
           <button
             type="button"
@@ -224,9 +225,6 @@ export function Intake() {
             <Icon name="upload" size={15} className="flex-none" />
             {t.intake.uploadRfq}
           </button>
-          {/* Said beside the button rather than in a paragraph under the card: it answers a question
-              the renter only has while they are looking at it. */}
-          <span className="text-meta text-muted">{t.intake.dropSub}</span>
         </div>
 
         <input ref={fileInput} type="file" multiple accept={ACCEPT_ATTR} className="hidden" onChange={(e) => onFiles(e.target.files)} />
@@ -253,23 +251,25 @@ export function Intake() {
         )}
       </div>
 
-      {/* ── The examples, as things you can press ──
-          Gone once there is text: they are a way to START, and a row of alternative openings under a
-          request someone is already writing invites them to throw it away. */}
-      {state.text.length === 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {t.intake.examples.map((ex) => (
-            <button
-              key={ex.chip}
-              type="button"
-              onClick={() => actions.setText(ex.text)}
-              className="rounded-full border border-border bg-surface px-4 py-2 text-body font-semibold text-navy transition hover:border-brand hover:text-brand"
-            >
-              {ex.chip}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* ── PROJ · the renter's own sites, under the box (owner, 2026-08-31) ─────────────────────
+          *"Projects will be in the place of these suggestions."*
+
+          ~~The strip lived inside the card, on the floor of the field.~~ ~~And under the card sat a
+          row of example sentences that wrote themselves in.~~ Both are answered by one move: the
+          sites take the row the examples had.
+
+          It is the right trade. The examples taught a renter what to write, and the typing
+          placeholder in the box already does that — the chips only repeated it, for the one press a
+          renter makes on their first visit and never again. The sites are the opposite: they are the
+          renter's own, they matter on every visit after the first, and they are the one thing here
+          that fills in half the request. And a strip of the renter's OWN data reads better as a row
+          of things to pick from under the box than as furniture bolted inside it.
+
+          `ProjectChips` renders until one is picked, `ProjectPills` after — the same strip, so
+          choosing a site swaps its contents and moves nothing. Both render nothing at all when there
+          is no site to show, so a renter who has never made one sees a plain box. */}
+      <ProjectChips />
+      <ProjectPills />
 
       {/* ── The way on ── */}
       <div className="mt-6 flex flex-wrap items-center justify-end gap-3">

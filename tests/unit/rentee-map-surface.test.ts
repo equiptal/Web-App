@@ -850,16 +850,17 @@ describe("no ask control on this surface writes — they compose (owner, 2026-08
 describe("the distance and its state read whole at any panel width", () => {
   const css = read(CSS);
 
-  it("centres the distance and lets it hug its own figure", () => {
-    // ~~Full width.~~ The prompt that shared this line is gone (owner, 2026-08-31), and a stretched
-    // block behind a two-digit figure was a band of empty card. It hugs and centres instead, so
-    // every card's number sits on one vertical axis whatever the panel's width.
+  it("gives the distance the column's full width, starting where every other line starts", () => {
+    // ~~Centred and hugging its figure.~~ Withdrawn the same day it landed (owner, 2026-08-31): the
+    // hug gave the text column three different left edges — readiness, distance, model — and the
+    // empty space it removed was the card's own margin. One start, one end, three lines.
     const yard = cssBlock(css, ".bidmap .bm-eq .bm-eq-yard {");
-    expect(yard).toMatch(/width:\s*auto/);
-    expect(yard).toMatch(/align-self:\s*center/);
-    expect(yard).toMatch(/justify-content:\s*center/);
-    // It may never widen the card: a long figure is capped by the column, not by the card growing.
-    expect(yard).toMatch(/max-width:\s*100%/);
+    expect(yard).toMatch(/width:\s*100%/);
+    expect(yard).toMatch(/justify-content:\s*flex-start/);
+    expect(yard).toMatch(/text-align:\s*start/);
+    // …and the readiness above it stretches to the same two edges rather than floating mid-row.
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-rd {")).toMatch(/flex:\s*1/);
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-rdbar {")).toMatch(/flex:\s*1/);
     // The card is a row — the picture in its 104px cell, the text beside it — and the text column is
     // the column: the corner control, the distance, the model and the foot each own their line.
     expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-in {")).toMatch(/align-items:\s*stretch/);

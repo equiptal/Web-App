@@ -13,12 +13,32 @@
  * clean way back — the requests under each are real. So when a site exists at the address, creating
  * another is not offered at all; the choice is *add it to this one* or *it is a different site*.
  *
- * ── It does not → show them the split, in their own numbers ──────────────────────────────────────
+ * ── It does not → show them what the SITE would keep ─────────────────────────────────────────────
  *
- * The whole mental model of this feature is one line: **the site is saved, the shopping trip is
- * not.** Explaining that in prose fails; showing it as two labelled lists of the values they just
- * typed does not. This is the one screen where a renter meets that split with their own request in
- * front of them, which is why the lists are exhaustive rather than illustrative.
+ * One list: the values that become the project, in their own numbers. ~~Two lists side by side, the
+ * second naming everything that stays with this request — equipment, budget, payment method,
+ * supplier filters.~~ Removed by the owner (2026-08-31: *"this must only show the project details
+ * not the right section"*), and he is right about what it cost: a column of «—» against four labels
+ * read as four things the renter had failed to fill in, on a screen whose whole job is to say *this
+ * is what we will remember*. What the project does NOT take needs no inventory — nothing about the
+ * request changes either way.
+ *
+ * ── It is a MODAL, at the moment of submitting ────────────────────────────────────────────────────
+ *
+ * ~~A panel under the confirmation screen's own actions.~~ It sat below *View request & bids* and
+ * *New request*, which are the two controls a renter reaches for the instant the page appears — so
+ * the offer was under the thing that navigates away from it. Asked as a dialog, at the one moment it
+ * is about, it gets answered.
+ *
+ * ── «Yes» opens the form; it does not save silently ──────────────────────────────────────────────
+ *
+ * Pressing *Make the project* used to POST one immediately, with whatever the request happened to
+ * carry. It now opens the ordinary project dialog, prefilled from the request and with the values
+ * the request could not supply — the title, usually the payment terms — marked as unset (owner,
+ * 2026-08-31). Two reasons it is better: the site the renter is about to own is the one place a name
+ * is worth typing, and a project quietly created with four of six fields blank is a record they will
+ * meet later with no idea why it is thin. Marked, never required: the address is still the only
+ * thing Save waits for.
  *
  * ── Declining changes nothing, and is remembered ─────────────────────────────────────────────────
  *
@@ -30,9 +50,11 @@
 import { useEffect, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { Button, Icon } from "@/components/ui";
+import { Dialog } from "@/components/Dialog";
 import { listProjects, createProject, assignToProject } from "@/lib/api/client";
 import { projectTitle, shortSite, type ProjectSummary } from "@/lib/contract/project";
 import type { ProjectDetails, Preferences } from "@/lib/contract/draft";
+import { ProjectForm, type ProjectFormValue } from "@/components/projects/ProjectForm";
 
 const DISMISS_KEY = "moedatech.projectOffer.dismissed";
 
@@ -70,6 +92,8 @@ export function ProjectOffer({
   const [existing, setExisting] = useState<ProjectSummary[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [gone, setGone] = useState(() => dismissed());
+  /** The second stage: the project dialog, prefilled. Null while the offer itself is on screen. */
+  const [form, setForm] = useState<ProjectFormValue | null>(null);
 
   const address = project.location.label ?? "";
 
@@ -91,11 +115,52 @@ export function ProjectOffer({
     onDone?.();
   }
 
+  /** The request, as the project form's value. The four timing fields a project holds, and no
+   *  fifth — see {@link siteTiming}. The title is deliberately blank: it is the one thing the
+   *  request cannot answer, and the form marks it. */
+  function seed(): ProjectFormValue {
+    return {
+      title: null,
+      location: { label: address, lat: project.location.lat ?? null, lng: project.location.lng ?? null },
+      defaults: { timing: siteTiming(project), paymentTerms: preferences.payment.terms ?? null },
+    };
+  }
+
+  /** The one write both create paths end at: make the site, then file this request under it. */
+  async function save(value: ProjectFormValue) {
+    setBusy(true);
+    try {
+      const made = await createProject(value);
+      if (requestId) await assignToProject(requestId, made.id);
+    } finally {
+      close();
+    }
+  }
+
+  /* ── The second stage ──
+     The ordinary project dialog at its ordinary width, with `markUnset` so the renter sees which
+     values the request could not supply. Cancelling here is *Not now*: they have already answered
+     the offer, and bouncing them back to it would be the same question twice. */
+  if (form) {
+    return (
+      <Dialog open onClose={close} title={t.projects.surface.newProject} size="xl">
+        <ProjectForm
+          value={form}
+          onChange={setForm}
+          markUnset
+          onCancel={close}
+          onSave={(v) => void save(v)}
+          saving={busy}
+        />
+      </Dialog>
+    );
+  }
+
   /* ── The site already exists ── */
   if (existing.length > 0) {
     const site = existing[0];
     return (
-      <Panel title={o.alreadyTitle.replace("{site}", projectTitle(site))} sub={o.alreadySub}>
+      <Shell title={o.alreadyTitle.replace("{site}", projectTitle(site))} sub={o.alreadySub} onClose={close}>
         <div className="grid gap-2 sm:grid-cols-2">
           {/* Two EQUAL cards. Making "add it" the primary would push a renter into merging two
               genuinely different sites that happen to share a street name. */}
@@ -114,92 +179,74 @@ export function ProjectOffer({
               }
             }}
           />
+          {/* A second site at one address is the case that most needs a NAME — two projects called
+              «Riyadh» are the split this whole panel exists to prevent — so this opens the form
+              rather than posting. */}
           <Choice
             icon="add_location_alt"
             title={o.different}
             sub={o.differentSub}
             disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                const made = await createProject({
-                  title: null,
-                  location: { label: address, lat: project.location.lat ?? null, lng: project.location.lng ?? null },
-                  defaults: { timing: { ...project.timing }, paymentTerms: preferences.payment.terms ?? null },
-                });
-                if (requestId) await assignToProject(requestId, made.id);
-              } finally {
-                close();
-              }
-            }}
+            onClick={() => setForm(seed())}
           />
         </div>
         <NotNow label={o.notNow} onClick={close} />
-      </Panel>
+      </Shell>
     );
   }
 
   /* ── No site here yet ── */
+  /* Exactly the five values `createProject` below is about to send, in the same order — never a
+     sixth. «Hours per day» was listed here until 2026-08-31 and the project has not held it since
+     08-30 (`ProjectDefaults.timing` omits it by type): the panel was promising to remember a number
+     nobody was storing. `extendable` took the row, because that one is saved. */
   const saved: Array<[string, string]> = [
     [o.fieldSite, shortSite(address)],
     [o.fieldDates, [project.timing.startDate, project.timing.endDate].filter(Boolean).join(" → ") || "—"],
     [o.fieldBasis, project.timing.rentalBasis ?? "—"],
-    [o.fieldHours, project.timing.hoursPerDay != null ? String(project.timing.hoursPerDay) : "—"],
+    [o.fieldExtendable, project.timing.extendable ? t.common.yes : t.common.no],
     [o.fieldPayment, preferences.payment.terms ?? "—"],
-  ];
-  const stays: Array<[string, string]> = [
-    [o.fieldEquipment, o.thisRequestOnly],
-    [o.fieldBudget, preferences.budgetSar ? String(preferences.budgetSar) : "—"],
-    [o.fieldMethod, preferences.payment.method ?? "—"],
-    [o.fieldSuppliers, preferences.supplierFilters.verifiedOnly ? o.verifiedOnly : "—"],
   ];
 
   return (
-    <Panel title={o.createTitle} sub={o.createSub}>
-      {/* The split, in their own values. This is the one screen where a renter meets it with their
-          own request in front of them, so the lists are exhaustive rather than illustrative. */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <List heading={o.savedHeading} tone="keep" rows={saved} />
-        <List heading={o.staysHeading} tone="stay" rows={stays} />
-      </div>
+    <Shell title={o.createTitle} sub={o.createSub} onClose={close}>
+      {/* What the SITE keeps, in the renter's own values — one list, full width. */}
+      <List heading={o.savedHeading} rows={saved} />
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            try {
-              const made = await createProject({
-                title: null,
-                location: { label: address, lat: project.location.lat ?? null, lng: project.location.lng ?? null },
-                defaults: { timing: { ...project.timing }, paymentTerms: preferences.payment.terms ?? null },
-              });
-              if (requestId) await assignToProject(requestId, made.id);
-            } finally {
-              close();
-            }
-          }}
-        >
+        {/* Opens the form — it does not post. See the note at the top on why. */}
+        <Button disabled={busy} onClick={() => setForm(seed())}>
           <Icon name="add" size={15} /> {o.createAction}
         </Button>
         <NotNow label={o.notNow} onClick={close} />
       </div>
-    </Panel>
+    </Shell>
   );
 }
 
 /* ----------------------------- Chrome ----------------------------- */
 
-function Panel({ title, sub, children }: { title: string; sub: string; children: React.ReactNode }) {
+/**
+ * The app's one dialog shell, at `md`.
+ *
+ * Closing it by any route — the X, Escape, the backdrop — is *Not now*, which is permanent per
+ * device. That is deliberate and it is the existing rule: an offer that returns after being refused
+ * reads as nagging, and there is no half-answer to give here.
+ */
+function Shell({ title, sub, onClose, children }: { title: string; sub: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-3 rounded-sm border border-border bg-surface p-4">
-      <div>
-        <h3 className="text-subhead font-extrabold text-navy">{title}</h3>
-        <p className="mt-0.5 text-body text-muted">{sub}</p>
-      </div>
-      {children}
-    </section>
+    <Dialog open onClose={onClose} title={title} subtitle={sub}>
+      <div className="flex flex-col gap-4">{children}</div>
+    </Dialog>
   );
+}
+
+/** The four timing values a PROJECT holds — never the draft's fifth (`hoursPerDay`), which is a
+ *  per-hire question. Spreading `project.timing` sent it to the API in silence: the target type omits
+ *  the key, but a spread is not an object literal, so nothing checked it. */
+function siteTiming(project: ProjectDetails) {
+  const { startDate, endDate, rentalBasis, extendable } = project.timing;
+  return { startDate, endDate, rentalBasis, extendable };
 }
 
 function Choice({
@@ -231,12 +278,16 @@ function Choice({
   );
 }
 
-function List({ heading, tone, rows }: { heading: string; tone: "keep" | "stay"; rows: Array<[string, string]> }) {
+/** One tone, because there is one list now: the amber the whole product uses for "this is kept". */
+function List({ heading, rows }: { heading: string; rows: Array<[string, string]> }) {
   return (
-    <div className={`flex flex-col gap-1 rounded-sm border p-3 ${tone === "keep" ? "border-brand/40 bg-brand-soft" : "border-border bg-surface2/50"}`}>
-      <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{heading}</span>
+    <div className="flex flex-col divide-y divide-brand/20 rounded-sm border border-brand/40 bg-brand-soft px-3.5 py-1">
+      <span className="py-2 text-label font-semibold uppercase tracking-[.03em] text-muted">{heading}</span>
       {rows.map(([k, v]) => (
-        <span key={k} className="flex items-baseline justify-between gap-2 text-meta">
+        /* A row per value, ruled: the list is the subject of this dialog now rather than half of a
+           comparison, so it is read down, and a rule between rows is what keeps the label and its
+           value paired when the value is short. */
+        <span key={k} className="flex items-baseline justify-between gap-3 py-2 text-body">
           <span className="text-muted">{k}</span>
           <span className="truncate font-semibold text-navy">{v}</span>
         </span>

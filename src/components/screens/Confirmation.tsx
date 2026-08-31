@@ -190,15 +190,18 @@ export function Confirmation() {
         L={L}
       />
       {/* PROJ (W-T24) — the offer, after a PROJECTLESS submit only. A renter who already filed
-          this under a site has been asked nothing and is asked nothing now. */}
+          this under a site has been asked nothing and is asked nothing now.
+
+          It opens ITSELF as a dialog (owner, 2026-08-31): as a panel it sat under *View request &
+          bids*, which is the control a renter presses the moment this screen appears, so the offer
+          was below the thing that navigates away from it. No wrapper here — the dialog owns its own
+          geometry, and its own "already dismissed" check decides whether it renders at all. */}
       {!draft?.projectId && draft && (
-        <div style={{ maxWidth: 720, margin: "18px auto 0" }}>
-          <ProjectOffer
-            requestId={state.requestUuids[0] ?? null}
-            project={draft.project}
-            preferences={draft.preferences}
-          />
-        </div>
+        <ProjectOffer
+          requestId={state.requestUuids[0] ?? null}
+          project={draft.project}
+          preferences={draft.preferences}
+        />
       )}
     </div>
   );
