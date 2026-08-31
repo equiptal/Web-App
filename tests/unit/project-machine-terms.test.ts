@@ -89,10 +89,13 @@ describe("how many fields a machine states differently", () => {
   });
 
   it("counts a nested operator field, which a shallow compare would miss", () => {
+    /* `fatFood` rather than `nightShift`: night shift was removed from the form (owner,
+       2026-08-31) and is no longer compared, because counting a field nobody can set would make the
+       badge say 1 with nothing to point at. */
     const shared = blankTerms();
     const mine = {
       ...shared,
-      operator: { ...shared.operator, nightShift: true } as typeof shared.operator,
+      operator: { ...shared.operator, fatFood: "supplier" } as typeof shared.operator,
     };
     expect(countDifferences(mine, shared)).toBe(1);
   });

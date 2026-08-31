@@ -1455,6 +1455,7 @@ export const ar: Dictionary = {
       removeFromProject: "إزالة من هذا المشروع",
     },
     workOrder: {
+      operatorNeeded: "هذه المعدة تحتاج مشغّلاً",
       nationality: "جنسية المشغّل",
       natAny: "أي جنسية",
       natRestricted: "محددة",

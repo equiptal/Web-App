@@ -1719,6 +1719,7 @@ export const en = {
       removeFromProject: "Remove from this project",
     },
     workOrder: {
+      operatorNeeded: "This equipment needs an operator",
       nationality: "Operator nationality",
       natAny: "Any",
       natRestricted: "Restricted",

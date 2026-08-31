@@ -188,7 +188,10 @@ export function WorkOrderForm({
     (draft.when.startDate != null && draft.when.startDate !== projectWhen.startDate) ||
     (draft.when.endDate != null && draft.when.endDate !== projectWhen.endDate);
 
-  const [termsOpen, setTermsOpen] = useState(false);
+  /* Open from the start (owner, 2026-08-31). These are the order's own terms and every machine
+     inherits them, so they are part of filling the form in rather than something to go and find.
+     The PER-MACHINE block stays closed — that one is the exception, and exceptions are rare. */
+  const [termsOpen, setTermsOpen] = useState(true);
 
   /* The rate is per WHAT — read off the order's own basis, which the site seeded. Showing "per
      month" beside the box is the difference between a number a renter can check and one they have
