@@ -12,9 +12,13 @@ import { addRenterSuppliersBulk, type NewRenterSupplier } from "@/lib/api/client
  *
  * ── Rows, not a form ────────────────────────────────────────────────────────────────────────────
  *
- * It opens on three blank rows because a renter opening this has a list in his head, not one firm.
- * A form would make him do the same four fields, one at a time, and press Save between each — and
- * the second time he did that he would go and find a spreadsheet instead.
+ * A form would make a renter do four fields, press Save, and start again — and the second time he
+ * did that he would go and find a spreadsheet instead. So it is a table, and *Add another* is one
+ * click away when he has more.
+ *
+ * **It opens on ONE row** (owner, 2026-09-01). Three empty rows look like three things that must be
+ * filled in, and a renter adding a single supplier reads two of them as work he is being asked to
+ * do. One row is the honest floor; the second appears when he asks for it.
  *
  * ── A row counts when it can be used ────────────────────────────────────────────────────────────
  *
@@ -38,7 +42,7 @@ const usable = (r: Row) => !!r.name.trim() && !!(r.email.trim() || r.phone.trim(
 export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; onClose: () => void; onAdded: () => void }) {
   const t = useT();
   const c = t.suppliers;
-  const [rows, setRows] = useState<Row[]>([blank(), blank(), blank()]);
+  const [rows, setRows] = useState<Row[]>([blank()]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,7 +50,7 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
   const patch = (i: number, next: Partial<Row>) => setRows((r) => r.map((row, n) => (n === i ? { ...row, ...next } : row)));
 
   const close = () => {
-    setRows([blank(), blank(), blank()]);
+    setRows([blank()]);
     setError(null);
     onClose();
   };
