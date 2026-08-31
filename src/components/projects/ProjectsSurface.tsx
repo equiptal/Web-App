@@ -48,6 +48,7 @@ import { RowMenu } from "./RowMenu";
 import { AwardDialog, UnawardConfirm } from "./AwardDialog";
 import { PeriodConflictDialog } from "./PeriodConflictDialog";
 import { WorkOrderForm, workOrderPayload, blankMachine, blankTerms, type WorkOrderDraft } from "./WorkOrderForm";
+import { FileRequestDialog } from "./FileRequestDialog";
 import { MoveDialog } from "./MoveDialog";
 import { DocumentsDialog } from "./DocumentsDialog";
 import { ConflictDialog, periodConflicts } from "./ConflictDialog";
@@ -110,7 +111,18 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   const [unawarding, setUnawarding] = useState<Award | null>(null);
   const [workOrder, setWorkOrder] = useState<WorkOrderDraft | null>(null);
   const [taxonomy, setTaxonomy] = useState<Taxonomy>([]);
-  const [unassigned, setUnassigned] = useState<ChartGroup[]>([]);
+  /**
+   * Requests filed nowhere — what *Add an existing request* can offer.
+   *
+   * Kept as chart groups because that is the shape the surface already speaks, and because each one
+   * carries the address the file dialog shows beside it. They are no longer a place on the board:
+   * *Unassigned* was removed at the owner's request (2026-08-31), and the action moved onto the site
+   * where a renter is actually standing when they want one.
+   */
+  const [unassigned, setUnassigned] = useState<(ChartGroup & { address?: string | null })[]>([]);
+
+  /** Which site is being filed into, while the picker is open. */
+  const [filingInto, setFilingInto] = useState<{ projectId: string; label: string } | null>(null);
   const [filing, setFiling] = useState<{ requestId: string; address: string | null; projectId: string | null } | null>(null);
   const [papers, setPapers] = useState<{ award: Award; isRequest: boolean } | null>(null);
   const [conflict, setConflict] = useState<ChartGroup | null>(null);
@@ -248,6 +260,28 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
    * nothing, because nothing is in question. The dialog exists for the one case where it is: a row
    * carrying its own dates that the site is about to contradict.
    */
+  /**
+   * Put a request that already exists onto this site.
+   *
+   * Filing changes nothing about the request — not its status, not a single value it carries — so
+   * there is nothing to confirm and nothing to warn about. Both lists are re-read afterwards: the
+   * request leaves the unfiled set and appears on the site's chart, and a stale copy of either
+   * would show it in two places at once.
+   */
+  async function fileExisting(requestId: string, projectId: string) {
+    setSaving(true);
+    setNotice(null);
+    try {
+      await assignToProject(requestId, projectId);
+      setFilingInto(null);
+      await Promise.all([reload(), reloadUnassigned()]);
+    } catch {
+      setNotice(t.projects.file.failed);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function save(value: ProjectFormValue, applyTo: string[]) {
     if (!editing) return;
 
@@ -522,10 +556,10 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
           chart={chart}
           /* W-T18 fills this from the requests list; until then the rail entry stays hidden, which
              is exactly what it should do when nothing is filed nowhere. */
-          unassigned={unassigned}
           onEditProject={(p) => void openEdit(p)}
           onNewWorkOrder={startWorkOrder}
           onNewRequest={(p) => router.push(`/create?project=${encodeURIComponent(p.id)}`)}
+          onFileExisting={(p) => setFilingInto({ projectId: p.id, label: projectTitle(p) })}
           onOpenConflict={setConflict}
           rowMenu={(group, itemId, awardId) => {
             const item = group.items.find((i) => i.id === itemId);
@@ -702,6 +736,17 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
 
       {unawarding && (
         <UnawardConfirm open onClose={() => setUnawarding(null)} award={unawarding} onConfirm={() => void unaward()} busy={saving} />
+      )}
+
+      {filingInto && (
+        <FileRequestDialog
+          open
+          onClose={() => setFilingInto(null)}
+          candidates={unassigned}
+          siteLabel={filingInto.label}
+          busy={saving}
+          onFile={(requestId) => void fileExisting(requestId, filingInto.projectId)}
+        />
       )}
 
       {/* Raised only by `save`, and only when something would now read differently from the site. */}

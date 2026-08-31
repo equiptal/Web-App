@@ -1671,6 +1671,15 @@ export const en = {
       badType: "PDF, JPG, PNG or WEBP. Convert it first, or take a photo of the page.",
       readFailed: "That file could not be read. Try another.",
     },
+    file: {
+      title: "Add an existing request",
+      sub: "Put a request you have already posted onto {site}.",
+      none: "Every request you have is already on a site.",
+      noMatch: "Nothing matches that.",
+      search: "Search your requests",
+      note: "Filing changes nothing about the request â not its status, not its dates, not its terms.",
+      failed: "That did not file. Try again.",
+    },
     periodConflict: {
       title: "{n} things here keep different dates",
       sub: "This site will say {period}.",
@@ -1820,6 +1829,7 @@ export const en = {
       filedCount: "{r} req · {w} WO",
       addWorkOrder: "Add work order",
       newRequest: "New request",
+      fileExisting: "Add existing request",
       whatIsHere: "What is on this site",
       ownPeriod: "own dates",
       nothingYet: "Nothing on this site yet. Add a work order for a machine already here, or post a request.",

@@ -49,10 +49,10 @@ export function ProjectsBoard({
   onSelect,
   onNewProject,
   chart,
-  unassigned,
   onEditProject,
   onNewWorkOrder,
   onNewRequest,
+  onFileExisting,
   onOpenConflict,
   rowMenu,
 }: {
@@ -63,11 +63,12 @@ export function ProjectsBoard({
   onNewProject: () => void;
   chart: { project: ProjectSummary; groups: ChartGroup[] } | null;
   /** Rows filed nowhere. The rail entry appears only when this is non-empty. */
-  unassigned: ChartGroup[];
   onEditProject: (p: ProjectSummary) => void;
   /** Both live on the header — without them a site is a page with nothing to do on it. */
   onNewWorkOrder: (p: ProjectSummary) => void;
   onNewRequest: (p: ProjectSummary) => void;
+  /** Bring a request that already exists onto this site. */
+  onFileExisting: (p: ProjectSummary) => void;
   /** Pressed from the *own dates* chip on a group header. */
   onOpenConflict?: (group: ChartGroup) => void;
   rowMenu?: (group: ChartGroup, itemId: string, awardId: string | null) => React.ReactNode;
@@ -104,21 +105,6 @@ export function ProjectsBoard({
           );
         })}
 
-        {/* Only when something is actually filed nowhere. */}
-        {unassigned.length > 0 && (
-          <button
-            type="button"
-            onClick={() => onSelect(null)}
-            className={`flex min-w-[180px] items-center gap-1.5 rounded-sm border px-3 py-2 text-start transition ${
-              selectedId === null ? "border-brand bg-brand-soft" : "border-dashed border-border bg-surface hover:border-brand"
-            }`}
-          >
-            <Icon name="inbox" size={13} className="flex-none text-muted" />
-            <span className="min-w-0 flex-1 truncate text-body font-semibold text-navy">{t.projects.board.unassigned}</span>
-            <span className="flex-none text-meta font-semibold text-muted">{unassigned.length}</span>
-          </button>
-        )}
-
         <button
           type="button"
           onClick={onNewProject}
@@ -130,9 +116,7 @@ export function ProjectsBoard({
 
       {/* ── The site ── */}
       <div className="min-w-0 flex-1">
-        {selectedId === null ? (
-          <UnassignedPanel groups={unassigned} rowMenu={rowMenu} />
-        ) : chart ? (
+        {chart ? (
           <SitePanel
             project={chart.project}
             groups={chart.groups}
@@ -140,6 +124,7 @@ export function ProjectsBoard({
             onEdit={onEditProject}
             onNewWorkOrder={() => onNewWorkOrder(chart.project)}
             onNewRequest={() => onNewRequest(chart.project)}
+            onFileExisting={() => onFileExisting(chart.project)}
             onOpenConflict={onOpenConflict}
             rowMenu={rowMenu}
           />
@@ -160,6 +145,7 @@ function SitePanel({
   onEdit,
   onNewWorkOrder,
   onNewRequest,
+  onFileExisting,
   onOpenConflict,
   rowMenu,
 }: {
@@ -169,6 +155,7 @@ function SitePanel({
   onEdit: (p: ProjectSummary) => void;
   onNewWorkOrder: () => void;
   onNewRequest: () => void;
+  onFileExisting: () => void;
   onOpenConflict?: (group: ChartGroup) => void;
   rowMenu?: (group: ChartGroup, itemId: string, awardId: string | null) => React.ReactNode;
 }) {
@@ -267,6 +254,20 @@ function SitePanel({
         <Button onClick={onNewRequest}>
           <Icon name="add" size={14} /> {t.projects.board.newRequest}
         </Button>
+
+        {/* The third way to put something here: one that already exists (owner, 2026-08-31).
+            It used to live in a rail entry called *Unassigned*, which made "filed nowhere" look like
+            a place — a site sitting beside the real ones — and put the action on the request when
+            the renter's sentence is *"put that request on THIS site"*, said while looking at the
+            site. Quiet, like the pen: bringing an existing request here is a filing job, not the
+            thing a renter came to do. */}
+        <button
+          type="button"
+          onClick={onFileExisting}
+          className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-body font-semibold text-navy-mid transition hover:border-brand hover:text-brand"
+        >
+          <Icon name="playlist_add" size={14} /> {t.projects.board.fileExisting}
+        </button>
       </div>
 
       {/* ── Chart. `overflow-hidden` is for the bars; the row menu lives outside the track. ── */}
@@ -362,35 +363,3 @@ function Cell({ label, children }: { label: React.ReactNode; children: React.Rea
 /* ----------------------------- Unassigned ----------------------------- */
 
 /** No chart, and **no `overflow-hidden`** — that is what cut the row menu in the prototype. */
-function UnassignedPanel({
-  groups,
-  rowMenu,
-}: {
-  groups: ChartGroup[];
-  rowMenu?: (group: ChartGroup, itemId: string, awardId: string | null) => React.ReactNode;
-}) {
-  const t = useT();
-  return (
-    <div className="flex flex-col gap-3">
-      <div>
-        <h2 className="text-display font-extrabold leading-tight text-navy">{t.projects.board.unassigned}</h2>
-        <p className="mt-1 text-body text-muted">{t.projects.board.unassignedSub}</p>
-      </div>
-
-      <div className="rounded-sm border border-border bg-surface">
-        {groups.map((g) => (
-          <div key={g.id} className="flex items-center gap-2 border-b border-border px-3 py-2.5 last:border-b-0">
-            <Icon name="campaign" size={14} className="flex-none text-muted" />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-body font-semibold text-navy">{g.title?.trim() || g.ref}</span>
-              <span className="block truncate text-meta text-muted">
-                {g.items.map((i) => `${i.label} ×${i.quantity}`).join(" · ")}
-              </span>
-            </span>
-            {rowMenu?.(g, g.items[0]?.id ?? "", null)}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
