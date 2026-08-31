@@ -1284,10 +1284,37 @@ export function ingestClientMatch(text: string, lineItems: Array<Record<string, 
  * that can make a request worse is not one.
  */
 export function warmAgentCache(): void {
+  /**
+   * ⚠️ **It has never warmed anything.** `{ message: "warm", warm: true }` answers
+   * `{"fallback":true,"reason":"upstream_502"}` after ~3.9 seconds, measured on staging 2026-08-31.
+   * There is no `warm` key on the agent's contract, and *"warm"* is not equipment: Tier 0 refuses
+   * it, Tier 1 runs a model call on the word, and the handler errors. So the call cost four seconds
+   * of upstream time on every intake load, warmed no cache, and the renter went on paying the cache
+   * write — which is the exact cost this function exists to absorb.
+   *
+   * It failed invisibly by design: never awaited, never surfaced. The right property for an
+   * optimisation, and the reason nobody noticed it was doing nothing for weeks.
+   *
+   * **A real short line with `allow_tier0: false`** instead. That flag is already on the agent's
+   * contract — *"set false to force Tier 1"* — and forcing Tier 1 is the whole point: Tier 0 answers
+   * from the browser's own taxonomy and never reads the prompt, so a line that Tier 0 could handle
+   * would warm nothing either. This is one Haiku call on eight words, which is what the warm-up was
+   * always meant to cost.
+   */
   void fetch("/api/agent/quick", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: "warm", warm: true }),
+    /* `created_by` marks it, because this DOES write an RFQ row like any other Tier 1 call.
+       It cannot reach the few-shot corpus — that reads only `status IN ('reviewed','approved')`, a
+       human gate — but it does land in the review queue, and a reviewer meeting an identical
+       "1 excavator 20 ton" every few minutes deserves to know which rows to skip. `source` stays
+       `web_rfq`: it came from the web, and lying about that to tidy a queue would put a wrong fact
+       in the corpus to fix a cosmetic one. */
+    body: JSON.stringify({
+      message: "1 excavator 20 ton",
+      allow_tier0: false,
+      created_by: "web-cache-warm",
+    }),
   }).catch(() => {});
 }
 
