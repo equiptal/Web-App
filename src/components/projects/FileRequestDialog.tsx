@@ -28,6 +28,7 @@ import { useT, useLocale } from "@/lib/i18n";
 import { Button, Icon } from "@/components/ui";
 import { Dialog } from "@/components/Dialog";
 import type { ChartGroup } from "@/lib/contract/award";
+import { shortSite } from "@/lib/contract/project";
 
 export function FileRequestDialog({
   open,
@@ -35,6 +36,7 @@ export function FileRequestDialog({
   /** Requests with no project, shaped as chart groups by the surface. */
   candidates,
   siteLabel,
+  siteAddress,
   onFile,
   onNew,
   busy,
@@ -43,6 +45,8 @@ export function FileRequestDialog({
   onClose: () => void;
   candidates: (ChartGroup & { address?: string | null })[];
   siteLabel: string;
+  /** The site's own address — what each request's address is compared against. */
+  siteAddress: string | null;
   onFile: (requestId: string) => void;
   /** Post a new one instead — the intake, with this site already picked. */
   onNew: () => void;
@@ -52,6 +56,24 @@ export function FileRequestDialog({
   const f = t.projects.file;
   const { locale } = useLocale();
   const [query, setQuery] = useState("");
+
+  /**
+   * Is this request's address somewhere else?
+   *
+   * The move dialog already leads with the sites at a row's own address and says so when none match
+   * (AC-54), and the intake raises a stated place that contradicts the site (AC-29). This dialog was
+   * the third door and said nothing — so a Riyadh request could be filed under a Qiddiya site with
+   * no word about it, which is how the owner found it.
+   *
+   * Surfaced, never blocked: **filing changes no value on the request** (AC-21), including its
+   * address. A machine really can be needed at a yard the site does not name, and refusing that
+   * would be inventing a rule the product does not have.
+   */
+  const here = shortSite(siteAddress).trim().toLowerCase();
+  const elsewhere = (c: { address?: string | null }) => {
+    const there = shortSite(c.address).trim().toLowerCase();
+    return !!here && !!there && here !== there;
+  };
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -115,6 +137,15 @@ export function FileRequestDialog({
                         {c.ref}
                         {c.address ? ` · ${c.address}` : ""}
                       </span>
+                      {/* Amber, and on the row rather than in a confirm: the renter is choosing
+                          between requests, and the thing they need to know has to be visible while
+                          they choose rather than after. */}
+                      {elsewhere(c) && (
+                        <span className="mt-0.5 flex items-center gap-1 text-meta font-semibold text-warn">
+                          <Icon name="info" size={12} className="flex-none" />
+                          {f.elsewhere.replace("{site}", shortSite(siteAddress))}
+                        </span>
+                      )}
                     </span>
                     <Icon name="add" size={14} className="flex-none text-brand" />
                   </button>

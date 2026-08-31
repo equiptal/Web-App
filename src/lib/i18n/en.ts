@@ -1669,6 +1669,7 @@ export const en = {
       sub: "Put a request you have already posted onto {site}.",
       none: "Every request you have is already on a site.",
       noMatch: "Nothing matches that.",
+      elsewhere: "Posted for somewhere else — filing it here changes nothing about it.",
       orExisting: "or one you already posted",
       search: "Search your requests",
       note: "Filing changes nothing about the request â not its status, not its dates, not its terms.",

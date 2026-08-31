@@ -551,6 +551,16 @@ function SitePanel({
                 )}
               </div>
             ))}
+
+            {/* ── Room after the last row (owner, 2026-08-31) ────────────────────────────────────
+                *"Let users scroll for a space after the chart so the chart is not at the bottom."*
+                The last row sat flush against the panel's own border, which made a full chart look
+                cut off rather than finished — and a row menu opening downward on that row had
+                nothing to open into, so it flipped up over the rows the renter was comparing.
+
+                Inside the scroller, so it is scrollable space rather than a permanent gap: a chart
+                short enough to fit needs no scrollbar and shows none. */}
+            <div aria-hidden className="h-24 flex-none" />
           </>
         ) : (
           <p className="px-3 py-6 text-center text-body text-muted">{t.projects.board.nothingYet}</p>

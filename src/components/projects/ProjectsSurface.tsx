@@ -140,7 +140,12 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   const [unassigned, setUnassigned] = useState<(ChartGroup & { address?: string | null })[]>([]);
 
   /** Which site is being filed into, while the picker is open. */
-  const [filingInto, setFilingInto] = useState<{ projectId: string; label: string } | null>(null);
+  const [filingInto, setFilingInto] = useState<{
+    projectId: string;
+    label: string;
+    /** The site's address, so the picker can flag a request that belongs somewhere else. */
+    address: string | null;
+  } | null>(null);
 
   /** The chart row being renamed. */
   const [renaming, setRenaming] = useState<ChartGroup | null>(null);
@@ -600,7 +605,10 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   if (embedded && !projects) return null;
 
   return (
-    <div className="flex flex-col gap-5">
+    /* `pb-24`: the page must not end on the chart's last pixel either — a surface whose final row is
+       also the last thing above the viewport edge reads as truncated, and the chat dock floats over
+       that corner (owner, 2026-08-31). */
+    <div className="flex flex-col gap-5 pb-24">
       <SectionHeader count={projects?.length ?? 0} />
 
       {notice && <p className="rounded-sm border border-danger/40 bg-danger/5 px-3 py-2 text-body text-danger">{notice}</p>}
@@ -618,7 +626,9 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
              is exactly what it should do when nothing is filed nowhere. */
           onEditProject={(p) => void openEdit(p)}
           onNewWorkOrder={startWorkOrder}
-          onAddRequest={(p) => setFilingInto({ projectId: p.id, label: projectTitle(p) })}
+          onAddRequest={(p) =>
+            setFilingInto({ projectId: p.id, label: projectTitle(p), address: p.location.label })
+          }
           onRename={setRenaming}
           onOpenConflict={setConflict}
           rowMenu={(group, itemId, awardId) => {
@@ -821,6 +831,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
           onClose={() => setFilingInto(null)}
           candidates={unassigned}
           siteLabel={filingInto.label}
+          siteAddress={filingInto.address}
           busy={saving}
           onFile={(requestId) => void fileExisting(requestId, filingInto.projectId)}
           onNew={() => router.push(`/create?project=${encodeURIComponent(filingInto.projectId)}`)}
