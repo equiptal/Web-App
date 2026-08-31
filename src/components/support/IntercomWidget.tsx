@@ -271,8 +271,13 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
  * Separation from the page comes from the size and the ground beneath it, both of which the app's
  * own bubble also relies on once its shadow is taken away.
  *
- * Not draggable, unlike the app's. The app moves it because a phone screen is small enough for a
- * fixed bubble to sit on top of something that matters; at this width nothing is under it.
+ * ~~Not draggable, unlike the app's. The app moves it because a phone screen is small enough for a
+ * fixed bubble to sit on top of something that matters; at this width nothing is under it.~~
+ * Withdrawn (owner, 2026-08-31) — and it now matches `chat_bubble.dart` on this too. "Nothing is
+ * under it" was a claim about a layout that keeps changing, and this app has surfaces that fill
+ * their viewport and put their own work in that corner: the bid map's price bar, a card row that
+ * scrolls sideways beneath it, a dialog's footer. Letting the renter move it is cheaper than being
+ * right about every corner forever. See {@link Launcher}.
  */
 /**
  * The four destinations the nav bar names, and their subtrees.
@@ -283,12 +288,123 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
  */
 const LAUNCHER_ROUTES = ["/", "/browse", "/requests", "/company"] as const;
 
+/** Where the renter parked the bubble, in viewport pixels from the top-left of the window. */
+type BubbleAt = { x: number; y: number };
+
+/**
+ * **The bubble is the renter's to move** (owner, 2026-08-31).
+ *
+ * ~~"Not draggable, unlike the app's. The app moves it because a phone screen is small enough for a
+ * fixed bubble to sit on top of something that matters; at this width nothing is under it."~~
+ * Withdrawn. It is not only phones: this app has surfaces that fill their viewport and put their own
+ * work in the bottom corner — the bid map's price bar, a card row that scrolls sideways under it, a
+ * dialog's footer buttons — and "nothing is under it" is a claim about a layout that keeps changing.
+ * Letting the renter move it is cheaper than being right about every corner forever.
+ *
+ * ── The size, and why it is not `1rem` ──────────────────────────────────────────────────────────
+ * `BUBBLE` is the button's own diameter and `EDGE` the gap it keeps from the window. They are
+ * constants rather than literals because the clamp below needs both, and a bubble that could be
+ * dragged half off the screen is a bubble that cannot be dragged back.
+ */
+const BUBBLE = 56;
+const EDGE = 12;
+const BUBBLE_KEY = "moeda.support.bubble";
+
+/** Inside the window, always — read on restore and again on every resize. */
+function clampToView(at: BubbleAt): BubbleAt {
+  const maxX = Math.max(EDGE, window.innerWidth - BUBBLE - EDGE);
+  const maxY = Math.max(EDGE, window.innerHeight - BUBBLE - EDGE);
+  return { x: Math.min(Math.max(at.x, EDGE), maxX), y: Math.min(Math.max(at.y, EDGE), maxY) };
+}
+
+function readBubble(): BubbleAt | null {
+  try {
+    const raw = window.localStorage.getItem(BUBBLE_KEY);
+    if (!raw) return null;
+    const at = JSON.parse(raw) as BubbleAt;
+    return typeof at?.x === "number" && typeof at?.y === "number" ? clampToView(at) : null;
+  } catch {
+    // A blocked or malformed store means the bubble sits where it always did. Nothing else depends
+    // on this, so there is nothing to report and nothing to recover.
+    return null;
+  }
+}
+
 function Launcher({ unread }: { unread: number }) {
   const { dir } = useLocale();
   // Null outside a route (and in a bare render): treat that as "not on a tab" rather than throwing.
   const pathname = usePathname() ?? "";
 
-  const open = useCallback(() => window.Intercom?.("show"), []);
+  /**
+   * Where it sits. `null` means "wherever the stylesheet puts it" — the bottom-end corner it has
+   * always occupied — so a renter who never drags it sees no change at all, and the default keeps
+   * following the writing direction without this having to know about RTL.
+   */
+  const [at, setAt] = useState<BubbleAt | null>(null);
+  /** True from the first pixel of a real drag until the click that would follow it is swallowed. */
+  const dragging = useRef(false);
+  const moved = useRef(false);
+  /** Pointer offset inside the button, so it does not jump to centre itself under the finger. */
+  const grab = useRef({ dx: 0, dy: 0 });
+
+  // Restore on mount (client only — `localStorage` does not exist while this renders on the server).
+  useEffect(() => setAt(readBubble()), []);
+
+  // A window that got smaller must not strand it outside. Only ever pulls it back in.
+  useEffect(() => {
+    if (!at) return;
+    const onResize = () => setAt((prev) => (prev ? clampToView(prev) : prev));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [at]);
+
+  const onPointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    // Primary button / touch / pen only: a right-click is a context menu, not a drag.
+    if (e.button !== 0) return;
+    const box = e.currentTarget.getBoundingClientRect();
+    grab.current = { dx: e.clientX - box.left, dy: e.clientY - box.top };
+    dragging.current = true;
+    moved.current = false;
+    // Capture, so the drag survives the pointer leaving the button — which it does immediately,
+    // because the button is moving out from under it.
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }, []);
+
+  const onPointerMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!dragging.current) return;
+    const next = { x: e.clientX - grab.current.dx, y: e.clientY - grab.current.dy };
+    // A few pixels of slop before this counts as a drag. Without it every press registers as a
+    // one-pixel move and the click that opens the messenger never fires.
+    if (!moved.current) {
+      const box = e.currentTarget.getBoundingClientRect();
+      if (Math.abs(next.x - box.left) < 4 && Math.abs(next.y - box.top) < 4) return;
+      moved.current = true;
+    }
+    setAt(clampToView(next));
+  }, []);
+
+  const onPointerUp = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+    if (!moved.current) return; // a press, not a drag — let the click through to `open`
+    const box = e.currentTarget.getBoundingClientRect();
+    try {
+      window.localStorage.setItem(BUBBLE_KEY, JSON.stringify({ x: box.left, y: box.top }));
+    } catch {
+      /* it stays put for this visit and returns to the corner on the next; nothing else breaks */
+    }
+  }, []);
+
+  const open = useCallback(() => {
+    // The click that ends a drag is not a request for support. `moved` is still true here — the
+    // browser fires `click` after `pointerup` — so this is where it is spent.
+    if (moved.current) {
+      moved.current = false;
+      return;
+    }
+    window.Intercom?.("show");
+  }, []);
 
   if (!INTERCOM_APP_ID) return null;
 
@@ -311,17 +427,27 @@ function Launcher({ unread }: { unread: number }) {
     <button
       type="button"
       onClick={open}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
       aria-label={dir === "rtl" ? "الدعم" : "Support"}
-      className="fixed bottom-6 z-40 grid size-14 place-items-center rounded-full text-white transition-transform hover:scale-105 active:scale-95"
+      title={dir === "rtl" ? "الدعم — اسحب لتحريكه" : "Support — drag to move"}
+      className="fixed z-40 grid size-14 place-items-center rounded-full text-white transition-transform hover:scale-105 active:scale-95"
       style={{
-        // Logical, not `right`: under Arabic every other floating control on this app sits on the
-        // left, and a bubble alone on the right reads as something bolted on.
-        insetInlineEnd: "1.5rem",
+        // `touch-action: none` so a drag on a phone moves the bubble instead of scrolling the page
+        // under it. `cursor: grab` says the thing can be picked up before anyone tries.
+        touchAction: "none",
+        cursor: "grab",
+        // Parked: absolute viewport coordinates, which is what a drag produces. Unparked: the corner
+        // it has always sat in — logical, not `right`, because under Arabic every other floating
+        // control on this app sits on the left and a bubble alone on the right reads as bolted on.
+        ...(at ? { left: at.x, top: at.y } : { insetInlineEnd: "1.5rem", bottom: "1.5rem" }),
         // ~~`linear-gradient(135deg, var(--brand), var(--brand-press))`.~~ Flat `--brand`, the one
         // orange every other control on this app is painted in (owner, 2026-08-30: *"show one
         // orange for all buttons"*). It was the ONLY orange here that was not #f79009 — the
         // gradient ran down to #cc7207 — and a support bubble is not the place to introduce a
-        // second one. See the note below on what this now differs from.
+        // second one.
         backgroundColor: "var(--brand)",
       }}
     >
