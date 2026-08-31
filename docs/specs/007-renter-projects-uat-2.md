@@ -266,6 +266,37 @@ stored gross against ruling R-01b; cycle totals round each component then sum. S
 Run 2026-08-31 · pricing golden set**. Not fixed — pricing moves every surface's numbers and the
 RMAP-AC-216 retirement rides with it, which is the owner's call.
 
+**F4 ✅ The marks are events, not a new period. — VERIFIED LIVE 2026-08-31.**
+Mark a machine arrived on a date outside its period. The bar keeps printing the **agreed** dates and
+the diamond sits at the mark's own date, outside the bar. Before this, marking arrival on the 31st
+made a work order starting on the 1st read *2026-08-31 → 2026-12-31* — a period nobody agreed to.
+Checked on staging with a mark on each row: both bars read `2026-09-01 → 2026-12-31`.
+
+**F5 ✅ Diamonds, two colours, and a legend. — VERIFIED LIVE.**
+Green **Arrived**, orange **Left**, sharp-cornered diamonds rather than dots, and one line under the
+rows: *Arrived · Left · what happened — the bar is what was agreed*. The legend swatches are the
+marks themselves at the same size, so there is nothing to translate.
+
+**F6 ✅ Attach a document is always offered.** ⏮ on a row nobody has awarded → *Attach a document*
+sits with the two marks. An unawarded row files against the **site**, which the dialog states in one
+line. Verified end to end against the deployed backend: presign → PUT → `POST /awards/-/documents`
+→ `201`, and the paper appears in the chart's own documents. No backend deploy needed for this.
+
+**F7 ✅ A paper shows its name, and ⛔ opens.**
+The chart row and the dialog both show one document icon plus the **filename**, and both are
+pressable. Pressing **needs the backend deploy** — there was no download endpoint at all, anywhere:
+the chart publishes `{ id, kind, filename }` and never the S3 key, so every attached paper was
+write-only. `GET /agents/projects/{id}/documents/{docId}/url` is written and uncommitted. Until it
+lands, a press says *Could not open that paper. Try again.* rather than doing nothing — verified.
+
+**F8 ✅ A new paper appears in the open dialog at once.**
+Attach one; it is in the list without closing the dialog. It used to appear only on reopen, because
+the code read React state that the same tick had not updated yet.
+
+**F9 ✅ Mobilization and demobilization on the award. — VERIFIED LIVE.**
+⏮ → *Award* now reads `SUPPLIER · UNITS · RATE · MOBILIZATION · DEMOBILIZATION · PER`, with the
+line's total, using the work order's own arithmetic. The deployed backend stores both.
+
 ## What is blocked, and on what
 
 **Backend — 5 files uncommitted in `Moedatech-App/apps/backend-agents`:**
@@ -274,6 +305,7 @@ RMAP-AC-216 retirement rides with it, which is the owner's call.
 |---|---|
 | `validators/project.schema.ts` | C10, D6 (`labels`, `marks`). **Not** the haulage amounts — those are already deployed and verified. |
 | `handlers/agents/projects/updateProject.ts` | C10, D6 (the merge patches) |
+| `handlers/agents/projects/documents/getDocumentUrl.ts` **(new)** | F7 — opening a paper. Nothing else in the platform presigns a project document on read. |
 | `handlers/agents/projects/getChart.ts` | C3, C13 (terms on the row). **Not B12** — the edit path reads the work-orders endpoint, which already carries terms. |
 | `handlers/agents/work-orders/updateWorkOrder.ts` | E9 (the move) |
 | `services/project-awards.service.ts` | E8 (`moveAwardsTo`) |

@@ -238,6 +238,29 @@ while a blank renders four empty answers under a label saying they were copied. 
 it assert values rather than shape, and were confirmed to fail against the double conversion before
 being committed.
 
+---
+
+## Run · 2026-08-31 · marks, papers and the award dialog · staging, browser
+
+**5 fixes — 1 major, 4 minor. All closed in this session** (`8aee652`, `2d8052d`), except the one
+that needs the backend endpoint.
+
+Every one is the same shape of fault: something was recorded and then could not be seen, or was seen
+and could not be reached.
+
+| | what was wrong | closed by |
+|---|---|---|
+| ~~FIX-PROJ-7~~ | **major.** A mark widened the bar, which then PRINTED the moved dates — marking arrival on the 31st made a work order starting on the 1st read *2026-08-31 → 2026-12-31*, a period nobody agreed to. The plan and what happened are two facts. | `8aee652` |
+| ~~FIX-PROJ-8~~ | Every attached paper was **write-only**, platform-wide. `getChart` publishes `{ id, kind, filename }` and never the key, and nothing presigned one on read. | web `8aee652`; **needs** the new backend endpoint |
+| ~~FIX-PROJ-9~~ | *Attach a document* was gated on an award, though the backend's attach has always read `-` as *file against the site* — so the paper that exists BEFORE anyone is named was the one that could not be filed. | `8aee652` |
+| ~~FIX-PROJ-10~~ | `fetchChart` **dropped the site's own documents**. The backend has sent them since the chart existed; a site-level paper was attachable through the API and listed nowhere. | `8aee652` |
+| ~~FIX-PROJ-11~~ | The open papers dialog showed the old list after an attach. `refreshChart`'s callers read state the same tick had not updated — `setChart` does not change the variable the calling function closed over. | `8aee652` |
+
+**And one that nearly shipped as a leak of the wrong kind:** `chart.documents` is *every* paper on
+the site, awards' papers included, because the backend builds it from `Project.documents` where an
+award holds only ids. An unawarded row would have listed other rows' purchase orders in a dialog
+whose remove button files against `-`. The awards' claimed ids are now subtracted (`2d8052d`).
+
 ## Observed once, not reproduced — no fix entry
 
 **A single `403` on the dashboard's first paint** (PROJ-UI-01, first run). Four subsequent runs were
