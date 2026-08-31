@@ -464,6 +464,13 @@ both exist in reduced form (§T) — this phase gives them recipients and a temp
 
 ## Open items
 
+- **⚠ CONFIRM: does the vendor flag reveal a supplier's contact?** Chosen provisionally on 2026-08-31 —
+  a flagged `platform` row returns the account's email and phone (**SUP-BE-20**). It is the first time
+  the platform gives out a supplier's details without the supplier acting, and the only gate is a
+  checkbox the renter ticks about himself. It ships behind a server-side switch, logged and capped at
+  20 reveals a day per company. **The owner will confirm or change it.** The alternative that costs
+  almost nothing: reveal on a real relationship — a bid, a deal room, an award.
+
 - **Who in a company may write?** The list belongs to the company (decision 1), so any member can currently delete a supplier or rename a group everyone uses. `CompanyHub` already has members and roles. Decide before Phase 1: everyone writes, or owners write and members read. Silence here means whoever builds it guesses, and guessing wrong is a support ticket about a colleague deleting a vendor.
 - **The vendor flag should record who set it and when** — `vendor_registered_by`, `vendor_registered_at`. Two columns, and the first time two people disagree about whether a firm is approved, they settle it in a second rather than an argument.
 - **The screen is bilingual, like every other one.** EN/AR strings in `src/lib/i18n/*`, RTL through logical properties, `DESIGN.md` tokens, no shadows. Stated here because it is not optional and every other plan in this repo says so out loud.

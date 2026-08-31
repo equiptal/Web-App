@@ -80,11 +80,14 @@ The list belongs to the company, so any member can delete a supplier or rename a
 
 Supplier (name + `On Moedatech` badge + contact) · Vendor registration · Contact · Groups · Bids · row actions. Row and name open the profile; the bids cell opens the bids list. Search across name, contact, email and phone. Two pills: **All** and **Registered vendors**.
 
-**Contact shows what the RENTER entered, and nothing else.** A supplier added from the directory has no email or phone here until the renter types one — the cell reads *not set*, with *add* beside it, exactly as an off-platform row with a missing email does. **Their account details are never shown** (SUP-BE-20): the supplier gave Moedatech a number to sign in with, not to every renter who ticks him in a picker.
+**Contact — and one provisional rule.** An `own` row shows what the renter typed, always. A `platform` row shows the supplier's own email and phone **once it is flagged as a registered vendor** — which the picker always does (**SUP-BE-20**, ⚠ provisional, owner to confirm). The cell renders identically either way, so nothing in the UI has to change when the answer settles.
+
+**Whatever the payload does not carry, the cell says so** — *not set · add* — and the renter's own entry always wins over the account's.
 
 **Given/When/Then**
 - Given a row whose supplier has no account / Then no badge is drawn — the absence is the state.
-- Given a platform supplier the renter has entered no contact for / Then the contact cell reads *not set · add*, and no account email or phone appears anywhere on the screen.
+- Given the contact fields come back null / Then the cell reads *not set · add* and nothing is invented to fill it.
+- Given the reveal switch is turned off server-side / Then the screen keeps working and platform rows simply read *not set* — the web must not assume the fields are there.
 - Given the list is empty / Then the empty state offers both ways of adding, and says Moedatech's own directory is not this list.
 
 ### SUP-T14 — Add from Moedatech

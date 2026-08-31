@@ -83,7 +83,8 @@ The list. One row per link, with the roll-up computed here.
   "id": "…", "kind": "platform", "supplierId": "u_882",
   "name": "Zahid Tractor",          // live from the account for platform, stored for own
   "contactName": "Faisal Al-Otaibi",
-  // What the RENTER typed. Null until he does — never the supplier's account details (SUP-BE-20).
+  // `own` rows: what the RENTER typed. `platform` rows: the account's, once vendor_registered
+  // is true — PROVISIONAL, behind a switch, see SUP-BE-20.
   "email": "tenders@zahidtractor.com", "phone": "+966552148890", "crNumber": "1010445521",
   "vendorRegistered": true, "groups": ["Earthmoving","Riyadh"],
   "store": true, "verified": true,
@@ -317,21 +318,43 @@ GET /agents/suppliers?q=zahid&city=Riyadh&cursor=…
 
 ---
 
-## SUP-BE-20 — A supplier's own contact details are never returned **[agents]**
+## SUP-BE-20 — A supplier's contact, revealed on the vendor flag **⚠ PROVISIONAL** **[agents]**
 
-**The rule:** `email` and `phone` on a link row are what the RENTER typed. They are never filled from the supplier's account, in any read, for any row.
+> **NOT CONFIRMED. The owner chose this on 2026-08-31 and said he will confirm it later.**
+> **Build it behind a server-side switch** so the answer can change without a migration or a redeploy
+> of the web. Do not treat it as settled, and do not let a second feature start depending on it.
 
-A `platform` row a renter added from the directory therefore comes back with `email: null, phone: null` until he enters something himself — and the screen shows *not set*, not the supplier's account details.
+**The rule as chosen:** a `platform` link row returns the supplier's account `email` and `phone` once
+`vendor_registered` is true. The picker only ever adds as a registered vendor, so in practice this is
+every platform row a renter creates.
 
-**Why this is a rule and not a preference.** The supplier gave Moedatech a phone to sign in with. He did not give it to every renter who ticks him in a picker. Serving it would turn the directory into a contact-harvesting tool, and it would do so silently, because the renter would never know the number was not his own note.
+`own` rows are unaffected: their contact is what the renter typed, as it always was.
 
-Consequences, all intended:
+**What this is, stated plainly, because it will be asked about later.** Moedatech publishes no supplier
+contact anywhere today — `StoreDetail` carries name, description, logo, city, verified and equipment,
+and nothing else. The contact channel is a bid, which the supplier chose to send and which is gated by
+`canAccessRequest`. **This is the first place the platform hands over a supplier's details without the
+supplier doing anything**, and the only gate is a checkbox the renter ticks about himself.
 
-- A platform supplier with no renter-entered email **cannot be sent a shared request**. That is correct: the renter has no address for them, and the app is not going to supply one behind their back.
-- The **bid** is where a real contact appears — a bid the supplier chose to send carries what he chose to put on it, and it is already gated by `canAccessRequest`.
-- Matching (SUP-BE-9, BE-11) still uses the account's phone **server-side**. It compares; it never returns.
+**So it ships with three guards, and they are not optional:**
 
-**Done when:** a freshly linked platform supplier returns null contact fields, and no read anywhere in this feature can be made to return a supplier's account email or phone.
+1. **A reveal is a logged event** — company, user, supplier, timestamp. If this is ever questioned, the
+   answer has to be a record and not a shrug.
+2. **A daily ceiling per company** on newly revealed platform contacts. Start at 20. It does not
+   inconvenience a renter registering the firms he works with; it does stop a directory being drained.
+3. **A server-side switch** — one setting flips the whole behaviour back to renter-entered-only, which
+   is what the alternatives below need.
+
+**The alternatives, kept here because the decision is open:**
+
+- **On a real relationship** — reveal once they have bid, opened a deal room, or been awarded. Nothing
+  new is exposed: they gave the details in that context. Recommended, and in practice near-identical,
+  because a registered vendor you have never traded with is rare.
+- **Renter-entered only** — the original rule. Costs nothing to the share flow, because a supplier with
+  an account receives requests in the app and does not need to be emailed a link.
+
+**Done when:** the reveal is behind the switch, every reveal is logged, the ceiling is enforced, and
+turning the switch off returns null contact fields without any other change.
 
 ---
 
