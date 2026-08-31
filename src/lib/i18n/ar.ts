@@ -2026,5 +2026,6 @@ export const ar: Dictionary = {
     importedMixed: "{n} مستورد · {merged} موجود مسبقاً · {rejected} مرفوض",
     importFailed: "لم يتم الاستيراد. لم تتم إضافة شيء.",
     importSuppliers: "استيراد قائمة",
+    xlsxNotRead: "لا تُقرأ ملفات إكسل مباشرة. افتح الملف، وحدّد الصفوف مع صف العناوين، والصقها أعلاه — أو احفظه بصيغة CSV.",
   },
 };

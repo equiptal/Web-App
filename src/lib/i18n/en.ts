@@ -2323,6 +2323,7 @@ export const en = {
     importedMixed: "{n} imported · {merged} already in your list · {rejected} refused",
     importFailed: "That did not import. Nothing was added.",
     importSuppliers: "Import a list",
+    xlsxNotRead: "Excel files are not read directly. Open it, select the rows including the header, and paste them above — or save it as CSV.",
   },
 };
 

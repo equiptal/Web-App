@@ -77,6 +77,16 @@ export function ImportSuppliersDialog({ open, onClose, onDone }: { open: boolean
   };
 
   const onFile = async (file: File) => {
+    /**
+     * An .xlsx is a ZIP container, not text — reading it as text produces binary noise and the
+     * parser would answer "we could not read that", which blames the renter for choosing the file
+     * he actually has. So it is named, and answered with the route that works: the rows are in the
+     * spreadsheet he has open, and copying them is faster than saving a second copy of the file.
+     */
+    if (/\.(xlsx|xls|xlsm|numbers|ods)$/i.test(file.name)) {
+      setError(c.xlsxNotRead);
+      return;
+    }
     if (file.size > 2 * 1024 * 1024) {
       setError(c.importTooBig);
       return;
