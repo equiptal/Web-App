@@ -367,3 +367,28 @@ describe("every answer the fast lane gives", () => {
     expect(quickItemsToDraft(bad as never, null, "x").items[0].equipmentYear).toBeNull();
   });
 });
+
+describe("operator_included arrives in two shapes", () => {
+  /* ⚠️ `agent.ts` types it `boolean | null`, and staging has returned BOTH `true` and the string
+     `"YES"` for the same question on the same endpoint. The reader checked only `=== "YES"`, so a
+     boolean read as *not stated* — the agent got «with operator» right and this dropped it. */
+  const withOperator = (v: unknown) => ({
+    tier: 1 as const,
+    line_items: [{ subtype: "Crawler Excavator", capacity: "30 ton", quantity: 1, operator_included: v }],
+  });
+
+  it("reads the boolean", () => {
+    expect(quickItemsToDraft(withOperator(true) as never, null, "x").items[0].operatorNeeded).toBe("yes");
+    expect(quickItemsToDraft(withOperator(false) as never, null, "x").items[0].operatorNeeded).toBe("no");
+  });
+
+  it("reads the string", () => {
+    expect(quickItemsToDraft(withOperator("YES") as never, null, "x").items[0].operatorNeeded).toBe("yes");
+    expect(quickItemsToDraft(withOperator("no") as never, null, "x").items[0].operatorNeeded).toBe("no");
+  });
+
+  it("reads an absent one as not stated, so the project can answer it", () => {
+    expect(quickItemsToDraft(withOperator(null) as never, null, "x").items[0].operatorNeeded ?? null).toBeNull();
+    expect(quickItemsToDraft(withOperator(undefined) as never, null, "x").items[0].operatorNeeded ?? null).toBeNull();
+  });
+});

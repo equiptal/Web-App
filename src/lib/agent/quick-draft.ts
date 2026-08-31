@@ -40,6 +40,26 @@ function resolve(tree: Taxonomy | null | undefined, subtype: string | null, capa
  * things downstream: `null` lets a project or a template fill the field, and `[]` is the renter
  * saying *no certificate*.
  */
+/**
+ * Does this machine need an operator? Accepts BOTH shapes the wire uses.
+ *
+ * ⚠️ `agent.ts` types it `boolean | null`, and staging has returned both `true` and the string
+ * `"YES"` for the same question on the same endpoint. A reader that checked only `=== "YES"` — which
+ * is what this was — silently answered *not stated* for the boolean, so «with operator» was read
+ * correctly by the agent and dropped here on the runs that used a boolean. Caught by reading the
+ * live payload rather than the type.
+ */
+function operatorOf(raw: unknown): "yes" | "no" | null {
+  if (raw === true) return "yes";
+  if (raw === false) return "no";
+  if (typeof raw === "string") {
+    const v = raw.trim().toUpperCase();
+    if (v === "YES" || v === "TRUE") return "yes";
+    if (v === "NO" || v === "FALSE") return "no";
+  }
+  return null;
+}
+
 /** `true` = the renter, `false` = the supplier, absent = not stated. The full path's own fold. */
 function party(byRentee: unknown): "me" | "supplier" | null {
   return byRentee == null ? null : byRentee === true ? "me" : "supplier";
@@ -152,7 +172,7 @@ export function quickItemsToDraft(
 
          The rest of the payload stays dropped on purpose: the five `*_match` verdicts, `verdict`,
          the three Arabic names and the duplicate `category`. The app reads none of them. */
-      operatorNeeded: r.operator_included === "YES" ? "yes" : r.operator_included === "NO" ? "no" : null,
+      operatorNeeded: operatorOf(r.operator_included),
       /* `by_rentee` is a boolean about WHO, and this app stores the party. `true` is the renter, so
          "delivery on the supplier" arrives as false and becomes "supplier" — the same fold
          `machineTermsOfRequestItem` does on the full path, not a second opinion about it. */
