@@ -272,9 +272,30 @@ function SitePanel({
               </span>
             }
           >
+            {/* An underlined link to the real place (owner, 2026-08-31).
+                A site's address that cannot be pressed is an address a renter retypes into another
+                tab. And this one can be a PIN rather than a search: the project holds `lat`/`lng`
+                from the map the renter dropped it on, so the link opens the exact point they chose
+                — unlike the request details, whose payload carries no coordinates at all and has to
+                search the address instead. */}
             <span className="flex min-w-0 items-center gap-1.5">
               <Icon name="place" size={14} className="flex-none text-muted" />
-              <span className="truncate font-normal">{project.location.label}</span>
+              {project.location.label ? (
+                <a
+                  href={
+                    typeof project.location.lat === "number" && typeof project.location.lng === "number"
+                      ? `https://www.google.com/maps?q=${project.location.lat},${project.location.lng}`
+                      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(project.location.label)}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="truncate font-normal underline decoration-border underline-offset-2 transition hover:text-brand hover:decoration-brand"
+                >
+                  {project.location.label}
+                </a>
+              ) : (
+                <span className="truncate font-normal">{"—"}</span>
+              )}
             </span>
           </Cell>
 
