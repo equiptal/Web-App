@@ -69,21 +69,22 @@ function open(ui: React.ReactElement): string[] {
 }
 
 describe("what the menu offers", () => {
-  it("a request nobody has awarded: award and the bids, and no papers", () => {
-    /* The CALLER decides whether a mark is possible, and for an unawarded request it is not: nobody
-       has been given the job, so there is no arrival to record. The surface passes no `onMark` for
-       that case, which is why this omits it rather than passing `all()`. */
-    const noMark = { ...all(), onMark: undefined };
-    const items = open(<RowMenu group={group("request")} award={null} actions={noMark} />);
+  it("a request nobody has awarded: award, the bids, AND the marks", () => {
+    /* Marks no longer wait on an award (owner, 2026-08-31: *"I don't want the user to follow a
+       specific sequence"*). A machine arriving is a fact about the machine; who supplies it is a
+       different fact, recorded at a different time and sometimes never. The row keeps its own mark,
+       so there is nothing to award first and no invented supplier. */
+    const items = open(<RowMenu group={group("request")} award={null} actions={all()} />);
 
     expect(items).toContain("Award");
     expect(items).toContain("Review the bids");
-    expect(items.join("|")).not.toMatch(/mobilized/i);
-    // No award means no id to file a paper under.
+    expect(items).toContain("Mark mobilized");
+    expect(items).toContain("Mark demobilized");
+    // Papers still need an award: there is no id to file one under until one exists.
     expect(items).not.toContain("Attach a document");
   });
 
-  it("a work-order machine nobody supplies: the marks, because it is the renter's own", () => {
+  it("a work-order machine nobody supplies: the marks too", () => {
     /* Owner, 2026-08-31: *"I want them allowed even if no supplier is mentioned, so they are always
        visible."* A work order with no supplier line IS the renter's own fleet, and their own
        excavator still arrives on a Tuesday — hiding the mark behind an award made the one kind of

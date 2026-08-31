@@ -20,7 +20,7 @@ const p = (over: Partial<ProjectSummary> = {}): ProjectSummary => ({
     paymentTerms: null,
   },
   version: 1,
-  awards: { requests: {}, workOrderItems: {}, labels: {} },
+  awards: { requests: {}, workOrderItems: {}, labels: {}, marks: {} },
   ownerUserId: null,
   ownerName: null,
   createdAt: null,

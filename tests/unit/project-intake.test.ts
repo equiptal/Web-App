@@ -26,7 +26,7 @@ const QIDDIYA: ProjectSummary = {
     paymentTerms: "net-30",
   },
   version: 4,
-  awards: { requests: {}, workOrderItems: {}, labels: {} },
+  awards: { requests: {}, workOrderItems: {}, labels: {}, marks: {} },
   ownerUserId: "46",
   ownerName: "Ahmed",
   createdAt: null,

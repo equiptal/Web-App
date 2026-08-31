@@ -863,6 +863,29 @@ export async function renameRequestRow(
   });
 }
 
+/**
+ * Record that a machine arrived, or left — without needing an award to hang it on.
+ *
+ * A MERGE on the backend, per row and per field: sending only `mobilizedAt` cannot clear a
+ * `demobilizedAt` recorded an hour ago, and two renters marking two different machines cannot
+ * overwrite one another.
+ *
+ * Awards keep their own marks, which are finer: two units from one vendor can arrive while a third
+ * from another has not. This is the row's own answer, for the case where nobody has been awarded
+ * anything yet.
+ */
+export async function markRow(
+  projectId: string,
+  expectedVersion: number,
+  rowId: string,
+  patch: { mobilizedAt?: string | null; demobilizedAt?: string | null },
+): Promise<void> {
+  await projectFetch(projectPath(projectId), {
+    method: "PATCH",
+    body: { expectedVersion, marks: { [rowId]: patch } },
+  });
+}
+
 export async function deleteProject(id: string): Promise<void> {
   await projectFetch(projectPath(id), { method: "DELETE" });
 }

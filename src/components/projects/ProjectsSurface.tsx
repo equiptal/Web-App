@@ -20,6 +20,7 @@ import {
   deleteProject,
   fetchChart,
   saveAward,
+  markRow,
   markAward,
   deleteAward,
   saveWorkOrder,
@@ -387,21 +388,11 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   }
 
   /**
-   * Mark a machine as arrived or gone, whether or not a supplier is named.
-   *
-   * A mark lives on an award, and an award needs a supplier. A work order with no supplier line is
-   * the renter's own fleet, so the first mark on one records them as its supplier — which is what
-   * that row already means — and then marks it. From the renter's side it is one press.
-   *
-   * The whole quantity, because own fleet is not a split: if they later award part of it to a
-   * vendor, that is a change to the award they can make in the dialog.
-   */
-  /**
    * The red half of the move dialog.
    *
    * A REQUEST is unfiled: it keeps every value and can be filed again, which is why this is the same
    * call as filing it to nowhere. A WORK ORDER is deleted, because the site is the only place it
-   * exists — there is no "unfiled work order" to become.
+   * exists — there is no "unfiled work order" for it to become.
    */
   async function removeRow() {
     if (!filing) return;
@@ -413,8 +404,19 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     await file(null);
   }
 
-  async function markOrOwn(
-    group: ChartGroup,
+  /**
+   * Record that a machine arrived, or left. No award needed, and no order to follow.
+   *
+   * ⚠️ **Two places a mark can live, and which one is not a preference.** An AWARD's mark is finer
+   * and deliberate (PROJ-AC-13): two units from one vendor can arrive while a third from another has
+   * not, so when the renter is looking at an awarded row, that row's award is what they mean. A row
+   * with nobody awarded has no allocation to speak of, so the mark belongs to the machine.
+   *
+   * ⚠️ **This replaced an invention.** The first version created an award named *Own fleet* so there
+   * would be somewhere to write, which put words in the renter's mouth: it said a supplier had been
+   * chosen when none had. The row's own mark says only what happened.
+   */
+  async function markAnything(
     item: ChartItem,
     award: Award | null,
     which: "mobilizedAt" | "demobilizedAt",
@@ -429,16 +431,8 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     setSaving(true);
     setNotice(null);
     try {
-      const made = await withFreshVersion(selected, version, (v) =>
-        saveAward(selected, v, {
-          workOrderItemId: item.id,
-          supplierName: t.projects.chart.ownFleet,
-          units: item.quantity,
-          rentalBasis: null,
-        }),
-      );
-      if (made.award) await mark(made.award.id, which, value);
-      else await refreshChart();
+      await withFreshVersion(selected, version, (v) => markRow(selected, v, item.id, { [which]: value }));
+      await refreshChart();
     } catch {
       setNotice(t.projects.chart.markFailed);
     } finally {
@@ -816,10 +810,9 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
                      Only ever on a WORK ORDER. A marketplace request with no award has not been
                      given to anyone yet, and inventing the renter as its supplier would say the
                      opposite of what is true. */
-                  onMark:
-                    a || group.kind === "work_order"
-                      ? (which, value) => void markOrOwn(group, item, a, which, value)
-                      : undefined,
+                  /* ALWAYS, for both kinds. A mark is a fact about the machine, and it no longer
+                     waits on an award to have somewhere to live. */
+                  onMark: (which, value) => void markAnything(item, a, which, value),
                   // Un-awarding is reached through Change the award's own confirm, so the menu
                   // does not offer two doors to the same destructive act.
                   onOpenRequest: group.kind === "request" ? () => router.push(requestUrl(group.id)) : undefined,

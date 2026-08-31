@@ -247,3 +247,38 @@ describe("the span a site actually runs", () => {
     expect(s.end.shown).toBeNull();
   });
 });
+
+describe("marks that do not wait on an award", () => {
+  /* Owner, 2026-08-31: *"Can the mark as mobilized or demobilized be independent of awarding to the
+     supplier? I don't want the user to follow a specific sequence."*
+
+     A machine arriving on site is a fact about the machine. Who supplies it is a different fact,
+     recorded at a different time and sometimes never. The first version created an award named *Own
+     fleet* so there would be somewhere to write — which said a supplier had been chosen when none
+     had. A row-level mark says only what happened. */
+
+  it("reads a row's own marks out of the blob", () => {
+    const book = mapAwardBook({ marks: { r1: { mobilizedAt: "2026-09-04", demobilizedAt: null } } });
+    expect(book.marks.r1).toEqual({ mobilizedAt: "2026-09-04", demobilizedAt: null });
+  });
+
+  it("keeps a row that has only left, not arrived", () => {
+    // Nothing orders these two. A renter may record the departure of something they never logged in.
+    const book = mapAwardBook({ marks: { r1: { demobilizedAt: "2026-12-01" } } });
+    expect(book.marks.r1).toEqual({ mobilizedAt: null, demobilizedAt: "2026-12-01" });
+  });
+
+  it("drops a row with neither date rather than keeping an empty one", () => {
+    // "Never marked" has to read one way only, or a caller has to test for two shapes of nothing.
+    expect(mapAwardBook({ marks: { r1: {}, r2: { mobilizedAt: null } } }).marks).toEqual({});
+  });
+
+  it("drops a date that is not a date", () => {
+    expect(mapAwardBook({ marks: { r1: { mobilizedAt: 20260904 } } }).marks).toEqual({});
+  });
+
+  it("is empty on a blob that has never held one", () => {
+    expect(mapAwardBook({ requests: {}, workOrderItems: {} }).marks).toEqual({});
+    expect(mapAwardBook(null).marks).toEqual({});
+  });
+});

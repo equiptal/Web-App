@@ -122,9 +122,21 @@ export interface AwardBook {
    * read on the board it was typed on.
    */
   labels: Record<string, string>;
+  /**
+   * Arrived and left, per MACHINE rather than per award.
+   *
+   * A machine arriving on site is a fact about the machine; who supplies it is a different fact,
+   * recorded at a different time and sometimes never. Marks therefore do not wait on an award
+   * (owner, 2026-08-31: *"I don't want the user to follow a specific sequence"*).
+   *
+   * ⚠️ Does NOT replace `Award.mobilizedAt`, which is deliberate and finer (PROJ-AC-13): two units
+   * from one vendor can arrive while a third from another has not. A row WITH awards is read from
+   * its awards; a row without is read from here.
+   */
+  marks: Record<string, { mobilizedAt: string | null; demobilizedAt: string | null }>;
 }
 
-export const EMPTY_AWARD_BOOK: AwardBook = { requests: {}, workOrderItems: {}, labels: {} };
+export const EMPTY_AWARD_BOOK: AwardBook = { requests: {}, workOrderItems: {}, labels: {}, marks: {} };
 
 /* ----------------------------- Reading the blob ----------------------------- */
 
@@ -200,7 +212,19 @@ export function mapAwardBook(raw: unknown): AwardBook {
     }
   }
 
-  return { requests: read(src.requests), workOrderItems: read(src.workOrderItems), labels };
+  /* Marks, read as defensively as the awards: a date that is not a string is dropped rather than
+     rendered, and a row with neither date is simply absent. */
+  const marks: AwardBook["marks"] = {};
+  if (isRecord(src.marks)) {
+    for (const [rowId, v] of Object.entries(src.marks)) {
+      if (!isRecord(v)) continue;
+      const mob = typeof v.mobilizedAt === "string" ? v.mobilizedAt : null;
+      const demob = typeof v.demobilizedAt === "string" ? v.demobilizedAt : null;
+      if (mob || demob) marks[rowId] = { mobilizedAt: mob, demobilizedAt: demob };
+    }
+  }
+
+  return { requests: read(src.requests), workOrderItems: read(src.workOrderItems), labels, marks };
 }
 
 /** Every award under a project, in no particular order — the roll-up and the "×2 of 3" counts. */
