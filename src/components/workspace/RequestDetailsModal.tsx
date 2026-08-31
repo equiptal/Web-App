@@ -199,6 +199,7 @@ export function RequestDetailsModal({
         }}
         shareUrl={shareUrl}
         renterName={link?.renterName}
+        requestCode={group.groupRef ?? subject?.displayId ?? null}
         deadline={deadline}
         onSaveDeadline={(iso) => {
           setDeadline(iso);
@@ -465,6 +466,7 @@ export function RequestDetailsModal({
         onClose={() => setShareOpen(false)}
         shareUrl={shareUrl}
         renterName={link?.renterName}
+        requestCode={group.groupRef ?? subject?.displayId ?? null}
         deadline={deadline}
         onSaveDeadline={(iso) => {
           setDeadline(iso);

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 import { copyBidLink } from "@/lib/bidCardHtml";
+import { ShareToSuppliers } from "./ShareToSuppliers";
 import { ACTIONS, btn, cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 
@@ -22,6 +23,7 @@ export function ShareForBidsSheet({
   shareUrl,
   formUrl,
   renterName,
+  requestCode,
   deadline,
   onSaveDeadline,
   logoUrl,
@@ -35,6 +37,8 @@ export function ShareForBidsSheet({
   /** Optional read-only preview of the supplier bid form. */
   formUrl?: string;
   renterName?: string | null;
+  /** `EXC-170845` — carried into the e-mail subject so an operator can file the reply. */
+  requestCode?: string | null;
   /** Current deadline ISO (or null = none). */
   deadline: string | null;
   /** Persist a new deadline (ISO) or clear it (null). */
@@ -171,6 +175,14 @@ export function ShareForBidsSheet({
                 <Icon name={copied ? "check" : "content_copy"} size={16} />{copied ? L("Copied", "تم النسخ") : L("Copy", "نسخ")}
               </button>
             </div>
+          </div>
+
+          {/* SUP-T41 — the recipients he already keeps. Above the raw channels because it is the
+              answer to "who do I send this to", and the channel row is the answer to "how", which is
+              only worth asking once he knows. */}
+          <div>
+            <div className={lbl}>{L("Send it to suppliers you keep", "أرسِله إلى مورّديك")}</div>
+            <ShareToSuppliers shareUrl={shareUrl} renterName={renterName} requestCode={requestCode} ar={ar} L={L} />
           </div>
 
           {/* channels */}

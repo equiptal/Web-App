@@ -182,6 +182,7 @@ export function Confirmation() {
         shareUrl={shareUrl}
         formUrl={formUrl}
         renterName={renterName}
+        requestCode={refCode || null}
         deadline={deadline}
         onSaveDeadline={saveDeadline}
         logoUrl={logo}
