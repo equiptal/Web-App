@@ -11,6 +11,7 @@ import {
   bidCount,
   canBeEmailed,
   groupsOf,
+  isOnMoedatech,
   supplierTier,
   type SupplierProfile,
 } from "@/lib/contract/renter-suppliers";
@@ -36,10 +37,13 @@ export function SupplierProfileDialog({
   id,
   onClose,
   onOpenBids,
+  onInvite,
 }: {
   id: string | null;
   onClose: () => void;
   onOpenBids: (id: string) => void;
+  /** Absent where there is nothing to invite from — the button is then not drawn. */
+  onInvite?: () => void;
 }) {
   const t = useT();
   const c = t.suppliers;
@@ -65,7 +69,16 @@ export function SupplierProfileDialog({
       title={p?.name ?? "…"}
       subtitle={p?.contactName || c.noContactName}
       footer={
-        <div className="flex w-full items-center justify-end">
+        <div className="flex w-full items-center justify-end gap-2">
+          {/* The prototype puts *Invite to Moedatech* here as well as on the row, and it is right to:
+              a renter reading somebody's whole history is exactly where he decides they are worth
+              having in the app. Off-platform only — a firm with an account has nothing to join. */}
+          {p && onInvite && !isOnMoedatech(p) && (
+            <button type="button" onClick={onInvite} className={cx(btn("secondary", "md"), "me-auto")}>
+              <Icon name="person_add" size={15} />
+              {c.inviteToApp}
+            </button>
+          )}
           <button type="button" onClick={onClose} className={btn("primary", "md")}>
             {c.close}
           </button>

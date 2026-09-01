@@ -402,6 +402,11 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
       <SupplierProfileDialog
         id={profileId}
         onClose={() => setProfileId(null)}
+        onInvite={() => {
+          const row = (rows ?? []).find((x) => x.id === profileId);
+          setProfileId(null);
+          if (row) setInviting(row);
+        }}
         onOpenBids={(x) => {
           setProfileId(null);
           setBidsId(x);
