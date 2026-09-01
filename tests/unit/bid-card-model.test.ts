@@ -153,12 +153,12 @@ describe("bidCardModel", () => {
     const m = bidCardModel(preview, copy, "en", form({ status: "closed", closedReason: "deadline" }));
 
     expect(m.cta).toBe("No longer accepting bids");
-    expect(m.closing).toBe("Closed 21 Aug 2026 — no longer accepting bids");
+    expect(m.closing).toBe("Closed 21 Aug 2026. No longer accepting bids");
     // The request stays named. The backend's own string replaces the whole description, so a link
     // forwarded a week later loses the city and the dates — this is the fault being fixed.
     expect(m.where).toBe("Riyadh · 1 month · 18 Aug → 17 Sep 2026");
     expect(bidCardDescription(m)).toContain("Riyadh");
-    expect(bidCardDescription(m)).toContain("no longer accepting bids");
+    expect(bidCardDescription(m)).toContain("No longer accepting bids");
   });
 
   it("Given no form payload, When built, Then it falls back to splitting the preview strings", () => {

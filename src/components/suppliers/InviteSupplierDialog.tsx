@@ -42,13 +42,15 @@ import { bidCount, type RenterSupplier } from "@/lib/contract/renter-suppliers";
  * words — the same trick the bid link already uses, and for the same reason: what we cannot send, we
  * can hand over.
  *
- * ── Recorded, for the two channels the record has a word for ────────────────────────────────────
+ * ── All four are recorded ───────────────────────────────────────────────────────────────────────
  *
- * SUP-BE-15 takes `channel: "email" | "whatsapp"`, so those two land on the supplier's history the
- * moment the client opens. SMS and the clipboard are sent the same message and are NOT recorded —
- * the enum has no value for them, and writing them as "email" would put a lie in an audit row. The
- * dialog says which of the four leave a trace rather than letting a renter discover it from a
- * profile that is missing an entry he remembers making.
+ * The enum was `email | whatsapp` when this was built, so SMS and the clipboard were sent and not
+ * recorded, and the dialog said so. The backend widened it: verified against the deployed stage on
+ * 2026-09-02, all four are accepted and `other` is refused, which is the right shape — `copy` means
+ * *the renter took the words somewhere we cannot see*, and that is a different fact from a channel
+ * we know.
+ *
+ * So every press lands on the supplier's history the moment the client opens.
  */
 export function InviteSupplierDialog({
   supplier,
@@ -120,6 +122,7 @@ export function InviteSupplierDialog({
       icon: "sms",
       label: c.inviteChannelSms,
       go: () => {
+        void recordSupplierInvite([supplier.id], "sms");
         window.location.href = `sms:${phone}?&body=${enc}`;
       },
       blocked: phone ? null : c.inviteNoPhone,
@@ -131,6 +134,7 @@ export function InviteSupplierDialog({
       // Always available: a renter who talks to this supplier somewhere we do not model still gets
       // the words.
       go: () => {
+        void recordSupplierInvite([supplier.id], "copy");
         void copyInvite(message, {
           renterName,
           supplierName: name,

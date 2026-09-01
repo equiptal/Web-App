@@ -172,6 +172,9 @@ const ITEM: RequestItem = {
   maxEquipmentAge: null,
   dieselIncluded: true,
   fatRequired: true,
+  fatFood: true,
+  fatAccommodationTransport: false,
+  workType: "Tower lift",
   safetyCertifications: ["SCE", "OSHA"],
   additionalNotes: "Needs a hydraulic breaker attachment.",
 };

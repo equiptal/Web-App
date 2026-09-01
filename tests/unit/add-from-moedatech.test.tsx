@@ -17,7 +17,7 @@ import { AddFromMoedatechDialog } from "@/components/suppliers/AddFromMoedatechD
  */
 
 const api = vi.hoisted(() => ({
-  found: [] as { supplierId: string; name: string; contactName: string | null }[],
+  found: [] as { supplierId: string; name: string; contactName: string | null; city: string | null; verified: boolean; hasStore: boolean }[],
   linked: [] as unknown[][],
 }));
 

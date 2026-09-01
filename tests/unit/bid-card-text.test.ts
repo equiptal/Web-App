@@ -34,7 +34,8 @@ describe("bidCardText", () => {
     const out = bidCardText(model(), URL_, { renterName: "Shibh Al Jazira" });
 
     expect(out).toContain("Shibh Al Jazira invites you to bid");
-    expect(out).toContain("EXC-170845 — Tower light 9m · with operator ×6");
+    // A colon, not an em dash: no em dash in copy a renter reads.
+    expect(out).toContain("EXC-170845: Tower light 9m · with operator ×6");
     expect(out).toContain("Riyadh · 1 month · 18 Aug → 17 Sep 2026");
     expect(out).toContain("Mobilisation: Supplier");
     expect(out).toContain("Fuel: Renter · diesel");

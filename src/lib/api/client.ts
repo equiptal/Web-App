@@ -1652,6 +1652,15 @@ export async function listSupplierSuggestions(): Promise<SupplierSuggestion[]> {
 }
 
 /**
+ * The channels the record has a word for.
+ *
+ * `copy` is its own value rather than folded into `other`: it means *the renter took the words and
+ * sent them somewhere we cannot see*, which is a different fact from a channel we know. Verified
+ * against the deployed stage on 2026-09-02 — all four are accepted, `other` is refused.
+ */
+export type SendChannel = "email" | "whatsapp" | "sms" | "copy";
+
+/**
  * Record who a request was declared sent to (SUP-T41), or who was invited (SUP-T42).
  *
  * **Declared, not observed.** The renter's own mail client sends the message, so this is the list he
@@ -1664,7 +1673,7 @@ export async function listSupplierSuggestions(): Promise<SupplierSuggestion[]> {
 export async function recordRequestShare(
   requestId: string,
   renterSupplierIds: string[],
-  channel: "email" | "whatsapp",
+  channel: SendChannel,
 ): Promise<void> {
   if (!renterSupplierIds.length) return;
   try {
@@ -1680,7 +1689,7 @@ export async function recordRequestShare(
 /** The same record with no request behind it. Same rule: an audit row never fails the act. */
 export async function recordSupplierInvite(
   renterSupplierIds: string[],
-  channel: "email" | "whatsapp",
+  channel: SendChannel,
 ): Promise<void> {
   if (!renterSupplierIds.length) return;
   try {

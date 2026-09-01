@@ -17,25 +17,38 @@ import { makeAgentDraft, makeItem, renderCanvas } from "../setup/canvas";
 const rail = (opts: Parameters<typeof renderCanvas>[1] = {}) =>
   renderCanvas((store) => <OperatorRail item={store.state.draft!.items[0]} />, opts);
 
+/* ── Opening is not answering (owner, 2026-09-01) ────────────────────────────────────────────────
+   One control used to do both: the header toggle wrote `operatorNeeded` AND showed the panel, and
+   the collapsed strip set «yes» on the press that opened it — so looking at the rail ordered an
+   operator, and suppliers price one. `expanded` is local now; the ANSWER is the question at the top
+   of the panel, and nothing else writes it. */
 describe("turning the operator off (MREQ-AC-25)", () => {
-  it("collapses to the strip and records 'no'", async () => {
+  it("records 'no' from the question, and keeps the panel open to say so", async () => {
     const handle = await rail();
     expect(screen.getByText("FOOD")).toBeTruthy();
 
-    await handle.run(() => {
-      // The header toggle is the only checkbox-like control at the top of the rail.
-      screen.getByText("The operator").closest("div")!.parentElement!.querySelector("button")!.click();
-    });
+    await handle.run(() => screen.getByRole("button", { name: "No operator" }).click());
 
     expect(handle.store().state.draft!.items[0].operatorNeeded).toBe("no");
+    // The details go — there is no operator to feed or house — but the question stays answerable.
     expect(screen.queryByText("FOOD")).toBeNull();
-    // Collapsed, not gone — a renter who turned it off by accident has to be able to find it.
-    expect(screen.getByLabelText("The operator")).toBeTruthy();
+    expect(screen.getByText("Do you want an operator with this equipment?")).toBeTruthy();
   });
 
-  it("reopens from the collapsed strip", async () => {
+  it("closes to the strip, and reopening ANSWERS NOTHING", async () => {
     const handle = await rail({ draft: makeAgentDraft({ items: [makeItem({ operatorNeeded: "no" })] }) });
-    await handle.run(() => screen.getByLabelText("The operator").click());
+
+    // An item that says «no» opens closed: the strip is what is on screen.
+    const strip = screen.getByLabelText("The operator");
+    await handle.run(() => strip.click());
+
+    // Opened — and the answer is untouched, which is the whole point of the split.
+    expect(handle.store().state.draft!.items[0].operatorNeeded).toBe("no");
+    expect(screen.getByText("Do you want an operator with this equipment?")).toBeTruthy();
+    expect(screen.queryByText("FOOD")).toBeNull();
+
+    // Saying yes is a separate, deliberate press — and only then do the details appear.
+    await handle.run(() => screen.getByRole("button", { name: "Include an operator" }).click());
     expect(handle.store().state.draft!.items[0].operatorNeeded).toBe("yes");
     expect(screen.getByText("FOOD")).toBeTruthy();
   });

@@ -262,7 +262,7 @@ export function ShareToSuppliers({
           rows={2}
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder={L("Optional — added above the request details.", "اختياري — يُضاف فوق تفاصيل الطلب.")}
+          placeholder={L("Optional. Added above the request details.", "اختياري. يُضاف فوق تفاصيل الطلب.")}
           className="rounded-sm border border-border bg-surface p-2.5 text-meta text-navy outline-none focus:border-brand"
         />
       </label>
@@ -287,8 +287,8 @@ export function ShareToSuppliers({
         <p className="flex items-start gap-2 rounded-sm bg-surface2 px-3 py-2 text-meta text-muted-dark">
           <Icon name="info" size={15} className="flex-none" />
           {L(
-            `${unreachable.length} of the ones you picked have no e-mail — add one on the row, or they are left out.`,
-            `${unreachable.length} ممن اخترتهم بلا بريد — أضِف بريدًا على السطر، وإلا فلن يُرسل إليهم.`,
+            `${unreachable.length} of the ones you picked have no e-mail. Add one on the row, or they are left out.`,
+            `${unreachable.length} ممن اخترتهم بلا بريد. أضِف بريدًا على السطر، وإلا فلن يُرسل إليهم.`,
           )}
         </p>
       )}
@@ -297,8 +297,8 @@ export function ShareToSuppliers({
         <p className="flex items-start gap-2 rounded-sm bg-surface2 px-3 py-2 text-meta text-muted-dark">
           <Icon name="info" size={15} className="flex-none" />
           {L(
-            "Over 25 recipients — most mail clients cut the list. Copy the addresses and paste them into BCC yourself.",
-            "أكثر من 25 مستلمًا — معظم برامج البريد تقتطع القائمة. انسخ العناوين والصقها في حقل نسخة مخفية.",
+            "Over 25 recipients, and most mail clients cut the list. Copy the addresses and paste them into BCC yourself.",
+            "أكثر من 25 مستلمًا، ومعظم برامج البريد تقتطع القائمة. انسخ العناوين والصقها في حقل نسخة مخفية.",
           )}
         </p>
       )}

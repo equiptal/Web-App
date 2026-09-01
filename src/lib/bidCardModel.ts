@@ -43,7 +43,7 @@ export interface BidCardModel {
   where: string | null;
   /** Mobilisation, demobilisation, food, accommodation & transport, fuel. Only what is set. */
   terms: BidCardTerm[];
-  /** `Bidding closes 21 Aug 2026` while open, `Closed 21 Aug 2026 — no longer accepting bids` after. */
+  /** `Bidding closes 21 Aug 2026` while open, `Closed 21 Aug 2026. No longer accepting bids` after. */
   closing: string | null;
   accepting: boolean;
   /** The one line the image asks for: bid, or do not bother. */
@@ -55,7 +55,7 @@ const COPY = {
     cta: "Open the link to submit your bid →",
     ctaClosed: "No longer accepting bids",
     closes: (on: string) => `Bidding closes ${on}`,
-    closed: (on: string) => `Closed ${on} — no longer accepting bids`,
+    closed: (on: string) => `Closed ${on}. No longer accepting bids`,
     closedNoDate: "No longer accepting bids",
     machines: (n: number) => `${n} machines`,
     more: (n: number) => ` +${n} more`,
@@ -78,7 +78,7 @@ const COPY = {
     cta: "افتح الرابط لتقديم عرضك ←",
     ctaClosed: "لم يعد يقبل العروض",
     closes: (on: string) => `يُغلق الاستقبال ${on}`,
-    closed: (on: string) => `أُغلق ${on} — لم يعد يقبل العروض`,
+    closed: (on: string) => `أُغلق ${on}. لم يعد يقبل العروض`,
     closedNoDate: "لم يعد يقبل العروض",
     machines: (n: number) => `${n} معدات`,
     more: (n: number) => ` +${n} أخرى`,

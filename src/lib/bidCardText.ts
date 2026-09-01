@@ -30,13 +30,13 @@ const COPY = {
   en: {
     invites: (renter: string) => `${renter} invites you to bid on an equipment request.`,
     invitesNoName: "You are invited to bid on an equipment request.",
-    noAccount: "No account is needed — the link opens the form.",
+    noAccount: "No account is needed. The link opens the form.",
     closed: "This request is no longer accepting bids.",
   },
   ar: {
     invites: (renter: string) => `يدعوك ${renter} لتقديم عرض على طلب معدات.`,
     invitesNoName: "أنت مدعوٌّ لتقديم عرض على طلب معدات.",
-    noAccount: "لا حاجة لحساب — الرابط يفتح النموذج مباشرة.",
+    noAccount: "لا حاجة لحساب. الرابط يفتح النموذج مباشرة.",
     closed: "لم يعد هذا الطلب يقبل العروض.",
   },
 } as const;
@@ -68,7 +68,7 @@ export function bidCardText(
     // against it without opening the link.
     renter ? t.invites(renter) : t.invitesNoName,
     "",
-    m.ref ? `${m.ref} — ${m.imageHeadline}` : m.imageHeadline,
+    m.ref ? `${m.ref}: ${m.imageHeadline}` : m.imageHeadline,
     m.where || null,
 
     // Every machine, when there is more than one. The image can only name the first.
