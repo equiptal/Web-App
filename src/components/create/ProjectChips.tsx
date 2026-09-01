@@ -122,6 +122,23 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
     };
   }, [chosenId]);
 
+  /**
+   * One thing filed at this site applies ITSELF (owner, 2026-09-01).
+   *
+   * A dropdown with a single row is a question with one answer: the renter opens it, reads the only
+   * entry, and picks the thing he would have been given anyway. With two or more there is a real
+   * choice, so the list opens instead (`defaultOpen` on the pill below) and he makes it.
+   *
+   * Guarded on `templateTerms` so it fires once: applying writes to the store, which re-renders this,
+   * and without the guard the machine line would be appended to the text on every pass.
+   */
+  useEffect(() => {
+    if (templates.length !== 1 || state.templateTerms || picking) return;
+    void applyTemplate(templates[0].itemId);
+    // `applyTemplate` reads the store's own current values; re-running on its identity would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templates, state.templateTerms, picking]);
+
   // Already picked — the pills have taken over the strip.
   if (!user || !projects?.length) return null;
 
@@ -163,9 +180,20 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
   }
 
   return (
-    /* Under the intake card, carrying the page's own margin rather than the card's inner padding. */
-    <div className="mt-3 flex flex-wrap items-center gap-2">
-      <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{t.projects.chips.label}</span>
+    /* INSIDE the box now, on the floor row (owner, 2026-09-01) — the site is what fills half the
+       request, so it belongs in the thing the request is written in rather than under it. */
+    <div className="flex min-w-0 flex-wrap items-center gap-2">
+      {/* ── A reason to press it ─────────────────────────────────────────────────────────────────
+          The row was a bare `PROJECT` label and some grey chips, which said what they were and never
+          why anyone would touch them. One quiet line instead (owner, 2026-09-01), and only while
+          nothing is chosen: once a site is picked the row is showing an answer, and an invitation
+          beside an answer is noise. */}
+      {!chosen && (
+        <span className="flex items-center gap-1.5 rounded-full border border-brand/45 bg-brand-soft px-2.5 py-1 text-label font-semibold text-brand-deep">
+          <Icon name="bolt" size={13} className="flex-none" />
+          {t.projects.chips.hint}
+        </span>
+      )}
 
       {/* ── The chosen site, and the dropdown of what is filed under it ──────────────────────────
           Marked with the brand, so the row says which of these is answering the request. The native
@@ -232,9 +260,12 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
             key={p.id}
             type="button"
             onClick={() => actions.selectProject(p)}
-            className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-label font-semibold text-navy transition hover:border-brand hover:text-brand"
+            /* Brand-outlined rather than grey (owner, 2026-09-01: *"project pills need to be more
+               visible"*). Outlined and not filled: filled would compete with Continue, which is the
+               one thing on this screen that should read as the next step. */
+            className="flex items-center gap-1.5 rounded-full border border-brand/45 bg-surface px-3 py-1 text-label font-semibold text-brand-deep transition hover:border-brand hover:bg-brand-soft"
           >
-            <Icon name="place" size={13} className="flex-none text-muted" />
+            <Icon name="place" size={13} className="flex-none text-brand" />
             {projectTitle(p)}
             {/* Tagged, not hidden — see the note at the top. */}
             {ended && <span className="text-meta font-semibold text-muted">{t.projects.chips.ended}</span>}

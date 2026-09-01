@@ -342,6 +342,20 @@ body {
   outline-offset: var(--ring-offset);
 }
 
+/* Inside a card that clips its own corners, the ring is drawn INSIDE the control it belongs to.
+ *
+ * `--ring-offset` pushes the outline outwards, and an outline pushed outwards inside an
+ * `overflow-hidden` parent is cut off by it — on the intake card that produced a full-width orange
+ * bar between the term pills and the textarea, which reads as a divider cutting one field into
+ * sections (owner, 2026-09-01: *"I want the focus to include the full text box as one parent, not
+ * this separate line between the boxes and the text"*).
+ *
+ * A negative offset draws the same ring against the inside of the control's own edge, so it cannot
+ * reach the parent's clip and a keyboard user still sees exactly which pill they are on. */
+.field-card :focus-visible {
+  outline-offset: -2px;
+}
+
 .material-symbols-rounded {
   font-variation-settings: "opsz" 24, "wght" 500, "FILL" 0, "GRAD" 0;
   line-height: 1;

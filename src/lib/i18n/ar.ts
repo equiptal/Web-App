@@ -1700,6 +1700,7 @@ export const ar: Dictionary = {
         saveAndApply: "احفظ وطبّق على {n}",
       },
     chips: {
+      hint: "اختر موقعًا — نصف هذا يُملأ تلقائيًا",
       label: "المشروع",
       ended: "منتهي",
       all: "كل المشاريع",
@@ -1735,6 +1736,8 @@ export const ar: Dictionary = {
     operatorRail: "المشغّل",
     where: "وجهة الآلة",
     when: "مدة التشغيل",
+    nextPanel: "التالي — {panel}",
+    missingTitle: "قبل الإرسال، ينقص:",
     lockedForRequest: "مثبّت لكامل الطلب",
     collapse: "طيّ",
     change: "تغيير",

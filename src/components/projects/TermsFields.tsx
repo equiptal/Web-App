@@ -28,7 +28,7 @@ import { useT } from "@/lib/i18n";
 import { Icon, Toggle } from "@/components/ui";
 import { Dropdown } from "@/components/Dropdown";
 import { SAFETY_CERTIFICATES, OPERATOR_CERTIFICATES, type Party } from "@/lib/contract/options";
-import type { MachineTerms } from "@/lib/contract/work-order";
+import { blankTerms, type MachineTerms } from "@/lib/contract/work-order";
 
 const input =
   "w-full rounded-sm border border-border bg-surface px-3 py-2 text-body text-navy outline-none transition focus:border-brand";
@@ -36,36 +36,12 @@ const input =
 const PARTY_OPTS: Party[] = ["me", "supplier"];
 const NATIONALITY_OPTS = ["any", "restricted"] as const;
 
-/** Nothing answered. The two non-nullable fields take the app's own defaults, not a lie about null. */
-export function blankTerms(): MachineTerms {
-  return {
-    /* ~~"yes"~~ — **off by default** (owner, 2026-08-31). It is the question most often answered
-       *no*, and a toggle that starts on asks a renter hiring a generator to turn something off
-       before they can move past four fields about operator nationality. Starting off means the four
-       appear only for the renter who actually wants them. */
-    operatorNeeded: "no",
-    operator: {
-      nationality: null,
-      nationalityCustom: "",
-      certificate: [],
-      certificateOther: "",
-      nightShift: false,
-      fatFood: null,
-      fatAccommodationTransport: null,
-    } as MachineTerms["operator"],
-    /* Not asked any more (owner, 2026-08-31: *"also remove fuel"*). Diesel is the app's own
-       default and the type does not admit null, so it is seeded and left alone rather than deleted
-       from the shape — which would move a backend contract for a field nobody is arguing about.
-       `night shift` went the same way: the key stays `false` and no control offers it. */
-    fuelType: "diesel",
-    equipmentYear: null,
-    deliveryOverride: null,
-    returnOverride: null,
-    fuelResponsibilityOverride: null,
-    safetyCertsOverride: null,
-    safetyCertsOtherText: null,
-  };
-}
+/* `blankTerms` moved to `contract/work-order.ts` (2026-09-01) — the intake store needs it to answer a
+   term on a request that was never started from a template, and a reducer importing a factory out of
+   a form component is how a contract ends up living in a screen. Re-exported so every existing caller
+   keeps its import. */
+export { blankTerms };
+
 
 /**
  * How many fields this machine states differently from the order's.

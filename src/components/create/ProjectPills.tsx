@@ -62,13 +62,40 @@ const NO_CERT = "__none__";
 
 /* ----------------------------- One pill ----------------------------- */
 
-/** Three tones, and the same three wherever a pill appears in the strip. */
-function tone(changed?: boolean, conflict?: boolean) {
-  return conflict
+/**
+ * Four tones, and the same four wherever a pill appears in the strip.
+ *
+ * `missing` is the one added on 2026-09-01: a term the request CANNOT go out without and nobody has
+ * answered. Red and empty rather than absent, because an absent pill is a question the renter never
+ * sees — and the three it applies to (who delivers, who returns it, who pays for the fuel) are the
+ * three every supplier has to ask about before he can price anything.
+ */
+function tone(changed?: boolean, conflict?: boolean, missing?: boolean) {
+  return conflict || missing
     ? "border-danger bg-danger/5 text-danger"
     : changed
       ? "border-brand bg-brand-soft text-navy"
       : "border-border bg-surface text-navy";
+}
+
+/**
+ * The × that drops a pill off the strip.
+ *
+ * Only on what the request can go out without (owner, 2026-09-01). A required term has none: an ×
+ * that hands back a red box the moment it is pressed is a control that argues with the renter, and
+ * the honest answer to "I do not want to state this" there is that the request needs it.
+ */
+function PillX({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onRemove}
+      aria-label={`${label} ×`}
+      className="-me-1 grid h-4 w-4 flex-none place-items-center rounded-full text-current/55 transition hover:bg-surface2 hover:text-current"
+    >
+      <Icon name="close" size={11} />
+    </button>
+  );
 }
 
 /**
@@ -99,17 +126,20 @@ function Pill({
   value,
   changed,
   conflict,
+  onRemove,
 }: {
   label: string;
   value: ReactNode;
   changed?: boolean;
   conflict?: boolean;
+  onRemove?: () => void;
 }) {
   return (
     <span className={`${PILL} ${tone(changed, conflict)}`}>
       <span className={LABEL}>{label}</span>
       <span className={VALUE}>{value}</span>
       {changed && !conflict && <span aria-hidden className="text-meta leading-none text-brand">●</span>}
+      {onRemove && <PillX label={label} onRemove={onRemove} />}
     </span>
   );
 }
@@ -129,6 +159,8 @@ function PillSelect<T extends string>({
   optionLabel,
   empty = "—",
   changed,
+  missing,
+  onRemove,
   onChange,
 }: {
   label: string;
@@ -137,6 +169,8 @@ function PillSelect<T extends string>({
   optionLabel?: (v: T) => string;
   empty?: string;
   changed?: boolean;
+  missing?: boolean;
+  onRemove?: () => void;
   onChange: (v: T | null) => void;
 }) {
   return (
@@ -150,8 +184,9 @@ function PillSelect<T extends string>({
        ~~A native `select` at zero opacity stretched over the pill.~~ Before that, and worse: it
        opened the operating system's menu, with a blue highlight bar and no way to tick the chosen
        row. */
+    <span className="inline-flex items-center">
     <Dropdown
-      triggerClass={`${PILL} ${tone(changed)} ${EDITABLE}`}
+      triggerClass={`${PILL} ${tone(changed, false, missing)} ${EDITABLE}`}
       label={label}
       prefix={label}
       placeholder={empty}
@@ -159,6 +194,13 @@ function PillSelect<T extends string>({
       onChange={(v) => onChange((v || null) as T | null)}
       options={options.map((o) => ({ value: o, label: optionLabel ? optionLabel(o) : o }))}
     />
+    {/* Outside the trigger: inside it, a press on the × would open the menu on its way past. */}
+    {onRemove && (
+      <span className={`${PILL} ${tone(changed, false, missing)} -ms-px rounded-s-none border-s-0 ps-0`}>
+        <PillX label={label} onRemove={onRemove} />
+      </span>
+    )}
+    </span>
   );
 }
 
@@ -178,6 +220,8 @@ function PillSegment<T extends string>({
   options,
   optionLabel,
   changed,
+  missing,
+  onRemove,
   onChange,
 }: {
   label: string;
@@ -185,11 +229,13 @@ function PillSegment<T extends string>({
   options: readonly [T, T];
   optionLabel: (v: T) => string;
   changed?: boolean;
+  missing?: boolean;
+  onRemove?: () => void;
   onChange: (v: T) => void;
 }) {
   const name = `${label}-${options.join("-")}`;
   return (
-    <span className={`${PILL} ${tone(changed)} pe-0.5`}>
+    <span className={`${PILL} ${tone(changed, false, missing)} pe-0.5`}>
       <span className={LABEL}>{label}</span>
       {changed && <span aria-hidden className="text-meta leading-none text-brand">●</span>}
 
@@ -217,6 +263,7 @@ function PillSegment<T extends string>({
           );
         })}
       </span>
+      {onRemove && <PillX label={label} onRemove={onRemove} />}
     </span>
   );
 }
@@ -360,6 +407,9 @@ export function ProjectPills() {
           value={project.defaults.paymentTerms}
           options={PAYMENT_TERMS}
           changed={dirty("preferences.payment_terms")}
+          /* Droppable: a request with no stated payment terms is a request the supplier quotes his
+             own on, which is a normal way to ask. */
+          onRemove={() => actions.patchProjectTerms(null)}
           onChange={(v) => actions.patchProjectTerms(v)}
         />
 
@@ -371,38 +421,53 @@ export function ProjectPills() {
 
             Two-answer fields are segments rather than menus: with only *me* and *supplier* there is
             nothing to reveal, and a renter comparing them should not have to open anything. */}
+        {/* ── The three a request cannot go out without ────────────────────────────────────────
+            Drawn whether or not a template ran (owner, 2026-09-01). They used to appear only when a
+            work order or a request had been copied, so a renter who picked a SITE and nothing else
+            was never asked who delivers, who returns it, or who pays for the fuel — and every
+            supplier bidding had to ask him before he could price anything.
+
+            Unanswered, they are RED and empty. No × on them either: an × that hands back a red box
+            the moment it is pressed is a control arguing with the renter, and the honest answer to
+            "I do not want to state this" here is that the request needs it. */}
+        <PillSegment<Party>
+          label={t.projects.pills.delivery}
+          value={terms?.deliveryOverride ?? null}
+          options={["me", "supplier"] as const}
+          optionLabel={(v) => t.options.party[v]}
+          changed={dirty("preferences.delivery")}
+          missing={!terms?.deliveryOverride}
+          onChange={(v) => actions.patchTerms({ deliveryOverride: v }, ["preferences.delivery"])}
+        />
+        <PillSegment<Party>
+          label={t.projects.pills.ret}
+          value={terms?.returnOverride ?? null}
+          options={["me", "supplier"] as const}
+          optionLabel={(v) => t.options.party[v]}
+          changed={dirty("preferences.return")}
+          missing={!terms?.returnOverride}
+          onChange={(v) => actions.patchTerms({ returnOverride: v }, ["preferences.return"])}
+        />
+        <PillSegment<Party>
+          label={t.projects.pills.fuelResp}
+          value={terms?.fuelResponsibilityOverride ?? null}
+          options={["me", "supplier"] as const}
+          optionLabel={(v) => t.options.party[v]}
+          changed={dirty("preferences.fuel")}
+          missing={!terms?.fuelResponsibilityOverride}
+          onChange={(v) => actions.patchTerms({ fuelResponsibilityOverride: v }, ["preferences.fuel"])}
+        />
+
         {terms && (
           <>
-            <PillSegment<Party>
-              label={t.projects.pills.delivery}
-              value={terms.deliveryOverride ?? null}
-              options={["me", "supplier"] as const}
-              optionLabel={(v) => t.options.party[v]}
-              changed={dirty("preferences.delivery")}
-              onChange={(v) => actions.patchTerms({ deliveryOverride: v }, ["preferences.delivery"])}
-            />
-            <PillSegment<Party>
-              label={t.projects.pills.ret}
-              value={terms.returnOverride ?? null}
-              options={["me", "supplier"] as const}
-              optionLabel={(v) => t.options.party[v]}
-              changed={dirty("preferences.return")}
-              onChange={(v) => actions.patchTerms({ returnOverride: v }, ["preferences.return"])}
-            />
-            <PillSegment<Party>
-              label={t.projects.pills.fuelResp}
-              value={terms.fuelResponsibilityOverride ?? null}
-              options={["me", "supplier"] as const}
-              optionLabel={(v) => t.options.party[v]}
-              changed={dirty("preferences.fuel")}
-              onChange={(v) => actions.patchTerms({ fuelResponsibilityOverride: v }, ["preferences.fuel"])}
-            />
             <PillSegment<"yes" | "no">
               label={t.projects.pills.operator}
               value={terms.operatorNeeded === "no" ? "no" : "yes"}
               options={["yes", "no"] as const}
               optionLabel={(v) => (v === "yes" ? t.common.yes : t.common.no)}
               changed={dirty("preferences.operator")}
+              /* No × — `operatorNeeded` does not admit "unstated": its two answers are yes and no,
+                 and *no* IS the answer a renter who does not want an operator is giving. */
               onChange={(v) => actions.patchTerms({ operatorNeeded: v }, ["preferences.operator"])}
             />
 
@@ -425,6 +490,7 @@ export function ProjectPills() {
               options={[NO_CERT, ...SAFETY_CERTIFICATES]}
               optionLabel={(v) => (v === NO_CERT ? t.create.machineCard.noCert : t.options.safetyCert[v as SafetyCertificate] ?? v)}
               changed={dirty("preferences.certs")}
+              onRemove={() => actions.patchTerms({ safetyCertsOverride: null }, ["preferences.certs"])}
               onChange={(v) =>
                 actions.patchTerms(
                   {

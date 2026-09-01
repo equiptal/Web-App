@@ -1976,6 +1976,7 @@ export const en = {
         saveAndApply: "Save and apply to {n}",
       },
     chips: {
+      hint: "Pick a site — half of this fills itself in",
       label: "Project",
       ended: "ended",
       all: "All projects",
@@ -2011,6 +2012,8 @@ export const en = {
     operatorRail: "OPERATOR",
     where: "Where it goes",
     when: "When it runs",
+    nextPanel: "Next — {panel}",
+    missingTitle: "Before this can be sent",
     lockedForRequest: "locked for the whole request",
     collapse: "collapse",
     change: "change",

@@ -204,15 +204,27 @@ describe("a term the template copied", () => {
     expect(st.projectDirty.filter((k) => k === "preferences.delivery")).toHaveLength(1);
   });
 
-  it("is ignored when no template has been picked", () => {
-    // There is nothing to patch, and inventing an empty terms object here would make a request claim
-    // answers nobody gave.
+  it("still lands when no template has been picked — a site alone must be answerable", () => {
+    /**
+     * ⚠️ This used to assert the patch was IGNORED, on the reading that inventing a terms object
+     * would make a request claim answers nobody gave. The object is all-null, so it claims nothing —
+     * and the patch itself is an answer the renter just gave.
+     *
+     * What it actually cost: a renter who picked a SITE and no work order could not set delivery,
+     * return or fuel at all. The pills took his press and did nothing, and the request went out
+     * without the three terms every supplier has to ask about before he can price it (owner,
+     * 2026-09-01).
+     */
     const next = reducer(initialState, {
       t: "PATCH_TEMPLATE_TERMS",
       patch: { deliveryOverride: "me" },
       keys: ["preferences.delivery"],
     });
-    expect(next.templateTerms).toBeNull();
-    expect(next).toBe(initialState);
+
+    expect(next.templateTerms?.deliveryOverride).toBe("me");
+    // Only what he answered. Everything else stays unstated, and the strip draws those red.
+    expect(next.templateTerms?.returnOverride).toBeNull();
+    expect(next.templateTerms?.fuelResponsibilityOverride).toBeNull();
+    expect(next.projectDirty).toContain("preferences.delivery");
   });
 });

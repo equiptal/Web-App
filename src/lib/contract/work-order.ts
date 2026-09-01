@@ -331,3 +331,34 @@ export const WORK_ORDER_HEADER_FIELDS = [
   "when",
   "whenConflictAck",
 ] as const satisfies readonly (keyof WorkOrderItem)[];
+
+/** Nothing answered. The two non-nullable fields take the app's own defaults, not a lie about null. */
+export function blankTerms(): MachineTerms {
+  return {
+    /* ~~"yes"~~ — **off by default** (owner, 2026-08-31). It is the question most often answered
+       *no*, and a toggle that starts on asks a renter hiring a generator to turn something off
+       before they can move past four fields about operator nationality. Starting off means the four
+       appear only for the renter who actually wants them. */
+    operatorNeeded: "no",
+    operator: {
+      nationality: null,
+      nationalityCustom: "",
+      certificate: [],
+      certificateOther: "",
+      nightShift: false,
+      fatFood: null,
+      fatAccommodationTransport: null,
+    } as MachineTerms["operator"],
+    /* Not asked any more (owner, 2026-08-31: *"also remove fuel"*). Diesel is the app's own
+       default and the type does not admit null, so it is seeded and left alone rather than deleted
+       from the shape — which would move a backend contract for a field nobody is arguing about.
+       `night shift` went the same way: the key stays `false` and no control offers it. */
+    fuelType: "diesel",
+    equipmentYear: null,
+    deliveryOverride: null,
+    returnOverride: null,
+    fuelResponsibilityOverride: null,
+    safetyCertsOverride: null,
+    safetyCertsOtherText: null,
+  };
+}

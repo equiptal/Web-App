@@ -36,7 +36,7 @@ import type { SiteLocation, ProjectDefaults, ProjectSummary } from "@/lib/contra
 import type { PaymentTerm } from "@/lib/contract/options";
 import { projectTitle, filingFor } from "@/lib/contract/project";
 import { applyProjectDefaults, applyMachineTerms } from "@/lib/contract/project-apply";
-import type { MachineTerms } from "@/lib/contract/work-order";
+import { blankTerms, type MachineTerms } from "@/lib/contract/work-order";
 import { draftToRfqCorrection } from "@/lib/api/agent-adapters";
 import { useSession } from "@/lib/session";
 
@@ -508,10 +508,17 @@ export function reducer(state: RfqState, a: Action): RfqState {
      * project* and start reading as theirs.
      */
     case "PATCH_TEMPLATE_TERMS": {
-      if (!state.templateTerms) return state;
+      /**
+       * ⚠️ It used to `return state` when there was no template, which meant a renter who picked a
+       * SITE and nothing else could not answer delivery, return or fuel at all — the pills took his
+       * press and did nothing (owner, 2026-09-01).
+       *
+       * A blank set is started instead. Those three are required, and a request that cannot state
+       * them is a request every supplier has to ask about before he can price it.
+       */
       return {
         ...state,
-        templateTerms: { ...state.templateTerms, ...a.patch },
+        templateTerms: { ...(state.templateTerms ?? blankTerms()), ...a.patch },
         projectDirty: [...new Set([...state.projectDirty, ...a.keys])],
       };
     }

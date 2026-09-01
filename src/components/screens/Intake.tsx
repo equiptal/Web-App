@@ -199,7 +199,10 @@ export function Intake() {
            `overflow-hidden` that outline was clipped to a single orange bar across the card's floor
            (owner, 2026-08-31: remove it). Moved to the card's own border, which is one line in the
            place a border belongs — and a keyboard user still sees where they are. */
-        className={`flex flex-col overflow-hidden rounded-lg border bg-surface transition focus-within:border-brand ${
+        /* `field-card` is what globals.css hangs the inset focus ring on — see the rule there. The
+           card takes the brand border, every control inside it draws its own ring against its own
+           edge, and neither can be clipped into a bar across the card. */
+        className={`field-card flex flex-col overflow-hidden rounded-lg border bg-surface transition focus-within:border-brand ${
           dragging ? "border-brand ring-2 ring-brand/25" : "border-border"
         }`}
       >
@@ -222,16 +225,22 @@ export function Intake() {
           className="min-h-[188px] w-full flex-1 resize-none border-0 bg-transparent px-5 pb-2 pt-5 text-subhead leading-relaxed text-navy outline-none placeholder:text-muted/70 focus-visible:outline-none"
         />
 
-        {/* ── The floor: the one control the dropzone became ──
-            The button alone. «Add as many files as you like — we'll read them all» stood beside it
-            until 2026-08-31 (owner: remove it): no limit is stated anywhere, so a line promising
-            there is none was answering a question nobody had asked, and the button already says
-            what it does. */}
+        {/* ── The floor: the renter's sites, and the way to hand us a file ─────────────────────
+            The sites moved IN here (owner, 2026-09-01: *"I want the project pills to appear as part
+            of the text box, in the place of the upload RFQ button, and this upload button will be on
+            the most right"*). They sat under the card, where a row of the renter's own data read as
+            furniture on the page; on the floor of the box they read as part of the thing being
+            written, which is what they are — a site fills half the request.
+
+            Upload keeps the row but not the lead. It is the other way in for the renter who has a
+            document rather than a sentence, and it belongs at the end of the row for the same reason
+            it stopped being the only thing on it. */}
         <div className="flex flex-wrap items-center gap-2.5 px-5 pb-4 pt-1">
+          <ProjectChips />
           <button
             type="button"
             onClick={() => fileInput.current?.click()}
-            className="flex items-center gap-1.5 rounded-sm border border-border bg-surface px-3 py-1.5 text-body font-semibold text-navy-mid transition hover:border-brand hover:text-brand"
+            className="ms-auto flex flex-none items-center gap-1.5 rounded-sm border border-border bg-surface px-3 py-1.5 text-body font-semibold text-navy-mid transition hover:border-brand hover:text-brand"
           >
             <Icon name="upload" size={15} className="flex-none" />
             {t.intake.uploadRfq}
@@ -262,27 +271,6 @@ export function Intake() {
         )}
       </div>
 
-      {/* ── PROJ · the renter's own sites, under the box (owner, 2026-08-31) ─────────────────────
-          *"Projects will be in the place of these suggestions."*
-
-          ~~The strip lived inside the card, on the floor of the field.~~ ~~And under the card sat a
-          row of example sentences that wrote themselves in.~~ Both are answered by one move: the
-          sites take the row the examples had.
-
-          It is the right trade. The examples taught a renter what to write, and the typing
-          placeholder in the box already does that — the chips only repeated it, for the one press a
-          renter makes on their first visit and never again. The sites are the opposite: they are the
-          renter's own, they matter on every visit after the first, and they are the one thing here
-          that fills in half the request. And a strip of the renter's OWN data reads better as a row
-          of things to pick from under the box than as furniture bolted inside it.
-
-          `ProjectChips` renders until one is picked, `ProjectPills` after — the same strip, so
-          choosing a site swaps its contents and moves nothing. Both render nothing at all when there
-          is no site to show, so a renter who has never made one sees a plain box. */}
-      {/* `ProjectChips` stays here: it is a PICKER, not a value — a row of the renter's sites to
-          choose from, which reads better under the box than bolted inside it. Its values move into
-          the box the moment one is chosen, and `ProjectPills` renders up there instead. */}
-      <ProjectChips />
 
       {/* ── The way on ── */}
       <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
