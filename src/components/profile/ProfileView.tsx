@@ -15,6 +15,7 @@ import { ChangePhoneModal } from "./ChangePhoneModal";
 import { DeleteAccountModal } from "./DeleteAccountModal";
 import { openSupportMessenger } from "@/components/support/IntercomWidget";
 import { btn } from "@/lib/ds";
+import { SkeletonFields, SkeletonRows, SkeletonSection } from "@/components/Skeleton";
 import { pin } from "@/lib/uiPins";
 
 /* ~~`SUPPORT_URL`, `PRIVACY_URL`, `TERMS_URL` — three pages on the marketing site.~~ All three
@@ -142,7 +143,14 @@ export function ProfileView() {
         }
       />
 
-      {loading && <p className="mt-6 text-center text-body text-muted">…</p>}
+      {/* The two columns this page is about to draw — who you are on one side, how the account
+          behaves on the other — so nothing moves when they arrive. */}
+      {loading && (
+        <div className="mt-5 grid gap-5 lg:grid-cols-2">
+          <SkeletonSection><SkeletonFields rows={3} /></SkeletonSection>
+          <SkeletonSection><SkeletonRows rows={5} /></SkeletonSection>
+        </div>
+      )}
       {loadError && !loading && (
         <p className="mt-6 rounded-sm border border-danger/30 bg-danger-soft px-4 py-3 text-center text-body font-semibold text-danger">
           {p.loadError}

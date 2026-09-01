@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Icon } from "@/components/ui";
-import { cx } from "@/lib/ds";
+import { cx, TITLE_CASE } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 
 /**
@@ -92,7 +92,7 @@ export function PageMasthead({
               handle. `min-w-0` on the name and `flex-none` on the badge, so a long company name
               truncates and the badge never does. */}
           <span className="flex items-center gap-2">
-            <span className={`min-w-0 truncate text-title font-extrabold leading-tight ${plain ? "text-navy" : ""}`}>{title}</span>
+            <span className={cx("min-w-0 truncate text-title font-extrabold leading-tight", TITLE_CASE, plain && "text-navy")}>{title}</span>
             {badge && <span className="flex-none">{badge}</span>}
           </span>
           {subtitle && <p className={`mt-0.5 truncate text-meta ${plain ? "text-muted" : "text-white/65"}`}>{subtitle}</p>}

@@ -68,7 +68,7 @@ export function RestoreAccountPrompt({
             `text-inherit` takes the panel's own ink there and the page's navy everywhere else — one
             rule rather than a tone prop threaded through a screen that has no other dark-specific
             need. `Dialog`'s dark tone sets `text-white` on the panel, which is what it inherits. */}
-        <h2 className="text-display font-extrabold tracking-[-.4px] text-inherit">{a.restoreTitle}</h2>
+        <h2 className="text-display font-extrabold capitalize tracking-[-.4px] text-inherit">{a.restoreTitle}</h2>
       </div>
       {/* `text-inherit` with an opacity, for the same reason as the heading above: white/70 on the
           auth modal's navy, navy/70 on every other ground. A fixed `text-muted` was unreadable on the

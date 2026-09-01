@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CloseIcon } from "@/components/HeaderIcons";
-import { CARD_FOOTER, cx } from "@/lib/ds";
+import { CARD_FOOTER, cx, TITLE_CASE } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 
 /**
@@ -241,7 +241,7 @@ export function Dialog({
           <div {...pin("dialog-header")} className={`flex flex-none items-start gap-3 bg-surface2 px-5 py-3.5 ${flushHeader ? "" : "border-b border-border"}`}>
             {icon && <span className="grid h-[34px] w-[34px] flex-none place-items-center">{icon}</span>}
             <div className="min-w-0 flex-1">
-              {title && <h2 className="text-title font-extrabold leading-tight tracking-[-.2px] text-navy">{title}</h2>}
+              {title && <h2 className={cx("text-title font-extrabold leading-tight tracking-[-.2px] text-navy", TITLE_CASE)}>{title}</h2>}
               {subtitle && <p className="mt-0.5 text-meta leading-snug text-muted">{subtitle}</p>}
             </div>
             <DialogClose onClose={onClose} />

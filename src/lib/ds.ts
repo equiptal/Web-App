@@ -31,8 +31,43 @@ export type ControlSize = "sm" | "md" | "lg";
    weight did not, and a 13px label at 600 on a saturated orange reads thinner than the same label on
    a white ground. The size stays on `--text-body`: the scale has six sizes and no others, and a
    button is not the place to add a seventh. */
+/**
+ * **Title Case, on every button and every title** (owner, 2026-08-31).
+ *
+ * *"Make all titles and buttons capitalizing first letter of each word."*
+ *
+ * A CSS transform, not a rewritten dictionary. Two reasons, and the second is the one that decides
+ * it:
+ *
+ *  1. There are several hundred label strings across two locales, and a casing convention held by
+ *     hand across all of them lasts exactly until the next string is added.
+ *  2. **Arabic has no case.** `text-transform: capitalize` is a no-op on it, so one rule gives the
+ *     English its title case and leaves the Arabic untouched. Retyping the dictionary would have
+ *     meant an English-only convention living inside a bilingual file, with nothing to enforce it.
+ *
+ * It is the literal reading of the instruction — first letter of EVERY word — rather than editorial
+ * title case, which lowercases articles and short prepositions ("Sign In or Create Your Account").
+ * CSS cannot tell a preposition from a noun, and the rule as asked for is the one a stylesheet can
+ * actually keep. Acronyms are safe: `capitalize` raises the first letter and leaves the rest, so
+ * `VAT`, `SAR` and `AI` come through whole.
+ *
+ * ── The one hazard, stated ───────────────────────────────────────────────────────────
+ * Some title slots carry data a PERSON typed, not copy we wrote: `PageMasthead` shows the firm's
+ * name on `/company` and a greeting with the renter's name on `/profile`, and a couple of dialogs
+ * put a site's name in their heading. `capitalize` only ever raises a lowercase first letter — it
+ * never lowercases — so `EQ Rental` and `Al-Faisal Contracting Est.` come through untouched and
+ * `eq rental` is tidied. The case it gets WRONG is a deliberately lowercase name: `iMotion` renders
+ * as `IMotion`.
+ *
+ * Judged worth it for a contracting marketplace, where that spelling is rare, and recorded here
+ * because the fix if it ever bites is small and specific: drop `TITLE_CASE` from the name-bearing
+ * slots (`PageMasthead`'s title, `Dialog`'s) and leave it on the buttons and the app's own headings,
+ * which are always ours.
+ */
+export const TITLE_CASE = "capitalize";
+
 const BTN_BASE =
-  "inline-flex items-center justify-center gap-2 rounded-md text-body font-bold " +
+  "inline-flex items-center justify-center gap-2 rounded-md text-body font-bold capitalize " +
   "transition-colors select-none " +
   "disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg " +
   "disabled:border-disabled-border disabled:pointer-events-none";

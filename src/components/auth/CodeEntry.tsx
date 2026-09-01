@@ -145,7 +145,7 @@ export function CodeEntry({
         {a.back}
       </button>
 
-      <h2 className={`mb-2 text-display font-extrabold tracking-[-.5px] ${dark ? "text-white" : "text-navy"}`}>{a.codeTitle}</h2>
+      <h2 className={`mb-2 text-display font-extrabold capitalize tracking-[-.5px] ${dark ? "text-white" : "text-navy"}`}>{a.codeTitle}</h2>
       <p className={`mb-7 text-body leading-[1.55] ${dark ? "text-white/60" : "text-muted"}`}>
         {sentPre}
         <b className={dark ? "text-white" : "text-navy"} dir="ltr">{dest}</b>

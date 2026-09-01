@@ -24,6 +24,7 @@ import {
 } from "@/lib/api/company-client";
 import type { CompanyMember, MyCompany } from "@/lib/contract/company";
 import { btn } from "@/lib/ds";
+import { SkeletonFields, SkeletonRows, SkeletonSection } from "@/components/Skeleton";
 import { pin } from "@/lib/uiPins";
 
 /**
@@ -142,7 +143,14 @@ export function CompanyHub() {
       )}
 
       {loading ? (
-        <p className="py-16 text-center text-body text-muted">…</p>
+        /* The shape the page is about to be: the firm's particulars on one side, its roster on the
+           other. ~~A centred ellipsis.~~ It was indistinguishable from a renter with no company,
+           which is a real state this page also has — so the first thing it said was sometimes the
+           opposite of the truth. */
+        <div className="grid gap-5 lg:grid-cols-2">
+          <SkeletonSection><SkeletonFields rows={3} /></SkeletonSection>
+          <SkeletonSection><SkeletonRows rows={4} /></SkeletonSection>
+        </div>
       ) : loadError ? (
         <div className="rounded-sm border border-border bg-surface p-8 text-center">
           <p className="text-body font-semibold text-navy">{c.loadError}</p>
@@ -840,7 +848,7 @@ function ConfirmDialog({
         >
           <Icon name={spec.icon} size={26} />
         </span>
-        <h2 className="mt-4 text-title font-extrabold text-navy">{spec.title}</h2>
+        <h2 className="mt-4 text-title font-extrabold capitalize text-navy">{spec.title}</h2>
         {/* `whitespace-pre-line` so the dissolve copy keeps its paragraph breaks (app parity). */}
         <p className="mt-3 whitespace-pre-line text-start text-body leading-relaxed text-muted">{spec.body}</p>
 

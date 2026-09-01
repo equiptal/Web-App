@@ -6,6 +6,7 @@ import { fmt, useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import { PAGE_MAX, PAGE_X } from "@/components/AppShell";
+import { Skeleton } from "@/components/Skeleton";
 import { SignInPrompt } from "@/components/common/SignInPrompt";
 import { fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail, recommendBids } from "@/lib/api/client";
 import { groupRequests, requestCodeOf, type RequestGroup } from "@/lib/contract/requests";
@@ -483,10 +484,28 @@ export function RequestsWorkspace() {
     );
   }
   if (groups === null) {
+    /* The surface's own shape while it arrives: the rail of request circles, then the row of bid
+       cards under it. ~~A centred «Loading…» in an otherwise empty viewport.~~ On a full-bleed page
+       that is a lot of nothing, and it is the same picture the "you have no requests" state draws —
+       so the page's first answer was one it often had to take back. */
     return (
-      <Standalone>
-        <div className="text-center text-body font-semibold text-muted">{t.workspace.loading}</div>
-      </Standalone>
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex-none border-b border-border bg-surface3/60">
+          <div className={`mx-auto flex h-[96px] w-full max-w-[1440px] items-center gap-4 ${PAGE_X}`}>
+            {Array.from({ length: 6 }, (_, i) => (
+              <div key={i} className="flex flex-none flex-col items-center gap-1">
+                <Skeleton className="size-14 rounded-full" />
+                <Skeleton className="h-2.5 w-10" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className={`mx-auto w-full ${PAGE_MAX} ${PAGE_X} mt-4 flex gap-5`}>
+          {Array.from({ length: 3 }, (_, i) => (
+            <Skeleton key={i} className="h-[420px] w-[344px] flex-none rounded-lg" />
+          ))}
+        </div>
+      </div>
     );
   }
   if (failed) {

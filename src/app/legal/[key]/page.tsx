@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/ui";
 import { Section } from "@/components/PageSection";
+import { SkeletonText } from "@/components/Skeleton";
 import { btn } from "@/lib/ds";
 import { useLocale, useT } from "@/lib/i18n";
 import type { LegalContent } from "@/app/api/app-content/[key]/route";
@@ -58,7 +59,14 @@ export default function LegalPage({ params }: { params: Promise<{ key: string }>
       <div className="w-full pb-10" dir={ar ? "rtl" : "ltr"}>
         <Section title={title} hint={doc ? `${L("Version", "الإصدار")} ${doc.version}` : undefined}>
           <div className="p-5">
-            {loading && <p className="py-10 text-center text-body text-muted">…</p>}
+            {/* A document's worth of lines, in three paragraphs — the shape of the thing arriving. */}
+            {loading && (
+              <div className="flex flex-col gap-6">
+                <SkeletonText lines={4} />
+                <SkeletonText lines={5} />
+                <SkeletonText lines={3} />
+              </div>
+            )}
 
             {failed && !loading && (
               <div className="py-10 text-center">

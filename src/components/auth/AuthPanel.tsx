@@ -203,8 +203,8 @@ export const authLabel = (tone: AuthTone): string =>
 
 export const authTitle = (tone: AuthTone): string =>
   tone === "dark"
-    ? "mb-2 text-display font-extrabold tracking-[-.5px] text-white"
-    : "mb-2 text-center text-display font-extrabold tracking-[-.5px] text-navy";
+    ? "mb-2 text-display font-extrabold capitalize tracking-[-.5px] text-white"
+    : "mb-2 text-center text-display font-extrabold capitalize tracking-[-.5px] text-navy";
 
 export const authSub = (tone: AuthTone): string =>
   tone === "dark" ? "mb-6 text-body leading-[1.55] text-white/60" : "mb-6 text-center text-body leading-[1.55] text-muted";
