@@ -57,9 +57,17 @@ describe("buildBidMetadata", () => {
     expect(m.title).toBe(EN.title);
     expect(m.openGraph?.title).toBe(EN.title);
     expect(m.openGraph?.description).toBe(EN.description);
-    // The backend's image, honoured as sent — it resolves to the same asset the emailed card uses, so
-    // a supplier meeting this link twice sees one picture.
-    expect((m.openGraph as { images?: { url: string }[] }).images?.[0].url).toBe(preview.imageUrl);
+    /**
+     * OUR card, even though the preview named one.
+     *
+     * ⚠️ `preview.imageUrl` is not a rendering of the request. `previewImageUrl()` in the agents
+     * backend is a CONSTANT — `${WEB_APP_URL}/og-bid.png`, the same 19 KB file for every request ever
+     * shared (verified against the live endpoint, 2026-09-01). It is always set, so preferring it
+     * meant our own per-request card was never reached and every link carried a picture of nothing.
+     */
+    expect((m.openGraph as { images?: { url: string }[] }).images?.[0].url).toBe(
+      `${STAGING}/bid/excavator-riyadh-11111111-2222-3333-4444-555555555555/og`,
+    );
     // The shared URL, not the extracted token — clients relabel the card if the canonical disagrees.
     expect(m.openGraph?.url).toBe(`${STAGING}/bid/excavator-riyadh-11111111-2222-3333-4444-555555555555`);
     expect(m.alternates?.canonical).toBe(`${STAGING}/bid/excavator-riyadh-11111111-2222-3333-4444-555555555555`);
@@ -89,15 +97,14 @@ describe("buildBidMetadata", () => {
     );
   });
 
-  it("Given a preview with NO imageUrl, When building metadata, Then it uses our own card and not the generic file", () => {
+  it("Given the backend's generic file, When building metadata, Then our own card is used instead", () => {
     /**
-     * SUP-T02, found in production. The backend's preview answers with a title and a description but
-     * no `imageUrl`, so every shared link fell through to `og-bid.png` — a picture that says nothing
-     * about the request — while `/bid/{slug}/og` sat there working. The link unfurled, which is why
-     * it looked right at a glance, and carried a picture of nothing, which is why it was not.
+     * SUP-T02, found against the owner's own production token. The generic file is what the backend
+     * always sends, so this is the ordinary case rather than an edge one — and the same assertion
+     * holds whether `imageUrl` is the constant or empty.
      */
     const m = buildBidMetadata({
-      preview: { ...preview, imageUrl: "" },
+      preview: { ...preview, imageUrl: `${STAGING}/og-bid.png` },
       slug: "excavator-riyadh-11111111-2222-3333-4444-555555555555",
       lang: "en",
       origin: STAGING,

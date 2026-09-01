@@ -191,21 +191,22 @@ export function buildBidMetadata({
   /**
    * The card image, in order of how much it knows about THIS request.
    *
-   * 1. `preview.imageUrl` — the backend's own rendering, absolute and stage-correct.
-   * 2. **This app's `og` route** — the same card, drawn here from the same preview.
+   * 1. **This app's `og` route** — drawn per request: the reference, the equipment, the call to bid.
+   * 2. `preview.imageUrl` — for a caller with no origin to build an absolute URL from.
    * 3. `OG_CARD_IMAGE` — a generic picture that says nothing about the request.
    *
-   * Step 2 was missing, and that is the whole of SUP-T02 (found in production, 2026-09-01). The
-   * backend's preview answers with title and description but no `imageUrl`, so every shared link fell
-   * straight to the generic file — while `/bid/{slug}/og` sat there working, returning a 37 KB card
-   * nobody was asking for. The link unfurled, which is why it looked fine at a glance, and carried a
-   * picture of nothing, which is why it did not.
+   * ⚠️ **`preview.imageUrl` used to win, and that was the whole of SUP-T02** (found against the
+   * owner's own production token, 2026-09-01). It is not a rendering of the request: `previewImageUrl()`
+   * in the agents backend is `() => `${WEB_APP_URL}/og-bid.png``, a CONSTANT — the same 19 KB file for
+   * every request ever shared. So it was always set, `generated` was never reached, and every link
+   * unfurled with a picture of nothing while `/bid/{slug}/og` sat there returning a real card.
    *
-   * The generic file stays as the last resort for a caller with no origin to build an absolute URL
-   * from; a relative `og:image` is ignored by every unfurler.
+   * Preferring ours is not a tie-break, it is the point: a static file cannot know the equipment. The
+   * backend's stays below it because a card with the brand on it beats no card at all, and a relative
+   * `og:image` is ignored by every unfurler.
    */
   const generated = origin ? `${origin}/bid/${slug}/og${lang === "ar" ? "?lang=ar" : ""}` : null;
-  const image = preview?.imageUrl || generated || OG_CARD_IMAGE;
+  const image = generated || preview?.imageUrl || OG_CARD_IMAGE;
 
   return {
     // The root layout's title template appends " — Moedatech", which is where the brand comes from.

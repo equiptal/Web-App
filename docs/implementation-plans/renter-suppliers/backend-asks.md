@@ -62,7 +62,47 @@ shows for a supplier who has both.
 
 ---
 
-## 4. `extendable` is not on the public bid-form payload
+## 4. A closed request withholds everything, so the card cannot name it
+
+Verified live against the owner's own token, 2026-09-01 (`REQ-00233`):
+
+```
+GET /public/bid-form/{token}
+  -> { token, status: "closed", closedReason: "closed_request", deadline: null,
+       renter: {...}, items: [] }        // getBidForm.ts:85 — an early return
+
+GET /public/bid-form/{token}/preview
+  -> description: "This request is no longer accepting bids."   // buildPreviewCopy, the !accepting branch
+```
+
+Both surfaces drop the request the moment it closes. The full payload returns an empty shell with no
+`projectTerms` and no items; the preview REPLACES the description rather than adding to it.
+
+So a link forwarded a week later keeps the equipment (it is in the title) and loses **the city and the
+dates**. The reader cannot tell which request went by, which is the one thing a forwarded link is for.
+
+**Ask, smallest version:** in `buildPreviewCopy`, make the closed branch **append** instead of
+replacing —
+
+```ts
+// the !accepting branch, today:
+description: clamp('This request is no longer accepting bids.', DESC_MAX)
+// what the card needs:
+description: clamp([city, length, 'No longer accepting bids'].filter(Boolean).join(' · '), DESC_MAX)
+```
+
+Every value is already computed three lines above it. One line, and the card is right on every surface
+including the ones we do not control.
+
+**Larger version, only if you want the terms too:** let `getBidForm` return `projectTerms` and `items`
+on a closed request and keep `status: "closed"` doing the work. The form already refuses the bid on
+that flag, so the early return is protecting nothing the flag does not.
+
+**Done when:** the preview's description for a closed token still names the city and the dates.
+
+---
+
+## 5. `extendable` is not on the public bid-form payload
 
 The bid-link card reads `GET /public/bid-form/{token}` and draws the request's terms from it. The one
 field it cannot show is `extendable`, so a month-long request that the renter marked extendable reads
@@ -77,7 +117,7 @@ else on it is missing.
 
 ---
 
-## 5. Two open decisions the backend has already ruled on — confirm and close
+## 6. Two open decisions the backend has already ruled on — confirm and close
 
 Neither is web work. Both are in `backend-delivered.md §1` and neither has been put to the owner:
 

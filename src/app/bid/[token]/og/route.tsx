@@ -84,7 +84,15 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
 
   const d = bidCardModel(preview, copy, effective, form);
   const rtl = effective === "ar";
-  const host = (preview?.url || "").replace(/^https?:\/\//, "").split("/")[0] || "web.moedatech.net";
+  /**
+   * The domain on the card is the one this image is being SERVED from.
+   *
+   * ⚠️ It was `preview.url`, and that is the backend's `OS_APP_URL` — which on the staging agents
+   * stack is `web-production-de3c8.up.railway.app` (verified against the live endpoint, 2026-09-01).
+   * The trust line at the bottom of the card is the one element whose whole job is to say "this came
+   * from us", so printing somebody's deploy host there does the opposite of what it is for.
+   */
+  const host = req.nextUrl.host || "web.moedatech.net";
 
   /**
    * The renderer honours `direction: rtl` for text (Arabic shapes and orders correctly inside a line)
