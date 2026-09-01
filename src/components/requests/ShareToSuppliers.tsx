@@ -6,6 +6,8 @@ import { btn, cx } from "@/lib/ds";
 import { listRenterSuppliers, recordRequestShare, updateRenterSupplier, type RenterSupplier } from "@/lib/api/client";
 import { canBeEmailed, groupsOf, groupsWithCounts } from "@/lib/contract/renter-suppliers";
 import { bidTokenFromUrl } from "@/lib/bidCardHtml";
+import { bidCardText } from "@/lib/bidCardText";
+import { useBidCard } from "@/lib/useBidCard";
 
 /**
  * SUP-T41 — sending a request to the suppliers already on the renter's list.
@@ -63,6 +65,11 @@ export function ShareToSuppliers({
   const [emailDraft, setEmailDraft] = useState("");
   const [note, setNote] = useState("");
   const [copied, setCopied] = useState(false);
+  /* The language comes from `L`, which this component already takes — asking `useLocale` for it
+     would tie a component that is handed its own translator to a provider it does not otherwise
+     need, and the share sheet renders it outside one. */
+  const lang = L("en", "ar") as "en" | "ar";
+  const card = useBidCard(shareUrl, lang);
 
   useEffect(() => {
     if (!open || rows) return;
@@ -93,30 +100,19 @@ export function ShareToSuppliers({
     : L("Invitation to bid (RFQ)", "دعوة لتقديم عرض سعر");
 
   /**
-   * The body the supplier reads — and the same words the preview below shows him before he sends.
+   * The body the supplier reads — the same template every other channel sends (owner, 2026-09-01).
    *
-   * His own line goes ABOVE the request details, exactly where the prototype puts it: it is the part
-   * a person actually reads, and under the link it would be read after the decision was made.
+   * This used to compose its own message while the share sheet composed a different one, so the same
+   * request read two ways depending on which door the renter used. Both render `bidCardText` now, and
+   * the only thing this adds is his own line, which goes first: it is the part a person actually
+   * reads, and under the request details it would be read after the decision.
    *
-   * ~~An "our reference" field.~~ Removed (2026-09-01) — it was mine, not the prototype's. The
-   * request already carries a code both sides can quote, and a second reference invented at send
-   * time is one more thing the renter has to keep true.
+   * ~~An "our reference" field.~~ Removed — it was mine, not the prototype's, and the request already
+   * carries a code the template prints.
    */
-  const body = [
-    L("Hello,", "مرحبًا،"),
-    "",
-    note.trim() ? `${note.trim()}\n` : null,
-    renterName
-      ? L(`${renterName} has a new equipment request open for bids.`, `لدى ${renterName} طلب معدات جديد مفتوح لتلقّي العروض.`)
-      : L("A new equipment request is open for bids.", "طلب معدات جديد مفتوح لتلقّي العروض."),
-    requestCode ? L(`Reference: ${requestCode}`, `المرجع: ${requestCode}`) : null,
-    "",
-    shareUrl,
-    "",
-    L("No account is needed — the link opens the form.", "لا حاجة لحساب — الرابط يفتح النموذج مباشرة."),
-  ]
-    .filter((l) => l !== null)
-    .join("\n");
+  const body = card
+    ? bidCardText(card.model, shareUrl, { renterName, note, lang })
+    : [note.trim() || null, note.trim() ? "" : null, shareUrl].filter((l) => l !== null).join("\n");
 
   const send = () => {
     if (!addresses.length || tooMany) return;

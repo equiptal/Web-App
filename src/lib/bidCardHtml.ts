@@ -8,8 +8,13 @@
  *
  * `copyBidLink` therefore writes TWO clipboard flavours at once:
  *   - `text/html`  → this card. Gmail, Outlook web, Word, Notion take it.
- *   - `text/plain` → the bare URL. WhatsApp, Telegram, SMS take it, and unfurl it themselves.
+ *   - `text/plain` → **the same card in words** (`bidCardText`). WhatsApp, Telegram and SMS take it,
+ *     and unfurl the URL inside it themselves.
  * The destination picks; the user never chooses.
+ *
+ * ⚠️ The plain flavour was the BARE URL, and that was the last place the one template leaked: a
+ * renter who copied and pasted into WhatsApp sent a naked link, while the same press into Gmail sent
+ * a full card (owner, 2026-09-01). Same facts either way now.
  *
  * ── THE CARD SAYS MORE THAN THE IMAGE ────────────────────────────────────────────────────────────
  * The generated image carries the logo, the reference, the machine and one line asking for the bid —
@@ -28,6 +33,7 @@
 import { JOIN_URL } from "@/lib/config/store-links";
 import { COLORS, RADII } from "@/lib/ds-colors";
 import { bidCardModel, type BidCardModel } from "@/lib/bidCardModel";
+import { bidCardText } from "@/lib/bidCardText";
 import type { BidPreview } from "@/lib/api/bidPreview";
 import { mapBidFormData, type BidFormData } from "@/lib/contract/link-bids";
 
@@ -162,11 +168,12 @@ export async function copyBidLink(shareUrl: string, lang: "en" | "ar" = "en"): P
     const imageUrl = p.imageUrl || `${window.location.origin}/bid/${token}/og${lang === "ar" ? "?lang=ar" : ""}`;
     const model = bidCardModel((p as BidPreview) ?? null, copy, lang, form);
     const html = bidCardHtml({ ...copy, imageUrl, url: shareUrl }, model, lang);
+    const text = bidCardText(model, shareUrl, { lang });
 
     await navigator.clipboard.write([
       new ClipboardItem({
         "text/html": new Blob([html], { type: "text/html" }),
-        "text/plain": new Blob([shareUrl], { type: "text/plain" }),
+        "text/plain": new Blob([text], { type: "text/plain" }),
       }),
     ]);
     return true;

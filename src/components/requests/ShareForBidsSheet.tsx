@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 import { copyBidLink } from "@/lib/bidCardHtml";
+import { bidCardText } from "@/lib/bidCardText";
+import { useBidCard } from "@/lib/useBidCard";
 import { ShareToSuppliers } from "./ShareToSuppliers";
 import { ACTIONS, btn, cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
@@ -51,6 +53,9 @@ export function ShareForBidsSheet({
   L: (en: string, arr: string) => string;
 }) {
   const [copied, setCopied] = useState(false);
+  /* Above the `if (!open) return null` below, with the other hooks: the card is fetched, and a hook
+     after an early return runs in a different order on the render that closes the sheet. */
+  const card = useBidCard(shareUrl, ar ? "ar" : "en");
   const [dlInput, setDlInput] = useState("");
   const [dlEdit, setDlEdit] = useState(false);
   const [logo, setLogo] = useState<string | null>(logoUrl ?? null);
@@ -97,9 +102,23 @@ export function ShareForBidsSheet({
   };
 
   const renter = renterName?.trim();
-  const message = renter
-    ? L(`${renter} invites you to submit a bid (RFQ) for their equipment request: ${shareUrl}`, `يدعوك ${renter} لتقديم عرض سعر (طلب عروض أسعار) على طلب معداته: ${shareUrl}`)
-    : L(`You're invited to submit a bid (RFQ) for an equipment request: ${shareUrl}`, `أنت مدعوٌّ لتقديم عرض سعر (طلب عروض أسعار) على طلب معدات: ${shareUrl}`);
+
+  /**
+   * **One template, wherever the link goes** (owner, 2026-09-01).
+   *
+   * WhatsApp, SMS and the share sheet used to send a one-liner that named nobody's machine, no site
+   * and no deadline — while *Send to my suppliers* sent a laid-out note and *Copy* sent a bare URL.
+   * Three messages for one request, and which one a supplier got depended on which button was
+   * pressed. They all render the same model now.
+   *
+   * The fallback is the old one-liner, and it stays: the card is fetched, so a slow or unreachable
+   * preview must cost the detail and never the share.
+   */
+  const message = card
+    ? bidCardText(card.model, shareUrl, { renterName: renter, lang: ar ? "ar" : "en" })
+    : renter
+      ? L(`${renter} invites you to submit a bid (RFQ) for their equipment request: ${shareUrl}`, `يدعوك ${renter} لتقديم عرض سعر (طلب عروض أسعار) على طلب معداته: ${shareUrl}`)
+      : L(`You're invited to submit a bid (RFQ) for an equipment request: ${shareUrl}`, `أنت مدعوٌّ لتقديم عرض سعر (طلب عروض أسعار) على طلب معدات: ${shareUrl}`);
 
   /**
    * Copies the link as BOTH the rich card and the plain URL — one clipboard write, two flavours.
