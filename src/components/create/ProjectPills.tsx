@@ -140,23 +140,25 @@ function PillSelect<T extends string>({
   onChange: (v: T | null) => void;
 }) {
   return (
-    /* ── The house dropdown, worn as a pill (owner, 2026-08-31) ─────────────────────────────────
-       ~~A native `select` at zero opacity stretched over the pill.~~ It worked, and it opened the
-       operating system's own menu: a blue highlight bar, system type, and no way to tick the row
-       that is already chosen. One dropdown across the product means this one too — the pill IS the
-       trigger now, so there is no invisible layer to keep in register with it. */
-    <span className={`${PILL} ${tone(changed)} gap-0 p-0`}>
-      <Dropdown
-        tone="pill"
-        label={label}
-        prefix={label}
-        placeholder={empty}
-        value={value}
-        onChange={(v) => onChange((v || null) as T | null)}
-        options={options.map((o) => ({ value: o, label: optionLabel ? optionLabel(o) : o }))}
-      />
-      {changed && <span aria-hidden className="pe-2 text-meta leading-none text-brand">●</span>}
-    </span>
+    /* ── ONE box, not a box in a box (owner, 2026-09-01: *"why are some boxes nested? remove the
+       nested, keep it one box"*) ────────────────────────────────────────────────────────────────
+       The pill was a bordered `span` wrapping a `Dropdown` whose `pill` tone draws its own border,
+       so BASIS and PAYMENT rendered as two rectangles a pixel apart while START, END and EXTENDABLE
+       — which are not dropdowns — rendered as one. The trigger IS the pill: it takes the pill's own
+       skin through `triggerClass`, and the wrapper is gone.
+
+       ~~A native `select` at zero opacity stretched over the pill.~~ Before that, and worse: it
+       opened the operating system's menu, with a blue highlight bar and no way to tick the chosen
+       row. */
+    <Dropdown
+      triggerClass={`${PILL} ${tone(changed)} ${EDITABLE}`}
+      label={label}
+      prefix={label}
+      placeholder={empty}
+      value={value}
+      onChange={(v) => onChange((v || null) as T | null)}
+      options={options.map((o) => ({ value: o, label: optionLabel ? optionLabel(o) : o }))}
+    />
   );
 }
 

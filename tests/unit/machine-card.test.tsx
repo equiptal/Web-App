@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { screen, within } from "@testing-library/react";
 import { MachineCard } from "@/components/create/MachineCard";
-import { EQUIPMENT_YEARS, FUEL_TYPES, SAFETY_CERTIFICATES, itemGaps, transportGaps } from "@/lib/contract";
+import { equipmentYears, FUEL_TYPES, SAFETY_CERTIFICATES, itemGaps, transportGaps } from "@/lib/contract";
 import { makeAgentDraft, makeItem, renderCanvas } from "../setup/canvas";
 
 /**
@@ -32,17 +32,30 @@ function card(opts: Parameters<typeof renderCanvas>[1] = {}) {
  * `aria-hidden` ligature span, so its text is in `textContent` but not in the accessible name. Going
  * through the a11y tree is both more robust and the thing a screen-reader user actually gets.
  */
+/**
+ * The trigger, whichever kind it is.
+ *
+ * Certificates became a MULTI-select (owner, 2026-09-01) — the field has always been an array on the
+ * draft, on the wire and on the bid form, and only this control disagreed. A multi-select opener is a
+ * `button` with `aria-haspopup="listbox"`, not a `combobox`, so the helpers accept both rather than
+ * every certificate test learning which one it is.
+ */
+function triggerFor(name: string) {
+  const combo = screen.queryByRole("combobox", { name });
+  return combo ?? screen.getByRole("button", { name });
+}
+
 async function open(handle: Awaited<ReturnType<typeof card>>, name: string) {
-  const trigger = screen.getByRole("combobox", { name });
+  const trigger = triggerFor(name);
   // Idempotent: the trigger toggles, so opening one that is already open would close it.
   if (trigger.getAttribute("aria-expanded") !== "true") {
     await handle.run(() => trigger.click());
   }
-  return screen.getByRole("listbox", { name });
+  return screen.getByRole("listbox", name === "CERTIFICATE" ? undefined : { name });
 }
 
 async function close(handle: Awaited<ReturnType<typeof card>>, name: string) {
-  const trigger = screen.getByRole("combobox", { name });
+  const trigger = triggerFor(name);
   if (trigger.getAttribute("aria-expanded") === "true") {
     await handle.run(() => trigger.click());
   }
@@ -52,7 +65,9 @@ async function optionsOf(handle: Awaited<ReturnType<typeof card>>, name: string)
   const listbox = await open(handle, name);
   const labels = within(listbox)
     .getAllByRole("option")
-    .map((o) => o.textContent!.replace(/^check/, "").trim());
+    // The longest ligature first: "check_box_outline_blank" starts with "check", so stripping the
+    // short one leaves "_box_outline_blank" glued to the label.
+    .map((o) => o.textContent!.replace(/^(check_box_outline_blank|check_box|check)/, "").trim());
   await close(handle, name);
   return labels;
 }
@@ -68,7 +83,8 @@ describe("the four overlay controls (MREQ-AC-16)", () => {
   // thing a screen-reader user gets, and the reason SearchSelect grew a `label` prop.
   it("renders certificate, quantity, fuel and minimum year", async () => {
     await card();
-    expect(screen.getByRole("combobox", { name: "CERTIFICATE" })).toBeTruthy();
+    // A multi-select opener: `button` + aria-haspopup, not a combobox.
+    expect(screen.getByRole("button", { name: "CERTIFICATE" })).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "FUEL" })).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "MINIMUM YEAR" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "QUANTITY +" })).toBeTruthy();
@@ -99,12 +115,23 @@ describe("option lists come from the contract (MREQ-AC-17/18/19)", () => {
     expect(FUEL_TYPES).toEqual(["diesel", "electric"]);
   });
 
-  it("offers exactly the platform's year bands, with Any year as a real choice", async () => {
+  it("offers the app's own years — every one from 2010 to now, newest first, Any leading", async () => {
+    /**
+     * ⚠️ This used to assert the bands `2015+ … 2022+` and call them "the platform's". They were
+     * this app's alone: `year_stepper.dart` offers every year from 2010 to the current one, and the
+     * backend stores a plain number. A renter on the web could only ask for something the app has no
+     * way to express (owner, 2026-09-01).
+     */
     const handle = await card();
     const labels = await optionsOf(handle, "MINIMUM YEAR");
-    // Same set, same length — a stray "2021+" would fail here.
-    expect(labels).toEqual(["2015+", "2018+", "2020+", "2022+", "Any year"]);
-    expect(EQUIPMENT_YEARS.length).toBe(labels.length);
+    const thisYear = new Date().getFullYear();
+
+    expect(labels[0]).toBe("Any year");
+    expect(labels[1]).toBe(String(thisYear));
+    expect(labels[labels.length - 1]).toBe("2010");
+    // Computed, so it is right every January rather than silently missing the newest year.
+    expect(labels.length).toBe(equipmentYears().length);
+    expect(labels).not.toContain("2018+");
   });
 
   it("offers the platform's certificates plus an explicit No certificate", async () => {
@@ -115,6 +142,28 @@ describe("option lists come from the contract (MREQ-AC-17/18/19)", () => {
     expect(SAFETY_CERTIFICATES).toEqual(["tuv", "aramco", "other"]);
     // The prototype's inventions must not be reachable.
     for (const invented of ["CE", "ISO 9001", "SASO"]) expect(labels).not.toContain(invented);
+  });
+
+  it("takes more than one certificate, because the field has always been a list", async () => {
+    /**
+     * The defect this closes: a renter needing TÜV AND Aramco could ask for one of them, and found
+     * out which half he had lost at the bids. `safety_certificates` is an array on the draft, on the
+     * wire, and on the bid form where a supplier confirms each cert on its own row.
+     */
+    const handle = await card();
+    await pick(handle, "CERTIFICATE", "TÜV");
+    await pick(handle, "CERTIFICATE", "Aramco Certified");
+
+    expect(handle.store().state.draft!.items[0].safetyCertsOverride).toEqual(["tuv", "aramco"]);
+  });
+
+  it("un-ticks one without losing the other", async () => {
+    const handle = await card();
+    await pick(handle, "CERTIFICATE", "TÜV");
+    await pick(handle, "CERTIFICATE", "Aramco Certified");
+    await pick(handle, "CERTIFICATE", "TÜV");
+
+    expect(handle.store().state.draft!.items[0].safetyCertsOverride).toEqual(["aramco"]);
   });
 
   it("stores No certificate as an explicit empty list, and records the answer (MREQ-AC-55)", async () => {
@@ -304,19 +353,27 @@ describe("the option list opens where it can be read", () => {
     } as DOMRect);
   };
 
+  /* The list is a PORTAL on `document.body` since 2026-09-01 — an absolute list was clipped by the
+     nearest scroll box, and half this app's lists live in one. So the direction is no longer a
+     Tailwind class on a relative box; it is a `top` in viewport pixels, which is what these read.
+     The control is stubbed at y=700 with a height of 34, so `bottom` is 734. */
+  const topOf = (listbox: HTMLElement) => Number.parseFloat(listbox.parentElement!.style.top);
+
   it("opens upward when the control sits near the bottom of the viewport", async () => {
     // 768-tall jsdom viewport; a control at 700 has ~34px below it and 700 above.
     atViewportY(700);
     const handle = await card();
     const listbox = await open(handle, "MINIMUM YEAR");
-    expect(listbox.parentElement!.className).toContain("bottom-[calc(100%+4px)]");
+    // Above the trigger's own top edge, never below its bottom.
+    expect(topOf(listbox)).toBeLessThan(700);
   });
 
   it("opens downward when there is room", async () => {
     atViewportY(80);
     const handle = await card();
     const listbox = await open(handle, "MINIMUM YEAR");
-    expect(listbox.parentElement!.className).toContain("top-[calc(100%+4px)]");
+    // Just under the trigger's bottom edge (80 + 34 + a 4px gap).
+    expect(topOf(listbox)).toBe(118);
   });
 
   // A cramped viewport must not send the list somewhere even worse than below.
@@ -324,6 +381,6 @@ describe("the option list opens where it can be read", () => {
     atViewportY(20);
     const handle = await card();
     const listbox = await open(handle, "MINIMUM YEAR");
-    expect(listbox.parentElement!.className).toContain("top-[calc(100%+4px)]");
+    expect(topOf(listbox)).toBe(58);
   });
 });

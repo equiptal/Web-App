@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { screen } from "@testing-library/react";
+import { requiredGaps } from "@/lib/contract";
 import { Canvas } from "@/components/create/Canvas";
 import { confirmedProject, makeAgentDraft, makeItem, renderCanvas } from "../setup/canvas";
 
 /**
- * MREQ-TC-01/10/13 — the canvas mounts, shows the renter their own words, and counts what is left.
+ * MREQ-TC-01/10/13 — the canvas mounts, shows the renter their own words, and marks what is left.
  *
  * The four-step wizard shipped with no component test at all, which is how a screen reaches UAT
  * unlooked-at. These start at the cheapest useful question: does it render, and does it say the
@@ -27,7 +28,7 @@ describe("the canvas renders (MREQ-AC-01)", () => {
     }
   });
 
-  it("counts only the gaps that block, and drops the pill at zero (MREQ-AC-12/13)", async () => {
+  it("marks only the gaps that block, and marks none when there are none (MREQ-AC-12/13)", async () => {
     // A fully answered draft: site confirmed, basis chosen, year + cert touched, charged days accepted.
     const item = makeItem();
     const handle = await renderCanvas(<Canvas />, {
@@ -39,14 +40,21 @@ describe("the canvas renders (MREQ-AC-01)", () => {
       },
     });
 
-    expect(screen.queryByText(/things need you/)).toBeNull();
-    expect(screen.queryByText(/thing needs you/)).toBeNull();
+    /* ~~«N things need you».~~ The counter is gone (owner, 2026-09-01) — it counted gaps the cards
+       below already mark one by one, in the place the renter has to act on them. The RULE it stood
+       for is what matters and is what this pins now, read off the source the counter itself read:
+       a fully answered draft has no gaps, and un-answering one control produces exactly one. */
+    const gaps = () => {
+      const st = handle.store().state;
+      return requiredGaps(st.draft!, st.chargedDaysUnderstood).length;
+    };
 
-    // Untouch one control and exactly one thing needs the renter.
+    expect(gaps()).toBe(0);
+
     await handle.run(() => {
       handle.store().actions.setChargedDaysUnderstood(false);
     });
-    expect(screen.getByText("1 thing needs you")).toBeTruthy();
+    expect(gaps()).toBe(1);
   });
 
   it("names the item when there is more than one (MREQ-AC-38)", async () => {

@@ -25,23 +25,19 @@ import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
 import { Button, Icon, TextArea, TextInput } from "@/components/ui";
 import { equipmentIcon } from "@/components/requests/EquipImg";
 import { CanvasField, ChoiceChips, ChoiceRow, PanelDot } from "@/components/create/Provenance";
+import { CertSelect } from "@/components/create/CertSelect";
 import { SearchSelect } from "@/components/create/SearchSelect";
 import { useItemAttachments, useItemOverrides, useItemTaxonomy, useProvenance } from "@/components/create/hooks";
 import { pin } from "@/lib/uiPins";
 import {
-  EQUIPMENT_YEARS,
+  equipmentYears,
   isTouched,
   FUEL_TYPES,
-  SAFETY_CERTIFICATES,
   type EquipmentItem,
   type FuelType,
   type Party,
   type RequiredGap,
-  type SafetyCertificate,
 } from "@/lib/contract";
-
-/** A sentinel for "No certificate" — an explicit answer that stores as an empty list (MREQ-AC-55). */
-const NO_CERT = "__none__";
 
 export function MachineCard({
   item,
@@ -66,6 +62,7 @@ export function MachineCard({
   const overrides = useItemOverrides(item, state.draft!.project);
   const attachments = useItemAttachments(item);
   const prov = useProvenance(item.id);
+  const years = equipmentYears();
 
   const gapFor = (field: string) => gaps.some((g) => g.field === field);
   const shake = (field: string) => shaking && gapFor(field);
@@ -75,17 +72,6 @@ export function MachineCard({
     prov.touch(field);
     actions.patchItem(item.id, patch);
   };
-
-  /**
-   * What the certificate chip displays: the chosen cert, or the explicit "No certificate" once the
-   * renter has answered that way, or nothing at all while the question is still open. `[]` alone
-   * cannot tell "none, deliberately" from "not yet asked".
-   */
-  const certValue = overrides.safetyCerts.length
-    ? overrides.safetyCerts[0]
-    : isTouched(state.draft!, prov.key("safety_certificates"))
-      ? NO_CERT
-      : null;
 
   const notAvailable = item.verdict === "no-match";
   /**
@@ -156,20 +142,20 @@ export function MachineCard({
           <div className="absolute inset-x-2.5 top-2.5 flex items-start justify-between gap-2">
             <div className="min-w-0 max-w-[58%]">
               <div className={shake("safety_certificates") ? "shake-error" : undefined}>
-                <SearchSelect
-                  value={certValue}
-                  placeholder={t.create.machineCard.cert}
-                  searchPlaceholder={t.create.machineCard.cert}
-                  label={t.create.machineCard.cert}
+                {/* More than one, because the field has always been an array everywhere else — on the
+                    draft, on the wire, and on the bid form where a supplier confirms each cert on its
+                    own row. Only this control disagreed, so a renter needing TÜV AND Aramco could ask
+                    for one of them and find out at the bids which half he had lost. */}
+                <CertSelect
+                  values={overrides.safetyCerts}
+                  touched={isTouched(state.draft!, prov.key("safety_certificates"))}
                   tone={gapFor("safety_certificates") ? "brand" : "overlay"}
-                  options={[
-                    { value: NO_CERT, label: t.create.machineCard.noCert },
-                    ...SAFETY_CERTIFICATES.map((c) => ({ value: c, label: t.options.safetyCert[c] })),
-                  ]}
-                  onChange={(v) =>
+                  onChange={(next) =>
                     set("safety_certificates", {
-                      safetyCertsOverride: v === NO_CERT ? [] : [v as SafetyCertificate],
-                      ...(v === NO_CERT ? { safetyCertsOtherText: null } : {}),
+                      safetyCertsOverride: next,
+                      // Dropping "other" takes its free text with it, or the note outlives the box it
+                      // belonged to and gets sent with a request that no longer asks for it.
+                      ...(next.includes("other") ? {} : { safetyCertsOtherText: null }),
                     })
                   }
                 />
@@ -228,7 +214,16 @@ export function MachineCard({
                 searchPlaceholder={t.create.machineCard.minYear}
                 label={t.create.machineCard.minYear}
                 tone={gapFor("equipment_year") ? "brand" : "overlay"}
-                options={EQUIPMENT_YEARS.map((y) => ({ value: y, label: y === "any" ? t.create.machineCard.anyYear : y }))}
+                /* Every year from 2010 to now, newest first — the app's own list (`year_stepper.dart`),
+                   and `SearchSelect` gives it the same search box the app's sheet has. A draft saved
+                   with one of the old bands keeps rendering: the value is carried in so the field
+                   shows what the renter chose rather than emptying itself. */
+                options={[
+                  ...(overrides.equipmentYear && !years.includes(overrides.equipmentYear)
+                    ? [{ value: overrides.equipmentYear, label: overrides.equipmentYear }]
+                    : []),
+                  ...years.map((y) => ({ value: y, label: y === "any" ? t.create.machineCard.anyYear : y })),
+                ]}
                 onChange={(v) => set("equipment_year", { equipmentYear: v })}
               />
             </div>

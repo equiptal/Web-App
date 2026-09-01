@@ -136,8 +136,11 @@ describe("adding a machine by hand", () => {
 
     expect(handle.store().state.draft!.items.length).toBe(2);
     expect(handle.store().state.itemIndex).toBe(1);
-    // A fresh item has no taxonomy yet, so it blocks — and says so.
-    expect(screen.getByText(/things need you|thing needs you/)).toBeTruthy();
+    /* ~~«N things need you».~~ Removed (owner, 2026-09-01): it counted gaps the cards below already
+       mark one by one, in the place the renter has to act on them. The gap itself is what this pins
+       now — the required dot the panel draws beside an unanswered field. */
+    // A fresh item has no taxonomy yet, so it blocks — and the panel marks where.
+    expect(document.querySelectorAll(".text-brand").length).toBeGreaterThan(0);
   });
 
   it("will not add while this machine is unanswered", async () => {

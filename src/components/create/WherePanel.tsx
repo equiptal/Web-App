@@ -16,10 +16,11 @@ import dynamic from "next/dynamic";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Icon } from "@/components/ui";
-import { PanelDot, ProvenanceNote } from "@/components/create/Provenance";
+import { PanelDot } from "@/components/create/Provenance";
 import { useProvenance } from "@/components/create/hooks";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { isSystemChosen } from "@/lib/contract";
 import { leftTheSite, projectTitle } from "@/lib/contract/project";
 
 // Client-only: the maps script touches `window` at import.
@@ -111,23 +112,31 @@ export function WherePanel({
           <PanelDot complete={complete} />
           <Icon name="place" size={16} className="flex-none text-navy" />
           <span className="flex-none text-subhead font-extrabold text-navy">{t.create.where}</span>
-          <span className="truncate text-body text-muted">
+          {/* The amber ring, where the «from your project» line used to be.
+ 
+              The label is gone product-wide (owner, 2026-09-01: *"remove ai/project label, the orange
+              highlight is enough"*) — but `Where` was the one panel that had ONLY the label and no
+              ring, so dropping it would have made a site-supplied address look identical to a typed
+              one. That is the exact thing the 2026-08-31 ask fixed. Same signal, in the product's
+              own vocabulary. */}
+          <span
+            className={
+              isSystemChosen(locationSource) && !unfiled
+                ? "truncate rounded-sm bg-warn/[0.07] px-1.5 text-body text-muted ring-1 ring-warn/45"
+                : "truncate text-body text-muted"
+            }
+          >
             {loc.label ?? "—"}
             {hasLocation && <span className="ms-1.5 text-muted/70">{`${loc.lat?.toFixed(6)}, ${loc.lng?.toFixed(6)}`}</span>}
           </span>
-          {/* On the collapsed head, because that is where a renter reads the address without opening
-              anything — and the whole point of the label is to answer "where did this come from?"
-              before they wonder whether to change it. */}
-          {/* The site's label is replaced by the consequence, not accompanied by it: «from your
-              project» beside «this is no longer your project's place» would be two claims in a row
-              contradicting each other. */}
+          {/* The site's mark is replaced by the consequence, not accompanied by it: a «from your
+              project» ring around «this is no longer your project's place» would be two claims in a
+              row contradicting each other. */}
           {unfiled ? (
             <span className="flex flex-none items-center gap-1 text-meta font-semibold text-danger">
               <Icon name="error_outline" size={13} /> {t.create.wherePanel.unfiledShort}
             </span>
-          ) : (
-            <ProvenanceNote source={locationSource} />
-          )}
+          ) : null}
         </span>
         <Icon name={open ? "expand_less" : "expand_more"} size={18} className="flex-none text-muted" />
       </button>
@@ -205,14 +214,7 @@ export function WherePanel({
                         <span className="truncate text-body font-semibold leading-tight text-navy">
                           {loc.label?.trim() || t.step1.location.mapPicker.pinnedNoAddress}
                         </span>
-                        {/* On the address itself, not only on the collapsed head (owner, 2026-08-31:
-                            *"if the location is detected from the project it must be shown here"*).
-                            The head answers it before you open the panel; inside the panel this is
-                            the line a renter reads before deciding whether to move the pin, so the
-                            answer has to be on that line too. It disappears the moment they do move
-                            it — `PATCH_LOCATION` records the field as theirs. */}
-                        <ProvenanceNote source={locationSource} />
-                      </span>
+                                              </span>
                       <span className="block text-label text-muted">
                         {(loc.lat as number).toFixed(6)}, {(loc.lng as number).toFixed(6)}
                       </span>

@@ -194,6 +194,12 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
               to tell two of the same machine apart. */}
           {templates.length > 0 && (
             <Dropdown
+              /* Opens ITSELF the moment a site is chosen (owner, 2026-09-01) — the renter picked the
+                 project, and «what have I already hired here?» is the next question, not one they
+                 should have to find a caret for. Keyed by the project so choosing another site opens
+                 that one's list; `defaultOpen` is read at mount, so closing it keeps it closed. */
+              key={chosen.id}
+              defaultOpen={!state.templateTerms}
               tone="bare"
               label={t.projects.pills.startFrom}
               placeholder=""

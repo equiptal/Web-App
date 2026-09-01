@@ -20,53 +20,19 @@ import type { ReactNode } from "react";
 import { useT } from "@/lib/i18n";
 import { isSystemChosen, type FieldSource } from "@/lib/contract";
 
-/** The pin beside a value the renter's SITE supplied. Same size and colour as the sparkle. */
-function SitePin() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="var(--brand)" className="flex-none" aria-hidden>
-      <path d="M12 2a7 7 0 00-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 00-7-7zm0 9.5A2.5 2.5 0 1112 6.5a2.5 2.5 0 010 5z" />
-    </svg>
-  );
-}
-
-/** The sparkle the prototype puts beside an agent-chosen value. 11px, amber, decorative. */
-function Sparkle() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="var(--brand)" className="flex-none" aria-hidden>
-      <path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2z" />
-    </svg>
-  );
-}
-
 /**
- * The amber "AI selected" / "Default" line, rendered beneath its control.
+ * ~~The amber "AI selected" / "Default" line under a system-chosen control.~~
  *
- * Renders nothing for a renter-set field: once someone has answered a question it stops being ours,
- * and a note saying so on every control the renter has touched is just clutter.
+ * Removed (owner, 2026-09-01): **the orange highlight is enough to say a value was chosen for you.**
+ * The ring and the line said the same thing twice, and the line said it in a sentence — so a card
+ * with five prefilled fields carried five amber captions, and the marker that was meant to be quiet
+ * became the loudest thing on the panel.
+ *
+ * The distinction the line drew — agent-read versus site-default — was never one a renter could act
+ * on differently: either way he checks the value and changes it or leaves it. `FieldSource` still
+ * carries it for the code that does care (the ring, and what gets sent), and it is one import away if
+ * it is ever wanted back.
  */
-export function ProvenanceNote({ source }: { source: FieldSource }) {
-  const t = useT();
-  if (!isSystemChosen(source)) return null;
-  /**
-   * One label for `agent` and `default`. From the renter's side "the agent read this from your
-   * words" and "we filled this in for you" are the same fact — nobody asked them — and splitting the
-   * wording made them look like two different states worth telling apart.
-   *
-   * **`project` is the exception, and gets its own line.** The renter DID choose it: once, for the
-   * whole site. Labelling that "AI selected" hands their own decision back to them as ours, and the
-   * renter who reads it goes looking for a mistake that is not there. A pin instead of a sparkle,
-   * because nothing about it was generated.
-   */
-  const fromProject = source === "project";
-  return (
-    <div className="mt-1.5 flex items-center gap-1">
-      {fromProject ? <SitePin /> : <Sparkle />}
-      <span className="whitespace-nowrap text-label font-semibold text-warn">
-        {fromProject ? t.create.provenance.project : t.create.provenance.agent}
-      </span>
-    </div>
-  );
-}
 
 /** The blocking dot — the prototype's 8px amber bullet, inline after the label. */
 export function RequiredDot({ show }: { show: boolean }) {
@@ -131,7 +97,6 @@ export function CanvasField({
         {children}
       </div>
       {hint && <p className="mt-1.5 text-label leading-snug text-muted">{hint}</p>}
-      <ProvenanceNote source={source} />
     </div>
   );
 }

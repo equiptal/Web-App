@@ -106,9 +106,14 @@ describe("option lists come from the contract, not the prototype", () => {
 
   it("reads its vocabularies from options.ts", () => {
     const machine = readFileSync(join(CREATE_DIR, "MachineCard.tsx"), "utf8");
-    for (const list of ["FUEL_TYPES", "EQUIPMENT_YEARS", "SAFETY_CERTIFICATES", "PARTIES"]) {
+    /* `equipmentYears` is a function now, not a frozen list: the app offers every year from 2010 to
+       the current one (`year_stepper.dart`), and a hardcoded array is wrong every January — quietly,
+       because the newest year simply stops being offered. `SAFETY_CERTIFICATES` moved with the
+       multi-select into `CertSelect.tsx`, so that is where it is read. */
+    for (const list of ["FUEL_TYPES", "equipmentYears", "PARTIES"]) {
       expect(machine).toContain(list);
     }
+    expect(readFileSync(join(CREATE_DIR, "CertSelect.tsx"), "utf8")).toContain("SAFETY_CERTIFICATES");
     const operator = readFileSync(join(CREATE_DIR, "OperatorRail.tsx"), "utf8");
     expect(operator).toContain("OPERATOR_CERTIFICATES");
   });

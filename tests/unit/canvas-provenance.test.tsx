@@ -33,32 +33,39 @@ const card = (opts: Parameters<typeof renderCanvas>[1] = {}) =>
     opts,
   );
 
-describe("provenance badges (MREQ-AC-57/58/59)", () => {
-  // One label for both: from the renter's side, "the agent read this" and "we filled this in" are
-  // the same fact — nobody asked them.
-  it("marks what we defaulted, and says so on delivery and return", async () => {
+/** Controls ringed amber — the mark for "this was chosen for you", now the only one. */
+const ringed = (): number => document.querySelectorAll(".ring-warn\\/45").length;
+
+describe("provenance marks (MREQ-AC-57/58/59)", () => {
+  /**
+   * ⚠️ These used to read the caption "AI selected". It is gone (owner, 2026-09-01: *"remove the
+   * ai/project label, the orange highlight is enough"*) — the ring and the line said the same thing
+   * twice, and a card with five prefilled fields carried five amber captions, so the marker meant to
+   * be quiet became the loudest thing on the panel. Same rule, read off the ring.
+   */
+  it("marks what we defaulted, on delivery and return", async () => {
     await card();
-    // `defaultProjectDetails` seeds both transport legs to "me" — visible, and labelled as ours.
+    // `defaultProjectDetails` seeds both transport legs to "me" — visible, and marked as ours.
     expect(screen.getAllByText("Supplier").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("AI selected").length).toBeGreaterThan(0);
+    expect(ringed()).toBeGreaterThan(0);
   });
 
   it("marks what the agent chose", async () => {
     // The agent supplied the haulage legs, so they still equal the snapshot and read as its choice.
     await card({ draft: makeAgentDraft({ items: [makeItem({ deliveryOverride: "supplier", returnOverride: "supplier" })] }) });
-    expect(screen.getAllByText("AI selected").length).toBeGreaterThan(0);
+    expect(ringed()).toBeGreaterThan(0);
   });
 
   it("clears the mark once the renter answers, and records the field", async () => {
     const handle = await card({ draft: makeAgentDraft({ items: [makeItem({ deliveryOverride: "supplier" })] }) });
-    const before = screen.getAllByText("AI selected").length;
+    const before = ringed();
 
     await handle.run(() => {
       handle.store().actions.touchField("line_items[a0].delivery");
     });
 
-    // queryAll, not getAll: the whole point is that the count can reach zero.
-    expect(screen.queryAllByText("AI selected").length).toBe(before - 1);
+    // The whole point is that the count can reach zero.
+    expect(ringed()).toBe(before - 1);
     expect(handle.store().state.draft!.touchedFields).toContain("line_items[a0].delivery");
   });
 
@@ -70,7 +77,9 @@ describe("provenance badges (MREQ-AC-57/58/59)", () => {
   it("marks the panel overlays by colour rather than by a note", async () => {
     const handle = await card();
     const year = screen.getByRole("combobox", { name: "MINIMUM YEAR" });
-    const cert = screen.getByRole("combobox", { name: "CERTIFICATE" });
+    // The certificate is a multi-select now (owner, 2026-09-01), so it is a listbox opener rather
+    // than a combobox — the field has always been an array everywhere else.
+    const cert = screen.getByRole("button", { name: "CERTIFICATE" });
     expect(year.className).toContain("brand-press");
     expect(cert.className).toContain("brand-press");
 
@@ -88,9 +97,8 @@ describe("provenance badges (MREQ-AC-57/58/59)", () => {
         store.actions.setChargedDaysUnderstood(true);
       },
     });
-    // Delivery and return are still ours (badged "Default") — and nothing is blocking.
-    expect(screen.getAllByText("AI selected").length).toBeGreaterThan(0);
-    expect(screen.queryByText(/things need you|thing needs you/)).toBeNull();
+    // Delivery and return are still ours (ringed) — and nothing is blocking.
+    expect(ringed()).toBeGreaterThan(0);
   });
 });
 
@@ -140,7 +148,7 @@ describe("Arabic (MREQ-AC-51)", () => {
       locale: "ar",
       draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
     });
-    for (const english of ["YOU WROTE", "The machine", "Where it goes", "When it runs", "AI selected"]) {
+    for (const english of ["YOU WROTE", "The machine", "Where it goes", "When it runs"]) {
       expect(view.container.textContent).not.toContain(english);
     }
   });
@@ -156,8 +164,10 @@ describe("when the catalogue is unreachable (MREQ-AC-52)", () => {
 
     expect(screen.getByText("The machine")).toBeTruthy();
     expect(screen.getByText("Where it goes")).toBeTruthy();
-    // The item is incomplete, so the counter says so rather than the screen breaking.
-    expect(screen.getByText(/things need you/)).toBeTruthy();
+    /* ~~«N things need you».~~ Removed (owner, 2026-09-01): it counted gaps the cards below already
+       mark one by one, in the place the renter has to act on them. The gap itself is what this pins
+       now — the required dot the panel draws beside an unanswered field. */
+    expect(document.querySelectorAll(".text-brand").length).toBeGreaterThan(0);
     expect(handle.store().state.draft).toBeTruthy();
   });
 });

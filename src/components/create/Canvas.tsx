@@ -233,9 +233,6 @@ export function Canvas() {
     setCarryTo({ index: live.length, isNew: true });
   };
 
-  const needsYou =
-    gaps.length === 1 ? t.create.needsYouOne : fmt(t.create.needsYou, { n: gaps.length });
-
   /**
    * What the collapsed equipment strip says it holds.
    *
@@ -266,7 +263,13 @@ export function Canvas() {
           </span>
           <div className="min-w-0">
             <div className="text-label font-semibold uppercase tracking-[0.05em] text-warn">{t.create.youWrote}</div>
-            <p className="mt-0.5 truncate text-body italic text-navy-mid">{state.text ? `"${state.text}"` : "—"}</p>
+            {/* ⚠️ Not `truncate`. This is the renter's OWN sentence, and the whole reason it sits at
+                the top of the canvas is so he can check what we read against what he wrote. One line
+                with the rest clipped showed him the half he already remembered and hid the half the
+                machine may have got wrong (owner, 2026-09-01). */}
+            <p className="mt-0.5 whitespace-pre-wrap break-words text-body italic text-navy-mid">
+              {state.text ? `"${state.text}"` : "—"}
+            </p>
           </div>
         </div>
         <div className="flex flex-none items-center gap-3.5">
@@ -283,12 +286,9 @@ export function Canvas() {
             <Icon name="restart_alt" size={16} />
             <span className="hidden sm:inline">{t.create.startOver}</span>
           </button>
-          {gaps.length > 0 && (
-            <span className="flex items-center gap-1.5 rounded-full bg-surface px-3 py-1.5 text-meta font-semibold text-warn">
-              <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden />
-              {needsYou}
-            </span>
-          )}
+          {/* ~~«N things need you».~~ Removed (owner, 2026-09-01). It counted gaps the cards below
+              already mark one by one, in the place the renter has to act on them — so it was a number
+              he could not do anything with, sitting beside the two controls he could. */}
         </div>
       </div>
 

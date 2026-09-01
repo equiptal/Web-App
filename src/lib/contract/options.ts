@@ -9,8 +9,33 @@ export const RENTAL_BASES: RentalBasis[] = ["daily", "weekly", "monthly"];
 export type OvertimeRate = "without" | "1.5x" | "2x"; // AC-15
 export const OVERTIME_RATES: OvertimeRate[] = ["without", "1.5x", "2x"];
 
-/** Min manufacture year — matches the mobile request form: 2015+ / 2018+ / 2020+ / 2022+ + Any. */
-export const EQUIPMENT_YEARS = ["2015+", "2018+", "2020+", "2022+", "any"] as const;
+/**
+ * Minimum manufacture year, as the app asks it.
+ *
+ * ⚠️ This was `2015+ / 2018+ / 2020+ / 2022+ / any`, and the comment claimed those matched the mobile
+ * form. They do not. `year_stepper.dart` offers **every year from 2010 to the current one, newest
+ * first**, in a searchable sheet — and the backend stores a plain number (`equipmentYear`, `type:
+ * 'number'` in the export catalogue). So a renter on the web could only ask for a band the app has no
+ * way to express, and the two surfaces disagreed about the same field (owner, 2026-09-01).
+ *
+ * Computed, not frozen: a hardcoded list is wrong every January, and it is wrong quietly — the newest
+ * year simply stops being offered.
+ */
+export const EQUIPMENT_YEAR_MIN = 2010;
+
+export function equipmentYears(now: Date = new Date()): string[] {
+  const years: string[] = [];
+  for (let y = now.getFullYear(); y >= EQUIPMENT_YEAR_MIN; y--) years.push(String(y));
+  // "Any" leads: it is the answer for most requests, and burying it under sixteen years would make
+  // the common case the one that takes scrolling.
+  return ["any", ...years];
+}
+
+/**
+ * The bands this app used to offer. **Never offered again — kept so old drafts still render.**
+ * A request saved last month with `2018+` must not display as a blank field.
+ */
+export const LEGACY_EQUIPMENT_YEAR_BANDS = ["2015+", "2018+", "2020+", "2022+"] as const;
 
 // 2026-07 cert rule: equipment certs offered are TÜV + Aramco (SPSP/SASO dropped from selection but
 // legacy values still RENDER for old data, so they stay in the union). Aramco is equipment-only.
