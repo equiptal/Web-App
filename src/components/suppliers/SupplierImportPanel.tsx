@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Icon } from "@/components/ui";
 import { btn, cx } from "@/lib/ds";
 import { fmt, useT } from "@/lib/i18n";
-import { addRenterSuppliersBulk } from "@/lib/api/client";
+import { addRenterSuppliersBulk, type BulkResult } from "@/lib/api/client";
 import {
   SHEET_MAX_ROWS,
   guessField,
@@ -37,6 +37,18 @@ import {
  * Guessing saves clicks; guessing silently would put a phone number in the wrong column of forty
  * suppliers and nobody would find out until a match failed.
  *
+ * ── The backend decides, and says so before it writes ───────────────────────────────────────────
+ *
+ * `dryRun: true` runs the whole decision and writes nothing, so the renter reads what WILL happen —
+ * which rows are refused, which will merge into a supplier he already has, which came in mangled —
+ * while he can still fix the file. Guessing that here would mean two implementations of one rule and
+ * one of them wrong.
+ *
+ * **A merge fills blanks only and never overwrites**, so re-importing a corrected sheet does not
+ * update anything: a phone he fixed in the app stays fixed, and a phone he fixed in the sheet does
+ * not arrive. Said on the screen, because the alternative is a renter who believes he has updated
+ * forty suppliers and has not.
+ *
  * ── Nothing in the file is lost ─────────────────────────────────────────────────────────────────
  *
  * Four fields are ours. Every other column rides along under `extra` with its own header — payment
@@ -53,6 +65,9 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
   const [vendor, setVendor] = useState<boolean[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** What the backend says it would do. Null until the file is read, then re-run on every remap. */
+  const [plan, setPlan] = useState<BulkResult | null>(null);
+  const [planning, setPlanning] = useState(false);
 
   const table: SheetTable | null = useMemo(() => parseSheet(text), [text]);
 
@@ -60,7 +75,41 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
   const ready = rows.filter(importable);
   const skipped = rows.length - ready.length;
 
+  /** One payload, used for the preview and for the write — so the two cannot describe different rows. */
+  const payload = () =>
+    rows
+      .map((r, i) => ({ r, v: vendor[i] !== false }))
+      .filter(({ r }) => importable(r))
+      .map(({ r, v }) => ({
+        name: r.name.trim(),
+        contactName: r.contactName.trim() || null,
+        email: r.email.trim() || null,
+        phone: r.phone.trim() || null,
+        extra: r.extra,
+        vendorRegistered: v,
+      }));
+
+  /**
+   * Ask the backend what it would do. Writes nothing.
+   *
+   * Re-run whenever the mapping changes, because a column moved from *phone* to *ignore* changes
+   * every decision below it — a stale preview is worse than none.
+   */
+  const preview = async () => {
+    if (!ready.length || planning) return;
+    setPlanning(true);
+    setError(null);
+    try {
+      setPlan(await addRenterSuppliersBulk(payload(), true));
+    } catch {
+      // A preview that fails must not block the import: the write reports the same three arrays.
+      setPlan(null);
+    }
+    setPlanning(false);
+  };
+
   const reset = () => {
+    setPlan(null);
     setText("");
     setFileName(null);
     setMapping([]);
@@ -90,6 +139,7 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
     setError(parsed ? null : c.importUnreadable);
     setMapping(parsed ? parsed.headers.map(guessField) : []);
     setVendor(parsed ? parsed.rows.map(() => true) : []);
+    setPlan(null);
   };
 
   const save = async () => {
@@ -97,19 +147,7 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
     setSaving(true);
     setError(null);
     try {
-      const result = await addRenterSuppliersBulk(
-        rows
-          .map((r, i) => ({ r, v: vendor[i] !== false }))
-          .filter(({ r }) => importable(r))
-          .map(({ r, v }) => ({
-            name: r.name.trim(),
-            contactName: r.contactName.trim() || null,
-            email: r.email.trim() || null,
-            phone: r.phone.trim() || null,
-            extra: r.extra,
-            vendorRegistered: v,
-          })),
-      );
+      const result = await addRenterSuppliersBulk(payload());
       // Partial success is the normal outcome, so the message counts all three rather than claiming
       // everything landed.
       const created = result?.created?.length ?? ready.length;
@@ -190,7 +228,11 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
                   <td className="py-1.5">
                     <select
                       value={mapping[i]}
-                      onChange={(e) => setMapping((m) => m.map((f, n) => (n === i ? (e.target.value as SheetField) : f)))}
+                      onChange={(e) => {
+                        setMapping((m) => m.map((f, n) => (n === i ? (e.target.value as SheetField) : f)));
+                        // The old preview described a different mapping; drop it rather than show it.
+                        setPlan(null);
+                      }}
                       className="h-[30px] rounded-md border border-border-strong bg-surface px-2 text-meta font-semibold text-navy"
                     >
                       {FIELDS.map((f) => (
@@ -274,6 +316,33 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
         </span>
       </label>
 
+      {/* What the backend says it would do, before it does any of it. */}
+      {plan && (
+        <div className="grid gap-1.5 rounded-md border border-border-strong bg-surface2 px-3 py-2.5 text-meta text-navy">
+          <b className="font-extrabold">
+            {fmt(c.planLine, {
+              created: plan.created.length,
+              merged: plan.merged.length,
+              rejected: plan.rejected.length,
+            })}
+          </b>
+          {/* A merge fills blanks only — so a renter re-importing a corrected sheet learns HERE that
+              his correction will not land, rather than after forty rows quietly did not change. */}
+          {plan.merged.length > 0 && <span className="text-muted-dark">{c.mergeFillsBlanks}</span>}
+          {plan.rejected.map((r) => (
+            <span key={`r${r.row}`} className="text-danger-deep">
+              {fmt(c.planRejected, { row: r.row + 1, reason: reasonText(r.reason, c) })}
+            </span>
+          ))}
+          {(plan.warnings ?? []).map((w, i) => (
+            <span key={`w${i}`} className="text-warn-deep">
+              {fmt(c.planWarning, { row: w.row + 1, field: w.field, reason: reasonText(w.reason, c) })}
+              {w.value ? ` — “${w.value}”` : ""}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="flex items-center gap-2">
         <span className="text-meta text-muted">
           {skipped > 0 ? fmt(c.importCountSkipped, { n: ready.length, skipped }) : fmt(c.importCount, { n: ready.length })}
@@ -283,6 +352,17 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
           <button type="button" onClick={reset} className={btn("ghost", "md")}>
             {c.startOver}
           </button>
+          {/* Offered, not forced: a renter with four clean rows should not be made to preview them. */}
+          {!plan && (
+            <button
+              type="button"
+              onClick={() => void preview()}
+              disabled={!ready.length || planning}
+              className={btn("secondary", "md")}
+            >
+              {planning ? c.planning : c.previewImport}
+            </button>
+          )}
           <button type="button" onClick={save} disabled={!ready.length || saving} className={btn("primary", "md")}>
             {ready.length ? fmt(c.importN, { n: ready.length }) : c.importNone}
           </button>
@@ -290,4 +370,26 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
       </div>
     </div>
   );
+}
+
+/**
+ * A backend reason code as a sentence.
+ *
+ * An unknown code renders as itself: a new code the web has not learned about is still more useful
+ * to a renter (and to whoever he forwards it to) than the word "error".
+ */
+function reasonText(code: string, c: ReturnType<typeof useT>["suppliers"]): string {
+  const map: Record<string, string> = {
+    MISSING_CONTACT: c.rMissingContact,
+    MISSING_NAME: c.rMissingName,
+    INVALID_PHONE: c.rInvalidPhone,
+    INVALID_EMAIL: c.rInvalidEmail,
+    TRUNCATED: c.rTruncated,
+    TOO_LONG: c.rTooLong,
+    SAME_NAME_DIFFERENT_CONTACT: c.rSameName,
+  };
+  if (map[code]) return map[code];
+  // `DUPLICATE_OF_ROW_7` names a row of the renter's own file, so the number is worth keeping.
+  const dup = code.match(/^DUPLICATE_OF_ROW_(\d+)$/);
+  return dup ? fmt(c.rDuplicateOf, { row: Number(dup[1]) + 1 }) : code;
 }

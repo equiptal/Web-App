@@ -103,8 +103,11 @@ describe("InviteSupplierDialog", () => {
     expect(copy.disabled).toBe(false);
   });
 
-  it("Given nothing records the send, Then the dialog says so rather than implying a history entry", () => {
+  it("Given the channels differ in what they record, Then the dialog says which two leave a trace", () => {
     open(supplier());
-    expect(screen.getByText(en.suppliers.inviteNotRecorded)).toBeTruthy();
+    // SUP-BE-15 takes email | whatsapp only. Writing SMS as "email" would put a lie in an audit row,
+    // so those two are sent and not recorded — and the renter is told, rather than finding a profile
+    // missing an entry he remembers making.
+    expect(screen.getByText(en.suppliers.inviteRecorded)).toBeTruthy();
   });
 });

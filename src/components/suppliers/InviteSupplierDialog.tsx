@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui";
 import { cx } from "@/lib/ds";
 import { fmt, useT } from "@/lib/i18n";
 import { JOIN_URL } from "@/lib/config/store-links";
+import { recordSupplierInvite } from "@/lib/api/client";
 import { bidCount, type RenterSupplier } from "@/lib/contract/renter-suppliers";
 
 /**
@@ -30,9 +31,13 @@ import { bidCount, type RenterSupplier } from "@/lib/contract/renter-suppliers";
  * recognises the sender; a message from a Moedatech address is a colder one with a worse reply rate,
  * and the reply would land nowhere he looks.
  *
- * ⚠️ **Nothing is recorded.** SUP-BE-15 is the write that would put this on the supplier's history,
- * and it does not exist — so the dialog says the sending is not recorded rather than implying a
- * record the profile cannot show.
+ * ── Recorded, for the two channels the record has a word for ────────────────────────────────────
+ *
+ * SUP-BE-15 takes `channel: "email" | "whatsapp"`, so those two land on the supplier's history the
+ * moment the client opens. SMS and the clipboard are sent the same message and are NOT recorded —
+ * the enum has no value for them, and writing them as "email" would put a lie in an audit row. The
+ * dialog says which of the four leave a trace rather than letting a renter discover it from a
+ * profile that is missing an entry he remembers making.
  */
 export function InviteSupplierDialog({
   supplier,
@@ -64,7 +69,10 @@ export function InviteSupplierDialog({
       icon: "chat",
       label: c.inviteChannelWhatsApp,
       // The number goes in the path, so it opens the thread he already has with them.
-      go: () => window.open(`https://wa.me/${phone.replace(/^\+/, "")}?text=${enc}`, "_blank", "noopener"),
+      go: () => {
+        void recordSupplierInvite([supplier.id], "whatsapp");
+        window.open(`https://wa.me/${phone.replace(/^\+/, "")}?text=${enc}`, "_blank", "noopener");
+      },
       blocked: phone ? null : c.inviteNoPhone,
     },
     {
@@ -72,6 +80,8 @@ export function InviteSupplierDialog({
       icon: "mail",
       label: c.inviteChannelEmail,
       go: () => {
+        // Never awaited: an audit row must not stand between the renter and his mail client.
+        void recordSupplierInvite([supplier.id], "email");
         window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(c.inviteSubject)}&body=${enc}`;
       },
       blocked: email ? null : c.inviteNoEmail,
@@ -144,7 +154,7 @@ export function InviteSupplierDialog({
             {[...new Set(channels.map((ch) => ch.blocked).filter(Boolean))].join(" ")}
           </p>
         )}
-        <p className="text-label text-muted-light">{c.inviteNotRecorded}</p>
+        <p className="text-label text-muted-light">{c.inviteRecorded}</p>
       </div>
     </Dialog>
   );

@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/ui";
 import { btn, cx } from "@/lib/ds";
-import { listRenterSuppliers, updateRenterSupplier, type RenterSupplier } from "@/lib/api/client";
+import { listRenterSuppliers, recordRequestShare, updateRenterSupplier, type RenterSupplier } from "@/lib/api/client";
 import { canBeEmailed, groupsOf, groupsWithCounts } from "@/lib/contract/renter-suppliers";
-import { copyBidLink } from "@/lib/bidCardHtml";
+import { bidTokenFromUrl, copyBidLink } from "@/lib/bidCardHtml";
 
 /**
  * SUP-T41 — sending a request to the suppliers already on the renter's list.
@@ -34,6 +34,13 @@ import { copyBidLink } from "@/lib/bidCardHtml";
  * A supplier with no e-mail is shown with an *Add e-mail* box on the row. Dropping him silently and
  * reporting "sent to 12" when the renter picked 14 is the kind of quiet failure he finds out about a
  * week later, when a bid he was waiting for never came.
+ *
+ * ── What is recorded is what he DECLARED ────────────────────────────────────────────────────────
+ *
+ * The send is written to the supplier's history (SUP-BE-14) at the moment the mail client opens —
+ * which is the last thing this app can observe. Whether he then pressed Send in Gmail is not ours to
+ * know, and every recipient of one request gets the same link, so the bid page sees a visit and never
+ * whose. The profile says "you shared this with them", never "they opened it".
  */
 export function ShareToSuppliers({
   shareUrl,
@@ -110,6 +117,10 @@ export function ShareToSuppliers({
 
   const send = () => {
     if (!addresses.length || tooMany) return;
+    // Recorded first, and never awaited: the audit row must not stand between the renter and his
+    // mail client, and a failed write must not tell him the message did not go out.
+    const token = bidTokenFromUrl(shareUrl);
+    if (token) void recordRequestShare(token, reachable.map((s) => s.id), "email");
     // Recipients in BCC and nothing in To: forty suppliers in one To line tells each of them who
     // else was asked.
     window.location.href = `mailto:?bcc=${encodeURIComponent(addresses.join(","))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;

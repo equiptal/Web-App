@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 import { btn, cx } from "@/lib/ds";
-import { fmt, useT } from "@/lib/i18n";
+import { fmt, useLocale, useT } from "@/lib/i18n";
 import { getRenterSupplier } from "@/lib/api/client";
-import type { SupplierProfile } from "@/lib/contract/renter-suppliers";
+import { bidRateLabel, type SupplierProfile } from "@/lib/contract/renter-suppliers";
 
 /**
  * SUP-T33 — every bid this supplier sent, and one step from each to the real thing.
@@ -29,6 +29,7 @@ export function SupplierBidsDialog({
   onProfile: (id: string) => void;
 }) {
   const t = useT();
+  const { locale } = useLocale();
   const c = t.suppliers;
   const router = useRouter();
   const [p, setP] = useState<SupplierProfile | null>(null);
@@ -90,7 +91,13 @@ export function SupplierBidsDialog({
                 </b>
                 <span className="block text-meta text-muted">{[b.site, b.requestCode].filter(Boolean).join(" · ")}</span>
               </span>
-              {b.price !== null && <span className="flex-none font-mono text-meta font-semibold text-navy">{b.price}</span>}
+              {/* A RATE, per unit per period — never a total, and never summed down the column
+                  (backend delivery note §3.6). The period and the count are what make it a price. */}
+              {b.price !== null && (
+                <span className="flex-none whitespace-nowrap font-mono text-meta font-semibold text-navy">
+                  {bidRateLabel(b, locale === "ar" ? "ar" : "en")}
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => router.push(`/requests/${encodeURIComponent(b.requestId)}`)}

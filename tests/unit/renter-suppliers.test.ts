@@ -8,6 +8,8 @@ import {
   groupsWithCounts,
   supplierTier,
   type RenterSupplier,
+  isOnMoedatech,
+  bidRateLabel,
 } from "@/lib/contract/renter-suppliers";
 
 const row = (over: Partial<RenterSupplier> = {}): RenterSupplier => ({
@@ -105,5 +107,49 @@ describe("the relationship, in one word", () => {
   it("counts both channels — an account holder can use the shared form too", () => {
     expect(bidCount(roll({ bidsApp: 3, bidsLink: 1 }))).toBe(4);
     expect(bidCount(row())).toBe(0);
+  });
+});
+
+/* ============================================================================================== *
+ * What the backend actually delivered (delivery note, 2026-09-01)
+ * ============================================================================================== */
+
+describe("onMoedatech, not kind", () => {
+  it("Given a hand-typed row matched to an account, Then it is on Moedatech and cannot be invited", () => {
+    // The row stays the renter's — his name, his flag, his groups — and the badge still tells the
+    // truth about the firm. Reading `kind` for this offered an invite to an existing user.
+    const s = { id: "1", kind: "own", name: "Najd", phone: "+966559031174", email: "a@b.sa", onMoedatech: true, matchedOn: "phone", vendorRegistered: true } as unknown as RenterSupplier;
+    expect(isOnMoedatech(s)).toBe(true);
+    expect(canBeInvited(s)).toBe(false);
+  });
+
+  it("Given a payload from before the field existed, Then a linked row still shows the badge", () => {
+    const s = { id: "2", kind: "platform", name: "Zahid", vendorRegistered: true } as unknown as RenterSupplier;
+    expect(isOnMoedatech(s)).toBe(true);
+  });
+
+  it("Given a firm with no account, Then it can be invited", () => {
+    const s = { id: "3", kind: "own", name: "Yard", email: "y@x.sa", onMoedatech: false, vendorRegistered: true } as unknown as RenterSupplier;
+    expect(canBeInvited(s)).toBe(true);
+  });
+});
+
+describe("bidRateLabel", () => {
+  it("Given a rate per month for three units, Then it says so and does not multiply", () => {
+    // A total needs billable days, which is the request's business. A wrong total on a supplier's
+    // history is worse than an honest rate.
+    expect(bidRateLabel({ price: 8400, priceUnit: "PER_MONTH", units: 3 })).toBe("8,400 / month × 3");
+  });
+
+  it("Given one unit, Then the count is left off", () => {
+    expect(bidRateLabel({ price: 300, priceUnit: "PER_DAY", units: 1 })).toBe("300 / day");
+  });
+
+  it("Given no period, Then the amount stands alone rather than claiming one", () => {
+    expect(bidRateLabel({ price: 500, priceUnit: null, units: null })).toBe("500");
+  });
+
+  it("Given no price, Then there is nothing to render", () => {
+    expect(bidRateLabel({ price: null, priceUnit: "PER_DAY", units: 2 })).toBeNull();
   });
 });

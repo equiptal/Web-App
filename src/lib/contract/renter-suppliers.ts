@@ -38,9 +38,14 @@ export type RenterSupplierSource = "platform" | "manual" | "sheet" | "link_bid";
  * **Computed server-side, deliberately.** A company with two hundred suppliers would otherwise cost
  * one request per supplier on every page load.
  *
- * `newBids` is absent until SUP-BE-13: it is "since *you* last looked", which needs a per-user seen
- * state that Phase 3 adds. Undefined therefore means *not answered yet*, not zero — the badge is not
- * drawn rather than drawn empty.
+ * `newBids` DOES arrive, and it is a 24-HOUR WINDOW rather than "since you last looked" — the
+ * backend computes it from `NEW_BID_WINDOW_HOURS` (`renter-supplier-rollup.service.ts:71`), not from
+ * a per-user seen stamp. SUP-BE-13 is what turns it into the second thing.
+ *
+ * So the badge says *today*, never *unread*: a renter who reads a bid and comes back an hour later
+ * must not be told it is still new, and a renter who was away a week must not be told a Tuesday bid
+ * is old news. Undefined still means *not answered*, not zero — the badge is not drawn rather than
+ * drawn empty.
  */
 export interface SupplierRollup {
   /** Bids this supplier made inside the app. */
@@ -53,7 +58,7 @@ export interface SupplierRollup {
   rooms: number;
   /** Project awards carrying this row's supplier id. */
   awards: number;
-  /** Bids since this user last opened the list. Undefined until the backend answers it. */
+  /** Bids in the last 24 hours. Undefined on a payload that predates the roll-up. */
   newBids?: number;
 }
 
@@ -76,6 +81,18 @@ export interface RenterSupplier {
    * the exact class of bug the agents-contract test exists to catch.
    */
   supplierId?: string | number | null;
+  /**
+   * Does this firm hold a Moedatech account?
+   *
+   * ⚠️ **This is NOT `kind === "platform"`, and reading it as that was wrong.** A hand-typed row is
+   * matched to an account on every read, by phone or e-mail, and comes back `kind: "own"` with
+   * `onMoedatech: true` (backend delivery note §3.1, decision 2). The row stays the renter's — his
+   * name, his flag, his groups, nothing rewritten — and the badge self-corrects the day the supplier
+   * signs up. So: **`onMoedatech` decides the badge; `kind` decides who owns the fields.**
+   */
+  onMoedatech?: boolean;
+  /** How the match was made. Null on a linked row, where the id IS the link. */
+  matchedOn?: "phone" | "email" | null;
   /** The account's name for `platform`, the renter's own for `own`. */
   name: string;
   /** The renter's flag, and the renter's alone. */
@@ -130,11 +147,44 @@ export interface SupplierBid {
   requestCode: string | null;
   equipment: string;
   site: string | null;
+  /**
+   * ⚠️ **A RATE, per unit per period — never a total.** In both lanes (backend delivery note §3.6).
+   * So it is shown with its period and its count beside it and the column is never summed: adding
+   * 8,400/month to 300/day gives a number that is not money.
+   */
   price: number | null;
+  /** `PER_DAY` · `PER_WEEK` · `PER_MONTH` · `PER_JOB`. The period the rate is per. */
   priceUnit: string | null;
+  /** Units bid on this line. Part of what makes the rate a price. */
+  units?: number | null;
   at: string;
   /** Which channel it arrived through — an account holder can use the shared form too. */
   via: "app" | "link";
+}
+
+/**
+ * `8,400 / month × 3` — a rate said as a rate.
+ *
+ * Deliberately NOT multiplied out. A total needs the number of billable days, which is the request's
+ * business and not this row's, and a wrong total on a supplier's history is worse than an honest rate
+ * a renter can read.
+ */
+export function bidRateLabel(
+  bid: Pick<SupplierBid, "price" | "priceUnit" | "units">,
+  lang: "en" | "ar" = "en",
+): string | null {
+  if (bid.price == null) return null;
+  const ar = lang === "ar";
+  const period: Record<string, [string, string]> = {
+    PER_DAY: ["day", "يوم"],
+    PER_WEEK: ["week", "أسبوع"],
+    PER_MONTH: ["month", "شهر"],
+    PER_JOB: ["job", "مهمة"],
+  };
+  const p = bid.priceUnit ? period[bid.priceUnit.toUpperCase()] : undefined;
+  const amount = bid.price.toLocaleString(ar ? "ar-SA" : "en-US");
+  const rate = p ? `${amount} / ${ar ? p[1] : p[0]}` : amount;
+  return bid.units && bid.units > 1 ? `${rate} × ${bid.units}` : rate;
 }
 
 /** One award, as the profile lists it. Only awards carrying a supplier id can appear. */
@@ -193,7 +243,19 @@ export const canBeEmailed = (s: RenterSupplier): boolean => !!s.email?.trim();
  * Off-platform only: a supplier who already has an account has nothing to join, and offering it would
  * read as "we do not know who you are" to a firm that has been bidding in the app for a year.
  */
-export const canBeInvited = (s: RenterSupplier): boolean => s.kind === "own" && canBeEmailed(s);
+/**
+ * ⚠️ `onMoedatech`, not `kind`. A hand-typed row whose phone matches an account is `kind: "own"` and
+ * already on Moedatech — inviting them would be us not knowing our own users.
+ */
+export const canBeInvited = (s: RenterSupplier): boolean => !isOnMoedatech(s) && canBeEmailed(s);
+
+/**
+ * Is this firm on Moedatech?
+ *
+ * `onMoedatech` when the backend says so; otherwise the older signal, so a payload from before the
+ * field existed still draws the badge on a linked row rather than losing it.
+ */
+export const isOnMoedatech = (s: RenterSupplier): boolean => s.onMoedatech ?? s.kind === "platform";
 
 /**
  * Something the renter typed was kept but could not be used as a key.

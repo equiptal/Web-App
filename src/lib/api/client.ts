@@ -1481,14 +1481,34 @@ export function isAlreadyLinked(err: unknown): boolean {
 }
 
 export interface BulkResult {
-  created: { row: number; id: string }[];
-  merged: { row: number; id: string; on: string }[];
-  rejected: { row: number; reason: string }[];
+  /** `id` is null on a dry run — nothing was written, so there is nothing to name. */
+  created: { row: number; id: string | null }[];
+  merged: { row: number; id: string | null; on: "phone" | "email" | string }[];
+  rejected: { row: number; reason: "MISSING_CONTACT" | "MISSING_NAME" | string }[];
+  /**
+   * A row that landed, but not as typed.
+   *
+   * `INVALID_PHONE` · `INVALID_EMAIL` · `TRUNCATED` · `TOO_LONG` · `SAME_NAME_DIFFERENT_CONTACT`.
+   *
+   * ⚠️ **`SAME_NAME_DIFFERENT_CONTACT` is the one to design for.** The sheet names a supplier already
+   * on the list but reaches a different phone and e-mail, so it was added as a NEW row. Two firms a
+   * renter named the same are real, so the backend refuses to fold them — the preview asks.
+   */
+  warnings?: { row: number; field: string; reason: string; value?: string }[];
 }
 
-/** The spreadsheet import. Partial success is the normal outcome — read all three arrays. */
-export async function addRenterSuppliersBulk(rows: NewRenterSupplier[]): Promise<BulkResult> {
-  return projectFetch<BulkResult>("/api/renter-suppliers/bulk", { method: "POST", body: { rows } });
+/**
+ * The spreadsheet import.
+ *
+ * `dryRun` runs the whole decision and **writes nothing**, so the renter sees his rejected rows and
+ * his duplicates while he can still fix the file. Partial success is the normal outcome either way —
+ * read all four arrays, and never report a count that came from the row total.
+ */
+export async function addRenterSuppliersBulk(rows: NewRenterSupplier[], dryRun = false): Promise<BulkResult> {
+  return projectFetch<BulkResult>("/api/renter-suppliers/bulk", {
+    method: "POST",
+    body: dryRun ? { rows, dryRun: true } : { rows },
+  });
 }
 
 /** Link suppliers who already have accounts. One already linked is skipped, not an error. */
@@ -1537,6 +1557,45 @@ export async function listSupplierSuggestions(): Promise<SupplierSuggestion[]> {
     return await projectFetch<SupplierSuggestion[]>("/api/renter-suppliers/suggestions");
   } catch {
     return [];
+  }
+}
+
+/**
+ * Record who a request was declared sent to (SUP-T41), or who was invited (SUP-T42).
+ *
+ * **Declared, not observed.** The renter's own mail client sends the message, so this is the list he
+ * chose — not who received it and not who opened it. Every recipient of one request gets the same
+ * link, so the bid page sees a visit and never whose.
+ *
+ * Never throws at the caller: the send has already happened by the time this runs, and failing the
+ * UI over an audit row would tell a renter his message did not go out when it did.
+ */
+export async function recordRequestShare(
+  requestId: string,
+  renterSupplierIds: string[],
+  channel: "email" | "whatsapp",
+): Promise<void> {
+  if (!renterSupplierIds.length) return;
+  try {
+    await projectFetch(`/api/requests/${encodeURIComponent(requestId)}/shares`, {
+      method: "POST",
+      body: { renterSupplierIds, channel },
+    });
+  } catch {
+    /* the message went out regardless */
+  }
+}
+
+/** The same record with no request behind it. Same rule: an audit row never fails the act. */
+export async function recordSupplierInvite(
+  renterSupplierIds: string[],
+  channel: "email" | "whatsapp",
+): Promise<void> {
+  if (!renterSupplierIds.length) return;
+  try {
+    await projectFetch("/api/renter-suppliers/invites", { method: "POST", body: { renterSupplierIds, channel } });
+  } catch {
+    /* the invite went out regardless */
   }
 }
 

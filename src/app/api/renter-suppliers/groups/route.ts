@@ -27,9 +27,18 @@ export async function PATCH(req: Request) {
   return NextResponse.json({ code: "not_configured" }, { status: 503 });
 }
 
+/**
+ * The name is a PATH segment, not a query parameter.
+ *
+ * ⚠️ It was a query, and the backend never had that route — `agents-contract.test.ts` had it waived
+ * as `DELETE /agents/renter-suppliers/groups`, so deleting a group 404'd and the renter read it as
+ * "it broke" (found 2026-09-01, against the backend's own delivery note §3.7).
+ *
+ * Percent-encoded, because group names hold spaces and Arabic.
+ */
 export async function DELETE(req: Request) {
   const name = new URL(req.url).searchParams.get("name") ?? "";
   if (!name.trim()) return NextResponse.json({ code: "group_name_required" }, { status: 400 });
-  if (useRealApp) return relayAsRenter(`/renter-suppliers/groups?name=${encodeURIComponent(name)}`, { method: "DELETE" });
+  if (useRealApp) return relayAsRenter(`/renter-suppliers/groups/${encodeURIComponent(name)}`, { method: "DELETE" });
   return NextResponse.json({ code: "not_configured" }, { status: 503 });
 }

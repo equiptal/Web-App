@@ -13,6 +13,7 @@ import { ShareToSuppliers } from "@/components/requests/ShareToSuppliers";
 const rows = vi.hoisted(() => ({
   list: [] as { id: string; name: string; email: string | null; groups?: string[] }[],
   patched: [] as unknown[][],
+  recorded: [] as unknown[][],
 }));
 
 vi.mock("@/lib/api/client", () => ({
@@ -21,9 +22,16 @@ vi.mock("@/lib/api/client", () => ({
     rows.patched.push(args);
     return Promise.resolve({});
   },
+  recordRequestShare: (...args: unknown[]) => {
+    rows.recorded.push(args);
+    return Promise.resolve();
+  },
 }));
 
-vi.mock("@/lib/bidCardHtml", () => ({ copyBidLink: () => Promise.resolve(true) }));
+vi.mock("@/lib/bidCardHtml", async (real) => ({
+  ...(await real<typeof import("@/lib/bidCardHtml")>()),
+  copyBidLink: () => Promise.resolve(true),
+}));
 
 const L = (en: string) => en;
 const URL_ = "https://web.moedatech.net/bid/excavator-5cc5efdc-86ab-459e-a73e-564257e2cbd2";
@@ -32,6 +40,7 @@ let href = "";
 
 beforeEach(() => {
   rows.patched = [];
+  rows.recorded = [];
   href = "";
   // `mailto:` navigation is the whole output of this component, so it is what the test reads.
   Object.defineProperty(window, "location", {
@@ -71,6 +80,10 @@ describe("ShareToSuppliers", () => {
     // The request's own code rides in the subject so an operator can file the reply against it.
     expect(decodeURIComponent(href)).toContain("EXC-170845");
     expect(decodeURIComponent(href)).toContain(URL_);
+
+    // Declared, not observed: the record is written against the link token the renter shared, and it
+    // says who he chose — never who received it or opened it.
+    expect(rows.recorded[0]).toEqual(["5cc5efdc-86ab-459e-a73e-564257e2cbd2", ["a", "b"], "email"]);
   });
 
   it("Given one of them has no e-mail, When picked, Then it is named before the send and not counted", async () => {

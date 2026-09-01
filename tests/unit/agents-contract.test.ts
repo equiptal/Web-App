@@ -108,7 +108,7 @@ when("the routes this app calls", () => {
    *
    * Owned by `docs/implementation-plans/renter-suppliers/backend-tickets.md` — SUP-BE-3…8, BE-14.
    */
-  const knownAbsent = new Set([
+  const knownAbsent = new Set<string>([
     // GET /agents/renter-suppliers is BUILT — the guard below caught the stale waiver.
     // POST /agents/renter-suppliers is BUILT — caught by the guard, 2026-09-01.
     // GET /agents/renter-suppliers/{} is BUILT — caught by the guard below, 2026-09-01.
@@ -119,7 +119,8 @@ when("the routes this app calls", () => {
     // GET /agents/renter-suppliers/suggestions is BUILT — caught by the guard, 2026-09-01.
     // GET /agents/renter-suppliers/groups is BUILT — caught by the guard, 2026-09-01.
     // PATCH /agents/renter-suppliers/groups is BUILT — caught by the guard, 2026-09-01.
-    "DELETE /agents/renter-suppliers/groups",
+    // DELETE /agents/renter-suppliers/groups/{} is BUILT — this app was calling the wrong shape
+    // (a query, not a path segment), which is why the waiver looked correct: 2026-09-01.
   ]);
 
   it("all exist on the backend", () => {

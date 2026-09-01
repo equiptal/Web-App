@@ -13,9 +13,11 @@ import { SupplierBidsDialog } from "./SupplierBidsDialog";
 import { EditSupplierDialog } from "./EditSupplierDialog";
 import { InviteSupplierDialog } from "./InviteSupplierDialog";
 import { SuggestedBand } from "./SuggestedBand";
+import { hasUnseenBid, loadSeen, markSeen } from "@/lib/supplierSeen";
 import {
   bidCount,
   canBeEmailed,
+  isOnMoedatech,
   groupsOf,
   groupsWithCounts,
   hasUnparsed,
@@ -77,6 +79,12 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
   const [bidsId, setBidsId] = useState<string | null>(null);
   const [editing, setEditing] = useState<RenterSupplier | null>(null);
   const [inviting, setInviting] = useState<RenterSupplier | null>(null);
+  /* When THIS person last opened each row. Local by design — see `supplierSeen.ts`. */
+  const [seen, setSeen] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setSeen(loadSeen());
+  }, []);
 
   const load = useCallback(() => {
     listRenterSuppliers().then(setRows);
@@ -328,8 +336,15 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
                       return next;
                     })
                   }
-                  onOpen={() => setProfileId(s.id)}
-                  onOpenBids={() => setBidsId(s.id)}
+                  onOpen={() => {
+                    setProfileId(s.id);
+                    setSeen(markSeen(s.id));
+                  }}
+                  onOpenBids={() => {
+                    setBidsId(s.id);
+                    setSeen(markSeen(s.id));
+                  }}
+                  seenAt={seen[s.id]}
                   onEdit={() => setEditing(s)}
                   onInvite={() => setInviting(s)}
                 />
@@ -440,6 +455,7 @@ function Row({
   onOpenBids,
   onEdit,
   onInvite,
+  seenAt,
 }: {
   s: RenterSupplier;
   c: ReturnType<typeof useT>["suppliers"];
@@ -451,8 +467,13 @@ function Row({
   onOpenBids: () => void;
   onEdit: () => void;
   onInvite: () => void;
+  /** ISO of this reader's last look at the row, or undefined if he never has. */
+  seenAt?: string;
 }) {
-  const platform = s.kind === "platform";
+  /* ⚠️ The badge is `onMoedatech`, never `kind`. A hand-typed row matched to an account by phone or
+     e-mail is `kind: "own"` and still on Moedatech — the fields stay the renter's, the badge tells
+     the truth about the firm (backend delivery note §3.1). */
+  const onApp = isOnMoedatech(s);
   const groups = groupsOf(s);
   const bids = bidCount(s);
   const roll = s.rollup;
@@ -490,7 +511,7 @@ function Row({
           <span
             className={cx(
               "grid h-[30px] w-[30px] flex-none place-items-center rounded-sm text-meta font-extrabold",
-              platform ? "bg-navy text-surface" : "bg-surface3 text-navy-mid",
+              onApp ? "bg-navy text-surface" : "bg-surface3 text-navy-mid",
             )}
           >
             {initials(s.name)}
@@ -499,7 +520,7 @@ function Row({
             <span className="flex items-center gap-1.5 text-body font-extrabold text-navy">
               {s.name}
               {/* A fact about the firm, not about this row: it is where their bids arrive. */}
-              {platform && (
+              {onApp && (
                 <span className="inline-flex h-[19px] flex-none items-center gap-1 rounded-full bg-navy px-2 text-label font-extrabold text-surface">
                   <Icon name="verified_user" size={12} />
                   {c.onMoedatech}
@@ -564,8 +585,36 @@ function Row({
           </>
         ) : (
           <button type="button" onClick={onOpenBids} className="block text-start">
-            <span className="block text-body font-extrabold text-navy underline decoration-border-strong underline-offset-2 hover:decoration-navy">
-              {bids === 1 ? fmt(c.bidOne, { n: 1 }) : fmt(c.bidMany, { n: bids })}
+            <span className="flex items-center gap-1.5">
+              <span className="text-body font-extrabold text-navy underline decoration-border-strong underline-offset-2 hover:decoration-navy">
+                {bids === 1 ? fmt(c.bidOne, { n: 1 }) : fmt(c.bidMany, { n: bids })}
+              </span>
+              {/* SUP-T34 — the ONE filled badge on the screen, and the only thing that moves. That is
+                  the point of it: everything else here is text, so a renter's eye is caught by the
+                  row that changed rather than by five things competing.
+
+                  It says TODAY, not UNREAD. The backend counts a 24-hour window, not a per-user seen
+                  stamp (SUP-BE-13), so the title says so — a badge claiming "unread" that a renter
+                  cannot clear by reading is a badge he learns to ignore.
+
+                  `motion-safe:` and nothing else: a renter who has asked his system for less motion
+                  gets the badge without the pulse, which is the whole of what he asked for. */}
+              {(roll?.newBids ?? 0) > 0 && (
+                <span
+                  title={fmt(c.newBidsTitle, { n: roll?.newBids ?? 0 })}
+                  className="inline-flex h-[18px] items-center rounded-full bg-brand px-2 text-label font-extrabold uppercase tracking-wide text-brand-fg motion-safe:animate-pulse"
+                >
+                  {c.newBadge}
+                </span>
+              )}
+              {/* The badge and the dot answer different questions, so both can be true at once. The
+                  badge is the last 24 hours and is the same for everyone in the firm; the dot is
+                  since THIS reader last opened the row, kept locally because the backend has no
+                  per-user seen state and deliberately none (delivery note §3.2). It goes the moment
+                  he opens the row, while the badge stays until tomorrow. */}
+              {hasUnseenBid(roll?.lastBidAt, seenAt) && (
+                <span title={c.unseenBid} className="h-[7px] w-[7px] flex-none rounded-full bg-info" />
+              )}
             </span>
             <span className="block text-label font-semibold text-muted">
               {[...detail, roll?.awards ? fmt(c.awarded, { n: roll.awards }) : null].filter(Boolean).join(" · ")}
@@ -578,7 +627,7 @@ function Row({
         <span className="flex items-center justify-end">
           {/* SUP-T42 — off-platform rows only. A supplier who already has an account has nothing to
               be invited to, and offering it would be us not knowing our own users. */}
-          {!platform && (
+          {!onApp && (
             <button
               type="button"
               onClick={onInvite}

@@ -49,8 +49,26 @@ const SIZE: Record<DialogSize, string> = {
   xl: "max-w-[880px]",
 };
 
-/** The scrim, shared by the centred dialog and the side drawer so both dim the page identically. */
-const SCRIM = "fixed inset-0 z-[60] bg-navy/45";
+/**
+ * The scrim, shared by the centred dialog and the side drawer so both dim the page identically.
+ *
+ * ── Why it is BLACK and blurred, not navy (owner, 2026-09-01) ────────────────────────────────────
+ *
+ * *"How do I make contrast between the modal and the background?"* — asked of the auth dialog, which
+ * is `navy-deep`, opened over the guest home, which is a navy hero above navy cards. `navy/45` over
+ * that is navy on navy on navy: the scrim darkened the page without separating anything from it, and
+ * the panel's own edge dissolved into the picture behind it.
+ *
+ * Two changes, and neither is a shadow — this app has none:
+ *
+ *  · **`black/55`.** Black is the one ink that is not in the palette behind it, so it reads as a
+ *    dimming of the PAGE rather than as more of the same colour. 55 over 45 because the page it has
+ *    to suppress is already dark; on the light surfaces it costs nothing.
+ *  · **A 3px blur.** Contrast is not only tone — a sharp photograph competing at full detail behind
+ *    a form is what made the excavator look like part of the dialog. Blurring the page removes the
+ *    competition outright, which no amount of opacity does.
+ */
+const SCRIM = "fixed inset-0 z-[60] bg-black/55 backdrop-blur-[3px]";
 
 /**
  * How many dialogs are open, so a NESTED one does not dim the page twice.
@@ -75,7 +93,9 @@ let openDialogs = 0;
  *  and not a new component. */
 const PANEL: Record<DialogTone, string> = {
   default: "border border-border bg-surface",
-  dark: "border border-white/10 bg-navy-deep text-white",
+  /* A brighter hairline than `white/10`: on a dark page the panel's own edge is the only line
+     saying where it ends, and a tenth of white against a dimmed navy hero is not a line. */
+  dark: "border border-white/20 bg-navy-deep text-white",
 };
 
 export type DialogTone = "default" | "dark";
