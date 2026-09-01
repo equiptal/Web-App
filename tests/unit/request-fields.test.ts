@@ -175,6 +175,8 @@ const ITEM: RequestItem = {
   fatFood: true,
   fatAccommodationTransport: false,
   workType: "Tower lift",
+  attachmentIds: [],
+  customAttachments: [],
   safetyCertifications: ["SCE", "OSHA"],
   additionalNotes: "Needs a hydraulic breaker attachment.",
 };

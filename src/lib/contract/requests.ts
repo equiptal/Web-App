@@ -196,6 +196,19 @@ export interface RequestItem {
   safetyCertifications: string[] | null;
   /** Free-text work type, crane subtypes only (backend `work_type`, VARCHAR(255)). */
   workType: string | null;
+  /**
+   * Admin-defined `SubtypeAttachment` ids chosen for this item (backend `attachment_ids`), and the
+   * renter's own free-text additions beside them (`custom_attachments`).
+   *
+   * The ids mean nothing on their own: naming them needs that subtype's catalogue, which is
+   * `GET /api/equipment/attachments/{subtypeId}`. Any surface that shows them has to fetch it.
+   *
+   * `customAttachments` has no UI anywhere: the agent's parse can produce it, and the canvas never
+   * asks for it. A form that edits attachments therefore passes it through untouched rather than
+   * dropping it, which a wholesale item replacement would otherwise do.
+   */
+  attachmentIds: string[] | null;
+  customAttachments: string[] | null;
   additionalNotes: string | null;
 }
 

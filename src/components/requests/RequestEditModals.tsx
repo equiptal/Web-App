@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Dialog } from "@/components/Dialog";
 import { Dropdown } from "@/components/Dropdown";
 import { CertSelect } from "@/components/create/CertSelect";
+import type { SubtypeAttachmentOption } from "@/lib/contract/app";
 import { requestedMinYear } from "@/lib/contract/bids";
 import { SAFETY_CERTIFICATES, type SafetyCertificate } from "@/lib/contract/options";
 import { updateRequest } from "@/lib/api/client";
@@ -171,6 +172,28 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
   const [mob, setMob] = useState(it?.mobilizationByRentee ? "rentee" : "supplier");
   const [demob, setDemob] = useState(it?.demobilizationByRentee ? "rentee" : "supplier");
   const [workType, setWorkType] = useState(s(it?.workType));
+  const [attachments, setAttachments] = useState<string[]>(it?.attachmentIds ?? []);
+  /**
+   * That subtype's attachment catalogue, so the ids on the item can be NAMED.
+   *
+   * The canvas's own `useItemAttachments` reads the same endpoint, with one difference that matters
+   * here: it applies the admin's `preSelected` defaults when nothing is chosen. That is right for a
+   * machine being described for the first time and wrong for one being corrected. A request the
+   * renter deliberately left without attachments must not gain them by opening this form.
+   */
+  const [attachOptions, setAttachOptions] = useState<SubtypeAttachmentOption[]>([]);
+  const subtypeId = it?.subtypeId ?? null;
+  useEffect(() => {
+    if (!subtypeId) return;
+    let live = true;
+    fetch(`/api/equipment/attachments/${encodeURIComponent(subtypeId)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: SubtypeAttachmentOption[]) => live && setAttachOptions(Array.isArray(list) ? list : []))
+      .catch(() => live && setAttachOptions([]));
+    return () => {
+      live = false;
+    };
+  }, [subtypeId]);
   const [certs, setCerts] = useState<SafetyCertificate[]>(
     (it?.safetyCertifications ?? []).filter((c): c is SafetyCertificate =>
       (SAFETY_CERTIFICATES as readonly string[]).includes(c),
@@ -201,6 +224,10 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
   const withOperator = operator === "YES";
   /** An SLA against yourself is not a term — the canvas hides it for the same reason. */
   const supplierMaintains = maint === "supplier";
+  /* Work type is crane-only on the canvas (`equipment_step.dart` `_isCraneSelected`, mirrored in
+     `hooks.ts`), and the test there is the subtype's NAME. The record carries that name, so the same
+     test works here without loading the taxonomy. */
+  const isCrane = (it?.subtypeName ?? "").toLowerCase().includes("crane");
 
   /** A window that runs backwards. The `min`/`max` above stop a picked date; this stops a typed one,
    *  and a request that already holds a reversed pair from before either guard existed. */
@@ -239,7 +266,11 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
         // Only meaningful for a burnt fuel, exactly as `toDieselIncluded` decides it on create.
         ...(fuel === "DIESEL" || fuel === "PETROL" ? { dieselIncluded: fuelBy === "supplier" } : {}),
         safetyCertifications: certs,
-        ...(workType.trim() ? { workType: workType.trim().slice(0, 255) } : {}),
+        ...(isCrane && workType.trim() ? { workType: workType.trim().slice(0, 255) } : {}),
+        attachmentIds: attachments,
+        /* Passed through, not edited: nothing in the product asks for these, and the item is
+           REPLACED by this patch, so leaving them out would delete whatever the parse found. */
+        ...(it.customAttachments?.length ? { customAttachments: it.customAttachments } : {}),
         /* The operator's own answers go only with an operator, and are cleared without one — the
            same rule the canvas applies by not asking them.
 
@@ -348,9 +379,39 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
             <span className={lbl}>{L("Safety certificates", "شهادات السلامة")}</span>
             <div className="mt-1"><CertSelect values={certs} touched onChange={setCerts} /></div>
           </div>
-          <label className="mt-2 block"><span className={lbl}>{L("Work type", "نوع العمل")}</span>
-            <input className={fld} value={workType} maxLength={255} onChange={(e) => setWorkType(e.target.value)} />
-          </label>
+          {/* Hidden entirely when this subtype has no admin-defined attachments, which is the
+              canvas's own rule (MREQ-AC-22): an empty picker is a question with no answers. */}
+          {attachOptions.length > 0 && (
+            <div className="mt-2">
+              <span className={lbl}>{L("Attachments", "الملحقات")}</span>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {attachOptions.map((a) => {
+                  const on = attachments.includes(a.id);
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() =>
+                        setAttachments((prev) => (prev.includes(a.id) ? prev.filter((x) => x !== a.id) : [...prev, a.id]))
+                      }
+                      className={`rounded-md border px-3 py-1.5 text-body font-semibold transition ${
+                        on ? "border-brand bg-brand-soft text-brand-deep" : "border-border bg-surface text-navy hover:bg-surface2"
+                      }`}
+                    >
+                      {ar ? a.nameAr || a.name : a.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {/* Crane-only, as the canvas has it. */}
+          {isCrane && (
+            <label className="mt-2 block"><span className={lbl}>{L("Work type", "نوع العمل")}</span>
+              <input className={fld} value={workType} maxLength={255} onChange={(e) => setWorkType(e.target.value)} />
+            </label>
+          )}
           <label className="mt-1 block"><span className={lbl}>{L("Equipment notes", "ملاحظات المعدة")}</span>
             <textarea rows={2} className="mt-1 w-full rounded-md border border-border bg-surface2 p-3 text-body outline-0" value={itemNotes} onChange={(e) => setItemNotes(e.target.value)} />
           </label>
