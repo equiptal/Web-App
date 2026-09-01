@@ -182,7 +182,7 @@ export function ShareForBidsSheet({
               only worth asking once he knows. */}
           <div>
             <div className={lbl}>{L("Send it to suppliers you keep", "أرسِله إلى مورّديك")}</div>
-            <ShareToSuppliers shareUrl={shareUrl} renterName={renterName} requestCode={requestCode} ar={ar} L={L} />
+            <ShareToSuppliers shareUrl={shareUrl} renterName={renterName} requestCode={requestCode} L={L} />
           </div>
 
           {/* channels */}

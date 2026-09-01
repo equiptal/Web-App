@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 import { cx } from "@/lib/ds";
-import { fmt, useT } from "@/lib/i18n";
+import { fmt, useLocale, useT } from "@/lib/i18n";
 import { JOIN_URL } from "@/lib/config/store-links";
+import { copyInvite } from "@/lib/inviteCardHtml";
 import { recordSupplierInvite } from "@/lib/api/client";
 import { bidCount, type RenterSupplier } from "@/lib/contract/renter-suppliers";
 
@@ -25,11 +26,21 @@ import { bidCount, type RenterSupplier } from "@/lib/contract/renter-suppliers";
  * never has is told what the app is for. Same shape, same ending, and the renter is not asked to
  * pick — the list already knows which of the two is true.
  *
- * ── His voice, not ours ─────────────────────────────────────────────────────────────────────────
+ * ── His voice, not ours (owner, 2026-09-01) ─────────────────────────────────────────────────────
  *
  * It opens his own WhatsApp, his own mail client. A supplier who has worked with him for years
  * recognises the sender; a message from a Moedatech address is a colder one with a worse reply rate,
  * and the reply would land nowhere he looks.
+ *
+ * ⚠️ The prototype (`dlgJoinInvite`) draws this as an e-mail FROM `hello@moedatech.net`, with the two
+ * store badges. Sending it from us is not what the owner wants and there is no endpoint that could —
+ * `/agents/renter-suppliers/invites` records a send, it does not make one. And a `mailto:` body is
+ * plain text, so the badges cannot ride an e-mail the renter sends himself.
+ *
+ * They ride the CLIPBOARD instead. *Copy* writes the prototype's card as `text/html` and the plain
+ * sentence as `text/plain`, so a paste into Gmail gets the badges and a paste into WhatsApp gets the
+ * words — the same trick the bid link already uses, and for the same reason: what we cannot send, we
+ * can hand over.
  *
  * ── Recorded, for the two channels the record has a word for ────────────────────────────────────
  *
@@ -47,8 +58,26 @@ export function InviteSupplierDialog({
   onClose: () => void;
 }) {
   const t = useT();
+  const { locale } = useLocale();
   const c = t.suppliers;
   const [copied, setCopied] = useState(false);
+  /**
+   * The renter's own firm, for the card's opening line — *"Zahid Contracting already works with
+   * you"*. Read here, once, and only when someone is actually being invited: it is one line of one
+   * card, which does not justify a fetch on every page that might one day open this.
+   *
+   * A failure is not an error. The card has a lead that names no one, and a nameless sentence beats a
+   * dialog that will not open.
+   */
+  const [renterName, setRenterName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!supplier) return;
+    fetch("/api/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((me: { companyName?: string | null } | null) => setRenterName(me?.companyName?.trim() || null))
+      .catch(() => setRenterName(null));
+  }, [supplier]);
 
   if (!supplier) return null;
 
@@ -102,7 +131,11 @@ export function InviteSupplierDialog({
       // Always available: a renter who talks to this supplier somewhere we do not model still gets
       // the words.
       go: () => {
-        void navigator.clipboard?.writeText(message).catch(() => {});
+        void copyInvite(message, {
+          renterName,
+          supplierName: name,
+          lang: locale === "ar" ? "ar" : "en",
+        }).catch(() => false);
         setCopied(true);
         setTimeout(() => setCopied(false), 1800);
       },

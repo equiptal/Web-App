@@ -5,7 +5,7 @@ import { Icon } from "@/components/ui";
 import { btn, cx } from "@/lib/ds";
 import { listRenterSuppliers, recordRequestShare, updateRenterSupplier, type RenterSupplier } from "@/lib/api/client";
 import { canBeEmailed, groupsOf, groupsWithCounts } from "@/lib/contract/renter-suppliers";
-import { bidTokenFromUrl, copyBidLink } from "@/lib/bidCardHtml";
+import { bidTokenFromUrl } from "@/lib/bidCardHtml";
 
 /**
  * SUP-T41 — sending a request to the suppliers already on the renter's list.
@@ -46,14 +46,12 @@ export function ShareToSuppliers({
   shareUrl,
   renterName,
   requestCode,
-  ar,
   L,
 }: {
   shareUrl: string;
   renterName?: string | null;
   /** `EXC-170845`, for the subject line — the thing a supplier quotes back at an operator. */
   requestCode?: string | null;
-  ar: boolean;
   L: (en: string, arr: string) => string;
 }) {
   const [rows, setRows] = useState<RenterSupplier[] | null>(null);
@@ -64,8 +62,7 @@ export function ShareToSuppliers({
   const [addingEmailOn, setAddingEmailOn] = useState<string | null>(null);
   const [emailDraft, setEmailDraft] = useState("");
   const [note, setNote] = useState("");
-  const [reference, setReference] = useState("");
-  const [copied, setCopied] = useState<"none" | "message" | "addresses">("none");
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!open || rows) return;
@@ -96,17 +93,23 @@ export function ShareToSuppliers({
     : L("Invitation to bid (RFQ)", "دعوة لتقديم عرض سعر");
 
   /**
-   * The body the supplier reads. The renter's optional line goes ABOVE the link, where a person
-   * actually reads it, and his reference beside the request's own so an operator can file it.
+   * The body the supplier reads — and the same words the preview below shows him before he sends.
+   *
+   * His own line goes ABOVE the request details, exactly where the prototype puts it: it is the part
+   * a person actually reads, and under the link it would be read after the decision was made.
+   *
+   * ~~An "our reference" field.~~ Removed (2026-09-01) — it was mine, not the prototype's. The
+   * request already carries a code both sides can quote, and a second reference invented at send
+   * time is one more thing the renter has to keep true.
    */
   const body = [
     L("Hello,", "مرحبًا،"),
     "",
+    note.trim() ? `${note.trim()}\n` : null,
     renterName
       ? L(`${renterName} has a new equipment request open for bids.`, `لدى ${renterName} طلب معدات جديد مفتوح لتلقّي العروض.`)
       : L("A new equipment request is open for bids.", "طلب معدات جديد مفتوح لتلقّي العروض."),
-    reference.trim() ? L(`Our reference: ${reference.trim()}`, `مرجعنا: ${reference.trim()}`) : null,
-    note.trim() ? `\n${note.trim()}` : null,
+    requestCode ? L(`Reference: ${requestCode}`, `المرجع: ${requestCode}`) : null,
     "",
     shareUrl,
     "",
@@ -126,9 +129,9 @@ export function ShareToSuppliers({
     window.location.href = `mailto:?bcc=${encodeURIComponent(addresses.join(","))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
-  const flash = (what: "message" | "addresses") => {
-    setCopied(what);
-    setTimeout(() => setCopied("none"), 1800);
+  const flash = () => {
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
   };
 
   const saveEmail = async (s: RenterSupplier) => {
@@ -253,20 +256,35 @@ export function ShareToSuppliers({
         )}
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        <input
-          value={reference}
-          onChange={(e) => setReference(e.target.value)}
-          placeholder={L("Your reference (optional)", "مرجعك (اختياري)")}
-          className="h-[30px] rounded-sm border border-border bg-surface px-2.5 text-meta text-navy outline-none focus:border-brand"
-        />
-        <input
+      {/* The prototype's one field, with its own words. A textarea, not a line: what a renter writes
+          here is a sentence to a person, and a 30px box tells him to keep it to four words. */}
+      <label className="grid gap-1">
+        <span className="text-label font-extrabold uppercase tracking-wide text-muted">
+          {L("A line of your own", "سطر منك")}
+        </span>
+        <textarea
+          rows={2}
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder={L("A line to them (optional)", "سطر لهم (اختياري)")}
-          className="h-[30px] rounded-sm border border-border bg-surface px-2.5 text-meta text-navy outline-none focus:border-brand"
+          placeholder={L("Optional — added above the request details.", "اختياري — يُضاف فوق تفاصيل الطلب.")}
+          className="rounded-sm border border-border bg-surface p-2.5 text-meta text-navy outline-none focus:border-brand"
         />
-      </div>
+      </label>
+
+      {/* «What they receive» — the prototype shows the message before it is sent, and it should: it
+          goes out under the renter's own name, and the moment to read it is before, not afterwards in
+          his sent folder. */}
+      <label className="grid gap-1">
+        <span className="text-label font-extrabold uppercase tracking-wide text-muted">
+          {L("What they receive", "ما سيصلهم")}
+        </span>
+        <div className="rounded-sm border border-border bg-surface2">
+          <div className="border-b border-border px-2.5 py-1.5 text-label text-muted">
+            <b className="font-extrabold text-navy">{L("Subject", "الموضوع")}</b> · {subject}
+          </div>
+          <p className="max-h-[150px] overflow-auto whitespace-pre-wrap px-2.5 py-2 text-meta text-navy">{body}</p>
+        </div>
+      </label>
 
       {/* Named before the send, never dropped in silence. */}
       {unreachable.length > 0 && (
@@ -291,34 +309,40 @@ export function ShareToSuppliers({
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-meta text-muted">
-          {L(`${reachable.length} will be sent to`, `سيُرسل إلى ${reachable.length}`)}
+          {/* The prototype's count, and it names the skipped in the same breath rather than leaving
+              the renter to subtract two numbers. */}
+          {reachable.length
+            ? L(`${reachable.length} recipients`, `${reachable.length} مستلم`)
+            : L("Pick at least one supplier with an e-mail", "اختر مورّداً واحداً لديه بريد")}
+          {unreachable.length > 0 && (
+            <span className="font-extrabold text-danger-deep">
+              {" · "}
+              {L(`${unreachable.length} skipped`, `${unreachable.length} متخطّى`)}
+            </span>
+          )}
         </span>
         <span className="ms-auto flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              copyBidLink(shareUrl, ar ? "ar" : "en")
-                .catch(() => false)
-                .then(() => flash("message"));
-            }}
-            className={btn("ghost", "md")}
-          >
-            {copied === "message" ? L("Copied", "تم النسخ") : L("Copy the message", "انسخ الرسالة")}
-          </button>
+          {/* ~~«Copy the message».~~ Removed (2026-09-01): it was not in the prototype, and it lied —
+              it put the bid CARD and the link on the clipboard, not the message composed above it, so
+              a renter who wrote a line and pressed it pasted something without his line in it.
+
+              «Copy the addresses» stays, because the 25-recipient ceiling is real and the prototype
+              did not model it: past it a mailto is truncated by the client, and a send that quietly
+              loses half its recipients is worse than one the renter finishes by hand. */}
           {tooMany ? (
             <button
               type="button"
               onClick={() => {
                 void navigator.clipboard?.writeText(addresses.join(", ")).catch(() => {});
-                flash("addresses");
+                flash();
               }}
               className={btn("primary", "md")}
             >
-              {copied === "addresses" ? L("Copied", "تم النسخ") : L("Copy the addresses", "انسخ العناوين")}
+              {copied ? L("Copied", "تم النسخ") : L("Copy the addresses", "انسخ العناوين")}
             </button>
           ) : (
             <button type="button" onClick={send} disabled={!addresses.length} className={cx(btn("primary", "md"))}>
-              {L(`Send to ${reachable.length}`, `أرسِل إلى ${reachable.length}`)}
+              {reachable.length ? L(`Send to ${reachable.length}`, `أرسِل إلى ${reachable.length}`) : L("Send", "إرسال")}
             </button>
           )}
         </span>

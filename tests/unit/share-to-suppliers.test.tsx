@@ -59,7 +59,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 const open = () => {
-  render(<ShareToSuppliers shareUrl={URL_} renterName="Shibh Al Jazira" requestCode="EXC-170845" ar={false} L={L} />);
+  render(<ShareToSuppliers shareUrl={URL_} renterName="Shibh Al Jazira" requestCode="EXC-170845" L={L} />);
   fireEvent.click(screen.getByRole("button", { name: /Send to my suppliers/ }));
 };
 
@@ -99,6 +99,9 @@ describe("ShareToSuppliers", () => {
     // Said out loud: reporting "sent to 2" when one was dropped is found out a week later, when a
     // bid the renter was waiting for never came.
     expect(screen.getByText(/1 of the ones you picked have no e-mail/)).toBeTruthy();
+    // And counted again in the footer, beside the recipients — the prototype names the skipped
+    // rather than leaving the renter to subtract two numbers.
+    expect(screen.getByText(/1 skipped/)).toBeTruthy();
     expect(screen.getByRole("button", { name: /Send to 1/ })).toBeTruthy();
   });
 
