@@ -66,10 +66,30 @@ function sizeOf(dataUrl: string | undefined): string {
  * Files can be DROPPED, not only browsed — a card that rejects a dragged file is a worse lie than
  * no target at all.
  */
+/**
+ * Typography and box metrics shared by the intake field and its colour mirror.
+ *
+ * ⚠️ ONE string, used twice, on purpose. The mirror technique fails as visible double-vision the
+ * moment the two disagree about a font, a line-height or a padding, and the cheapest guarantee that
+ * they never disagree is that there is only one place to change.
+ */
+const FIELD_TEXT = "px-5 pb-2 pt-5 text-subhead leading-relaxed";
+
 export function Intake() {
   const t = useT();
 
   const { state, actions } = useRfq();
+  const mirror = useRef<HTMLDivElement>(null);
+
+  /* Split the box's text around the line the site typed — see `projectTypedLine` in the store.
+     `lastIndexOf`, because the template appends: if the same machine name also appears in something
+     the renter wrote earlier, the coloured one is the one that just arrived. Not found means they
+     have edited it, and then none of it is coloured, which is the honest answer. */
+  const typedLine = state.projectTypedLine;
+  const at = typedLine ? state.text.lastIndexOf(typedLine) : -1;
+  const before = at >= 0 ? state.text.slice(0, at) : state.text;
+  const marked = at >= 0 ? typedLine : null;
+  const after = at >= 0 ? state.text.slice(at + (typedLine as string).length) : "";
 
   /**
    * Hand over to the processing screen only if the parse is still running after 8 seconds (W-T23).
@@ -217,13 +237,46 @@ export function Intake() {
             Renders nothing until a site is picked, so an untouched intake is still a plain box. */}
         <ProjectPills />
 
-        <textarea
-          value={state.text}
-          onChange={(e) => actions.setText(e.target.value)}
-          placeholder={typed}
-          aria-label={t.intake.pasteLabel}
-          className="min-h-[188px] w-full flex-1 resize-none border-0 bg-transparent px-5 pb-2 pt-5 text-subhead leading-relaxed text-navy outline-none placeholder:text-muted/70 focus-visible:outline-none"
-        />
+        {/* ── The renter's words, and the site's, in one box ────────────────────────────────────
+
+            A `<textarea>` cannot colour part of its own text, and the site's machine line has to read
+            differently from what the renter typed (owner, 2026-08-31: *"show it in different color
+            font"*) — otherwise the one thing that arrived on its own looks exactly like the six words
+            they wrote themselves.
+
+            So the text is drawn TWICE: a mirror underneath does the colouring, and the textarea on
+            top keeps its caret, its selection, its scrolling and its keyboard while its own glyphs go
+            transparent. Both take `FIELD_TEXT`, one string, so the two can never drift into
+            double-vision — that is the failure mode of this technique and the only real risk in it.
+
+            The mirror always renders the FULL text. When the marked line is not found — the renter
+            edited it, which is exactly when it stops being the site's words — it renders everything
+            in the ordinary colour, which is byte for byte what this box looked like before. */}
+        <div className="relative flex min-h-[188px] w-full flex-1">
+          <div
+            aria-hidden
+            ref={mirror}
+            className={`${FIELD_TEXT} pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-navy`}
+          >
+            {before}
+            {marked && <span className="text-brand">{marked}</span>}
+            {after}
+          </div>
+
+          <textarea
+            value={state.text}
+            onChange={(e) => actions.setText(e.target.value)}
+            onScroll={(e) => {
+              if (mirror.current) mirror.current.scrollTop = e.currentTarget.scrollTop;
+            }}
+            placeholder={typed}
+            aria-label={t.intake.pasteLabel}
+            /* `text-transparent` with `caret-navy`: the mirror below draws the glyphs, this draws the
+               caret and owns every interaction. The placeholder stays visible — it is the element's
+               own, not text, so transparency does not reach it. */
+            className={`${FIELD_TEXT} relative w-full flex-1 resize-none border-0 bg-transparent text-transparent caret-navy outline-none placeholder:text-muted/70 focus-visible:outline-none`}
+          />
+        </div>
 
         {/* ── The floor: the renter's sites, and the way to hand us a file ─────────────────────
             The sites moved IN here (owner, 2026-09-01: *"I want the project pills to appear as part

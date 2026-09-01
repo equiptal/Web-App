@@ -157,6 +157,41 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
    * excavator, and a chip they cannot retype would make them delete it to say so. Appended, never
    * replacing what is already typed.
    */
+  /**
+   * Write the machine into the box the way a person would — a character at a time.
+   *
+   * ── Why not just set it ─────────────────────────────────────────────────────────────────────────
+   *
+   * It appeared whole, in one frame, after the renter had already typed something above it (owner,
+   * 2026-08-31: *"I want it shown as typed, like someone is really typing this item in the text, not
+   * directly copied"*). A line that materialises in a box you were writing in reads as a glitch: the
+   * eye never sees it arrive, so the renter's first question is whether they typed it. Typed out, the
+   * same words are unmistakably an ACTION that just happened, with a cause they can point at — they
+   * pressed a template a moment ago.
+   *
+   * 14ms a character: about 70 a second, faster than anyone types and slow enough to be seen
+   * arriving. A twenty-character machine name is under a third of a second, so nobody waits for it.
+   *
+   * ── It stays interruptible ──────────────────────────────────────────────────────────────────────
+   *
+   * Each frame appends to the SNAPSHOT taken before it started, never to the live value, so a renter
+   * typing while it runs does not have their keystrokes overwritten by a stale base: the animation
+   * finishes writing its own line and stops. It only ever writes the tail of the box, so the caret is
+   * never taken from them either.
+   */
+  async function typeInto(before: string, line: string) {
+    const base = before ? `${before}
+` : "";
+    for (let i = 1; i <= line.length; i++) {
+      actions.setText(base + line.slice(0, i));
+      // eslint-disable-next-line no-await-in-loop -- a typewriter is sequential by definition
+      await new Promise((r) => setTimeout(r, 14));
+    }
+    // Marked AFTER the last character, so the colour arrives with the finished word rather than
+    // chasing the caret across the screen.
+    actions.markProjectTyped(line);
+  }
+
   async function applyTemplate(itemId: string) {
     const option = templates.find((x) => x.itemId === itemId);
     if (!option || !chosen) return;
@@ -169,7 +204,7 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
       const line = `${option.quantity > 1 ? `${option.quantity} × ` : ""}${option.machine}`.trim();
       if (line) {
         const before = state.text.trimEnd();
-        actions.setText(before ? `${before}\n${line}` : line);
+        await typeInto(before, line);
       }
     } catch {
       // Nothing is applied and nothing is said. A template is a shortcut; failing to take one leaves

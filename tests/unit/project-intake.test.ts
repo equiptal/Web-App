@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { reducer, initialState, type RfqState } from "@/lib/store/rfq-store";
 import type { AgentDraft } from "@/lib/contract";
 import { defaultProjectDetails, defaultPreferences, newManualItem } from "@/lib/contract";
+import type { EquipmentItem } from "@/lib/contract/draft";
 import type { ProjectSummary } from "@/lib/contract/project";
 import { fieldSource } from "@/lib/contract/provenance";
 import { filingFor, leftTheSite } from "@/lib/contract/project";
@@ -294,5 +295,47 @@ describe("adding a machine", () => {
     let s = withFirst({ operatorNeeded: "yes" });
     s = reducer(s, { t: "ADD_ITEM" });
     expect(s.draft!.items[1].operator).not.toBe(s.draft!.items[0].operator);
+  });
+});
+
+/* ============================================================================================== *
+ * The line a template typed, and its colour
+ * ============================================================================================== */
+
+describe("the site's own words in the box", () => {
+  /* *"I want it to be shown as typed, like someone is really typing this item in the text, not
+     directly copied, and show it in different color font."*
+
+     The colour needs to know WHICH words came from the site. Held as the string rather than as
+     character offsets, which makes it self-healing: the moment the renter edits those words the
+     string stops matching and the colour goes, because they are the renter's words now. Offsets
+     would have to survive every keystroke and would eventually point at somebody else's sentence. */
+
+  it("remembers the line a template typed", () => {
+    let s = reducer(initialState, { t: "SELECT_PROJECT", project: QIDDIYA });
+    s = reducer(s, { t: "PROJECT_TYPED", line: "2 × Generator 250 kVA" });
+    expect(s.projectTypedLine).toBe("2 × Generator 250 kVA");
+  });
+
+  it("forgets it when the site is removed", () => {
+    /* The WORDS stay in the box — the renter may still want that machine — but nothing colours them
+       as the site's any more, because there is no site. */
+    let s = reducer(initialState, { t: "SELECT_PROJECT", project: QIDDIYA });
+    s = reducer(s, { t: "SET_TEXT", text: "2 × Generator 250 kVA" });
+    s = reducer(s, { t: "PROJECT_TYPED", line: "2 × Generator 250 kVA" });
+    s = reducer(s, { t: "CLEAR_PROJECT" });
+
+    expect(s.projectTypedLine).toBeNull();
+    expect(s.text).toBe("2 × Generator 250 kVA");
+  });
+
+  it("survives the renter typing around it", () => {
+    // Only an edit to the line itself should drop the colour, not an edit anywhere in the box.
+    let s = reducer(initialState, { t: "SELECT_PROJECT", project: QIDDIYA });
+    s = reducer(s, { t: "PROJECT_TYPED", line: "2 × Generator 250 kVA" });
+    s = reducer(s, { t: "SET_TEXT", text: "for 3 weeks\n2 × Generator 250 kVA" });
+    expect(s.projectTypedLine).toBe("2 × Generator 250 kVA");
+    // The box can still find it, which is what the colour is drawn from.
+    expect(s.text.lastIndexOf(s.projectTypedLine!)).toBeGreaterThan(-1);
   });
 });

@@ -173,6 +173,16 @@ export interface RfqState {
    */
   project: { id: string; title: string; location: SiteLocation; defaults: ProjectDefaults } | null;
   /**
+   * The line a TEMPLATE typed into the intake box, verbatim.
+   *
+   * Held so the box can colour it: the renter needs to see which words are theirs and which arrived
+   * from the site they picked (owner, 2026-08-31). Stored as the STRING rather than as character
+   * offsets, which makes it self-healing — the moment the renter edits those words the string stops
+   * matching, the colour goes, and the text is simply theirs. Offsets would have to be tracked
+   * through every keystroke and would eventually point at somebody else's sentence.
+   */
+  projectTypedLine: string | null;
+  /**
    * Which pills the renter changed on this request. They render as changed, and the fields they
    * cover read `renter` rather than `project` once the draft exists — once someone has answered a
    * question, it stops being the site's answer.
@@ -227,6 +237,7 @@ export const initialState: RfqState = {
   direct: null,
   project: null,
   projectDirty: [],
+  projectTypedLine: null,
   workOrderGroupId: null,
   templateTerms: null,
   processingSince: null,
@@ -274,6 +285,7 @@ type Action =
   | { t: "SET_TRIAL"; isTrial: boolean }
   | { t: "SET_DIRECT"; direct: DirectTarget | null }
   | { t: "SELECT_PROJECT"; project: ProjectSummary }
+  | { t: "PROJECT_TYPED"; line: string | null }
   | { t: "CLEAR_PROJECT" }
   | { t: "PATCH_PROJECT_DEFAULTS"; patch: Partial<TimingHours>; keys: string[] }
   | { t: "PATCH_PROJECT_TERMS"; paymentTerms: PaymentTerm | null }
@@ -438,11 +450,15 @@ export function reducer(state: RfqState, a: Action): RfqState {
         },
         projectDirty: [],
       };
+    case "PROJECT_TYPED":
+      return { ...state, projectTypedLine: a.line };
     case "CLEAR_PROJECT":
       // The template goes with the site. It was a thing INSIDE that project, so leaving its terms
       // behind would carry values from a site the renter just removed, with nothing on screen
       // saying where they came from.
-      return { ...state, project: null, projectDirty: [], workOrderGroupId: null, templateTerms: null };
+      // The typed line goes too: the words stay in the box (the renter may want them) but nothing
+      // colours them as the site's any more, because there is no site.
+      return { ...state, project: null, projectDirty: [], workOrderGroupId: null, templateTerms: null, projectTypedLine: null };
     /* A pill edit. `keys` are the dotted paths it covers, recorded so the field reads `renter` on
        the canvas afterwards rather than `project` - once someone answers a question it stops being
        the site's answer. */
@@ -849,6 +865,8 @@ const RfqContext = createContext<RfqContextValue | null>(null);
 function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState) {
   return {
     setText: (text: string) => dispatch({ t: "SET_TEXT", text }),
+    /** Mark (or unmark) the line a template typed, so the box can colour it. */
+    markProjectTyped: (line: string | null) => dispatch({ t: "PROJECT_TYPED", line }),
     addFiles: (files: { name: string; type: string; data?: string }[]) => dispatch({ t: "ADD_FILES", files }),
     removeFile: (index: number) => dispatch({ t: "REMOVE_FILE", index }),
     setSimulateError: (value: boolean) => dispatch({ t: "SET_SIMULATE_ERROR", value }),
