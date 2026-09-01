@@ -26,8 +26,12 @@ import { isAlreadyLinked, linkRenterSuppliers, searchSupplierDirectory, type Dir
  * by hand, which made a SECOND row for a company that already had an account, and every match after
  * that ran against the wrong record.
  *
- * ⚠️ The directory carries no city and no verification mark. So the picker shows neither — half a
- * column, filled in only for the firms that happen to have a store, is worse than no column.
+ * ── The city and the mark are back (2026-09-02) ─────────────────────────────────────────────────
+ *
+ * This was built showing neither, on the reading that the directory did not carry them. It does:
+ * the deployed route answers `city`, `is_verified` and `has_store`. A renter searching "Al" was
+ * being handed nine identical-looking rows while the data to tell them apart was already in the
+ * response.
  *
  * ── Registered, always (owner, 2026-09-01) ──────────────────────────────────────────────────────
  *
@@ -137,10 +141,17 @@ export function AddFromMoedatechDialog({
                     className="h-3.5 w-3.5 flex-none accent-ok"
                   />
                   <span className="min-w-0 flex-1">
-                    <b className="block truncate text-meta font-extrabold text-navy">{s.name}</b>
-                    {/* The person behind the account, and only when it is not the same as the firm —
-                        a line repeating the name above it is a line that teaches nothing. */}
-                    {s.contactName && <span className="block truncate text-label text-muted">{s.contactName}</span>}
+                    <b className="flex items-center gap-1.5 text-meta font-extrabold text-navy">
+                      <span className="truncate">{s.name}</span>
+                      {s.verified && (
+                        <Icon name="verified_user" size={12} className="flex-none text-ok" aria-label={c.verifiedByMoedatech} />
+                      )}
+                    </b>
+                    {/* The city and the person — what tells two firms with similar names apart. Only
+                        what is there: a row with neither draws no second line rather than an empty one. */}
+                    <span className="block truncate text-label text-muted">
+                      {[s.city, s.contactName].filter(Boolean).join(" · ")}
+                    </span>
                   </span>
                 </label>
               </li>

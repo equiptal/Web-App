@@ -33,9 +33,10 @@ vi.mock("@/lib/api/client", () => ({
 beforeEach(() => {
   api.linked = [];
   api.found = [
-    { supplierId: "9", name: "Zahid Tractor", contactName: "Bandar" },
-    // No store, no city, no verification mark — and listed exactly like the one above.
-    { supplierId: "17", name: "Najd Equipment Est.", contactName: null },
+    { supplierId: "9", name: "Zahid Tractor", contactName: "Bandar", city: "Riyadh", verified: true, hasStore: true },
+    // No store, no city, no mark — and listed exactly like the one above, because a firm with no
+    // shopfront is still a firm.
+    { supplierId: "17", name: "Najd Equipment Est.", contactName: null, city: null, verified: false, hasStore: false },
   ];
 });
 
@@ -90,11 +91,25 @@ describe("AddFromMoedatechDialog", () => {
     expect((screen.getByRole("button", { name: en.suppliers.dirAdd }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("Given the account has no company name of its own, Then the person is not repeated under it", async () => {
+  it("Given a city and a person, Then both are shown — that is what tells two similar names apart", async () => {
     open();
     await search();
-    // "Bandar" sits under "Zahid Tractor"; "Najd Equipment Est." has no second line to repeat itself.
-    expect(screen.getByText("Bandar")).toBeTruthy();
-    expect(screen.queryByText("Najd Equipment Est.", { selector: "span" })).toBeNull();
+    // The directory does carry these; the picker was built as though it did not (2026-09-02).
+    expect(screen.getByText("Riyadh · Bandar")).toBeTruthy();
+  });
+
+  it("Given the SUPPLIER id, When linked, Then it goes out as a NUMBER", async () => {
+    /**
+     * `users.id` is an integer and the backend's schema says so. Sending the string this app carries
+     * it as answered `422 VALIDATION_ERROR: items — Expected number, received string`, so nobody
+     * could be linked at all (found end-to-end against the deployed stage, 2026-09-02).
+     */
+    open();
+    await search();
+    fireEvent.click(screen.getAllByRole("checkbox")[0]);
+    fireEvent.click(screen.getByRole("button", { name: en.suppliers.dirAddN.replace("{n}", "1") }));
+
+    await waitFor(() => expect(api.linked.length).toBe(1));
+    expect(api.linked[0][0]).toEqual([{ supplierId: "9", vendorRegistered: true }]);
   });
 });

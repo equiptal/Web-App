@@ -1511,11 +1511,24 @@ export async function addRenterSuppliersBulk(rows: NewRenterSupplier[], dryRun =
   });
 }
 
-/** Link suppliers who already have accounts. One already linked is skipped, not an error. */
+/**
+ * Link suppliers who already have accounts. One already linked is skipped, not an error.
+ *
+ * ⚠️ **`supplierId` goes out as a NUMBER.** `users.id` is an integer in that database and the
+ * backend's schema says so — sending the string this app carries it as answered
+ * `422 VALIDATION_ERROR: items — Expected number, received string`, so *Add from Moedatech* could
+ * not link anybody (found end-to-end against the deployed stage, 2026-09-02).
+ *
+ * Coerced here rather than at the call site: every caller reads its id out of a payload where it is
+ * already a string, and one of them would eventually forget.
+ */
 export async function linkRenterSuppliers(
-  items: { supplierId: string; vendorRegistered: boolean }[],
-): Promise<{ created: { supplierId: string; id: string }[]; skipped: { supplierId: string }[] }> {
-  return projectFetch("/api/renter-suppliers/link", { method: "POST", body: { items } });
+  items: { supplierId: string | number; vendorRegistered: boolean }[],
+): Promise<{ created: { supplierId: number; id: string }[]; skipped: { supplierId: number }[] }> {
+  return projectFetch("/api/renter-suppliers/link", {
+    method: "POST",
+    body: { items: items.map((i) => ({ ...i, supplierId: Number(i.supplierId) })) },
+  });
 }
 
 /** The vendor flag, the contact the renter keeps, the groups. Idempotent: the toggle fires twice. */
@@ -1569,6 +1582,16 @@ export interface DirectorySupplier {
   name: string;
   /** The person behind the account, when it is not the same as the name above. */
   contactName: string | null;
+  /**
+   * ⚠️ These three DO arrive, and the picker was built as though they did not.
+   *
+   * `backend-asks.md §4` asked for them on the strength of reading the handler's `SELECT`. The
+   * deployed route answers `{ id, name, company_name, city, is_verified, has_store }` — so the ask
+   * was already done and the picker was hiding a column it had (2026-09-02).
+   */
+  city: string | null;
+  verified: boolean;
+  hasStore: boolean;
 }
 
 /**
@@ -1601,7 +1624,18 @@ export async function searchSupplierDirectory(q: string, limit = 25): Promise<Di
       const company = typeof (o.companyName ?? o.company_name) === "string" ? String(o.companyName ?? o.company_name).trim() : "";
       // A row with neither a company nor a person cannot be shown or chosen sensibly.
       if (!company && !person) return [];
-      return [{ supplierId: String(id), name: company || person, contactName: company && person ? person : null }];
+      const bool = (v: unknown) => v === true || v === 1 || v === "1";
+      return [
+        {
+          supplierId: String(id),
+          name: company || person,
+          contactName: company && person ? person : null,
+          city: typeof (o.city ?? o.City) === "string" ? String(o.city).trim() || null : null,
+          // `is_verified` and `has_store` arrive as 0/1 from a raw query, not as booleans.
+          verified: bool(o.isVerified ?? o.is_verified),
+          hasStore: bool(o.hasStore ?? o.has_store),
+        },
+      ];
     });
   } catch {
     return [];
