@@ -282,18 +282,22 @@
   --radius-sm: 2px;    /* chips, tags, tight controls */
   --radius-md: 4px;    /* inputs, buttons, list rows — the default */
   --radius-lg: 6px;    /* cards, panels, sheets */
-  /* The storefront's four, from the prototype. A shop is a softer object than a form row — the
-     reference the app's 2/4/6 came from is a console, and these three screens are a catalogue. */
-  --radius-shop-tab: 20px;      /* a category pill on Browse */
-  --radius-shop-media: 16px;    /* the gallery and the map */
-  --radius-shop-chip-lg: 16px;  /* the subtype / size chips on the sheet */
-  --radius-shop-card: 14px;     /* the card skin */
-  --radius-shop-pill: 12px;     /* the location pill, a document chip */
-  --radius-shop-control: 10px;  /* the search field, a button, a spec box, the map label */
-  --radius-shop-logo: 10px;     /* a store's logo square */
-  --radius-shop-logo-md: 9px;   /* the supplier's logo on the sheet */
-  --radius-shop-chip: 8px;      /* a size / year chip, a gallery thumbnail */
-  --radius-shop-logo-sm: 6px;   /* the 24px logo beside a name on a card */
+  /* The storefront's own steps. A shop is a softer object than a form row — the reference the app's
+     2/4/6 came from is a console, and these three screens are a catalogue.
+
+     ~~14 for a card, 16 for the media, 10 for a control~~ — halved on 2026-09-01 (owner: *"use less
+     rounded cards"*). A pill is still a pill: `shop-tab` and the round tags did NOT move with them,
+     because their shape is the control, not a corner treatment on a rectangle. */
+  --radius-shop-tab: 20px;      /* a category pill on Browse — a shape, not a radius */
+  --radius-shop-media: 10px;    /* the gallery and the map */
+  --radius-shop-chip-lg: 8px;   /* the subtype / size chips on the sheet */
+  --radius-shop-card: 8px;      /* the card skin */
+  --radius-shop-pill: 8px;      /* the location pill, a document chip */
+  --radius-shop-control: 6px;   /* the search field, a button, a spec box, the map label */
+  --radius-shop-logo: 8px;      /* a store's logo square */
+  --radius-shop-logo-md: 8px;   /* the supplier's logo on the sheet */
+  --radius-shop-chip: 6px;      /* a size / year chip, a gallery thumbnail */
+  --radius-shop-logo-sm: 4px;   /* the 24px logo beside a name on a card */
 
   /* ── Shadow ──────────────────────────────────────────────────────────────────────────────────
      There are none (owner, 2026-08-26). The whole namespace is cleared, so `shadow-sm` and its

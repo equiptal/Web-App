@@ -176,7 +176,7 @@ export function EquipmentDetailSurface({
   if (error) {
     return (
       <div className={`${SHOP_PAGE} pt-6`}>
-        <div className="rounded-shop-card border border-shop-line p-8 text-center text-shop-body text-shop-ink-3">
+        <div className="rounded-shop-card border border-shop-line bg-white p-8 text-center text-shop-body text-shop-ink-3">
           <Icon name="error_outline" size={22} className="mx-auto mb-2" />
           <p>{t.store.error}</p>
           <button onClick={() => setReloadKey((k) => k + 1)} className={btn("secondary", "sm", { className: "mt-3" })}>
@@ -256,7 +256,7 @@ export function EquipmentDetailSurface({
       <div className="mt-[34px] grid grid-cols-1 items-start gap-7 lg:grid-cols-2">
         <SupplierCard store={store} storeId={ownerStoreId} fallbackName={eq.storeName} t={t} />
 
-        <section className="rounded-shop-card border border-shop-line p-5">
+        <section className="rounded-shop-card border border-shop-line bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-2.5">
               <h2 className="m-0 text-shop-name font-shop-bold text-shop-ink">{category || subcategory || "—"}</h2>
@@ -280,7 +280,7 @@ export function EquipmentDetailSurface({
           {specStyle === "boxed" ? (
             <div className="mt-5 grid grid-cols-2 gap-3">
               {specs.map((row) => (
-                <div key={row.label} className="rounded-shop-control border border-shop-line px-3.5 py-3">
+                <div key={row.label} className="rounded-shop-control border border-shop-line bg-white px-3.5 py-3">
                   <div className="text-shop-tag font-shop-bold tracking-[0.3px] text-shop-ink-4">{row.label.toUpperCase()}</div>
                   <div className="mt-1 text-shop-value font-semibold text-shop-ink">{row.value ?? "—"}</div>
                 </div>
@@ -344,7 +344,7 @@ function SupplierCard({
 }) {
   const name = store?.name ?? fallbackName ?? "";
   return (
-    <section className="rounded-shop-card border border-shop-line p-5">
+    <section className="rounded-shop-card border border-shop-line bg-white p-5">
       <div className="flex items-start justify-between gap-3.5">
         <div className="flex min-w-0 items-center gap-3">
           {store?.logoUrl ? (

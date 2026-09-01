@@ -171,7 +171,7 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
 
       {/* Results (AC-16/17/23) */}
       {error ? (
-        <div className="rounded-shop-card border border-shop-line p-8 text-center text-shop-body text-shop-ink-3">
+        <div className="rounded-shop-card border border-shop-line bg-white p-8 text-center text-shop-body text-shop-ink-3">
           <Icon name="error_outline" size={22} className="mx-auto mb-2" />
           <p>{t.browse.error}</p>
           <button onClick={() => setReloadKey((k) => k + 1)} className={btn("secondary", "sm", { className: "mt-3" })}>
@@ -181,7 +181,7 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
       ) : stores === null ? (
         <div className="p-8 text-center text-shop-body text-shop-ink-3">{t.browse.loading}</div>
       ) : shown.length === 0 ? (
-        <div className="rounded-shop-card border border-shop-line p-8 text-center text-shop-body text-shop-ink-3">
+        <div className="rounded-shop-card border border-shop-line bg-white p-8 text-center text-shop-body text-shop-ink-3">
           <Icon name="storefront" size={22} className="mx-auto mb-2" />
           {t.browse.empty}
         </div>

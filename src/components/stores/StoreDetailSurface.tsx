@@ -71,7 +71,7 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
   if (error) {
     return (
       <div className={`${SHOP_PAGE} pt-6`}>
-        <div className="rounded-shop-card border border-shop-line p-8 text-center text-shop-body text-shop-ink-3">
+        <div className="rounded-shop-card border border-shop-line bg-white p-8 text-center text-shop-body text-shop-ink-3">
           <Icon name="error_outline" size={22} className="mx-auto mb-2" />
           <p>{t.store.error}</p>
           <button onClick={() => setReloadKey((k) => k + 1)} className={btn("secondary", "sm", { className: "mt-3" })}>
@@ -97,7 +97,7 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
 
       <div className="flex flex-col gap-7">
         {/* ── The store ─────────────────────────────────────────────────────────────────────── */}
-        <section className="rounded-shop-card border border-shop-line p-5">
+        <section className="rounded-shop-card border border-shop-line bg-white p-5">
           <div className="flex items-center gap-3">
             {detail.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -166,7 +166,7 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
 
         {/* ── Its equipment ─────────────────────────────────────────────────────────────────── */}
         {detail.equipment.length === 0 ? (
-          <div className="rounded-shop-card border border-shop-line p-8 text-center text-shop-body text-shop-ink-3">{t.store.noEquipment}</div>
+          <div className="rounded-shop-card border border-shop-line bg-white p-8 text-center text-shop-body text-shop-ink-3">{t.store.noEquipment}</div>
         ) : (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
             {detail.equipment.map((e) => (
@@ -214,7 +214,7 @@ function EquipmentTile({
     <Link
       {...pin("store-equipment-card")}
       href={`/equipment/${encodeURIComponent(eq.id)}?storeId=${encodeURIComponent(storeId)}`}
-      className="block overflow-hidden rounded-shop-card border border-shop-line text-shop-ink transition hover:border-shop-amber"
+      className="block overflow-hidden rounded-shop-card border border-shop-line bg-white text-shop-ink transition hover:border-shop-amber"
     >
       <div className="relative aspect-[16/11] w-full bg-shop-fill">
         {eq.photoUrl ? (
