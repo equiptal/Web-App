@@ -111,10 +111,21 @@ describe("the last item reviews instead of advancing", () => {
     expect(screen.queryByText(/Next equipment/)).toBeNull();
 
     await handle.run(() => screen.getByText(/Review & send/).closest("button")!.click());
+    // The press asks before it commits — see the note in `canvas-gating`.
+    expect(handle.store().state.readyToSend).toBe(false);
+    await handle.run(() => screen.getAllByText(/Review & send/).at(-1)!.closest("button")!.click());
     expect(handle.store().state.readyToSend).toBe(true);
   });
 });
 
+/**
+ * Adding a second machine, from the one place that offers it.
+ *
+ * ~~A standing «+ Add another machine» beside the CTA on every screen.~~ Removed (owner,
+ * 2026-09-01): it made two calls to action out of one moment and asked its question on items the
+ * renter had not finished. It is now the secondary answer to the modal that a finished request
+ * raises, which is the one point where it IS a question.
+ */
 describe("adding a machine by hand", () => {
   it("asks first, then appends and moves to it", async () => {
     const handle = await renderCanvas(<Canvas />, {
@@ -122,6 +133,8 @@ describe("adding a machine by hand", () => {
       prepare: answered(["a0"]),
     });
 
+    // Reached through the finished-request prompt, which is the only door to it now.
+    await handle.run(() => screen.getByText(/Review & send/).closest("button")!.click());
     await handle.run(() => screen.getByText(/Add another machine/).closest("button")!.click());
 
     // The same modal as moving between parsed items — the site and schedule apply to this one too.
@@ -149,8 +162,12 @@ describe("adding a machine by hand", () => {
       // Year and certificate deliberately left open.
     });
 
-    await handle.run(() => screen.getByText(/Add another machine/).closest("button")!.click());
+    /* An unanswered machine never reaches the prompt at all, which is the stronger form of the same
+       rule: the old button sat there offering to add a second machine beside a first one that was
+       not finished. Now the press refuses on the gaps and the question is never put. */
+    await handle.run(() => screen.getByText(/Review & send/).closest("button")!.click());
 
+    expect(screen.queryByText(/Anything else on this job/)).toBeNull();
     expect(screen.queryByText("Equipment #2")).toBeNull();
     expect(handle.store().state.draft!.items.length).toBe(1);
   });
@@ -210,6 +227,7 @@ describe("the bar for the next machine is this machine", () => {
       handle.store().actions.touchField("line_items[a1].safety_certificates");
     });
     await handle.run(() => screen.getByText(/Review & send/).closest("button")!.click());
+    await handle.run(() => screen.getAllByText(/Review & send/).at(-1)!.closest("button")!.click());
     expect(handle.store().state.readyToSend).toBe(true);
   });
 });

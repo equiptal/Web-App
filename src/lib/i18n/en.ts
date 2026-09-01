@@ -2101,6 +2101,7 @@ export const en = {
       startDate: "START DATE",
       endDate: "END DATE",
       duration: "Duration",
+      durationDays: "{n} days",
       billing: "HOW YOU'RE BILLED",
       extendable: "Extendable",
       quoteRate: "Suppliers quote you a {basis} rate.",
@@ -2145,6 +2146,20 @@ export const en = {
       copied: "Its other details — like delivery, food, and certificates — start out matching this equipment, but you can change any of them.",
       editFirst: "Edit this item first",
       continue: "Continue",
+    },
+    /* ── The last stop before review (owner, 2026-09-01) ───────────────────────────────
+       The canvas had a standing «+ Add another machine» beside «Review & send», which asked the
+       question on every screen of the flow and made two calls to action out of one moment. It asks
+       once now, and at the moment it is actually a question: the machine in front of the renter is
+       finished and the whole request is answered, so the only thing left to decide is whether there
+       IS another one.
+
+       The body says what carrying on costs him — nothing, the site and schedule already apply —
+       because the reason people re-post a second request instead of adding an item is that they
+       assume a second machine means starting again. */
+    addMore: {
+      title: "Anything else on this job?",
+      body: "Your request is ready to review. If the job needs another machine, add it now — it uses the same site and schedule, so there is nothing to fill in twice.",
     },
     ready: {
       title: "Ready to send",

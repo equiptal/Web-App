@@ -134,19 +134,27 @@ describe("accepting the charged days closes the schedule (MREQ-AC-05)", () => {
 });
 
 describe("the primary button refuses with gaps (MREQ-AC-15)", () => {
-  // Owner, 2026-08-26: it is DISABLED while anything is owed rather than live-then-shaking. A button
-  // that looks ready and then refuses teaches the renter that the page is broken.
-  it("is disabled, and cannot reach the review screen", async () => {
+  /* ~~Owner, 2026-08-26: it is DISABLED while anything is owed rather than live-then-shaking. A
+     button that looks ready and then refuses teaches the renter that the page is broken.~~
+     Reversed by the owner on 2026-09-01, for the reason the first ruling missed: a disabled button
+     cannot say WHY. *"He doesn't know what is blocking him"* — so it presses, and the press answers:
+     the red list of what is missing shakes, and the panel that owes it opens.
+
+     What AC-15 actually protects is unchanged and is what this still pins: a request with gaps
+     cannot reach the review screen. */
+  it("refuses the review screen, and says what is missing", async () => {
     const handle = await renderCanvas(<Canvas />, {
       draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
     });
 
-    const button = screen.getByText(/Review & send/).closest("button")! as HTMLButtonElement;
-    expect(button.disabled).toBe(true);
+    // The list is on screen before the press — it is drawn whenever anything is owed.
+    expect(screen.getByText("Before this can be sent")).toBeTruthy();
 
+    const button = screen.getByText(/Review & send/).closest("button")! as HTMLButtonElement;
     await handle.run(() => button.click());
 
     expect(handle.store().state.readyToSend).toBe(false);
+    expect(screen.getByText("Before this can be sent")).toBeTruthy();
   });
 
   it("advances to the review screen when nothing is left", async () => {
@@ -163,6 +171,15 @@ describe("the primary button refuses with gaps (MREQ-AC-15)", () => {
       screen.getByText(/Review & send/).closest("button")!.click();
     });
 
+    /* It ASKS first (owner, 2026-09-01). A finished request is the one moment "is there another
+       machine?" is a real question, so the press that used to go straight through now raises it —
+       and going on is the modal's own primary. Nothing is committed by the press itself. */
+    expect(handle.store().state.readyToSend).toBe(false);
+    expect(screen.getByText(/Anything else on this job/)).toBeTruthy();
+
+    await handle.run(() => {
+      screen.getAllByText(/Review & send/).at(-1)!.closest("button")!.click();
+    });
     expect(handle.store().state.readyToSend).toBe(true);
   });
 });

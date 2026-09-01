@@ -48,8 +48,12 @@ export function Canvas() {
   const { state, actions } = useRfq();
   const [shaking, setShaking] = useState(false);
   const [shakingWhere, setShakingWhere] = useState(false);
+  /** The blocking list, shaken on a refused send — see the block above the move-on row. */
+  const [shakingList, setShakingList] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [carryTo, setCarryTo] = useState<{ index: number; isNew: boolean } | null>(null);
+  /** The last press before review: add another machine, or go on. See `advance`. */
+  const [askAddMore, setAskAddMore] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   /** The equipment block — expanded card or collapsed strip — so a refusal can bring it into view. */
   const equipmentRef = useRef<HTMLElement | null>(null);
@@ -198,7 +202,13 @@ export function Canvas() {
        * editable at a time, so opening the equipment panel on the machine already in front of the
        * renter showed them a finished card and looked like the button had done nothing. Go to the
        * machine that owes the answer; fall back to the panel when the gap is request-wide.
+       *
+       * The LIST shakes with it (owner, 2026-09-01: *"shake it and say clearly in red what is
+       * blocking"*): the press lands on the button at the bottom of the page, the answer it needs is
+       * in a panel somewhere above, and the list is the one thing on screen that names both.
        */
+      setShakingList(true);
+      timers.current.push(setTimeout(() => setShakingList(false), SHAKE_MS));
       const first = gaps[0];
       const owing = first.itemId ? live.findIndex((i) => i.id === first.itemId) : -1;
       if (owing >= 0 && owing !== index) actions.goItem(owing);
@@ -206,15 +216,25 @@ export function Canvas() {
       shakeNow(first.panel === "where" ? "where" : "fields");
       return;
     }
-    actions.setReadyToSend(true);
+    /* Everything is answered, so the only thing left to decide is whether there is another machine.
+       That is the one moment the question is worth asking, and it is where the standing
+       «+ Add another machine» button used to live — see the note where it was removed. */
+    setAskAddMore(true);
   };
 
   /**
    * What the move-on button is waiting for — null when it is free to fire.
    *
-   * «Review & send» is DISABLED until the whole request is answered (owner, 2026-08-26) rather than
-   * refusing on press: a button that looks live and then shakes teaches the renter that the page is
-   * broken. «Next machine» only ever owed this machine, so it keeps that narrower bar.
+   * ~~«Review & send» is DISABLED until the whole request is answered (owner, 2026-08-26) rather
+   * than refusing on press: a button that looks live and then shakes teaches the renter that the
+   * page is broken.~~ **Reversed on 2026-09-01, by the owner, for the reason the ruling missed:** a
+   * disabled button cannot tell you why. *"He doesn't know what is blocking him and what is
+   * missing"* — and the only channel a disabled control has is a `title`, which needs a hover on
+   * something that looks inert.
+   *
+   * So it presses, and the refusal is the answer: the red list above it shakes, the blocking panel
+   * opens on the machine that owes it, and that panel shakes too. `blockedBy` is kept for the
+   * `title`, which is still the fastest way to read the FIRST reason without pressing anything.
    */
   const blockedBy = isLastItem ? gaps[0] ?? null : equipmentGaps[0] ?? null;
 
@@ -331,6 +351,35 @@ export function Canvas() {
           </button>
         ))}
 
+      {/* ── A way on, from the machine itself (owner, 2026-09-01) ────────────────────────────────
+          *"I want a trigger from the machine or operator that opens the next panel for him."*
+
+          The only control that moved between panels was the header of the panel you were moving TO,
+          which is below the fold on a filled machine card — so a renter who had answered the machine
+          had nothing at the end of it saying where to go next, and the one button in the footer says
+          *Review & send*, which is the end of the whole errand rather than the next step.
+
+          It refuses on press rather than sitting disabled, and the refusal is useful: it shakes the
+          machine card and the card marks what it still owes. That is the same rule `advance` uses. */}
+      {item && state.activeSection === "equipment" && isFirstItem && (
+        <div className="mb-3.5 flex justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              if (equipmentGaps.length > 0) {
+                shakeNow("fields");
+                return;
+              }
+              openSection("where");
+            }}
+            className="inline-flex items-center gap-1.5 rounded-sm border border-brand px-4 py-2 text-body font-semibold text-brand transition hover:bg-brand-soft"
+          >
+            {fmt(t.create.nextPanel, { panel: t.create.where })}
+            <Icon name="arrow_forward" size={16} className="rtl:rotate-180" />
+          </button>
+        </div>
+      )}
+
       {/* ---------------- Site and schedule ----------------
           Request-wide, so from the second machine onwards they are shown as settled rather than
           re-offered: editing them here would silently change the first machine's terms too. */}
@@ -364,6 +413,67 @@ export function Canvas() {
         </div>
       )}
 
+      {/* ── What is still missing (owner, 2026-09-01) ────────────────────────────────────────────
+          *"He doesn't know, when he has only filled the machine and tries to review and send, what
+          is blocking him and what is missing."*
+
+          And he could not: *Review & send* is DISABLED until the request is answered, and a disabled
+          button cannot be pressed, so the only explanation — its `title` — needed a hover on a
+          control that looks inert. Worse, the gap is usually not on screen: it belongs to another
+          panel, or to another machine, and only one of either is open at a time.
+
+          So the list is drawn, above the button it is holding: one row per gap, each naming the panel
+          (and the machine, when there is more than one) and what it wants, and each PRESSABLE —
+          pressing goes to that machine, opens that panel and shakes it. It renders only on the last
+          machine, which is where the send lives; the earlier cards are gated on their own fields and
+          say so themselves. */}
+      {isLastItem && gaps.length > 0 && (
+        /* RED, not amber (owner, 2026-09-01). Amber is this product's «worth your attention»; these
+           are the reasons the request cannot be sent at all, which is the one thing `danger` is for.
+           `shake-error` fires on a refused press — see `advance`. */
+        <div
+          className={`mb-3 flex flex-col gap-1.5 rounded-sm border border-danger/45 bg-danger/[0.06] p-3.5 ${
+            shakingList ? "shake-error" : ""
+          }`}
+        >
+          <span className="flex items-center gap-1.5 text-body font-extrabold text-danger">
+            <Icon name="error_outline" size={15} className="flex-none" />
+            {t.create.missingTitle}
+          </span>
+          <ul className="flex flex-col">
+            {gaps.map((g) => {
+              const owing = g.itemId ? live.findIndex((i) => i.id === g.itemId) : -1;
+              const panelName =
+                g.panel === "where" ? t.create.where : g.panel === "when" ? t.create.when : t.create.ready.machineAndOperator;
+              return (
+                <li key={`${g.panel}-${g.itemId ?? "req"}-${g.field}`}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (owing >= 0 && owing !== index) actions.goItem(owing);
+                      if (state.activeSection !== g.panel) actions.openSection(g.panel);
+                      shakeNow(g.panel === "where" ? "where" : "fields");
+                    }}
+                    className="flex w-full items-center gap-2 py-1 text-start text-body font-semibold text-danger transition hover:text-danger-deep"
+                  >
+                    <Icon name="chevron_right" size={14} className="flex-none text-danger rtl:rotate-180" />
+                    {/* ONE text node, deliberately: the panel's name in a node of its own would be a
+                        second element reading «Where it goes» on a page whose panel head already
+                        does, and the row is a sentence rather than a heading with a note under it.
+                        The machine is named only when there is more than one to confuse. */}
+                    <span className="min-w-0">
+                      {`${panelName}${
+                        owing >= 0 && live.length > 1 ? ` · ${fmt(t.create.itemOfCount, { n: owing + 1, total: live.length })}` : ""
+                      } — ${gateReason(t, g.reason) ?? g.field}`}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       {/* ---------------- Move on ---------------- */}
       <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
         {!isFirstItem ? (
@@ -376,16 +486,14 @@ export function Canvas() {
         ) : (
           <span />
         )}
+        {/* ~~«+ Add another machine», standing beside the CTA on every screen of the flow.~~ Removed
+            (owner, 2026-09-01). It made two calls to action out of one moment and asked its question
+            on every item, including the ones where the renter had not yet finished the machine in
+            front of him. The question is asked once now, and where it is actually a question — the
+            «add more» modal further down, raised by `advance` on a finished request. */}
         <div className="flex flex-wrap items-center gap-2.5">
           <button
-            onClick={addMachine}
-            className="rounded-sm bg-warn/15 px-5 py-2.5 text-body font-semibold text-warn transition hover:bg-warn/25"
-          >
-            + {t.create.addAnother}
-          </button>
-          <button
             onClick={advance}
-            disabled={blockedBy != null}
             title={blockedBy ? gateReason(t, blockedBy.reason) : undefined}
             className={btn("primary", "md", { className: "transition" })}
           >
@@ -394,6 +502,39 @@ export function Canvas() {
           </button>
         </div>
       </div>
+
+      {/* ── The one place the question is asked (owner, 2026-09-01) ─────────────────────────────
+          Pressing «Review & send» on a finished request opens this instead of going straight
+          through. Adding hands over to `addMachine`, which raises the carry-forward modal below and
+          then opens the new blank card — the same path the old button took, minus the standing
+          invitation to leave a half-answered machine.
+
+          Dismissing it is neither answer: the renter is returned to the canvas, not sent to review.
+          A modal whose X means "yes, continue" is a modal that submits a request by being closed. */}
+      <Modal open={askAddMore} onClose={() => setAskAddMore(false)} title={t.create.addMore.title}>
+        <p className="mb-5 text-body leading-relaxed text-muted">{t.create.addMore.body}</p>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            onClick={() => {
+              setAskAddMore(false);
+              addMachine();
+            }}
+            className={btn("secondary", "md", { className: "transition" })}
+          >
+            + {t.create.addAnother}
+          </button>
+          <button
+            onClick={() => {
+              setAskAddMore(false);
+              actions.setReadyToSend(true);
+            }}
+            className={btn("primary", "md", { className: "transition" })}
+          >
+            {t.create.reviewAndSend}
+            <Icon name="arrow_forward" size={16} className="rtl:rotate-180" />
+          </button>
+        </div>
+      </Modal>
 
       <CarryForwardModal
         open={carryTo != null}
