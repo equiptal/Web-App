@@ -426,6 +426,21 @@ export function ReadyToSend() {
         >
           {t.create.ready.backToEditing}
         </button>
+        {/* ── Two ways to post, and the difference is who sees it ─────────────────────────────
+            *Send* posts and lands on the confirmation, which is what it always did.
+
+            *Post & share* opens the recipients, the channel and the preview FIRST, then does the
+            whole thing in one press (owner, 2026-09-02). It is secondary rather than primary because
+            a renter with no suppliers on his list yet should not be steered into a dialog that has
+            nothing in it — and posting is the act, sharing is what he may also want. */}
+        <button
+          type="button"
+          disabled={busy || items.length === 0}
+          onClick={() => actions.setShareOnPost(true)}
+          className={btn("secondary", "lg", { className: "transition" })}
+        >
+          <Icon name="ios_share" size={17} /> {t.intake.postShare.post}
+        </button>
         <Button disabled={busy || items.length === 0} onClick={onSubmit} className="px-6 py-3 text-subhead">
           <Icon name="send" size={18} /> {busy ? `${t.create.ready.send}…` : t.create.ready.send}
         </Button>

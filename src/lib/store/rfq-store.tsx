@@ -111,6 +111,14 @@ export interface RfqState {
   chargedDaysUnderstood: boolean;
   /** MREQ-AC-42 — the read-only Ready-to-send screen is showing instead of the canvas. */
   readyToSend: boolean;
+  /**
+   * Is the post-and-share dialog open?
+   *
+   * On the STORE rather than on the screen that opens it, because posting flips the phase and
+   * unmounts that screen — a `useState` there would take the dialog with it, halfway through the one
+   * press it exists to serve.
+   */
+  shareOnPost: boolean;
   taxonomy: Taxonomy;
   draft: RfqDraft | null;
   // intake inputs (preserved across errors — AC-10)
@@ -216,6 +224,7 @@ export const initialState: RfqState = {
   itemIndex: 0,
   chargedDaysUnderstood: false,
   readyToSend: false,
+  shareOnPost: false,
   taxonomy: [],
   draft: null,
   text: "",
@@ -262,6 +271,7 @@ type Action =
   | { t: "GO_ITEM"; index: number }
   | { t: "SET_CHARGED_DAYS_UNDERSTOOD"; value: boolean }
   | { t: "SET_READY_TO_SEND"; value: boolean }
+  | { t: "SET_SHARE_ON_POST"; value: boolean }
   | { t: "TOUCH_FIELD"; key: string }
   | { t: "PATCH_LOCATION"; patch: Partial<ProjectDetails["location"]> }
   | { t: "CONFIRM_LOCATION" }
@@ -566,6 +576,8 @@ export function reducer(state: RfqState, a: Action): RfqState {
       return { ...state, chargedDaysUnderstood: a.value };
     case "SET_READY_TO_SEND":
       return { ...state, readyToSend: a.value, activeSection: a.value ? null : "equipment" };
+    case "SET_SHARE_ON_POST":
+      return { ...state, shareOnPost: a.value };
     case "TOUCH_FIELD":
       // Idempotent: the renter answering the same control twice is still one answer.
       return withDraft(state, (d) =>
@@ -965,6 +977,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
     goItem: (index: number) => dispatch({ t: "GO_ITEM", index }),
     setChargedDaysUnderstood: (value: boolean) => dispatch({ t: "SET_CHARGED_DAYS_UNDERSTOOD", value }),
     setReadyToSend: (value: boolean) => dispatch({ t: "SET_READY_TO_SEND", value }),
+    setShareOnPost: (value: boolean) => dispatch({ t: "SET_SHARE_ON_POST", value }),
     /** MREQ-AC-59 — record that the renter personally answered this control. */
     touchField: (key: string) => dispatch({ t: "TOUCH_FIELD", key }),
 
@@ -995,9 +1008,20 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
     setTrial: (isTrial: boolean) => dispatch({ t: "SET_TRIAL", isTrial }),
     setDirect: (direct: DirectTarget | null) => dispatch({ t: "SET_DIRECT", direct }),
 
-    async submit() {
+    /**
+     * Post the request.
+     *
+     * **Returns the ids it created**, which it previously kept to itself. A caller that needs to do
+     * something with the request the moment it exists — post, then share the link it mints, in one
+     * press — cannot read them off the state it dispatched into: `SUBMIT_SUCCESS` flips the phase, so
+     * the screen that pressed the button is unmounted before the next line runs. Returning them is a
+     * pure addition; nothing about what gets created changed (owner, 2026-09-02).
+     *
+     * `null` on failure, so a caller can tell "nothing was posted" from "posted with no uuid".
+     */
+    async submit(): Promise<{ requestId: string; requestUuids: string[] } | null> {
       const s = getState();
-      if (!s.draft) return;
+      if (!s.draft) return null;
       dispatch({ t: "SUBMIT_START" });
       // A5: did the renter edit the agent's original draft? Compared here (before submit) against the
       // agentOrigin snapshot; the correction is fired AFTER a successful create — fire-and-forget, so it
@@ -1052,6 +1076,8 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
           requestUuids: requestUuids ?? [],
           trialExpiresAt,
         });
+        const posted = { requestId, requestUuids: requestUuids ?? [] };
+
         if (s.draft.rfqId && editedFromDraft) {
           const patch = draftToRfqCorrection(
             { project: s.draft.project, items: finalItems, preferences: s.draft.preferences },
@@ -1059,12 +1085,14 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
           );
           void postRfqCorrection(s.draft.rfqId, patch);
         }
+        return posted;
       } catch (e) {
         const detail =
           e instanceof ApiError
             ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status }
             : null;
         dispatch({ t: "SUBMIT_ERROR", kind: e instanceof ApiError ? e.kind : "unknown", detail });
+        return null;
       }
     },
     reset: () => {

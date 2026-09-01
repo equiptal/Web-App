@@ -10,6 +10,7 @@ import { Processing } from "@/components/screens/Processing";
 import { Confirmation } from "@/components/screens/Confirmation";
 import { Canvas } from "@/components/create/Canvas";
 import { ReadyToSend } from "@/components/create/ReadyToSend";
+import { PostAndShareDialog } from "@/components/create/PostAndShareDialog";
 import { Icon } from "@/components/ui";
 import { btn } from "@/lib/ds";
 
@@ -52,6 +53,13 @@ export function CreateSurface() {
 
   return (
     <>
+      {/* ── Post and share, mounted HERE on purpose ──────────────────────────────────────────────
+          Its button posts, and posting flips `phase` to `confirmation` — which unmounts *Ready to
+          send* mid-press. A dialog owned by that screen would vanish between the post and the share.
+          This component owns the switch and survives it, so the flip happens behind the dialog and
+          the renter sees one continuous act. */}
+      <PostAndShareDialog open={state.shareOnPost} onClose={() => actions.setShareOnPost(false)} />
+
       {/* mobile/016 — trial-run ribbon. Stays above every phase of the flow (intake → wizard →
           confirmation) so it's never ambiguous whether this submission reaches real suppliers. Switching
           to a real request goes through the URL, which is the authority for the mode (see /create). */}
