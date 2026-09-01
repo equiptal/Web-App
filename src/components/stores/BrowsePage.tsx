@@ -56,7 +56,24 @@ export function BrowsePage() {
      it is this page's own reason for existing (owner, 2026-08-30: the banner says a renter can ask
      the market, the directory says who the market is). */
   return (
-    <div {...pin("browse-page")} className={`${SHOP_PAGE} flex flex-col gap-7 pt-9`}>
+    /* ── No page ground above the banner (owner, 2026-09-01) ─────────────────────────────────────
+       *"What is this?"* — a pale 11px band between the navy header and the hero, on the page a guest
+       lands on.
+
+       `pt-9` (36px) is the storefront column's own head, and it is right for the DIRECTORY. The
+       banner is not in that column: it breaks out to `w-screen` and pulls itself up by
+       `PAGE_Y + 1px` (25/29) to sit flush under the header — a figure written against the shell's
+       padding, not against this page's. 36 less 25 left eleven pixels of page showing through, and
+       against a dark header and a dark photograph eleven pixels of near-white reads as a seam.
+
+       So this column's head is set to exactly what the banner pulls — the same `PAGE_Y + 1px` the
+       banner was written against — and the two cancel to zero. The banner then sits flush under the
+       header on this page as it already does on the home hub, where the shell's own padding is what
+       it was cancelling. The directory keeps its 28px of air from `gap-7`, unchanged. */
+    <div
+      {...pin("browse-page")}
+      className={`${SHOP_PAGE} flex flex-col gap-7 pt-[calc(1.5rem+1px)] sm:pt-[calc(1.75rem+1px)]`}
+    >
       <CtaBanner />
       <BrowseSurface title={t.home.suppliersTitle} />
     </div>
