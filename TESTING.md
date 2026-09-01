@@ -52,6 +52,45 @@ session cookie, not a bearer token. The dashboard is served at `/`; `/dashboard`
 
 ---
 
+## 13 · STORE — the storefront: directory, store profile, equipment sheet
+
+Run · 2026-09-02 · staging · **19 pass · 0 fail · 3 not run**. Backend deployed the same day
+(`categories[]`, `matched[]`, `GET /public/equipment/{id}`, yard coordinates on the authed detail).
+
+The three screens are one journey: Browse names the suppliers, a store profile says who one is, and
+the equipment sheet is the machine a renter actually asks for. Every case below was run against the
+staging backend, the API layer through the app's own routes on a local dev server.
+
+| ID | Case | Expected | L | Mut | Coverage |
+|---|---|---|---|---|---|
+| STORE-01 | The card mappers keep what the card draws | `categories[]` and `matched[]` default to `[]`; the taxonomy triple and the yard city survive | U | no | `tests/unit/stores.test.ts` |
+| STORE-02 | A request from a store is DIRECT | `type: "DIRECT"` + integer `supplierId`; an unusable id broadcasts rather than 400s | U | no | `tests/unit/app-adapters.test.ts` |
+| STORE-03 | A direct run starts from a clean draft | `SET_DIRECT` on a new target drops the held draft and returns to intake | U | no | `tests/unit/direct-request.test.ts` |
+| STORE-04 | A city with no coordinates draws no map | `cityCentroid` answers null rather than a country centroid | U | no | `tests/unit/direct-request.test.ts` |
+| STORE-05 | The storefront palette matches its mirror | every `--shop-*` value in `globals.css` equals `ds-colors.ts` | U | no | `tests/unit/ds-colors.test.ts` |
+| STORE-06 | A store card names its categories | `GET /api/stores` → `categories[{id,name,nameAr}]`, most-stocked first | A | no | manual |
+| STORE-07 | An unfiltered browse sends no machines | `matched: []` on every card | A | no | manual |
+| STORE-08 | A category-filtered browse previews per store | each card carries ≤ 3 of ITS OWN matches, never the page's newest three | A | no | manual |
+| STORE-09 | A previewed machine carries what the card draws | subtype, size, year, city, photo URL, verification | A | no | manual |
+| STORE-10 | A guest can open one machine | `GET /public/equipment/{id}` → 200 with the safe projection | A | no | manual |
+| STORE-11 | The public sheet hides what it should | no `userId`, no `supplierId`, no yard coordinates; documents empty | A | no | manual |
+| STORE-12 | The taxonomy route still resolves | `/public/equipment/taxonomy` → 200 tree, not the id route | A | no | manual |
+| STORE-13 | An unknown machine 404s | `GET /public/equipment/<random uuid>` → 404 | A | no | manual |
+| STORE-14 | The authed sheet places the yard | `yardLat` / `yardLng` as numbers; `userId` names the supplier | A | no | manual |
+| STORE-15 | A guest is refused the authed sheet | `GET /equipment/{id}` with no token → 401 | A | no | manual |
+| STORE-16 | Browse renders the directory | title + count, search, city menu, pill row, store cards with chips and «+n» | B | no | manual |
+| STORE-17 | A pill turns cards into machines | every card becomes the machine face; `1/2` counter and ‹ › appear | B | no | manual |
+| STORE-18 | The stepper pages without navigating | counter advances, the link's id changes, the route does not | B | no | manual |
+| STORE-19 | The equipment sheet renders whole | heading `subtype · size`, four specs, map, price, View store | B | no | manual |
+| STORE-20 | A guest pressing Request is asked to sign in | the account modal opens; no navigation to `/create` | B | no | manual |
+| STORE-21 | A direct entry names its recipient | `/create?supplierId=…` shows the ribbon and prefills the intake | B | no | manual |
+| STORE-22 | The store profile renders whole | back link, identity row, About, document chips, tiles four to a row | B | no | manual |
+| STORE-23 | The loop closes | profile → sheet → View store → profile, no console error | B | no | manual |
+| STORE-24 | Arabic | `dir=rtl`, storefront copy and taxonomy in Arabic, no English left | B | no | manual |
+| STORE-25 | A signed-in renter sees the precise yard | the sheet's map pin is the yard, not the city centre | B | no | — |
+| STORE-26 | A DIRECT request reaches the supplier | submit lands `type: DIRECT` with the store's `supplierId` | A | yes | — |
+| STORE-27 | The recipient survives a reload | a mid-flow reload keeps the ribbon and the supplier | B | no | — |
+
 ## 1 · GUEST — guest browsing & parse quota
 
 _Last run: never._

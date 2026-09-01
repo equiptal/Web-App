@@ -6,6 +6,49 @@ defect that comes back is visibly a regression and not a new discovery.
 
 ---
 
+## Run · 2026-09-02 · STORE (the storefront) · staging
+
+**0 defects. 2 questions of intent, both for the owner rather than for a fixer.** Every case that ran
+passed: the three screens render, the loop closes, the new backend fields arrive, and the console is
+clean in both languages. What is below is not broken code.
+
+### ASK-STORE-1 · Browse offers 37 category pills; the prototype draws 8
+
+| | |
+|---|---|
+| **Case** | STORE-16 |
+| **Severity** | minor — nothing is wrong, but the row is a different object at 37 than at 8 |
+| **Where** | `src/components/stores/BrowseSurface.tsx` (the pill row renders `taxonomy` whole) |
+| **Expected** | the reference's eight: Excavator, Mobile Crane, Tower Crane, Telehandler, Wheel Loader, Forklift, Portable Generator, plus All |
+| **Actual** | the taxonomy's full top level on staging: 37 pills, scrolling well past the fold |
+| **Cause** | the pills are data, and the app's taxonomy is larger than the prototype's mock |
+| **Fix** | none until the intent is settled. Either the row stays honest and scrolls, or the backend marks a browsable subset (a `featured` flag on a category), or the web shows the first N by stock and hides the rest behind «More». |
+| **Risk** | picking a subset in the web would hard-code a taxonomy the backend owns |
+| **Ruling** | — |
+
+### ASK-STORE-2 · The directory is titled «Most popular suppliers»; the prototype says «Suggested Suppliers»
+
+| | |
+|---|---|
+| **Case** | STORE-16 |
+| **Severity** | minor |
+| **Where** | `src/components/stores/BrowsePage.tsx` passes `t.home.suppliersTitle` |
+| **Expected** | «Suggested Suppliers» (the artboard's own heading) |
+| **Actual** | «Most popular suppliers» |
+| **Cause** | the heading is the home page's existing string, reused when the directory became its own page |
+| **Fix** | one word from the owner and it is a one-line change; the Arabic key moves with it |
+| **Risk** | the same key is read by the dashboard's supplier block |
+| **Ruling** | — |
+
+### Note · `documentKeys: []` rides on every public equipment row
+
+Not a leak and not new: `batchSignItems` re-attaches the field it signs, so the public projection —
+which deliberately drops documents — answers with an empty array rather than with nothing. Verified
+empty on 17 matched rows and on the public store equipment list. Worth removing when that signer is
+next touched, because a field named `documentKeys` on a public payload reads like an oversight.
+
+---
+
 ## Run · 2026-08-30 · renter-projects + create + request · staging
 
 **3 fixes — 2 blocker, 1 major. All three closed.** The two backend ones landed in `f95c1e50` and
