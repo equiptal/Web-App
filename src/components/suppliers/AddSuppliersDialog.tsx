@@ -6,18 +6,20 @@ import { Icon } from "@/components/ui";
 import { btn, cx } from "@/lib/ds";
 import { fmt, useT } from "@/lib/i18n";
 import { addRenterSuppliersBulk, type NewRenterSupplier } from "@/lib/api/client";
-import { AddFromMoedatechPanel } from "./AddFromMoedatechPanel";
 import { SupplierImportPanel } from "./SupplierImportPanel";
 
 /**
  * SUP-T15 — adding the suppliers a renter already works with.
  *
- * ── One door, three ways through it (owner, 2026-09-01) ─────────────────────────────────────────
+ * ── Typing, or a sheet instead — as the prototype has it ────────────────────────────────────────
  *
- * *Add* and *Import* used to be two buttons in the page header for one intention. A renter with a
- * file had to guess which one was his before either had told him what it wanted. So there is one
- * button, and the choice — type them, upload a list, or take one off Moedatech — is made in here,
- * where all three are visible at once and none is a dead end.
+ * `prototypes/renter-suppliers-v1.html` (`addRowsPanel`) ends the rows with an *or* rule and one
+ * secondary button, **Upload a sheet instead**. Not a tab strip: tabs say "these are two equal
+ * things, choose", and they are not — typing is what the dialog opens on because most renters add
+ * two or three suppliers, and the sheet is the escape hatch for the one who has forty.
+ *
+ * *Add from Moedatech* is NOT in here. It has its own button in the header, also from the prototype,
+ * because it makes a different kind of row — one linked to an account rather than the renter's own.
  *
  * ── Rows, not a form ────────────────────────────────────────────────────────────────────────────
  *
@@ -62,7 +64,8 @@ const GRID = "grid grid-cols-[1.2fr_.9fr_1.2fr_.9fr_auto_28px] items-center gap-
 export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; onClose: () => void; onAdded: (msg?: string) => void }) {
   const t = useT();
   const c = t.suppliers;
-  const [mode, setMode] = useState<"type" | "file" | "app">("type");
+  /** One way, and back. `file` is reached from the rows and returns to them on cancel. */
+  const [mode, setMode] = useState<"type" | "file">("type");
   const [rows, setRows] = useState<Row[]>([blank()]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +113,7 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
       /* The import panel carries its own actions — its primary button says how many rows will be
          written, which a fixed dialog footer cannot. */
       footer={
-        mode !== "type" ? undefined : (
+        mode === "file" ? undefined : (
           <div className="flex w-full items-center justify-end gap-2">
             {error && <span className="me-auto text-meta font-extrabold text-danger-deep">{error}</span>}
             <button type="button" onClick={close} className={btn("ghost", "md")}>
@@ -124,29 +127,13 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
       }
     >
       <div className="grid gap-3">
-        {/* Two ways in, both named, neither hidden behind the other. */}
-        <div className="flex w-fit gap-0.5 rounded-md bg-surface2 p-0.5">
-          <ModeTab on={mode === "type"} onClick={() => setMode("type")} icon="edit" label={c.modeType} />
-          <ModeTab on={mode === "file"} onClick={() => setMode("file")} icon="table_view" label={c.modeFile} />
-          <ModeTab on={mode === "app"} onClick={() => setMode("app")} icon="storefront" label={c.modeApp} />
-        </div>
-
-        {mode === "app" ? (
-          <AddFromMoedatechPanel
-            typeTabLabel={c.modeType}
-            onDone={(msg) => {
-              onAdded(msg);
-              close();
-            }}
-            onCancel={close}
-          />
-        ) : mode === "file" ? (
+        {mode === "file" ? (
           <SupplierImportPanel
             onDone={(msg) => {
               onAdded(msg);
               close();
             }}
-            onCancel={close}
+            onCancel={() => setMode("type")}
           />
         ) : (
           <div className="grid gap-1.5">
@@ -220,26 +207,23 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
                 <span className="block text-muted-dark">{c.markAllHint}</span>
               </span>
             </label>
+
+            {/* The prototype's `or` rule and one secondary button — not a tab. Tabs say "two equal
+                things, choose"; these are not equal. Typing is what the dialog opens on because most
+                renters add two or three, and the sheet is the escape hatch for the one with forty. */}
+            <div className="my-1 flex items-center gap-3 text-label font-extrabold uppercase tracking-wide text-muted-light">
+              <span className="h-px flex-1 bg-border" />
+              {c.or}
+              <span className="h-px flex-1 bg-border" />
+            </div>
+            <button type="button" onClick={() => setMode("file")} className={cx(btn("secondary", "md"), "w-fit")}>
+              <Icon name="upload_file" size={15} />
+              {c.uploadInstead}
+            </button>
           </div>
         )}
       </div>
     </Dialog>
-  );
-}
-
-function ModeTab({ on, onClick, icon, label }: { on: boolean; onClick: () => void; icon: string; label: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cx(
-        "inline-flex h-[30px] items-center gap-1.5 rounded-sm px-3 text-meta font-extrabold transition",
-        on ? "bg-surface text-navy" : "text-muted hover:text-navy",
-      )}
-    >
-      <Icon name={icon} size={15} />
-      {label}
-    </button>
   );
 }
 

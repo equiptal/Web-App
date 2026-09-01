@@ -47,7 +47,9 @@ export function SuggestedBand({ onAdded }: { onAdded: (message: string) => void 
       await addRenterSupplier({
         name: s.companyName,
         phone: s.phone ?? null,
-        crNumber: s.crNumber ?? null,
+        // Whatever the bid arrived with. A row added without it is a supplier the renter cannot send
+        // his next request to — and he would never know why this one was skipped.
+        email: s.email ?? null,
         // Not a registered vendor by default: they bid, which is not the same as the renter having
         // decided to work with them. He can raise the flag on the row in one click.
         vendorRegistered: false,
@@ -80,7 +82,10 @@ export function SuggestedBand({ onAdded }: { onAdded: (message: string) => void 
             className="inline-flex h-[26px] items-center gap-1.5 rounded-full border border-info/30 bg-surface py-0 pe-1 ps-2.5 font-semibold text-navy"
           >
             {s.companyName}
-            <span className="text-muted">{s.via === "link" ? c.suggestedViaLink : c.suggestedOnApp}</span>
+            {/* The backend calls it `why` and this app called it `via`. Read both: the row is the same
+                fact either way, and a payload that used the other name would silently read as "on
+                Moedatech" for a bid that came through a link. */}
+            <span className="text-muted">{s.via === "link" || s.why === "link_bid" ? c.suggestedViaLink : c.suggestedOnApp}</span>
             <button
               type="button"
               disabled={busy !== null}

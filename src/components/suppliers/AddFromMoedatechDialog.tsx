@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 import { btn } from "@/lib/ds";
 import { fmt, useT } from "@/lib/i18n";
@@ -8,6 +9,14 @@ import { isAlreadyLinked, linkRenterSuppliers, searchSupplierDirectory, type Dir
 
 /**
  * SUP-T14 — adding a supplier who already has a Moedatech account.
+ *
+ * ── Its own door, as the prototype has it (owner, 2026-09-01) ───────────────────────────────────
+ *
+ * `prototypes/renter-suppliers-v1.html` puts TWO buttons in the header — *Add from Moedatech* and
+ * *Add my own suppliers* — because the two make different kinds of row: one linked to an account,
+ * one the renter's own. This was briefly built as a third tab inside the other dialog, which buried
+ * it: a renter looking for a firm on Moedatech had to open a dialog named after the other route
+ * before he could see this one existed.
  *
  * ── The directory, not the shopfronts ───────────────────────────────────────────────────────────
  *
@@ -32,15 +41,14 @@ import { isAlreadyLinked, linkRenterSuppliers, searchSupplierDirectory, type Dir
  * Stated on the panel, because a renter about to put another company in a list of his own has a fair
  * question about what that company will see, and the honest answer is nothing.
  */
-export function AddFromMoedatechPanel({
+export function AddFromMoedatechDialog({
+  open,
+  onClose,
   onDone,
-  onCancel,
-  typeTabLabel,
 }: {
+  open: boolean;
+  onClose: () => void;
   onDone: (msg: string) => void;
-  onCancel: () => void;
-  /** Named so the "add anyone else under …" line points at a tab the renter can actually see. */
-  typeTabLabel: string;
 }) {
   const t = useT();
   const c = t.suppliers;
@@ -94,7 +102,7 @@ export function AddFromMoedatechPanel({
     }
   };
 
-  return (
+  const body = (
     <div className="grid gap-3">
       <div className="grid gap-1.5">
         <span className="flex h-[34px] items-center gap-2 rounded-md border border-border-strong bg-surface px-2.5">
@@ -108,8 +116,8 @@ export function AddFromMoedatechPanel({
           />
         </span>
         {/* Every account with `is_supplier`, shopfront or not — so the only firms missing here are the
-            ones with no Moedatech account at all, which is what the other tab is for. */}
-        <span className="text-meta text-muted">{fmt(c.appEveryone, { tab: typeTabLabel })}</span>
+            ones with no Moedatech account at all, which is what the other button is for. */}
+        <span className="text-meta text-muted">{c.dirEveryone}</span>
       </div>
 
       <div className="max-h-[300px] overflow-auto rounded-md border border-border">
@@ -149,18 +157,32 @@ export function AddFromMoedatechPanel({
           {c.appRegisteredRule}
         </span>
       </p>
-
-      <div className="flex items-center gap-2">
-        {error && <span className="text-meta font-extrabold text-danger-deep">{error}</span>}
-        <span className="ms-auto flex items-center gap-2">
-          <button type="button" onClick={onCancel} className={btn("ghost", "md")}>
-            {t.common.cancel}
-          </button>
-          <button type="button" onClick={save} disabled={!chosen.length || saving} className={btn("primary", "md")}>
-            {chosen.length === 1 ? c.appAddOne : chosen.length ? fmt(c.appAddN, { n: chosen.length }) : c.appAddNone}
-          </button>
-        </span>
-      </div>
     </div>
+  );
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      size="xl"
+      icon={<Icon name="verified" size={18} />}
+      title={c.dirTitle}
+      subtitle={c.dirSubtitle}
+      footer={
+        <div className="flex w-full items-center gap-2">
+          {error && <span className="text-meta font-extrabold text-danger-deep">{error}</span>}
+          <span className="ms-auto flex items-center gap-2">
+            <button type="button" onClick={onClose} className={btn("ghost", "md")}>
+              {t.common.cancel}
+            </button>
+            <button type="button" onClick={save} disabled={!chosen.length || saving} className={btn("primary", "md")}>
+              {chosen.length ? fmt(c.dirAddN, { n: chosen.length }) : c.dirAdd}
+            </button>
+          </span>
+        </div>
+      }
+    >
+      {body}
+    </Dialog>
   );
 }

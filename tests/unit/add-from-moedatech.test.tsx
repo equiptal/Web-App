@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { LocaleProvider } from "@/lib/i18n";
 import { en } from "@/lib/i18n/en";
-import { AddFromMoedatechPanel } from "@/components/suppliers/AddFromMoedatechPanel";
+import { AddFromMoedatechDialog } from "@/components/suppliers/AddFromMoedatechDialog";
 
 /**
  * SUP-T14 — adding a supplier who already has a Moedatech account.
@@ -44,7 +44,7 @@ afterEach(cleanup);
 function open(onDone: (msg: string) => void = () => {}) {
   return render(
     <LocaleProvider>
-      <AddFromMoedatechPanel onDone={onDone} onCancel={() => {}} typeTabLabel={en.suppliers.modeType} />
+      <AddFromMoedatechDialog open onClose={() => {}} onDone={onDone} />
     </LocaleProvider>,
   );
 }
@@ -54,10 +54,12 @@ const search = async () => {
   await waitFor(() => expect(screen.getByText("Zahid Tractor")).toBeTruthy(), { timeout: 2000 });
 };
 
-describe("AddFromMoedatechPanel", () => {
-  it("Given the panel opens, Then it says the directory covers everyone with an account", () => {
+describe("AddFromMoedatechDialog", () => {
+  it("Given the dialog opens, Then it says the directory covers everyone with an account", () => {
     open();
-    expect(screen.getByText(en.suppliers.appEveryone.replace("{tab}", en.suppliers.modeType))).toBeTruthy();
+    // Its own door, as the prototype has it — not a tab buried inside the other dialog.
+    expect(screen.getByText(en.suppliers.dirTitle)).toBeTruthy();
+    expect(screen.getByText(en.suppliers.dirEveryone)).toBeTruthy();
   });
 
   it("Given a supplier with no store, When searched, Then it is listed and selectable like any other", async () => {
@@ -74,7 +76,7 @@ describe("AddFromMoedatechPanel", () => {
     await search();
 
     fireEvent.click(screen.getAllByRole("checkbox")[0]);
-    fireEvent.click(screen.getByRole("button", { name: en.suppliers.appAddOne }));
+    fireEvent.click(screen.getByRole("button", { name: en.suppliers.dirAddN.replace("{n}", "1") }));
 
     await waitFor(() => expect(api.linked.length).toBe(1));
     // The account id, and registered — a renter does not add a platform firm unless he works with it,
@@ -85,7 +87,7 @@ describe("AddFromMoedatechPanel", () => {
   it("Given nothing is ticked, Then the button is refused", async () => {
     open();
     await search();
-    expect((screen.getByRole("button", { name: en.suppliers.appAddNone }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: en.suppliers.dirAdd }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("Given the account has no company name of its own, Then the person is not repeated under it", async () => {

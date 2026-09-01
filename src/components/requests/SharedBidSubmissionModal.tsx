@@ -533,7 +533,11 @@ export function SharedBidSubmissionModal({
                   <CoField label={L("National address", "العنوان الوطني")} text={submission.nationalAddress} docType="national_address" />
                   {/* Contact info — shown plainly (the supplier's real phone). The masked "negotiate via
                       relay" variant is deferred until the relay ships; for now the renter gets the number. */}
-                  <RoField label={L("Contact info", "بيانات التواصل")} value={submission.contactInfo} empty={notEntered} />
+                  <RoField label={L("Phone", "رقم الجوال")} value={submission.contactInfo} empty={notEntered} />
+                  {/* The e-mail the supplier gave on the form. Shown even when blank, because its
+                      absence is what the renter needs to know: it is the address his next request
+                      would go to, and *Send to my suppliers* leaves out a row that has none. */}
+                  <RoField label={L("E-mail", "البريد الإلكتروني")} value={submission.contactEmail} empty={notEntered} />
                   {supplierNotes && <RoField label={L("Notes — for the whole quotation", "ملاحظات — لكامل عرض السعر")} value={supplierNotes} multiline />}
                 </div>
 

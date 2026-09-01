@@ -7,6 +7,7 @@ import { btn, cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 import { deleteSupplierGroup, listRenterSuppliers, renameSupplierGroup, updateRenterSupplier } from "@/lib/api/client";
 import { AddSuppliersDialog } from "./AddSuppliersDialog";
+import { AddFromMoedatechDialog } from "./AddFromMoedatechDialog";
 import { DeleteGroupDialog, GroupsMenu, NameGroupDialog, RenameGroupDialog } from "./SupplierGroups";
 import { SupplierProfileDialog } from "./SupplierProfileDialog";
 import { SupplierBidsDialog } from "./SupplierBidsDialog";
@@ -61,6 +62,7 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
   const [pill, setPill] = useState<"all" | "vendor">("all");
   const [toast, setToast] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [addingFromApp, setAddingFromApp] = useState(false);
 
   /* Groups. `picking` is the only mode that shows checkboxes — a column of empty boxes on every row
      implies bulk work this screen does not do, so it appears when a group is being made and goes
@@ -197,10 +199,19 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
             {vendors > 0 && <> · {fmt(c.vendors, { n: vendors })}</>}
           </p>
         </div>
-        {/* ~~A second «Import a list» button.~~ Removed (owner, 2026-09-01): two controls for one
-            intention made a renter with a file guess which door was his before either had told him
-            what it wanted. Uploading is now a tab inside this dialog. */}
+        {/* Two buttons, as the prototype has them. **Both say ADD; only the source differs, which is
+            the whole difference between them** — one makes a row linked to a Moedatech account, the
+            other a row that is the renter's own. The directory leads because its rows are the linked
+            ones.
+
+            ~~A third «Import a list» button.~~ Uploading a sheet is not a third source, it is another
+            way to type the same rows, so it lives inside *Add my own suppliers* — under an `or` rule,
+            exactly where the prototype puts it. */}
         <span className="ms-auto flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => setAddingFromApp(true)} className={btn("primary", "md")}>
+            <Icon name="verified" size={15} />
+            {c.addFromApp}
+          </button>
           <button type="button" onClick={() => setAdding(true)} className={btn("tinted", "md")}>
             <Icon name="person_add" size={15} />
             {c.addSupplier}
@@ -354,8 +365,18 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
         )}
       </div>
 
-      {/* One dialog: typed rows or an uploaded list, chosen inside it. `msg` is the import's own
-          count — typed rows have nothing to count that the list below does not already show. */}
+      <AddFromMoedatechDialog
+        open={addingFromApp}
+        onClose={() => setAddingFromApp(false)}
+        onDone={(msg) => {
+          setAddingFromApp(false);
+          setToast(msg);
+          load();
+        }}
+      />
+
+      {/* Typed rows, or an uploaded sheet reached from inside them. `msg` is the import's own count —
+          typed rows have nothing to count that the list below does not already show. */}
       <AddSuppliersDialog
         open={adding}
         onClose={() => setAdding(false)}

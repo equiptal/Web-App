@@ -106,6 +106,15 @@ export interface LinkBidSubmission {
   vatNumber?: string | null;
   nationalAddress?: string | null;
   contactInfo?: string | null;
+  /**
+   * The supplier's e-mail, as they typed it on the bid form.
+   *
+   * **SUP-BE-9's third matching key** (owner, 2026-08-31): a link submission is attached to a row in
+   * My Suppliers by phone, then by this. It is also the only way the renter can e-mail them
+   * afterwards — *Send to my suppliers* skips a row with no address, and a supplier who bid and left
+   * no e-mail is one the renter cannot include in the next request.
+   */
+  contactEmail?: string | null;
   /** Supplier's city — captured on the form; feeds the account the admin creates on convert. */
   city?: string | null;
   /** Rentee's pre-conversion "Negotiate" messages (append-only `{ text, at }`) — rendered as a chat
@@ -183,6 +192,18 @@ export interface SubmitBidFormPayload {
   /** Supplier phone — the account key. Stored normalized (E.164) in the existing `contact_info`
    *  column on the backend; the form collects it via a structured phone input. */
   contactInfo: string;
+  /**
+   * The supplier's e-mail. Optional, and the backend takes it as `contactEmail`.
+   *
+   * Asked for because of what it unlocks after the bid, not for the bid itself: it is the second key
+   * a link submission is matched to a My Suppliers row on (phone first), and it is the address the
+   * renter's next request is sent to. A supplier who bids and leaves it blank is one the renter
+   * cannot include next time — so the field says that, rather than sitting there unexplained.
+   *
+   * Not required: a bid is the thing this form exists to collect, and refusing one over an address
+   * would trade the whole point of the page for a nicety.
+   */
+  contactEmail?: string;
   /** Supplier's city — optional. */
   city?: string;
   notes?: string;
@@ -239,6 +260,7 @@ export function mapLinkSubmissions(raw: unknown): LinkBidSubmission[] {
       vatNumber: s(o.vatNumber),
       nationalAddress: s(o.nationalAddress),
       contactInfo: s(o.contactInfo),
+      contactEmail: s(o.contactEmail),
       city: s(o.city),
       renteeMessages: (Array.isArray(o.renteeMessages) ? (o.renteeMessages as Record<string, unknown>[]) : [])
         .map((m) => ({ text: s(m?.text) ?? "", at: s(m?.at) ?? "" }))

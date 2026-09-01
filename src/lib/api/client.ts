@@ -1545,9 +1545,19 @@ export async function removeRenterSupplier(
 export interface SupplierSuggestion {
   companyName: string;
   phone?: string | null;
-  crNumber?: string | null;
+  /**
+   * The address the supplier gave on the bid form.
+   *
+   * ⚠️ Carried into the row when the renter adds them, and it is the difference between a supplier he
+   * can send his next request to and one he cannot: *Send to my suppliers* skips a row with no
+   * e-mail. Dropping it here would mean a firm that bid, gave an address, and still had to be chased
+   * for it by hand.
+   */
+  email?: string | null;
   supplierId?: string | number | null;
-  via: "app" | "link";
+  /** How they reached the renter. `why` is the backend's own name for the same fact. */
+  via?: "app" | "link";
+  why?: string;
   at?: string;
 }
 

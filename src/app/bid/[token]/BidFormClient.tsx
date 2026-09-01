@@ -193,7 +193,7 @@ export default function BidFormClient({ token }: { token: string }) {
   const [notFound, setNotFound] = useState(false);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [contract, setContract] = useState<Record<string, boolean>>({});
-  const [company, setCompany] = useState({ companyName: "", crNumber: "", vatNumber: "", nationalAddress: "", contactInfo: "", city: "", notes: "", validUntil: "" });
+  const [company, setCompany] = useState({ companyName: "", crNumber: "", vatNumber: "", nationalAddress: "", contactInfo: "", contactEmail: "", city: "", notes: "", validUntil: "" });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
@@ -400,6 +400,8 @@ export default function BidFormClient({ token }: { token: string }) {
         vatNumber: company.vatNumber.trim(),
         nationalAddress: company.nationalAddress.trim(),
         contactInfo: company.contactInfo.trim(),
+        // Optional, and sent only when it is there — an empty string would store "" as an address.
+        ...(company.contactEmail.trim() ? { contactEmail: company.contactEmail.trim() } : {}),
         city: company.city.trim() || undefined,
         // No backend flag for VAT-inclusive pricing — carry it as a tagged line in the notes (which
         // round-trip to the renter's submission view). The viewer surfaces it as a dedicated note.
@@ -882,9 +884,19 @@ export default function BidFormClient({ token }: { token: string }) {
             </div>
             <div className="frow">
               <Field label={L("Phone", "رقم الجوال")} req invalid={showErrors && !company.contactInfo.trim()} L={L}><input type="tel" inputMode="tel" value={company.contactInfo} onChange={(e) => setCompany({ ...company, contactInfo: e.target.value })} placeholder={L("e.g. 05XXXXXXXX", "مثال: 05XXXXXXXX")} /></Field>
+              {/* Optional, and beside the phone rather than below the notes, because the two answer the
+                  same question — how the renter reaches you — and a supplier fills them together.
+
+                  Not required on purpose: a bid is what this page exists to collect, and refusing one
+                  over an address would trade the whole point of the page for a nicety. */}
+              <Field label={L("E-mail", "البريد الإلكتروني")} L={L}><input type="email" inputMode="email" value={company.contactEmail} onChange={(e) => setCompany({ ...company, contactEmail: e.target.value })} placeholder="name@company.com" /></Field>
+            </div>
+            <div className="frow">
               <Field label={L("City", "المدينة")} L={L}><input value={company.city} onChange={(e) => setCompany({ ...company, city: e.target.value })} placeholder={L("e.g. Riyadh", "مثال: الرياض")} /></Field>
             </div>
-            <p style={{ margin: "-4px 0 2px", fontSize: 11.5, color: "var(--muted)" }}>{L("Your phone lets you continue this bid in the Moedatech app later.", "رقمك يتيح لك متابعة هذا العرض في تطبيق مؤيداتك لاحقاً.")}</p>
+            {/* What each one buys the SUPPLIER, not what it buys us — that is the only version of this
+                sentence he has a reason to read. */}
+            <p style={{ margin: "-4px 0 2px", fontSize: 11.5, color: "var(--muted)" }}>{L("Your phone lets you continue this bid in the Moedatech app later. Your e-mail is how this renter sends you their next request.", "رقمك يتيح لك متابعة هذا العرض في تطبيق معداتك لاحقاً. وبريدك هو الطريقة التي يرسل بها هذا المستأجر طلبه القادم إليك.")}</p>
             {QUOTE_EXPIRY_ENABLED && <Field label={L("Quote valid until", "صلاحية العرض حتى")} L={L}><input type="date" value={company.validUntil} onChange={(e) => setCompany({ ...company, validUntil: e.target.value })} /></Field>}
             <div className="notes-field"><label>{L("Notes — for the whole quotation", "ملاحظات — لكامل عرض السعر")}<span className="optx">{L("Optional", "اختياري")}</span></label><textarea value={company.notes} onChange={(e) => setCompany({ ...company, notes: e.target.value })} /></div>
 
