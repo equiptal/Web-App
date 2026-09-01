@@ -181,8 +181,21 @@ export interface RequestItem {
   minimumEquipmentYear: number | null;
   maxEquipmentAge: number | null;
   dieselIncluded: boolean | null;
+  /**
+   * The DEPRECATED F.A.T rollup, and the two columns that superseded it.
+   *
+   * `fatRequired` is derived on create (`operatorIncluded && (fatFood || fatAccommodationTransport)`)
+   * and kept only for consumers that have not moved to the split. Writing it independently of the
+   * two below produces `fat_required = true` with both split columns null, which the admin surfaces
+   * read as "F.A.T included" while the bid form, which reads the split, can show nothing at all.
+   * `app-adapters` carries the whole ruling; anything that writes these must derive it the same way.
+   */
   fatRequired: boolean | null;
+  fatFood: boolean | null;
+  fatAccommodationTransport: boolean | null;
   safetyCertifications: string[] | null;
+  /** Free-text work type, crane subtypes only (backend `work_type`, VARCHAR(255)). */
+  workType: string | null;
   additionalNotes: string | null;
 }
 

@@ -3,7 +3,9 @@
 import { useState, type ReactNode } from "react";
 import { Dialog } from "@/components/Dialog";
 import { Dropdown } from "@/components/Dropdown";
+import { CertSelect } from "@/components/create/CertSelect";
 import { requestedMinYear } from "@/lib/contract/bids";
+import { SAFETY_CERTIFICATES, type SafetyCertificate } from "@/lib/contract/options";
 import { updateRequest } from "@/lib/api/client";
 import { type RequestRecord } from "@/lib/contract/requests";
 import "@/components/requests/requests-proto.css";
@@ -129,6 +131,18 @@ const BYWHO_OPTS: Opt[] = [{ v: "rentee", en: "Me (renter)", ar: "أنا (الم
  * against yourself is not a term. Copying the conditions matters as much as copying the fields — a
  * form that asks about a night shift on a machine with no operator is a different form.
  *
+ * ── ~~Three fields the read payload does not carry.~~ Wrong, and worth recording ─────────────
+ * (owner, 2026-09-01: *"in request details these are shown so why in edit it cant"*)
+ *
+ * The claim was that `workType`, the F.A.T split and the certificate list could not be prefilled
+ * because `RequestItem` does not name them. `RequestItem` is a DESCRIPTION, not a filter:
+ * `mapRequestDetail` spreads the raw record and whitelists nothing, so every column the backend
+ * returns reaches this component whether the interface mentions it or not. The interface was
+ * incomplete; it names them now.
+ *
+ * The certificate list was the sharpest of it: the details modal has always PRINTED it, off the same
+ * record this form reads, while this form passed it through untouched.
+ *
  * ── What is stated but not edited ───────────────────────────────────────────────────────────────
  * **The site.** It is in the order because the renter expects it there, and it is READ-ONLY: the
  * canvas picks a location on a map and stores `projectLat`/`projectLng` beside the label, and a text
@@ -145,13 +159,23 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
   const [operator, setOperator] = useState(s(it?.operatorIncluded ?? "NO"));
   const [nationality, setNationality] = useState(s(it?.operatorNationality));
   const [nightShift, setNightShift] = useState(!!it?.nightShiftRequired);
-  const [fat, setFat] = useState(it?.fatRequired ? "supplier" : "rentee");
+  /* The SPLIT, which is what create asks: food and accommodation are two answers. `fatRequired` is
+     the deprecated rollup and is DERIVED from them on save, never set beside them. Falling back to
+     the rollup keeps a request created before the split opening on what it actually holds. */
+  const [fatFood, setFatFood] = useState((it?.fatFood ?? it?.fatRequired) ? "supplier" : "rentee");
+  const [fatStay, setFatStay] = useState((it?.fatAccommodationTransport ?? it?.fatRequired) ? "supplier" : "rentee");
   const [fuel, setFuel] = useState(s(it?.fuelTypePreference ?? "DIESEL"));
   /** `dieselIncluded` IS the fuel-responsibility answer: true ⇒ the supplier carries it. */
   const [fuelBy, setFuelBy] = useState(it?.dieselIncluded ? "supplier" : "rentee");
   const [minYear, setMinYear] = useState(s(requestedMinYear((it ?? {}) as unknown as Record<string, unknown>)));
   const [mob, setMob] = useState(it?.mobilizationByRentee ? "rentee" : "supplier");
   const [demob, setDemob] = useState(it?.demobilizationByRentee ? "rentee" : "supplier");
+  const [workType, setWorkType] = useState(s(it?.workType));
+  const [certs, setCerts] = useState<SafetyCertificate[]>(
+    (it?.safetyCertifications ?? []).filter((c): c is SafetyCertificate =>
+      (SAFETY_CERTIFICATES as readonly string[]).includes(c),
+    ),
+  );
   const [itemNotes, setItemNotes] = useState(s(it?.additionalNotes));
 
   // ── When ──
@@ -214,16 +238,30 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
         demobilizationByRentee: demob === "rentee",
         // Only meaningful for a burnt fuel, exactly as `toDieselIncluded` decides it on create.
         ...(fuel === "DIESEL" || fuel === "PETROL" ? { dieselIncluded: fuelBy === "supplier" } : {}),
-        safetyCertifications: it.safetyCertifications ?? [],
+        safetyCertifications: certs,
+        ...(workType.trim() ? { workType: workType.trim().slice(0, 255) } : {}),
         /* The operator's own answers go only with an operator, and are cleared without one — the
-           same rule the canvas applies by not asking them. */
+           same rule the canvas applies by not asking them.
+
+           `fatRequired` is DERIVED from the two split answers, exactly as `app-adapters` derives it
+           on create. Setting it independently is what produces `fat_required = true` with both split
+           columns null: an impossible state that the admin surfaces read as "F.A.T included" while
+           the bid form, which reads the split, shows nothing at all. */
         ...(withOperator
           ? {
-              fatRequired: fat === "supplier",
+              fatFood: fatFood === "supplier",
+              fatAccommodationTransport: fatStay === "supplier",
+              fatRequired: fatFood === "supplier" || fatStay === "supplier",
               nightShiftRequired: nightShift,
               ...(nationality ? { operatorNationality: nationality } : {}),
             }
-          : { fatRequired: undefined, nightShiftRequired: undefined, operatorNationality: undefined }),
+          : {
+              fatFood: undefined,
+              fatAccommodationTransport: undefined,
+              fatRequired: undefined,
+              nightShiftRequired: undefined,
+              operatorNationality: undefined,
+            }),
         /* Posted under the deprecated alias, which is what the backend coalesces and what the create
            adapter also sends (`maxEquipmentAge: toManufactureYear(...)`). It is a manufacture YEAR
            despite the name; `requestedMinYear` is how it is read back. */
@@ -287,7 +325,10 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
             {withOperator && (
               <>
                 <Sel label={L("Operator nationality", "جنسية المشغّل")} value={nationality} onChange={setNationality} opts={NATIONALITY_OPTS} />
-                <Sel label={L("F.A.T (catering) by", "الإعاشة من قبل")} value={fat} onChange={setFat} opts={BYWHO_OPTS} />
+                {/* Two answers, as the operator rail asks them. One control covering both was this
+                    form's own invention. */}
+                <Sel label={L("Food by", "الطعام من قبل")} value={fatFood} onChange={setFatFood} opts={BYWHO_OPTS} />
+                <Sel label={L("Accommodation and transport by", "السكن والمواصلات من قبل")} value={fatStay} onChange={setFatStay} opts={BYWHO_OPTS} />
               </>
             )}
             <Sel label={L("Fuel type", "نوع الوقود")} value={fuel} onChange={setFuel} opts={FUEL_OPTS} />
@@ -300,6 +341,16 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
             <Sel label={L("Return (demobilization) by", "الإرجاع من قبل")} value={demob} onChange={setDemob} opts={BYWHO_OPTS} />
           </div>
           {withOperator && <Chk label={L("Night shift required", "يتطلب وردية ليلية")} value={nightShift} onChange={setNightShift} />}
+          {/* The same picker the canvas uses, so the two surfaces cannot offer different lists.
+              `touched` is true: this request has already been submitted, so an empty list is the
+              renter's answer, not a question he has yet to reach. */}
+          <div className="mt-2">
+            <span className={lbl}>{L("Safety certificates", "شهادات السلامة")}</span>
+            <div className="mt-1"><CertSelect values={certs} touched onChange={setCerts} /></div>
+          </div>
+          <label className="mt-2 block"><span className={lbl}>{L("Work type", "نوع العمل")}</span>
+            <input className={fld} value={workType} maxLength={255} onChange={(e) => setWorkType(e.target.value)} />
+          </label>
           <label className="mt-1 block"><span className={lbl}>{L("Equipment notes", "ملاحظات المعدة")}</span>
             <textarea rows={2} className="mt-1 w-full rounded-md border border-border bg-surface2 p-3 text-body outline-0" value={itemNotes} onChange={(e) => setItemNotes(e.target.value)} />
           </label>
