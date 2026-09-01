@@ -181,3 +181,36 @@ describe("bidCardModel", () => {
     expect(m.closing).toBe("يُغلق الاستقبال 21 أغسطس 2026");
   });
 });
+
+describe("bidCardDescription", () => {
+  it("Given a full request, Then the deadline survives and the terms fill what is left", () => {
+    // WhatsApp gives about two lines. This used to join everything and hand over ~215 characters, so
+    // the client cut the tail — and the tail was the deadline, the one line that decides whether a
+    // supplier acts today or next week.
+    const d = bidCardDescription(bidCardModel(preview, copy, "en", form()));
+
+    expect(d.length).toBeLessThanOrEqual(200);
+    expect(d).toContain("Riyadh");
+    expect(d).toContain("Bidding closes 21 Aug 2026");
+    // The order is the priority order: where, deadline, then terms while they fit.
+    expect(d.indexOf("Bidding closes")).toBeLessThan(d.indexOf("Mobilisation"));
+  });
+
+  it("Given more terms than fit, Then it stops on a whole term rather than mid-word", () => {
+    const long = form({
+      items: [
+        item({
+          requiredTerms: {
+            ...item().requiredTerms,
+            fatFood: "A very long answer that will not fit inside the budget at all",
+          },
+        }),
+      ],
+    });
+    const d = bidCardDescription(bidCardModel(preview, copy, "en", long));
+
+    expect(d.length).toBeLessThanOrEqual(200);
+    // A term that does not fit is on the page one tap away; a half-written one is noise.
+    expect(d.endsWith("·")).toBe(false);
+  });
+});

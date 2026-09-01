@@ -99,6 +99,15 @@ const COPY = {
   },
 } as const;
 
+/**
+ * What an unfurling client will show before it cuts.
+ *
+ * WhatsApp gives roughly two lines, Slack a little more, Apple Mail more again. 200 is past the
+ * backend's own 160 — this description is worth more room because it is the only prose the card has
+ * now that the image says just the machine — and short enough that nothing important is cut.
+ */
+const DESCRIPTION_MAX = 200;
+
 const MONTHS = {
   en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
   ar: ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"],
@@ -300,7 +309,25 @@ export function bidCardModel(
  * state sits beside it.
  */
 export function bidCardDescription(m: BidCardModel): string {
-  return [m.where, m.terms.map((x) => `${x.label}: ${x.value}`).join(" · ") || null, m.closing]
-    .filter(Boolean)
-    .join(" · ");
+  /**
+   * ⚠️ **There is a length, and the order is a priority order.**
+   *
+   * This used to join where + every term + the closing line and hand over whatever came out — around
+   * 215 characters for an ordinary request. WhatsApp gives a description about two lines, and the
+   * backend's own copy clamps at 160, so the tail was being cut by the client — and the tail was the
+   * DEADLINE, which is the one line that decides whether a supplier acts today or next week.
+   *
+   * So: where, then the deadline, then as many terms as fit. A term that does not fit is on the page
+   * one tap away; a deadline that does not fit is a bid that arrives too late.
+   */
+  const head = [m.where, m.closing].filter(Boolean).join(" · ");
+  let out = head;
+  for (const term of m.terms) {
+    const next = `${out} · ${term.label}: ${term.value}`;
+    if (next.length > DESCRIPTION_MAX) break;
+    out = next;
+  }
+  // Only the head can exceed the budget on its own, and cutting a date in half is worse than an
+  // ellipsis — so it is trimmed rather than clipped by whoever renders it.
+  return out.length > DESCRIPTION_MAX ? `${out.slice(0, DESCRIPTION_MAX - 1).trimEnd()}…` : out;
 }
