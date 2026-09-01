@@ -189,7 +189,11 @@ export function PostAndShareDialog({ open, onClose }: { open: boolean; onClose: 
           {posted ? (
             <span className="flex items-center gap-1.5 text-meta font-extrabold text-ok-deep">
               <Icon name="check_circle" size={15} />
-              {fmt(c.done, { n: reachable.length })}
+              {/* «Shared», not «sent» (owner, 2026-09-02) — and it is the right word for what
+                  happened: the renter chose these suppliers and the message went to his client under
+                  his name. It is also the vocabulary the rest of the feature already uses, where a
+                  send is DECLARED and the profile says «you shared this with them». */}
+              {reachable.length === 1 ? c.doneOne : fmt(c.done, { n: reachable.length })}
             </span>
           ) : (
             unreachable.length > 0 && (
