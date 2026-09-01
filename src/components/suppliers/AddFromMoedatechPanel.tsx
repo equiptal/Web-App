@@ -2,28 +2,23 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui";
-import { btn, cx } from "@/lib/ds";
+import { btn } from "@/lib/ds";
 import { fmt, useT } from "@/lib/i18n";
-import { isAlreadyLinked, linkRenterSuppliers } from "@/lib/api/client";
-import type { StoreCard } from "@/lib/contract/stores";
+import { isAlreadyLinked, linkRenterSuppliers, searchSupplierDirectory, type DirectorySupplier } from "@/lib/api/client";
 
 /**
  * SUP-T14 — adding a supplier who already has a Moedatech account.
  *
- * ── It browses stores, and says so ──────────────────────────────────────────────────────────────
+ * ── The directory, not the shopfronts ───────────────────────────────────────────────────────────
  *
- * The right source is a supplier directory: a firm with no shopfront is still a firm, and the renter
- * who cannot find him here types him in by hand — which makes a SECOND row for a company that
- * already has an account, and every match after that is against the wrong record. Until
- * `GET /agents/suppliers` exists (SUP-BE-16b) this reads `GET /api/stores` and states the limit in
- * one line under the search. An absence a renter can see is a limit; an absence he cannot is a bug.
+ * This read `GET /api/stores` while `GET /agents/suppliers` was thought not to exist. It does, and it
+ * lists every account with `is_supplier` set — so a firm with no shopfront is now listed like any
+ * other. That matters more than it sounds: the renter who could not find a supplier here typed him in
+ * by hand, which made a SECOND row for a company that already had an account, and every match after
+ * that ran against the wrong record.
  *
- * ── A store is not a company ────────────────────────────────────────────────────────────────────
- *
- * The link points at the SUPPLIER, never at the shopfront — two stores can belong to one firm. So a
- * row whose payload does not name its company is listed and NOT selectable, with the reason
- * (`supplierIdOf` in `contract/stores.ts` returns null rather than guessing). Linking the store id
- * would attach the renter to something that is not a company and nothing downstream would match.
+ * ⚠️ The directory carries no city and no verification mark. So the picker shows neither — half a
+ * column, filled in only for the firms that happen to have a store, is worse than no column.
  *
  * ── Registered, always (owner, 2026-09-01) ──────────────────────────────────────────────────────
  *
@@ -51,7 +46,7 @@ export function AddFromMoedatechPanel({
   const c = t.suppliers;
 
   const [q, setQ] = useState("");
-  const [rows, setRows] = useState<StoreCard[] | null>(null);
+  const [rows, setRows] = useState<DirectorySupplier[] | null>(null);
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,19 +63,13 @@ export function AddFromMoedatechPanel({
     }
     const mine = ++seq.current;
     const id = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/stores?search=${encodeURIComponent(needle)}&limit=25`);
-        const json = (await res.json()) as { stores?: StoreCard[] };
-        if (mine === seq.current) setRows(json.stores ?? []);
-      } catch {
-        if (mine === seq.current) setRows([]);
-      }
+      const found = await searchSupplierDirectory(needle);
+      if (mine === seq.current) setRows(found);
     }, 300);
     return () => clearTimeout(id);
   }, [q]);
 
-  const selectable = (s: StoreCard) => !!s.supplierId;
-  const chosen = (rows ?? []).filter((s) => selectable(s) && picked[s.id]);
+  const chosen = (rows ?? []).filter((s) => picked[s.supplierId]);
 
   const save = async () => {
     if (!chosen.length || saving) return;
@@ -88,8 +77,7 @@ export function AddFromMoedatechPanel({
     setError(null);
     try {
       const result = await linkRenterSuppliers(
-        // `supplierId` is non-null on every row that reached here — `selectable` is the guard.
-        chosen.map((s) => ({ supplierId: s.supplierId as string, vendorRegistered: true })),
+        chosen.map((s) => ({ supplierId: s.supplierId, vendorRegistered: true })),
       );
       const created = result?.created?.length ?? chosen.length;
       const skipped = result?.skipped?.length ?? 0;
@@ -119,9 +107,9 @@ export function AddFromMoedatechPanel({
             className="w-full bg-transparent text-meta font-semibold text-navy outline-none placeholder:text-muted"
           />
         </span>
-        {/* The limit, said out loud rather than left to be discovered by a renter who cannot find a
-            firm he knows has an account. */}
-        <span className="text-meta text-muted">{fmt(c.appOnlyStores, { tab: typeTabLabel })}</span>
+        {/* Every account with `is_supplier`, shopfront or not — so the only firms missing here are the
+            ones with no Moedatech account at all, which is what the other tab is for. */}
+        <span className="text-meta text-muted">{fmt(c.appEveryone, { tab: typeTabLabel })}</span>
       </div>
 
       <div className="max-h-[300px] overflow-auto rounded-md border border-border">
@@ -131,37 +119,24 @@ export function AddFromMoedatechPanel({
           <p className="p-6 text-center text-meta text-muted">{c.appNoResults}</p>
         ) : (
           <ul>
-            {rows.map((s) => {
-              const ok = selectable(s);
-              return (
-                <li key={s.id} className="border-b border-border last:border-b-0">
-                  <label
-                    className={cx(
-                      "flex items-center gap-2.5 px-3 py-2.5",
-                      ok ? "cursor-pointer hover:bg-surface2" : "cursor-not-allowed bg-surface2",
-                    )}
-                  >
-                    <input
-                      type="checkbox"
-                      disabled={!ok}
-                      checked={!!picked[s.id] && ok}
-                      onChange={(e) => setPicked((p) => ({ ...p, [s.id]: e.target.checked }))}
-                      className="h-3.5 w-3.5 flex-none accent-ok"
-                    />
-                    <span className="min-w-0 flex-1">
-                      <b className={cx("block truncate text-meta font-extrabold", ok ? "text-navy" : "text-muted")}>
-                        {s.name}
-                      </b>
-                      <span className="block truncate text-label text-muted">
-                        {[s.city, s.isVerified ? c.verifiedByMoedatech : null].filter(Boolean).join(" · ")}
-                        {/* Listed and refused, with the reason — never quietly dropped from the list. */}
-                        {!ok && <> · {c.appNoSupplierId}</>}
-                      </span>
-                    </span>
-                  </label>
-                </li>
-              );
-            })}
+            {rows.map((s) => (
+              <li key={s.supplierId} className="border-b border-border last:border-b-0">
+                <label className="flex cursor-pointer items-center gap-2.5 px-3 py-2.5 hover:bg-surface2">
+                  <input
+                    type="checkbox"
+                    checked={!!picked[s.supplierId]}
+                    onChange={(e) => setPicked((p) => ({ ...p, [s.supplierId]: e.target.checked }))}
+                    className="h-3.5 w-3.5 flex-none accent-ok"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <b className="block truncate text-meta font-extrabold text-navy">{s.name}</b>
+                    {/* The person behind the account, and only when it is not the same as the firm —
+                        a line repeating the name above it is a line that teaches nothing. */}
+                    {s.contactName && <span className="block truncate text-label text-muted">{s.contactName}</span>}
+                  </span>
+                </label>
+              </li>
+            ))}
           </ul>
         )}
       </div>

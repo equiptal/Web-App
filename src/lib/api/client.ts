@@ -1551,6 +1551,53 @@ export interface SupplierSuggestion {
   at?: string;
 }
 
+/** One row of the Moedatech supplier directory (backend S1). */
+export interface DirectorySupplier {
+  /** The account id — what a link row stores. A number on the wire, like every other user id. */
+  supplierId: string;
+  /** The firm. Falls back to the person when the account carries no company name. */
+  name: string;
+  /** The person behind the account, when it is not the same as the name above. */
+  contactName: string | null;
+}
+
+/**
+ * Search every supplier who holds an account.
+ *
+ * ⚠️ **Every one, not only those with a store.** A firm with no shopfront is still a firm, and the
+ * renter who cannot find one here types it in by hand — which makes a second row for a company that
+ * already has an account, and every match after that runs against the wrong record.
+ *
+ * Returns `[]` rather than throwing: a picker that fails is a renter who cannot add a supplier.
+ */
+export async function searchSupplierDirectory(q: string, limit = 25): Promise<DirectorySupplier[]> {
+  try {
+    const raw = await projectFetch<unknown>(
+      `/api/supplier-directory?q=${encodeURIComponent(q)}&limit=${limit}`,
+    );
+    const list = Array.isArray(raw)
+      ? raw
+      : raw && typeof raw === "object" && Array.isArray((raw as { data?: unknown }).data)
+        ? ((raw as { data: unknown[] }).data)
+        : [];
+    return list.flatMap((r) => {
+      const o = (r ?? {}) as Record<string, unknown>;
+      const id = o.id ?? o.supplierId ?? o.userId;
+      if (id == null) return [];
+      const person = [o.firstName ?? o.first_name, o.lastName ?? o.last_name]
+        .filter((x) => typeof x === "string" && x.trim())
+        .join(" ")
+        .trim();
+      const company = typeof (o.companyName ?? o.company_name) === "string" ? String(o.companyName ?? o.company_name).trim() : "";
+      // A row with neither a company nor a person cannot be shown or chosen sensibly.
+      if (!company && !person) return [];
+      return [{ supplierId: String(id), name: company || person, contactName: company && person ? person : null }];
+    });
+  } catch {
+    return [];
+  }
+}
+
 /** Suggestions are a courtesy: an empty answer hides the band, which is what "none" should look like. */
 export async function listSupplierSuggestions(): Promise<SupplierSuggestion[]> {
   try {

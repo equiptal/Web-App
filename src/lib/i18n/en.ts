@@ -2340,6 +2340,7 @@ export const en = {
     inviteNotRecorded: "Sending is not recorded yet.",
     modeApp: "From Moedatech",
     appSearch: "Search suppliers on Moedatech",
+    appEveryone: "Everyone with a Moedatech account. A firm without one goes under {tab}.",
     appOnlyStores: "Only suppliers with a store are listed here — add anyone else under {tab}.",
     appNoSupplierId: "cannot be linked — this store does not name its company",
     appPrivate: "The supplier is not told. Their name, their store and their equipment stay theirs — you are only adding them to your own list.",
