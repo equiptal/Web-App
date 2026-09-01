@@ -40,6 +40,7 @@ import { useT, useLocale } from "@/lib/i18n";
 import { Button, Icon, Toggle } from "@/components/ui";
 import { SearchSelect } from "@/components/create/SearchSelect";
 import { RENTAL_BASES, type RentalBasis } from "@/lib/contract/options";
+import { endBeforeStart } from "@/lib/contract/date-range";
 import { MachineTermsPanel, blankTerms } from "./TermsFields";
 // The SAME field chrome the project dialog is built from — see `Field`'s note there. Two dialogs
 // that open from one page and spell a label two ways read as two products.
@@ -110,7 +111,15 @@ export interface WorkOrderDraft {
  * The seed is a COPY, deep enough to cover the nested operator block: two machines sharing one
  * object would edit each other, which is the bug this shape exists to avoid.
  */
-export function blankMachine(seed?: MachineTerms): MachineDraft {
+/**
+ * A blank machine for a work order.
+ *
+ * `basis` is the SITE's, and it matters: the line below used to be built as `blankLine("monthly")`
+ * while its own comment said *"the site's, so nobody re-picks it per line"*. It was not — a work
+ * order on a weekly site opened with every supplier line reading monthly, and the renter either
+ * caught it on each line or priced a week's work at a month's rate (owner, 2026-09-01).
+ */
+export function blankMachine(seed?: MachineTerms, basis: Award["rentalBasis"] = "monthly"): MachineDraft {
   return {
     categoryId: null,
     subcategoryId: null,
@@ -121,7 +130,7 @@ export function blankMachine(seed?: MachineTerms): MachineDraft {
     quantity: 1,
     notes: "",
     terms: seed ? { ...seed, operator: { ...seed.operator } as MachineTerms["operator"] } : blankTerms(),
-    lines: [blankLine("monthly")],
+    lines: [blankLine(basis)],
   };
 }
 
@@ -195,7 +204,13 @@ export function WorkOrderForm({
     ? t.options.rentalBasis[draft.when.rentalBasis]
     : t.options.rentalBasis.monthly;
 
+  /* A period that runs backwards is refused here, not by a 400 that names no field. The work order
+     may leave both dates empty and inherit the site's — that is not an error, so only two dates that
+     ARE set and out of order count (owner, 2026-09-01). */
+  const datesBackwards = endBeforeStart(draft.when.startDate, draft.when.endDate);
+
   const ready =
+    !datesBackwards &&
     draft.machines.length > 0 &&
     draft.machines.every((m) => machineIsNamed({ ref: refOf(m), rawLabel: m.rawLabel })) &&
     // The backend refuses this too, with a 409. Refusing here means the renter finds out while they
@@ -253,6 +268,9 @@ export function WorkOrderForm({
             <input
               type="date"
               className={input}
+              /* The picker refuses it and the line below says so — `min` alone is silent, and no
+                 help to a renter who types the date. */
+              min={draft.when.startDate ?? projectWhen.startDate ?? undefined}
               value={draft.when.endDate ?? ""}
               placeholder={projectWhen.endDate ?? ""}
               onChange={(e) => onChange({ ...draft, when: { ...draft.when, endDate: e.target.value || null } })}
@@ -333,7 +351,13 @@ export function WorkOrderForm({
           primary, and, when Save cannot fire, the reason on the opposite edge. A disabled button
           with nothing beside it is indistinguishable from a broken one. */}
       <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
-        {!ready && !saving && (
+        {datesBackwards && !saving && (
+          <span className="me-auto flex items-center gap-1.5 text-meta font-semibold text-danger-deep">
+            <Icon name="error_outline" size={13} className="flex-none" />
+            {t.common.endBeforeStart}
+          </span>
+        )}
+        {!ready && !saving && !datesBackwards && (
           <span className="me-auto flex items-center gap-1.5 text-meta font-semibold text-warn">
             <Icon name="info" size={13} className="flex-none" />
             {draft.machines.some(overAssigned) ? w.fixUnitsFirst : w.nameMachineFirst}

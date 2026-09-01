@@ -7,6 +7,7 @@ import type { Dictionary } from "./en";
  */
 export const ar: Dictionary = {
   common: {
+    endBeforeStart: "تاريخ النهاية قبل تاريخ البداية. عدّل أحدهما.",
     next: "التالي",
     back: "السابق",
     cancel: "إلغاء",
@@ -95,7 +96,7 @@ export const ar: Dictionary = {
     ctaTitleAfter: " يجد معدّتك القادمة",
     ctaSubtitle: "صف ما تحتاجه بكلماتك، ومساعدنا الذكي يوصلك بالمؤجّرين المناسبين.",
     uploadRfq: "رفع طلب عروض",
-    suppliersTitle: "مؤجرون مقترحون",
+    suppliersTitle: "المؤجّرون الأكثر رواجًا",
     viewAll: "عرض الكل",
     showLess: "عرض أقل",
     reqSummary: "{n} مفتوح · {bids} عرضاً جديداً",
@@ -1801,6 +1802,9 @@ export const ar: Dictionary = {
       nightIncluded: "مشمولة",
       nightDayOnly: "نهاراً فقط",
       noOperator: "لا حاجة لمشغّل — سنقودها بأنفسنا",
+      needOperator: "هل تريد مشغّلًا مع هذه المعدة؟",
+      operatorIncluded: "مع مشغّل",
+      operatorNotIncluded: "بدون مشغّل",
       withOperator: "مع مشغّل",
     },
     wherePanel: {

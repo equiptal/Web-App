@@ -1,6 +1,7 @@
 export * from "./verdict";
 export * from "./taxonomy";
 export * from "./options";
+export * from "./date-range";
 export * from "./draft";
 export * from "./gates";
 export * from "./provenance";

@@ -5,6 +5,7 @@
  */
 export const en = {
   common: {
+    endBeforeStart: "The end date is before the start date. Move one of them.",
     next: "Next",
     back: "Back",
     cancel: "Cancel",
@@ -101,7 +102,7 @@ export const en = {
     ctaTitleAfter: " find your next equipment",
     ctaSubtitle: "Describe what you need in plain words. Our AI assistant matches you with the right suppliers.",
     uploadRfq: "Upload RFQ",
-    suppliersTitle: "Suggested Suppliers",
+    suppliersTitle: "Most popular suppliers",
     viewAll: "View all",
     showLess: "Show less",
     // ── The dashboard's requests block (owner, 2026-08-29) ──────────────────────────────────────
@@ -2079,6 +2080,9 @@ export const en = {
       nightIncluded: "Included",
       nightDayOnly: "Day only",
       noOperator: "No operator needed — we drive it ourselves",
+      needOperator: "Do you want an operator with this equipment?",
+      operatorIncluded: "Include an operator",
+      operatorNotIncluded: "No operator",
       withOperator: "with an operator",
     },
     wherePanel: {

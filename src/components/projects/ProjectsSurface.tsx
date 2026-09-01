@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
+import { Skeleton } from "@/components/Skeleton";
 import { Icon } from "@/components/ui";
 import { Dialog } from "@/components/Dialog";
 import { useRouter } from "next/navigation";
@@ -639,7 +640,10 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
         startDate: p.defaults.timing.startDate,
         endDate: p.defaults.timing.endDate,
       },
-      machines: [blankMachine()],
+      /* The site's basis reaches the supplier line too, which it did not: the line was built on a
+         hardcoded "monthly" while its comment claimed the site's. A work order on a weekly site
+         opened with every line reading monthly. */
+      machines: [blankMachine(undefined, p.defaults.timing.rentalBasis)],
     });
   }
 
@@ -840,8 +844,28 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     );
   }
 
-  // Still loading: nothing, rather than a flash of an empty state that is about to be wrong.
-  if (embedded && !projects) return null;
+  /* Still loading. ~~Nothing at all, "rather than a flash of an empty state that is about to be
+     wrong".~~ The instinct was right and the answer was too blunt: the block simply was not there,
+     so the dashboard grew a section under the reader's cursor when it arrived. A skeleton says the
+     same thing — this is not an answer yet — while holding the room the answer will need. */
+  if (embedded && !projects) {
+    return (
+      <div className="flex flex-col gap-5 pb-24">
+        <div className="flex items-center gap-3">
+          <Skeleton className="size-[38px] flex-none rounded-sm" />
+          <div className="min-w-0">
+            <Skeleton className="h-3.5 w-32" />
+            <Skeleton className="mt-1.5 h-2.5 w-48" />
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }, (_, i) => (
+            <Skeleton key={i} className="h-[168px] rounded-lg" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     /* `pb-24`: the page must not end on the chart's last pixel either — a surface whose final row is
@@ -1052,7 +1076,18 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
           open
           onClose={() => setAwarding(null)}
           item={awarding.item}
-          defaultBasis={(chart?.project.defaults.timing.rentalBasis as Award["rentalBasis"]) ?? "monthly"}
+          /* ── The ROW's basis, then the site's (owner, 2026-09-01) ────────────────────────────
+             *"The rate must already use the request or the work order rental basis."* It read the
+             PROJECT's, which is the site's default and not what this row runs on: a work order set
+             to weekly on a monthly site priced its award «per month» and nothing said so. The group
+             carries its own `when.rentalBasis` — a request took a copy at submit, a work order was
+             given one on its form — so that is what the money is quoted against, and the site is
+             only the fallback for a row that states nothing. */
+          defaultBasis={
+            (awarding.group.when?.rentalBasis as Award["rentalBasis"]) ??
+            (chart?.project.defaults.timing.rentalBasis as Award["rentalBasis"]) ??
+            "monthly"
+          }
           onSave={(lines) => void award(lines)}
           saving={saving}
         />

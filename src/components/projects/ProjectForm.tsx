@@ -42,6 +42,7 @@ import {
   type SiteLocation,
 } from "@/lib/contract/project";
 import { RENTAL_BASES, PAYMENT_TERMS, type RentalBasis, type PaymentTerm } from "@/lib/contract/options";
+import { endBeforeStart } from "@/lib/contract/date-range";
 
 const MapLocationPicker = dynamic(() => import("@/components/shared/GoogleMapLocationPicker"), { ssr: false });
 
@@ -149,7 +150,11 @@ export function ProjectForm({
     onChange({ ...value, defaults: { ...value.defaults, timing: { ...timing, ...patch } } });
 
   /** The location is the one required field. A site with no place is not a site. */
-  const canSave = value.location.label.trim().length > 0 && !saving;
+  /* A period that runs backwards is refused here rather than at the backend, which answers a 400
+     naming no field — so the renter reads "it broke" and has to guess which of the two dates it
+     meant (owner, 2026-09-01). */
+  const datesBackwards = endBeforeStart(timing.startDate, timing.endDate);
+  const canSave = value.location.label.trim().length > 0 && !saving && !datesBackwards;
 
   /** The flag for one optional field: the word when it is empty and we were asked to mark it. */
   const unset = (empty: boolean) => (markUnset && empty ? t.projects.form.unsetFlag : undefined);
@@ -224,7 +229,15 @@ export function ProjectForm({
 
           {/* Dates stay empty rather than being invented. A site with no dates yet is honest. */}
           <Field label={t.projects.form.end} flag={unset(!timing.endDate)}>
-            <input type="date" className={input} value={timing.endDate ?? ""} onChange={(e) => patchTiming({ endDate: e.target.value || null })} />
+            <input
+              type="date"
+              className={input}
+              /* The picker refuses it AND the message below says so. `min` alone is silent, and it is
+                 no help at all to a renter who types the date rather than picking it. */
+              min={timing.startDate ?? undefined}
+              value={timing.endDate ?? ""}
+              onChange={(e) => patchTiming({ endDate: e.target.value || null })}
+            />
           </Field>
 
           <Field label={t.projects.form.extendableLabel}>
@@ -295,7 +308,14 @@ export function ProjectForm({
             </button>
           )}
 
-          {!canSave && !saving && (
+          {datesBackwards && (
+            <span className="flex items-center gap-1.5 text-meta font-semibold text-danger-deep">
+              <Icon name="error_outline" size={13} className="flex-none" />
+              {t.common.endBeforeStart}
+            </span>
+          )}
+
+          {!canSave && !saving && !datesBackwards && (
             <span className="flex items-center gap-1.5 text-meta font-semibold text-warn">
               <Icon name="info" size={13} className="flex-none" />
               {t.projects.form.addressRequired}
