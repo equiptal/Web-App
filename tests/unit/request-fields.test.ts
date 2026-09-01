@@ -3,12 +3,15 @@ import { itemDetailRows, requestDetailRows } from "@/lib/contract/request-fields
 import type { RequestItem, RequestRecord } from "@/lib/contract/requests";
 
 /**
- * The request details modal has to show EVERY parameter the request stores (owner, 2026-08-29).
+ * ~~The request details modal has to show EVERY parameter the request stores (owner, 2026-08-29).~~
+ * **Narrowed 2026-09-01:** *"It has toooo much info — I want to show him the request fields that are
+ * part of the create request experience, not system fields."*
  *
- * That is a claim about coverage, so the test that matters is the one that fails when the backend
- * grows a field nobody wired up. `every stored field reaches a row` below is that test: it lists the
- * request-level fields by hand and asserts each one appears, so adding a field to `RequestRecord`
- * without adding it here is the moment to decide whether the renter should see it.
+ * So the claim is no longer coverage, it is MEMBERSHIP: a row appears iff the renter could have set
+ * it in the create flow. `SHOWN` and `HIDDEN` below are the two halves of that, and the test that
+ * matters is still the one that fails when the backend grows a field nobody has ruled on — every
+ * request-level field is named in one list or the other, so adding one to `RequestRecord` without
+ * adding it here is the moment to decide which side it belongs on.
  *
  * The rest pin the two rules the rows are built on: a value that is absent is DROPPED rather than
  * printed as a dash, and a boolean whose meaning lives in its field name is stated in words.
@@ -46,42 +49,60 @@ const FULL: RequestRecord = {
   equipmentItems: [],
 };
 
-/** The label each field is expected to arrive under. */
-const EXPECTED: Record<string, string> = {
+/** Set in the create flow, so the renter reads it back — and the label it arrives under. */
+const SHOWN: Record<string, string> = {
   rentalType: "Rental basis",
-  urgency: "Urgency",
   workingHoursPerDay: "Working hours",
   workingDaysPerWeek: "Working days / week",
-  jobEstimatedHours: "Estimated job hours",
   overtimeRate: "Overtime rate",
-  terrainType: "Terrain",
-  fulfillmentType: "Fulfillment",
   paymentTerms: "Payment terms",
   paymentMethod: "Payment method",
   breakdownResponseSla: "Breakdown response",
   maintenanceResponsibility: "Maintenance",
   budgetCeiling: "Budget",
-  minimumSupplierRating: "Min. supplier rating",
-  deliveryLeadTime: "Delivery lead time",
   offerDuration: "Offer duration",
   verifiedSuppliersOnly: "Verified suppliers only",
-  equipmentStorageOnSite: "On-site storage",
   subletting: "Subletting allowed",
   localContent: "Local content",
   extendable: "Extendable",
 };
 
-describe("every stored field reaches a row", () => {
+/**
+ * Stored, but never asked in the create flow — so never printed as one of the renter's answers.
+ *
+ * `urgency` is the sharpest of them: it is COMPUTED from the start date (`computeUrgency`), so
+ * showing it invites the renter to wonder where he set it. The rest are backend columns a mobile
+ * build or an older web form can fill; a request that has one is not lying, it is simply not part of
+ * the conversation this page is having.
+ */
+const HIDDEN: Record<string, string> = {
+  urgency: "Urgency",
+  jobEstimatedHours: "Estimated job hours",
+  terrainType: "Terrain",
+  fulfillmentType: "Fulfillment",
+  minimumSupplierRating: "Min. supplier rating",
+  deliveryLeadTime: "Delivery lead time",
+  equipmentStorageOnSite: "On-site storage",
+};
+
+describe("every field the RENTER set reaches a row", () => {
   const labels = requestDetailRows(FULL, false, L).map(([k]) => k);
 
-  it.each(Object.entries(EXPECTED))("%s is shown as «%s»", (_field, label) => {
+  it.each(Object.entries(SHOWN))("%s is shown as «%s»", (_field, label) => {
     expect(labels).toContain(label);
   });
 
+  it.each(Object.entries(HIDDEN))("%s is NOT shown, though it is stored", (field, label) => {
+    // FULL sets every one of these, so a row appearing here is the field leaking back in.
+    expect(FULL[field as keyof RequestRecord]).not.toBeUndefined();
+    expect(labels).not.toContain(label);
+  });
+
   it("shows nothing beyond the fields named above", () => {
-    // Duration and the certificate list are deliberately absent: both have a home of their own in
-    // the modal, and a field printed twice makes a reader ask which one is authoritative.
-    expect(labels.sort()).toEqual(Object.values(EXPECTED).sort());
+    // Duration and the certificate list are deliberately absent for a different reason: both have a
+    // home of their own in the modal, and a field printed twice makes a reader ask which is
+    // authoritative.
+    expect(labels.sort()).toEqual(Object.values(SHOWN).sort());
     expect(labels).not.toContain("Duration");
     expect(labels).not.toContain("Required certificates");
   });
@@ -89,10 +110,10 @@ describe("every stored field reaches a row", () => {
 
 describe("a value that is not there", () => {
   it("is dropped, not printed as a dash", () => {
-    const rows = requestDetailRows({ ...FULL, budgetCeiling: null, terrainType: null }, false, L);
+    const rows = requestDetailRows({ ...FULL, budgetCeiling: null, offerDuration: null }, false, L);
     const labels = rows.map(([k]) => k);
     expect(labels).not.toContain("Budget");
-    expect(labels).not.toContain("Terrain");
+    expect(labels).not.toContain("Offer duration");
     expect(rows.every(([, v]) => v !== "" && v !== "—")).toBe(true);
   });
 
@@ -102,8 +123,8 @@ describe("a value that is not there", () => {
   });
 
   it("keeps a FALSE boolean, which is an answer", () => {
-    const rows = requestDetailRows(FULL, false, L);
-    expect(rows).toContainEqual(["On-site storage", "No"]);
+    const rows = requestDetailRows({ ...FULL, subletting: false }, false, L);
+    expect(rows).toContainEqual(["Subletting allowed", "No"]);
   });
 });
 
@@ -118,14 +139,11 @@ describe("reading the values", () => {
   });
 
   it("prettifies an enum it has no map for, rather than hiding it", () => {
-    expect(get("Terrain")).toBe("Rocky");
-    expect(get("Delivery lead time")).toBe("Three Days");
     expect(get("Payment method")).toBe("Bank Transfer");
   });
 
   it("carries the unit with the number", () => {
     expect(get("Working hours")).toBe("10 hrs/day");
-    expect(get("Estimated job hours")).toBe("240 hrs");
     expect(get("Budget")).toBe("120,000 SAR");
   });
 
@@ -148,7 +166,10 @@ const ITEM: RequestItem = {
   demobilizationByRentee: false,
   nightShiftRequired: true,
   operatorNationality: "Saudi",
-  maxEquipmentAge: 5,
+  /* The LIVE wire's field. `maxEquipmentAge` is the deprecated alias the web still POSTS under and
+     the backend never sends back — which is exactly why the row was blank until 2026-09-01. */
+  minimumEquipmentYear: 2020,
+  maxEquipmentAge: null,
   dieselIncluded: true,
   fatRequired: true,
   safetyCertifications: ["SCE", "OSHA"],
@@ -176,16 +197,18 @@ describe("a machine's own terms", () => {
     expect(get("Operator nationality")).toBe("Saudi");
     expect(get("Fuel")).toBe("Diesel");
     expect(get("Night shift")).toBe("Yes");
-    expect(get("Max equipment age")).toBe("5 years");
+    /* A minimum manufacture YEAR, read through `requestedMinYear` and stated as one. It used to read
+       the alias alone and print an age, so a renter who had just set 2020 saw no row at all. */
+    expect(get("Equipment year")).toBe("2020 or newer");
     expect(get("Safety certificates")).toBe("SCE · OSHA");
     expect(get("Notes")).toBe("Needs a hydraulic breaker attachment.");
   });
 
   it("drops what the item left unset", () => {
-    const sparse = { ...ITEM, operatorNationality: null, maxEquipmentAge: null, safetyCertifications: [], additionalNotes: null };
+    const sparse = { ...ITEM, operatorNationality: null, minimumEquipmentYear: null, safetyCertifications: [], additionalNotes: null };
     const labels = itemDetailRows(sparse, false, L).map(([k]) => k);
     expect(labels).not.toContain("Operator nationality");
-    expect(labels).not.toContain("Max equipment age");
+    expect(labels).not.toContain("Equipment year");
     expect(labels).not.toContain("Safety certificates");
     expect(labels).not.toContain("Notes");
   });

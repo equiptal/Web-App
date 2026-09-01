@@ -171,6 +171,14 @@ export interface RequestItem {
   demobilizationByRentee: boolean | null;
   nightShiftRequired: boolean | null;
   operatorNationality: string | null;
+  /**
+   * The equipment-year ask, as the LIVE wire sends it — a minimum manufacture year (2020).
+   *
+   * `maxEquipmentAge` beside it is the deprecated alias the web still POSTS under and the backend
+   * coalesces (`minimumEquipmentYear ?? maxEquipmentAge`); it is not sent back. Read them through
+   * `requestedMinYear`, never either one alone — its note carries the two times that went wrong.
+   */
+  minimumEquipmentYear: number | null;
   maxEquipmentAge: number | null;
   dieselIncluded: boolean | null;
   fatRequired: boolean | null;

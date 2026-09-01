@@ -547,7 +547,13 @@ const normKey = (k: string) => k.toLowerCase().replace(/[^a-z0-9]/g, "");
  * therefore not removable — it is the only thing that reads a request submitted by an old build — but
  * it must never be read ALONE.
  *
- * It was, until 2026-08-10: `mapBid` set `reqMinYear` from the alias only, so every live bid carried
+ * It happened AGAIN on the request detail (owner, 2026-09-01: *"the year term of the equipment does
+ * not appear even when I edited the request and set it"*). `itemDetailRows` read `maxEquipmentAge`
+ * alone — the field the web POSTS under, and the one the backend never sends back — so a renter who
+ * had just set 2020 saw the row missing entirely. That is the third reader, and it goes through here
+ * now: this function is exported for it.
+ *
+ * It was first, until 2026-08-10: `mapBid` set `reqMinYear` from the alias only, so every live bid carried
  * `reqMinYear: null` while the Terms modal 400 lines up read the real field and disagreed. A renter who
  * asked for 2020 got «لم تطلب سنة» in the match grid and no السنة filter at all (RM3-AC-28a/28c/37).
  * Both callers now go through here, so the next rename lands in one place.
@@ -555,7 +561,7 @@ const normKey = (k: string) => k.toLowerCase().replace(/[^a-z0-9]/g, "");
  * The value is returned RAW — a min year (2020) or, on legacy data, an age. Deciding which it reads as
  * is `computeUnitReadiness`'s job and stays there; this only reads the wire.
  */
-function requestedMinYear(item: Record<string, unknown>): number | null {
+export function requestedMinYear(item: Record<string, unknown>): number | null {
   return n(item.minimumEquipmentYear) ?? n(item.maxEquipmentAge);
 }
 
