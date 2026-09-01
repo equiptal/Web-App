@@ -36,6 +36,8 @@ import {
 import { arabicIndicDigits } from "@/lib/contract/bid-map";
 import { ACTIONS, btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { Dropdown } from "@/components/Dropdown";
+import { shortSite } from "@/lib/contract/project";
 import { leftTheSite, projectTitle } from "@/lib/contract/project";
 
 export function ReadyToSend() {
@@ -53,6 +55,8 @@ export function ReadyToSend() {
   const { tier } = useSession();
   const [showAccount, setShowAccount] = useState(false);
   const [showLimit, setShowLimit] = useState(false);
+  /** Everything the strip summarises, in the sections it came from. */
+  const [details, setDetails] = useState(false);
 
   const { draft, taxonomy, busy, error, errorDetail } = state;
   // Basic-account request cap (backend E8009) — a verify prompt, not inline red text.
@@ -105,10 +109,121 @@ export function ReadyToSend() {
     actions.goItem(index);
   };
 
+  /* ── The whole request, on one line, beside the title (owner, 2026-09-02) ────────────────────
+   *
+   * *"All the summary shown as simple card containing main info, on the same side of the title of
+   * the page on the right. I want this page for another content, so compact the summary in one
+   * summarized card that can view more and open all of these in a modal."*
+   *
+   * Four stacked cards owned the whole page to restate values the renter had just finished setting.
+   * They were a receipt, and a receipt is read once and scrolled past, so the page was spending its
+   * best space on the least new information. One line says the same thing at a glance and hands the
+   * page back.
+   *
+   * Nothing is hidden: everything those cards held is a press away, in the same sections with the
+   * same pens and the same export. What changed is which of the two is the default.
+   */
+  const first = rows[0];
+  const place = project.location.label ?? null;
+  const mapHref =
+    project.location.lat != null && project.location.lng != null
+      ? `https://www.google.com/maps?q=${project.location.lat},${project.location.lng}`
+      : place
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`
+        : null;
+
+  /* What is TRUE of the first machine, and only what is true: an operator it does not need, a year
+     nobody set and a certificate nobody asked for are three facts about nothing. `termsSummary` on
+     the chart makes the same choice for the same reason. */
+  const machineNote = first
+    ? [
+        first.operatorNeeded === "yes" ? t.create.ready.stripOperator : null,
+        first.year && first.year !== "any" ? first.year : null,
+        first.certificate.length
+          ? first.certificate.map((c) => (c === "other" && first.certificateOther ? first.certificateOther : t.options.safetyCert[c])).join(", ")
+          : null,
+      ].filter(Boolean).join(" · ")
+    : "";
+
   return (
     <div {...pin("ready-to-send")}>
-      <h1 className="text-display font-extrabold text-navy">{t.create.ready.title}</h1>
-      <p className="mb-3 mt-1 text-meta text-muted">{t.create.ready.subtitle}</p>
+      {/* The title and the summary share one row: the summary is what the page is ABOUT, so it sits
+          at the top of it rather than under it. It wraps below the title on a narrow screen, where
+          two things cannot share a line without one of them being unreadable. */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0">
+          <h1 className="text-display font-extrabold text-navy">{t.create.ready.title}</h1>
+          <p className="mt-1 text-meta text-muted">{t.create.ready.subtitle}</p>
+        </div>
+      </div>
+
+      <div className="mb-3.5 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-sm border border-border bg-surface px-4 py-2.5">
+        {/* A green dot for «this is ready», the same mark the panels use on the canvas. */}
+        <span aria-hidden className="size-2 flex-none rounded-full bg-ok" />
+
+        {mapHref && place && (
+          <StripFact icon="place">
+            {/* The real link (owner, 2026-09-02). An address a renter cannot press is an address
+                they retype into another tab to check. */}
+            <a
+              href={mapHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="truncate underline decoration-border underline-offset-2 hover:text-brand"
+            >
+              {shortSite(place)}
+            </a>
+          </StripFact>
+        )}
+
+        {project.timing.startDate && project.timing.endDate && (
+          <StripFact icon="calendar_month">
+            {fmtDate(project.timing.startDate)} → {fmtDate(project.timing.endDate)}
+            {charged.known && <span className="text-muted"> · {num(charged.chargedDays)} {t.create.ready.stripDays}</span>}
+          </StripFact>
+        )}
+
+        {/* Payment is SET here, not just shown (owner, 2026-09-02). It is the one term a renter
+            commonly answers at this moment, and sending them into a modal to press one chip is the
+            kind of trip this redesign exists to remove. */}
+        <StripFact icon="star_outline">
+          <Dropdown
+            tone="pill"
+            label={t.create.ready.paymentTerms}
+            placeholder={t.create.ready.stripNoPayment}
+            value={prefs.payment.terms}
+            onChange={(v) => actions.patchPreferences({ payment: { terms: (v || null) as PaymentTerm } })}
+            options={PAYMENT_TERMS.map((o) => ({ value: o, label: t.options.paymentTerm[o] }))}
+          />
+          {prefs.supplierFilters.verifiedOnly && (
+            <span className="text-muted">· {t.create.ready.stripVerified}</span>
+          )}
+        </StripFact>
+
+        {first && (
+          <StripFact icon="inventory_2">
+            <span className="truncate">
+              {first.equipment}
+              {first.size ? ` ${first.size}` : ""} ×{num(first.qty)}
+            </span>
+            {machineNote && <span className="truncate text-muted">· {machineNote}</span>}
+            {items.length > 1 && (
+              <span className="flex-none font-semibold text-brand">+{num(items.length - 1)}</span>
+            )}
+          </StripFact>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setDetails(true)}
+          className={btn("secondary", "sm", { className: "ms-auto flex-none" })}
+        >
+          {t.create.ready.viewAll}
+        </button>
+      </div>
+
+      <Dialog open={details} onClose={() => setDetails(false)} title={t.create.ready.detailsTitle} size="xl">
+        <div className="flex flex-col">
 
       {/* ---------------- Site ---------------- */}
       <SummaryCard title={t.create.ready.where} onEdit={() => backToItem(0)}>
@@ -272,6 +387,9 @@ export function ReadyToSend() {
         </div>
       </SummaryCard>
 
+        </div>
+      </Dialog>
+
       <div className="mb-3.5 flex items-start gap-3 rounded-sm border border-info/25 bg-info-soft px-4 py-3">
         <Icon name="ios_share" size={18} className="mt-0.5 flex-none text-info" />
         <p className="text-body leading-relaxed text-navy">
@@ -361,6 +479,22 @@ export function ReadyToSend() {
         </Dialog>
       )}
     </div>
+  );
+}
+
+/**
+ * One fact on the summary strip: an icon, its value, and a rule before the next one.
+ *
+ * The rule is a border rather than a «·» so the row reads as separate facts at a glance instead of
+ * one long sentence, and it is dropped on the first child because a rule with nothing before it is
+ * a stray mark on the left edge.
+ */
+function StripFact({ icon, children }: { icon: string; children: React.ReactNode }) {
+  return (
+    <span className="flex min-w-0 items-center gap-1.5 border-border ps-4 text-body text-navy first-of-type:ps-0 sm:border-s sm:first-of-type:border-s-0">
+      <Icon name={icon} size={14} className="flex-none text-muted" />
+      {children}
+    </span>
   );
 }
 

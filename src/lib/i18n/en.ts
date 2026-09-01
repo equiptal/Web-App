@@ -162,7 +162,7 @@ export const en = {
   browse: {
     title: "Verified Suppliers",
     signInTitle: "Sign in to browse suppliers",
-    signInBody: "Browsing suppliers and their equipment needs an account. Sign in — it only takes a moment.",
+    signInBody: "Browsing suppliers and their equipment needs an account. Sign in. It only takes a moment.",
     search: "Search stores or equipment",
     city: "City",
     category: "Category",
@@ -229,10 +229,10 @@ export const en = {
     prevPhoto: "Previous",
     nextPhoto: "Next",
     // The map says what it actually knows: a yard's coordinates, or only the city.
-    approxLocation: "Approximate — city only",
+    approxLocation: "Approximate: city only",
     noLocation: "No location on this listing",
     // The recipient ribbon on the create flow, when the request was started from a store.
-    directBanner: "This request goes to {name} only — no other supplier sees it.",
+    directBanner: "This request goes to {name} only. No other supplier sees it.",
     directBannerBack: "Back to the store",
     directSupplierFallback: "this supplier",
   },
@@ -241,7 +241,7 @@ export const en = {
     heading: "How would you like to create your request?",
     subheading: "Describe your request, or upload an existing RFQ document. If it belongs to a project, its defaults fill themselves in.",
     optUploadTitle: "Write / Upload RFQ",
-    optUploadDesc: "Write your request or upload a file — your AI assistant fills the form automatically.",
+    optUploadDesc: "Write your request or upload a file. Your AI assistant fills the form automatically.",
     recommended: "Recommended",
     optManualTitle: "Fill Manually",
     optManualDesc: "Enter equipment details step by step using a guided form.",
@@ -266,9 +266,9 @@ export const en = {
     uploadRfq: "Upload RFQ",
     addSomething: "Add a description or a file",
     continueLabel: "Continue",
-    pastePlaceholder: "Write your request in plain words — e.g. “I need a 30-ton forklift at King Khalid Airport, Riyadh, for 3 weeks starting next Sunday, with an operator and diesel included, delivered to site.”\n\nYou can also paste an email, or an equipment list.",
+    pastePlaceholder: "Write your request in plain words: e.g. “I need a 30-ton forklift at King Khalid Airport, Riyadh, for 3 weeks starting next Sunday, with an operator and diesel included, delivered to site.”\n\nYou can also paste an email, or an equipment list.",
     uploadLabel: "Attach files too",
-    uploadOptional: "optional — add as many as you like",
+    uploadOptional: "optional: add as many as you like",
     dropTitle: "Drop files here, or",
     uploadHint: "PDF, image, Word or Excel",
     acceptedTypes: "Accepted file types: PDF, image, Word, Excel.", // AC-07 tentative
@@ -292,7 +292,7 @@ export const en = {
   processing: {
     title: "Reading your RFQ…",
     note: "Project details and items will appear as they're parsed.",
-    sub: "This usually takes a few seconds — hang tight.",
+    sub: "This usually takes a few seconds. Hang tight.",
     stage1: "Reading your document/text",
     stage2: "Extracting your project details",
     stage3: "Matching your equipment to what we provide",
@@ -306,11 +306,11 @@ export const en = {
     agentWorking: "AGENT WORKING",
     liveActivity: "LIVE ACTIVITY",
     feedReading: "Reading your document/text…",
-    feedRead: "Found readable text — {n} request block",
+    feedRead: "Found readable text: {n} request block",
     feedExtracted: "Extracted site, duration and quantities",
     feedChecking: "Checking: {item}",
     feedMatched: "{item} → matched to {match}",
-    feedAllMatched: "All equipment matched — preparing your request",
+    feedAllMatched: "All equipment matched: preparing your request",
     stageScan: "Scan",
     stageExtract: "Extract",
     stageMatch: "Match",
@@ -318,7 +318,7 @@ export const en = {
   },
   step1: {
     title: "Project details",
-    subtitle: "We read these from your RFQ — they apply to your whole request, across all items.",
+    subtitle: "We read these from your RFQ. They apply to your whole request, across all items.",
     location: {
       confirmPrompt: "Is this the right site? Please confirm it before you continue.",
       fillPrompt: "Add the project location before you can confirm.", // AC-16: can't confirm an empty location
@@ -331,7 +331,7 @@ export const en = {
       useGps: "Use my current location",
       setManual: "Drop a pin manually",
       extractedFrom: "From your RFQ",
-      conflictTitle: "Two different locations were found — pick one:",
+      conflictTitle: "Two different locations were found. Pick one:",
       fromText: "From text", // AC-47 tentative
       fromFile: "From file", // AC-47 tentative
       multiLocationTitle: "This request covers a single location.", // AC-48
@@ -380,7 +380,7 @@ export const en = {
     fromRfq: "From your RFQ",
     matchedTo: "Matched to",
     settingsForAll: "Settings for all equipment",
-    settingsForAllHint: "Defaults for every item below — open any item to change it for that item only.",
+    settingsForAllHint: "Defaults for every item below. Open any item to change it for that item only.",
     appliesToItems: "Applies to {count} items",
     certificatesTitle: "Required certificates",
     itemSettings: "Operator, fuel & delivery",
@@ -396,8 +396,8 @@ export const en = {
       needsOk: "Needs your OK", // AC-54
       notAvailable: "Not available", // AC-54 / AC-30 tentative
     },
-    confidentReady: "Ready — no action needed.",
-    needsValidationPrompt: "We matched this — approve it or change it.",
+    confidentReady: "Ready. No action needed.",
+    needsValidationPrompt: "We matched this: approve it or change it.",
     nearestSuggested: "Nearest available size: {measurement}.", // AC-19
     pickSizeToApprove: "Pick a size to approve.", // AC-18/19: why Approve is disabled
     unitConversion: "{fromValue}{fromUnit} ≈ {toValue}{toUnit} in our sizes.", // AC-20
@@ -414,16 +414,16 @@ export const en = {
       provide: "Provide it for me?", // AC-30/31 tentative
       // Both explainers state the outcome up front: a no-match item never goes out to suppliers
       // (AC-33), whether or not the renter messages us — so the row shouldn't imply otherwise.
-      explainer: "We couldn't find this in our catalogue — it won't be included in this request.",
+      explainer: "We couldn't find this in our catalogue. It won't be included in this request.",
       // Shown when the equipment IS in the catalogue but the requested SIZE isn't yet (a genuine new size).
-      newSizeExplainer: "We carry this equipment, but not this size yet — message us to add it. It won't be included in this request.",
+      newSizeExplainer: "We carry this equipment, but not this size yet. Message us to add it. It won't be included in this request.",
       // AC-31: prefilled WhatsApp message to Moedatech support requesting the equipment be sourced.
       whatsappMessage: 'Hi Moedatech, I\'m creating an RFQ and need equipment that isn\'t available in the app: "{item}". Please add/source it for me so it is added to my request. Thank you!',
       // New-size variant: equipment exists, the size doesn't — ask support to add the size.
       whatsappMessageSize: 'Hi Moedatech, I\'m creating an RFQ for "{item}" but the size I need isn\'t in the app yet. Please add this size so it can be added to my request. Thank you!',
       // AC-31: shown in place of the action once the renter has been handed off to WhatsApp — the item
       // stays put so returning from WhatsApp doesn't look like it was dropped.
-      requested: "We got your message — we'll add this and contact you on WhatsApp.",
+      requested: "We got your message. We'll add this and contact you on WhatsApp.",
     },
     perItem: {
       quantity: "Quantity",
@@ -435,8 +435,8 @@ export const en = {
       applyToAll: "Apply these settings to all items",
       certificate: "Operator certificate",
       fat: "F.A.T (Food, Accommodation & Transport)",
-      fatFood: "F.A.T — Food",
-      fatTransport: "F.A.T — Accommodation & transport",
+      fatFood: "F.A.T: Food",
+      fatTransport: "F.A.T: Accommodation & transport",
       workType: "Work type",
       workTypePlaceholder: "e.g. lifting steel beams, tower assembly",
       equipmentYear: "Minimum equipment year",
@@ -461,7 +461,7 @@ export const en = {
   },
   step3: {
     title: "Preferences",
-    subtitle: "These apply to the whole request. Filled in from your RFQ — edit anything.",
+    subtitle: "These apply to the whole request. Filled in from your RFQ. Edit anything.",
     coreTerms: "Core terms", // AC-35 tentative
     optionalExtras: "Optional Extras", // AC-35 tentative
     payment: { title: "Payment", terms: "Payment terms", method: "Payment method" },
@@ -481,20 +481,20 @@ export const en = {
   },
   preview: {
     title: "Review and send",
-    subtitle: "Here's your full request. Send it once and every supplier can bid — you'll get one quotation covering all items.",
+    subtitle: "Here's your full request. Send it once and every supplier can bid. You'll get one quotation covering all items.",
     shareTeaserTitle: "Invite suppliers you already know",
-    shareTeaserBody: "Once you send this, you'll get a shareable link to invite suppliers to bid — even ones off Moedatech. Their bids land right here for you to compare.",
+    shareTeaserBody: "Once you send this, you'll get a shareable link to invite suppliers to bid, even ones off Moedatech. Their bids land right here for you to compare.",
     post: "Post request",
     send: "Send request",
     edit: "Edit",
     confirmed: "confirmed",
-    notSent: "{count} not available — left off this request.",
+    notSent: "{count} not available: left off this request.",
     export: "Open in Excel", // AC-52
     itemsTable: "All items",
     projectSummary: "Project",
     equipmentSummary: "Equipment",
     preferencesSummary: "Preferences",
-    whyTitle: "What I assumed — please confirm",
+    whyTitle: "What I assumed: please confirm",
     perItem: "Per item",
     table: {
       equipment: "Equipment",
@@ -519,7 +519,7 @@ export const en = {
     message: "Suppliers can now see it and send bids. You'll get one quotation covering all the items in your request.",
     newRequest: "New request",
     done: "Done",
-    laterNote: "Tracking bids and managing this request on the web is coming soon — for now you'll continue with bids in the Moedatech app as usual.",
+    laterNote: "Tracking bids and managing this request on the web is coming soon: for now you'll continue with bids in the Moedatech app as usual.",
     itemsSummary: "{count} items",
   },
   /**
@@ -530,16 +530,16 @@ export const en = {
   startRequest: {
     title: "Start Your Request",
     trialTitle: "Trial Request",
-    trialBody: "Try the request flow with sample bids — nothing is sent to suppliers.",
+    trialBody: "Try the request flow with sample bids. Nothing is sent to suppliers.",
     realTitle: "Real Request",
     realBody: "Send your request to real suppliers and get live bids.",
     cancel: "CANCEL AND RETURN",
     close: "Close",
     /** Ribbon above the RFQ flow while trial mode is on. */
-    modeBanner: "Trial run — nothing will be sent to suppliers.",
+    modeBanner: "Trial run. Nothing will be sent to suppliers.",
     modeBannerSwitch: "Switch to a real request",
     /** Shown with the sample bids on a trial request. */
-    bidsBanner: "These are sample bids for your trial — no real suppliers were contacted.",
+    bidsBanner: "These are sample bids for your trial. No real suppliers were contacted.",
     trialBadge: "TRIAL",
     disappearsSoon: "TRIAL - DISAPPEARS SOON",
   },
@@ -558,10 +558,10 @@ export const en = {
     noCompany: "You're not part of a company yet. Enter an invite code from a company owner to join.",
     enterCode: "Invite code",
     joinButton: "Join",
-    joinRequestSent: "Join request sent — waiting for the owner to approve.",
+    joinRequestSent: "Join request sent: waiting for the owner to approve.",
     invalidCode: "That invite code isn't valid.",
     joinConsent:
-      "Equipment, requests and bids you add — including ones you already have — become this company's and stay with it if you later leave. Continue?",
+      "Equipment, requests and bids you add, including ones you already have, become this company's and stay with it if you later leave. Continue?",
     // Pending membership.
     pendingApproval: "Waiting for the owner to approve you.",
     pendingBadge: "Awaiting approval",
@@ -570,7 +570,7 @@ export const en = {
     // joining anywhere else until an owner happens to reject you.
     cancelJoin: "Withdraw request",
     cancelJoinConfirm:
-      "Withdraw your request to join this company? Nothing has been shared yet, so nothing is lost — and you'll be able to enter a different invite code straight away.",
+      "Withdraw your request to join this company? Nothing has been shared yet, so nothing is lost, and you'll be able to enter a different invite code straight away.",
     cancelJoinDone: "Join request withdrawn.",
     // Owner: invite code + join requests.
     // The heading over the whole team card — the code, the roster and the way out under one word.
@@ -587,7 +587,7 @@ export const en = {
     // companyCreateOwn* keys). Offered ABOVE the join form, as in the app.
     createOwnTitle: "Add your own company",
     createOwnDesc:
-      "Verify to create your own company and unlock full access — or join an existing company with an invite code below.",
+      "Verify to create your own company and unlock full access, or join an existing company with an invite code below.",
     createOwnCta: "Create your company",
     pendingJoiners: "Pending join requests",
     approve: "Approve",
@@ -606,11 +606,11 @@ export const en = {
     // Exits.
     leave: "Leave company",
     leaveConfirm:
-      "Leave your company? You'll lose your access to the firm's requests, bids and equipment — including ones you created or brought in. This can't be undone without a new invite.",
+      "Leave your company? You'll lose your access to the firm's requests, bids and equipment, including ones you created or brought in. This can't be undone without a new invite.",
     promoteFirst: "You're the owner. Promote another member to owner before you leave.",
     dissolve: "Close company",
     dissolveConfirm:
-      "You're the only member, so leaving closes this company for good.\n\nNothing is lost: your equipment, requests, bids and past deals move back to your personal account and stay yours. But this can't be undone — the invite code stops working and the company's CR and VAT verification is retired, so you'd need to verify a new company to come back.\n\nAny deal rooms still in progress will be closed automatically and the other party notified.",
+      "You're the only member, so leaving closes this company for good.\n\nNothing is lost: your equipment, requests, bids and past deals move back to your personal account and stay yours. But this can't be undone. The invite code stops working and the company's CR and VAT verification is retired, so you'd need to verify a new company to come back.\n\nAny deal rooms still in progress will be closed automatically and the other party notified.",
     // Shared UI.
     cancel: "Cancel",
     retry: "Retry",
@@ -629,7 +629,7 @@ export const en = {
     postGateTitle: "Sign in to post your request",
     // General title for the sign-in/register modal — it serves BOTH new and returning accounts.
     gateTitle: "Sign in to continue",
-    gateSub: "Enter your phone number — we'll text a verification code. New or returning, just enter your number.",
+    gateSub: "Enter your phone number. We'll text a verification code. New or returning, just enter your number.",
     // Guest AI-agent limit reached (per-device run cap). Neutral wording — no free/paid framing.
     trialTitle: "You've reached your limit",
     trialSub: "Sign in to continue.",
@@ -658,11 +658,11 @@ export const en = {
     emptyTitle: "We couldn't read a request from that", // AC-09 tentative
     emptyBody: "Try again, or edit what you pasted.",
     networkTitle: "Connection problem", // AC-10 tentative
-    networkBody: "Something went wrong. Your input is saved — try again.",
+    networkBody: "Something went wrong. Your input is saved. Try again.",
     busyTitle: "The AI assistant is busy",
-    busyBody: "It's handling a lot of requests right now. Your input is saved — try again in a moment.",
+    busyBody: "It's handling a lot of requests right now. Your input is saved. Try again in a moment.",
     unavailableTitle: "The AI assistant is unavailable",
-    unavailableBody: "It couldn't process your request right now. Your input is saved — try again shortly.",
+    unavailableBody: "It couldn't process your request right now. Your input is saved. Try again shortly.",
     switchManual: "Switch to Manual",
   },
   options: {
@@ -690,10 +690,10 @@ export const en = {
   auth: {
     brandPill: "Equipment, on demand",
     brandHeadline: "Rent the right equipment, from suppliers you can trust.",
-    brandSubtitle: "Post a request, compare competitive bids from verified suppliers, and book — all in one place.",
+    brandSubtitle: "Post a request, compare competitive bids from verified suppliers, and book: all in one place.",
     feat1Title: "Post a request in minutes",
     feat1Sub: "Tell us what you need, when and where",
-    feat2Title: "Or upload an RFQ — your smart assistant handles it",
+    feat2Title: "Or upload an RFQ. Your smart assistant handles it",
     feat2Sub: "We read your document & build the request",
     feat3Title: "Compare bids & enter the deal room to negotiate",
     feat3Sub: "Competitive offers from verified suppliers",
@@ -708,32 +708,32 @@ export const en = {
     emailLabel: "Email address",
     emailInvalid: "Enter a valid email address.",
     countryLabel: "Country",
-    smsSaudiOnly: "SMS isn't available outside Saudi Arabia — use Email to get your code.",
+    smsSaudiOnly: "SMS isn't available outside Saudi Arabia. Use Email to get your code.",
     emailChoiceTitle: "Keep your saved email?",
     emailChoiceBody: "This number already uses {stored}. Keep it, or switch to the one you just entered ({new})?",
     emailKeep: "Keep current",
     emailUseNew: "Use new",
     emailSwitching: "Switching…",
-    emailSwitchError: "Couldn't switch your email — keeping the current one.",
+    emailSwitchError: "Couldn't switch your email: keeping the current one.",
     withPhone: "Phone",
     withEmail: "Email",
     entryTitle: "Sign in or create your account",
-    entrySub: "Enter your phone or email — we'll send a verification code. New or returning, this is the only step.",
+    entrySub: "Enter your phone or email. We'll send a verification code. New or returning, this is the only step.",
     addPhoneTitle: "Add your phone number",
-    addPhoneSub: "Your phone is your account identity — we'll text a code to verify it.",
+    addPhoneSub: "Your phone is your account identity. We'll text a code to verify it.",
     verifyCreate: "Verify & create account",
     verifyPhone: "Verify",
     phoneVerified: "Phone verified",
     signInInstead: "Sign in instead",
     emailRequiredTitle: "Add your email",
     emailRequiredSub: "We'll use it for receipts and to help you sign in.",
-    emailSignInUnavailable: "We couldn't sign you in with this email — please use your phone number.",
+    emailSignInUnavailable: "We couldn't sign you in with this email: please use your phone number.",
     finishTitle: "Finish your signup",
-    finishBody: "You're almost there — add your details to finish creating your account.",
+    finishBody: "You're almost there. Add your details to finish creating your account.",
     finishCta: "Finish signup",
     sendCode: "Send code", // AC-01
     sending: "Sending…",
-    signInFoot: "New here? Just enter your number — we'll set you up.",
+    signInFoot: "New here? Just enter your number. We'll set you up.",
     codeTitle: "Enter the 4-digit code", // AC-02
     codeSentTo: "We sent it to {phone}", // AC-02
     verify: "Verify & continue", // AC-03
@@ -744,7 +744,7 @@ export const en = {
     signOut: "Sign out", // AC-19
     // Restore gate — a verified sign-in on a self-deleted account (app parity: restoreAccount* strings).
     restoreTitle: "Welcome back!",
-    restoreBody: "You deleted this account earlier. Restore it to get your profile, requests and bids back — everything is still here.",
+    restoreBody: "You deleted this account earlier. Restore it to get your profile, requests and bids back: everything is still here.",
     restoreConfirm: "Yes, restore my account",
     restoring: "Restoring…",
     restoreDeny: "No, sign out",
@@ -755,7 +755,7 @@ export const en = {
       expired: "That code has expired. Request a new one.", // AC-11
       locked: "Too many attempts. Request a new code.", // AC-10
       send_failed: "We couldn't send the code. Please try again.", // AC-15
-      email_ambiguous: "This email is linked to more than one account — use a different email, or sign in with your phone.",
+      email_ambiguous: "This email is linked to more than one account. Use a different email, or sign in with your phone.",
       email_taken: "This email is already in use.",
       phone_taken: "You already have an account with this number.",
       phone_not_verified: "Please verify your phone number first.",
@@ -795,7 +795,7 @@ export const en = {
       whatsapp: "Enter a valid Saudi mobile number.", // AC-04
       phone: "Enter your phone number and verification code.",
       submit: "We couldn't save your details. Please try again.",
-      offline: "You appear to be offline. Your details are kept — try again.", // AC-23
+      offline: "You appear to be offline. Your details are kept. Try again.", // AC-23
     },
   },
   verify: {
@@ -832,7 +832,7 @@ export const en = {
       // E12004: this account was deleted, so every gated call is refused until it's restored. Retrying
       // the form can never work — send them through sign-in, where the restore prompt is waiting.
       accountDeleted: "This account was deleted. Sign out and sign in again to restore it, then submit.",
-      offline: "You appear to be offline. Your input is kept — try again.", // AC-23
+      offline: "You appear to be offline. Your input is kept. Try again.", // AC-23
     },
     /**
      * The single-pile company-documents flow. Copy is taken verbatim from the mobile app's
@@ -842,7 +842,7 @@ export const en = {
     pile: {
       title: "Add company documents",
       heroTitle: "Upload your documents in one go",
-      heroSubtitle: "Send us everything you have — our team will review it and confirm your request.",
+      heroSubtitle: "Send us everything you have. Our team will review it and confirm your request.",
       requiredSection: "Required to continue",
       requiredPill: "Required",
       optionalSection: "Additional documents",
@@ -855,7 +855,7 @@ export const en = {
       optQualifications: "Qualifications",
       optSaso: "SASO certificate",
       dropzoneTitle: "Drag or upload your documents here",
-      dropzoneSubtitle: "Commercial registration, national address, tax, and any extra documents — in one batch",
+      dropzoneSubtitle: "Commercial registration, national address, tax, and any extra documents: in one batch",
       dropzoneHint: "Images or PDF · up to {max} documents",
       limitReached: "Maximum reached ({count} documents)",
       remove: "Remove",
@@ -922,7 +922,7 @@ export const en = {
     account: "Account",
     // Company / verification card
     companyVerifiedTitle: "Company verified",
-    companyVerifiedBody: "Your company is verified — you have a trusted renter badge.",
+    companyVerifiedBody: "Your company is verified. You have a trusted renter badge.",
     companyPendingTitle: "Verification in review",
     companyPendingBody: "Your company details are under review. We'll update your status here.",
     companyNoneTitle: "Verify your company",
@@ -1014,7 +1014,7 @@ export const en = {
     signIn: "Sign in",
     // Off-platform offers never open this surface (RM3-AC-25) — they keep their own viewer.
     offPlatformNotHere: "This offer came in through your shared link",
-    offPlatformNotHereWhy: "It carries items, not registered equipment — so there is nothing here to place or verify. Open it from your bids to read the submission and reply.",
+    offPlatformNotHereWhy: "It carries items, not registered equipment. So there is nothing here to place or verify. Open it from your bids to read the submission and reply.",
     // V2 — panel header. Identity only: no contact details, no deals count, no IBAN, CR or VAT.
     //
     // ── Both were SHORTENED because they were eating the supplier's name (owner, 2026-08-19) ──────
@@ -1067,7 +1067,7 @@ export const en = {
     // failure — "try again" is precisely what the rule exists to stop, and the question is already
     // with the supplier.
     askPendingWhy: "You've already asked this, and the supplier hasn't answered yet.",
-    requestAlreadyPending: "You've already asked this. It's with the supplier — you'll see his answer in the chat.",
+    requestAlreadyPending: "You've already asked this. It's with the supplier. You'll see his answer in the chat.",
     // Map canvas
     // The prototype's copy verbatim: «مشروعك». "Your site" names a place on a map; the pin names the
     // PROJECT, which is the thing every distance on this surface is measured from.
@@ -1086,7 +1086,7 @@ export const en = {
     pickSupplier: "Pick a supplier from the list to see their equipment",
     sortPrice: "Lowest price",
     sortNearest: "Nearest",
-    sortNearestOff: "Nearest — needs a project location",
+    sortNearestOff: "Nearest: needs a project location",
     rate: "Offer price",
     ratePer: "SAR / {unit}",
     perDay: "day",
@@ -1099,19 +1099,19 @@ export const en = {
     offPlatform: "Off-platform",
     justArrived: "Just arrived",
     unitsOfferedLine: "{n} offered",
-    unitsIdentifiedLine: "{n} identified — serial, documents and location",
-    unitsUnidentifiedLine: "{n} unidentified — readiness can't be checked",
+    unitsIdentifiedLine: "{n} identified: serial, documents and location",
+    unitsUnidentifiedLine: "{n} unidentified: readiness can't be checked",
     refresh: "Refresh",
     refreshing: "Refreshing…",
     freshnessNote: "Offers update when you open this page, come back to it, or press refresh.",
     // T15 — the colour key, hosted inside the panel
     keyToggle: "What do the colours mean?",
     keyHeading: "Every pin on the map is one piece of equipment",
-    keyConfirmed: "Confirmed — the supplier confirmed its yard in the offer readiness",
-    keyUnconfirmed: "Not confirmed — he hasn't confirmed it yet",
+    keyConfirmed: "Confirmed. The supplier confirmed its yard in the offer readiness",
+    keyUnconfirmed: "Not confirmed. He hasn't confirmed it yet",
     keyNotUnavailable:
-      "“Not confirmed” does not mean unavailable — it means the supplier hasn't named its yard in the offer readiness yet. Ask him to confirm from the equipment panel.",
-    keyCountOnly: "Units added as a count only don't appear on the map — no equipment is registered for them.",
+      "“Not confirmed” does not mean unavailable. It means the supplier hasn't named its yard in the offer readiness yet. Ask him to confirm from the equipment panel.",
+    keyCountOnly: "Units added as a count only don't appear on the map. No equipment is registered for them.",
     // V10 — the machine marker's availability label (§6.8). One scale, two labels, and "not confirmed"
     // reads as UNANSWERED — never refused, never unavailable (RM3-AC-20). The "you can request it"
     // variant is gone with the hollow marker; a machine he did not offer is now an ORDINARY red pin
@@ -1169,9 +1169,9 @@ export const en = {
     // things in prose (owner, 2026-08-31) — prose is where a renter looking at a red number stops
     // reading, and what he wants to know is where he is in a flow and what the end of it gets him.
     eqYardStep1T: "Today it stands here",
-    eqYardStep1B: "This is the machine's own location right now, read off its file — not a delivery distance quoted for your job.",
+    eqYardStep1B: "This is the machine's own location right now, read off its file. Not a delivery distance quoted for your job.",
     eqYardStep2T: "Nobody has promised it",
-    eqYardStep2B: "The supplier hasn't named the yard this machine would move from for your offer, so red means unanswered — not refused, and not unavailable.",
+    eqYardStep2B: "The supplier hasn't named the yard this machine would move from for your offer, so red means unanswered. Not refused, and not unavailable.",
     eqYardStep3T: "Ask him, and it turns green",
     eqYardStep3B: "The question goes into your chat with him, ready to send. When he names the yard, this distance turns green and the machine counts as confirmed for your offer.",
     eqYardExplainCta: "Ask the supplier",
@@ -1183,7 +1183,7 @@ export const en = {
     eqYardAskedWhat: "What you asked",
     // The chips' own explanations, on hover and to a screen reader.
     eqYardConfirmedWhy: "The supplier named the yard this machine moves from, so this distance is confirmed for your offer.",
-    eqYardUnconfirmedWhy: "Not confirmed for this offer — press to see what that means and to ask.",
+    eqYardUnconfirmedWhy: "Not confirmed for this offer: press to see what that means and to ask.",
     // The dots beside the file icon: the machine's papers, scored the way the app scores them.
     eqReadinessOnFile: "{done} of {total} documents on file",
     eqOpenFile: "Open this machine's file",
@@ -1202,7 +1202,7 @@ export const en = {
     // The filtered empty state — deliberately unlike RM3-AC-26's. That one is a statement about the
     // supplier; this one is a statement about the chips the renter pressed.
     eqFilterEmpty: "No equipment matches what you chose",
-    eqFilterEmptyWhy: "Active filters: {filters}. This offer has {total} — clear the filters to see them all.",
+    eqFilterEmptyWhy: "Active filters: {filters}. This offer has {total}: clear the filters to see them all.",
     // The company panel's own back control, and the detail's.
     // The list-foot ask (§6.4). The prototype says «المورد»; this surface says «المؤجّر» / supplier.
     eqAskAnother: "Ask the supplier to add another {type}",
@@ -1225,7 +1225,7 @@ export const en = {
     noLocatable: "None of this supplier's equipment can be placed",
     // The resize grip's accessible name. Says what dragging does and what returns it, because the
     // control is invisible until hovered and a screen reader never sees the cursor change.
-    resizePanel: "Drag to widen the panel — double-click, or Home, to restore",
+    resizePanel: "Drag to widen the panel: double-click, or Home, to restore",
     noLocatableWhy:
       "He hasn't shared a yard for any equipment that fits this request, so nothing can be drawn. Ask him to confirm a yard.",
     offPlatformNoPins: "An off-platform offer has no pin",
@@ -1328,7 +1328,7 @@ export const en = {
     // have had to work out that they are the same thing.
     confirmPrice: "Accept",
     // The one place the offered and the agreed count are reconciled (RM3-AC-66).
-    unitsDiffer: "Priced on {agreed} agreed units — the offer was made of {offered}.",
+    unitsDiffer: "Priced on {agreed} agreed units. The offer was made of {offered}.",
     rental: "Rental",
     // The basis, restated under the label the way the BID CARD restates it: the raw quoted rate over its
     // own period, the days it is actually charged across, then how many units — so the rental total is
@@ -1391,7 +1391,7 @@ export const en = {
     fullDetails: "Full details",
     share: "Share",
     quotation: "Quotation",
-    quotationNeedsRoom: "The quotation is issued in the deal room — open the conversation with this supplier first.",
+    quotationNeedsRoom: "The quotation is issued in the deal room. Open the conversation with this supplier first.",
     // The dark strip, right half — the item, and what the selected supplier offers against it.
     offers: "{supplier} offers",
     noBidSelected: "No bid selected",
@@ -1434,7 +1434,7 @@ export const en = {
     sourceOffline: "Offline",
     // Empty states.
     emptyTitle: "No requests yet",
-    emptyBody: "Create your first request to start getting supplier bids — you'll set up your account when you submit.",
+    emptyBody: "Create your first request to start getting supplier bids. You'll set up your account when you submit.",
     emptyCta: "Create request",
     signedOutTitle: "Sign in to see your requests",
     signedOutBody: "Your requests, the bids on them, and every comparison live here once you're signed in.",
@@ -1488,7 +1488,7 @@ export const en = {
     inviteSent: "Invite opened",
     inviteNoContact: "This bid carries no number to reach the supplier on.",
     inviteMessage:
-      "Hello {supplier} — I received your bid through Moedatech. If you install the Moedatech app you'll see my requests directly and can bid on more of them. {url}",
+      "Hello {supplier}: I received your bid through Moedatech. If you install the Moedatech app you'll see my requests directly and can bid on more of them. {url}",
     // The off-platform card's second control. What it opens is read-only by construction — the
     // supplier's own submission through the shared link, in the bid form's own shape. ~~`editQuote`,
     // "the renter typed this quote in himself, so it is his to correct".~~ Deleted with the label
@@ -1505,7 +1505,7 @@ export const en = {
     // without this line.
     countPricedAbove: "Priced on {priced} units, though the offer lists {offered}.",
     countPricedBelow: "Priced on {priced} of the {offered} units offered.",
-    countClaimed: "{n} of these units name no machine — {named} machines were listed.",
+    countClaimed: "{n} of these units name no machine: {named} machines were listed.",
     // ── The comparison matrix ──
     // "Pick one" focuses the row — it drives the strip above. It never awards; that is the deal room.
     supplierPickOne: "Supplier · pick one",
@@ -1628,7 +1628,7 @@ export const en = {
     q1Title: "How did your request go?",
     q1Question: "You requested {equipment}. Who did you end up renting from, and for how much?",
     someoneElse: "Someone else (not listed)",
-    noOne: "No one — I didn't rent",
+    noOne: "No one: I didn't rent",
     priceLabel: "How much did you pay {unit}?",
     reasonNoOne: "If you don't mind, what happened?",
     reasonSomeoneElse: "Tell us more (optional)",
@@ -1636,7 +1636,7 @@ export const en = {
     skip: "Skip for now",
     // Q2 — still need this? (no bids)
     q2Title: "Your request hasn't received any bids yet",
-    q2Body: "Try loosening your requirements so more suppliers can take part — otherwise we'll close this request for you.",
+    q2Body: "Try loosening your requirements so more suppliers can take part: otherwise we'll close this request for you.",
     edit: "Edit my requirements",
     close: "Close the request",
   },
@@ -1656,7 +1656,7 @@ export const en = {
       fieldName: "Project",
       viewAction: "View the project",
       alreadyTitle: "You already have a project at {site}",
-      alreadySub: "Add this request to it, or say it is a different site — two projects for one place split the site's picture in two.",
+      alreadySub: "Add this request to it, or say it is a different site: two projects for one place split the site's picture in two.",
       addTo: "Add it to {site}",
       addToSub: "Nothing on the request changes. It just appears on that site's chart.",
       different: "It's a different site",
@@ -1693,8 +1693,8 @@ export const en = {
       },
       attach: "Attach a file",
       removeNamed: "Remove {name}",
-      oursIsGenerated: "Our quotation for this request is generated, not uploaded — download it from the row menu. The one here is the quotation the SUPPLIER sent you.",
-      siteLevelNote: "Nobody is awarded this machine yet, so this paper is filed against the site — not against a supplier.",
+      oursIsGenerated: "Our quotation for this request is generated, not uploaded: download it from the row menu. The one here is the quotation the SUPPLIER sent you.",
+      siteLevelNote: "Nobody is awarded this machine yet, so this paper is filed against the site. Not against a supplier.",
       openHint: "Open this paper",
       openFailed: "Could not open that paper. Try again.",
       tooBig: "That file is over {max}. Attach a smaller one.",
@@ -1706,14 +1706,14 @@ export const en = {
       sub: "Put a request you have already posted onto {site}.",
       none: "Every request you have is already on a site.",
       noMatch: "Nothing matches that.",
-      elsewhere: "Different location — cannot be part of this project.",
+      elsewhere: "Different location: cannot be part of this project.",
       askTitle: "This request is for {there}, not {here}.",
       askBody: "A project is one place, so a request posted for somewhere else cannot be filed on it. Change the request’s location to {here}, or pick another request.",
       askEdit: "Change the request’s location",
       askNotEditable: "its location can no longer be changed",
       orExisting: "or one you already posted",
       search: "Search your requests",
-      note: "Filing changes nothing about the request — not its status, not its dates, not its terms. Only its location has to match.",
+      note: "Filing changes nothing about the request. Not its status, not its dates, not its terms. Only its location has to match.",
       failed: "That did not file. Try again.",
     },
     rename: {
@@ -1741,7 +1741,7 @@ export const en = {
     conflict: {
       openTheForm: "Open the work order and change its dates there \u2014 that form owns the check that keeps a group\u2019s rows in step.",
       title: "This runs to different dates",
-      intro: "Both are kept. Keeping the difference is usually right — a machine that stays longer than the site's own dates is a fact, not a mistake.",
+      intro: "Both are kept. Keeping the difference is usually right. A machine that stays longer than the site's own dates is a fact, not a mistake.",
       keepDifferent: "Keep it different",
       matchProject: "Match the project",
       costsTheEdit: "This request has bids, so matching the project uses its one remaining edit.",
@@ -1751,10 +1751,10 @@ export const en = {
     move: {
       fileTitle: "File this in a project",
       moveTitle: "Move this to another project",
-      changesNothing: "Filing changes nothing on the request — not one value moves, even where the new site says something different. That is why it works after bids and costs you no edit.",
+      changesNothing: "Filing changes nothing on the request. Not one value moves, even where the new site says something different. That is why it works after bids and costs you no edit.",
       movingDropsAwards: "Moving it to another site removes the awards recorded here, with their marks and documents. The request itself is untouched.",
-      movingCarries: "Its awards and papers move with it — nothing is lost.",
-      movingDropsAwardsWorkOrder: "Moving this order leaves its awards behind — they belong to the site they were agreed on.",
+      movingCarries: "Its awards and papers move with it. Nothing is lost.",
+      movingDropsAwardsWorkOrder: "Moving this order leaves its awards behind. They belong to the site they were agreed on.",
       deleteWorkOrder: "Delete this work order",
       atThisAddress: "At {site}",
       noneHere: "No project at {site} yet.",
@@ -1780,11 +1780,11 @@ export const en = {
       safetyOtherPlaceholder: "Name the certificate",
       overrideBadge: "{n} different",
       termsTitle: "Terms for this order",
-      termsUnreadable: "Could not read this order’s terms. Try again — opening it without them would overwrite what you entered.",
+      termsUnreadable: "Could not read this order’s terms. Try again: opening it without them would overwrite what you entered.",
       sameAsFirst: "same as the first machine",
       orderTitle: "Name this order",
       orderTitleHint: "What you will call it on the chart.",
-      orderTitlePlaceholder: "e.g. Own fleet — Qiddiya",
+      orderTitlePlaceholder: "e.g. Own fleet: Qiddiya",
       operator: "Operator",
       delivery: "Delivery by",
       ret: "Return by",
@@ -1809,7 +1809,7 @@ export const en = {
       subtype: "Type",
       size: "Size",
       search: "Search…",
-      notInCatalogue: "Not in our catalogue — I will type the name",
+      notInCatalogue: "Not in our catalogue: I will type the name",
       rawLabelPlaceholder: "What it is, e.g. Welding machine",
       rawSizePlaceholder: "Size, e.g. 400A",
       quantity: "Units",
@@ -1819,12 +1819,12 @@ export const en = {
       termsComing: "Operator, delivery, fuel and certificates for this machine. Arriving with the terms editor.",
       period: "How long it is here",
       periodHint: "Leave these empty and the work order runs to the site's own dates.",
-      differs: "This runs to different dates from the site ({start} → {end}). That is allowed — both are kept, and the chart shows the difference.",
+      differs: "This runs to different dates from the site ({start} → {end}). That is allowed: both are kept, and the chart shows the difference.",
       supplier: "Who provides it",
       supplierHint: "A work order is awarded the moment it exists, because the machine is already here. Leave a supplier blank for your own fleet.",
       supplierPlaceholder: "Supplier, or your own fleet",
       unnamedMachine: "This machine",
-      nameMachineFirst: "Say what the machine is first — pick its type, or tick «not in our catalogue» and type its name.",
+      nameMachineFirst: "Say what the machine is first. Pick its type, or tick «not in our catalogue» and type its name.",
       fixUnitsFirst: "A machine has more units promised to suppliers than it asks for. Fix the counts to save.",
     },
     menu: {
@@ -1847,7 +1847,7 @@ export const en = {
     },
     award: {
       title: "Who is supplying this?",
-      privateNote: "Your own record. This is not the marketplace accept — it reads nothing from the deal room and writes nothing to it.",
+      privateNote: "Your own record. This is not the marketplace accept. It reads nothing from the deal room and writes nothing to it.",
       supplier: "Supplier",
       supplierPlaceholder: "Type the supplier's name",
       notRegistered: "not vendor-registered",
@@ -1867,7 +1867,7 @@ export const en = {
       perDaily: "per day",
       perWeekly: "per week",
       perMonthly: "per month",
-      moneyOptional: "Rate, mobilization and demobilization are optional — record what you agreed.",
+      moneyOptional: "Rate, mobilization and demobilization are optional: record what you agreed.",
       basis: "Per",
       daily: "day",
       weekly: "week",
@@ -1937,9 +1937,9 @@ export const en = {
       title: "“{name}” is ready",
       sub: "What is on this site?",
       workOrder: "Add a work order",
-      workOrderSub: "A machine already on site — your own, or a vendor you use. Private: no supplier ever sees it.",
+      workOrderSub: "A machine already on site. Your own, or a vendor you use. Private: no supplier ever sees it.",
       request: "Post a new request",
-      requestSub: "Ask our suppliers. The site's terms are filled in already — you type the machine.",
+      requestSub: "Ask our suppliers. The site's terms are filled in already. You type the machine.",
       later: "Not now",
     },
     surface: {
@@ -1954,7 +1954,7 @@ export const en = {
         saveFailed: "That did not save. Try again.",
       },
     form: {
-        addressRequired: "Add the location first — drop a pin, or type it.",
+        addressRequired: "Add the location first. Drop a pin, or type it.",
         whereTitle: "Where",
         address: "Location",
         addressPlaceholder: "Drop a pin above, or type the location",
@@ -1971,11 +1971,11 @@ export const en = {
         paymentTerms: "Payment terms",
         applyTitle: "What is already on this site",
         applyNote: "Nothing here changes unless you tick it. A request with bids has one edit left, and ticking it spends that edit.",
-        stateFree: "no bids — free to edit",
-        stateCosts: "has bids — uses its one edit",
+        stateFree: "no bids: free to edit",
+        stateCosts: "has bids: uses its one edit",
         stateUsed: "edit already used",
         stateClosed: "closed",
-        stateWorkOrder: "work order — always editable",
+        stateWorkOrder: "work order: always editable",
         saveProjectOnly: "Project only",
         saveAndApply: "Save and apply to {n}",
       },
@@ -2016,7 +2016,7 @@ export const en = {
     operatorRail: "OPERATOR",
     where: "Where it goes",
     when: "When it runs",
-    nextPanel: "Next — {panel}",
+    nextPanel: "Next: {panel}",
     missingTitle: "Before this can be sent",
     lockedForRequest: "locked for the whole request",
     collapse: "collapse",
@@ -2060,7 +2060,7 @@ export const en = {
       unavailableTitle: "{equipment} isn't available from suppliers right now.",
       unavailableWhatsapp: "Message us on WhatsApp",
       unavailableChoose: "Choose another type",
-      sourcingRequested: "We're looking for this one — we'll be in touch.",
+      sourcingRequested: "We're looking for this one. We'll be in touch.",
     },
     operatorCard: {
       /**
@@ -2086,14 +2086,14 @@ export const en = {
       nightShift: "NIGHT SHIFT",
       nightIncluded: "Included",
       nightDayOnly: "Day only",
-      noOperator: "No operator needed — we drive it ourselves",
+      noOperator: "No operator needed. We drive it ourselves",
       needOperator: "Do you want an operator with this equipment?",
       operatorIncluded: "Include an operator",
       operatorNotIncluded: "No operator",
       withOperator: "with an operator",
     },
     wherePanel: {
-      unfiledShort: "different location — not in the project",
+      unfiledShort: "different location: not in the project",
       unfiledNote: "This is a different place from {project}, so this request will not be part of it. Move the pin back to file it there.",
       searchPlaceholder: "Search a place, or paste a Maps link / coordinates",
       dragHint: "Drag the map, or drop a pin where the machine goes",
@@ -2118,8 +2118,8 @@ export const en = {
       // its arithmetic on one, the acknowledgement on the next. The uppercase title above it is gone
       // — the sentence names the number, so a heading only made the block taller.
       // `chargedLine` follows the count, which is rendered beside it at 20px.
-      chargedLine: "billable days — {total} calendar days less {fridays} Fridays, at {hours} hours a day",
-      chargedLineBasis: "billable days — {total} calendar days less {fridays} Fridays, at {hours} hours a day, billed {basis}",
+      chargedLine: "billable days: {total} calendar days less {fridays} Fridays, at {hours} hours a day",
+      chargedLineBasis: "billable days: {total} calendar days less {fridays} Fridays, at {hours} hours a day, billed {basis}",
       chargedNoDates: "Add a start and end date and we'll show exactly how many days you'll be charged for. Fridays are never charged.",
       confirmCharged: "I understand suppliers will quote against {charged} billable days",
       confirmChargedNoDates: "I understand suppliers will price without a fixed end date.",
@@ -2147,7 +2147,7 @@ export const en = {
     carry: {
       title: "Equipment #{n}",
       locked: "The site and schedule already apply to your whole request, so this equipment uses the same ones automatically.",
-      copied: "Its other details — like delivery, food, and certificates — start out matching this equipment, but you can change any of them.",
+      copied: "Its other details, like delivery, food and certificates, start out matching this equipment, but you can change any of them.",
       editFirst: "Edit this item first",
       continue: "Continue",
     },
@@ -2163,11 +2163,17 @@ export const en = {
        assume a second machine means starting again. */
     addMore: {
       title: "Anything else on this job?",
-      body: "Your request is ready to review. If the job needs another machine, add it now — it uses the same site and schedule, so there is nothing to fill in twice.",
+      body: "Your request is ready to review. If the job needs another machine, add it now. It uses the same site and schedule, so there is nothing to fill in twice.",
     },
     ready: {
+      viewAll: "View all details",
+      detailsTitle: "The full request",
+      stripDays: "days",
+      stripOperator: "with operator",
+      stripVerified: "Verified only",
+      stripNoPayment: "Payment terms",
       title: "Ready to send",
-      subtitle: "This is exactly what suppliers will see. Terms and payment come after the bids arrive — nothing else to fill in here.",
+      subtitle: "This is exactly what suppliers will see. Terms and payment come after the bids arrive. Nothing else to fill in here.",
       where: "Where it goes",
       when: "When it runs",
       machineAndOperator: "The machine & operator",
@@ -2193,7 +2199,7 @@ export const en = {
       optional: "(optional)",
       inviteTitle: "Invite suppliers you already know",
       inviteBody:
-        "Once you send this, you'll get a shareable link to invite suppliers to bid — even ones off Moedatech. Their bids land right here for you to compare.",
+        "Once you send this, you'll get a shareable link to invite suppliers to bid, even ones off Moedatech. Their bids land right here for you to compare.",
       backToEditing: "Back to editing",
       send: "Send to suppliers",
       notSet: "not set",
@@ -2223,8 +2229,8 @@ export const en = {
     noContactName: "no contact name",
     registered: "Registered",
     mark: "Mark",
-    markTitle: "Mark as a registered vendor — your own label, the supplier is never told",
-    unmarkTitle: "Registered vendor — click to unset",
+    markTitle: "Mark as a registered vendor. Your own label, the supplier is never told",
+    unmarkTitle: "Registered vendor: click to unset",
     notSet: "not set",
     add: "add",
     noGroup: "no group",
@@ -2240,7 +2246,7 @@ export const en = {
     couldNotRead: "We could not read that",
     couldNotReadBody: "The value you sent is kept but cannot be used to reach them. Edit the row to correct it.",
     emptyTitle: "Your list is empty",
-    emptyBody: "Moedatech has hundreds of suppliers — none of them are here until you add them.",
+    emptyBody: "Moedatech has hundreds of suppliers. None of them are here until you add them.",
     noMatchTitle: "No supplier matches",
     noMatchBody: "Change the search or the filters.",
     loading: "Loading your suppliers…",
@@ -2253,7 +2259,7 @@ export const en = {
     addOne: "Add 1 supplier",
     addMany: "Add {n} suppliers",
     addNone: "Add suppliers",
-    addFailed: "That did not save. Your rows are still here — try again.",
+    addFailed: "That did not save. Your rows are still here. Try again.",
     addHint: "Each supplier needs a company name, and an email or a phone. Without an email the request's share sheet skips them.",
     fName: "Company name",
     fContact: "Contact",
@@ -2262,7 +2268,7 @@ export const en = {
     fCr: "CR number",
     removeRow: "Remove this row",
     markAll: "Mark them all as registered vendors",
-    markAllHint: "On by default — untick any row above to add that one as a contact only.",
+    markAllHint: "On by default: untick any row above to add that one as a contact only.",
     addSupplier: "Add suppliers",
     added: "Added to your list",
     createGroup: "Create group",
@@ -2271,8 +2277,8 @@ export const en = {
     rename: "Rename",
     renameGroup: "Rename the group",
     deleteGroup: "Delete the group",
-    deleteGroupBody: "The {n} suppliers in it stay in your list — they simply end up with no group.",
-    deleteGroupBodyOne: "The supplier in it stays in your list — they simply end up with no group.",
+    deleteGroupBody: "The {n} suppliers in it stay in your list. They simply end up with no group.",
+    deleteGroupBodyOne: "The supplier in it stays in your list. They simply end up with no group.",
     nameGroup: "Name the group",
     groupName: "Group name",
     groupPlaceholder: "Earthmoving, Riyadh, Preferred…",
@@ -2281,7 +2287,7 @@ export const en = {
     nSelectedFor: "{n} selected for the new group",
     groupCreated: "{name} created with {n}",
     groupRenamed: "Renamed to {name}",
-    groupDeleted: "Group deleted — the suppliers stay",
+    groupDeleted: "Group deleted. The suppliers stay",
     groupFailed: "That did not save. Nothing changed.",
     close: "Close",
     offPlatform: "Off platform",
@@ -2290,7 +2296,7 @@ export const en = {
     registeredVendor: "Registered vendor",
     openBids: "Open bids",
     insideApp: "Inside the app",
-    noAccountBody: "They have no Moedatech account, so there is no deal room and no award — every bid reached you through your shared form.",
+    noAccountBody: "They have no Moedatech account, so there is no deal room and no award: every bid reached you through your shared form.",
     kOnApp: "on Moedatech",
     kViaLink: "via your link",
     kRooms: "deal rooms",
@@ -2312,13 +2318,13 @@ export const en = {
     noAwards: "You have not awarded them anything yet.",
     whatYouSent: "What you sent them",
     nothingSent: "Nothing sent yet.",
-    requestShared: "Request shared — ",
+    requestShared: "Request shared",
     invitationSent: "Invitation to join Moedatech",
     theyOpened: "they opened the link",
     notOpened: "not opened yet",
     theyJoined: "they joined",
     notJoined: "not joined yet",
-    noEmailCannotShare: "No email — the request's share sheet will skip them",
+    noEmailCannotShare: "No email. The request's share sheet will skip them",
     fromYourSheet: "From your sheet",
     profileFailed: "We could not load this supplier.",
     tier_new: "New",
@@ -2337,12 +2343,12 @@ export const en = {
     supplierProfile: "Supplier profile",
     viaLinkShort: "via link",
     editTitle: "Edit supplier",
-    editPlatformSub: "Name and store come from their Moedatech account — you can only edit what is yours.",
+    editPlatformSub: "Name and store come from their Moedatech account. You can only edit what is yours.",
     nameIsTheirs: "Read from their Moedatech account.",
     emailHint: "Without it, the request's share sheet skips them.",
     addToGroup: "Add to a group",
     removeFromGroup: "Remove from this group",
-    groupsHint: "Removing a group here only unlabels this supplier — the group itself stays.",
+    groupsHint: "Removing a group here only unlabels this supplier. The group itself stays.",
     saved: "Saved",
     saveFailed: "That did not save. Nothing changed.",
     edit: "Edit",
@@ -2357,7 +2363,7 @@ export const en = {
     inviteTitle: "Invite {name} to Moedatech",
     inviteSubtitle: "Your message, in your words. Send it however you already talk to them.",
     inviteMessageCold: "Hello {supplier}, I use Moedatech to send out my equipment requests. If you install the app you'll see them directly and can bid on them. {url}",
-    inviteWhy: "Same message on every channel — only the e-mail subject is extra.",
+    inviteWhy: "Same message on every channel: only the e-mail subject is extra.",
     inviteSubject: "An invitation to bid on my equipment requests",
     inviteChannelWhatsApp: "WhatsApp",
     inviteChannelEmail: "E-mail",
@@ -2378,8 +2384,8 @@ export const en = {
     modeApp: "From Moedatech",
     appSearch: "Search suppliers on Moedatech",
     appEveryone: "Everyone with a Moedatech account. A firm without one goes under {tab}.",
-    appOnlyStores: "Only suppliers with a store are listed here — add anyone else under {tab}.",
-    appNoSupplierId: "cannot be linked — this store does not name its company",
+    appOnlyStores: "Only suppliers with a store are listed here. Add anyone else under {tab}.",
+    appNoSupplierId: "cannot be linked: this store does not name its company",
     appPrivate: "The supplier is not told. Their name, their store and their equipment stay theirs; you are only adding them to your own list.",
     appRegisteredRule: "Everyone added here is marked a registered vendor, which is what lets you see their contact details.",
     appSearchFirst: "Type a name to search.",
@@ -2398,8 +2404,8 @@ export const en = {
     planning: "Checking…",
     planLine: "{created} will be added · {merged} will merge into a supplier you already have · {rejected} refused",
     mergeFillsBlanks: "A merge fills what is empty and never overwrites. A phone you corrected in the app stays as it is, and a correction in this sheet will not replace it. Edit those in the app.",
-    planRejected: "Row {row} refused — {reason}",
-    planWarning: "Row {row}, {field} — {reason}",
+    planRejected: "Row {row} refused: {reason}",
+    planWarning: "Row {row}, {field}: {reason}",
     rMissingContact: "no e-mail and no phone",
     rMissingName: "no company name",
     rInvalidPhone: "that is not a phone number, so the row was added without one",
@@ -2412,7 +2418,7 @@ export const en = {
     importSubtitle: "Paste the rows from your spreadsheet, or choose a CSV.",
     pasteLabel: "Paste from your spreadsheet",
     pastePlaceholder: "Company\tContact\tE-mail\tMobile\nZahid Tractor\tFaisal\tt@z.sa\t0551234567",
-    pasteHint: "Select the rows in Excel — including the header row — and paste them here.",
+    pasteHint: "Select the rows in Excel, including the header row, and paste them here.",
     or: "or",
     chooseCsv: "Choose a CSV file",
     importUnreadable: "We could not read that. It needs a header row and at least one row under it.",
@@ -2425,8 +2431,8 @@ export const en = {
     ignoreColumn: "Ignore this column",
     columnN: "Column {n}",
     preview: "Preview",
-    skippedRows: "{n} rows will be skipped — they have no company name, or no email and no phone.",
-    markAllPreviewHint: "On by default — untick any row in the preview to import that one as a contact only.",
+    skippedRows: "{n} rows will be skipped. They have no company name, or no email and no phone.",
+    markAllPreviewHint: "On by default: untick any row in the preview to import that one as a contact only.",
     startOver: "Start over",
     importN: "Import {n} suppliers",
     importNone: "Import",
@@ -2441,7 +2447,7 @@ export const en = {
     suggestedOnApp: "on Moedatech",
     addToMySuppliers: "Add to my suppliers",
     dismiss: "Dismiss",
-    xlsxNotRead: "Excel files are not read directly. Open it, select the rows including the header, and paste them above — or save it as CSV.",
+    xlsxNotRead: "Excel files are not read directly. Open it, select the rows including the header, and paste them above, or save it as CSV.",
   },
 };
 
