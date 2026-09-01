@@ -165,6 +165,19 @@ export interface BidFormProjectTerms {
   endDate: string | null;
   hoursPerDay: number | null;
   workingDaysPerWeek: number | null;
+  /**
+   * May the hire run on past the end date?
+   *
+   * ⚠️ **Three states, not two.** `true` = the renter said it may; `false` = he said it may not;
+   * `null` = he was never asked, which is every request made before the field existed. Coalescing
+   * null to false would print "not extendable" as a fact nobody stated, and a supplier prices a flat
+   * month against a hire that was always meant to run on.
+   *
+   * ⚠️ The backend has sent this since 2026-09-01 and this app was dropping it on the floor — the
+   * mapper never read the key, so the bid form the supplier fills in never showed it and neither did
+   * the card. Read the word only for `true`; say nothing for the other two.
+   */
+  extendable: boolean | null;
 }
 export interface BidFormData {
   token: string;
@@ -312,7 +325,18 @@ export function mapBidFormData(raw: unknown): BidFormData {
     deadline: s(r.deadline),
     renter: { name: s(renter.name), contactName: s(renter.contactName), city: s(renter.city), verified: renter.verified === true, logoUrl: s(renter.logoUrl) },
     projectTerms: pt
-      ? { location: s(pt.location), lat: n(pt.lat), lng: n(pt.lng), rentalBasis: s(pt.rentalBasis), startDate: s(pt.startDate), endDate: s(pt.endDate), hoursPerDay: n(pt.hoursPerDay), workingDaysPerWeek: n(pt.workingDaysPerWeek) }
+      ? {
+          location: s(pt.location),
+          lat: n(pt.lat),
+          lng: n(pt.lng),
+          rentalBasis: s(pt.rentalBasis),
+          startDate: s(pt.startDate),
+          endDate: s(pt.endDate),
+          hoursPerDay: n(pt.hoursPerDay),
+          workingDaysPerWeek: n(pt.workingDaysPerWeek),
+          //三states preserved: only a real boolean becomes one, anything else stays null.
+          extendable: typeof pt.extendable === "boolean" ? pt.extendable : null,
+        }
       : null,
     // Exclude `maintenance` (not a supplier-confirmed term here) + `overtime` when it's effectively none (0).
     contractTerms: ct.map((c) => ({ key: s(c.key) ?? "", label: s(c.label) ?? "", value: s(c.value) ?? "" }))

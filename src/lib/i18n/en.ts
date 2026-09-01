@@ -2376,7 +2376,7 @@ export const en = {
     inviteNotRecorded: "Sending is not recorded yet.",
     addFromApp: "Add from Moedatech",
     dirTitle: "Add registered vendors from Moedatech",
-    dirSubtitle: "Everyone you tick joins your list, as a registered vendor.",
+    dirSubtitle: "Everyone you tick joins your list. Untick the flag on any you are only trying out.",
     dirEveryone: "Everyone with a Moedatech account, whether or not they have a store.",
     dirAdd: "Add selected",
     dirAddN: "Add {n} selected",

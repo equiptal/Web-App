@@ -72,7 +72,7 @@ describe("AddFromMoedatechDialog", () => {
     expect(boxes.every((b) => !b.disabled)).toBe(true);
   });
 
-  it("Given a supplier is ticked, When saved, Then the SUPPLIER id is linked and marked registered", async () => {
+  it("Given a supplier is ticked, When saved, Then the SUPPLIER id is linked, registered by default", async () => {
     open();
     await search();
 
@@ -80,9 +80,26 @@ describe("AddFromMoedatechDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: en.suppliers.dirAddN.replace("{n}", "1") }));
 
     await waitFor(() => expect(api.linked.length).toBe(1));
-    // The account id, and registered — a renter does not add a platform firm unless he works with it,
-    // and that flag is what unlocks the contact details.
     expect(api.linked[0][0]).toEqual([{ supplierId: "9", vendorRegistered: true }]);
+  });
+
+  it("Given the vendor flag is unticked on a row, Then that firm is added without it", async () => {
+    /**
+     * It used to be forced on (owner, 2026-09-02 reversed it). Adding from Moedatech now behaves
+     * exactly like adding a firm by hand, and the flag means the one thing it says: this is a firm I
+     * have registered as a vendor. A renter can add one he is only trying out without claiming so.
+     */
+    open();
+    await search();
+
+    fireEvent.click(screen.getAllByRole("checkbox")[0]);
+    // The row's own tick appears once the row is chosen.
+    const ticks = screen.getAllByRole("checkbox");
+    fireEvent.click(ticks[ticks.length - 1]);
+    fireEvent.click(screen.getByRole("button", { name: en.suppliers.dirAddN.replace("{n}", "1") }));
+
+    await waitFor(() => expect(api.linked.length).toBe(1));
+    expect(api.linked[0][0]).toEqual([{ supplierId: "9", vendorRegistered: false }]);
   });
 
   it("Given nothing is ticked, Then the button is refused", async () => {

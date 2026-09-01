@@ -66,6 +66,7 @@ const COPY = {
     days: (n: number) => `${n} ${n === 1 ? "day" : "days"}`,
     weeks: (n: number) => `${n} ${n === 1 ? "week" : "weeks"}`,
     months: (n: number) => `${n} ${n === 1 ? "month" : "months"}`,
+    extendable: (period: string) => `${period} & extendable`,
     terms: {
       mob: "Mobilisation",
       demob: "Demobilisation",
@@ -89,6 +90,7 @@ const COPY = {
     days: (n: number) => `${n} يوم`,
     weeks: (n: number) => `${n} أسبوع`,
     months: (n: number) => `${n} شهر`,
+    extendable: (period: string) => `${period} وقابل للتمديد`,
     terms: {
       mob: "النقل إلى الموقع",
       demob: "النقل من الموقع",
@@ -194,17 +196,28 @@ function itemLabel(it: BidFormItem, lang: "en" | "ar"): string {
   return withOp ? `${head} · ${COPY[lang].withOperator}` : head;
 }
 
-/** `1 month` / `2 weeks` / `9 days`, whichever is the honest round number for the window. */
-function durationOf(start: string | null, end: string | null, lang: "en" | "ar"): string | null {
+/**
+ * `1 month` / `2 weeks` / `9 days`, whichever is the honest round number for the window — and
+ * `1 month & extendable` when the renter said the hire may run on.
+ *
+ * ⚠️ The word is drawn for `true` ONLY. `false` and `null` both say nothing: null means the renter
+ * was never asked, and printing "not extendable" as a fact nobody stated is the failure this guards.
+ * A supplier who is not told may price a flat month against a hire that was always meant to run on.
+ */
+function durationOf(
+  start: string | null,
+  end: string | null,
+  lang: "en" | "ar",
+  extendable: boolean | null = null,
+): string | null {
   if (!start || !end) return null;
   const a = new Date(start).getTime();
   const b = new Date(end).getTime();
   if (Number.isNaN(a) || Number.isNaN(b) || b <= a) return null;
   const days = Math.max(1, Math.round((b - a) / DAY_MS));
   const t = COPY[lang];
-  if (days >= 30) return t.months(Math.round(days / 30));
-  if (days >= 7 && days % 7 === 0) return t.weeks(days / 7);
-  return t.days(days);
+  const period = days >= 30 ? t.months(Math.round(days / 30)) : days >= 7 && days % 7 === 0 ? t.weeks(days / 7) : t.days(days);
+  return extendable === true ? t.extendable(period) : period;
 }
 
 /**
@@ -286,7 +299,16 @@ export function bidCardModel(
     // A single-machine request already says the machine in the title; repeating it as a row below is
     // the same words twice in 14 vertical pixels.
     items: multi ? items.map((i) => ({ label: itemLabel(i, lang), value: `×${i.numberOfUnits ?? 1}` })) : [],
-    where: [multi ? null : city, durationOf(form.projectTerms?.startDate ?? null, form.projectTerms?.endDate ?? null, lang), startEnd || null]
+    where: [
+      multi ? null : city,
+      durationOf(
+        form.projectTerms?.startDate ?? null,
+        form.projectTerms?.endDate ?? null,
+        lang,
+        form.projectTerms?.extendable ?? null,
+      ),
+      startEnd || null,
+    ]
       .filter(Boolean)
       .join(" · ") || null,
     terms: rows,

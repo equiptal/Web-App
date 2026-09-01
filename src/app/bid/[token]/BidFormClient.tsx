@@ -433,7 +433,7 @@ export default function BidFormClient({ token }: { token: string }) {
       // Surface the backend's specific reason (e.g. the units-cap 400/409 "Offer between 1 and N…") instead
       // of a generic failure, so a race reads cleanly. Falls back to the generic message.
       const msg = e instanceof ApiError ? (ar ? (e.messageAr ?? e.detail) : (e.detail ?? e.messageAr)) : null;
-      alert(msg || L("Could not submit — the request may have closed, or please try again.", "تعذّر الإرسال — قد يكون الطلب أُغلق، أو حاول مرة أخرى."));
+      alert(msg || L("Could not submit. The request may have closed, or please try again.", "تعذّر الإرسال: قد يكون الطلب أُغلق، أو حاول مرة أخرى."));
     }
   }
 
@@ -515,7 +515,7 @@ export default function BidFormClient({ token }: { token: string }) {
       {submitted && (
         <div className="wrap"><div className="state"><div className="sic"><span className="material-icons-outlined">check_circle</span></div>
           <h2>{L("Bid submitted", "تم إرسال العرض")}</h2>
-          <p>{L("Your bid is now with the renter on the Moedatech platform — they can view it and compare it side by side with the other bids.", "عرضك الآن لدى المستأجر على منصة معداتك — يمكنه عرضه ومقارنته جنباً إلى جنب مع بقية العروض.")}</p>
+          <p>{L("Your bid is now with the renter on the Moedatech platform. They can view it and compare it side by side with the other bids.", "عرضك الآن لدى المستأجر على منصة معداتك: يمكنه عرضه ومقارنته جنباً إلى جنب مع بقية العروض.")}</p>
           <span className="recap"><span className="material-icons-outlined">payments</span>{sar} {nf(grand)}</span>
           <div className="state-actions"><button className="btn" onClick={resetForm}><span className="material-icons-outlined">add</span>{L("Submit another bid", "إرسال عرض آخر")}</button></div>
         </div></div>
@@ -534,7 +534,7 @@ export default function BidFormClient({ token }: { token: string }) {
             <QualityRing quality={quality} L={L} />
             <div className="qb-tx">
               <b>{L("Bid quality", "جودة العرض")}</b>
-              <span>{L("Confirm the renter's terms and attach equipment photos + documents to raise your match score — higher-quality bids stand out to the renter.", "أكّد شروط المستأجر وأرفق صور المعدة والمستندات لرفع درجة المطابقة — العروض عالية الجودة تبرز لدى المستأجر.")}</span>
+              <span>{L("Confirm the renter's terms and attach equipment photos + documents to raise your match score: higher-quality bids stand out to the renter.", "أكّد شروط المستأجر وأرفق صور المعدة والمستندات لرفع درجة المطابقة: العروض عالية الجودة تبرز لدى المستأجر.")}</span>
               {/* Breakdown — shows the supplier exactly which dimension to improve; each bar turns green when complete. */}
               <div className="qb-parts">
                 {([
@@ -569,6 +569,13 @@ export default function BidFormClient({ token }: { token: string }) {
                 {data.projectTerms.rentalBasis && <Cell k={L("Rental basis", "أساس الإيجار")}>{rentalBasisLabel(data.projectTerms.rentalBasis, L)}</Cell>}
                 {data.projectTerms.startDate && <Cell k={L("Rental start", "بدء الإيجار")}>{fmtDate(data.projectTerms.startDate)}</Cell>}
                 <Cell k={L("Rental end", "نهاية الإيجار")}>{data.projectTerms.endDate ? fmtDate(data.projectTerms.endDate) : L("Open-ended", "بدون نهاية محددة")}</Cell>
+                {/* ⚠️ `true` ONLY. `false` and `null` both draw nothing: null means the renter was
+                    never asked, and "not extendable" printed as a fact nobody stated is worse than
+                    silence. The backend has sent this since 2026-09-01 and this form was dropping it,
+                    so a supplier priced a flat month against a hire meant to run on. */}
+                {data.projectTerms.extendable === true && (
+                  <Cell k={L("May be extended", "قابل للتمديد")}>{L("Yes", "نعم")}</Cell>
+                )}
                 {data.projectTerms.hoursPerDay != null && <Cell k={L("Hours per day", "ساعات/يوم")}>{data.projectTerms.hoursPerDay}</Cell>}
                 {data.projectTerms.workingDaysPerWeek != null && <Cell k={L("Working days / week", "أيام العمل/أسبوع")}>{data.projectTerms.workingDaysPerWeek}</Cell>}
               </div>
@@ -576,7 +583,7 @@ export default function BidFormClient({ token }: { token: string }) {
 
               {data.contractTerms.length > 0 && (
                 <>
-                  <div className="subhead"><span className="material-icons-outlined">gavel</span>{L("Contract terms — for all items", "شروط العقد — لكل البنود")}
+                  <div className="subhead"><span className="material-icons-outlined">gavel</span>{L("Contract terms: for all items", "شروط العقد: لكل البنود")}
                     <button type="button" className={`yall${allContractYes ? " on" : ""}`} onClick={() => toggleContractYes(allContractYes)}><span className="yall-sw"></span>{L("Yes to all", "نعم للكل")}</button>
                   </div>
                   <div className="treqgrid">
@@ -648,7 +655,7 @@ export default function BidFormClient({ token }: { token: string }) {
                 {multiItem && !fullyCovered && (
                   <button type="button" className={`supply-tog${skip ? " off" : ""}`} onClick={() => toggleSupply(it.requestItemId)}>
                     <span className="supply-sw"></span>
-                    <span className="supply-tx">{skip ? L("You can't supply this item — tap to include it", "لا يمكنك توفير هذا البند — اضغط لإضافته") : L("I can supply this item", "أستطيع توفير هذا البند")}</span>
+                    <span className="supply-tx">{skip ? L("You can't supply this item: tap to include it", "لا يمكنك توفير هذا البند: اضغط لإضافته") : L("I can supply this item", "أستطيع توفير هذا البند")}</span>
                     {!skip && <span className="supply-skip">{L("Can't supply? Skip it", "لا تستطيع؟ استبعده")}</span>}
                   </button>
                 )}
@@ -661,7 +668,7 @@ export default function BidFormClient({ token }: { token: string }) {
                 ) : skip ? (
                   <div className="skip-note">
                     <span className="material-icons-outlined">block</span>
-                    <span>{L("Not included in your bid. You won't price this item or confirm its terms — bid on the items you can supply.", "غير مُدرَج في عرضك. لن تُسعّر هذا البند أو تؤكّد شروطه — قدّم عرضك على البنود التي تستطيع توفيرها.")}</span>
+                    <span>{L("Not included in your bid. You won't price this item or confirm its terms: bid on the items you can supply.", "غير مُدرَج في عرضك. لن تُسعّر هذا البند أو تؤكّد شروطه: قدّم عرضك على البنود التي تستطيع توفيرها.")}</span>
                   </div>
                 ) : (
                 <>
@@ -702,7 +709,7 @@ export default function BidFormClient({ token }: { token: string }) {
 
                 {terms.length > 0 && (
                   <>
-                    <div className="subhead"><span className="material-icons-outlined">fact_check</span>{L("Terms — can you meet each?", "الشروط — هل يمكنك الالتزام بكلٍّ منها؟")}
+                    <div className="subhead"><span className="material-icons-outlined">fact_check</span>{L("Terms: can you meet each?", "الشروط: هل يمكنك الالتزام بكلٍّ منها؟")}
                       <button type="button" className={`yall${allItemYes ? " on" : ""}`} onClick={() => toggleItemYes(it, allItemYes)}><span className="yall-sw"></span>{L("Yes to all", "نعم للكل")}</button>
                     </div>
                     <div className="treqgrid">
@@ -798,7 +805,7 @@ export default function BidFormClient({ token }: { token: string }) {
                   <span className="material-icons-outlined au-ic">workspace_premium</span>
                   <div className="au-tx">
                     <b>{L("Photos & documents raise your bid quality", "الصور والمستندات ترفع جودة عرضك")}</b>
-                    <span>{L("Bids with equipment photos and supporting documents score higher and stand out — the renter is far more likely to pick a complete, verified bid and close the deal with you.", "العروض المرفقة بصور المعدة والمستندات الداعمة تحصل على درجة أعلى وتبرز أكثر — والمستأجر أميل بكثير لاختيار عرض مكتمل وموثّق وإتمام الصفقة معك.")}</span>
+                    <span>{L("Bids with equipment photos and supporting documents score higher and stand out. The renter is far more likely to pick a complete, verified bid and close the deal with you.", "العروض المرفقة بصور المعدة والمستندات الداعمة تحصل على درجة أعلى وتبرز أكثر، والمستأجر أميل بكثير لاختيار عرض مكتمل وموثّق وإتمام الصفقة معك.")}</span>
                   </div>
                 </div>
 
@@ -824,7 +831,7 @@ export default function BidFormClient({ token }: { token: string }) {
                   const slots = parseCertSlots(it.requiredTerms.equipmentCert, "");
                   return slots.length ? (
                     <AttachSection icon="workspace_premium" accent={ATT_ACCENT.eqc}
-                      title={L("Equipment certificate", "شهادة المعدة")} desc={L("Attach if you have it — strengthens your bid", "أرفقها إن توفّرت — تقوّي عرضك")} pill={L("Optional", "اختياري")}>
+                      title={L("Equipment certificate", "شهادة المعدة")} desc={L("Attach if you have it: strengthens your bid", "أرفقها إن توفّرت: تقوّي عرضك")} pill={L("Optional", "اختياري")}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {slots.map((sl) => (
                           <FileUploader key={sl.code} token={token} folder="documents" accent={ATT_ACCENT.eqc}
@@ -841,7 +848,7 @@ export default function BidFormClient({ token }: { token: string }) {
                   const slots = parseCertSlots(it.requiredTerms.operatorCert, "operator_");
                   return slots.length ? (
                     <AttachSection icon="badge" accent={ATT_ACCENT.opc}
-                      title={L("Operator certificate", "شهادة المشغّل")} desc={L("Attach if you have it — strengthens your bid", "أرفقها إن توفّرت — تقوّي عرضك")} pill={L("Optional", "اختياري")}>
+                      title={L("Operator certificate", "شهادة المشغّل")} desc={L("Attach if you have it: strengthens your bid", "أرفقها إن توفّرت: تقوّي عرضك")} pill={L("Optional", "اختياري")}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {slots.map((sl) => (
                           <FileUploader key={sl.code} token={token} folder="documents" accent={ATT_ACCENT.opc}
@@ -860,7 +867,7 @@ export default function BidFormClient({ token }: { token: string }) {
           })}
 
           {/* Grand total */}
-          <div className="grand"><span className="gk">{L("Grand total — all items (incl. VAT)", "الإجمالي الكلي — كل البنود (شامل الضريبة)")}</span><span className="gv">{grand > 0 ? nf(grand) : "—"} {sar}</span></div>
+          <div className="grand"><span className="gk">{L("Grand total: all items (incl. VAT)", "الإجمالي الكلي: كل البنود (شامل الضريبة)")}</span><span className="gv">{grand > 0 ? nf(grand) : "—"} {sar}</span></div>
 
           {/* Your details */}
           <div className="sec">
@@ -898,18 +905,18 @@ export default function BidFormClient({ token }: { token: string }) {
                 sentence he has a reason to read. */}
             <p style={{ margin: "-4px 0 2px", fontSize: 11.5, color: "var(--muted)" }}>{L("Your phone lets you continue this bid in the Moedatech app later. Your e-mail is how this renter sends you their next request.", "رقمك يتيح لك متابعة هذا العرض في تطبيق معداتك لاحقاً. وبريدك هو الطريقة التي يرسل بها هذا المستأجر طلبه القادم إليك.")}</p>
             {QUOTE_EXPIRY_ENABLED && <Field label={L("Quote valid until", "صلاحية العرض حتى")} L={L}><input type="date" value={company.validUntil} onChange={(e) => setCompany({ ...company, validUntil: e.target.value })} /></Field>}
-            <div className="notes-field"><label>{L("Notes — for the whole quotation", "ملاحظات — لكامل عرض السعر")}<span className="optx">{L("Optional", "اختياري")}</span></label><textarea value={company.notes} onChange={(e) => setCompany({ ...company, notes: e.target.value })} /></div>
+            <div className="notes-field"><label>{L("Notes: for the whole quotation", "ملاحظات: لكامل عرض السعر")}<span className="optx">{L("Optional", "اختياري")}</span></label><textarea value={company.notes} onChange={(e) => setCompany({ ...company, notes: e.target.value })} /></div>
 
             {/* Optional extra company docs — Local Content / SASO heavy equipment / Other. */}
             <div className="subhead"><span className="material-icons-outlined">folder_open</span>{L("Other company documents", "مستندات أخرى للشركة")}<span className="optx">{L("Optional", "اختياري")}</span></div>
             <FileUploader token={token} folder="documents" kinds={companyExtraKinds} value={coExtra} onChange={setCoExtra} L={L} disabled={submitting} />
           </div>
 
-          {showErrors && !valid && <div className="submit-err"><span className="material-icons-outlined">error_outline</span>{!hasSupplied ? (allCovered ? L("Every item is already fully covered by other suppliers' accepted bids — there's nothing left to bid on.", "جميع البنود مُغطّاة بالفعل من عروض مؤجّرين آخرين المقبولة — لا يوجد ما يمكن تقديم عرض عليه.") : L("Mark at least one item as one you can supply — a bid can't be empty.", "حدّد بنداً واحداً على الأقل تستطيع توفيره — لا يمكن أن يكون العرض فارغاً.")) : L("Please complete the highlighted items: answer every term, enter a rate for each item, and fill all company details.", "الرجاء إكمال العناصر المظللة: أجب عن كل شرط، وأدخل سعراً لكل بند، واملأ جميع بيانات الشركة.")}</div>}
+          {showErrors && !valid && <div className="submit-err"><span className="material-icons-outlined">error_outline</span>{!hasSupplied ? (allCovered ? L("Every item is already fully covered by other suppliers' accepted bids. There's nothing left to bid on.", "جميع البنود مُغطّاة بالفعل من عروض مؤجّرين آخرين المقبولة. لا يوجد ما يمكن تقديم عرض عليه.") : L("Mark at least one item as one you can supply. A bid can't be empty.", "حدّد بنداً واحداً على الأقل تستطيع توفيره. لا يمكن أن يكون العرض فارغاً.")) : L("Please complete the highlighted items: answer every term, enter a rate for each item, and fill all company details.", "الرجاء إكمال العناصر المظللة: أجب عن كل شرط، وأدخل سعراً لكل بند، واملأ جميع بيانات الشركة.")}</div>}
           <div className="submit-bar"><button className="btn primary lg" disabled={submitting} onClick={onSubmit}><span className="material-icons-outlined">send</span>{submitting ? L("Submitting…", "جارٍ الإرسال…") : L("Submit bid", "إرسال العرض")}</button>
             <div className="submit-note">{L("Once submitted, your bid is final and can't be edited from this link.", "بعد الإرسال، يصبح عرضك نهائياً ولا يمكن تعديله من هذا الرابط.")}</div>
           </div>
-          <div className="footer-note">{L("Private bid link — your details are shared only with the renter.", "رابط عرض خاص — تُشارك بياناتك مع المستأجر فقط.")}</div>
+          <div className="footer-note">{L("Private bid link. Your details are shared only with the renter.", "رابط عرض خاص: تُشارك بياناتك مع المستأجر فقط.")}</div>
         </div>
       )}
 

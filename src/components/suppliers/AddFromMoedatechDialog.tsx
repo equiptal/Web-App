@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
-import { btn } from "@/lib/ds";
+import { btn, cx } from "@/lib/ds";
 import { fmt, useT } from "@/lib/i18n";
 import { isAlreadyLinked, linkRenterSuppliers, searchSupplierDirectory, type DirectorySupplier } from "@/lib/api/client";
 
@@ -33,12 +33,15 @@ import { isAlreadyLinked, linkRenterSuppliers, searchSupplierDirectory, type Dir
  * being handed nine identical-looking rows while the data to tell them apart was already in the
  * response.
  *
- * ── Registered, always (owner, 2026-09-01) ──────────────────────────────────────────────────────
+ * ── The vendor flag is a choice here, like everywhere else (owner, 2026-09-02) ──────────────────
  *
- * A renter does not add a firm from the platform unless he works with it — that was the whole of the
- * owner's objection to this screen. So there is no per-row tick here: everyone added is a registered
- * vendor, which is also what unlocks their contact details, and the dialog says so rather than
- * leaving it to be discovered.
+ * It was forced on, on the reading that a renter does not add a platform firm unless he works with
+ * it — and because the flag was the proposed gate for revealing the supplier's contact details. Both
+ * halves are gone: **adding from Moedatech now behaves exactly like adding a firm by hand**, the tick
+ * is per row with a master above it, and the contact appears once the row exists either way.
+ *
+ * Which leaves the flag meaning the one thing it says: *this is a firm I have registered as a
+ * vendor.* A renter can add a supplier he is only trying out without claiming otherwise.
  *
  * ── The supplier is not told ────────────────────────────────────────────────────────────────────
  *
@@ -60,6 +63,10 @@ export function AddFromMoedatechDialog({
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<DirectorySupplier[] | null>(null);
   const [picked, setPicked] = useState<Record<string, boolean>>({});
+  /* Per row, because a batch always has an exception — the firm being tried out, the one inherited
+     from a previous site. On by default: someone picking a firm off the directory is usually picking
+     one he works with. */
+  const [vendor, setVendor] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -89,7 +96,7 @@ export function AddFromMoedatechDialog({
     setError(null);
     try {
       const result = await linkRenterSuppliers(
-        chosen.map((s) => ({ supplierId: s.supplierId, vendorRegistered: true })),
+        chosen.map((s) => ({ supplierId: s.supplierId, vendorRegistered: vendor[s.supplierId] !== false })),
       );
       const created = result?.created?.length ?? chosen.length;
       const skipped = result?.skipped?.length ?? 0;
@@ -153,6 +160,28 @@ export function AddFromMoedatechDialog({
                       {[s.city, s.contactName].filter(Boolean).join(" · ")}
                     </span>
                   </span>
+
+                  {/* Its own tick, shown only once the row is chosen: a vendor question about a firm
+                      nobody is adding is a question with no consequence. */}
+                  {picked[s.supplierId] && (
+                    <span
+                      className={cx(
+                        "inline-flex h-[22px] flex-none items-center gap-1 rounded-full border px-2 text-label font-extrabold",
+                        vendor[s.supplierId] !== false
+                          ? "border-ok bg-ok-soft text-ok-deep"
+                          : "border-dashed border-border-strong bg-surface text-muted",
+                      )}
+                      onClick={(e) => e.preventDefault()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={vendor[s.supplierId] !== false}
+                        onChange={(e) => setVendor((v) => ({ ...v, [s.supplierId]: e.target.checked }))}
+                        className="h-3 w-3 accent-ok"
+                      />
+                      {c.registered}
+                    </span>
+                  )}
                 </label>
               </li>
             ))}
@@ -160,13 +189,25 @@ export function AddFromMoedatechDialog({
         )}
       </div>
 
+      {/* The master. It only sets them all at once; the row's own tick is what decides. */}
+      <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-ok/40 bg-ok-soft px-3 py-2.5 text-meta text-ok-deep">
+        <input
+          type="checkbox"
+          checked={chosen.every((s) => vendor[s.supplierId] !== false)}
+          onChange={(e) =>
+            setVendor(Object.fromEntries((rows ?? []).map((s) => [s.supplierId, e.target.checked])))
+          }
+          className="mt-0.5 h-4 w-4 flex-none accent-ok"
+        />
+        <span>
+          <b className="block font-extrabold">{c.markAll}</b>
+          <span className="block text-muted-dark">{c.markAllHint}</span>
+        </span>
+      </label>
+
       <p className="flex gap-2 rounded-md bg-surface2 px-3 py-2.5 text-meta text-muted-dark">
         <Icon name="shield" size={15} className="flex-none" />
-        <span>
-          {c.appPrivate}
-          <br />
-          {c.appRegisteredRule}
-        </span>
+        <span>{c.appPrivate}</span>
       </p>
     </div>
   );
