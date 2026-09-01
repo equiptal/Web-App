@@ -1,5 +1,25 @@
 # What the backend still has to change
 
+> ## Verified end to end on 2026-09-02 — 37 checks, all passing
+>
+> `node scripts/e2e-renter-suppliers.mjs` runs the whole feature against the deployed stage and
+> deletes everything it made. What that run settled:
+>
+> - **§1 deploy — DONE.** Every route answers 401 without a token; the nonsense control still 404s.
+> - **§2 migration — DONE.** The list, the writes and the roll-up all answer 200.
+> - **§3 the `channel` enum — DONE.** `channel: "sms"` is accepted and comes back on `sends[]`.
+> - **§4 city and the verified mark — DONE.** `GET /agents/suppliers` answers
+>   `{ id, name, company_name, city, is_verified, has_store }`. The web was hiding them.
+> - **The group delete path is right.** `DELETE /groups/{name}` answers
+>   `{ removedFrom, suppliersKept, deletedSuppliers }`.
+> - **A send carries `declaredAt` and never `opened`**, as designed.
+> - **`dryRun` writes nothing** — checked by re-reading the list after it.
+>
+> **One fault found, and it was the WEB's:** `POST /link` wants `supplierId` as a number and this app
+> sent the string it carries ids as, so nobody could be linked. Fixed in `ea26a31`.
+>
+> What is left below: §5, §6 and §7.
+
 **Written for the backend developer**, after reading `backend-delivered.md` and wiring the web against
 it. Everything in the delivery note that the web can consume is consumed — the list below is only what
 is left.
