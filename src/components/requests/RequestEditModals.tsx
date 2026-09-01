@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { Dialog } from "@/components/Dialog";
 import { Dropdown } from "@/components/Dropdown";
+import { requestedMinYear } from "@/lib/contract/bids";
 import { updateRequest } from "@/lib/api/client";
 import { type RequestRecord } from "@/lib/contract/requests";
 import "@/components/requests/requests-proto.css";
@@ -96,7 +97,11 @@ const SLA_OPTS: Opt[] = [
   { v: "TWENTY_FOUR_HR", en: "24 hours", ar: "٢٤ ساعة" }, { v: "FORTY_EIGHT_HR", en: "48 hours", ar: "٤٨ ساعة" },
   { v: "SEVENTY_TWO_HR", en: "72 hours", ar: "٧٢ ساعة" },
 ];
-const FULFILL_OPTS: Opt[] = [{ v: "SINGLE_SUPPLIER", en: "Single supplier", ar: "مؤجّر واحد" }, { v: "MULTIPLE_SUPPLIERS", en: "Multiple suppliers", ar: "عدة مؤجّرين" }];
+/* ~~`FULFILL_OPTS`.~~ Gone with the Fulfillment field (owner, 2026-09-01). The create canvas never
+   asks it, so it is not one of the renter's answers and this form does not put it to him. Nor does
+   the details list — see `request-fields.ts`. Same for Terrain, Working days/week and Payment
+   method: all four are stored columns an older form or a mobile build can fill, and none is part of
+   the conversation the create flow has. */
 const OFFER_OPTS: Opt[] = [{ v: "24H", en: "24 hours", ar: "٢٤ ساعة" }, { v: "48H", en: "48 hours", ar: "٤٨ ساعة" }, { v: "72H", en: "72 hours", ar: "٧٢ ساعة" }, { v: "1W", en: "1 week", ar: "أسبوع" }];
 const OPERATOR_OPTS: Opt[] = [{ v: "YES", en: "With operator", ar: "مع مشغّل" }, { v: "NO", en: "Without operator", ar: "بدون مشغّل" }];
 const FUEL_OPTS: Opt[] = [{ v: "DIESEL", en: "Diesel", ar: "ديزل" }, { v: "PETROL", en: "Petrol", ar: "بنزين" }, { v: "ELECTRIC", en: "Electric", ar: "كهربائي" }];
@@ -104,39 +109,74 @@ const FUEL_OPTS: Opt[] = [{ v: "DIESEL", en: "Diesel", ar: "ديزل" }, { v: "P
 const NATIONALITY_OPTS: Opt[] = [{ v: "restricted", en: "Restricted", ar: "مقيّدة" }, { v: "any", en: "Any", ar: "أي" }];
 const BYWHO_OPTS: Opt[] = [{ v: "rentee", en: "Me (renter)", ar: "أنا (المستأجر)" }, { v: "supplier", en: "Supplier", ar: "المؤجّر" }];
 
+/**
+ * **Edit a request — the create flow's own fields, in the create flow's own order** (owner,
+ * 2026-09-01: *"make sure all fields in the edit match exactly field of the normal create request
+ * flow, no more no less, and in same order — equipment then where then when then preferences"*).
+ *
+ * It had grown its own field set. Some of it the create canvas never asks (Terrain, Fulfillment,
+ * Working days/week, Payment method), so a renter met questions here he had never been asked and
+ * could not recognise; and some of what the canvas DOES ask was missing (fuel responsibility,
+ * extendable). The order was its own too — Project & timing first, equipment second.
+ *
+ * The list below is `app-adapters.createRequestPayload`'s, read against the canvas that fills it,
+ * grouped and ordered exactly as the renter met them: the machine, then where it goes, then when,
+ * then how he wants to be dealt with.
+ *
+ * ── The conditional fields are the canvas's conditions, not new ones ────────────────────────────
+ * The operator's questions appear only WITH an operator, because that is when the canvas raises the
+ * operator rail; the maintenance SLA only when the supplier carries maintenance, because an SLA
+ * against yourself is not a term. Copying the conditions matters as much as copying the fields — a
+ * form that asks about a night shift on a machine with no operator is a different form.
+ *
+ * ── What is stated but not edited ───────────────────────────────────────────────────────────────
+ * **The site.** It is in the order because the renter expects it there, and it is READ-ONLY: the
+ * canvas picks a location on a map and stores `projectLat`/`projectLng` beside the label, and a text
+ * box here would edit the words while leaving the coordinates — which every distance, every map pin
+ * and every supplier match is computed from — pointing at the old place. Moving a request is a
+ * different act from correcting one, and it needs the picker, not a field.
+ */
 export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r: RequestRecord; ar: boolean; L: (en: string, arr: string) => string; onClose: () => void; onSaved: () => void; siblingIds?: string[] }) {
   const s = (v: unknown) => (v == null ? "" : String(v));
   const it = r.equipmentItems?.[0];
-  // Project
-  const [rentalType, setRentalType] = useState(s(r.rentalType));
-  const [startDate, setStartDate] = useState(s(r.startDate).slice(0, 10));
-  const [endDate, setEndDate] = useState(s(r.endDate).slice(0, 10));
-  const [hours, setHours] = useState(s(r.workingHoursPerDay));
-  const [days, setDays] = useState(s((r as Record<string, unknown>).workingDaysPerWeek));
-  const [overtime, setOvertime] = useState(s((r as Record<string, unknown>).overtimeRate));
-  const [terrain, setTerrain] = useState(s((r as Record<string, unknown>).terrainType));
-  // Equipment (single item — fan-out)
+
+  // ── Equipment ──
   const [units, setUnits] = useState(s(it?.numberOfUnits ?? 1));
   const [operator, setOperator] = useState(s(it?.operatorIncluded ?? "NO"));
-  const [fuel, setFuel] = useState(s(it?.fuelTypePreference ?? "DIESEL"));
   const [nationality, setNationality] = useState(s(it?.operatorNationality));
+  const [nightShift, setNightShift] = useState(!!it?.nightShiftRequired);
+  const [fat, setFat] = useState(it?.fatRequired ? "supplier" : "rentee");
+  const [fuel, setFuel] = useState(s(it?.fuelTypePreference ?? "DIESEL"));
+  /** `dieselIncluded` IS the fuel-responsibility answer: true ⇒ the supplier carries it. */
+  const [fuelBy, setFuelBy] = useState(it?.dieselIncluded ? "supplier" : "rentee");
+  const [minYear, setMinYear] = useState(s(requestedMinYear((it ?? {}) as unknown as Record<string, unknown>)));
   const [mob, setMob] = useState(it?.mobilizationByRentee ? "rentee" : "supplier");
   const [demob, setDemob] = useState(it?.demobilizationByRentee ? "rentee" : "supplier");
-  const [fat, setFat] = useState(it?.fatRequired ? "supplier" : "rentee");
-  const [maxAge, setMaxAge] = useState(s(it?.maxEquipmentAge));
-  const [nightShift, setNightShift] = useState(!!it?.nightShiftRequired);
   const [itemNotes, setItemNotes] = useState(s(it?.additionalNotes));
-  // Preferences
+
+  // ── When ──
+  const [startDate, setStartDate] = useState(s(r.startDate).slice(0, 10));
+  const [endDate, setEndDate] = useState(s(r.endDate).slice(0, 10));
+  const [rentalType, setRentalType] = useState(s(r.rentalType));
+  const [extendable, setExtendable] = useState(!!(r as Record<string, unknown>).extendable);
+  const [hours, setHours] = useState(s(r.workingHoursPerDay));
+  const [overtime, setOvertime] = useState(s((r as Record<string, unknown>).overtimeRate));
+
+  // ── Preferences ──
   const [payTerms, setPayTerms] = useState(s(r.paymentTerms));
   const [maint, setMaint] = useState(s(r.maintenanceResponsibility));
   const [sla, setSla] = useState(s((r as Record<string, unknown>).breakdownResponseSla));
   const [budget, setBudget] = useState(s(r.budgetCeiling));
-  const [fulfill, setFulfill] = useState(s((r as Record<string, unknown>).fulfillmentType));
   const [offer, setOffer] = useState(s((r as Record<string, unknown>).offerDuration));
   const [verifiedOnly, setVerifiedOnly] = useState(!!(r as Record<string, unknown>).verifiedSuppliersOnly);
   const [subletting, setSubletting] = useState(!!(r as Record<string, unknown>).subletting);
   const [notes, setNotes] = useState(s(r.additionalNotes));
   const [busy, setBusy] = useState(false);
+
+  /** The canvas raises the operator rail only with an operator, so these follow it. */
+  const withOperator = operator === "YES";
+  /** An SLA against yourself is not a term — the canvas hides it for the same reason. */
+  const supplierMaintains = maint === "supplier";
 
   /** A window that runs backwards. The `min`/`max` above stop a picked date; this stops a typed one,
    *  and a request that already holds a reversed pair from before either guard existed. */
@@ -149,15 +189,16 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
     if (rentalType) patch.rentalType = rentalType;
     if (startDate) patch.startDate = new Date(`${startDate}T00:00:00Z`).toISOString();
     if (endDate) patch.endDate = new Date(`${endDate}T00:00:00Z`).toISOString();
+    patch.extendable = extendable;
     if (hours) patch.workingHoursPerDay = Number(hours);
-    if (days) patch.workingDaysPerWeek = Number(days);
     if (overtime) patch.overtimeRate = overtime;
-    patch.terrainType = terrain || undefined;
     if (payTerms) patch.paymentTerms = payTerms;
     if (maint) patch.maintenanceResponsibility = maint;
-    if (sla) patch.breakdownResponseSla = sla;
+    /* Cleared rather than left behind when the renter hands maintenance back to himself: the field
+       is hidden at that point, and a stale SLA would go on being sent by a form that no longer
+       shows it. */
+    patch.breakdownResponseSla = supplierMaintains && sla ? sla : undefined;
     if (budget) patch.budgetCeiling = Number(budget);
-    if (fulfill) patch.fulfillmentType = fulfill;
     if (offer) patch.offerDuration = offer;
     patch.verifiedSuppliersOnly = verifiedOnly;
     patch.subletting = subletting;
@@ -171,11 +212,22 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
         fuelTypePreference: fuel || "DIESEL",
         mobilizationByRentee: mob === "rentee",
         demobilizationByRentee: demob === "rentee",
-        fatRequired: fat === "supplier",
-        nightShiftRequired: nightShift,
+        // Only meaningful for a burnt fuel, exactly as `toDieselIncluded` decides it on create.
+        ...(fuel === "DIESEL" || fuel === "PETROL" ? { dieselIncluded: fuelBy === "supplier" } : {}),
         safetyCertifications: it.safetyCertifications ?? [],
-        ...(maxAge ? { maxEquipmentAge: Number(maxAge) } : {}),
-        ...(nationality ? { operatorNationality: nationality } : {}),
+        /* The operator's own answers go only with an operator, and are cleared without one — the
+           same rule the canvas applies by not asking them. */
+        ...(withOperator
+          ? {
+              fatRequired: fat === "supplier",
+              nightShiftRequired: nightShift,
+              ...(nationality ? { operatorNationality: nationality } : {}),
+            }
+          : { fatRequired: undefined, nightShiftRequired: undefined, operatorNationality: undefined }),
+        /* Posted under the deprecated alias, which is what the backend coalesces and what the create
+           adapter also sends (`maxEquipmentAge: toManufactureYear(...)`). It is a manufacture YEAR
+           despite the name; `requestedMinYear` is how it is read back. */
+        ...(minYear ? { maxEquipmentAge: Number(minYear) } : {}),
         ...(itemNotes ? { additionalNotes: itemNotes } : {}),
       }];
     }
@@ -227,42 +279,65 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
     <Dialog open onClose={onClose} size="lg" title={L("Edit request", "تعديل الطلب")} padded={false}>
       <div dir={ar ? "rtl" : "ltr"}>
         <div className="px-5 py-4">
-          <SecH icon="event">{L("Project & timing", "المشروع والتوقيت")}</SecH>
-          <div className="grid grid-cols-2 gap-3">
-            <Sel label={L("Rental basis", "أساس الإيجار")} value={rentalType} onChange={setRentalType} opts={RENTAL_OPTS} />
-            <Sel label={L("Overtime rate", "معدل العمل الإضافي")} value={overtime} onChange={setOvertime} opts={OVERTIME_OPTS} />
-            {/* Each end bounds the other, as the numeric fields on this same row already bound
-                themselves (owner, 2026-08-25). Save is blocked too — see `datesReversed`. */}
-            <label><span className={lbl}>{L("Start date", "تاريخ البدء")}</span><input type="date" max={endDate || undefined} className={fld} value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
-            <label><span className={lbl}>{L("End date", "تاريخ الانتهاء")}</span><input type="date" min={startDate || undefined} className={fld} value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
-            <Num label={L("Working hours/day", "ساعات العمل/يوم")} value={hours} onChange={setHours} min={1} max={24} />
-            <Num label={L("Working days/week", "أيام العمل/أسبوع")} value={days} onChange={setDays} min={1} max={7} />
-            <label className="col-span-2"><span className={lbl}>{L("Terrain", "طبيعة الأرض")}</span><input className={fld} value={terrain} onChange={(e) => setTerrain(e.target.value)} placeholder={L("e.g. sand, rocky", "مثل: رملية، صخرية")} /></label>
-          </div>
-
+          {/* ── 1 · Equipment ── */}
           <SecH icon="construction">{L("Equipment", "المعدات")}</SecH>
           <div className="grid grid-cols-2 gap-3">
             <Num label={L("Quantity", "الكمية")} value={units} onChange={setUnits} min={1} />
             <Sel label={L("Operator", "المشغّل")} value={operator} onChange={setOperator} opts={OPERATOR_OPTS} />
+            {withOperator && (
+              <>
+                <Sel label={L("Operator nationality", "جنسية المشغّل")} value={nationality} onChange={setNationality} opts={NATIONALITY_OPTS} />
+                <Sel label={L("F.A.T (catering) by", "الإعاشة من قبل")} value={fat} onChange={setFat} opts={BYWHO_OPTS} />
+              </>
+            )}
             <Sel label={L("Fuel type", "نوع الوقود")} value={fuel} onChange={setFuel} opts={FUEL_OPTS} />
-            <Sel label={L("Operator nationality", "جنسية المشغّل")} value={nationality} onChange={setNationality} opts={NATIONALITY_OPTS} />
+            {/* Only a burnt fuel has a bill to carry — the canvas asks it on the same condition. */}
+            {(fuel === "DIESEL" || fuel === "PETROL") && (
+              <Sel label={L("Fuel by", "الوقود من قبل")} value={fuelBy} onChange={setFuelBy} opts={BYWHO_OPTS} />
+            )}
+            <Num label={L("Min. equipment year", "أقدم سنة صنع")} value={minYear} onChange={setMinYear} min={1990} max={2030} />
             <Sel label={L("Delivery (mobilization) by", "التوصيل من قبل")} value={mob} onChange={setMob} opts={BYWHO_OPTS} />
             <Sel label={L("Return (demobilization) by", "الإرجاع من قبل")} value={demob} onChange={setDemob} opts={BYWHO_OPTS} />
-            <Sel label={L("F.A.T (catering) by", "الإعاشة من قبل")} value={fat} onChange={setFat} opts={BYWHO_OPTS} />
-            <Num label={L("Min. equipment year", "أقدم سنة صنع")} value={maxAge} onChange={setMaxAge} min={1990} max={2026} />
           </div>
-          <Chk label={L("Night shift required", "يتطلب وردية ليلية")} value={nightShift} onChange={setNightShift} />
+          {withOperator && <Chk label={L("Night shift required", "يتطلب وردية ليلية")} value={nightShift} onChange={setNightShift} />}
           <label className="mt-1 block"><span className={lbl}>{L("Equipment notes", "ملاحظات المعدة")}</span>
             <textarea rows={2} className="mt-1 w-full rounded-md border border-border bg-surface2 p-3 text-body outline-0" value={itemNotes} onChange={(e) => setItemNotes(e.target.value)} />
           </label>
 
+          {/* ── 2 · Where — stated, not edited. See the note on this component. ── */}
+          <SecH icon="place">{L("Where", "الموقع")}</SecH>
+          <p className="rounded-md border border-border bg-surface2 px-3 py-2.5 text-body text-navy">
+            {r.projectAddressLabel || L("No site on this request", "لا موقع على هذا الطلب")}
+          </p>
+          <p className="mt-1 text-meta text-muted">
+            {L(
+              "The site is set on the map when the request is made. Moving it changes every distance and match, so it is not edited here.",
+              "يُحدَّد الموقع على الخريطة عند إنشاء الطلب. تغييره يغيّر كل المسافات والمطابقات، لذلك لا يُعدَّل من هنا.",
+            )}
+          </p>
+
+          {/* ── 3 · When ── */}
+          <SecH icon="event">{L("When", "التوقيت")}</SecH>
+          <div className="grid grid-cols-2 gap-3">
+            {/* Each end bounds the other, as the numeric fields on this same row already bound
+                themselves (owner, 2026-08-25). Save is blocked too — see `datesReversed`. */}
+            <label><span className={lbl}>{L("Start date", "تاريخ البدء")}</span><input type="date" max={endDate || undefined} className={fld} value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
+            <label><span className={lbl}>{L("End date", "تاريخ الانتهاء")}</span><input type="date" min={startDate || undefined} className={fld} value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
+            <Sel label={L("Rental basis", "أساس الإيجار")} value={rentalType} onChange={setRentalType} opts={RENTAL_OPTS} />
+            <Num label={L("Working hours/day", "ساعات العمل/يوم")} value={hours} onChange={setHours} min={1} max={24} />
+            <Sel label={L("Overtime rate", "معدل العمل الإضافي")} value={overtime} onChange={setOvertime} opts={OVERTIME_OPTS} />
+          </div>
+          <Chk label={L("Extendable", "قابل للتمديد")} value={extendable} onChange={setExtendable} />
+
+          {/* ── 4 · Preferences ── */}
           <SecH icon="tune">{L("Preferences", "التفضيلات")}</SecH>
           <div className="grid grid-cols-2 gap-3">
             <Sel label={L("Payment terms", "شروط الدفع")} value={payTerms} onChange={setPayTerms} opts={PAYTERMS_OPTS} />
             <Sel label={L("Maintenance by", "الصيانة من قبل")} value={maint} onChange={setMaint} opts={MAINT_OPTS} />
-            <Sel label={L("Breakdown response", "زمن الاستجابة للأعطال")} value={sla} onChange={setSla} opts={SLA_OPTS} />
+            {supplierMaintains && (
+              <Sel label={L("Breakdown response", "زمن الاستجابة للأعطال")} value={sla} onChange={setSla} opts={SLA_OPTS} />
+            )}
             <Num label={L("Budget ceiling (SAR)", "سقف الميزانية (ر.س)")} value={budget} onChange={setBudget} min={0} />
-            <Sel label={L("Fulfillment", "آلية التنفيذ")} value={fulfill} onChange={setFulfill} opts={FULFILL_OPTS} />
             <Sel label={L("Offer validity", "صلاحية العرض")} value={offer} onChange={setOffer} opts={OFFER_OPTS} />
           </div>
           <Chk label={L("Verified suppliers only", "المؤجّرون الموثّقون فقط")} value={verifiedOnly} onChange={setVerifiedOnly} />
