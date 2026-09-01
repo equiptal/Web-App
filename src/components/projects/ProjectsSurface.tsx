@@ -7,7 +7,7 @@
  * create a site and edit its terms, which is what the intake chips need to be worth anything.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef} from "react";
 import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Skeleton } from "@/components/Skeleton";
@@ -190,6 +190,8 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   const [deleting, setDeleting] = useState<ProjectSummary | null>(null);
   const [created, setCreated] = useState<ProjectSummary | null>(null);
   const router = useRouter();
+  /** The board itself, so a `?site=` link can bring it into view on a long dashboard. */
+  const board = useRef<HTMLDivElement>(null);
   const { sessionKey, status } = useSession();
 
   /**
@@ -267,10 +269,23 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     void reloadUnassigned();
   }, [reload, reloadUnassigned, sessionKey, status]);
 
-  // Land on a site rather than an empty right-hand pane. The first is the most recently touched,
-  // which is almost always the one the renter came back for.
+  /* Land on a site rather than an empty right-hand pane. The first is the most recently touched,
+     which is almost always the one the renter came back for.
+
+     ── Unless a link names one ─────────────────────────────────────────────────────────────────────
+     `?site=<id>` wins. It is how *View it* on the just-filed dialog arrives here (owner,
+     2026-08-31): a link that lands on the board and then selects whichever site was touched last is
+     a link that shows the renter the wrong project and makes them hunt for the one they pressed.
+     The board also scrolls to itself, because on the dashboard it sits well below the fold. */
   useEffect(() => {
-    if (selected === null && projects && projects.length > 0) setSelected(projects[0].id);
+    if (selected !== null || !projects || projects.length === 0) return;
+    const wanted = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("site") : null;
+    const found = wanted ? projects.find((p) => p.id === wanted) : null;
+    setSelected((found ?? projects[0]).id);
+    if (found) {
+      // After paint, so the row it scrolls to exists.
+      requestAnimationFrame(() => board.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    }
   }, [projects, selected]);
 
   useEffect(() => {
@@ -871,7 +886,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     /* `pb-24`: the page must not end on the chart's last pixel either — a surface whose final row is
        also the last thing above the viewport edge reads as truncated, and the chat dock floats over
        that corner (owner, 2026-08-31). */
-    <div className="flex flex-col gap-5 pb-24">
+    <div ref={board} className="flex flex-col gap-5 pb-24">
       <SectionHeader count={projects?.length ?? 0} />
 
       {notice && <p className="rounded-sm border border-danger/40 bg-danger/5 px-3 py-2 text-body text-danger">{notice}</p>}

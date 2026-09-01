@@ -8,7 +8,7 @@ import { postableItems } from "@/lib/contract";
 import { fetchRequestSubmissions, bidShareUrl, setBidDeadline, setShareLinkLogo } from "@/lib/api/client";
 import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
 import { pin } from "@/lib/uiPins";
-import { ProjectOffer } from "@/components/create/ProjectOffer";
+import { ProjectFiled } from "@/components/create/ProjectFiled";
 
 /**
  * AC-42 confirmation — "Your request is live" (prototype: Request Sent). Animated success hero,
@@ -198,7 +198,7 @@ export function Confirmation() {
           was below the thing that navigates away from it. No wrapper here — the dialog owns its own
           geometry, and its own "already dismissed" check decides whether it renders at all. */}
       {!draft?.projectId && draft && (
-        <ProjectOffer
+        <ProjectFiled
           requestId={state.requestUuids[0] ?? null}
           project={draft.project}
           preferences={draft.preferences}
