@@ -338,3 +338,54 @@ describe("a template term over a guessed one", () => {
     expect(next.items[0].deliveryOverride).toBe("me");
   });
 });
+
+/* ============================================================================================== *
+ * The order of precedence, stated once and pinned
+ * ============================================================================================== */
+
+describe("who wins when the project and the text disagree", () => {
+  /* Reported as a doubt rather than a bug (owner, 2026-08-31): *"it was chosen aramco certificate
+     but not filled in the request because maybe my text mentioned tuv — in this case the input text
+     will be used over the project settings."*
+
+     Right, and that IS the rule. What was broken was upstream: the fast lane's reader dropped
+     `safety_certifications` entirely, so on that path neither answer arrived and the field looked
+     empty for both reasons at once. Fixed separately; these cases pin the rule itself so the next
+     doubt has an answer that does not depend on reading the merge. */
+
+  const aramcoTemplate = {
+    ...machineTermsOf(newManualItem("i1")),
+    safetyCertsOverride: ["aramco"] as const,
+  } as ReturnType<typeof machineTermsOf>;
+
+  it("the TEXT wins: TUV in the sentence beats Aramco on the site", () => {
+    const base = blankDraft();
+    // What the agent read from "…with tuv".
+    const spoken = { ...newManualItem("i1"), safetyCertsOverride: ["tuv"] } as EquipmentItem;
+    const draft: RfqDraft = { ...base, items: [spoken] };
+
+    const { draft: next } = applyMachineTerms(draft, aramcoTemplate, { project: base.project, items: draft.items });
+    expect(next.items[0].safetyCertsOverride).toEqual(["tuv"]);
+  });
+
+  it("the PROJECT fills it when the sentence said nothing", () => {
+    const base = blankDraft();
+    const silent = newManualItem("i1");
+    const draft: RfqDraft = { ...base, items: [silent] };
+
+    const { draft: next } = applyMachineTerms(draft, aramcoTemplate, { project: base.project, items: [] });
+    expect(next.items[0].safetyCertsOverride).toEqual(["aramco"]);
+  });
+
+  it("an EMPTY answer from the text is not silence — it is «no certificate»", () => {
+    /* `[]` and `null` must not collapse: `null` means nobody has said, and the project fills it;
+       `[]` is the renter saying none, and a site's cert overwriting that is the site overruling a
+       deliberate answer. */
+    const base = blankDraft();
+    const none = { ...newManualItem("i1"), safetyCertsOverride: [] } as EquipmentItem;
+    const draft: RfqDraft = { ...base, items: [none] };
+
+    const { draft: next } = applyMachineTerms(draft, aramcoTemplate, { project: base.project, items: draft.items });
+    expect(next.items[0].safetyCertsOverride).toEqual([]);
+  });
+});

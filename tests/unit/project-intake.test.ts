@@ -238,3 +238,61 @@ describe("what reaches the wire", () => {
     expect(leftTheSite(site, { label: null })).toBe(false);
   });
 });
+
+/* ============================================================================================== *
+ * A second machine starts from the first
+ * ============================================================================================== */
+
+describe("adding a machine", () => {
+  /* *"The first item values selected in the request are number 1 priority to be passed to the next
+     item terms — and in case of conflict with the project or the text, priority to what he selected
+     in the request."*
+
+     ⚠️ It did not happen at all. The work-order form has copied the first machine's terms since it
+     was built; the REQUEST added a blank line — so a renter who set delivery, fuel, operator and a
+     certificate on machine 1 answered all four again on machine 2, on a screen that had just shown
+     them the answers. */
+
+  const withFirst = (over: Partial<EquipmentItem>): RfqState => {
+    const first = { ...newManualItem("i1"), ...over } as EquipmentItem;
+    const draft = { project: defaultProjectDetails(), items: [first], preferences: defaultPreferences() };
+    return reducer(initialState, { t: "PROCESS_SUCCESS", draft: draft as never });
+  };
+
+  it("copies the first machine's terms onto the new one", () => {
+    let s = withFirst({
+      deliveryOverride: "supplier",
+      returnOverride: "supplier",
+      fuelResponsibilityOverride: "supplier",
+      operatorNeeded: "yes",
+      equipmentYear: "2019",
+      safetyCertsOverride: ["aramco"],
+    });
+    s = reducer(s, { t: "ADD_ITEM" });
+
+    const second = s.draft!.items[1];
+    expect(second.deliveryOverride).toBe("supplier");
+    expect(second.returnOverride).toBe("supplier");
+    expect(second.fuelResponsibilityOverride).toBe("supplier");
+    expect(second.operatorNeeded).toBe("yes");
+    expect(second.equipmentYear).toBe("2019");
+    expect(second.safetyCertsOverride).toEqual(["aramco"]);
+  });
+
+  it("never copies the EQUIPMENT — that is why a second line is being added", () => {
+    let s = withFirst({ rawLabel: "Crawler Excavator", rawSize: "30 ton", quantity: 4 });
+    s = reducer(s, { t: "ADD_ITEM" });
+
+    const second = s.draft!.items[1];
+    expect(second.rawLabel ?? null).not.toBe("Crawler Excavator");
+    expect(second.ref.subcategoryId ?? null).toBeNull();
+    expect(second.quantity).not.toBe(4);
+  });
+
+  it("copies the operator's own answers, not a shared reference", () => {
+    // A shared object would make editing machine 2's food change machine 1's.
+    let s = withFirst({ operatorNeeded: "yes" });
+    s = reducer(s, { t: "ADD_ITEM" });
+    expect(s.draft!.items[1].operator).not.toBe(s.draft!.items[0].operator);
+  });
+});

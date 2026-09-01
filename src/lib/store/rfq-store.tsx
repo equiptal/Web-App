@@ -35,7 +35,7 @@ import { quickResultToDraft, quickItemsToDraft } from "@/lib/agent/quick-draft";
 import type { SiteLocation, ProjectDefaults, ProjectSummary } from "@/lib/contract/project";
 import type { PaymentTerm } from "@/lib/contract/options";
 import { projectTitle, filingFor } from "@/lib/contract/project";
-import { applyProjectDefaults, applyMachineTerms } from "@/lib/contract/project-apply";
+import { applyProjectDefaults, applyMachineTerms, machineTermsOf } from "@/lib/contract/project-apply";
 import { blankTerms, type MachineTerms } from "@/lib/contract/work-order";
 import { draftToRfqCorrection } from "@/lib/api/agent-adapters";
 import { useSession } from "@/lib/session";
@@ -737,7 +737,32 @@ export function reducer(state: RfqState, a: Action): RfqState {
         // app's `_withGlobalEquipmentDefaults` stamps SPSP right here, which is why every request built
         // by adding lines came out demanding it. The EQUIPMENT cert lands on the first category pick
         // (SET_ITEM_CATEGORY) — there's no category to classify yet.
-        const items = [...d.items, newManualItem(`m${state.seq}`)];
+        const fresh = newManualItem(`m${state.seq}`);
+
+        /* ── A second machine inherits the FIRST one's terms (owner, 2026-08-31) ─────────────────
+         *
+         * *"The first item values selected in the request are number 1 priority to be passed to the
+         * next item terms — and in case of conflict with the project or the text, priority to what
+         * he selected in the request."*
+         *
+         * ⚠️ It did not happen at all here. The work-order form has done this since it was built
+         * (`blankMachine(seed)`), and the REQUEST added a blank line — so a renter who set delivery,
+         * fuel, operator and a certificate on machine 1 answered all four again on machine 2, on a
+         * screen that had just shown them the answers.
+         *
+         * Item 1 wins over the project and over the text, and that ordering is the renter's own
+         * instruction rather than an accident of when things run: the project and the agent both
+         * spoke at parse time, before this line existed, and item 1 is the most recent statement
+         * about how THIS request works. Nothing re-applies over it afterwards.
+         *
+         * The equipment itself is never copied — only the commercial terms. A second machine is a
+         * different machine; that is why it is being added. */
+        const first = d.items[0];
+        const seeded = first
+          ? ({ ...fresh, ...machineTermsOf(first), operator: { ...first.operator } } as EquipmentItem)
+          : fresh;
+
+        const items = [...d.items, seeded];
         return { ...d, items, summary: computeSummary(items) };
       });
     case "REMOVE_ITEM":
