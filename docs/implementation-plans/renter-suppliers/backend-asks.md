@@ -8,7 +8,32 @@ Ordered by what blocks whom.
 
 ---
 
-## 1. Run the migration — **this blocks everything**
+## 1. Deploy the renter-suppliers stack — **it is not on staging at all**
+
+Probed on 2026-09-01 against `AGENTS_API_URL` as `.env.example` names it
+(`https://kge3xspt36.execute-api.eu-central-1.amazonaws.com`), with no token, so every deployed route
+should answer `401`:
+
+| route | status |
+|---|---|
+| `GET /agents/taxonomy` | **401** — deployed, authorizer refused |
+| `GET /agents/suppliers` | **401** — deployed |
+| `GET /agents/renter-suppliers` | **404** |
+| `GET /agents/renter-suppliers/groups` | **404** |
+| `POST /agents/renter-suppliers/invites` | **404** |
+| `GET /agents/nonsense-route` | **404** — the control |
+
+The renter-suppliers routes answer exactly what a route that does not exist answers, while their
+neighbours in the same `serverless.yml` answer 401. They are written, and they are not deployed on this
+stage.
+
+This sits above the migration: a migration cannot be exercised by handlers that are not there.
+
+**Done when:** `GET /agents/renter-suppliers` answers `401` without a token, like its neighbours.
+
+---
+
+## 2. Run the migration — **this blocks everything**
 
 `20260831220000_renter_suppliers` has never been applied on any stage. Until it is, every
 `/agents/renter-suppliers*` endpoint answers 500 and the whole feature is dark: the list, the add, the
@@ -22,7 +47,7 @@ on staging.
 
 ---
 
-## 2. `channel` has no word for two of the four channels we send on
+## 3. `channel` has no word for two of the four channels we send on
 
 `shares.create` and `shares.invite` take `channel: z.enum(['email', 'whatsapp'])`.
 
@@ -44,7 +69,7 @@ comes back on `sends[]` with that channel.
 
 ---
 
-## 3. The supplier directory has no city and no verification mark
+## 4. The supplier directory has no city and no verification mark
 
 `GET /agents/suppliers` (S1) answers `id`, `first_name`, `last_name`, `company_name`. The web now
 reads it for the *Add from Moedatech* picker — correctly, because it lists every account rather than
@@ -62,7 +87,7 @@ shows for a supplier who has both.
 
 ---
 
-## 4. A closed request withholds everything, so the card cannot name it
+## 5. A closed request withholds everything, so the card cannot name it
 
 Verified live against the owner's own token, 2026-09-01 (`REQ-00233`):
 
@@ -102,7 +127,7 @@ that flag, so the early return is protecting nothing the flag does not.
 
 ---
 
-## 5. `extendable` is not on the public bid-form payload
+## 6. `extendable` is not on the public bid-form payload
 
 The bid-link card reads `GET /public/bid-form/{token}` and draws the request's terms from it. The one
 field it cannot show is `extendable`, so a month-long request that the renter marked extendable reads
@@ -117,7 +142,7 @@ else on it is missing.
 
 ---
 
-## 6. Two open decisions the backend has already ruled on — confirm and close
+## 7. Two open decisions the backend has already ruled on — confirm and close
 
 Neither is web work. Both are in `backend-delivered.md §1` and neither has been put to the owner:
 
