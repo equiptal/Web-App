@@ -93,8 +93,10 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
           <PanelDot complete={complete} />
           <h2 className="text-subhead font-extrabold text-navy">{t.create.operator}</h2>
         </span>
-        {/* Closes the panel. ~~A toggle that wrote «no operator».~~ The answer is asked once, below,
-            and a second control for it here is how the two got confused in the first place. */}
+        {/* Closes the panel WITHOUT answering. ~~A toggle that wrote «no operator».~~ The answer is
+            asked once, below, and a second control for it here is how the two got confused in the
+            first place. Since 2026-09-02 switching that answer off also closes — but the two are
+            different acts, and this is the one that leaves the answer alone. */}
         <button
           type="button"
           onClick={() => setExpanded(false)}
@@ -111,18 +113,32 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
           the first thing in the rail because everything under it is a detail OF the answer: with no
           operator there is no food, no accommodation and no certificate to ask about, so the rest is
           hidden until the answer is yes. */}
-      <div className="flex flex-col gap-2 rounded-sm border border-border bg-surface2 p-3.5">
-        <span className="text-body font-semibold text-navy">{t.create.operatorCard.needOperator}</span>
-        <ChoiceRow<"yes" | "no">
-          value={item.operatorNeeded}
-          onChange={(v) => {
+      {/* ── A switch, not two buttons (owner, 2026-09-02) ────────────────────────────────────────
+          A pair of buttons is the shape for a choice between two THINGS. This is one thing that is
+          either on or off, and the app's `Toggle` already draws that: brand orange when it is on,
+          which is the light the rail's own header and closed strip are painted in.
+
+          Turning it OFF closes the panel, which is the second way out the owner asked for. It is not
+          an extra behaviour bolted to the answer: with no operator there is nothing under this line
+          to ask about, so the panel has nothing left to show. The ✕ stays for a renter who wants to
+          put the rail away WITHOUT changing his answer, which is a different act.
+
+          Turning it on never closes anything, so the switch cannot trap him: the question is still
+          right there, and the details it governs appear beneath it. */}
+      <div className="flex items-center justify-between gap-3 rounded-sm border border-border bg-surface2 p-3.5">
+        <span className="min-w-0 text-body font-semibold text-navy">{t.create.operatorCard.needOperator}</span>
+        <Toggle
+          checked={on}
+          onChange={(next) => {
             prov.touch("operator_needed");
-            actions.patchItem(item.id, { operatorNeeded: v });
+            actions.patchItem(item.id, { operatorNeeded: next ? "yes" : "no" });
+            if (!next) setExpanded(false);
           }}
-          options={[
-            { value: "yes", label: t.create.operatorCard.operatorIncluded },
-            { value: "no", label: t.create.operatorCard.operatorNotIncluded },
-          ]}
+          label={
+            <span className="text-meta font-semibold text-muted">
+              {on ? t.create.operatorCard.operatorIncluded : t.create.operatorCard.operatorNotIncluded}
+            </span>
+          }
         />
       </div>
 

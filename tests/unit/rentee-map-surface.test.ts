@@ -354,8 +354,15 @@ describe("the card carries three things, and the ask is the largest of them", ()
     // front shot, else any shot, else null — and a machine with none says so rather than shimmering
     // forever at something that will never arrive.
     expect(list).toMatch(/className=\{`bm-eq-photo\$\{photo \? "" : " is-empty"\}`\}/);
-    expect(list).toMatch(/<img src=\{photo\}/);
-    expect(list).toContain("eqNoPhoto");
+    /* ~~A raw `<img src={photo}>` with an «eqNoPhoto» sentence beside it.~~ Both went to the shared
+       `Photo` (2026-09-02, "one placeholder for every picture that is not there"), which also covers
+       the case the old branch could not see: a machine that NAMES a photograph the bucket does not
+       hold, where `photo` is non-null and the browser drew its broken glyph.
+
+       What this test is about has not changed — the card draws the MODEL's `photo`, and a machine
+       with none says so rather than shimmering forever at something that will never arrive. Only the
+       component that does it has. */
+    expect(list).toMatch(/<Photo src=\{photo\}/);
     expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-photo.is-empty {")).toMatch(/animation:\s*none/);
     // The 104px SIDE cell, not a banner (owner, 2026-08-29). A full-width picture gave a machine
     // with no photo a third of the card to say «No photo» in.
