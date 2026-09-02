@@ -241,7 +241,6 @@ export const en = {
       coach: "Share with your supplier to bid",
       expiry: "Link expires",
       title: "Share this request",
-      subtitle: "Post it and send the link, in one press.",
       linkLabel: "Your shareable link",
       linkMasked: "moeda.tech/r/••••••",
       linkHint: "Generated the moment you post. Suppliers open it without an account.",

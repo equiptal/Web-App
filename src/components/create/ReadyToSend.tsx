@@ -151,9 +151,15 @@ export function ReadyToSend() {
           at the top of it rather than under it. It wraps below the title on a narrow screen, where
           two things cannot share a line without one of them being unreadable. */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        {/* ~~A line under the title: "This is exactly what suppliers will see. Terms and payment come
+            after the bids arrive. Nothing else to fill in here."~~ Removed (owner, 2026-09-02).
+
+            It had also stopped being true. Payment terms are SET on this screen now, from the strip
+            below, so "terms and payment come after the bids arrive" told the renter the opposite of
+            what the control under it does. And the rest of it explained a page that explains itself:
+            the strip states the request, the cards state the detail, and the button says send. */}
         <div className="min-w-0">
           <h1 className="text-display font-extrabold text-navy">{t.create.ready.title}</h1>
-          <p className="mt-1 text-meta text-muted">{t.create.ready.subtitle}</p>
         </div>
       </div>
 

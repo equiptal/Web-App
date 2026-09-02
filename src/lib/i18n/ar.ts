@@ -217,7 +217,6 @@ export const ar: Dictionary = {
       coach: "شارِكه مع مورّدك ليقدّم عرضه",
       expiry: "ينتهي الرابط",
       title: "مشاركة هذا الطلب",
-      subtitle: "انشره وأرسل الرابط بضغطة واحدة.",
       linkLabel: "رابط المشاركة",
       linkMasked: "moeda.tech/r/••••••",
       linkHint: "يُنشأ لحظة النشر. يفتحه المورّدون دون حساب.",
