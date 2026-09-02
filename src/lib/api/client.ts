@@ -1594,26 +1594,43 @@ export interface DirectorySupplier {
   hasStore: boolean;
 }
 
+/** One page of the directory, with what the pager needs to know. */
+export interface DirectoryPage {
+  rows: DirectorySupplier[];
+  page: number;
+  totalPages: number;
+  total: number;
+}
+
 /**
- * Search every supplier who holds an account.
+ * Browse or search every supplier who holds an account.
  *
  * ⚠️ **Every one, not only those with a store.** A firm with no shopfront is still a firm, and the
  * renter who cannot find one here types it in by hand — which makes a second row for a company that
  * already has an account, and every match after that runs against the wrong record.
  *
- * Returns `[]` rather than throwing: a picker that fails is a renter who cannot add a supplier.
+ * `q` empty means BROWSE (owner, 2026-09-02): the dialog opens on page one rather than on a "type to
+ * search" prompt, because a renter who does not yet know which firms are on Moedatech has nothing to
+ * type — and 1,492 of them is a list worth looking at.
+ *
+ * Verified accounts lead **within the page**. Ordering them first across all 1,492 is the backend's
+ * `ORDER BY` to give; this only lifts them inside the twenty being looked at, which is where it
+ * matters for a page-one browse.
+ *
+ * Returns an empty page rather than throwing: a picker that fails is a renter who cannot add a
+ * supplier.
  */
-export async function searchSupplierDirectory(q: string, limit = 25): Promise<DirectorySupplier[]> {
+export async function searchSupplierDirectory(q: string, page = 1, limit = 20): Promise<DirectoryPage> {
+  const empty: DirectoryPage = { rows: [], page: 1, totalPages: 1, total: 0 };
   try {
     const raw = await projectFetch<unknown>(
-      `/api/supplier-directory?q=${encodeURIComponent(q)}&limit=${limit}`,
+      `/api/supplier-directory?q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`,
     );
-    const list = Array.isArray(raw)
-      ? raw
-      : raw && typeof raw === "object" && Array.isArray((raw as { data?: unknown }).data)
-        ? ((raw as { data: unknown[] }).data)
-        : [];
-    return list.flatMap((r) => {
+    const env = (raw ?? {}) as Record<string, unknown>;
+    const list = Array.isArray(raw) ? raw : Array.isArray(env.data) ? (env.data as unknown[]) : [];
+    const meta = (env.meta ?? {}) as Record<string, unknown>;
+
+    const rows = list.flatMap((r) => {
       const o = (r ?? {}) as Record<string, unknown>;
       const id = o.id ?? o.supplierId ?? o.userId;
       if (id == null) return [];
@@ -1630,15 +1647,25 @@ export async function searchSupplierDirectory(q: string, limit = 25): Promise<Di
           supplierId: String(id),
           name: company || person,
           contactName: company && person ? person : null,
-          city: typeof (o.city ?? o.City) === "string" ? String(o.city).trim() || null : null,
+          city: typeof o.city === "string" ? o.city.trim() || null : null,
           // `is_verified` and `has_store` arrive as 0/1 from a raw query, not as booleans.
           verified: bool(o.isVerified ?? o.is_verified),
           hasStore: bool(o.hasStore ?? o.has_store),
         },
       ];
     });
+
+    // Verified first, and otherwise the order the backend gave — which is alphabetical by company.
+    rows.sort((a, b) => Number(b.verified) - Number(a.verified));
+
+    return {
+      rows,
+      page: typeof meta.page === "number" ? meta.page : page,
+      totalPages: typeof meta.totalPages === "number" ? meta.totalPages : 1,
+      total: typeof meta.total === "number" ? meta.total : rows.length,
+    };
   } catch {
-    return [];
+    return empty;
   }
 }
 

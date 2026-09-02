@@ -5,7 +5,7 @@ import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 import { btn, cx } from "@/lib/ds";
 import { fmt, useT } from "@/lib/i18n";
-import { isAlreadyLinked, linkRenterSuppliers, searchSupplierDirectory, type DirectorySupplier } from "@/lib/api/client";
+import { isAlreadyLinked, linkRenterSuppliers, searchSupplierDirectory, type DirectoryPage } from "@/lib/api/client";
 
 /**
  * SUP-T14 — adding a supplier who already has a Moedatech account.
@@ -25,6 +25,13 @@ import { isAlreadyLinked, linkRenterSuppliers, searchSupplierDirectory, type Dir
  * other. That matters more than it sounds: the renter who could not find a supplier here typed him in
  * by hand, which made a SECOND row for a company that already had an account, and every match after
  * that ran against the wrong record.
+ *
+ * ── It BROWSES; searching is the shortcut, not the toll gate (owner, 2026-09-02) ────────────────
+ *
+ * It opened on "type a name to search", which asks the renter to name a firm before he has been
+ * shown that any exist. There are 1,492 supplier accounts; page one of them is the answer to "who is
+ * on Moedatech?", and the search box is for the renter who already knows. Twenty at a time, verified
+ * first, with a pager.
  *
  * ── The city and the mark are back (2026-09-02) ─────────────────────────────────────────────────
  *
@@ -61,7 +68,8 @@ export function AddFromMoedatechDialog({
   const c = t.suppliers;
 
   const [q, setQ] = useState("");
-  const [rows, setRows] = useState<DirectorySupplier[] | null>(null);
+  const [page, setPage] = useState<DirectoryPage | null>(null);
+  const [pageNo, setPageNo] = useState(1);
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   /* Per row, because a batch always has an exception — the firm being tried out, the one inherited
      from a previous site. On by default: someone picking a firm off the directory is usually picking
@@ -75,18 +83,22 @@ export function AddFromMoedatechDialog({
   const seq = useRef(0);
 
   useEffect(() => {
-    const needle = q.trim();
-    if (needle.length < 2) {
-      setRows(null);
-      return;
-    }
+    if (!open) return;
     const mine = ++seq.current;
+    // Debounced for typing; a page press is the same path and 250ms is imperceptible on a click.
     const id = setTimeout(async () => {
-      const found = await searchSupplierDirectory(needle);
-      if (mine === seq.current) setRows(found);
-    }, 300);
+      const found = await searchSupplierDirectory(q.trim(), pageNo);
+      if (mine === seq.current) setPage(found);
+    }, 250);
     return () => clearTimeout(id);
+  }, [open, q, pageNo]);
+
+  // A new search starts at the beginning; staying on page 7 of the old query shows nothing.
+  useEffect(() => {
+    setPageNo(1);
   }, [q]);
+
+  const rows = page?.rows ?? null;
 
   const chosen = (rows ?? []).filter((s) => picked[s.supplierId]);
 
@@ -126,14 +138,12 @@ export function AddFromMoedatechDialog({
             className="w-full bg-transparent text-meta font-semibold text-navy outline-none placeholder:text-muted"
           />
         </span>
-        {/* Every account with `is_supplier`, shopfront or not — so the only firms missing here are the
-            ones with no Moedatech account at all, which is what the other button is for. */}
-        <span className="text-meta text-muted">{c.dirEveryone}</span>
+
       </div>
 
       <div className="max-h-[300px] overflow-auto rounded-md border border-border">
         {rows === null ? (
-          <p className="p-6 text-center text-meta text-muted">{c.appSearchFirst}</p>
+          <p className="p-6 text-center text-meta text-muted">{c.loading}</p>
         ) : rows.length === 0 ? (
           <p className="p-6 text-center text-meta text-muted">{c.appNoResults}</p>
         ) : (
@@ -161,9 +171,11 @@ export function AddFromMoedatechDialog({
                     </span>
                   </span>
 
-                  {/* Its own tick, shown only once the row is chosen: a vendor question about a firm
-                      nobody is adding is a question with no consequence. */}
-                  {picked[s.supplierId] && (
+                  {/* On EVERY row, not only the picked ones (owner, 2026-09-02: *"I must be able to
+                      deselect the vendor registered for a specific one"*). It was revealed on
+                      selection, which is the moment it matters — and a control that appears only
+                      after another one is pressed is a control a renter does not know he has. */}
+                  {(
                     <span
                       className={cx(
                         "inline-flex h-[22px] flex-none items-center gap-1 rounded-full border px-2 text-label font-extrabold",
@@ -188,6 +200,34 @@ export function AddFromMoedatechDialog({
           </ul>
         )}
       </div>
+
+      {/* ── The pager ────────────────────────────────────────────────────────────────────────────
+          1,492 accounts is not a list to scroll. Twenty a page, and the count is stated so a renter
+          searching a common word knows whether to narrow it rather than paging through ninety. */}
+      {page && page.totalPages > 1 && (
+        <div className="flex items-center gap-2 text-meta text-muted">
+          <span>{fmt(c.dirCount, { shown: rows?.length ?? 0, total: page.total })}</span>
+          <span className="ms-auto flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={pageNo <= 1}
+              onClick={() => setPageNo((n) => Math.max(1, n - 1))}
+              className="rounded-sm border border-border px-2.5 py-1 font-semibold text-navy transition hover:border-brand disabled:bg-disabled-bg disabled:text-disabled-fg"
+            >
+              {c.prev}
+            </button>
+            <span className="tabular-nums">{fmt(c.dirPage, { page: page.page, of: page.totalPages })}</span>
+            <button
+              type="button"
+              disabled={pageNo >= page.totalPages}
+              onClick={() => setPageNo((n) => n + 1)}
+              className="rounded-sm border border-border px-2.5 py-1 font-semibold text-navy transition hover:border-brand disabled:bg-disabled-bg disabled:text-disabled-fg"
+            >
+              {c.next}
+            </button>
+          </span>
+        </div>
+      )}
 
       {/* The master. It only sets them all at once; the row's own tick is what decides. */}
       <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-ok/40 bg-ok-soft px-3 py-2.5 text-meta text-ok-deep">
