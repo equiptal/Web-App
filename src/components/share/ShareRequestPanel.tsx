@@ -161,9 +161,12 @@ export function ShareRequestPanel({
   const [sharedWith, setSharedWith] = useState<number | null>(null);
   /** Which channels this request has already gone out on, so a second press is not a mystery. */
   const [sent, setSent] = useState<string[]>([]);
-  /** The card is waiting on his clipboard for one paste — said on screen, or he will never know. */
-  const [cardOnClipboard, setCardOnClipboard] = useState(false);
-  const [copiedAddresses, setCopiedAddresses] = useState(false);
+  /**
+   * What is waiting on his clipboard, and therefore what the panel tells him to paste.
+   *
+   * Never both: the clipboard holds one thing, and each provider is missing exactly one.
+   */
+  const [pasteNeeded, setPasteNeeded] = useState<"addresses" | "card" | null>(null);
   const [copied, setCopied] = useState(false);
   const [addingEmailOn, setAddingEmailOn] = useState<string | null>(null);
   const [emailDraft, setEmailDraft] = useState("");
@@ -311,32 +314,33 @@ export function ShareRequestPanel({
       if (reachable.length) void recordRequestShare(id, reachable.map((x) => x.id), "email");
 
       /**
-       * ── The card, in an e-mail that still comes from HIM (owner, 2026-09-02) ──────────────────
+       * ── ONE paste, and which one depends on the provider (owner, 2026-09-03) ──────────────────
        *
-       * *"i want it from his email not us , so it is like normal sharing but with preview."*
+       * *"he will be so confused once he will paste contacts and once he will paste the template."*
+       * He would have been, and worse: **the clipboard holds one thing.** Copying the card on every
+       * e-mail send and also offering an addresses button meant the second quietly destroyed the
+       * first, and whichever he pasted, the other was gone.
        *
-       * A compose URL can only carry `text/plain` — that is a limit of `?body=`, not of e-mail, and
-       * it is why the body below is words. Sending the card as real HTML from OUR server was the
-       * obvious fix and is the wrong one: it would arrive from `notifications@moedatech.net`, which
-       * is precisely what he ruled out.
+       * They are never both needed. Each provider is missing exactly one thing, and it is a
+       * different thing:
        *
-       * So the CARD goes on the clipboard at the same moment. Gmail's and Outlook's composers
-       * keep pasted HTML, so one Ctrl+V adds it under the words he is already looking at, in a
-       * message sent from his own account.
+       *   - **Outlook** discards `bcc` from a URL, so its window opens with no recipients — and its
+       *     composer builds the card itself from the link. He needs the ADDRESSES.
+       *   - **Gmail** takes `bcc` properly, so its recipients are already filled in — and its
+       *     composer never fetches a link, so no card will ever appear. He needs the CARD.
        *
-       * ⚠️ **The card alone, never the whole message.** The first cut copied the full rendered
-       * message — greeting, intro, card, sign-off, link — while the compose body already held that
-       * same message as words. Pasting therefore produced the request TWICE in one e-mail. The body
-       * carries the words; the clipboard carries the picture; together they are the message once.
-       *
-       * The plain flavour is the URL, not the message, for the same reason: an app that takes
-       * `text/plain` from this clipboard is being handed a link to add, not a second copy of a
-       * letter that is already there.
+       * So the clipboard carries the one thing his provider cannot supply, and the panel names it
+       * and says where it goes. One paste, never two, and never a choice about which.
        *
        * Not awaited, deliberately: `window.open` must fire inside the click that caused it, and an
        * `await` first hands the pop-up blocker a reason to swallow the compose window.
        */
-      if (card) {
+      if (provider === "outlook") {
+        if (reachable.length) {
+          void navigator.clipboard?.writeText(reachable.map((x) => x.email).join("; ")).catch(() => {});
+          setPasteNeeded("addresses");
+        }
+      } else if (card) {
         void copyShareMessage(
           url,
           bidCardHtml(
@@ -350,7 +354,7 @@ export function ShareRequestPanel({
             lang,
           ),
         ).catch(() => {});
-        setCardOnClipboard(true);
+        setPasteNeeded("card");
       }
 
       const openedIt = openEmailCompose({
@@ -784,24 +788,18 @@ export function ShareRequestPanel({
                 So this is not a warning about a compromise — it is the step. Stated as one, with the
                 addresses one press away, because a compose window that opens with no recipients and
                 no explanation is the feature looking broken. */}
-            {channel === "email" && !carriesRecipients(provider) && reachable.length > 0 && (
-              <span className="flex items-start gap-2 rounded-sm border border-border bg-surface2 px-2.5 py-2">
+            {/* ── The ONE step this provider will need, named before he presses ────────────
+                Each is missing exactly one thing, and it is a different thing — so he is told which
+                one, once, rather than left to work out why a window opened half-empty. */}
+            {channel === "email" && sharedWith === null && (
+              <span className="flex items-start gap-2 rounded-sm border border-border bg-surface2 px-2.5 py-2 text-meta text-navy">
                 <Icon name="content_paste" size={14} className="mt-0.5 flex-none text-muted" />
-                <span className="min-w-0 flex-1 text-meta text-navy">
-                  {fmt(c.outlookPasteBcc, { n: reachable.length })}{" "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void navigator.clipboard
-                        ?.writeText(reachable.map((x) => x.email).join("; "))
-                        .catch(() => {});
-                      setCopiedAddresses(true);
-                      setTimeout(() => setCopiedAddresses(false), 2400);
-                    }}
-                    className="font-semibold text-brand underline decoration-brand/40 underline-offset-2"
-                  >
-                    {copiedAddresses ? c.addressesCopied : c.copyAddresses}
-                  </button>
+                <span className="min-w-0 flex-1">
+                  {!carriesRecipients(provider)
+                    ? reachable.length > 0
+                      ? fmt(c.stepOutlook, { n: reachable.length })
+                      : c.stepOutlookNone
+                    : c.stepGmail}
                 </span>
               </span>
             )}
@@ -837,10 +835,12 @@ export function ShareRequestPanel({
                   <Icon name="check_circle" size={15} />
                   {sharedWith === 0 ? c.postedOnly : sharedWith === 1 ? c.doneOne : fmt(c.done, { n: sharedWith })}
                 </span>
-                {cardOnClipboard && (
-                  <span className="flex items-start gap-1.5 text-label font-semibold text-navy">
-                    <Icon name="content_paste" size={13} className="mt-px flex-none" />
-                    {c.pasteForCard}
+                {/* The clipboard holds ONE thing, so this names that thing and where it goes. It
+                    is the only instruction on the screen at this moment, which is the point. */}
+                {pasteNeeded && (
+                  <span className="flex items-start gap-1.5 rounded-sm bg-surface px-2 py-1.5 text-label font-semibold text-navy">
+                    <Icon name="content_paste" size={13} className="mt-px flex-none text-brand" />
+                    {pasteNeeded === "addresses" ? c.nowPasteAddresses : c.nowPasteCard}
                   </span>
                 )}
                 <span className="text-label text-ok-deep">{c.shareAgainHint}</span>

@@ -142,8 +142,10 @@ describe("how it goes", () => {
     expect(url.searchParams.get("bcc")).toBeNull();
     // The subject names the request, not our filing code (owner, 2026-09-03).
     expect(url.searchParams.get("subject")).toBe("A new equipment request for you");
-    // He is told, and given the addresses — an empty window with no explanation reads as broken.
-    expect(screen.getByText(c.copyAddresses)).toBeTruthy();
+    // ⚠️ The clipboard holds ONE thing, so Outlook gets the ADDRESSES — the thing its compose URL
+    // cannot carry — and is told exactly where to put them. Never the card as well.
+    await waitFor(() => expect(screen.getByText(c.nowPasteAddresses)).toBeTruthy());
+    expect(screen.queryByText(c.nowPasteCard)).toBeNull();
   });
 
   it("Given nobody is ticked, Then it still sends — the renter addresses it himself", async () => {
@@ -446,6 +448,8 @@ describe("the card, in an e-mail from HIS address (owner, 2026-09-02)", () => {
       </LocaleProvider>,
     );
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    // GMAIL: its URL carries the recipients, so the one thing it cannot supply is the card.
+    fireEvent.click(screen.getByText(c.gmail));
     fireEvent.click(screen.getByText(c.sendToSuppliers));
 
     // The compose window still opens, and the clipboard is loaded in the same press.
@@ -461,7 +465,9 @@ describe("the card, in an e-mail from HIS address (owner, 2026-09-02)", () => {
     expect(html).not.toContain("Hello,");
     expect(html).not.toContain("invites you to bid");
     // And he is TOLD, or he would never know to paste.
-    expect(screen.getByText(c.pasteForCard)).toBeTruthy();
+    expect(screen.getByText(c.nowPasteCard)).toBeTruthy();
+    // Gmail's URL carries the recipients, so the addresses are never the thing on the clipboard.
+    expect(screen.queryByText(c.nowPasteAddresses)).toBeNull();
   });
 
   it("Given he never pastes, Then what he sends is still a complete message", async () => {
