@@ -183,23 +183,6 @@ export function ReadyToSend() {
           </StripFact>
         )}
 
-        {/* Payment is SET here, not just shown (owner, 2026-09-02). It is the one term a renter
-            commonly answers at this moment, and sending them into a modal to press one chip is the
-            kind of trip this redesign exists to remove. */}
-        <StripFact icon="star_outline">
-          <Dropdown
-            tone="pill"
-            label={t.create.ready.paymentTerms}
-            placeholder={t.create.ready.stripNoPayment}
-            value={prefs.payment.terms}
-            onChange={(v) => actions.patchPreferences({ payment: { terms: (v || null) as PaymentTerm } })}
-            options={PAYMENT_TERMS.map((o) => ({ value: o, label: t.options.paymentTerm[o] }))}
-          />
-          {prefs.supplierFilters.verifiedOnly && (
-            <span className="text-muted">· {t.create.ready.stripVerified}</span>
-          )}
-        </StripFact>
-
         {first && (
           <StripFact icon="inventory_2">
             <span className="truncate">
@@ -212,6 +195,29 @@ export function ReadyToSend() {
             )}
           </StripFact>
         )}
+
+        {/* Payment is SET here, not just shown (owner, 2026-09-02). It is the one term a renter
+            commonly answers at this moment, and sending them into a modal to press one chip is the
+            kind of trip this redesign exists to remove.
+
+            LAST, after the equipment, and with no icon (owner, 2026-09-02). The facts before it
+            describe the job the renter has already answered: where, when, what. This is the one
+            thing on the strip he can still change, so it reads as the strip's last word rather than
+            as a third fact about the site. A star said nothing about payment, and there is no glyph
+            that would: the control names itself. */}
+        <StripFact>
+          <Dropdown
+            tone="pill"
+            label={t.create.ready.paymentTerm}
+            placeholder={t.create.ready.paymentTerm}
+            value={prefs.payment.terms}
+            onChange={(v) => actions.patchPreferences({ payment: { terms: (v || null) as PaymentTerm } })}
+            options={PAYMENT_TERMS.map((o) => ({ value: o, label: t.options.paymentTerm[o] }))}
+          />
+          {prefs.supplierFilters.verifiedOnly && (
+            <span className="text-muted">· {t.create.ready.stripVerified}</span>
+          )}
+        </StripFact>
 
         <button
           type="button"
@@ -426,21 +432,6 @@ export function ReadyToSend() {
         >
           {t.create.ready.backToEditing}
         </button>
-        {/* ── Two ways to post, and the difference is who sees it ─────────────────────────────
-            *Send* posts and lands on the confirmation, which is what it always did.
-
-            *Post & share* opens the recipients, the channel and the preview FIRST, then does the
-            whole thing in one press (owner, 2026-09-02). It is secondary rather than primary because
-            a renter with no suppliers on his list yet should not be steered into a dialog that has
-            nothing in it — and posting is the act, sharing is what he may also want. */}
-        <button
-          type="button"
-          disabled={busy || items.length === 0}
-          onClick={() => actions.setShareOnPost(true)}
-          className={btn("secondary", "lg", { className: "transition" })}
-        >
-          <Icon name="ios_share" size={17} /> {t.intake.postShare.post}
-        </button>
         <Button disabled={busy || items.length === 0} onClick={onSubmit} className="px-6 py-3 text-subhead">
           <Icon name="send" size={18} /> {busy ? `${t.create.ready.send}…` : t.create.ready.send}
         </Button>
@@ -504,10 +495,17 @@ export function ReadyToSend() {
  * one long sentence, and it is dropped on the first child because a rule with nothing before it is
  * a stray mark on the left edge.
  */
-function StripFact({ icon, children }: { icon: string; children: React.ReactNode }) {
+/**
+ * One fact on the strip: a mark, then the fact.
+ *
+ * `icon` is optional because the payment control at the end has no glyph that would help. A star
+ * said nothing about payment terms, and a mark that does not name its subject is a shape the reader
+ * has to decode before reading the thing beside it (owner, 2026-09-02).
+ */
+function StripFact({ icon, children }: { icon?: string; children: React.ReactNode }) {
   return (
     <span className="flex min-w-0 items-center gap-1.5 border-border ps-4 text-body text-navy first-of-type:ps-0 sm:border-s sm:first-of-type:border-s-0">
-      <Icon name={icon} size={14} className="flex-none text-muted" />
+      {icon && <Icon name={icon} size={14} className="flex-none text-muted" />}
       {children}
     </span>
   );

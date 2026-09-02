@@ -1899,7 +1899,7 @@ export const ar: Dictionary = {
       stripDays: "يوم",
       stripOperator: "مع مشغّل",
       stripVerified: "المورّدون الموثّقون فقط",
-      stripNoPayment: "شروط الدفع",
+      paymentTerm: "شرط الدفع",
       title: "جاهز للإرسال",
       subtitle: "هذا بالضبط ما سيراه المورّدون. الشروط والدفع تأتي بعد وصول العروض. لا شيء آخر تملؤه هنا.",
       where: "وجهة الآلة",

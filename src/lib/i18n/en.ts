@@ -2202,7 +2202,10 @@ export const en = {
       stripDays: "days",
       stripOperator: "with operator",
       stripVerified: "Verified only",
-      stripNoPayment: "Payment terms",
+      /* Singular, and it is both the control's name and its empty state (owner, 2026-09-02:
+         *"call it payment term"*). ~~`stripNoPayment`, a second string for the same control saying
+         the same thing.~~ One term is being chosen, so one word names it. */
+      paymentTerm: "Payment term",
       title: "Ready to send",
       subtitle: "This is exactly what suppliers will see. Terms and payment come after the bids arrive. Nothing else to fill in here.",
       where: "Where it goes",
