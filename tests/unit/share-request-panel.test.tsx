@@ -375,7 +375,7 @@ describe("the link preview (owner, 2026-09-02)", () => {
       </LocaleProvider>,
     );
 
-  it("Given no link yet, Then the card the link becomes is STILL drawn", async () => {
+  it("Given WhatsApp, Then the card is drawn — because WhatsApp really draws one", async () => {
     /**
      * *"why in the preview i dont see like the link preview itself."* It used to need the URL, which
      * does not exist until the request does — so the one thing a supplier actually sees was missing
@@ -383,25 +383,34 @@ describe("the link preview (owner, 2026-09-02)", () => {
      * picture comes from the draft and is already correct.
      */
     drawDraft();
-    expect(await screen.findByText(c.cardAsText)).toBeTruthy();
+    fireEvent.click(await screen.findByText(c.whatsapp));
 
     /**
-     * And the navy band is DRAWN, not stood in for. `/bid/<token>/og` needs a token; the generic
-     * file it used to fall back to is a navy rectangle with the logo and nothing else, so the half
-     * of the card a supplier sees first was the one part of the preview that was untrue.
+     * The band is DRAWN, not stood in for. `/bid/<token>/og` needs a token; the generic file it
+     * fell back to is a navy rectangle with the logo and nothing else, so the half of the card a
+     * supplier sees first was the one part of the preview that was untrue.
      */
-    expect(screen.getAllByText(/Crawler Excavator 20 ton/)).toHaveLength(1);
+    await waitFor(() => expect(screen.getByText(c.whatsappDraws)).toBeTruthy());
     expect(document.querySelector('img[src="/og-bid.png"]')).toBeNull();
-    // The four elements the real `og` route draws, from the same model.
     expect(screen.getByText("MOEDATECH")).toBeTruthy();
     expect(screen.getByText(/Open the link to submit your bid/)).toBeTruthy();
   });
 
-  it("Given WhatsApp, Then the card is inside the bubble, where WhatsApp draws it", async () => {
+  it("Given E-MAIL, Then NO card is drawn — a compose URL carries only words", async () => {
+    /**
+     * Owner, 2026-09-03: *"just make sure the preview always same as actual in what will be sent in
+     * the channel."* Gmail builds no card from a pasted link, and the e-mail body is `text/plain`
+     * either way. Drawing one in this frame would promise a laid-out message that only appears if
+     * the renter pastes.
+     */
     drawDraft();
-    fireEvent.click(await screen.findByText(c.whatsapp));
-    // Same card, same place in the message, whichever frame it is read in.
-    await waitFor(() => expect(screen.getByText(c.cardAsText)).toBeTruthy());
+    await screen.findByLabelText(c.tplGreeting);
+
+    expect(screen.queryByText(c.whatsappDraws)).toBeNull();
+    expect(screen.queryByText("MOEDATECH")).toBeNull();
+    // The details are still there, as the words the message actually carries.
+    expect(screen.getByText(/Crawler Excavator 20 ton/)).toBeTruthy();
+    expect(screen.getByText(c.cardAsText)).toBeTruthy();
   });
 });
 

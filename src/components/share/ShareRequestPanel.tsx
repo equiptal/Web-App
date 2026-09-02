@@ -878,7 +878,7 @@ export function ShareRequestPanel({
                   onChange={patchTemplate}
                   c={c}
                   linkPending={!uuid}
-                  unfurl={unfurl}
+                  unfurl={null}
                 />
               </div>
             </div>
@@ -936,6 +936,22 @@ export function ShareRequestPanel({
  * ⚠️ The link is last and on its own line. WhatsApp finds a URL to unfurl in a `wa.me` prefill
  * only when it ends the message; a sentence after it and no card appears (owner, 2026-09-02).
  */
+/**
+ * ── The preview is per CHANNEL, because the message is (owner, 2026-09-03) ──────────────────────
+ *
+ * *"just make sure the preview always same as actual in what will be sent in the channel."*
+ *
+ * One message, two things that can happen to it:
+ *
+ *   - **E-mail.** A compose URL carries `text/plain` and nothing else, so the details arrive as
+ *     WORDS. `unfurl` is null here and the card is not drawn — Gmail builds none, and Outlook's is
+ *     the same picture the link would unfurl anywhere. Drawing a card in this frame would promise a
+ *     laid-out message that only appears if the renter pastes.
+ *   - **WhatsApp.** The same words, and WhatsApp fetches the link and draws the card ITSELF, above
+ *     the bubble. So the card belongs in that preview — and the details genuinely do appear twice
+ *     there, once as text and once in the card. That repetition is WhatsApp's, not ours: take the
+ *     URL out of the message and the card never gets built.
+ */
 function Message({
   parts,
   template,
@@ -968,15 +984,9 @@ function Message({
 
           Not editable: a supplier prices what this says, and a card that disagrees with the request
           it links to is found out at the deal room. */}
+      {/* Ours, and in the message as WORDS — which is what every channel actually carries. */}
       <div title={c.fixedByUs}>
-        {unfurl ? (
-          <div
-            className="max-w-[400px] [&_img]:!h-auto [&_img]:!w-full [&_table]:!w-full [&_table]:!max-w-full"
-            dangerouslySetInnerHTML={{ __html: unfurl }}
-          />
-        ) : (
-          <p className="whitespace-pre-wrap text-meta leading-relaxed text-navy">{parts.card}</p>
-        )}
+        <p className="whitespace-pre-wrap text-meta leading-relaxed text-navy">{parts.card}</p>
         <span className="mt-1.5 flex items-start gap-1 text-label text-muted">
           <Icon name="lock" size={10} className="mt-0.5 flex-none" />
           {c.cardAsText}
@@ -996,6 +1006,18 @@ function Message({
             {c.linkMasked}
           </p>
         )
+      )}
+
+      {/* WhatsApp builds this itself, from the link above, and shows it with the words. Drawn only
+          where it really appears — so the preview is the message, per channel, and not a hope. */}
+      {unfurl && (
+        <div className="grid gap-1">
+          <span className="text-label uppercase tracking-wide text-muted">{c.whatsappDraws}</span>
+          <div
+            className="max-w-[360px] [&_img]:!h-auto [&_img]:!w-full [&_table]:!w-full [&_table]:!max-w-full"
+            dangerouslySetInnerHTML={{ __html: unfurl }}
+          />
+        </div>
       )}
     </div>
   );
