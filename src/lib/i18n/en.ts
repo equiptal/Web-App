@@ -238,6 +238,9 @@ export const en = {
   },
   intake: {
     postShare: {
+      fromLine: "From: {name}",
+      fromYou: "you",
+      previewTime: "now",
       coach: "Share with your supplier to bid",
       expiry: "Link expires",
       title: "Share this request",

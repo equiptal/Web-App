@@ -68,6 +68,15 @@ export function ShareOnPost() {
   const [addingEmailOn, setAddingEmailOn] = useState<string | null>(null);
   const [emailDraft, setEmailDraft] = useState("");
   const [coach, setCoach] = useState(true);
+  /** The renter's own firm, for the From line. Read once, and a failure just leaves it unnamed. */
+  const [renterName, setRenterName] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((me: { companyName?: string | null } | null) => setRenterName(me?.companyName?.trim() || null))
+      .catch(() => setRenterName(null));
+  }, []);
 
   useEffect(() => {
     if (rows) return;
@@ -355,17 +364,47 @@ export function ShareOnPost() {
             )}
           </span>
 
-          {previewIsEmail && emailHtml ? (
-            /* The card itself, not a picture of it — the same markup the clipboard carries into
-               Gmail, so what the renter reviews is what the supplier receives. */
-            <div
-              className="overflow-auto rounded-md border border-border bg-surface2 p-3"
-              dangerouslySetInnerHTML={{ __html: emailHtml }}
-            />
+          {/* ── The client's own chrome, as the prototype draws it ────────────────────────────
+              A message in a plain box is a message you have to imagine arriving. In the frame it
+              lands in — a From line and a subject, or a chat bubble with a timestamp — the renter is
+              reading what his supplier will read, which is the only question this panel answers.
+
+              ⚠️ The prototype's From says `Moedatech <notifications@moedatech.net>`. It is a mock,
+              and it is not what happens: this goes out from the renter's own account (owner,
+              2026-09-01), so the From line names HIM. A preview that named us would be rehearsing a
+              message nobody sends. */}
+          {previewIsEmail ? (
+            <div className="overflow-hidden rounded-md border border-border bg-surface">
+              <div className="border-b border-border bg-surface2 px-3 py-2">
+                <div className="text-meta font-extrabold text-navy">
+                  {fmt(c.subject, { code: state.requestId || "" }).trim()}
+                </div>
+                <div className="mt-0.5 text-label text-muted">
+                  {fmt(c.fromLine, { name: renterName || c.fromYou })}
+                </div>
+              </div>
+              {emailHtml ? (
+                /* The card itself, not a picture of it — the same markup the clipboard carries into
+                   Gmail, so what he reviews is exactly what is received. */
+                <div className="max-h-[320px] overflow-auto p-3" dangerouslySetInnerHTML={{ __html: emailHtml }} />
+              ) : (
+                <p className="max-h-[320px] overflow-auto whitespace-pre-wrap p-3 text-meta text-navy">{body}</p>
+              )}
+            </div>
           ) : (
-            <p className="max-h-[340px] overflow-auto whitespace-pre-wrap rounded-md border border-border bg-surface2 px-3 py-2.5 text-meta text-navy">
-              {body}
-            </p>
+            /* The chat bubble. Tinted and tailed like the real thing, with the ticks the prototype
+               has — the point is to be recognisable at a glance, not to be a replica. */
+            <div className="rounded-md border border-border bg-surface2 p-3">
+              <div className="relative max-w-[92%] rounded-md rounded-ss-none bg-ok-soft px-3 py-2">
+                <p className="max-h-[300px] overflow-auto whitespace-pre-wrap text-meta leading-relaxed text-navy">
+                  {body}
+                </p>
+                <span className="mt-1 flex items-center justify-end gap-1 text-label text-muted">
+                  {c.previewTime}
+                  <Icon name="done_all" size={12} className="text-info" />
+                </span>
+              </div>
+            </div>
           )}
           {!posted && <span className="text-label text-muted">{c.previewPending}</span>}
         </div>

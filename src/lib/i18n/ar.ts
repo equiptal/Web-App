@@ -214,6 +214,9 @@ export const ar: Dictionary = {
   },
   intake: {
     postShare: {
+      fromLine: "من: {name}",
+      fromYou: "أنت",
+      previewTime: "الآن",
       coach: "شارِكه مع مورّدك ليقدّم عرضه",
       expiry: "ينتهي الرابط",
       title: "مشاركة هذا الطلب",
