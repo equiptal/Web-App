@@ -19,6 +19,7 @@ export const ar: Dictionary = {
     add: "إضافة",
     save: "حفظ",
     done: "تم",
+    open: "افتح",
     close: "إغلاق",
     retry: "إعادة المحاولة",
     optional: "اختياري",

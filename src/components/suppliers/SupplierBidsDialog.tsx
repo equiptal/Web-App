@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 import { btn, cx } from "@/lib/ds";
-import { fmt, useLocale, useT } from "@/lib/i18n";
+import { fmt, useT } from "@/lib/i18n";
 import { getRenterSupplier } from "@/lib/api/client";
-import { bidRateLabel, type SupplierProfile } from "@/lib/contract/renter-suppliers";
+import type { SupplierProfile } from "@/lib/contract/renter-suppliers";
 
 /**
  * SUP-T33 — every bid this supplier sent, and one step from each to the real thing.
@@ -29,7 +29,6 @@ export function SupplierBidsDialog({
   onProfile: (id: string) => void;
 }) {
   const t = useT();
-  const { locale } = useLocale();
   const c = t.suppliers;
   const router = useRouter();
   const [p, setP] = useState<SupplierProfile | null>(null);
@@ -91,19 +90,20 @@ export function SupplierBidsDialog({
                 </b>
                 <span className="block text-meta text-muted">{[b.site, b.requestCode].filter(Boolean).join(" · ")}</span>
               </span>
-              {/* A RATE, per unit per period — never a total, and never summed down the column
-                  (backend delivery note §3.6). The period and the count are what make it a price. */}
-              {b.price !== null && (
-                <span className="flex-none whitespace-nowrap font-mono text-meta font-semibold text-navy">
-                  {bidRateLabel(b, locale === "ar" ? "ar" : "en")}
-                </span>
-              )}
+              {/* ── No rate here (owner, 2026-09-03) ────────────────────────────────────────────
+                  A rate out of context invites the one thing this column must never support:
+                  reading down it. 300/day beside 8,400/month beside 2/day are not comparable, and
+                  the list is ordered by DATE, so the eye compares neighbours that have nothing to
+                  do with each other. The request itself shows every bid side by side, with its
+                  period, its count and its terms — which is where a number becomes a price. */}
               <button
                 type="button"
-                onClick={() => router.push(`/requests/${encodeURIComponent(b.requestId)}`)}
+                /* `?r=` — the workspace resolves which group holds this request. `/requests/<id>` is
+                   not a route, so it fell through to the list; see `RequestsWorkspace`. */
+                onClick={() => router.push(`/requests?r=${encodeURIComponent(b.requestId)}`)}
                 className={cx(btn("secondary", "sm"), "flex-none")}
               >
-                {c.openInRequest}
+                {t.common.open}
                 <Icon name="arrow_forward" size={14} />
               </button>
             </div>

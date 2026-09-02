@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
-import { useT } from "@/lib/i18n";
+import { useLocale, useT } from "@/lib/i18n";
 import { fetchAllMyRequests } from "@/lib/api/client";
-import type { RequestListItem } from "@/lib/contract/requests";
+import { parseAddress, prettyLocation, type RequestListItem } from "@/lib/contract/requests";
 import { ShareRequestPanel } from "./ShareRequestPanel";
 
 /**
@@ -25,6 +25,26 @@ import { ShareRequestPanel } from "./ShareRequestPanel";
  * the one question this shell adds is *which request*. Only requests that HAVE a link are listed:
  * offering one that cannot be shared and failing on the press is a worse answer than not offering it.
  */
+/**
+ * How a renter recognises his own request in a list of forty (owner, 2026-09-03).
+ *
+ * It read `CEX-020902 · QFC4+RX Diriyah Saudi Arabia` — a code he did not choose and a plus-code
+ * from Google that names no place a person has been to. Neither says what the request is FOR, so
+ * picking the right one meant opening them.
+ *
+ * The MACHINE leads, because that is what he was thinking about when he wrote it, and the machine's
+ * name already carries its size (`Crawler Excavator 30 ton`). Then where it goes, and the count when
+ * there is more than one. The code stays last: two requests for the same machine on the same site
+ * are ordinary, and it is the only thing that tells them apart.
+ */
+function requestLabel(r: RequestListItem, lang: "en" | "ar"): string {
+  const name = (lang === "ar" ? r.item?.nameAr || r.item?.name : r.item?.name)?.trim();
+  const qty = (r.item?.qty ?? 1) > 1 ? ` ×${r.item?.qty}` : "";
+  const { city, neighbourhood } = parseAddress(r.city);
+  const where = prettyLocation(city ? (neighbourhood ? `${city} — ${neighbourhood}` : city) : (r.city ?? ""));
+  return [name ? `${name}${qty}` : null, where || null, r.displayId].filter(Boolean).join(" · ");
+}
+
 export function ShareRequestModal({
   open,
   onClose,
@@ -45,7 +65,9 @@ export function ShareRequestModal({
   onShared?: (count: number) => void;
 }) {
   const t = useT();
+  const { locale } = useLocale();
   const c = t.intake.postShare;
+  const label = (r: RequestListItem) => requestLabel(r, locale === "ar" ? "ar" : "en");
 
   const [requests, setRequests] = useState<RequestListItem[] | null>(null);
   const [chosen, setChosen] = useState<string>("");
@@ -91,7 +113,7 @@ export function ShareRequestModal({
               >
                 {requests.map((r) => (
                   <option key={r.id} value={r.requestGroupId || r.id}>
-                    {[r.displayId, r.city].filter(Boolean).join(" · ")}
+                    {label(r)}
                   </option>
                 ))}
               </select>

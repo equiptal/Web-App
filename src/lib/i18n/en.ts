@@ -17,6 +17,7 @@ export const en = {
     add: "Add",
     save: "Save",
     done: "Done",
+    open: "Open",
     close: "Close",
     retry: "Retry",
     optional: "optional",

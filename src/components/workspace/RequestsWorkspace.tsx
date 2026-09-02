@@ -203,6 +203,24 @@ export function RequestsWorkspace() {
   useEffect(() => {
     if (entered || !groups?.length) return;
     setEntered(true);
+    /**
+     * ── `r` opens ONE request without knowing its group (owner, 2026-09-03) ────────────────────
+     *
+     * A caller that holds a bid holds the REQUEST it was made on, not the fan-out group that
+     * request belongs to. `SupplierBidsDialog` was pushing `/requests/<requestId>` — a route that
+     * does not exist — so every «open in the request» landed on the whole list, which is what the
+     * owner saw as *"the general marketplace page"*.
+     *
+     * Resolving it here rather than making the caller look up a group keeps the knowledge where the
+     * groups already are: for a solo request `g` and `r` are the same id, and for a fanned-out one
+     * only this screen can say which group holds it.
+     */
+    const r = params?.get("r");
+    if (r) {
+      const owner = groups.find((x) => x.items.some((it) => it.id === r));
+      if (owner) setWanted({ groupId: owner.id, itemId: r, bidId: null });
+    }
+
     const g = params?.get("g");
     if (g && groups.some((x) => x.id === g)) {
       // `i` picks ONE machine of a multi-item group (the dashboard's per-item rows link with it).
