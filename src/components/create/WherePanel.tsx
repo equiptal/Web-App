@@ -16,7 +16,7 @@ import dynamic from "next/dynamic";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Icon } from "@/components/ui";
-import { PanelDot } from "@/components/create/Provenance";
+import { CheckFromProject, PanelDot } from "@/components/create/Provenance";
 import { useProvenance } from "@/components/create/hooks";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
@@ -32,6 +32,7 @@ export function WherePanel({
   onToggle,
   shakeConfirm,
   tried,
+  prefilledNote,
 }: {
   open: boolean;
   complete: boolean;
@@ -40,6 +41,8 @@ export function WherePanel({
   shakeConfirm?: boolean;
   /** The renter has tried to move on — see `tried` in `Canvas`. The shake ends; this does not. */
   tried?: boolean;
+  /** This panel opened on its own because the renter had never seen it — see `CheckFromProject`. */
+  prefilledNote?: boolean;
 }) {
   const t = useT();
   const { state, actions } = useRfq();
@@ -151,6 +154,7 @@ export function WherePanel({
 
       {open && (
         <div {...pin("where-panel-body")} className="px-5 pb-5">
+          {prefilledNote && <CheckFromProject />}
           {/* ~~The same thing again, in full, in a red band across the panel.~~ Removed (owner,
               2026-09-01: *"no need — there is already another notice above that will be kept"*). The
               head of this panel already carries «not in the project» in red, on the same line as the
@@ -200,9 +204,24 @@ export function WherePanel({
                   first. A button that gates the panel cannot be hostage to any of that. The address
                   is the same string either way — the picker hands it to `patchLocation` as it
                   resolves it, so what is printed below is what it resolved. */}
+              {/* ── A site saved as an ADDRESS still gets a pin (owner, 2026-09-02) ───────────────
+                  *"The location is from the project so it must be shown fully with the confirm
+                  option. Now I can't confirm anything, I have to retype it to continue."*
+
+                  `ProjectForm` requires a label and nothing else, so a project can hold «Qiddiya
+                  Zone 4, Riyadh» with no coordinates. This panel then showed the address in its
+                  header, an unpinned map under it, and a confirm button that could not be pressed,
+                  because `gateWhere` asks for a POINT. The only way on was to retype the address
+                  into the search box — the one thing the renter had already answered.
+
+                  So the map geocodes the site's own label and drops the pin itself. The renter still
+                  presses «This is the right spot», which is the confirmation the flow is built on;
+                  what he no longer does is type an address twice. `pinProjectLocation` rather than
+                  `patchLocation` keeps the label and the «from your project» mark: see the reducer. */}
               <MapLocationPicker
                 value={hasLocation ? { lat: loc.lat as number, lng: loc.lng as number } : null}
                 label={loc.label}
+                onResolveLabel={(lat, lng) => actions.pinProjectLocation(lat, lng)}
                 onChange={(lat, lng, address) => actions.patchLocation({ lat, lng, label: address || loc.label, source: "map" })}
                 hideAddress
               />

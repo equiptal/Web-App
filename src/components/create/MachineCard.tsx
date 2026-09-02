@@ -39,6 +39,29 @@ import {
   type RequiredGap,
 } from "@/lib/contract";
 
+/**
+ * The title of an overlay control, carrying its «* Required».
+ *
+ * The four chips on the photograph have no visible label: on a photo, a title over every one of
+ * them would be four grey captions across the machine, and the placeholder inside each chip already
+ * names it. That is fine until one of them is what is blocking the send. Then the renter needs to be
+ * told WHICH chip, and «* Required» floating on its own over a photograph says neither which field
+ * nor, against a light image, anything legible at all (owner, 2026-09-02: *"show it on the field
+ * title itself"*).
+ *
+ * So the title appears exactly when the mark does, in one opaque strip with it — the field's name
+ * and its demand in the same box, on a background that does not depend on the photograph.
+ */
+function OverlayRequired({ title }: { title: string }) {
+  const t = useT();
+  return (
+    <span className="mb-1 inline-flex max-w-full items-center gap-1.5 rounded-sm border border-danger bg-surface px-1.5 py-0.5">
+      <span className="truncate text-label font-extrabold uppercase tracking-[0.05em] text-navy">{title}</span>
+      <span className="flex-none text-label font-extrabold text-danger">{t.create.requiredMark}</span>
+    </span>
+  );
+}
+
 export function MachineCard({
   item,
   gaps,
@@ -161,9 +184,7 @@ export function MachineCard({
               unanswered — an unasked certificate silently narrows the renter's own bidder pool. */}
           <div className="absolute inset-x-2.5 top-2.5 flex items-start justify-between gap-2">
             <div className="min-w-0 max-w-[58%]">
-              {owed("safety_certificates") && (
-                <span className="mb-1 block text-label font-extrabold text-danger">{t.create.requiredMark}</span>
-              )}
+              {owed("safety_certificates") && <OverlayRequired title={t.create.machineCard.cert} />}
               <div className={shake("safety_certificates") ? "shake-error" : undefined}>
                 {/* More than one, because the field has always been an array everywhere else — on the
                     draft, on the wire, and on the bid form where a supplier confirms each cert on its
@@ -194,8 +215,14 @@ export function MachineCard({
             </div>
 
             {/* The prototype's inline −/×N/+ chip rather than the boxed Stepper, which is too tall
-                to sit on the panel without covering the machine. */}
-            <div className="flex flex-none items-center gap-2.5 rounded-sm bg-[color-mix(in_srgb,var(--navy-deep)_80%,transparent)] px-2 py-1.5 text-meta text-white">
+                to sit on the panel without covering the machine.
+
+                Marked too, for completeness of the gate set: the stepper's own minimum is 1, so a
+                zero can only arrive on a restored draft — and when it does, the refusal must still
+                point at something. */}
+            <div className="flex flex-none flex-col items-end">
+            {owed("quantity") && <OverlayRequired title={t.create.machineCard.quantity} />}
+            <div className="flex items-center gap-2.5 rounded-sm bg-[color-mix(in_srgb,var(--navy-deep)_80%,transparent)] px-2 py-1.5 text-meta text-white">
               <button
                 type="button"
                 aria-label={`${t.create.machineCard.quantity} −`}
@@ -215,25 +242,30 @@ export function MachineCard({
                 +
               </button>
             </div>
+            </div>
           </div>
 
           {/* Bottom row: fuel on the left, minimum year on the right. */}
           <div className="absolute inset-x-2.5 bottom-2.5 flex items-end justify-between gap-2">
-            <div className="min-w-0 max-w-[46%]">
+            {/* ── Fuel is REQUIRED, and said nothing about it (owner, 2026-09-02) ───────────────
+                `itemAppGaps` gates on `fuelType` — it is one of the app's own six — but this chip
+                had neither the mark nor a gap tone, so a refusal opened the equipment panel with
+                nothing on screen marked and looked like a button doing nothing at all. That is one
+                half of *"random panels open and there is nothing I can do"*. */}
+            <div className={`min-w-0 max-w-[46%] ${shake("fuel_type") ? "shake-error" : ""}`}>
+              {owed("fuel_type") && <OverlayRequired title={t.create.machineCard.fuel} />}
               <SearchSelect
                 value={item.fuelType}
                 placeholder={t.create.machineCard.fuel}
                 searchPlaceholder={t.create.machineCard.fuel}
                 label={t.create.machineCard.fuel}
-                tone="overlay"
+                tone={gapFor("fuel_type") ? "brand" : "overlay"}
                 options={FUEL_TYPES.map((f) => ({ value: f, label: t.options.fuelType[f] }))}
                 onChange={(v) => set("fuel_type", { fuelType: v as FuelType })}
               />
             </div>
             <div className={`min-w-0 max-w-[48%] ${shake("equipment_year") ? "shake-error" : ""}`}>
-              {owed("equipment_year") && (
-                <span className="mb-1 block text-label font-extrabold text-danger">{t.create.requiredMark}</span>
-              )}
+              {owed("equipment_year") && <OverlayRequired title={t.create.machineCard.minYear} />}
               <SearchSelect
                 value={overrides.equipmentYear}
                 placeholder={t.create.machineCard.minYear}

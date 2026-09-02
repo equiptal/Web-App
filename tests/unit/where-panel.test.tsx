@@ -53,6 +53,52 @@ describe("confirming the site (MREQ-AC-29)", () => {
   });
 });
 
+/**
+ * A site saved as a typed ADDRESS, with no pin (owner, 2026-09-02).
+ *
+ * `ProjectForm` requires the label and nothing else, so this is an ordinary project — and it left
+ * the panel in a dead end: the address in the header, no pin, and a confirm button that cannot be
+ * pressed because `gateWhere` wants a point. The map now geocodes the site's own label and hands
+ * back the point; the geocoder is Google's, so what is pinned here is the action it calls.
+ */
+describe("a site with an address and no pin", () => {
+  const addressOnly = () =>
+    makeAgentDraft({
+      items: [makeItem()],
+      project: confirmedProject({
+        location: { label: "Qiddiya Zone 4, Riyadh", confirmed: false, source: "project" },
+      }),
+    });
+
+  it("takes the point and leaves the label, the source and the confirmation alone", async () => {
+    const handle = await panel({ draft: addressOnly() });
+    expect(screen.getByRole("button", { name: "This is the right spot" }).hasAttribute("disabled")).toBe(true);
+
+    await handle.run(() => handle.store().actions.pinProjectLocation(24.7136, 46.6753));
+
+    const loc = handle.store().state.draft!.project.location;
+    expect([loc.lat, loc.lng]).toEqual([24.7136, 46.6753]);
+    // The site's own wording, not the geocoder's: a re-worded label reads as a MOVE off the site.
+    expect(loc.label).toBe("Qiddiya Zone 4, Riyadh");
+    expect(loc.source).toBe("project");
+    // Still the renter's to confirm, and still the site's value: a pin nobody dragged is not a touch.
+    expect(loc.confirmed).toBe(false);
+    expect(handle.store().state.draft!.touchedFields ?? []).not.toContain("location.label");
+    expect(screen.getByRole("button", { name: "This is the right spot" }).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("cannot pull a renter back to the site's address once he has pinned his own", async () => {
+    const handle = await panel({ draft: addressOnly() });
+    await handle.run(() => handle.store().actions.patchLocation({ lat: 25.1, lng: 46.9, source: "map" }));
+
+    // A slow geocode answering after the drag: ignored, or the marker jumps back under his hand.
+    await handle.run(() => handle.store().actions.pinProjectLocation(24.7136, 46.6753));
+
+    const loc = handle.store().state.draft!.project.location;
+    expect([loc.lat, loc.lng]).toEqual([25.1, 46.9]);
+  });
+});
+
 describe("a text↔file disagreement (MREQ-AC-31)", () => {
   it("asks which source is right, and hides the map until it is settled", async () => {
     const handle = await panel({ draft: unconfirmed({ conflict: { fromText: "Riyadh", fromFile: "Jeddah" } }) });

@@ -57,9 +57,23 @@ interface MapLocationPickerProps {
    * it loads (and as nothing at all under jsdom), so anything gating a step must not live inside it.
    */
   hideAddress?: boolean;
+  /**
+   * Resolve `label` into a point, once, when there is no pin.
+   *
+   * For a site that was saved as a typed ADDRESS with no pin: the caller has a place to show and no
+   * coordinates to show it at, and everything downstream of the map needs a point. Rather than
+   * asking the renter to retype what is already on screen, the geocoder is asked the same question
+   * the search box would ask, with the label as the query.
+   *
+   * Only the POINT is handed back, and deliberately not the address the geocoder echoed: the caller
+   * owns the label, and Google's wording of the same place is not the caller's. On no result the
+   * label is dropped into the search box instead, so the renter's next step is one press rather than
+   * a retype.
+   */
+  onResolveLabel?: (lat: number, lng: number) => void;
 }
 
-export default function GoogleMapLocationPicker({ value, label, onChange, height = "300px", hideAddress }: MapLocationPickerProps) {
+export default function GoogleMapLocationPicker({ value, label, onChange, height = "300px", hideAddress, onResolveLabel }: MapLocationPickerProps) {
   const t = useT();
   const mp = t.step1.location.mapPicker;
 
@@ -180,6 +194,33 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
     placeMarker(value.lat, value.lng);
     map.current.panTo(value);
   }, [ready, value, placeMarker]);
+
+  /* ── The site's own address, geocoded once ─────────────────────────────────────────────────────
+     See `onResolveLabel`. Guarded on `value` being absent so it never fires over a pin, and on the
+     ref so a re-render with the same empty value cannot ask twice. */
+  const resolvedLabelFor = useRef<string | null>(null);
+  useEffect(() => {
+    const q = (label ?? "").trim();
+    if (!ready || value || !q || !onResolveLabel || resolvedLabelFor.current === q) return;
+    resolvedLabelFor.current = q;
+    let alive = true;
+    void geocodeSearch(q).then((results) => {
+      if (!alive) return;
+      const hit = results[0];
+      if (!hit) {
+        // Nothing matched: hand the renter the query rather than an empty box.
+        setSearchInput(q);
+        return;
+      }
+      placeMarker(hit.lat, hit.lng);
+      map.current?.panTo({ lat: hit.lat, lng: hit.lng });
+      map.current?.setZoom(15);
+      onResolveLabel(hit.lat, hit.lng);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [ready, value, label, onResolveLabel, geocodeSearch, placeMarker]);
 
   // Reverse-geocode the current coords so the displayed address matches the exact pin.
   useEffect(() => {

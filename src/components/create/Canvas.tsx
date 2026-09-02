@@ -23,7 +23,7 @@ import { WherePanel } from "@/components/create/WherePanel";
 import { WhenPanel } from "@/components/create/WhenPanel";
 import { CarryForwardModal } from "@/components/create/CarryForwardModal";
 import { PanelDot } from "@/components/create/Provenance";
-import { gateWhen, gateWhere, itemGaps, panelGaps, postableItems, requiredGaps, resolveRef, taxName, transportGaps } from "@/lib/contract";
+import { gateWhen, gateWhere, itemGaps, postableItems, requiredGaps, resolveRef, taxName, transportGaps } from "@/lib/contract";
 import type { RequiredGap } from "@/lib/contract";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
@@ -48,6 +48,18 @@ export function Canvas() {
   const { state, actions } = useRfq();
   const [shaking, setShaking] = useState(false);
   const [shakingWhere, setShakingWhere] = useState(false);
+  /**
+   * The schedule's own shake, which used to be the equipment panel's.
+   *
+   * ⚠️ `shaking` drove BOTH the machine's fields and the schedule, and `shakeNow` took «fields» or
+   * «where» — so every refusal that belonged to the schedule was passed as «fields», and «fields»
+   * force-opens the equipment panel and scrolls to it. Press *Review & send* with the schedule's
+   * acknowledgement unticked and the canvas opened the MACHINE, complete and with nothing to answer,
+   * having just closed the panel that owed the answer (owner, 2026-09-02: *"sometimes when I click
+   * review and send, random panels open and there is nothing I can do with them"*). One state per
+   * panel, and `shakeNow` now takes the panel's own name.
+   */
+  const [shakingWhen, setShakingWhen] = useState(false);
   /** The way-on button, shaken when the machine it sits under still owes an answer. */
   const [shakingNext, setShakingNext] = useState(false);
   /**
@@ -74,6 +86,15 @@ export function Canvas() {
    * once shown, the next press sends.
    */
   const [seen, setSeen] = useState<Set<string>>(() => new Set([state.activeSection ?? "equipment"]));
+  /**
+   * The panel that the unseen pass just opened, so it can say why it opened.
+   *
+   * A panel appearing and shaking with nothing missing in it reads as the page misbehaving (owner,
+   * 2026-09-02: *"sometimes when I click review and send, random panels open and there is nothing I
+   * can do with them"*). The shake is the attention and this is the sentence: *filled in from your
+   * project, have a look, then press again*. Cleared the moment the renter opens anything himself.
+   */
+  const [prefilledNote, setPrefilledNote] = useState<"where" | "when" | null>(null);
 
   /* Every press that opens a panel records it. Declared with the other hooks, above every
      early return: a hook placed after one runs in a different order on the render that takes
@@ -89,6 +110,9 @@ export function Canvas() {
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   /** The equipment block — expanded card or collapsed strip — so a refusal can bring it into view. */
   const equipmentRef = useRef<HTMLElement | null>(null);
+  /** The other two panels, for the same reason: a shake off screen is a click that did nothing. */
+  const whereRef = useRef<HTMLDivElement | null>(null);
+  const whenRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const t0 = timers.current;
@@ -161,16 +185,22 @@ export function Canvas() {
     timers.current.push(setTimeout(() => setShakingNext(false), SHAKE_MS));
   };
 
-  const shakeNow = (which: "fields" | "where") => {
+  const shakeNow = (panel: "equipment" | "where" | "when") => {
+    // Any refusal about a MISSING answer clears the «just have a look» note: the two would otherwise
+    // sit in the same panel saying opposite things.
+    setPrefilledNote(null);
     // Every refusal, whichever panel it lands in, turns the standing marks on. See `tried`.
     setTried(true);
-    const set = which === "where" ? setShakingWhere : setShaking;
-    if (which === "fields") {
+    if (panel === "equipment") {
       // The blocking fields must be on screen to shake at all — and now that equipment collapses,
       // they may not even be rendered. Open it first, then bring it into view.
       if (state.activeSection !== "equipment") actions.openSection("equipment");
       equipmentRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    } else {
+      // The panel is opened by the caller, which knows whether it is a refusal or a look-at-this.
+      (panel === "where" ? whereRef : whenRef).current?.scrollIntoView({ block: "center", behavior: "smooth" });
     }
+    const set = panel === "where" ? setShakingWhere : panel === "when" ? setShakingWhen : setShaking;
     set(true);
     timers.current.push(setTimeout(() => set(false), SHAKE_MS));
   };
@@ -185,12 +215,13 @@ export function Canvas() {
    * state in which the next one is worth opening.
    */
   const openSection = (section: "equipment" | "where" | "when") => {
+    setPrefilledNote(null);
     if (state.activeSection === section) {
       collapse(section);
       return;
     }
     if (section !== "equipment" && equipmentGaps.length > 0) {
-      shakeNow("fields");
+      shakeNow("equipment");
       return;
     }
     if (section === "when" && !whereOk) {
@@ -211,7 +242,7 @@ export function Canvas() {
     const owed =
       section === "equipment" ? equipmentGaps.length > 0 : section === "where" ? !whereOk : !whenOk;
     if (owed) {
-      shakeNow(section === "where" ? "where" : "fields");
+      shakeNow(section);
       return;
     }
     actions.openSection(null);
@@ -230,7 +261,7 @@ export function Canvas() {
    */
   const advance = () => {
     if (equipmentGaps.length > 0) {
-      shakeNow("fields");
+      shakeNow("equipment");
       shakeNext();
       return;
     }
@@ -252,7 +283,8 @@ export function Canvas() {
       const unseen = (["where", "when"] as const).find((p) => !seen.has(p));
       if (unseen) {
         actions.openSection(unseen);
-        shakeNow(unseen === "where" ? "where" : "fields");
+        shakeNow(unseen);
+        setPrefilledNote(unseen);
         return;
       }
     }
@@ -271,7 +303,7 @@ export function Canvas() {
       const owing = first.itemId ? live.findIndex((i) => i.id === first.itemId) : -1;
       if (owing >= 0 && owing !== index) actions.goItem(owing);
       if (state.activeSection !== first.panel) actions.openSection(first.panel);
-      shakeNow(first.panel === "where" ? "where" : "fields");
+      shakeNow(first.panel);
       return;
     }
     /* Everything is answered, so the only thing left to decide is whether there is another machine.
@@ -305,7 +337,7 @@ export function Canvas() {
    */
   const addMachine = () => {
     if (equipmentGaps.length > 0) {
-      shakeNow("fields");
+      shakeNow("equipment");
       return;
     }
     setCarryTo({ index: live.length, isNew: true });
@@ -431,7 +463,7 @@ export function Canvas() {
             type="button"
             onClick={() => {
               if (equipmentGaps.length > 0) {
-                shakeNow("fields");
+                shakeNow("equipment");
                 shakeNext();
                 return;
               }
@@ -454,20 +486,26 @@ export function Canvas() {
           re-offered: editing them here would silently change the first machine's terms too. */}
       {isFirstItem ? (
         <>
+          <div ref={whereRef}>
           <WherePanel
             open={state.activeSection === "where"}
             complete={whereOk}
             onToggle={() => openSection("where")}
             shakeConfirm={shakingWhere}
             tried={tried}
+            prefilledNote={prefilledNote === "where"}
           />
+          </div>
+          <div ref={whenRef}>
           <WhenPanel
             open={state.activeSection === "when"}
             complete={whenOk}
             tried={tried}
+            prefilledNote={prefilledNote === "when"}
             onToggle={() => openSection("when")}
-            shakeConfirm={shaking && panelGaps(gaps, "when").length > 0}
+            shakeConfirm={shakingWhen}
           />
+          </div>
         </>
       ) : (
         <div className="mb-3.5 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-sm border border-ok/40 bg-ok/[0.06] px-5 py-3.5">

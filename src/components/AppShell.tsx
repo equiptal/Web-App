@@ -206,7 +206,8 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
   const browseTab: NavItem = { key: "browse", label: t.shell.browse, href: "/browse" };
   const navItems: NavItem[] = [
     ...(guest ? [browseTab, dashboardTab] : [dashboardTab, browseTab]),
-    { key: "requests", label: t.shell.requests, href: "/requests" },
+    // The KEY stays «requests»: it is the route's name, and it is what the active tab is matched on.
+    { key: "requests", label: t.shell.marketplace, href: "/requests" },
     // ~~My Suppliers.~~ It is on the dashboard now, under the projects (owner, 2026-09-01) — a
     // renter asks who to send a request to while he is looking at the request, and a fifth tab was
     // one more thing to remember rather than one more thing to find.

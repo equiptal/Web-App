@@ -426,7 +426,6 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
                   seenAt={seen[s.id]}
                   onEdit={() => setEditing(s)}
                   onInvite={() => setInviting(s)}
-                  onShare={() => setSharingWith([s])}
                 />
               ))}
             </tbody>
@@ -572,7 +571,6 @@ function Row({
   onOpenBids,
   onEdit,
   onInvite,
-  onShare,
   seenAt,
 }: {
   s: RenterSupplier;
@@ -584,8 +582,6 @@ function Row({
   onOpen: () => void;
   onOpenBids: () => void;
   onEdit: () => void;
-  /** Share a request with THIS supplier alone — the prototype's per-row action. */
-  onShare: () => void;
   onInvite: () => void;
   /** ISO of this reader's last look at the row, or undefined if he never has. */
   seenAt?: string;
@@ -647,7 +643,8 @@ function Row({
                 </span>
               )}
             </span>
-            <span className="block text-meta text-muted">{s.contactName || c.noContactName}</span>
+            {/* A dash, not «No contact name» (owner, 2026-09-03) — see the note on the phone cell. */}
+            <span className="block text-meta text-muted">{s.contactName || EMPTY}</span>
           </span>
         </span>
       </td>
@@ -676,16 +673,27 @@ function Row({
           the phone is what WhatsApp and matching run on. A renter looking down the list for whoever
           he cannot e-mail was reading a paragraph per row.
 
-          Each says what is absent in its own words, and offers the fix in place. */}
+          ── A dash where there is nothing, and no sentence about it (owner, 2026-09-03) ──────────
+          *"For any missing info show the dash only, no need to explain in text, with the option to
+          add for contacts only."*
+
+          ~~«No e-mail — add», «No phone — add», «no group», «No bids yet / nothing shared with them
+          yet».~~ Every empty cell explained itself, so a list of ten suppliers carried thirty short
+          sentences saying nothing had happened — and they were louder than the values that HAD
+          arrived, because there were more of them. A dash says «nothing here» in one character, and
+          a reader scanning for a gap finds it faster than a reader reading.
+
+          The two CONTACT columns keep a way to fix it, because they are the only cells whose
+          emptiness stops something: a supplier with no e-mail is skipped by *Send to my suppliers*.
+          «add» is a real button now rather than a styled span, and it opens the same edit form the
+          pen does. Groups and bids get the dash alone: neither is a thing the renter fills in here. */}
       <td className="px-3 py-2.5 text-meta">
         {s.phone ? (
           <span className="block font-semibold text-navy" dir="ltr">
             {s.phone}
           </span>
         ) : (
-          <span className="block text-muted-dark">
-            {c.noPhone} <span className="font-extrabold text-info-deep">{c.add}</span>
-          </span>
+          <MissingContact onAdd={onEdit} label={c.add} />
         )}
         <Unusable s={s} kind="phone" c={c} />
       </td>
@@ -696,27 +704,20 @@ function Row({
             {s.email}
           </span>
         ) : (
-          /* Named, not left blank: no e-mail is the reason «Send to my suppliers» will skip this
-             row, and the renter should meet that fact here rather than at the share sheet. */
-          <span className="block text-muted-dark">
-            {c.noEmailCol} <span className="font-extrabold text-info-deep">{c.add}</span>
-          </span>
+          <MissingContact onAdd={onEdit} label={c.add} />
         )}
         <Unusable s={s} kind="email" c={c} />
       </td>
 
       <td className="px-3 py-2.5">
         <span className={cx("block text-meta", groups.length ? "font-semibold text-muted-dark" : "text-muted-light")}>
-          {groups.length ? groups.join(" · ") : c.noGroup}
+          {groups.length ? groups.join(" · ") : EMPTY}
         </span>
       </td>
 
       <td className="px-3 py-2.5">
         {bids === 0 ? (
-          <>
-            <span className="block text-body font-extrabold text-muted-light">{c.noBids}</span>
-            <span className="block text-label font-semibold text-muted">{c.nothingShared}</span>
-          </>
+          <span className="block text-body font-extrabold text-muted-light">{EMPTY}</span>
         ) : (
           <button type="button" onClick={onOpenBids} className="block text-start">
             <span className="flex items-center gap-1.5">
@@ -759,21 +760,15 @@ function Row({
 
       <td className="px-3 py-2.5">
         <span className="flex items-center justify-end">
-          {/* ── Share with this one (owner's prototype, `shareOne`) ─────────────────────────────
-              The toolbar shares with whoever is ticked; this shares with the row under the cursor.
-              A renter reading a supplier's row and deciding to send him something should not have
-              to go up to the toolbar and find him again in a list he is already looking at.
+          {/* ~~Share a request with this one row (the prototype's `shareOne`).~~ Removed (owner,
+              2026-09-02: *"remove the share icon, keep only the invite here"*).
 
-              It opens the SAME modal, with him already ticked — so the two doors cannot end up
-              sending two different messages. */}
-          <button
-            type="button"
-            onClick={onShare}
-            title={c.shareARequest}
-            className="grid h-[30px] w-[30px] place-items-center rounded-sm text-muted transition hover:bg-surface3 hover:text-navy"
-          >
-            <Icon name="ios_share" size={15} />
-          </button>
+              Three glyphs deep, the column stopped reading as actions and started reading as
+              decoration — and two of the three sent something: one shared a REQUEST, one invited the
+              firm to Moedatech. Sharing is not this page's job. It belongs to a request, it is
+              reached from the request, and the toolbar above still shares with whoever is ticked
+              when a renter really is working from this list. What is left on the row is what only
+              this row can do: invite the firm, and edit its details. */}
 
           {/* SUP-T42 — off-platform rows only. A supplier who already has an account has nothing to
               be invited to, and offering it would be us not knowing our own users. */}
@@ -812,6 +807,31 @@ function Row({
 function fieldWord(field: string, c: ReturnType<typeof useT>["suppliers"]): string {
   const f = field.toLowerCase();
   return f.includes("phone") || f.includes("mobile") ? c.colPhone : f.includes("mail") ? c.colEmail : field;
+}
+
+/** What an empty cell says: one character, and the same one everywhere. */
+const EMPTY = "—";
+
+/**
+ * An empty CONTACT cell: the dash, and the way to fill it.
+ *
+ * Only phone and e-mail get this. Their emptiness has a consequence the renter can act on — a
+ * supplier with no e-mail is skipped when a request is sent to «my suppliers» — while an empty
+ * group or bid count is simply a fact about the firm, and offering to «add» a bid would be nonsense.
+ */
+function MissingContact({ onAdd, label }: { onAdd: () => void; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5 text-muted-light">
+      {EMPTY}
+      <button
+        type="button"
+        onClick={onAdd}
+        className="font-extrabold text-info-deep transition hover:underline"
+      >
+        {label}
+      </button>
+    </span>
+  );
 }
 
 /** Which column an unreadable value belongs under. `null` for a key that is neither. */

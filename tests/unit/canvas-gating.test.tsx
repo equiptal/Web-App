@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { screen } from "@testing-library/react";
 import { Canvas } from "@/components/create/Canvas";
 import { confirmedProject, makeAgentDraft, makeItem, renderCanvas } from "../setup/canvas";
+import type { EquipmentItem } from "@/lib/contract/draft";
 
 /**
  * MREQ-TC-02/03/04/05/15 — the locks, and the shake that is the whole of their explanation.
@@ -184,6 +185,53 @@ describe("the primary button refuses with gaps (MREQ-AC-15)", () => {
       screen.getAllByText(/Review & send/).at(-1)!.closest("button")!.click();
     });
     expect(handle.store().state.readyToSend).toBe(true);
+  });
+});
+
+/**
+ * A refusal opens the panel that OWES the answer, and no other (owner, 2026-09-02).
+ *
+ * ⚠️ It opened the equipment panel for a SCHEDULE gap. `shakeNow` took «fields» or «where», so a
+ * schedule refusal was passed as «fields» — and «fields» force-opens the machine and scrolls to it.
+ * The renter pressed *Review & send* with the charged-day acknowledgement unticked and was shown a
+ * finished machine, the panel that owed the answer having just been closed again: *"random panels
+ * open and there is nothing I can do with them"*.
+ */
+describe("a refusal opens the panel that owes the answer", () => {
+  it("opens the SCHEDULE for a schedule gap, and marks the field", async () => {
+    const item = makeItem();
+    const handle = await renderCanvas(<Canvas />, {
+      draft: makeAgentDraft({ items: [item], project: confirmedProject() }),
+      // The machine is complete; the charged-day acknowledgement is the only thing left.
+      prepare: answerYearAndCert(item.id),
+    });
+
+    await handle.run(() => {
+      screen.getByText(/Review & send/).closest("button")!.click();
+    });
+
+    expect(handle.store().state.activeSection).toBe("when");
+    expect(screen.getAllByText("* Required").length).toBeGreaterThan(0);
+  });
+
+  it("marks FUEL, which is one of the app's own gates and had no mark at all", async () => {
+    /* `EquipmentItem.fuelType` is typed non-null, and `itemAppGaps` checks it anyway: the draft
+       arrives from the agent, so the gate does not trust the type. The cast reproduces exactly what
+       that gate is guarding against. */
+    const item = makeItem({ fuelType: null as unknown as EquipmentItem["fuelType"] });
+    const handle = await renderCanvas(<Canvas />, {
+      draft: makeAgentDraft({ items: [item], project: confirmedProject() }),
+      prepare: answerYearAndCert(item.id),
+    });
+
+    await handle.run(() => {
+      screen.getByText(/Review & send/).closest("button")!.click();
+    });
+
+    expect(handle.store().state.activeSection).toBe("equipment");
+    // The chip has no visible label of its own, so the mark brings the field's NAME with it.
+    expect(screen.getAllByText("FUEL").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("* Required").length).toBeGreaterThan(0);
   });
 });
 

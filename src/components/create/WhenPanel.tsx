@@ -17,7 +17,7 @@ import { useState } from "react";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Icon, Toggle } from "@/components/ui";
-import { CanvasField, ChoiceRow, PanelDot } from "@/components/create/Provenance";
+import { CanvasField, CheckFromProject, ChoiceRow, PanelDot } from "@/components/create/Provenance";
 import { useProvenance } from "@/components/create/hooks";
 import { computeChargedDays, OVERTIME_RATES, RENTAL_BASES, type OvertimeRate, type RentalBasis } from "@/lib/contract";
 import { arabicIndicDigits } from "@/lib/contract/bid-map";
@@ -31,6 +31,7 @@ export function WhenPanel({
   onToggle,
   shakeConfirm,
   tried,
+  prefilledNote,
 }: {
   open: boolean;
   complete: boolean;
@@ -39,6 +40,8 @@ export function WhenPanel({
   shakeConfirm?: boolean;
   /** The renter has tried to move on — see `tried` in `Canvas`. */
   tried?: boolean;
+  /** This panel opened on its own because the renter had never seen it — see `CheckFromProject`. */
+  prefilledNote?: boolean;
 }) {
   const t = useT();
   const { locale } = useLocale();
@@ -102,10 +105,13 @@ export function WhenPanel({
 
       {open && (
         <div {...pin("when-panel-body")} className="flex flex-col gap-4 px-5 pb-5">
+          {prefilledNote && <CheckFromProject />}
           <div className="grid gap-4 md:grid-cols-2">
             {/* ---- Dates. Optional here; the nudge explains what it costs to leave them out. ---- */}
             <div className="rounded-sm bg-surface2 p-5">
-              <CanvasField label={t.create.whenPanel.dates}>
+              {/* Dates are OPTIONAL (MREQ-AC-10) — the mark appears only for the one date state
+                  that blocks a send, a window that runs backwards. */}
+              <CanvasField label={t.create.whenPanel.dates} required={!!tried && charged.reversed}>
                 <div className="flex items-center gap-3">
                   <label className="flex-1 rounded-sm border border-border bg-surface px-3.5 py-2.5">
                     <span className="mb-1 block text-label font-semibold tracking-wide text-muted">{t.create.whenPanel.startDate}</span>
@@ -164,10 +170,15 @@ export function WhenPanel({
 
             {/* ---- Billing basis. ---- */}
             <div className="rounded-sm bg-surface2 p-5">
+              {/* The BASIS is what `gateWhen` refuses on, so its title carries the mark once the
+                  renter has tried to move on. Without it, a refusal opened this panel with the
+                  acknowledgement line not even rendered — it needs a basis to have anything to
+                  acknowledge — and so with nothing at all marked (owner, 2026-09-02). */}
               <CanvasField
                 label={t.create.whenPanel.billing}
                 source={basisSource}
                 missing={!timing.rentalBasis}
+                required={!!tried && !timing.rentalBasis}
                 hint={timing.rentalBasis ? fmt(t.create.whenPanel.quoteRate, { basis: t.options.rentalBasis[timing.rentalBasis].toLowerCase() }) : undefined}
               >
                 {/* ── One control for every choice on the canvas (owner, 2026-08-26) ─────────────

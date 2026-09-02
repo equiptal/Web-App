@@ -34,6 +34,28 @@ import { isSystemChosen, type FieldSource } from "@/lib/contract";
  * it is ever wanted back.
  */
 
+/**
+ * Why this panel just opened by itself.
+ *
+ * *Review & send* opens a panel the SITE filled and the renter has never looked at, and shakes it.
+ * Nothing in it is missing, which is the point — and which is also why the shake alone reads as the
+ * page misbehaving: a panel appears, wobbles, and demands nothing (owner, 2026-09-02: *"sometimes
+ * when I click review and send, random panels open and there is nothing I can do with them"*).
+ *
+ * So the panel says what it wants: read this, then press again. Brand-coloured rather than red,
+ * because it is not a refusal about a missing answer, it is an ask to look at one that is already
+ * there.
+ */
+export function CheckFromProject() {
+  const t = useT();
+  return (
+    <p className="mb-3 flex items-start gap-2 rounded-sm border border-brand/40 bg-brand-soft px-3.5 py-2.5 text-body font-semibold leading-snug text-navy">
+      <span className="material-icons-outlined mt-px flex-none text-label text-brand">visibility</span>
+      {t.create.checkFromProject}
+    </p>
+  );
+}
+
 /** The blocking dot — the prototype's 8px amber bullet, inline after the label. */
 export function RequiredDot({ show }: { show: boolean }) {
   if (!show) return null;

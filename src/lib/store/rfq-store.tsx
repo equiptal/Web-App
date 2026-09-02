@@ -274,6 +274,8 @@ type Action =
   | { t: "SET_SHARE_ON_POST"; value: boolean }
   | { t: "TOUCH_FIELD"; key: string }
   | { t: "PATCH_LOCATION"; patch: Partial<ProjectDetails["location"]> }
+  /** The site's own address, geocoded into a point — see the reducer for why it is not a patch. */
+  | { t: "PIN_PROJECT_LOCATION"; lat: number; lng: number }
   | { t: "CONFIRM_LOCATION" }
   | { t: "RESOLVE_LOCATION_CONFLICT"; source: "text" | "file" }
   | { t: "DISMISS_MULTILOCATION" }
@@ -598,6 +600,36 @@ export function reducer(state: RfqState, a: Action): RfqState {
           ? d.touchedFields
           : [...(d.touchedFields ?? []), "location.label"],
       }));
+    /**
+     * The project's ADDRESS, resolved to a point.
+     *
+     * A project can be saved with a typed address and no pin — `ProjectForm` requires the label and
+     * nothing else — so a request from that site arrived with a label, no coordinates, and therefore
+     * a dead end: `gateWhere` wants a point, so *This is the right spot* was disabled and the only
+     * way on was to type the address again into the picker's search box (owner, 2026-09-02: *"the
+     * location is from the project so it must be shown fully with the confirm option, now I can't
+     * confirm anything, I have to retype it to continue"*).
+     *
+     * So the map resolves the site's own address once and hands back the point. NOT `PATCH_LOCATION`,
+     * for two reasons, and both are the whole point of a separate action:
+     *
+     *  · that action records `location.label` as TOUCHED, which is how the panel knows the renter
+     *    moved the pin himself — and this pin is the site's address, not a move. Marked, the «from
+     *    your project» ring would vanish from a value the renter never edited.
+     *  · the LABEL is kept exactly as the project stores it. Google's formatted address for the same
+     *    point is worded differently often enough that replacing it would make `leftTheSite` compare
+     *    two spellings of one place and unfile the request from its own site.
+     *
+     * `confirmed` is deliberately untouched: it stays false, the renter presses the button, and the
+     * confirmation still means a person looked at the pin. Ignored when a point already exists, so a
+     * slow geocode answering after the renter has dragged the marker cannot pull him back.
+     */
+    case "PIN_PROJECT_LOCATION":
+      return withDraft(state, (d) => {
+        const loc = d.project.location;
+        if (loc.lat != null || loc.lng != null || !(loc.label ?? "").trim()) return d;
+        return { ...d, project: { ...d.project, location: { ...loc, lat: a.lat, lng: a.lng } } };
+      });
     case "CONFIRM_LOCATION":
       return withDraft(state, (d) => ({ ...d, project: { ...d.project, location: { ...d.project.location, confirmed: true } } }));
     case "RESOLVE_LOCATION_CONFLICT":
@@ -891,6 +923,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
       dispatch({ t: "PATCH_PROJECT_DEFAULTS", patch, keys }),
     patchProjectTerms: (paymentTerms: PaymentTerm | null) => dispatch({ t: "PATCH_PROJECT_TERMS", paymentTerms }),
     patchProjectSite: (location: SiteLocation) => dispatch({ t: "PATCH_PROJECT_SITE", location }),
+    pinProjectLocation: (lat: number, lng: number) => dispatch({ t: "PIN_PROJECT_LOCATION", lat, lng }),
     setWorkOrderSource: (groupId: string | null) => dispatch({ t: "SET_WORK_ORDER_SOURCE", groupId }),
     useTemplate: (
       terms: MachineTerms | null,
