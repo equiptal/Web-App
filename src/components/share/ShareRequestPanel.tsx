@@ -30,7 +30,7 @@ import {
 } from "@/lib/shareTemplate";
 import {
   EMAIL_PROVIDERS,
-  hidesRecipients,
+  carriesRecipients,
   loadEmailProvider,
   openEmailCompose,
   saveEmailProvider,
@@ -772,11 +772,19 @@ export function ShareRequestPanel({
                 *Copy addresses* is that way out: paste into Outlook's own Bcc field, clear the To
                 line, send. Two actions, and they work in every version of Outlook there has ever
                 been, which no URL parameter can promise. */}
-            {channel === "email" && !hidesRecipients(provider) && reachable.length > 1 && (
-              <span className="flex items-start gap-1.5 text-meta text-warn-deep">
-                <Icon name="visibility" size={14} className="mt-px flex-none" />
-                <span className="min-w-0 flex-1">
-                  {c.outlookNoBcc}{" "}
+            {/* ── Outlook's window opens EMPTY, and the addresses are handed over to paste ──────
+                Its deeplink documents `to`, `subject` and `body`. `bcc` is discarded, and the
+                renter would rather paste than have eight competitors put in one another's To line
+                to work around it (owner, 2026-09-03).
+
+                So this is not a warning about a compromise — it is the step. Stated as one, with the
+                addresses one press away, because a compose window that opens with no recipients and
+                no explanation is the feature looking broken. */}
+            {channel === "email" && !carriesRecipients(provider) && reachable.length > 0 && (
+              <span className="flex items-start gap-2 rounded-sm border border-border bg-surface2 px-2.5 py-2">
+                <Icon name="content_paste" size={14} className="mt-0.5 flex-none text-muted" />
+                <span className="min-w-0 flex-1 text-meta text-navy">
+                  {fmt(c.outlookPasteBcc, { n: reachable.length })}{" "}
                   <button
                     type="button"
                     onClick={() => {

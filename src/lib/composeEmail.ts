@@ -40,8 +40,14 @@ export type EmailProvider = keyof typeof COMPOSE_URLS;
 
 export const EMAIL_PROVIDERS: EmailProvider[] = ["outlook", "gmail"];
 
-/** Whether this provider can carry blind copies. Drives the note the panel shows. */
-export const hidesRecipients = (p: EmailProvider): boolean => p !== "outlook";
+/**
+ * Whether a compose URL for this provider can carry recipients at all.
+ *
+ * Gmail's `view=cm` takes `bcc` properly. Outlook's deeplink documents only `to`, `subject` and
+ * `body` — and putting a blind list in `to` is not "carrying" it, so Outlook is given none and the
+ * panel offers the addresses for pasting instead.
+ */
+export const carriesRecipients = (p: EmailProvider): boolean => p !== "outlook";
 
 /** Which browser key remembers the pick. Per browser, never sent anywhere. */
 const PROVIDER_KEY = "moeda.emailProvider";
@@ -107,10 +113,23 @@ export function composeEmailUrl({ to = [], bcc = [], subject = "", body = "", pr
   // Gmail takes comma-separated addresses and its own short parameter names; Outlook takes
   // semicolons and the long ones. Handing either the other's spelling silently drops the recipients.
   const join = (list: string[]) => list.join(gmail ? "," : ";");
-  const visible = provider === "outlook" ? [...to, ...bcc] : to;
-  const blind = provider === "outlook" ? [] : bcc;
-  if (visible.length) q.set("to", join(visible));
-  if (blind.length) q.set("bcc", join(blind));
+  /**
+   * ⚠️ **Outlook is handed NO recipients at all** (owner, 2026-09-03: *"remove the `to` in outlook
+   * just ask to copy and paste for now"*).
+   *
+   * ~~Its `bcc` is discarded, so the recipients rode in `to`.~~ That worked, and it put eight
+   * competitors in one another's To line to do it. The renter would rather paste: the panel copies
+   * the addresses and he drops them into Outlook's own Bcc field, which is two actions and keeps the
+   * list private, instead of one action that spends his commercial business to save it.
+   *
+   * ⚠️ This is about `bcc` ONLY. A `to` is a message addressed to a named person — an invitation to
+   * one supplier — and there is nothing blind about it, so it is passed through as always.
+   */
+  const outlook = provider === "outlook";
+  // `to` is documented and works everywhere — an INVITATION is addressed to one named person, and
+  // there is nothing blind about it. Only `bcc` is the casualty.
+  if (to.length) q.set("to", join(to));
+  if (!outlook && bcc.length) q.set("bcc", join(bcc));
   if (subject) q.set(gmail ? "su" : "subject", subject);
   if (body) q.set("body", body);
   const base = COMPOSE_URLS[provider];

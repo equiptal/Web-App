@@ -134,11 +134,15 @@ describe("how it goes", () => {
     await waitFor(() => expect(opened).toHaveBeenCalled());
     const url = new URL(opened.mock.calls[0][0] as string);
     /**
-     * Outlook is the default provider and it DISCARDS `bcc`, so its recipients ride in `to` — see
-     * `composeEmail.ts`. Gmail keeps them blind, which is what the BCC test there pins.
+     * ⚠️ Outlook is the default provider and its compose deeplink carries NO blind list, so the
+     * window opens with the message and no recipients — the panel hands the addresses over to paste
+     * into Bcc instead (owner, 2026-09-03). Gmail keeps them blind; `compose-email.test.ts` pins that.
      */
-    expect(url.searchParams.get("to")).toBe("ops@alfaisal.sa");
+    expect(url.searchParams.get("to")).toBeNull();
+    expect(url.searchParams.get("bcc")).toBeNull();
     expect(url.searchParams.get("subject")).toContain("EXC-170845");
+    // He is told, and given the addresses — an empty window with no explanation reads as broken.
+    expect(screen.getByText(c.copyAddresses)).toBeTruthy();
   });
 
   it("Given nobody is ticked, Then it still sends — the renter addresses it himself", async () => {
