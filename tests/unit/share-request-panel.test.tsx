@@ -321,6 +321,25 @@ describe("finding a supplier", () => {
   });
 });
 
+describe("copying", () => {
+  it("Given Copy, Then the clipboard holds the LINK and nothing else", async () => {
+    /**
+     * Owner, 2026-09-02: *"copy link must only copy the linkl not the message."* It briefly copied
+     * the whole message, which made the one control a renter reaches for when he needs a URL — a
+     * CRM field, a purchase order — hand him four paragraphs. The template still travels: every
+     * app that unfurls a link draws the card from the URL itself.
+     */
+    const writeText = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+
+    draw();
+    fireEvent.click(await screen.findByText(c.copy));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
+    expect(writeText.mock.calls[0][0]).toBe("http://localhost:3000/bid/abc-123");
+  });
+});
+
 describe("what they receive", () => {
   it("Given a draft and no link yet, Then the message can still be read", async () => {
     /**

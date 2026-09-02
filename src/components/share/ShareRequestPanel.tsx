@@ -282,7 +282,19 @@ export function ShareRequestPanel({
         .then(() => true)
         .catch(() => false);
       if (!shared) {
-        await navigator.clipboard?.writeText(message).catch(() => {});
+        /* Both flavours here, unlike Copy: *More* means "send this somewhere", so a paste into
+           Gmail should arrive as the laid-out message with the card, and a paste into a chat as the
+           words. Copy means "give me the URL", which is a different question. */
+        await copyShareMessage(
+          message,
+          card
+            ? shareMessageHtml(card.model, url, card.imageUrl || `${window.location.origin}/bid/${id}/og`, {
+                template,
+                renterName,
+                lang,
+              })
+            : message,
+        ).catch(() => {});
         setCopiedMessage(true);
         setTimeout(() => setCopiedMessage(false), 2400);
       }
@@ -374,20 +386,18 @@ export function ShareRequestPanel({
             type="button"
             disabled={!uuid}
             onClick={() => {
-              /* The whole message, not the bare link (owner, 2026-09-02). A renter who pastes into
-                 a chat we have no button for must send the same thing the buttons send — otherwise
-                 the request reads one way through E-mail and another way through Copy. */
-              void copyShareMessage(
-                card ? renderShareMessage(card.model, shareUrl, { template, renterName, lang }) : shareUrl,
-                card
-                  ? shareMessageHtml(
-                      card.model,
-                      shareUrl,
-                      card.imageUrl || `${window.location.origin}/bid/${uuid}/og`,
-                      { template, renterName, lang },
-                    )
-                  : shareUrl,
-              ).catch(() => {});
+              /**
+               * The link, and only the link (owner, 2026-09-02: *"copy link must only copy the
+               * linkl not the message"*).
+               *
+               * ~~It briefly copied the whole message in two flavours.~~ That made the one control
+               * a renter reaches for when he needs a URL — a CRM field, a WhatsApp Business
+               * template, a purchase order — hand him four paragraphs instead. The template still
+               * travels: every app that unfurls a link draws the card from the URL itself, which is
+               * what `/bid/[token]/og` is for. Where a renter wants the words as well, that is what
+               * *More* does.
+               */
+              void navigator.clipboard?.writeText(shareUrl).catch(() => {});
               setCopied(true);
               setTimeout(() => setCopied(false), 1600);
             }}
