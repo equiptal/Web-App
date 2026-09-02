@@ -34,8 +34,13 @@ describe("bidCardText", () => {
     const out = bidCardText(model(), URL_, { renterName: "Shibh Al Jazira" });
 
     expect(out).toContain("Shibh Al Jazira invites you to bid");
-    // A colon, not an em dash: no em dash in copy a renter reads.
-    expect(out).toContain("EXC-170845: Tower light 9m · with operator ×6");
+    /**
+     * The machine, and NOT the reference (owner, 2026-09-03: *"remove any request code from the
+     * templates"*). It is our filing, not his: a supplier reading `CEX-020902:` before the equipment
+     * is handed an internal code as the first thing he sees. The card still carries it, to one side.
+     */
+    expect(out).toContain("Tower light 9m · with operator ×6");
+    expect(out).not.toContain("EXC-170845");
     expect(out).toContain("Riyadh · 1 month · 18 Aug → 17 Sep 2026");
     expect(out).toContain("Mobilisation: Supplier");
     expect(out).toContain("Fuel: Renter · diesel");
@@ -53,7 +58,7 @@ describe("bidCardText", () => {
     const out = bidCardText(model(), URL_, { renterName: "Shibh Al Jazira", note: "Need these on site Monday." });
 
     expect(out.indexOf("Shibh Al Jazira invites you")).toBeLessThan(out.indexOf("Need these on site Monday."));
-    expect(out.indexOf("Need these on site Monday.")).toBeLessThan(out.indexOf("EXC-170845"));
+    expect(out.indexOf("Need these on site Monday.")).toBeLessThan(out.indexOf("Tower light 9m"));
   });
 
   it("Given any request, Then the LINK is the last thing in the message", () => {
@@ -77,7 +82,7 @@ describe("bidCardText", () => {
     expect(out).toContain("Please quote the below by Sunday.");
     expect(out).toContain("Regards, Shibh Al Jazira");
     // The card between them is still ours, unchanged.
-    expect(out).toContain("EXC-170845: Tower light 9m · with operator ×6");
+    expect(out).toContain("Tower light 9m · with operator ×6");
   });
 
   it("Given several machines, Then every one is listed — the image can only name the first", () => {

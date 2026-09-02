@@ -78,7 +78,12 @@ export interface ShareRequestPanelProps {
   mode: "post" | "share";
   /** `share` mode: the request being shared. */
   requestUuid?: string | null;
-  /** The short code on the subject line, when there is one. */
+  /**
+   * The request's short code.
+   *
+   * No longer on the subject line (owner, 2026-09-03) — kept on the prop because the CARD still
+   * carries it, and the modal reads it off whichever request the renter picks.
+   */
   requestCode?: string | null;
   /** `post` mode: the draft, so the preview can be read before the link exists. */
   draftForm?: BidFormData | null;
@@ -111,7 +116,6 @@ export interface ShareRequestPanelProps {
 export function ShareRequestPanel({
   mode,
   requestUuid = null,
-  requestCode = null,
   draftForm = null,
   onPost,
   onShared,
@@ -191,7 +195,7 @@ export function ShareRequestPanel({
   /** The same message in its halves, so the preview can show which of them he may edit. */
   const parts = card ? shareMessageParts(card.model, shareUrl, { template, renterName, lang }) : null;
 
-  const subject = fmt(c.subject, { code: requestCode ?? "" }).trim();
+  const subject = c.subject;
 
   /**
    * The card the LINK turns into in the supplier's app — the thing WhatsApp draws, and the thing a

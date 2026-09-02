@@ -237,7 +237,7 @@ export const ar: Dictionary = {
       whatsappFirst: "يفتح محادثة واحدة مع {name}. لا يقبل واتساب أكثر من واحد دفعة واحدة.",
       whatsappNoPhone: "لا يوجد رقم لأيٍّ ممن اخترتهم.",
       preview: "ما سيصلهم",
-      subject: "طلب معدات جديد لك {code}",
+      subject: "طلب معدات جديد لك",
       skipping: "{n} ممن اخترتهم بلا بريد وسيُستبعدون.",
       posting: "جارٍ النشر…",
       done: "تمت مشاركة الطلب مع {n} مورّدين",

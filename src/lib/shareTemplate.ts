@@ -242,9 +242,17 @@ const FIXED = {
 export function cardBlock(m: BidCardModel, lang: "en" | "ar" = "en"): string {
   const t = FIXED[lang];
   const lines: (string | null)[] = [
-    // The reference leads the machine so an operator can file the reply against it without opening
-    // the link.
-    m.ref ? `${m.ref}: ${m.imageHeadline}` : m.imageHeadline,
+    /**
+     * The machine, and only the machine (owner, 2026-09-03: *"remove any request code from the
+     * templates"*).
+     *
+     * ~~The reference led it, so an operator could file the reply without opening the link.~~ That
+     * is our filing, not his: a supplier reading `CEX-020902:` before the equipment is being handed
+     * an internal code as the first thing he sees, and it buys him nothing he cannot get from the
+     * link. The card still carries it, small and to one side, where somebody who wants to quote it
+     * can find it.
+     */
+    m.imageHeadline,
 
     // The SITE and the DATES first, and once: they belong to the request, not to any one machine.
     m.where || null,

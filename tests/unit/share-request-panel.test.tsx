@@ -140,7 +140,8 @@ describe("how it goes", () => {
      */
     expect(url.searchParams.get("to")).toBeNull();
     expect(url.searchParams.get("bcc")).toBeNull();
-    expect(url.searchParams.get("subject")).toContain("EXC-170845");
+    // The subject names the request, not our filing code (owner, 2026-09-03).
+    expect(url.searchParams.get("subject")).toBe("A new equipment request for you");
     // He is told, and given the addresses — an empty window with no explanation reads as broken.
     expect(screen.getByText(c.copyAddresses)).toBeTruthy();
   });

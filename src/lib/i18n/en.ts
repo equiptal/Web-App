@@ -265,7 +265,7 @@ export const en = {
       whatsappFirst: "Opens one chat, with {name}. WhatsApp cannot take several at once.",
       whatsappNoPhone: "None of the ones you picked has a phone.",
       preview: "What they receive",
-      subject: "A new equipment request for you {code}",
+      subject: "A new equipment request for you",
       skipping: "{n} of the ones you picked have no e-mail and will be left out.",
       posting: "Posting…",
       done: "Request shared with {n} suppliers",
