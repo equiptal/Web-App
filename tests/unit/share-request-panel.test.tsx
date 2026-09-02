@@ -262,8 +262,8 @@ describe("the words around the card", () => {
     drawDraft();
     expect(await screen.findByText("Hello,")).toBeTruthy();
     expect(screen.getByText(/invites you to bid/)).toBeTruthy();
-    // Ours, and marked as ours where he can see it before he presses Edit.
-    expect(screen.getByText(c.fixedByUs)).toBeTruthy();
+    // The details sit between them as the CARD, marked as ours and as not editable.
+    expect(screen.getByText(c.cardAsText)).toBeTruthy();
   });
 
   it("Given he edits a line, Then it is edited IN the preview, and that is what is sent", async () => {
@@ -287,11 +287,10 @@ describe("the words around the card", () => {
      * would know is a withdrawn bid at the deal room.
      */
     drawDraft();
-    // Twice on the page now, and deliberately: once in the message, once in the card the LINK
-    // unfurls into. Neither is editable.
+    // Once, in the card, and not a field: a supplier prices what it says.
     const shown = await screen.findAllByText(/Crawler Excavator 20 ton/);
-    expect(shown.length).toBeGreaterThan(1);
-    expect(shown.every((el) => el.closest("textarea") === null)).toBe(true);
+    expect(shown).toHaveLength(1);
+    expect(shown[0].closest("textarea")).toBeNull();
   });
 
   it("Given the channel, Then the preview follows it with no tabs to press", async () => {
@@ -384,22 +383,25 @@ describe("the link preview (owner, 2026-09-02)", () => {
      * picture comes from the draft and is already correct.
      */
     drawDraft();
-    expect(await screen.findByText(c.unfurl)).toBeTruthy();
+    expect(await screen.findByText(c.cardAsText)).toBeTruthy();
 
     /**
      * And the navy band is DRAWN, not stood in for. `/bid/<token>/og` needs a token; the generic
      * file it used to fall back to is a navy rectangle with the logo and nothing else, so the half
      * of the card a supplier sees first was the one part of the preview that was untrue.
      */
-    expect(screen.getAllByText(/Crawler Excavator 20 ton/).length).toBeGreaterThan(1);
+    expect(screen.getAllByText(/Crawler Excavator 20 ton/)).toHaveLength(1);
     expect(document.querySelector('img[src="/og-bid.png"]')).toBeNull();
+    // The four elements the real `og` route draws, from the same model.
+    expect(screen.getByText("MOEDATECH")).toBeTruthy();
+    expect(screen.getByText(/Open the link to submit your bid/)).toBeTruthy();
   });
 
   it("Given WhatsApp, Then the card is inside the bubble, where WhatsApp draws it", async () => {
     drawDraft();
     fireEvent.click(await screen.findByText(c.whatsapp));
-    // Same card, drawn where that client actually draws it.
-    await waitFor(() => expect(screen.getByText(c.unfurl)).toBeTruthy());
+    // Same card, same place in the message, whichever frame it is read in.
+    await waitFor(() => expect(screen.getByText(c.cardAsText)).toBeTruthy());
   });
 });
 
@@ -499,17 +501,26 @@ describe("the preview says what is SENT, not what is stored", () => {
     expect(intro.value).toBe("You are invited to bid on an equipment request.");
   });
 
-  it("Given the card, Then it is drawn ONCE, outside the message", async () => {
-    // Owner: *"so request details is duplicated in the card and in the text itslef?"* The card is
-    // not part of the message — it is what some apps build out of the link — so it sits outside the
-    // frame, labelled with the apps that draw it.
+  it("Given the details, Then they appear ONCE — as the card, not as the card AND the text", async () => {
+    /**
+     * Owner: *"so request details is duplicated in the card and in the text itslef?"* Yes, twice
+     * over: the same facts as a text block, then again as a card underneath.
+     *
+     * They were never two things — one request, two renderings, and which one a supplier meets
+     * depends on his app. The preview draws the richer one, in the place the details belong, and
+     * says underneath what arrives where a card cannot.
+     */
     render(
       <LocaleProvider>
         <ShareRequestPanel mode="post" draftForm={DRAFT} renterName="Shibh Al Jazira" onPost={async () => "u"} />
       </LocaleProvider>,
     );
-    expect((await screen.findAllByText(c.unfurl)).length).toBe(1);
-    expect(screen.getByText(c.unfurlWhere)).toBeTruthy();
+    await screen.findByLabelText(c.tplGreeting);
+
+    // One machine name on the page, not two.
+    expect(screen.getAllByText(/Crawler Excavator 20 ton/)).toHaveLength(1);
+    // And the details are named as ours, once — not headed by a second «what the link turns into».
+    expect(screen.getAllByText(c.cardAsText)).toHaveLength(1);
   });
 });
 

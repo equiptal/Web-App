@@ -124,7 +124,14 @@ export function bidCardHtml(card: BidCardPreview, model: BidCardModel | null, la
   const align = lang === "ar" ? "right" : "left";
   const url = escapeHtml(card.url);
 
-  const title = model?.cardTitle || card.title;
+  /**
+   * The headline lives in the picture. When there IS no picture and we draw the band as markup, the
+   * band already carries it — repeating it as the title directly underneath is the machine's name
+   * twice in twenty vertical pixels, which is what a real unfurl never does (the image is a picture,
+   * the title is text, and a reader reads them as one thing).
+   */
+  const bandIsMarkup = !card.imageUrl && !!model;
+  const title = bandIsMarkup ? "" : model?.cardTitle || card.title;
   const where = model?.where ?? card.description;
   /**
    * The request's own answers first — the site and the dates are above this, and these are the
@@ -164,7 +171,7 @@ export function bidCardHtml(card: BidCardPreview, model: BidCardModel | null, la
       }
     </td></tr>
     <tr><td align="${align}" style="padding:14px 16px 16px;">
-      <div style="font-size:14px;font-weight:700;color:${COLORS.foreground};line-height:1.35;">${escapeHtml(title)}</div>
+      ${title ? `<div style="font-size:14px;font-weight:700;color:${COLORS.foreground};line-height:1.35;">${escapeHtml(title)}</div>` : ""}
       ${where ? `<div style="font-size:12px;color:${COLORS.mutedDark};font-weight:600;line-height:1.4;padding-top:6px;">${escapeHtml(where)}</div>` : ""}
       ${block(terms)}
       ${itemRows ? `<div style="border-top:1px solid ${COLORS.border};margin-top:9px;padding-top:2px;">${itemRows}</div>` : ""}

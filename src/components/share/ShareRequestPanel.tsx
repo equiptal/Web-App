@@ -857,6 +857,7 @@ export function ShareRequestPanel({
                   onChange={patchTemplate}
                   c={c}
                   linkPending={!uuid}
+                  unfurl={unfurl}
                 />
               </div>
             </div>
@@ -875,35 +876,9 @@ export function ShareRequestPanel({
                   onChange={patchTemplate}
                   c={c}
                   linkPending={!uuid}
+                  unfurl={unfurl}
                 />
               </div>
-            </div>
-          )}
-
-          {/* ── The card, ONCE, and outside the message (owner, 2026-09-02) ──────────────────
-              *"so request details is duplicated in the card and in the text itslef?"* It was drawn
-              inside the message frame, under the body, which read as a second block of the letter
-              saying the same thing twice.
-
-              It is not part of the message. The message is words — that is all a compose URL can
-              carry, and it is what a supplier with images off, or on SMS, or in Gmail, actually
-              reads. The card is what SOME apps build for themselves out of the link. Drawn outside
-              the frame, dimmed, and labelled with the apps that draw it, it stops being a repeat and
-              becomes what it is: a note about the link.
-
-              The repetition itself is real and is not a fault to design away — in WhatsApp the
-              supplier genuinely sees both. The words are the only carrier that reaches every
-              client; the card is the one that reaches the eye first. */}
-          {unfurl && (
-            <div className="grid gap-1.5 rounded-md border border-dashed border-border bg-surface2 p-3">
-              <span className="text-label uppercase tracking-wide text-muted">{c.unfurl}</span>
-              {/* The card is laid out for e-mail at a fixed 440px; these let it shrink into the
-                  column rather than pushing a sideways scrollbar through the panel. */}
-              <div
-                className="max-w-[380px] opacity-90 [&_img]:!h-auto [&_img]:!w-full [&_table]:!w-full [&_table]:!max-w-full"
-                dangerouslySetInnerHTML={{ __html: unfurl }}
-              />
-              <span className="text-label text-muted">{c.unfurlWhere}</span>
             </div>
           )}
 
@@ -946,28 +921,45 @@ function Message({
   onChange,
   c,
   linkPending,
+  unfurl,
 }: {
   parts: ShareMessageParts;
   template: ShareTemplate;
   onChange: (field: keyof ShareTemplate, value: string) => void;
   c: ReturnType<typeof useT>["intake"]["postShare"];
   linkPending: boolean;
+  /** The card, when there is one. Its absence falls back to the same facts as words. */
+  unfurl: string | null;
 }) {
   return (
     <div className="grid gap-2.5">
       <Editable value={template.greeting} display={parts.greeting} onChange={(v) => onChange("greeting", v)} label={c.tplGreeting} />
       <Editable value={template.intro} display={parts.intro} onChange={(v) => onChange("intro", v)} label={c.tplIntro} />
 
-      {/* Ours. A hairline rail and a padlock rather than a filled box with a heading: the renter is
-          reading the message his supplier gets, and a titled panel in the middle of it is chrome
-          nobody receives. */}
-      <div className="relative ps-3" title={c.fixedByUs}>
-        <span aria-hidden className="absolute inset-y-0 start-0 w-0.5 rounded-full bg-border-strong" />
-        <span className="mb-0.5 flex items-center gap-1 text-label uppercase tracking-wide text-muted-light">
-          <Icon name="lock" size={10} />
-          {c.fixedByUs}
+      {/* ── ONE details element, and it is the CARD (owner, 2026-09-02) ───────────────────────
+          *"so request details is duplicated in the card and in the text itslef?"* — and the answer
+          was yes, twice over: the same facts as a text block here, and again as a card underneath.
+
+          There is one now. The card and the text block were never two things: they are the same
+          request in two renderings, and which one a supplier meets depends on his app. So the
+          preview draws the RICHER of the two, where the details belong — between the renter's
+          intro and his sign-off — and says underneath what arrives where a card cannot.
+
+          Not editable: a supplier prices what this says, and a card that disagrees with the request
+          it links to is found out at the deal room. */}
+      <div title={c.fixedByUs}>
+        {unfurl ? (
+          <div
+            className="max-w-[400px] [&_img]:!h-auto [&_img]:!w-full [&_table]:!w-full [&_table]:!max-w-full"
+            dangerouslySetInnerHTML={{ __html: unfurl }}
+          />
+        ) : (
+          <p className="whitespace-pre-wrap text-meta leading-relaxed text-navy">{parts.card}</p>
+        )}
+        <span className="mt-1.5 flex items-start gap-1 text-label text-muted">
+          <Icon name="lock" size={10} className="mt-0.5 flex-none" />
+          {c.cardAsText}
         </span>
-        <p className="whitespace-pre-wrap text-meta leading-relaxed text-navy">{parts.card}</p>
       </div>
 
       <Editable value={template.signoff} display={parts.signoff} onChange={(v) => onChange("signoff", v)} label={c.tplSignoff} />
