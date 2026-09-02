@@ -297,14 +297,14 @@ export const en = {
       pickNone: "Clear selection",
       shareAgain: "Share again",
       shareAgainHint: "Pick another channel above and press again. The link stays the same.",
-      cardAsText: "Fixed by us. These details go in the message as text, so every supplier reads them.",
-      whatsappDraws: "WhatsApp also shows",
       nowPasteAddresses: "Your suppliers are on the clipboard. Press Ctrl+V in Outlook’s Bcc field.",
       nowPasteCard: "The card is on the clipboard. Press Ctrl+V at the end of the message.",
       linkHint: "Your shareable link is generated the moment you post your request.",
       noPhone: "no phone",
       vendorShort: "Vendor",
       skippingPhone: "{n} of the ones you picked have no phone.",
+      arrivesEmail: "E-mail carries these details as text today. The card appears once you connect your mailbox.",
+      arrivesChat: "WhatsApp builds this card from the link itself.",
       modalSubtitle: "Pick who sees it, and how it reaches them.",
     },
     reading: "Reading",
@@ -2369,7 +2369,9 @@ export const en = {
     removeRow: "Remove this row",
     markAll: "Mark them all as registered vendors",
     markAllHint: "On by default: untick any row above to add that one as a contact only.",
-    addSupplier: "Add suppliers",
+    /* «My» is the whole distinction from the button beside it (owner, 2026-09-03). Both add
+       suppliers; one picks a firm off Moedatech, this one takes the renter's own contacts. */
+    addSupplier: "Add my suppliers",
     added: "Added to your list",
     createGroup: "Create group",
     newGroup: "New group",
@@ -2486,7 +2488,10 @@ export const en = {
     inviteRecorded: "Copy pastes the full card, with the app links, into Gmail or Outlook. However you send it, it lands on their history.",
     inviteNotRecorded: "Sending is not recorded yet.",
     addFromApp: "Add from Moedatech",
-    dirTitle: "Save suppliers to your list",
+    /* Named for what it saves (owner, 2026-09-03: *"make the title save Moedatech supplier to your
+       list"*). «Save suppliers to your list» is also what the OTHER dialog does, from typed rows and
+       from a sheet, so the title said nothing about which of the three doors he had opened. */
+    dirTitle: "Save Moedatech suppliers to your list",
     dirSubtitle: "They stay in your list so you can send them your requests directly, and mark the ones you have registered as vendors.",
     dirEveryone: "Everyone with a Moedatech account, whether or not they have a store.",
     dirAdd: "Add selected",
@@ -2501,7 +2506,6 @@ export const en = {
     appEveryone: "Everyone with a Moedatech account. A firm without one goes under {tab}.",
     appOnlyStores: "Only suppliers with a store are listed here. Add anyone else under {tab}.",
     appNoSupplierId: "cannot be linked: this store does not name its company",
-    appPrivate: "The supplier is not told. Their name, their store and their equipment stay theirs; you are only adding them to your own list.",
     appRegisteredRule: "Everyone added here is marked a registered vendor, which is what lets you see their contact details.",
     appSearchFirst: "Type a name to search.",
     appNoResults: "No supplier with a store matches that.",

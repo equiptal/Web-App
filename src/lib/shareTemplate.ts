@@ -56,8 +56,8 @@ export const NAME_TOKEN = "{name}";
 const DEFAULTS = {
   en: {
     greeting: "Hello,",
-    intro: `${NAME_TOKEN} invites you to bid on an equipment request.`,
-    introNoName: "You are invited to bid on an equipment request.",
+    intro: `${NAME_TOKEN} invites you to bid on my equipment request.`,
+    introNoName: "You are invited to bid on my equipment request.",
     signoff: `Thanks,\n${NAME_TOKEN}`,
     signoffNoName: "Thanks,",
   },

@@ -281,8 +281,9 @@ describe("the words around the card", () => {
     drawDraft();
     expect(await screen.findByText("Hello,")).toBeTruthy();
     expect(screen.getByText(/invites you to bid/)).toBeTruthy();
-    // The details sit between them as the CARD, marked as ours and as not editable.
-    expect(screen.getByText(c.cardAsText)).toBeTruthy();
+    // The details sit between them AS THE CARD — the template is greeting, card, sign-off.
+    expect(screen.getByText("MOEDATECH")).toBeTruthy();
+    expect(screen.getByText(/Open the link to submit your bid/)).toBeTruthy();
   });
 
   it("Given he edits a line, Then it is edited IN the preview, and that is what is sent", async () => {
@@ -412,28 +413,28 @@ describe("the link preview (owner, 2026-09-02)", () => {
      * fell back to is a navy rectangle with the logo and nothing else, so the half of the card a
      * supplier sees first was the one part of the preview that was untrue.
      */
-    await waitFor(() => expect(screen.getByText(c.whatsappDraws)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(c.arrivesChat)).toBeTruthy());
     expect(document.querySelector('img[src="/og-bid.png"]')).toBeNull();
     expect(screen.getByText("MOEDATECH")).toBeTruthy();
     expect(screen.getByText(/Open the link to submit your bid/)).toBeTruthy();
   });
 
-  it("Given E-MAIL, Then NO card is drawn — a compose URL carries only words", async () => {
+  it("Given E-MAIL, Then the card is still the template — and the panel says what arrives today", async () => {
     /**
-     * Owner, 2026-09-03: *"just make sure the preview always same as actual in what will be sent in
-     * the channel."* Gmail builds no card from a pasted link, and the e-mail body is `text/plain`
-     * either way. Drawing one in this frame would promise a laid-out message that only appears if
-     * the renter pastes.
+     * Owner, 2026-09-03: *"greetings, {name} invites you to bid on my equipment request, then the
+     * card with the details and link, then at the end the renter name with thanks — that's it no
+     * more no less."* The template is the template in every channel.
+     *
+     * What differs is the DOOR, and that is said outside the message rather than by drawing a
+     * different template: a compose URL carries `text/plain`, so e-mail gets these details as words
+     * until a mailbox is connected.
      */
     drawDraft();
     fireEvent.click(await screen.findByText(c.email));
 
-    expect(screen.queryByText(c.whatsappDraws)).toBeNull();
-    expect(screen.queryByText("MOEDATECH")).toBeNull();
-    // The details are still there, as the words the message actually carries. (More than one match:
-    // the subject line names the machine too, since 2026-09-03.)
-    expect(screen.getAllByText(/Crawler Excavator 20 ton/).length).toBeGreaterThan(0);
-    expect(screen.getByText(c.cardAsText)).toBeTruthy();
+    expect(screen.getByText("MOEDATECH")).toBeTruthy();
+    expect(screen.getByText(c.arrivesEmail)).toBeTruthy();
+    expect(screen.queryByText(c.arrivesChat)).toBeNull();
   });
 });
 
@@ -501,7 +502,7 @@ describe("the preview says what is SENT, not what is stored", () => {
     );
 
     const intro = (await screen.findByLabelText(c.tplIntro)) as HTMLTextAreaElement;
-    expect(intro.value).toBe("Shibh Al Jazira invites you to bid on an equipment request.");
+    expect(intro.value).toBe("Shibh Al Jazira invites you to bid on my equipment request.");
     expect(intro.value).not.toContain("{name}");
 
     // Clicking in hands him the token back, because that is the thing he edits.
@@ -516,7 +517,7 @@ describe("the preview says what is SENT, not what is stored", () => {
       </LocaleProvider>,
     );
     const intro = (await screen.findByLabelText(c.tplIntro)) as HTMLTextAreaElement;
-    expect(intro.value).toBe("You are invited to bid on an equipment request.");
+    expect(intro.value).toBe("You are invited to bid on my equipment request.");
   });
 
   it("Given the details, Then they appear ONCE — as the card, not as the card AND the text", async () => {
@@ -540,10 +541,12 @@ describe("the preview says what is SENT, not what is stored", () => {
      * (`RFQ for <machine>`), which is a different sentence in a different place — what must not
      * happen is the same facts twice inside the message.
      */
-    // `selector: "p"` because a wrapping div matches the same text; the paragraph is the block.
-    expect(screen.getAllByText(/Crawler Excavator 20 ton/, { selector: "p" })).toHaveLength(1);
-    // And the details are named as ours, once — not headed by a second «what the link turns into».
-    expect(screen.getAllByText(c.cardAsText)).toHaveLength(1);
+    /**
+     * ONE rendering of the details, and it is the card. The message used to state its own contents
+     * twice — a text block, then the card underneath — which is what the owner kept reading as
+     * duplication, and he was right: nobody designs a letter that says everything twice.
+     */
+    expect(screen.getAllByText(/Crawler Excavator 20 ton · with operator/, { selector: "div" })).toHaveLength(1);
   });
 });
 

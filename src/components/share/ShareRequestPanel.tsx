@@ -762,7 +762,7 @@ export function ShareRequestPanel({
                   onChange={patchTemplate}
                   c={c}
                   linkPending={!uuid}
-                  unfurl={null}
+                  unfurl={unfurl}
                 />
               </div>
             </div>
@@ -785,6 +785,16 @@ export function ShareRequestPanel({
                 />
               </div>
             </div>
+          )}
+
+          {/* Outside the message on purpose: the template is greeting, card, sign-off, and nothing
+              else. This says what today's door can actually carry, without putting a caveat inside
+              the thing he is composing. */}
+          {!!card && (
+            <span className="flex items-start gap-1.5 text-label text-muted">
+              <Icon name="info" size={12} className="mt-px flex-none" />
+              {previewIsEmail ? c.arrivesEmail : c.arrivesChat}
+            </span>
           )}
 
           {!isDefaultTemplate(template, lang) && (
@@ -969,60 +979,43 @@ function Message({
   onChange: (field: keyof ShareTemplate, value: string) => void;
   c: ReturnType<typeof useT>["intake"]["postShare"];
   linkPending: boolean;
-  /** The card, when there is one. Its absence falls back to the same facts as words. */
   unfurl: string | null;
 }) {
   return (
-    <div className="grid gap-2.5">
+    <div className="grid gap-3">
       <Editable value={template.greeting} display={parts.greeting} onChange={(v) => onChange("greeting", v)} label={c.tplGreeting} />
       <Editable value={template.intro} display={parts.intro} onChange={(v) => onChange("intro", v)} label={c.tplIntro} />
 
-      {/* ── ONE details element, and it is WORDS (owner, 2026-09-02, then 2026-09-03) ────────
-          *"so request details is duplicated in the card and in the text itslef?"* — and the answer
-          was yes, twice over: these facts as a text block, and again as a card underneath.
+      {/* ── The CARD is the details, and it carries the link (owner, 2026-09-03) ──────────────────
+          *"greetings, {name} invites you to bid on my equipment request, then the card with the
+          details and link, then at the end the renter name with thanks — that's it no more no less."*
 
-          There is one now, and it is the text, because the text is what every channel actually
-          carries. A compose URL takes `text/plain`; SMS takes text; a supplier with images off
-          reads text. The card is not a second copy of this — it is what SOME apps build for
-          themselves out of the link, and it is drawn below only in the channel that really builds
-          one.
+          ~~The details as a text block, then the card underneath.~~ Two renderings of one thing,
+          stacked, which is what he kept reading as duplication — and he was right: nobody designs a
+          message that states its own contents twice.
 
-          Not editable: a supplier prices what this says, and a block that disagrees with the
-          request it links to is found out at the deal room. */}
-      <div title={c.fixedByUs}>
-        <p className="whitespace-pre-wrap text-meta leading-relaxed text-navy">{parts.card}</p>
-        <span className="mt-1.5 flex items-start gap-1 text-label text-muted">
-          <Icon name="lock" size={10} className="mt-0.5 flex-none" />
-          {c.cardAsText}
-        </span>
-      </div>
+          So this is the template, and the card is the middle of it. Not editable: a supplier prices
+          what it says, and a card that disagrees with the request it links to is found out at the
+          deal room. */}
+      {unfurl ? (
+        <div
+          className="max-w-[400px] [&_img]:!h-auto [&_img]:!w-full [&_table]:!w-full [&_table]:!max-w-full"
+          dangerouslySetInnerHTML={{ __html: unfurl }}
+        />
+      ) : (
+        <p className="whitespace-pre-wrap rounded-sm border border-dashed border-border bg-surface2 p-2.5 text-meta leading-relaxed text-navy">
+          {parts.card}
+        </p>
+      )}
+
+      {linkPending && (
+        <p className="flex items-center gap-1.5 font-mono text-label text-muted-light">
+          <Icon name="lock" size={11} />
+          {c.linkMasked}
+        </p>
+      )}
 
       <Editable value={template.signoff} display={parts.signoff} onChange={(v) => onChange("signoff", v)} label={c.tplSignoff} />
-
-      {parts.url ? (
-        <p dir="ltr" className="break-all font-mono text-meta text-info">
-          {parts.url}
-        </p>
-      ) : (
-        linkPending && (
-          <p className="flex items-center gap-1.5 font-mono text-meta text-muted-light">
-            <Icon name="lock" size={11} />
-            {c.linkMasked}
-          </p>
-        )
-      )}
-
-      {/* WhatsApp builds this itself, from the link above, and shows it with the words. Drawn only
-          where it really appears — so the preview is the message, per channel, and not a hope. */}
-      {unfurl && (
-        <div className="grid gap-1">
-          <span className="text-label uppercase tracking-wide text-muted">{c.whatsappDraws}</span>
-          <div
-            className="max-w-[360px] [&_img]:!h-auto [&_img]:!w-full [&_table]:!w-full [&_table]:!max-w-full"
-            dangerouslySetInnerHTML={{ __html: unfurl }}
-          />
-        </div>
-      )}
     </div>
   );
 }
