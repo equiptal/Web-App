@@ -74,7 +74,9 @@ export function Confirmation() {
   }, [reqUuid]);
   useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
 
-  const shareUrl = origin && reqUuid ? bidShareUrl(origin, reqUuid, renterName) : "";
+  // Not gated on `origin`: the link is the Supplier OS host, not this app's, so it is final on the
+  // server render too (no empty-then-populated value once hydration lands).
+  const shareUrl = reqUuid ? bidShareUrl(reqUuid) : "";
   const formUrl = shareUrl || `${origin}/supplier-bid-v2.html?preview=1`;
   // The RFQ group code (RFQ-NNNNN) when the backend emits one, else the per-request code (REQ-…).
   const refCode = groupRef ?? (reqId ? `REQ-${reqId}` : "");

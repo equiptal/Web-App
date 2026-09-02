@@ -32,10 +32,7 @@
 
 import { JOIN_URL } from "@/lib/config/store-links";
 import { COLORS, RADII } from "@/lib/ds-colors";
-import { bidCardModel, type BidCardModel } from "@/lib/bidCardModel";
-import { bidCardText } from "@/lib/bidCardText";
-import type { BidPreview } from "@/lib/api/bidPreview";
-import { mapBidFormData, type BidFormData } from "@/lib/contract/link-bids";
+import type { BidCardModel } from "@/lib/bidCardModel";
 
 export interface BidCardPreview {
   title: string;
@@ -122,64 +119,12 @@ export function bidCardHtml(card: BidCardPreview, model: BidCardModel | null, la
 </a>`;
 }
 
-/**
- * Put the link on the clipboard as both the card and the plain URL.
+/*
+ * ── `copyBidLink` lived here ────────────────────────────────────────────────────────────────────
  *
- * Falls back to writing just the URL when the rich path isn't available — an insecure context, an
- * older browser, a failed preview fetch, or a `ClipboardItem` the browser refuses. The user always
- * ends up with a working link; the card is the enhancement.
- *
- * Returns `true` when the card went on the clipboard, so the caller can say so.
+ * It wrote the card to the clipboard in two flavours, and it rendered the DEFAULT wording: no
+ * greeting the renter had written, no company name. `copyShareMessage` does the same two-flavour
+ * write from the renter's own template, so keeping this one meant one dialog could put two
+ * different messages on the clipboard depending on which Copy was pressed. Removed rather than
+ * wrapped: a second clipboard writer is a second message waiting to happen.
  */
-export async function copyBidLink(shareUrl: string, lang: "en" | "ar" = "en"): Promise<boolean> {
-  const plain = () => navigator.clipboard?.writeText(shareUrl);
-
-  const token = bidTokenFromUrl(shareUrl);
-  // `ClipboardItem` is undefined in non-secure contexts and older Safari.
-  if (!token || typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
-    await plain();
-    return false;
-  }
-
-  try {
-    const [previewRes, formRes] = await Promise.all([
-      fetch(`/api/bid-form/${encodeURIComponent(token)}/preview`),
-      // The request itself, for the machines and the terms. A failure here costs the detail, not the
-      // card — the preview's two strings still make a valid one.
-      fetch(`/api/bid-form/${encodeURIComponent(token)}`).catch(() => null),
-    ]);
-    if (!previewRes.ok) throw new Error(String(previewRes.status));
-    const p = (await previewRes.json()) as Partial<BidPreview>;
-    const copy = (lang === "ar" ? p.ar : p.en) ?? { title: p.title ?? "", description: p.description ?? "" };
-    if (!copy.title) throw new Error("incomplete preview");
-
-    let form: BidFormData | null = null;
-    if (formRes?.ok) {
-      const raw: unknown = await formRes.json().catch(() => null);
-      const mapped = raw ? mapBidFormData(raw) : null;
-      form = mapped?.items?.length ? mapped : null;
-    }
-
-    /**
-     * The image, in order of how much it knows about THIS request: the backend's own rendering, then
-     * ours. The generic file is deliberately not a fallback here — a card with a picture of nothing
-     * pasted into an email is worse than the same card with our per-request one, which always renders.
-     */
-    const imageUrl = p.imageUrl || `${window.location.origin}/bid/${token}/og${lang === "ar" ? "?lang=ar" : ""}`;
-    const model = bidCardModel((p as BidPreview) ?? null, copy, lang, form);
-    const html = bidCardHtml({ ...copy, imageUrl, url: shareUrl }, model, lang);
-    const text = bidCardText(model, shareUrl, { lang });
-
-    await navigator.clipboard.write([
-      new ClipboardItem({
-        "text/html": new Blob([html], { type: "text/html" }),
-        "text/plain": new Blob([text], { type: "text/plain" }),
-      }),
-    ]);
-    return true;
-  } catch {
-    // Never leave the user with nothing because the card failed.
-    await plain().catch(() => {});
-    return false;
-  }
-}

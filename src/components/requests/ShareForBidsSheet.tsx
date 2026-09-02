@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
-import { bidTokenFromUrl, copyBidLink } from "@/lib/bidCardHtml";
+import { bidTokenFromUrl } from "@/lib/bidCardHtml";
 import { ShareRequestPanel } from "@/components/share/ShareRequestPanel";
 import { ACTIONS, btn, cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
@@ -50,7 +50,6 @@ export function ShareForBidsSheet({
   ar: boolean;
   L: (en: string, arr: string) => string;
 }) {
-  const [copied, setCopied] = useState(false);
   const [dlInput, setDlInput] = useState("");
   const [dlEdit, setDlEdit] = useState(false);
   const [logo, setLogo] = useState<string | null>(logoUrl ?? null);
@@ -97,22 +96,6 @@ export function ShareForBidsSheet({
   };
 
 
-  /**
-   * Copies the link as BOTH the rich card and the plain URL — one clipboard write, two flavours.
-   *
-   * Gmail never builds a preview for a pasted URL (it refuses to fetch the page), so the only way a
-   * renter's emailed link shows a card is to put the card itself on the clipboard. Gmail's composer
-   * keeps pasted HTML, so it renders. WhatsApp and SMS take the plain flavour instead and unfurl the
-   * URL themselves, so nothing that works today changes.
-   *
-   * Degrades to the plain URL on its own if anything fails — see `copyBidLink`.
-   */
-  const copyLink = () => {
-    if (!shareUrl) return;
-    copyBidLink(shareUrl, ar ? "ar" : "en")
-      .catch(() => false)
-      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); });
-  };
   const openDl = () => { setDlInput(toLocalInput(deadline)); setDlEdit(true); };
   const saveDl = (clear?: boolean) => {
     onSaveDeadline(clear || !dlInput ? null : new Date(dlInput).toISOString());
@@ -135,7 +118,10 @@ export function ShareForBidsSheet({
     <Dialog
       open
       onClose={onClose}
-      size="md"
+      /* The panel inside is a two-column layout — a 520px dialog squeezed it into two columns of
+         about 200px each, which truncated every supplier name and gave the page four nested
+         scrollbars. */
+      size="xxl"
       padded={false}
       icon={<span className="grid h-[34px] w-[34px] place-items-center rounded-sm bg-brand text-white"><Icon name="ios_share" size={18} /></span>}
       title={L("Share for bids", "مشاركة لتلقّي العروض")}
@@ -144,20 +130,14 @@ export function ShareForBidsSheet({
       <div {...pin("share-for-bids")} className="flex min-h-0 flex-1 flex-col text-start" dir={ar ? "rtl" : "ltr"}>
 
         <div className="flex flex-col gap-5 overflow-y-auto px-5 py-4">
-          {/* link + copy */}
-          <div>
-            <div className={lbl}>{L("Your bid link", "رابط تقديم العرض")}</div>
-            <div className="flex gap-2">
-              <div className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-sm border border-border bg-surface2 px-3 text-meta text-navy">
-                <Icon name="link" size={15} className="flex-none text-muted" />
-                <span className="truncate" dir="ltr">{shareUrl || "…"}</span>
-              </div>
-              <button onClick={copyLink} className={`inline-flex h-11 flex-none items-center gap-1.5 rounded-sm px-4 text-body font-semibold text-white ${copied ? "bg-ok" : "bg-brand"}`}>
-                <Icon name={copied ? "check" : "content_copy"} size={16} />{copied ? L("Copied", "تم النسخ") : L("Copy", "نسخ")}
-              </button>
-            </div>
-          </div>
+          {/* ── The link row belongs to the panel now ────────────────────────────────────────
+              This drew its own link + Copy, and that Copy called `copyBidLink`, which renders the
+              DEFAULT wording with no renter name. The panel below copies the renter's own template.
+              So one dialog held two Copy buttons that put two different messages on the clipboard,
+              which is precisely the drift the shared panel exists to prevent.
 
+              `showExpiry={false}` keeps this sheet's deadline editor, which is the better of the
+              two: it takes a date AND a time, and it can clear one. */}
           {/* ── ONE share panel, the same one the review carries (owner, 2026-09-02) ───────────
               This used to be two blocks: a supplier picker of its own, and a four-icon channel row
               (WhatsApp / Email / SMS / More). Between them and the review screen there were three
@@ -172,14 +152,15 @@ export function ShareForBidsSheet({
               owner's prototype and neither could name who it went to — `sms:` and `navigator.share`
               open with no recipient, so nothing was recorded and the renter had no list of who he
               had told. */}
+          {/* No heading of its own: the panel opens with SEND TO MY SUPPLIERS, and two headings a
+              line apart saying the same thing is how the sheet came to look stacked. */}
           <div>
-            <div className={lbl}>{L("Send it to suppliers you keep", "أرسِله إلى مورّديك")}</div>
             <ShareRequestPanel
               mode="share"
               requestUuid={bidTokenFromUrl(shareUrl)}
               requestCode={requestCode ?? null}
               renterName={renterName}
-              showLink={false}
+              showExpiry={false}
             />
           </div>
 

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/ui";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
+import { useSession } from "@/lib/session";
+import { AccountModal } from "@/components/onboarding/AccountModal";
 import { draftBidForm } from "@/lib/draftBidForm";
 import { ShareRequestPanel } from "@/components/share/ShareRequestPanel";
 
@@ -33,7 +35,9 @@ export function ShareOnPost() {
   const t = useT();
   const c = t.intake.postShare;
   const { state, actions } = useRfq();
+  const { tier } = useSession();
   const [coach, setCoach] = useState(true);
+  const [showAccount, setShowAccount] = useState(false);
   /** The renter's own firm, for the From line. Read once, and a failure just leaves it unnamed. */
   const [renterName, setRenterName] = useState<string | null>(null);
 
@@ -65,6 +69,17 @@ export function ShareOnPost() {
   );
 
   const post = async (): Promise<string | null> => {
+    /**
+     * The account gate lives here now, because this is the button that posts.
+     *
+     * It used to sit on the review screen's own Send, which is gone. Returning null stops the share
+     * without opening anything: the renter makes an account, presses Send again, and everything he
+     * picked is still on screen because nothing unmounted.
+     */
+    if (tier === "guest") {
+      setShowAccount(true);
+      return null;
+    }
     const result = await actions.submit();
     const uuid = result?.requestUuids?.[0] ?? null;
     // `submit` has already put the failure on the store; the review above says what went wrong.
@@ -97,6 +112,14 @@ export function ShareOnPost() {
         draftForm={draftForm}
         onPost={post}
         renterName={renterName}
+      />
+
+      <AccountModal
+        open={showAccount}
+        onClose={() => setShowAccount(false)}
+        onCreated={() => setShowAccount(false)}
+        title={t.guest.postGateTitle}
+        postSubhead={t.guest.postBodyRequest}
       />
     </section>
   );

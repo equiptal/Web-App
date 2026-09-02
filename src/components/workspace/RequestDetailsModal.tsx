@@ -162,7 +162,8 @@ export function RequestDetailsModal({
    */
   const extendable = subjectRecord ? requestFieldFormatters(ar, L).yn(subjectRecord.extendable) : null;
   const notes = typeof subjectRecord?.additionalNotes === "string" ? subjectRecord.additionalNotes.trim() : "";
-  const shareUrl = typeof window !== "undefined" ? bidShareUrl(window.location.origin, group.id, link?.renterName) : "";
+  // The Supplier OS host, not this app's origin — so no `typeof window` guard and no SSR-empty value.
+  const shareUrl = bidShareUrl(group.id);
 
   /** Edit opens the same form the detail page used — the record has to be fetched in full first. */
   const openEdit = async () => {

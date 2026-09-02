@@ -178,16 +178,32 @@ describe("the line-item table (MREQ-AC-45)", () => {
   });
 });
 
-describe("sending (MREQ-AC-47)", () => {
-  it("raises the account modal for a guest instead of posting", async () => {
+describe("sending, and the two buttons that are gone (owner, 2026-09-02)", () => {
+  /**
+   * The review used to end in an action row: *Back to editing* and *Send to suppliers*.
+   *
+   * Both are gone. The send is the one button on the share card below — which is the only one that
+   * knows WHICH suppliers, and the only one that can mint the link before it sends it; two buttons
+   * that both post a request is one too many. The account gate went with it, to the thing that
+   * posts (`ShareOnPost`).
+   */
+  it("has no send of its own", async () => {
+    await review();
+    expect(screen.queryByRole("button", { name: /Send to suppliers/i })).toBeNull();
+  });
+
+  it("offers a pen beside «View all details» instead of a button in an action row", async () => {
+    // Where the hand already is: he has just read the strip, and the two controls are the two
+    // things he can do about it — look closer, or change it.
     const handle = await review();
-    expect(handle.store().state.busy).toBe(false);
+    const pen = screen.getByRole("button", { name: "Back to editing" });
 
-    await handle.run(() => screen.getByRole("button", { name: /Send to suppliers/ }).click());
+    // A pen, not a labelled button: its only content is the glyph, and its name is an `aria-label`.
+    expect(pen.textContent?.trim()).toBe("edit");
+    expect(pen.previousElementSibling?.textContent).toContain("View all details");
 
-    // Guest — the gate opens and nothing is submitted.
-    expect(handle.store().state.requestId).toBeNull();
-    expect(handle.store().state.busy).toBe(false);
+    await handle.run(() => pen.click());
+    expect(handle.store().state.readyToSend).toBe(false);
   });
 });
 

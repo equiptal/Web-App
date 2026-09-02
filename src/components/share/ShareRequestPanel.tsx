@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui";
 import { btn, cx } from "@/lib/ds";
 import { fmt, useLocale, useT } from "@/lib/i18n";
@@ -15,6 +15,7 @@ import {
 import { canBeEmailed } from "@/lib/contract/renter-suppliers";
 import type { BidFormData } from "@/lib/contract/link-bids";
 import { bidCardHtml } from "@/lib/bidCardHtml";
+import { copyShareMessage, shareMessageHtml } from "@/lib/copyShareMessage";
 import { useBidCard } from "@/lib/useBidCard";
 import {
   clearTemplate,
@@ -96,6 +97,14 @@ export interface ShareRequestPanelProps {
    * this stops, and two deadline controls that write the same field is worse than that.
    */
   showLink?: boolean;
+  /**
+   * Draw the expiry beside the link.
+   *
+   * Off where the shell owns a richer one — the bid-link sheet's editor takes a date AND a time and
+   * can clear it, which a plain date box cannot. Two controls writing the same deadline is worse
+   * than either of them alone.
+   */
+  showExpiry?: boolean;
 }
 
 export function ShareRequestPanel({
@@ -108,6 +117,7 @@ export function ShareRequestPanel({
   preselect,
   renterName = null,
   showLink = true,
+  showExpiry = true,
 }: ShareRequestPanelProps) {
   const t = useT();
   const c = t.intake.postShare;
@@ -120,12 +130,13 @@ export function ShareRequestPanel({
   );
   const [byEmail, setByEmail] = useState(true);
   const [byWhatsApp, setByWhatsApp] = useState(false);
+  /** Anywhere else — the device's own share sheet, or the clipboard where there is none. */
+  const [byOther, setByOther] = useState(false);
+  const [copiedMessage, setCopiedMessage] = useState(false);
   const [provider, setProvider] = useState<EmailProvider>("outlook");
-  const [tab, setTab] = useState<"email" | "whatsapp">("email");
-  const [note, setNote] = useState("");
+  const [tab, setTab] = useState<"email" | "plain">("email");
   /** The renter's own wording, kept on this browser so every request after this one carries it. */
   const [template, setTemplate] = useState<ShareTemplate>(() => defaultTemplate("en"));
-  const [editing, setEditing] = useState(false);
   const [query, setQuery] = useState("");
   const [expiry, setExpiry] = useState("");
   const [busy, setBusy] = useState(false);
@@ -148,10 +159,9 @@ export function ShareRequestPanel({
       .catch(() => setRows([]));
   }, []);
 
-  const shareUrl = useMemo(() => {
-    if (!uuid || typeof window === "undefined") return "";
-    return bidShareUrl(window.location.origin, uuid, null);
-  }, [uuid]);
+  // The Supplier OS host, not this app's origin, so there is nothing to read off `window` and the
+  // value is already final on the server render.
+  const shareUrl = useMemo(() => (uuid ? bidShareUrl(uuid) : ""), [uuid]);
 
   const card = useBidCard(shareUrl, lang, draftForm);
 
@@ -161,7 +171,7 @@ export function ShareRequestPanel({
   const firstWithPhone = chosen.find((s) => s.phone?.trim()) ?? null;
 
   /** The same message in its halves, so the preview can show which of them he may edit. */
-  const parts = card ? shareMessageParts(card.model, shareUrl, { template, note, renterName, lang }) : null;
+  const parts = card ? shareMessageParts(card.model, shareUrl, { template, renterName, lang }) : null;
 
   const subject = fmt(c.subject, { code: requestCode ?? "" }).trim();
 
@@ -172,7 +182,12 @@ export function ShareRequestPanel({
           {
             title: card.model.cardTitle,
             description: card.model.where ?? "",
-            imageUrl: card.imageUrl || `${window.location.origin}/bid/${uuid}/og`,
+            // Deliberately this app's host, not the OS: the emailed card and the unfurled card are
+            // served from the same place so they cannot drift apart. Guarded because `shareUrl` is
+            // now truthy during SSR, where `window` does not exist.
+            imageUrl:
+              card.imageUrl ||
+              (typeof window === "undefined" ? "" : `${window.location.origin}/bid/${uuid}/og`),
             url: shareUrl,
           },
           card.model,
@@ -181,17 +196,21 @@ export function ShareRequestPanel({
       : null;
 
   /**
-   * Moedatech alone is a legitimate send (owner, 2026-09-02: *"users must be able to send the
-   * request only through moedatech without any other channel"*). So the gate is not "has he picked a
-   * channel" — it is "can what he picked actually go".
+   * ⚠️ **Send is never gated on a channel being able to reach someone** (owner, 2026-09-02:
+   * *"nothing happen when i click post and share"*).
+   *
+   * ~~It used to be: `moedatechOnly || !chosen.length || (byEmail && reachable.length) || …`~~ Tick a
+   * supplier who has no e-mail with E-mail on, and every clause was false. The button went quietly
+   * disabled, so pressing it did nothing at all — and because the post happens on this press, **the
+   * request was never created either**. Four of a typical renter's suppliers have no address, so
+   * this was not an edge.
+   *
+   * The model was wrong, not just the expression. Moedatech is always a destination, so posting is
+   * always valid; the extra channels do what they can and say what they could not. Nothing about
+   * who is picked may stop a request from being created.
    */
-  const moedatechOnly = !byEmail && !byWhatsApp;
-  const canSend =
-    !busy &&
-    (moedatechOnly ||
-      !chosen.length ||
-      (byEmail && !!reachable.length) ||
-      (byWhatsApp && !!firstWithPhone));
+  const moedatechOnly = !byEmail && !byWhatsApp && !byOther;
+  const canSend = !busy;
 
   /** The list, narrowed. Searching never changes the ticks — a hidden pick is still a pick. */
   const visible = (rows ?? []).filter((r) =>
@@ -218,12 +237,9 @@ export function ShareRequestPanel({
     // the link works either way.
     if (expiry) void setBidDeadline(id, new Date(expiry).toISOString()).catch(() => {});
 
-    const url = bidShareUrl(window.location.origin, id, null);
-    const message = card
-      ? renderShareMessage(card.model, url, { template, note, renterName, lang })
-      : `${note}
-
-${url}`;
+    const url = bidShareUrl(id);
+    // No card means no request worth describing; the link alone is still a valid share.
+    const message = card ? renderShareMessage(card.model, url, { template, renterName, lang }) : url;
     let reached = 0;
 
     if (byEmail) {
@@ -255,10 +271,38 @@ ${url}`;
       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank", "noopener");
       if (firstWithPhone) reached += 1;
     }
+    if (byOther) {
+      /**
+       * The device's own sheet. `navigator.share` needs a user gesture and HTTPS, and it rejects on
+       * a cancel as well as on a failure — so a rejection is never treated as an error, it just
+       * falls through to the clipboard, which is what a desktop browser gets anyway.
+       */
+      const shared = await navigator
+        .share?.({ title: subject, text: message })
+        .then(() => true)
+        .catch(() => false);
+      if (!shared) {
+        await navigator.clipboard?.writeText(message).catch(() => {});
+        setCopiedMessage(true);
+        setTimeout(() => setCopiedMessage(false), 2400);
+      }
+    }
 
     setSharedWith(reached);
     onShared?.(reached);
     setBusy(false);
+  };
+
+  /**
+   * One of his own lines changed.
+   *
+   * Saved on every keystroke rather than behind a Save button: there is no Save on this panel, and
+   * a wording he typed and then sent without pressing anything must still be there next month.
+   */
+  const patchTemplate = (field: keyof ShareTemplate, value: string) => {
+    const next = { ...template, [field]: value };
+    setTemplate(next);
+    saveTemplate(next, lang);
   };
 
   const saveEmail = async (s: RenterSupplier) => {
@@ -276,7 +320,14 @@ ${url}`;
     }
   };
 
-  const previewIsEmail = tab === "email" || !byWhatsApp;
+  /**
+   * Which frame the preview draws.
+   *
+   * ⚠️ No tabs (owner, 2026-09-02). Pressing WhatsApp and then having to press WhatsApp AGAIN in a
+   * tab strip to see it is asking the same question twice; the channel row is already the answer.
+   * `tab` is set by the channel buttons and only ever shows a channel that is actually on.
+   */
+  const previewIsEmail = byEmail && (tab === "email" || (!byWhatsApp && !byOther));
   const label = "text-label font-extrabold uppercase tracking-wide text-muted";
 
   return (
@@ -289,17 +340,21 @@ ${url}`;
           {c.linkLabel}
         </span>
         <div className="flex flex-wrap items-center gap-2">
-          {/* The expiry sits beside the link because it is a property OF the link, not of the request. */}
-          <span className="flex h-[34px] items-center gap-2 rounded-md border border-border px-2.5">
-            <Icon name="event" size={14} className="text-muted" />
-            <input
-              type="date"
-              value={expiry}
-              onChange={(e) => setExpiry(e.target.value)}
-              aria-label={c.expiry}
-              className="w-[112px] bg-transparent text-meta text-navy outline-none"
-            />
-          </span>
+          {/* The expiry sits beside the link because it is a property OF the link, not of the
+              request — and it is named, because a bare date box beside a URL could be anything. */}
+          {showExpiry && (
+            <span className="flex h-[34px] items-center gap-2 rounded-md border border-border px-2.5">
+              <Icon name="event" size={14} className="flex-none text-muted" />
+              <span className="text-label font-extrabold uppercase tracking-wide text-muted">{c.expiry}</span>
+              <input
+                type="date"
+                value={expiry}
+                onChange={(e) => setExpiry(e.target.value)}
+                aria-label={c.expiry}
+                className="w-[112px] bg-transparent text-meta text-navy outline-none"
+              />
+            </span>
+          )}
           {/* Locked until it exists (owner, 2026-09-02: *"users cant copy or view the link before
               sharing or posting it because it is not created yet"*). Drawn as a padlocked, dashed
               field rather than hidden: the renter needs to know a link is coming and that this is
@@ -319,7 +374,20 @@ ${url}`;
             type="button"
             disabled={!uuid}
             onClick={() => {
-              void navigator.clipboard?.writeText(shareUrl).catch(() => {});
+              /* The whole message, not the bare link (owner, 2026-09-02). A renter who pastes into
+                 a chat we have no button for must send the same thing the buttons send — otherwise
+                 the request reads one way through E-mail and another way through Copy. */
+              void copyShareMessage(
+                card ? renderShareMessage(card.model, shareUrl, { template, renterName, lang }) : shareUrl,
+                card
+                  ? shareMessageHtml(
+                      card.model,
+                      shareUrl,
+                      card.imageUrl || `${window.location.origin}/bid/${uuid}/og`,
+                      { template, renterName, lang },
+                    )
+                  : shareUrl,
+              ).catch(() => {});
               setCopied(true);
               setTimeout(() => setCopied(false), 1600);
             }}
@@ -329,11 +397,10 @@ ${url}`;
             {copied ? c.copied : c.copy}
           </button>
         </div>
-        <p className="text-meta text-muted">{c.linkHint}</p>
       </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
         {/* ── Left: who, and how ─────────────────────────────────────────────────────────────── */}
         <div className="flex flex-col gap-4">
           <div className="grid gap-2">
@@ -373,13 +440,13 @@ ${url}`;
             ) : rows.length === 0 ? (
               <span className="text-meta text-muted">{c.noSuppliers}</span>
             ) : (
-              <div className="max-h-[228px] overflow-auto rounded-md border border-border">
+              <div className="max-h-[300px] overflow-auto rounded-md border border-border">
                 <ul>
                   {visible.map((s) => {
                     const on = !!picked[s.id];
                     return (
                       <li key={s.id} className="border-b border-border last:border-b-0">
-                        <div className={cx("flex items-center gap-2.5 px-3 py-2", on && "bg-ok-soft")}>
+                        <div className={cx("flex items-center gap-3 px-3 py-2", on && "bg-ok-soft")}>
                           <button
                             type="button"
                             role="checkbox"
@@ -462,8 +529,11 @@ ${url}`;
                 title={c.alwaysHint}
                 className="inline-flex h-[34px] flex-none items-center gap-2 rounded-md border border-ok bg-ok-soft px-3"
               >
+                {/* The wordmark the nav bar carries, so the renter recognises it as us rather than
+                    as an icon he has to decode. `brightness-0` forces it to ink on the pale chip;
+                    the nav inverts the same file to white on navy. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/moedatech-logomark.svg" alt="Moedatech" className="h-3.5 w-auto" />
+                <img src="/moedatech-logo.svg" alt="Moedatech" className="h-3 w-auto brightness-0" />
                 <Icon name="check" size={13} className="text-ok-deep" />
               </span>
               <span aria-hidden className="h-6 w-px flex-none bg-border" />
@@ -471,7 +541,7 @@ ${url}`;
                 on={byWhatsApp}
                 onClick={() => {
                   setByWhatsApp((v) => !v);
-                  setTab("whatsapp");
+                  setTab("plain");
                 }}
                 icon="chat"
                 label={c.whatsapp}
@@ -485,6 +555,20 @@ ${url}`;
                 icon="mail"
                 label={c.email}
               />
+              {/* ── Anywhere else (owner, 2026-09-02) ─────────────────────────────────────────
+                  A renter whose supplier is on Telegram, or who wants the message in his own notes,
+                  had no way out of the two named channels. This hands the message to the device's
+                  own share sheet — every app on the machine, not a list we chose — and copies it
+                  where there is no sheet, which is most desktop browsers. */}
+              <Channel
+                on={byOther}
+                onClick={() => {
+                  setByOther((v) => !v);
+                  setTab("plain");
+                }}
+                icon="ios_share"
+                label={c.other}
+              />
               <button
                 type="button"
                 onClick={() => void send()}
@@ -492,15 +576,16 @@ ${url}`;
                 className={cx(btn("primary", "md"), "ms-auto flex-none")}
               >
                 <Icon name="send" size={15} />
+                {/* The only send on this screen now: the review's own «Send to suppliers» button is
+                    gone, because two buttons that both post a request is one too many and neither
+                    of them said which suppliers. */}
                 {busy
                   ? c.posting
                   : moedatechOnly
                     ? mode === "post"
                       ? c.postMoedatechOnly
                       : c.sendMoedatechOnly
-                    : mode === "post"
-                      ? c.post
-                      : c.send}
+                    : c.sendToSuppliers}
               </button>
             </div>
             {/* With both extras off this is the whole answer, so it is stated as a fact rather than
@@ -553,157 +638,106 @@ ${url}`;
                 {c.tooLong}
               </span>
             )}
+            {copiedMessage && (
+              <span className="flex items-center gap-1.5 text-meta font-semibold text-ok-deep">
+                <Icon name="check" size={14} />
+                {c.messageCopied}
+              </span>
+            )}
+            {/* What actually happened, not a blanket «shared». A send that reached nobody by e-mail
+                still POSTED, and saying «shared with 0 suppliers» would read as a failure when the
+                request is live on Moedatech and waiting. */}
             {sharedWith !== null && (
               <span className="flex items-center gap-1.5 rounded-md bg-ok-soft px-3 py-2 text-meta font-extrabold text-ok-deep">
                 <Icon name="check_circle" size={15} />
-                {sharedWith === 1 ? c.doneOne : fmt(c.done, { n: sharedWith })}
+                {sharedWith === 0 ? c.postedOnly : sharedWith === 1 ? c.doneOne : fmt(c.done, { n: sharedWith })}
               </span>
-            )}
-          </div>
-
-          <label className="grid gap-1">
-            <span className={label}>{c.yourLine}</span>
-            <textarea
-              rows={2}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={c.yourLineHint}
-              className="rounded-sm border border-border bg-surface p-2.5 text-meta text-navy outline-none focus:border-brand"
-            />
-          </label>
-
-          {/* ── His wording, kept (owner, 2026-09-02) ──────────────────────────────────────────
-              *"users can edit the template in terms of the wording of text sections like hello etc
-              not the request card itself this is fixed from us."*
-
-              Three fields, and only three: the greeting, the line that introduces the request, and
-              the sign-off. Saved on this browser, so a firm that always opens the same way types it
-              once. The card between them is ours, and the panel says so where he can see it —
-              because a renter who could edit the card could send one that disagrees with the request
-              it links to, and the first anyone would know is a withdrawn bid at the deal room.
-
-              Behind a toggle, not open by default: he is here to send a request, and most days the
-              wording he set last month is the wording he wants. */}
-          <div className="grid gap-2">
-            <button
-              type="button"
-              onClick={() => setEditing((v) => !v)}
-              className="flex items-center gap-1.5 text-meta font-semibold text-brand"
-            >
-              <Icon name={editing ? "expand_less" : "edit"} size={14} />
-              {c.editWording}
-              {!isDefaultTemplate(template, lang) && (
-                <span className="rounded-sm bg-brand-soft px-1.5 py-0.5 text-label font-extrabold text-brand-deep">
-                  {c.edited}
-                </span>
-              )}
-            </button>
-
-            {editing && (
-              <div className="grid gap-2.5 rounded-md border border-border bg-surface2 p-3">
-                <p className="text-meta text-muted">{c.editWordingHint}</p>
-                {(
-                  [
-                    ["greeting", c.tplGreeting, 1],
-                    ["intro", c.tplIntro, 2],
-                    ["signoff", c.tplSignoff, 2],
-                  ] as const
-                ).map(([field, name, lines]) => (
-                  <label key={field} className="grid gap-1">
-                    <span className="text-label font-extrabold uppercase tracking-wide text-muted">{name}</span>
-                    <textarea
-                      rows={lines}
-                      value={template[field]}
-                      onChange={(e) => {
-                        const next = { ...template, [field]: e.target.value };
-                        setTemplate(next);
-                        saveTemplate(next, lang);
-                      }}
-                      className="rounded-sm border border-border bg-surface p-2 text-meta text-navy outline-none focus:border-brand"
-                    />
-                  </label>
-                ))}
-                <span className="flex items-center gap-3">
-                  <span className="flex-1 text-label text-muted">{c.tplNameToken}</span>
-                  {!isDefaultTemplate(template, lang) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        clearTemplate(lang);
-                        setTemplate(defaultTemplate(lang));
-                      }}
-                      className="flex-none text-meta font-semibold text-brand"
-                    >
-                      {c.tplReset}
-                    </button>
-                  )}
-                </span>
-              </div>
             )}
           </div>
 
         </div>
 
-        {/* ── Right: what they receive ───────────────────────────────────────────────────────── */}
+        {/* ── Right: what they receive, and where he writes it ─────────────────────────────
+            The preview IS the editor (owner, 2026-09-02: *"i want the template itself editable and
+            will be reflected in what will be sent"*).
+
+            It used to be a read-only panel with a separate *Edit the wording* drawer beneath it and
+            a *A line of your own* box beside that — three places to type one message, and the thing
+            he was editing was not the thing he was looking at. Now his own lines are fields drawn to
+            look exactly like the text they will become, and our card between them is not.
+
+            No tabs: the channel row above already says which one he is sending, and asking again
+            here is asking twice. */}
         <div className="flex flex-col gap-2">
-          <span className="flex items-center gap-2">
+          <span className="flex items-baseline gap-2">
             <span className={label}>{c.preview}</span>
-            {byEmail && byWhatsApp && (
-              <span className="ms-auto flex gap-0.5 rounded-sm bg-surface2 p-0.5">
-                <Tab on={previewIsEmail} onClick={() => setTab("email")} label={c.email} />
-                <Tab on={!previewIsEmail} onClick={() => setTab("whatsapp")} label={c.whatsapp} />
-              </span>
-            )}
+            <span className="ms-auto text-label text-muted">{c.editHint}</span>
           </span>
 
-          {!card ? (
+          {!card || !parts ? (
             <p className="rounded-md border border-dashed border-border bg-surface2 px-3 py-6 text-center text-meta text-muted">
               {c.previewEmpty}
             </p>
           ) : previewIsEmail ? (
-            /* ── The client's own chrome, as the prototype draws it ──────────────────────────
-               A message in a plain box is a message you have to imagine arriving. In the frame it
-               lands in, the renter is reading what his supplier will read.
-
-               ⚠️ The prototype's From says `Moedatech <notifications@moedatech.net>`. It is a mock,
+            /* ⚠️ The prototype's From says `Moedatech <notifications@moedatech.net>`. It is a mock,
                and it is not what happens: this goes out from the renter's own account (owner,
-               2026-09-01), so the From line names HIM.
-
-               ⚠️ The BODY is plain text, because that is what a compose URL can carry — so the
-               preview shows plain text. The card underneath is what the supplier's client draws
-               from the LINK, which is a separate thing and is labelled as one. Rendering the card
-               as the body would promise a rich e-mail nobody sends. */
-            <div className="overflow-hidden rounded-md border border-border bg-surface">
-              <div className="border-b border-border bg-surface2 px-3 py-2">
+               2026-09-01), so the From line names HIM. */
+            <div className="flex max-h-[460px] flex-col overflow-hidden rounded-md border border-border bg-surface">
+              <div className="flex-none border-b border-border bg-surface2 px-3 py-2">
                 <div className="text-meta font-extrabold text-navy">{subject}</div>
                 <div className="mt-0.5 text-label text-muted">{fmt(c.fromLine, { name: renterName || c.fromYou })}</div>
               </div>
-              <div className="max-h-[220px] overflow-auto p-3">
-                <Message parts={parts!} fixedLabel={c.fixedByUs} />
+              {/* One scroll region for the whole message. It used to be three, nested — the body,
+                  the card under it and the dialog around both — and a renter reading a message he is
+                  about to send should not have to work out which of three bars moves what. */}
+              <div className="min-h-0 flex-1 overflow-auto p-3">
+                <Message
+                  parts={parts}
+                  template={template}
+                  onChange={patchTemplate}
+                  c={c}
+                  linkPending={!uuid}
+                />
+                {unfurl && (
+                  <div className="mt-3 border-t border-border pt-3">
+                    <span className="mb-1.5 block text-label uppercase tracking-wide text-muted">{c.unfurl}</span>
+                    {/* The card is laid out for e-mail at a fixed 440px; these let it shrink into the
+                        column rather than pushing a sideways scrollbar through the panel. */}
+                    <div
+                      className="[&_img]:!h-auto [&_img]:!w-full [&_table]:!w-full [&_table]:!max-w-full"
+                      dangerouslySetInnerHTML={{ __html: unfurl }}
+                    />
+                  </div>
+                )}
               </div>
-              {unfurl && (
-                <div className="border-t border-border p-3">
-                  <span className="mb-1.5 block text-label uppercase tracking-wide text-muted">{c.unfurl}</span>
-                  <div className="max-h-[220px] overflow-auto" dangerouslySetInnerHTML={{ __html: unfurl }} />
-                </div>
-              )}
             </div>
           ) : (
-            /* The chat bubble. Tinted and tailed like the real thing, with the ticks the prototype
-               has — recognisable at a glance, not a replica. */
-            <div className="rounded-md border border-border bg-surface2 p-3">
-              <div className="max-w-[92%] rounded-md rounded-ss-none bg-surface px-3 py-2">
-                <div className="max-h-[300px] overflow-auto">
-                  <Message parts={parts!} fixedLabel={c.fixedByUs} />
-                </div>
-                <span className="mt-1 flex items-center justify-end gap-1 text-label text-muted">
-                  {c.previewTime}
-                  <Icon name="done_all" size={12} className="text-info" />
-                </span>
+            /* The chat bubble — recognisable at a glance, not a replica. */
+            <div className="max-h-[460px] overflow-auto rounded-md border border-border bg-surface2 p-3">
+              <div className="max-w-[94%] rounded-md rounded-ss-none bg-surface px-3 py-2">
+                <Message
+                  parts={parts}
+                  template={template}
+                  onChange={patchTemplate}
+                  c={c}
+                  linkPending={!uuid}
+                />
               </div>
             </div>
           )}
-          {!uuid && <span className="text-label text-muted">{c.previewNoLink}</span>}
+
+          {!isDefaultTemplate(template, lang) && (
+            <button
+              type="button"
+              onClick={() => {
+                clearTemplate(lang);
+                setTemplate(defaultTemplate(lang));
+              }}
+              className="self-start text-meta font-semibold text-brand"
+            >
+              {c.tplReset}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -711,35 +745,104 @@ ${url}`;
 }
 
 /**
- * The message, with the seam showing.
+ * The message, with his own lines editable in place.
  *
- * His greeting, his intro, OUR card, his sign-off, then the link. The card is drawn against a tint
- * with a padlock beside it — not to decorate it, but because the renter is about to be offered an
- * *Edit wording* button and needs to see, before he presses it, which half that button reaches.
+ * His greeting, his intro, OUR card, his sign-off, then the link. The three of his are fields drawn
+ * to look exactly like the text they will become — no boxes, no labels, no separate drawer — so
+ * what he is editing and what he is reading are the same object. That was the complaint: the
+ * preview and the message were two different things on the screen at once.
  *
- * ⚠️ The link is last and on its own line. WhatsApp finds a URL to unfurl in a `wa.me` prefill only
- * when it ends the message; a sentence after it and no card appears (owner, 2026-09-02).
+ * The card between them is text, never a field. A renter who could edit it could send a card that
+ * disagrees with the request it links to, and the first anyone would know is a withdrawn bid at the
+ * deal room.
+ *
+ * ⚠️ The link is last and on its own line. WhatsApp finds a URL to unfurl in a `wa.me` prefill
+ * only when it ends the message; a sentence after it and no card appears (owner, 2026-09-02).
  */
-function Message({ parts, fixedLabel }: { parts: ShareMessageParts; fixedLabel: string }) {
-  const text = "whitespace-pre-wrap text-meta leading-relaxed text-navy";
+function Message({
+  parts,
+  template,
+  onChange,
+  c,
+  linkPending,
+}: {
+  parts: ShareMessageParts;
+  template: ShareTemplate;
+  onChange: (field: keyof ShareTemplate, value: string) => void;
+  c: ReturnType<typeof useT>["intake"]["postShare"];
+  linkPending: boolean;
+}) {
   return (
     <div className="grid gap-2.5">
-      {!!parts.greeting && <p className={text}>{parts.greeting}</p>}
-      {!!parts.intro && <p className={text}>{parts.intro}</p>}
-      <div className="relative rounded-sm border border-border bg-surface2 p-2.5">
-        <span className="mb-1 flex items-center gap-1 text-label uppercase tracking-wide text-muted">
-          <Icon name="lock" size={11} />
-          {fixedLabel}
+      <Editable value={template.greeting} onChange={(v) => onChange("greeting", v)} label={c.tplGreeting} />
+      <Editable value={template.intro} onChange={(v) => onChange("intro", v)} label={c.tplIntro} />
+
+      {/* Ours. A hairline rail and a padlock rather than a filled box with a heading: the renter is
+          reading the message his supplier gets, and a titled panel in the middle of it is chrome
+          nobody receives. */}
+      <div className="relative ps-3" title={c.fixedByUs}>
+        <span aria-hidden className="absolute inset-y-0 start-0 w-0.5 rounded-full bg-border-strong" />
+        <span className="mb-0.5 flex items-center gap-1 text-label uppercase tracking-wide text-muted-light">
+          <Icon name="lock" size={10} />
+          {c.fixedByUs}
         </span>
-        <p className={text}>{parts.card}</p>
+        <p className="whitespace-pre-wrap text-meta leading-relaxed text-navy">{parts.card}</p>
       </div>
-      {!!parts.signoff && <p className={text}>{parts.signoff}</p>}
-      {!!parts.url && (
+
+      <Editable value={template.signoff} onChange={(v) => onChange("signoff", v)} label={c.tplSignoff} />
+
+      {parts.url ? (
         <p dir="ltr" className="break-all font-mono text-meta text-info">
           {parts.url}
         </p>
+      ) : (
+        linkPending && (
+          <p className="flex items-center gap-1.5 font-mono text-meta text-muted-light">
+            <Icon name="lock" size={11} />
+            {c.linkMasked}
+          </p>
+        )
       )}
     </div>
+  );
+}
+
+/**
+ * One of the renter's own lines: a field that looks like the text it will be.
+ *
+ * It grows with what he types rather than scrolling inside itself, because a two-line greeting that
+ * shows one line is a message he cannot read — which is the whole failing this panel exists to fix.
+ * The dashed underline appears on hover and focus only: a page of permanently boxed fields stops
+ * looking like a message.
+ */
+function Editable({
+  value,
+  onChange,
+  label,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  label: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      aria-label={label}
+      placeholder={label}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full resize-none overflow-hidden rounded-sm border border-transparent bg-transparent px-1 py-0.5 text-meta leading-relaxed text-navy outline-none transition hover:border-dashed hover:border-border-strong focus:border-solid focus:border-brand focus:bg-surface"
+    />
   );
 }
 
@@ -760,17 +863,3 @@ function Channel({ on, onClick, icon, label }: { on: boolean; onClick: () => voi
   );
 }
 
-function Tab({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cx(
-        "rounded-sm px-2.5 py-1 text-label font-extrabold transition",
-        on ? "bg-navy text-surface" : "text-muted hover:text-navy",
-      )}
-    >
-      {label}
-    </button>
-  );
-}

@@ -70,7 +70,7 @@ export function ShareRequestModal({
     <Dialog
       open={open}
       onClose={onClose}
-      size="xl"
+      size="xxl"
       icon={<Icon name="share" size={18} />}
       title={c.title}
       subtitle={c.modalSubtitle}

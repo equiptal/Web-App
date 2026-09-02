@@ -17,9 +17,7 @@ import { Dialog } from "@/components/Dialog";
 import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
-import { useSession } from "@/lib/session";
-import { Button, Icon, Pchips, Seg2, SelChips, TextArea, TextInput } from "@/components/ui";
-import { AccountModal } from "@/components/onboarding/AccountModal";
+import { Icon, Pchips, Seg2, SelChips, TextArea, TextInput } from "@/components/ui";
 import { buildSpecRows, downloadCsv, toCsv, type SpecRow } from "@/lib/export/spec-sheet";
 import {
   BID_WINDOWS,
@@ -34,7 +32,7 @@ import {
   type PaymentTerm,
 } from "@/lib/contract";
 import { arabicIndicDigits } from "@/lib/contract/bid-map";
-import { ACTIONS, btn } from "@/lib/ds";
+import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 import { Dropdown } from "@/components/Dropdown";
 import { shortSite } from "@/lib/contract/project";
@@ -52,13 +50,11 @@ export function ReadyToSend() {
   const unfiled = state.project && state.draft
     ? leftTheSite(state.project.location, state.draft.project.location)
     : false;
-  const { tier } = useSession();
-  const [showAccount, setShowAccount] = useState(false);
   const [showLimit, setShowLimit] = useState(false);
   /** Everything the strip summarises, in the sections it came from. */
   const [details, setDetails] = useState(false);
 
-  const { draft, taxonomy, busy, error, errorDetail } = state;
+  const { draft, taxonomy, error, errorDetail } = state;
   // Basic-account request cap (backend E8009) — a verify prompt, not inline red text.
   const isLimit = errorDetail?.backendCode === "E8009";
   useEffect(() => {
@@ -72,7 +68,6 @@ export function ReadyToSend() {
   const prefs = draft.preferences;
   const items = postableItems(draft.items);
   const charged = computeChargedDays(project.timing);
-  const onSubmit = () => (tier === "guest" ? setShowAccount(true) : actions.submit());
 
   const rows = buildSpecRows(draft, taxonomy);
   const tt = t.preview.table;
@@ -225,13 +220,29 @@ export function ReadyToSend() {
           )}
         </StripFact>
 
-        <button
-          type="button"
-          onClick={() => setDetails(true)}
-          className={btn("secondary", "sm", { className: "ms-auto flex-none" })}
-        >
-          {t.create.ready.viewAll}
-        </button>
+        <span className="ms-auto flex flex-none items-center gap-1.5">
+          <button type="button" onClick={() => setDetails(true)} className={btn("secondary", "sm")}>
+            {t.create.ready.viewAll}
+          </button>
+          {/* ── Editing lives HERE now (owner, 2026-09-02) ────────────────────────────────────
+              ~~A «Back to editing» button in the action row at the foot of the page.~~ It sat
+              beside the send, which made leaving and posting look like two halves of one choice,
+              and it was a whole page away from the summary a renter is actually reading when he
+              spots the thing he wants to change.
+
+              A pen beside «View all details» is where the hand already is: he has just read the
+              strip, and the two controls are the two things he can do about it — look closer, or
+              change it. */}
+          <button
+            type="button"
+            onClick={() => actions.setReadyToSend(false)}
+            title={t.create.ready.backToEditing}
+            aria-label={t.create.ready.backToEditing}
+            className="grid h-[30px] w-[30px] place-items-center rounded-sm border border-border text-muted transition hover:border-brand hover:text-brand"
+          >
+            <Icon name="edit" size={15} />
+          </button>
+        </span>
       </div>
 
       <Dialog open={details} onClose={() => setDetails(false)} title={t.create.ready.detailsTitle} size="xl">
@@ -428,28 +439,11 @@ export function ReadyToSend() {
         </div>
       )}
 
-      <div className={ACTIONS}>
-        <button
-          onClick={() => actions.setReadyToSend(false)}
-          className={btn("secondary", "lg", { className: "transition" })}
-        >
-          {t.create.ready.backToEditing}
-        </button>
-        <Button disabled={busy || items.length === 0} onClick={onSubmit} className="px-6 py-3 text-subhead">
-          <Icon name="send" size={18} /> {busy ? `${t.create.ready.send}…` : t.create.ready.send}
-        </Button>
-      </div>
-
-      <AccountModal
-        open={showAccount}
-        onClose={() => setShowAccount(false)}
-        onCreated={() => {
-          setShowAccount(false);
-          void actions.submit(); // account created (now basic) → post the request
-        }}
-        title={t.guest.postGateTitle}
-        postSubhead={t.guest.postBodyRequest}
-      />
+      {/* ── No action row (owner, 2026-09-02) ────────────────────────────────────────────────
+          It carried «Back to editing» and «Send to suppliers». Both are gone: editing is the pen
+          beside «View all details», and the send is the one button on the share card below — which
+          is the only one that knows WHICH suppliers, and the only one that can mint the link before
+          it sends it. Two buttons that both post a request is one too many. */}
 
       {showLimit && (
         <Dialog

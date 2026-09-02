@@ -27,7 +27,7 @@ vi.mock("@/lib/api/client", () => ({
   },
   setBidDeadline: () => Promise.resolve(),
   updateRenterSupplier: () => Promise.resolve({}),
-  bidShareUrl: (origin: string, id: string) => `${origin}/bid/${id}`,
+  bidShareUrl: (id: string) => `https://os.moedatech.net/bid/${id}`,
 }));
 
 const DRAFT: BidFormData = {
@@ -129,7 +129,7 @@ describe("how it goes", () => {
   it("Given e-mail, Then the recipients are the ticked suppliers, in BCC", async () => {
     draw();
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.send));
+    fireEvent.click(screen.getByText(c.sendToSuppliers));
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
     const url = new URL(opened.mock.calls[0][0] as string);
@@ -144,12 +144,76 @@ describe("how it goes", () => {
     // from their suppliers fine."* The compose window opens with the message and no recipient.
     draw();
     await screen.findByText("Al Faisal Rentals");
-    fireEvent.click(screen.getByText(c.send));
+    fireEvent.click(screen.getByText(c.sendToSuppliers));
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
     expect(new URL(opened.mock.calls[0][0] as string).searchParams.get("bcc")).toBeNull();
     // Nobody was named, so nothing is recorded against the request.
     expect(api.shares).toHaveLength(0);
+  });
+
+  it("Given a pick with no e-mail, Then Send still works — and the request is still POSTED", async () => {
+    /**
+     * ⚠️ The regression this pins (owner, 2026-09-02: *"nothing happen when i click post and
+     * share"*). Send used to be gated on a channel being able to reach somebody, so ticking a
+     * supplier with no address quietly disabled the button — and because the post happens on this
+     * press, the request was never created either. Four of a typical renter's ten suppliers have no
+     * address, so this was not an edge.
+     *
+     * Moedatech is always a destination. Nothing about who is picked may stop a request existing.
+     */
+    const posted = vi.fn(async () => "new-uuid");
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="post" draftForm={DRAFT} onPost={posted} />
+      </LocaleProvider>,
+    );
+
+    // `Najd Equipment Est.` has a phone and no e-mail; E-mail is the channel that is on.
+    fireEvent.click(await screen.findByText("Najd Equipment Est."));
+    const button = screen.getByText(c.sendToSuppliers).closest("button")!;
+    expect(button.hasAttribute("disabled")).toBe(false);
+
+    fireEvent.click(button);
+    await waitFor(() => expect(posted).toHaveBeenCalled());
+    // It reached nobody by e-mail, and says so as a posting rather than as a failure.
+    await waitFor(() => expect(screen.getByText(c.postedOnly)).toBeTruthy());
+  });
+
+  it("Given «More», Then the message goes to the device's own share sheet", async () => {
+    // Owner, 2026-09-02: *"must be an option for general share that open any channel."*
+    const share = vi.fn(async (_data: { title?: string; text?: string }) => undefined);
+    vi.stubGlobal("navigator", { ...navigator, share, clipboard: { writeText: async () => {} } });
+
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="post" draftForm={DRAFT} onPost={async () => "new-uuid"} />
+      </LocaleProvider>,
+    );
+    fireEvent.click(await screen.findByText(c.other));
+    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.sendToSuppliers));
+
+    await waitFor(() => expect(share).toHaveBeenCalled());
+    // The whole message, not the bare link — the same words every other channel carries.
+    expect(share.mock.calls[0][0].text).toContain("Crawler Excavator");
+  });
+
+  it("Given no share sheet, Then «More» copies the message instead of failing quietly", async () => {
+    const writeText = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { ...navigator, share: undefined, clipboard: { writeText } });
+
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="post" draftForm={DRAFT} onPost={async () => "new-uuid"} />
+      </LocaleProvider>,
+    );
+    fireEvent.click(await screen.findByText(c.other));
+    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.sendToSuppliers));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
+    expect(screen.getByText(c.messageCopied)).toBeTruthy();
   });
 
   it("Given both extras are off, Then it says Moedatech only, and still sends", async () => {
@@ -167,14 +231,14 @@ describe("how it goes", () => {
 
     fireEvent.click(button);
     // No mail window, no WhatsApp: Moedatech alone means nothing else is opened.
-    await waitFor(() => expect(screen.getByText(c.done.replace("{n}", "0"))).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(c.postedOnly)).toBeTruthy());
     expect(opened).not.toHaveBeenCalled();
   });
 
   it("Given a share went out, Then it is recorded against the request", async () => {
     draw();
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.send));
+    fireEvent.click(screen.getByText(c.sendToSuppliers));
 
     await waitFor(() => expect(api.shares).toHaveLength(1));
     expect(api.shares[0]).toEqual(["abc-123", ["1"], "email"]);
@@ -198,33 +262,44 @@ describe("the words around the card", () => {
     expect(screen.getByText(c.fixedByUs)).toBeTruthy();
   });
 
-  it("Given he edits the greeting, Then it is what the preview carries", async () => {
+  it("Given he edits a line, Then it is edited IN the preview, and that is what is sent", async () => {
+    /**
+     * Owner, 2026-09-02: *"i want the template itself editable and will be reflected in what will
+     * be sent."* There is no separate drawer and no separate note box — the thing he reads and the
+     * thing he types are one object, which is what makes the preview honest.
+     */
     drawDraft();
-    fireEvent.click(await screen.findByText(c.editWording));
-    fireEvent.change(screen.getByLabelText(c.tplGreeting), { target: { value: "Dear partner," } });
+    const greeting = await screen.findByLabelText(c.tplGreeting);
+    fireEvent.change(greeting, { target: { value: "Dear partner," } });
 
-    // The field and the preview both, which is the point: what he types is what is sent.
-    await waitFor(() => expect(screen.getAllByText("Dear partner,").length).toBeGreaterThan(1));
-    // Changed from ours, and offered a way back.
-    expect(screen.getByText(c.edited)).toBeTruthy();
-    expect(screen.getByText(c.tplReset)).toBeTruthy();
+    expect((greeting as HTMLTextAreaElement).value).toBe("Dear partner,");
+    await waitFor(() => expect(screen.getByText(c.tplReset)).toBeTruthy());
   });
 
-  it("Given the card, Then there is no way to edit it", async () => {
+  it("Given the card, Then it is text in the message and never a field", async () => {
     /**
      * Owner, 2026-09-02: *"not the request card itself this is fixed from us."* A renter who could
      * edit it could send a card that disagrees with the request it links to, and the first anyone
      * would know is a withdrawn bid at the deal room.
      */
     drawDraft();
-    fireEvent.click(await screen.findByText(c.editWording));
-
-    const fields = [c.tplGreeting, c.tplIntro, c.tplSignoff];
-    expect(fields.every((f) => !!screen.getByLabelText(f))).toBe(true);
-    // The card block is text on the page, never a field.
-    const cardText = screen.getByText(/Crawler Excavator 20 ton/);
-    expect(cardText.tagName).not.toBe("TEXTAREA");
+    const cardText = await screen.findByText(/Crawler Excavator 20 ton/);
     expect(cardText.closest("textarea")).toBeNull();
+    expect(cardText.tagName).toBe("P");
+  });
+
+  it("Given the channel, Then the preview follows it with no tabs to press", async () => {
+    // The channel row already says which one he is sending; a tab strip asks the same question again.
+    drawDraft();
+    await screen.findByLabelText(c.tplGreeting);
+
+    // E-mail is on, so the e-mail frame is drawn: subject line and From.
+    expect(screen.getByText(/A new equipment request for you/)).toBeTruthy();
+
+    fireEvent.click(screen.getByText(c.whatsapp));
+    fireEvent.click(screen.getByText(c.email));
+    // Only WhatsApp now: no From line, and no tab strip to have pressed.
+    await waitFor(() => expect(screen.queryByText(/A new equipment request for you/)).toBeNull());
   });
 });
 
@@ -260,10 +335,10 @@ describe("what they receive", () => {
 
     expect(await screen.findByText(/Crawler Excavator 20 ton/)).toBeTruthy();
     // Honest about the one thing that is genuinely missing.
-    expect(screen.getByText(c.previewNoLink)).toBeTruthy();
-    // Locked, and drawn as locked: the renter needs to know a link is coming and where it will be,
-    // or Copy looks broken rather than not-yet.
-    expect(screen.getByText(c.linkMasked)).toBeTruthy();
+    // Locked, and drawn as locked in BOTH places — the link field, and where the link will sit in
+    // the message itself. The renter needs to know one is coming, or Copy looks broken rather than
+    // not-yet.
+    expect(screen.getAllByText(c.linkMasked).length).toBe(2);
     expect(screen.getByText(c.copy).closest("button")!.hasAttribute("disabled")).toBe(true);
   });
 
