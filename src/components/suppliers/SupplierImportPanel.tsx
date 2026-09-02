@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/ui";
 import { btn, cx } from "@/lib/ds";
 import { fmt, useT } from "@/lib/i18n";
@@ -123,21 +123,41 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
   /**
    * Ask the backend what it would do. Writes nothing.
    *
-   * Re-run whenever the mapping changes, because a column moved from *phone* to *ignore* changes
-   * every decision below it — a stale preview is worse than none.
+   * ⚠️ It was a button — *Check the file first* — and it should never have been (owner, 2026-09-02).
+   * The renter has to press it to learn the two things only the backend knows: which rows would MERGE
+   * into a supplier he already has, and which are duplicates of each other. Those are not optional
+   * details he might want; they are the difference between "8 new suppliers" and "6 new and 2
+   * updated". A fact that changes what the button means cannot sit behind a second button.
+   *
+   * So it runs itself, on every change to the sheet, the mapping or a cell. `key` is what stops it
+   * re-running for a change that cannot alter the answer.
    */
-  const preview = async () => {
-    if (!ready.length || planning) return;
-    setPlanning(true);
-    setError(null);
-    try {
-      setPlan(await addRenterSuppliersBulk(payload(), true));
-    } catch {
-      // A preview that fails must not block the import: the write reports the same three arrays.
+  const key = table ? JSON.stringify([mapping, table.rows]) : "";
+
+  useEffect(() => {
+    if (!table || !ready.length) {
       setPlan(null);
+      return;
     }
-    setPlanning(false);
-  };
+    let live = true;
+    setPlanning(true);
+    const id = setTimeout(async () => {
+      try {
+        const result = await addRenterSuppliersBulk(payload(), true);
+        if (live) setPlan(result);
+      } catch {
+        // A failed check must not block the import: the write reports the same three arrays.
+        if (live) setPlan(null);
+      }
+      if (live) setPlanning(false);
+    }, 400);
+    return () => {
+      live = false;
+      clearTimeout(id);
+    };
+    // `payload` closes over the current rows and vendor flags; `key` is what actually changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
   const reset = () => {
     setPlan(null);
@@ -244,13 +264,23 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
         <span className="grid h-8 w-8 flex-none place-items-center rounded-sm bg-navy text-surface">
           <Icon name="table_view" size={16} />
         </span>
-        <span className="min-w-0">
+        <span className="min-w-0 flex-1">
           <b className="block text-body font-extrabold text-navy">{fileName}</b>
           <span className="block text-meta text-muted">
             {fmt(c.rowsColumns, { rows: table.rows.length, cols: table.headers.length })}
             {table.rows.length === SHEET_MAX_ROWS && <> · {c.cappedAt}</>}
           </span>
         </span>
+        {/* Where starting over lives now: on the file, which is the thing being replaced. */}
+        <button
+          type="button"
+          onClick={reset}
+          title={c.chooseAnother}
+          aria-label={c.chooseAnother}
+          className="grid h-7 w-7 flex-none place-items-center rounded-sm text-muted transition hover:bg-surface3 hover:text-navy"
+        >
+          <Icon name="close" size={14} />
+        </button>
       </div>
 
       {/* ── The rows, first (owner, 2026-09-02) ──────────────────────────────────────────────────
@@ -400,7 +430,10 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
         </span>
       </label>
 
-      {/* What the backend says it would do, before it does any of it. */}
+      {/* What the backend says it would do, before it does any of it — asked automatically. */}
+      {planning && !plan && (
+        <span className="text-meta text-muted">{c.planning}</span>
+      )}
       {plan && (
         <div className="grid gap-1.5 rounded-md border border-border-strong bg-surface2 px-3 py-2.5 text-meta text-navy">
           <b className="font-extrabold">
@@ -432,21 +465,11 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
           {skipped > 0 ? fmt(c.importCountSkipped, { n: ready.length, skipped }) : fmt(c.importCount, { n: ready.length })}
         </span>
         {error && <span className="text-meta font-extrabold text-danger-deep">{error}</span>}
+        {/* ~~«Start over» and «Check the file first».~~ Both gone (owner, 2026-09-02). The check
+            runs itself, because what it answers changes what Import means; and starting over is
+            swapping the file, which now happens on the file's own chip where the file is. One
+            button, and it says exactly how many rows it will write. */}
         <span className="ms-auto flex items-center gap-2">
-          <button type="button" onClick={reset} className={btn("ghost", "md")}>
-            {c.startOver}
-          </button>
-          {/* Offered, not forced: a renter with four clean rows should not be made to preview them. */}
-          {!plan && (
-            <button
-              type="button"
-              onClick={() => void preview()}
-              disabled={!ready.length || planning}
-              className={btn("secondary", "md")}
-            >
-              {planning ? c.planning : c.previewImport}
-            </button>
-          )}
           <button type="button" onClick={save} disabled={!ready.length || saving} className={btn("primary", "md")}>
             {ready.length ? fmt(c.importN, { n: ready.length }) : c.importNone}
           </button>

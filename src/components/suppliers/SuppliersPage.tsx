@@ -206,8 +206,10 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
           ) : (
             <h1 className="text-title font-extrabold tracking-tight text-navy">{c.title}</h1>
           )}
+          {/* The count is INSIDE the sentence, not beside it (owner, 2026-09-02: *"the 3 is
+              duplicated"*). `summaryMany` is «{n} suppliers» and already carries the figure, so the
+              bold number in front of it printed «3 3 suppliers». */}
           <p className="mt-0.5 text-meta text-muted">
-            <b className="font-extrabold text-navy">{rows?.length ?? 0}</b>{" "}
             {(rows?.length ?? 0) === 1 ? fmt(c.summaryOne, { n: 1 }) : fmt(c.summaryMany, { n: rows?.length ?? 0 })}
             {vendors > 0 && <> · {fmt(c.vendors, { n: vendors })}</>}
           </p>
@@ -606,14 +608,25 @@ function Row({
             {c.noPhone} <span className="font-extrabold text-info-deep">{c.add}</span>
           </span>
         )}
-        {/* Present only when the backend could not turn something into a key — the text survives so
-            the renter can correct it, and the key column stays null so no lookup is poisoned. */}
-        {hasUnparsed(s) && (
-          <span title={c.couldNotReadBody} className="mt-0.5 inline-flex items-center gap-1 text-label font-extrabold text-danger-deep">
-            <Icon name="error" size={12} />
-            {c.couldNotRead}
-          </span>
-        )}
+        {/* ── What the sheet said, when it was not a phone or an address ───────────────────────
+            The backend keeps the raw text under `unparsed` and leaves the real column null, so no
+            lookup is poisoned by it — a supplier whose phone reads «call the office» must not match
+            another firm.
+
+            ⚠️ It used to say only "we could not read that", which tells a renter nothing he can act
+            on: not which field, and not what the offending value was (owner asked what it meant,
+            2026-09-02). It names both now, so the fix is obvious from the row. */}
+        {hasUnparsed(s) &&
+          Object.entries(s.unparsed ?? {}).map(([field, raw]) => (
+            <span
+              key={field}
+              title={c.couldNotReadBody}
+              className="mt-0.5 flex items-start gap-1 text-label font-semibold text-danger-deep"
+            >
+              <Icon name="error" size={12} className="mt-px flex-none" />
+              <span>{fmt(c.couldNotReadField, { field: fieldWord(field, c), value: raw })}</span>
+            </span>
+          ))}
       </td>
 
       <td className="px-3 py-2.5 text-meta">
@@ -708,6 +721,12 @@ function Row({
       </td>
     </tr>
   );
+}
+
+/** The renter's word for a field the backend named in `unparsed`. */
+function fieldWord(field: string, c: ReturnType<typeof useT>["suppliers"]): string {
+  const f = field.toLowerCase();
+  return f.includes("phone") || f.includes("mobile") ? c.colPhone : f.includes("mail") ? c.colEmail : field;
 }
 
 function Empty({ filtered, c }: { filtered: boolean; c: ReturnType<typeof useT>["suppliers"] }) {
