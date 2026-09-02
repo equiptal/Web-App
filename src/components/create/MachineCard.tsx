@@ -100,7 +100,9 @@ export function MachineCard({
       {/* The prototype's 2fr / 3fr split, 20px gutter, columns aligned to the top. */}
       <div {...pin("machine-card-body")} className="grid gap-5 lg:grid-cols-[2fr_3fr] lg:items-stretch">
         {/* ---------------- The 450px panel, and the four controls on its corners ---------------- */}
-        <div {...pin("machine-card-image")} className="relative h-full min-h-[450px] w-full min-w-0 rounded-md bg-surface2">
+        {/* `overflow-hidden`: the photograph now runs to the panel's own edges, so the panel has to
+            clip it to its corners or the image squares them off. */}
+        <div {...pin("machine-card-image")} className="relative h-full min-h-[450px] w-full min-w-0 overflow-hidden rounded-md bg-surface2">
           {/* ── The subtype's own photograph, where the admin panel has one (owner, 2026-08-31) ──
               The panel drew a Material Symbol chosen by matching the subtype's NAME against a list of
               words — «excavator» → the agriculture glyph — which is a reasonable guess and never the
@@ -117,30 +119,38 @@ export function MachineCard({
               answer 403. Without the catch the panel would draw a broken image where it used to draw
               a glyph — worse than what it replaced. The backend warns of the same trap on its own
               helper. */}
-          <div className="grid h-full place-content-center justify-items-center gap-2 px-6 text-center">
-            {photo && !photoBroken ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={photo}
-                alt=""
-                draggable={false}
-                onError={() => setBrokenPhoto(photo)}
-                /* FILLS the frame (owner, 2026-09-01: *"the request image must fit the whole card
-                   size"*). `object-contain` fitted the whole photograph inside a 240px box and left
-                   the rest of the card empty above and below it — the machine ended up a stamp in
-                   the middle of a tall grey card. `cover` crops instead, which is what a photograph
-                   wants; the subject of these is centred by construction. */
-                className="h-[240px] w-full rounded-md object-cover"
-              />
-            ) : (
+          {photo && !photoBroken ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={photo}
+              alt=""
+              draggable={false}
+              onError={() => setBrokenPhoto(photo)}
+              /* ── THE PANEL, not a picture inside it (owner, 2026-09-02) ────────────────────
+                 *"Make the image shown in the full card, no margin, no padding, full fit."*
+
+                 ~~240px tall, inside a `px-6` box, with the machine's name under it.~~ Two things
+                 were wrong with that. The photograph sat as a stamp in the middle of a 450px grey
+                 card, so the card read as mostly empty; and the name under it repeated the TYPE and
+                 SIZE the selects state in full in the very next column.
+
+                 `absolute inset-0` with `object-cover`: it fills the panel corner to corner. The
+                 four chips already float on the corners, so they were drawn for a photograph
+                 underneath them rather than beside it. */
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          ) : (
+            /* No photograph: the glyph keeps its centred box and its caption. Here the name is not a
+               repetition, it is the only thing saying what the machine is. */
+            <div className="grid h-full place-content-center justify-items-center gap-2 px-6 text-center">
               <Icon name={equipmentIcon(tax.subtypeName || tax.categoryName)} size={132} className="text-navy/20" />
-            )}
-            {(tax.subtypeName || tax.categoryName) && (
-              <p className="text-body font-semibold leading-snug text-navy/45">
-                {[tax.subtypeName || tax.categoryName, tax.sizeName].filter(Boolean).join(" · ")}
-              </p>
-            )}
-          </div>
+              {(tax.subtypeName || tax.categoryName) && (
+                <p className="text-body font-semibold leading-snug text-navy/45">
+                  {[tax.subtypeName || tax.categoryName, tax.sizeName].filter(Boolean).join(" · ")}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Top-left the certificate, top-right the quantity. Amber while the certificate is
               unanswered — an unasked certificate silently narrows the renter's own bidder pool. */}
