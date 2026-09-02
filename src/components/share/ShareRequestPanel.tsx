@@ -159,6 +159,7 @@ export function ShareRequestPanel({
   const [sent, setSent] = useState<string[]>([]);
   /** The card is waiting on his clipboard for one paste — said on screen, or he will never know. */
   const [cardOnClipboard, setCardOnClipboard] = useState(false);
+  const [copiedAddresses, setCopiedAddresses] = useState(false);
   const [copied, setCopied] = useState(false);
   const [addingEmailOn, setAddingEmailOn] = useState<string | null>(null);
   const [emailDraft, setEmailDraft] = useState("");
@@ -763,13 +764,33 @@ export function ShareRequestPanel({
               {moedatechOnly ? c.moedatechOnlyHint : c.alwaysHint}
             </p>
 
-            {/* Outlook discards `bcc`, so its recipients ride in `to` — said out loud, because a
-                renter sending to eight competitors has a right to know they will see each other, and
-                because the fix is one press away (Gmail, or *More*). */}
+            {/* ── Outlook discards `bcc`, so its recipients ride in `to` ────────────────────────
+                Said out loud, because a renter sending to eight competitors has a right to know
+                they will see each other — and given a way out that does not depend on Outlook
+                honouring a parameter it does not document.
+
+                *Copy addresses* is that way out: paste into Outlook's own Bcc field, clear the To
+                line, send. Two actions, and they work in every version of Outlook there has ever
+                been, which no URL parameter can promise. */}
             {channel === "email" && !hidesRecipients(provider) && reachable.length > 1 && (
               <span className="flex items-start gap-1.5 text-meta text-warn-deep">
                 <Icon name="visibility" size={14} className="mt-px flex-none" />
-                {c.outlookNoBcc}
+                <span className="min-w-0 flex-1">
+                  {c.outlookNoBcc}{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void navigator.clipboard
+                        ?.writeText(reachable.map((x) => x.email).join("; "))
+                        .catch(() => {});
+                      setCopiedAddresses(true);
+                      setTimeout(() => setCopiedAddresses(false), 2400);
+                    }}
+                    className="font-semibold text-brand underline decoration-brand/40 underline-offset-2"
+                  >
+                    {copiedAddresses ? c.addressesCopied : c.copyAddresses}
+                  </button>
+                </span>
               </span>
             )}
 

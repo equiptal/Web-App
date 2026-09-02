@@ -39,7 +39,11 @@ export const en = {
   shell: {
     home: "Home",
     profile: "Profile",
-    requests: "Requests",
+    /* The tab over `/requests` (owner, 2026-09-03: *"call the requests tab in the nav bar
+       Marketplace"*). The route, the page and the word «request» everywhere else are unchanged: this
+       is the NAME OF THE PLACE, and the place is where a renter's requests meet the suppliers who
+       answer them. «Requests» named the contents of one screen; a tab names a destination. */
+    marketplace: "Marketplace",
     compare: "Compare bids",
     dashboard: "Dashboard",
     browse: "Browse",
@@ -293,8 +297,10 @@ export const en = {
       shareAgain: "Share again",
       shareAgainHint: "Pick another channel above and press again. The link stays the same.",
       pasteForCard: "The card is on your clipboard. Press Ctrl+V at the end of the message to add it.",
-      outlookNoBcc: "Outlook cannot send blind copies, so everyone you picked will see the others. Use Gmail or More to keep the list private.",
+      outlookNoBcc: "Outlook cannot take blind copies from a link, so everyone you picked will see the others.",
       cardAsText: "Fixed by us. Apps without link previews, like Gmail, receive these details as plain text instead.",
+      copyAddresses: "Copy addresses for Bcc",
+      addressesCopied: "Copied · paste into Bcc",
       modalSubtitle: "Pick who sees it, and how it reaches them.",
     },
     reading: "Reading",

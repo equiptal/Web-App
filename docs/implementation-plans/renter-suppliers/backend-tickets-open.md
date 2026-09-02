@@ -272,6 +272,48 @@ history — the bids reappear as suggestions. A tidy-up annoyance, not data loss
 
 ---
 
+## Blind copies with Outlook — every route there is
+
+**Owner, 2026-09-03:** *"no way to send it to bcc, search and explore ways or technologies that
+allow."* Recorded here so nobody re-opens the search from scratch.
+
+The constraint: Outlook's web compose deeplink
+(`outlook.office.com/mail/deeplink/compose`) documents `to`, `subject` and `body`. It has no
+documented `bcc`, and a `bcc` parameter is discarded with no error — measured against a real send on
+2026-09-02: the recipient never appeared, while the identical call to Gmail's `view=cm` carried it.
+
+| Route | Blind copies | Sends as the renter | Needs |
+| --- | --- | --- | --- |
+| Outlook deeplink `?bcc=` | **no** — discarded | yes | — |
+| Outlook deeplink `?to=` | no, but they arrive | yes | shipped today |
+| `mailto:?bcc=` | **yes** (RFC 6068) | yes | a configured desktop client |
+| Copy addresses → paste into Bcc | **yes** | yes | one paste; shipped today |
+| Microsoft Graph draft | **yes** | yes | OAuth (`Mail.ReadWrite`) |
+| Gmail `view=cm&bcc=` | **yes** | yes | the renter is on Gmail |
+| Server-side SES | **yes** | only with a verified domain | SUP-BE-23 |
+
+### Why not `mailto:`
+
+It is the only client-side route that formally supports `bcc`, and it is the one this app
+deliberately abandoned (`composeEmail.ts`): on a machine with no configured mail client it does
+nothing at all, and the renter watches Send do nothing and concludes the feature is broken. Trading a
+send that always works for one that sometimes carries a blind copy is the wrong way round.
+
+### What ships today
+
+Recipients in `to`, the cost stated on screen, and **Copy addresses for Bcc** beside it — paste into
+Outlook's own Bcc field, clear the To line, send. Two actions, and they work in every version of
+Outlook there has ever been, which no URL parameter can promise.
+
+### What would remove the paste
+
+**Microsoft Graph** (`POST /me/messages` with `bccRecipients`, scope `Mail.ReadWrite`) — the same
+ticket as SUP-BE-23 Option A, and cheap on the Microsoft side. It solves blind copies and the missing
+card in one build, for every Outlook renter. That is the strongest argument yet for doing Graph
+first and leaving Gmail to the paste.
+
+---
+
 ## SUP-BE-24 — the shared link unfurls a picture of nothing (ONE LINE)
 
 **Severity: this is why no supplier has ever seen a card.** Measured against staging on 2026-09-02,
