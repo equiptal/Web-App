@@ -52,6 +52,10 @@ export const COLORS = {
   ok: "#1daf58",
   okSoft: "#e7f7ee",
   okDeep: "#15803d",
+  /** The verified badge's own green (owner's artwork, 2026-09-02) — see `VerifiedMark`. Not `ok`:
+   *  that one is a STATUS and moves with the status palette; a badge that moved with it would stop
+   *  being recognisable as the same mark. */
+  verified: "#10a64a",
   warn: "#d4780a",
   warnSoft: "#fff3e0",
   warnDeep: "#8a4f08",
@@ -123,6 +127,7 @@ export const CSS_VAR_NAME: Record<keyof typeof COLORS, string> = {
   ok: "--ok",
   okSoft: "--ok-soft",
   okDeep: "--ok-deep",
+  verified: "--verified",
   warn: "--warn",
   warnSoft: "--warn-soft",
   warnDeep: "--warn-deep",

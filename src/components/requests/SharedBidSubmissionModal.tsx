@@ -101,7 +101,7 @@ export function SharedBidSubmissionModal({
   // A company field the supplier gave as text OR a document — render whichever they submitted, in place.
   const coDoc = (type: string) => submission?.companyDocuments?.find((d) => d.type === type);
   /** AC-218 — a row the supplier left empty says so, rather than showing a dash that reads like a gap. */
-  const notEntered = L("— not entered", "— غير مُدخل");
+  const notEntered = L(": not entered", ": غير مُدخل");
   const CoField = ({ label, text, docType }: { label: string; text?: string | null; docType: string }) => {
     if (text && text.trim()) return <RoField label={label} value={text} />;
     const doc = coDoc(docType);
@@ -275,7 +275,7 @@ export function SharedBidSubmissionModal({
         <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
         <div className="slb-banner">
           <span className="material-icons-outlined">visibility</span>
-          {L("Submitted bid — exactly what the supplier filled in your form", "العرض المُقدَّم — تمامًا كما ملأه المؤجّر في نموذجك")}
+          {L("Submitted bid: exactly what the supplier filled in your form", "العرض المُقدَّم: تمامًا كما ملأه المؤجّر في نموذجك")}
         </div>
 
         <div className="qprint" style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
@@ -348,7 +348,7 @@ export function SharedBidSubmissionModal({
                     )}
                     {contractTerms.length > 0 && (
                       <>
-                        <div className="subhead"><span className="material-icons-outlined">gavel</span>{L("Contract terms — for all items", "شروط العقد — لكل البنود")}</div>
+                        <div className="subhead"><span className="material-icons-outlined">gavel</span>{L("Contract terms: for all items", "شروط العقد: لكل البنود")}</div>
                         <div className="treqgrid">
                           {contractTerms.map((c) => {
                             const ok = contractAns[c.key as keyof typeof contractAns];
@@ -409,7 +409,7 @@ export function SharedBidSubmissionModal({
 
                       {terms.length > 0 && (
                         <>
-                          <div className="subhead"><span className="material-icons-outlined">fact_check</span>{L("Terms — supplier's answers", "الشروط — إجابات المؤجّر")}</div>
+                          <div className="subhead"><span className="material-icons-outlined">fact_check</span>{L("Terms: supplier's answers", "الشروط: إجابات المؤجّر")}</div>
                           <div className="treqgrid">
                             {terms.flatMap((k) => {
                               const cc = conf as Record<string, boolean | undefined>;
@@ -515,12 +515,12 @@ export function SharedBidSubmissionModal({
                 {vatInclusive && (
                   <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 12px", padding: "10px 14px", borderRadius: "var(--r-md)", background: "var(--action-dim)", border: "1px solid color-mix(in srgb, var(--brand) 30%, transparent)", fontSize: 12.5, fontWeight: 700, color: "var(--navy-mid)" }}>
                     <span className="material-icons-outlined" style={{ fontSize: 18, color: "var(--brand)", flexShrink: 0 }}>receipt_long</span>
-                    {L("The supplier quoted VAT-inclusive prices. Amounts here are shown net of 15% VAT — the grand total is exactly what they entered.", "قدّم المؤجّر أسعارًا شاملة لضريبة القيمة المضافة. تُعرض المبالغ هنا صافية من ضريبة ١٥٪ — والإجمالي الكلي هو ما أدخله تمامًا.")}
+                    {L("The supplier quoted VAT-inclusive prices. Amounts here are shown net of 15% VAT. The grand total is exactly what they entered.", "قدّم المؤجّر أسعارًا شاملة لضريبة القيمة المضافة. تُعرض المبالغ هنا صافية من ضريبة ١٥٪، والإجمالي الكلي هو ما أدخله تمامًا.")}
                   </div>
                 )}
 
                 {/* ── Total (this item when focused, else the whole submission) ── */}
-                <div className="grand"><span className="gk">{singleItem ? L("Item total (incl. VAT)", "إجمالي البند (شامل الضريبة)") : L("Grand total — all items (incl. VAT)", "الإجمالي الكلي — كل البنود (شامل الضريبة)")}</span><span className="gv">{nf(grandIncl)} {sar}</span></div>
+                <div className="grand"><span className="gk">{singleItem ? L("Item total (incl. VAT)", "إجمالي البند (شامل الضريبة)") : L("Grand total: all items (incl. VAT)", "الإجمالي الكلي: كل البنود (شامل الضريبة)")}</span><span className="gv">{nf(grandIncl)} {sar}</span></div>
 
                 {/* ── Supplier's details (read-only) ── */}
                 <div className="sec">
@@ -538,7 +538,7 @@ export function SharedBidSubmissionModal({
                       absence is what the renter needs to know: it is the address his next request
                       would go to, and *Send to my suppliers* leaves out a row that has none. */}
                   <RoField label={L("E-mail", "البريد الإلكتروني")} value={submission.contactEmail} empty={notEntered} />
-                  {supplierNotes && <RoField label={L("Notes — for the whole quotation", "ملاحظات — لكامل عرض السعر")} value={supplierNotes} multiline />}
+                  {supplierNotes && <RoField label={L("Notes: for the whole quotation", "ملاحظات: لكامل عرض السعر")} value={supplierNotes} multiline />}
                 </div>
 
                 {/* ── Other company documents (CR/VAT/Address now render in their fields above) ── */}

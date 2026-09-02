@@ -32,7 +32,7 @@ describe("the charged-day figure (MREQ-AC-32/33)", () => {
     await panel();
     expect(screen.getByText("155")).toBeTruthy();
     expect(
-      screen.getByText("billable days — 181 calendar days less 26 Fridays, at 10 hours a day, billed monthly"),
+      screen.getByText("billable days: 181 calendar days less 26 Fridays, at 10 hours a day, billed monthly"),
     ).toBeTruthy();
   });
 
@@ -50,7 +50,7 @@ describe("the charged-day figure (MREQ-AC-32/33)", () => {
   it("is two lines with no heading over them", async () => {
     await panel();
     expect(screen.queryByText("DAYS YOU'LL BE CHARGED FOR")).toBeNull();
-    expect(screen.getByText(/^billable days —/)).toBeTruthy();
+    expect(screen.getByText(/^billable days:/)).toBeTruthy();
     expect(screen.getByText(/^I understand suppliers will quote against/)).toBeTruthy();
   });
 
@@ -76,7 +76,7 @@ describe("with the end date before the start date", () => {
 
   it("withholds the figure instead of reporting one day", async () => {
     await panel({ draft: withTiming(backwards) });
-    expect(screen.queryByText(/billable days —/)).toBeNull();
+    expect(screen.queryByText(/billable days:/)).toBeNull();
     expect(screen.getAllByText("The end date is before the start date. Fix the dates to see billable days.").length).toBeGreaterThan(0);
   });
 

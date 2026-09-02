@@ -21,7 +21,7 @@ import { useProvenance } from "@/components/create/hooks";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 import { isSystemChosen } from "@/lib/contract";
-import { leftTheSite, projectTitle } from "@/lib/contract/project";
+import { leftTheSite } from "@/lib/contract/project";
 
 // Client-only: the maps script touches `window` at import.
 const MapLocationPicker = dynamic(() => import("@/components/shared/GoogleMapLocationPicker"), { ssr: false });
@@ -143,17 +143,11 @@ export function WherePanel({
 
       {open && (
         <div {...pin("where-panel-body")} className="px-5 pb-5">
-          {/* Said in full where the renter is standing when they do it. Red rather than amber: amber
-              is this app's «check this», and there is nothing to check — the outcome is settled and
-              the renter's only choices are to accept it or move the pin back. */}
-          {unfiled && (
-            <p className="mb-3 flex items-start gap-2 rounded-sm border border-danger/40 bg-danger-soft px-3 py-2.5 text-body text-danger">
-              <Icon name="error_outline" size={16} className="mt-px flex-none" />
-              <span>
-                {t.create.wherePanel.unfiledNote.replace("{project}", projectTitle(state.project!))}
-              </span>
-            </p>
-          )}
+          {/* ~~The same thing again, in full, in a red band across the panel.~~ Removed (owner,
+              2026-09-01: *"no need — there is already another notice above that will be kept"*). The
+              head of this panel already carries «not in the project» in red, on the same line as the
+              address that caused it, and the review screen says it a third time before sending. A
+              banner under all that is the product raising its voice at a renter who has understood. */}
 
           {/* AC-47 — a text↔file disagreement is settled before anything else; confirming over an
               unresolved conflict would pick a site by accident. */}

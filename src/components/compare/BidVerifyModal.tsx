@@ -80,9 +80,9 @@ export function BidVerifyModal({
       const corrected = bidFormDraftToNormalized(draft, extracted);
       const r = await commitBid({ source_file: draft.meta.source_file, extracted, corrected, vat_mode: draftVatMode(draft) });
       if (r.agent && r.result?.bid) onCommitted(r.result.bid);
-      else setErr(L("Couldn't add the quote — your AI assistant isn't connected. Try again.", "تعذّر إضافة العرض — مساعدك الذكي غير متصل. حاول مجددًا."));
+      else setErr(L("Couldn't add the quote. Your AI assistant isn't connected. Try again.", "تعذّر إضافة العرض: مساعدك الذكي غير متصل. حاول مجددًا."));
     } catch {
-      setErr(L("Couldn't add the quote — please try again.", "تعذّرت الإضافة — حاول مرة أخرى."));
+      setErr(L("Couldn't add the quote: please try again.", "تعذّرت الإضافة: حاول مرة أخرى."));
     } finally {
       setSubmitting(false);
     }
@@ -126,7 +126,7 @@ export function BidVerifyModal({
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 20px", borderBottom: "1px solid var(--surface3)", flex: "0 0 auto" }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h3 style={{ margin: 0, fontSize: 17, fontWeight: 900, color: "var(--navy)" }}>{L("Verify the uploaded quote", "تحقّق من العرض المرفوع")}</h3>
-            <p style={{ margin: "3px 0 0", fontSize: 12.5, color: "var(--muted)" }}>{L("We transformed the quote into your bid form — confirm, edit, or leave blank, then add it.", "حوّلنا العرض إلى نموذج عرضك — أكّد أو عدّل أو اترك فارغًا ثم أضِفه.")}</p>
+            <p style={{ margin: "3px 0 0", fontSize: 12.5, color: "var(--muted)" }}>{L("We transformed the quote into your bid form: confirm, edit, or leave blank, then add it.", "حوّلنا العرض إلى نموذج عرضك: أكّد أو عدّل أو اترك فارغًا ثم أضِفه.")}</p>
           </div>
           <button onClick={onClose} aria-label={L("Close", "إغلاق")} style={{ width: 34, height: 34, borderRadius: "var(--radius-sm)", border: "none", background: "var(--surface2)", color: "var(--muted)", cursor: "pointer", fontSize: 18 }}>✕</button>
         </div>
@@ -187,7 +187,7 @@ export function BidVerifyModal({
                   {/* Terms */}
                   {item.terms.length > 0 && (
                     <>
-                      <div className="subhead"><span className="material-icons-outlined">fact_check</span>{L("Terms — does the quote meet each?", "الشروط — هل يلبّي العرض كلًّا منها؟")}
+                      <div className="subhead"><span className="material-icons-outlined">fact_check</span>{L("Terms: does the quote meet each?", "الشروط: هل يلبّي العرض كلًّا منها؟")}
                         <button type="button" className={`yall${allTermsYes ? " on" : ""}`} onClick={toggleAllYes}><span className="yall-sw"></span>{L("Yes to all", "نعم للكل")}</button>
                       </div>
                       <div className="treqgrid">{item.terms.map((t, i) => termCell(t, (a) => setTerm(i, a)))}</div>
@@ -267,7 +267,7 @@ export function BidVerifyModal({
                       <input value={e.value} onChange={(ev) => setExtra(i, ev.target.value)} />
                     </div>
                   ))}
-                  <div className="ro-hint">{L("Anything from the quote that doesn't fit a field above — edit or clear it. These show in the comparison's Notes row.", "أي شيء من العرض لا يناسب حقلًا أعلاه — عدّله أو امسحه. تظهر في صف الملاحظات بالمقارنة.")}</div>
+                  <div className="ro-hint">{L("Anything from the quote that doesn't fit a field above. Edit or clear it. These show in the comparison's Notes row.", "أي شيء من العرض لا يناسب حقلًا أعلاه: عدّله أو امسحه. تظهر في صف الملاحظات بالمقارنة.")}</div>
                 </div>
               )}
             </div>
@@ -276,7 +276,7 @@ export function BidVerifyModal({
 
         {/* Footer */}
         <div style={{ padding: "12px 20px 16px", borderTop: "1px solid var(--surface3)", flex: "0 0 auto" }}>
-          <p style={{ margin: "0 0 8px", fontSize: 11.5, color: "var(--muted)" }}>{L("Anything unknown is left for you to fill — or leave it blank and add it now.", "كل ما هو غير معروف متروك لك لتعبئته — أو اتركه فارغًا وأضِفه الآن.")}</p>
+          <p style={{ margin: "0 0 8px", fontSize: 11.5, color: "var(--muted)" }}>{L("Anything unknown is left for you to fill, or leave it blank and add it now.", "كل ما هو غير معروف متروك لك لتعبئته: أو اتركه فارغًا وأضِفه الآن.")}</p>
           {err && <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 700, color: "var(--danger)" }}>{err}</p>}
           <div style={{ display: "flex", gap: 10 }}>
             <button onClick={onClose} style={{ flex: "0 0 auto", padding: "12px 18px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--navy)", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{L("Cancel", "إلغاء")}</button>

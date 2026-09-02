@@ -237,10 +237,29 @@ export function RequestDetailsModal({
         subtitle={group.groupRef ?? subject?.displayId ?? group.id}
         footer={
           <>
+            {/* ── Cancel, in the footer with the other two (owner, 2026-09-02) ──────────────────
+                ~~It sat at the foot of the BODY, behind its own rule, deliberately out of reach of
+                «the same sweep of the hand that shares».~~ What that actually produced was a second
+                footer: two rules, two rows of actions, and the destructive one ABOVE the pair it was
+                being kept away from — so it was the first thing under the request and it scrolled
+                with the body while Share and Edit stayed put.
+
+                All three are footer actions, so all three are in the footer. Distance is not what
+                keeps it safe: it is a text button in `danger` on the far edge, it says what it ends,
+                and it opens a confirm that names the request. */}
+            {actions.canCancel && (
+              <button
+                type="button"
+                onClick={() => setConfirmCancel(true)}
+                className="me-auto text-body font-semibold text-danger underline-offset-4 transition hover:underline"
+              >
+                {t.workspace.cancelRequest}
+              </button>
+            )}
             {/* Said out loud rather than left to a hover: a disabled button with no reason reads as
-                a bug. It leads the row, so the reason is read before the button it explains. */}
+                a bug. It is read before the button it explains. */}
             {actions.editCapUsed && (
-              <p className="me-auto text-label font-semibold text-muted">{t.workspace.editCapUsed}</p>
+              <p className="text-label font-semibold text-muted">{t.workspace.editCapUsed}</p>
             )}
             {actions.canEdit && (
               <button
@@ -444,21 +463,6 @@ export function RequestDetailsModal({
           )}
         </div>
 
-        {/* Cancelling ends the request, so it stays down here in the body and away from the two
-            buttons in the footer — it must not be reachable by the same sweep of the hand that
-            shares. `-mx-5` pulls the rule out to the panel's own edges; inside the body's padding it
-            was a short line floating in the middle of nothing. */}
-        {actions.canCancel && (
-          <div className="-mx-5 mt-4 border-t border-border px-5 pt-3.5">
-            <button
-              type="button"
-              onClick={() => setConfirmCancel(true)}
-              className="text-meta font-semibold text-danger underline-offset-4 hover:underline"
-            >
-              {t.workspace.cancelRequest}
-            </button>
-          </div>
-        )}
       </Dialog>
 
       <ShareForBidsSheet

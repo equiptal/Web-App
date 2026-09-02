@@ -129,7 +129,7 @@ export function Confirmation() {
               </div>
               <div style={{ flex: 1, minWidth: 200 }}>
                 <span style={{ fontSize: 15.5, fontWeight: 800, color: "var(--surface)" }}>{L("Know suppliers already? Invite them", "تعرف مؤجّرين؟ ادعهم")}</span>
-                <span style={{ fontSize: 12.5, fontWeight: 500, color: "var(--muted-light)", marginInlineStart: 8 }}>{L("Share a private link — their bids land right here.", "شارك رابطاً خاصاً — تصل عروضهم هنا مباشرة.")}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 500, color: "var(--muted-light)", marginInlineStart: 8 }}>{L("Share a private link. Their bids land right here.", "شارك رابطاً خاصاً: تصل عروضهم هنا مباشرة.")}</span>
               </div>
               <button onClick={() => setShareOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "var(--brand-light)", flexShrink: 0, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
                 <Svg w={14} stroke="var(--brand-light)" sw={2.1}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Svg>
@@ -282,7 +282,7 @@ function SceneShare({ L }: { ar?: boolean; L: (e: string, a: string) => string }
       <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".08em", color: "var(--muted)" }}>{L("REQUESTS FOR QUOTE", "طلبات عروض الأسعار")}</div>
       <div style={{ marginTop: 10, background: "var(--navy-deep)", borderRadius: "var(--radius-lg)", padding: "15px 16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 14, fontWeight: 800, color: "var(--surface)" }}>{L("Riyadh — Qiddiya Project", "الرياض — مشروع القدية")}</span>
+          <span style={{ fontSize: 14, fontWeight: 800, color: "var(--surface)" }}>{L("Riyadh: Qiddiya Project", "الرياض: مشروع القدية")}</span>
           <span style={{ fontSize: 9, fontWeight: 800, color: "var(--ok-soft)", background: "color-mix(in srgb, var(--ok) 16%, transparent)", padding: "2px 7px", borderRadius: "var(--radius-lg)" }}>● {L("Open", "مفتوح")}</span>
         </div>
         <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted-light)", marginTop: 3 }}>REQ-00196 · 1 Jul 2026</div>
@@ -326,7 +326,7 @@ function SceneForm({ L }: { ar?: boolean; L: (e: string, a: string) => string })
         </div>
       </div>
       <div style={{ flex: 1, overflow: "hidden", padding: "14px 18px" }}>
-        <div style={{ fontSize: 10, fontWeight: 800, color: "var(--muted-dark)", marginBottom: 8 }}>📋 {L("TERMS — CAN YOU MEET EACH?", "الشروط — هل يمكنك الالتزام؟")}</div>
+        <div style={{ fontSize: 10, fontWeight: 800, color: "var(--muted-dark)", marginBottom: 8 }}>📋 {L("TERMS: CAN YOU MEET EACH?", "الشروط: هل يمكنك الالتزام؟")}</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
           {terms.map((t) => (
             <div key={t.label} style={{ background: "var(--surface)", border: "1px solid var(--surface3)", borderRadius: "var(--radius-sm)", padding: "8px 9px", animation: `rlv-dropIn .45s ease ${t.delay} both` }}>
@@ -370,7 +370,7 @@ function SceneDone({ L }: { ar: boolean; L: (e: string, a: string) => string }) 
           </div>
         </div>
         <div style={{ fontSize: 18, fontWeight: 800, color: "var(--navy-deep)" }}>{L("Bid submitted", "تم إرسال العرض")}</div>
-        <div style={{ fontSize: 12.5, fontWeight: 500, color: "var(--muted-dark)", marginTop: 6, lineHeight: 1.5, maxWidth: 260 }}>{L("Their offer is now with you on Moedatech — ready to compare side by side.", "عرضهم الآن لديك على معداتك — جاهز للمقارنة جنباً إلى جنب.")}</div>
+        <div style={{ fontSize: 12.5, fontWeight: 500, color: "var(--muted-dark)", marginTop: 6, lineHeight: 1.5, maxWidth: 260 }}>{L("Their offer is now with you on Moedatech: ready to compare side by side.", "عرضهم الآن لديك على معداتك: جاهز للمقارنة جنباً إلى جنب.")}</div>
         <div style={{ display: "inline-block", marginTop: 13, fontSize: 13, fontWeight: 800, color: "var(--navy-deep)", background: "var(--background)", padding: "7px 15px", borderRadius: "var(--radius-sm)" }}>💵 SAR 2,185</div>
       </div>
     </div>
@@ -387,7 +387,7 @@ function SceneCompare({ L }: { ar: boolean; L: (e: string, a: string) => string 
   return (
     <div style={{ position: "absolute", inset: 0, padding: "18px 20px", animation: "rlv-fade .35s ease both" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 11 }}>
-        <span style={{ fontSize: 12, fontWeight: 800, color: "var(--navy-deep)" }}>{L("Forklift · 10 ton — 3 bids", "رافعة شوكية · ١٠ طن — ٣ عروض")}</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: "var(--navy-deep)" }}>{L("Forklift · 10 ton: 3 bids", "رافعة شوكية · ١٠ طن: ٣ عروض")}</span>
         <span style={{ fontSize: 10, fontWeight: 800, color: "var(--ok-deep)", background: "var(--ok-soft)", padding: "3px 8px", borderRadius: "var(--radius-lg)" }}>{L("1/1 fulfilled", "١/١ مكتمل")}</span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

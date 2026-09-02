@@ -478,10 +478,16 @@ export function HomeRequests() {
                         )}
                       </td>
                       <td className="whitespace-nowrap px-3.5 text-end">
-                        {/* ── The prototype's three, back on the row ────────────────────────────
-                            Share invites bids, Edit changes what was asked for, ✕ ends it. Icons
-                            rather than words: three labelled buttons would be wider than the request
-                            they act on, and each carries its sentence on `title`.
+                        {/* ── Two on the row, not three (owner, 2026-09-02) ─────────────────────
+                            Share invites bids and ✕ ends it. Icons rather than words: labelled
+                            buttons would be wider than the request they act on, and each carries its
+                            sentence on `title`.
+
+                            ~~A pen between them.~~ Removed: it opened the request's own dialog,
+                            which is where the row already goes when you press it — so the row had a
+                            control that did what the row does, and a renter deciding whether to edit
+                            had to tell a 28px pen apart from a 28px share and a 28px cross. Editing
+                            lives on the dialog it belongs to, beside Share and Cancel.
 
                             ✕ renders only where the backend will actually take it
                             (`cancellableItems`) — a control that exists and then refuses is worse
@@ -489,7 +495,6 @@ export function HomeRequests() {
                             row's one filled button: it is the thing the renter came to do. */}
                         <span className="inline-flex items-center gap-1">
                           <RowAction icon="ios_share" label={t.home.reqShare} onPress={() => setOpen({ group: g, share: true })} />
-                          <RowAction icon="edit" label={t.home.reqEdit} onPress={() => setOpen({ group: g, share: false })} />
                           {/* ── One ✕, two meanings, and the row's state decides which ─────────
                               While the request can still be cancelled, ✕ cancels it. Once it is
                               closed it can't be, and the ✕ takes it off the feed instead — which

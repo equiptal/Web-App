@@ -17,7 +17,10 @@ interface CityOpt {
 
 
 /**
- * Suggested Suppliers (web-app/004, AC-10–17, AC-23) — the prototype's Stores Page, value for value.
+ * Most popular suppliers (web-app/004, AC-10–17, AC-23) — the prototype's Stores Page, value for
+ * value. ~~«Suggested Suppliers».~~ Renamed by the owner (2026-09-01): nothing here is a suggestion
+ * — the list is not ranked to this renter, it is the directory — and calling it one promised a
+ * personalisation the page does not do.
  *
  * A title with the count beside it, one row carrying a search field and the city, a row of category
  * pills, then five cards to a row. The card is where the category lands: no pill and it shows the
@@ -110,7 +113,7 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
 
   return (
     <div {...pin("browse-surface")} className="flex flex-col">
-      {/* The title, with the count beside it — «Suggested Suppliers · 13 stores across Saudi Arabia».
+      {/* The title, with the count beside it — «Most popular suppliers · 13 stores across Saudi Arabia».
           The View-all toggle is the preview's, and only a preview ever draws it. */}
       {title && (
         <div className="mb-5 flex flex-wrap items-baseline justify-between gap-2.5">

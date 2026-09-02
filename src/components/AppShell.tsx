@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { VerifiedMark } from "@/components/VerifiedMark";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
@@ -424,9 +425,12 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
                     scale starts at 11px, and 11px of «Verify» is wider than the 34px circle — hung off
                     it, the badge would either clip at the bar's edge or cover the reader's initials.
                     Inside the same link, so it is one press to the same place. */}
+                {/* The house mark, `mono` (owner, 2026-09-02): at 15px on the bar, inside a disc that
+                    is already the green, the two-tone rosette would be a green badge on a green
+                    badge. Same glyph, one colour — see `VerifiedMark`. */}
                 {tier === "verified" ? (
                   <span className="absolute -end-0.5 -bottom-0.5 grid h-[15px] w-[15px] place-items-center rounded-full border-2 border-navy bg-ok text-white">
-                    <Icon name="check" size={9} />
+                    <VerifiedMark size={9} mono />
                   </span>
                 ) : null}
                 </span>

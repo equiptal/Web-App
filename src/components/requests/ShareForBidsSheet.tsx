@@ -177,7 +177,7 @@ export function ShareForBidsSheet({
       padded={false}
       icon={<span className="grid h-[34px] w-[34px] place-items-center rounded-sm bg-brand text-white"><Icon name="ios_share" size={18} /></span>}
       title={L("Share for bids", "مشاركة لتلقّي العروض")}
-      subtitle={L("Send this link to suppliers — they bid without an account, even off-platform.", "أرسل هذا الرابط للمؤجّرين — يقدّمون عرضهم دون حساب، حتى خارج المنصة.")}
+      subtitle={L("Send this link to suppliers. They bid without an account, even off-platform.", "أرسل هذا الرابط للمؤجّرين: يقدّمون عرضهم دون حساب، حتى خارج المنصة.")}
     >
       <div {...pin("share-for-bids")} className="flex min-h-0 flex-1 flex-col text-start" dir={ar ? "rtl" : "ltr"}>
 
@@ -267,7 +267,7 @@ export function ShareForBidsSheet({
               <Icon name="visibility" size={18} className="flex-none text-navy-mid" />
               <span className="flex-1">
                 <b className="block text-body font-semibold text-navy">{L("View the bid form", "عرض نموذج تقديم العرض")}</b>
-                <span className="text-label font-normal text-muted">{L("See exactly what suppliers fill in — read-only.", "شاهد ما سيعبّيه المؤجّرون — للعرض فقط.")}</span>
+                <span className="text-label font-normal text-muted">{L("See exactly what suppliers fill in: read-only.", "شاهد ما سيعبّيه المؤجّرون: للعرض فقط.")}</span>
               </span>
               <Icon name="open_in_new" size={16} className="flex-none text-muted" />
             </a>

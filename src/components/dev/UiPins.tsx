@@ -201,7 +201,7 @@ export function UiPins() {
       <button
         type="button"
         onClick={toggle}
-        title="UI pins — click, or Ctrl+Shift+U"
+        title="UI pins: click, or Ctrl+Shift+U"
         style={{
           position: "fixed",
           bottom: 16,

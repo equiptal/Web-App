@@ -70,6 +70,10 @@
      not a redder warning — it is to stop `--warn` being an orange at all, or to let the icon and
      the wording carry the caution and leave the hue to the CTA. */
   --ok: #1daf58;
+  /* The VERIFIED badge's own green (owner's artwork, 2026-09-02). Deliberately not `--ok`: that one
+     is a status — "this went well" — and it moves with the status palette. A badge that moved with
+     it would stop being recognisable as the same mark. See `VerifiedMark`. */
+  --verified: #10a64a;
   --ok-soft: #e7f7ee;
   --ok-deep: #15803d;
   --warn: #d4780a;
@@ -175,6 +179,10 @@
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
   --color-ok-deep: var(--ok-deep);
+  /* The verified badge's green — see the note on `--verified` above. Mirrored here because a colour
+     `:root` defines and `@theme` does not is a colour half the app cannot reach; `ds-colors` fails
+     the build over exactly that, which is how this one was caught. */
+  --color-verified: var(--verified);
   --color-warn: var(--warn);
   --color-warn-soft: var(--warn-soft);
   --color-warn-deep: var(--warn-deep);

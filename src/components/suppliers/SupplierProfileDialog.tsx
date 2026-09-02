@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { VerifiedMark } from "@/components/VerifiedMark";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 import { btn, cx } from "@/lib/ds";
@@ -150,13 +151,13 @@ function Badges({ p }: { p: SupplierProfile }) {
       )}
       {p.verified && (
         <span className="inline-flex h-[23px] items-center gap-1.5 rounded-full border border-info/30 bg-info-soft px-2.5 text-label font-extrabold text-info-deep">
-          <Icon name="verified" size={13} />
+          <VerifiedMark size={13} />
           {c.verifiedByMoedatech}
         </span>
       )}
       {p.vendorRegistered && (
         <span className="inline-flex h-[23px] items-center gap-1.5 rounded-full border border-ok bg-ok-soft px-2.5 text-label font-extrabold text-ok-deep">
-          <Icon name="verified" size={13} />
+          <VerifiedMark size={13} />
           {c.registeredVendor}
         </span>
       )}

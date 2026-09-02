@@ -287,8 +287,8 @@ export function SharedLinkBidCard({
           </div>
           <p style={{ fontSize: 11.5, color: "var(--muted-light)", fontWeight: 600, textAlign: "center", margin: "9px 0 0" }}>
             {onNegotiate
-              ? L("Message this supplier now — continue the deal with them in the app.", "راسل هذا المؤجّر الآن — وأكمل الصفقة معه في التطبيق.")
-              : L("Off-platform supplier — view their submitted bid.", "مؤجّر خارج المنصة — اعرض عرضه المُقدَّم.")}
+              ? L("Message this supplier now: continue the deal with them in the app.", "راسل هذا المؤجّر الآن، وأكمل الصفقة معه في التطبيق.")
+              : L("Off-platform supplier: view their submitted bid.", "مؤجّر خارج المنصة: اعرض عرضه المُقدَّم.")}
           </p>
         </div>
       )}

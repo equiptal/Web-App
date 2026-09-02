@@ -4,9 +4,26 @@
  * *The operator* (MREQ-AC-25–28), at the prototype's geometry.
  *
  * A fixed 380px rail beside the machine card rather than a section below it, because the operator is
- * a property of the machine next to it, not a later step — and because turning it off has to be one
- * obvious move. Off, it collapses to a 72px vertical strip that still says what it is and reopens on
- * a click; it does not disappear, since a renter who turned it off by accident needs to find it.
+ * a property of the machine next to it, not a later step. Closed, it collapses to a 72px vertical
+ * strip that still says what it is and reopens on a click; it does not disappear, since a renter who
+ * closed it by accident needs to find it.
+ *
+ * ── OPENING IS NOT ANSWERING (owner, 2026-09-01) ─────────────────────────────────────────────────
+ *
+ * *"Clicking the operator panel toggles it and assumes it is included. I want clicking to open it —
+ * but make the renter include it explicitly."*
+ *
+ * One control was doing two jobs: the header toggle both showed the panel and wrote
+ * `operatorNeeded`, and the collapsed strip set it to «yes» on the press that opened it. So a renter
+ * who opened the rail to see what was in it had, by that press alone, ordered an operator — and
+ * suppliers price one.
+ *
+ * They are two things now. `expanded` is local and means "the panel is showing"; `operatorNeeded` is
+ * the ANSWER, and the only thing that writes it is the question at the top of the panel. Opening
+ * changes nothing about the request.
+ *
+ * The panel opens on whatever the item already says, so an agent that read "with an operator" opens
+ * ready to be checked rather than closed and easy to miss.
  *
  * Inside: three boxes at 16px apart, each a `1fr 1fr` grid, matching the machine card's boxes so the
  * two columns read as one row rather than two unrelated cards.
@@ -33,7 +50,10 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
   const [moreOpen, setMoreOpen] = useState(false);
 
   const op = item.operator;
+  /** The ANSWER. Nothing but the question below writes it. */
   const on = item.operatorNeeded === "yes";
+  /** Whether the panel is showing. Opens on the item's own answer, then the renter's to keep. */
+  const [expanded, setExpanded] = useState(on);
   const complete = !on || [op.fatFood, op.fatAccommodationTransport, op.nationality].every(Boolean);
 
   const setOp = (field: string, patch: Parameters<typeof actions.patchItemOperator>[1]) => {
@@ -46,12 +66,12 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
     { value: "me", label: t.options.party.me },
   ];
 
-  // ---- Collapsed: the prototype's 72px strip. ----
-  if (!on) {
+  // ---- Closed: the prototype's 72px strip. Pressing it OPENS, and writes nothing. ----
+  if (!expanded) {
     return (
       <button
         type="button"
-        onClick={() => actions.patchItem(item.id, { operatorNeeded: "yes" })}
+        onClick={() => setExpanded(true)}
         className="flex w-[72px] flex-none flex-col items-center gap-3.5 self-stretch rounded-lg border-[1.5px] border-brand-light bg-brand-soft py-4 transition"
         aria-label={t.create.operator}
       >
@@ -73,8 +93,42 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
           <PanelDot complete={complete} />
           <h2 className="text-subhead font-extrabold text-navy">{t.create.operator}</h2>
         </span>
-        <Toggle checked={on} onChange={() => actions.patchItem(item.id, { operatorNeeded: "no" })} />
+        {/* Closes the panel. ~~A toggle that wrote «no operator».~~ The answer is asked once, below,
+            and a second control for it here is how the two got confused in the first place. */}
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          aria-label={t.common.close}
+          title={t.common.close}
+          className="grid h-7 w-7 flex-none place-items-center rounded-sm text-muted transition hover:bg-surface2 hover:text-navy"
+        >
+          <Icon name="close" size={16} />
+        </button>
       </div>
+
+      {/* ── The question, directly under the title (owner, 2026-09-01) ────────────────────────────
+          Asked outright, and answered by the renter — never by the act of opening the panel. It is
+          the first thing in the rail because everything under it is a detail OF the answer: with no
+          operator there is no food, no accommodation and no certificate to ask about, so the rest is
+          hidden until the answer is yes. */}
+      <div className="flex flex-col gap-2 rounded-sm border border-border bg-surface2 p-3.5">
+        <span className="text-body font-semibold text-navy">{t.create.operatorCard.needOperator}</span>
+        <ChoiceRow<"yes" | "no">
+          value={item.operatorNeeded}
+          onChange={(v) => {
+            prov.touch("operator_needed");
+            actions.patchItem(item.id, { operatorNeeded: v });
+          }}
+          options={[
+            { value: "yes", label: t.create.operatorCard.operatorIncluded },
+            { value: "no", label: t.create.operatorCard.operatorNotIncluded },
+          ]}
+        />
+      </div>
+
+      {/* Everything below answers "which operator", which only exists once the answer above is yes. */}
+      {on && (
+      <>
 
       <div {...pin("operator-rail-options")} className="grid gap-3.5 rounded-sm bg-surface2 p-3.5 sm:grid-cols-2">
         <CanvasField label={t.create.operatorCard.food} source={prov.itemSource("operator.fat_food", op.fatFood)}>
@@ -174,6 +228,8 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

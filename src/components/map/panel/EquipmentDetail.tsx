@@ -203,7 +203,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
   /** The disabled control says what it is waiting for rather than going quietly inert. «المورد» is
    *  this surface's word for the other party, matching the prototype — the owner's ruling of
    *  2026-08-10, which reversed an earlier one that had this surface saying «المؤجّر». */
-  const pendingLabel = L("Asked — awaiting his reply", "طُلب — بانتظار ردّه");
+  const pendingLabel = L("Asked: awaiting his reply", "طُلب: بانتظار ردّه");
   const pendingWhy = L(
     "You've already asked this, and the supplier hasn't answered yet.",
     "سبق أن طلبت هذا، ولم يردّ المورد بعد.",

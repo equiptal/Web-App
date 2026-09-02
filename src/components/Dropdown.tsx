@@ -28,6 +28,12 @@
  *
  * ── Three things it does that a native select cannot ─────────────────────────────────────────────
  *
+ *  · **It escapes whatever it is inside.** The list is a PORTAL on `document.body`, placed from the
+ *    trigger's rect. An `absolute` list is clipped by the nearest scroll box, and half this app's
+ *    lists live in one: the documents dialog cut «Purchase order» in half against the dialog's own
+ *    scrolling body (owner, 2026-09-01: *"it is stripped"*). It closes on any ancestor scroll rather
+ *    than chasing it — a menu that follows the page while you scroll past its own trigger is the
+ *    other half of that bug, and re-placing on every scroll event is what made the row menu shake.
  *  · **It flips up** when the trigger sits low in the viewport, measured on each open. Two of these
  *    are anchored to the bottom edge of the machine panel, and a list that opened below the fold had
  *    to be scrolled to be read.
@@ -39,6 +45,7 @@
  */
 
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "@/components/Icon";
 import { pin } from "@/lib/uiPins";
 
@@ -71,6 +78,7 @@ export function Dropdown({
   prefix,
   triggerClass,
   disabled = false,
+  defaultOpen = false,
   onChange,
 }: {
   value: string | null;
@@ -104,30 +112,51 @@ export function Dropdown({
    */
   triggerClass?: string;
   disabled?: boolean;
+  /**
+   * Open the moment it mounts.
+   *
+   * For a list the renter has just asked for without pressing it — picking a project opens what is
+   * filed at that project (owner, 2026-09-01). Read once, at mount, so the list can then be closed
+   * and stay closed; a caller that wants it open again remounts it with a `key`.
+   */
+  defaultOpen?: boolean;
   onChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [dropUp, setDropUp] = useState(false);
+  /** Where the portalled list sits, in viewport coordinates. Measured when it opens. */
+  const [at, setAt] = useState<{ top: number; left: number; width: number } | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
+  /** The portalled list, so an outside-click check can tell "inside the menu" from "outside". */
+  const listRef = useRef<HTMLDivElement>(null);
   // A combobox has to name the popup it controls, or assistive tech cannot follow the relationship.
   const listId = useId();
 
-  // Close on an outside click or Escape — a dropdown left open behind a panel switch is how a
-  // surface ends up with two of them showing at once.
+  /* Close on an outside click, on Escape, and on ANY ancestor scrolling (capture). The list is a
+     fixed layer: chasing the trigger down the page would re-render the row on every scroll event —
+     the bug that made the chart's row menu shake — and leaving it where it was opened is worse. A
+     menu closing when the surface under it moves is what every platform does. */
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+      const node = e.target as Node;
+      if (boxRef.current?.contains(node)) return;
+      if (listRef.current?.contains(node)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
+    const away = () => setOpen(false);
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", away, true);
+    window.addEventListener("resize", away);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", away, true);
+      window.removeEventListener("resize", away);
     };
   }, [open]);
 
@@ -137,11 +166,26 @@ export function Dropdown({
       const below = window.innerHeight - rect.bottom;
       // Flip only when there is genuinely more room the other way, so a cramped viewport does not
       // send the list somewhere even worse.
-      setDropUp(below < ESTIMATED_LIST_HEIGHT && rect.top > below);
+      const up = below < ESTIMATED_LIST_HEIGHT && rect.top > below;
+      const width = Math.min(Math.max(rect.width, 220), Math.min(340, window.innerWidth - 16));
+      setAt({
+        top: up ? Math.max(8, rect.top - 4 - ESTIMATED_LIST_HEIGHT) : rect.bottom + 4,
+        // Clamped to the window, and anchored to the trigger's own inline-start edge.
+        left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
+        width,
+      });
     }
     setQuery("");
     setOpen(true);
   };
+
+  /** Asked for open — see `defaultOpen`. Measured after paint, so the trigger has a rect to read. */
+  useEffect(() => {
+    if (!defaultOpen) return;
+    const id = requestAnimationFrame(() => openList());
+    return () => cancelAnimationFrame(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selected = options.find((o) => o.value === value);
   const searchable = options.length > 7;
@@ -187,13 +231,14 @@ export function Dropdown({
         <Icon name="expand_more" size={tone === "field" ? 16 : 14} className={`flex-none ${tone === "brand" || tone === "overlay" ? "" : "opacity-50"}`} />
       </button>
 
-      {open && (
+      {open && at && createPortal(
         <div
-          /* `min-w` off the trigger so a short pill still opens a readable list, and `max-w` so a
-             long machine name cannot run the list off the side of a narrow card. */
-          className={`absolute start-0 z-30 min-w-[max(100%,220px)] max-w-[min(340px,80vw)] overflow-hidden rounded-md border border-border bg-surface ${
-            dropUp ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"
-          }`}
+          ref={listRef}
+          /* `z-[70]`, above the dialog shell's own `z-[60]` scrim: this list is opened FROM a dialog
+             more often than not. Width comes from the trigger, floored at 220 so a short pill still
+             opens something readable and capped so a long machine name cannot run off the window. */
+          style={{ position: "fixed", top: at.top, left: at.left, width: at.width }}
+          className="z-[70] overflow-hidden rounded-md border border-border bg-surface"
         >
           {searchable && (
             <div className="border-b border-border p-2">
@@ -239,7 +284,8 @@ export function Dropdown({
             ))}
             {filtered.length === 0 && <p className="px-3 py-3 text-body text-muted">—</p>}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

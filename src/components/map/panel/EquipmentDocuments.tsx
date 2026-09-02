@@ -337,7 +337,7 @@ export function EquipmentDocuments({
           }}
         >
           {pending
-            ? L("Asked — awaiting his reply", "طُلب — بانتظار ردّه")
+            ? L("Asked: awaiting his reply", "طُلب: بانتظار ردّه")
             : canRequest
               ? L(`Ask the supplier to send it (${requestCount})`, `اطلب من المورد إرساله (${arDigits(requestCount)})`)
               : L("Ask the supplier to send it", "اطلب من المورد إرساله")}

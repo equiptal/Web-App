@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { VerifiedMark } from "@/components/VerifiedMark";
 import { Icon } from "@/components/ui";
 import { cx, TITLE_CASE } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
@@ -328,7 +329,7 @@ export function DocPill({ label, url, viewLabel, verifiedLabel }: { label: React
         </span>
       ) : (
         <span className="flex flex-none items-center gap-1 text-body font-semibold text-ok">
-          <Icon name="verified" size={14} /> {verifiedLabel}
+          <VerifiedMark size={14} /> {verifiedLabel}
         </span>
       )}
     </>

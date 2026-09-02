@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { VerifiedMark } from "@/components/VerifiedMark";
 import { useRouter } from "next/navigation";
 import { useT, useLocale, type Locale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
@@ -137,7 +138,7 @@ export function ProfileView() {
         subtitle={<span dir="ltr">{user?.phone ?? profile?.phone ?? "—"}</span>}
         badge={
           <MastheadPill tone={tier === "verified" ? "ok" : "neutral"} onLight>
-            {tier === "verified" && <Icon name="verified" size={13} />}
+            {tier === "verified" && <VerifiedMark size={13} />}
             {tierLabel}
           </MastheadPill>
         }

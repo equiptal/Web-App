@@ -191,8 +191,7 @@ export function BidEligibilityModal({ r, supplierName, ar, L, onClose }: { r: Bi
 
         <div style={{ padding: "14px 16px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", lineHeight: 1.5 }}>
-            {L("What each offered unit holds for your request — photos and the certificates you asked for. Proof-of-ownership isn't shown here.",
-               "ما توفّره كل وحدة معروضة لطلبك — الصور والشهادات التي طلبتها. لا تُعرض إثباتات الملكية هنا.")}
+            {L("What each offered unit holds for your request: photos and the certificates you asked for. Proof-of-ownership isn't shown here.", "ما توفّره كل وحدة معروضة لطلبك: الصور والشهادات التي طلبتها. لا تُعرض إثباتات الملكية هنا.")}
           </div>
           {r.units.map((u) => <UnitCard key={u.equipmentId} u={u} ar={ar} L={L} />)}
         </div>

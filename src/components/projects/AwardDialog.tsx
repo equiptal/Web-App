@@ -95,7 +95,16 @@ export function AwardDialog({
   open,
   onClose,
   item,
-  /** The site's basis, as the starting value — a renter rarely hires one machine on a different one. */
+  /**
+   * **The basis this line is priced on, and it is not asked for here** (owner, 2026-09-01: *"the rate
+   * must already use the request or the work order rental basis, not enter it here"*).
+   *
+   * It comes from the row being awarded — the work order's `when.rentalBasis`, or the request's —
+   * and the rate column simply says «Rate · per month». A `Per` dropdown on the award line was a
+   * fourth control asking the renter to restate a fact the record already holds, and it could
+   * DISAGREE with it: a monthly work order carrying a weekly award reads as a data error on the
+   * chart, and nothing on this dialog said which of the two was right.
+   */
   defaultBasis = "monthly",
   onSave,
   saving,
@@ -109,6 +118,9 @@ export function AwardDialog({
 }) {
   const t = useT();
   const a = t.projects.award;
+  /** «per month» / «per week» / «per day», from the record — see `defaultBasis`. */
+  const basisWord =
+    defaultBasis === "daily" ? a.perDaily : defaultBasis === "weekly" ? a.perWeekly : a.perMonthly;
 
   const [lines, setLines] = useState<Line[]>([blank(defaultBasis)]);
   const [suppliers, setSuppliers] = useState<RenterSupplier[] | null>(null);
@@ -220,7 +232,16 @@ export function AwardDialog({
                 {a.addSupplier}
               </button>
 
-              <div className="grid gap-2 sm:grid-cols-5">
+              {/* ── One row of money, with room to read it (owner, 2026-09-01: *"the awarding modal
+                  is terrible"*) ──────────────────────────────────────────────────────────────────
+                  Five equal columns put «DEMOBILIZATION» and «PER» into each other at 737px, and
+                  three money boxes all placeheld «SAR, optional» — truncated to «SAR, op» in every
+                  one of them, which is a placeholder that says nothing three times.
+
+                  Now: units is as narrow as a number needs, the three amounts share the rest evenly,
+                  the basis is STATED on the rate's own label instead of being a control, and every
+                  box placeholds `SAR` alone. What is optional is said once, under the row. */}
+              <div className="grid gap-2.5 sm:grid-cols-[5.5rem_repeat(3,minmax(0,1fr))]">
                 <label className="flex flex-col gap-1">
                   <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{a.units}</span>
                   <input
@@ -234,56 +255,48 @@ export function AwardDialog({
                 </label>
 
                 <label className="flex flex-col gap-1">
-                  <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{a.rate}</span>
+                  <span className="flex items-baseline gap-1 truncate text-label font-semibold uppercase tracking-[.03em] text-muted">
+                    {a.rate}
+                    {/* The record's own basis, read out — never a control. See `defaultBasis`. */}
+                    <span className="font-semibold normal-case text-navy-mid">· {basisWord}</span>
+                  </span>
                   <input
                     type="number"
                     min={0}
                     className="w-full rounded-sm border border-border bg-surface px-3 py-2 text-body text-navy outline-none focus:border-brand"
                     value={l.rateAmount}
-                    placeholder={a.ratePlaceholder}
+                    placeholder={t.common.sar}
                     onChange={(e) => patch(i, { rateAmount: e.target.value })}
                   />
                 </label>
 
                 <label className="flex flex-col gap-1">
-                  <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{a.mobAmount}</span>
+                  <span className="truncate text-label font-semibold uppercase tracking-[.03em] text-muted">{a.mobAmount}</span>
                   <input
                     type="number"
                     min={0}
                     className="w-full rounded-sm border border-border bg-surface px-3 py-2 text-body text-navy outline-none focus:border-brand"
                     value={l.mobAmount}
-                    placeholder={a.ratePlaceholder}
+                    placeholder={t.common.sar}
                     onChange={(e) => patch(i, { mobAmount: e.target.value })}
                   />
                 </label>
 
                 <label className="flex flex-col gap-1">
-                  <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{a.demobAmount}</span>
+                  <span className="truncate text-label font-semibold uppercase tracking-[.03em] text-muted">{a.demobAmount}</span>
                   <input
                     type="number"
                     min={0}
                     className="w-full rounded-sm border border-border bg-surface px-3 py-2 text-body text-navy outline-none focus:border-brand"
                     value={l.demobAmount}
-                    placeholder={a.ratePlaceholder}
+                    placeholder={t.common.sar}
                     onChange={(e) => patch(i, { demobAmount: e.target.value })}
                   />
                 </label>
-
-                <label className="flex flex-col gap-1">
-                  <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{a.basis}</span>
-                  <Dropdown
-                    label={a.basis}
-                    placeholder="—"
-                    value={l.rentalBasis ?? null}
-                    onChange={(v) => patch(i, { rentalBasis: (v || null) as Award["rentalBasis"] })}
-                    options={[
-                      { value: "daily", label: a.daily },
-                      { value: "weekly", label: a.weekly },
-                      { value: "monthly", label: a.monthly },
-                    ]}
-                  />
-                </label>
               </div>
+
+              {/* Said once for the whole row, instead of three times inside the boxes. */}
+              <p className="text-meta text-muted">{a.moneyOptional}</p>
 
               {/* What this line comes to, where the renter can see it against the rate they typed.
                   Absent rather than 0 when nothing is priced — a rate the renter has not agreed yet

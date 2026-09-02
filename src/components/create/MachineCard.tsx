@@ -125,7 +125,12 @@ export function MachineCard({
                 alt=""
                 draggable={false}
                 onError={() => setBrokenPhoto(photo)}
-                className="max-h-[240px] w-full rounded-md object-contain"
+                /* FILLS the frame (owner, 2026-09-01: *"the request image must fit the whole card
+                   size"*). `object-contain` fitted the whole photograph inside a 240px box and left
+                   the rest of the card empty above and below it — the machine ended up a stamp in
+                   the middle of a tall grey card. `cover` crops instead, which is what a photograph
+                   wants; the subject of these is centred by construction. */
+                className="h-[240px] w-full rounded-md object-cover"
               />
             ) : (
               <Icon name={equipmentIcon(tax.subtypeName || tax.categoryName)} size={132} className="text-navy/20" />

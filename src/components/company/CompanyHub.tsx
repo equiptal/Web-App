@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { VerifiedMark } from "@/components/VerifiedMark";
 import { Dialog } from "@/components/Dialog";
 import { CompanyDetails } from "@/components/company/CompanyDetails";
 import { MastheadPill, PageMasthead, RowList, Section } from "@/components/PageSection";
@@ -579,7 +580,7 @@ function ActiveCompany({
         badge={
           company.isVerified ? (
             <MastheadPill tone="ok" onLight>
-              <Icon name="verified" size={13} /> {c.verified}
+              <VerifiedMark size={13} /> {c.verified}
             </MastheadPill>
           ) : undefined
         }

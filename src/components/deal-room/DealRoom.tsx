@@ -223,7 +223,7 @@ export function DealRoom({ id, onTitle, initialFlow }: {
       await withdrawAcceptance(id);
       await loadRoom();
     } catch (e) {
-      window.alert(errMsg(e, L("Couldn't withdraw right now — please try again.", "تعذّر سحب القبول الآن — حاول مرة أخرى.")));
+      window.alert(errMsg(e, L("Couldn't withdraw right now: please try again.", "تعذّر سحب القبول الآن: حاول مرة أخرى.")));
     } finally {
       setWithdrawing(false);
     }
@@ -532,7 +532,7 @@ export function DealRoom({ id, onTitle, initialFlow }: {
       await loadRoom();
       setFlowMode(null);
     } catch (e) {
-      setCounterErr(errMsg(e, L("Couldn’t send your counter — please try again.", "تعذّر إرسال عرضك المقابل — حاول مرة أخرى.")));
+      setCounterErr(errMsg(e, L("Couldn’t send your counter: please try again.", "تعذّر إرسال عرضك المقابل: حاول مرة أخرى.")));
     } finally {
       setBusy(false);
     }
@@ -551,7 +551,7 @@ export function DealRoom({ id, onTitle, initialFlow }: {
       await loadRoom();
       setFlowMode(null);
     } catch (e) {
-      window.alert(errMsg(e, L("Couldn’t accept right now — please try again.", "تعذّر القبول الآن — حاول مرة أخرى.")));
+      window.alert(errMsg(e, L("Couldn’t accept right now: please try again.", "تعذّر القبول الآن: حاول مرة أخرى.")));
     } finally {
       setBusy(false);
     }
@@ -942,11 +942,11 @@ export function DealRoom({ id, onTitle, initialFlow }: {
             {multi && <div className="pb-bhead">{L("Per unit", "لكل وحدة")}</div>}
             <div className="pb-brow"><span className="l">{L("Rental", "الإيجار")} ({rentalLabel})</span><span className="v">{nf(perUnit.rental)}</span></div>
             {room.mobExcluded
-              ? <div className="pb-brow"><span className="l">{L("Mobilization", "التعبئة — موب")}</span><span className="v ex">{L("Not included", "غير مشمول")}</span></div>
-              : room.mobPrice ? <div className="pb-brow"><span className="l">{L("Mobilization", "التعبئة — موب")}</span><span className="v">{nf(perUnit.mob)}</span></div> : null}
+              ? <div className="pb-brow"><span className="l">{L("Mobilization", "التعبئة: موب")}</span><span className="v ex">{L("Not included", "غير مشمول")}</span></div>
+              : room.mobPrice ? <div className="pb-brow"><span className="l">{L("Mobilization", "التعبئة: موب")}</span><span className="v">{nf(perUnit.mob)}</span></div> : null}
             {room.demobExcluded
-              ? <div className="pb-brow"><span className="l">{L("Return", "الإرجاع — ديموب")}</span><span className="v ex">{L("Not included", "غير مشمول")}</span></div>
-              : room.demobPrice ? <div className="pb-brow"><span className="l">{L("Return", "الإرجاع — ديموب")}</span><span className="v">{nf(perUnit.demob)}</span></div> : null}
+              ? <div className="pb-brow"><span className="l">{L("Return", "الإرجاع: ديموب")}</span><span className="v ex">{L("Not included", "غير مشمول")}</span></div>
+              : room.demobPrice ? <div className="pb-brow"><span className="l">{L("Return", "الإرجاع: ديموب")}</span><span className="v">{nf(perUnit.demob)}</span></div> : null}
             <div className="pb-brow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{nf(perUnit.subtotal)}</span></div>
             <div className="pb-brow"><span className="l">{L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)")}</span><span className="v">{nf(perUnit.vat)}</span></div>
             <div className="pb-brow tot"><span className="l">{L("Estimated total", "الإجمالي التقديري")}</span><span className="v">{nf(perUnit.total)} {L("SAR", "ر.س")}</span></div>
@@ -1075,7 +1075,7 @@ export function DealRoom({ id, onTitle, initialFlow }: {
             </div>
             <div className="dl-modal-body">
               <p className="dl-modal-msg">
-                {L("This reopens negotiation with the supplier — the accepted deal returns to negotiating and the terms/price can change again. A new quotation is issued once you re-confirm.", "يعيد هذا فتح التفاوض مع المؤجّر — تعود الصفقة المقبولة إلى التفاوض ويمكن تغيير الشروط والسعر. يصدر عرض سعر جديد بعد إعادة التأكيد.")}
+                {L("This reopens negotiation with the supplier. The accepted deal returns to negotiating and the terms/price can change again. A new quotation is issued once you re-confirm.", "يعيد هذا فتح التفاوض مع المؤجّر: تعود الصفقة المقبولة إلى التفاوض ويمكن تغيير الشروط والسعر. يصدر عرض سعر جديد بعد إعادة التأكيد.")}
               </p>
               {releaseErr && <p className="dl-err">{releaseErr}</p>}
             </div>
@@ -1673,7 +1673,7 @@ function CounterFlow({
                       <tbody>
                         {cmpRow(L("Base rental", "الإيجار الأساسي"), rate, false, supDeal.rate, false)}
                         {cmpRow(L("Mobilization", "التعبئة"), mob, mEx, supDeal.mobPrice, supDeal.mobExcluded)}
-                        {cmpRow(L("Return — demob", "الإرجاع"), demob, dEx, supDeal.demobPrice, supDeal.demobExcluded)}
+                        {cmpRow(L("Return: demob", "الإرجاع"), demob, dEx, supDeal.demobPrice, supDeal.demobExcluded)}
                       </tbody>
                     </table></div>
                   )}
@@ -1706,8 +1706,8 @@ function CounterFlow({
                     </td>
                     <td><b className="tot">{money(rentalLine)}</b></td>
                   </tr>
-                  {legTr(L("Mobilization — mob", "التعبئة — موب"), L("delivery", "توصيل"), mobStr, setMobStr, mobUnitsN, setMobUnitsN, mobExcluded, setMobExcluded, refMobPrice, supRound?.mobUnits ?? null, L("Cancel mobilization (delivery to site) from the supplier?", "إلغاء التعبئة (النقل إلى الموقع) من المورد؟"))}
-                  {legTr(L("Return — demob", "الإرجاع — ديموب"), L("pickup", "استلام"), demobStr, setDemobStr, demobUnitsN, setDemobUnitsN, demobExcluded, setDemobExcluded, refDemobPrice, supRound?.demobUnits ?? null, L("Cancel demobilization (return from site) from the supplier?", "إلغاء الإرجاع (النقل من الموقع) من المورد؟"))}
+                  {legTr(L("Mobilization: mob", "التعبئة: موب"), L("delivery", "توصيل"), mobStr, setMobStr, mobUnitsN, setMobUnitsN, mobExcluded, setMobExcluded, refMobPrice, supRound?.mobUnits ?? null, L("Cancel mobilization (delivery to site) from the supplier?", "إلغاء التعبئة (النقل إلى الموقع) من المورد؟"))}
+                  {legTr(L("Return: demob", "الإرجاع: ديموب"), L("pickup", "استلام"), demobStr, setDemobStr, demobUnitsN, setDemobUnitsN, demobExcluded, setDemobExcluded, refDemobPrice, supRound?.demobUnits ?? null, L("Cancel demobilization (return from site) from the supplier?", "إلغاء الإرجاع (النقل من الموقع) من المورد؟"))}
                 </tbody>
               </table></div>
               <div className="qp-totals">
@@ -1725,7 +1725,7 @@ function CounterFlow({
                       {editable && !d.server ? (
                         <Dropdown
                           label={ar ? t.labelAr : t.label}
-                          placeholder={L("— choose —", "— اختر —")}
+                          placeholder={L(": choose", ": اختر")}
                           value={chosenSel(t) === "__none" ? null : chosenSel(t)}
                           onChange={(v) => pickTerm(t, v)}
                           options={opts.map((o) => ({ value: o.value, label: o.label }))}
@@ -1761,7 +1761,7 @@ function CounterFlow({
                             <td>{editable ? (
                               <Dropdown
                                 label={ar ? t.labelAr : t.label}
-                                placeholder={L("— choose —", "— اختر —")}
+                                placeholder={L(": choose", ": اختر")}
                                 value={chosenSel(t) === "__none" ? null : chosenSel(t)}
                                 onChange={(v) => pickTerm(t, v)}
                                 options={opts.map((o) => ({ value: o.value, label: o.label }))}
@@ -1795,7 +1795,7 @@ function CounterFlow({
                     )}
                     {operatingTerms.some((t) => decide(t).badge === "locked") && (
                       <>
-                        <tr className="cat settled"><td colSpan={4}>{L("Acknowledge — fixed by your request", "للعلم — مثبّتة من طلبك")}</td></tr>
+                        <tr className="cat settled"><td colSpan={4}>{L("Acknowledge: fixed by your request", "للعلم: مثبّتة من طلبك")}</td></tr>
                         {operatingTerms.filter((t) => decide(t).badge === "locked").map((t) => { const d = decide(t); return (
                           <tr key={t.key} className="locked">
                             <td className="lbl">🔒 {ar ? t.labelAr : t.label}{termNotes(t)}</td>
@@ -1925,11 +1925,11 @@ function CounterFlow({
                 </span>
               </div>
               <p style={{ fontSize: 13, fontWeight: 600, color: "var(--muted)", lineHeight: 1.7, margin: "10px 0 18px" }}>
-                {L("If you cancel, the supplier won't handle it — it becomes your responsibility: you arrange the transport and cover its cost, and it won't appear in the supplier's offer.", "عند الإلغاء لن يتكفّل المورد بها — تصبح على مسؤوليتك أنت: تنظّم النقل وتتحمّل تكلفته، ولن تظهر ضمن عرض المورد.")}
+                {L("If you cancel, the supplier won't handle it. It becomes your responsibility: you arrange the transport and cover its cost, and it won't appear in the supplier's offer.", "عند الإلغاء لن يتكفّل المورد بها: تصبح على مسؤوليتك أنت: تنظّم النقل وتتحمّل تكلفته، ولن تظهر ضمن عرض المورد.")}
               </p>
               <div style={{ display: "flex", gap: 10 }}>
                 <button onClick={() => setPendingEx(null)} style={{ flex: "0 0 auto", padding: "13px 22px", borderRadius: "var(--radius-lg)", border: "1.5px solid var(--border)", background: "var(--surface)", color: "var(--navy)", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>{L("Go back", "تراجع")}</button>
-                <button onClick={() => { pendingEx.onYes(); setPendingEx(null); }} style={{ flex: 1, padding: "13px 12px", borderRadius: "var(--radius-lg)", border: "none", background: "var(--danger)", color: "var(--surface)", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{L("Yes, cancel it — on me", "نعم، ألغِها — عليّ أنا")}</button>
+                <button onClick={() => { pendingEx.onYes(); setPendingEx(null); }} style={{ flex: 1, padding: "13px 12px", borderRadius: "var(--radius-lg)", border: "none", background: "var(--danger)", color: "var(--surface)", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{L("Yes, cancel it: on me", "نعم، ألغِها: عليّ أنا")}</button>
               </div>
             </div>
           </div>

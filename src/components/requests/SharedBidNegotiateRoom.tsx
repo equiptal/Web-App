@@ -191,12 +191,12 @@ export function SharedBidNegotiateRoom({
           <div className="thread">
             <div className="sysev">
               <span className="material-icons-outlined">bolt</span>
-              <span>{L("Off-platform negotiation — messages are delivered when the supplier joins the app.", "تفاوض خارج المنصة — تُسلَّم الرسائل عند انضمام المؤجّر إلى التطبيق.")}</span>
+              <span>{L("Off-platform negotiation: messages are delivered when the supplier joins the app.", "تفاوض خارج المنصة: تُسلَّم الرسائل عند انضمام المؤجّر إلى التطبيق.")}</span>
             </div>
             {!submission ? (
               <div className="sysev">{L("Submission details aren't available.", "تفاصيل العرض غير متاحة.")}</div>
             ) : messages.length === 0 ? (
-              <div className="sysev">{L("No messages yet — send the first one to open negotiations 👋", "لا رسائل بعد — أرسل أول رسالة لبدء التفاوض 👋")}</div>
+              <div className="sysev">{L("No messages yet. Send the first one to open negotiations 👋", "لا رسائل بعد: أرسل أول رسالة لبدء التفاوض 👋")}</div>
             ) : (
               messages.map((m, i) => (
                 <div className="msg mine" key={`${m.at}-${i}`}>

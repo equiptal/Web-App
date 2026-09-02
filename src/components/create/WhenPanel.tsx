@@ -149,7 +149,12 @@ export function WhenPanel({
               )}
               {charged.known && (
                 <p className="mt-3.5 text-body text-muted">
-                  {t.create.whenPanel.duration}: <span className="font-semibold text-navy">{num(charged.totalDays)}</span>
+                  {t.create.whenPanel.duration}:{" "}
+                  {/* «122 days», not «122» (owner, 2026-09-01). A bare figure under two dates reads
+                      as anything — a price, a count of machines — and the unit is one word. */}
+                  <span className="font-semibold text-navy">
+                    {fmt(t.create.whenPanel.durationDays, { n: num(charged.totalDays) })}
+                  </span>
                 </p>
               )}
             </div>
@@ -197,6 +202,26 @@ export function WhenPanel({
                   «DAYS YOU'LL BE CHARGED FOR» above it was the same fact twice and a third line of
                   height. The number sits at 20px beside the text rather than above it, so the
                   sentence wraps under itself and not under the figure. */}
+              {/* ── Only once there is something to acknowledge (owner, 2026-09-01) ──────────────
+                  *"This note must be shown after the start–end and how you're billed are filled,
+                  whether filled by agent detection or by the user."*
+
+                  It stated «suppliers will quote against the days you use» over a blank pair of
+                  dates and no basis — an acknowledgement of a figure that did not exist yet, asked
+                  before the renter had answered anything. Now the dates and the basis are the
+                  condition, and it appears the moment both hold, whoever filled them: the agent's
+                  extraction and the renter's own typing land in the same two fields.
+
+                  ⚠️ The condition is the BASIS, not the dates. Dates are optional on the web
+                  (MREQ-AC-10) and the acknowledgement is what makes an undated request sendable —
+                  its second wording is *"I understand suppliers will price without a fixed end
+                  date."* Requiring dates to show it would have locked every undated request out of
+                  sending, since `gateWhen` still needs the tick. The basis is required either way,
+                  so gating on it means the line appears the moment the panel has been answered at
+                  all, and never over an empty one.
+
+                  With dates it names the billable figure; without them it names the consequence. */}
+              {timing.rentalBasis && (
               <div className="mt-4 border-t border-border pt-4">
                 {charged.known ? (
                   <p className="flex items-baseline gap-2 text-meta leading-relaxed text-muted">
@@ -230,6 +255,7 @@ export function WhenPanel({
                     : t.create.whenPanel.confirmChargedNoDates}
                 </label>
               </div>
+              )}
             </div>
           </div>
 

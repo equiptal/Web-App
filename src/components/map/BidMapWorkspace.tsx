@@ -36,6 +36,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { VerifiedMark } from "@/components/VerifiedMark";
 import dynamic from "next/dynamic";
 import { ChatDock } from "@/components/map/ChatDock";
 import type { MachinePin } from "@/components/map/MapCanvas";
@@ -963,24 +964,12 @@ export function BidMapWorkspace({
                         width costs nothing. The prototype's chip carries the same phrase there. */}
                     {bid.verified && (
                       <span className="bm-verified" title={t.bidMap.verifiedCompanyWhy}>
-                        {/* A bare CHECK, drawn at 11px in the chip's own ink — `rVerifiedChip`
-                            (prototype 4056). It was Material's `verified` badge, a filled rosette
-                            whose scallops carry their own meaning at 13px and read as a second mark
-                            beside the word rather than as the tick for it. The stroke here is the
-                            prototype's 2.6, so the glyph keeps the chip's weight without a fill. */}
-                        <svg
-                          width="11"
-                          height="11"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.6"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M20 6L9 17l-5-5" />
-                        </svg>
+                        {/* ~~A bare stroked check at 11px, in the chip's own ink (`rVerifiedChip`,
+                            prototype 4056).~~ The house mark (owner, 2026-09-02): one badge wherever
+                            something is vetted, so the chip here and the chip on a supplier's profile
+                            are the same claim in the same shape. It brings its own green rather than
+                            taking the chip's, which is what makes it recognisable on any ground. */}
+                        <VerifiedMark size={12} />
                         {t.bidMap.verifiedCompany}
                       </span>
                     )}

@@ -266,8 +266,20 @@ export interface ChartGroup {
   status?: string | null;
   bidCount?: number;
   renteeEditUsed?: boolean;
-  /** Its own period, or `null` when it inherits the project's. */
-  when: { startDate: string | null; endDate: string | null } | null;
+  /**
+   * Its own period, or `null` when it inherits the project's.
+   *
+   * `rentalBasis` is what an AWARD on this row is priced against (owner, 2026-09-01) — the work
+   * order's own footing, or the copy a request took at submit. Optional because the chart endpoint
+   * is not guaranteed to send it on every row: the work-order feed does (`listWorkOrders` maps a
+   * `when.rentalBasis` straight out of the payload), and where it is absent the award falls back to
+   * the site's default rather than asking the renter to restate it.
+   */
+  when: {
+    startDate: string | null;
+    endDate: string | null;
+    rentalBasis?: "daily" | "weekly" | "monthly" | null;
+  } | null;
   items: ChartItem[];
 }
 

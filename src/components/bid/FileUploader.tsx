@@ -44,7 +44,7 @@ export function FileUploader({
   const errMsg = (code: string) =>
     code === "too_large" ? L("File exceeds 10 MB", "الملف يتجاوز ١٠ ميجابايت")
       : code === "unsupported_type" ? L("Only images or PDF are allowed", "الصور أو ملفات PDF فقط")
-        : L("Upload failed — please try again", "فشل الرفع — حاول مرة أخرى");
+        : L("Upload failed: please try again", "فشل الرفع: حاول مرة أخرى");
 
   function trigger(type: string) {
     pendingType.current = type;
@@ -110,7 +110,7 @@ export function FileUploader({
         </div>
         <div className="u-pick-hint">
           <span className="material-icons-outlined">add_circle_outline</span>
-          {L("Pick a type and Add — you can add as many as you need", "اختر نوعًا واضغط إضافة — يمكنك إضافة العدد الذي تريد")}
+          {L("Pick a type and Add. You can add as many as you need", "اختر نوعًا واضغط إضافة: يمكنك إضافة العدد الذي تريد")}
         </div>
         </>
       ) : value.length === 0 ? (
