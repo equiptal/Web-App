@@ -30,7 +30,6 @@ import {
 } from "@/lib/shareTemplate";
 import {
   EMAIL_PROVIDERS,
-  carriesRecipients,
   loadEmailProvider,
   openEmailCompose,
   saveEmailProvider,
@@ -788,22 +787,6 @@ export function ShareRequestPanel({
                 So this is not a warning about a compromise — it is the step. Stated as one, with the
                 addresses one press away, because a compose window that opens with no recipients and
                 no explanation is the feature looking broken. */}
-            {/* ── The ONE step this provider will need, named before he presses ────────────
-                Each is missing exactly one thing, and it is a different thing — so he is told which
-                one, once, rather than left to work out why a window opened half-empty. */}
-            {channel === "email" && sharedWith === null && (
-              <span className="flex items-start gap-2 rounded-sm border border-border bg-surface2 px-2.5 py-2 text-meta text-navy">
-                <Icon name="content_paste" size={14} className="mt-0.5 flex-none text-muted" />
-                <span className="min-w-0 flex-1">
-                  {!carriesRecipients(provider)
-                    ? reachable.length > 0
-                      ? fmt(c.stepOutlook, { n: reachable.length })
-                      : c.stepOutlookNone
-                    : c.stepGmail}
-                </span>
-              </span>
-            )}
-
             {/* Said plainly: the alternative is a renter who believes four people were messaged. */}
             {channel === "whatsapp" && sharedWith === null && (
               <span className="text-meta text-muted">
