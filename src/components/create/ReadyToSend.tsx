@@ -396,13 +396,10 @@ export function ReadyToSend() {
         </div>
       </Dialog>
 
-      <div className="mb-3.5 flex items-start gap-3 rounded-sm border border-info/25 bg-info-soft px-4 py-3">
-        <Icon name="ios_share" size={18} className="mt-0.5 flex-none text-info" />
-        <p className="text-body leading-relaxed text-navy">
-          <b className="font-semibold">{t.create.ready.inviteTitle}</b>
-          <span className="text-navy-mid"> — {t.create.ready.inviteBody}</span>
-        </p>
-      </div>
+      {/* ~~A banner promising a shareable link once you send.~~ Removed (owner's prototype,
+          2026-09-02): the link, the recipients and the preview are all on the *Share this request*
+          card below now, so a paragraph describing them sat above the thing itself. A coach mark on
+          that card does the pointing, once, and can be dismissed. */}
 
       {/* ── What this send will NOT do (owner, 2026-08-31) ────────────────────────────────────────
           *"changing location will not be able to be part of the selected project beside the confirm

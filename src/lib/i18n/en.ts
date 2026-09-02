@@ -238,6 +238,8 @@ export const en = {
   },
   intake: {
     postShare: {
+      coach: "Share with your supplier to bid",
+      expiry: "Link expires",
       title: "Share this request",
       subtitle: "Post it and send the link, in one press.",
       linkLabel: "Your shareable link",

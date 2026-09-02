@@ -214,6 +214,8 @@ export const ar: Dictionary = {
   },
   intake: {
     postShare: {
+      coach: "شارِكه مع مورّدك ليقدّم عرضه",
+      expiry: "ينتهي الرابط",
       title: "مشاركة هذا الطلب",
       subtitle: "انشره وأرسل الرابط بضغطة واحدة.",
       linkLabel: "رابط المشاركة",

@@ -10,7 +10,7 @@ import { Processing } from "@/components/screens/Processing";
 import { Confirmation } from "@/components/screens/Confirmation";
 import { Canvas } from "@/components/create/Canvas";
 import { ReadyToSend } from "@/components/create/ReadyToSend";
-import { PostAndShareDialog } from "@/components/create/PostAndShareDialog";
+import { ShareOnPost } from "@/components/create/ShareOnPost";
 import { Icon } from "@/components/ui";
 import { btn } from "@/lib/ds";
 
@@ -53,12 +53,6 @@ export function CreateSurface() {
 
   return (
     <>
-      {/* ── Post and share, mounted HERE on purpose ──────────────────────────────────────────────
-          Its button posts, and posting flips `phase` to `confirmation` — which unmounts *Ready to
-          send* mid-press. A dialog owned by that screen would vanish between the post and the share.
-          This component owns the switch and survives it, so the flip happens behind the dialog and
-          the renter sees one continuous act. */}
-      <PostAndShareDialog open={state.shareOnPost} onClose={() => actions.setShareOnPost(false)} />
 
       {/* mobile/016 — trial-run ribbon. Stays above every phase of the flow (intake → wizard →
           confirmation) so it's never ambiguous whether this submission reaches real suppliers. Switching
@@ -102,6 +96,17 @@ export function CreateSurface() {
         </div>
       )}
       {screen}
+
+      {/* ── «Share this request», the card under the review ──────────────────────────────────────
+          A card on the page rather than a dialog (the owner's prototype): a renter looking at what
+          he is about to send should see who it goes to without pressing anything first.
+
+          Rendered HERE and not inside the phase switch, because its button posts — and posting flips
+          `phase` to `confirmation`, which would unmount the card and its state mid-press, between
+          the post and the share. Outside the switch it survives, so the flip happens behind it and
+          it stays on screen to report what it shared. `shareOnPost` is what keeps it there
+          afterwards; before the post it follows the review it belongs to. */}
+      {(state.readyToSend || state.shareOnPost) && <ShareOnPost />}
       {/* The shared dialog, not a scrim of its own (owner, 2026-08-28: one design for every modal).
           This drew `bg-black/50` where the system's scrim is navy at 45%, and its own panel and
           heading with no way out but the two buttons — a prompt with no close is the one thing a
