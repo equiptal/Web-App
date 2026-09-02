@@ -20,6 +20,7 @@ import {
   PinIcon,
   PriceIcon,
   SHOP_PAGE,
+  ShopLogo,
   StorefrontIcon,
   VerifiedDot,
 } from "@/components/stores/shop";
@@ -347,14 +348,12 @@ function SupplierCard({
     <section className="rounded-shop-card border border-shop-line bg-white p-5">
       <div className="flex items-start justify-between gap-3.5">
         <div className="flex min-w-0 items-center gap-3">
-          {store?.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={store.logoUrl} alt={name} className="h-12 w-12 flex-none rounded-shop-logo-md object-cover" />
-          ) : (
-            <span className="grid h-12 w-12 flex-none place-items-center rounded-shop-logo-md bg-shop-fill text-shop-lead font-shop-bold text-shop-ink">
-              {name.trim()[0]?.toUpperCase() ?? "?"}
-            </span>
-          )}
+          <ShopLogo
+            src={store?.logoUrl ?? null}
+            name={name}
+            className="h-12 w-12 flex-none rounded-shop-logo-md"
+            initialClassName="grid h-12 w-12 flex-none place-items-center rounded-shop-logo-md bg-shop-fill text-shop-lead font-shop-bold text-shop-ink"
+          />
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="text-shop-lead font-shop-bold text-shop-ink">

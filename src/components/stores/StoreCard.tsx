@@ -5,15 +5,18 @@ import Link from "next/link";
 import { useLocale, useT } from "@/lib/i18n";
 import type { StoreCard as StoreCardData } from "@/lib/contract/stores";
 import { pin } from "@/lib/uiPins";
-import { PinIcon, VerifiedDot } from "@/components/stores/shop";
+import { PinIcon, ShopLogo, ShopPhoto, VerifiedDot } from "@/components/stores/shop";
 
 /**
  * A supplier card, in the two faces the prototype gives it. One 14px outline either way; what
  * changes is the tile at the top and the three lines under it.
  *
- * **All** — the SHOPFRONT. A navy tile carrying the store's logo at 52px, the tick top-right and the
- * city in a translucent white pill bottom-left. Then the logo again at 24px beside the name, how
- * much equipment, and up to two category chips with a «+n» in amber for the rest.
+ * **All** — the SHOPFRONT. The tile IS the logo: fitted to the card on white, at the size the mark
+ * can actually be read, with the tick top-right and the city in a dark pill bottom-left. ~~A navy
+ * block with a 52px badge on it~~ (owner, 2026-09-02: *"show the logo in fit with the card instead
+ * of the navy"*) — the badge was a stamp on a coloured ground, and most of these marks are wordmarks
+ * that need width before they need a backdrop. Then the logo again at 24px beside the name, how much
+ * equipment, and up to two category chips with a «+n» in amber for the rest.
  *
  * **A category** — the MACHINE. The tile is the photo; the pill goes dark over it; a store with more
  * than one match gets a `1/2` counter top-left and ‹ › over the image. Then the store's name, the
@@ -32,30 +35,20 @@ export function StoreCard({ store }: { store: StoreCardData }) {
   const at = Math.min(i, Math.max(0, matched.length - 1));
   const eq = matched.length > 0 ? matched[at] : null;
 
-  const logo = (size: 52 | 24) =>
-    store.logoUrl ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={store.logoUrl}
-        alt={store.name}
-        className={size === 52 ? "h-[52px] w-[52px] rounded-shop-logo object-cover" : "h-6 w-6 flex-none rounded-shop-logo-sm object-cover"}
-      />
-    ) : (
-      <span
-        className={
-          size === 52
-            ? "grid h-[52px] w-[52px] place-items-center rounded-shop-logo bg-white text-shop-name font-shop-bold text-shop-ink"
-            : "grid h-6 w-6 flex-none place-items-center rounded-shop-logo-sm bg-shop-fill text-shop-tag font-shop-bold text-shop-ink"
-        }
-      >
-        {store.name.trim()[0]?.toUpperCase() ?? "?"}
-      </span>
-    );
+  /** The 24px mark beside the name, on both faces. */
+  const smallLogo = (
+    <ShopLogo
+      src={store.logoUrl}
+      name={store.name}
+      className="h-6 w-6 flex-none rounded-shop-logo-sm"
+      initialClassName="grid h-6 w-6 flex-none place-items-center rounded-shop-logo-sm bg-shop-fill text-shop-tag font-shop-bold text-shop-ink"
+    />
+  );
 
   /** The name row: the small logo, then the store, wrapping to two lines rather than truncating. */
   const nameRow = (
     <div className="flex min-h-5 min-w-0 items-start gap-[7px]">
-      {logo(24)}
+      {smallLogo}
       <span className="min-w-0 text-pretty text-shop-control font-semibold leading-[1.3] text-shop-ink">{store.name}</span>
     </div>
   );
@@ -70,7 +63,7 @@ export function StoreCard({ store }: { store: StoreCardData }) {
       <div {...pin("store-card-equipment")} className="overflow-hidden rounded-shop-card border border-shop-line bg-white">
         <Link href={`/equipment/${encodeURIComponent(eq.id)}?storeId=${encodeURIComponent(store.id)}`} className="block text-shop-ink">
           <div className="relative aspect-[16/11] w-full bg-shop-fill">
-            {eq.photoUrl && <div className="h-full w-full bg-cover bg-center" style={{ backgroundImage: `url("${eq.photoUrl}")` }} />}
+            <ShopPhoto src={eq.photoUrl} alt={label} />
             {store.isVerified && (
               <span className="absolute end-2 top-2">
                 <VerifiedDot size={22} />
@@ -141,16 +134,22 @@ export function StoreCard({ store }: { store: StoreCardData }) {
       href={`/stores/${store.id}`}
       className="block overflow-hidden rounded-shop-card border border-shop-line bg-white text-shop-ink"
     >
-      {/* The navy tile — a shop has no photograph, so its own mark stands on the house colour. */}
-      <div className="relative flex aspect-[16/11] w-full items-center justify-center bg-shop-ink">
-        {logo(52)}
+      {/* The tile is the mark. White, because a logo is drawn for paper and most of these carry their
+          own white; contained and generously sized, because a wordmark needs width to be read. */}
+      <div className="relative flex aspect-[16/11] w-full items-center justify-center border-b border-shop-line bg-white p-5">
+        <ShopLogo
+          src={store.logoUrl}
+          name={store.name}
+          className="max-h-full max-w-full"
+          initialClassName="grid h-[52px] w-[52px] place-items-center rounded-shop-logo bg-shop-fill text-shop-name font-shop-bold text-shop-ink"
+        />
         {store.isVerified && (
           <span className="absolute end-2 top-2">
             <VerifiedDot size={22} />
           </span>
         )}
         {store.city && (
-          <span className="absolute bottom-2 start-2 inline-flex items-center gap-1 rounded-shop-pill bg-shop-tag-light px-[9px] py-1 text-shop-tag font-shop-bold text-white">
+          <span className="absolute bottom-2 start-2 inline-flex items-center gap-1 rounded-shop-pill bg-shop-tag px-[9px] py-1 text-shop-tag font-shop-bold text-white">
             <PinIcon size={11} strokeWidth={1.8} /> {store.city}
           </span>
         )}

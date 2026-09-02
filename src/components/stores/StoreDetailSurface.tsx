@@ -7,7 +7,7 @@ import { Icon } from "@/components/ui";
 import type { EquipmentCard, StoreDetail, TaxonomyNode } from "@/lib/contract/stores";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
-import { BackArrowIcon, CheckIcon, CityTag, DocIcon, EyeIcon, PinIcon, SHOP_PAGE, VerifiedDot } from "@/components/stores/shop";
+import { BackArrowIcon, CheckIcon, CityTag, DocIcon, EyeIcon, PinIcon, SHOP_PAGE, ShopLogo, ShopPhoto, VerifiedDot } from "@/components/stores/shop";
 
 /**
  * A supplier's profile — the approved prototype, matched value for value.
@@ -99,14 +99,12 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
         {/* ── The store ─────────────────────────────────────────────────────────────────────── */}
         <section className="rounded-shop-card border border-shop-line bg-white p-5">
           <div className="flex items-center gap-3">
-            {detail.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={detail.logoUrl} alt={detail.name} className="h-14 w-14 flex-none rounded-shop-logo object-cover" />
-            ) : (
-              <span className="grid h-14 w-14 flex-none place-items-center rounded-shop-logo bg-shop-fill text-shop-name font-shop-bold text-shop-ink">
-                {detail.name.trim()[0]?.toUpperCase() ?? "?"}
-              </span>
-            )}
+            <ShopLogo
+              src={detail.logoUrl}
+              name={detail.name}
+              className="h-14 w-14 flex-none rounded-shop-logo"
+              initialClassName="grid h-14 w-14 flex-none place-items-center rounded-shop-logo bg-shop-fill text-shop-name font-shop-bold text-shop-ink"
+            />
             <div className="min-w-0">
               <div className="flex items-center gap-[7px]">
                 <span className="truncate text-shop-name font-shop-bold text-shop-ink">{detail.name}</span>
@@ -218,7 +216,7 @@ function EquipmentTile({
     >
       <div className="relative aspect-[16/11] w-full bg-shop-fill">
         {eq.photoUrl ? (
-          <div className="h-full w-full bg-cover bg-center" style={{ backgroundImage: `url("${eq.photoUrl}")` }} />
+          <ShopPhoto src={eq.photoUrl} alt={label} />
         ) : iconUrl ? (
           <div className="h-full w-full bg-center bg-no-repeat" style={{ backgroundImage: `url("${iconUrl}")`, backgroundSize: "44px" }} />
         ) : null}

@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 /**
  * The storefront's own furniture: the page column, and the five glyphs the prototype draws.
  *
@@ -20,6 +22,53 @@
  * that begins with a back link.
  */
 export const SHOP_PAGE = "mx-auto w-full max-w-[1360px] px-6 pb-20";
+
+/**
+ * A logo that steps aside when the object is not there.
+ *
+ * A signed S3 URL is not a promise that the file exists: on staging five stores' logos answer 404
+ * (the row points at a key the bucket never received), and an `<img>` whose src 404s draws the
+ * browser's own broken-glyph-and-alt-text — the worst possible answer, because it looks like OUR
+ * bug on a card that is otherwise fine. The initials mark is what a store with no logo already gets,
+ * so a logo that fails to load simply becomes a store with no logo.
+ *
+ * `object-contain`, never `cover`: a supplier's mark is a shape with its own proportions, and
+ * cropping it to fill a square cuts the wordmark off half these logos.
+ */
+export function ShopLogo({
+  src,
+  name,
+  className,
+  initialClassName,
+}: {
+  src: string | null;
+  name: string;
+  /** The box. Size, radius and any ground colour belong here. */
+  className: string;
+  /** The same box when it has to draw a letter instead — it needs a text size and a ground. */
+  initialClassName: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  if (src && !failed) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt={name} onError={() => setFailed(true)} className={`${className} object-contain`} />;
+  }
+  return <span className={initialClassName}>{name.trim()[0]?.toUpperCase() ?? "?"}</span>;
+}
+
+/**
+ * A photograph that leaves its ground showing when the object is missing.
+ *
+ * Same fault as above, different answer: a machine with no photograph is drawn as the grey ground
+ * its card already has, so the caller renders this INSIDE that ground and gets the fallback for
+ * free. `null` rather than a placeholder image, because the ground is the placeholder.
+ */
+export function ShopPhoto({ src, alt, className }: { src: string | null; alt: string; className?: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) return null;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt={alt} onError={() => setFailed(true)} className={className ?? "h-full w-full object-cover"} />;
+}
 
 export function BackArrowIcon({ size = 16 }: { size?: number }) {
   return (
