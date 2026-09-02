@@ -491,21 +491,17 @@ export function HomeRequests() {
 
                             ✕ renders only where the backend will actually take it
                             (`cancellableItems`) — a control that exists and then refuses is worse
-                            than one that was never offered. «Compare bids» keeps its place as the
-                            row's one filled button: it is the thing the renter came to do. */}
+                            than one that was never offered. «Compare bids» is the row's one filled
+                            button, and now its first: it is the thing the renter came to do. */}
                         <span className="inline-flex items-center gap-1">
-                          <RowAction icon="ios_share" label={t.home.reqShare} onPress={() => setOpen({ group: g, share: true })} />
-                          {/* ── One ✕, two meanings, and the row's state decides which ─────────
-                              While the request can still be cancelled, ✕ cancels it. Once it is
-                              closed it can't be, and the ✕ takes it off the feed instead — which
-                              is the control that was missing: a finished request had no way off
-                              the dashboard at all. Both are destructive-looking, so both are
-                              labelled for what they actually do. */}
-                          {canCancel && cancellableItems([it]).length > 0 ? (
-                            <RowAction icon="close" label={t.home.reqCancel} tone="danger" onPress={() => setCancelling(g)} />
-                          ) : (
-                            <RowAction icon="close" label={L("Remove from this list", "إزالة من هذه القائمة")} onPress={() => askDismiss(g)} />
-                          )}
+                          {/* ── Compare bids first, the icons last (owner, 2026-09-02) ─────────
+                              *"Show the icons without box and keep them at the end of the row, the
+                              compare bids before."*
+
+                              It reads in the order of intent: the thing the renter came to do, then
+                              the two things they might do instead. With the boxes gone the filled
+                              button is the only drawn control in the cell, so the eye lands on it
+                              first and the icons sit quietly after it. */}
                           <button
                             type="button"
                             onClick={(e) => {
@@ -521,10 +517,23 @@ export function HomeRequests() {
                               );
                             }}
                             disabled={!it.bidCount}
-                            className={cx(btn("primary", "sm"), "ms-1.5")}
+                            className={btn("primary", "sm")}
                           >
                             {t.home.compareBids}
                           </button>
+
+                          <RowAction icon="ios_share" label={t.home.reqShare} onPress={() => setOpen({ group: g, share: true })} />
+                          {/* ── One ✕, two meanings, and the row's state decides which ─────────
+                              While the request can still be cancelled, ✕ cancels it. Once it is
+                              closed it can't be, and the ✕ takes it off the feed instead — which
+                              is the control that was missing: a finished request had no way off
+                              the dashboard at all. Both are destructive-looking, so both are
+                              labelled for what they actually do. */}
+                          {canCancel && cancellableItems([it]).length > 0 ? (
+                            <RowAction icon="close" label={t.home.reqCancel} tone="danger" onPress={() => setCancelling(g)} />
+                          ) : (
+                            <RowAction icon="close" label={L("Remove from this list", "إزالة من هذه القائمة")} onPress={() => askDismiss(g)} />
+                          )}
                         </span>
                       </td>
                     </tr>
@@ -779,9 +788,16 @@ function RowAction({
       }}
       aria-label={label}
       title={label}
+      /* ── No box (owner, 2026-09-02) ──────────────────────────────────────────────────────────
+         ~~A bordered 28px tile each.~~ Two outlined boxes beside a filled button made the row end in
+         three competing buttons, and the two that matter least were the ones drawn most like the
+         one that matters: same size, same border, same ground. An icon on its own reads as a
+         secondary action, which is what these are.
+         The 28px target stays — only the paint goes, so nothing gets harder to hit. The hover is
+         the ground rather than the border, which is how the app's other bare icon controls behave. */
       className={cx(
-        "grid size-7 flex-none place-items-center rounded-sm border border-border bg-surface transition hover:bg-surface2",
-        tone === "danger" ? "text-danger hover:border-danger/40" : "text-navy hover:border-navy-mid/40",
+        "grid size-7 flex-none place-items-center rounded-sm transition hover:bg-surface2",
+        tone === "danger" ? "text-danger hover:text-danger" : "text-muted hover:text-navy",
       )}
     >
       <Icon name={icon} size={15} />
