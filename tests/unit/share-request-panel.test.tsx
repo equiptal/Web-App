@@ -458,6 +458,53 @@ describe("the card, in an e-mail from HIS address (owner, 2026-09-02)", () => {
   });
 });
 
+describe("the preview says what is SENT, not what is stored", () => {
+  it("Given a company name, Then the preview shows it — never the raw {name}", async () => {
+    /**
+     * ⚠️ The template stores `{name}`, which is what he must see to edit it. A preview that reads
+     * *"{name} invites you to bid"* is showing him a message nobody receives — the exact gap between
+     * preview and send this panel exists to close. Resolved when the field is idle; raw the moment
+     * he clicks in.
+     */
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="post" draftForm={DRAFT} renterName="Shibh Al Jazira" onPost={async () => "u"} />
+      </LocaleProvider>,
+    );
+
+    const intro = (await screen.findByLabelText(c.tplIntro)) as HTMLTextAreaElement;
+    expect(intro.value).toBe("Shibh Al Jazira invites you to bid on an equipment request.");
+    expect(intro.value).not.toContain("{name}");
+
+    // Clicking in hands him the token back, because that is the thing he edits.
+    fireEvent.focus(intro);
+    await waitFor(() => expect((screen.getByLabelText(c.tplIntro) as HTMLTextAreaElement).value).toContain("{name}"));
+  });
+
+  it("Given no company name, Then the default reads properly instead of losing a word", async () => {
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="post" draftForm={DRAFT} onPost={async () => "u"} />
+      </LocaleProvider>,
+    );
+    const intro = (await screen.findByLabelText(c.tplIntro)) as HTMLTextAreaElement;
+    expect(intro.value).toBe("You are invited to bid on an equipment request.");
+  });
+
+  it("Given the card, Then it is drawn ONCE, outside the message", async () => {
+    // Owner: *"so request details is duplicated in the card and in the text itslef?"* The card is
+    // not part of the message — it is what some apps build out of the link — so it sits outside the
+    // frame, labelled with the apps that draw it.
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="post" draftForm={DRAFT} renterName="Shibh Al Jazira" onPost={async () => "u"} />
+      </LocaleProvider>,
+    );
+    expect((await screen.findAllByText(c.unfurl)).length).toBe(1);
+    expect(screen.getByText(c.unfurlWhere)).toBeTruthy();
+  });
+});
+
 describe("copying", () => {
   it("Given Copy, Then the clipboard holds the LINK and nothing else", async () => {
     /**

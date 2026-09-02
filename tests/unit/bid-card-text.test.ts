@@ -84,14 +84,16 @@ describe("bidCardText", () => {
     const out = bidCardText(
       model({
         items: [
-          { label: "Tower light 9m", value: "×6" },
-          { label: "Generator 250 kVA", value: "×2" },
+          { label: "Tower light 9m", units: "×6", terms: [] },
+          { label: "Generator 250 kVA", units: "×2", terms: [{ label: "Fuel", value: "Supplier" }] },
         ],
       }),
       URL_,
     );
     expect(out).toContain("• Tower light 9m ×6");
     expect(out).toContain("• Generator 250 kVA ×2");
+    // And the term only the generator carries sits under it, indented, not in the shared block.
+    expect(out).toContain("   Fuel: Supplier");
   });
 
   it("Given a request with no terms and no deadline, Then those lines simply do not exist", () => {

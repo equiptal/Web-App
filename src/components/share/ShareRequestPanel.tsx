@@ -841,17 +841,6 @@ export function ShareRequestPanel({
                   c={c}
                   linkPending={!uuid}
                 />
-                {unfurl && (
-                  <div className="mt-3 border-t border-border pt-3">
-                    <span className="mb-1.5 block text-label uppercase tracking-wide text-muted">{c.unfurl}</span>
-                    {/* The card is laid out for e-mail at a fixed 440px; these let it shrink into the
-                        column rather than pushing a sideways scrollbar through the panel. */}
-                    <div
-                      className="[&_img]:!h-auto [&_img]:!w-full [&_table]:!w-full [&_table]:!max-w-full"
-                      dangerouslySetInnerHTML={{ __html: unfurl }}
-                    />
-                  </div>
-                )}
               </div>
             </div>
           ) : (
@@ -870,16 +859,34 @@ export function ShareRequestPanel({
                   c={c}
                   linkPending={!uuid}
                 />
-                {unfurl && (
-                  <div className="mt-2.5 border-t border-border pt-2.5">
-                    <span className="mb-1.5 block text-label uppercase tracking-wide text-muted">{c.unfurl}</span>
-                    <div
-                      className="[&_img]:!h-auto [&_img]:!w-full [&_table]:!w-full [&_table]:!max-w-full"
-                      dangerouslySetInnerHTML={{ __html: unfurl }}
-                    />
-                  </div>
-                )}
               </div>
+            </div>
+          )}
+
+          {/* ── The card, ONCE, and outside the message (owner, 2026-09-02) ──────────────────
+              *"so request details is duplicated in the card and in the text itslef?"* It was drawn
+              inside the message frame, under the body, which read as a second block of the letter
+              saying the same thing twice.
+
+              It is not part of the message. The message is words — that is all a compose URL can
+              carry, and it is what a supplier with images off, or on SMS, or in Gmail, actually
+              reads. The card is what SOME apps build for themselves out of the link. Drawn outside
+              the frame, dimmed, and labelled with the apps that draw it, it stops being a repeat and
+              becomes what it is: a note about the link.
+
+              The repetition itself is real and is not a fault to design away — in WhatsApp the
+              supplier genuinely sees both. The words are the only carrier that reaches every
+              client; the card is the one that reaches the eye first. */}
+          {unfurl && (
+            <div className="grid gap-1.5 rounded-md border border-dashed border-border bg-surface2 p-3">
+              <span className="text-label uppercase tracking-wide text-muted">{c.unfurl}</span>
+              {/* The card is laid out for e-mail at a fixed 440px; these let it shrink into the
+                  column rather than pushing a sideways scrollbar through the panel. */}
+              <div
+                className="max-w-[380px] opacity-90 [&_img]:!h-auto [&_img]:!w-full [&_table]:!w-full [&_table]:!max-w-full"
+                dangerouslySetInnerHTML={{ __html: unfurl }}
+              />
+              <span className="text-label text-muted">{c.unfurlWhere}</span>
             </div>
           )}
 
@@ -931,8 +938,8 @@ function Message({
 }) {
   return (
     <div className="grid gap-2.5">
-      <Editable value={template.greeting} onChange={(v) => onChange("greeting", v)} label={c.tplGreeting} />
-      <Editable value={template.intro} onChange={(v) => onChange("intro", v)} label={c.tplIntro} />
+      <Editable value={template.greeting} display={parts.greeting} onChange={(v) => onChange("greeting", v)} label={c.tplGreeting} />
+      <Editable value={template.intro} display={parts.intro} onChange={(v) => onChange("intro", v)} label={c.tplIntro} />
 
       {/* Ours. A hairline rail and a padlock rather than a filled box with a heading: the renter is
           reading the message his supplier gets, and a titled panel in the middle of it is chrome
@@ -946,7 +953,7 @@ function Message({
         <p className="whitespace-pre-wrap text-meta leading-relaxed text-navy">{parts.card}</p>
       </div>
 
-      <Editable value={template.signoff} onChange={(v) => onChange("signoff", v)} label={c.tplSignoff} />
+      <Editable value={template.signoff} display={parts.signoff} onChange={(v) => onChange("signoff", v)} label={c.tplSignoff} />
 
       {parts.url ? (
         <p dir="ltr" className="break-all font-mono text-meta text-info">
@@ -971,32 +978,48 @@ function Message({
  * shows one line is a message he cannot read — which is the whole failing this panel exists to fix.
  * The dashed underline appears on hover and focus only: a page of permanently boxed fields stops
  * looking like a message.
+ *
+ * ⚠️ **Raw while he types, RESOLVED the rest of the time.**
+ *
+ * The template stores `{name}`, which is what he must see to edit it — but a preview that reads
+ * *"{name} invites you to bid"* is showing him a message nobody receives, and this panel exists to
+ * end exactly that gap between the preview and the send. So `display` (the filled line, and the
+ * no-name wording when we cannot name him) is what is drawn until the field takes focus, and the
+ * token comes back the moment he clicks in.
  */
 function Editable({
   value,
+  display,
   onChange,
   label,
 }: {
+  /** What is stored and edited — with `{name}` in it. */
   value: string;
+  /** What is sent — the same line with the name filled in. Shown whenever the field is not focused. */
+  display: string;
   onChange: (v: string) => void;
   label: string;
 }) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
+  const [editing, setEditing] = useState(false);
+  const shown = editing ? value : display;
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
-  }, [value]);
+  }, [shown]);
 
   return (
     <textarea
       ref={ref}
       rows={1}
-      value={value}
+      value={shown}
       aria-label={label}
       placeholder={label}
+      onFocus={() => setEditing(true)}
+      onBlur={() => setEditing(false)}
       onChange={(e) => onChange(e.target.value)}
       className="w-full resize-none overflow-hidden rounded-sm border border-transparent bg-transparent px-1 py-0.5 text-meta leading-relaxed text-navy outline-none transition hover:border-dashed hover:border-border-strong focus:border-solid focus:border-brand focus:bg-surface"
     />

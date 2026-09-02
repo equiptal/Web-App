@@ -98,8 +98,28 @@ export function bidCardHtml(card: BidCardPreview, model: BidCardModel | null, la
 
   const title = model?.cardTitle || card.title;
   const where = model?.where ?? card.description;
-  const items = (model?.items ?? []).map((i) => row(i.label, i.value, align));
+  /**
+   * The request's own answers first — the site and the dates are above this, and these are the
+   * terms every machine on the request agrees on.
+   */
   const terms = (model?.terms ?? []).map((i) => row(i.label, i.value, align));
+
+  /**
+   * Then each machine, and beneath it only what IT carries.
+   *
+   * A term the whole request agrees on has already been stated once above; repeating it under every
+   * machine is how a five-item card becomes a wall a supplier scrolls past. What is left under a
+   * machine is, by construction, the thing that makes it different from the others.
+   */
+  const itemRows = (model?.items ?? [])
+    .map(
+      (i) =>
+        `<div style="padding-top:9px;">
+      <div style="font-size:12.5px;font-weight:700;color:${COLORS.foreground};line-height:1.4;">${escapeHtml([i.label, i.units].filter(Boolean).join(" "))}</div>
+      ${i.terms.length ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;">${i.terms.map((x) => row(x.label, x.value, align)).join("")}</table>` : ""}
+    </div>`,
+    )
+    .join("");
 
   return `<a href="${url}" style="text-decoration:none;color:inherit;display:block;max-width:440px;">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="440" dir="${dir}" style="width:440px;max-width:100%;border:1px solid ${COLORS.background};border-radius:${RADII.md};border-collapse:separate;overflow:hidden;background:${COLORS.surface};font-family:'Segoe UI',Roboto,Arial,sans-serif;">
@@ -109,8 +129,8 @@ export function bidCardHtml(card: BidCardPreview, model: BidCardModel | null, la
     <tr><td align="${align}" style="padding:14px 16px 16px;">
       <div style="font-size:14px;font-weight:700;color:${COLORS.foreground};line-height:1.35;">${escapeHtml(title)}</div>
       ${where ? `<div style="font-size:12px;color:${COLORS.mutedDark};font-weight:600;line-height:1.4;padding-top:6px;">${escapeHtml(where)}</div>` : ""}
-      ${block(items)}
       ${block(terms)}
+      ${itemRows ? `<div style="border-top:1px solid ${COLORS.border};margin-top:9px;padding-top:2px;">${itemRows}</div>` : ""}
       ${model?.closing ? `<div style="font-size:11px;color:${COLORS.muted};padding-top:8px;">${escapeHtml(model.closing)}.</div>` : ""}
       <div style="border-top:1px solid ${COLORS.border};margin-top:11px;padding-top:10px;font-size:11.5px;color:${COLORS.mutedDark};line-height:1.5;">${JOIN_LINE[lang](JOIN_URL)}</div>
       <div style="font-size:10.5px;color:${COLORS.mutedLight};letter-spacing:0.4px;padding-top:10px;">${escapeHtml(hostOf(card.url))}</div>

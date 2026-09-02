@@ -245,14 +245,29 @@ export function cardBlock(m: BidCardModel, lang: "en" | "ar" = "en"): string {
     // The reference leads the machine so an operator can file the reply against it without opening
     // the link.
     m.ref ? `${m.ref}: ${m.imageHeadline}` : m.imageHeadline,
+
+    // The SITE and the DATES first, and once: they belong to the request, not to any one machine.
     m.where || null,
 
-    // Every machine, when there is more than one. The image can only name the first.
-    ...(m.items.length ? ["", ...m.items.map((i) => `• ${i.label} ${i.value}`)] : []),
-
-    // One term per line rather than the card's row pairs: a chat bubble has width for a line and no
-    // columns to align.
+    // Then what every machine agrees on — also the request's own answers.
     ...(m.terms.length ? ["", ...m.terms.map((x) => `${x.label}: ${x.value}`)] : []),
+
+    /**
+     * Then each machine, with only the terms IT carries.
+     *
+     * The image can name one headline; this is where the rest of the request lives. A machine whose
+     * every answer is shared prints as a bare line, which is the truth — there is nothing about it
+     * the block above has not already said.
+     */
+    ...(m.items.length
+      ? [
+          "",
+          ...m.items.flatMap((i) => [
+            `• ${[i.label, i.units].filter(Boolean).join(" ")}`,
+            ...i.terms.map((x) => `   ${x.label}: ${x.value}`),
+          ]),
+        ]
+      : []),
 
     m.closing ? "" : null,
     m.closing,

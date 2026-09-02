@@ -30,6 +30,23 @@ export interface BidCardTerm {
   value: string;
 }
 
+/**
+ * One machine on a multi-machine request.
+ *
+ * `terms` carries only what this item does NOT share with the others. Delivery, fuel and the F.A.T
+ * split are modelled per item, so three machines can carry three answers — and a card that showed
+ * one of the three, or collapsed them to "Varies", made a supplier price the wrong one and withdraw
+ * at the deal room. What every item agrees on is lifted into the request's own block above.
+ */
+export interface BidCardItem {
+  /** `Excavator 20 ton · with operator` */
+  label: string;
+  /** `×2`, or empty for a single unit. */
+  units: string;
+  /** This item's own answers, where they differ from the shared block. */
+  terms: BidCardTerm[];
+}
+
 export interface BidCardModel {
   /** `EXC-170845` / `RFQ-00077`, or null on a request that predates the short-code sequence. */
   ref: string | null;
@@ -37,11 +54,17 @@ export interface BidCardModel {
   imageHeadline: string;
   /** The card's headline: the scale and the city, because the list sits under it. */
   cardTitle: string;
-  /** Each machine on its own row. Empty for a single-machine request — the title already said it. */
-  items: BidCardTerm[];
+  /** Each machine, with the terms only IT carries. Empty for a single-machine request. */
+  items: BidCardItem[];
   /** `Riyadh · 1 month · 18 Aug → 17 Sep 2026`, dropping whatever the request does not carry. */
   where: string | null;
-  /** Mobilisation, demobilisation, food, accommodation & transport, fuel. Only what is set. */
+  /**
+   * The terms EVERY item agrees on — the request's own answers.
+   *
+   * Mobilisation, demobilisation, food, accommodation & transport, fuel, equipment year and the
+   * certificates asked for. Only what is set: a request with no fuel answer prints no fuel row,
+   * because "Fuel: —" teaches a supplier to skim the block and then he skims the row that mattered.
+   */
   terms: BidCardTerm[];
   /** `Bidding closes 21 Aug 2026` while open, `Closed 21 Aug 2026. No longer accepting bids` after. */
   closing: string | null;
@@ -58,9 +81,8 @@ const COPY = {
     closed: (on: string) => `Closed ${on}. No longer accepting bids`,
     closedNoDate: "No longer accepting bids",
     machines: (n: number) => `${n} machines`,
-    more: (n: number) => ` +${n} more`,
+    more: (n: number) => (n === 1 ? " + 1 other equipment item" : ` + ${n} other equipment items`),
     withOperator: "with operator",
-    varies: "Varies by machine",
     onRenter: "Renter",
     onSupplier: "Supplier",
     days: (n: number) => `${n} ${n === 1 ? "day" : "days"}`,
@@ -73,6 +95,8 @@ const COPY = {
       food: "Food",
       accom: "Accommodation & transport",
       fuel: "Fuel",
+      year: "Equipment year",
+      cert: "Certificates",
     },
   },
   ar: {
@@ -82,7 +106,7 @@ const COPY = {
     closed: (on: string) => `أُغلق ${on}. لم يعد يقبل العروض`,
     closedNoDate: "لم يعد يقبل العروض",
     machines: (n: number) => `${n} معدات`,
-    more: (n: number) => ` +${n} أخرى`,
+    more: (n: number) => (n === 1 ? " + معدّة أخرى" : ` + ${n} معدات أخرى`),
     withOperator: "مع مشغّل",
     varies: "يختلف حسب المعدة",
     onRenter: "على المستأجر",
@@ -97,6 +121,8 @@ const COPY = {
       food: "الإعاشة",
       accom: "السكن والنقل",
       fuel: "الوقود",
+      year: "سنة الصنع",
+      cert: "الشهادات",
     },
   },
 } as const;
@@ -171,18 +197,14 @@ function party(v: string | null | undefined, lang: "en" | "ar"): string | null {
   return s;
 }
 
-/**
- * One answer for the whole request, or the admission that there is more than one.
+/*
+ * — `acrossItems` lived here —
  *
- * Delivery, return and the F.A.T terms are modelled PER ITEM, so three machines can carry three
- * answers. Showing one of the three is worse than saying there are three: a supplier who prices on
- * the wrong one has to withdraw, and the renter finds out at the deal room.
+ * It answered a per-item term for the whole request, and said "Varies by machine" when the items
+ * disagreed. That named the existence of a difference without naming the difference, so a supplier
+ * priced one of the answers and found out which one at the deal room. Each machine now states its
+ * own; what they agree on is lifted into the request's block. See `termsOf` and `shared`.
  */
-function acrossItems(items: BidFormItem[], pick: (i: BidFormItem) => string | null | undefined, lang: "en" | "ar"): string | null {
-  const values = items.map((i) => party(pick(i), lang)).filter((v): v is string => !!v);
-  if (!values.length) return null;
-  return values.every((v) => v === values[0]) ? values[0] : COPY[lang].varies;
-}
 
 /** `Tower light 9m · with operator` — size and operator only when the request carries them. */
 function itemLabel(it: BidFormItem, lang: "en" | "ar"): string {
@@ -276,17 +298,54 @@ export function bidCardModel(
    * Fuel carries its type when the renter set one — "Renter · diesel" is a different job from
    * "Renter", and it is the kind of thing a supplier prices wrong once and remembers.
    */
-  const fuel = acrossItems(items, (i) => i.requiredTerms?.fuel, lang);
-  const fuelType = items[0]?.requiredTerms?.fuelType?.trim();
-  const rows: BidCardTerm[] = [
-    { label: t.terms.mob, value: acrossItems(items, (i) => i.deliveryBy, lang) },
-    { label: t.terms.demob, value: acrossItems(items, (i) => i.returnBy, lang) },
-    { label: t.terms.food, value: acrossItems(items, (i) => i.requiredTerms?.fatFood, lang) },
-    { label: t.terms.accom, value: acrossItems(items, (i) => i.requiredTerms?.fatTransport, lang) },
-    { label: t.terms.fuel, value: fuel && fuelType ? `${fuel} · ${fuelType.toLowerCase()}` : fuel },
-    // What the request does not answer is not drawn. Never "Fuel: —": an empty row teaches a supplier
-    // to skim the block, and then he skims the row that mattered.
-  ].flatMap((r) => (r.value ? [{ label: r.label, value: r.value }] : []));
+  /**
+   * ── One item's own answers ─────────────────────────────────────────────────────────────────────
+   *
+   * Every term the card can draw, for ONE machine, in the order a supplier prices them: who moves it
+   * there and back, who feeds and houses the operator, who fuels it, how old it may be, and what it
+   * must be certified to.
+   *
+   * Nothing is invented. A term the request does not answer produces no row — never "Fuel: —",
+   * because an empty row teaches a supplier to skim the block and then he skims the row that
+   * mattered.
+   */
+  const termsOf = (i: BidFormItem): BidCardTerm[] => {
+    const fuel = party(i.requiredTerms?.fuel, lang);
+    const fuelType = i.requiredTerms?.fuelType?.trim();
+    const year = i.requiredTerms?.year?.trim();
+    const cert = [i.requiredTerms?.equipmentCert, i.requiredTerms?.operatorCert]
+      .map((v) => v?.trim())
+      .filter(Boolean)
+      .join(", ");
+    return (
+      [
+        { label: t.terms.mob, value: party(i.deliveryBy, lang) },
+        { label: t.terms.demob, value: party(i.returnBy, lang) },
+        { label: t.terms.food, value: party(i.requiredTerms?.fatFood, lang) },
+        { label: t.terms.accom, value: party(i.requiredTerms?.fatTransport, lang) },
+        { label: t.terms.fuel, value: fuel && fuelType ? `${fuel} · ${fuelType.toLowerCase()}` : fuel },
+        // "any" is the absence of a requirement, not a requirement to be any age.
+        { label: t.terms.year, value: year && year.toLowerCase() !== "any" ? year : null },
+        { label: t.terms.cert, value: cert || null },
+      ] as { label: string; value: string | null }[]
+    ).flatMap((r) => (r.value ? [{ label: r.label, value: r.value }] : []));
+  };
+
+  /**
+   * ── What the request answers, and what each machine answers for itself ────────────────────────
+   *
+   * A term every item agrees on belongs to the REQUEST and is stated once, at the top, beside the
+   * site and the dates. A term they disagree on belongs to the machine and is stated on its row.
+   *
+   * ~~`acrossItems` collapsed a disagreement to the word "Varies".~~ That told a supplier there was
+   * something he needed to know without telling him what it was, so he priced one of the answers and
+   * found out which at the deal room. Two excavators where one is delivered by the renter and one by
+   * the supplier is an ordinary request, and it is now drawn as one.
+   */
+  const perItem = items.map(termsOf);
+  const shared = perItem[0].filter((r) => perItem.every((list) => list.some((x) => x.label === r.label && x.value === r.value)));
+  const isShared = (r: BidCardTerm) => shared.some((x) => x.label === r.label && x.value === r.value);
+  const rows: BidCardTerm[] = shared;
 
   const startEnd = [fmtDate(form.projectTerms?.startDate ?? null, lang, false), fmtDate(form.projectTerms?.endDate ?? null, lang)]
     .filter(Boolean)
@@ -297,10 +356,19 @@ export function bidCardModel(
     imageHeadline,
     cardTitle,
     // A single-machine request already says the machine in the title; repeating it as a row below is
-    // the same words twice in 14 vertical pixels.
-    items: multi ? items.map((i) => ({ label: itemLabel(i, lang), value: `×${i.numberOfUnits ?? 1}` })) : [],
+    // the same words twice in 14 vertical pixels. Its terms are all "shared" by definition, so they
+    // sit in the request's own block.
+    items: multi
+      ? items.map((i, n) => ({
+          label: itemLabel(i, lang),
+          units: (i.numberOfUnits ?? 1) > 1 ? `×${i.numberOfUnits}` : "",
+          terms: perItem[n].filter((r) => !isShared(r)),
+        }))
+      : [],
     where: [
-      multi ? null : city,
+      // The site is stated once for the whole request, whether there is one machine or six — it is
+      // the request's answer, not a machine's.
+      city,
       durationOf(
         form.projectTerms?.startDate ?? null,
         form.projectTerms?.endDate ?? null,

@@ -113,14 +113,23 @@ describe("bidCardModel", () => {
       }),
     );
 
-    expect(m.imageHeadline).toBe("Tower light 9m · with operator ×6 +2 more");
+    // The image names one machine and counts the rest in words a supplier reads at a glance.
+    expect(m.imageHeadline).toBe("Tower light 9m · with operator ×6 + 2 other equipment items");
     expect(m.cardTitle).toBe("3 machines · Riyadh");
     expect(m.items).toHaveLength(3);
-    expect(m.items[1]).toEqual({ label: "Generator 250 kVA · with operator", value: "×2" });
+    expect(m.items[1].label).toBe("Generator 250 kVA · with operator");
+    expect(m.items[1].units).toBe("×2");
+    // These three agree on every term, so nothing hangs off the individual rows.
+    expect(m.items[1].terms).toEqual([]);
   });
 
-  it("Given a term that differs per machine, When built, Then it says so rather than picking one", () => {
-    // Showing one of three answers makes a supplier price the wrong job and withdraw at the deal room.
+  it("Given a term that differs per machine, When built, Then each machine states its OWN answer", () => {
+    /**
+     * ~~It used to collapse a disagreement to the word "Varies by machine".~~ That told a supplier
+     * there was something he needed to know without telling him what it was, so he priced one of the
+     * answers and found out which at the deal room. Two excavators where one is delivered by the
+     * renter and one by the supplier is an ordinary request, and it is drawn as one.
+     */
     const m = bidCardModel(
       preview,
       copy,
@@ -128,7 +137,46 @@ describe("bidCardModel", () => {
       form({ items: [item(), item({ requestItemId: "i2", deliveryBy: "renter" })] }),
     );
 
-    expect(m.terms[0]).toEqual({ label: "Mobilisation", value: "Varies by machine" });
+    // Not in the request's shared block, because the request has no single answer for it.
+    expect(m.terms.some((r) => r.label === "Mobilisation")).toBe(false);
+    // On each machine, as the fact it is.
+    expect(m.items[0].terms).toContainEqual({ label: "Mobilisation", value: "Supplier" });
+    expect(m.items[1].terms).toContainEqual({ label: "Mobilisation", value: "Renter" });
+    // What they DO agree on stays stated once, above.
+    expect(m.terms.some((r) => r.label === "Fuel")).toBe(true);
+  });
+
+  it("Given a year and a certificate, When built, Then the card asks for them", () => {
+    /**
+     * Owner, 2026-09-02: the card carries *"cert or year if required"*. A supplier who brings a 2009
+     * machine to a request that said 2015+ has wasted a mobilisation, and one who arrives without a
+     * TUV certificate cannot work at all — both are things he must read BEFORE he prices.
+     */
+    const m = bidCardModel(
+      preview,
+      copy,
+      "en",
+      form({
+        items: [
+          item({ requiredTerms: { ...item().requiredTerms, year: "2015", equipmentCert: "TÜV", operatorCert: "SPSP" } }),
+        ],
+      }),
+    );
+
+    expect(m.terms).toContainEqual({ label: "Equipment year", value: "2015" });
+    expect(m.terms).toContainEqual({ label: "Certificates", value: "TÜV, SPSP" });
+  });
+
+  it("Given a year of «any», Then no row — it is the absence of a requirement", () => {
+    // "Any year" is what a request says when nobody set one. Printing it as a requirement invites a
+    // supplier to read the block as though every line were a constraint.
+    const m = bidCardModel(
+      preview,
+      copy,
+      "en",
+      form({ items: [item({ requiredTerms: { ...item().requiredTerms, year: "any" } })] }),
+    );
+    expect(m.terms.some((r) => r.label === "Equipment year")).toBe(false);
   });
 
   it("Given terms the renter left unset, When built, Then those rows do not exist", () => {

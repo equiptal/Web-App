@@ -59,10 +59,14 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
     default: "Moedatech - WebApp معداتك - تطبيق الويب",
-    template: "%s — Moedatech",
+    /* A hyphen, not an em dash (owner, 2026-09-02). The tab is the one piece of copy that gets
+       truncated by something other than us: browsers cut the title to the tab's width, and «My
+       Organization — Moedatec…» spends three of its last characters on punctuation. The default above
+       has always used a hyphen; the template disagreed with it. */
+    template: "%s - Moedatech",
   },
   description:
-    "Create an equipment RFQ from a pasted or uploaded document, collect bids, and close the deal — all in one place.",
+    "Create an equipment RFQ from a pasted or uploaded document, collect bids, and close the deal, all in one place.",
   applicationName: "Moedatech",
   keywords: ["Moedatech", "equipment", "RFQ", "rental", "bids", "construction equipment", "معداتك"],
   authors: [{ name: "Moedatech" }],
