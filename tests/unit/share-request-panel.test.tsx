@@ -126,16 +126,18 @@ describe("how it goes", () => {
     expect(screen.getByText(c.alwaysHint)).toBeTruthy();
   });
 
-  it("Given e-mail, Then the recipients are the ticked suppliers, in BCC", async () => {
+  it("Given e-mail, Then the recipients are the ticked suppliers", async () => {
     draw();
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.sendToSuppliers));
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
     const url = new URL(opened.mock.calls[0][0] as string);
-    // BCC, never To: forty suppliers in a To line tells each of them who else was asked.
-    expect(url.searchParams.get("bcc")).toBe("ops@alfaisal.sa");
-    expect(url.searchParams.get("to")).toBeNull();
+    /**
+     * Outlook is the default provider and it DISCARDS `bcc`, so its recipients ride in `to` — see
+     * `composeEmail.ts`. Gmail keeps them blind, which is what the BCC test there pins.
+     */
+    expect(url.searchParams.get("to")).toBe("ops@alfaisal.sa");
     expect(url.searchParams.get("subject")).toContain("EXC-170845");
   });
 
@@ -147,7 +149,9 @@ describe("how it goes", () => {
     fireEvent.click(screen.getByText(c.sendToSuppliers));
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
-    expect(new URL(opened.mock.calls[0][0] as string).searchParams.get("bcc")).toBeNull();
+    const q = new URL(opened.mock.calls[0][0] as string).searchParams;
+    expect(q.get("bcc")).toBeNull();
+    expect(q.get("to")).toBeNull();
     // Nobody was named, so nothing is recorded against the request.
     expect(api.shares).toHaveLength(0);
   });
@@ -382,9 +386,13 @@ describe("the link preview (owner, 2026-09-02)", () => {
     drawDraft();
     expect(await screen.findByText(c.unfurl)).toBeTruthy();
 
-    // The generic band stands in until `/bid/<token>/og` has a token to render for.
-    const img = document.querySelector<HTMLImageElement>('img[src="/og-bid.png"]');
-    expect(img).not.toBeNull();
+    /**
+     * And the navy band is DRAWN, not stood in for. `/bid/<token>/og` needs a token; the generic
+     * file it used to fall back to is a navy rectangle with the logo and nothing else, so the half
+     * of the card a supplier sees first was the one part of the preview that was untrue.
+     */
+    expect(screen.getAllByText(/Crawler Excavator 20 ton/).length).toBeGreaterThan(1);
+    expect(document.querySelector('img[src="/og-bid.png"]')).toBeNull();
   });
 
   it("Given WhatsApp, Then the card is inside the bubble, where WhatsApp draws it", async () => {

@@ -40,6 +40,9 @@ export type EmailProvider = keyof typeof COMPOSE_URLS;
 
 export const EMAIL_PROVIDERS: EmailProvider[] = ["outlook", "gmail"];
 
+/** Whether this provider can carry blind copies. Drives the note the panel shows. */
+export const hidesRecipients = (p: EmailProvider): boolean => p !== "outlook";
+
 /** Which browser key remembers the pick. Per browser, never sent anywhere. */
 const PROVIDER_KEY = "moeda.emailProvider";
 
@@ -80,14 +83,34 @@ export interface Compose {
 }
 
 /** The compose URL, or null when it would be too long to survive the trip. */
+/**
+ * ── Outlook drops blind copies (owner, 2026-09-02) ─────────────────────────────────────────────
+ *
+ * *"i tried to share a request with a user that has outlook email but wasnt added as the recipent
+ * but in gmail worked."*
+ *
+ * Microsoft's compose deeplink documents `to`, `subject` and `body`. `bcc` is not among them, and it
+ * is discarded without a word — so the renter got a compose window addressed to nobody, and the only
+ * way to notice is to read the empty To line before pressing send. Gmail's `view=cm` does support
+ * `bcc`, which is why the same press worked there.
+ *
+ * So Outlook is handed the recipients in `to`, because **a message that reaches nobody is worse than
+ * one where suppliers can see each other**. That is a real cost and it is not hidden: the panel says
+ * so beside the provider, and a renter who needs the list private has Gmail or *More* a press away.
+ *
+ * ⚠️ To reverse this call, delete the `provider === "outlook"` branch below and let `bcc` stay `bcc`.
+ * The panel's note reads off the same condition, so it goes quiet on its own.
+ */
 export function composeEmailUrl({ to = [], bcc = [], subject = "", body = "", provider = "outlook" }: Compose): string | null {
   const gmail = provider === "gmail";
   const q = new URLSearchParams();
   // Gmail takes comma-separated addresses and its own short parameter names; Outlook takes
   // semicolons and the long ones. Handing either the other's spelling silently drops the recipients.
   const join = (list: string[]) => list.join(gmail ? "," : ";");
-  if (to.length) q.set("to", join(to));
-  if (bcc.length) q.set("bcc", join(bcc));
+  const visible = provider === "outlook" ? [...to, ...bcc] : to;
+  const blind = provider === "outlook" ? [] : bcc;
+  if (visible.length) q.set("to", join(visible));
+  if (blind.length) q.set("bcc", join(blind));
   if (subject) q.set(gmail ? "su" : "subject", subject);
   if (body) q.set("body", body);
   const base = COMPOSE_URLS[provider];

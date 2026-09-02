@@ -30,6 +30,7 @@ import {
 } from "@/lib/shareTemplate";
 import {
   EMAIL_PROVIDERS,
+  hidesRecipients,
   loadEmailProvider,
   openEmailCompose,
   saveEmailProvider,
@@ -213,9 +214,15 @@ export function ShareRequestPanel({
           // Deliberately this app's host, not the OS: the emailed card and the unfurled card are
           // served from the same place so they cannot drift apart. Guarded because `window` does
           // not exist during SSR.
+          /**
+           * The real rendering once there is a token to render for. Empty before that — NOT the
+           * generic file: `/og-bid.png` is a navy rectangle with the logo on it and nothing else, so
+           * standing it in made the half of the card a supplier sees first the one part of the
+           * preview that was untrue. `bidCardHtml` draws the band from the model instead.
+           */
           imageUrl:
             card.imageUrl ||
-            (typeof window === "undefined" || !uuid ? "/og-bid.png" : `${window.location.origin}/bid/${uuid}/og`),
+            (typeof window === "undefined" || !uuid ? "" : `${window.location.origin}/bid/${uuid}/og`),
           url: shareUrl,
         },
         card.model,
@@ -755,6 +762,16 @@ export function ShareRequestPanel({
               {moedatechOnly && <Icon name="check_circle" size={14} className="flex-none" />}
               {moedatechOnly ? c.moedatechOnlyHint : c.alwaysHint}
             </p>
+
+            {/* Outlook discards `bcc`, so its recipients ride in `to` — said out loud, because a
+                renter sending to eight competitors has a right to know they will see each other, and
+                because the fix is one press away (Gmail, or *More*). */}
+            {channel === "email" && !hidesRecipients(provider) && reachable.length > 1 && (
+              <span className="flex items-start gap-1.5 text-meta text-warn-deep">
+                <Icon name="visibility" size={14} className="mt-px flex-none" />
+                {c.outlookNoBcc}
+              </span>
+            )}
 
             {/* Said plainly: the alternative is a renter who believes four people were messaged. */}
             {channel === "whatsapp" && sharedWith === null && (

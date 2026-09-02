@@ -24,6 +24,40 @@ describe("bidTokenFromUrl", () => {
   });
 });
 
+describe("the navy band before the request exists", () => {
+  it("Given no image yet, Then the band is DRAWN from the model, not stood in for", () => {
+    /**
+     * `/bid/<token>/og` renders the real one and needs a token, which does not exist until the
+     * request does. The panel used to fall back to `/og-bid.png` — a navy rectangle with the logo
+     * and nothing else — so the half of the card a supplier sees first was the one part of the
+     * preview that was untrue.
+     */
+    const html = bidCardHtml(
+      { ...card, imageUrl: "" },
+      {
+        ref: "CEX-020964",
+        imageHeadline: "Excavator 20 ton · with operator ×2",
+        cardTitle: "Excavator 20 ton · with operator ×2",
+        items: [],
+        where: "Riyadh · 4 months",
+        terms: [],
+        closing: null,
+        accepting: true,
+        cta: "Open the link to submit your bid →",
+      },
+    );
+
+    // The same four things the `og` route draws, in the same order.
+    expect(html).toContain("MOEDATECH");
+    expect(html).toContain("CEX-020964");
+    expect(html).toContain("Excavator 20 ton");
+    expect(html).toContain("Open the link to submit your bid");
+    // And no picture of nothing.
+    expect(html).not.toContain("og-bid.png");
+    expect(html).not.toContain("<img");
+  });
+});
+
 describe("bidCardHtml", () => {
   const html = bidCardHtml(card, null);
 

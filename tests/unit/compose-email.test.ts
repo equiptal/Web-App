@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { COMPOSE_URL_MAX, composeEmailUrl } from "@/lib/composeEmail";
+import { COMPOSE_URL_MAX, composeEmailUrl, hidesRecipients } from "@/lib/composeEmail";
 
 /**
  * Opening a message without depending on a mail app being set up.
@@ -10,15 +10,36 @@ import { COMPOSE_URL_MAX, composeEmailUrl } from "@/lib/composeEmail";
  * install.
  */
 describe("composeEmailUrl", () => {
-  it("Given several recipients, Then they go in BCC — never in To", () => {
+  it("Given Gmail and several recipients, Then they go in BCC — never in To", () => {
     // Forty suppliers in a To line tells each of them exactly who else was asked, which is the
     // renter's commercial business and nobody else's.
-    const url = composeEmailUrl({ bcc: ["a@x.sa", "b@y.sa"], subject: "Request", body: "Hello" })!;
+    const url = composeEmailUrl({ bcc: ["a@x.sa", "b@y.sa"], subject: "Request", body: "Hello", provider: "gmail" })!;
+
+    const q = new URL(url).searchParams;
+    expect(q.get("bcc")).toBe("a@x.sa,b@y.sa");
+    expect(q.get("to")).toBeNull();
+  });
+
+  it("Given OUTLOOK, Then the recipients ride in To, because it discards BCC", () => {
+    /**
+     * ⚠️ Owner, 2026-09-02: *"i tried to share a request with a user that has outlook email but wasnt
+     * added as the recipent but in gmail worked."*
+     *
+     * Microsoft's compose deeplink documents `to`, `subject` and `body`; `bcc` is discarded without a
+     * word, so the renter got a window addressed to nobody. A message that reaches nobody is worse
+     * than one where suppliers see each other — and the panel says so, beside the provider.
+     */
+    const url = composeEmailUrl({ bcc: ["a@x.sa", "b@y.sa"], subject: "Request", provider: "outlook" })!;
 
     expect(url.startsWith("https://outlook.office.com/mail/deeplink/compose?")).toBe(true);
     const q = new URL(url).searchParams;
-    expect(q.get("bcc")).toBe("a@x.sa;b@y.sa");
-    expect(q.get("to")).toBeNull();
+    expect(q.get("to")).toBe("a@x.sa;b@y.sa");
+    expect(q.get("bcc")).toBeNull();
+  });
+
+  it("Given the provider, Then the panel can ask whether it hides the list", () => {
+    expect(hidesRecipients("gmail")).toBe(true);
+    expect(hidesRecipients("outlook")).toBe(false);
   });
 
   it("Given one named recipient, Then it goes in To — an invitation is addressed to a person", () => {

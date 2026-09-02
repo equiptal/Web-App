@@ -91,6 +91,34 @@ function block(rows: string[]): string {
  * both strip `<style>` blocks and ignore flex/grid. The image is a fixed 160px band rather than
  * `object-fit: cover`, which Outlook does not support; the asset is already that shape.
  */
+/**
+ * The navy band, drawn as MARKUP rather than fetched as a picture.
+ *
+ * `/bid/[token]/og` renders the real one, and it needs a token — which does not exist until the
+ * request does. The share panel therefore showed a generic band with nothing on it but the logo, so
+ * the most visible half of the card was the one part of the preview that was not true.
+ *
+ * This is the same four elements in the same order as that route: the mark, the reference, the
+ * equipment, the call to bid, and the host underneath. Not a replica of the pixels — a statement of
+ * the same facts, which is what a preview owes.
+ */
+function navyBand(model: BidCardModel, host: string, align: string): string {
+  const headline = escapeHtml(model.imageHeadline);
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;background:${COLORS.navy};">
+      <tr><td align="${align}" style="padding:16px 18px 14px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td align="${align}" style="font-size:13px;font-weight:800;letter-spacing:1px;color:${COLORS.surface};">MOEDATECH</td>
+            ${model.ref ? `<td align="${align === "left" ? "right" : "left"}" style="font-size:11px;letter-spacing:1.5px;color:rgba(255,255,255,0.6);">${escapeHtml(model.ref)}</td>` : ""}
+          </tr>
+        </table>
+        <div style="font-size:${headline.length > 46 ? 16 : 20}px;font-weight:700;color:${COLORS.surface};line-height:1.2;padding-top:16px;">${headline}</div>
+        <div style="font-size:12px;font-weight:700;color:${model.accepting ? COLORS.brand : COLORS.dangerHover};padding-top:10px;">${escapeHtml(model.cta)}</div>
+        <div style="font-size:9.5px;letter-spacing:1.5px;color:rgba(255,255,255,0.48);padding-top:14px;">${escapeHtml(host.toUpperCase())}</div>
+      </td></tr>
+    </table>`;
+}
+
 export function bidCardHtml(card: BidCardPreview, model: BidCardModel | null, lang: "en" | "ar" = "en"): string {
   const dir = lang === "ar" ? "rtl" : "ltr";
   const align = lang === "ar" ? "right" : "left";
@@ -124,7 +152,16 @@ export function bidCardHtml(card: BidCardPreview, model: BidCardModel | null, la
   return `<a href="${url}" style="text-decoration:none;color:inherit;display:block;max-width:440px;">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="440" dir="${dir}" style="width:440px;max-width:100%;border:1px solid ${COLORS.background};border-radius:${RADII.md};border-collapse:separate;overflow:hidden;background:${COLORS.surface};font-family:'Segoe UI',Roboto,Arial,sans-serif;">
     <tr><td style="padding:0;line-height:0;">
-      <img src="${escapeHtml(card.imageUrl)}" alt="" width="440" height="160" style="display:block;width:440px;max-width:100%;height:160px;border:0;outline:none;text-decoration:none;background-color:${COLORS.navy};">
+      ${
+        /* The real rendering when there is one; the same facts in markup when there is not yet a
+           request to render. An `<img>` pointing at the generic file drew a band with nothing on it,
+           which is the half of the card a supplier sees first. */
+        card.imageUrl
+          ? `<img src="${escapeHtml(card.imageUrl)}" alt="" width="440" height="160" style="display:block;width:440px;max-width:100%;height:160px;border:0;outline:none;text-decoration:none;background-color:${COLORS.navy};">`
+          : model
+            ? navyBand(model, hostOf(card.url), align)
+            : ""
+      }
     </td></tr>
     <tr><td align="${align}" style="padding:14px 16px 16px;">
       <div style="font-size:14px;font-weight:700;color:${COLORS.foreground};line-height:1.35;">${escapeHtml(title)}</div>

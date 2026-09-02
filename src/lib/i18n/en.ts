@@ -295,6 +295,7 @@ export const en = {
       shareAgainHint: "Pick another channel above and press again. The link stays the same.",
       pasteForCard: "The card is on your clipboard. Press Ctrl+V at the end of the message to add it.",
       unfurlWhere: "Built by WhatsApp, Telegram and Outlook from the link itself. Not part of your message, and Gmail does not show it.",
+      outlookNoBcc: "Outlook cannot send blind copies, so everyone you picked will see the others. Use Gmail or More to keep the list private.",
       modalSubtitle: "Pick who sees it, and how it reaches them.",
     },
     reading: "Reading",
@@ -2059,7 +2060,7 @@ export const en = {
       ret: "Return",
       fuelResp: "Fuel",
       operator: "Operator",
-      certs: "Certificates",
+      certs: "equipment cert",
       year: "year",
       fuel: "fuel",
       food: "food",
@@ -2084,6 +2085,9 @@ export const en = {
     when: "When it runs",
     nextPanel: "Next: {panel}",
     requiredMark: "* Required",
+    /* Said in a panel the SITE filled and the renter has never opened, so the panel that opens on
+       «Review & send» states why it opened. See `prefilledNote` in `Canvas`. */
+    checkFromProject: "Filled in from your project. Have a look, then press Review & send again.",
     nextOnly: "Next",
     missingTitle: "Before this can be sent",
     lockedForRequest: "locked for the whole request",

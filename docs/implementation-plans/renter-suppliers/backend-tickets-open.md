@@ -272,6 +272,71 @@ history — the bids reappear as suggestions. A tidy-up annoyance, not data loss
 
 ---
 
+## SUP-BE-24 — the shared link unfurls a picture of nothing (ONE LINE)
+
+**Severity: this is why no supplier has ever seen a card.** Measured against staging on 2026-09-02,
+not inferred.
+
+### What happens
+
+The link a renter shares is the OS app's, which is correct and deliberate (`NEXT_PUBLIC_OS_APP_URL`;
+c-hub shares the same). So the card every supplier sees is built from the OS app's Open Graph tags.
+
+Fetched for a real request, `a319541b-9762-43dd-a3d2-030bf3a3850d`:
+
+```
+og:title       CEX-020902 — إيجار حفار، وحدتان
+og:description QFC4+RX Diriyah Saudi Arabia · إيجار 121 يومًا · بانتظار ردّك
+og:image       https://webstaging.moedatech.net/og-bid.png      ← a CONSTANT
+```
+
+`og:image` is the same 19 KB navy rectangle with the logo on it — for every request ever shared. No
+equipment, no reference, no call to bid. A supplier scanning WhatsApp sees a brand mark and an
+Arabic one-liner.
+
+### The fix
+
+```ts
+// apps/backend-agents/src/handlers/agents/bid-form/getBidFormPreview.ts:94
+- export const previewImageUrl = () => `${WEB_APP_URL}/og-bid.png`;
++ export const previewImageUrl = (token: string) => `${WEB_APP_URL}/bid/${token}/og`;
+```
+
+and pass the token at the one call site (line 441).
+
+**Nothing needs to be rendered on the backend.** That route already exists on the web app, is public,
+and answers today:
+
+```
+GET https://webstaging.moedatech.net/bid/<uuid>/og
+→ 200 image/png, 1200×630, 40 KB
+```
+
+It draws the mark, the reference, the equipment (`Excavator 20 ton · with operator ×2`, or
+`+ 2 other equipment items`), the call to bid, and the source domain. `?lang=ar` for Arabic.
+
+### Two smaller things in the same file, worth doing with it
+
+1. **`og:description` is thinner than it needs to be.** It carries the site and a day count. The web
+   builds a richer one from the same payload — city, duration, the responsibility split, and the
+   DEADLINE, which is the line that decides whether a supplier acts today or next week. See
+   `bidCardDescription` in `src/lib/bidCardModel.ts`; it clamps at 200 characters for WhatsApp.
+2. **Declare the image.** `og:image:width` 1200, `og:image:height` 630, `og:image:type` image/png.
+   An unfurler that must fetch the picture just to measure it sometimes times out and draws a
+   text-only card. LinkedIn is strictest; WhatsApp and Outlook both render sooner with them present.
+
+### One thing to check, not necessarily to fix
+
+`GET /bid/<uuid>` on the OS host answers **307**, not 200. Most unfurl bots follow redirects; not all
+do. If the card is still missing after the image fix, this is the next thing to rule out.
+
+### Done when
+
+A renter pastes a shared link into WhatsApp and sees the equipment, the reference and the call to bid
+— not the logo.
+
+---
+
 ## SUP-BE-23 — a share e-mail that carries the card, from the renter's own address
 
 **Owner, 2026-09-02:** *"i want it from his email not us"* and *"i dont want user to copy past i want

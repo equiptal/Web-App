@@ -73,6 +73,30 @@ const NO_CERT = "__none__";
  * sees — and the three it applies to (who delivers, who returns it, who pays for the fuel) are the
  * three every supplier has to ask about before he can price anything.
  */
+/**
+ * ── What earns a place on the strip (owner, 2026-09-02) ────────────────────────────────────────
+ *
+ * *"the rule is only show filled fields terms from the project or work order/request or show the
+ * missing required fields ... but optional fields like year-night shift-etc if not filled already
+ * they will not appear here."*
+ *
+ * Two reasons a pill exists, and no third:
+ *
+ *   1. **It has a value** — the project seeded it, a work order copied it, the agent read it out of
+ *      the RFQ, or the renter set it. The strip's job is to show what the site brought.
+ *   2. **The request cannot go out without it, and nobody has answered** — drawn empty and red.
+ *
+ * An OPTIONAL field with no value is not a question worth asking on this row: it is one of a dozen
+ * things nobody said, and drawing all dozen turns a summary of what IS known into a form. They stay
+ * reachable in *More details*, which is where a renter goes to state something he has not stated.
+ *
+ * ⚠️ The required three are delivery, return and fuel responsibility — what every supplier must ask
+ * before he can price anything. Year and the equipment certificate are gated PER ITEM on the machine
+ * card (`itemWebGaps`, MREQ-AC-54), not here: this strip carries the request-wide default, and a
+ * default nobody set is not a gap, it is the absence of a shortcut.
+ */
+const shown = (value: unknown) => value !== null && value !== undefined && value !== "";
+
 function tone(changed?: boolean, conflict?: boolean, missing?: boolean) {
   return conflict || missing
     ? "border-danger bg-danger/5 text-danger"
@@ -410,6 +434,7 @@ export function ProjectPills() {
           onChange={(v) => actions.patchProjectDefaults({ extendable: v === "yes" }, ["timing.extendable"])}
         />
 
+        {shown(project.defaults.paymentTerms) && (
         <PillSelect<PaymentTerm>
           label={t.projects.pills.paymentTerms}
           value={project.defaults.paymentTerms}
@@ -420,6 +445,7 @@ export function ProjectPills() {
           onRemove={() => actions.patchProjectTerms(null)}
           onChange={(v) => actions.patchProjectTerms(v)}
         />
+        )}
 
         {/* ── The machine's own terms, once one has been picked ──────────────────────────
 
@@ -473,6 +499,7 @@ export function ProjectPills() {
                 the fuel without ever saying which fuel — and a template that copied «electric» from a
                 work order showed nothing (owner, 2026-09-02: *"make sure the pills have all the
                 project and its children values"*). */}
+            {shown(terms.fuelType) && (
             <PillSelect<string>
               label={t.projects.pills.fuel}
               value={terms.fuelType ?? null}
@@ -483,6 +510,7 @@ export function ProjectPills() {
                  something, and the seed is diesel. Changing it is the only act available. */
               onChange={(v) => actions.patchTerms({ fuelType: v as typeof terms.fuelType }, ["preferences.fuel_type"])}
             />
+            )}
 
             <PillSegment<"yes" | "no">
               label={t.projects.pills.operator}
@@ -506,6 +534,7 @@ export function ProjectPills() {
                 The same list the machine card offers, and «any» is a real answer rather than an
                 empty one: it says the renter will take any year, which is what suppliers price
                 against. */}
+            {shown(terms.equipmentYear) && (
             <PillSelect<string>
               label={t.projects.pills.year}
               value={terms.equipmentYear ?? null}
@@ -515,6 +544,7 @@ export function ProjectPills() {
               onRemove={() => actions.patchTerms({ equipmentYear: null }, ["preferences.equipment_year"])}
               onChange={(v) => actions.patchTerms({ equipmentYear: v }, ["preferences.equipment_year"])}
             />
+            )}
 
             {/* ── The operator's own terms ───────────────────────────────────────────────────────
                 Food, accommodation and transport, the night shift, the nationality rule and the
@@ -528,6 +558,7 @@ export function ProjectPills() {
                 hold. */}
             {terms.operatorNeeded !== "no" && (
               <>
+                {shown(terms.operator?.fatFood) && (
                 <PillSegment<Party>
                   label={t.projects.pills.food}
                   value={terms.operator?.fatFood ?? null}
@@ -538,6 +569,8 @@ export function ProjectPills() {
                     actions.patchTerms({ operator: { ...terms.operator, fatFood: v } }, ["preferences.operator_food"])
                   }
                 />
+                )}
+                {shown(terms.operator?.fatAccommodationTransport) && (
                 <PillSegment<Party>
                   label={t.projects.pills.accom}
                   value={terms.operator?.fatAccommodationTransport ?? null}
@@ -551,6 +584,10 @@ export function ProjectPills() {
                     )
                   }
                 />
+                )}
+                {/* A boolean, so «unset» and «no» are different states and only one of them earns a
+                    pill: `?? false` would draw «nights: No» as though the renter had ruled it out. */}
+                {shown(terms.operator?.nightShift) && (
                 <PillSegment<"yes" | "no">
                   label={t.projects.pills.night}
                   value={terms.operator?.nightShift ? "yes" : "no"}
@@ -561,6 +598,8 @@ export function ProjectPills() {
                     actions.patchTerms({ operator: { ...terms.operator, nightShift: v === "yes" } }, ["preferences.operator_night"])
                   }
                 />
+                )}
+                {shown(terms.operator?.nationality) && (
                 <PillSelect<string>
                   label={t.projects.pills.nationality}
                   value={terms.operator?.nationality ?? null}
@@ -581,6 +620,8 @@ export function ProjectPills() {
                     )
                   }
                 />
+                )}
+                {shown(terms.operator?.certificate?.[0]) && (
                 <PillSelect<string>
                   label={t.projects.pills.opCerts}
                   value={terms.operator?.certificate?.[0] ?? (terms.operator?.certificate ? NO_CERT : null)}
@@ -605,6 +646,7 @@ export function ProjectPills() {
                     )
                   }
                 />
+                )}
               </>
             )}
 
@@ -621,6 +663,7 @@ export function ProjectPills() {
                 certificate, TÜV, Aramco, Other — and two shapes for one question is how the two
                 surfaces drift. «Other» keeps its free-text box in *More details*, which is the one
                 thing a pill genuinely cannot hold. */}
+            {shown(terms.safetyCertsOverride?.[0]) && (
             <PillSelect<string>
               label={t.projects.pills.certs}
               value={terms.safetyCertsOverride?.[0] ?? (terms.safetyCertsOverride ? NO_CERT : null)}
@@ -637,6 +680,7 @@ export function ProjectPills() {
                 )
               }
             />
+            )}
           </>
         )}
 
