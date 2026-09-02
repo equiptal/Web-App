@@ -35,6 +35,27 @@ link { supplierId: 313, vendorRegistered: false }
 Identical. The flag changes nothing, so this is not a gate that is switched off — the fields are
 simply never populated for a `platform` row.
 
+### It is worse than a missing field: the row cannot be edited at all
+
+Found in UAT on 2026-09-02. `PATCH /agents/renter-suppliers/{id}` on a linked row answers:
+
+```
+400  MISSING_CONTACT
+     "A supplier must keep an email or a phone number"
+```
+
+The rule is right in itself. But **every linked row has neither**, because this ticket is what would
+give it one — so the guard refuses an edit to a row whose contact the backend is itself withholding.
+The renter meets it by pressing the vendor toggle and reading a flat failure against a flag that has
+nothing to do with contacts.
+
+So a supplier added from the directory is **frozen**: no flag, no groups, no contact, nothing. The
+web now names the reason instead of saying "that did not save", which is the best it can do from
+here.
+
+⚠️ **`contactName` belongs in this ticket too.** It is the same family as the e-mail and the phone —
+the person at the firm, held on the account — and it comes back null for the same reason.
+
 ### Why it matters
 
 The web's share sheet has one rule, and it is deliberate:
@@ -77,7 +98,8 @@ person he actually deals with, and that is the one he means.
   "supplierId": 313,
   "vendorRegistered": false,          // no longer relevant to the fields below
   "email": "m7a7ooo@gmail.com",       // the account's, unless the renter typed his own
-  "phone": "+966559107772"
+  "phone": "+966559107772",
+  "contactName": "Mohammed"           // the person on the account, same rule
 }
 ```
 
@@ -90,8 +112,10 @@ person he actually deals with, and that is the one he means.
 
 ### Done when
 
-`GET /agents/renter-suppliers/{id}` for a freshly linked supplier whose account has an e-mail returns
-that e-mail, with the vendor flag off.
+1. `GET /agents/renter-suppliers/{id}` for a freshly linked supplier whose account has an e-mail
+   returns that e-mail, with the vendor flag off.
+2. `PATCH` on that same row succeeds — today it is refused by `MISSING_CONTACT`, which is the guard
+   firing on the very gap this ticket closes.
 
 ### One thing to expect
 

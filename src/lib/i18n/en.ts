@@ -2283,6 +2283,7 @@ export const en = {
     loading: "Loading your suppliers…",
     vendorOn: "{name} is a registered vendor",
     vendorOff: "{name} is no longer a registered vendor",
+    vendorNeedsContact: "{name} has no e-mail and no phone yet. Add one on the row, then the flag will save.",
     vendorFailed: "That did not save. Nothing changed.",
     addTitle: "Add suppliers",
     addSubtitle: "Type them in, upload a list, or pick a firm that is already on Moedatech.",

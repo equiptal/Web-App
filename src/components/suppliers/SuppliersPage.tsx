@@ -5,7 +5,7 @@ import { Icon } from "@/components/ui";
 import { fmt, useT } from "@/lib/i18n";
 import { btn, cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
-import { deleteSupplierGroup, listRenterSuppliers, renameSupplierGroup, updateRenterSupplier } from "@/lib/api/client";
+import { ApiError, deleteSupplierGroup, listRenterSuppliers, renameSupplierGroup, updateRenterSupplier } from "@/lib/api/client";
 import { AddSuppliersDialog } from "./AddSuppliersDialog";
 import { AddFromMoedatechDialog } from "./AddFromMoedatechDialog";
 import { DeleteGroupDialog, GroupsMenu, NameGroupDialog, RenameGroupDialog } from "./SupplierGroups";
@@ -127,9 +127,22 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
     setToast(fmt(next ? c.vendorOn : c.vendorOff, { name: row.name }));
     try {
       await updateRenterSupplier(row.id, { vendorRegistered: next });
-    } catch {
+    } catch (err) {
       setRows((list) => (list ?? []).map((s) => (s.id === row.id ? { ...s, vendorRegistered: !next } : s)));
-      setToast(c.vendorFailed);
+      /**
+       * Say WHY, when the backend said why.
+       *
+       * `MISSING_CONTACT` is the one a renter actually meets: a supplier must keep an e-mail or a
+       * phone, and **every row linked from the directory has neither** — the account's own details are
+       * not returned yet (SUP-BE-20). So the rule refuses an edit to a row whose contact the backend
+       * is itself withholding, and the renter reads a flat "that did not save" against a flag that has
+       * nothing to do with it (found in UAT, 2026-09-02).
+       *
+       * Until that ticket lands, the honest answer is the one that tells him what to do: add a way to
+       * reach them, then the flag will save.
+       */
+      const code = err instanceof ApiError ? err.backendCode : undefined;
+      setToast(code === "MISSING_CONTACT" ? fmt(c.vendorNeedsContact, { name: row.name }) : c.vendorFailed);
     }
   };
 
