@@ -131,6 +131,13 @@ export async function fetchBidForm(token: string): Promise<BidFormData | null> {
  */
 const OG_CARD_IMAGE = "/og-bid.png";
 
+/**
+ * What `/bid/[token]/og` renders, declared so every unfurler can lay the card out without fetching
+ * the picture first. Keep in step with `WIDTH`/`HEIGHT` in that route.
+ */
+export const OG_IMAGE_WIDTH = 1200;
+export const OG_IMAGE_HEIGHT = 630;
+
 /** Generic copy for when the preview is unavailable. Says nothing about the request — the safe default. */
 const FALLBACK = {
   en: { title: "Bid request", description: "Submit a bid on an equipment request — no account needed." },
@@ -220,7 +227,30 @@ export function buildBidMetadata({
       description,
       url: canonical,
       locale: lang === "ar" ? "ar_SA" : "en_US",
-      images: [{ url: image, alt: title }],
+      /**
+       * ── The card is DECLARED, not left to be measured ───────────────────────────────────────
+       *
+       * Width, height and type are what let a client lay the card out before the picture has
+       * arrived — and what make it choose the LARGE card rather than the thumbnail. Without them,
+       * some unfurlers fetch the image just to size it, and the slow ones give up first and draw a
+       * text-only card. LinkedIn is the strictest about it; WhatsApp and Outlook both render sooner
+       * with them present.
+       *
+       * `secureUrl` is the same absolute https URL, for the older clients that read only that key.
+       *
+       * 1200 × 630 is what `/bid/[token]/og` actually renders (`WIDTH`/`HEIGHT` there). If that
+       * route's size ever changes, these change with it or the card lays out wrong everywhere.
+       */
+      images: [
+        {
+          url: image,
+          secureUrl: image.startsWith("https://") ? image : undefined,
+          width: OG_IMAGE_WIDTH,
+          height: OG_IMAGE_HEIGHT,
+          type: "image/png",
+          alt: title,
+        },
+      ],
     },
     twitter: { card: "summary_large_image", title, description, images: [image] },
   };

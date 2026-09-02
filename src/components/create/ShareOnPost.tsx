@@ -38,6 +38,8 @@ export function ShareOnPost() {
   const { tier } = useSession();
   const [coach, setCoach] = useState(true);
   const [showAccount, setShowAccount] = useState(false);
+  /** The request cap has a dialog of its own on the review above; this banner leaves it to it. */
+  const isLimit = state.errorDetail?.backendCode === "E8009";
   /** The renter's own firm, for the From line. Read once, and a failure just leaves it unnamed. */
   const [renterName, setRenterName] = useState<string | null>(null);
 
@@ -104,6 +106,33 @@ export function ShareOnPost() {
       )}
 
       <h2 className="mb-5 text-subhead font-extrabold text-navy">{c.title}</h2>
+
+      {/* ── A refused post must SAY it was refused ─────────────────────────────────────────────
+          The submit already carried everything needed to explain itself — `errorDetail` holds the
+          backend's own code, status and message — and nothing on this screen drew any of it. Only
+          the request cap (`E8009`) had a home, in a dialog of its own. Every other refusal ended as
+          a press that did nothing at all, which is the report: *"why i cant send to suppliers?"*
+
+          It names the backend's own words rather than a house sentence, because a renter who has to
+          ask us anyway should be able to paste one line and be understood. `/api/requests` returns
+          502 for ANY backend refusal and puts the real status inside the body, so the status here is
+          `backendStatus`, never the 502 the browser console shows. */}
+      {state.error && !isLimit && (
+        <div className="mb-5 flex items-start gap-3 rounded-sm border border-danger/40 bg-danger-soft px-4 py-3">
+          <Icon name="error_outline" size={18} className="mt-0.5 flex-none text-danger" />
+          <div className="min-w-0 flex-1">
+            <b className="block text-body font-semibold text-danger">{t.errors.networkTitle}</b>
+            <span className="block text-meta leading-relaxed text-danger">
+              {state.errorDetail?.detail || t.errors.networkBody}
+            </span>
+            {(state.errorDetail?.backendCode || state.errorDetail?.backendStatus) && (
+              <span dir="ltr" className="mt-1 block font-mono text-label text-danger/80">
+                {[state.errorDetail.backendCode, state.errorDetail.backendStatus].filter(Boolean).join(" · ")}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       <ShareRequestPanel
         mode="post"

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { extractBidToken, buildBidMetadata, type BidPreview } from "@/lib/api/bidPreview";
+import { extractBidToken, buildBidMetadata, OG_IMAGE_HEIGHT, OG_IMAGE_WIDTH, type BidPreview } from "@/lib/api/bidPreview";
 
 /**
  * Link-preview (Open Graph) metadata for `/bid/{slug}-{groupId}`.
@@ -47,6 +47,33 @@ describe("extractBidToken", () => {
   it("passes an unrecognised segment through rather than dropping it", () => {
     // The backend also accepts a single request id, so this must not be swallowed.
     expect(extractBidToken("some-legacy-token")).toBe("some-legacy-token");
+  });
+});
+
+describe("the card every client reads", () => {
+  it("Given any request, Then the image declares its size and type", () => {
+    /**
+     * ── ONE preview, for every channel that draws one (owner, 2026-09-02) ────────────────────────
+     *
+     * The card is not an e-mail feature or a WhatsApp feature: it is Open Graph, and WhatsApp,
+     * Telegram, Slack, iMessage, LinkedIn and **Outlook.com** all read the same tags. Declaring the
+     * width, height and type is what lets a client lay it out before the picture arrives, and what
+     * makes it pick the LARGE card over a thumbnail — an unfurler that has to fetch the image just
+     * to measure it will sometimes time out and draw text only.
+     */
+    const og = buildBidMetadata({
+      preview: null,
+      slug: "abc",
+      lang: "en",
+      origin: "https://webstaging.moedatech.net",
+    }).openGraph as { images: { url: string; width: number; height: number; type: string; secureUrl?: string }[] };
+
+    const img = og.images[0];
+    expect(img.width).toBe(OG_IMAGE_WIDTH);
+    expect(img.height).toBe(OG_IMAGE_HEIGHT);
+    expect(img.type).toBe("image/png");
+    // Absolute and https, or the older clients that read only `secure_url` draw nothing.
+    expect(img.secureUrl).toBe("https://webstaging.moedatech.net/bid/abc/og");
   });
 });
 

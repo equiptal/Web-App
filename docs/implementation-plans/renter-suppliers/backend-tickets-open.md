@@ -272,6 +272,83 @@ history — the bids reappear as suggestions. A tidy-up annoyance, not data loss
 
 ---
 
+## SUP-BE-23 — a share e-mail that carries the card, from the renter's own address
+
+**Owner, 2026-09-02:** *"i want it from his email not us"* and *"i dont want user to copy past i want
+it when share it directly to has preview."*
+
+### The constraint, stated once
+
+The web opens the renter's own compose window by URL. `?body=` is `text/plain` by specification —
+Gmail's `view=cm`, Outlook's `deeplink/compose`, and `mailto:` (RFC 6068) alike. **No compose URL
+accepts HTML.** So no browser-only change can put a card in that message. The card currently rides
+the clipboard and needs one Ctrl+V, which the owner has rejected.
+
+Getting the card in means WRITING INTO the mailbox rather than opening a window at it. Two ways.
+
+### Option A — OAuth mail draft (recommended)
+
+Create an HTML draft in the renter's own mailbox; the web opens it for him to review and send.
+
+- **Microsoft Graph** — `POST /me/messages` with `body.contentType: "HTML"`, scope
+  `Mail.ReadWrite`. Ordinary consent; admin consent for tenants. **Cheap.**
+- **Gmail API** — `users.drafts.create` with a base64url MIME body, scope `gmail.compose`. This is a
+  Google **restricted** scope: production access needs a paid third-party security assessment
+  (CASA), which takes months. **Expensive.**
+
+Backend owns: the OAuth handshake, refresh-token storage per renter, and a
+`POST /agents/requests/{id}/share-draft` taking `{ supplierIds[], subject, html, text }` that creates
+the draft and answers its id/webLink. The web already renders the HTML (`shareMessageHtml`) and
+already records the share.
+
+**Recommendation: ship Microsoft first.** It is a fraction of the work, and this market's business
+mailboxes are heavily Microsoft 365. Gmail renters keep the paste until CASA is done.
+
+### Option B — domain-verified SES
+
+The renter's company verifies its domain with us (one DNS record); SES then sends legitimately as
+`bandar@zahid.sa`. Truly from him, no OAuth, no paste.
+
+Backend owns: a domain-verification flow per company, DKIM records, and a `share-email` route using
+the existing `ses.service.ts` (`sendEmail({ to, subject, html, from })` is already there).
+
+The catch is that it is **per company, not per user** — a renter cannot self-serve without control of
+his DNS, so it fits verified companies and leaves everyone else on the paste.
+
+### A and B both send from his address. They differ over his Sent folder
+
+| | A · OAuth draft | B · Verified domain |
+| --- | --- | --- |
+| The `From` a supplier sees | his address | his address |
+| Who actually sends it | **his mailbox** | our servers, DKIM-signed for his domain |
+| It appears in his **Sent** folder | **yes** | no, unless we BCC him |
+| He reviews it before it goes | yes — it opens as a draft | no, it just sends |
+| Setup | one consent, per person | one DNS record, per company |
+| A renter on a personal `@gmail.com` | works | **impossible** — he owns no domain |
+| Delivery + bounce reporting | no | **yes** |
+
+A is the more literal reading of *"from his email"*: his account sends it, and he finds it in Sent
+next month when a supplier disputes what was asked. B is his address on our envelope — legitimate,
+but the message never touches his mailbox, so it is invisible to him afterwards unless we BCC him,
+and that BCC is then the only record he has.
+
+**Neither is wrong. Pick on this question:** does the renter need to find the e-mail in his own Sent
+folder later? If yes, A. If what matters more is knowing the e-mail was actually delivered, B.
+
+### Not viable, for the record
+
+- **SES from `notifications@moedatech.net` with `Reply-To` the renter.** What most platforms do, and
+  what the owner explicitly ruled out: it is not his address.
+- **An `.eml` download.** Real, but needs a configured desktop mail client — the exact failure
+  `composeEmail.ts` exists to avoid — and download-then-open is worse than one paste.
+
+### Done when
+
+A renter presses Send with E-mail chosen and a message **with the card in it** is waiting in his own
+Sent or Drafts folder, from his own address, with no clipboard step.
+
+---
+
 ## Closed since the last list — no action
 
 - **Deploy, and the migration.** Every route answers 401 without a token; the nonsense control 404s.

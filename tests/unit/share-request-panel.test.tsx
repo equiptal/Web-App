@@ -190,8 +190,8 @@ describe("how it goes", () => {
         <ShareRequestPanel mode="post" draftForm={DRAFT} onPost={async () => "new-uuid"} />
       </LocaleProvider>,
     );
+    // One channel at a time: pressing «More» selects it, and E-mail goes off with the same press.
     fireEvent.click(await screen.findByText(c.other));
-    fireEvent.click(screen.getByText(c.email));
     fireEvent.click(screen.getByText(c.sendToSuppliers));
 
     await waitFor(() => expect(share).toHaveBeenCalled());
@@ -208,8 +208,8 @@ describe("how it goes", () => {
         <ShareRequestPanel mode="post" draftForm={DRAFT} onPost={async () => "new-uuid"} />
       </LocaleProvider>,
     );
+    // One channel at a time: pressing «More» selects it, and E-mail goes off with the same press.
     fireEvent.click(await screen.findByText(c.other));
-    fireEvent.click(screen.getByText(c.email));
     fireEvent.click(screen.getByText(c.sendToSuppliers));
 
     await waitFor(() => expect(writeText).toHaveBeenCalled());
@@ -283,9 +283,11 @@ describe("the words around the card", () => {
      * would know is a withdrawn bid at the deal room.
      */
     drawDraft();
-    const cardText = await screen.findByText(/Crawler Excavator 20 ton/);
-    expect(cardText.closest("textarea")).toBeNull();
-    expect(cardText.tagName).toBe("P");
+    // Twice on the page now, and deliberately: once in the message, once in the card the LINK
+    // unfurls into. Neither is editable.
+    const shown = await screen.findAllByText(/Crawler Excavator 20 ton/);
+    expect(shown.length).toBeGreaterThan(1);
+    expect(shown.every((el) => el.closest("textarea") === null)).toBe(true);
   });
 
   it("Given the channel, Then the preview follows it with no tabs to press", async () => {
@@ -296,9 +298,8 @@ describe("the words around the card", () => {
     // E-mail is on, so the e-mail frame is drawn: subject line and From.
     expect(screen.getByText(/A new equipment request for you/)).toBeTruthy();
 
+    // ONE channel at a time: pressing WhatsApp is the whole act, and E-mail goes off with it.
     fireEvent.click(screen.getByText(c.whatsapp));
-    fireEvent.click(screen.getByText(c.email));
-    // Only WhatsApp now: no From line, and no tab strip to have pressed.
     await waitFor(() => expect(screen.queryByText(/A new equipment request for you/)).toBeNull());
   });
 });
@@ -321,6 +322,142 @@ describe("finding a supplier", () => {
   });
 });
 
+describe("one channel at a time (owner, 2026-09-02)", () => {
+  it("Given WhatsApp is pressed, Then E-mail goes off — two tabs cannot open on one press", async () => {
+    /**
+     * ⚠️ The regression this pins. Three independent toggles meant Send could call `window.open`
+     * twice in the same tick, and a browser's pop-up blocker swallows the second. The renter watched
+     * one window appear, assumed both had, and one channel silently never happened.
+     */
+    draw();
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.whatsapp));
+    fireEvent.click(screen.getByText(c.sendToSuppliers));
+
+    await waitFor(() => expect(opened).toHaveBeenCalledTimes(1));
+    expect(String(opened.mock.calls[0][0])).toContain("wa.me");
+  });
+
+  it("Given it has already gone out, Then the button offers another channel rather than another post", async () => {
+    // Owner: *"he clicks email first and post it then he want to share it to whatsapp."* The link
+    // already exists, so a second press is a second CHANNEL, never a second request.
+    draw();
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.sendToSuppliers));
+
+    await waitFor(() => expect(screen.getByText(c.shareAgain)).toBeTruthy());
+    expect(screen.getByText(c.shareAgainHint)).toBeTruthy();
+
+    // And the channel it has used says so, so he can see where it has been.
+    expect(screen.getByText(c.email).closest("button")!.textContent).toContain("check");
+  });
+
+  it("Given E-mail is the channel, Then Outlook and Gmail are asked for beside it", async () => {
+    // Owner: *"when user click email they will ask to share through outlook or gmail instead of
+    // having them here."* They belong to the channel, not to the panel.
+    draw();
+    await screen.findByText("Al Faisal Rentals");
+    expect(screen.getByText(c.outlook)).toBeTruthy();
+
+    fireEvent.click(screen.getByText(c.whatsapp));
+    expect(screen.queryByText(c.outlook)).toBeNull();
+  });
+});
+
+describe("the link preview (owner, 2026-09-02)", () => {
+  const drawDraft = () =>
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="post" draftForm={DRAFT} renterName="Shibh Al Jazira" onPost={async () => "u"} />
+      </LocaleProvider>,
+    );
+
+  it("Given no link yet, Then the card the link becomes is STILL drawn", async () => {
+    /**
+     * *"why in the preview i dont see like the link preview itself."* It used to need the URL, which
+     * does not exist until the request does — so the one thing a supplier actually sees was missing
+     * from the screen where the renter decides whether to send it. Everything on the card but the
+     * picture comes from the draft and is already correct.
+     */
+    drawDraft();
+    expect(await screen.findByText(c.unfurl)).toBeTruthy();
+
+    // The generic band stands in until `/bid/<token>/og` has a token to render for.
+    const img = document.querySelector<HTMLImageElement>('img[src="/og-bid.png"]');
+    expect(img).not.toBeNull();
+  });
+
+  it("Given WhatsApp, Then the card is inside the bubble, where WhatsApp draws it", async () => {
+    drawDraft();
+    fireEvent.click(await screen.findByText(c.whatsapp));
+    // Same card, drawn where that client actually draws it.
+    await waitFor(() => expect(screen.getByText(c.unfurl)).toBeTruthy());
+  });
+});
+
+describe("the card, in an e-mail from HIS address (owner, 2026-09-02)", () => {
+  it("Given an e-mail send, Then the card goes on the clipboard for one paste", async () => {
+    /**
+     * *"i want it from his email not us , so it is like normal sharing but with preview."*
+     *
+     * A compose URL carries `text/plain` only, so the body is words. Sending real HTML from OUR
+     * server would arrive from `notifications@moedatech.net`, which is the thing he ruled out. The
+     * card therefore rides the clipboard: Gmail and Outlook keep pasted HTML, so one Ctrl+V turns
+     * his plain message into the laid-out one, still from his own account.
+     */
+    const write = vi.fn(async (_items: unknown[]) => {});
+    // jsdom's Blob has no `.text()`, so the stub keeps the raw strings it was handed.
+    const seen: Record<string, string> = {};
+    vi.stubGlobal("Blob", class {
+      constructor(parts: string[], opts: { type: string }) {
+        seen[opts.type] = parts.join("");
+      }
+    });
+    vi.stubGlobal("ClipboardItem", class { constructor(public parts: Record<string, Blob>) {} });
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { write, writeText: async () => {} } });
+
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="post" draftForm={DRAFT} renterName="Shibh Al Jazira" onPost={async () => "u"} />
+      </LocaleProvider>,
+    );
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.sendToSuppliers));
+
+    // The compose window still opens, and the clipboard is loaded in the same press.
+    await waitFor(() => expect(opened).toHaveBeenCalled());
+    await waitFor(() => expect(write).toHaveBeenCalled());
+
+    /**
+     * ⚠️ The CARD alone, never the whole message. The body already holds the words; copying the
+     * rendered message too meant a paste produced the request twice in one e-mail.
+     */
+    const html = seen["text/html"] ?? "";
+    expect(html).toContain("Crawler Excavator");
+    expect(html).not.toContain("Hello,");
+    expect(html).not.toContain("invites you to bid");
+    // And he is TOLD, or he would never know to paste.
+    expect(screen.getByText(c.pasteForCard)).toBeTruthy();
+  });
+
+  it("Given he never pastes, Then what he sends is still a complete message", async () => {
+    // The body stands on its own: every fact, the link last. Nothing is worse for skipping the paste.
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="post" draftForm={DRAFT} renterName="Shibh Al Jazira" onPost={async () => "u"} />
+      </LocaleProvider>,
+    );
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.sendToSuppliers));
+
+    await waitFor(() => expect(opened).toHaveBeenCalled());
+    const body = new URL(String(opened.mock.calls[0][0])).searchParams.get("body")!;
+    expect(body).toContain("Crawler Excavator");
+    expect(body).toContain("Riyadh");
+    expect(body.trimEnd().endsWith("/bid/u")).toBe(true);
+  });
+});
+
 describe("copying", () => {
   it("Given Copy, Then the clipboard holds the LINK and nothing else", async () => {
     /**
@@ -329,14 +466,15 @@ describe("copying", () => {
      * CRM field, a purchase order — hand him four paragraphs. The template still travels: every
      * app that unfurls a link draws the card from the URL itself.
      */
-    const writeText = vi.fn(async () => {});
+    const writeText = vi.fn(async (_text: string) => {});
     vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
 
     draw();
     fireEvent.click(await screen.findByText(c.copy));
 
     await waitFor(() => expect(writeText).toHaveBeenCalled());
-    expect(writeText.mock.calls[0][0]).toBe("http://localhost:3000/bid/abc-123");
+    // The URL, whole and alone: no greeting, no card, nothing to trim out of a CRM field.
+    expect(writeText.mock.calls[0][0]).toMatch(/^https?:\/\/\S+\/bid\/abc-123$/);
   });
 });
 
@@ -352,7 +490,7 @@ describe("what they receive", () => {
       </LocaleProvider>,
     );
 
-    expect(await screen.findByText(/Crawler Excavator 20 ton/)).toBeTruthy();
+    expect((await screen.findAllByText(/Crawler Excavator 20 ton/)).length).toBeGreaterThan(0);
     // Honest about the one thing that is genuinely missing.
     // Locked, and drawn as locked in BOTH places — the link field, and where the link will sit in
     // the message itself. The renter needs to know one is coming, or Copy looks broken rather than

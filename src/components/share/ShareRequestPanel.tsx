@@ -128,20 +128,36 @@ export function ShareRequestPanel({
   const [picked, setPicked] = useState<Record<string, boolean>>(() =>
     Object.fromEntries((preselect ?? []).map((id) => [id, true])),
   );
-  const [byEmail, setByEmail] = useState(true);
-  const [byWhatsApp, setByWhatsApp] = useState(false);
-  /** Anywhere else — the device's own share sheet, or the clipboard where there is none. */
-  const [byOther, setByOther] = useState(false);
+  /**
+   * ── ONE extra channel at a time (owner, 2026-09-02) ──────────────────────────────────────────
+   *
+   * *"if user selected whats and email then click send , it will take him to email or whatsapp?"*
+   *
+   * ~~Three independent toggles.~~ With two of them on, Send opened two tabs in the same tick and
+   * the browser's pop-up blocker swallowed the second — so the renter watched one window appear,
+   * assumed both had, and one channel silently never happened. There was no answer to his question
+   * because the design had not decided.
+   *
+   * It is decided now: Moedatech always, plus at most ONE extra per press. Sending to a second
+   * channel is a second press, which is honest about what it is — the link already exists by then,
+   * so nothing is posted twice and `sent` remembers where it has been.
+   */
+  const [channel, setChannel] = useState<"none" | "email" | "whatsapp" | "other">("email");
   const [copiedMessage, setCopiedMessage] = useState(false);
   const [provider, setProvider] = useState<EmailProvider>("outlook");
-  const [tab, setTab] = useState<"email" | "plain">("email");
   /** The renter's own wording, kept on this browser so every request after this one carries it. */
   const [template, setTemplate] = useState<ShareTemplate>(() => defaultTemplate("en"));
   const [query, setQuery] = useState("");
+  /** Which group the list is cut to. Empty is all of them. */
+  const [group, setGroup] = useState("");
   const [expiry, setExpiry] = useState("");
   const [busy, setBusy] = useState(false);
   const [uuid, setUuid] = useState<string | null>(requestUuid);
   const [sharedWith, setSharedWith] = useState<number | null>(null);
+  /** Which channels this request has already gone out on, so a second press is not a mystery. */
+  const [sent, setSent] = useState<string[]>([]);
+  /** The card is waiting on his clipboard for one paste — said on screen, or he will never know. */
+  const [cardOnClipboard, setCardOnClipboard] = useState(false);
   const [copied, setCopied] = useState(false);
   const [addingEmailOn, setAddingEmailOn] = useState<string | null>(null);
   const [emailDraft, setEmailDraft] = useState("");
@@ -175,25 +191,37 @@ export function ShareRequestPanel({
 
   const subject = fmt(c.subject, { code: requestCode ?? "" }).trim();
 
-  /** What the link unfurls into in the supplier's client — the card, not the body. */
-  const unfurl =
-    card && shareUrl
-      ? bidCardHtml(
-          {
-            title: card.model.cardTitle,
-            description: card.model.where ?? "",
-            // Deliberately this app's host, not the OS: the emailed card and the unfurled card are
-            // served from the same place so they cannot drift apart. Guarded because `shareUrl` is
-            // now truthy during SSR, where `window` does not exist.
-            imageUrl:
-              card.imageUrl ||
-              (typeof window === "undefined" ? "" : `${window.location.origin}/bid/${uuid}/og`),
-            url: shareUrl,
-          },
-          card.model,
-          lang,
-        )
-      : null;
+  /**
+   * The card the LINK turns into in the supplier's app — the thing WhatsApp draws, and the thing a
+   * renter means when he says *"the link preview"*.
+   *
+   * ⚠️ Drawn BEFORE the post as well (owner, 2026-09-02: *"why in the preview i dont see like the
+   * link preview itself"*). It used to need `shareUrl`, which does not exist until the request does,
+   * so the one thing a supplier actually sees was missing from the screen where the renter decides
+   * whether to send it.
+   *
+   * Everything on the card except the picture comes from the draft and is already correct. The
+   * picture is generated per request by `/bid/<token>/og`, and before there is a token the generic
+   * band stands in — the same navy mark the supplier would see if the render ever failed, so the
+   * stand-in is a real state of the card rather than an invention.
+   */
+  const unfurl = card
+    ? bidCardHtml(
+        {
+          title: card.model.cardTitle,
+          description: card.model.where ?? "",
+          // Deliberately this app's host, not the OS: the emailed card and the unfurled card are
+          // served from the same place so they cannot drift apart. Guarded because `window` does
+          // not exist during SSR.
+          imageUrl:
+            card.imageUrl ||
+            (typeof window === "undefined" || !uuid ? "/og-bid.png" : `${window.location.origin}/bid/${uuid}/og`),
+          url: shareUrl,
+        },
+        card.model,
+        lang,
+      )
+    : null;
 
   /**
    * ⚠️ **Send is never gated on a channel being able to reach someone** (owner, 2026-09-02:
@@ -209,13 +237,36 @@ export function ShareRequestPanel({
    * always valid; the extra channels do what they can and say what they could not. Nothing about
    * who is picked may stop a request from being created.
    */
-  const moedatechOnly = !byEmail && !byWhatsApp && !byOther;
+  const moedatechOnly = channel === "none";
   const canSend = !busy;
 
-  /** The list, narrowed. Searching never changes the ticks — a hidden pick is still a pick. */
-  const visible = (rows ?? []).filter((r) =>
-    query.trim() ? r.name.toLowerCase().includes(query.trim().toLowerCase()) : true,
+  /**
+   * The list, narrowed. Narrowing never changes the ticks — a hidden pick is still a pick, and the
+   * count above the list is what says so.
+   */
+  const visible = (rows ?? []).filter(
+    (r) =>
+      (!group || (r.groups ?? []).includes(group)) &&
+      (!query.trim() || r.name.toLowerCase().includes(query.trim().toLowerCase())),
   );
+
+  /** Every group the renter actually uses, in the order he sees them on My Suppliers. */
+  const groups = [...new Set((rows ?? []).flatMap((r) => r.groups ?? []))].sort((a, b) => a.localeCompare(b));
+
+  /**
+   * Tick everything the list is currently showing — which is how a GROUP gets sent to.
+   *
+   * Cut the list to *Site A* and press this, and the whole site is picked. There is no separate
+   * "send to a group" control because there does not need to be: the group is a filter, and picking
+   * what a filter left is the same act whether it filtered by group or by name.
+   */
+  const allShownPicked = visible.length > 0 && visible.every((r) => picked[r.id]);
+  const toggleAllShown = () =>
+    setPicked((prev) => {
+      const next = { ...prev };
+      for (const r of visible) next[r.id] = !allShownPicked;
+      return next;
+    });
 
   const send = async () => {
     if (busy) return;
@@ -242,10 +293,54 @@ export function ShareRequestPanel({
     const message = card ? renderShareMessage(card.model, url, { template, renterName, lang }) : url;
     let reached = 0;
 
-    if (byEmail) {
+    if (channel === "email") {
       // No pick at all is a legitimate share (owner, 2026-09-02): the renter wants the message in
       // his own compose window to address himself. Nothing is recorded, because nobody was named.
       if (reachable.length) void recordRequestShare(id, reachable.map((x) => x.id), "email");
+
+      /**
+       * ── The card, in an e-mail that still comes from HIM (owner, 2026-09-02) ──────────────────
+       *
+       * *"i want it from his email not us , so it is like normal sharing but with preview."*
+       *
+       * A compose URL can only carry `text/plain` — that is a limit of `?body=`, not of e-mail, and
+       * it is why the body below is words. Sending the card as real HTML from OUR server was the
+       * obvious fix and is the wrong one: it would arrive from `notifications@moedatech.net`, which
+       * is precisely what he ruled out.
+       *
+       * So the CARD goes on the clipboard at the same moment. Gmail's and Outlook's composers
+       * keep pasted HTML, so one Ctrl+V adds it under the words he is already looking at, in a
+       * message sent from his own account.
+       *
+       * ⚠️ **The card alone, never the whole message.** The first cut copied the full rendered
+       * message — greeting, intro, card, sign-off, link — while the compose body already held that
+       * same message as words. Pasting therefore produced the request TWICE in one e-mail. The body
+       * carries the words; the clipboard carries the picture; together they are the message once.
+       *
+       * The plain flavour is the URL, not the message, for the same reason: an app that takes
+       * `text/plain` from this clipboard is being handed a link to add, not a second copy of a
+       * letter that is already there.
+       *
+       * Not awaited, deliberately: `window.open` must fire inside the click that caused it, and an
+       * `await` first hands the pop-up blocker a reason to swallow the compose window.
+       */
+      if (card) {
+        void copyShareMessage(
+          url,
+          bidCardHtml(
+            {
+              title: card.model.cardTitle,
+              description: card.model.where ?? "",
+              imageUrl: card.imageUrl || `${window.location.origin}/bid/${id}/og`,
+              url,
+            },
+            card.model,
+            lang,
+          ),
+        ).catch(() => {});
+        setCardOnClipboard(true);
+      }
+
       const openedIt = openEmailCompose({
         bcc: reachable.map((x) => x.email as string),
         subject,
@@ -257,7 +352,7 @@ export function ShareRequestPanel({
       if (openedIt) reached += reachable.length;
       else setTooLong(true);
     }
-    if (byWhatsApp) {
+    if (channel === "whatsapp") {
       /**
        * ONE chat. `wa.me` has no multi-recipient form and no browser API does, so the first pick
        * with a phone is the one it opens — said on screen before the press, because the alternative
@@ -271,7 +366,7 @@ export function ShareRequestPanel({
       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank", "noopener");
       if (firstWithPhone) reached += 1;
     }
-    if (byOther) {
+    if (channel === "other") {
       /**
        * The device's own sheet. `navigator.share` needs a user gesture and HTTPS, and it rejects on
        * a cancel as well as on a failure — so a rejection is never treated as an error, it just
@@ -300,7 +395,9 @@ export function ShareRequestPanel({
       }
     }
 
-    setSharedWith(reached);
+    // Cumulative, because a second press is a second channel, not a correction of the first.
+    setSharedWith((prev) => (prev ?? 0) + reached);
+    if (channel !== "none") setSent((prev) => (prev.includes(channel) ? prev : [...prev, channel]));
     onShared?.(reached);
     setBusy(false);
   };
@@ -339,7 +436,7 @@ export function ShareRequestPanel({
    * tab strip to see it is asking the same question twice; the channel row is already the answer.
    * `tab` is set by the channel buttons and only ever shows a channel that is actually on.
    */
-  const previewIsEmail = byEmail && (tab === "email" || (!byWhatsApp && !byOther));
+  const previewIsEmail = channel === "email";
   const label = "text-label font-extrabold uppercase tracking-wide text-muted";
 
   return (
@@ -428,7 +525,23 @@ export function ShareRequestPanel({
                 because narrowing the list must never change who is ticked. A pick scrolled out of
                 view is still a pick, and the count above says so. */}
             {!!rows?.length && (
-              <span className="flex h-[30px] items-center gap-2 rounded-md border border-border px-2.5">
+              <span className="flex flex-wrap items-center gap-2">
+                {!!groups.length && (
+                  <select
+                    value={group}
+                    onChange={(e) => setGroup(e.target.value)}
+                    aria-label={c.allGroups}
+                    className="h-[30px] flex-none rounded-md border border-border bg-surface px-2 text-meta font-semibold text-navy outline-none"
+                  >
+                    <option value="">{c.allGroups}</option>
+                    {groups.map((g) => (
+                      <option key={g} value={g}>
+                        {g}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <span className="flex h-[30px] min-w-[140px] flex-1 items-center gap-2 rounded-md border border-border px-2.5">
                 <Icon name="search" size={14} className="flex-none text-muted" />
                 <input
                   value={query}
@@ -437,11 +550,23 @@ export function ShareRequestPanel({
                   aria-label={c.searchSuppliers}
                   className="min-w-0 flex-1 bg-transparent text-meta text-navy outline-none"
                 />
-                {!!query && (
-                  <button type="button" onClick={() => setQuery("")} aria-label={t.common.close} className="flex-none text-muted hover:text-navy">
-                    <Icon name="close" size={13} />
-                  </button>
-                )}
+                  {!!query && (
+                    <button type="button" onClick={() => setQuery("")} aria-label={t.common.close} className="flex-none text-muted hover:text-navy">
+                      <Icon name="close" size={13} />
+                    </button>
+                  )}
+                </span>
+                {/* The whole of whatever is showing. With a group chosen, this IS «send to the
+                    group»; with a search typed, it is «everyone called Zahid». One control, because
+                    it is one act. */}
+                <button
+                  type="button"
+                  onClick={toggleAllShown}
+                  disabled={!visible.length}
+                  className="flex-none text-meta font-semibold text-brand disabled:text-muted-light"
+                >
+                  {allShownPicked ? c.pickNone : fmt(c.pickAll, { n: visible.length })}
+                </button>
               </span>
             )}
 
@@ -523,7 +648,7 @@ export function ShareRequestPanel({
                 {!visible.length && <p className="px-3 py-4 text-center text-meta text-muted">{c.noMatches}</p>}
               </div>
             )}
-            {byEmail && unreachable.length > 0 && sharedWith === null && (
+            {channel === "email" && unreachable.length > 0 && sharedWith === null && (
               <span className="text-meta text-danger-deep">{fmt(c.skipping, { n: unreachable.length })}</span>
             )}
           </div>
@@ -548,36 +673,49 @@ export function ShareRequestPanel({
               </span>
               <span aria-hidden className="h-6 w-px flex-none bg-border" />
               <Channel
-                on={byWhatsApp}
-                onClick={() => {
-                  setByWhatsApp((v) => !v);
-                  setTab("plain");
-                }}
+                on={channel === "whatsapp"}
+                onClick={() => setChannel((v) => (v === "whatsapp" ? "none" : "whatsapp"))}
                 icon="chat"
                 label={c.whatsapp}
+                done={sent.includes("whatsapp")}
               />
               <Channel
-                on={byEmail}
-                onClick={() => {
-                  setByEmail((v) => !v);
-                  setTab("email");
-                }}
+                on={channel === "email"}
+                onClick={() => setChannel((v) => (v === "email" ? "none" : "email"))}
                 icon="mail"
                 label={c.email}
+                done={sent.includes("email")}
               />
-              {/* ── Anywhere else (owner, 2026-09-02) ─────────────────────────────────────────
-                  A renter whose supplier is on Telegram, or who wants the message in his own notes,
-                  had no way out of the two named channels. This hands the message to the device's
-                  own share sheet — every app on the machine, not a list we chose — and copies it
-                  where there is no sheet, which is most desktop browsers. */}
+              {/* ── The provider is asked WHERE the channel is (owner, 2026-09-02) ────────────
+                  *"when user click email they will ask to share through outlook or gmail instead of
+                  having them here."* It was a standing row of its own below, which made it read as
+                  a fourth setting rather than as part of the one channel it belongs to. Pressing
+                  E-mail reveals it, in the same row, beside the chip it qualifies. */}
+              {channel === "email" &&
+                EMAIL_PROVIDERS.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    aria-pressed={provider === p}
+                    onClick={() => {
+                      setProvider(p);
+                      saveEmailProvider(p);
+                    }}
+                    className={cx(
+                      "h-[26px] flex-none rounded-sm px-2.5 text-meta font-semibold transition",
+                      provider === p ? "bg-navy text-surface" : "text-muted hover:text-navy",
+                    )}
+                  >
+                    {c[p]}
+                  </button>
+                ))}
+              {/* Anywhere else — the device's own sheet, and the clipboard where there is none. */}
               <Channel
-                on={byOther}
-                onClick={() => {
-                  setByOther((v) => !v);
-                  setTab("plain");
-                }}
+                on={channel === "other"}
+                onClick={() => setChannel((v) => (v === "other" ? "none" : "other"))}
                 icon="ios_share"
                 label={c.other}
+                done={sent.includes("other")}
               />
               <button
                 type="button"
@@ -586,16 +724,23 @@ export function ShareRequestPanel({
                 className={cx(btn("primary", "md"), "ms-auto flex-none")}
               >
                 <Icon name="send" size={15} />
-                {/* The only send on this screen now: the review's own «Send to suppliers» button is
+                {/* The only send on this screen: the review's own «Send to suppliers» button is
                     gone, because two buttons that both post a request is one too many and neither
-                    of them said which suppliers. */}
+                    of them said which suppliers.
+
+                    Once it has ALREADY gone somewhere, the same button is how it goes somewhere
+                    else — pick another channel, press again. It reads off `sent`, not off the uuid:
+                    a request that exists but has never been shared from here is a first send, and
+                    calling that «again» would be a lie. */}
                 {busy
                   ? c.posting
-                  : moedatechOnly
-                    ? mode === "post"
-                      ? c.postMoedatechOnly
-                      : c.sendMoedatechOnly
-                    : c.sendToSuppliers}
+                  : sent.length
+                    ? c.shareAgain
+                    : moedatechOnly
+                      ? mode === "post"
+                        ? c.postMoedatechOnly
+                        : c.sendMoedatechOnly
+                      : c.sendToSuppliers}
               </button>
             </div>
             {/* With both extras off this is the whole answer, so it is stated as a fact rather than
@@ -611,33 +756,8 @@ export function ShareRequestPanel({
               {moedatechOnly ? c.moedatechOnlyHint : c.alwaysHint}
             </p>
 
-            {/* Which webmail. A renter on Gmail handed an Outlook window is in the same position as
-                one handed a dead `mailto:` — a compose screen for an account he is not signed into. */}
-            {byEmail && (
-              <span className="flex items-center gap-2">
-                <span className="text-meta text-muted">{c.openIn}</span>
-                {EMAIL_PROVIDERS.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    aria-pressed={provider === p}
-                    onClick={() => {
-                      setProvider(p);
-                      saveEmailProvider(p);
-                    }}
-                    className={cx(
-                      "rounded-sm px-2.5 py-1 text-meta font-semibold transition",
-                      provider === p ? "bg-navy text-surface" : "text-muted hover:text-navy",
-                    )}
-                  >
-                    {c[p]}
-                  </button>
-                ))}
-              </span>
-            )}
-
             {/* Said plainly: the alternative is a renter who believes four people were messaged. */}
-            {byWhatsApp && sharedWith === null && (
+            {channel === "whatsapp" && sharedWith === null && (
               <span className="text-meta text-muted">
                 {firstWithPhone ? fmt(c.whatsappFirst, { name: firstWithPhone.name }) : c.whatsappNoPhone}
               </span>
@@ -657,10 +777,23 @@ export function ShareRequestPanel({
             {/* What actually happened, not a blanket «shared». A send that reached nobody by e-mail
                 still POSTED, and saying «shared with 0 suppliers» would read as a failure when the
                 request is live on Moedatech and waiting. */}
+            {/* What happened, and what may still happen. A renter who has just e-mailed four people
+                and now wants the same request on WhatsApp needs to be told that is a press away —
+                otherwise the confirmation reads as the end of the road and he goes looking for a
+                second Share button that does not exist. */}
             {sharedWith !== null && (
-              <span className="flex items-center gap-1.5 rounded-md bg-ok-soft px-3 py-2 text-meta font-extrabold text-ok-deep">
-                <Icon name="check_circle" size={15} />
-                {sharedWith === 0 ? c.postedOnly : sharedWith === 1 ? c.doneOne : fmt(c.done, { n: sharedWith })}
+              <span className="grid gap-1 rounded-md bg-ok-soft px-3 py-2">
+                <span className="flex items-center gap-1.5 text-meta font-extrabold text-ok-deep">
+                  <Icon name="check_circle" size={15} />
+                  {sharedWith === 0 ? c.postedOnly : sharedWith === 1 ? c.doneOne : fmt(c.done, { n: sharedWith })}
+                </span>
+                {cardOnClipboard && (
+                  <span className="flex items-start gap-1.5 text-label font-semibold text-navy">
+                    <Icon name="content_paste" size={13} className="mt-px flex-none" />
+                    {c.pasteForCard}
+                  </span>
+                )}
+                <span className="text-label text-ok-deep">{c.shareAgainHint}</span>
               </span>
             )}
           </div>
@@ -722,7 +855,12 @@ export function ShareRequestPanel({
               </div>
             </div>
           ) : (
-            /* The chat bubble — recognisable at a glance, not a replica. */
+            /* The chat bubble — recognisable at a glance, not a replica.
+
+               The card sits INSIDE the bubble here, under the message, because that is where WhatsApp
+               puts it: one bubble carrying the words and the preview together. In the e-mail frame it
+               is a separate block under the body, because that is where a mail client puts it. Same
+               card, drawn where each client actually draws it. */
             <div className="max-h-[460px] overflow-auto rounded-md border border-border bg-surface2 p-3">
               <div className="max-w-[94%] rounded-md rounded-ss-none bg-surface px-3 py-2">
                 <Message
@@ -732,6 +870,15 @@ export function ShareRequestPanel({
                   c={c}
                   linkPending={!uuid}
                 />
+                {unfurl && (
+                  <div className="mt-2.5 border-t border-border pt-2.5">
+                    <span className="mb-1.5 block text-label uppercase tracking-wide text-muted">{c.unfurl}</span>
+                    <div
+                      className="[&_img]:!h-auto [&_img]:!w-full [&_table]:!w-full [&_table]:!max-w-full"
+                      dangerouslySetInnerHTML={{ __html: unfurl }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -856,7 +1003,26 @@ function Editable({
   );
 }
 
-function Channel({ on, onClick, icon, label }: { on: boolean; onClick: () => void; icon: string; label: string }) {
+/**
+ * One extra channel.
+ *
+ * `done` marks one this request has already gone out on, so a renter coming back to send it
+ * somewhere else can see at a glance where it has been — which is the whole reason a second press
+ * is allowed at all.
+ */
+function Channel({
+  on,
+  onClick,
+  icon,
+  label,
+  done,
+}: {
+  on: boolean;
+  onClick: () => void;
+  icon: string;
+  label: string;
+  done?: boolean;
+}) {
   return (
     <button
       type="button"
@@ -869,6 +1035,7 @@ function Channel({ on, onClick, icon, label }: { on: boolean; onClick: () => voi
     >
       <Icon name={icon} size={15} className={on ? "text-ok-deep" : "text-muted"} />
       {label}
+      {done && <Icon name="check" size={13} className="text-ok-deep" />}
     </button>
   );
 }
