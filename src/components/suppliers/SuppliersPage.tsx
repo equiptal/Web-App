@@ -333,7 +333,7 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
                     />
                   </th>
                 )}
-                {[c.colSupplier, c.colVendor, c.colContact, c.colGroups, c.colBids, ""].map((h, hi) => (
+                {[c.colSupplier, c.colVendor, c.colPhone, c.colEmail, c.colGroups, c.colBids, ""].map((h, hi) => (
                   <th
                     key={h || hi}
                     className="border-b border-border bg-surface2 px-3 py-2 text-start text-label font-extrabold uppercase tracking-wide text-muted"
@@ -589,23 +589,43 @@ function Row({
         </button>
       </td>
 
+      {/* ── Phone and e-mail, a column each (owner, 2026-09-02) ──────────────────────────────────
+          They shared one cell, stacked, so «which of the two is missing» took reading rather than
+          scanning — and the two are not interchangeable: the e-mail is what a request is shared to,
+          the phone is what WhatsApp and matching run on. A renter looking down the list for whoever
+          he cannot e-mail was reading a paragraph per row.
+
+          Each says what is absent in its own words, and offers the fix in place. */}
       <td className="px-3 py-2.5 text-meta">
-        {canBeEmailed(s) ? (
-          <span className="block font-semibold text-navy">{s.email}</span>
+        {s.phone ? (
+          <span className="block font-semibold text-navy" dir="ltr">
+            {s.phone}
+          </span>
         ) : (
           <span className="block text-muted-dark">
-            {c.notSet} — <span className="font-extrabold text-info-deep">{c.add}</span>
+            {c.noPhone} <span className="font-extrabold text-info-deep">{c.add}</span>
           </span>
         )}
-        <span className="block text-muted" dir="ltr">
-          {s.phone || "—"}
-        </span>
         {/* Present only when the backend could not turn something into a key — the text survives so
             the renter can correct it, and the key column stays null so no lookup is poisoned. */}
         {hasUnparsed(s) && (
           <span title={c.couldNotReadBody} className="mt-0.5 inline-flex items-center gap-1 text-label font-extrabold text-danger-deep">
             <Icon name="error" size={12} />
             {c.couldNotRead}
+          </span>
+        )}
+      </td>
+
+      <td className="px-3 py-2.5 text-meta">
+        {canBeEmailed(s) ? (
+          <span className="block font-semibold text-navy" dir="ltr">
+            {s.email}
+          </span>
+        ) : (
+          /* Named, not left blank: no e-mail is the reason «Send to my suppliers» will skip this
+             row, and the renter should meet that fact here rather than at the share sheet. */
+          <span className="block text-muted-dark">
+            {c.noEmailCol} <span className="font-extrabold text-info-deep">{c.add}</span>
           </span>
         )}
       </td>

@@ -59,7 +59,19 @@ const blank = (): Row => ({ name: "", contactName: "", email: "", phone: "", ven
 const usable = (r: Row) => !!r.name.trim() && !!(r.email.trim() || r.phone.trim());
 
 /** Four columns and the flag — the grid is declared once so the header and the rows cannot drift. */
-const GRID = "grid grid-cols-[1.2fr_.9fr_1.2fr_.9fr_auto_28px] items-center gap-1.5";
+/**
+ * The row, and the header over it, in ONE template.
+ *
+ * ⚠️ The vendor column was `auto`, and `auto` is measured from the CONTENT — the header cell held
+ * the words «Vendor registration», the row cell held a pill, and the two came out different widths.
+ * Every column after them then landed somewhere else, so each label sat a few pixels off the box it
+ * named and the whole table looked hand-placed (owner, 2026-09-02: *"the labels must be above the
+ * box exactly at its start"*). A FIXED column cannot disagree with itself.
+ *
+ * `items-end` rather than `items-center`, so a header and a 34px field share a baseline.
+ */
+const GRID =
+  "grid grid-cols-[1.4fr_1fr_1.5fr_1.1fr_10rem_28px] items-end gap-x-2.5 gap-y-1.5";
 
 export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; onClose: () => void; onAdded: (msg?: string) => void }) {
   const t = useT();
@@ -92,8 +104,36 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
         phone: r.phone.trim() || null,
         vendorRegistered: r.vendor,
       }));
-      await addRenterSuppliersBulk(payload);
-      onAdded();
+      /**
+       * ⚠️ The result used to be thrown away.
+       *
+       * `bulk` answers `created`, `merged` and `rejected`, and this called it, ignored all three, and
+       * said "added". So a row that MERGED into a supplier already on the list, and a row the backend
+       * refused, both looked identical to a row that landed — and the renter, seeing no new line
+       * appear, concluded the feature was broken (owner, found in UAT 2026-09-02).
+       *
+       * Now it says which of the three happened. A merge is a success and reads as one, but it is a
+       * different success, and the renter has to be told which he got.
+       */
+      const result = await addRenterSuppliersBulk(payload);
+      const created = result?.created?.length ?? 0;
+      const merged = result?.merged?.length ?? 0;
+      const rejected = result?.rejected?.length ?? 0;
+
+      // Refusals stay on screen rather than passing in a toast: they are the rows the renter still
+      // has to do something about, and each one names which row and why.
+      if (rejected > 0 && created + merged === 0) {
+        setError(refusalLine(result?.rejected ?? [], c));
+        setSaving(false);
+        return;
+      }
+      onAdded(
+        merged || rejected
+          ? fmt(c.addedMixed, { n: created, merged, rejected })
+          : created === 1
+            ? fmt(c.addedOne, { n: 1 })
+            : fmt(c.addedMany, { n: created }),
+      );
       close();
     } catch {
       // Never close on failure: the renter's typing is the only copy of it.
@@ -106,7 +146,7 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
     <Dialog
       open={open}
       onClose={close}
-      size="xl"
+      size="xxl"
       icon={<Icon name="person_add" size={18} />}
       title={c.addTitle}
       subtitle={c.addSubtitle}
@@ -137,14 +177,15 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
           />
         ) : (
           <div className="grid gap-1.5">
+            {/* One header row for the whole table, not a label per row: five labels repeated down
+                six rows is a wall of shouting, and the columns do not change meaning as you go. */}
             <div className={GRID}>
-              {[c.fName, c.fContact, c.fEmail, c.fPhone].map((h, i) => (
-                <span key={h} className="text-label font-extrabold uppercase tracking-wide text-muted">
+              {[c.fName, c.fContact, c.fEmail, c.fPhone, c.colVendor].map((h, i) => (
+                <span key={h} className="truncate text-label font-extrabold uppercase tracking-wide text-muted">
                   {h}
                   {i === 0 && <span className="text-danger"> *</span>}
                 </span>
               ))}
-              <span className="text-label font-extrabold uppercase tracking-wide text-muted">{c.colVendor}</span>
               <span />
             </div>
 
@@ -156,7 +197,7 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
                 <Field value={r.phone} onChange={(v) => patch(i, { phone: v })} placeholder="+966 5X XXX XXXX" />
                 <label
                   className={cx(
-                    "inline-flex h-[26px] cursor-pointer items-center gap-1.5 rounded-full border px-2.5 text-label font-extrabold",
+                    "inline-flex h-[34px] cursor-pointer items-center justify-center gap-1.5 rounded-md border px-2.5 text-label font-extrabold",
                     r.vendor ? "border-ok bg-ok-soft text-ok-deep" : "border-dashed border-border-strong bg-surface text-muted",
                   )}
                 >
@@ -173,7 +214,7 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
                   disabled={rows.length === 1}
                   onClick={() => setRows((list) => list.filter((_, n) => n !== i))}
                   title={c.removeRow}
-                  className="grid h-[26px] w-[26px] place-items-center rounded-sm text-muted transition hover:bg-danger-soft hover:text-danger disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
+                  className="grid h-[34px] w-[28px] place-items-center rounded-sm text-muted transition hover:bg-danger-soft hover:text-danger disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
                 >
                   <Icon name="close" size={13} />
                 </button>
@@ -225,6 +266,21 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
       </div>
     </Dialog>
   );
+}
+
+/**
+ * The refusals, as one line a renter can act on.
+ *
+ * Named by ROW, because the dialog he is looking at is a table of rows — "row 3 has no e-mail and no
+ * phone" points at something on his screen, where "MISSING_CONTACT" points at our vocabulary.
+ */
+function refusalLine(
+  rejected: { row: number; reason: string }[],
+  c: ReturnType<typeof useT>["suppliers"],
+): string {
+  const reason = (code: string) =>
+    code === "MISSING_CONTACT" ? c.rMissingContact : code === "MISSING_NAME" ? c.rMissingName : code;
+  return rejected.map((r) => fmt(c.planRejected, { row: r.row + 1, reason: reason(r.reason) })).join(" · ");
 }
 
 function Field({
