@@ -243,16 +243,19 @@ export function cardBlock(m: BidCardModel, lang: "en" | "ar" = "en"): string {
   const t = FIXED[lang];
   const lines: (string | null)[] = [
     /**
-     * The machine, and only the machine (owner, 2026-09-03: *"remove any request code from the
-     * templates"*).
+     * The machine — but NOT when the list below is about to name every one of them.
      *
-     * ~~The reference led it, so an operator could file the reply without opening the link.~~ That
-     * is our filing, not his: a supplier reading `CEX-020902:` before the equipment is being handed
-     * an internal code as the first thing he sees, and it buys him nothing he cannot get from the
-     * link. The card still carries it, small and to one side, where somebody who wants to quote it
-     * can find it.
+     * With two items the headline read "Excavator 20 ton ×2 + 1 other equipment item" and the list
+     * underneath then said "• Excavator 20 ton ×2" and "• Excavator 20 ton ×2" again. The first
+     * machine appeared twice and the phrase "+ 1 other" described a line the reader could already
+     * see (owner, 2026-09-03: *"why so duplicate info shown"*).
+     *
+     * A one-machine request keeps its headline, because there is no list to replace it.
+     *
+     * ⚠️ No reference either, since 2026-09-03: that is our filing, not his, and a supplier reading
+     * `CEX-020902:` before the equipment is handed an internal code as the first thing he sees.
      */
-    m.imageHeadline,
+    m.items.length ? null : m.imageHeadline,
 
     // The SITE and the DATES first, and once: they belong to the request, not to any one machine.
     m.where || null,

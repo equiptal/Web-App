@@ -247,7 +247,7 @@ export const en = {
       fromLine: "From: {name}",
       fromYou: "you",
       coach: "Share with your supplier to bid",
-      expiry: "Expiry date",
+      expiry: "Expiry date of your link",
       title: "Share this request",
       linkLabel: "Your shareable link",
       linkMasked: "Generated the moment you post",
@@ -266,7 +266,7 @@ export const en = {
       whatsappFirst: "Opens one chat, with {name}. WhatsApp cannot take several at once.",
       whatsappNoPhone: "None of the ones you picked has a phone.",
       preview: "What they receive",
-      subject: "A new equipment request for you",
+      subject: "RFQ for {equipment}",
       skipping: "{n} of the ones you picked have no e-mail and will be left out.",
       posting: "Posting…",
       done: "Request shared with {n} suppliers",
@@ -274,7 +274,7 @@ export const en = {
       openIn: "Open in",
       outlook: "Outlook",
       gmail: "Gmail",
-      alwaysHint: "Every request goes to Moedatech. E-mail and WhatsApp are extra.",
+      alwaysHint: "Every request goes to Moedatech. You can share it via other channels too.",
       previewEmpty: "Add equipment to your request to see what suppliers receive.",
       whichRequest: "Which request",
       noRequests: "You have no requests to share yet.",
@@ -301,6 +301,10 @@ export const en = {
       whatsappDraws: "WhatsApp also shows",
       nowPasteAddresses: "Your suppliers are on the clipboard. Press Ctrl+V in Outlook’s Bcc field.",
       nowPasteCard: "The card is on the clipboard. Press Ctrl+V at the end of the message.",
+      linkHint: "Your shareable link is generated the moment you post your request.",
+      noPhone: "no phone",
+      vendorShort: "Vendor",
+      skippingPhone: "{n} of the ones you picked have no phone.",
       modalSubtitle: "Pick who sees it, and how it reaches them.",
     },
     reading: "Reading",
@@ -2252,6 +2256,12 @@ export const en = {
          *"call it payment term"*). ~~`stripNoPayment`, a second string for the same control saying
          the same thing.~~ One term is being chosen, so one word names it. */
       paymentTerm: "Payment details",
+      /* The TITLE over the strip's payment control (owner, 2026-09-03: *"this in the ready to send
+         must have payment terms as the title of the field"*). The pill showed «Net 30» and nothing
+         else once a term was chosen, so the one thing on that strip a renter can still change did
+         not say what it was; unset it read «Payment details», which is a placeholder and vanishes
+         the moment he answers. A title stays. */
+      paymentTermTitle: "Payment terms",
       title: "Ready to send",
       subtitle: "This is exactly what suppliers will see. Terms and payment come after the bids arrive. Nothing else to fill in here.",
       where: "Where it goes",
@@ -2337,7 +2347,12 @@ export const en = {
     vendorNeedsContact: "{name} has no e-mail and no phone yet. Add one on the row, then the flag will save.",
     vendorFailed: "That did not save. Nothing changed.",
     addTitle: "Add suppliers",
-    addSubtitle: "Type them in, upload a list, or pick a firm that is already on Moedatech.",
+    /* What the dialog is for, in the renter's own terms (owner, 2026-09-03). ~~«Type them in,
+       upload a list, or pick a firm that is already on Moedatech.»~~ That named three doors, one of
+       which is a different dialog, and said nothing about WHY a contact matters. A supplier with no
+       e-mail and no phone is a name on a list he can never send a request to, and that is the fact
+       worth stating at the top. */
+    addSubtitle: "Type them in, or upload a list with their contact details, so you can share your requests with them.",
     addAnother: "Add another",
     addOne: "Add 1 supplier",
     addMany: "Add {n} suppliers",
@@ -2346,7 +2361,6 @@ export const en = {
     addedMany: "{n} suppliers added",
     addedMixed: "{n} added · {merged} already on your list, updated · {rejected} refused",
     addFailed: "That did not save. Your rows are still here. Try again.",
-    addHint: "Each supplier needs a company name, and an email or a phone. Without an email the request's share sheet skips them.",
     fName: "Company name",
     fContact: "Contact name",
     fEmail: "Email",

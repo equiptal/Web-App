@@ -29,10 +29,8 @@ import {
   type ShareTemplate,
 } from "@/lib/shareTemplate";
 import {
-  EMAIL_PROVIDERS,
   loadEmailProvider,
   openEmailCompose,
-  saveEmailProvider,
   type EmailProvider,
 } from "@/lib/composeEmail";
 
@@ -129,6 +127,12 @@ export function ShareRequestPanel({
   const lang = locale === "ar" ? "ar" : "en";
 
   const [rows, setRows] = useState<RenterSupplier[] | null>(null);
+  /**
+   * Nobody is ticked by default (owner, 2026-09-03).
+   *
+   * A pre-ticked list is a decision made for him that he has to notice and undo. `preselect` is the
+   * row action — he chose that supplier by pressing his row — and is the only thing that starts on.
+   */
   const [picked, setPicked] = useState<Record<string, boolean>>(() =>
     Object.fromEntries((preselect ?? []).map((id) => [id, true])),
   );
@@ -146,7 +150,7 @@ export function ShareRequestPanel({
    * channel is a second press, which is honest about what it is — the link already exists by then,
    * so nothing is posted twice and `sent` remembers where it has been.
    */
-  const [channel, setChannel] = useState<"none" | "email" | "whatsapp" | "other">("email");
+  const [channel, setChannel] = useState<"none" | "email" | "whatsapp" | "other">("none");
   const [copiedMessage, setCopiedMessage] = useState(false);
   const [provider, setProvider] = useState<EmailProvider>("outlook");
   /** The renter's own wording, kept on this browser so every request after this one carries it. */
@@ -187,17 +191,38 @@ export function ShareRequestPanel({
   // value is already final on the server render.
   const shareUrl = useMemo(() => (uuid ? bidShareUrl(uuid) : ""), [uuid]);
 
+  /**
+   * What the link field shows before there is a link.
+   *
+   * The shape of the real thing — host, path, the first characters of the token — with the rest
+   * starred. A renter who has never shared one has no idea what he is waiting for; "Generated the
+   * moment you post" described the timing and not the thing.
+   */
+  const maskedLink = useMemo(() => {
+    const host = typeof window === "undefined" ? "" : window.location.host;
+    return `${host}/bid/${(requestUuid ?? "").slice(0, 4) || "••••"}${"*".repeat(12)}`;
+  }, [requestUuid]);
+
   const card = useBidCard(shareUrl, lang, draftForm);
 
   const chosen = (rows ?? []).filter((s) => picked[s.id]);
   const reachable = chosen.filter(canBeEmailed);
   const unreachable = chosen.filter((s) => !canBeEmailed(s));
   const firstWithPhone = chosen.find((s) => s.phone?.trim()) ?? null;
+  const noPhone = chosen.filter((s) => !s.phone?.trim());
 
   /** The same message in its halves, so the preview can show which of them he may edit. */
   const parts = card ? shareMessageParts(card.model, shareUrl, { template, renterName, lang }) : null;
 
-  const subject = c.subject;
+  /**
+   * `RFQ for Crawler Excavator 20 ton` (owner, 2026-09-03).
+   *
+   * ~~"A new equipment request for you".~~ A supplier's inbox holds forty of those; the subject line
+   * is the one place he decides whether to open it, so it names the machine. `imageHeadline` is used
+   * rather than the card title because it is the short form — first machine, then the count of the
+   * rest — and a subject line is cut at about sixty characters.
+   */
+  const subject = card ? fmt(c.subject, { equipment: card.model.imageHeadline }) : c.subject.replace("{equipment}", "").trim();
 
   /**
    * The card the LINK turns into in the supplier's app — the thing WhatsApp draws, and the thing a
@@ -452,30 +477,29 @@ export function ShareRequestPanel({
    * `tab` is set by the channel buttons and only ever shows a channel that is actually on.
    */
   const previewIsEmail = channel === "email";
-  const label = "text-label font-extrabold uppercase tracking-wide text-muted";
+  /** The app's own field-title style (`Tile` in `ReadyToSend`). Extrabold made these shout over
+   *  every other label on the review, and a title is not the thing being read. */
+  const label = "text-label font-semibold uppercase tracking-[0.05em] text-muted";
 
   return (
     <div className="grid gap-5">
       {/* ── The link ──────────────────────────────────────────────────────────────────────────── */}
       {showLink && (
       <div className="grid gap-2">
-        <span className="flex items-center gap-1.5 text-body font-extrabold text-navy">
-          <Icon name="lock" size={14} className="text-muted" />
-          {c.linkLabel}
-        </span>
+        {/* No heading: the field says what it is, and the line under it says when it arrives. */}
         <div className="flex flex-wrap items-center gap-2">
           {/* The expiry sits beside the link because it is a property OF the link, not of the
               request — and it is named, because a bare date box beside a URL could be anything. */}
           {showExpiry && (
             <span className="flex h-[34px] items-center gap-2 rounded-md border border-border px-2.5">
               <Icon name="event" size={14} className="flex-none text-muted" />
-              <span className="text-label font-extrabold uppercase tracking-wide text-muted">{c.expiry}</span>
+              <span className="whitespace-nowrap text-label font-semibold uppercase tracking-[0.05em] text-muted">{c.expiry}</span>
               <input
                 type="date"
                 value={expiry}
                 onChange={(e) => setExpiry(e.target.value)}
                 aria-label={c.expiry}
-                className="w-[112px] bg-transparent text-meta text-navy outline-none"
+                className="w-[124px] bg-transparent text-meta text-navy outline-none"
               />
             </span>
           )}
@@ -491,7 +515,7 @@ export function ShareRequestPanel({
           >
             {!uuid && <Icon name="lock" size={13} className="flex-none text-muted-light" />}
             <span dir="ltr" className={cx("block min-w-0 flex-1 truncate font-mono text-meta", uuid ? "text-navy" : "text-muted-light")}>
-              {uuid ? shareUrl.replace(/^https?:\/\//, "") : c.linkMasked}
+              {uuid ? shareUrl.replace(/^https?:\/\//, "") : maskedLink}
             </span>
           </span>
           <button
@@ -519,6 +543,7 @@ export function ShareRequestPanel({
             {copied ? c.copied : c.copy}
           </button>
         </div>
+        <p className="text-meta text-muted">{c.linkHint}</p>
       </div>
       )}
 
@@ -617,13 +642,34 @@ export function ShareRequestPanel({
                             </span>
                             <span className="min-w-0 flex-1">
                               <b className="block truncate text-meta font-semibold text-navy">{s.name}</b>
+                              {/* ── What THIS channel needs from him (owner, 2026-09-03) ──────
+                                  The row always showed the e-mail, so picking WhatsApp and finding
+                                  half the list unreachable meant reading a column about the wrong
+                                  thing. It shows the address for e-mail and the number for
+                                  WhatsApp, and names what is missing in red either way. */}
                               <span
                                 dir="ltr"
-                                className={cx("block truncate text-label", s.email ? "text-muted" : "text-danger-deep")}
+                                className={cx(
+                                  "block truncate text-label",
+                                  (channel === "whatsapp" ? s.phone : s.email) ? "text-muted" : "text-danger-deep",
+                                )}
                               >
-                                {s.email || c.noEmail}
+                                {channel === "whatsapp" ? s.phone || c.noPhone : s.email || c.noEmail}
                               </span>
                             </span>
+                            {/* Vendor-registered is the renter's OWN flag on this supplier, and it
+                                decides whether an award can go to him — so it belongs on the row he
+                                is picking from, not only in the table he set it in. Distinct from
+                                the green tick, which is Moedatech saying the FIRM is verified. */}
+                            {s.vendorRegistered && (
+                              <span
+                                title={t.suppliers.colVendor}
+                                className="inline-flex h-[18px] flex-none items-center gap-1 rounded-full border border-navy/25 bg-surface2 px-1.5 text-label font-semibold text-navy-mid"
+                              >
+                                <Icon name="workspace_premium" size={11} />
+                                {c.vendorShort}
+                              </span>
+                            )}
                             {s.verified && <Icon name="verified_user" size={14} className="flex-none text-ok" />}
                           </button>
 
@@ -663,173 +709,16 @@ export function ShareRequestPanel({
                 {!visible.length && <p className="px-3 py-4 text-center text-meta text-muted">{c.noMatches}</p>}
               </div>
             )}
-            {channel === "email" && unreachable.length > 0 && sharedWith === null && (
+            {/* Named before the press, per channel: «2 have no phone» is a different sentence from
+                «2 have no e-mail», and only one of them is true at a time. */}
+            {sharedWith === null && channel === "email" && unreachable.length > 0 && (
               <span className="text-meta text-danger-deep">{fmt(c.skipping, { n: unreachable.length })}</span>
             )}
-          </div>
-
-          {/* ── SEND VIA ───────────────────────────────────────────────────────────────────────
-              Moedatech is first, locked, and ticked — it is not a channel the renter chooses, it is
-              where the request goes. Saying so beside the two he DOES choose is what stops him
-              believing that unticking both means nobody sees his request. */}
-          <div className="grid gap-2">
-            <span className={label}>{c.sendVia}</span>
-            <div className="flex flex-wrap items-center gap-2">
-              <span
-                title={c.alwaysHint}
-                className="inline-flex h-[34px] flex-none items-center gap-2 rounded-md border border-ok bg-ok-soft px-3"
-              >
-                {/* The wordmark the nav bar carries, so the renter recognises it as us rather than
-                    as an icon he has to decode. `brightness-0` forces it to ink on the pale chip;
-                    the nav inverts the same file to white on navy. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/moedatech-logo.svg" alt="Moedatech" className="h-3 w-auto brightness-0" />
-                <Icon name="check" size={13} className="text-ok-deep" />
-              </span>
-              <span aria-hidden className="h-6 w-px flex-none bg-border" />
-              <Channel
-                on={channel === "whatsapp"}
-                onClick={() => setChannel((v) => (v === "whatsapp" ? "none" : "whatsapp"))}
-                icon="chat"
-                label={c.whatsapp}
-                done={sent.includes("whatsapp")}
-              />
-              <Channel
-                on={channel === "email"}
-                onClick={() => setChannel((v) => (v === "email" ? "none" : "email"))}
-                icon="mail"
-                label={c.email}
-                done={sent.includes("email")}
-              />
-              {/* ── The provider is asked WHERE the channel is (owner, 2026-09-02) ────────────
-                  *"when user click email they will ask to share through outlook or gmail instead of
-                  having them here."* It was a standing row of its own below, which made it read as
-                  a fourth setting rather than as part of the one channel it belongs to. Pressing
-                  E-mail reveals it, in the same row, beside the chip it qualifies. */}
-              {channel === "email" &&
-                EMAIL_PROVIDERS.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    aria-pressed={provider === p}
-                    onClick={() => {
-                      setProvider(p);
-                      saveEmailProvider(p);
-                    }}
-                    className={cx(
-                      "h-[26px] flex-none rounded-sm px-2.5 text-meta font-semibold transition",
-                      provider === p ? "bg-navy text-surface" : "text-muted hover:text-navy",
-                    )}
-                  >
-                    {c[p]}
-                  </button>
-                ))}
-              {/* Anywhere else — the device's own sheet, and the clipboard where there is none. */}
-              <Channel
-                on={channel === "other"}
-                onClick={() => setChannel((v) => (v === "other" ? "none" : "other"))}
-                icon="ios_share"
-                label={c.other}
-                done={sent.includes("other")}
-              />
-              <button
-                type="button"
-                onClick={() => void send()}
-                disabled={!canSend}
-                className={cx(btn("primary", "md"), "ms-auto flex-none")}
-              >
-                <Icon name="send" size={15} />
-                {/* The only send on this screen: the review's own «Send to suppliers» button is
-                    gone, because two buttons that both post a request is one too many and neither
-                    of them said which suppliers.
-
-                    Once it has ALREADY gone somewhere, the same button is how it goes somewhere
-                    else — pick another channel, press again. It reads off `sent`, not off the uuid:
-                    a request that exists but has never been shared from here is a first send, and
-                    calling that «again» would be a lie. */}
-                {busy
-                  ? c.posting
-                  : sent.length
-                    ? c.shareAgain
-                    : moedatechOnly
-                      ? mode === "post"
-                        ? c.postMoedatechOnly
-                        : c.sendMoedatechOnly
-                      : c.sendToSuppliers}
-              </button>
-            </div>
-            {/* With both extras off this is the whole answer, so it is stated as a fact rather than
-                left as the absence of two ticks — a renter must never wonder whether pressing Send
-                with nothing selected sends nothing at all. */}
-            <p
-              className={cx(
-                "text-meta",
-                moedatechOnly ? "flex items-center gap-1.5 font-semibold text-ok-deep" : "text-muted",
-              )}
-            >
-              {moedatechOnly && <Icon name="check_circle" size={14} className="flex-none" />}
-              {moedatechOnly ? c.moedatechOnlyHint : c.alwaysHint}
-            </p>
-
-            {/* ── Outlook discards `bcc`, so its recipients ride in `to` ────────────────────────
-                Said out loud, because a renter sending to eight competitors has a right to know
-                they will see each other — and given a way out that does not depend on Outlook
-                honouring a parameter it does not document.
-
-                *Copy addresses* is that way out: paste into Outlook's own Bcc field, clear the To
-                line, send. Two actions, and they work in every version of Outlook there has ever
-                been, which no URL parameter can promise. */}
-            {/* ── Outlook's window opens EMPTY, and the addresses are handed over to paste ──────
-                Its deeplink documents `to`, `subject` and `body`. `bcc` is discarded, and the
-                renter would rather paste than have eight competitors put in one another's To line
-                to work around it (owner, 2026-09-03).
-
-                So this is not a warning about a compromise — it is the step. Stated as one, with the
-                addresses one press away, because a compose window that opens with no recipients and
-                no explanation is the feature looking broken. */}
-            {/* Said plainly: the alternative is a renter who believes four people were messaged. */}
-            {channel === "whatsapp" && sharedWith === null && (
-              <span className="text-meta text-muted">
-                {firstWithPhone ? fmt(c.whatsappFirst, { name: firstWithPhone.name }) : c.whatsappNoPhone}
-              </span>
-            )}
-            {tooLong && (
-              <span className="flex items-start gap-1.5 text-meta font-semibold text-danger-deep">
-                <Icon name="error_outline" size={14} className="mt-px flex-none" />
-                {c.tooLong}
-              </span>
-            )}
-            {copiedMessage && (
-              <span className="flex items-center gap-1.5 text-meta font-semibold text-ok-deep">
-                <Icon name="check" size={14} />
-                {c.messageCopied}
-              </span>
-            )}
-            {/* What actually happened, not a blanket «shared». A send that reached nobody by e-mail
-                still POSTED, and saying «shared with 0 suppliers» would read as a failure when the
-                request is live on Moedatech and waiting. */}
-            {/* What happened, and what may still happen. A renter who has just e-mailed four people
-                and now wants the same request on WhatsApp needs to be told that is a press away —
-                otherwise the confirmation reads as the end of the road and he goes looking for a
-                second Share button that does not exist. */}
-            {sharedWith !== null && (
-              <span className="grid gap-1 rounded-md bg-ok-soft px-3 py-2">
-                <span className="flex items-center gap-1.5 text-meta font-extrabold text-ok-deep">
-                  <Icon name="check_circle" size={15} />
-                  {sharedWith === 0 ? c.postedOnly : sharedWith === 1 ? c.doneOne : fmt(c.done, { n: sharedWith })}
-                </span>
-                {/* The clipboard holds ONE thing, so this names that thing and where it goes. It
-                    is the only instruction on the screen at this moment, which is the point. */}
-                {pasteNeeded && (
-                  <span className="flex items-start gap-1.5 rounded-sm bg-surface px-2 py-1.5 text-label font-semibold text-navy">
-                    <Icon name="content_paste" size={13} className="mt-px flex-none text-brand" />
-                    {pasteNeeded === "addresses" ? c.nowPasteAddresses : c.nowPasteCard}
-                  </span>
-                )}
-                <span className="text-label text-ok-deep">{c.shareAgainHint}</span>
-              </span>
+            {sharedWith === null && channel === "whatsapp" && noPhone.length > 0 && (
+              <span className="text-meta text-danger-deep">{fmt(c.skippingPhone, { n: noPhone.length })}</span>
             )}
           </div>
+
 
         </div>
 
@@ -911,6 +800,126 @@ export function ShareRequestPanel({
             </button>
           )}
         </div>
+      </div>
+
+      {/* ── SEND VIA: a row of its own, under BOTH columns (owner, 2026-09-03) ────────────────
+          It lived at the foot of the left column, under the supplier list, where it read as one more
+          thing about the suppliers — and the button that posts the request sat in the narrower half
+          of the screen. It belongs to the whole panel: whom he picked on the left and what they
+          receive on the right both end here.
+
+          The pale orange band is not decoration — it is what stops the eye reading Send as a fourth
+          control in a column of controls. */}
+      <div className="grid gap-2.5 rounded-md border border-brand/30 bg-brand-soft px-4 py-3.5">
+        <span className={label}>{c.sendVia}</span>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Moedatech is not a channel he chooses — it is where the request goes. Larger than the
+              rest, and never pressable: a control he cannot turn off must not look like one he can. */}
+          <span
+            title={c.alwaysHint}
+            className="inline-flex h-[42px] flex-none items-center gap-2.5 rounded-md border border-ok bg-surface px-4"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/moedatech-logo.svg" alt="Moedatech" className="h-4 w-auto brightness-0" />
+            <Icon name="check_circle" size={16} className="text-ok-deep" />
+          </span>
+
+          <span aria-hidden className="h-7 w-px flex-none bg-border-strong" />
+
+          <Channel
+            on={channel === "whatsapp"}
+            onClick={() => setChannel((v) => (v === "whatsapp" ? "none" : "whatsapp"))}
+            icon="chat"
+            label={c.whatsapp}
+            done={sent.includes("whatsapp")}
+          />
+          <Channel
+            on={channel === "email"}
+            onClick={() => setChannel((v) => (v === "email" ? "none" : "email"))}
+            icon="mail"
+            label={c.email}
+            done={sent.includes("email")}
+          />
+          <Channel
+            on={channel === "other"}
+            onClick={() => setChannel((v) => (v === "other" ? "none" : "other"))}
+            icon="ios_share"
+            label={c.other}
+            done={sent.includes("other")}
+          />
+
+          <button
+            type="button"
+            onClick={() => void send()}
+            disabled={!canSend}
+            className={cx(btn("primary", "lg"), "ms-auto flex-none px-6")}
+          >
+            <Icon name="send" size={16} />
+            {busy
+              ? c.posting
+              : sent.length
+                ? c.shareAgain
+                : moedatechOnly
+                  ? mode === "post"
+                    ? c.postMoedatechOnly
+                    : c.sendMoedatechOnly
+                  : c.sendToSuppliers}
+          </button>
+        </div>
+
+        <p
+          className={cx(
+            "text-meta",
+            moedatechOnly ? "flex items-center gap-1.5 font-semibold text-ok-deep" : "text-navy-mid",
+          )}
+        >
+          {moedatechOnly && <Icon name="check_circle" size={14} className="flex-none" />}
+          {moedatechOnly ? c.moedatechOnlyHint : c.alwaysHint}
+        </p>
+
+          {/* Said plainly: the alternative is a renter who believes four people were messaged. */}
+          {channel === "whatsapp" && sharedWith === null && (
+            <span className="text-meta text-muted">
+              {firstWithPhone ? fmt(c.whatsappFirst, { name: firstWithPhone.name }) : c.whatsappNoPhone}
+            </span>
+          )}
+          {tooLong && (
+            <span className="flex items-start gap-1.5 text-meta font-semibold text-danger-deep">
+              <Icon name="error_outline" size={14} className="mt-px flex-none" />
+              {c.tooLong}
+            </span>
+          )}
+          {copiedMessage && (
+            <span className="flex items-center gap-1.5 text-meta font-semibold text-ok-deep">
+              <Icon name="check" size={14} />
+              {c.messageCopied}
+            </span>
+          )}
+          {/* What actually happened, not a blanket «shared». A send that reached nobody by e-mail
+              still POSTED, and saying «shared with 0 suppliers» would read as a failure when the
+              request is live on Moedatech and waiting. */}
+          {/* What happened, and what may still happen. A renter who has just e-mailed four people
+              and now wants the same request on WhatsApp needs to be told that is a press away —
+              otherwise the confirmation reads as the end of the road and he goes looking for a
+              second Share button that does not exist. */}
+          {sharedWith !== null && (
+            <span className="grid gap-1 rounded-md bg-ok-soft px-3 py-2">
+              <span className="flex items-center gap-1.5 text-meta font-extrabold text-ok-deep">
+                <Icon name="check_circle" size={15} />
+                {sharedWith === 0 ? c.postedOnly : sharedWith === 1 ? c.doneOne : fmt(c.done, { n: sharedWith })}
+              </span>
+              {/* The clipboard holds ONE thing, so this names that thing and where it goes. It
+                  is the only instruction on the screen at this moment, which is the point. */}
+              {pasteNeeded && (
+                <span className="flex items-start gap-1.5 rounded-sm bg-surface px-2 py-1.5 text-label font-semibold text-navy">
+                  <Icon name="content_paste" size={13} className="mt-px flex-none text-brand" />
+                  {pasteNeeded === "addresses" ? c.nowPasteAddresses : c.nowPasteCard}
+                </span>
+              )}
+              <span className="text-label text-ok-deep">{c.shareAgainHint}</span>
+            </span>
+          )}
       </div>
     </div>
   );
@@ -1058,18 +1067,39 @@ function Editable({
     el.style.height = `${el.scrollHeight}px`;
   }, [shown]);
 
+  /**
+   * ── It has to LOOK editable (owner, 2026-09-03) ────────────────────────────────────────────────
+   *
+   * A borderless field that only reveals itself on hover is invisible on a touch screen and easy to
+   * miss on a mouse — the renter read the preview as a picture and never discovered his own lines
+   * were his. So it is a box with a pen in it, always, and the pen brightens on focus.
+   *
+   * It is still not a form: the type is the message's type, the box is faint, and what he reads is
+   * what arrives. The pen is the smallest thing that says «this line is yours».
+   */
   return (
-    <textarea
-      ref={ref}
-      rows={1}
-      value={shown}
-      aria-label={label}
-      placeholder={label}
-      onFocus={() => setEditing(true)}
-      onBlur={() => setEditing(false)}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full resize-none overflow-hidden rounded-sm border border-transparent bg-transparent px-1 py-0.5 text-meta leading-relaxed text-navy outline-none transition hover:border-dashed hover:border-border-strong focus:border-solid focus:border-brand focus:bg-surface"
-    />
+    <span className="group relative block">
+      <textarea
+        ref={ref}
+        rows={1}
+        value={shown}
+        aria-label={label}
+        placeholder={label}
+        onFocus={() => setEditing(true)}
+        onBlur={() => setEditing(false)}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full resize-none overflow-hidden rounded-sm border border-border bg-surface2/60 py-1 pe-7 ps-2 text-meta leading-relaxed text-navy outline-none transition hover:border-border-strong focus:border-brand focus:bg-surface"
+      />
+      <Icon
+        name="edit"
+        size={12}
+        aria-hidden
+        className={cx(
+          "pointer-events-none absolute end-2 top-1.5 transition",
+          editing ? "text-brand" : "text-muted-light group-hover:text-muted",
+        )}
+      />
+    </span>
   );
 }
 
@@ -1100,12 +1130,14 @@ function Channel({
       onClick={onClick}
       className={cx(
         "inline-flex h-[34px] flex-none items-center gap-1.5 rounded-md border px-3.5 text-meta font-extrabold transition",
-        on ? "border-ok bg-ok-soft text-navy" : "border-border bg-surface text-muted hover:text-navy",
+        /* Navy when chosen. Green is Moedatech's, and an extra channel wearing it read as a second
+           «this always happens» rather than as a choice he made. */
+        on ? "border-navy bg-navy text-surface" : "border-border bg-surface text-navy-mid hover:border-navy",
       )}
     >
-      <Icon name={icon} size={15} className={on ? "text-ok-deep" : "text-muted"} />
+      <Icon name={icon} size={15} className={on ? "text-surface" : "text-muted"} />
       {label}
-      {done && <Icon name="check" size={13} className="text-ok-deep" />}
+      {done && <Icon name="check" size={13} className={on ? "text-surface/80" : "text-ok-deep"} />}
     </button>
   );
 }
