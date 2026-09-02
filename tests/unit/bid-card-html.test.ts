@@ -47,11 +47,16 @@ describe("the navy band before the request exists", () => {
       },
     );
 
-    // The same four things the `og` route draws, in the same order.
+    // The same three things the `og` route draws, in the same order.
     expect(html).toContain("MOEDATECH");
-    expect(html).toContain("CEX-020964");
     expect(html).toContain("Excavator 20 ton");
     expect(html).toContain("Open the link to submit your bid");
+    /**
+     * And NOT the reference (owner, 2026-09-03: *"remove it from the card too"*). It is our filing,
+     * not his: the one number on the card a supplier cannot use, in the corner his eye reaches
+     * before the equipment. He has the link, and the link knows which request it is.
+     */
+    expect(html).not.toContain("CEX-020964");
     // And no picture of nothing.
     expect(html).not.toContain("og-bid.png");
     expect(html).not.toContain("<img");

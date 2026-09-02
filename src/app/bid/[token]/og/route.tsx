@@ -117,15 +117,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
           direction: rtl ? "rtl" : "ltr",
         }}
       >
-        {/* Masthead: the mark, and the reference a supplier can quote back at an operator. */}
-        <div style={{ display: "flex", flexDirection: row, alignItems: "center", justifyContent: "space-between" }}>
+        {/* ── The mark, and nothing beside it (owner, 2026-09-03) ────────────────────────────────
+            ~~The reference sat here, so a supplier could quote it back at an operator.~~ *"remove it
+            from the card too."* It is our filing, not his: the one number on the card he cannot use,
+            in the corner his eye reaches before the equipment. He has the link, and the link knows
+            which request it is. */}
+        <div style={{ display: "flex", flexDirection: row, alignItems: "center" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={logoDataUri(OG_COLORS.white)} width={228} height={86} alt="" />
-          {d.ref ? (
-            <div style={{ display: "flex", fontSize: 34, letterSpacing: 2.5, color: "rgba(255,255,255,0.6)" }}>
-              {d.ref}
-            </div>
-          ) : null}
         </div>
 
         {/**

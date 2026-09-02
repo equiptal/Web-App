@@ -106,12 +106,7 @@ function navyBand(model: BidCardModel, host: string, align: string): string {
   const headline = escapeHtml(model.imageHeadline);
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;background:${COLORS.navy};">
       <tr><td align="${align}" style="padding:16px 18px 14px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;">
-          <tr>
-            <td align="${align}" style="font-size:13px;font-weight:800;letter-spacing:1px;color:${COLORS.surface};">MOEDATECH</td>
-            ${model.ref ? `<td align="${align === "left" ? "right" : "left"}" style="font-size:11px;letter-spacing:1.5px;color:rgba(255,255,255,0.6);">${escapeHtml(model.ref)}</td>` : ""}
-          </tr>
-        </table>
+        <div style="font-size:13px;font-weight:800;letter-spacing:1px;color:${COLORS.surface};">MOEDATECH</div>
         <div style="font-size:${headline.length > 46 ? 16 : 20}px;font-weight:700;color:${COLORS.surface};line-height:1.2;padding-top:16px;">${headline}</div>
         <div style="font-size:12px;font-weight:700;color:${model.accepting ? COLORS.brand : COLORS.dangerHover};padding-top:10px;">${escapeHtml(model.cta)}</div>
         <div style="font-size:9.5px;letter-spacing:1.5px;color:rgba(255,255,255,0.48);padding-top:14px;">${escapeHtml(host.toUpperCase())}</div>
