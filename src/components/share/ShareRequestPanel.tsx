@@ -985,18 +985,18 @@ function Message({
       <Editable value={template.greeting} display={parts.greeting} onChange={(v) => onChange("greeting", v)} label={c.tplGreeting} />
       <Editable value={template.intro} display={parts.intro} onChange={(v) => onChange("intro", v)} label={c.tplIntro} />
 
-      {/* ── ONE details element, and it is the CARD (owner, 2026-09-02) ───────────────────────
+      {/* ── ONE details element, and it is WORDS (owner, 2026-09-02, then 2026-09-03) ────────
           *"so request details is duplicated in the card and in the text itslef?"* — and the answer
-          was yes, twice over: the same facts as a text block here, and again as a card underneath.
+          was yes, twice over: these facts as a text block, and again as a card underneath.
 
-          There is one now. The card and the text block were never two things: they are the same
-          request in two renderings, and which one a supplier meets depends on his app. So the
-          preview draws the RICHER of the two, where the details belong — between the renter's
-          intro and his sign-off — and says underneath what arrives where a card cannot.
+          There is one now, and it is the text, because the text is what every channel actually
+          carries. A compose URL takes `text/plain`; SMS takes text; a supplier with images off
+          reads text. The card is not a second copy of this — it is what SOME apps build for
+          themselves out of the link, and it is drawn below only in the channel that really builds
+          one.
 
-          Not editable: a supplier prices what this says, and a card that disagrees with the request
-          it links to is found out at the deal room. */}
-      {/* Ours, and in the message as WORDS — which is what every channel actually carries. */}
+          Not editable: a supplier prices what this says, and a block that disagrees with the
+          request it links to is found out at the deal room. */}
       <div title={c.fixedByUs}>
         <p className="whitespace-pre-wrap text-meta leading-relaxed text-navy">{parts.card}</p>
         <span className="mt-1.5 flex items-start gap-1 text-label text-muted">
