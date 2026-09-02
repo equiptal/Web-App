@@ -137,7 +137,9 @@
      A solid outline, not a shadow. This app has no shadows, and a focus ring is not decoration —
      a keyboard user has no other way to know where they are. */
   --ring-focus: 2px solid var(--brand);
-  --ring-offset: 2px;
+  /* 0, not 2: an offset ring is a SECOND line outside the control's own border. See the focus rule
+     below for why the two became one. */
+  --ring-offset: 0px;
 
   /* ── Floating layers ─────────────────────────────────────────────────────────────────────────
      Nothing in this app casts a shadow. A modal, sheet, dropdown or tooltip is separated from the
@@ -344,10 +346,33 @@ body {
 
 /* ── Focus ──────────────────────────────────────────────────────────────────────────────────────
    One rule for everything focusable. `:focus-visible` rather than `:focus`, so a mouse click on a
-   button does not leave a ring behind it. */
-:focus-visible {
-  outline: var(--ring-focus);
-  outline-offset: var(--ring-offset);
+   button does not leave a ring behind it.
+
+   ── ONE orange line, not two (owner, 2026-09-02) ──────────────────────────────────────────────
+   *"Some focuses still show a double line. I want one consistent focus style: orange, single line,
+   across all sections and forms."*
+
+   Two things were drawing it. The ring sat 2px OUTSIDE the control, and 29 controls also turn their
+   own border brand on focus, so a focused input showed an orange border, a gap, and an orange ring
+   around that. Both were orange, which is why it read as a mistake rather than as a style.
+
+   Now the ring hugs the border box (`--ring-offset: 0`) and the border joins it, so the two are one
+   continuous orange band instead of two lines with air between them. Controls with no border of
+   their own — buttons, links, pills — are unaffected by the border rule and keep the same single
+   ring, which is what makes the style the same everywhere.
+
+   ── In `@layer base`, so a component can still opt out ────────────────────────────────────────
+   ⚠️ This rule was UNLAYERED. In Tailwind v4 an unlayered rule beats every utility, so
+   `focus-visible:outline-none` did nothing at all — three components ask for it and none of them
+   were getting it, which is a second way the same double line appeared. Inside `base`, a utility
+   wins, and a control that genuinely draws its own ring (the intake card, which rings the whole box
+   rather than the field inside it) can say so and be believed. */
+@layer base {
+  :focus-visible {
+    outline: var(--ring-focus);
+    outline-offset: var(--ring-offset);
+    border-color: var(--brand);
+  }
 }
 
 /* Inside a card that clips its own corners, the ring is drawn INSIDE the control it belongs to.
@@ -360,8 +385,10 @@ body {
  *
  * A negative offset draws the same ring against the inside of the control's own edge, so it cannot
  * reach the parent's clip and a keyboard user still sees exactly which pill they are on. */
-.field-card :focus-visible {
-  outline-offset: -2px;
+@layer base {
+  .field-card :focus-visible {
+    outline-offset: -2px;
+  }
 }
 
 .material-symbols-rounded {
