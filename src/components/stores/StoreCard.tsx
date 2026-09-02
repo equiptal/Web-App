@@ -37,12 +37,7 @@ export function StoreCard({ store }: { store: StoreCardData }) {
 
   /** The 24px mark beside the name, on both faces. */
   const smallLogo = (
-    <ShopLogo
-      src={store.logoUrl}
-      name={store.name}
-      className="h-6 w-6 flex-none rounded-shop-logo-sm"
-      initialClassName="grid h-6 w-6 flex-none place-items-center rounded-shop-logo-sm bg-shop-fill text-shop-tag font-shop-bold text-shop-ink"
-    />
+    <ShopLogo src={store.logoUrl} name={store.name} className="h-6 w-6 flex-none rounded-shop-logo-sm" placeholderSize={14} />
   );
 
   /** The name row: the small logo, then the store, wrapping to two lines rather than truncating. */
@@ -137,12 +132,7 @@ export function StoreCard({ store }: { store: StoreCardData }) {
       {/* The tile is the mark. White, because a logo is drawn for paper and most of these carry their
           own white; contained and generously sized, because a wordmark needs width to be read. */}
       <div className="relative flex aspect-[16/11] w-full items-center justify-center border-b border-shop-line bg-white p-5">
-        <ShopLogo
-          src={store.logoUrl}
-          name={store.name}
-          className="max-h-full max-w-full"
-          initialClassName="grid h-[52px] w-[52px] place-items-center rounded-shop-logo bg-shop-fill text-shop-name font-shop-bold text-shop-ink"
-        />
+        <ShopLogo src={store.logoUrl} name={store.name} className="h-full w-full" placeholderSize={52} />
         {store.isVerified && (
           <span className="absolute end-2 top-2">
             <VerifiedDot size={22} />

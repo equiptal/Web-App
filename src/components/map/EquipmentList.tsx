@@ -80,6 +80,7 @@ import type { FleetMachine } from "@/lib/contract/fleet";
 import { equipmentCardModel, type EquipmentCardReadiness } from "@/components/map/equipment-card-model";
 import type { MatchRequest } from "@/components/map/panel/machine-panel-model";
 import { fmt, useLocale, useT } from "@/lib/i18n";
+import { Photo } from "@/components/Photo";
 
 /**
  * **Has this renter had the red-distance explained to him yet?**
@@ -740,12 +741,11 @@ function EquipmentCard({
             }
           }}
         >
-          {photo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={photo} alt="" className="bm-eq-art" />
-          ) : (
-            <span className="bm-eq-nophoto">{t.bidMap.eqNoPhoto}</span>
-          )}
+          {/* The app's one placeholder, not a sentence (owner, 2026-09-02). «No photo» set in 9.5px was
+              a paragraph standing where a picture goes, and it read as an error rather than as an
+              absence. `Photo` also covers the case the old branch could not see: a machine that NAMES
+              a photograph the bucket does not hold, which drew the browser's broken glyph. */}
+          <Photo src={photo} alt="" className="bm-eq-art" placeholderSize={30} />
         </span>
 
         <div className="bm-eq-tx">

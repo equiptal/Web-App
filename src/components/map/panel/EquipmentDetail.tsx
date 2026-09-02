@@ -56,6 +56,7 @@ import {
   type PanelRequestDraft,
 } from "./machine-panel-model";
 import "./panel-proto.css";
+import { PhotoPlaceholder } from "@/components/Photo";
 import { pin } from "@/lib/uiPins";
 
 const MARK: Record<"green" | "grey" | "red", string> = { green: "✓", grey: "—", red: "!" };
@@ -235,7 +236,12 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
           in it, and comes off the ROW'S GROUP rather than off its url; see `DocViewSubject.kind`. */}
       <div className={`mp-viewer${framedDoc ? ` doc ${framedDoc.kind}` : ""}`}>
         {framed == null ? (
-          <div className="mp-hero-empty">{L("No photo on this equipment's file", "لا توجد صورة على ملف هذه المعدّة")}</div>
+          /* The placeholder rather than the sentence (owner, 2026-09-02): the frame is 196px of
+             photograph-shaped space, and what belongs in it when there is no photograph is the shape of
+             one. The words stay as the label, so a screen reader still hears the fact. */
+          <div className="mp-hero-empty" aria-label={L("No photo on this equipment's file", "لا توجد صورة على ملف هذه المعدّة")}>
+            <PhotoPlaceholder size={64} />
+          </div>
         ) : framedBroken ? (
           /* **The paper renders HERE, not in a message about the paper** (owner, UAT of 2026-08-11 —
              *"the document does not render at the top"*, over a screenshot of this very state). What he

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { useAuthGate } from "@/components/auth/AuthGate";
 import { Icon } from "@/components/ui";
+import { PhotoPlaceholder } from "@/components/Photo";
 import type { EquipmentDetail, StoreDetail } from "@/lib/contract/stores";
 import { cityCentroid } from "@/lib/contract/saudi-cities";
 import { btn } from "@/lib/ds";
@@ -348,12 +349,7 @@ function SupplierCard({
     <section className="rounded-shop-card border border-shop-line bg-white p-5">
       <div className="flex items-start justify-between gap-3.5">
         <div className="flex min-w-0 items-center gap-3">
-          <ShopLogo
-            src={store?.logoUrl ?? null}
-            name={name}
-            className="h-12 w-12 flex-none rounded-shop-logo-md"
-            initialClassName="grid h-12 w-12 flex-none place-items-center rounded-shop-logo-md bg-shop-fill text-shop-lead font-shop-bold text-shop-ink"
-          />
+          <ShopLogo src={store?.logoUrl ?? null} name={name} className="h-12 w-12 flex-none rounded-shop-logo-md" placeholderSize={26} />
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="text-shop-lead font-shop-bold text-shop-ink">
@@ -443,8 +439,8 @@ function Gallery({
 }) {
   if (photos.length === 0) {
     return (
-      <div className="grid h-[280px] place-items-center overflow-hidden rounded-shop-media border border-shop-line bg-shop-fill lg:h-full">
-        <Icon name="construction" size={48} className="text-shop-ink-4" />
+      <div className="h-[280px] overflow-hidden rounded-shop-media border border-shop-line lg:h-full">
+        <PhotoPlaceholder size={72} />
       </div>
     );
   }
