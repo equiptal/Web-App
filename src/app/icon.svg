@@ -1,31 +1,44 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  The browser tab's icon: the logomark in gold on a navy ground (owner, 2026-09-02).
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="760" viewBox="80 40 760 760">
+  <!--
+    The browser tab's icon: the logomark in gold on a navy ground (owner, 2026-09-02).
+  
+    ~~icon.png, the mark dark on a transparent ground.~~ On a light tab strip it read as a grey smudge
+    and on a dark one it vanished into it: a transparent icon has no ground of its own, so it borrows
+    whatever the browser is painting and looks different in every window. A tab icon is 16px, the
+    smallest the brand ever appears at and the one place it cannot afford to be ambiguous.
+  
+    The two colours are the app's own navy-deep and brand-light tokens, hard-coded here because a
+    favicon is fetched as a standalone file and never sees the app's stylesheet. A CSS variable would
+    render as nothing at all.
+  
+    SVG rather than another PNG: one file covers 16px through 512px, and it carries the shape of the
+    mark rather than a rasterisation of it. src/app/icon.png is deleted with this, so Next emits
+    exactly one icon link and no browser has to choose between them. The same artwork stays at
+    public/moedatech-app-icon.png for the OG and Twitter cards, which need a raster.
+  
+    THE VIEWBOX. The mark's own box is 160 240 600 360, which is wide rather than square, so its
+    centre sits at (460, 420). A 760 square around that centre is 80 40 760 760, leaving 80 of padding
+    at the sides and 200 above and below. That is what keeps the mark off the rounded corners at tab
+    size.
+  
+    NOTE FOR THE NEXT EDITOR: this is XML, so a comment may not contain two hyphens in a row. Writing
+    the tokens as CSS variables here made the file malformed, and browsers forgave it while the build
+    did not.
+  
+  ⚠️ THE ROOT ELEMENT COMES FIRST, and the prose lives INSIDE it.
 
-  ~~icon.png, the mark dark on a transparent ground.~~ On a light tab strip it read as a grey smudge
-  and on a dark one it vanished into it: a transparent icon has no ground of its own, so it borrows
-  whatever the browser is painting and looks different in every window. A tab icon is 16px, the
-  smallest the brand ever appears at and the one place it cannot afford to be ambiguous.
+  This documentation used to sit above `<svg>`, and it broke every staging build from 2026-09-02
+  23:10 onward: `next build` failed with *Image import "…icon.svg" is not a valid image file*, and
+  the twelve deploys after it never shipped. Next's metadata image loader measures the file by
+  sniffing the FIRST bytes for a root element; behind 1.5 KB of comment there was nothing to find,
+  so a perfectly valid SVG was read as a corrupt one. Browsers never minded, which is why it looked
+  fine locally: `npm run typecheck`, `lint` and `test` do not compile the app, and only `npm run
+  build` sees this.
 
-  The two colours are the app's own navy-deep and brand-light tokens, hard-coded here because a
-  favicon is fetched as a standalone file and never sees the app's stylesheet. A CSS variable would
-  render as nothing at all.
-
-  SVG rather than another PNG: one file covers 16px through 512px, and it carries the shape of the
-  mark rather than a rasterisation of it. src/app/icon.png is deleted with this, so Next emits
-  exactly one icon link and no browser has to choose between them. The same artwork stays at
-  public/moedatech-app-icon.png for the OG and Twitter cards, which need a raster.
-
-  THE VIEWBOX. The mark's own box is 160 240 600 360, which is wide rather than square, so its
-  centre sits at (460, 420). A 760 square around that centre is 80 40 760 760, leaving 80 of padding
-  at the sides and 200 above and below. That is what keeps the mark off the rounded corners at tab
-  size.
-
-  NOTE FOR THE NEXT EDITOR: this is XML, so a comment may not contain two hyphens in a row. Writing
-  the tokens as CSS variables here made the file malformed, and browsers forgave it while the build
-  did not.
--->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="80 40 760 760">
+  `width` and `height` are stated as well as `viewBox`, so the measurement never depends on parsing
+  the box at all.
+  -->
   <rect x="80" y="40" width="760" height="760" rx="152" fill="#161c2c" />
   <g fill="#fbbf6b">
     <path d="M327.3,410s151.1-103.2,219-147.8l84.1,36.9v1.8s-12.8,22.4-12.8,22.4l-71-24.2,136.7,69.9,8.5,37.2-168.4-59.7-130.7,85.8-65.4-22.2Z"/>
