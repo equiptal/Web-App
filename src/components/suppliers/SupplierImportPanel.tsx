@@ -31,6 +31,24 @@ import {
  * it asked the renter to do something he does not think of doing: select rows in Excel and copy
  * them. Choosing a file is the thing he already knows how to do.
  *
+ * ── The rows come first, and they can be corrected in place (owner, 2026-09-02) ─────────────────
+ *
+ * The mapping led and the rows followed, which put the abstract half first: a renter opening this has
+ * a file in his head, not a set of column assignments, and the first thing he wants is to see his own
+ * data. So the preview leads and the mapping sits under it, as the thing you adjust when a column
+ * came out wrong.
+ *
+ * And every cell is editable. A sheet is somebody's working document — a phone typed as *call the
+ * office*, a name left blank on one line — and the alternative to fixing it here was to close the
+ * dialog, open Excel, fix it there, save, and start again. The edits apply to this import only; the
+ * file on disk is never touched.
+ *
+ * ── The rule is stated, not discovered ──────────────────────────────────────────────────────────
+ *
+ * **A supplier needs a company name, and an e-mail or a phone.** That is `importable`, and it used to
+ * be invisible until a row was refused for breaking it. It is said at the top now, and every skipped
+ * row says which half it is missing.
+ *
  * ── The mapping is shown, not assumed ───────────────────────────────────────────────────────────
  *
  * Headers are guessed, and every guess is a dropdown he can change before anything is written.
@@ -69,7 +87,20 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
   const [plan, setPlan] = useState<BulkResult | null>(null);
   const [planning, setPlanning] = useState(false);
 
-  const table: SheetTable | null = useMemo(() => parseSheet(text), [text]);
+  /** Cell corrections, keyed `row:column`. This import only — the file on disk is never touched. */
+  const [edits, setEdits] = useState<Record<string, string>>({});
+
+  const parsed: SheetTable | null = useMemo(() => parseSheet(text), [text]);
+
+  /** The sheet as the renter has corrected it. Everything below reads this, never the raw parse. */
+  const table: SheetTable | null = useMemo(() => {
+    if (!parsed) return null;
+    if (!Object.keys(edits).length) return parsed;
+    return {
+      ...parsed,
+      rows: parsed.rows.map((cells, r) => cells.map((v, i) => edits[`${r}:${i}`] ?? v)),
+    };
+  }, [parsed, edits]);
 
   const rows = table ? mapRows(table, mapping) : [];
   const ready = rows.filter(importable);
@@ -110,6 +141,7 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
 
   const reset = () => {
     setPlan(null);
+    setEdits({});
     setText("");
     setFileName(null);
     setMapping([]);
@@ -135,6 +167,7 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
     const raw = await file.text();
     const parsed = parseSheet(raw);
     setText(raw);
+    setEdits({});
     setFileName(file.name);
     setError(parsed ? null : c.importUnreadable);
     setMapping(parsed ? parsed.headers.map(guessField) : []);
@@ -162,6 +195,10 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
       setSaving(false);
     }
   };
+
+  /** Which half of the rule this row breaks — the renter's words, not the backend's code. */
+  const whySkipped = (r: (typeof rows)[number]): string =>
+    !r.name.trim() ? c.rMissingName : c.rMissingContact;
 
   const FIELDS: SheetField[] = ["name", "contactName", "email", "phone", "extra", "skip"];
   const fieldLabel: Record<SheetField, string> = {
@@ -216,10 +253,111 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
         </span>
       </div>
 
+      {/* ── The rows, first (owner, 2026-09-02) ──────────────────────────────────────────────────
+          The mapping used to lead, which put the abstract half first: a renter opening this has a
+          file in his head, not a set of column assignments. His own data leads now, and the mapping
+          under it is what he adjusts when a column came out wrong. */}
       <div className="grid gap-1.5">
-        <span className="text-label font-extrabold uppercase tracking-wide text-muted">{c.matchColumns}</span>
+        <span className="flex items-center gap-2 text-label font-extrabold uppercase tracking-wide text-muted">
+          {c.preview}
+          {/* The rule, said rather than discovered when a row is refused for breaking it. */}
+          <span className="font-semibold normal-case tracking-normal text-muted">{c.importRule}</span>
+        </span>
+        <div className="max-h-[260px] overflow-auto rounded-md border border-border">
+          <table className="w-full border-collapse text-meta">
+            <thead>
+              <tr>
+                <th className="border-b border-border bg-surface2 px-2.5 py-1.5 text-start text-label font-extrabold uppercase text-muted">
+                  {c.colVendor}
+                </th>
+                {table.headers.map((h, i) => (
+                  <th
+                    key={i}
+                    className="whitespace-nowrap border-b border-border bg-surface2 px-2.5 py-1.5 text-start text-label font-extrabold uppercase text-muted"
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {table.rows.map((cells, r) => {
+                const ok = importable(rows[r]);
+                return (
+                  <tr key={r} className={cx("border-b border-border last:border-b-0", !ok && "bg-danger-soft/40")}>
+                    <td className="px-2.5 py-1.5 align-top">
+                      {/* Per row, because a batch always has an exception. */}
+                      <input
+                        type="checkbox"
+                        disabled={!ok}
+                        checked={ok && vendor[r] !== false}
+                        onChange={(e) => setVendor((v) => v.map((x, n) => (n === r ? e.target.checked : x)))}
+                        className="mt-1 h-3.5 w-3.5 accent-ok"
+                      />
+                    </td>
+                    {cells.map((v, i) => (
+                      <td key={i} className="px-1 py-1 align-top">
+                        {/* ── Editable, in place ───────────────────────────────────────────────
+                            A sheet is somebody's working document: a phone typed as «call the
+                            office», a name left off one line. The alternative was to close this,
+                            open Excel, fix it, save, and start again. This import only — the file
+                            on disk is never touched. */}
+                        <input
+                          value={v}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            setEdits((m) => ({ ...m, [`${r}:${i}`]: next }));
+                            // The plan described the sheet before this edit.
+                            setPlan(null);
+                          }}
+                          className={cx(
+                            "w-full min-w-[110px] rounded-sm border border-transparent bg-transparent px-1.5 py-0.5 outline-none focus:border-brand focus:bg-surface",
+                            ok ? "text-navy" : "text-muted-dark",
+                          )}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Which rows, and which half of the rule each one breaks — not a count at the bottom. */}
+        {skipped > 0 && (
+          <div className="grid gap-1 rounded-md bg-danger-soft/50 px-3 py-2 text-meta text-danger-deep">
+            {rows.map((r, i) =>
+              importable(r) ? null : (
+                <span key={i} className="flex items-start gap-2">
+                  <Icon name="error_outline" size={14} className="mt-px flex-none" />
+                  {fmt(c.planRejected, { row: i + 1, reason: whySkipped(r) })}
+                </span>
+              ),
+            )}
+            <span className="text-muted-dark">{c.fixHere}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="grid gap-1.5">
+        <span className="flex items-center gap-2 text-label font-extrabold uppercase tracking-wide text-muted">
+          {c.matchColumns}
+          {/* ⚠️ The middle column shows the FIRST ROW's value, and said so nowhere — so a renter read
+              «Zahid Tractor» beside a dropdown and reasonably asked how to change the mapping for the
+              other rows. One dropdown maps a WHOLE column; the value is only an example of what is
+              in it (owner, 2026-09-02). */}
+          <span className="font-semibold normal-case tracking-normal text-muted">{c.mappingIsPerColumn}</span>
+        </span>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-meta">
+            <thead>
+              <tr className="text-label uppercase tracking-wide text-muted">
+                <th className="py-1 pe-3 text-start font-semibold">{c.yourColumn}</th>
+                <th className="py-1 pe-3 text-start font-semibold">{c.exampleFromRow1}</th>
+                <th className="py-1 text-start font-semibold">{c.mapsTo}</th>
+              </tr>
+            </thead>
             <tbody>
               {table.headers.map((h, i) => (
                 <tr key={i} className="border-b border-border last:border-b-0">
@@ -247,60 +385,6 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
             </tbody>
           </table>
         </div>
-      </div>
-
-      <div className="grid gap-1.5">
-        <span className="text-label font-extrabold uppercase tracking-wide text-muted">{c.preview}</span>
-        <div className="max-h-[220px] overflow-auto rounded-md border border-border">
-          <table className="w-full border-collapse text-meta">
-            <thead>
-              <tr>
-                <th className="border-b border-border bg-surface2 px-2.5 py-1.5 text-start text-label font-extrabold uppercase text-muted">
-                  {c.colVendor}
-                </th>
-                {table.headers.map((h, i) => (
-                  <th
-                    key={i}
-                    className="whitespace-nowrap border-b border-border bg-surface2 px-2.5 py-1.5 text-start text-label font-extrabold uppercase text-muted"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {table.rows.map((cells, r) => {
-                const ok = importable(rows[r]);
-                return (
-                  <tr key={r} className={cx("border-b border-border last:border-b-0", !ok && "bg-surface2")}>
-                    <td className="px-2.5 py-1.5">
-                      {/* Per row, because a batch always has an exception. */}
-                      <input
-                        type="checkbox"
-                        disabled={!ok}
-                        checked={ok && vendor[r] !== false}
-                        onChange={(e) => setVendor((v) => v.map((x, n) => (n === r ? e.target.checked : x)))}
-                        className="h-3.5 w-3.5 accent-ok"
-                      />
-                    </td>
-                    {cells.map((v, i) => (
-                      <td key={i} className={cx("whitespace-nowrap px-2.5 py-1.5", ok ? "text-navy" : "text-muted-light")}>
-                        {v || "—"}
-                      </td>
-                    ))}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        {skipped > 0 && (
-          <span className="flex items-start gap-2 rounded-md bg-surface2 px-3 py-2 text-meta text-muted-dark">
-            <Icon name="info" size={15} className="flex-none" />
-            {/* Named, never dropped in silence. */}
-            {fmt(c.skippedRows, { n: skipped })}
-          </span>
-        )}
       </div>
 
       <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-ok/40 bg-ok-soft px-3 py-2.5 text-meta text-ok-deep">

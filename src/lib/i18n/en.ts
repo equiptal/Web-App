@@ -2244,7 +2244,7 @@ export const en = {
    * it could be mistaken for something the supplier earned.
    */
   suppliers: {
-    title: "My Suppliers",
+    title: "My suppliers list",
     summaryOne: "{n} supplier",
     summaryMany: "{n} suppliers",
     vendors: "{n} registered vendors",
@@ -2469,6 +2469,12 @@ export const en = {
     pastedRows: "Pasted rows",
     rowsColumns: "{rows} rows · {cols} columns",
     cappedAt: "first 500 only",
+    importRule: "A supplier needs a company name, and an e-mail or a phone.",
+    mappingIsPerColumn: "One choice per column, applied to every row.",
+    yourColumn: "Your column",
+    exampleFromRow1: "Example from row 1",
+    mapsTo: "Becomes",
+    fixHere: "Correct them in the table above, or import without them.",
     matchColumns: "Match your columns to ours",
     keepAsExtra: "Keep as extra field",
     ignoreColumn: "Ignore this column",
