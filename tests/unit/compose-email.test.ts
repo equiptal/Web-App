@@ -45,6 +45,29 @@ describe("composeEmailUrl", () => {
     expect(url).toBeNull();
   });
 
+
+  it("Given Gmail, Then it takes Gmail's own spelling — commas and `su`", () => {
+    /**
+     * Gmail separates addresses with COMMAS and calls the subject `su`; Outlook uses semicolons and
+     * `subject`. Handing either the other's spelling is not an error anybody sees: the compose window
+     * opens with the recipients silently dropped, and the renter sends it.
+     */
+    const url = composeEmailUrl({ bcc: ["a@x.sa", "b@y.sa"], subject: "Request", body: "Hi", provider: "gmail" })!;
+
+    expect(url.startsWith("https://mail.google.com/mail/?view=cm&fs=1&")).toBe(true);
+    const q = new URL(url).searchParams;
+    expect(q.get("bcc")).toBe("a@x.sa,b@y.sa");
+    expect(q.get("su")).toBe("Request");
+    expect(q.get("subject")).toBeNull();
+    // Gmail's own two parameters survive the join rather than being overwritten by ours.
+    expect(q.get("view")).toBe("cm");
+    expect(q.get("fs")).toBe("1");
+  });
+
+  it("Given no provider, Then it is Outlook — the default nobody has to choose", () => {
+    expect(composeEmailUrl({ bcc: ["a@x.sa"] })).toContain("outlook.office.com");
+  });
+
   it("Given nothing at all, Then it is still a valid compose window", () => {
     expect(composeEmailUrl({})).toContain("outlook.office.com");
   });

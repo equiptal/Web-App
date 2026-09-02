@@ -14,7 +14,7 @@ import { SupplierBidsDialog } from "./SupplierBidsDialog";
 import { EditSupplierDialog } from "./EditSupplierDialog";
 import { InviteSupplierDialog } from "./InviteSupplierDialog";
 import { SuggestedBand } from "./SuggestedBand";
-import { ShareRequestDialog } from "./ShareRequestDialog";
+import { ShareRequestModal } from "@/components/share/ShareRequestModal";
 import {
   activeFilterCount,
   NO_FILTERS,
@@ -269,24 +269,29 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
           <Pill on={pill === "all"} onClick={() => setPill("all")} label={c.all} n={rows?.length ?? 0} />
           <Pill on={pill === "vendor"} onClick={() => setPill("vendor")} label={c.registeredVendors} n={vendors} icon="verified" />
 
-          {/* ── Share a request, from HERE as well as from the request ────────────────────────────
-              Both doors exist in the prototype on purpose, and its own note says why: *"pick the
-              suppliers first, or pick the request first. Both write the same record, so either way
-              it lands under «What you sent them» and on the request itself."*
-
-              A renter on this screen is thinking about people; a renter on a request is thinking
-              about a job. Making him navigate to the other one first is making him translate. */}
-          <button
-            type="button"
-            onClick={() => setSharingWith([])}
-            disabled={!rows?.length}
-            className={cx(btn("secondary", "sm"), "flex-none")}
-          >
-            <Icon name="share" size={14} />
-            {c.shareARequest}
-          </button>
-
           <span className="ms-auto flex items-center gap-2">
+            {/* ── Share a request, from HERE as well as from the request ──────────────────────────
+                Both doors exist in the prototype on purpose, and its own note says why: *"pick the
+                suppliers first, or pick the request first. Both write the same record, so either way
+                it lands under «What you sent them» and on the request itself."*
+
+                A renter on this screen is thinking about people; a renter on a request is thinking
+                about a job. Making him navigate to the other one first is making him translate.
+
+                It sits WITH the groups menu and the filters (owner, 2026-09-02). Everything on the
+                trailing side acts on the list in front of him: narrow it, group it, send it a
+                request. The search box and the two count pills on the leading side describe what he
+                is looking at. Alone in the middle, this was the one control belonging to neither. */}
+            <button
+              type="button"
+              onClick={() => setSharingWith([])}
+              disabled={!rows?.length}
+              className={cx(btn("secondary", "sm"), "flex-none")}
+            >
+              <Icon name="share" size={14} />
+              {c.shareARequest}
+            </button>
+
             <GroupsMenu
               groups={groups}
               active={groupFilter}
@@ -421,6 +426,7 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
                   seenAt={seen[s.id]}
                   onEdit={() => setEditing(s)}
                   onInvite={() => setInviting(s)}
+                  onShare={() => setSharingWith([s])}
                 />
               ))}
             </tbody>
@@ -460,14 +466,15 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
         onClose={() => setFiltersOpen(false)}
       />
 
-      <ShareRequestDialog
+      {/* The same panel the review screen carries, in the shell this screen needs (owner,
+          2026-09-02: *"on any share option for a request it will open for them modal in the same
+          style"*). Nothing about the share lives here, so this door cannot drift from that one. */}
+      <ShareRequestModal
         open={sharingWith !== null}
-        suppliers={rows ?? []}
-        preselect={sharingWith ?? []}
+        preselect={(sharingWith ?? []).map((s) => s.id)}
         onClose={() => setSharingWith(null)}
-        onShared={(msg) => {
-          setSharingWith(null);
-          setToast(msg);
+        onShared={(n) => {
+          setToast(n === 1 ? c.sharedOne : fmt(c.sharedMany, { n }));
           load();
         }}
       />
@@ -565,6 +572,7 @@ function Row({
   onOpenBids,
   onEdit,
   onInvite,
+  onShare,
   seenAt,
 }: {
   s: RenterSupplier;
@@ -576,6 +584,8 @@ function Row({
   onOpen: () => void;
   onOpenBids: () => void;
   onEdit: () => void;
+  /** Share a request with THIS supplier alone — the prototype's per-row action. */
+  onShare: () => void;
   onInvite: () => void;
   /** ISO of this reader's last look at the row, or undefined if he never has. */
   seenAt?: string;
@@ -677,25 +687,7 @@ function Row({
             {c.noPhone} <span className="font-extrabold text-info-deep">{c.add}</span>
           </span>
         )}
-        {/* ── What the sheet said, when it was not a phone or an address ───────────────────────
-            The backend keeps the raw text under `unparsed` and leaves the real column null, so no
-            lookup is poisoned by it — a supplier whose phone reads «call the office» must not match
-            another firm.
-
-            ⚠️ It used to say only "we could not read that", which tells a renter nothing he can act
-            on: not which field, and not what the offending value was (owner asked what it meant,
-            2026-09-02). It names both now, so the fix is obvious from the row. */}
-        {hasUnparsed(s) &&
-          Object.entries(s.unparsed ?? {}).map(([field, raw]) => (
-            <span
-              key={field}
-              title={c.couldNotReadBody}
-              className="mt-0.5 flex items-start gap-1 text-label font-semibold text-danger-deep"
-            >
-              <Icon name="error" size={12} className="mt-px flex-none" />
-              <span>{fmt(c.couldNotReadField, { field: fieldWord(field, c), value: raw })}</span>
-            </span>
-          ))}
+        <Unusable s={s} kind="phone" c={c} />
       </td>
 
       <td className="px-3 py-2.5 text-meta">
@@ -710,6 +702,7 @@ function Row({
             {c.noEmailCol} <span className="font-extrabold text-info-deep">{c.add}</span>
           </span>
         )}
+        <Unusable s={s} kind="email" c={c} />
       </td>
 
       <td className="px-3 py-2.5">
@@ -766,6 +759,22 @@ function Row({
 
       <td className="px-3 py-2.5">
         <span className="flex items-center justify-end">
+          {/* ── Share with this one (owner's prototype, `shareOne`) ─────────────────────────────
+              The toolbar shares with whoever is ticked; this shares with the row under the cursor.
+              A renter reading a supplier's row and deciding to send him something should not have
+              to go up to the toolbar and find him again in a list he is already looking at.
+
+              It opens the SAME modal, with him already ticked — so the two doors cannot end up
+              sending two different messages. */}
+          <button
+            type="button"
+            onClick={onShare}
+            title={c.shareARequest}
+            className="grid h-[30px] w-[30px] place-items-center rounded-sm text-muted transition hover:bg-surface3 hover:text-navy"
+          >
+            <Icon name="ios_share" size={15} />
+          </button>
+
           {/* SUP-T42 — off-platform rows only. A supplier who already has an account has nothing to
               be invited to, and offering it would be us not knowing our own users. */}
           {!onApp && (
@@ -803,6 +812,62 @@ function Row({
 function fieldWord(field: string, c: ReturnType<typeof useT>["suppliers"]): string {
   const f = field.toLowerCase();
   return f.includes("phone") || f.includes("mobile") ? c.colPhone : f.includes("mail") ? c.colEmail : field;
+}
+
+/** Which column an unreadable value belongs under. `null` for a key that is neither. */
+function unusableKind(field: string): "phone" | "email" | null {
+  const f = field.toLowerCase();
+  if (f.includes("phone") || f.includes("mobile")) return "phone";
+  if (f.includes("mail")) return "email";
+  return null;
+}
+
+/**
+ * **What the sheet said, when it was not a phone or an address** — under the column it is about.
+ *
+ * The backend keeps the raw text under `unparsed` and leaves the real column null, so no lookup is
+ * poisoned by it: a supplier whose phone reads «call the office» must not match another firm.
+ *
+ * ⚠️ It used to say only "we could not read that", which tells a renter nothing he can act on:
+ * not which field, and not what the offending value was (owner asked what it meant, 2026-09-02). It
+ * names both now, so the fix is obvious from the row.
+ *
+ * ── Why this is a component and not a loop in one cell (owner, 2026-09-02) ──────────────────────
+ * *"Why is the e-mail note shown on the phone field?"* Because the loop over `unparsed` sat in the
+ * phone cell and printed EVERY key it found — which was right while the two shared one cell, and
+ * wrong the moment they became a column each. A row with a good phone and a bad e-mail read as
+ * «+966551110005 / E-mail was not usable», with the actual e-mail column saying only «No e-mail».
+ *
+ * Each cell now asks for its own kind. A key that is neither a phone nor an address is dropped
+ * rather than shown in an arbitrary column: it is a backend field this table has no place for, and
+ * guessing a home for it is how this bug happened in the first place.
+ */
+function Unusable({
+  s,
+  kind,
+  c,
+}: {
+  s: RenterSupplier;
+  kind: "phone" | "email";
+  c: ReturnType<typeof useT>["suppliers"];
+}) {
+  if (!hasUnparsed(s)) return null;
+  const mine = Object.entries(s.unparsed ?? {}).filter(([field]) => unusableKind(field) === kind);
+  if (!mine.length) return null;
+  return (
+    <>
+      {mine.map(([field, raw]) => (
+        <span
+          key={field}
+          title={c.couldNotReadBody}
+          className="mt-0.5 flex items-start gap-1 text-label font-semibold text-danger-deep"
+        >
+          <Icon name="error" size={12} className="mt-px flex-none" />
+          <span>{fmt(c.couldNotReadField, { field: fieldWord(field, c), value: raw })}</span>
+        </span>
+      ))}
+    </>
+  );
 }
 
 function Empty({ filtered, c }: { filtered: boolean; c: ReturnType<typeof useT>["suppliers"] }) {

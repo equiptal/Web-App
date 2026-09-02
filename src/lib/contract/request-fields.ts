@@ -57,9 +57,9 @@ export function requestFieldFormatters(ar: boolean, L: Pick) {
 /**
  * Every REQUEST-level parameter that has a value.
  *
- * Duration and the certificate list are deliberately absent: both have a home of their own in the
- * modal — duration beside the dates it is derived from, the certificates as chips — and a field
- * printed twice makes a reader wonder which one is authoritative.
+ * Duration, EXTENDABLE and the certificate list are deliberately absent: each has a home of its own
+ * in the modal — duration and extendable beside the dates they describe, the certificates as chips —
+ * and a field printed twice makes a reader wonder which one is authoritative.
  */
 export function requestDetailRows(r: RequestRecord, ar: boolean, L: Pick): Row[] {
   const { yn, enumL, n, qty } = requestFieldFormatters(ar, L);
@@ -91,7 +91,24 @@ export function requestDetailRows(r: RequestRecord, ar: boolean, L: Pick): Row[]
         build or an older web form could fill, so a request that HAS one is not lying; it is simply
         not part of the conversation this page is having.
 
-     They are still on the record and still reach the edit form. This is what the DETAIL states. */
+     They are still on the record and still reach the edit form. This is what the DETAIL states.
+
+     ── Trimmed again (owner, 2026-09-02) ─────────────────────────────────────────────────────────
+     *"These must be removed from the request details, and extendable shown after the start and end
+     date. Also all the terms and fields look so overwhelming, show the ones in the request in a
+     clear way."*
+
+     Dropped here for a third reason, which is neither «computed» nor «never asked»:
+      · **Verified suppliers only** and **Subletting allowed** — these are not terms a supplier
+        prices against, they are rules about WHO may see the request, and the modal already answers
+        that in its own words: the *Request* block states the reach, and a verified-only request
+        reaches nobody else by construction. Printed as two more yes/no rows they read as conditions
+        of the rental, which they are not.
+
+     Moved rather than dropped:
+      · **Extendable** — it qualifies the PERIOD, so it now sits with the start and end dates it
+        extends, the same rule that already keeps duration up there. Buried among twenty terms it
+        was the one answer about the dates that a reader had to go hunting for. */
   return kept([
     [L("Rental basis", "أساس الإيجار"), enumL(r.rentalType, rentalMap)],
     [L("Working hours", "ساعات العمل"), qty(r.workingHoursPerDay, ["hrs/day", "ساعة/يوم"])],
@@ -103,10 +120,7 @@ export function requestDetailRows(r: RequestRecord, ar: boolean, L: Pick): Row[]
     [L("Maintenance", "الصيانة"), enumL(r.maintenanceResponsibility, maintMap)],
     [L("Budget", "الميزانية"), r.budgetCeiling ? `${n(r.budgetCeiling)} ${L("SAR", "ر.س")}` : null],
     [L("Offer duration", "مدة العرض"), enumL(r.offerDuration, offerMap)],
-    [L("Verified suppliers only", "مؤجّرون موثّقون فقط"), yn(r.verifiedSuppliersOnly)],
-    [L("Subletting allowed", "التأجير من الباطن"), yn(r.subletting)],
     [L("Local content", "المحتوى المحلي"), yn(r.localContent)],
-    [L("Extendable", "قابل للتمديد"), yn(r.extendable)],
   ]);
 }
 

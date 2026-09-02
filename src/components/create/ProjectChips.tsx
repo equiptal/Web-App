@@ -218,17 +218,11 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
     /* INSIDE the box now, on the floor row (owner, 2026-09-01) — the site is what fills half the
        request, so it belongs in the thing the request is written in rather than under it. */
     <div className="flex min-w-0 flex-wrap items-center gap-2">
-      {/* ── A reason to press it ─────────────────────────────────────────────────────────────────
-          The row was a bare `PROJECT` label and some grey chips, which said what they were and never
-          why anyone would touch them. One quiet line instead (owner, 2026-09-01), and only while
-          nothing is chosen: once a site is picked the row is showing an answer, and an invitation
-          beside an answer is noise. */}
-      {!chosen && (
-        <span className="flex items-center gap-1.5 rounded-full border border-brand/45 bg-brand-soft px-2.5 py-1 text-label font-semibold text-brand-deep">
-          <Icon name="bolt" size={13} className="flex-none" />
-          {t.projects.chips.hint}
-        </span>
-      )}
+      {/* ~~«Pick a site, and half of this fills itself in», in an amber chip at the head of the
+          row.~~ Removed (owner, 2026-09-02). It was written to give the row a reason to be pressed,
+          and it sat in the row it was advertising: an amber pill among the site pills, the same size
+          and shape as the things it was pointing at. What a site does is obvious the first time one
+          is picked, and after that the sentence is furniture. */}
 
       {/* ── The chosen site, and the dropdown of what is filed under it ──────────────────────────
           Marked with the brand, so the row says which of these is answering the request. The native

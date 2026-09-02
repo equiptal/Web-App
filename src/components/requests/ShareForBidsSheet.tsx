@@ -3,10 +3,8 @@
 import { useEffect, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
-import { copyBidLink } from "@/lib/bidCardHtml";
-import { bidCardText } from "@/lib/bidCardText";
-import { useBidCard } from "@/lib/useBidCard";
-import { ShareToSuppliers } from "./ShareToSuppliers";
+import { bidTokenFromUrl, copyBidLink } from "@/lib/bidCardHtml";
+import { ShareRequestPanel } from "@/components/share/ShareRequestPanel";
 import { ACTIONS, btn, cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 
@@ -53,9 +51,6 @@ export function ShareForBidsSheet({
   L: (en: string, arr: string) => string;
 }) {
   const [copied, setCopied] = useState(false);
-  /* Above the `if (!open) return null` below, with the other hooks: the card is fetched, and a hook
-     after an early return runs in a different order on the render that closes the sheet. */
-  const card = useBidCard(shareUrl, ar ? "ar" : "en");
   const [dlInput, setDlInput] = useState("");
   const [dlEdit, setDlEdit] = useState(false);
   const [logo, setLogo] = useState<string | null>(logoUrl ?? null);
@@ -101,24 +96,6 @@ export function ShareForBidsSheet({
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
-  const renter = renterName?.trim();
-
-  /**
-   * **One template, wherever the link goes** (owner, 2026-09-01).
-   *
-   * WhatsApp, SMS and the share sheet used to send a one-liner that named nobody's machine, no site
-   * and no deadline — while *Send to my suppliers* sent a laid-out note and *Copy* sent a bare URL.
-   * Three messages for one request, and which one a supplier got depended on which button was
-   * pressed. They all render the same model now.
-   *
-   * The fallback is the old one-liner, and it stays: the card is fetched, so a slow or unreachable
-   * preview must cost the detail and never the share.
-   */
-  const message = card
-    ? bidCardText(card.model, shareUrl, { renterName: renter, lang: ar ? "ar" : "en" })
-    : renter
-      ? L(`${renter} invites you to submit a bid (RFQ) for their equipment request: ${shareUrl}`, `يدعوك ${renter} لتقديم عرض سعر (طلب عروض أسعار) على طلب معداته: ${shareUrl}`)
-      : L(`You're invited to submit a bid (RFQ) for an equipment request: ${shareUrl}`, `أنت مدعوٌّ لتقديم عرض سعر (طلب عروض أسعار) على طلب معدات: ${shareUrl}`);
 
   /**
    * Copies the link as BOTH the rich card and the plain URL — one clipboard write, two flavours.
@@ -136,27 +113,12 @@ export function ShareForBidsSheet({
       .catch(() => false)
       .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); });
   };
-  const shareVia = (kind: "WhatsApp" | "Email" | "SMS" | "More") => {
-    const enc = encodeURIComponent(message);
-    if (kind === "WhatsApp") window.open(`https://wa.me/?text=${enc}`, "_blank", "noopener");
-    else if (kind === "Email") window.location.href = `mailto:?subject=${encodeURIComponent(renter ? L(`${renter} — invitation to bid (RFQ)`, `${renter} — دعوة لتقديم عرض سعر`) : L("Invitation to bid (RFQ)", "دعوة لتقديم عرض سعر"))}&body=${enc}`;
-    else if (kind === "SMS") window.location.href = `sms:?&body=${enc}`;
-    else if (typeof navigator !== "undefined" && navigator.share) navigator.share({ url: shareUrl, text: message }).catch(() => {});
-    else copyLink();
-  };
-
   const openDl = () => { setDlInput(toLocalInput(deadline)); setDlEdit(true); };
   const saveDl = (clear?: boolean) => {
     onSaveDeadline(clear || !dlInput ? null : new Date(dlInput).toISOString());
     setDlEdit(false);
   };
 
-  const channels = [
-    ["WhatsApp", "chat", L("WhatsApp", "واتساب")],
-    ["Email", "mail", L("Email", "إيميل")],
-    ["SMS", "sms", L("SMS", "رسالة")],
-    ["More", "ios_share", L("More", "المزيد")],
-  ] as const;
 
   const lbl = "mb-2 text-label font-semibold uppercase tracking-wide text-muted";
 
@@ -196,24 +158,29 @@ export function ShareForBidsSheet({
             </div>
           </div>
 
-          {/* SUP-T41 — the recipients he already keeps. Above the raw channels because it is the
-              answer to "who do I send this to", and the channel row is the answer to "how", which is
-              only worth asking once he knows. */}
+          {/* ── ONE share panel, the same one the review carries (owner, 2026-09-02) ───────────
+              This used to be two blocks: a supplier picker of its own, and a four-icon channel row
+              (WhatsApp / Email / SMS / More). Between them and the review screen there were three
+              pickers and three ways of writing the same message, and which one a supplier received
+              depended on which button was pressed.
+
+              `showLink={false}` because this sheet already draws the link above and a deadline
+              editor below — two link rows a few pixels apart, and two controls writing the same
+              deadline, is worse than either.
+
+              What is gone with the icon row: **SMS** and the OS share sheet. Neither is in the
+              owner's prototype and neither could name who it went to — `sms:` and `navigator.share`
+              open with no recipient, so nothing was recorded and the renter had no list of who he
+              had told. */}
           <div>
             <div className={lbl}>{L("Send it to suppliers you keep", "أرسِله إلى مورّديك")}</div>
-            <ShareToSuppliers shareUrl={shareUrl} renterName={renterName} requestCode={requestCode} L={L} />
-          </div>
-
-          {/* channels */}
-          <div>
-            <div className={lbl}>{L("Or share directly", "أو شارك مباشرة")}</div>
-            <div className="grid grid-cols-4 gap-2">
-              {channels.map(([kind, icon, label]) => (
-                <button key={kind} onClick={() => shareVia(kind)} className="flex flex-col items-center gap-1.5 rounded-sm border border-border bg-surface px-2 py-3 text-label font-semibold text-navy hover:bg-surface2">
-                  <span className="grid h-9 w-9 place-items-center rounded-full bg-surface2 text-navy-mid"><Icon name={icon} size={18} /></span>{label}
-                </button>
-              ))}
-            </div>
+            <ShareRequestPanel
+              mode="share"
+              requestUuid={bidTokenFromUrl(shareUrl)}
+              requestCode={requestCode ?? null}
+              renterName={renterName}
+              showLink={false}
+            />
           </div>
 
           {/* deadline */}

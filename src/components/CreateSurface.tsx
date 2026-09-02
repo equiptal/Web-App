@@ -105,8 +105,14 @@ export function CreateSurface() {
           `phase` to `confirmation`, which would unmount the card and its state mid-press, between
           the post and the share. Outside the switch it survives, so the flip happens behind it and
           it stays on screen to report what it shared. `shareOnPost` is what keeps it there
-          afterwards; before the post it follows the review it belongs to. */}
-      {(state.readyToSend || state.shareOnPost) && <ShareOnPost />}
+          afterwards; before the post it follows the review it belongs to.
+
+          ⚠️ `shareOnPost` alone is NOT enough (owner, 2026-09-02: *"suddenly this is shown in some
+          pages"*). It is set on a post and nothing clears it, so a renter who posted and then went
+          back to the canvas carried a card advertising the PREVIOUS request's link into the request
+          he was writing next. Pinning it to `confirmation` says what it always meant: this card
+          belongs to the review it is posting, and to the moment just after. */}
+      {(state.readyToSend || (state.phase === "confirmation" && state.shareOnPost)) && <ShareOnPost />}
       {/* The shared dialog, not a scrim of its own (owner, 2026-08-28: one design for every modal).
           This drew `bg-black/50` where the system's scrim is navy at 45%, and its own panel and
           heading with no way out but the two buttons — a prompt with no close is the one thing a

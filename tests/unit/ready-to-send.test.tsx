@@ -72,7 +72,7 @@ describe("Preferences are the only editable region (MREQ-AC-43)", () => {
   it("offers payment terms, maintenance, budget, bid window, filters and notes", async () => {
     const handle = await review();
     await openDetails(handle);
-    expect(screen.getByText(/PAYMENT TERMS/)).toBeTruthy();
+    expect(screen.getByText(/PAYMENT DETAILS/)).toBeTruthy();
     expect(screen.getByText("MAINTENANCE")).toBeTruthy();
     expect(screen.getByText(/BUDGET CEILING/)).toBeTruthy();
     expect(screen.getByText(/OFFER \/ BID WINDOW/)).toBeTruthy();
@@ -83,7 +83,7 @@ describe("Preferences are the only editable region (MREQ-AC-43)", () => {
   it("offers exactly the platform's payment terms — none of the prototype's", async () => {
     const handle = await review();
     await openDetails(handle);
-    const field = screen.getByText(/PAYMENT TERMS/).closest("div")!.parentElement!;
+    const field = screen.getByText(/PAYMENT DETAILS/).closest("div")!.parentElement!;
     const labels = within(field)
       .getAllByRole("button")
       .map((b) => b.textContent!.trim());
@@ -95,7 +95,7 @@ describe("Preferences are the only editable region (MREQ-AC-43)", () => {
   it("writes a chosen term to the draft, and clears it on a second press", async () => {
     const handle = await review();
     await openDetails(handle);
-    const field = screen.getByText(/PAYMENT TERMS/).closest("div")!.parentElement!;
+    const field = screen.getByText(/PAYMENT DETAILS/).closest("div")!.parentElement!;
     await handle.run(() => within(field).getByRole("button", { name: "Net 30" }).click());
     expect(handle.store().state.draft!.preferences.payment.terms).toBe("net-30");
     await handle.run(() => within(field).getByRole("button", { name: "Net 30" }).click());

@@ -61,10 +61,7 @@ const SHOWN: Record<string, string> = {
   maintenanceResponsibility: "Maintenance",
   budgetCeiling: "Budget",
   offerDuration: "Offer duration",
-  verifiedSuppliersOnly: "Verified suppliers only",
-  subletting: "Subletting allowed",
   localContent: "Local content",
-  extendable: "Extendable",
 };
 
 /**
@@ -77,6 +74,13 @@ const SHOWN: Record<string, string> = {
  */
 const HIDDEN: Record<string, string> = {
   urgency: "Urgency",
+  /* Not «never asked» but «answered elsewhere in the modal» (owner, 2026-09-02):
+     `verifiedSuppliersOnly` and `subletting` are rules about WHO may see the request, and the
+     modal's own *Request* block states its reach; `extendable` qualifies the period, so it is
+     printed beside the start and end dates, like duration. */
+  verifiedSuppliersOnly: "Verified suppliers only",
+  subletting: "Subletting allowed",
+  extendable: "Extendable",
   jobEstimatedHours: "Estimated job hours",
   terrainType: "Terrain",
   fulfillmentType: "Fulfillment",
@@ -104,6 +108,7 @@ describe("every field the RENTER set reaches a row", () => {
     // authoritative.
     expect(labels.sort()).toEqual(Object.values(SHOWN).sort());
     expect(labels).not.toContain("Duration");
+    expect(labels).not.toContain("Extendable");
     expect(labels).not.toContain("Required certificates");
   });
 });
@@ -123,8 +128,8 @@ describe("a value that is not there", () => {
   });
 
   it("keeps a FALSE boolean, which is an answer", () => {
-    const rows = requestDetailRows({ ...FULL, subletting: false }, false, L);
-    expect(rows).toContainEqual(["Subletting allowed", "No"]);
+    const rows = requestDetailRows({ ...FULL, localContent: false }, false, L);
+    expect(rows).toContainEqual(["Local content", "No"]);
   });
 });
 

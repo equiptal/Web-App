@@ -13,7 +13,7 @@ import {
 } from "@/lib/api/client";
 import { CERT_LABEL } from "@/lib/contract/bids";
 import { publicTaxonomyUrl, statusMeta, type RequestGroup, type RequestListItem, type RequestRecord } from "@/lib/contract/requests";
-import { itemDetailRows, requestDetailRows } from "@/lib/contract/request-fields";
+import { itemDetailRows, requestDetailRows, requestFieldFormatters, type Row } from "@/lib/contract/request-fields";
 import { requestActions, type WorkspaceBid } from "@/lib/contract/workspace";
 import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
 import { ConfirmCancelModal, EditRequestModal } from "@/components/requests/RequestEditModals";
@@ -152,6 +152,15 @@ export function RequestDetailsModal({
   /** The request-level parameters. Read off the subject: the group copies them to every item. */
   const subjectRecord = subject ? records[subject.id] ?? null : null;
   const paramRows = subjectRecord ? requestDetailRows(subjectRecord, ar, L) : [];
+  /**
+   * Extendable, said with the dates and not with the terms (owner, 2026-09-02).
+   *
+   * It is the one stored flag that qualifies the PERIOD — «these dates, and they can move» — so it
+   * belongs under the end date rather than twenty rows below it. `requestDetailRows` no longer
+   * returns it, which is why it is read off the record here; `yn` is the same formatter that list
+   * uses, so «No» reads the same wherever it appears.
+   */
+  const extendable = subjectRecord ? requestFieldFormatters(ar, L).yn(subjectRecord.extendable) : null;
   const notes = typeof subjectRecord?.additionalNotes === "string" ? subjectRecord.additionalNotes.trim() : "";
   const shareUrl = typeof window !== "undefined" ? bidShareUrl(window.location.origin, group.id, link?.renterName) : "";
 
@@ -350,13 +359,13 @@ export function RequestDetailsModal({
                       </div>
                     </div>
                     {rows.length > 0 && (
-                      /* Inside the machine's own box, on a rule — these are ITS terms, and a list
-                         floating below the row would read as the request's. */
-                      <dl className="divide-y divide-border border-t border-border px-3">
-                        {rows.map(([label, value]) => (
-                          <Fact key={label} label={label} value={value} />
-                        ))}
-                      </dl>
+                      /* Inside the machine's own box, under a rule — these are ITS terms, and a
+                         list floating below the row would read as the request's. Same grid as the
+                         request-level terms below: one shape for «a set of answers», so a reader
+                         does not learn two layouts inside one modal. */
+                      <div className="border-t border-border px-3 py-2.5">
+                        <FactGrid rows={rows} cell="bg-surface" />
+                      </div>
                     )}
                   </div>
                 );
@@ -371,6 +380,7 @@ export function RequestDetailsModal({
             <dl className="divide-y divide-border">
               <Fact label={t.workspace.factStarts} value={fmt(subject?.startDate ?? null)} />
               {subject?.endDate && <Fact label={L("Ends", "ينتهي")} value={fmt(subject.endDate)} />}
+              {extendable && <Fact label={L("Extendable", "قابل للتمديد")} value={extendable} />}
               <Fact
                 label={t.workspace.factDuration}
                 value={subject?.durationDays ? t.workspace.daysValue.replace("{n}", String(subject.durationDays)) : "—"}
@@ -419,16 +429,20 @@ export function RequestDetailsModal({
           </Section>
 
           {/* ── Everything else the request stores ──────────────────────────────────────────────
-              Roughly twenty parameters, and only the ones with a value are drawn — a list padded
-              with dashes reads as a broken fetch rather than as a request that simply left them
-              unset. The section itself disappears when the request set none of them. */}
+              Only the ones with a VALUE are drawn — a list padded with dashes reads as a broken
+              fetch rather than as a request that simply left them unset, and the section itself
+              disappears when the request set none of them.
+
+              As a GRID of boxes, not a divided column (owner, 2026-09-02: *"all the terms and
+              fields look so overwhelming, show the ones in the request in a clear way"*). A dozen
+              full-width rows of label-left / value-right is a page of scrolling in which every row
+              looks like every other, and the eye has to cross the whole panel to join a label to
+              its answer. Three to a line, label directly over value, the whole set is one block a
+              reader takes in at a glance, and what the request actually states is a third of the
+              height it was. */}
           {paramRows.length > 0 && (
             <Section title={L("Terms and preferences", "الشروط والتفضيلات")}>
-              <dl className="divide-y divide-border">
-                {paramRows.map(([label, value]) => (
-                  <Fact key={label} label={label} value={value} />
-                ))}
-              </dl>
+              <FactGrid rows={paramRows} />
             </Section>
           )}
 
@@ -543,6 +557,33 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       <h3 className="text-label font-extrabold uppercase tracking-wide text-muted">{title}</h3>
       <div className="mt-2">{children}</div>
     </section>
+  );
+}
+
+/**
+ * A set of answers as boxes, three to a line, label over value.
+ *
+ * `Fact` is right for the handful of facts a reader came for — status, the dates, the site — where
+ * label-left / value-right down a rule reads as a summary. It is wrong for a dozen enum answers:
+ * that is a wall (owner, 2026-09-02), and a wall is skipped rather than read.
+ *
+ * Two to a line on a narrow panel, three from `sm` up. The value is `title`d because a long one
+ * («Bank Transfer», an address of a payment term) truncates rather than reflowing the grid.
+ */
+function FactGrid({ rows, cell = "bg-surface2" }: { rows: Row[]; cell?: string }) {
+  return (
+    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+      {rows.map(([label, value]) => (
+        <div key={label} className={`min-w-0 rounded-sm border border-border px-2.5 py-1.5 ${cell}`}>
+          <div className="truncate text-label font-extrabold uppercase tracking-wide text-muted" title={label}>
+            {label}
+          </div>
+          <div className="mt-0.5 truncate text-body font-semibold text-navy" title={value}>
+            {value}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 

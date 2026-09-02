@@ -44,11 +44,40 @@ describe("bidCardText", () => {
     expect(out).toContain("No account is needed");
   });
 
-  it("Given the renter's own line, Then it goes first — above anything we wrote", () => {
-    // It is the part a person actually reads; under the request details it would be read after the
-    // decision was made.
+  it("Given the renter's own line, Then it is above the card, under the line that says who is asking", () => {
+    /**
+     * It is the part a person actually reads; under the request details it would be read after the
+     * decision was made. It sits below the standing intro rather than above the greeting, because
+     * the intro says WHO is asking and this says what is special about today — in that order.
+     */
     const out = bidCardText(model(), URL_, { renterName: "Shibh Al Jazira", note: "Need these on site Monday." });
-    expect(out.startsWith("Need these on site Monday.")).toBe(true);
+
+    expect(out.indexOf("Shibh Al Jazira invites you")).toBeLessThan(out.indexOf("Need these on site Monday."));
+    expect(out.indexOf("Need these on site Monday.")).toBeLessThan(out.indexOf("EXC-170845"));
+  });
+
+  it("Given any request, Then the LINK is the last thing in the message", () => {
+    /**
+     * ⚠️ Not a style choice. WhatsApp finds a URL to unfurl in a `wa.me` prefill only when it ends
+     * the message; put a sentence after it and no card appears — which is exactly the report:
+     * *"when i click share the template from the web the template is not shown but when i send it
+     * then copy paste through whatsapp it is shown"* (owner, 2026-09-02).
+     */
+    const out = bidCardText(model(), URL_, { renterName: "Shibh Al Jazira" });
+    expect(out.endsWith(URL_)).toBe(true);
+  });
+
+  it("Given the renter's own wording, Then it is sent instead of ours", () => {
+    const out = bidCardText(model(), URL_, {
+      renterName: "Shibh Al Jazira",
+      template: { greeting: "Dear partner,", intro: "Please quote the below by Sunday.", signoff: "Regards, {name}" },
+    });
+
+    expect(out.startsWith("Dear partner,")).toBe(true);
+    expect(out).toContain("Please quote the below by Sunday.");
+    expect(out).toContain("Regards, Shibh Al Jazira");
+    // The card between them is still ours, unchanged.
+    expect(out).toContain("EXC-170845: Tower light 9m · with operator ×6");
   });
 
   it("Given several machines, Then every one is listed — the image can only name the first", () => {
@@ -80,8 +109,16 @@ describe("bidCardText", () => {
     expect(out).not.toContain("No account is needed");
   });
 
-  it("Given no renter name, Then it still opens with an invitation rather than a blank line", () => {
+  it("Given no renter name, Then the default reads properly rather than losing a word", () => {
+    /**
+     * "{name} invites you to bid" with the token stripped is " invites you to bid" — not a shorter
+     * sentence, a broken one. The untouched default has a form that works without a name; a renter's
+     * OWN wording is never rewritten, only stripped of the token.
+     */
     const out = bidCardText(model(), URL_);
-    expect(out.startsWith("You are invited to bid")).toBe(true);
+    expect(out).toContain("You are invited to bid");
+    expect(out).not.toContain("{name}");
+    // And no sentence that begins where the missing name would have been.
+    expect(out.split("\n").some((l) => l.trimStart().startsWith("invites"))).toBe(false);
   });
 });

@@ -13,9 +13,12 @@
  * — so the same request read three ways depending on which button was pressed, and two of the three
  * said nothing about the machine, the site or the deadline.
  *
- * This is that same model in words. Now every channel carries the same facts in the same order, and
- * the rendering differs only where the medium forces it: a picture where a picture is drawn, markup
- * where markup survives, text where neither does.
+ * ── The words are now the renter's; the card is still ours ──────────────────────────────────────
+ *
+ * The message is composed by `shareTemplate.ts`: his greeting, his intro, our fixed card block, his
+ * sign-off, then the link. This file stays because the clipboard's plain flavour and anything else
+ * that wants the message with no template still want ONE function to call — it is that function,
+ * and it delegates, so there is no second renderer to drift.
  *
  * ── Text is not the poor relation ───────────────────────────────────────────────────────────────
  *
@@ -25,70 +28,23 @@
  */
 
 import type { BidCardModel } from "@/lib/bidCardModel";
+import { renderShareMessage, type ShareTemplate } from "@/lib/shareTemplate";
 
-const COPY = {
-  en: {
-    invites: (renter: string) => `${renter} invites you to bid on an equipment request.`,
-    invitesNoName: "You are invited to bid on an equipment request.",
-    noAccount: "No account is needed. The link opens the form.",
-    closed: "This request is no longer accepting bids.",
-  },
-  ar: {
-    invites: (renter: string) => `يدعوك ${renter} لتقديم عرض على طلب معدات.`,
-    invitesNoName: "أنت مدعوٌّ لتقديم عرض على طلب معدات.",
-    noAccount: "لا حاجة لحساب. الرابط يفتح النموذج مباشرة.",
-    closed: "لم يعد هذا الطلب يقبل العروض.",
-  },
-} as const;
-
-/**
- * Render the card as a message.
- *
- * `note` is the renter's own line and goes first, above everything we wrote: it is the part a person
- * actually reads, and under the request details it would be read after the decision was made.
- *
- * Nothing is invented. A request with no terms prints no term lines; one with no deadline prints no
- * closing line. What the request does not carry does not appear, which is the same rule the image and
- * the HTML card follow.
- */
 export function bidCardText(
   m: BidCardModel,
   url: string,
-  { renterName, note, lang = "en" }: { renterName?: string | null; note?: string | null; lang?: "en" | "ar" } = {},
+  {
+    renterName,
+    note,
+    lang = "en",
+    template,
+  }: {
+    renterName?: string | null;
+    note?: string | null;
+    lang?: "en" | "ar";
+    /** The renter's own wording. Omitted, the built-in default is used. */
+    template?: ShareTemplate;
+  } = {},
 ): string {
-  const t = COPY[lang];
-  const renter = renterName?.trim();
-  const own = note?.trim();
-
-  const lines: (string | null)[] = [
-    own || null,
-    own ? "" : null,
-
-    // Who is asking, and for what. The reference leads the machine so an operator can file the reply
-    // against it without opening the link.
-    renter ? t.invites(renter) : t.invitesNoName,
-    "",
-    m.ref ? `${m.ref}: ${m.imageHeadline}` : m.imageHeadline,
-    m.where || null,
-
-    // Every machine, when there is more than one. The image can only name the first.
-    ...(m.items.length ? ["", ...m.items.map((i) => `• ${i.label} ${i.value}`)] : []),
-
-    // The terms, one per line rather than the card's row pairs: a chat bubble has width for a line
-    // and no columns to align.
-    ...(m.terms.length ? ["", ...m.terms.map((x) => `${x.label}: ${x.value}`)] : []),
-
-    m.closing ? "" : null,
-    m.closing,
-    "",
-    url,
-    "",
-    m.accepting ? t.noAccount : t.closed,
-  ];
-
-  return lines
-    .filter((l) => l !== null)
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  return renderShareMessage(m, url, { renterName, note, lang, template });
 }

@@ -125,7 +125,15 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
 
           Turning it on never closes anything, so the switch cannot trap him: the question is still
           right there, and the details it governs appear beneath it. */}
-      <div className="flex items-center justify-between gap-3 rounded-sm border border-border bg-surface2 p-3.5">
+      {/* ── The question, and the switch. Nothing else (owner, 2026-09-02) ─────────────────────
+          ~~«Include an operator» / «No operator» printed beside the switch.~~ Removed: a switch
+          already says which way it is set, so the words restated it — and being two words they
+          wrapped onto a second line, which pushed the question onto two lines of its own and made a
+          one-line row three lines tall. The question asks; the switch answers.
+
+          `whitespace-nowrap` on nothing here: the question is allowed to wrap on a narrow rail, but
+          the SWITCH never leaves its line, which is what keeps the row one row. */}
+      <div className="flex items-center justify-between gap-3 rounded-sm border border-border bg-surface2 px-3.5 py-2.5">
         <span className="min-w-0 text-body font-semibold text-navy">{t.create.operatorCard.needOperator}</span>
         <Toggle
           checked={on}
@@ -134,11 +142,6 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
             actions.patchItem(item.id, { operatorNeeded: next ? "yes" : "no" });
             if (!next) setExpanded(false);
           }}
-          label={
-            <span className="text-meta font-semibold text-muted">
-              {on ? t.create.operatorCard.operatorIncluded : t.create.operatorCard.operatorNotIncluded}
-            </span>
-          }
         />
       </div>
 

@@ -29,13 +29,26 @@ export interface BidCardSource {
   imageUrl: string | null;
 }
 
-export function useBidCard(shareUrl: string, lang: "en" | "ar" = "en"): BidCardSource | null {
+/**
+ * `draft` is the request the renter is still writing, for the surfaces that preview a card BEFORE
+ * the link exists (see `draftBidForm`). It is used only while there is no token: the moment the
+ * request is posted the real payload wins, so the preview and the sent message cannot diverge.
+ */
+export function useBidCard(
+  shareUrl: string,
+  lang: "en" | "ar" = "en",
+  draft: BidFormData | null = null,
+): BidCardSource | null {
   const [card, setCard] = useState<BidCardSource | null>(null);
 
   useEffect(() => {
     const token = shareUrl ? bidTokenFromUrl(shareUrl) : null;
     if (!token) {
-      setCard(null);
+      setCard(
+        draft
+          ? { model: bidCardModel(null, { title: "", description: "" }, lang, draft), imageUrl: null }
+          : null,
+      );
       return;
     }
     let live = true;
@@ -73,7 +86,7 @@ export function useBidCard(shareUrl: string, lang: "en" | "ar" = "en"): BidCardS
     return () => {
       live = false;
     };
-  }, [shareUrl, lang]);
+  }, [shareUrl, lang, draft]);
 
   return card;
 }

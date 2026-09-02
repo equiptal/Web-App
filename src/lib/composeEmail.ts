@@ -9,8 +9,15 @@
  * raises a "choose an app" dialog for apps that are not signed in. The renter presses Send, watches
  * nothing happen, and reasonably concludes the feature is broken.
  *
- * Outlook on the web needs no client and no install: it opens a compose window in the browser he is
- * already in, signed into the account he is already signed into.
+ * Webmail needs no client and no install: it opens a compose window in the browser he is already in,
+ * signed into the account he is already signed into.
+ *
+ * ── Two of them, because a renter has one (owner, 2026-09-02) ───────────────────────────────────
+ *
+ * Outlook and Gmail between them cover essentially every business mailbox in this market, and a
+ * renter on Gmail handed an Outlook window is in the same position as a renter handed a dead
+ * `mailto:` — a compose screen for an account he is not signed into. So he picks, once, and the pick
+ * is remembered on this browser.
  *
  * ── It still goes out from HIM ──────────────────────────────────────────────────────────────────
  *
@@ -23,8 +30,36 @@
  * commercial business and nobody else's.
  */
 
-/** Where Outlook composes. The work host; personal accounts are redirected to `outlook.live.com`. */
-const OUTLOOK_COMPOSE = "https://outlook.office.com/mail/deeplink/compose";
+/** Where each one composes. Outlook's work host redirects personal accounts to `outlook.live.com`. */
+const COMPOSE_URLS = {
+  outlook: "https://outlook.office.com/mail/deeplink/compose",
+  gmail: "https://mail.google.com/mail/?view=cm&fs=1",
+} as const;
+
+export type EmailProvider = keyof typeof COMPOSE_URLS;
+
+export const EMAIL_PROVIDERS: EmailProvider[] = ["outlook", "gmail"];
+
+/** Which browser key remembers the pick. Per browser, never sent anywhere. */
+const PROVIDER_KEY = "moeda.emailProvider";
+
+export function loadEmailProvider(): EmailProvider {
+  try {
+    const v = window.localStorage.getItem(PROVIDER_KEY);
+    return v === "gmail" || v === "outlook" ? v : "outlook";
+  } catch {
+    // Private mode, or storage blocked. A default is a fine answer; a crash is not.
+    return "outlook";
+  }
+}
+
+export function saveEmailProvider(p: EmailProvider): void {
+  try {
+    window.localStorage.setItem(PROVIDER_KEY, p);
+  } catch {
+    /* nothing here is worth a broken share */
+  }
+}
 
 /**
  * Past this, a URL stops being reliable: browsers, and Outlook's own handler, begin truncating —
@@ -40,16 +75,23 @@ export interface Compose {
   bcc?: string[];
   subject?: string;
   body?: string;
+  /** Whose compose window to open. Defaults to Outlook. */
+  provider?: EmailProvider;
 }
 
 /** The compose URL, or null when it would be too long to survive the trip. */
-export function composeEmailUrl({ to = [], bcc = [], subject = "", body = "" }: Compose): string | null {
+export function composeEmailUrl({ to = [], bcc = [], subject = "", body = "", provider = "outlook" }: Compose): string | null {
+  const gmail = provider === "gmail";
   const q = new URLSearchParams();
-  if (to.length) q.set("to", to.join(";"));
-  if (bcc.length) q.set("bcc", bcc.join(";"));
-  if (subject) q.set("subject", subject);
+  // Gmail takes comma-separated addresses and its own short parameter names; Outlook takes
+  // semicolons and the long ones. Handing either the other's spelling silently drops the recipients.
+  const join = (list: string[]) => list.join(gmail ? "," : ";");
+  if (to.length) q.set("to", join(to));
+  if (bcc.length) q.set("bcc", join(bcc));
+  if (subject) q.set(gmail ? "su" : "subject", subject);
   if (body) q.set("body", body);
-  const url = `${OUTLOOK_COMPOSE}?${q.toString()}`;
+  const base = COMPOSE_URLS[provider];
+  const url = `${base}${base.includes("?") ? "&" : "?"}${q.toString()}`;
   return url.length > COMPOSE_URL_MAX ? null : url;
 }
 
