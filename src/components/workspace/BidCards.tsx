@@ -563,6 +563,9 @@ function BidCardTile({
                 }}
                 className={btn("primary", "lg", { className: "flex-1 transition" })}
               >
+                {/* The same glyph the supplier row and the profile dialog use for this act, so a
+                    renter meets one «invite» across the product rather than three. */}
+                <Icon name={invited ? "check" : "person_add"} size={16} />
                 {invited ? t.workspace.inviteSent : t.workspace.inviteToApp}
               </button>
             ) : (
@@ -573,6 +576,7 @@ function BidCardTile({
                 onClick={(e) => e.stopPropagation()}
                 className={btn("primary", "lg", { className: "flex-1" })}
               >
+                <Icon name="person_add" size={16} />
                 {t.workspace.inviteToApp}
               </button>
             )}

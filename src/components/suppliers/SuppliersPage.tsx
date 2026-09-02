@@ -706,7 +706,14 @@ function Row({
               title={c.inviteToApp}
               className="grid h-[30px] w-[30px] place-items-center rounded-sm text-muted transition hover:bg-surface3 hover:text-navy"
             >
-              <Icon name="ios_share" size={15} />
+              {/* ── One icon for «invite», everywhere (owner, 2026-09-02) ──────────────────────
+                  ~~`ios_share`.~~ A share arrow says *send this somewhere*, which is what the
+                  REQUEST's share sheet does; this asks a firm to join Moedatech. Two different acts
+                  wearing one glyph, on a page where the renter also shares requests.
+
+                  `person_add` is what the profile dialog already used for the same act, so this is
+                  the row catching up with it rather than a new idea. */}
+              <Icon name="person_add" size={15} />
             </button>
           )}
           <button
