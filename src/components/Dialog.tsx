@@ -39,14 +39,23 @@ import { pin } from "@/lib/uiPins";
  * but invisible, and could be typed into.
  */
 
-export type DialogSize = "sm" | "md" | "lg" | "xl";
+export type DialogSize = "sm" | "md" | "lg" | "xl" | "xxl";
 
-/** Four widths, and no fifth. `xl` is for a dialog showing a document, not a form. */
+/**
+ * Five widths, and no sixth. `xl` is for a dialog showing a document, not a form.
+ *
+ * `xxl` is for a dialog holding a TABLE — several fields across, repeated down the rows. Added for
+ * *Add my own suppliers* (owner, 2026-09-02: *"you can widen the modal if there is not enough space
+ * for the fields"*), where five columns inside 880px left an email box too narrow to read an address
+ * in. It is not a licence to widen a form: a single column of fields does not get more legible past
+ * 640, it gets harder to scan.
+ */
 const SIZE: Record<DialogSize, string> = {
   sm: "max-w-[420px]",
   md: "max-w-[520px]",
   lg: "max-w-[640px]",
   xl: "max-w-[880px]",
+  xxl: "max-w-[1080px]",
 };
 
 /**

@@ -78,15 +78,24 @@ describe("InviteSupplierDialog", () => {
   });
 
   it("Given WhatsApp and e-mail, When each is used, Then the body is character-for-character the same", () => {
+    /**
+     * ⚠️ E-mail opens OUTLOOK ON THE WEB now, not a `mailto:` (owner, 2026-09-02) — a machine with no
+     * mail client configured does nothing at all when handed a mailto, and the renter watches the
+     * button do nothing. So both channels are read off `window.open` rather than one off
+     * `location.href`.
+     */
     open(supplier());
     fireEvent.click(screen.getByRole("button", { name: new RegExp(en.suppliers.inviteChannelWhatsApp) }));
     fireEvent.click(screen.getByRole("button", { name: new RegExp(en.suppliers.inviteChannelEmail) }));
 
-    const wa = decodeURIComponent(opened[0].split("?text=")[1]);
-    const mail = decodeURIComponent(href.split("&body=")[1]);
-    expect(wa).toBe(mail);
+    const wa = new URL(opened[0]).searchParams.get("text");
+    const mailUrl = new URL(opened[1]);
+    expect(mailUrl.host).toBe("outlook.office.com");
+    expect(mailUrl.searchParams.get("body")).toBe(wa);
     // Only the subject exists in one and not the other.
-    expect(decodeURIComponent(href)).toContain(en.suppliers.inviteSubject);
+    expect(mailUrl.searchParams.get("subject")).toBe(en.suppliers.inviteSubject);
+    // Addressed to the supplier, since an invitation goes to one person.
+    expect(mailUrl.searchParams.get("to")).toBe("bids@zahid.sa");
   });
 
   it("Given no phone, Then WhatsApp and SMS are refused with the reason, and Copy still works", () => {

@@ -1,4 +1,4 @@
-# My Suppliers — the two tickets still open
+# My Suppliers — the tickets still open
 
 **For the backend developer.** Everything else in this feature is built, deployed and verified: the
 web ran 37 end-to-end checks against `kge3xspt36` on 2026-09-02 and all of them pass. These two are
@@ -178,6 +178,79 @@ invitation with the door locked, and the description fix above is what actually 
 ### Done when
 
 The preview's description for a closed token still names the city and the dates.
+
+---
+
+## SUP-BE-22 · A matched row counts its bids and cannot list them
+
+**Status:** the renter sees "9 bids", opens them, and is told there are none.
+**Found in UAT, 2026-09-02.** One line, self-contained, no decision needed.
+
+### What happens now
+
+Renter `userId=46`, row `ca034e95…`:
+
+```
+GET /agents/renter-suppliers        →  rollup: { bidsApp: 9, bidsLink: 0 }
+GET /agents/renter-suppliers/{id}   →  bids: []
+```
+
+The row itself says how it got there:
+
+```jsonc
+{ "name": "yo", "kind": "own", "source": "sheet",
+  "phone": "+966502165558",
+  "supplierId": 2544, "onMoedatech": true, "matchedOn": "phone" }
+```
+
+An imported row whose phone MATCHES account 2544. The match is recomputed on every read and is not
+stored, so the row's `supplier_user_id` column is null — nothing was ever linked.
+
+### Why
+
+The two reads resolve that account differently.
+
+`renter-supplier-rollup.service.ts:149` — the COUNT falls back to the match:
+
+```ts
+const accountOf = (r) => r.supplierUserId ?? resolved?.get(r.id)?.supplierId ?? null;
+const supplierIds = [...new Set(rows.map(accountOf).filter(...))];
+```
+
+`renter-supplier-profile.service.ts:122` — the LIST reads the stored column alone:
+
+```ts
+row.supplierUserId !== null
+  ? prisma.bid.findMany({ where: { supplierId: row.supplierUserId, ... } })
+  : Promise.resolve([])          // ← an imported row takes THIS branch
+```
+
+So on a matched row the profile does not fetch the wrong bids. **It never runs the query at all.**
+
+### How much of a renter's list this covers
+
+Every supplier he typed in or imported whose phone or e-mail matches a real account — which is the
+common case, and the case `onMoedatech` and `matchedOn` exist to serve. Only a row added through *Add
+from Moedatech*, where `supplier_user_id` is genuinely stored, lists its bids today.
+
+Off-platform bids are unaffected and agree exactly, because both sides call the same
+`readLinkSubmissionsForScope`. The row `gg` on the same account reports `bidsLink: 2` and lists two.
+
+### What to build
+
+Give the profile the roll-up's fallback — resolve the account the same way before deciding whether
+there is anything to fetch. Best as one shared `accountOf`, since two copies of that resolution is
+what produced this.
+
+### Done when
+
+For every row, `bids[].filter(via === "app").length` equals `rollup.bidsApp`. The row above lists nine.
+
+### Worth checking while you are there
+
+`rollup.bidsLink` counts SUBMISSIONS and `bids[]` carries one line per request ITEM, so those two are
+**meant** to differ: a submission covering two machines is `bidsLink: 1` and two rows. The web knows
+this. Only the app lane is wrong.
 
 ---
 

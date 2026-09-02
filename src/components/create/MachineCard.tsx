@@ -43,11 +43,14 @@ export function MachineCard({
   item,
   gaps,
   shaking,
+  tried,
   onCollapse,
 }: {
   item: EquipmentItem;
   gaps: RequiredGap[];
   shaking: boolean;
+  /** The renter has tried to move on — see `tried` in `Canvas`. */
+  tried?: boolean;
   onCollapse?: () => void;
 }) {
   const t = useT();
@@ -66,6 +69,8 @@ export function MachineCard({
 
   const gapFor = (field: string) => gaps.some((g) => g.field === field);
   const shake = (field: string) => shaking && gapFor(field);
+  /** The standing «* Required» mark: this field is owed, and the renter has already tried to go on. */
+  const owed = (field: string) => !!tried && gapFor(field);
 
   /** Set an item field and record that the renter answered it, in one move. */
   const set = (field: string, patch: Partial<EquipmentItem>) => {
@@ -156,6 +161,9 @@ export function MachineCard({
               unanswered — an unasked certificate silently narrows the renter's own bidder pool. */}
           <div className="absolute inset-x-2.5 top-2.5 flex items-start justify-between gap-2">
             <div className="min-w-0 max-w-[58%]">
+              {owed("safety_certificates") && (
+                <span className="mb-1 block text-label font-extrabold text-danger">{t.create.requiredMark}</span>
+              )}
               <div className={shake("safety_certificates") ? "shake-error" : undefined}>
                 {/* More than one, because the field has always been an array everywhere else — on the
                     draft, on the wire, and on the bid form where a supplier confirms each cert on its
@@ -223,6 +231,9 @@ export function MachineCard({
               />
             </div>
             <div className={`min-w-0 max-w-[48%] ${shake("equipment_year") ? "shake-error" : ""}`}>
+              {owed("equipment_year") && (
+                <span className="mb-1 block text-label font-extrabold text-danger">{t.create.requiredMark}</span>
+              )}
               <SearchSelect
                 value={overrides.equipmentYear}
                 placeholder={t.create.machineCard.minYear}
@@ -268,6 +279,7 @@ export function MachineCard({
                 label={t.create.machineCard.type}
                 missing={gapFor("subtype") || gapFor("category")}
                 shake={shake("subtype") || shake("category")}
+                required={owed("subtype") || owed("category")}
                 source={prov.itemSource("subtype", item.ref.subcategoryId)}
               >
                 <SearchSelect
@@ -292,6 +304,7 @@ export function MachineCard({
                 label={t.create.machineCard.size}
                 missing={gapFor("capacity")}
                 shake={shake("capacity")}
+                  required={owed("capacity")}
                 source={prov.itemSource("capacity", item.ref.measurementId)}
               >
                 <SearchSelect
@@ -324,6 +337,7 @@ export function MachineCard({
                   label={t.create.machineCard.delivery}
                   missing={gapFor("delivery")}
                   shake={shake("delivery")}
+                  required={owed("delivery")}
                   source={prov.itemSource("delivery", overrides.delivery, "deliveryOverride", true)}
                   icon={
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-none" aria-hidden>
@@ -344,6 +358,7 @@ export function MachineCard({
                 label={t.create.machineCard.returnFromSite}
                 missing={gapFor("return")}
                 shake={shake("return")}
+                  required={owed("return")}
                 source={prov.itemSource("return", overrides.returnFromSite, "returnOverride", true)}
                 icon={
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-none" aria-hidden>

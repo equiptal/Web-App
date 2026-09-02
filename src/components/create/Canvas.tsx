@@ -48,8 +48,40 @@ export function Canvas() {
   const { state, actions } = useRfq();
   const [shaking, setShaking] = useState(false);
   const [shakingWhere, setShakingWhere] = useState(false);
-  /** The blocking list, shaken on a refused send — see the block above the move-on row. */
-  const [shakingList, setShakingList] = useState(false);
+  /** The way-on button, shaken when the machine it sits under still owes an answer. */
+  const [shakingNext, setShakingNext] = useState(false);
+  /**
+   * The renter has tried to move on at least once.
+   *
+   * Until they do, an unanswered field is simply unanswered — this canvas opens with several of them
+   * and marking every one «* Required» on arrival would meet a renter with a page of red before they
+   * had done anything (owner, 2026-09-02: the mark is for *"when a field is required and not filled
+   * and the user is trying to go to next or send"*).
+   *
+   * After the first refusal it stays on: the mark belongs to the FIELD until that field is answered,
+   * and a second shake is not what tells someone which box to fill.
+   */
+  const [tried, setTried] = useState(false);
+  /**
+   * Which of the two request-wide panels the renter has OPENED.
+   *
+   * A site fills Where and When in full, so a renter can reach *Review & send* having never looked
+   * at either — and then discover the dates at the supplier's first question (owner, 2026-09-02:
+   * *"can we detect if they were never opened, and if so open them for him to see, with shaking"*).
+   * Nothing is missing in that case, so no gap can catch it; being unseen is the whole fault.
+   *
+   * Seeded from the section the canvas opens on, and added to by `openSection` below. One pass only:
+   * once shown, the next press sends.
+   */
+  const [seen, setSeen] = useState<Set<string>>(() => new Set([state.activeSection ?? "equipment"]));
+
+  /* Every press that opens a panel records it. Declared with the other hooks, above every
+     early return: a hook placed after one runs in a different order on the render that takes
+     that return, which is the rule `react-hooks/rules-of-hooks` exists to catch. */
+  useEffect(() => {
+    const open = state.activeSection;
+    if (open) setSeen((prev) => (prev.has(open) ? prev : new Set(prev).add(open)));
+  }, [state.activeSection]);
   const [confirmReset, setConfirmReset] = useState(false);
   const [carryTo, setCarryTo] = useState<{ index: number; isNew: boolean } | null>(null);
   /** The last press before review: add another machine, or go on. See `advance`. */
@@ -122,7 +154,16 @@ export function Canvas() {
    * looking hundreds of pixels below the fields that are blocking them, and a shake up there is a
    * click that appears to do nothing at all. Scroll first, then shake.
    */
+  /** The way-on button, in red for the length of a refusal. */
+  const shakeNext = () => {
+    setTried(true);
+    setShakingNext(true);
+    timers.current.push(setTimeout(() => setShakingNext(false), SHAKE_MS));
+  };
+
   const shakeNow = (which: "fields" | "where") => {
+    // Every refusal, whichever panel it lands in, turns the standing marks on. See `tried`.
+    setTried(true);
     const set = which === "where" ? setShakingWhere : setShaking;
     if (which === "fields") {
       // The blocking fields must be on screen to shake at all — and now that equipment collapses,
@@ -190,11 +231,30 @@ export function Canvas() {
   const advance = () => {
     if (equipmentGaps.length > 0) {
       shakeNow("fields");
+      shakeNext();
       return;
     }
     if (!isLastItem) {
       setCarryTo({ index: index + 1, isNew: false });
       return;
+    }
+    /* ── A panel the SITE filled, that the renter never opened ────────────────────────────────
+       Nothing is missing, so no gap can catch it: the project supplied the address, the dates and
+       the basis, and the renter can reach *Review & send* having never looked at either panel — then
+       meet the dates at the supplier's first question (owner, 2026-09-02: *"can we detect if they
+       were never opened, and if so open them for him to see, with shaking"*).
+
+       Only when a PROJECT filled them. A renter who typed his own dates has read them by definition,
+       and stopping him to look at his own answer is a step for nothing — it would also stand between
+       every ordinary request and the «anything else?» ask that follows. One pass: the panel opens,
+       it shakes, and the next press goes on. */
+    if (gaps.length === 0 && (draft.projectFields?.length ?? 0) > 0) {
+      const unseen = (["where", "when"] as const).find((p) => !seen.has(p));
+      if (unseen) {
+        actions.openSection(unseen);
+        shakeNow(unseen === "where" ? "where" : "fields");
+        return;
+      }
     }
     if (gaps.length > 0) {
       /**
@@ -207,8 +267,6 @@ export function Canvas() {
        * blocking"*): the press lands on the button at the bottom of the page, the answer it needs is
        * in a panel somewhere above, and the list is the one thing on screen that names both.
        */
-      setShakingList(true);
-      timers.current.push(setTimeout(() => setShakingList(false), SHAKE_MS));
       const first = gaps[0];
       const owing = first.itemId ? live.findIndex((i) => i.id === first.itemId) : -1;
       if (owing >= 0 && owing !== index) actions.goItem(owing);
@@ -328,7 +386,7 @@ export function Canvas() {
       {item &&
         (state.activeSection === "equipment" ? (
           <div ref={equipmentRef as React.Ref<HTMLDivElement>} className="mb-3.5 flex flex-col gap-4 lg:flex-row lg:items-stretch">
-            <MachineCard item={item} gaps={equipmentGaps} shaking={shaking} onCollapse={() => collapse("equipment")} />
+            <MachineCard item={item} gaps={equipmentGaps} shaking={shaking} tried={tried} onCollapse={() => collapse("equipment")} />
             <OperatorRail item={item} />
           </div>
         ) : (
@@ -363,18 +421,29 @@ export function Canvas() {
           machine card and the card marks what it still owes. That is the same rule `advance` uses. */}
       {item && state.activeSection === "equipment" && isFirstItem && (
         <div className="mb-3.5 flex justify-end">
+          {/* «Next», and nothing else (owner, 2026-09-02). Naming the destination made the button
+              about Where, which is not what it is for: it is the way OUT of this machine, and where
+              that leads is the next panel's own heading to state.
+
+              It refuses in RED and shakes when the machine still owes an answer — the same press
+              also marks the field itself, so the button says «not yet» and the card says which. */}
           <button
             type="button"
             onClick={() => {
               if (equipmentGaps.length > 0) {
                 shakeNow("fields");
+                shakeNext();
                 return;
               }
               openSection("where");
             }}
-            className="inline-flex items-center gap-1.5 rounded-sm border border-brand px-4 py-2 text-body font-semibold text-brand transition hover:bg-brand-soft"
+            className={`inline-flex items-center gap-1.5 rounded-sm border px-4 py-2 text-body font-semibold transition ${
+              shakingNext
+                ? "shake-error border-danger bg-danger-soft text-danger"
+                : "border-brand text-brand hover:bg-brand-soft"
+            }`}
           >
-            {fmt(t.create.nextPanel, { panel: t.create.where })}
+            {t.create.nextOnly}
             <Icon name="arrow_forward" size={16} className="rtl:rotate-180" />
           </button>
         </div>
@@ -390,10 +459,12 @@ export function Canvas() {
             complete={whereOk}
             onToggle={() => openSection("where")}
             shakeConfirm={shakingWhere}
+            tried={tried}
           />
           <WhenPanel
             open={state.activeSection === "when"}
             complete={whenOk}
+            tried={tried}
             onToggle={() => openSection("when")}
             shakeConfirm={shaking && panelGaps(gaps, "when").length > 0}
           />
@@ -413,66 +484,11 @@ export function Canvas() {
         </div>
       )}
 
-      {/* ── What is still missing (owner, 2026-09-01) ────────────────────────────────────────────
-          *"He doesn't know, when he has only filled the machine and tries to review and send, what
-          is blocking him and what is missing."*
-
-          And he could not: *Review & send* is DISABLED until the request is answered, and a disabled
-          button cannot be pressed, so the only explanation — its `title` — needed a hover on a
-          control that looks inert. Worse, the gap is usually not on screen: it belongs to another
-          panel, or to another machine, and only one of either is open at a time.
-
-          So the list is drawn, above the button it is holding: one row per gap, each naming the panel
-          (and the machine, when there is more than one) and what it wants, and each PRESSABLE —
-          pressing goes to that machine, opens that panel and shakes it. It renders only on the last
-          machine, which is where the send lives; the earlier cards are gated on their own fields and
-          say so themselves. */}
-      {isLastItem && gaps.length > 0 && (
-        /* RED, not amber (owner, 2026-09-01). Amber is this product's «worth your attention»; these
-           are the reasons the request cannot be sent at all, which is the one thing `danger` is for.
-           `shake-error` fires on a refused press — see `advance`. */
-        <div
-          className={`mb-3 flex flex-col gap-1.5 rounded-sm border border-danger/45 bg-danger/[0.06] p-3.5 ${
-            shakingList ? "shake-error" : ""
-          }`}
-        >
-          <span className="flex items-center gap-1.5 text-body font-extrabold text-danger">
-            <Icon name="error_outline" size={15} className="flex-none" />
-            {t.create.missingTitle}
-          </span>
-          <ul className="flex flex-col">
-            {gaps.map((g) => {
-              const owing = g.itemId ? live.findIndex((i) => i.id === g.itemId) : -1;
-              const panelName =
-                g.panel === "where" ? t.create.where : g.panel === "when" ? t.create.when : t.create.ready.machineAndOperator;
-              return (
-                <li key={`${g.panel}-${g.itemId ?? "req"}-${g.field}`}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (owing >= 0 && owing !== index) actions.goItem(owing);
-                      if (state.activeSection !== g.panel) actions.openSection(g.panel);
-                      shakeNow(g.panel === "where" ? "where" : "fields");
-                    }}
-                    className="flex w-full items-center gap-2 py-1 text-start text-body font-semibold text-danger transition hover:text-danger-deep"
-                  >
-                    <Icon name="chevron_right" size={14} className="flex-none text-danger rtl:rotate-180" />
-                    {/* ONE text node, deliberately: the panel's name in a node of its own would be a
-                        second element reading «Where it goes» on a page whose panel head already
-                        does, and the row is a sentence rather than a heading with a note under it.
-                        The machine is named only when there is more than one to confuse. */}
-                    <span className="min-w-0">
-                      {`${panelName}${
-                        owing >= 0 && live.length > 1 ? ` · ${fmt(t.create.itemOfCount, { n: owing + 1, total: live.length })}` : ""
-                      } — ${gateReason(t, g.reason) ?? g.field}`}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+      {/* ~~A red list of everything missing, above the move-on row.~~ Removed (owner, 2026-09-02).
+          It named the gaps in a second place, away from the fields that own them, so a renter read a
+          sentence about a field and then had to go and find it. The refusal does that walk for them
+          now: it opens the panel, scrolls to the card, shakes the field and marks it «* Required» —
+          and the button they pressed goes red for the same beat. */}
 
       {/* ---------------- Move on ---------------- */}
       <div className="mt-1 flex flex-wrap items-center justify-between gap-3">

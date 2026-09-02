@@ -7,6 +7,7 @@ import { cx } from "@/lib/ds";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { JOIN_URL } from "@/lib/config/store-links";
 import { copyInvite } from "@/lib/inviteCardHtml";
+import { openEmailCompose } from "@/lib/composeEmail";
 import { recordSupplierInvite } from "@/lib/api/client";
 import { bidCount, type RenterSupplier } from "@/lib/contract/renter-suppliers";
 
@@ -75,10 +76,15 @@ export function InviteSupplierDialog({
 
   useEffect(() => {
     if (!supplier) return;
-    fetch("/api/me", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((me: { companyName?: string | null } | null) => setRenterName(me?.companyName?.trim() || null))
-      .catch(() => setRenterName(null));
+    // Guarded: a missing `fetch` throws inside the effect, where `.catch` cannot see it.
+    try {
+      void fetch("/api/me", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((me: { companyName?: string | null } | null) => setRenterName(me?.companyName?.trim() || null))
+        .catch(() => setRenterName(null));
+    } catch {
+      setRenterName(null);
+    }
   }, [supplier]);
 
   if (!supplier) return null;
@@ -113,7 +119,9 @@ export function InviteSupplierDialog({
       go: () => {
         // Never awaited: an audit row must not stand between the renter and his mail client.
         void recordSupplierInvite([supplier.id], "email");
-        window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(c.inviteSubject)}&body=${enc}`;
+        // Outlook on the web, for the same reason as everywhere else: a machine with no mail client
+        // set up does nothing at all when handed a `mailto:`. See `composeEmail.ts`.
+        openEmailCompose({ to: [email], subject: c.inviteSubject, body: message });
       },
       blocked: email ? null : c.inviteNoEmail,
     },

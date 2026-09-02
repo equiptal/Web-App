@@ -53,6 +53,7 @@ export function CanvasField({
   source = "empty",
   missing = false,
   shake = false,
+  required = false,
   optional = false,
   icon,
   hint,
@@ -62,8 +63,16 @@ export function CanvasField({
   source?: FieldSource;
   /** True when this field is an unmet requirement — draws the dot and counts toward the pill. */
   missing?: boolean;
-  /** True for the duration of a refused move. */
+  /** True for the duration of a refused move: 450ms of movement, and nothing else. */
   shake?: boolean;
+  /**
+   * The renter has tried to move on and this field is what stopped them.
+   *
+   * Separate from `shake` on purpose (owner, 2026-09-02). The shake says «look here» and then stops
+   * — a renter who glanced away has missed the whole message — so the WORD «* Required» and the red
+   * edge stay until the field is answered. The animation is the attention; this is the answer.
+   */
+  required?: boolean;
   optional?: boolean;
   icon?: ReactNode;
   /** A quiet line under the control — the prototype's "KSA STANDARD", "Suppliers quote you a …". */
@@ -75,13 +84,18 @@ export function CanvasField({
     <div className={`min-w-0 ${shake ? "shake-error" : ""}`}>
       <div
         className={`mb-2 flex items-center gap-1.5 text-label font-semibold uppercase leading-tight tracking-[0.05em] ${
-          missing ? "text-brand" : "text-muted"
+          required ? "text-danger" : missing ? "text-brand" : "text-muted"
         }`}
       >
         {icon}
         <span>{label}</span>
         {optional && <span className="font-normal normal-case tracking-normal text-muted/70">{t.create.machineCard.notesOptional}</span>}
-        <RequiredDot show={missing} />
+        {/* The word, not just the dot — see `shake`. */}
+        {required ? (
+          <span className="font-extrabold text-danger">{t.create.requiredMark}</span>
+        ) : (
+          <RequiredDot show={missing} />
+        )}
       </div>
       {/**
         * The amber highlight wraps the CONTROL, not the whole field.
@@ -92,7 +106,13 @@ export function CanvasField({
         * on the thing it describes and leaves every leg on the same baseline.
         */}
       <div
-        className={isSystemChosen(source) ? "rounded-sm bg-warn/[0.07] ring-1 ring-warn/45 ring-offset-2 ring-offset-surface2" : undefined}
+        className={
+          required
+            ? "rounded-sm ring-1 ring-danger ring-offset-2 ring-offset-surface2"
+            : isSystemChosen(source)
+              ? "rounded-sm bg-warn/[0.07] ring-1 ring-warn/45 ring-offset-2 ring-offset-surface2"
+              : undefined
+        }
       >
         {children}
       </div>

@@ -14,6 +14,14 @@ import { SupplierBidsDialog } from "./SupplierBidsDialog";
 import { EditSupplierDialog } from "./EditSupplierDialog";
 import { InviteSupplierDialog } from "./InviteSupplierDialog";
 import { SuggestedBand } from "./SuggestedBand";
+import { ShareRequestDialog } from "./ShareRequestDialog";
+import {
+  activeFilterCount,
+  NO_FILTERS,
+  passesFilters,
+  SupplierFilters,
+  type SupplierFilterState,
+} from "./SupplierFilters";
 import { hasUnseenBid, loadSeen, markSeen } from "@/lib/supplierSeen";
 import {
   bidCount,
@@ -81,6 +89,11 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
   const [bidsId, setBidsId] = useState<string | null>(null);
   const [editing, setEditing] = useState<RenterSupplier | null>(null);
   const [inviting, setInviting] = useState<RenterSupplier | null>(null);
+  /* The finer cuts, behind one button — the everyday split stays on the two pills beside it. */
+  const [filters, setFilters] = useState<SupplierFilterState>(NO_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  /** Whom a share is being composed for. Empty means «whoever is picked in the dialog». */
+  const [sharingWith, setSharingWith] = useState<RenterSupplier[] | null>(null);
   /* When THIS person last opened each row. Local by design — see `supplierSeen.ts`. */
   const [seen, setSeen] = useState<Record<string, string>>({});
 
@@ -105,13 +118,14 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
     return (rows ?? []).filter((s) => {
       if (pill === "vendor" && !s.vendorRegistered) return false;
       if (groupFilter && !groupsOf(s).includes(groupFilter)) return false;
+      if (!passesFilters(s, filters)) return false;
       if (!needle) return true;
       // Everything a renter might half-remember: the firm, the person, either way of reaching them.
       return [s.name, s.contactName, s.email, s.phone]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(needle));
     });
-  }, [rows, q, pill, groupFilter]);
+  }, [rows, q, pill, groupFilter, filters]);
 
   /**
    * The flag flips on click and the request follows.
@@ -254,7 +268,25 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
           </span>
           <Pill on={pill === "all"} onClick={() => setPill("all")} label={c.all} n={rows?.length ?? 0} />
           <Pill on={pill === "vendor"} onClick={() => setPill("vendor")} label={c.registeredVendors} n={vendors} icon="verified" />
-          <span className="ms-auto">
+
+          {/* ── Share a request, from HERE as well as from the request ────────────────────────────
+              Both doors exist in the prototype on purpose, and its own note says why: *"pick the
+              suppliers first, or pick the request first. Both write the same record, so either way
+              it lands under «What you sent them» and on the request itself."*
+
+              A renter on this screen is thinking about people; a renter on a request is thinking
+              about a job. Making him navigate to the other one first is making him translate. */}
+          <button
+            type="button"
+            onClick={() => setSharingWith([])}
+            disabled={!rows?.length}
+            className={cx(btn("secondary", "sm"), "flex-none")}
+          >
+            <Icon name="share" size={14} />
+            {c.shareARequest}
+          </button>
+
+          <span className="ms-auto flex items-center gap-2">
             <GroupsMenu
               groups={groups}
               active={groupFilter}
@@ -279,6 +311,22 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
                 setPicking(true);
               }}
             />
+
+            {/* One button for everything finer, carrying a count so a renter can see the list is
+                narrowed without opening it — which is the failure a hidden filter causes. */}
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(true)}
+              className={cx(btn("secondary", "sm"), "flex-none")}
+            >
+              <Icon name="tune" size={14} />
+              {c.filters}
+              {activeFilterCount(filters, groupFilter) > 0 && (
+                <span className="ms-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-label font-extrabold text-brand-fg">
+                  {activeFilterCount(filters, groupFilter)}
+                </span>
+              )}
+            </button>
           </span>
         </div>
 
@@ -402,6 +450,27 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
       />
 
       <InviteSupplierDialog supplier={inviting} onClose={() => setInviting(null)} />
+
+      <SupplierFilters
+        open={filtersOpen}
+        rows={rows ?? []}
+        value={filters}
+        onChange={setFilters}
+        onClearGroup={() => setGroupFilter("")}
+        onClose={() => setFiltersOpen(false)}
+      />
+
+      <ShareRequestDialog
+        open={sharingWith !== null}
+        suppliers={rows ?? []}
+        preselect={sharingWith ?? []}
+        onClose={() => setSharingWith(null)}
+        onShared={(msg) => {
+          setSharingWith(null);
+          setToast(msg);
+          load();
+        }}
+      />
 
       <EditSupplierDialog
         key={editing?.id ?? "none"}

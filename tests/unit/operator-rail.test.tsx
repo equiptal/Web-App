@@ -23,19 +23,26 @@ const rail = (opts: Parameters<typeof renderCanvas>[1] = {}) =>
    operator, and suppliers price one. `expanded` is local now; the ANSWER is the question at the top
    of the panel, and nothing else writes it. */
 describe("turning the operator off (MREQ-AC-25)", () => {
-  it("records 'no' from the question, and keeps the panel open to say so", async () => {
+  /* The question is a SWITCH now, not a pair of buttons — `role="switch"`, with the answer written
+     beside it. What it pins is unchanged: the answer is written only here, and opening the panel
+     writes nothing. */
+  const askSwitch = () => screen.getByRole("switch");
+
+  it("records 'no' from the question, and folds the rail back to its strip", async () => {
     const handle = await rail();
     expect(screen.getByText("FOOD")).toBeTruthy();
 
-    await handle.run(() => screen.getByRole("button", { name: "No operator" }).click());
+    await handle.run(() => askSwitch().click());
 
     expect(handle.store().state.draft!.items[0].operatorNeeded).toBe("no");
-    // The details go — there is no operator to feed or house — but the question stays answerable.
+    /* The details go — there is no operator to feed or house — and the rail folds to the 72px strip
+       it has always used for «no operator». Collapsed, not gone: a renter who answered by accident
+       has to be able to find it, and pressing the strip only OPENS it (the test below). */
     expect(screen.queryByText("FOOD")).toBeNull();
-    expect(screen.getByText("Do you want an operator with this equipment?")).toBeTruthy();
+    expect(screen.getByLabelText("The operator")).toBeTruthy();
   });
 
-  it("closes to the strip, and reopening ANSWERS NOTHING", async () => {
+  it("reopening the strip ANSWERS NOTHING", async () => {
     const handle = await rail({ draft: makeAgentDraft({ items: [makeItem({ operatorNeeded: "no" })] }) });
 
     // An item that says «no» opens closed: the strip is what is on screen.
@@ -48,7 +55,7 @@ describe("turning the operator off (MREQ-AC-25)", () => {
     expect(screen.queryByText("FOOD")).toBeNull();
 
     // Saying yes is a separate, deliberate press — and only then do the details appear.
-    await handle.run(() => screen.getByRole("button", { name: "Include an operator" }).click());
+    await handle.run(() => askSwitch().click());
     expect(handle.store().state.draft!.items[0].operatorNeeded).toBe("yes");
     expect(screen.getByText("FOOD")).toBeTruthy();
   });

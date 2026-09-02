@@ -30,12 +30,15 @@ export function WhenPanel({
   complete,
   onToggle,
   shakeConfirm,
+  tried,
 }: {
   open: boolean;
   complete: boolean;
   onToggle: () => void;
   /** True while a refused move is drawing attention to the acknowledgement. */
   shakeConfirm?: boolean;
+  /** The renter has tried to move on — see `tried` in `Canvas`. */
+  tried?: boolean;
 }) {
   const t = useT();
   const { locale } = useLocale();
@@ -253,6 +256,10 @@ export function WhenPanel({
                   {charged.known
                     ? fmt(t.create.whenPanel.confirmCharged, { charged: num(charged.chargedDays) })
                     : t.create.whenPanel.confirmChargedNoDates}
+                  {/* The one thing this panel is waiting for, said until it is answered. */}
+                  {tried && !state.chargedDaysUnderstood && (
+                    <span className="ms-1 font-extrabold text-danger">{t.create.requiredMark}</span>
+                  )}
                 </label>
               </div>
               )}

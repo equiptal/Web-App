@@ -49,6 +49,9 @@ import {
   RENTAL_BASES,
   PAYMENT_TERMS,
   SAFETY_CERTIFICATES,
+  OPERATOR_CERTIFICATES,
+  FUEL_TYPES,
+  equipmentYears,
   type RentalBasis,
   type PaymentTerm,
   type Party,
@@ -174,32 +177,37 @@ function PillSelect<T extends string>({
   onChange: (v: T | null) => void;
 }) {
   return (
-    /* ── ONE box, not a box in a box (owner, 2026-09-01: *"why are some boxes nested? remove the
-       nested, keep it one box"*) ────────────────────────────────────────────────────────────────
-       The pill was a bordered `span` wrapping a `Dropdown` whose `pill` tone draws its own border,
-       so BASIS and PAYMENT rendered as two rectangles a pixel apart while START, END and EXTENDABLE
-       — which are not dropdowns — rendered as one. The trigger IS the pill: it takes the pill's own
-       skin through `triggerClass`, and the wrapper is gone.
+    /* ── ONE box, and the × is IN it (owner, 2026-09-01, again 2026-09-02) ───────────────────────
+       *"Why are some boxes nested? Remove the nested, keep it one box"* — then, on seeing the
+       result: *"Can the × be part of the box, not another smaller box, so all in one?"*
 
-       ~~A native `select` at zero opacity stretched over the pill.~~ Before that, and worse: it
+       The first pass moved the pill's skin ONTO the dropdown trigger, which fixed the nesting but
+       left the × with nowhere to live: it cannot go inside the trigger, because the trigger is a
+       `<button>` and a button inside a button is invalid markup — a press on the × would open the
+       menu on its way past. So it became a second bordered pill glued to the first with
+       `-ms-px rounded-s-none border-s-0`, which is two rectangles pretending to be one and reads as
+       exactly that at any zoom.
+
+       The skin goes back on the WRAPPER, and the trigger is drawn bare. Then the × is an ordinary
+       sibling inside the one border: two elements, one box, no nested buttons. `focus-within` is
+       what keeps the whole pill lit while the keyboard is inside the trigger.
+
+       ~~A native `select` at zero opacity stretched over the pill.~~ Before all of it, and worse: it
        opened the operating system's menu, with a blue highlight bar and no way to tick the chosen
        row. */
-    <span className="inline-flex items-center">
-    <Dropdown
-      triggerClass={`${PILL} ${tone(changed, false, missing)} ${EDITABLE}`}
-      label={label}
-      prefix={label}
-      placeholder={empty}
-      value={value}
-      onChange={(v) => onChange((v || null) as T | null)}
-      options={options.map((o) => ({ value: o, label: optionLabel ? optionLabel(o) : o }))}
-    />
-    {/* Outside the trigger: inside it, a press on the × would open the menu on its way past. */}
-    {onRemove && (
-      <span className={`${PILL} ${tone(changed, false, missing)} -ms-px rounded-s-none border-s-0 ps-0`}>
-        <PillX label={label} onRemove={onRemove} />
-      </span>
-    )}
+    <span className={`${PILL} ${tone(changed, false, missing)} ${EDITABLE}`}>
+      <Dropdown
+        /* Bare: no border, no ground, no height of its own. The pill around it is the box, and the
+           trigger only has to lay its prefix, its value and its caret out inside it. */
+        triggerClass="text-label text-current"
+        label={label}
+        prefix={label}
+        placeholder={empty}
+        value={value}
+        onChange={(v) => onChange((v || null) as T | null)}
+        options={options.map((o) => ({ value: o, label: optionLabel ? optionLabel(o) : o }))}
+      />
+      {onRemove && <PillX label={label} onRemove={onRemove} />}
     </span>
   );
 }
@@ -460,6 +468,22 @@ export function ProjectPills() {
 
         {terms && (
           <>
+            {/* ── The fuel it burns, not only who buys it ────────────────────────────────────────
+                `fuelResponsibility` was here and `fuelType` was not, so the strip asked who pays for
+                the fuel without ever saying which fuel — and a template that copied «electric» from a
+                work order showed nothing (owner, 2026-09-02: *"make sure the pills have all the
+                project and its children values"*). */}
+            <PillSelect<string>
+              label={t.projects.pills.fuel}
+              value={terms.fuelType ?? null}
+              options={[...FUEL_TYPES]}
+              optionLabel={(v) => t.options.fuelType[v as keyof typeof t.options.fuelType] ?? v}
+              changed={dirty("preferences.fuel_type")}
+              /* No ✕: `fuelType` does not admit «unstated» on an item — every machine burns
+                 something, and the seed is diesel. Changing it is the only act available. */
+              onChange={(v) => actions.patchTerms({ fuelType: v as typeof terms.fuelType }, ["preferences.fuel_type"])}
+            />
+
             <PillSegment<"yes" | "no">
               label={t.projects.pills.operator}
               value={terms.operatorNeeded === "no" ? "no" : "yes"}
@@ -470,6 +494,119 @@ export function ProjectPills() {
                  and *no* IS the answer a renter who does not want an operator is giving. */
               onChange={(v) => actions.patchTerms({ operatorNeeded: v }, ["preferences.operator"])}
             />
+
+            {/* ── The model year (owner, 2026-09-02: *"the year is detected and filled from the
+                project and the work orders, but not shown as a pill — why?"*) ────────────────────
+                It was not drawn. `MachineTerms` has carried `equipmentYear` all along, a template
+                copies it, the project seeds it, and `patchTerms` already writes it — so the value
+                travelled the whole way to the request and the one surface that shows what a template
+                brought stayed silent about it. A renter could only see it by opening the machine
+                card, and could not tell it had been set at all.
+
+                The same list the machine card offers, and «any» is a real answer rather than an
+                empty one: it says the renter will take any year, which is what suppliers price
+                against. */}
+            <PillSelect<string>
+              label={t.projects.pills.year}
+              value={terms.equipmentYear ?? null}
+              options={equipmentYears()}
+              optionLabel={(v) => (v === "any" ? t.create.machineCard.anyYear : v)}
+              changed={dirty("preferences.equipment_year")}
+              onRemove={() => actions.patchTerms({ equipmentYear: null }, ["preferences.equipment_year"])}
+              onChange={(v) => actions.patchTerms({ equipmentYear: v }, ["preferences.equipment_year"])}
+            />
+
+            {/* ── The operator's own terms ───────────────────────────────────────────────────────
+                Food, accommodation and transport, the night shift, the nationality rule and the
+                operator's certificate all travel in `MachineTerms.operator`, and a work order copied
+                every one of them — into a strip that showed none. They are the terms a supplier
+                prices an operator against, so a renter has to be able to SEE what the site brought.
+
+                Only when there is an operator to describe: with «no» above, these are five boxes
+                asking about somebody nobody hired. The free-text pair — the nationality list and the
+                «other» certificate — stay in *More details*, which is the one thing a pill cannot
+                hold. */}
+            {terms.operatorNeeded !== "no" && (
+              <>
+                <PillSegment<Party>
+                  label={t.projects.pills.food}
+                  value={terms.operator?.fatFood ?? null}
+                  options={["me", "supplier"] as const}
+                  optionLabel={(v) => t.options.party[v]}
+                  changed={dirty("preferences.operator_food")}
+                  onChange={(v) =>
+                    actions.patchTerms({ operator: { ...terms.operator, fatFood: v } }, ["preferences.operator_food"])
+                  }
+                />
+                <PillSegment<Party>
+                  label={t.projects.pills.accom}
+                  value={terms.operator?.fatAccommodationTransport ?? null}
+                  options={["me", "supplier"] as const}
+                  optionLabel={(v) => t.options.party[v]}
+                  changed={dirty("preferences.operator_accom")}
+                  onChange={(v) =>
+                    actions.patchTerms(
+                      { operator: { ...terms.operator, fatAccommodationTransport: v } },
+                      ["preferences.operator_accom"],
+                    )
+                  }
+                />
+                <PillSegment<"yes" | "no">
+                  label={t.projects.pills.night}
+                  value={terms.operator?.nightShift ? "yes" : "no"}
+                  options={["yes", "no"] as const}
+                  optionLabel={(v) => (v === "yes" ? t.common.yes : t.common.no)}
+                  changed={dirty("preferences.operator_night")}
+                  onChange={(v) =>
+                    actions.patchTerms({ operator: { ...terms.operator, nightShift: v === "yes" } }, ["preferences.operator_night"])
+                  }
+                />
+                <PillSelect<string>
+                  label={t.projects.pills.nationality}
+                  value={terms.operator?.nationality ?? null}
+                  options={["any", "restricted"]}
+                  optionLabel={(v) =>
+                    v === "any" ? t.create.operatorCard.nationalityAny : t.create.operatorCard.nationalityRestricted
+                  }
+                  changed={dirty("preferences.operator_nationality")}
+                  onRemove={() =>
+                    actions.patchTerms({ operator: { ...terms.operator, nationality: null } }, ["preferences.operator_nationality"])
+                  }
+                  onChange={(v) =>
+                    actions.patchTerms(
+                      /* Leaving «restricted» drops the list with it: a stale set of nationalities on a
+                         request that now accepts any would ride to the supplier unseen. */
+                      { operator: { ...terms.operator, nationality: v, ...(v === "any" ? { nationalityCustom: null } : {}) } },
+                      ["preferences.operator_nationality"],
+                    )
+                  }
+                />
+                <PillSelect<string>
+                  label={t.projects.pills.opCerts}
+                  value={terms.operator?.certificate?.[0] ?? (terms.operator?.certificate ? NO_CERT : null)}
+                  options={[NO_CERT, ...OPERATOR_CERTIFICATES]}
+                  optionLabel={(v) =>
+                    v === NO_CERT ? t.create.machineCard.noCert : t.options.safetyCert[v as never] ?? v
+                  }
+                  changed={dirty("preferences.operator_certs")}
+                  onRemove={() =>
+                    actions.patchTerms({ operator: { ...terms.operator, certificate: [] } }, ["preferences.operator_certs"])
+                  }
+                  onChange={(v) =>
+                    actions.patchTerms(
+                      {
+                        operator: {
+                          ...terms.operator,
+                          certificate: v == null || v === NO_CERT ? [] : [v as never],
+                          ...(v === "other" ? {} : { certificateOther: null }),
+                        },
+                      },
+                      ["preferences.operator_certs"],
+                    )
+                  }
+                />
+              </>
+            )}
 
             {/* ── The certificate is EDITABLE, and shown whether or not it is set ──────────────
                 ~~Certificates report rather than edit: the set lives in *More details*.~~ Two faults

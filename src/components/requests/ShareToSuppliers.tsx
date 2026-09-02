@@ -6,6 +6,7 @@ import { btn, cx } from "@/lib/ds";
 import { listRenterSuppliers, recordRequestShare, updateRenterSupplier, type RenterSupplier } from "@/lib/api/client";
 import { canBeEmailed, groupsOf, groupsWithCounts } from "@/lib/contract/renter-suppliers";
 import { bidTokenFromUrl } from "@/lib/bidCardHtml";
+import { openEmailCompose } from "@/lib/composeEmail";
 import { bidCardText } from "@/lib/bidCardText";
 import { useBidCard } from "@/lib/useBidCard";
 
@@ -120,9 +121,10 @@ export function ShareToSuppliers({
     // mail client, and a failed write must not tell him the message did not go out.
     const token = bidTokenFromUrl(shareUrl);
     if (token) void recordRequestShare(token, reachable.map((s) => s.id), "email");
-    // Recipients in BCC and nothing in To: forty suppliers in one To line tells each of them who
-    // else was asked.
-    window.location.href = `mailto:?bcc=${encodeURIComponent(addresses.join(","))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    /* Outlook on the web rather than `mailto:` (owner, 2026-09-02): a machine with no mail client
+       set up does nothing at all when handed a mailto. Recipients in BCC and nothing in To — forty
+       suppliers in one To line tells each of them who else was asked. */
+    openEmailCompose({ bcc: addresses, subject, body });
   };
 
   const flash = () => {

@@ -36,27 +36,22 @@ vi.mock("@/lib/bidCardHtml", async (real) => ({
 const L = (en: string) => en;
 const URL_ = "https://web.moedatech.net/bid/excavator-5cc5efdc-86ab-459e-a73e-564257e2cbd2";
 
-let href = "";
+const opened: string[] = [];
 
 beforeEach(() => {
   rows.patched = [];
   rows.recorded = [];
-  href = "";
-  // `mailto:` navigation is the whole output of this component, so it is what the test reads.
-  Object.defineProperty(window, "location", {
-    value: {
-      get href() {
-        return href;
-      },
-      set href(v: string) {
-        href = v;
-      },
-    },
-    writable: true,
+  opened.length = 0;
+  vi.stubGlobal("open", (u: string) => {
+    opened.push(u);
+    return null;
   });
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 const open = () => {
   render(<ShareToSuppliers shareUrl={URL_} renterName="Shibh Al Jazira" requestCode="EXC-170845" L={L} />);
@@ -75,11 +70,19 @@ describe("ShareToSuppliers", () => {
     screen.getAllByRole("checkbox").forEach((box) => fireEvent.click(box));
     fireEvent.click(screen.getByRole("button", { name: /Send to 2/ }));
 
-    expect(href.startsWith("mailto:?bcc=")).toBe(true);
-    expect(decodeURIComponent(href)).toContain("bids@zahid.sa,rfq@rajhi.sa");
+    /**
+     * ⚠️ Outlook on the web, not a `mailto:` (owner, 2026-09-02). A machine with no mail client
+     * configured does nothing at all when handed a mailto — the renter presses Send and watches
+     * nothing happen. The rule this pins is unchanged: the addresses go in BCC and the To line stays
+     * empty, because forty suppliers in a To line tells each of them who else was asked.
+     */
+    const url = new URL(opened[0]);
+    expect(url.host).toBe("outlook.office.com");
+    expect(url.searchParams.get("bcc")).toBe("bids@zahid.sa;rfq@rajhi.sa");
+    expect(url.searchParams.get("to")).toBeNull();
     // The request's own code rides in the subject so an operator can file the reply against it.
-    expect(decodeURIComponent(href)).toContain("EXC-170845");
-    expect(decodeURIComponent(href)).toContain(URL_);
+    expect(url.searchParams.get("subject")).toContain("EXC-170845");
+    expect(url.searchParams.get("body")).toContain(URL_);
 
     // Declared, not observed: the record is written against the link token the renter shared, and it
     // says who he chose — never who received it or opened it.

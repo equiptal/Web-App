@@ -31,12 +31,15 @@ export function WherePanel({
   complete,
   onToggle,
   shakeConfirm,
+  tried,
 }: {
   open: boolean;
   complete: boolean;
   onToggle: () => void;
   /** True while a refused move is pointing at the confirm button (MREQ-AC-03). */
   shakeConfirm?: boolean;
+  /** The renter has tried to move on — see `tried` in `Canvas`. The shake ends; this does not. */
+  tried?: boolean;
 }) {
   const t = useT();
   const { state, actions } = useRfq();
@@ -86,6 +89,10 @@ export function WherePanel({
       <Icon name="check_circle" size={17} /> {t.step1.location.confirmed}
     </span>
   ) : (
+    <span className="flex flex-none flex-col items-end gap-1">
+      {/* Standing, not just for the length of the shake: this is the one thing the panel is waiting
+          for, and «* Required» says so until it is answered (owner, 2026-09-02). */}
+      {tried && <span className="text-label font-extrabold text-danger">{t.create.requiredMark}</span>}
     <button
       type="button"
       disabled={!hasLocation}
@@ -96,6 +103,7 @@ export function WherePanel({
     >
       {t.create.wherePanel.confirm}
     </button>
+    </span>
   );
 
   return (

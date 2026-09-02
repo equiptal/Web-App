@@ -17,6 +17,7 @@ import { canBeEmailed } from "@/lib/contract/renter-suppliers";
 import { bidCardText } from "@/lib/bidCardText";
 import { bidCardHtml } from "@/lib/bidCardHtml";
 import { useBidCard } from "@/lib/useBidCard";
+import { openEmailCompose } from "@/lib/composeEmail";
 
 /**
  * *Share this request* — the card under the summary on **Ready to send**.
@@ -68,14 +69,22 @@ export function ShareOnPost() {
   const [addingEmailOn, setAddingEmailOn] = useState<string | null>(null);
   const [emailDraft, setEmailDraft] = useState("");
   const [coach, setCoach] = useState(true);
+  const [tooLong, setTooLong] = useState(false);
   /** The renter's own firm, for the From line. Read once, and a failure just leaves it unnamed. */
   const [renterName, setRenterName] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/me", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((me: { companyName?: string | null } | null) => setRenterName(me?.companyName?.trim() || null))
-      .catch(() => setRenterName(null));
+    /* `fetch` itself can be missing — a test renderer, an old embedded browser — and calling it then
+       throws INSIDE the effect, where `.catch` never sees it and React takes the whole tree down with
+       it. The name is decoration on a From line; nothing here may cost the screen. */
+    try {
+      void fetch("/api/me", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((me: { companyName?: string | null } | null) => setRenterName(me?.companyName?.trim() || null))
+        .catch(() => setRenterName(null));
+    } catch {
+      setRenterName(null);
+    }
   }, []);
 
   useEffect(() => {
@@ -139,9 +148,16 @@ export function ShareOnPost() {
 
     if (byEmail && reachable.length) {
       void recordRequestShare(uuid, reachable.map((s) => s.id), "email");
-      window.location.href = `mailto:?bcc=${encodeURIComponent(
-        reachable.map((s) => s.email as string).join(","),
-      )}&subject=${encodeURIComponent(fmt(c.subject, { code: state.requestId || "" }).trim())}&body=${encodeURIComponent(message)}`;
+      /* Outlook on the web, not `mailto:` — a machine with no mail client configured does nothing
+         at all when handed a mailto, and the renter watches Send do nothing. See `composeEmail.ts`. */
+      const opened = openEmailCompose({
+        bcc: reachable.map((s) => s.email as string),
+        subject: fmt(c.subject, { code: state.requestId || "" }).trim(),
+        body: message,
+      });
+      // Too long for a URL. The request is posted and the link is on screen; say so rather than
+      // opening a window carrying half a message.
+      if (!opened) setTooLong(true);
     }
     if (byWhatsApp && firstWithPhone) {
       void recordRequestShare(uuid, [firstWithPhone.id], "whatsapp");
@@ -330,6 +346,12 @@ export function ShareOnPost() {
             {byWhatsApp && !posted && (
               <span className="text-meta text-muted">
                 {firstWithPhone ? fmt(c.whatsappFirst, { name: firstWithPhone.name }) : c.whatsappNoPhone}
+              </span>
+            )}
+            {tooLong && (
+              <span className="flex items-start gap-1.5 text-meta font-semibold text-danger-deep">
+                <Icon name="error_outline" size={14} className="mt-px flex-none" />
+                {c.tooLong}
               </span>
             )}
             {posted && (

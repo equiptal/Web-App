@@ -142,19 +142,22 @@ describe("the primary button refuses with gaps (MREQ-AC-15)", () => {
 
      What AC-15 actually protects is unchanged and is what this still pins: a request with gaps
      cannot reach the review screen. */
-  it("refuses the review screen, and says what is missing", async () => {
+  it("refuses the review screen, and marks the field that owes the answer", async () => {
     const handle = await renderCanvas(<Canvas />, {
       draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
     });
 
-    // The list is on screen before the press — it is drawn whenever anything is owed.
-    expect(screen.getByText("Before this can be sent")).toBeTruthy();
+    /* ~~A red list of everything missing, drawn above the button.~~ Removed on 2026-09-02: it named
+       the gaps in a second place, away from the fields that own them. The refusal now walks the
+       renter to the field itself and marks it «* Required» there. */
+    expect(screen.queryByText("Before this can be sent")).toBeNull();
 
     const button = screen.getByText(/Review & send/).closest("button")! as HTMLButtonElement;
     await handle.run(() => button.click());
 
     expect(handle.store().state.readyToSend).toBe(false);
-    expect(screen.getByText("Before this can be sent")).toBeTruthy();
+    // The mark is on the field, and it is the same word wherever a field is owed.
+    expect(screen.getAllByText("* Required").length).toBeGreaterThan(0);
   });
 
   it("advances to the review screen when nothing is left", async () => {
