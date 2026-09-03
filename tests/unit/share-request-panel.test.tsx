@@ -635,6 +635,46 @@ describe("the Add action belongs to the channel (owner, 2026-09-03)", () => {
   });
 });
 
+describe("what onShared tells the caller (owner, 2026-09-03)", () => {
+  it("Given a channel opened, Then the caller is told WHICH — so it can wait for him to come back", async () => {
+    /**
+     * *"the send must go to the channel directly before seeing the sucess popup, success shown when
+     * he is back on the web."*
+     *
+     * The panel hands the message off and a new tab takes focus a few milliseconds later. A caller
+     * that announces immediately draws its dialog and has it buried. `channel` is passed so the
+     * caller can hold the announcement until this tab is visible again — and so it knows the one
+     * case where nothing opened at all.
+     */
+    const onShared = vi.fn();
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="share" requestUuid="abc-123" onShared={onShared} />
+      </LocaleProvider>,
+    );
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.sendToSuppliers));
+
+    await waitFor(() => expect(onShared).toHaveBeenCalled());
+    expect(onShared.mock.calls[0][1]).toBe("email");
+  });
+
+  it("Given Moedatech alone, Then the channel is «none» — nothing opened, so nothing to return from", async () => {
+    const onShared = vi.fn();
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="share" requestUuid="abc-123" onShared={onShared} />
+      </LocaleProvider>,
+    );
+    await screen.findByText("Al Faisal Rentals");
+    fireEvent.click(screen.getByText(c.sendMoedatechOnly));
+
+    await waitFor(() => expect(onShared).toHaveBeenCalled());
+    expect(onShared.mock.calls[0][1]).toBe("none");
+  });
+});
+
 describe("copying", () => {
   it("Given Copy, Then the clipboard holds the LINK and nothing else", async () => {
     /**

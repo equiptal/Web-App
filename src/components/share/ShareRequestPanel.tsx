@@ -90,7 +90,12 @@ export interface ShareRequestPanelProps {
   /** `post` mode: posts and returns the new request's uuid. Null means the post failed. */
   onPost?: () => Promise<string | null>;
   /** Fired once a share has gone out, with how many suppliers it reached. */
-  onShared?: (count: number) => void;
+  /**
+   * Fired once a share has gone out. `channel` is `"none"` when the request went to Moedatech alone
+   * — the only case where nothing opened in another tab, and therefore the only case where a caller
+   * should say so immediately rather than wait for the renter to come back.
+   */
+  onShared?: (count: number, channel: string) => void;
   /** Rows to start with ticked — the per-row share action picks one. */
   preselect?: string[];
   /** The renter's own firm, for the From line. */
@@ -486,7 +491,7 @@ export function ShareRequestPanel({
     // Cumulative, because a second press is a second channel, not a correction of the first.
     setHandedOff({ channel, n: reached });
     if (channel !== "none") setSent((prev) => (prev.includes(channel) ? prev : [...prev, channel]));
-    onShared?.(reached);
+    onShared?.(reached, channel);
     setBusy(false);
   };
 

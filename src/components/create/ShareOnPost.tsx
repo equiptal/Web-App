@@ -56,6 +56,21 @@ export function ShareOnPost() {
    * that inline.
    */
   const [posted, setPosted] = useState(false);
+  /**
+   * ── The tick waits until he is LOOKING at us (owner, 2026-09-03) ────────────────────────────
+   *
+   * *"the send must go to the channel directly before seeing the sucess popup, success shown when
+   * he is back on the web."*
+   *
+   * ~~It opened as soon as the channel had been handed off.~~ That is a few milliseconds before the
+   * new tab takes focus, so the dialog was drawn and then buried — and a renter returning from
+   * Gmail met a pop-up that had appeared while he was not there.
+   *
+   * So the announcement is held until this tab is visible again. He goes, he sends, he comes back,
+   * and the tick is waiting for him — which is the moment "it is posted" is the thing he wants to
+   * know.
+   */
+  const [waitingToTell, setWaitingToTell] = useState(false);
   /** How many suppliers that first send actually reached — 0 when he posted to Moedatech alone. */
   const [reached, setReached] = useState(0);
   const announced = useRef(false);
@@ -63,6 +78,23 @@ export function ShareOnPost() {
   const isLimit = state.errorDetail?.backendCode === "E8009";
   /** The renter's own firm, for the From line. Read once, and a failure just leaves it unnamed. */
   const [renterName, setRenterName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!waitingToTell) return;
+    const tell = () => {
+      if (document.visibilityState !== "visible") return;
+      setWaitingToTell(false);
+      setPosted(true);
+    };
+    /* Both events: a tab switch fires `visibilitychange`, and returning from a window that never hid
+       this one (a second monitor, a small pop-up) fires only `focus`. */
+    document.addEventListener("visibilitychange", tell);
+    window.addEventListener("focus", tell);
+    return () => {
+      document.removeEventListener("visibilitychange", tell);
+      window.removeEventListener("focus", tell);
+    };
+  }, [waitingToTell]);
 
   useEffect(() => {
     /* `fetch` itself can be missing — a test renderer, an old embedded browser — and calling it then
@@ -175,11 +207,13 @@ export function ShareOnPost() {
         draftForm={draftForm}
         onPost={post}
         renterName={renterName}
-        onShared={(n) => {
+        onShared={(n, channel) => {
           if (announced.current) return;
           announced.current = true;
           setReached(n);
-          setPosted(true);
+          // Moedatech alone opens no tab, so there is nothing to come back FROM.
+          if (channel === "none") setPosted(true);
+          else setWaitingToTell(true);
         }}
       />
 
