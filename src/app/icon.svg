@@ -1,49 +1,45 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="760" height="760" viewBox="80 40 760 760">
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <!--
-    The browser tab's icon: the logomark in gold on a navy ground (owner, 2026-09-02).
-  
-    ~~icon.png, the mark dark on a transparent ground.~~ On a light tab strip it read as a grey smudge
-    and on a dark one it vanished into it: a transparent icon has no ground of its own, so it borrows
-    whatever the browser is painting and looks different in every window. A tab icon is 16px, the
-    smallest the brand ever appears at and the one place it cannot afford to be ambiguous.
-  
-    The two colours are the app's own navy-deep and brand-light tokens, hard-coded here because a
-    favicon is fetched as a standalone file and never sees the app's stylesheet. A CSS variable would
-    render as nothing at all.
-  
-    SVG rather than another PNG: one file covers 16px through 512px, and it carries the shape of the
-    mark rather than a rasterisation of it. src/app/icon.png is deleted with this, so Next emits
-    exactly one icon link and no browser has to choose between them. The same artwork stays at
-    public/moedatech-app-icon.png for the OG and Twitter cards, which need a raster.
-  
-    THE VIEWBOX. The mark's own box is 160 240 600 360, which is wide rather than square, so its
-    centre sits at (460, 420). A 760 square around that centre is 80 40 760 760, leaving 80 of padding
-    at the sides and 200 above and below. That is what keeps the mark off the rounded corners at tab
-    size.
-  
-    NOTE FOR THE NEXT EDITOR: this is XML, so a comment may not contain two hyphens in a row. Writing
-    the tokens as CSS variables here made the file malformed, and browsers forgave it while the build
-    did not.
-  
-  ⚠️ THE ROOT ELEMENT COMES FIRST, and the prose lives INSIDE it.
+    The browser tab's icon: the Moedatech wordmark in white on a navy ground (owner, 2026-09-03,
+    asking for "the logo with the navy background, same as one on prod but navy background and white
+    font").
 
-  This documentation used to sit above `<svg>`, and it broke every staging build from 2026-09-02
-  23:10 onward: `next build` failed with *Image import "…icon.svg" is not a valid image file*, and
-  the twelve deploys after it never shipped. Next's metadata image loader measures the file by
-  sniffing the FIRST bytes for a root element; behind 1.5 KB of comment there was nothing to find,
-  so a perfectly valid SVG was read as a corrupt one. Browsers never minded, which is why it looked
-  fine locally: `npm run typecheck`, `lint` and `test` do not compile the app, and only `npm run
-  build` sees this.
+    THE MARK IS PROD'S. It is `public/moedatech-logo.svg` inlined, which is the same artwork
+    `web.moedatech.net` serves as its icon: the wordmark with the excavator arm as its roofline.
+    ~~The abstract four path logomark that was here.~~ That is a different piece of artwork
+    altogether, and nobody outside this repo would read it as this company.
 
-  `width` and `height` are stated as well as `viewBox`, so the measurement never depends on parsing
-  the box at all.
+    INLINED, not referenced. A favicon is fetched as a standalone document, so an external `href`,
+    a `use` into another file, or a CSS variable all resolve to nothing. The colours are literals for
+    the same reason: the navy-deep token's value and white, written out.
+
+    THE GROUND. The wordmark ships navy on transparent, which is what prod uses. A transparent icon
+    borrows whatever the browser paints behind it, so it read as a grey smudge on a light tab strip
+    and vanished on a dark one. Inverting it onto a navy tile fixes both: one appearance in every
+    window, and the roundel is the app's own navy.
+
+    THE GEOMETRY. The mark is 567 x 213, about 2.7 to 1, so a square canvas is filled by its
+    WIDTH and the height falls where it falls. 58 of side padding keeps it off the rounded
+    corners; the rest is centred vertically. `rx` is a fifth of the canvas, which is the roundel the
+    app icon already uses.
+
+    NOTE FOR THE NEXT EDITOR: this is XML, so a comment may not contain two hyphens in a row.
+
+    THE ROOT ELEMENT COMES FIRST, and the prose lives INSIDE it. This documentation used to sit above
+    `<svg>` and it broke twelve staging deploys: Next's metadata image loader sniffs the first bytes
+    for a root element, found 1.5 KB of comment, and reported a valid SVG as a corrupt image. Only
+    `npm run build` catches that; typecheck, lint and test do not compile the app.
+
+    `width` and `height` are stated as well as `viewBox`, so the measurement never has to parse the
+    box at all.
   -->
-  <rect x="80" y="40" width="760" height="760" rx="152" fill="#161c2c" />
-  <g fill="#fbbf6b">
-    <path d="M327.3,410s151.1-103.2,219-147.8l84.1,36.9v1.8s-12.8,22.4-12.8,22.4l-71-24.2,136.7,69.9,8.5,37.2-168.4-59.7-130.7,85.8-65.4-22.2Z"/>
-    <path d="M699.7,330.5l-2.4-13.3,14.5,2.1,8.7,29.4c14.2,3.5,27.6,8.1,39.5,16.8,33.2,24.1,31.9,58.4,5.3,87.3-16.8,18.2-40.3,31.6-62.3,42.3-.6-.2-.3-1.4-.2-2,1.2-5.4,3.7-11.7,5.1-17.3,9.7-39,9.8-82.5-15-116l-65.9-33.3,10.4-21.7,1.3-.9,60.9,26.5Z"/>
-    <path d="M599.4,416s-144.1,104.4-212,149l-84.1-36.9v-1.8s12.8-22.4,12.8-22.4l71,24.2-136.7-69.9-8.5-37.2,168.4,59.7,130.7-85.8,58.4,21.1Z"/>
-    <path d="M234,496.6l2.4,13.3-14.5-2.1-8.7-29.4c-14.2-3.5-27.6-8.1-39.5-16.8-33.2-24.1-31.9-58.4-5.3-87.3,16.8-18.2,40.3-31.6,62.3-42.3.6.2.3,1.4.2,2-1.2,5.4-3.7,11.7-5.1,17.3-9.7,39-9.8,82.5,15,116l65.9,33.3-10.4,21.7-1.3.9-60.9,26.5Z"/>
+  <rect width="512" height="512" rx="102" fill="#161c2c" />
+  <g transform="translate(58.00 181.44) scale(0.698500)" fill="#ffffff">
+    <path d="M544.48235,139.19264c-10.66597-3.54671-38.23046-3.16793-48.69839,1.16213-14.97023,6.18953-20.14395,21.61598-18.89571,36.95636h-64.64133v-3.90825h49.37845v-34.5546l-1.35154-1.35154h-54.75877c-.72314,0-7.26559,1.83362-8.50522,2.26404-16.14097,5.71607-22.13252,21.96034-20.66906,38.12716h-29.06236v-10.8898c0-13.17964-15.69331-30.06955-29.17428-30.06955h-60.59532v35.89753h53.86345v4.49362h-53.86345v35.89753l279.99205.26686c33.65928,0,41.67381-62.7733,6.9815-74.2915ZM530.76898,177.5866h-17.94879v-4.49362h17.94879v4.49362Z"/>
+    <path d="M541.03685,99.23785h-13.35182v15.56422l-.75755-.18941h-14.31597c-3.69304,0-8.45352,5.1307-9.11639,10.53682h23.05358v.02585h23.17417v-17.25145c0-3.98575-4.70889-8.68602-8.68602-8.68602ZM539.35817,114.80207h-1.29989v-5.19096h1.29989v5.19096Z"/>
+    <path d="M332.78305,37.45733l-1.33192-5.96993,8.04267,1.44935,4.19553,13.10911c12.22308,1.58726,40.94335,11.37777,39.30227,32.71546-1.64108,21.3377-24.53061,36.0801-24.53061,36.0801,0,0-14.12832,7.47455-19.25582,10.61382,2.00743-4.07129,17.35417-54.26336-8.2033-75.09522l-42.62412-17.52376,5.51773-10.81331,38.88756,15.43438Z"/>
+    <path d="M228.94132,43.70562l-161.61386,95.10645h47.12141c12.90599,0,29.17224,16.14364,29.17224,29.16673l.02231,9.75195,19.09153-.14503v-40.38977h34.5553l1.34858,1.34865v74.93953L.0005,213.48213l.02434-35.18297h107.69797v-3.58882H0v-35.447C31.73005,123.48758,238.8893,0,238.8893,0l51.3064,19.55968c-.03901,0-5.65057,9.82433-6.16323,10.75503l-49.86867-15.0626-.06129-.01673.05571.02789,92.47076,40.0721c.64082,2.85865,4.37443,17.88791,4.37443,17.88791l-102.06209-29.51766Z"/>
+    <path d="M166.99182,100.99401h32.04549v24.18131h-52.75081v-3.47599c0-11.42758,9.27774-20.70532,20.70532-20.70532Z"/>
   </g>
 </svg>

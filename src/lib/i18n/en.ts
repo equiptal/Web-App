@@ -239,6 +239,7 @@ export const en = {
     about: "About",
     viewStore: "View store",
     expandMap: "Open the map",
+    openInGoogleMaps: "Open in Google Maps",
     prevPhoto: "Previous",
     nextPhoto: "Next",
     // The map says what it actually knows: a yard's coordinates, or only the city.
@@ -260,6 +261,8 @@ export const en = {
       linkLabel: "Your shareable link",
       linkMasked: "Generated the moment you post",
       copy: "Copy link",
+      copyShort: "Copy",
+      previewShort: "Preview",
       copied: "Copied",
       loading: "Loading…",
       recipients: "Send to my suppliers",
@@ -268,6 +271,7 @@ export const en = {
       noSuppliers: "No suppliers on your list yet.",
       noEmail: "no e-mail",
       addEmail: "Add e-mail",
+      addPhone: "Add phone",
       sendVia: "Send via",
       email: "E-mail",
       whatsapp: "WhatsApp",
@@ -277,8 +281,6 @@ export const en = {
       subject: "RFQ for {equipment}",
       skipping: "{n} of the ones you picked have no e-mail and will be left out.",
       posting: "Posting…",
-      done: "Request shared with {n} suppliers",
-      doneOne: "Request shared with 1 supplier",
       openIn: "Open in",
       outlook: "Outlook",
       gmail: "Gmail",
@@ -313,6 +315,9 @@ export const en = {
       skippingPhone: "{n} of the ones you picked have no phone.",
       previewForm: "Preview form",
       postedKeepSharing: "Keep sharing",
+      openedEmail: "Your e-mail opened with {n} suppliers. Send it there to finish.",
+      openedWhatsApp: "WhatsApp opened with {name}. Send it there to finish.",
+      openedOther: "Handed to your share sheet. Send it there to finish.",
       postedTitle: "Your request is posted",
       postedLive: "It is live on Moedatech now.",
       postedLiveOne: "It is live on Moedatech now, and shared with 1 supplier.",
@@ -2331,10 +2336,19 @@ export const en = {
     colBids: "Bids",
     onMoedatech: "On Moedatech",
     noContactName: "no contact name",
-    registered: "Registered",
+    /* ── The BADGE says «Vendor»; the ACT still says «vendor registered» ─────────────────────
+       Owner, 2026-09-03: *"keep it mark as vendor registered, mark them all as vendor registered,
+       but I mean the badge only, to have it Vendor instead of Registered."*
+
+       The chip sits on a row that is already about a supplier, so «Vendor» is the whole of what it
+       has to say, where «Registered» stated a state without saying registered as WHAT. The controls
+       that SET the flag name the act instead, and «mark as vendor registered» is the product's
+       phrase for that act. The share panel's own chip already read «Vendor», so the badges now
+       agree wherever they are drawn. */
+    registered: "Vendor",
     mark: "Mark",
-    markTitle: "Mark as a registered vendor. Your own label, the supplier is never told",
-    unmarkTitle: "Registered vendor: click to unset",
+    markTitle: "Mark as vendor registered. Your own label, the supplier is never told",
+    unmarkTitle: "Vendor registered: click to unset",
     notSet: "not set",
     add: "add",
     noGroup: "no group",
@@ -2379,7 +2393,7 @@ export const en = {
     fPhone: "Phone",
     fCr: "CR number",
     removeRow: "Remove this row",
-    markAll: "Mark them all as registered vendors",
+    markAll: "Mark them all as vendor registered",
     markAllHint: "On by default: untick any row above to add that one as a contact only.",
     /* «My» is the whole distinction from the button beside it (owner, 2026-09-03). Both add
        suppliers; one picks a firm off Moedatech, this one takes the renter's own contacts. */
@@ -2418,7 +2432,7 @@ export const en = {
     offPlatform: "Off platform",
     hasStore: "Has a store",
     verifiedByMoedatech: "Verified by Moedatech",
-    registeredVendor: "Registered vendor",
+    registeredVendor: "Vendor",
     openBids: "Open bids",
     insideApp: "Inside the app",
     noAccountBody: "They have no Moedatech account, so there is no deal room and no award: every bid reached you through your shared form.",

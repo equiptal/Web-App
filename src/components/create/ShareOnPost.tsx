@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Icon } from "@/components/ui";
+import { Icon, SuccessTick } from "@/components/ui";
 import { Dialog } from "@/components/Dialog";
 import { btn, cx } from "@/lib/ds";
 import { fmt, useT } from "@/lib/i18n";
@@ -114,11 +114,23 @@ export function ShareOnPost() {
   };
 
   return (
-    <section className="relative mt-6 rounded-lg border border-border bg-surface p-6">
+    <section className={cx("relative mt-6 rounded-lg border border-border bg-surface p-6", coach && "pt-16")}>
       {/* The coach mark: a pointer at the thing, dismissible, gone for good once dismissed. Not a
-          banner — a banner is permanent furniture, and this has one job on a renter's first visit. */}
+          banner — a banner is permanent furniture, and this has one job on a renter's first visit.
+
+          ── It sits INSIDE the card now (owner, 2026-09-03) ──────────────────────────────────
+          ~~`-top-2.5` with `-translate-y-full`, which lifted it clear of the card and onto the page
+          above.~~ There is a page up there: it landed across «Ready to send», so the heading of the
+          screen was covered by a hint about one card on it.
+
+          It is anchored to the card's own top edge instead, and the card takes `pt-16` while it is
+          showing — the mark makes room for itself rather than being laid over the content it is
+          pointing at. Dismiss it and the padding goes with it.
+
+          `font-semibold`, not `font-extrabold` (same instruction): it is a hint, and it was set
+          heavier than the heading it was sitting on. */}
       {coach && (
-        <div className="absolute -top-2.5 start-6 z-10 flex -translate-y-full items-center gap-2 rounded-md bg-navy px-3 py-2 text-label font-extrabold text-surface">
+        <div className="absolute top-3 start-6 z-10 flex items-center gap-2 rounded-md bg-navy px-3 py-2 text-label font-semibold text-surface">
           {c.coach}
           <button type="button" onClick={() => setCoach(false)} aria-label={t.common.close} className="text-surface/60 hover:text-surface">
             <Icon name="close" size={12} />
@@ -126,8 +138,6 @@ export function ShareOnPost() {
           <span aria-hidden className="absolute -bottom-1 start-5 h-2.5 w-2.5 rotate-45 bg-navy" />
         </div>
       )}
-
-      <h2 className="mb-5 text-subhead font-extrabold text-navy">{c.title}</h2>
 
       {/* ── A refused post must SAY it was refused ─────────────────────────────────────────────
           The submit already carried everything needed to explain itself — `errorDetail` holds the
@@ -156,7 +166,9 @@ export function ShareOnPost() {
         </div>
       )}
 
+      {/* The heading goes INTO the panel, at the head of its link row (owner, 2026-09-03). */}
       <ShareRequestPanel
+        heading={<h2 className="me-1 flex-none text-subhead font-extrabold text-navy">{c.title}</h2>}
         mode="post"
         requestUuid={state.shareOnPost ? (state.requestUuids[0] ?? null) : null}
         requestCode={state.requestId}
@@ -175,29 +187,40 @@ export function ShareOnPost() {
           A tick, the code, and one way out. Deliberately NOT a page: he is midway through choosing
           channels, and the supplier list, the wording he wrote and the channel he picked are all
           behind this dialog, exactly where he left them. */}
-      <Dialog
-        open={posted}
-        onClose={() => setPosted(false)}
-        size="sm"
-        icon={
-          <span className="grid h-[34px] w-[34px] flex-none place-items-center rounded-full bg-ok-soft text-ok-deep">
-            <Icon name="check_circle" size={20} />
-          </span>
-        }
-        title={c.postedTitle}
-        /* ⚠️ It only claims a share when one HAPPENED (owner, 2026-09-03: *"removed shared with your
-           supplier if he didnt share it"*). A renter who posted to Moedatech alone being told his
-           suppliers were told is the panel lying about the one thing he pressed. */
-        subtitle={reached === 0 ? c.postedLive : reached === 1 ? c.postedLiveOne : fmt(c.postedLiveMany, { n: reached })}
-        footer={
-          <button type="button" onClick={() => setPosted(false)} className={cx(btn("primary", "md"), "ms-auto")}>
+      {/* ── Centred, with the tick drawn in front of him (owner, 2026-09-03) ──────────────────
+          ~~The dialog's own header band: a 20px glyph in a soft green chip, the title beside it, the
+          subtitle under, all ranged left.~~ That is the shape of an ordinary dialog, and this is not
+          an ordinary moment — it is the one press the whole flow exists for, and the header band
+          announced it in the same voice a rename confirmation uses.
+
+          So the header is dropped and the body carries everything, centred under a tick that draws
+          itself. `Dialog` floats its close in the corner when there is no title, which is exactly
+          the shape the reference has.
+
+          The message is unchanged, and so is the rule under it. */}
+      <Dialog open={posted} onClose={() => setPosted(false)} size="sm">
+        <div className="flex flex-col items-center px-2 pb-1 pt-4 text-center">
+          <SuccessTick />
+          <h2 className="mt-5 text-title font-extrabold capitalize text-navy">{c.postedTitle}</h2>
+          {/* ⚠️ It only claims a share when one HAPPENED (owner, 2026-09-03: *"removed shared with
+              your supplier if he didnt share it"*). A renter who posted to Moedatech alone being
+              told his suppliers were told is the panel lying about the one thing he pressed. */}
+          <p className="mt-2 text-body leading-relaxed text-muted-dark">
+            {reached === 0 ? c.postedLive : reached === 1 ? c.postedLiveOne : fmt(c.postedLiveMany, { n: reached })}
+          </p>
+          {/* The link is already on the card behind this, so the dialog does not offer it again — it
+              says the one thing he does not know yet and gets out of the way. */}
+          <p className="mt-3 text-meta text-muted">{c.postedNext}</p>
+          {/* Full width and last, as the reference has it: there is one thing to do here, so it
+              takes the whole row rather than hiding on a trailing edge. */}
+          <button
+            type="button"
+            onClick={() => setPosted(false)}
+            className={cx(btn("primary", "lg", { full: true }), "mt-6")}
+          >
             {c.postedKeepSharing}
           </button>
-        }
-      >
-        {/* The link is already on the card behind this, so the dialog does not offer it again — it
-            says the one thing he does not know yet and gets out of the way. */}
-        <p className="text-meta text-muted">{c.postedNext}</p>
+        </div>
       </Dialog>
 
       <AccountModal

@@ -5,6 +5,7 @@ import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 import { btn, cx } from "@/lib/ds";
 import { fmt, useT } from "@/lib/i18n";
+import { VendorMark } from "@/components/VendorMark";
 import { isAlreadyLinked, linkRenterSuppliers, searchSupplierDirectory, type DirectoryPage } from "@/lib/api/client";
 
 /**
@@ -203,6 +204,7 @@ export function AddFromMoedatechDialog({
                       onChange={(e) => setVendor((v) => ({ ...v, [s.supplierId]: e.target.checked }))}
                       className="h-3 w-3 accent-ok"
                     />
+                    <VendorMark size={13} />
                     {c.registered}
                   </label>
                 </div>

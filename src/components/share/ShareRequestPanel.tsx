@@ -175,7 +175,19 @@ export function ShareRequestPanel({
   const [expiry, setExpiry] = useState("");
   const [busy, setBusy] = useState(false);
   const [uuid, setUuid] = useState<string | null>(requestUuid);
-  const [sharedWith, setSharedWith] = useState<number | null>(null);
+  /**
+   * ── What actually happened, and it is not "shared" (owner, 2026-09-03) ──────────────────────
+   *
+   * *"this is tracking what? because i didnt send anything the whatsapp was pending."*
+   *
+   * ~~`sharedWith` counted a successful `window.open`.~~ Opening a compose window is not sending a
+   * message: the renter may read it, edit it, close it, or never come back. We hand the message to
+   * his mail app and lose sight of it there — there is no callback, and there cannot be one.
+   *
+   * So this records the HAND-OFF, and the copy says so. A count of sends we cannot observe is a
+   * number that will be wrong for every renter who changes his mind.
+   */
+  const [handedOff, setHandedOff] = useState<{ channel: string; n: number } | null>(null);
   /** Which channels this request has already gone out on, so a second press is not a mystery. */
   const [sent, setSent] = useState<string[]>([]);
   /**
@@ -211,12 +223,11 @@ export function ShareRequestPanel({
    * ⚠️ **Built from `bidShareUrl`, never from `window.location`** (owner, 2026-09-03: *"it must
    * show the actual os link now so even for preview or copy paste be accurate"*).
    *
-   * The shared link points at the SUPPLIER OS, not at this app — the public bid form moved there.
-   * Masking with the browser's own host showed the renter a preview of a link that will never
-   * exist, and the host is the half of a URL a person actually reads. Through the real builder, the
-   * placeholder and the finished link differ in exactly one thing: the token.
+   * ~~A masked stand-in URL, `webstaging.moedatech.net/bid/••••••`, drawn in the field until the
+   * request is posted.~~ Removed 2026-09-03: the field now carries the SENTENCE that used to sit
+   * under the row — «your shareable link is generated the moment you post your request» — which is
+   * the thing the dots were there to be explained by. One line saved, and nothing to decode.
    */
-  const maskedLink = useMemo(() => bidShareUrl("••••••••").replace(/^https?:\/\//, ""), []);
 
   const card = useBidCard(shareUrl, lang, draftForm);
 
@@ -464,7 +475,7 @@ export function ShareRequestPanel({
     }
 
     // Cumulative, because a second press is a second channel, not a correction of the first.
-    setSharedWith((prev) => (prev ?? 0) + reached);
+    setHandedOff({ channel, n: reached });
     if (channel !== "none") setSent((prev) => (prev.includes(channel) ? prev : [...prev, channel]));
     onShared?.(reached);
     setBusy(false);
@@ -482,18 +493,20 @@ export function ShareRequestPanel({
     saveTemplate(next, lang);
   };
 
-  const saveEmail = async (s: RenterSupplier) => {
-    const email = emailDraft.trim();
-    if (!email) return;
-    setRows((list) => (list ?? []).map((x) => (x.id === s.id ? { ...x, email } : x)));
+  /** Saves whichever contact the chosen channel is missing — an address, or a number. */
+  const saveContact = async (s: RenterSupplier) => {
+    const value = emailDraft.trim();
+    if (!value) return;
+    const field = channel === "whatsapp" ? "phone" : "email";
+    setRows((list) => (list ?? []).map((x) => (x.id === s.id ? { ...x, [field]: value } : x)));
     setAddingEmailOn(null);
     setEmailDraft("");
     try {
-      await updateRenterSupplier(s.id, { email });
+      await updateRenterSupplier(s.id, { [field]: value });
     } catch {
       // A linked row still answers 400 (backend SUP-BE-20). Put it back rather than leave the renter
       // believing an address was saved that the next screen will not have.
-      setRows((list) => (list ?? []).map((x) => (x.id === s.id ? { ...x, email: s.email } : x)));
+      setRows((list) => (list ?? []).map((x) => (x.id === s.id ? { ...x, [field]: s[field] } : x)));
     }
   };
 
@@ -715,15 +728,26 @@ export function ShareRequestPanel({
                                   half the list unreachable meant reading a column about the wrong
                                   thing. It shows the address for e-mail and the number for
                                   WhatsApp, and names what is missing in red either way. */}
-                              <span
-                                dir="ltr"
-                                className={cx(
-                                  "block truncate text-label",
-                                  (channel === "whatsapp" ? s.phone : s.email) ? "text-muted" : "text-danger-deep",
-                                )}
-                              >
-                                {channel === "whatsapp" ? s.phone || c.noPhone : s.email || c.noEmail}
-                              </span>
+                              {/* With a channel chosen, the row shows what THAT channel needs. With
+                                  none, it states both and asks for neither — a renter who has not
+                                  said how he is sending has not been asked for anything yet. */}
+                              {channel === "none" ? (
+                                <span dir="ltr" className="block truncate text-label">
+                                  <span className={s.email ? "text-muted" : "text-danger-deep"}>{s.email || c.noEmail}</span>
+                                  <span className="text-muted-light"> · </span>
+                                  <span className={s.phone ? "text-muted" : "text-danger-deep"}>{s.phone || c.noPhone}</span>
+                                </span>
+                              ) : (
+                                <span
+                                  dir="ltr"
+                                  className={cx(
+                                    "block truncate text-label",
+                                    (channel === "whatsapp" ? s.phone : s.email) ? "text-muted" : "text-danger-deep",
+                                  )}
+                                >
+                                  {channel === "whatsapp" ? s.phone || c.noPhone : s.email || c.noEmail}
+                                </span>
+                              )}
                             </span>
                             {/* Vendor-registered is the renter's OWN flag on this supplier, and it
                                 decides whether an award can go to him — so it belongs on the row he
@@ -742,19 +766,27 @@ export function ShareRequestPanel({
                             {s.verified && <Icon name="verified_user" size={14} className="flex-none text-ok" />}
                           </button>
 
-                          {/* Fixed in place: sending him to another screen to add an address would
+                          {/* ── The «Add» belongs to the CHANNEL (owner, 2026-09-03) ──────────
+                              *"the add option is when channel is selected and this apply to phone
+                              and emails both."* Offered with nothing chosen, it asked him to fix a
+                              gap for a send he had not decided to make — and it only ever offered
+                              an address, so a renter about to use WhatsApp was pointed at the wrong
+                              field.
+
+                              Fixed in place rather than on another screen: sending him away would
                               lose the selection he is building here. */}
-                          {!canBeEmailed(s) &&
+                          {channel !== "none" &&
+                            !(channel === "whatsapp" ? s.phone?.trim() : canBeEmailed(s)) &&
                             (addingEmailOn === s.id ? (
                               <span className="flex flex-none items-center gap-1.5">
                                 <input
                                   autoFocus
                                   value={emailDraft}
                                   onChange={(e) => setEmailDraft(e.target.value)}
-                                  placeholder="name@company.com"
+                                  placeholder={channel === "whatsapp" ? "+9665…" : "name@company.com"}
                                   className="h-[26px] w-[150px] rounded-sm border border-border-strong px-2 text-meta text-navy outline-none focus:border-brand"
                                 />
-                                <button type="button" onClick={() => void saveEmail(s)} className="text-meta font-semibold text-brand">
+                                <button type="button" onClick={() => void saveContact(s)} className="text-meta font-semibold text-brand">
                                   {t.common.save}
                                 </button>
                               </span>
@@ -767,7 +799,7 @@ export function ShareRequestPanel({
                                 }}
                                 className="flex-none text-meta font-semibold text-brand"
                               >
-                                {c.addEmail}
+                                {channel === "whatsapp" ? c.addPhone : c.addEmail}
                               </button>
                             ))}
                         </div>
@@ -780,10 +812,10 @@ export function ShareRequestPanel({
             )}
             {/* Named before the press, per channel: «2 have no phone» is a different sentence from
                 «2 have no e-mail», and only one of them is true at a time. */}
-            {sharedWith === null && channel === "email" && unreachable.length > 0 && (
+            {handedOff === null && channel === "email" && unreachable.length > 0 && (
               <span className="text-meta text-danger-deep">{fmt(c.skipping, { n: unreachable.length })}</span>
             )}
-            {sharedWith === null && channel === "whatsapp" && noPhone.length > 0 && (
+            {handedOff === null && channel === "whatsapp" && noPhone.length > 0 && (
               <span className="text-meta text-danger-deep">{fmt(c.skippingPhone, { n: noPhone.length })}</span>
             )}
           </div>
@@ -970,7 +1002,7 @@ export function ShareRequestPanel({
         </p>
 
           {/* Said plainly: the alternative is a renter who believes four people were messaged. */}
-          {channel === "whatsapp" && sharedWith === null && (
+          {channel === "whatsapp" && handedOff === null && (
             <span className="text-meta text-muted">
               {firstWithPhone ? fmt(c.whatsappFirst, { name: firstWithPhone.name }) : c.whatsappNoPhone}
             </span>
@@ -994,11 +1026,17 @@ export function ShareRequestPanel({
               and now wants the same request on WhatsApp needs to be told that is a press away —
               otherwise the confirmation reads as the end of the road and he goes looking for a
               second Share button that does not exist. */}
-          {sharedWith !== null && (
+          {handedOff !== null && (
             <span className="grid gap-1 rounded-md bg-ok-soft px-3 py-2">
               <span className="flex items-center gap-1.5 text-meta font-extrabold text-ok-deep">
                 <Icon name="check_circle" size={15} />
-                {sharedWith === 0 ? c.postedOnly : sharedWith === 1 ? c.doneOne : fmt(c.done, { n: sharedWith })}
+                {handedOff?.channel === "none" || !handedOff?.n
+                  ? c.postedOnly
+                  : handedOff.channel === "whatsapp"
+                    ? fmt(c.openedWhatsApp, { name: firstWithPhone?.name ?? "" })
+                    : handedOff.channel === "other"
+                      ? c.openedOther
+                      : fmt(c.openedEmail, { n: handedOff.n })}
               </span>
               {/* The clipboard holds ONE thing, so this names that thing and where it goes. It
                   is the only instruction on the screen at this moment, which is the point. */}

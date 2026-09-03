@@ -5,6 +5,7 @@ import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 import { btn, cx } from "@/lib/ds";
 import { fmt, useT } from "@/lib/i18n";
+import { VendorMark } from "@/components/VendorMark";
 import { addRenterSuppliersBulk, type NewRenterSupplier } from "@/lib/api/client";
 import { SupplierImportPanel } from "./SupplierImportPanel";
 
@@ -207,6 +208,7 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
                     onChange={(e) => patch(i, { vendor: e.target.checked })}
                     className="h-3 w-3 accent-ok"
                   />
+                  <VendorMark size={13} />
                   {c.registered}
                 </label>
                 <button

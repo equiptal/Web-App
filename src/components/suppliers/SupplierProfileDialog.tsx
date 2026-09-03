@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { VerifiedMark } from "@/components/VerifiedMark";
+import { VendorMark } from "@/components/VendorMark";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 import { btn, cx } from "@/lib/ds";
@@ -157,7 +158,11 @@ function Badges({ p }: { p: SupplierProfile }) {
       )}
       {p.vendorRegistered && (
         <span className="inline-flex h-[23px] items-center gap-1.5 rounded-full border border-ok bg-ok-soft px-2.5 text-label font-extrabold text-ok-deep">
-          <VerifiedMark size={13} />
+          {/* ⚠️ This wore `VerifiedMark`, which is MOEDATECH's rosette and says the opposite of what
+              this chip means: verified is ours to grant, vendor is the renter's own private label.
+              Beside a genuine «verified by Moedatech» chip on the same line, the two read as one
+              claim said twice. */}
+          <VendorMark size={13} />
           {c.registeredVendor}
         </span>
       )}

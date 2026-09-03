@@ -443,6 +443,39 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
   );
 }
 
+/* ------------------------------------ SuccessTick ------------------------------------ */
+
+/**
+ * **A green tick, drawn** — the mark on a confirmation the renter has just earned.
+ *
+ * The disc pops in and the check is then drawn on it. Both movements and the reasoning behind them
+ * live in `globals.css` under `tick-pop` / `tick-draw`, next to the app's other keyframes, because
+ * a stylesheet is where `prefers-reduced-motion` can turn them off without this component knowing.
+ *
+ * `aria-hidden`: the words beside it already say the thing happened, and a screen reader announcing
+ * a decorative tick would say it twice.
+ */
+export function SuccessTick({ size = 72 }: { size?: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="tick-disc grid flex-none place-items-center rounded-full bg-ok"
+      style={{ width: size, height: size }}
+    >
+      <svg viewBox="0 0 32 32" width={size * 0.5} height={size * 0.5} fill="none">
+        <path
+          className="tick-check"
+          d="M8 16.5 13.5 22 24 11"
+          stroke="var(--surface)"
+          strokeWidth="3.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </span>
+  );
+}
+
 /* ------------------------------------ Stepper ------------------------------------ */
 
 export function Stepper({ value, onChange, min = 1, max = 99 }: { value: number; onChange: (v: number) => void; min?: number; max?: number }) {

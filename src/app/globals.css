@@ -464,3 +464,45 @@ body {
     animation: none;
   }
 }
+
+/* ---- The success tick (owner, 2026-09-03) ----
+   A confirmation that a request went out is the one moment in the flow worth marking: the renter has
+   just pressed the button he came to press, and everything else on the screen is the work he did to
+   get there. A 20px glyph in a header band states it; a tick drawn in front of him CONFIRMS it.
+
+   Two movements, and they are sequenced rather than simultaneous. The disc arrives first, with a
+   small overshoot, because a circle that snaps into place reads as a rendering artefact. The check
+   is then DRAWN on it, which is the part that says "done" — a check that fades in is a picture of a
+   check, and a check that draws is an act finishing.
+
+   `stroke-dasharray` and `stroke-dashoffset` are the whole mechanism: the path is 30 units long, so
+   the dash starts fully offset (invisible) and animates to zero (complete). It needs no library and
+   no JS, and it cannot desynchronise from the disc because both are on one timeline.
+
+   Reduced motion keeps BOTH, and animates neither: the disc and the finished check are the meaning,
+   the movement is the flourish. A reader who asked for less motion still gets the answer. */
+@keyframes tick-pop {
+  0% { transform: scale(0.4); opacity: 0; }
+  55% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes tick-draw {
+  to { stroke-dashoffset: 0; }
+}
+.tick-disc {
+  animation: tick-pop 0.34s cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+.tick-check {
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+  animation: tick-draw 0.3s 0.22s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tick-disc {
+    animation: none;
+  }
+  .tick-check {
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+}

@@ -5,6 +5,7 @@ import { Icon } from "@/components/ui";
 import { fmt, useT } from "@/lib/i18n";
 import { btn, cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { VendorMark } from "@/components/VendorMark";
 import { ApiError, deleteSupplierGroup, listRenterSuppliers, renameSupplierGroup, updateRenterSupplier } from "@/lib/api/client";
 import { AddSuppliersDialog } from "./AddSuppliersDialog";
 import { AddFromMoedatechDialog } from "./AddFromMoedatechDialog";
@@ -279,7 +280,7 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
             />
           </span>
           <Pill on={pill === "all"} onClick={() => setPill("all")} label={c.all} n={rows?.length ?? 0} />
-          <Pill on={pill === "vendor"} onClick={() => setPill("vendor")} label={c.registeredVendors} n={vendors} icon="verified" />
+          <Pill on={pill === "vendor"} onClick={() => setPill("vendor")} label={c.registeredVendors} n={vendors} mark />
 
           <span className="ms-auto flex items-center gap-2">
             {/* ── Share a request, from HERE as well as from the request ──────────────────────────
@@ -554,7 +555,22 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
   );
 }
 
-function Pill({ on, onClick, label, n, icon }: { on: boolean; onClick: () => void; label: string; n: number; icon?: string }) {
+function Pill({
+  on,
+  onClick,
+  label,
+  n,
+  icon,
+  mark,
+}: {
+  on: boolean;
+  onClick: () => void;
+  label: string;
+  n: number;
+  icon?: string;
+  /** The vendor artwork instead of a Material glyph — see `VendorMark`. */
+  mark?: boolean;
+}) {
   return (
     <button
       type="button"
@@ -565,7 +581,7 @@ function Pill({ on, onClick, label, n, icon }: { on: boolean; onClick: () => voi
         on ? "border-navy bg-navy text-surface" : "border-border bg-surface text-muted-dark hover:border-navy-mid hover:text-navy",
       )}
     >
-      {icon && <Icon name={icon} size={13} />}
+      {mark ? <VendorMark size={13} className={on ? "invert" : undefined} /> : icon ? <Icon name={icon} size={13} /> : null}
       {label}
       <span className="font-mono tabular-nums opacity-75">{n}</span>
     </button>
@@ -674,7 +690,10 @@ function Row({
               : "border-dashed border-border-strong bg-surface text-muted hover:border-navy-mid hover:text-navy",
           )}
         >
-          <Icon name={s.vendorRegistered ? "verified" : "add"} size={14} />
+          {/* One mark for this flag everywhere (owner, 2026-09-03) — see `VendorMark`. The `add`
+              plus is kept for the UNSET state, because there the chip is an invitation to set it,
+              and the mark itself would say the row already is one. */}
+          {s.vendorRegistered ? <VendorMark size={14} /> : <Icon name="add" size={14} />}
           {s.vendorRegistered ? c.registered : c.mark}
         </button>
       </td>

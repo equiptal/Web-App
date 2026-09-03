@@ -550,6 +550,64 @@ describe("the preview says what is SENT, not what is stored", () => {
   });
 });
 
+describe("what the panel claims after a send (owner, 2026-09-03)", () => {
+  it("Given a send, Then it says the CHANNEL OPENED — never that it was sent", async () => {
+    /**
+     * ⚠️ *"this is tracking what? because i didnt send anything the whatsapp was pending."*
+     *
+     * It counted a successful `window.open` and called it "Request shared with 2 suppliers".
+     * Opening a compose window is not sending a message: he may read it, edit it, close it, or
+     * never come back. We hand the message to his mail app and lose sight of it there — there is no
+     * callback, and there cannot be one. So the panel reports the HAND-OFF.
+     */
+    draw();
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.sendToSuppliers));
+
+    await waitFor(() => expect(screen.getByText(c.openedEmail.replace("{n}", "1"))).toBeTruthy());
+    expect(screen.queryByText(/shared with/i)).toBeNull();
+  });
+
+  it("Given Moedatech alone, Then it claims no channel at all", async () => {
+    draw();
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.sendMoedatechOnly));
+
+    await waitFor(() => expect(screen.getByText(c.postedOnly)).toBeTruthy());
+  });
+});
+
+describe("the Add action belongs to the channel (owner, 2026-09-03)", () => {
+  it("Given no channel, Then a row states both contacts and offers neither", async () => {
+    draw();
+    const row = (await screen.findByText("Najd Equipment Est.")).closest("li")!;
+
+    // Both stated — he has not said how he is sending, so he is not being asked to fix anything.
+    expect(within(row).getByText(c.noEmail)).toBeTruthy();
+    expect(within(row).queryByText(c.addEmail)).toBeNull();
+    expect(within(row).queryByText(c.addPhone)).toBeNull();
+  });
+
+  it("Given WhatsApp, Then a row missing a NUMBER offers Add phone, not Add e-mail", async () => {
+    // It only ever offered an address, so a renter about to use WhatsApp was pointed at the wrong
+    // field entirely.
+    draw();
+    await screen.findByText("Najd Equipment Est.");
+    fireEvent.click(screen.getByText(c.whatsapp));
+
+    // `Al Faisal Rentals` has both, so no Add appears on it either way.
+    const hasBoth = screen.getByText("Al Faisal Rentals").closest("li")!;
+    expect(within(hasBoth).queryByText(c.addPhone)).toBeNull();
+
+    // `Najd` has a number and no address — so with WhatsApp chosen it needs nothing, and the
+    // e-mail prompt that used to sit there is gone.
+    const najd = screen.getByText("Najd Equipment Est.").closest("li")!;
+    expect(within(najd).queryByText(c.addEmail)).toBeNull();
+    expect(within(najd).getByText("+966505556677")).toBeTruthy();
+  });
+});
+
 describe("copying", () => {
   it("Given Copy, Then the clipboard holds the LINK and nothing else", async () => {
     /**
