@@ -2362,7 +2362,7 @@ export const en = {
     last: "last {when}",
     couldNotRead: "We could not read that",
     couldNotReadField: "{field} was not usable: “{value}”",
-    couldNotReadBody: "Your sheet said this, and it is not a phone number or an address — so it is kept as a note, and cannot be used to reach them or to match them to a Moedatech account. Edit the row to correct it.",
+    couldNotReadBody: "Your sheet said this, and it is not a phone number or an address, so it is kept as a note, and cannot be used to reach them or to match them to a Moedatech account. Edit the row to correct it.",
     emptyTitle: "Your list is empty",
     emptyBody: "Moedatech has hundreds of suppliers. None of them are here until you add them.",
     noMatchTitle: "No supplier matches",

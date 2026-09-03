@@ -220,14 +220,19 @@ export function ShareRequestPanel({
   /**
    * What the link field shows before there is a link.
    *
-   * ⚠️ **Built from `bidShareUrl`, never from `window.location`** (owner, 2026-09-03: *"it must
-   * show the actual os link now so even for preview or copy paste be accurate"*).
+   * ⚠️ **The SHAPE of the coming link, not a sentence about it** (owner, 2026-09-03: *"in the link
+   * locked placeholder will show part of the name of the link with ***"*).
    *
-   * ~~A masked stand-in URL, `webstaging.moedatech.net/bid/••••••`, drawn in the field until the
-   * request is posted.~~ Removed 2026-09-03: the field now carries the SENTENCE that used to sit
-   * under the row — «your shareable link is generated the moment you post your request» — which is
-   * the thing the dots were there to be explained by. One line saved, and nothing to decode.
+   * ~~It briefly carried the hint sentence instead, on the reasoning that the sentence explained the
+   * dots so the dots did no work.~~ They do different work: the sentence says WHEN, and the mask says
+   * WHAT — a renter who has never shared one of these has no picture of the thing he is waiting for,
+   * and the host is the half of a URL a person actually reads.
+   *
+   * ⚠️ Built from `bidShareUrl`, never from `window.location`: the link points at the supplier OS,
+   * not at this app. Through the real builder, the placeholder and the finished link differ in
+   * exactly one thing — the token.
    */
+  const maskedLink = useMemo(() => bidShareUrl("••••" + "*".repeat(10)).replace(/^https?:\/\//, ""), []);
 
   const card = useBidCard(shareUrl, lang, draftForm);
 
@@ -556,11 +561,8 @@ export function ShareRequestPanel({
             )}
           >
             {!uuid && <Icon name="lock" size={13} className="flex-none text-muted-light" />}
-            {/* ── The empty field says what it is waiting for (owner, 2026-09-03) ───────────────
-                ~~A row of masked dots, with «Your shareable link is generated the moment you post
-                your request» on a line of its own underneath.~~ The sentence explained the dots, so
-                the dots were doing no work: the field can carry the sentence itself, and the line
-                under the row goes, which is one of the two lines this card needed back. */}
+            {/* The shape of the link that is coming — host, path, a stub, stars. The sentence that
+                says WHEN it arrives sits under the row; this says WHAT it will be. */}
             <span
               dir={uuid ? "ltr" : undefined}
               className={cx(
@@ -568,7 +570,7 @@ export function ShareRequestPanel({
                 uuid ? "font-mono text-navy" : "text-muted-light",
               )}
             >
-              {uuid ? shareUrl.replace(/^https?:\/\//, "") : c.linkHint}
+              {uuid ? shareUrl.replace(/^https?:\/\//, "") : maskedLink}
             </span>
           </span>
           <button
@@ -612,6 +614,9 @@ export function ShareRequestPanel({
             {c.previewShort}
           </a>
         </div>
+        {/* WHEN it arrives. The field above says what it will be; this says when — two different
+            facts, and folding them into one control lost the one a first-time renter needs. */}
+        <p className="text-meta text-muted">{c.linkHint}</p>
       </div>
       )}
 
@@ -950,7 +955,11 @@ export function ShareRequestPanel({
               it reads as settled beside three things that are still choices. */}
           <span
             title={c.alwaysHint}
-            className="inline-flex h-[34px] flex-none items-center gap-2.5 rounded-md border border-ok bg-ok-soft px-4"
+            /* Taller than the channels beside it, and on white rather than the band's own tint
+               (owner, 2026-09-03: *"make moedatech larger box to be more visisble"*). It is not one
+               of the choices — it is the floor under all of them, and matching their height made it
+               read as a fourth chip that happened to be ticked. */
+            className="inline-flex h-[42px] flex-none items-center gap-2.5 rounded-md border border-ok bg-surface px-4"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/moedatech-logo.svg" alt="Moedatech" className="h-4 w-auto brightness-0" />
