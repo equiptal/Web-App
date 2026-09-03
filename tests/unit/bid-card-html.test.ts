@@ -24,6 +24,44 @@ describe("bidTokenFromUrl", () => {
   });
 });
 
+describe("the card is the shape an unfurl builds", () => {
+  it("Given a model, Then image, title, description, host — and no term table", () => {
+    /**
+     * Owner, 2026-09-03: *"this is how the template must look like, this is what we decided which is
+     * different from the current preview. why??"*
+     *
+     * Because this drew something no client builds: a two-column list of «Mobilization / Renter»
+     * pairs, plus a per-item block under it. WhatsApp, Telegram, Slack and Outlook all render the
+     * SAME four things from Open Graph — image, one bold title, a description paragraph, the host
+     * — because there are no tags for anything else.
+     */
+    const html = bidCardHtml(card, {
+      ref: null,
+      imageHeadline: "Excavator 20 ton · with operator ×2",
+      cardTitle: "Excavator 20 ton · with operator ×2",
+      items: [],
+      where: "Riyadh · 4 months & extendable",
+      terms: [
+        { label: "Mobilization", value: "Renter" },
+        { label: "Fuel", value: "Supplier" },
+      ],
+      closing: "Bidding closes 21 Aug 2026",
+      accepting: true,
+      cta: "Open the link to submit your bid →",
+    });
+
+    // The four slots.
+    expect(html).toContain("<img");
+    expect(html).toContain("Excavator 20 ton");
+    expect(html).toContain("Riyadh");
+    expect(html).toContain("WEBSTAGING.MOEDATECH.NET");
+
+    // The terms ride in the description paragraph, not in rows of their own.
+    expect(html).toContain("Mobilization: Renter");
+    expect(html).not.toContain("<td width=\"122\"");
+  });
+});
+
 describe("the navy band before the request exists", () => {
   it("Given no image yet, Then the band is DRAWN from the model, not stood in for", () => {
     /**

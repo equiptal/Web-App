@@ -31,7 +31,7 @@
  */
 
 import { COLORS, RADII } from "@/lib/ds-colors";
-import type { BidCardModel } from "@/lib/bidCardModel";
+import { bidCardDescription, type BidCardModel } from "@/lib/bidCardModel";
 
 export interface BidCardPreview {
   title: string;
@@ -71,26 +71,13 @@ function hostOf(url: string): string {
  * in the one place we have it.
  */
 
-/** One `label · value` line. A row the request cannot answer never reaches here. */
-function row(label: string, value: string, align: string): string {
-  return `<tr>
-        <td width="122" style="padding:2px 0;font-size:11.5px;color:${COLORS.muted};font-weight:600;vertical-align:top;text-align:${align};">${escapeHtml(label)}</td>
-        <td style="padding:2px 0;font-size:11.5px;color:${COLORS.navy};font-weight:700;text-align:${align};">${escapeHtml(value)}</td>
-      </tr>`;
-}
-
-/** A bordered group of rows, or nothing at all when the group is empty. */
-function block(rows: string[]): string {
-  if (!rows.length) return "";
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-top:1px solid ${COLORS.border};margin-top:9px;padding-top:8px;border-collapse:collapse;">
-      ${rows.join("\n      ")}
-    </table>`;
-}
-
-/**
- * Table-based with inline styles, because that is what survives a paste into Gmail and Outlook —
- * both strip `<style>` blocks and ignore flex/grid. The image is a fixed 160px band rather than
- * `object-fit: cover`, which Outlook does not support; the asset is already that shape.
+/*
+ * — `row` and `block` lived here —
+ *
+ * They drew the term table: a two-column list of «Mobilization / Renter» pairs under the title.
+ * Removed 2026-09-03 because no client builds one. An unfurl has four slots — image, title,
+ * description, host — and everything a table said now rides in the description, which is the same
+ * string `og:description` carries.
  */
 /**
  * The navy band, drawn as MARKUP rather than fetched as a picture.
@@ -123,34 +110,27 @@ export function bidCardHtml(card: BidCardPreview, model: BidCardModel | null, la
   /**
    * The headline lives in the picture. When there IS no picture and we draw the band as markup, the
    * band already carries it — repeating it as the title directly underneath is the machine's name
-   * twice in twenty vertical pixels, which is what a real unfurl never does (the image is a picture,
-   * the title is text, and a reader reads them as one thing).
+   * twice in twenty vertical pixels, which is what a real unfurl never does.
    */
   const bandIsMarkup = !card.imageUrl && !!model;
   const title = bandIsMarkup ? "" : model?.cardTitle || card.title;
-  const where = model?.where ?? card.description;
-  /**
-   * The request's own answers first — the site and the dates are above this, and these are the
-   * terms every machine on the request agrees on.
-   */
-  const terms = (model?.terms ?? []).map((i) => row(i.label, i.value, align));
 
   /**
-   * Then each machine, and beneath it only what IT carries.
+   * ── ONE paragraph, because that is what an unfurl draws (owner, 2026-09-03) ──────────────────
    *
-   * A term the whole request agrees on has already been stated once above; repeating it under every
-   * machine is how a five-item card becomes a wall a supplier scrolls past. What is left under a
-   * machine is, by construction, the thing that makes it different from the others.
+   * *"this is how the template must look like, this is what we decided which is different from the
+   * current preview. why??"* — and the answer was that this function drew something no client
+   * builds: a two-column table of terms, plus a per-item block under it.
+   *
+   * WhatsApp, Telegram, Slack and Outlook all render the SAME four things from Open Graph: the
+   * image, one bold title, a description paragraph, and the host. There are no rows, no columns and
+   * no second block, because there are no tags for them.
+   *
+   * So the card is those four things. `bidCardDescription` is the same string that goes into
+   * `og:description`, clamped where WhatsApp clamps it — site, duration, dates, then as many terms
+   * as fit, deadline first. The preview and the unfurl are now one drawing of one model.
    */
-  const itemRows = (model?.items ?? [])
-    .map(
-      (i) =>
-        `<div style="padding-top:9px;">
-      <div style="font-size:12.5px;font-weight:700;color:${COLORS.foreground};line-height:1.4;">${escapeHtml([i.label, i.units].filter(Boolean).join(" "))}</div>
-      ${i.terms.length ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;">${i.terms.map((x) => row(x.label, x.value, align)).join("")}</table>` : ""}
-    </div>`,
-    )
-    .join("");
+  const description = model ? bidCardDescription(model) : card.description;
 
   return `<a href="${url}" style="text-decoration:none;color:inherit;display:block;max-width:440px;">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="440" dir="${dir}" style="width:440px;max-width:100%;border:1px solid ${COLORS.background};border-radius:${RADII.md};border-collapse:separate;overflow:hidden;background:${COLORS.surface};font-family:'Segoe UI',Roboto,Arial,sans-serif;">
@@ -168,10 +148,7 @@ export function bidCardHtml(card: BidCardPreview, model: BidCardModel | null, la
     </td></tr>
     <tr><td align="${align}" style="padding:14px 16px 16px;">
       ${title ? `<div style="font-size:14px;font-weight:700;color:${COLORS.foreground};line-height:1.35;">${escapeHtml(title)}</div>` : ""}
-      ${where ? `<div style="font-size:12px;color:${COLORS.mutedDark};font-weight:600;line-height:1.4;padding-top:6px;">${escapeHtml(where)}</div>` : ""}
-      ${block(terms)}
-      ${itemRows ? `<div style="border-top:1px solid ${COLORS.border};margin-top:9px;padding-top:2px;">${itemRows}</div>` : ""}
-      ${model?.closing ? `<div style="font-size:11px;color:${COLORS.muted};padding-top:8px;">${escapeHtml(model.closing)}.</div>` : ""}
+      ${description ? `<div style="font-size:12px;color:${COLORS.mutedDark};line-height:1.5;padding-top:6px;">${escapeHtml(description)}</div>` : ""}
       <div style="font-size:10.5px;color:${COLORS.mutedLight};letter-spacing:0.4px;padding-top:10px;">${escapeHtml(hostOf(card.url))}</div>
     </td></tr>
   </table>
