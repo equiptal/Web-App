@@ -153,10 +153,9 @@ describe("how it goes", () => {
      * requests"; the subject is where he decides whether to open it, so it names the machine.
      */
     expect(url.searchParams.get("subject")).toContain("RFQ for");
-    // ⚠️ The clipboard holds ONE thing, so Outlook gets the ADDRESSES — the thing its compose URL
-    // cannot carry — and is told exactly where to put them. Never the card as well.
-    await waitFor(() => expect(screen.getByText(c.nowPasteAddresses)).toBeTruthy());
-    expect(screen.queryByText(c.nowPasteCard)).toBeNull();
+    // ⚠️ And the panel says nothing afterwards: three lines of narration under the button went on
+    // 2026-09-03. The pop-up on return carries the one fact he does not already have.
+    expect(screen.queryByText(/on the clipboard/i)).toBeNull();
   });
 
   it("Given nobody is ticked, Then it still sends — the renter addresses it himself", async () => {
@@ -199,9 +198,8 @@ describe("how it goes", () => {
     expect(button.hasAttribute("disabled")).toBe(false);
 
     fireEvent.click(button);
+    // The request is CREATED, which is the thing the disabled button used to prevent.
     await waitFor(() => expect(posted).toHaveBeenCalled());
-    // It reached nobody by e-mail, and says so as a posting rather than as a failure.
-    await waitFor(() => expect(screen.getByText(c.postedOnly)).toBeTruthy());
   });
 
   it("Given «More», Then the message goes to the device's own share sheet", async () => {
@@ -215,8 +213,8 @@ describe("how it goes", () => {
       </LocaleProvider>,
     );
     // One channel at a time: pressing «More» selects it, and E-mail goes off with the same press.
+    // ⚠️ One press: *More* IS the act, so it hands over immediately rather than waiting for Send.
     fireEvent.click(await screen.findByText(c.other));
-    fireEvent.click(screen.getByText(c.sendToSuppliers));
 
     await waitFor(() => expect(share).toHaveBeenCalled());
     // The whole message, not the bare link — the same words every other channel carries.
@@ -234,29 +232,36 @@ describe("how it goes", () => {
     );
     // One channel at a time: pressing «More» selects it, and E-mail goes off with the same press.
     fireEvent.click(await screen.findByText(c.other));
-    fireEvent.click(screen.getByText(c.sendToSuppliers));
 
     await waitFor(() => expect(writeText).toHaveBeenCalled());
     expect(screen.getByText(c.messageCopied)).toBeTruthy();
   });
 
   it("Given both extras are off, Then it says Moedatech only, and still sends", async () => {
+    const posted = vi.fn(async () => "new-uuid");
     /**
      * Owner, 2026-09-02: *"users must be able to send the request only through moedatech without any
      * other channel so they must see that clearly in the ui."* Stated as a fact, not left as the
      * absence of two ticks — a renter must never wonder whether Send does nothing.
      */
-    draw();
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="post" draftForm={DRAFT} onPost={posted} />
+      </LocaleProvider>,
+    );
     await screen.findByText("Al Faisal Rentals");
     // Nothing is on to begin with, so this IS the Moedatech-only state.
     expect(screen.getByText(c.moedatechOnlyHint)).toBeTruthy();
-    const button = screen.getByText(c.sendMoedatechOnly).closest("button")!;
+    const button = screen.getByText(c.postMoedatechOnly).closest("button")!;
     expect(button.hasAttribute("disabled")).toBe(false);
 
     fireEvent.click(button);
     // No mail window, no WhatsApp: Moedatech alone means nothing else is opened.
-    await waitFor(() => expect(screen.getByText(c.postedOnly)).toBeTruthy());
+    await waitFor(() => expect(posted).toHaveBeenCalled());
     expect(opened).not.toHaveBeenCalled();
+    /* And the button does NOT become «Share again»: nothing was shared, so offering to repeat it
+       would name an act that never happened. `sent` only records real channels. */
+    expect(screen.queryByText(c.shareAgain)).toBeNull();
   });
 
   it("Given a share went out, Then it is recorded against the request", async () => {
@@ -372,8 +377,8 @@ describe("one channel at a time (owner, 2026-09-02)", () => {
     fireEvent.click(screen.getByText(c.email));
     fireEvent.click(screen.getByText(c.sendToSuppliers));
 
+    // The button renames itself; the three narration lines under it went on 2026-09-03.
     await waitFor(() => expect(screen.getByText(c.shareAgain)).toBeTruthy());
-    expect(screen.getByText(c.shareAgainHint)).toBeTruthy();
 
     // And the channel it has used says so, so he can see where it has been.
     expect(screen.getByText(c.email).closest("button")!.textContent).toContain("check");
@@ -465,9 +470,6 @@ describe("what rides the clipboard on an e-mail send", () => {
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("ops@alfaisal.sa"));
-    // And he is told, once, where to put them.
-    expect(screen.getByText(c.nowPasteAddresses)).toBeTruthy();
-    expect(screen.queryByText(c.nowPasteCard)).toBeNull();
   });
 
   it("Given he never pastes, Then what he sends is still a complete message", async () => {
@@ -552,31 +554,25 @@ describe("the preview says what is SENT, not what is stored", () => {
   });
 });
 
-describe("what the panel claims after a send (owner, 2026-09-03)", () => {
-  it("Given a send, Then it says the CHANNEL OPENED — never that it was sent", async () => {
+describe("the panel narrates nothing after a send (owner, 2026-09-03)", () => {
+  it("Given a send, Then no running commentary is left under the button", async () => {
     /**
-     * ⚠️ *"this is tracking what? because i didnt send anything the whatsapp was pending."*
+     * ~~«Your e-mail opened with 1 suppliers» — «Your suppliers are on the clipboard, press Ctrl+V»
+     * — «Pick another channel above and press again».~~ *"remove this it isnt even working."*
      *
-     * It counted a successful `window.open` and called it "Request shared with 2 suppliers".
-     * Opening a compose window is not sending a message: he may read it, edit it, close it, or
-     * never come back. We hand the message to his mail app and lose sight of it there — there is no
-     * callback, and there cannot be one. So the panel reports the HAND-OFF.
+     * Three lines describing a window the renter is already looking at, one of them counting a send
+     * we cannot observe. What he does not already know is that the request is POSTED, and the
+     * pop-up on his return says exactly that — see `ShareOnPost`.
      */
     draw();
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.email));
     fireEvent.click(screen.getByText(c.sendToSuppliers));
 
-    await waitFor(() => expect(screen.getByText(c.openedEmail.replace("{n}", "1"))).toBeTruthy());
-    expect(screen.queryByText(/shared with/i)).toBeNull();
-  });
-
-  it("Given Moedatech alone, Then it claims no channel at all", async () => {
-    draw();
-    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.sendMoedatechOnly));
-
-    await waitFor(() => expect(screen.getByText(c.postedOnly)).toBeTruthy());
+    await waitFor(() => expect(opened).toHaveBeenCalled());
+    expect(screen.queryByText(/on the clipboard/i)).toBeNull();
+    expect(screen.queryByText(/opened with/i)).toBeNull();
+    expect(screen.queryByText(/Pick another channel/i)).toBeNull();
   });
 });
 

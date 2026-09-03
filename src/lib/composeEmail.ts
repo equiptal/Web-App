@@ -133,7 +133,19 @@ export function composeEmailUrl({ to = [], bcc = [], subject = "", body = "", pr
   if (subject) q.set(gmail ? "su" : "subject", subject);
   if (body) q.set("body", body);
   const base = COMPOSE_URLS[provider];
-  const url = `${base}${base.includes("?") ? "&" : "?"}${q.toString()}`;
+  /**
+   * ⚠️ **`URLSearchParams` encodes a space as `+`, and a compose window prints it literally.**
+   *
+   * `toString()` produces `application/x-www-form-urlencoded`, where `+` means space — a FORM
+   * convention. Outlook and Gmail decode their deeplink parameters as ordinary percent-encoding, so
+   * every space arrived as a plus sign: *"RFQ+for+Excavator+20+ton"*, and a body nobody could read
+   * (owner, 2026-09-03).
+   *
+   * `%20` means space in both conventions, so re-encoding is safe and total. A literal plus the
+   * renter typed is already `%2B` by this point and is untouched.
+   */
+  const query = q.toString().replace(/\+/g, "%20");
+  const url = `${base}${base.includes("?") ? "&" : "?"}${query}`;
   return url.length > COMPOSE_URL_MAX ? null : url;
 }
 

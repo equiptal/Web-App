@@ -197,12 +197,6 @@ export function ShareRequestPanel({
   const [handedOff, setHandedOff] = useState<{ channel: string; n: number } | null>(null);
   /** Which channels this request has already gone out on, so a second press is not a mystery. */
   const [sent, setSent] = useState<string[]>([]);
-  /**
-   * What is waiting on his clipboard, and therefore what the panel tells him to paste.
-   *
-   * Never both: the clipboard holds one thing, and each provider is missing exactly one.
-   */
-  const [pasteNeeded, setPasteNeeded] = useState<"addresses" | "card" | null>(null);
   const [copied, setCopied] = useState(false);
   const [addingEmailOn, setAddingEmailOn] = useState<string | null>(null);
   /** *Add my suppliers*, opened from the `+` beside the search — see that control. */
@@ -360,7 +354,12 @@ export function ShareRequestPanel({
       return next;
     });
 
-  const send = async () => {
+  /**
+   * `override` exists for *More*, which sends on its own press: `setChannel` has not landed yet at
+   * that moment, so the channel is passed in rather than read out of state a render too early.
+   */
+  const send = async (override?: "none" | "email" | "whatsapp" | "other") => {
+    const ch = override ?? channel;
     if (busy) return;
     setBusy(true);
     setTooLong(false);
@@ -385,7 +384,7 @@ export function ShareRequestPanel({
     const message = card ? renderShareMessage(card.model, url, { template, renterName, lang }) : url;
     let reached = 0;
 
-    if (channel === "email") {
+    if (ch === "email") {
       // No pick at all is a legitimate share (owner, 2026-09-02): the renter wants the message in
       // his own compose window to address himself. Nothing is recorded, because nobody was named.
       if (reachable.length) void recordRequestShare(id, reachable.map((x) => x.id), "email");
@@ -415,7 +414,6 @@ export function ShareRequestPanel({
       if (provider === "outlook") {
         if (reachable.length) {
           void navigator.clipboard?.writeText(reachable.map((x) => x.email).join("; ")).catch(() => {});
-          setPasteNeeded("addresses");
         }
       } else if (card) {
         void copyShareMessage(
@@ -431,7 +429,6 @@ export function ShareRequestPanel({
             lang,
           ),
         ).catch(() => {});
-        setPasteNeeded("card");
       }
 
       const openedIt = openEmailCompose({
@@ -445,7 +442,7 @@ export function ShareRequestPanel({
       if (openedIt) reached += reachable.length;
       else setTooLong(true);
     }
-    if (channel === "whatsapp") {
+    if (ch === "whatsapp") {
       /**
        * ONE chat. `wa.me` has no multi-recipient form and no browser API does, so the first pick
        * with a phone is the one it opens — said on screen before the press, because the alternative
@@ -459,7 +456,7 @@ export function ShareRequestPanel({
       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank", "noopener");
       if (firstWithPhone) reached += 1;
     }
-    if (channel === "other") {
+    if (ch === "other") {
       /**
        * The device's own sheet. `navigator.share` needs a user gesture and HTTPS, and it rejects on
        * a cancel as well as on a failure — so a rejection is never treated as an error, it just
@@ -489,9 +486,9 @@ export function ShareRequestPanel({
     }
 
     // Cumulative, because a second press is a second channel, not a correction of the first.
-    setHandedOff({ channel, n: reached });
-    if (channel !== "none") setSent((prev) => (prev.includes(channel) ? prev : [...prev, channel]));
-    onShared?.(reached, channel);
+    setHandedOff({ channel: ch, n: reached });
+    if (ch !== "none") setSent((prev) => (prev.includes(ch) ? prev : [...prev, ch]));
+    onShared?.(reached, ch);
     setBusy(false);
   };
 
@@ -1088,7 +1085,22 @@ export function ShareRequestPanel({
           />
           <Channel
             on={channel === "other"}
-            onClick={() => setChannel((v) => (v === "other" ? "none" : "other"))}
+            /**
+             * ── «More» opens the sheet on the PRESS (owner, 2026-09-03: *"why the more option
+             * doesnt do anything it must open the all share options with copy"*) ────────────────
+             *
+             * It was a channel like the other two: press it, then press Send. But WhatsApp and
+             * E-mail are choices about a message the renter is still composing, while *More* IS the
+             * act — it hands the whole thing to the operating system, which then asks him where it
+             * goes. Making him press twice to reach a chooser is a chooser in front of a chooser.
+             *
+             * It still selects itself first, so the preview shows what is about to be handed over,
+             * and so a second press repeats the share rather than doing nothing.
+             */
+            onClick={() => {
+              setChannel("other");
+              void send("other");
+            }}
             icon="ios_share"
             label={c.other}
             done={sent.includes("other")}
@@ -1144,33 +1156,14 @@ export function ShareRequestPanel({
           {/* What actually happened, not a blanket «shared». A send that reached nobody by e-mail
               still POSTED, and saying «shared with 0 suppliers» would read as a failure when the
               request is live on Moedatech and waiting. */}
-          {/* What happened, and what may still happen. A renter who has just e-mailed four people
-              and now wants the same request on WhatsApp needs to be told that is a press away —
-              otherwise the confirmation reads as the end of the road and he goes looking for a
-              second Share button that does not exist. */}
-          {handedOff !== null && (
-            <span className="grid gap-1 rounded-md bg-ok-soft px-3 py-2">
-              <span className="flex items-center gap-1.5 text-meta font-extrabold text-ok-deep">
-                <Icon name="check_circle" size={15} />
-                {handedOff?.channel === "none" || !handedOff?.n
-                  ? c.postedOnly
-                  : handedOff.channel === "whatsapp"
-                    ? fmt(c.openedWhatsApp, { name: firstWithPhone?.name ?? "" })
-                    : handedOff.channel === "other"
-                      ? c.openedOther
-                      : fmt(c.openedEmail, { n: handedOff.n })}
-              </span>
-              {/* The clipboard holds ONE thing, so this names that thing and where it goes. It
-                  is the only instruction on the screen at this moment, which is the point. */}
-              {pasteNeeded && (
-                <span className="flex items-start gap-1.5 rounded-sm bg-surface px-2 py-1.5 text-label font-semibold text-navy">
-                  <Icon name="content_paste" size={13} className="mt-px flex-none text-brand" />
-                  {pasteNeeded === "addresses" ? c.nowPasteAddresses : c.nowPasteCard}
-                </span>
-              )}
-              <span className="text-label text-ok-deep">{c.shareAgainHint}</span>
-            </span>
-          )}
+          {/* ── The panel says nothing after the press (owner, 2026-09-03) ────────────────────
+              ~~«Your e-mail opened with 1 suppliers» — «Your suppliers are on the clipboard, press
+              Ctrl+V» — «Pick another channel above and press again».~~ Three lines of narration
+              stacked under a button, describing a window the renter is already looking at, and one
+              of them counting a send we cannot observe. *"remove this it isnt even working."*
+
+              The pop-up on return says the request is posted, which is the one fact he does not
+              already have. Everything else was us explaining ourselves. */}
       </div>
 
       {/* ── Adding a supplier without leaving the share (owner, 2026-09-03) ────────────────────
