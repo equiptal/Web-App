@@ -92,22 +92,40 @@ export function WherePanel({
       <Icon name="check_circle" size={17} /> {t.step1.location.confirmed}
     </span>
   ) : (
-    <span className="flex flex-none flex-col items-end gap-1">
-      {/* Standing, not just for the length of the shake: this is the one thing the panel is waiting
-          for, and «* Required» says so until it is answered (owner, 2026-09-02). */}
-      {tried && <span className="text-label font-extrabold text-danger">{t.create.requiredMark}</span>}
+    /* ── The button is a SIBLING of the address box, not a stack (owner, 2026-09-03) ─────────────
+       *"Make the button at the same start and end as the location beside it, align them as they
+       were, and the required is above it, so we increase the space between them and the map to fit
+       the required. Just make sure the button and the location box are aligned."*
+
+       It was wrapped in a column that held «* Required» above it, and that column is what broke the
+       row: the label added height on one side only, so the button dropped below the box's baseline
+       and the two edges no longer met. The mark now lives ABOVE THE ROW (see `confirmMark`), which
+       is the one place it costs neither side its alignment, and the row itself stretches so the
+       button's top and bottom are the box's own. */
     <button
       type="button"
       disabled={!hasLocation}
       onClick={() => actions.confirmLocation()}
-      className={`flex-none rounded-sm bg-navy px-4 py-2 text-body font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg ${
+      className={`flex-none self-stretch rounded-sm bg-navy px-4 text-body font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg ${
         shakeConfirm ? "shake-error" : ""
       }`}
     >
       {t.create.wherePanel.confirm}
     </button>
-    </span>
   );
+
+  /**
+   * The confirmation's own mark, on its own line above the row.
+   *
+   * Two stages, like every other required answer: a red `*` while it stands unanswered, the word
+   * «* Required» from the moment a refusal points here. It is not inside the button's column
+   * because a label there pushes the button out of line with the address box beside it.
+   */
+  const confirmMark = !(loc.confirmed && hasLocation) ? (
+    <div className="mb-1.5 flex justify-end text-label font-extrabold text-danger">
+      {tried ? t.create.requiredMark : "*"}
+    </div>
+  ) : null;
 
   return (
     <section {...pin("where-panel")}
@@ -226,9 +244,12 @@ export function WherePanel({
                 hideAddress
               />
 
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              {/* `mt-4` rather than `mt-3`: the mark above the row needs the room, and the owner
+                  asked for exactly that space rather than for a tighter label. */}
+              {confirmMark}
+              <div className="mt-4 flex flex-wrap items-stretch justify-between gap-3">
                 {hasLocation ? (
-                  <span className="flex min-w-0 flex-1 items-start gap-1.5 rounded-sm border border-border bg-surface px-3 py-2">
+                  <span className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm border border-border bg-surface px-3 py-2">
                     <Icon name="location_on" size={15} className="mt-px flex-none text-brand" />
                     <span className="min-w-0">
                       <span className="flex min-w-0 items-center gap-1.5">

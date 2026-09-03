@@ -179,6 +179,7 @@ export function WhenPanel({
                 source={basisSource}
                 missing={!timing.rentalBasis}
                 required={!!tried && !timing.rentalBasis}
+                star
                 hint={timing.rentalBasis ? fmt(t.create.whenPanel.quoteRate, { basis: t.options.rentalBasis[timing.rentalBasis].toLowerCase() }) : undefined}
               >
                 {/* ── One control for every choice on the canvas (owner, 2026-08-26) ─────────────
@@ -267,10 +268,22 @@ export function WhenPanel({
                   {charged.known
                     ? fmt(t.create.whenPanel.confirmCharged, { charged: num(charged.chargedDays) })
                     : t.create.whenPanel.confirmChargedNoDates}
-                  {/* The one thing this panel is waiting for, said until it is answered. */}
-                  {tried && !state.chargedDaysUnderstood && (
-                    <span className="ms-1 font-extrabold text-danger">{t.create.requiredMark}</span>
-                  )}
+                  {/* ── The two stages, on the tick itself (owner, 2026-09-03) ──────────────────
+                      *"Even for the acknowledgement, don't set it yourself, let the user check it,
+                      and if he clicks next equipment or review and send without checking it, shake
+                      it and show the red required."*
+
+                      It has always started unticked and nothing in the app ever ticks it for him —
+                      `chargedDaysUnderstood` is seeded false, is not persisted with the draft, and
+                      is cleared again whenever the figure it refers to changes. What was missing is
+                      that it never SAID it was owed until a refusal. Now the star stands from the
+                      moment the line appears, and the word arrives with the shake. */}
+                  {!state.chargedDaysUnderstood &&
+                    (tried ? (
+                      <span className="ms-1 flex-none font-extrabold text-danger">{t.create.requiredMark}</span>
+                    ) : (
+                      <span className="ms-1 flex-none font-extrabold text-danger">*</span>
+                    ))}
                 </label>
               </div>
               )}

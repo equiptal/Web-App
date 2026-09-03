@@ -89,13 +89,16 @@ export function ShareRequestModal({
     : (requests?.find((r) => (r.requestGroupId || r.id) === chosen)?.displayId ?? null);
 
   return (
+    /* ~~A subtitle: «Pick who sees it, and how it reaches them.»~~ Removed (owner, 2026-09-03).
+       The panel under it is three labelled blocks — SEND TO MY SUPPLIERS, SEND VIA, WHAT THEY
+       RECEIVE — each saying that same sentence in the place where it is true. A subtitle that
+       paraphrases the screen costs a line of the modal's height and teaches nothing. */
     <Dialog
       open={open}
       onClose={onClose}
       size="xxl"
       icon={<Icon name="share" size={18} />}
       title={c.title}
-      subtitle={c.modalSubtitle}
     >
       <div className="grid gap-5">
         {!requestUuid && (

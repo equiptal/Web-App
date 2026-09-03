@@ -50,7 +50,6 @@ import {
   PAYMENT_TERMS,
   SAFETY_CERTIFICATES,
   OPERATOR_CERTIFICATES,
-  FUEL_TYPES,
   equipmentYears,
   type RentalBasis,
   type PaymentTerm,
@@ -494,23 +493,18 @@ export function ProjectPills() {
 
         {terms && (
           <>
-            {/* ── The fuel it burns, not only who buys it ────────────────────────────────────────
-                `fuelResponsibility` was here and `fuelType` was not, so the strip asked who pays for
-                the fuel without ever saying which fuel — and a template that copied «electric» from a
-                work order showed nothing (owner, 2026-09-02: *"make sure the pills have all the
-                project and its children values"*). */}
-            {shown(terms.fuelType) && (
-            <PillSelect<string>
-              label={t.projects.pills.fuel}
-              value={terms.fuelType ?? null}
-              options={[...FUEL_TYPES]}
-              optionLabel={(v) => t.options.fuelType[v as keyof typeof t.options.fuelType] ?? v}
-              changed={dirty("preferences.fuel_type")}
-              /* No ✕: `fuelType` does not admit «unstated» on an item — every machine burns
-                 something, and the seed is diesel. Changing it is the only act available. */
-              onChange={(v) => actions.patchTerms({ fuelType: v as typeof terms.fuelType }, ["preferences.fuel_type"])}
-            />
-            )}
+            {/* ~~The fuel it burns, beside who buys it.~~ Removed (owner, 2026-09-03: *"remove
+                fuel type from the pills of the items, it is always prefilled by us in the system"*).
+
+                It was added on 09-02 under «the pills must carry all the project and its children
+                values», and the reasoning held for every OTHER term: those are answers a site or a
+                work order gave, and a pill is where the renter reads one back. Fuel type is not one
+                of those. `defaultProjectDetails()` seeds diesel and the agent overwrites it from the
+                machine itself, so the pill showed the SYSTEM's own value on every request, in a
+                strip whose whole purpose is to show what came from the renter's site. Where fuel
+                genuinely is his to state, it is on the machine card, which is where he is looking at
+                the machine that burns it. `fuelResponsibility` stays: who PAYS is a commercial term
+                and the site does set it. */}
 
             <PillSegment<"yes" | "no">
               label={t.projects.pills.operator}

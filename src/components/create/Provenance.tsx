@@ -76,6 +76,7 @@ export function CanvasField({
   missing = false,
   shake = false,
   required = false,
+  star = false,
   optional = false,
   icon,
   hint,
@@ -95,6 +96,22 @@ export function CanvasField({
    * edge stay until the field is answered. The animation is the attention; this is the answer.
    */
   required?: boolean;
+  /**
+   * This field is required, and says so before anybody is refused.
+   *
+   * A red `*` beside the label, from the first render (owner, 2026-09-03): *"at first all these
+   * fields will show a red star so the user knows he must fill them, and if he tries to move on and
+   * one is blocking him then it will shake and show the word Required, not only a star."*
+   *
+   * So the star is the STANDING fact, this answer is owed, and `required` above is the same fact at
+   * the moment it stopped him. Two stages of one mark, never both at once: the word replaces the
+   * star rather than joining it.
+   *
+   * Not every gate gets one. The minimum year and the certificate block the canvas but are not the
+   * REQUEST's own requirements (MREQ-AC-54: the app treats both as optional, and each offers an
+   * explicit «Any year» / «No certificate»), so they shake when unanswered and are never starred.
+   */
+  star?: boolean;
   optional?: boolean;
   icon?: ReactNode;
   /** A quiet line under the control — the prototype's "KSA STANDARD", "Suppliers quote you a …". */
@@ -110,7 +127,12 @@ export function CanvasField({
         }`}
       >
         {icon}
-        <span>{label}</span>
+        <span>
+          {label}
+          {/* The star rides the LABEL, not the row: «TYPE *» is one thing to read, while a star a
+              gap away from the word it qualifies reads as a footnote to the whole field. */}
+          {star && !required && <span className="ms-0.5 font-extrabold text-danger">*</span>}
+        </span>
         {optional && <span className="font-normal normal-case tracking-normal text-muted/70">{t.create.machineCard.notesOptional}</span>}
         {/* The word, not just the dot — see `shake`. */}
         {required ? (

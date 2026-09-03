@@ -98,18 +98,36 @@ describe("AddFromMoedatechDialog", () => {
      * It used to be forced on (owner, 2026-09-02 reversed it). Adding from Moedatech now behaves
      * exactly like adding a firm by hand, and the flag means the one thing it says: this is a firm I
      * have registered as a vendor. A renter can add one he is only trying out without claiming so.
+     *
+     * ⚠️ THE ROW'S OWN CHIP, by position, and that is the point of the rewrite. This pressed the
+     * LAST checkbox in the dialog, which is the master, so it proved that unticking ALL of them
+     * works and said nothing about the row. The row's chip could not be unticked at all, and this
+     * test passed throughout (owner, 2026-09-03: *"I can't add a supplier without deselecting him as
+     * not registered"*). Checkbox 0 picks the first row, checkbox 1 is that same row's vendor flag.
      */
     open();
     await listed();
 
-    fireEvent.click(screen.getAllByRole("checkbox")[0]);
-    // The row's own tick appears once the row is chosen.
-    const ticks = screen.getAllByRole("checkbox");
-    fireEvent.click(ticks[ticks.length - 1]);
+    const boxes = screen.getAllByRole("checkbox");
+    fireEvent.click(boxes[0]);
+    fireEvent.click(boxes[1]);
     fireEvent.click(screen.getByRole("button", { name: en.suppliers.dirAddN.replace("{n}", "1") }));
 
     await waitFor(() => expect(api.linked.length).toBe(1));
     expect(api.linked[0][0]).toEqual([{ supplierId: "9", vendorRegistered: false }]);
+  });
+
+  it("Given a row's vendor chip is pressed, Then it does not also pick or unpick the row", async () => {
+    /* The chip used to live INSIDE the row's label, so it toggled the pick as well — which is why it
+       carried a `preventDefault` that froze its own tick. Two labels now, side by side. */
+    open();
+    await listed();
+
+    const boxes = screen.getAllByRole("checkbox") as HTMLInputElement[];
+    fireEvent.click(boxes[1]);
+
+    expect(boxes[0].checked).toBe(false);
+    expect(boxes[1].checked).toBe(false);
   });
 
   it("Given more than one page, Then it pages rather than scrolling 1,492 rows", async () => {

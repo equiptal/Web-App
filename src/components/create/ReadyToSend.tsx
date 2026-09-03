@@ -142,23 +142,25 @@ export function ReadyToSend() {
 
   return (
     <div {...pin("ready-to-send")}>
-      {/* The title and the summary share one row: the summary is what the page is ABOUT, so it sits
-          at the top of it rather than under it. It wraps below the title on a narrow screen, where
-          two things cannot share a line without one of them being unreadable. */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        {/* ~~A line under the title: "This is exactly what suppliers will see. Terms and payment come
-            after the bids arrive. Nothing else to fill in here."~~ Removed (owner, 2026-09-02).
+      {/* ── The title and the summary on ONE row (owner, 2026-09-03) ──────────────────────────
+          ~~The heading, then the strip under it.~~ Two full-width bands stacked, and the first of
+          them held three words. The heading names the screen and the strip states the request, so
+          side by side they read as one line — «Ready to send: this, here, then» — and the cards
+          below start a viewport-height higher.
 
-            It had also stopped being true. Payment terms are SET on this screen now, from the strip
-            below, so "terms and payment come after the bids arrive" told the renter the opposite of
-            what the control under it does. And the rest of it explained a page that explains itself:
-            the strip states the request, the cards state the detail, and the button says send. */}
-        <div className="min-w-0">
-          <h1 className="text-display font-extrabold text-navy">{t.create.ready.title}</h1>
-        </div>
-      </div>
+          The heading takes only its own width; the strip takes the rest and keeps its own border, so
+          it is still a card rather than a run of text after a title. `basis-[34rem]` is what makes
+          the wrap honest: below that the strip drops to its own line rather than squeezing the facts
+          into a column two words wide.
 
-      <div className="mb-3.5 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-sm border border-border bg-surface px-4 py-2.5">
+          ~~A line under the title: "This is exactly what suppliers will see. Terms and payment come
+          after the bids arrive. Nothing else to fill in here."~~ Removed (owner, 2026-09-02).
+          It had also stopped being true: payment terms are SET on this screen now, from the strip
+          itself. And the rest of it explained a page that explains itself. */}
+      <div className="mb-3.5 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <h1 className="flex-none text-display font-extrabold text-navy">{t.create.ready.title}</h1>
+
+        <div className="flex min-w-0 flex-1 basis-[34rem] flex-wrap items-center gap-x-4 gap-y-2 rounded-sm border border-border bg-surface px-4 py-2.5">
         {/* A green dot for «this is ready», the same mark the panels use on the canvas. */}
         <span aria-hidden className="size-2 flex-none rounded-full bg-ok" />
 
@@ -209,7 +211,12 @@ export function ReadyToSend() {
         <StripFact>
           <Dropdown
             tone="pill"
-            label={t.create.ready.paymentTerm}
+            /* The field NAMES ITSELF, chosen or not (owner, 2026-09-03). `placeholder` only shows
+               while the control is empty, so the moment a term was picked the strip read «Net 30»
+               with nothing saying what Net 30 was. `prefix` is the pill's standing title and rides
+               inside the same box, so the row gains a word, not a second element. */
+            prefix={t.create.ready.paymentTermTitle}
+            label={t.create.ready.paymentTermTitle}
             placeholder={t.create.ready.paymentTerm}
             value={prefs.payment.terms}
             onChange={(v) => actions.patchPreferences({ payment: { terms: (v || null) as PaymentTerm } })}
@@ -243,6 +250,7 @@ export function ReadyToSend() {
             <Icon name="edit" size={15} />
           </button>
         </span>
+        </div>
       </div>
 
       <Dialog open={details} onClose={() => setDetails(false)} title={t.create.ready.detailsTitle} size="xl">

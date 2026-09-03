@@ -1,13 +1,18 @@
 "use client";
 
 /**
- * The little map beside an equipment's gallery — one pin, no controls worth speaking of, no route.
+ * The map beside an equipment's gallery, and the same map full-size in a dialog.
  *
- * It answers "roughly where is this machine" and nothing else, so it is deliberately not `MapCanvas`:
- * that canvas is a bid workspace (machine pins, availability colours, distance chips, a dotted route
- * to the project) and every one of those facts is absent here. Dragging, scroll-zoom and the keyboard
- * pan are off — the pin is the content, and a small map that swallows the page's scroll is a bug the
- * renter cannot name.
+ * It is a REAL map now (owner, 2026-09-03): drag, zoom, double-click, the zoom control and OSM's
+ * attribution are all on. It was frozen — every interaction disabled — on the theory that a small
+ * panel is a picture of a place rather than a place. That is wrong in the one case the panel exists
+ * for: a renter asking *where is this, exactly* wants to pull the map about and see what is around
+ * it, and a map that refuses is furniture.
+ *
+ * **Scroll-wheel zoom stays off** and is the one exception, because it is the one interaction the
+ * renter does not ask for: a wheel over a map inside a scrolling page swallows the page's scroll and
+ * the reader loses their place. `Ctrl`/`⌘` + wheel still zooms (leaflet's own behaviour), the ± are
+ * always there, and the expand control opens a map where the wheel is free.
  *
  * `leaflet` touches `window` at import time, so the page reaches this module through
  * `dynamic(..., { ssr: false })`, the same handling `MapCanvas` and `MapLocationPicker` need.
@@ -31,25 +36,31 @@ export default function EquipmentLocationMap({
   label,
   /** Yard coordinates get a close view; a city centroid gets a city-wide one — the zoom states which. */
   precise,
+  /** The expanded copy: the wheel zooms, and the attribution has room to sit. */
+  expanded = false,
 }: {
   lat: number;
   lng: number;
   label: string | null;
   precise: boolean;
+  expanded?: boolean;
 }) {
   return (
     <MapContainer
       center={[lat, lng]}
-      zoom={precise ? 13 : 10}
+      zoom={precise ? 14 : 10}
       style={{ height: "100%", width: "100%" }}
-      zoomControl={false}
-      scrollWheelZoom={false}
-      dragging={false}
-      doubleClickZoom={false}
-      keyboard={false}
-      attributionControl={false}
+      zoomControl
+      scrollWheelZoom={expanded}
+      dragging
+      doubleClickZoom
+      keyboard
+      attributionControl={expanded}
     >
-      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
       <Marker position={[lat, lng]}>
         {label && (
           <Tooltip direction="top" offset={[0, -34]} permanent>

@@ -221,33 +221,40 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
               </div>
             ))}
 
-            <button
-              type="button"
-              onClick={() => setRows((list) => [...list, blank()])}
-              className="mt-1 inline-flex h-[30px] w-fit items-center gap-1.5 rounded-md border border-dashed border-border-strong px-3 text-meta font-extrabold text-muted-dark transition hover:border-navy-mid hover:bg-surface2 hover:text-navy"
-            >
-              <Icon name="add" size={15} />
-              {c.addAnother}
-            </button>
+            {/* ── One row: add another on the left, mark-them-all on the right (owner, 2026-09-03) ──
+                *"This needs no long box, make it a box on the right at the same row as the Add
+                another button, and remove the description."*
 
-            <div className="mt-2 flex gap-2 rounded-md bg-surface2 px-3 py-2.5 text-meta text-muted-dark">
-              <Icon name="info" size={15} className="flex-none" />
-              <span>{c.addHint}</span>
+                It was a full-width green band with a heading and a sentence under it, sitting between
+                the table and the upload — three lines of chrome for one checkbox that most renters
+                leave exactly as it arrives. Beside «Add another» it is what it actually is: a control
+                over the rows above, at the end of them.
+
+                ~~«Each supplier needs a company name, and an email or a phone…»~~ Gone with it. The
+                table's own header stars the required column, the refusal names the row that is short
+                of a contact, and the dialog's subtitle now says what a list is for. Explaining all of
+                that a fourth time, before he has typed anything, is a paragraph in the way. */}
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setRows((list) => [...list, blank()])}
+                className="inline-flex h-[30px] w-fit items-center gap-1.5 rounded-md border border-dashed border-border-strong px-3 text-meta font-extrabold text-muted-dark transition hover:border-navy-mid hover:bg-surface2 hover:text-navy"
+              >
+                <Icon name="add" size={15} />
+                {c.addAnother}
+              </button>
+
+              {/* The flag is per row above; this only sets them all at once. */}
+              <label className="inline-flex h-[30px] cursor-pointer items-center gap-2 rounded-md border border-ok/40 bg-ok-soft px-3 text-meta font-extrabold text-ok-deep">
+                <input
+                  type="checkbox"
+                  checked={rows.every((r) => r.vendor)}
+                  onChange={(e) => setRows((list) => list.map((r) => ({ ...r, vendor: e.target.checked })))}
+                  className="h-3.5 w-3.5 flex-none accent-ok"
+                />
+                {c.markAll}
+              </label>
             </div>
-
-            {/* The flag is per row above; this only sets them all at once. */}
-            <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-ok/40 bg-ok-soft px-3 py-2.5 text-meta text-ok-deep">
-              <input
-                type="checkbox"
-                checked={rows.every((r) => r.vendor)}
-                onChange={(e) => setRows((list) => list.map((r) => ({ ...r, vendor: e.target.checked })))}
-                className="mt-0.5 h-4 w-4 flex-none accent-ok"
-              />
-              <span>
-                <b className="block font-extrabold">{c.markAll}</b>
-                <span className="block text-muted-dark">{c.markAllHint}</span>
-              </span>
-            </label>
 
             {/* The prototype's `or` rule and one secondary button — not a tab. Tabs say "two equal
                 things, choose"; these are not equal. Typing is what the dialog opens on because most
@@ -257,10 +264,15 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
               {c.or}
               <span className="h-px flex-1 bg-border" />
             </div>
-            <button type="button" onClick={() => setMode("file")} className={cx(btn("secondary", "md"), "w-fit")}>
-              <Icon name="upload_file" size={15} />
-              {c.uploadInstead}
-            </button>
+            {/* Centred under its own rule (owner, 2026-09-03). Left-aligned it read as one more
+                control in the column of fields; on the centre line it reads as the alternative the
+                rule above it announces. */}
+            <div className="flex justify-center">
+              <button type="button" onClick={() => setMode("file")} className={cx(btn("secondary", "md"), "w-fit")}>
+                <Icon name="upload_file" size={15} />
+                {c.uploadInstead}
+              </button>
+            </div>
           </div>
         )}
       </div>

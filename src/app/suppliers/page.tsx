@@ -1,4 +1,4 @@
-import { AppShell } from "@/components/AppShell";
+import { AppShell, PageBack } from "@/components/AppShell";
 import { SuppliersPage } from "@/components/suppliers/SuppliersPage";
 
 /**
@@ -11,6 +11,7 @@ import { SuppliersPage } from "@/components/suppliers/SuppliersPage";
 export default function Suppliers() {
   return (
     <AppShell>
+      <PageBack fallback="/" />
       <SuppliersPage />
     </AppShell>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Dropdown } from "@/components/Dropdown";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
@@ -39,13 +40,43 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
+  const router = useRouter();
 
   const [cities, setCities] = useState<CityOpt[]>([]);
   const [taxonomy, setTaxonomy] = useState<TaxonomyNode[]>([]);
 
+  /**
+   * The narrowing lives in the URL (owner, 2026-09-03).
+   *
+   * *"I clicked an equipment from the stores, I clicked back … I want browsing all stores."* Back
+   * lands here, and it used to land on an UNFILTERED directory: the pill was component state, so
+   * returning threw away the category, the city and the words the renter had typed, and put him at
+   * the top of 60 cards to find his place again. A filter nobody can link to is also a filter nobody
+   * can share or reload.
+   *
+   * Read off `window.location` rather than `useSearchParams`, which would oblige this page to carry
+   * a Suspense boundary for a convenience — the same call `ProjectChips` makes, for the same reason.
+   * The first render is the server's and holds none of it; the effect below fills it in.
+   *
+   * ⚠️ **Coming BACK here restores the view but not the address.** Next hands back the client state
+   * for that entry — the pill is still lit and the machine cards are still there, which is what the
+   * renter asked for — while restoring the entry's original `/browse`. Re-asserting the query from a
+   * `popstate` handler was tried and does not stick (the router rewrites the address during the same
+   * event), so the screen is right and the address bar is one filter behind until the next press.
+   * Reloading at that moment lands on the unfiltered directory. Worth solving with `useSearchParams`
+   * as the single source if this ever bites.
+   */
   const [city, setCity] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [search, setSearch] = useState("");
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    setCity(q.get("city") ?? "");
+    setCategoryId(q.get("category") ?? "");
+    const s = q.get("search") ?? "";
+    setSearch(s);
+    setDebounced(s);
+  }, []);
   const [debounced, setDebounced] = useState("");
 
   const [stores, setStores] = useState<StoreCardData[] | null>(null);
@@ -88,6 +119,30 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
     const id = setTimeout(() => setDebounced(search.trim()), 300);
     return () => clearTimeout(id);
   }, [search]);
+
+  /**
+   * Write the narrowing back into the address bar.
+   *
+   * `replaceState`, never `push`: a category is a view of this page, not a page of its own, so Back
+   * must leave the directory rather than walk backwards through six pills the renter pressed on the
+   * way to the one he wanted. It is also why the debounced search is what rides here — one entry per
+   * search, not one per keystroke.
+   */
+  useEffect(() => {
+    // The ROUTER's replace, not `history.replaceState`. The latter rewrites the address bar while
+    // leaving the router's own entry saying `/browse`, so the address and the entry drift apart.
+    // `scroll: false` keeps the renter's place in the grid.
+    const sync = () => {
+      const q = new URLSearchParams(window.location.search);
+      const set = (k: string, v: string) => (v ? q.set(k, v) : q.delete(k));
+      set("category", categoryId);
+      set("city", city);
+      set("search", debounced);
+      const next = `${window.location.pathname}${q.toString() ? `?${q}` : ""}`;
+      if (next !== `${window.location.pathname}${window.location.search}`) router.replace(next, { scroll: false });
+    };
+    sync();
+  }, [categoryId, city, debounced, router]);
 
   useEffect(() => {
     setError(false);

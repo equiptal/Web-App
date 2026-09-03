@@ -1,6 +1,6 @@
 "use client";
 
-import { AppShell } from "@/components/AppShell";
+import { AppShell, PageBack } from "@/components/AppShell";
 import { useT, useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { SignInPrompt } from "@/components/common/SignInPrompt";
@@ -35,6 +35,10 @@ export default function ProfilePage() {
 
   return (
     <AppShell title={t.shell.profile}>
+      {/* Only on the signed-in page. The sign-in prompt above is a dead end by design: a visitor
+          pressed something that needs an account, and offering him a way back to a page he cannot
+          use either is not the answer he needs. */}
+      <PageBack fallback="/" />
       <ProfileView />
     </AppShell>
   );

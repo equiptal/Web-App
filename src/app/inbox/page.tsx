@@ -1,6 +1,6 @@
 "use client";
 
-import { AppShell } from "@/components/AppShell";
+import { AppShell, PageBack } from "@/components/AppShell";
 import { InboxView } from "@/components/inbox/InboxView";
 import { useT, useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
@@ -14,6 +14,7 @@ export default function InboxPage() {
   const ar = locale === "ar";
   return (
     <AppShell title={t.shell.inbox}>
+      <PageBack fallback="/" />
       {status === "anon" ? (
         <SignInPrompt
           icon="inbox"

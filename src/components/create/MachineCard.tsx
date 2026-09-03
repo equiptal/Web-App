@@ -40,7 +40,7 @@ import {
 } from "@/lib/contract";
 
 /**
- * The title of an overlay control, carrying its «* Required».
+ * The title of an overlay control, carrying its star and, once it has refused, the word.
  *
  * The four chips on the photograph have no visible label: on a photo, a title over every one of
  * them would be four grey captions across the machine, and the placeholder inside each chip already
@@ -52,12 +52,15 @@ import {
  * So the title appears exactly when the mark does, in one opaque strip with it — the field's name
  * and its demand in the same box, on a background that does not depend on the photograph.
  */
-function OverlayRequired({ title }: { title: string }) {
+function OverlayRequired({ title, word }: { title: string; word?: boolean }) {
   const t = useT();
   return (
-    <span className="mb-1 inline-flex max-w-full items-center gap-1.5 rounded-sm border border-danger bg-surface px-1.5 py-0.5">
-      <span className="truncate text-label font-extrabold uppercase tracking-[0.05em] text-navy">{title}</span>
-      <span className="flex-none text-label font-extrabold text-danger">{t.create.requiredMark}</span>
+    /* `whitespace-nowrap` and no truncation: the strip is two short words and clipping the field's
+       NAME to «MINIMUM Y…» defeated the whole point of naming it (owner, 2026-09-03). It sizes to
+       its content and the chip below keeps its own width. */
+    <span className="mb-1 inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm border border-danger bg-surface px-1.5 py-0.5">
+      <span className="text-label font-extrabold uppercase tracking-[0.05em] text-navy">{title}</span>
+      <span className="flex-none text-label font-extrabold text-danger">{word ? t.create.requiredMark : "*"}</span>
     </span>
   );
 }
@@ -181,10 +184,20 @@ export function MachineCard({
           )}
 
           {/* Top-left the certificate, top-right the quantity. Amber while the certificate is
-              unanswered — an unasked certificate silently narrows the renter's own bidder pool. */}
+              unanswered — an unasked certificate silently narrows the renter's own bidder pool.
+
+              ── Neither is marked «required» (owner, 2026-09-03) ────────────────────────────────
+              *"This isn't originally required by the request (year and certificate), so only shake
+              it if not set, don't say required in red."*
+
+              Both are WEB-ONLY gates (MREQ-AC-54): the app treats them as optional, and each has an
+              explicit «No certificate» / «Any year» answer, so what the canvas wants from the renter
+              is a decision, not a value. Calling that «* Required» told him the request demanded
+              something it does not. They still block, and a refusal still shakes them — which is
+              the whole of what the canvas is entitled to say about a field the request never asked
+              for. */}
           <div className="absolute inset-x-2.5 top-2.5 flex items-start justify-between gap-2">
             <div className="min-w-0 max-w-[58%]">
-              {owed("safety_certificates") && <OverlayRequired title={t.create.machineCard.cert} />}
               <div className={shake("safety_certificates") ? "shake-error" : undefined}>
                 {/* More than one, because the field has always been an array everywhere else — on the
                     draft, on the wire, and on the bid form where a supplier confirms each cert on its
@@ -217,11 +230,9 @@ export function MachineCard({
             {/* The prototype's inline −/×N/+ chip rather than the boxed Stepper, which is too tall
                 to sit on the panel without covering the machine.
 
-                Marked too, for completeness of the gate set: the stepper's own minimum is 1, so a
-                zero can only arrive on a restored draft — and when it does, the refusal must still
-                point at something. */}
-            <div className="flex flex-none flex-col items-end">
-            {owed("quantity") && <OverlayRequired title={t.create.machineCard.quantity} />}
+                ~~Marked, for completeness of the gate set.~~ Unmarked again (owner, 2026-09-03):
+                the request does not ask for a quantity, it comes with one, and the stepper's own
+                minimum is 1 — so the mark stood over a field nobody can empty. */}
             <div className="flex items-center gap-2.5 rounded-sm bg-[color-mix(in_srgb,var(--navy-deep)_80%,transparent)] px-2 py-1.5 text-meta text-white">
               <button
                 type="button"
@@ -242,7 +253,6 @@ export function MachineCard({
                 +
               </button>
             </div>
-            </div>
           </div>
 
           {/* Bottom row: fuel on the left, minimum year on the right. */}
@@ -253,7 +263,12 @@ export function MachineCard({
                 nothing on screen marked and looked like a button doing nothing at all. That is one
                 half of *"random panels open and there is nothing I can do"*. */}
             <div className={`min-w-0 max-w-[46%] ${shake("fuel_type") ? "shake-error" : ""}`}>
-              {owed("fuel_type") && <OverlayRequired title={t.create.machineCard.fuel} />}
+              {/* ── The one overlay chip that is a REQUEST requirement ────────────────────────
+                  `itemAppGaps` gates `fuelType`, so it is marked like the others — but only while
+                  it is EMPTY. A star standing over a photograph on a field the agent fills for
+                  every machine is a warning about nothing, four times a card. Empty, it stars;
+                  blocking, it says the word. */}
+              {!item.fuelType && <OverlayRequired title={t.create.machineCard.fuel} word={owed("fuel_type")} />}
               <SearchSelect
                 value={item.fuelType}
                 placeholder={t.create.machineCard.fuel}
@@ -265,7 +280,6 @@ export function MachineCard({
               />
             </div>
             <div className={`min-w-0 max-w-[48%] ${shake("equipment_year") ? "shake-error" : ""}`}>
-              {owed("equipment_year") && <OverlayRequired title={t.create.machineCard.minYear} />}
               <SearchSelect
                 value={overrides.equipmentYear}
                 placeholder={t.create.machineCard.minYear}
@@ -312,6 +326,7 @@ export function MachineCard({
                 missing={gapFor("subtype") || gapFor("category")}
                 shake={shake("subtype") || shake("category")}
                 required={owed("subtype") || owed("category")}
+                star
                 source={prov.itemSource("subtype", item.ref.subcategoryId)}
               >
                 <SearchSelect
@@ -337,6 +352,7 @@ export function MachineCard({
                 missing={gapFor("capacity")}
                 shake={shake("capacity")}
                   required={owed("capacity")}
+                star
                 source={prov.itemSource("capacity", item.ref.measurementId)}
               >
                 <SearchSelect
@@ -370,6 +386,7 @@ export function MachineCard({
                   missing={gapFor("delivery")}
                   shake={shake("delivery")}
                   required={owed("delivery")}
+                  star
                   source={prov.itemSource("delivery", overrides.delivery, "deliveryOverride", true)}
                   icon={
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-none" aria-hidden>
@@ -391,6 +408,7 @@ export function MachineCard({
                 missing={gapFor("return")}
                 shake={shake("return")}
                   required={owed("return")}
+                star
                 source={prov.itemSource("return", overrides.returnFromSite, "returnOverride", true)}
                 icon={
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-none" aria-hidden>

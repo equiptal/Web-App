@@ -3,8 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { VerifiedMark } from "@/components/VerifiedMark";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useLocale, useT } from "@/lib/i18n";
+import { usePathname, useRouter } from "next/navigation";
+import { fmt, useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import type { Locale } from "@/lib/i18n/config";
@@ -13,6 +13,7 @@ import type { Locale } from "@/lib/i18n/config";
 import { AuthGateProvider, useAuthGate } from "@/components/auth/AuthGate";
 import { fetchDealRoomUnread } from "@/lib/api/client";
 import { btn, cx, OVERLAY, PAGE_BACK, PAGE_MAX, PAGE_X, PAGE_Y, POPOVER, SCRIM } from "@/lib/ds";
+import { backTarget, type BackNameKey } from "@/lib/contract/back-nav";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { AppNav, AppNavMobile, type NavItem } from "@/components/AppNav";
 import { ArrowBackIcon, MailIcon, CountBadge } from "@/components/HeaderIcons";
@@ -77,13 +78,46 @@ export { PAGE_MAX, PAGE_X, PAGE_Y } from "@/lib/ds";
  * The page does not place it: `AppShell` draws it as the first thing inside `<main>`, so every page
  * that has one has it in the same spot, at the same size, with the same 16px under it.
  */
-const BackContext = createContext<(fn: (() => void) | null) => void>(() => {});
-export function usePageBack(handler: (() => void) | null) {
+type BackSpec = { fallback: string } | (() => void) | null;
+const BackContext = createContext<(spec: BackSpec) => void>(() => {});
+
+/**
+ * Show a Back control on this page.
+ *
+ * Pass `{ fallback }` — the place this page belongs UNDER when nobody can say where the renter came
+ * from. The label and the destination are then the shell's to decide: it knows the last in-app route
+ * it saw, so `/create` reached from Browse says «Back to browse» and the same page reached from the
+ * Marketplace tab says «Back to marketplace» (owner, 2026-09-03). `back-nav.ts` holds that rule.
+ *
+ * A bare function still works, for a page whose back is an ACT rather than a destination — closing a
+ * step, leaving a sub-view — where there is no route to name.
+ *
+ * `null` while a page has no back to offer, so the control can appear and disappear with a phase.
+ */
+export function usePageBack(spec: BackSpec) {
   const register = useContext(BackContext);
+  // A caller writing `usePageBack({ fallback: "/" })` inline makes a new object every render, which
+  // would re-register forever. The spec is compared by VALUE, so it does not have to be memoised at
+  // every call site — which is the kind of thing nobody remembers and nothing catches.
+  const key = typeof spec === "function" || spec == null ? "" : spec.fallback;
+  const fn = typeof spec === "function" ? spec : null;
   useEffect(() => {
-    register(handler);
+    register(fn ?? (key ? { fallback: key } : null));
     return () => register(null);
-  }, [handler, register]);
+  }, [key, fn, register]);
+}
+
+/**
+ * The back control, as a line a page can drop inside its `<AppShell>`.
+ *
+ * `usePageBack` is a hook and the shell IS the provider, so a page component cannot call it: at the
+ * point where the page renders `<AppShell>`, it is standing outside the context the hook reads. This
+ * renders nothing and exists to be a child — which is the one position from which a page can ask
+ * the shell for anything.
+ */
+export function PageBack({ fallback }: { fallback: string }) {
+  usePageBack({ fallback });
+  return null;
 }
 
 /** Its old name, kept so a call site does not have to change to say the same thing. */
@@ -130,11 +164,24 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
   }, [accountOpen]);
   const { openAuth } = useAuthGate();
   const pathname = usePathname();
+  const router = useRouter();
   const [name, setName] = useState("");
   // A child page may register a Back handler; the arrow then draws at the top of `<main>`, on the
   // page's own gutter. Never in the bar — see `usePageBack`.
-  const [back, setBack] = useState<(() => void) | null>(null);
-  const registerBack = useCallback((fn: (() => void) | null) => setBack(() => fn), []);
+  const [back, setBack] = useState<BackSpec>(null);
+  const registerBack = useCallback((spec: BackSpec) => setBack(() => spec), []);
+
+  /* ── The last in-app route, kept so Back can NAME where it goes ───────────────────────────────
+     A ref rather than state: it must not re-render anything when it changes, and it is read only
+     while a back control is being drawn. `prev` is updated AFTER the render that used it, so the
+     page currently on screen still sees the page before it. */
+  const prevPath = useRef<string | null>(null);
+  const seenPath = useRef<string | null>(null);
+  useEffect(() => {
+    if (seenPath.current === pathname) return;
+    prevPath.current = seenPath.current;
+    seenPath.current = pathname;
+  }, [pathname]);
 
   // Read through a ref so the /api/me effect below can compare against the CURRENT tier without
   // listing `tier` as a dependency — that would re-fire the fetch on every tier change, and since
@@ -536,13 +583,31 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
               A full-bleed surface has no gutter of its own to sit on, so the control brings one. */}
           {back && (
             <div {...pin("page-back")} className={cx(PAGE_BACK, fullBleed && `${PAGE_X} pt-4`)}>
-              <button
-                onClick={back}
-                aria-label={locale === "ar" ? "رجوع" : "Back"}
-                className={btn("secondary", "md", { icon: true, pill: true })}
-              >
-                <ArrowBackIcon className="rtl:-scale-x-100" />
-              </button>
+              {(() => {
+                /* ── It NAMES its destination (owner, 2026-09-03) ───────────────────────────────
+                   ~~A bare arrow in a round pill.~~ An arrow says "leave", not "leave to where",
+                   and on a page reachable from four places that is the only thing the renter wants
+                   to know before pressing it. A labelled control also gives him something to aim
+                   at: a 34px circle is the smallest target on the page.
+
+                   The word comes from the trail, so it is the place he actually came from rather
+                   than a guess written into each page. Where the trail is empty — a cold load, a
+                   deep link, a fresh tab — the page's own `fallback` answers, and where even that
+                   is not a place we name, the control says «Back» and still works. */
+                const isFn = typeof back === "function";
+                const target = isFn ? null : backTarget(pathname, prevPath.current, back.fallback);
+                const key = target?.key ?? null;
+                const label = key ? fmt(t.shell.backTo, { place: t.shell[key as BackNameKey] }) : t.shell.back;
+                return (
+                  <button
+                    onClick={() => (isFn ? back() : router.push(target!.href))}
+                    className={btn("secondary", "md", { className: "gap-1.5" })}
+                  >
+                    <ArrowBackIcon size={16} className="rtl:-scale-x-100" />
+                    {label}
+                  </button>
+                );
+              })()}
             </div>
           )}
           {children}

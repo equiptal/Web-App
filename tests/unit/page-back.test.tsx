@@ -89,7 +89,20 @@ describe("AppShell places it, so no page has to", () => {
 
   it("gives it the shared recipe rather than a hand-written class", () => {
     expect(main).toContain("PAGE_BACK");
-    expect(main).toMatch(/btn\("secondary", "md", \{ icon: true, pill: true \}\)/);
+    /* ~~`{ icon: true, pill: true }` — a bare arrow in a round pill.~~ It NAMES its destination now
+       (owner, 2026-09-03), so it is an ordinary secondary button with a label beside the arrow. An
+       arrow alone says "leave" and not "leave to where", which on a page reachable from four places
+       is the only thing worth knowing before pressing it. Still the shared recipe, still one place. */
+    expect(main).toMatch(/btn\("secondary", "md", \{ className: "gap-1\.5" \}\)/);
+  });
+
+  it("labels it from the trail, so the word is the place he came from", () => {
+    // The rule itself is `back-nav.ts` and is tested there. This pins that the shell USES it rather
+    // than writing a label of its own, which is how the two would drift.
+    expect(main).toContain("backTarget(");
+    expect(main).toMatch(/t\.shell\.backTo/);
+    // And that a route it cannot name still draws a working control.
+    expect(main).toContain("t.shell.back;");
   });
 
   it("still registers through the hook, under both its names", () => {

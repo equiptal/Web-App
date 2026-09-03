@@ -1652,10 +1652,25 @@ export async function searchSupplierDirectory(q: string, page = 1, limit = 20): 
       const o = (r ?? {}) as Record<string, unknown>;
       const id = o.id ?? o.supplierId ?? o.userId;
       if (id == null) return [];
-      const person = [o.firstName ?? o.first_name, o.lastName ?? o.last_name]
+      /**
+       * ⚠️ THE BACKEND SENDS `name`, and this read only `firstName`/`lastName`.
+       *
+       * Probed against staging on 2026-09-03 (owner: *"why are only 2 shown?"*). `/agents/suppliers`
+       * answers `{ id, name, company_name, city, is_verified, has_store }` — one display name, not a
+       * split pair — and `company_name` is null on all but a handful of accounts. So of the twenty
+       * rows on page one, eighteen had no company and no `firstName`, were read as having neither a
+       * company nor a person, and were dropped by the guard below. The dialog showed the two rows
+       * that happened to carry a company name, over a directory of 1,492.
+       *
+       * `name` is now the person's name when the pair is absent. The pair is still read first, in
+       * case the endpoint ever splits it, and a row with nothing nameable is still dropped: that
+       * guard was right, it was the input to it that was wrong.
+       */
+      const pair = [o.firstName ?? o.first_name, o.lastName ?? o.last_name]
         .filter((x) => typeof x === "string" && x.trim())
         .join(" ")
         .trim();
+      const person = pair || (typeof o.name === "string" ? o.name.trim() : "");
       const company = typeof (o.companyName ?? o.company_name) === "string" ? String(o.companyName ?? o.company_name).trim() : "";
       // A row with neither a company nor a person cannot be shown or chosen sensibly.
       if (!company && !person) return [];
@@ -1673,8 +1688,22 @@ export async function searchSupplierDirectory(q: string, page = 1, limit = 20): 
       ];
     });
 
-    // Verified first, and otherwise the order the backend gave — which is alphabetical by company.
-    rows.sort((a, b) => Number(b.verified) - Number(a.verified));
+    /**
+     * Verified first, then the firms with a shopfront, then the order the backend gave.
+     *
+     * ── What this is NOT (owner, 2026-09-03) ──────────────────────────────────────────────────
+     * *"The first 5 are verified, have a store, and have the largest number of equipment."*
+     *
+     * The first two of those three are answered here. The third cannot be: `/agents/suppliers`
+     * carries no equipment count, so there is nothing to sort on — and neither this nor the verified
+     * rule can be a TOP FIVE, because both sort the twenty rows of the page in hand rather than the
+     * 1,492 behind them. A verified firm with fifty machines sitting on page 60 stays on page 60.
+     *
+     * Ranking the directory itself is the backend's to do; see the note in
+     * `docs/supplier-directory-ranking.md`. Until it does, this is an honest local tidy of
+     * one page and is deliberately not dressed up as a recommendation.
+     */
+    rows.sort((a, b) => Number(b.verified) - Number(a.verified) || Number(b.hasStore) - Number(a.hasStore));
 
     return {
       rows,

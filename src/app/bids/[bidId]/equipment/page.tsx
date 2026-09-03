@@ -23,7 +23,7 @@
 import { Suspense, use, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, PageBack } from "@/components/AppShell";
 import { useAuthGate } from "@/components/auth/AuthGate";
 import { BidMapWorkspace } from "@/components/map/BidMapWorkspace";
 import { Icon } from "@/components/ui";
@@ -43,6 +43,7 @@ export default function BidEquipmentPage({ params }: { params: Promise<{ bidId: 
     // the standard `max-w-[1440px]` page gutter, which drew it as a card floating in the middle of a
     // desktop viewport with the map squeezed into what was left.
     <AppShell fullBleed title={t.bidMap.surfaceTitle}>
+      <PageBack fallback="/requests" />
       {/* Suspense boundary: the surface below reads `useSearchParams` for `?company=1`, which needs one. */}
       <Suspense fallback={null}>
         <BidEquipmentGate bidId={decodeURIComponent(bidId)} />

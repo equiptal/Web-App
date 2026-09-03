@@ -150,7 +150,19 @@ export function AddFromMoedatechDialog({
           <ul>
             {rows.map((s) => (
               <li key={s.supplierId} className="border-b border-border last:border-b-0">
-                <label className="flex cursor-pointer items-center gap-2.5 px-3 py-2.5 hover:bg-surface2">
+                {/* ── Two controls side by side, not one inside the other (owner, 2026-09-03) ─────
+                    ⚠️ *"I can't add a supplier without deselecting him as not registered"* — and he
+                    could not deselect him at all. The vendor chip lived INSIDE the row's `<label>`,
+                    so every press on it also toggled the pick, and it carried
+                    `onClick={e => e.preventDefault()}` to stop that. A checkbox's tick IS its click's
+                    default action, so cancelling the click cancelled the tick: the flag was frozen on
+                    green and no row could ever be added as a contact only.
+
+                    A `<label>` must not contain a second control. The row is a plain flex box now,
+                    with a label around the NAME for picking and a label of its own around the chip.
+                    Neither press reaches the other. */}
+                <div className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-surface2">
+                  <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5">
                   <input
                     type="checkbox"
                     checked={!!picked[s.supplierId]}
@@ -171,30 +183,29 @@ export function AddFromMoedatechDialog({
                     </span>
                   </span>
 
+                  </label>
+
                   {/* On EVERY row, not only the picked ones (owner, 2026-09-02: *"I must be able to
                       deselect the vendor registered for a specific one"*). It was revealed on
-                      selection, which is the moment it matters — and a control that appears only
+                      selection, which is the moment it matters, and a control that appears only
                       after another one is pressed is a control a renter does not know he has. */}
-                  {(
-                    <span
-                      className={cx(
-                        "inline-flex h-[22px] flex-none items-center gap-1 rounded-full border px-2 text-label font-extrabold",
-                        vendor[s.supplierId] !== false
-                          ? "border-ok bg-ok-soft text-ok-deep"
-                          : "border-dashed border-border-strong bg-surface text-muted",
-                      )}
-                      onClick={(e) => e.preventDefault()}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={vendor[s.supplierId] !== false}
-                        onChange={(e) => setVendor((v) => ({ ...v, [s.supplierId]: e.target.checked }))}
-                        className="h-3 w-3 accent-ok"
-                      />
-                      {c.registered}
-                    </span>
-                  )}
-                </label>
+                  <label
+                    className={cx(
+                      "inline-flex h-[26px] flex-none cursor-pointer items-center gap-1.5 rounded-md border px-2 text-label font-extrabold",
+                      vendor[s.supplierId] !== false
+                        ? "border-ok bg-ok-soft text-ok-deep"
+                        : "border-dashed border-border-strong bg-surface text-muted",
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={vendor[s.supplierId] !== false}
+                      onChange={(e) => setVendor((v) => ({ ...v, [s.supplierId]: e.target.checked }))}
+                      className="h-3 w-3 accent-ok"
+                    />
+                    {c.registered}
+                  </label>
+                </div>
               </li>
             ))}
           </ul>
@@ -229,26 +240,29 @@ export function AddFromMoedatechDialog({
         </div>
       )}
 
-      {/* The master. It only sets them all at once; the row's own tick is what decides. */}
-      <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-ok/40 bg-ok-soft px-3 py-2.5 text-meta text-ok-deep">
-        <input
-          type="checkbox"
-          checked={chosen.every((s) => vendor[s.supplierId] !== false)}
-          onChange={(e) =>
-            setVendor(Object.fromEntries((rows ?? []).map((s) => [s.supplierId, e.target.checked])))
-          }
-          className="mt-0.5 h-4 w-4 flex-none accent-ok"
-        />
-        <span>
-          <b className="block font-extrabold">{c.markAll}</b>
-          <span className="block text-muted-dark">{c.markAllHint}</span>
-        </span>
-      </label>
+      {/* ── The master, in the shape the other dialog uses (owner, 2026-09-03) ─────────────────
+          The same act in two dialogs was drawn two ways: a compact chip beside «Add another» when
+          typing suppliers in, a full-width green band with a heading and a sentence under it here.
+          One shape, on the right, label only. The row's own tick is still what decides; this only
+          sets them all at once.
 
-      <p className="flex gap-2 rounded-md bg-surface2 px-3 py-2.5 text-meta text-muted-dark">
-        <Icon name="shield" size={15} className="flex-none" />
-        <span>{c.appPrivate}</span>
-      </p>
+          ~~«The supplier is not told. Their name, their store and their equipment stay theirs; you
+          are only adding them to your own list.»~~ Removed (owner, 2026-09-03). It answered a worry
+          nobody arrives with: the dialog is called «save to YOUR list», the button says save, and
+          nothing on the screen suggests the other firm hears about it. */}
+      <div className="flex justify-end">
+        <label className="inline-flex h-[30px] cursor-pointer items-center gap-2 rounded-md border border-ok/40 bg-ok-soft px-3 text-meta font-extrabold text-ok-deep">
+          <input
+            type="checkbox"
+            checked={chosen.every((s) => vendor[s.supplierId] !== false)}
+            onChange={(e) =>
+              setVendor(Object.fromEntries((rows ?? []).map((s) => [s.supplierId, e.target.checked])))
+            }
+            className="h-3.5 w-3.5 flex-none accent-ok"
+          />
+          {c.markAll}
+        </label>
+      </div>
     </div>
   );
 

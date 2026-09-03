@@ -14,6 +14,7 @@ import {
   deleteAward,
   withFreshVersion,
   listRenterSuppliers,
+  searchSupplierDirectory,
   fetchTemplateTerms,
   ProjectVersionConflict,
   AwardRefused,
@@ -393,5 +394,59 @@ describe("the terms a work-order template copies", () => {
     await expect(
       fetchTemplateTerms("p1", { kind: "work_order", id: "gone", itemId: "gone", ref: "gone", machine: "x", quantity: 1, when: null }),
     ).resolves.toBeNull();
+  });
+});
+
+/* ----------------------- The Moedatech directory ----------------------- */
+
+/**
+ * SUP — the picker showed 2 rows out of 1,492 (owner, 2026-09-03: *"why are only 2 shown?"*).
+ *
+ * Probed against staging: `/agents/suppliers` answers `{ id, name, company_name, city, is_verified,
+ * has_store }`. One display NAME, not a `firstName`/`lastName` pair — and `company_name` is null on
+ * all but a handful of accounts. The mapper read only the pair and the company, so eighteen rows of
+ * every twenty were read as nameless and dropped.
+ *
+ * This is the shape the backend actually sends, verbatim from that probe.
+ */
+describe("searchSupplierDirectory", () => {
+  const wire = (rows: unknown[]) => ({ data: rows, meta: { page: 1, limit: 20, total: 1492, totalPages: 75 } });
+
+  it("keeps a row whose only name is `name`, which is most of the directory", async () => {
+    stub(() =>
+      reply(200, wire([
+        { id: 638, name: "Hani Al Bassam", company_name: null, city: "Riyadh", is_verified: 0, has_store: 0 },
+        { id: 9, name: "Bandar", company_name: "Zahid Tractor", city: "Riyadh", is_verified: 1, has_store: 1 },
+      ])),
+    );
+
+    const page = await searchSupplierDirectory("", 1);
+
+    expect(page.rows.map((r) => r.name)).toEqual(["Zahid Tractor", "Hani Al Bassam"]);
+    expect(page.total).toBe(1492);
+    // The company keeps the person as its contact; a person alone is the row's own name.
+    expect(page.rows[0].contactName).toBe("Bandar");
+    expect(page.rows[1].contactName).toBeNull();
+  });
+
+  it("still drops a row with nothing nameable at all", async () => {
+    stub(() => reply(200, wire([{ id: 5, name: null, company_name: null, city: "Riyadh" }])));
+    expect((await searchSupplierDirectory("", 1)).rows).toEqual([]);
+  });
+
+  it("floats the verified, then the ones with a shopfront", async () => {
+    stub(() =>
+      reply(200, wire([
+        { id: 1, name: "Plain Co", company_name: null, is_verified: 0, has_store: 0 },
+        { id: 2, name: "Shop Co", company_name: null, is_verified: 0, has_store: 1 },
+        { id: 3, name: "Verified Co", company_name: null, is_verified: 1, has_store: 0 },
+      ])),
+    );
+
+    expect((await searchSupplierDirectory("", 1)).rows.map((r) => r.name)).toEqual([
+      "Verified Co",
+      "Shop Co",
+      "Plain Co",
+    ]);
   });
 });

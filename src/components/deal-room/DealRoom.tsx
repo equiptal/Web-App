@@ -112,7 +112,11 @@ export function DealRoom({ id, onTitle, initialFlow }: {
   const router = useRouter();
   // In-app Back arrow in the AppShell header → the Inbox (the deal-room list). A deal room is a
   // drill-down, so this gives an explicit way up instead of relying on the browser back button.
-  usePageBack(() => router.push("/inbox"));
+  /* `{ fallback }`, not a handler: the shell can then NAME where the press lands, and a renter who
+     reached this room from the Marketplace goes back there rather than to the inbox he never
+     visited (owner, 2026-09-03). The inbox stays the answer for a cold load, which is where a deal
+     room belongs when nobody can say how he arrived. */
+  usePageBack({ fallback: "/inbox" });
 
   const [room, setRoom] = useState<DealRoomView | null>(null);
   const [error, setError] = useState(false);

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, PageBack } from "@/components/AppShell";
 import { useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { canSeeProcurementDashboard } from "@/lib/access/dashboard";
@@ -28,6 +28,7 @@ export default function DashboardPage() {
 
   return (
     <AppShell fullBleed title={locale === "ar" ? "لوحة التحكم" : "Procurement Dashboard"}>
+      <PageBack fallback="/" />
       <iframe
         src={`/procurement-dashboard.html?embed=1&lang=${locale}`}
         title="Procurement Dashboard"

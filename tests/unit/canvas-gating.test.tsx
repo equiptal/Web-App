@@ -3,6 +3,7 @@ import { screen } from "@testing-library/react";
 import { Canvas } from "@/components/create/Canvas";
 import { confirmedProject, makeAgentDraft, makeItem, renderCanvas } from "../setup/canvas";
 import type { EquipmentItem } from "@/lib/contract/draft";
+import { EMPTY_REF } from "@/lib/contract/taxonomy";
 
 /**
  * MREQ-TC-02/03/04/05/15 — the locks, and the shake that is the whole of their explanation.
@@ -143,9 +144,11 @@ describe("the primary button refuses with gaps (MREQ-AC-15)", () => {
 
      What AC-15 actually protects is unchanged and is what this still pins: a request with gaps
      cannot reach the review screen. */
-  it("refuses the review screen, and marks the field that owes the answer", async () => {
+  it("refuses the review screen, and marks the REQUEST's own required field", async () => {
+    /* Nothing names the machine, so the blocking gap is the taxonomy — which the request genuinely
+       requires, and which therefore carries the word. */
     const handle = await renderCanvas(<Canvas />, {
-      draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
+      draft: makeAgentDraft({ items: [makeItem({ ref: EMPTY_REF })], project: confirmedProject() }),
     });
 
     /* ~~A red list of everything missing, drawn above the button.~~ Removed on 2026-09-02: it named
@@ -159,6 +162,30 @@ describe("the primary button refuses with gaps (MREQ-AC-15)", () => {
     expect(handle.store().state.readyToSend).toBe(false);
     // The mark is on the field, and it is the same word wherever a field is owed.
     expect(screen.getAllByText("* Required").length).toBeGreaterThan(0);
+  });
+
+  /**
+   * The two web-only gates say NOTHING in words (owner, 2026-09-03).
+   *
+   * *"This isn't originally required by the request (year and certificate), so only shake it if not
+   * set, don't say required in red."* They still block — MREQ-AC-54 is unchanged, and each has an
+   * explicit «Any year» / «No certificate» answer — but the canvas may not tell a renter the REQUEST
+   * demands something the request never asked for.
+   */
+  it("shakes the year and the certificate without ever calling them required", async () => {
+    const handle = await renderCanvas(<Canvas />, {
+      // A complete machine on a complete site: the year and the certificate are the only gaps.
+      draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
+    });
+
+    await handle.run(() => {
+      screen.getByText(/Review & send/).closest("button")!.click();
+    });
+
+    expect(handle.store().state.readyToSend).toBe(false);
+    expect(shaken(handle.view.container)).toBeGreaterThan(0);
+    // Neither the word nor the standing star: the request did not ask for either field.
+    expect(screen.queryByText("* Required")).toBeNull();
   });
 
   it("advances to the review screen when nothing is left", async () => {
@@ -232,6 +259,25 @@ describe("a refusal opens the panel that owes the answer", () => {
     // The chip has no visible label of its own, so the mark brings the field's NAME with it.
     expect(screen.getAllByText("FUEL").length).toBeGreaterThan(0);
     expect(screen.getAllByText("* Required").length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * The standing star, before anybody has been refused (owner, 2026-09-03).
+ *
+ * *"At first all these fields will show a red star so the user knows he must fill them, and if he
+ * tries to move on and one is blocking him then it will shake and show the word Required, not only
+ * a star."*
+ */
+describe("what a required field says before the first refusal", () => {
+  it("stars the request's own required fields, and says the word to nobody", async () => {
+    await renderCanvas(<Canvas />, {
+      draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
+    });
+
+    // TYPE, SIZE, DELIVERY TO SITE and RETURN FROM SITE, each starred on its own label.
+    expect(screen.getAllByText("*").length).toBeGreaterThanOrEqual(4);
+    expect(screen.queryByText("* Required")).toBeNull();
   });
 });
 

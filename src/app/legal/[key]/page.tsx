@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, PageBack } from "@/components/AppShell";
 import { Icon } from "@/components/ui";
 import { Section } from "@/components/PageSection";
 import { SkeletonText } from "@/components/Skeleton";
@@ -56,6 +56,7 @@ export default function LegalPage({ params }: { params: Promise<{ key: string }>
 
   return (
     <AppShell title={title}>
+      <PageBack fallback="/profile" />
       <div className="w-full pb-10" dir={ar ? "rtl" : "ltr"}>
         <Section title={title} hint={doc ? `${L("Version", "الإصدار")} ${doc.version}` : undefined}>
           <div className="p-5">

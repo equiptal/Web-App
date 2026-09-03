@@ -134,6 +134,15 @@ export function StorefrontIcon({ size = 14 }: { size?: number }) {
   );
 }
 
+/** Two corners pulling apart — the control that opens the map full size. */
+export function ExpandIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4 9V4H9M20 15V20H15M20 9V4H15M4 15V20H9" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** The camera, over a photo count. */
 export function CameraIcon({ size = 17 }: { size?: number }) {
   return (

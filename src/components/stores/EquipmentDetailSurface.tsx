@@ -7,7 +7,8 @@ import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { useAuthGate } from "@/components/auth/AuthGate";
 import { Icon } from "@/components/ui";
-import { PhotoPlaceholder } from "@/components/Photo";
+import { Dialog } from "@/components/Dialog";
+import { Photo, PhotoPlaceholder } from "@/components/Photo";
 import type { EquipmentDetail, StoreDetail } from "@/lib/contract/stores";
 import { cityCentroid } from "@/lib/contract/saudi-cities";
 import { btn } from "@/lib/ds";
@@ -17,6 +18,7 @@ import {
   CameraIcon,
   CheckIcon,
   DocIcon,
+  ExpandIcon,
   EyeIcon,
   PinIcon,
   PriceIcon,
@@ -73,6 +75,19 @@ export function EquipmentDetailSurface({
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [idx, setIdx] = useState(0);
+  const [mapOpen, setMapOpen] = useState(false);
+  /**
+   * Is there a page behind this one that belongs to us?
+   *
+   * Read once, after mount, because `window.history` does not exist on the server and its length on
+   * the FIRST render of a client navigation is not yet the length the renter will be going back
+   * through. A tab opened straight onto this URL has a length of 1; anything the renter walked to has
+   * more. That is the whole test — it does not need to know WHICH page, only that one is there.
+   */
+  const [cameFromApp, setCameFromApp] = useState(false);
+  useEffect(() => {
+    setCameFromApp(window.history.length > 1);
+  }, []);
 
   useEffect(() => {
     setError(false);
@@ -199,41 +214,71 @@ export function EquipmentDetailSurface({
 
   return (
     <div {...pin("equipment-sheet")} className={`${SHOP_PAGE} pt-6`}>
-      {/* Back to the store when the renter came from one, else back to the results he came from. */}
-      {ownerStoreId ? (
-        <Link
-          href={`/stores/${ownerStoreId}`}
-          className="mb-4 inline-flex items-center gap-[7px] text-shop-body font-semibold text-shop-ink-3 transition hover:text-shop-amber"
-        >
-          <BackArrowIcon /> {t.store.back}
-        </Link>
-      ) : (
+      {/* ── Back is the PAGE BEFORE, not the store (owner, 2026-09-03) ───────────────────────────
+          *"I clicked an equipment from the stores, I clicked back, it takes me to the store — I want
+          the page I was on, browsing all stores."*
+
+          It used to link to `/stores/{id}` whenever the machine named a store, which is true of every
+          machine: so a renter who opened one from a category card on Browse was put on that
+          supplier's profile, having never asked to go there, and lost his filter, his scroll and his
+          place in the grid. The destination was being read off the DATA when it is a fact about the
+          renter's own history.
+
+          `history.back()` answers it for both entrances, because it does not need to be told which
+          one was used. The link stays a link for the one case it cannot serve — a machine opened
+          cold, from a shared URL or a new tab, where there is nothing behind this page — and then it
+          goes to the store when we know it and to the directory when we do not. */}
+      {cameFromApp ? (
         <button
           onClick={() => router.back()}
           className="mb-4 inline-flex items-center gap-[7px] text-shop-body font-semibold text-shop-ink-3 transition hover:text-shop-amber"
         >
-          <BackArrowIcon /> {t.store.backToResults}
+          <BackArrowIcon /> {t.store.back}
         </button>
+      ) : (
+        <Link
+          href={ownerStoreId ? `/stores/${ownerStoreId}` : "/browse"}
+          className="mb-4 inline-flex items-center gap-[7px] text-shop-body font-semibold text-shop-ink-3 transition hover:text-shop-amber"
+        >
+          <BackArrowIcon /> {ownerStoreId ? t.store.backToStore : t.store.backToResults}
+        </Link>
       )}
 
       {/* The machine, and the one thing to do about it. */}
       <div className="mb-[18px] flex flex-wrap items-center justify-between gap-5">
         <h1 className="m-0 text-shop-page font-shop-bold text-shop-ink">{heading}</h1>
-        <button
-          onClick={requestThis}
-          className="flex-none whitespace-nowrap rounded-shop-control bg-shop-amber px-6 py-3 text-shop-control font-shop-bold text-white transition hover:bg-shop-amber-deep"
-        >
+        {/* The house button (owner, 2026-09-03), not a storefront-coloured one. The prototype draws
+            its own amber rectangle, and copying it put a SECOND primary button in the app — one
+            colour, one height and one hover away from every other Send, Submit and Request a renter
+            has already learnt. `btn()` is where that decision lives. */}
+        <button onClick={requestThis} className={btn("primary", "lg", { className: "flex-none whitespace-nowrap" })}>
           {t.store.requestThis}
         </button>
       </div>
 
-      {/* The band: photographs beside the place. 420px on a wide screen; each half keeps its own
-          height below that, where they are stacked. */}
-      <div className="grid gap-2 lg:h-[420px] lg:grid-cols-[7fr_3fr]">
+      {/* The band: photographs beside the place, and its shape follows how many photographs there are
+          (owner, 2026-09-03). Three or more fill the mosaic and the map takes 3fr; two sit side by
+          side and the map widens to 4fr; one or none leaves the map half the band. The old fixed
+          7fr/3fr drew an EMPTY CELL whenever a machine had two photographs, which is most of them —
+          a hole in the page saying nothing, while the map it sat beside was too narrow to read. */}
+      <div className={`grid gap-2 lg:h-[420px] ${photos.length >= 3 ? "lg:grid-cols-[7fr_3fr]" : photos.length === 2 ? "lg:grid-cols-[6fr_4fr]" : "lg:grid-cols-2"}`}>
         <Gallery photos={photos} layout={galleryLayout} idx={idx} setIdx={setIdx} t={t} />
         <div className="relative h-[280px] overflow-hidden rounded-shop-media border border-shop-line bg-shop-fill lg:h-full">
           {point ? (
-            <EquipmentLocationMap lat={point.lat} lng={point.lng} label={null} precise={precise} />
+            <>
+              <EquipmentLocationMap lat={point.lat} lng={point.lng} label={null} precise={precise} />
+              {/* Open it properly. The panel is a real map — drag, ±, double-click — but it is 3fr of
+                  a 420px band, and «where is this» is sometimes a question about the next district. */}
+              <button
+                type="button"
+                onClick={() => setMapOpen(true)}
+                aria-label={t.store.expandMap}
+                title={t.store.expandMap}
+                className="absolute end-2 top-2 z-[500] grid h-8 w-8 place-items-center rounded-shop-control bg-white/95 text-shop-ink-3 transition hover:text-shop-ink"
+              >
+                <ExpandIcon />
+              </button>
+            </>
           ) : (
             <div className="grid h-full place-items-center p-4 text-center text-shop-meta text-shop-ink-3">
               <span>
@@ -253,6 +298,16 @@ export function EquipmentDetailSurface({
           )}
         </div>
       </div>
+
+      {/* The map, full size. `padded={false}` because a map brings its own edges, and the address
+          rides in the title so the dialog says what it is showing. */}
+      {mapOpen && point && (
+        <Dialog open onClose={() => setMapOpen(false)} size="lg" title={where ?? t.store.specLocation} padded={false}>
+          <div className="h-[70vh] w-full overflow-hidden">
+            <EquipmentLocationMap lat={point.lat} lng={point.lng} label={where} precise={precise} expanded />
+          </div>
+        </Dialog>
+      )}
 
       {/* The supplier, and the machine. */}
       <div className="mt-[34px] grid grid-cols-1 items-start gap-7 lg:grid-cols-2">
@@ -445,40 +500,55 @@ function Gallery({
     );
   }
 
+  /**
+   * The mosaic is drawn for the photographs that exist, never around a hole.
+   *
+   * ~~1.4fr beside two stacked cells, always~~ — a machine with two photographs got the second cell
+   * filled and the third left blank, which is the state the owner caught (2026-09-03). Two now sit
+   * side by side and the band gives the map the width the empty cell was wasting; three or more keep
+   * the reference's mosaic. One photograph is one photograph, at the full width of the half.
+   */
   if (layout === "grid" && photos.length > 1) {
+    const two = photos.length === 2;
     const rest = photos.slice(1, 3);
     return (
-      <div className="grid h-[280px] grid-cols-[1.4fr_1fr] grid-rows-2 gap-2 overflow-hidden rounded-shop-media lg:h-full">
-        <button
-          type="button"
-          onClick={() => setIdx(0)}
-          className="row-span-2 h-full w-full bg-shop-fill bg-cover bg-center"
-          style={{ backgroundImage: `url("${photos[0]}")` }}
-          aria-label={`${t.store.photos} 1`}
-        />
+      <div
+        className={`grid h-[280px] gap-2 overflow-hidden rounded-shop-media lg:h-full ${
+          two ? "grid-cols-2 grid-rows-1" : "grid-cols-[1.4fr_1fr] grid-rows-2"
+        }`}
+      >
+        <button type="button" onClick={() => setIdx(0)} className={`h-full w-full ${two ? "" : "row-span-2"}`} aria-label={`${t.store.photos} 1`}>
+          <Photo src={photos[0]} alt="" />
+        </button>
         {rest.map((p, i) => (
-          <button
-            type="button"
-            key={p}
-            onClick={() => setIdx(i + 1)}
-            className="h-full w-full bg-shop-fill bg-cover bg-center"
-            style={{ backgroundImage: `url("${p}")` }}
-            aria-label={`${t.store.photos} ${i + 2}`}
-          />
+          <button type="button" key={p} onClick={() => setIdx(i + 1)} className="h-full w-full" aria-label={`${t.store.photos} ${i + 2}`}>
+            <Photo src={p} alt="" />
+          </button>
         ))}
-        {/* Two photos and no third leaves one cell empty: the tall image keeps its 1.4fr rather than
-            the grid collapsing into a shape the reference never draws. */}
-        {rest.length === 1 && <div className="h-full w-full bg-shop-fill" />}
       </div>
+    );
+  }
+
+  if (layout === "grid") {
+    // Exactly one: no grid at all, because a single photograph in a two-column shape is that shape
+    // with a hole in it — the fault this whole block was rewritten for.
+    return (
+      <button
+        type="button"
+        onClick={() => setIdx(0)}
+        className="h-[280px] w-full overflow-hidden rounded-shop-media lg:h-full"
+        aria-label={`${t.store.photos} 1`}
+      >
+        <Photo src={photos[0]} alt="" />
+      </button>
     );
   }
 
   return (
     <div className="flex h-[280px] flex-col gap-2 lg:h-full">
-      <div
-        className="w-full flex-1 overflow-hidden rounded-shop-media bg-shop-fill bg-cover bg-center"
-        style={{ backgroundImage: `url("${photos[Math.min(idx, photos.length - 1)]}")` }}
-      />
+      <div className="w-full flex-1 overflow-hidden rounded-shop-media">
+        <Photo src={photos[Math.min(idx, photos.length - 1)]} alt="" />
+      </div>
       {photos.length > 1 && (
         <div className="flex flex-none gap-2 overflow-x-auto">
           {photos.map((p, i) => (
@@ -486,12 +556,13 @@ function Gallery({
               type="button"
               key={p}
               onClick={() => setIdx(i)}
-              className={`h-[84px] w-[120px] flex-none rounded-shop-chip bg-shop-fill bg-cover bg-center transition ${
+              className={`h-[84px] w-[120px] flex-none overflow-hidden rounded-shop-chip transition ${
                 i === idx ? "ring-2 ring-shop-amber" : ""
               }`}
-              style={{ backgroundImage: `url("${p}")` }}
               aria-label={`${t.store.photos} ${i + 1}`}
-            />
+            >
+              <Photo src={p} alt="" placeholderSize={26} />
+            </button>
           ))}
         </div>
       )}

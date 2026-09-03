@@ -236,13 +236,25 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
             ~~A third «Import a list» button.~~ Uploading a sheet is not a third source, it is another
             way to type the same rows, so it lives inside *Add my own suppliers* — under an `or` rule,
             exactly where the prototype puts it. */}
+        {/* ── Two doors, equally weighted (owner, 2026-09-03) ────────────────────────────────────
+            *"Make both buttons orange, call it add my suppliers, and use representative icons for
+            both."*
+
+            ~~One primary and one tinted.~~ The tinted one read as the lesser option, and it is not:
+            a renter with forty firms of his own uses it far more than the directory. They are two
+            SOURCES for one act, so they carry one weight and are told apart by their icons and their
+            words rather than by their loudness.
+
+            `storefront` for Moedatech, because that is what he is picking from, a directory of firms
+            that already have an account here. `contacts` for his own, because that is what his list
+            is, and it distinguishes «people I already have» from «a firm I am looking up». */}
         <span className="ms-auto flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => setAddingFromApp(true)} className={btn("primary", "md")}>
-            <Icon name="verified" size={15} />
+            <Icon name="storefront" size={15} />
             {c.addFromApp}
           </button>
-          <button type="button" onClick={() => setAdding(true)} className={btn("tinted", "md")}>
-            <Icon name="person_add" size={15} />
+          <button type="button" onClick={() => setAdding(true)} className={btn("primary", "md")}>
+            <Icon name="contacts" size={15} />
             {c.addSupplier}
           </button>
         </span>

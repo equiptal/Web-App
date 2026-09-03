@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useState } from "react";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, PageBack } from "@/components/AppShell";
 import { StoreDetailSurface } from "@/components/stores/StoreDetailSurface";
 import { useT } from "@/lib/i18n";
 
@@ -20,6 +20,7 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
   const [name, setName] = useState("");
   return (
     <AppShell title={name || t.store.equipment} fullBleed>
+      <PageBack fallback="/browse" />
       <div className="min-h-0 flex-1 overflow-y-auto">
         <StoreDetailSurface id={id} onTitle={setName} />
       </div>
