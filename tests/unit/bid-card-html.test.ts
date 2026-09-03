@@ -50,14 +50,19 @@ describe("the card is the shape an unfurl builds", () => {
       cta: "Open the link to submit your bid →",
     });
 
-    // The four slots.
+    // Picture, name, where. No host line: the card IS the link, and every app that unfurls draws
+    // its own domain beneath it (owner, 2026-09-03).
     expect(html).toContain("<img");
     expect(html).toContain("Excavator 20 ton");
     expect(html).toContain("Riyadh");
-    expect(html).toContain("WEBSTAGING.MOEDATECH.NET");
+    expect(html).not.toContain("WEBSTAGING.MOEDATECH.NET");
 
-    // The terms ride in the description paragraph, not in rows of their own.
-    expect(html).toContain("Mobilization: Renter");
+    /**
+     * ⚠️ The TERMS are not on the card at all any more (owner, 2026-09-03: *"i want them as points
+     * ... part of the text message of this link preview"*). Nine facts in one grey paragraph is a
+     * thing nobody reads; they are lines in the message below the card now. See `cardBlock`.
+     */
+    expect(html).not.toContain("Mobilization: Renter");
     expect(html).not.toContain("<td width=\"122\"");
   });
 });
@@ -104,15 +109,19 @@ describe("the navy band before the request exists", () => {
 describe("bidCardHtml", () => {
   const html = bidCardHtml(card, null);
 
-  it("renders the prototype's card: band, title, description, source domain", () => {
-    expect(html).toContain('height="160"');                  // the band, per the prototype
+  it("renders the prototype's card: band, title, description", () => {
+    /* ⚠️ 440 × 231 = 1200 × 630 to scale. It was 440 × 160 — a 2.75:1 box for a 1.9:1 picture — so
+       every card squashed the mark and the headline (owner, 2026-09-03). */
+    expect(html).toContain('height="231"');
     // The card is pasted into a mail client, which has none of our stylesheet, so it carries literal
     // values from `ds-colors` rather than `var(--border)`.
     expect(html).toContain(`border:1px solid ${COLORS.background}`);
     expect(html).toContain(`border-radius:${RADII.md}`);
     expect(html).toContain("Forklift rental, 1 unit");
     expect(html).toContain("Riyadh · 30-day rental · Awaiting your response");
-    expect(html).toContain("WEBSTAGING.MOEDATECH.NET");
+    // The source domain went with the host line — see the case above.
+    // The source domain went with the host line — the card IS the link (owner, 2026-09-03).
+    expect(html).not.toContain("WEBSTAGING.MOEDATECH.NET");
   });
 
   it("uses only markup that survives a paste into Gmail and Outlook", () => {

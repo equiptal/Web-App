@@ -25,12 +25,49 @@ const when = present ? describe : describe.skip;
 
 const read = (p: string) => fs.readFileSync(path.join(AGENTS, p), "utf8");
 
-/** `METHOD /agents/...` for every route the backend actually exposes. */
+/**
+ * `METHOD /agents/...` for every route the backend actually exposes.
+ *
+ * WARNING: EVERY `serverless*.yml`, not only the root one (2026-09-03). The backend split its route
+ * table into three domain services that day, `serverless-agents-equipment.yml`, `-partners.yml` and
+ * `-projects.yml`, leaving only `/agents/health` in `serverless.yml`, whose own comment now says as
+ * much: every route lives in the three domain services, and new protected routes go in those files.
+ *
+ * Reading one file, this test reported 27 routes missing from a backend that still serves all of
+ * them. That is the failure a contract test can least afford: it cried wolf about the whole
+ * contract, and the next person's instinct is to switch it off.
+ *
+ * A glob rather than three names, because a fourth service is a thing that will happen.
+ */
 function routes(): Set<string> {
-  const yml = read("serverless.yml");
+  const files = fs.readdirSync(AGENTS).filter((f) => /^serverless.*\.ya?ml$/.test(f));
   const out = new Set<string>();
-  const re = /path:\s*(\/agents\/[^\s]+)\s*\n\s*method:\s*(\w+)/g;
-  for (const m of yml.matchAll(re)) out.add(`${m[2].toUpperCase()} ${m[1]}`);
+  /* `method: "*"` on every proxied route: QUOTED, and a star. `\\w+` matched neither the quote
+     nor the star, so all thirty-two routes in the three domain services were skipped and the whole
+     projects domain read as unbuilt. */
+  const re = /path:\s*(\/agents\/[^\s]+)\s*\n\s*method:\s*"?([\w*]+)"?/g;
+  for (const f of files) {
+    for (const m of read(f).matchAll(re)) out.add(`${m[2].toUpperCase()} ${m[1]}`);
+  }
+
+  /* ── And the route tables that now live in CODE (2026-09-03) ─────────────────────────────────
+     The yml stopped naming endpoints on the day of the split: each domain declares `/agents/x` and
+     `/agents/x/{proxy+}` at method `"*"`, and one handler per domain owns the real table:
+
+       src/apps/agents-projects.ts:
+         { method: 'POST', path: '/agents/projects/{id}/documents/upload-url', handler: … }
+
+     Reading those gives this test back exactly what it had before the split — every method and path
+     the backend serves, one per line, from the backend's own source. Without them the only thing
+     checkable is the prefix, and `/agents/projects/{}/charts` would pass here and 404 in production. */
+  const apps = path.join(AGENTS, "src", "apps");
+  if (fs.existsSync(apps)) {
+    const inCode = /method:\s*['"](\w+)['"]\s*,\s*path:\s*['"](\/agents\/[^'"]+)['"]/g;
+    for (const f of fs.readdirSync(apps).filter((x) => x.endsWith(".ts"))) {
+      const src = fs.readFileSync(path.join(apps, f), "utf8");
+      for (const m of src.matchAll(inCode)) out.add(`${m[1].toUpperCase()} ${m[2]}`);
+    }
+  }
   return out;
 }
 
@@ -94,6 +131,36 @@ function relayed(): Set<string> {
 /** Normalise `{id}` / `{p}` / `{awardId}` so the two sides can be compared by SHAPE. */
 const shape = (s: string) => s.replace(/\{[^}]+\}/g, "{}");
 
+/**
+ * Does the backend serve this route, exactly or through a proxy?
+ *
+ * WARNING: the domain services declare PROXIES, not endpoints (2026-09-03). `agents-projects` exposes
+ * `/agents/projects` and `/agents/projects/{proxy+}` at method `"*"`, and one handler routes
+ * everything underneath in its own code. So `GET /agents/projects/{}/chart` is served and appears
+ * nowhere in any yml, which is why reading the files literally reported twelve project routes as
+ * missing from a backend that answers all of them.
+ *
+ * A proxy entry therefore covers every path under its prefix, and `"*"` covers every method. What
+ * this test still catches is what it was written for: a relay to a prefix NOBODY serves.
+ *
+ * What it can no longer catch, and this is the honest cost of the split: a wrong path UNDER a
+ * proxied prefix. `/agents/projects/{}/charts` would pass here and 404 in production, because only
+ * the handler knows its own sub-routes.
+ */
+function served(route: string, have: Set<string>): boolean {
+  if (have.has(route)) return true;
+  const [method, path] = route.split(" ");
+  for (const entry of have) {
+    const [m, p] = entry.split(" ");
+    if (m !== "*" && m !== "ANY" && m !== method) continue;
+    if (!p.endsWith("/{}")) continue;
+    // `/agents/projects/{}` came from `/agents/projects/{proxy+}`: it owns its whole subtree.
+    const prefix = p.slice(0, -"/{}".length);
+    if (path === prefix || path.startsWith(`${prefix}/`)) return true;
+  }
+  return false;
+}
+
 when("the routes this app calls", () => {
   /**
    * Routes this app calls that the backend has NOT built, on purpose.
@@ -127,7 +194,7 @@ when("the routes this app calls", () => {
     const have = new Set([...routes()].map(shape));
     const missing = [...relayed()]
       .map(shape)
-      .filter((r) => !have.has(r) && !knownAbsent.has(r));
+      .filter((r) => !served(r, have) && !knownAbsent.has(r));
 
     // A relay to a path that does not exist is a 404 the renter reads as "it is broken", and it is
     // invisible here until someone opens the feature on a deployed environment.

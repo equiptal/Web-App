@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Icon } from "@/components/ui";
 import { VendorMark } from "@/components/VendorMark";
+import { MoedatechBadge } from "@/components/MoedatechBadge";
 import { btn, cx } from "@/lib/ds";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import {
@@ -13,7 +14,8 @@ import {
   updateRenterSupplier,
   type RenterSupplier,
 } from "@/lib/api/client";
-import { canBeEmailed } from "@/lib/contract/renter-suppliers";
+import { canBeEmailed, isOnMoedatech } from "@/lib/contract/renter-suppliers";
+import { AddSuppliersDialog } from "@/components/suppliers/AddSuppliersDialog";
 import type { BidFormData } from "@/lib/contract/link-bids";
 import { bidCardHtml } from "@/lib/bidCardHtml";
 import { copyShareMessage, shareMessageHtml } from "@/lib/copyShareMessage";
@@ -198,6 +200,8 @@ export function ShareRequestPanel({
   const [pasteNeeded, setPasteNeeded] = useState<"addresses" | "card" | null>(null);
   const [copied, setCopied] = useState(false);
   const [addingEmailOn, setAddingEmailOn] = useState<string | null>(null);
+  /** *Add my suppliers*, opened from the `+` beside the search — see that control. */
+  const [addingSupplier, setAddingSupplier] = useState(false);
   const [emailDraft, setEmailDraft] = useState("");
   const [tooLong, setTooLong] = useState(false);
 
@@ -561,17 +565,33 @@ export function ShareRequestPanel({
             )}
           >
             {!uuid && <Icon name="lock" size={13} className="flex-none text-muted-light" />}
-            {/* The shape of the link that is coming — host, path, a stub, stars. The sentence that
-                says WHEN it arrives sits under the row; this says WHAT it will be. */}
+            {/* The shape of the link that is coming: host, path, a stub, stars. It says WHAT the
+                link will be, and the sentence beside it says WHEN it arrives. */}
             <span
               dir={uuid ? "ltr" : undefined}
               className={cx(
-                "block min-w-0 flex-1 truncate text-meta",
-                uuid ? "font-mono text-navy" : "text-muted-light",
+                "block min-w-0 truncate text-meta",
+                uuid ? "flex-1 font-mono text-navy" : "flex-none font-mono text-muted-light",
               )}
             >
               {uuid ? shareUrl.replace(/^https?:\/\//, "") : maskedLink}
             </span>
+            {/* ── The sentence lives IN the field, beside the locked value (owner, 2026-09-03) ───
+                *"This must be in the placeholder of the link beside the locked value."*
+
+                ~~A line of its own under the row.~~ It is not a fact about the screen, it is what
+                this ONE field is waiting for, which is what a placeholder is; and under the row it
+                cost a line that the card needed back above the fold. It disappears the moment the
+                link exists, exactly as a placeholder should, because by then the field holds the
+                answer instead.
+
+                Hidden below `sm`: on a narrow panel the masked link and a sentence cannot share a
+                line, and the value is the half that must stay. */}
+            {!uuid && (
+              <span className="hidden min-w-0 flex-1 truncate text-meta text-muted-light sm:block">
+                {c.linkHint}
+              </span>
+            )}
           </span>
           <button
             type="button"
@@ -614,9 +634,6 @@ export function ShareRequestPanel({
             {c.previewShort}
           </a>
         </div>
-        {/* WHEN it arrives. The field above says what it will be; this says when — two different
-            facts, and folding them into one control lost the one a first-time renter needs. */}
-        <p className="text-meta text-muted">{c.linkHint}</p>
       </div>
       )}
 
@@ -682,16 +699,26 @@ export function ShareRequestPanel({
                     </button>
                   )}
                 </span>
-                {/* The whole of whatever is showing. With a group chosen, this IS «send to the
-                    group»; with a search typed, it is «everyone called Zahid». One control, because
-                    it is one act. */}
+                {/* ── A way to ADD one, where «Select all» used to be (owner, 2026-09-03) ───────
+                    *"In the place of Select all we will have just a + icon that will open the add
+                    suppliers modal."*
+
+                    The two controls were the wrong way round. Picking is what a renter does to the
+                    list he already has, and it belongs beside the count of what he picked, at the
+                    foot; adding is what he does when the firm he wants is not in the list at all,
+                    and the moment he notices that is while he is searching for it. So the search
+                    row now offers the thing the search just failed to find.
+
+                    Icon-only, and titled: the row is a group filter, a search box and this, and a
+                    third word there would push the search box narrower than the names in it. */}
                 <button
                   type="button"
-                  onClick={toggleAllShown}
-                  disabled={!visible.length}
-                  className="flex-none text-meta font-semibold text-brand disabled:text-muted-light"
+                  onClick={() => setAddingSupplier(true)}
+                  title={t.suppliers.addSupplier}
+                  aria-label={t.suppliers.addSupplier}
+                  className="grid h-[30px] w-[30px] flex-none place-items-center rounded-md border border-dashed border-border-strong text-muted-dark transition hover:border-brand hover:text-brand"
                 >
-                  {allShownPicked ? c.pickNone : fmt(c.pickAll, { n: visible.length })}
+                  <Icon name="add" size={16} />
                 </button>
               </span>
             )}
@@ -705,15 +732,75 @@ export function ShareRequestPanel({
                 <ul>
                   {visible.map((s) => {
                     const on = !!picked[s.id];
+                    /**
+                     * «Add», beside the gap it fills (owner, 2026-09-03).
+                     *
+                     * ~~At the far right of the row.~~ A whole column away from the words «no
+                     * e-mail» it answers, so the eye travelled to the edge and back. Built here and
+                     * dropped into the contact line under the name.
+                     *
+                     * It still belongs to the CHANNEL: offered with nothing chosen, it asked him to
+                     * fix a gap for a send he had not decided to make. ⚠️ E-mail and WhatsApp only,
+                     * because *More* hands the message to the device's own share sheet, which picks
+                     * its own recipient: a contact is not missing there, it is not ours to ask for.
+                     */
+                    const needsContact =
+                      (channel === "email" || channel === "whatsapp") &&
+                      !(channel === "whatsapp" ? s.phone?.trim() : canBeEmailed(s));
+                    const addContact = !needsContact ? null : addingEmailOn === s.id ? (
+                      <span className="flex flex-none items-center gap-1.5">
+                        <input
+                          autoFocus
+                          value={emailDraft}
+                          onChange={(e) => setEmailDraft(e.target.value)}
+                          placeholder={channel === "whatsapp" ? "+9665…" : "name@company.com"}
+                          className="h-[24px] w-[150px] rounded-sm border border-border-strong px-2 text-meta text-navy outline-none focus:border-brand"
+                        />
+                        <button type="button" onClick={() => void saveContact(s)} className="text-meta font-semibold text-brand">
+                          {t.common.save}
+                        </button>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAddingEmailOn(s.id);
+                          setEmailDraft("");
+                        }}
+                        className="flex-none text-label font-semibold text-brand hover:underline"
+                      >
+                        {channel === "whatsapp" ? c.addPhone : c.addEmail}
+                      </button>
+                    );
                     return (
                       <li key={s.id} className="border-b border-border last:border-b-0">
-                        <div className={cx("flex items-center gap-3 px-3 py-2", on && "bg-ok-soft")}>
+                        {/* ── The pick is the ROW; the contact line carries its own control ──────
+                            Owner, 2026-09-03: *"the no e-mail or no phone, I want them small below
+                            the supplier name, and in the no e-mail line beside it, Add."*
+
+                            «Add» used to sit at the far right of the row, a whole column away from
+                            the gap it fills, so the eye had to travel from «no e-mail» under the
+                            name across to the edge and back. It belongs beside the words it answers.
+
+                            That means the contact line cannot be inside the pick control: a
+                            `<button>` may not contain another button. So the ROW takes the click,
+                            the way the suppliers table's own rows do, and anything interactive
+                            inside it keeps its own press. The tick stays a `role="checkbox"` button
+                            for the keyboard and for what it announces. */}
+                        <div
+                          onClick={(e) => {
+                            if ((e.target as HTMLElement).closest("button, input, a")) return;
+                            setPicked((p) => ({ ...p, [s.id]: !p[s.id] }));
+                          }}
+                          className={cx("flex cursor-pointer items-center gap-3 px-3 py-2", on && "bg-ok-soft")}
+                        >
                           <button
                             type="button"
                             role="checkbox"
                             aria-checked={on}
+                            aria-label={s.name}
                             onClick={() => setPicked((p) => ({ ...p, [s.id]: !p[s.id] }))}
-                            className="flex min-w-0 flex-1 items-center gap-2.5 text-start"
+                            className="flex flex-none items-center gap-2.5 text-start"
                           >
                             <span
                               className={cx(
@@ -726,7 +813,9 @@ export function ShareRequestPanel({
                             <span className="grid h-[26px] w-[26px] flex-none place-items-center rounded-sm bg-navy text-label font-extrabold text-surface">
                               {s.name.trim().charAt(0).toUpperCase()}
                             </span>
-                            <span className="min-w-0 flex-1">
+                          </button>
+
+                          <span className="min-w-0 flex-1">
                               <b className="block truncate text-meta font-semibold text-navy">{s.name}</b>
                               {/* ── What THIS channel needs from him (owner, 2026-09-03) ──────
                                   The row always showed the e-mail, so picking WhatsApp and finding
@@ -736,80 +825,61 @@ export function ShareRequestPanel({
                               {/* With a channel chosen, the row shows what THAT channel needs. With
                                   none, it states both and asks for neither — a renter who has not
                                   said how he is sending has not been asked for anything yet. */}
-                              {channel === "none" ? (
-                                <span dir="ltr" className="block truncate text-label">
-                                  <span className={s.email ? "text-muted" : "text-danger-deep"}>{s.email || c.noEmail}</span>
-                                  <span className="text-muted-light"> · </span>
-                                  <span className={s.phone ? "text-muted" : "text-danger-deep"}>{s.phone || c.noPhone}</span>
-                                </span>
-                              ) : (
-                                <span
-                                  dir="ltr"
-                                  className={cx(
-                                    "block truncate text-label",
-                                    (channel === "whatsapp" ? s.phone : s.email) ? "text-muted" : "text-danger-deep",
-                                  )}
-                                >
-                                  {channel === "whatsapp" ? s.phone || c.noPhone : s.email || c.noEmail}
-                                </span>
-                              )}
+                              {/* The value and its fix on ONE small line under the name. */}
+                              <span className="flex min-w-0 items-center gap-1.5 text-label">
+                                {channel === "none" ? (
+                                  <span dir="ltr" className="min-w-0 truncate">
+                                    <span className={s.email ? "text-muted" : "text-danger-deep"}>{s.email || c.noEmail}</span>
+                                    <span className="text-muted-light"> · </span>
+                                    <span className={s.phone ? "text-muted" : "text-danger-deep"}>{s.phone || c.noPhone}</span>
+                                  </span>
+                                ) : (
+                                  <span
+                                    dir="ltr"
+                                    className={cx(
+                                      "min-w-0 truncate",
+                                      (channel === "whatsapp" ? s.phone : s.email) ? "text-muted" : "text-danger-deep",
+                                    )}
+                                  >
+                                    {channel === "whatsapp" ? s.phone || c.noPhone : s.email || c.noEmail}
+                                  </span>
+                                )}
+                                {addContact}
+                              </span>
                             </span>
                             {/* Vendor-registered is the renter's OWN flag on this supplier, and it
                                 decides whether an award can go to him — so it belongs on the row he
                                 is picking from, not only in the table he set it in. Distinct from
                                 the green tick, which is Moedatech saying the FIRM is verified. */}
                             {s.vendorRegistered && (
+                              /* ── ONE glyph, and the chip is green (owner, 2026-09-03) ──────────
+                                 *"Why are there two icons for vendor here? Just use this green
+                                 one."* `workspace_premium` was standing in for this flag before the
+                                 artwork existed, and adding the artwork left both on the chip: two
+                                 marks for one boolean, in a 18px pill.
+
+                                 Green, like the same chip in the suppliers table and both add
+                                 dialogs, so the flag looks the same wherever it is read. It stays
+                                 distinct from the green TICK beside it, which is Moedatech saying
+                                 the firm is verified, not the renter saying it is his vendor. */
                               <span
                                 title={t.suppliers.colVendor}
-                                className="inline-flex h-[18px] flex-none items-center gap-1 rounded-full border border-navy/25 bg-surface2 px-1.5 text-label font-semibold text-navy-mid"
+                                className="inline-flex h-[20px] flex-none items-center gap-1 rounded-full border border-ok bg-ok-soft px-1.5 text-label font-semibold text-ok-deep"
                               >
-                                <Icon name="workspace_premium" size={11} />
                                 <VendorMark size={12} />
                                 {c.vendorShort}
                               </span>
                             )}
-                            {s.verified && <Icon name="verified_user" size={14} className="flex-none text-ok" />}
-                          </button>
-
-                          {/* ── The «Add» belongs to the CHANNEL (owner, 2026-09-03) ──────────
-                              *"the add option is when channel is selected and this apply to phone
-                              and emails both."* Offered with nothing chosen, it asked him to fix a
-                              gap for a send he had not decided to make — and it only ever offered
-                              an address, so a renter about to use WhatsApp was pointed at the wrong
-                              field.
-
-                              Fixed in place rather than on another screen: sending him away would
-                              lose the selection he is building here. */}
-                          {/* ⚠️ E-mail and WhatsApp only. *More* hands the message to the device's
-                              own share sheet, which picks its own recipient — so a contact is not
-                              missing there, it is simply not ours to ask for. */}
-                          {(channel === "email" || channel === "whatsapp") &&
-                            !(channel === "whatsapp" ? s.phone?.trim() : canBeEmailed(s)) &&
-                            (addingEmailOn === s.id ? (
-                              <span className="flex flex-none items-center gap-1.5">
-                                <input
-                                  autoFocus
-                                  value={emailDraft}
-                                  onChange={(e) => setEmailDraft(e.target.value)}
-                                  placeholder={channel === "whatsapp" ? "+9665…" : "name@company.com"}
-                                  className="h-[26px] w-[150px] rounded-sm border border-border-strong px-2 text-meta text-navy outline-none focus:border-brand"
-                                />
-                                <button type="button" onClick={() => void saveContact(s)} className="text-meta font-semibold text-brand">
-                                  {t.common.save}
-                                </button>
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setAddingEmailOn(s.id);
-                                  setEmailDraft("");
-                                }}
-                                className="flex-none text-meta font-semibold text-brand"
-                              >
-                                {channel === "whatsapp" ? c.addPhone : c.addEmail}
-                              </button>
-                            ))}
+                            {/* ── «On Moedatech», beside the vendor chip (owner, 2026-09-03) ────
+                                ~~A bare green shield, drawn from `verified`.~~ Two problems with
+                                it. A wordless tick cannot say WHICH claim it is making, and the one
+                                a renter picking recipients needs is not «we checked their papers»,
+                                it is «this firm has an account, so their bid arrives in the app
+                                rather than as an e-mail he has to chase». And the same fact was
+                                already a labelled navy pill in My Suppliers, so the two screens
+                                disagreed about what it looks like. One badge now, from
+                                `MoedatechBadge`. */}
+                            {isOnMoedatech(s) && <MoedatechBadge />}
                         </div>
                       </li>
                     );
@@ -818,14 +888,31 @@ export function ShareRequestPanel({
                 {!visible.length && <p className="px-3 py-4 text-center text-meta text-muted">{c.noMatches}</p>}
               </div>
             )}
-            {/* Named before the press, per channel: «2 have no phone» is a different sentence from
-                «2 have no e-mail», and only one of them is true at a time. */}
-            {handedOff === null && channel === "email" && unreachable.length > 0 && (
-              <span className="text-meta text-danger-deep">{fmt(c.skipping, { n: unreachable.length })}</span>
-            )}
-            {handedOff === null && channel === "whatsapp" && noPhone.length > 0 && (
-              <span className="text-meta text-danger-deep">{fmt(c.skippingPhone, { n: noPhone.length })}</span>
-            )}
+            {/* ── The list's own footer: what will be left out, and one press to take them all ──
+                Named before the press, per channel: «2 have no phone» is a different sentence from
+                «2 have no e-mail», and only one of them is true at a time.
+
+                «Select all» sits here now (owner, 2026-09-03), on the line that reports what the
+                picking has come to. It is the whole of whatever is showing, so with a group chosen
+                it IS «send to the group» and with a search typed it is «everyone called Zahid»: one
+                control, because it is one act. */}
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="min-w-0 flex-1 text-meta text-danger-deep">
+                {handedOff === null && channel === "email" && unreachable.length > 0
+                  ? fmt(c.skipping, { n: unreachable.length })
+                  : handedOff === null && channel === "whatsapp" && noPhone.length > 0
+                    ? fmt(c.skippingPhone, { n: noPhone.length })
+                    : ""}
+              </span>
+              <button
+                type="button"
+                onClick={toggleAllShown}
+                disabled={!visible.length}
+                className="flex-none text-meta font-semibold text-brand disabled:text-muted-light"
+              >
+                {allShownPicked ? c.pickNone : fmt(c.pickAll, { n: visible.length })}
+              </button>
+            </span>
           </div>
 
 
@@ -873,7 +960,10 @@ export function ShareRequestPanel({
               {/* One scroll region for the whole message. It used to be three, nested — the body,
                   the card under it and the dialog around both — and a renter reading a message he is
                   about to send should not have to work out which of three bars moves what. */}
-              <div className="min-h-0 flex-1 overflow-auto p-3">
+              {/* Grey ground, so the white card inside reads as a card (owner, 2026-09-03: *"i want
+                  it light grey instead of white so it is shown as card with white background"*).
+                  On white it had no edge, and a card with no edge is a paragraph. */}
+              <div className="min-h-0 flex-1 overflow-auto bg-surface2 p-3">
                 <Message
                   parts={parts}
                   template={template}
@@ -948,22 +1038,31 @@ export function ShareRequestPanel({
           {/* Moedatech is not a channel he chooses, it is where the request goes, and it is never
               pressable: a control he cannot turn off must not look like one he can.
 
-              ── Same height, and the green ground back (owner, 2026-09-03) ─────────────────────
-              ~~42px on a row of 34px chips, on white.~~ The extra eight pixels made the row look
-              misaligned rather than making this one important, and white took away the one thing
-              that said «this always happens» at a glance. Green ground, green border, one height:
-              it reads as settled beside three things that are still choices. */}
+              ── Same height, and a light green ground (owner, 2026-09-03) ──────────────────────
+              ~~42px on a row of 34px chips, on white.~~ Two things were wrong and the note saying so
+              had been written without the code following it.
+
+              The eight extra pixels made the row look misaligned rather than making this one
+              important: a chip that is nearly the same height as its neighbours reads as a mistake,
+              where one that matches exactly reads as belonging. It is `h-[34px]`, the `Channel`
+              height, and if that ever moves the two have to move together.
+
+              White took away the one thing that said «this always happens» at a glance. `bg-ok-soft`
+              is the app's light green — the same tint every settled state on this surface wears —
+              and it is the ground, not the border, that carries the meaning at a glance.
+
+              What it does NOT take is the navy fill a chosen channel gets. Green is Moedatech's and
+              navy is «you picked this»; keeping them apart is what lets a renter see, in one look,
+              which parts of the row are his decision and which part is simply true. */}
           <span
             title={c.alwaysHint}
-            /* Taller than the channels beside it, and on white rather than the band's own tint
-               (owner, 2026-09-03: *"make moedatech larger box to be more visisble"*). It is not one
-               of the choices — it is the floor under all of them, and matching their height made it
-               read as a fourth chip that happened to be ticked. */
-            className="inline-flex h-[42px] flex-none items-center gap-2.5 rounded-md border border-ok bg-surface px-4"
+            className="inline-flex h-[34px] flex-none items-center gap-2 rounded-md border border-ok/30 bg-ok-soft px-3.5"
           >
+            {/* `h-3.5` inside a 34px chip, so the mark keeps the same optical weight it had in the
+                taller one rather than filling the smaller box edge to edge. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/moedatech-logo.svg" alt="Moedatech" className="h-4 w-auto brightness-0" />
-            <Icon name="check_circle" size={16} className="text-ok-deep" />
+            <img src="/moedatech-logo.svg" alt="Moedatech" className="h-3.5 w-auto brightness-0" />
+            <Icon name="check_circle" size={15} className="text-ok-deep" />
           </span>
 
           <span aria-hidden className="h-7 w-px flex-none bg-border-strong" />
@@ -1068,6 +1167,22 @@ export function ShareRequestPanel({
             </span>
           )}
       </div>
+
+      {/* ── Adding a supplier without leaving the share (owner, 2026-09-03) ────────────────────
+          The `+` beside the search opens the same dialog My Suppliers uses, because a firm added
+          here is added to the renter's list, full stop: two ways to type a supplier would drift
+          into two different sets of rules about what a supplier needs.
+
+          Stacked over this panel rather than replacing it, and the list reloads on success, so the
+          firm he has just typed in is in the list with the picks he had already made still ticked. */}
+      <AddSuppliersDialog
+        open={addingSupplier}
+        onClose={() => setAddingSupplier(false)}
+        onAdded={() => {
+          setAddingSupplier(false);
+          listRenterSuppliers().then(setRows).catch(() => {});
+        }}
+      />
     </div>
   );
 }

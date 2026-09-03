@@ -34,7 +34,7 @@ import { bidCardHtml } from "@/lib/bidCardHtml";
 // Literal values, not `var(--…)`: no mail client resolves a custom property, which is why the card
 // itself reads the same table. See `ds-colors.ts`.
 import { COLORS } from "@/lib/ds-colors";
-import { shareMessageParts, type ShareTemplate } from "@/lib/shareTemplate";
+import { cardBlock, shareMessageParts, type ShareTemplate } from "@/lib/shareTemplate";
 
 const escapeHtml = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -60,12 +60,24 @@ export function shareMessageHtml(
   const p = shareMessageParts(m, url, { template, renterName, lang });
   const card = bidCardHtml({ title: m.cardTitle, description: m.where ?? "", imageUrl, url }, m, lang);
 
+  /**
+   * ── The points go in the HTML too (owner, 2026-09-03: *"where is the reqest details in the
+   * email?"*) ─────────────────────────────────────────────────────────────────────────────────
+   *
+   * The plain-text message had them and this did not, so the same request read two ways depending
+   * on whether the renter's mailbox was connected. `omitHead` because the card directly above
+   * already names the machine and the site; what is left is the terms, the deadline, and the line
+   * that says no account is needed.
+   */
+  const detail = cardBlock(m, lang, { omitHead: true });
+
   return [
     `<div dir="${lang === "ar" ? "rtl" : "ltr"}" style="font-family:'Segoe UI',Roboto,Arial,sans-serif;">`,
     para(p.greeting),
     para(p.intro),
     card,
-    `<div style="height:14px;"></div>`,
+    `<div style="height:12px;"></div>`,
+    para(detail),
     para(p.signoff),
     // The link in words as well as in the card: a client that strips the card still leaves a way in.
     url ? `<p style="margin:0;font-size:13px;"><a href="${escapeHtml(url)}" style="color:${COLORS.info};">${escapeHtml(url)}</a></p>` : "",

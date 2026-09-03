@@ -239,36 +239,50 @@ const FIXED = {
  * closing line. What the request does not carry does not appear, which is the same rule the image
  * and the HTML card follow.
  */
-export function cardBlock(m: BidCardModel, lang: "en" | "ar" = "en"): string {
+export function cardBlock(
+  m: BidCardModel,
+  lang: "en" | "ar" = "en",
+  /**
+   * Drop the machine name and the site — for the HTML message, where the CARD above already
+   * carries both. In plain text there is no card, so they must stay.
+   */
+  { omitHead = false }: { omitHead?: boolean } = {},
+): string {
   const t = FIXED[lang];
+
+  /**
+   * ── One fact per line (owner, 2026-09-03) ────────────────────────────────────────────────────
+   *
+   * *"i want them as points not like this will never be read by user."*
+   *
+   * ~~Every term joined by middots into one paragraph.~~ Nine facts in a run-on sentence is a thing
+   * a supplier's eye slides off, and the DEADLINE — the line that decides whether he acts today or
+   * next week — sat in the middle of it.
+   *
+   * A line each, and a chat bubble has width for a line. Nothing is invented: what the request does
+   * not answer produces no line, because "Fuel: —" teaches him to skim the block and then he skims
+   * the one that mattered.
+   */
   const lines: (string | null)[] = [
     /**
-     * The machine — but NOT when the list below is about to name every one of them.
+     * ⚠️ The machine leads, and it must: e-mail has no card at all, so if the name is not in these
+     * words a supplier reading an e-mail never learns what he is being asked to price. The picture
+     * carries it too, but a picture is not readable with images off, in a text client, or by SMS.
      *
-     * With two items the headline read "Excavator 20 ton ×2 + 1 other equipment item" and the list
-     * underneath then said "• Excavator 20 ton ×2" and "• Excavator 20 ton ×2" again. The first
-     * machine appeared twice and the phrase "+ 1 other" described a line the reader could already
-     * see (owner, 2026-09-03: *"why so duplicate info shown"*).
-     *
-     * A one-machine request keeps its headline, because there is no list to replace it.
-     *
-     * ⚠️ No reference either, since 2026-09-03: that is our filing, not his, and a supplier reading
-     * `CEX-020902:` before the equipment is handed an internal code as the first thing he sees.
+     * Dropped only when the list below names every machine — then the headline would be the first
+     * of them said twice.
      */
-    m.items.length ? null : m.imageHeadline,
+    omitHead || m.items.length ? null : m.imageHeadline,
 
-    // The SITE and the DATES first, and once: they belong to the request, not to any one machine.
-    m.where || null,
+    // The site and the dates belong to the request, not to any one machine.
+    omitHead ? null : m.where || null,
 
-    // Then what every machine agrees on — also the request's own answers.
-    ...(m.terms.length ? ["", ...m.terms.map((x) => `${x.label}: ${x.value}`)] : []),
+    ...(m.terms.length ? ["", ...m.terms.map((x) => `• ${x.label}: ${x.value}`)] : []),
 
     /**
-     * Then each machine, with only the terms IT carries.
-     *
-     * The image can name one headline; this is where the rest of the request lives. A machine whose
-     * every answer is shared prints as a bare line, which is the truth — there is nothing about it
-     * the block above has not already said.
+     * Then each machine, with only the terms IT carries. A machine whose every answer is shared
+     * prints as a bare line, which is the truth — there is nothing about it the block above has
+     * not already said.
      */
     ...(m.items.length
       ? [

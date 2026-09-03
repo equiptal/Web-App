@@ -84,15 +84,15 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
 
   const d = bidCardModel(preview, copy, effective, form);
   const rtl = effective === "ar";
-  /**
-   * The domain on the card is the one this image is being SERVED from.
-   *
-   * ⚠️ It was `preview.url`, and that is the backend's `OS_APP_URL` — which on the staging agents
-   * stack is `web-production-de3c8.up.railway.app` (verified against the live endpoint, 2026-09-01).
-   * The trust line at the bottom of the card is the one element whose whole job is to say "this came
-   * from us", so printing somebody's deploy host there does the opposite of what it is for.
-   */
-  const host = req.nextUrl.host || "web.moedatech.net";
+  /*
+ * — the host line lived here —
+ *
+ * `req.nextUrl.host`, drawn small and grey in the corner as the card's trust signal. Removed
+ * 2026-09-03 with the line itself: the picture sits inside a link, and every app that unfurls draws
+ * its own domain beneath the card. Restore both together if it is ever wanted back — and read it
+ * from the REQUEST, never from `metadataBase`, which is hardcoded to production and made a staging
+ * card claim it came from prod.
+ */
 
   /**
    * The renderer honours `direction: rtl` for text (Arabic shapes and orders correctly inside a line)
@@ -164,18 +164,15 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
           </div>
         </div>
 
-        {/* The source domain — the card's trust signal (element 4 in the prototype). */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: row,
-            justifyContent: rtl ? "flex-start" : "flex-end",
-          }}
-        >
-          <div style={{ display: "flex", fontSize: 24, letterSpacing: 2.5, color: "rgba(255,255,255,0.48)" }}>
-            {host.toUpperCase()}
-          </div>
-        </div>
+        {/* ── No source domain (owner, 2026-09-03) ────────────────────────────────────────────
+            ~~The host, small and grey in the corner — the prototype's fourth element, there as a
+            trust signal.~~ *"remove this web.prod url view in the card just opening it wil open the
+            link."*
+
+            It earned its place when the card was the whole message. It is noise now: the picture
+            sits inside a link, and a raw `web-production-de3c8.up.railway.app` under a request
+            reads as machinery rather than as reassurance. Every app that unfurls draws its own
+            domain line beneath the card, so the signal survives where it was doing work. */}
       </div>
     ),
     {

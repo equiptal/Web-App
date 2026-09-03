@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { VerifiedMark } from "@/components/VerifiedMark";
 import { VendorMark } from "@/components/VendorMark";
+import { MoedatechBadge } from "@/components/MoedatechBadge";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 import { btn, cx } from "@/lib/ds";
@@ -135,15 +136,16 @@ function Badges({ p }: { p: SupplierProfile }) {
   const c = useT().suppliers;
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span
-        className={cx(
-          "inline-flex h-[23px] items-center gap-1.5 rounded-full px-2.5 text-label font-extrabold",
-          p.kind === "platform" ? "bg-navy text-surface" : "border border-border-strong bg-surface2 text-muted-dark",
-        )}
-      >
-        {p.kind === "platform" && <Icon name="verified_user" size={13} />}
-        {p.kind === "platform" ? c.onMoedatech : c.offPlatform}
-      </span>
+      {/* One badge for «on Moedatech», shared with the table and the share panel (owner,
+          2026-09-03). Off-platform keeps its own quiet chip: it is the ABSENCE of that fact, and a
+          shared component for «not the thing» would be a component with two opposite meanings. */}
+      {p.kind === "platform" ? (
+        <MoedatechBadge size={13} />
+      ) : (
+        <span className="inline-flex h-[23px] items-center gap-1.5 rounded-full border border-border-strong bg-surface2 px-2.5 text-label font-extrabold text-muted-dark">
+          {c.offPlatform}
+        </span>
+      )}
       {p.store && (
         <span className="inline-flex h-[23px] items-center gap-1.5 rounded-full border border-border-strong bg-surface2 px-2.5 text-label font-extrabold text-muted-dark">
           <Icon name="storefront" size={13} />

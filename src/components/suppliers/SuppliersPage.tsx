@@ -6,6 +6,7 @@ import { fmt, useT } from "@/lib/i18n";
 import { btn, cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 import { VendorMark } from "@/components/VendorMark";
+import { MoedatechBadge } from "@/components/MoedatechBadge";
 import { ApiError, deleteSupplierGroup, listRenterSuppliers, renameSupplierGroup, updateRenterSupplier } from "@/lib/api/client";
 import { AddSuppliersDialog } from "./AddSuppliersDialog";
 import { AddFromMoedatechDialog } from "./AddFromMoedatechDialog";
@@ -663,13 +664,10 @@ function Row({
           <span className="min-w-0">
             <span className="flex items-center gap-1.5 text-body font-extrabold text-navy">
               {s.name}
-              {/* A fact about the firm, not about this row: it is where their bids arrive. */}
-              {onApp && (
-                <span className="inline-flex h-[19px] flex-none items-center gap-1 rounded-full bg-navy px-2 text-label font-extrabold text-surface">
-                  <Icon name="verified_user" size={12} />
-                  {c.onMoedatech}
-                </span>
-              )}
+              {/* A fact about the firm, not about this row: it is where their bids arrive. The
+                  markup moved to `MoedatechBadge` so the share panel and the profile say it the
+                  same way (owner, 2026-09-03). */}
+              {onApp && <MoedatechBadge />}
             </span>
             {/* A dash, not «No contact name» (owner, 2026-09-03) — see the note on the phone cell. */}
             <span className="block text-meta text-muted">{s.contactName || EMPTY}</span>

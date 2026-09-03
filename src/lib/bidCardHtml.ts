@@ -31,7 +31,7 @@
  */
 
 import { COLORS, RADII } from "@/lib/ds-colors";
-import { bidCardDescription, type BidCardModel } from "@/lib/bidCardModel";
+import type { BidCardModel } from "@/lib/bidCardModel";
 
 export interface BidCardPreview {
   title: string;
@@ -116,21 +116,20 @@ export function bidCardHtml(card: BidCardPreview, model: BidCardModel | null, la
   const title = bandIsMarkup ? "" : model?.cardTitle || card.title;
 
   /**
-   * ── ONE paragraph, because that is what an unfurl draws (owner, 2026-09-03) ──────────────────
+   * ── The card names the request; the MESSAGE carries the detail (owner, 2026-09-03) ───────────
    *
-   * *"this is how the template must look like, this is what we decided which is different from the
-   * current preview. why??"* — and the answer was that this function drew something no client
-   * builds: a two-column table of terms, plus a per-item block under it.
+   * *"i want them as points not like this will never be read by user, i want them part of the text
+   * message of this link preview like below the image."*
    *
-   * WhatsApp, Telegram, Slack and Outlook all render the SAME four things from Open Graph: the
-   * image, one bold title, a description paragraph, and the host. There are no rows, no columns and
-   * no second block, because there are no tags for them.
+   * `bidCardDescription` put nine facts in one grey paragraph that wrapped to four lines — site,
+   * dates, deadline, four responsibilities, year, certificate, all separated by middots. Nobody
+   * reads that. It is what `og:description` has to be, because Open Graph has one description slot
+   * and no others; but our own card is not obliged to imitate a limitation.
    *
-   * So the card is those four things. `bidCardDescription` is the same string that goes into
-   * `og:description`, clamped where WhatsApp clamps it — site, duration, dates, then as many terms
-   * as fit, deadline first. The preview and the unfurl are now one drawing of one model.
+   * So the card keeps what an unfurl can genuinely show — picture, name, host — and every term
+   * becomes a line in the message underneath, where it can be scanned.
    */
-  const description = model ? bidCardDescription(model) : card.description;
+  const description = model ? model.where : card.description;
 
   return `<a href="${url}" style="text-decoration:none;color:inherit;display:block;max-width:440px;">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="440" dir="${dir}" style="width:440px;max-width:100%;border:1px solid ${COLORS.background};border-radius:${RADII.md};border-collapse:separate;overflow:hidden;background:${COLORS.surface};font-family:'Segoe UI',Roboto,Arial,sans-serif;">
@@ -140,16 +139,36 @@ export function bidCardHtml(card: BidCardPreview, model: BidCardModel | null, la
            request to render. An `<img>` pointing at the generic file drew a band with nothing on it,
            which is the half of the card a supplier sees first. */
         card.imageUrl
-          ? `<img src="${escapeHtml(card.imageUrl)}" alt="" width="440" height="160" style="display:block;width:440px;max-width:100%;height:160px;border:0;outline:none;text-decoration:none;background-color:${COLORS.navy};">`
+          ? /* ⚠️ 440 × 231, which is 1200 × 630 to scale. It was drawn at 440 × 160 — a 2.75:1 box
+               for a 1.9:1 picture — so every card squashed the mark and the headline vertically
+               (owner, 2026-09-03: *"the image text has wierd dimentions"*). Both attributes AND the
+               style carry it, because Outlook reads the attributes and ignores the style. */
+            `<img src="${escapeHtml(card.imageUrl)}" alt="" width="440" height="231" style="display:block;width:440px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;background-color:${COLORS.navy};">`
           : model
             ? navyBand(model, hostOf(card.url), align)
             : ""
       }
     </td></tr>
     <tr><td align="${align}" style="padding:14px 16px 16px;">
-      ${title ? `<div style="font-size:14px;font-weight:700;color:${COLORS.foreground};line-height:1.35;">${escapeHtml(title)}</div>` : ""}
-      ${description ? `<div style="font-size:12px;color:${COLORS.mutedDark};line-height:1.5;padding-top:6px;">${escapeHtml(description)}</div>` : ""}
-      <div style="font-size:10.5px;color:${COLORS.mutedLight};letter-spacing:0.4px;padding-top:10px;">${escapeHtml(hostOf(card.url))}</div>
+      ${
+        /* ⚠️ The picture already names the machine and asks for the bid, so a title here is the same
+           words again twenty pixels lower. What an unfurl needs under the image is the ONE thing the
+           image cannot be trusted to carry: where the link goes. The detail lives in the message
+           below the card, as lines a supplier can scan (owner, 2026-09-03). */
+        ""
+      }
+      ${title ? `<div style="font-size:13px;font-weight:700;color:${COLORS.foreground};line-height:1.35;">${escapeHtml(title)}</div>` : ""}
+      ${description ? `<div style="font-size:12px;color:${COLORS.mutedDark};line-height:1.5;padding-top:4px;">${escapeHtml(description)}</div>` : ""}
+      ${
+        /* ── No host line (owner, 2026-09-03: *"remove this web.prod url view in the card just
+             opening it wil open the link"*) ───────────────────────────────────────────────────
+           It was there as a trust signal, and it earned its place when the card was the whole
+           message. It is noise now: the card IS the link — the whole block is inside an `<a>` — and
+           a raw railway.app hostname under a request reads as machinery rather than as
+           reassurance. WhatsApp, Telegram and Slack draw their own domain line under an unfurl
+           regardless, so nothing is lost where it was doing work. */
+        ""
+      }
     </td></tr>
   </table>
 </a>`;
