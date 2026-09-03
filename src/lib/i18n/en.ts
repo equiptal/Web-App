@@ -39,6 +39,12 @@ export const en = {
   },
   shell: {
     home: "Home",
+    /* The back control's words. It names its DESTINATION, so a renter knows where a press lands
+       before he makes it (owner, 2026-09-03). `back` alone is the fallback for a route the product
+       has no name for — the control still works, it just cannot promise a place. */
+    back: "Back",
+    backTo: "Back to {place}",
+    suppliers: "Suppliers",
     profile: "Profile",
     /* The tab over `/requests` (owner, 2026-09-03: *"call the requests tab in the nav bar
        Marketplace"*). The route, the page and the word «request» everywhere else are unchanged: this
@@ -229,8 +235,10 @@ export const en = {
     suppliedBy: "Supplied by",
     backToSuppliers: "Back to suppliers",
     backToResults: "Back to results",
+    backToStore: "Back to the store",
     about: "About",
     viewStore: "View store",
+    expandMap: "Open the map",
     prevPhoto: "Previous",
     nextPhoto: "Next",
     // The map says what it actually knows: a yard's coordinates, or only the city.
@@ -304,8 +312,13 @@ export const en = {
       vendorShort: "Vendor",
       skippingPhone: "{n} of the ones you picked have no phone.",
       arrivesEmail: "E-mail carries these details as text today. The card appears once you connect your mailbox.",
+      previewForm: "Preview form",
+      postedTitle: "Your request is posted",
+      postedBody: "It is live on Moedatech as {code}. Suppliers there can bid now.",
+      postedBodyNoCode: "It is live on Moedatech. Suppliers there can bid now.",
+      postedKeepSharing: "Keep sharing",
+      postedNext: "Your link is ready on the card behind this. Pick a channel and send it whenever you like.",
       arrivesChat: "WhatsApp builds this card from the link itself.",
-      modalSubtitle: "Pick who sees it, and how it reaches them.",
     },
     reading: "Reading",
     heading: "How would you like to create your request?",

@@ -205,6 +205,17 @@ export function ShareRequestPanel({
 
   const card = useBidCard(shareUrl, lang, draftForm);
 
+  /**
+   * What a supplier actually opens.
+   *
+   * The real bid form once the request exists; the static mock in `public/` before that. Not a
+   * different idea — `Confirmation` has linked the same pair since this feature shipped.
+   */
+  const formUrl = useMemo(() => {
+    if (shareUrl) return shareUrl;
+    return typeof window === "undefined" ? "" : `${window.location.origin}/supplier-bid-v2.html?preview=1`;
+  }, [shareUrl]);
+
   const chosen = (rows ?? []).filter((s) => picked[s.id]);
   const reachable = chosen.filter(canBeEmailed);
   const unreachable = chosen.filter((s) => !canBeEmailed(s));
@@ -542,6 +553,20 @@ export function ShareRequestPanel({
             <Icon name={copied ? "check" : "content_copy"} size={14} />
             {copied ? c.copied : c.copy}
           </button>
+          {/* ── See the form a supplier fills in, BEFORE posting ──────────────────────────────
+              The real page once there is a token; the static mock in `public/` until then, which is
+              the same document the confirmation screen has always linked. A renter deciding whether
+              to send something should be able to look at what he is sending, and «post it and find
+              out» is not an answer. */}
+          <a
+            href={formUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cx(btn("secondary", "md"), "flex-none")}
+          >
+            <Icon name="visibility" size={14} />
+            {c.previewForm}
+          </a>
         </div>
         <p className="text-meta text-muted">{c.linkHint}</p>
       </div>
@@ -823,7 +848,15 @@ export function ShareRequestPanel({
       <div className="grid gap-2.5 rounded-md border border-brand/30 bg-brand-soft px-4 py-3.5">
         <span className={label}>{c.sendVia}</span>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        {/* ── One line, on any screen that has the room (owner, 2026-09-03) ────────────────────
+            *"Make sure the modal fits this screen as it is, with no change in the UI like wrapping
+            buttons."* Wrapping put «More» and the send button on a second line under the channels,
+            which reads as a second group of controls rather than as the end of this one.
+
+            `sm:flex-nowrap`: from the small breakpoint up the row holds its line, and the send
+            button keeps `ms-auto` against the right edge. Below that it still wraps, because on a
+            phone the alternative is a row scrolled sideways with the send button off screen. */}
+        <div className="flex flex-wrap items-center gap-2.5 sm:flex-nowrap">
           {/* Moedatech is not a channel he chooses — it is where the request goes. Larger than the
               rest, and never pressable: a control he cannot turn off must not look like one he can. */}
           <span

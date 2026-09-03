@@ -47,7 +47,21 @@ export function CreateSurface() {
          */
         return state.readyToSend ? <ReadyToSend /> : <Canvas />;
       case "confirmation":
-        return <Confirmation />;
+        /**
+         * ── Posting from the share card does not leave the page (owner, 2026-09-03) ────────────
+         *
+         * *"i dont want to be landed on the post request page which has the video of submitting
+         * bids, i just want a popup ... on the same page he was on."*
+         *
+         * The confirmation screen is a destination: it explains what happens next and offers the
+         * link. A renter who posted from the share card has the link in front of him and is midway
+         * through choosing channels — moving him to a page that offers it again takes the supplier
+         * list, the wording he wrote and the channel he picked with it.
+         *
+         * `shareOnPost` is only ever true when this post came from that card, so the confirmation
+         * screen still owns every other route to it.
+         */
+        return state.shareOnPost ? <ReadyToSend /> : <Confirmation />;
     }
   })();
 

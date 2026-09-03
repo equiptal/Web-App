@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/ui";
-import { useT } from "@/lib/i18n";
+import { Dialog } from "@/components/Dialog";
+import { btn, cx } from "@/lib/ds";
+import { fmt, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { useSession } from "@/lib/session";
 import { AccountModal } from "@/components/onboarding/AccountModal";
@@ -38,6 +40,8 @@ export function ShareOnPost() {
   const { tier } = useSession();
   const [coach, setCoach] = useState(true);
   const [showAccount, setShowAccount] = useState(false);
+  /** Said once, as a pop-up, and then he is back where he was — see the dialog at the foot. */
+  const [posted, setPosted] = useState(false);
   /** The request cap has a dialog of its own on the review above; this banner leaves it to it. */
   const isLimit = state.errorDetail?.backendCode === "E8009";
   /** The renter's own firm, for the From line. Read once, and a failure just leaves it unnamed. */
@@ -86,8 +90,10 @@ export function ShareOnPost() {
     const uuid = result?.requestUuids?.[0] ?? null;
     // `submit` has already put the failure on the store; the review above says what went wrong.
     if (!uuid) return null;
-    // Keeps this card mounted once the phase flips to confirmation — see `CreateSurface`.
+    // Keeps this card mounted once the phase flips to confirmation, and keeps the REVIEW on screen
+    // behind it rather than the confirmation page — see `CreateSurface`.
     actions.setShareOnPost(true);
+    setPosted(true);
     return uuid;
   };
 
@@ -142,6 +148,32 @@ export function ShareOnPost() {
         onPost={post}
         renterName={renterName}
       />
+
+      {/* ── It is posted, and he has not gone anywhere (owner, 2026-09-03) ────────────────────
+          A tick, the code, and one way out. Deliberately NOT a page: he is midway through choosing
+          channels, and the supplier list, the wording he wrote and the channel he picked are all
+          behind this dialog, exactly where he left them. */}
+      <Dialog
+        open={posted}
+        onClose={() => setPosted(false)}
+        size="sm"
+        icon={
+          <span className="grid h-[34px] w-[34px] flex-none place-items-center rounded-full bg-ok-soft text-ok-deep">
+            <Icon name="check_circle" size={20} />
+          </span>
+        }
+        title={c.postedTitle}
+        subtitle={state.requestId ? fmt(c.postedBody, { code: state.requestId }) : c.postedBodyNoCode}
+        footer={
+          <button type="button" onClick={() => setPosted(false)} className={cx(btn("primary", "md"), "ms-auto")}>
+            {c.postedKeepSharing}
+          </button>
+        }
+      >
+        {/* The link is already on the card behind this, so the dialog does not offer it again — it
+            says the one thing he does not know yet and gets out of the way. */}
+        <p className="text-meta text-muted">{c.postedNext}</p>
+      </Dialog>
 
       <AccountModal
         open={showAccount}
