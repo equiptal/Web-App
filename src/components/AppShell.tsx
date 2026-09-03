@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { VerifiedMark } from "@/components/VerifiedMark";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { fmt, useLocale, useT } from "@/lib/i18n";
+import { useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import type { Locale } from "@/lib/i18n/config";
@@ -13,7 +13,7 @@ import type { Locale } from "@/lib/i18n/config";
 import { AuthGateProvider, useAuthGate } from "@/components/auth/AuthGate";
 import { fetchDealRoomUnread } from "@/lib/api/client";
 import { btn, cx, OVERLAY, PAGE_BACK, PAGE_MAX, PAGE_X, PAGE_Y, POPOVER, SCRIM } from "@/lib/ds";
-import { backTarget, type BackNameKey } from "@/lib/contract/back-nav";
+import { backTarget } from "@/lib/contract/back-nav";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { AppNav, AppNavMobile, type NavItem } from "@/components/AppNav";
 import { ArrowBackIcon, MailIcon, CountBadge } from "@/components/HeaderIcons";
@@ -584,27 +584,33 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
           {back && (
             <div {...pin("page-back")} className={cx(PAGE_BACK, fullBleed && `${PAGE_X} pt-4`)}>
               {(() => {
-                /* ── It NAMES its destination (owner, 2026-09-03) ───────────────────────────────
-                   ~~A bare arrow in a round pill.~~ An arrow says "leave", not "leave to where",
-                   and on a page reachable from four places that is the only thing the renter wants
-                   to know before pressing it. A labelled control also gives him something to aim
-                   at: a 34px circle is the smallest target on the page.
+                /* ── ONE control, one word, one place (owner, 2026-09-03) ───────────────────────
+                   *"There are many variations of the back button on screens, and some have two. I
+                   want one consistent component reused on all screens, which is a simple plain
+                   Back, positioned in the same place on all screens."*
 
-                   The word comes from the trail, so it is the place he actually came from rather
-                   than a guess written into each page. Where the trail is empty — a cold load, a
-                   deep link, a fresh tab — the page's own `fallback` answers, and where even that
-                   is not a place we name, the control says «Back» and still works. */
+                   ~~«Back to browse», «Back To Home», «Back to suppliers», each named from the
+                   trail, and half of them boxed as secondary buttons.~~ Three shapes and a
+                   different sentence per screen, which is the opposite of a control a reader stops
+                   reading. It is now the same two things everywhere: an arrow and the word «Back».
+
+                   The DESTINATION logic stays exactly as it was — the trail still decides where the
+                   press lands, so back from a machine returns to the store he opened it from, and a
+                   cold load falls back to the page's own parent. That was never the problem; the
+                   label was, because naming it made every screen's control look different from
+                   every other.
+
+                   Plain text, not a button skin: this leaves the page, it does not act on it, and a
+                   bordered box gave it the weight of a primary control at the top of every screen. */
                 const isFn = typeof back === "function";
                 const target = isFn ? null : backTarget(pathname, prevPath.current, back.fallback);
-                const key = target?.key ?? null;
-                const label = key ? fmt(t.shell.backTo, { place: t.shell[key as BackNameKey] }) : t.shell.back;
                 return (
                   <button
                     onClick={() => (isFn ? back() : router.push(target!.href))}
-                    className={btn("secondary", "md", { className: "gap-1.5" })}
+                    className="inline-flex items-center gap-1.5 text-body font-semibold text-muted-dark transition hover:text-navy"
                   >
                     <ArrowBackIcon size={16} className="rtl:-scale-x-100" />
-                    {label}
+                    {t.shell.back}
                   </button>
                 );
               })()}

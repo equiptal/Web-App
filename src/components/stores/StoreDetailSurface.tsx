@@ -7,7 +7,7 @@ import { Icon } from "@/components/ui";
 import type { EquipmentCard, StoreDetail, TaxonomyNode } from "@/lib/contract/stores";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
-import { BackArrowIcon, CheckIcon, CityTag, DocIcon, EyeIcon, PinIcon, SHOP_PAGE, ShopLogo, ShopPhoto, VerifiedDot } from "@/components/stores/shop";
+import { CheckIcon, CityTag, DocIcon, EyeIcon, PinIcon, SHOP_PAGE, ShopLogo, ShopPhoto, VerifiedDot } from "@/components/stores/shop";
 
 /**
  * A supplier's profile — the approved prototype, matched value for value.
@@ -87,13 +87,10 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
 
   return (
     <div {...pin("store-detail")} className={`${SHOP_PAGE} pt-6`}>
-      {/* Back to suppliers — 13.5px, the prototype's own grey, 20px of air under it. */}
-      <Link
-        href="/browse"
-        className="mb-5 inline-flex items-center gap-[7px] text-shop-body font-semibold text-shop-ink-3 transition hover:text-shop-amber"
-      >
-        <BackArrowIcon /> {t.store.backToSuppliers}
-      </Link>
+      {/* ~~«Back to suppliers», the prototype's own grey link.~~ Removed (owner, 2026-09-03): the
+          page above this already renders the shell's `PageBack`, so a store showed TWO back
+          controls in two different shapes, one under the other, going to the same place. The shell's
+          is the one that survives everywhere. */}
 
       <div className="flex flex-col gap-7">
         {/* ── The store ─────────────────────────────────────────────────────────────────────── */}

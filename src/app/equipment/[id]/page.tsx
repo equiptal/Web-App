@@ -2,7 +2,7 @@
 
 import { Suspense, use, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, PageBack } from "@/components/AppShell";
 import { EquipmentDetailSurface } from "@/components/stores/EquipmentDetailSurface";
 import { useT } from "@/lib/i18n";
 
@@ -20,6 +20,10 @@ export default function EquipmentPage({ params }: { params: Promise<{ id: string
   const [title, setTitle] = useState("");
   return (
     <AppShell title={title || t.store.equipment} fullBleed>
+      {/* The one back control, from the shell — this page used to draw two of its own. The trail
+          returns the renter to the store he opened the machine from; a cold load, which is how a
+          shared machine link arrives, falls back to the directory. */}
+      <PageBack fallback="/browse" />
       {/* The storefront's own column, as on the store profile — the shell's gutter would sit on top
           of the prototype's 24px otherwise. */}
       <div className="min-h-0 flex-1 overflow-y-auto">

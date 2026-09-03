@@ -87,22 +87,28 @@ describe("AppShell places it, so no page has to", () => {
     expect(header).not.toContain("ArrowBackIcon");
   });
 
-  it("gives it the shared recipe rather than a hand-written class", () => {
+  it("is placed by the shared recipe, in one place", () => {
     expect(main).toContain("PAGE_BACK");
-    /* ~~`{ icon: true, pill: true }` — a bare arrow in a round pill.~~ It NAMES its destination now
-       (owner, 2026-09-03), so it is an ordinary secondary button with a label beside the arrow. An
-       arrow alone says "leave" and not "leave to where", which on a page reachable from four places
-       is the only thing worth knowing before pressing it. Still the shared recipe, still one place. */
-    expect(main).toMatch(/btn\("secondary", "md", \{ className: "gap-1\.5" \}\)/);
   });
 
-  it("labels it from the trail, so the word is the place he came from", () => {
-    // The rule itself is `back-nav.ts` and is tested there. This pins that the shell USES it rather
-    // than writing a label of its own, which is how the two would drift.
+  /**
+   * ~~`{ icon: true, pill: true }`, a bare arrow in a round pill.~~ ~~An ordinary secondary button
+   * naming its destination.~~ **A plain line of text, and the word is always «Back»** (owner,
+   * 2026-09-03): *"There are many variations of the back button on screens, and some have two. I
+   * want one consistent component reused on all screens, which is a simple plain Back."*
+   *
+   * The shape and the word were the variation. The DESTINATION is not: `backTarget` still decides
+   * where the press lands, which is why that assertion stays.
+   */
+  it("says «Back», in plain text, and never names a destination", () => {
+    expect(main).toContain("t.shell.back}");
+    expect(main).not.toMatch(/t\.shell\.backTo/);
+    // Not a button skin: this leaves the page, it does not act on it.
+    expect(main).not.toMatch(/btn\("secondary"/);
+  });
+
+  it("still asks the trail WHERE to go, even though it no longer says so", () => {
     expect(main).toContain("backTarget(");
-    expect(main).toMatch(/t\.shell\.backTo/);
-    // And that a route it cannot name still draws a working control.
-    expect(main).toContain("t.shell.back;");
   });
 
   it("still registers through the hook, under both its names", () => {

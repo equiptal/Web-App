@@ -14,11 +14,11 @@ import { cityCentroid } from "@/lib/contract/saudi-cities";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 import {
-  BackArrowIcon,
   CameraIcon,
   CheckIcon,
   DocIcon,
   ExpandIcon,
+  ExternalIcon,
   EyeIcon,
   PinIcon,
   PriceIcon,
@@ -76,18 +76,10 @@ export function EquipmentDetailSurface({
   const [reloadKey, setReloadKey] = useState(0);
   const [idx, setIdx] = useState(0);
   const [mapOpen, setMapOpen] = useState(false);
-  /**
-   * Is there a page behind this one that belongs to us?
-   *
-   * Read once, after mount, because `window.history` does not exist on the server and its length on
-   * the FIRST render of a client navigation is not yet the length the renter will be going back
-   * through. A tab opened straight onto this URL has a length of 1; anything the renter walked to has
-   * more. That is the whole test — it does not need to know WHICH page, only that one is there.
-   */
-  const [cameFromApp, setCameFromApp] = useState(false);
-  useEffect(() => {
-    setCameFromApp(window.history.length > 1);
-  }, []);
+  /* ~~`cameFromApp`, a `window.history.length > 1` probe, which chose between this page's two back
+     controls.~~ Both are gone: the shell draws the one back control now (owner, 2026-09-03), and it
+     reads the app's own route trail rather than the browser's history length. */
+
 
   useEffect(() => {
     setError(false);
@@ -214,35 +206,18 @@ export function EquipmentDetailSurface({
 
   return (
     <div {...pin("equipment-sheet")} className={`${SHOP_PAGE} pt-6`}>
-      {/* ── Back is the PAGE BEFORE, not the store (owner, 2026-09-03) ───────────────────────────
-          *"I clicked an equipment from the stores, I clicked back, it takes me to the store — I want
-          the page I was on, browsing all stores."*
+      {/* ── One back control, and it is the shell's (owner, 2026-09-03) ───────────────────────
+          ~~Two of its own: `history.back()` when the machine was opened from inside the app, and a
+          link to the owner's store or to the directory when it was opened cold.~~ *"There are many
+          variations of the back button, and some screens have two. I want one consistent component
+          reused on all screens."*
 
-          It used to link to `/stores/{id}` whenever the machine named a store, which is true of every
-          machine: so a renter who opened one from a category card on Browse was put on that
-          supplier's profile, having never asked to go there, and lost his filter, his scroll and his
-          place in the grid. The destination was being read off the DATA when it is a fact about the
-          renter's own history.
-
-          `history.back()` answers it for both entrances, because it does not need to be told which
-          one was used. The link stays a link for the one case it cannot serve — a machine opened
-          cold, from a shared URL or a new tab, where there is nothing behind this page — and then it
-          goes to the store when we know it and to the directory when we do not. */}
-      {cameFromApp ? (
-        <button
-          onClick={() => router.back()}
-          className="mb-4 inline-flex items-center gap-[7px] text-shop-body font-semibold text-shop-ink-3 transition hover:text-shop-amber"
-        >
-          <BackArrowIcon /> {t.store.back}
-        </button>
-      ) : (
-        <Link
-          href={ownerStoreId ? `/stores/${ownerStoreId}` : "/browse"}
-          className="mb-4 inline-flex items-center gap-[7px] text-shop-body font-semibold text-shop-ink-3 transition hover:text-shop-amber"
-        >
-          <BackArrowIcon /> {ownerStoreId ? t.store.backToStore : t.store.backToResults}
-        </Link>
-      )}
+          The reasoning behind the pair survives inside `backTarget`, which is what the shell's
+          control now uses: back is the page BEFORE, not the store the machine belongs to, because a
+          renter who opened it from a category card on Browse never asked to go to that supplier's
+          profile and would lose his filter, his scroll and his place in the grid. `/equipment/[id]`
+          registers `PageBack fallback="/browse"`, so the trail answers the common case and a cold
+          load, which is how a shared machine link arrives, lands on the directory. */}
 
       {/* The machine, and the one thing to do about it. */}
       <div className="mb-[18px] flex flex-wrap items-center justify-between gap-5">
@@ -263,7 +238,13 @@ export function EquipmentDetailSurface({
           a hole in the page saying nothing, while the map it sat beside was too narrow to read. */}
       <div className={`grid gap-2 lg:h-[420px] ${photos.length >= 3 ? "lg:grid-cols-[7fr_3fr]" : photos.length === 2 ? "lg:grid-cols-[6fr_4fr]" : "lg:grid-cols-2"}`}>
         <Gallery photos={photos} layout={galleryLayout} idx={idx} setIdx={setIdx} t={t} />
-        <div className="relative h-[280px] overflow-hidden rounded-shop-media border border-shop-line bg-shop-fill lg:h-full">
+        {/* ── `isolate`, and it is load-bearing (owner, 2026-09-03: the map draws over the dialog) ──
+            Leaflet numbers its own furniture in the hundreds — panes at 400, controls at 800 — and
+            with no stacking context of its own those numbers were being compared against the whole
+            page. The dialog's scrim sits at 60, so the map BEHIND it won: tiles, ± and the expand
+            control all painted over the dialog that was supposed to cover them. `isolation: isolate`
+            keeps leaflet's numbers inside this box, where they are about each other and nothing else. */}
+        <div className="relative isolate z-0 h-[280px] overflow-hidden rounded-shop-media border border-shop-line bg-shop-fill lg:h-full">
           {point ? (
             <>
               <EquipmentLocationMap lat={point.lat} lng={point.lng} label={null} precise={precise} />
@@ -302,8 +283,31 @@ export function EquipmentDetailSurface({
       {/* The map, full size. `padded={false}` because a map brings its own edges, and the address
           rides in the title so the dialog says what it is showing. */}
       {mapOpen && point && (
-        <Dialog open onClose={() => setMapOpen(false)} size="lg" title={where ?? t.store.specLocation} padded={false}>
-          <div className="h-[70vh] w-full overflow-hidden">
+        <Dialog
+          open
+          onClose={() => setMapOpen(false)}
+          size="lg"
+          title={where ?? t.store.specLocation}
+          padded={false}
+          footer={
+            /* The way out to the map a renter actually navigates by (owner, 2026-09-03).
+               `search/?api=1&query=lat,lng` is Google's own documented URL — no key, no SDK, and it
+               opens the pin in the app on a phone and in the browser on a desktop. The panel stays
+               OpenStreetMap because that is what every other map in this app is (the bid map, the
+               location picker), and swapping the tiles for Google's would need an API key, a billing
+               account and their terms — a decision, not a detail. */
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${point.lat},${point.lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={btn("secondary", "md", { className: "flex" })}
+            >
+              {t.store.openInGoogleMaps}
+              <ExternalIcon />
+            </a>
+          }
+        >
+          <div className="isolate z-0 h-[70vh] w-full overflow-hidden">
             <EquipmentLocationMap lat={point.lat} lng={point.lng} label={where} precise={precise} expanded />
           </div>
         </Dialog>

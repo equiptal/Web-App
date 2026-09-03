@@ -143,6 +143,16 @@ export function ExpandIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+/** An arrow leaving its box — a link that opens somewhere that is not this app. */
+export function ExternalIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden className="rtl:scale-x-[-1]">
+      <path d="M14 4H20V10M20 4L11 13" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M18 15V19C18 19.6 17.6 20 17 20H5C4.4 20 4 19.6 4 19V7C4 6.4 4.4 6 5 6H9" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** The camera, over a photo count. */
 export function CameraIcon({ size = 17 }: { size?: number }) {
   return (
