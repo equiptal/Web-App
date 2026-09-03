@@ -6,13 +6,17 @@ import { VendorMark } from "@/components/VendorMark";
 import { MoedatechBadge } from "@/components/MoedatechBadge";
 import { btn, cx } from "@/lib/ds";
 import { fmt, useLocale, useT } from "@/lib/i18n";
+import { en } from "@/lib/i18n/en";
+import { ar } from "@/lib/i18n/ar";
 import {
   bidShareUrl,
   listRenterSuppliers,
   recordRequestShare,
   setBidDeadline,
+  shareRequestEmail,
   updateRenterSupplier,
   type RenterSupplier,
+  type ShareEmailResult,
 } from "@/lib/api/client";
 import { canBeEmailed, isOnMoedatech } from "@/lib/contract/renter-suppliers";
 import { AddSuppliersDialog } from "@/components/suppliers/AddSuppliersDialog";
@@ -34,6 +38,7 @@ import {
 import {
   loadEmailProvider,
   openEmailCompose,
+  type Compose,
   type EmailProvider,
 } from "@/lib/composeEmail";
 
@@ -145,7 +150,29 @@ export function ShareRequestPanel({
   const t = useT();
   const c = t.intake.postShare;
   const { locale } = useLocale();
-  const lang = locale === "ar" ? "ar" : "en";
+  const uiLang = locale === "ar" ? "ar" : "en";
+  /**
+   * ── The MESSAGE's language, which is not the app's (owner, 2026-09-03) ────────────────────────
+   *
+   * *"i want one language in the same template, user has toggle on the preview to use arabic or
+   * english but they are separate."*
+   *
+   * A renter reading Moedatech in English writes to a supplier who reads Arabic, and the reverse is
+   * just as common. Tying the message to the interface made that a choice between working in a
+   * language he does not want and writing in one his supplier cannot read.
+   *
+   * ⚠️ **One language for the WHOLE message.** Not a mix: the greeting, the card, the picture and
+   * the sign-off all take this value. The bug that started this was exactly a mix — an English
+   * message carrying an Arabic card image, because the picture's language was decided somewhere
+   * else and nobody was passing this down.
+   *
+   * It starts as the interface's language, because that is the best guess anyone has, and it
+   * follows the interface when THAT changes — switching the whole app is a statement about
+   * language, and a stale toggle underneath it would be a second, quieter answer to the same
+   * question.
+   */
+  const [lang, setLang] = useState<"en" | "ar">(uiLang);
+  useEffect(() => setLang(uiLang), [uiLang]);
 
   const [rows, setRows] = useState<RenterSupplier[] | null>(null);
   /**
@@ -203,6 +230,26 @@ export function ShareRequestPanel({
   const [addingSupplier, setAddingSupplier] = useState(false);
   const [emailDraft, setEmailDraft] = useState("");
   const [tooLong, setTooLong] = useState(false);
+  /**
+   * What the mail API said about the last e-mail press (SUP-BE-23). Null until he presses.
+   *
+   * ⚠️ Component state, never remembered across mounts. The answer is "is this domain verified
+   * RIGHT NOW", and the whole point of showing the records is that IT is about to change it — a
+   * cached «not verified» would keep opening a compose window for a renter whose records went live
+   * an hour ago.
+   */
+  const [mailer, setMailer] = useState<ShareEmailResult | null>(null);
+  /**
+   * The compose window's arguments, kept so the renter can open it again himself.
+   *
+   * ⚠️ `window.open` needs a live user gesture, and this one fires AFTER an `await` on the mail
+   * API. Chrome and Firefox still allow it; Safari can refuse — and `noopener` makes `window.open`
+   * return null by spec, so a refusal cannot be detected. So the button is always offered on the
+   * fallback path rather than only when something looks wrong: a share he can finish with one press
+   * beats a share that silently did not open.
+   */
+  const [reopen, setReopen] = useState<Compose | null>(null);
+  const [dnsCopied, setDnsCopied] = useState(false);
 
   useEffect(() => setUuid(requestUuid), [requestUuid]);
   useEffect(() => setProvider(loadEmailProvider()), []);
@@ -267,7 +314,13 @@ export function ShareRequestPanel({
    * rather than the card title because it is the short form — first machine, then the count of the
    * rest — and a subject line is cut at about sixty characters.
    */
-  const subject = card ? fmt(c.subject, { equipment: card.model.imageHeadline }) : c.subject.replace("{equipment}", "").trim();
+  /**
+   * ⚠️ Read from the MESSAGE's dictionary, not the interface's `c`. The subject is the first line
+   * the supplier reads; an English «RFQ for» over an Arabic body is the same split this toggle
+   * exists to close.
+   */
+  const subjectTpl = (lang === "ar" ? ar : en).intake.postShare.subject;
+  const subject = card ? fmt(subjectTpl, { equipment: card.model.imageHeadline }) : subjectTpl.replace("{equipment}", "").trim();
 
   /**
    * The card the LINK turns into in the supplier's app — the thing WhatsApp draws, and the thing a
@@ -385,10 +438,6 @@ export function ShareRequestPanel({
     let reached = 0;
 
     if (ch === "email") {
-      // No pick at all is a legitimate share (owner, 2026-09-02): the renter wants the message in
-      // his own compose window to address himself. Nothing is recorded, because nobody was named.
-      if (reachable.length) void recordRequestShare(id, reachable.map((x) => x.id), "email");
-
       /**
        * ── ONE paste, and which one depends on the provider (owner, 2026-09-03) ──────────────────
        *
@@ -410,6 +459,13 @@ export function ShareRequestPanel({
        *
        * Not awaited, deliberately: `window.open` must fire inside the click that caused it, and an
        * `await` first hands the pop-up blocker a reason to swallow the compose window.
+       *
+       * ⚠️ **Written BEFORE the mail API is asked, even though a verified domain will make it
+       * useless.** A clipboard write also needs live user activation, and Safari drops that on the
+       * first `await` — so writing it afterwards, on the branch that actually needs it, would be
+       * the branch where it silently fails. For Outlook the clipboard IS the recipients, so a
+       * failed write there is a message addressed to nobody. Wasting it on a send that turned out
+       * not to need it costs nothing.
        */
       if (provider === "outlook") {
         if (reachable.length) {
@@ -422,7 +478,7 @@ export function ShareRequestPanel({
             {
               title: card.model.cardTitle,
               description: card.model.where ?? "",
-              imageUrl: card.imageUrl || `${window.location.origin}/bid/${id}/og`,
+              imageUrl: card.imageUrl || `${window.location.origin}/bid/${id}/og?lang=${lang}`,
               url,
             },
             card.model,
@@ -431,16 +487,51 @@ export function ShareRequestPanel({
         ).catch(() => {});
       }
 
-      const openedIt = openEmailCompose({
-        bcc: reachable.map((x) => x.email as string),
+      /**
+       * ── We send it ourselves when we may, and only then (SUP-BE-23) ───────────────────────────
+       *
+       * The compose window exists because a query string is characters with no MIME type: that one
+       * fact is why Gmail can never build a card from the body, and why Outlook discards `bcc`. Both
+       * are cured by something server-side putting the message on the wire, which is this call.
+       *
+       * ⚠️ **Awaited in full, never raced against a timeout.** A race that gave up early would open
+       * the compose window while the send was still in flight — and if it then succeeded, every
+       * supplier gets the same RFQ twice, from the same renter, minutes apart. One answer, then one
+       * action.
+       *
+       * ⚠️ **The recording is on the OTHER side of this branch now.** When we send it, the backend
+       * writes the row itself and stamps it with the SES message id — a fact it can prove. Calling
+       * `recordRequestShare` as well would file a second row saying the renter DECLARED the same
+       * send from his own client, which is a different claim and not a true one.
+       */
+      const outcome = await shareRequestEmail(id, reachable.map((x) => x.id), {
         subject,
-        body: message,
-        provider,
+        html: card
+          ? shareMessageHtml(card.model, url, card.imageUrl || `${window.location.origin}/bid/${id}/og?lang=${lang}`, {
+              template,
+              renterName,
+              lang,
+            })
+          : message,
+        text: message,
       });
-      // Too long for a URL, and a truncated body loses its tail, which is where the link is. The
-      // request is posted and the link is on screen; say so rather than sending half a message.
-      if (openedIt) reached += reachable.length;
-      else setTooLong(true);
+      setMailer(outcome);
+
+      if (outcome.sent) {
+        reached += outcome.recipients;
+      } else {
+        // No pick at all is a legitimate share (owner, 2026-09-02): the renter wants the message in
+        // his own compose window to address himself. Nothing is recorded, because nobody was named.
+        if (reachable.length) void recordRequestShare(id, reachable.map((x) => x.id), "email");
+
+        const args: Compose = { bcc: reachable.map((x) => x.email as string), subject, body: message, provider };
+        setReopen(args);
+        const openedIt = openEmailCompose(args);
+        // Too long for a URL, and a truncated body loses its tail, which is where the link is. The
+        // request is posted and the link is on screen; say so rather than sending half a message.
+        if (openedIt) reached += reachable.length;
+        else setTooLong(true);
+      }
     }
     if (ch === "whatsapp") {
       /**
@@ -473,7 +564,7 @@ export function ShareRequestPanel({
         await copyShareMessage(
           message,
           card
-            ? shareMessageHtml(card.model, url, card.imageUrl || `${window.location.origin}/bid/${id}/og`, {
+            ? shareMessageHtml(card.model, url, card.imageUrl || `${window.location.origin}/bid/${id}/og?lang=${lang}`, {
                 template,
                 renterName,
                 lang,
@@ -943,8 +1034,31 @@ export function ShareRequestPanel({
                 (owner, 2026-09-03). */}
             <Icon name="visibility" size={14} className="flex-none text-muted" />
             <span className={label}>{c.preview}</span>
-            <span className="ms-auto text-label text-muted">{c.editHint}</span>
+
+            {/* ── Which language the message is written in ──────────────────────────────────────
+                Here rather than in the toolbar because it changes what he is READING in this
+                column, and a control that changes a thing belongs beside the thing. Two segments,
+                each naming its own language in that language: «العربية» is legible to the renter
+                who wants it whatever the interface is set to. */}
+            <span className="ms-auto flex items-center rounded-sm border border-border bg-surface2 p-0.5">
+              {(["en", "ar"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setLang(v)}
+                  aria-pressed={lang === v}
+                  className={cx(
+                    "rounded-sm px-2 py-0.5 text-label transition-colors",
+                    lang === v ? "bg-brand text-brand-fg" : "text-navy-mid hover:text-navy",
+                  )}
+                >
+                  {v === "en" ? "English" : "العربية"}
+                </button>
+              ))}
+            </span>
           </span>
+
+          <span className="text-label text-muted">{c.editHint}</span>
 
           {!card || !parts ? (
             <p className="rounded-md border border-dashed border-border bg-surface2 px-3 py-6 text-center text-meta text-muted">
@@ -1083,28 +1197,34 @@ export function ShareRequestPanel({
             label={c.email}
             done={sent.includes("email")}
           />
-          <Channel
-            on={channel === "other"}
-            /**
-             * ── «More» opens the sheet on the PRESS (owner, 2026-09-03: *"why the more option
-             * doesnt do anything it must open the all share options with copy"*) ────────────────
-             *
-             * It was a channel like the other two: press it, then press Send. But WhatsApp and
-             * E-mail are choices about a message the renter is still composing, while *More* IS the
-             * act — it hands the whole thing to the operating system, which then asks him where it
-             * goes. Making him press twice to reach a chooser is a chooser in front of a chooser.
-             *
-             * It still selects itself first, so the preview shows what is about to be handed over,
-             * and so a second press repeats the share rather than doing nothing.
-             */
-            onClick={() => {
-              setChannel("other");
-              void send("other");
-            }}
-            icon="ios_share"
-            label={c.other}
-            done={sent.includes("other")}
-          />
+          {/**
+            * ── «More» exists only once there is a LINK (owner, 2026-09-03) ────────────────────
+            *
+            * *"clciking more posting the request? it mustn do so."*
+            *
+            * WhatsApp and E-mail are TICKS: pressing one chooses where the message will go, and
+            * nothing happens until Send. *More* is not a tick — it hands the message to the
+            * operating system on its own press, because a chooser behind a chooser is not a
+            * chooser. That single press was therefore also posting the request, so a renter
+            * opening *More* to see what was on offer published his request by looking.
+            *
+            * Hiding it before the post is not a guard bolted on — it is the honest shape. *More*
+            * gives the OS a URL, and before the post there IS no URL: the link is minted by
+            * `onPost`. So the control appears the moment it has something to hand over, and from
+            * then on one press means one share and nothing else.
+            */}
+          {uuid && (
+            <Channel
+              on={channel === "other"}
+              onClick={() => {
+                setChannel("other");
+                void send("other");
+              }}
+              icon="ios_share"
+              label={c.other}
+              done={sent.includes("other")}
+            />
+          )}
 
           <button
             type="button"
@@ -1152,6 +1272,98 @@ export function ShareRequestPanel({
               <Icon name="check" size={14} />
               {c.messageCopied}
             </span>
+          )}
+
+          {/* ── What the mail API did, and only when it did something (SUP-BE-23) ───────────────
+              The renter has just pressed Send and NO compose window opened — because we sent it
+              ourselves. That is the one outcome on this panel he cannot see for himself, so it is
+              the one outcome that is stated. Every other press still says nothing. */}
+          {mailer?.sent && (
+            <span className="flex items-start gap-1.5 text-meta font-semibold text-ok-deep">
+              <Icon name="check_circle" size={14} className="mt-px flex-none" />
+              <span>
+                {fmt(mailer.recipients === 1 ? c.mailSentOne : c.mailSent, {
+                  from: mailer.from,
+                  n: mailer.recipients,
+                })}
+                {/* A supplier he picked who has no address is not in that count, and a count that
+                    quietly omits him is how a renter comes to believe eight people were written to. */}
+                {mailer.skipped > 0 && ` ${fmt(c.mailSkipped, { n: mailer.skipped })}`}
+              </span>
+            </span>
+          )}
+
+          {/* A personal address can never be sent on behalf of — nobody can add a DNS record to
+              `gmail.com`. Said once, plainly, instead of a setup panel he could never finish. */}
+          {mailer?.sent === false && mailer.reason === "PERSONAL_DOMAIN" && (
+            <span className="text-meta text-muted">{c.mailPersonal}</span>
+          )}
+
+          {/* The compose window was opened after an `await`, which Safari may refuse — and
+              `noopener` makes the refusal undetectable. One press to try again, always offered. */}
+          {mailer?.sent === false && reopen && (
+            <button type="button" onClick={() => openEmailCompose(reopen)} className={cx(btn("link"), "text-meta")}>
+              {c.mailOpenInstead}
+            </button>
+          )}
+
+          {/* ── The records IT adds, once, per company ──────────────────────────────────────────
+              Shown only when adding them would actually change something: a verified domain has
+              nothing to add, and a personal one has nothing that would ever help.
+
+              ⚠️ Framed as an improvement, not a failure. His message has ALREADY gone to his own
+              compose window by the time he reads this — nothing is blocked, and telling him
+              otherwise would send him chasing his IT before he finishes the share he is in. */}
+          {mailer?.sent === false && mailer.reason === "DOMAIN_NOT_VERIFIED" && mailer.dns.length > 0 && (
+            <div className="mt-1 rounded-md border border-border bg-surface2 p-3">
+              <p className="text-body font-semibold text-navy">{fmt(c.mailSetupTitle, { domain: mailer.domain ?? "" })}</p>
+              <p className="mt-1 text-meta text-navy-mid">{fmt(c.mailSetupWhat, { domain: mailer.domain ?? "" })}</p>
+
+              {/* A table, because IT copies it field by field into a DNS panel that asks for exactly
+                  these three columns. `break-all` so a 60-character DKIM host wraps instead of
+                  pushing the panel sideways. */}
+              <div className="mt-2 overflow-x-auto">
+                <table className="w-full border-collapse text-meta">
+                  <thead>
+                    <tr className="text-start text-muted">
+                      <th className="py-1 pe-3 text-start font-semibold">{c.mailSetupHost}</th>
+                      <th className="py-1 pe-3 text-start font-semibold">{c.mailSetupValue}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mailer.dns.map((r) => (
+                      <tr key={`${r.type}-${r.name}`} className="border-t border-border align-top">
+                        <td className="py-1 pe-3 font-mono break-all text-navy">
+                          <span className="me-1.5 rounded-sm bg-surface3 px-1 text-muted">{r.type}</span>
+                          {r.name}
+                        </td>
+                        <td className="py-1 pe-3 font-mono break-all text-navy-mid">{r.value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  className={btn("secondary", "sm")}
+                  onClick={() => {
+                    /* Tab-separated, one record per line: that is what a DNS panel's bulk-import
+                       box and a spreadsheet both take, and what survives a paste into an e-mail
+                       to IT. */
+                    const text = mailer.dns.map((r) => `${r.type}\t${r.name}\t${r.value}`).join("\n");
+                    void navigator.clipboard?.writeText(text).catch(() => {});
+                    setDnsCopied(true);
+                    setTimeout(() => setDnsCopied(false), 2400);
+                  }}
+                >
+                  <Icon name={dnsCopied ? "check" : "content_paste"} size={15} />
+                  {dnsCopied ? c.mailSetupCopied : c.mailSetupCopy}
+                </button>
+                <span className="text-meta text-muted">{c.mailSetupWait}</span>
+              </div>
+            </div>
           )}
           {/* What actually happened, not a blanket «shared». A send that reached nobody by e-mail
               still POSTED, and saying «shared with 0 suppliers» would read as a failure when the

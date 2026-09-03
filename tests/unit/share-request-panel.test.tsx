@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { LocaleProvider } from "@/lib/i18n";
 import { en } from "@/lib/i18n/en";
+import { ar } from "@/lib/i18n/ar";
+import { defaultTemplate } from "@/lib/shareTemplate";
 import { ShareRequestPanel } from "@/components/share/ShareRequestPanel";
 import type { BidFormData } from "@/lib/contract/link-bids";
 
@@ -17,6 +19,13 @@ import type { BidFormData } from "@/lib/contract/link-bids";
 const api = vi.hoisted(() => ({
   rows: [] as Record<string, unknown>[],
   shares: [] as unknown[][],
+  /**
+   * What SUP-BE-23's endpoint answers. Default: it could not send, which is every renter whose IT
+   * has not added the DNS records — and therefore the behaviour every OTHER test in this file has
+   * always described. Only the cases below change it.
+   */
+  mail: { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [] } as Record<string, unknown>,
+  mailCalls: [] as unknown[][],
 }));
 
 vi.mock("@/lib/api/client", () => ({
@@ -26,6 +35,10 @@ vi.mock("@/lib/api/client", () => ({
     return Promise.resolve();
   },
   setBidDeadline: () => Promise.resolve(),
+  shareRequestEmail: (...args: unknown[]) => {
+    api.mailCalls.push(args);
+    return Promise.resolve(api.mail);
+  },
   updateRenterSupplier: () => Promise.resolve({}),
   bidShareUrl: (id: string) => `https://os.moedatech.net/bid/${id}`,
 }));
@@ -67,6 +80,8 @@ const opened = vi.fn();
 
 beforeEach(() => {
   api.shares = [];
+  api.mailCalls = [];
+  api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [] };
   api.rows = [
     { id: "1", name: "Al Faisal Rentals", email: "ops@alfaisal.sa", phone: "+966501112233", verified: true },
     // No address: he is in the list, he is pickable, and he is honestly named as skipped.
@@ -87,6 +102,8 @@ const draw = (props: Partial<React.ComponentProps<typeof ShareRequestPanel>> = {
   );
 
 const c = en.intake.postShare;
+const enShare = en.intake.postShare;
+const arShare = ar.intake.postShare;
 
 describe("who it goes to", () => {
   it("Given suppliers, Then they are a LIST — each row carrying the address it will be sent to", async () => {
@@ -212,7 +229,11 @@ describe("how it goes", () => {
         <ShareRequestPanel mode="post" draftForm={DRAFT} onPost={async () => "new-uuid"} />
       </LocaleProvider>,
     );
-    // One channel at a time: pressing «More» selects it, and E-mail goes off with the same press.
+    // ⚠️ The request is posted FIRST, because *More* only exists once there is a link to hand
+    // over — see the «not posted yet» case below.
+    await screen.findByText("Al Faisal Rentals");
+    fireEvent.click(screen.getByText(c.postMoedatechOnly).closest("button")!);
+
     // ⚠️ One press: *More* IS the act, so it hands over immediately rather than waiting for Send.
     fireEvent.click(await screen.findByText(c.other));
 
@@ -230,11 +251,60 @@ describe("how it goes", () => {
         <ShareRequestPanel mode="post" draftForm={DRAFT} onPost={async () => "new-uuid"} />
       </LocaleProvider>,
     );
-    // One channel at a time: pressing «More» selects it, and E-mail goes off with the same press.
+    await screen.findByText("Al Faisal Rentals");
+    fireEvent.click(screen.getByText(c.postMoedatechOnly).closest("button")!);
+
     fireEvent.click(await screen.findByText(c.other));
 
     await waitFor(() => expect(writeText).toHaveBeenCalled());
     expect(screen.getByText(c.messageCopied)).toBeTruthy();
+  });
+
+  it("Given the request is not posted yet, Then «More» is absent — a look cannot publish it", async () => {
+    /**
+     * Owner, 2026-09-03: *"clciking more posting the request? it mustn do so."*
+     *
+     * ⚠️ *More* sends on its own press, and in `post` mode sending MINTS THE REQUEST. So the
+     * control that exists to show a renter what channels are available was also the one control
+     * that published his request without a second thought — no tick, no Send, no confirmation.
+     *
+     * The fix is not a confirmation step. *More* hands the OS a URL and before the post there is
+     * no URL, so it simply has nothing to offer yet.
+     */
+    const posted = vi.fn(async () => "new-uuid");
+    const share = vi.fn(async () => undefined);
+    vi.stubGlobal("navigator", { ...navigator, share, clipboard: { writeText: async () => {} } });
+
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="post" draftForm={DRAFT} onPost={posted} />
+      </LocaleProvider>,
+    );
+    await screen.findByText("Al Faisal Rentals");
+
+    // The two TICKS are there — they choose, they do not send.
+    expect(screen.getByText(c.whatsapp)).toBeTruthy();
+    expect(screen.getByText(c.email)).toBeTruthy();
+    // The one control that would have sent is not.
+    expect(screen.queryByText(c.other)).toBeNull();
+    expect(posted).not.toHaveBeenCalled();
+    expect(share).not.toHaveBeenCalled();
+  });
+
+  it("Given the post has happened, Then «More» appears — now there is a link to hand over", async () => {
+    // The same panel stays on screen after the post, so the control arrives the moment it is real.
+    const share = vi.fn(async () => undefined);
+    vi.stubGlobal("navigator", { ...navigator, share, clipboard: { writeText: async () => {} } });
+
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="post" draftForm={DRAFT} onPost={async () => "new-uuid"} />
+      </LocaleProvider>,
+    );
+    await screen.findByText("Al Faisal Rentals");
+    fireEvent.click(screen.getByText(c.postMoedatechOnly).closest("button")!);
+
+    await waitFor(() => expect(screen.getByText(c.other)).toBeTruthy());
   });
 
   it("Given both extras are off, Then it says Moedatech only, and still sends", async () => {
@@ -721,5 +791,163 @@ describe("what they receive", () => {
       </LocaleProvider>,
     );
     expect(await screen.findByText(c.previewEmpty)).toBeTruthy();
+  });
+});
+
+/**
+ * ── We send it ourselves when we may (SUP-BE-23) ────────────────────────────────────────────────
+ *
+ * The compose window exists because a query string is characters with no MIME type: that one fact
+ * is why Gmail can never build a card from the body, and why Outlook silently discards `bcc`. When
+ * the renter's domain is verified, nothing opens at all — the mail leaves from his own address with
+ * the card in it and his suppliers in blind copy.
+ */
+describe("the mail we send ourselves", () => {
+  const sendByEmail = async () => {
+    draw();
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+  };
+
+  it("Given a verified domain, Then NO compose window opens and the send is stated", async () => {
+    /**
+     * ⚠️ This is the one outcome on this panel the renter cannot see for himself. Every other press
+     * puts a window in front of him; this one puts nothing, so silence would read as a dead button.
+     */
+    api.mail = { sent: true, from: "bandar@shibhaljazira.com", recipients: 1, messageId: "0100-abc", skipped: 0 };
+    await sendByEmail();
+
+    await waitFor(() => expect(screen.getByText(/bandar@shibhaljazira\.com/)).toBeTruthy());
+    expect(opened).not.toHaveBeenCalled();
+  });
+
+  it("Given WE sent it, Then no DECLARED share is recorded on top of it", async () => {
+    /**
+     * ⚠️ The backend writes that row itself, stamped with the SES message id — a send it can prove.
+     * Recording a second one here would file a claim that the renter declared the same send from
+     * his own client, which is a different fact and not a true one.
+     */
+    api.mail = { sent: true, from: "b@x.sa", recipients: 1, messageId: "m", skipped: 0 };
+    await sendByEmail();
+
+    await waitFor(() => expect(api.mailCalls).toHaveLength(1));
+    expect(api.shares).toHaveLength(0);
+  });
+
+  it("Given it could not send, Then the compose window opens exactly as before", async () => {
+    // Nothing regresses for a renter whose IT has not added the records: this is today's behaviour,
+    // chosen by a FIELD in the answer rather than by catching an error.
+    api.mail = { sent: false, reason: "DOMAIN_NOT_VERIFIED", from: "b@x.sa", domain: "x.sa", dns: [] };
+    await sendByEmail();
+
+    await waitFor(() => expect(opened).toHaveBeenCalled());
+    expect(api.shares).toHaveLength(1);
+  });
+
+  it("Given an unverified domain, Then the records his IT adds are on screen", async () => {
+    api.mail = {
+      sent: false,
+      reason: "DOMAIN_NOT_VERIFIED",
+      from: "bandar@shibhaljazira.com",
+      domain: "shibhaljazira.com",
+      dns: [{ type: "CNAME", name: "abc._domainkey.shibhaljazira.com", value: "abc.dkim.amazonses.com" }],
+    };
+    await sendByEmail();
+
+    await waitFor(() => expect(screen.getByText("abc._domainkey.shibhaljazira.com")).toBeTruthy());
+    expect(screen.getByText("abc.dkim.amazonses.com")).toBeTruthy();
+    // ⚠️ Framed as an improvement, never as a failure: his message HAS already gone to his own
+    // compose window, and telling him otherwise sends him chasing IT mid-share.
+    expect(opened).toHaveBeenCalled();
+  });
+
+  it("Given a personal address, Then it says so and offers NO records to chase", async () => {
+    /**
+     * ⚠️ Nobody can add a DNS record to `gmail.com`. Showing this renter a list to forward to IT
+     * would be an errand with no end, so the refusal is its own reason and its own sentence.
+     */
+    api.mail = { sent: false, reason: "PERSONAL_DOMAIN", from: "bandar@gmail.com", domain: "gmail.com", dns: [] };
+    await sendByEmail();
+
+    await waitFor(() => expect(screen.getByText(c.mailPersonal)).toBeTruthy());
+    expect(screen.queryByText(c.mailSetupCopy)).toBeNull();
+    expect(opened).toHaveBeenCalled();
+  });
+
+  it("Given the fallback ran, Then he can open his e-mail again himself", async () => {
+    /**
+     * ⚠️ `window.open` needs a live user gesture and this one fires AFTER an await on the mail API.
+     * Safari can refuse it, and `noopener` makes `window.open` return null by spec — so a refusal
+     * cannot be detected. The button is therefore always offered rather than only when something
+     * looks wrong.
+     */
+    api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [] };
+    await sendByEmail();
+
+    const again = await screen.findByText(c.mailOpenInstead);
+    opened.mockReset();
+    fireEvent.click(again);
+    expect(opened).toHaveBeenCalled();
+  });
+
+  it("Given WhatsApp, Then the mail API is not called at all", async () => {
+    draw();
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.whatsapp));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(opened).toHaveBeenCalled());
+    expect(api.mailCalls).toHaveLength(0);
+  });
+});
+
+/**
+ * ── One language per message, and the renter picks it (owner, 2026-09-03) ───────────────────────
+ *
+ * *"i want one language in the same template, user has toggle on the preview to use arabic or
+ * english but they are separate."*
+ *
+ * A renter reading Moedatech in English writes to a supplier who reads Arabic, and the reverse is
+ * just as common. The message's language is therefore its own choice, and it is ONE choice: the
+ * greeting, the card, the picture and the subject all take it.
+ */
+describe("the message's language", () => {
+  it("Given the toggle, Then the whole template switches — not part of it", async () => {
+    draw({ draftForm: DRAFT });
+    await screen.findByText("Al Faisal Rentals");
+
+    // It starts in the interface's language, which is the best guess anyone has.
+    expect(screen.getByDisplayValue(defaultTemplate("en").greeting)).toBeTruthy();
+
+    fireEvent.click(screen.getByText("العربية"));
+
+    await waitFor(() => expect(screen.getByDisplayValue(defaultTemplate("ar").greeting)).toBeTruthy());
+    // And the English wording is gone rather than sitting beside it.
+    expect(screen.queryByDisplayValue(defaultTemplate("en").greeting)).toBeNull();
+  });
+
+  it("Given Arabic is chosen, Then the CARD PICTURE is asked for in Arabic too", async () => {
+    /**
+     * ⚠️ This is the bug that started it, found against live staging on 2026-09-03: an English
+     * message carrying a card image that read «حفار 20 طن · مع مشغّل ×2». The picture's language was
+     * decided by an endpoint whose default is the OPPOSITE of the image route's, and nobody was
+     * passing a language down — so there was no neutral fallback, only the wrong one.
+     */
+    const seen: string[] = [];
+    vi.stubGlobal("fetch", async (url: string) => {
+      seen.push(String(url));
+      return { ok: false, status: 404, json: async () => ({}) };
+    });
+
+    // ⚠️ A real UUID: the card only loads for a link whose token parses, so a placeholder id
+    // would make this test pass by fetching nothing.
+    draw({ requestUuid: "a319541b-9762-43dd-a3d2-030bf3a3850d" });
+    await screen.findByText("Al Faisal Rentals");
+    // On mount it asks in the interface's language.
+    await waitFor(() => expect(seen.some((u) => u.includes("/preview?lang=en"))).toBe(true));
+
+    fireEvent.click(screen.getByText("العربية"));
+    await waitFor(() => expect(seen.some((u) => u.includes("/preview?lang=ar"))).toBe(true));
   });
 });

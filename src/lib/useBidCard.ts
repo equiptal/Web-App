@@ -56,7 +56,17 @@ export function useBidCard(
     (async () => {
       try {
         const [previewRes, formRes] = await Promise.all([
-          fetch(`/api/bid-form/${encodeURIComponent(token)}/preview`),
+          /**
+           * ⚠️ **`lang` is not optional, and leaving it off shipped an ARABIC picture on an ENGLISH
+           * message** (found against live staging, 2026-09-03: an English e-mail whose card image
+           * read «حفار 20 طن · مع مشغّل ×2»).
+           *
+           * The two defaults are OPPOSITE. This endpoint defaults to `ar` — `?lang=en` opts out —
+           * while `/bid/<token>/og`, the image it hands back a URL for, defaults to `en`. So the
+           * parameter is the only thing keeping the picture and the words in one language, and
+           * omitting it does not fall back to a neutral choice: it picks the wrong one.
+           */
+          fetch(`/api/bid-form/${encodeURIComponent(token)}/preview?lang=${lang}`),
           // The request itself, for the machines and the terms. A failure here costs the detail, not
           // the card — the preview's two strings still make a valid one.
           fetch(`/api/bid-form/${encodeURIComponent(token)}`).catch(() => null),

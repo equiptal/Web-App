@@ -1760,6 +1760,105 @@ export async function recordRequestShare(
   }
 }
 
+/**
+ * One DNS record the renter's IT has to add before we may send as their domain.
+ *
+ * Three CNAMEs (the DKIM signing keys) and usually one TXT. Added once, per company, forever — not
+ * per request and not per renter.
+ */
+export interface MailDnsRecord {
+  type: "CNAME" | "TXT";
+  name: string;
+  value: string;
+}
+
+/**
+ * Why a share e-mail could not be sent from the renter's own address.
+ *
+ * ⚠️ `PERSONAL_DOMAIN` is deliberately NOT folded into `DOMAIN_NOT_VERIFIED`, and the difference is
+ * the whole reason the renter is told anything at all: one is a task his IT can finish, and the
+ * other is a task that does not exist. Nobody can add a DNS record to `gmail.com`, so showing that
+ * renter a list of records to forward would be sending him on an errand with no end.
+ */
+export type ShareEmailReason =
+  | "DOMAIN_NOT_VERIFIED"
+  | "PERSONAL_DOMAIN"
+  | "NO_SENDER_ADDRESS"
+  | "NO_RECIPIENTS"
+  /** Ours, not the backend's: the call failed, or this deployment has no agents backend. */
+  | "UNAVAILABLE";
+
+export type ShareEmailResult =
+  | { sent: true; from: string; recipients: number; messageId: string; skipped: number }
+  | { sent: false; reason: ShareEmailReason; from: string | null; domain: string | null; dns: MailDnsRecord[] };
+
+const dnsRecords = (v: unknown): MailDnsRecord[] =>
+  Array.isArray(v)
+    ? v.flatMap((r) => {
+        const o = r as Record<string, unknown>;
+        const type = o?.type === "TXT" ? "TXT" : o?.type === "CNAME" ? "CNAME" : null;
+        return type && typeof o.name === "string" && typeof o.value === "string"
+          ? [{ type, name: o.name, value: o.value }]
+          : [];
+      })
+    : [];
+
+/**
+ * Send the share e-mail from the renter's own address (SUP-BE-23).
+ *
+ * The panel calls this FIRST on every e-mail share and opens the compose window only when the answer
+ * says it could not send. So a renter whose domain is verified never sees a compose window, and a
+ * renter whose IT has not added the records yet keeps exactly today's behaviour.
+ *
+ * ⚠️ **Never throws, and never resolves to anything but a decision.** The caller is inside a click
+ * that has already posted the request; an exception here would leave a live request with no share
+ * and no window. Every failure — network, 502, a shape we do not recognise — comes back as
+ * `UNAVAILABLE`, which the panel treats exactly like an unverified domain.
+ *
+ * ⚠️ **The recipients are not passed.** The backend reads them off the supplier rows this renter
+ * owns; `renterSupplierIds` says WHICH of his rows, never which addresses. Once a domain is verified
+ * this endpoint signs mail with that company's DKIM, so a caller-supplied address list would be a
+ * relay hole rather than a convenience.
+ */
+export async function shareRequestEmail(
+  requestId: string,
+  renterSupplierIds: string[],
+  message: { subject: string; html: string; text: string },
+): Promise<ShareEmailResult> {
+  const nope = (reason: ShareEmailReason): ShareEmailResult => ({ sent: false, reason, from: null, domain: null, dns: [] });
+  if (!renterSupplierIds.length) return nope("NO_RECIPIENTS");
+
+  try {
+    const raw = await projectFetch<Record<string, unknown>>(
+      `/api/requests/${encodeURIComponent(requestId)}/share-email`,
+      { method: "POST", body: { renterSupplierIds, ...message } },
+    );
+    if (raw?.sent === true) {
+      return {
+        sent: true,
+        from: typeof raw.from === "string" ? raw.from : "",
+        recipients: typeof raw.recipients === "number" ? raw.recipients : renterSupplierIds.length,
+        messageId: typeof raw.messageId === "string" ? raw.messageId : "",
+        skipped: typeof raw.skipped === "number" ? raw.skipped : 0,
+      };
+    }
+    const reason = raw?.reason;
+    return {
+      sent: false,
+      reason:
+        reason === "PERSONAL_DOMAIN" || reason === "NO_SENDER_ADDRESS" || reason === "NO_RECIPIENTS" || reason === "DOMAIN_NOT_VERIFIED"
+          ? reason
+          : "UNAVAILABLE",
+      from: typeof raw?.from === "string" ? raw.from : null,
+      domain: typeof raw?.domain === "string" ? raw.domain : null,
+      dns: dnsRecords(raw?.dns),
+    };
+  } catch {
+    // A refusal we could not reach is still a refusal to send. The window opens, the share goes out.
+    return nope("UNAVAILABLE");
+  }
+}
+
 /** The same record with no request behind it. Same rule: an audit row never fails the act. */
 export async function recordSupplierInvite(
   renterSupplierIds: string[],

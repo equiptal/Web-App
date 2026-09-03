@@ -1193,7 +1193,7 @@ export function RfqProvider({ children }: { children: ReactNode }) {
 
   // Persist the editable draft + position whenever they change (skip processing/confirmation phases).
   // Stamp the owning user id so a later session can tell whose draft this is.
-  const { phase, activeSection, itemIndex, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial, direct } = state;
+  const { phase, activeSection, itemIndex, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial, direct, readyToSend } = state;
   useEffect(() => {
     try {
       if (draft && (phase === "intake" || phase === "wizard")) {
@@ -1208,6 +1208,10 @@ export function RfqProvider({ children }: { children: ReactNode }) {
           JSON.stringify({
             phase,
             activeSection,
+            // The review screen is a POSITION in the flow, not a transient mode: a renter who
+            // reloads on «Review & send» must come back to it, not to the canvas he already
+            // finished (owner, 2026-09-03: a refresh there "must just refresh it").
+            readyToSend,
             itemIndex,
             draft,
             text,
@@ -1227,7 +1231,7 @@ export function RfqProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore quota/availability errors */
     }
-  }, [phase, activeSection, itemIndex, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial, direct, user]);
+  }, [phase, activeSection, readyToSend, itemIndex, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial, direct, user]);
 
   // ---- Browser history ⇄ canvas position (MREQ-AC-06/07).
   //
@@ -1242,11 +1246,21 @@ export function RfqProvider({ children }: { children: ReactNode }) {
   const lastOrdRef = useRef(0);
   useEffect(() => {
     // Baseline entry for the create flow, so the first Back returns here rather than straight off-page.
+    //
+    // A RELOAD keeps its own `rfqOrd` (browsers carry `history.state` across a refresh), so the
+    // baseline adopts it instead of stamping 0 over it. Zeroing it made a refresh on the review
+    // screen look like a fresh arrival at the intake: the restored draft put the canvas back at ord
+    // 2 while history said 0, the push effect fired another entry, and Back no longer walked the
+    // chain the renter had actually taken.
+    let ord0 = 0;
     try {
-      window.history.replaceState({ ...(window.history.state ?? {}), rfqOrd: 0 }, "");
+      const prior = (window.history.state as { rfqOrd?: unknown } | null)?.rfqOrd;
+      if (typeof prior === "number") ord0 = prior;
+      window.history.replaceState({ ...(window.history.state ?? {}), rfqOrd: ord0 }, "");
     } catch {
       /* history unavailable */
     }
+    lastOrdRef.current = ord0;
     const onPop = (e: PopStateEvent) => {
       const target = e.state && typeof (e.state as { rfqOrd?: unknown }).rfqOrd === "number" ? ((e.state as { rfqOrd: number }).rfqOrd) : 0;
       poppingRef.current = true;
@@ -1264,7 +1278,6 @@ export function RfqProvider({ children }: { children: ReactNode }) {
 
   // Push an entry only on a genuine forward move. Backward moves arrive via popstate (poppingRef)
   // and must not re-push.
-  const readyToSend = state.readyToSend;
   useEffect(() => {
     const ord = phase === "wizard" ? (readyToSend ? 2 : 1) : phase === "intake" ? 0 : -1;
     if (ord < 0) return; // processing / confirmation aren't part of the back/forward chain

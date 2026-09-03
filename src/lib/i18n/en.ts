@@ -323,6 +323,21 @@ export const en = {
       postedLiveOne: "It is live on Moedatech now, and shared with 1 supplier.",
       postedLiveMany: "It is live on Moedatech now, and shared with {n} suppliers.",
       postedNext: "You can still share it anytime with more suppliers.",
+      /* ── SUP-BE-23: the mail we send ourselves, from his own address ──────────────────────── */
+      mailSent: "Sent from {from} to {n} suppliers.",
+      mailSentOne: "Sent from {from} to 1 supplier.",
+      mailSkipped: "{n} of the ones you picked had no e-mail, so they were left out.",
+      mailOpenInstead: "Open your e-mail",
+      mailSetupTitle: "Send straight from {domain}, with no compose window",
+      mailSetupWhat:
+        "Your e-mail opened as usual, so nothing is held up. To have Moedatech send it for you next time, from your own address, your IT adds these records to {domain} once.",
+      mailSetupHost: "Name",
+      mailSetupValue: "Value",
+      mailSetupCopy: "Copy the records",
+      mailSetupCopied: "Records copied",
+      mailSetupWait: "Records take up to a day to take effect. Nothing changes for you until they do.",
+      mailPersonal:
+        "Your address is a personal one, so Moedatech cannot send on its behalf. Your e-mail opens instead, which is what it does today.",
     },
     reading: "Reading",
     heading: "How would you like to create your request?",

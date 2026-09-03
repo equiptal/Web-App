@@ -77,6 +77,41 @@ describe("cityOf", () => {
   it("Given nothing, When read, Then null — the row is simply not drawn", () => {
     expect(cityOf(null)).toBeNull();
   });
+
+  it("Given a COMMA-LESS label, Then the country is still stripped", () => {
+    /**
+     * ⚠️ Found against live staging, 2026-09-03. `COUNTRY_SEGMENTS` matches a WHOLE segment, so
+     * "Diriyah Saudi Arabia" is one segment that is not the country and the entire string came back
+     * as the city — and a label with no commas is not a rare shape, it is what a dropped PIN
+     * returns. The card IMAGE for CEX-020902 read «Diriyah» while the e-mail BODY of the same
+     * request read «QFC4+RX Diriyah Saudi Arabia»: the agents backend had fixed its copy of this
+     * function and this one had not.
+     */
+    expect(cityOf("QFC4+RX Diriyah Saudi Arabia")).toBe("Diriyah");
+    expect(cityOf("Riyadh Kingdom of Saudi Arabia")).toBe("Riyadh");
+  });
+
+  it("Given a PLUS CODE, Then it is dropped — it names nothing a supplier can read", () => {
+    // A grid reference, and it LEADS the line, taking the room the city needs.
+    expect(cityOf("QFC4+RX Diriyah")).toBe("Diriyah");
+    // Nothing but the grid reference: no city at all beats a card that says «QFC4+RX».
+    expect(cityOf("QFC4+RX")).toBeNull();
+  });
+
+  it("Given «ksa» inside a word, Then the word survives — the tail must be its own word", () => {
+    // A bare `endsWith` would turn a city transliterated "Miksa" into "Mi".
+    expect(cityOf("Miksa")).toBe("Miksa");
+  });
+
+  it("Given a label that is ONLY a country, Then null rather than «Saudi Arabia» as the site", () => {
+    /**
+     * ⚠️ It used to fall back to the raw last segment, which put the country on the card as the
+     * place the machine is going. `where` drops a null part, so the line reads the duration and the
+     * dates alone — shorter, and true.
+     */
+    expect(cityOf("Saudi Arabia")).toBeNull();
+    expect(cityOf("12461, Saudi Arabia")).toBeNull();
+  });
 });
 
 describe("bidCardModel", () => {

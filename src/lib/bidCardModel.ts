@@ -175,16 +175,67 @@ const COUNTRY_SEGMENTS = new Set([
 
 const stripPostcode = (s: string) => s.replace(/\b\d{4,6}\b/g, " ").replace(/\s+/g, " ").trim();
 
+/**
+ * A trailing country phrase on a segment that carries no comma of its own.
+ *
+ * ⚠️ **A comma-less label is not a rare shape, it is what a dropped PIN returns**, and it defeated
+ * the segment walk entirely: `COUNTRY_SEGMENTS` matches a WHOLE segment, so `"Riyadh Saudi Arabia"`
+ * is one segment that is not the country, and the whole string came back as the city.
+ *
+ * Measured against live staging on 2026-09-03: the card IMAGE for `CEX-020902` read `Diriyah` while
+ * the e-mail BODY of the same request read `QFC4+RX Diriyah Saudi Arabia`. The agents backend had
+ * fixed its copy of this function and this one had not, so one request said two different things in
+ * one message.
+ *
+ * Longest first, so "Kingdom of Saudi Arabia" is not left as "Kingdom of" and the Arabic long form
+ * is not left as its own first half. The short forms are suffixes of the long ones.
+ */
+const COUNTRY_TAILS = ["kingdom of saudi arabia", "المملكة العربية السعودية", "saudi arabia", "السعودية", "ksa"];
+
+const stripCountryTail = (s: string) => {
+  for (const tail of COUNTRY_TAILS) {
+    const cut = s.length - tail.length;
+    if (cut < 0) continue;
+    // ⚠️ The tail must be its own WORD, not any suffix: `ksa` is three letters, and a bare
+    // `endsWith` would turn a city transliterated "Miksa" into "Mi". `cut === 0` is the whole
+    // segment being the country, which must still match.
+    if (cut > 0 && !/\s/.test(s[cut - 1])) continue;
+    // Lowercase only the CANDIDATE SUFFIX, never the whole string: folding can change a string's
+    // length, and an index taken from the folded copy then cuts the original in the wrong place.
+    if (s.slice(cut).toLowerCase() !== tail) continue;
+    return s.slice(0, cut).trim();
+  }
+  return s;
+};
+
+/**
+ * Google returns a PLUS CODE in place of a street number when the pin is not on a mapped address:
+ * `"QFC4+RX Diriyah"` becomes `"Diriyah"`. It is a grid reference, so it names nothing a supplier
+ * can read, and it LEADS the line, taking the room the city needs.
+ *
+ * Anchored with `$` as well as the space, so a bare plus code with nothing after it resolves to no
+ * city at all rather than to itself.
+ */
+const stripPlusCode = (s: string) => s.replace(/^[A-Z0-9]{4,8}\+[A-Z0-9]{2,4}(\s+|$)/i, "").trim();
+
+/** Postcode, then country tail, then plus code, in that order, since each can uncover the next. */
+const cleanSegment = (s: string) => stripPlusCode(stripCountryTail(stripPostcode(s)));
+
 export function cityOf(label: string | null | undefined): string | null {
   if (!label) return null;
   const parts = label.split(/[,،]/).map((p) => p.trim()).filter(Boolean);
   for (let i = parts.length - 1; i >= 0; i--) {
-    const cleaned = stripPostcode(parts[i]);
+    const cleaned = cleanSegment(parts[i]);
     if (!cleaned) continue;
     if (COUNTRY_SEGMENTS.has(cleaned.toLowerCase())) continue;
     return cleaned;
   }
-  return parts.length ? stripPostcode(parts[parts.length - 1]) || parts[parts.length - 1] : null;
+  /**
+   * ⚠️ **Nothing readable was left, so this answers NULL.** It used to fall back to the raw last
+   * segment, which put "Saudi Arabia" on the card as the site of the job. `where` drops a null part,
+   * so the line reads "4 months & extendable . 1 Sep to 31 Dec 2026" instead: shorter, and true.
+   */
+  return null;
 }
 
 /** Whose responsibility a term is. Anything that is not one of the two parties shows as it arrived. */
