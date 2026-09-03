@@ -16,7 +16,7 @@ const model: BidCardModel = {
   cardTitle: "Tower light 9m · with operator ×6",
   items: [],
   where: "Riyadh · 1 month",
-  terms: [{ label: "Mobilisation", value: "Supplier" }],
+  terms: [{ label: "Mobilization", value: "Supplier" }],
   closing: "Bidding closes 21 Aug 2026",
   accepting: true,
   cta: "Submit your bid",

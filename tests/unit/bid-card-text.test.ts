@@ -18,7 +18,7 @@ const model = (over: Partial<BidCardModel> = {}): BidCardModel => ({
   items: [],
   where: "Riyadh · 1 month · 18 Aug → 17 Sep 2026",
   terms: [
-    { label: "Mobilisation", value: "Supplier" },
+    { label: "Mobilization", value: "Supplier" },
     { label: "Fuel", value: "Renter · diesel" },
   ],
   closing: "Bidding closes 21 Aug 2026",
@@ -42,7 +42,7 @@ describe("bidCardText", () => {
     expect(out).toContain("Tower light 9m · with operator ×6");
     expect(out).not.toContain("EXC-170845");
     expect(out).toContain("Riyadh · 1 month · 18 Aug → 17 Sep 2026");
-    expect(out).toContain("Mobilisation: Supplier");
+    expect(out).toContain("Mobilization: Supplier");
     expect(out).toContain("Fuel: Renter · diesel");
     expect(out).toContain("Bidding closes 21 Aug 2026");
     expect(out).toContain(URL_);
@@ -104,7 +104,7 @@ describe("bidCardText", () => {
   it("Given a request with no terms and no deadline, Then those lines simply do not exist", () => {
     // The same rule the image and the HTML card follow: what the request does not carry is not drawn.
     const out = bidCardText(model({ terms: [], closing: null }), URL_);
-    expect(out).not.toContain("Mobilisation");
+    expect(out).not.toContain("Mobilization");
     expect(out).not.toContain("closes");
     // And no run of blank lines where they would have been.
     expect(out).not.toMatch(/\n\n\n/);

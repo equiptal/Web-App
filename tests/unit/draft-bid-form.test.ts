@@ -78,13 +78,13 @@ describe("draftBidForm", () => {
     /**
      * ⚠️ The draft spells the renter `"me"`; `party()` in the card reads `ME` as the SUPPLIER,
      * because that is what it means on a bid. Left untranslated, a card tells the supplier he is
-     * delivering the machine the renter is delivering — and he prices a mobilisation nobody asked for.
+     * delivering the machine the renter is delivering — and he prices a mobilization nobody asked for.
      */
     const m = bidCardModel(null, { title: "", description: "" }, "en", draftBidForm(project(), [item()], TAXONOMY)!);
     const rows = Object.fromEntries(m.terms.map((r) => [r.label, r.value]));
 
-    expect(rows["Mobilisation"]).toBe("Renter");
-    expect(rows["Demobilisation"]).toBe("Supplier");
+    expect(rows["Mobilization"]).toBe("Renter");
+    expect(rows["Demobilization"]).toBe("Supplier");
     expect(rows["Fuel"]).toBe("Renter · diesel");
   });
 

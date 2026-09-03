@@ -89,8 +89,8 @@ describe("bidCardModel", () => {
     expect(m.items).toEqual([]);
     expect(m.where).toBe("Riyadh · 1 month · 18 Aug → 17 Sep 2026");
     expect(m.terms).toEqual([
-      { label: "Mobilisation", value: "Supplier" },
-      { label: "Demobilisation", value: "Supplier" },
+      { label: "Mobilization", value: "Supplier" },
+      { label: "Demobilization", value: "Supplier" },
       { label: "Food", value: "Supplier" },
       { label: "Accommodation & transport", value: "Renter" },
       { label: "Fuel", value: "Renter · diesel" },
@@ -138,10 +138,10 @@ describe("bidCardModel", () => {
     );
 
     // Not in the request's shared block, because the request has no single answer for it.
-    expect(m.terms.some((r) => r.label === "Mobilisation")).toBe(false);
+    expect(m.terms.some((r) => r.label === "Mobilization")).toBe(false);
     // On each machine, as the fact it is.
-    expect(m.items[0].terms).toContainEqual({ label: "Mobilisation", value: "Supplier" });
-    expect(m.items[1].terms).toContainEqual({ label: "Mobilisation", value: "Renter" });
+    expect(m.items[0].terms).toContainEqual({ label: "Mobilization", value: "Supplier" });
+    expect(m.items[1].terms).toContainEqual({ label: "Mobilization", value: "Renter" });
     // What they DO agree on stays stated once, above.
     expect(m.terms.some((r) => r.label === "Fuel")).toBe(true);
   });
@@ -149,7 +149,7 @@ describe("bidCardModel", () => {
   it("Given a year and a certificate, When built, Then the card asks for them", () => {
     /**
      * Owner, 2026-09-02: the card carries *"cert or year if required"*. A supplier who brings a 2009
-     * machine to a request that said 2015+ has wasted a mobilisation, and one who arrives without a
+     * machine to a request that said 2015+ has wasted a mobilization, and one who arrives without a
      * TUV certificate cannot work at all — both are things he must read BEFORE he prices.
      */
     const m = bidCardModel(
@@ -241,7 +241,7 @@ describe("bidCardDescription", () => {
     expect(d).toContain("Riyadh");
     expect(d).toContain("Bidding closes 21 Aug 2026");
     // The order is the priority order: where, deadline, then terms while they fit.
-    expect(d.indexOf("Bidding closes")).toBeLessThan(d.indexOf("Mobilisation"));
+    expect(d.indexOf("Bidding closes")).toBeLessThan(d.indexOf("Mobilization"));
   });
 
   it("Given more terms than fit, Then it stops on a whole term rather than mid-word", () => {

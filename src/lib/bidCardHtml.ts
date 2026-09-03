@@ -30,7 +30,6 @@
  * image band, then the title, the detail rows, the app line and the source domain.
  */
 
-import { JOIN_URL } from "@/lib/config/store-links";
 import { COLORS, RADII } from "@/lib/ds-colors";
 import type { BidCardModel } from "@/lib/bidCardModel";
 
@@ -63,12 +62,14 @@ function hostOf(url: string): string {
   return url.replace(/^https?:\/\//, "").split("/")[0].toUpperCase();
 }
 
-const JOIN_LINE = {
-  en: (host: string) =>
-    `New to Moedatech? Bid from the app and see every request from this renter — <a href="${host}" style="color:${COLORS.brandDeep};font-weight:800;text-decoration:none;">get the app</a>.`,
-  ar: (host: string) =>
-    `جديد على مُعِدّاتك؟ قدّم عروضك من التطبيق وتابع كل طلبات هذا المستأجر — <a href="${host}" style="color:${COLORS.brandDeep};font-weight:800;text-decoration:none;">حمّل التطبيق</a>.`,
-} as const;
+/*
+ * — `JOIN_LINE` lived here —
+ *
+ * "New to Moedatech? Bid from the app and see every request from this renter — get the app."
+ * Removed 2026-09-03: the card is a REQUEST, and a supplier reading it is deciding whether to price
+ * a job. An advertisement at the foot of it spends his attention on something he did not ask about,
+ * in the one place we have it.
+ */
 
 /** One `label · value` line. A row the request cannot answer never reaches here. */
 function row(label: string, value: string, align: string): string {
@@ -171,7 +172,6 @@ export function bidCardHtml(card: BidCardPreview, model: BidCardModel | null, la
       ${block(terms)}
       ${itemRows ? `<div style="border-top:1px solid ${COLORS.border};margin-top:9px;padding-top:2px;">${itemRows}</div>` : ""}
       ${model?.closing ? `<div style="font-size:11px;color:${COLORS.muted};padding-top:8px;">${escapeHtml(model.closing)}.</div>` : ""}
-      <div style="border-top:1px solid ${COLORS.border};margin-top:11px;padding-top:10px;font-size:11.5px;color:${COLORS.mutedDark};line-height:1.5;">${JOIN_LINE[lang](JOIN_URL)}</div>
       <div style="font-size:10.5px;color:${COLORS.mutedLight};letter-spacing:0.4px;padding-top:10px;">${escapeHtml(hostOf(card.url))}</div>
     </td></tr>
   </table>

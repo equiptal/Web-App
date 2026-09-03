@@ -812,16 +812,6 @@ export function ShareRequestPanel({
             </div>
           )}
 
-          {/* Outside the message on purpose: the template is greeting, card, sign-off, and nothing
-              else. This says what today's door can actually carry, without putting a caveat inside
-              the thing he is composing. */}
-          {!!card && (
-            <span className="flex items-start gap-1.5 text-label text-muted">
-              <Icon name="info" size={12} className="mt-px flex-none" />
-              {previewIsEmail ? c.arrivesEmail : c.arrivesChat}
-            </span>
-          )}
-
           {!isDefaultTemplate(template, lang) && (
             <button
               type="button"
@@ -857,11 +847,17 @@ export function ShareRequestPanel({
             button keeps `ms-auto` against the right edge. Below that it still wraps, because on a
             phone the alternative is a row scrolled sideways with the send button off screen. */}
         <div className="flex flex-wrap items-center gap-2.5 sm:flex-nowrap">
-          {/* Moedatech is not a channel he chooses — it is where the request goes. Larger than the
-              rest, and never pressable: a control he cannot turn off must not look like one he can. */}
+          {/* Moedatech is not a channel he chooses, it is where the request goes, and it is never
+              pressable: a control he cannot turn off must not look like one he can.
+
+              ── Same height, and the green ground back (owner, 2026-09-03) ─────────────────────
+              ~~42px on a row of 34px chips, on white.~~ The extra eight pixels made the row look
+              misaligned rather than making this one important, and white took away the one thing
+              that said «this always happens» at a glance. Green ground, green border, one height:
+              it reads as settled beside three things that are still choices. */}
           <span
             title={c.alwaysHint}
-            className="inline-flex h-[42px] flex-none items-center gap-2.5 rounded-md border border-ok bg-surface px-4"
+            className="inline-flex h-[34px] flex-none items-center gap-2.5 rounded-md border border-ok bg-ok-soft px-4"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/moedatech-logo.svg" alt="Moedatech" className="h-4 w-auto brightness-0" />
@@ -1155,7 +1151,9 @@ function Channel({
       aria-pressed={on}
       onClick={onClick}
       className={cx(
-        "inline-flex h-[34px] flex-none items-center gap-1.5 rounded-md border px-3.5 text-meta font-extrabold transition",
+        /* `font-semibold`, not extrabold (owner, 2026-09-03): three chips in the heaviest weight the
+           type scale has read as three warnings. They are choices. */
+        "inline-flex h-[34px] flex-none items-center gap-1.5 rounded-md border px-3.5 text-meta font-semibold transition",
         /* Navy when chosen. Green is Moedatech's, and an extra channel wearing it read as a second
            «this always happens» rather than as a choice he made. */
         on ? "border-navy bg-navy text-surface" : "border-border bg-surface text-navy-mid hover:border-navy",

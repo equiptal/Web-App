@@ -413,7 +413,7 @@ describe("the link preview (owner, 2026-09-02)", () => {
      * fell back to is a navy rectangle with the logo and nothing else, so the half of the card a
      * supplier sees first was the one part of the preview that was untrue.
      */
-    await waitFor(() => expect(screen.getByText(c.arrivesChat)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("MOEDATECH")).toBeTruthy());
     expect(document.querySelector('img[src="/og-bid.png"]')).toBeNull();
     expect(screen.getByText("MOEDATECH")).toBeTruthy();
     expect(screen.getByText(/Open the link to submit your bid/)).toBeTruthy();
@@ -432,9 +432,9 @@ describe("the link preview (owner, 2026-09-02)", () => {
     drawDraft();
     fireEvent.click(await screen.findByText(c.email));
 
+    // Same template, same card, whichever channel is chosen — no per-channel caveat on the message.
     expect(screen.getByText("MOEDATECH")).toBeTruthy();
-    expect(screen.getByText(c.arrivesEmail)).toBeTruthy();
-    expect(screen.queryByText(c.arrivesChat)).toBeNull();
+    expect(screen.getByText(/Open the link to submit your bid/)).toBeTruthy();
   });
 });
 

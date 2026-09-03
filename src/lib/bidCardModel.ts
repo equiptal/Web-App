@@ -4,7 +4,7 @@
  *
  * ── WHY THIS EXISTS ───────────────────────────────────────────────────────────────────────────────
  * The card used to be built by splitting the preview endpoint's two strings back into fields. Those
- * strings carry a city and a rental basis and nothing else — no items, no mobilisation, no fuel, no
+ * strings carry a city and a rental basis and nothing else — no items, no mobilization, no fuel, no
  * dates — which is why the card never showed a term: they were never in the string to begin with
  * (found in production, 2026-09-01).
  *
@@ -61,7 +61,7 @@ export interface BidCardModel {
   /**
    * The terms EVERY item agrees on — the request's own answers.
    *
-   * Mobilisation, demobilisation, food, accommodation & transport, fuel, equipment year and the
+   * Mobilization, demobilization, food, accommodation & transport, fuel, equipment year and the
    * certificates asked for. Only what is set: a request with no fuel answer prints no fuel row,
    * because "Fuel: —" teaches a supplier to skim the block and then he skims the row that mattered.
    */
@@ -90,8 +90,8 @@ const COPY = {
     months: (n: number) => `${n} ${n === 1 ? "month" : "months"}`,
     extendable: (period: string) => `${period} & extendable`,
     terms: {
-      mob: "Mobilisation",
-      demob: "Demobilisation",
+      mob: "Mobilization",
+      demob: "Demobilization",
       food: "Food",
       accom: "Accommodation & transport",
       fuel: "Fuel",
