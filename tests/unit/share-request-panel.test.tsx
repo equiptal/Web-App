@@ -562,7 +562,7 @@ describe("copying", () => {
     vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
 
     draw();
-    fireEvent.click(await screen.findByText(c.copy));
+    fireEvent.click(await screen.findByText(c.copyShort));
 
     await waitFor(() => expect(writeText).toHaveBeenCalled());
     // The URL, whole and alone: no greeting, no card, nothing to trim out of a CRM field.
@@ -590,7 +590,7 @@ describe("what they receive", () => {
      * of these, not two.
      */
     expect(screen.getByText(c.linkMasked)).toBeTruthy();
-    expect(screen.getByText(c.copy).closest("button")!.hasAttribute("disabled")).toBe(true);
+    expect(screen.getByText(c.copyShort).closest("button")!.hasAttribute("disabled")).toBe(true);
   });
 
   it("Given no equipment yet, Then it says so rather than drawing an empty card", async () => {

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Icon } from "@/components/ui";
+import { VendorMark } from "@/components/VendorMark";
 import { btn, cx } from "@/lib/ds";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import {
@@ -108,6 +109,18 @@ export interface ShareRequestPanelProps {
    * than either of them alone.
    */
   showExpiry?: boolean;
+  /**
+   * The screen's own heading, drawn at the head of the LINK ROW rather than above it.
+   *
+   * Owner, 2026-09-03: *"can you make the expiry date, link, copy and preview on one row with Share
+   * this request… so they fit in one row and the content below goes up."* The heading had a band of
+   * its own over a row of controls that reaches nowhere near the left edge, so the card opened with
+   * two half-empty lines before anything a renter could act on.
+   *
+   * A slot rather than a string, because the shells disagree about what the heading IS: the card on
+   * *Ready to send* owns an `<h2>`, and the modal has the dialog's own title bar and passes nothing.
+   */
+  heading?: ReactNode;
 }
 
 export function ShareRequestPanel({
@@ -120,6 +133,7 @@ export function ShareRequestPanel({
   renterName = null,
   showLink = true,
   showExpiry = true,
+  heading,
 }: ShareRequestPanelProps) {
   const t = useT();
   const c = t.intake.postShare;
@@ -194,14 +208,15 @@ export function ShareRequestPanel({
   /**
    * What the link field shows before there is a link.
    *
-   * The shape of the real thing — host, path, the first characters of the token — with the rest
-   * starred. A renter who has never shared one has no idea what he is waiting for; "Generated the
-   * moment you post" described the timing and not the thing.
+   * ⚠️ **Built from `bidShareUrl`, never from `window.location`** (owner, 2026-09-03: *"it must
+   * show the actual os link now so even for preview or copy paste be accurate"*).
+   *
+   * The shared link points at the SUPPLIER OS, not at this app — the public bid form moved there.
+   * Masking with the browser's own host showed the renter a preview of a link that will never
+   * exist, and the host is the half of a URL a person actually reads. Through the real builder, the
+   * placeholder and the finished link differ in exactly one thing: the token.
    */
-  const maskedLink = useMemo(() => {
-    const host = typeof window === "undefined" ? "" : window.location.host;
-    return `${host}/bid/${(requestUuid ?? "").slice(0, 4) || "••••"}${"*".repeat(12)}`;
-  }, [requestUuid]);
+  const maskedLink = useMemo(() => bidShareUrl("••••••••").replace(/^https?:\/\//, ""), []);
 
   const card = useBidCard(shareUrl, lang, draftForm);
 
@@ -266,7 +281,9 @@ export function ShareRequestPanel({
           imageUrl:
             card.imageUrl ||
             (typeof window === "undefined" || !uuid ? "" : `${window.location.origin}/bid/${uuid}/og`),
-          url: shareUrl,
+          /* Falls back to the OS base so the card's domain line names the host a supplier will
+             really see, rather than going blank until the request exists. */
+          url: shareUrl || bidShareUrl(""),
         },
         card.model,
         lang,
@@ -497,8 +514,9 @@ export function ShareRequestPanel({
       {/* ── The link ──────────────────────────────────────────────────────────────────────────── */}
       {showLink && (
       <div className="grid gap-2">
-        {/* No heading: the field says what it is, and the line under it says when it arrives. */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* The heading rides this row — see `heading`. */}
+          {heading}
           {/* The expiry sits beside the link because it is a property OF the link, not of the
               request — and it is named, because a bare date box beside a URL could be anything. */}
           {showExpiry && (
@@ -525,8 +543,19 @@ export function ShareRequestPanel({
             )}
           >
             {!uuid && <Icon name="lock" size={13} className="flex-none text-muted-light" />}
-            <span dir="ltr" className={cx("block min-w-0 flex-1 truncate font-mono text-meta", uuid ? "text-navy" : "text-muted-light")}>
-              {uuid ? shareUrl.replace(/^https?:\/\//, "") : maskedLink}
+            {/* ── The empty field says what it is waiting for (owner, 2026-09-03) ───────────────
+                ~~A row of masked dots, with «Your shareable link is generated the moment you post
+                your request» on a line of its own underneath.~~ The sentence explained the dots, so
+                the dots were doing no work: the field can carry the sentence itself, and the line
+                under the row goes, which is one of the two lines this card needed back. */}
+            <span
+              dir={uuid ? "ltr" : undefined}
+              className={cx(
+                "block min-w-0 flex-1 truncate text-meta",
+                uuid ? "font-mono text-navy" : "text-muted-light",
+              )}
+            >
+              {uuid ? shareUrl.replace(/^https?:\/\//, "") : c.linkHint}
             </span>
           </span>
           <button
@@ -551,7 +580,9 @@ export function ShareRequestPanel({
             className={cx(btn("secondary", "md"), "flex-none")}
           >
             <Icon name={copied ? "check" : "content_copy"} size={14} />
-            {copied ? c.copied : c.copy}
+            {/* One word each (owner, 2026-09-03): «Copy link» and «Preview form» named their object
+                twice, since the object is the field they sit beside. */}
+            {copied ? c.copied : c.copyShort}
           </button>
           {/* ── See the form a supplier fills in, BEFORE posting ──────────────────────────────
               The real page once there is a token; the static mock in `public/` until then, which is
@@ -565,18 +596,30 @@ export function ShareRequestPanel({
             className={cx(btn("secondary", "md"), "flex-none")}
           >
             <Icon name="visibility" size={14} />
-            {c.previewForm}
+            {c.previewShort}
           </a>
         </div>
-        <p className="text-meta text-muted">{c.linkHint}</p>
       </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
+      {/* ── The two columns are the same height (owner, 2026-09-03) ────────────────────────────
+          *"For the supplier list height, make it the same as the preview column beside it."*
+
+          They were two independent boxes at 300px and 460px, so the left column ended a third of the
+          way up the right one and the card had a step in its own middle. `lg:h-[27rem]` on the row
+          gives both a height to fill, and each column scrolls inside it: the supplier list and the
+          message are both lists nobody reads to the end, so a fixed frame is right for both.
+
+          Only from `lg`. Stacked on a narrow screen there is no «beside», and a fixed height there
+          would be an arbitrary crop. */}
+      <div className="grid gap-6 lg:h-[27rem] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
         {/* ── Left: who, and how ─────────────────────────────────────────────────────────────── */}
-        <div className="flex flex-col gap-4">
-          <div className="grid gap-2">
+        <div className="flex min-h-0 flex-col gap-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-2">
             <span className="flex items-center gap-2">
+              {/* A glyph on each column heading (owner, 2026-09-03): the two halves of this screen
+                  are «who» and «what», and at label size the words alone are two grey lines. */}
+              <Icon name="group" size={14} className="flex-none text-muted" />
               <span className={label}>{c.recipients}</span>
               <span className="ms-auto text-meta font-semibold text-navy-mid">{fmt(c.selected, { n: chosen.length })}</span>
             </span>
@@ -640,7 +683,7 @@ export function ShareRequestPanel({
             ) : rows.length === 0 ? (
               <span className="text-meta text-muted">{c.noSuppliers}</span>
             ) : (
-              <div className="max-h-[300px] overflow-auto rounded-md border border-border">
+              <div className="min-h-0 flex-1 overflow-auto rounded-md border border-border lg:max-h-none">
                 <ul>
                   {visible.map((s) => {
                     const on = !!picked[s.id];
@@ -692,6 +735,7 @@ export function ShareRequestPanel({
                                 className="inline-flex h-[18px] flex-none items-center gap-1 rounded-full border border-navy/25 bg-surface2 px-1.5 text-label font-semibold text-navy-mid"
                               >
                                 <Icon name="workspace_premium" size={11} />
+                                <VendorMark size={12} />
                                 {c.vendorShort}
                               </span>
                             )}
@@ -759,7 +803,10 @@ export function ShareRequestPanel({
             No tabs: the channel row above already says which one he is sending, and asking again
             here is asking twice. */}
         <div className="flex flex-col gap-2">
-          <span className="flex items-baseline gap-2">
+          <span className="flex items-center gap-2">
+            {/* The eye, because this column is the one thing on the screen he only LOOKS at
+                (owner, 2026-09-03). */}
+            <Icon name="visibility" size={14} className="flex-none text-muted" />
             <span className={label}>{c.preview}</span>
             <span className="ms-auto text-label text-muted">{c.editHint}</span>
           </span>
@@ -772,7 +819,7 @@ export function ShareRequestPanel({
             /* ⚠️ The prototype's From says `Moedatech <notifications@moedatech.net>`. It is a mock,
                and it is not what happens: this goes out from the renter's own account (owner,
                2026-09-01), so the From line names HIM. */
-            <div className="flex max-h-[460px] flex-col overflow-hidden rounded-md border border-border bg-surface">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-surface">
               <div className="flex-none border-b border-border bg-surface2 px-3 py-2">
                 <div className="text-meta font-extrabold text-navy">{subject}</div>
                 <div className="mt-0.5 text-label text-muted">{fmt(c.fromLine, { name: renterName || c.fromYou })}</div>
@@ -798,7 +845,7 @@ export function ShareRequestPanel({
                puts it: one bubble carrying the words and the preview together. In the e-mail frame it
                is a separate block under the body, because that is where a mail client puts it. Same
                card, drawn where each client actually draws it. */
-            <div className="max-h-[460px] overflow-auto rounded-md border border-border bg-surface2 p-3">
+            <div className="min-h-0 flex-1 overflow-auto rounded-md border border-border bg-surface2 p-3">
               <div className="max-w-[94%] rounded-md rounded-ss-none bg-surface px-3 py-2">
                 <Message
                   parts={parts}
@@ -835,8 +882,12 @@ export function ShareRequestPanel({
 
           The pale orange band is not decoration — it is what stops the eye reading Send as a fourth
           control in a column of controls. */}
-      <div className="grid gap-2.5 rounded-md border border-brand/30 bg-brand-soft px-4 py-3.5">
-        <span className={label}>{c.sendVia}</span>
+      {/* ── Thinner (owner, 2026-09-03) ────────────────────────────────────────────────────────
+          *"Make the bottom orange row thinner so it appears on the screen before scrolling down."*
+          The band is the last thing on the card and the one that has to be reachable without a
+          scroll, so its own padding is what it can least afford. The label now rides the row with
+          the controls instead of taking a line above them. */}
+      <div className="grid gap-2 rounded-md border border-brand/30 bg-brand-soft px-4 py-2.5">
 
         {/* ── One line, on any screen that has the room (owner, 2026-09-03) ────────────────────
             *"Make sure the modal fits this screen as it is, with no change in the UI like wrapping
@@ -847,6 +898,7 @@ export function ShareRequestPanel({
             button keeps `ms-auto` against the right edge. Below that it still wraps, because on a
             phone the alternative is a row scrolled sideways with the send button off screen. */}
         <div className="flex flex-wrap items-center gap-2.5 sm:flex-nowrap">
+          <span className={cx(label, "flex-none")}>{c.sendVia}</span>
           {/* Moedatech is not a channel he chooses, it is where the request goes, and it is never
               pressable: a control he cannot turn off must not look like one he can.
 
