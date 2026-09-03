@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui";
 import { Dialog } from "@/components/Dialog";
 import { btn, cx } from "@/lib/ds";
@@ -40,8 +40,23 @@ export function ShareOnPost() {
   const { tier } = useSession();
   const [coach, setCoach] = useState(true);
   const [showAccount, setShowAccount] = useState(false);
-  /** Said once, as a pop-up, and then he is back where he was — see the dialog at the foot. */
+  /**
+   * ── The tick waits for the channel to be handed off (owner, 2026-09-03) ─────────────────────
+   *
+   * ~~It opened the moment the request was created.~~ But the post is step one of the press: the
+   * compose window or WhatsApp opens a few lines later, in a NEW TAB that takes focus — so the
+   * dialog appeared, was immediately covered, and the renter met it on his way back with no idea
+   * what it was answering.
+   *
+   * `onShared` fires after every channel has been opened, so the tick is the first thing he sees
+   * when he returns — which is exactly when "it is posted" is the thing he wants to know. With no
+   * extra channel there is no tab, and it simply appears.
+   *
+   * Once only: a second send is another channel, not another request, and the panel already reports
+   * that inline.
+   */
   const [posted, setPosted] = useState(false);
+  const announced = useRef(false);
   /** The request cap has a dialog of its own on the review above; this banner leaves it to it. */
   const isLimit = state.errorDetail?.backendCode === "E8009";
   /** The renter's own firm, for the From line. Read once, and a failure just leaves it unnamed. */
@@ -93,7 +108,6 @@ export function ShareOnPost() {
     // Keeps this card mounted once the phase flips to confirmation, and keeps the REVIEW on screen
     // behind it rather than the confirmation page — see `CreateSurface`.
     actions.setShareOnPost(true);
-    setPosted(true);
     return uuid;
   };
 
@@ -147,6 +161,11 @@ export function ShareOnPost() {
         draftForm={draftForm}
         onPost={post}
         renterName={renterName}
+        onShared={() => {
+          if (announced.current) return;
+          announced.current = true;
+          setPosted(true);
+        }}
       />
 
       {/* ── It is posted, and he has not gone anywhere (owner, 2026-09-03) ────────────────────
