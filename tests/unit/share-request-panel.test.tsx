@@ -71,6 +71,8 @@ beforeEach(() => {
     { id: "1", name: "Al Faisal Rentals", email: "ops@alfaisal.sa", phone: "+966501112233", verified: true },
     // No address: he is in the list, he is pickable, and he is honestly named as skipped.
     { id: "2", name: "Najd Equipment Est.", email: null, phone: "+966505556677", verified: false },
+    // Neither contact — the row that proves the Add follows the CHANNEL rather than the field.
+    { id: "3", name: "Hail Heavy Transport", email: null, phone: null, verified: false },
   ];
   opened.mockReset();
   vi.stubGlobal("open", opened);
@@ -587,6 +589,31 @@ describe("the Add action belongs to the channel (owner, 2026-09-03)", () => {
     expect(within(row).getByText(c.noEmail)).toBeTruthy();
     expect(within(row).queryByText(c.addEmail)).toBeNull();
     expect(within(row).queryByText(c.addPhone)).toBeNull();
+  });
+
+  it("Given WhatsApp, Then a row with no number offers Add phone", async () => {
+    draw();
+    await screen.findByText("Al Faisal Rentals");
+    fireEvent.click(screen.getByText(c.whatsapp));
+
+    // Hail has neither contact — with WhatsApp chosen it is the NUMBER it is asked for.
+    const noContact = screen.getByText("Hail Heavy Transport").closest("li")!;
+    expect(within(noContact).getByText(c.addPhone)).toBeTruthy();
+    expect(within(noContact).queryByText(c.addEmail)).toBeNull();
+  });
+
+  it("Given MORE, Then no contact is asked for at all", async () => {
+    /**
+     * ⚠️ *More* hands the message to the device's own share sheet, which picks its own recipient.
+     * A missing address is not a gap there — it is simply not ours to ask for. The first cut fell
+     * through to the e-mail branch and offered «Add e-mail» on a channel that never uses one.
+     */
+    draw();
+    await screen.findByText("Al Faisal Rentals");
+    fireEvent.click(screen.getByText(c.other));
+
+    expect(screen.queryByText(c.addEmail)).toBeNull();
+    expect(screen.queryByText(c.addPhone)).toBeNull();
   });
 
   it("Given WhatsApp, Then a row missing a NUMBER offers Add phone, not Add e-mail", async () => {

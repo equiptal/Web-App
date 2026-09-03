@@ -775,7 +775,10 @@ export function ShareRequestPanel({
 
                               Fixed in place rather than on another screen: sending him away would
                               lose the selection he is building here. */}
-                          {channel !== "none" &&
+                          {/* ⚠️ E-mail and WhatsApp only. *More* hands the message to the device's
+                              own share sheet, which picks its own recipient — so a contact is not
+                              missing there, it is simply not ours to ask for. */}
+                          {(channel === "email" || channel === "whatsapp") &&
                             !(channel === "whatsapp" ? s.phone?.trim() : canBeEmailed(s)) &&
                             (addingEmailOn === s.id ? (
                               <span className="flex flex-none items-center gap-1.5">
@@ -834,7 +837,13 @@ export function ShareRequestPanel({
 
             No tabs: the channel row above already says which one he is sending, and asking again
             here is asking twice. */}
-        <div className="flex flex-col gap-2">
+        {/* `min-h-0` is load-bearing (owner, 2026-09-03: *"still the supplier column is a different
+            length from the preview one"*). The row was given a height and the LEFT column obeyed it,
+            because its own boxes carry `min-h-0`; this column did not, so it kept its default
+            `min-height: auto`, refused to shrink below its content, and grew past the row — which is
+            exactly the mismatch that was supposed to be fixed. Both columns now shrink to the row and
+            scroll inside it. */}
+        <div className="flex min-h-0 flex-col gap-2">
           <span className="flex items-center gap-2">
             {/* The eye, because this column is the one thing on the screen he only LOOKS at
                 (owner, 2026-09-03). */}
