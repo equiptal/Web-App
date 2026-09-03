@@ -56,6 +56,8 @@ export function ShareOnPost() {
    * that inline.
    */
   const [posted, setPosted] = useState(false);
+  /** How many suppliers that first send actually reached — 0 when he posted to Moedatech alone. */
+  const [reached, setReached] = useState(0);
   const announced = useRef(false);
   /** The request cap has a dialog of its own on the review above; this banner leaves it to it. */
   const isLimit = state.errorDetail?.backendCode === "E8009";
@@ -161,9 +163,10 @@ export function ShareOnPost() {
         draftForm={draftForm}
         onPost={post}
         renterName={renterName}
-        onShared={() => {
+        onShared={(n) => {
           if (announced.current) return;
           announced.current = true;
+          setReached(n);
           setPosted(true);
         }}
       />
@@ -182,7 +185,10 @@ export function ShareOnPost() {
           </span>
         }
         title={c.postedTitle}
-        subtitle={state.requestId ? fmt(c.postedBody, { code: state.requestId }) : c.postedBodyNoCode}
+        /* ⚠️ It only claims a share when one HAPPENED (owner, 2026-09-03: *"removed shared with your
+           supplier if he didnt share it"*). A renter who posted to Moedatech alone being told his
+           suppliers were told is the panel lying about the one thing he pressed. */
+        subtitle={reached === 0 ? c.postedLive : reached === 1 ? c.postedLiveOne : fmt(c.postedLiveMany, { n: reached })}
         footer={
           <button type="button" onClick={() => setPosted(false)} className={cx(btn("primary", "md"), "ms-auto")}>
             {c.postedKeepSharing}
