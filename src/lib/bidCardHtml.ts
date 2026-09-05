@@ -106,9 +106,17 @@ function navyBand(model: BidCardModel, align: string): string {
 
              The same `logoDataUri` that route uses, white on navy. A data URI rather than a path,
              because this markup is also what a paste carries into a mail client, and a client
-             fetching `/moedatech-logo.svg` from wherever it happens to be would fetch nothing. */ ""
+             fetching `/moedatech-logo.svg` from wherever it happens to be would fetch nothing.
+
+             ⚠️ 72px on a 440px card is 16%, matching the proportion the rendered card at
+             `/bid/<token>/og` draws (228 of 1200, 19%) rather than shouting over the equipment
+             name below it. It is a mark, not a masthead: the supplier is here to read the machine.
+
+             ⚠️ The ground is `COLORS.navy`, which IS `--navy` from `globals.css` — a test pins
+             the two files together. Satori cannot read a CSS variable, so the hex travels through
+             `ds-colors.ts` rather than the card inventing a navy of its own. */ ""
         }
-        <img src="${logoDataUri(COLORS.surface)}" alt="Moedatech" width="96" height="36" style="display:block;width:96px;height:auto;border:0;outline:none;">
+        <img src="${logoDataUri(COLORS.surface)}" alt="Moedatech" width="72" height="27" style="display:block;width:72px;height:auto;border:0;outline:none;">
         <div style="font-size:${headline.length > 46 ? 16 : 20}px;font-weight:700;color:${COLORS.surface};line-height:1.2;padding-top:16px;">${headline}</div>
         <div style="font-size:12px;font-weight:700;color:${model.accepting ? COLORS.brand : COLORS.dangerHover};padding-top:10px;">${escapeHtml(model.cta)}</div>
         ${
