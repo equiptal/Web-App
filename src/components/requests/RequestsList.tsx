@@ -360,7 +360,8 @@ export function GroupStrip({ group, ar, L, router, filledByItem = {} }: { group:
     fetchRequestSubmissions(group.id).then((r) => active && setLink(r)).catch(() => {});
     return () => { active = false; };
   }, [group.id]);
-  const shareUrl = typeof window !== "undefined" ? bidShareUrl(window.location.origin, group.id, link?.renterName) : "";
+  // Built from `bidShareUrl`, never from `window.location`: the link points at the supplier OS.
+  const shareUrl = bidShareUrl(group.id);
   const isBroadcast = group.type !== "DIRECT";
   const ffItems = [...group.items].sort((a, b) => (b.item?.qty ?? 1) - (a.item?.qty ?? 1));
   const ffShown = ffExpanded ? ffItems : ffItems.slice(0, 4);

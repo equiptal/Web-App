@@ -680,9 +680,27 @@ export async function setShareLinkLogo(requestId: string, logoUrl: string | null
   return postJsonMethod(`/api/me/requests/${encodeURIComponent(requestId)}/share-link`, { logoUrl }, "PUT");
 }
 
-/** Build a request's public share link. The token IS the request's UUID; the renter-name slug is a
- *  cosmetic prefix. The /bid page extracts the trailing UUID, so a slug with dashes is safe. */
-export function bidShareUrl(origin: string, requestId: string, renterName?: string | null): string {
-  const slug = renterName ? renterName.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) : "";
-  return `${origin}/bid/${slug ? `${slug}-` : ""}${requestId}`;
+/**
+ * Host of the Supplier OS, which is where the public bid form lives since 2026-08-31. The path did
+ * not move (`/bid/<token>`), only the host.
+ *
+ * The default is PRODUCTION on purpose, which inverts the usual "default to the safe/staging value"
+ * convention. `NEXT_PUBLIC_*` is compiled into the bundle at build time, so a missing variable in the
+ * PROD build resolves to this literal — default it to staging and a real supplier is handed a Railway
+ * link. Staging is the environment that opts in, by setting `NEXT_PUBLIC_OS_APP_URL`. c-hub's
+ * `lib/bidShareLink.ts` carries the same inversion for the same reason; do not "fix" it.
+ */
+const OS_BASE = (process.env.NEXT_PUBLIC_OS_APP_URL || "https://os.moedatech.net").replace(/\/$/, "");
+
+/**
+ * Build a request's public share link. The token IS the request's UUID / group id.
+ *
+ * No renter-name slug: the mobile app (`AppConstants.bidFormBaseUrl`) and c-hub admin
+ * (`lib/bidShareLink.ts`) emit `<OS host>/bid/<id>`, and all three producers have to emit one shape
+ * for the same request. The slug only ever worked because THIS app's `/bid` page strips it with a
+ * UUID regex (`extractBidToken`); keeping it would make the link's validity depend on the OS page
+ * carrying that same regex.
+ */
+export function bidShareUrl(requestId: string): string {
+  return `${OS_BASE}/bid/${requestId}`;
 }
