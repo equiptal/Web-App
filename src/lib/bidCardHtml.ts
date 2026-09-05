@@ -99,7 +99,7 @@ function navyBand(model: BidCardModel, align: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;background:${COLORS.navy};">
       <tr><td align="${align}" style="padding:16px 18px 16px;">
         ${
-          /* WARNMARK **The MARK, not the word** (owner, 2026-09-05: *"make sure moedatech show the
+          /* ⚠️ **The MARK, not the word** (owner, 2026-09-05: *"make sure moedatech show the
              moedatech logo not the text"*). `MOEDATECH` in letter-spaced caps was a stand-in that
              outlived its excuse: the real card at `/bid/<token>/og` has drawn the logo all along, so
              the preview was showing a different brand from the thing it previews.
@@ -120,7 +120,7 @@ function navyBand(model: BidCardModel, align: string): string {
         <div style="font-size:${headline.length > 46 ? 16 : 20}px;font-weight:700;color:${COLORS.surface};line-height:1.2;padding-top:16px;">${headline}</div>
         <div style="font-size:12px;font-weight:700;color:${model.accepting ? COLORS.brand : COLORS.dangerHover};padding-top:10px;">${escapeHtml(model.cta)}</div>
         ${
-          /* WARNMARK ~~The host, small and grey under the call to bid.~~ Removed (owner, 2026-09-05).
+          /* ⚠️ ~~The host, small and grey under the call to bid.~~ Removed (owner, 2026-09-05).
              It was a trust signal when the card was the whole message, and it is noise now: the
              whole block is inside an `<a>`, so the card IS the link, and `WEB-PRODUCTION-DE3C8.
              UP.RAILWAY.APP` under a request reads as machinery rather than as reassurance. The same

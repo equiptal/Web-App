@@ -1811,6 +1811,17 @@ export type ShareEmailResult =
       messageId: string | null;
       /** True only on the Graph path: the message is in the renter's own Sent folder. */
       inSentFolder: boolean;
+      /**
+       * A DRAFT waiting in his own Outlook, for him to read and send himself.
+       *
+       * ⚠️ **Present only when the backend drafted instead of sending**, which is the flow the
+       * owner asked for on 2026-09-05: *"open the outlook for him and see who is bcc then click
+       * send so he send it by him self."* A draft is the only way he ever sees the Bcc — the
+       * compose deeplink discards it, and a send he did not make shows him nothing at all.
+       *
+       * Null on today's backend, which calls `POST /me/sendMail` and sends outright.
+       */
+      draftUrl: string | null;
       recipients: number;
       skipped: number;
     }
@@ -1880,6 +1891,7 @@ export async function shareRequestEmail(
         // Null on the Graph path by design, so it stays nullable rather than being coerced to "".
         messageId: typeof raw.messageId === "string" ? raw.messageId : null,
         inSentFolder: raw.inSentFolder === true,
+        draftUrl: typeof raw.draftUrl === "string" && raw.draftUrl ? raw.draftUrl : null,
         recipients: typeof raw.recipients === "number" ? raw.recipients : renterSupplierIds.length,
         skipped: typeof raw.skipped === "number" ? raw.skipped : 0,
       };

@@ -40,6 +40,8 @@ describe("shareRequestEmail", () => {
       recipients: 4,
       messageId: "0100-abc",
       inSentFolder: false,
+      // ⚠️ Null on the SES path: nothing was drafted, the message has already gone.
+      draftUrl: null,
       skipped: 0,
     });
     expect(calls[0].url).toBe("/api/requests/req-1/share-email");
@@ -212,5 +214,35 @@ describe("shareRequestEmail", () => {
     if (out.sent) throw new Error("unreachable");
     expect(out.reason).toBe("SEND_REJECTED");
     expect(out.connectPath).toBeTruthy();
+  });
+
+  it("Given a DRAFT, Then its link comes back so the panel can open it", async () => {
+    /**
+     * 🔴 A draft is the only way the renter ever SEES the Bcc (owner, 2026-09-05). The compose
+     * deeplink discards blind copies without a word, and a message the server sent on his behalf
+     * shows him nothing at all — he is handed a number and asked to believe it.
+     */
+    stub(200, {
+      sent: true,
+      from: "bandar@zahid.sa",
+      via: "graph",
+      messageId: null,
+      inSentFolder: false,
+      recipients: 3,
+      draftUrl: "https://outlook.office.com/mail/deeplink/read/AAMk123",
+    });
+
+    const out = await shareRequestEmail("req-1", ["a", "b", "c"], MSG);
+    if (!out.sent) throw new Error("unreachable");
+    expect(out.draftUrl).toBe("https://outlook.office.com/mail/deeplink/read/AAMk123");
+  });
+
+  it("Given no draft link, Then it is null rather than an empty string", async () => {
+    // An empty string would read as "we have a link and it is blank" to anything checking for one.
+    stub(200, { sent: true, from: "b@x.sa", via: "graph", messageId: null, inSentFolder: true, recipients: 1, draftUrl: "" });
+
+    const out = await shareRequestEmail("req-1", ["a"], MSG);
+    if (!out.sent) throw new Error("unreachable");
+    expect(out.draftUrl).toBeNull();
   });
 });

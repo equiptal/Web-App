@@ -368,7 +368,7 @@ export function bidCardModel(
     const fuelType = i.requiredTerms?.fuelType?.trim();
     const year = i.requiredTerms?.year?.trim();
     /**
-     * WARNMARK **Two certificates, and they are not the same question** (owner, 2026-09-05:
+     * ⚠️ **Two certificates, and they are not the same question** (owner, 2026-09-05:
      * *"this on the card details must be specific equipment or operator cert"*).
      *
      * ~~Both joined under one «Certificates» row.~~ `Certificates: tuv` does not say whether the

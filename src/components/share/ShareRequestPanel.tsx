@@ -314,7 +314,7 @@ export function ShareRequestPanel({
    * Coming back from Microsoft.
    *
    * The backend appends one word to the URL it was given: `connected`, `denied`, `unavailable` or
-   * `error`. This is the REDIRECT path, taken when the pop-up was blocked; the pop-up path resolves
+   * `error`. This is the 🔴IRECT path, taken when the pop-up was blocked; the pop-up path resolves
    * in `startConnect` instead. Both end in the same place, which is why the word is read here rather
    * than only in one of them.
    *
@@ -345,33 +345,51 @@ export function ShareRequestPanel({
    * So the status is re-read on close and IT decides the outcome: a renter who closed the window
    * without deciding looks exactly like one who refused, and both mean "not connected".
    */
-  const startConnect = async () => {
-    if (connecting) return;
+  const startConnect = async (): Promise<boolean> => {
+    if (connecting) return false;
     setConnecting(true);
     setConnectNote(null);
     const url = await mailConnectUrl(window.location.href);
     if (!url) {
       setConnecting(false);
       setConnectNote("failed");
-      return;
+      return false;
     }
     const win = window.open(url, "moeda-mail-connect", "width=520,height=700");
+    /**
+     * 🔴 **Blocked: leave the button, do NOT redirect.**
+     *
+     * ~~It used to take the whole tab to Microsoft.~~ That is survivable from a button press, and it
+     * is not survivable from inside Send: by then the request is POSTED, and the draft, the picks
+     * and the wording live in memory that a navigation throws away. He would come back to a live
+     * request and an empty panel. Falling through to the compose window costs him a paste; a
+     * redirect costs him the screen.
+     */
     if (!win) {
-      // Blocked. Take the whole tab there rather than leaving a button that does nothing.
-      window.location.href = url;
-      return;
-    }
-    if (connectTimer.current !== null) window.clearInterval(connectTimer.current);
-    connectTimer.current = window.setInterval(() => {
-      if (!win.closed) return;
-      if (connectTimer.current !== null) window.clearInterval(connectTimer.current);
-      connectTimer.current = null;
       setConnecting(false);
-      void mailConnectStatus().then((st) => {
-        setConnect(st);
-        setConnectNote(st.connected ? "connected" : "denied");
-      });
-    }, 700);
+      setConnectNote("failed");
+      return false;
+    }
+    /**
+     * ⚠️ **`window.closed` is the only signal there is.** The consent page is Microsoft's and the
+     * landing page is the backend's, so nothing inside the pop-up can talk to us. The status is
+     * re-read on close and IT decides: a renter who closed the window without deciding looks exactly
+     * like one who refused, and both mean "not connected".
+     */
+    return new Promise<boolean>((resolve) => {
+      if (connectTimer.current !== null) window.clearInterval(connectTimer.current);
+      connectTimer.current = window.setInterval(() => {
+        if (!win.closed) return;
+        if (connectTimer.current !== null) window.clearInterval(connectTimer.current);
+        connectTimer.current = null;
+        setConnecting(false);
+        void mailConnectStatus().then((st) => {
+          setConnect(st);
+          setConnectNote(st.connected ? "connected" : "denied");
+          resolve(st.connected);
+        });
+      }, 700);
+    });
   };
 
   // The Supplier OS host, not this app's origin, so there is nothing to read off `window` and the
@@ -483,7 +501,7 @@ export function ShareRequestPanel({
   /**
    * The subject line, and it is the renter's now.
    *
-   * WARNMARK ~~Built from the message language's own `t.subject` on every render.~~ Ours, so he could
+   * ⚠️ ~~Built from the message language's own `t.subject` on every render.~~ Ours, so he could
    * read it and not change it (owner, 2026-09-05: *"make the template title editable"*). It lives in
    * the template beside his other wording, carries `{equipment}` so the machine still changes per
    * request while his phrasing stays, and is saved per language like the rest.
@@ -644,9 +662,25 @@ export function ShareRequestPanel({
        *
        * ⚠️ **The recording is on the OTHER side of this branch now.** When we send it, the backend
        * writes the row itself and stamps it with the SES message id — a fact it can prove. Calling
-       * `recordRequestShare` as well would file a second row saying the renter DECLARED the same
+       * `recordRequestShare` as well would file a second row saying the renter DECLA🔴 the same
        * send from his own client, which is a different claim and not a true one.
        */
+      /**
+       * -- One press: post, connect, then Outlook (owner, 2026-09-05) ---------------------------
+       *
+       * *"when user select suppliers and was selecting email and click post it must open for him
+       * the connector and choose his account then open the outlook for him and see who is bcc then
+       * click send so he send it by him self."*
+       *
+       * ~~The connector was a button he had to find AFTER a send had already failed.~~ Two presses
+       * and a paragraph to explain the first one. The request is posted by the time we get here, so
+       * the consent is not a detour: it is the next step of the thing he pressed.
+       *
+       * ⚠️ Only when there is something to connect TO. A stage with no app registration answers
+       * `configured: false`, and a renter already connected has nothing to do.
+       */
+      if (connect?.configured && !connect.connected) await startConnect();
+
       const outcome = await shareRequestEmail(id, reachable.map((x) => x.id), {
         subject,
         html: card
@@ -662,6 +696,20 @@ export function ShareRequestPanel({
 
       if (outcome.sent) {
         reached += outcome.recipients;
+        /**
+         * 🔴 **A draft is the only way he ever SEES the Bcc** (owner, 2026-09-05: *"make sure he
+         * can see the bcc emails"*). The compose deeplink discards blind copies without a word, and
+         * a message the server sent on his behalf shows him nothing at all — he is told a number
+         * and asked to believe it.
+         *
+         * So when the backend drafts rather than sends, this opens the draft in his own Outlook:
+         * his recipients in the Bcc line where he can read them, the card in the body, and Send is
+         * his to press.
+         *
+         * ⚠️ Null on today's backend, which calls `POST /me/sendMail`. Until it drafts, the
+         * message has already gone and there is nothing to open.
+         */
+        if (outcome.draftUrl) window.open(outcome.draftUrl, "_blank", "noopener");
       } else {
         // No pick at all is a legitimate share (owner, 2026-09-02): the renter wants the message in
         // his own compose window to address himself. Nothing is recorded, because nobody was named.
@@ -1269,7 +1317,7 @@ export function ShareRequestPanel({
                2026-09-01), so the From line names HIM. */
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-surface">
               <div className="flex-none border-b border-border bg-surface2 px-3 py-2">
-                {/* WARNMARK The subject is a FIELD now, drawn as the line it will become rather than
+                {/* ⚠️ The subject is a FIELD now, drawn as the line it will become rather than
                     as a boxed input: the same rule as his other wording, so what he edits and what
                     he reads are one object. */}
                 <Editable
@@ -1738,7 +1786,7 @@ function Message({
 }) {
   return (
     <div className="grid gap-3">
-      {/* WARNMARK **One box, not two** (owner, 2026-09-05: *"no need to seperate the edit per hello
+      {/* ⚠️ **One box, not two** (owner, 2026-09-05: *"no need to seperate the edit per hello
           or per you are invited etc, keep them one text box above the card"*). The greeting and the
           line that introduces the request are read as one paragraph, so editing them as two fields
           meant placing the cursor twice to change one thought, with a blank line between them the

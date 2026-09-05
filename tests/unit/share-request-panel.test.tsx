@@ -1555,3 +1555,100 @@ describe("a wording per channel", () => {
  * feature on 2026-09-05 (owner: *"for now keep it browser"*). They are worth restoring alongside
  * `docs/implementation-plans/renter-suppliers/share-template-on-account.md`.
  */
+
+
+/**
+ * -- One press: post, connect, Outlook (owner, 2026-09-05) ---------------------------------------
+ *
+ * *"when user select suppliers and was selecting email and click post it must open for him the
+ * connector and choose his account then open the outlook for him and see who is bcc then click send
+ * so he send it by him self."*
+ *
+ * The connector used to be a button he had to find AFTER a send had already failed: two presses and
+ * a paragraph explaining the first one. The request is posted by the time the consent is needed, so
+ * it is not a detour, it is the next step of the thing he pressed.
+ */
+describe("Send opens the connector itself", () => {
+  /** A pop-up that is already closed, so the poll resolves on its first tick. */
+  const popup = () => {
+    const win = { closed: true } as Window;
+    opened.mockReturnValue(win);
+    return win;
+  };
+
+  it("Given he is not connected, Then pressing Send opens the consent, then sends", async () => {
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
+    api.connectUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?x=1";
+    api.mail = { sent: true, from: "b@x.sa", via: "graph", recipients: 1, messageId: null, inSentFolder: false, skipped: 0, draftUrl: null };
+
+    // Not connected at the moment of the press; connected by the time the pop-up closes.
+    api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
+    popup();
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(opened).toHaveBeenCalled());
+    expect(String(opened.mock.calls[0][0])).toContain("login.microsoftonline.com");
+  });
+
+  it("Given a DRAFT came back, Then it opens so he can read the Bcc and press Send himself", async () => {
+    /**
+     * 🔴 **This is the only point in the whole feature where he SEES the recipients.** Outlook's
+     * compose deeplink discards blind copies without a word, and a send the server made on his
+     * behalf shows him nothing at all.
+     */
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
+    api.mail = {
+      sent: true,
+      from: "b@x.sa",
+      via: "graph",
+      recipients: 3,
+      messageId: null,
+      inSentFolder: false,
+      skipped: 0,
+      draftUrl: "https://outlook.office.com/mail/deeplink/read/AAMk123",
+    };
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() =>
+      expect(opened.mock.calls.some((call) => String(call[0]).includes("deeplink/read/AAMk123"))).toBe(true),
+    );
+  });
+
+  it("Given no draft link, Then nothing is opened — the message has already gone", async () => {
+    // ⚠️ Today's backend calls `POST /me/sendMail`. There is no draft to show, so opening
+    // anything would be opening a window at a message he cannot change.
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
+    api.mail = { sent: true, from: "b@x.sa", via: "graph", recipients: 1, messageId: null, inSentFolder: true, skipped: 0, draftUrl: null };
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(api.mailCalls).toHaveLength(1));
+    expect(opened).not.toHaveBeenCalled();
+  });
+
+  it("Given this stage cannot connect, Then Send does NOT try, and the window opens as before", async () => {
+    // ⚠️ `configured: false` means no Azure app registration. A consent pop-up there is a dead end.
+    api.connect = { configured: false, connected: false, provider: null, accountEmail: null, connectedAt: null };
+    api.connectUrl = null;
+    api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(opened).toHaveBeenCalled());
+    expect(String(opened.mock.calls[0][0])).not.toContain("login.microsoftonline.com");
+  });
+});
