@@ -105,7 +105,7 @@ describe("posting", () => {
   it("OMITS the three id keys and sends the name", async () => {
     const { adapters } = await withFlag();
     const body = adapters.draftToCreateRequest(payload([barge({ customEquipment: "floating crane barge" })]), "7");
-    const item = body.equipmentItems[0] as Record<string, unknown>;
+    const item = body.equipmentItems[0] as unknown as Record<string, unknown>;
 
     // `in`, not `=== undefined`: a key that is present and null would pass the second and 422 on the
     // wire, because the backend's fields are `.optional()`, never `.nullable()`.
@@ -118,7 +118,7 @@ describe("posting", () => {
 
   it("leaves an ordinary line's payload exactly as it was", async () => {
     const { adapters } = await withFlag();
-    const item = adapters.draftToCreateRequest(payload([makeItem()]), "7").equipmentItems[0] as Record<string, unknown>;
+    const item = adapters.draftToCreateRequest(payload([makeItem()]), "7").equipmentItems[0] as unknown as Record<string, unknown>;
     expect(item.categoryId).toBe("cat-earth");
     expect(item.subtypeId).toBe("sub-crawler");
     expect(item.capacityId).toBe("cap-30");
@@ -130,7 +130,7 @@ describe("posting", () => {
     // `deriveVerdict` returns no-match on a missing subtype even when the category resolved, and one
     // or two ids is a 422. All three go, or none do.
     const half = barge({ ref: { categoryId: "cat-lifting", subcategoryId: null, measurementId: null } });
-    const item = adapters.draftToCreateRequest(payload([half]), "7").equipmentItems[0] as Record<string, unknown>;
+    const item = adapters.draftToCreateRequest(payload([half]), "7").equipmentItems[0] as unknown as Record<string, unknown>;
     expect("categoryId" in item).toBe(false);
     expect(item.customEquipmentName).toBe("floating crane barge");
   });

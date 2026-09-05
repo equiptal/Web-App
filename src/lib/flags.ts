@@ -42,3 +42,16 @@ export const EMAIL_FIRST_AUTH_ENABLED: boolean = true;
  * Set NEXT_PUBLIC_CUSTOM_EQUIPMENT=1 once that deploy is done.
  */
 export const CUSTOM_EQUIPMENT_ENABLED = process.env.NEXT_PUBLIC_CUSTOM_EQUIPMENT === "1";
+
+/**
+ * TRIAL_REQUESTS_ENABLED — the «Trial Request» path (mobile/016): the first-request pop-up offering
+ * Trial or Real, the amber trial ribbon, and `isTrial: true` on the submit.
+ *
+ * OFF (owner, 2026-09-06): *"no trial request on the web for now"*. A plain code toggle rather than
+ * an env var, because it is a product decision and not a per-environment one. Hidden, not deleted:
+ * the whole path is one flag away from coming back, and the backend still supports it.
+ *
+ * With it off, «Create request» goes straight into the form, `?mode=trial` is ignored (a bookmarked
+ * link cannot create a trial), and `isTrial` is never sent.
+ */
+export const TRIAL_REQUESTS_ENABLED: boolean = false;

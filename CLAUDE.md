@@ -2,6 +2,50 @@
 
 ## Change log
 
+- **2026-09-06 - Trial requests are hidden on the web, and an off-catalogue row says so in orange.**
+  Owner: *"no trial request on the web for now"*, and the no-match row must warn rather than refuse.
+  `TRIAL_REQUESTS_ENABLED = false` (a code toggle, not an env var - it is a product decision, not a
+  per-environment one) hides the first-request Trial/Real pop-up, the amber trial ribbon, and stops
+  `isTrial` reaching the wire. `?mode=trial` is now READ AS REAL rather than honoured, so a bookmarked
+  link cannot create a trial, and a persisted draft carrying `isTrial` from before cannot post one.
+  The off-catalogue row is a warning (orange, `warning` glyph, «This equipment type isn't available
+  yet» + what the renter can still do) instead of the red error, and the edit modal can now change the
+  machine's NAME.
+  Files: `src/lib/flags.ts`, `src/components/home/CtaBanner.tsx`, `src/app/create/page.tsx`,
+  `src/components/CreateSurface.tsx`, `src/lib/store/rfq-store.tsx`,
+  `src/components/create/MachineCard.tsx`, `src/components/requests/RequestEditModals.tsx`,
+  `src/lib/i18n/{en,ar}.ts`.
+  Trap: `step2.noMatch.explainer` was reworded to the new promise and put back. It is the FLAG-OFF
+  wording and it is true only there - with `CUSTOM_EQUIPMENT_ENABLED` off the item really is dropped.
+  The two states need two sentences; `machineCard.notInCatalogue*` carries the other one.
+  Trap: the edit modal built its item patch behind `if (it.categoryId && it.subtypeId &&
+  it.capacityId)`, and an off-catalogue line reads those back as the EMPTY STRING - so every equipment
+  edit on such a request (quantity, operator, fuel) appeared to save and sent nothing at all. It now
+  sends the item with `customEquipmentName` in place of the ids.
+  ⚠️ **Backend, unconfirmed**: `PATCH /rentees/me/requests/{id}` accepting an item with
+  `customEquipmentName` and no ids has NOT been verified - the deployed contract covered create,
+  reads and the bid form only. If it refuses, editing an off-catalogue request 422s visibly in the
+  modal rather than failing silently, which is the better of the two.
+
+- **2026-09-06 - Back returns to the VIEW, not just the page; and «offline» stopped meaning two things.**
+  (1) The workspace kept its chosen request and open tab in component state alone, so leaving for
+  `/bids/<id>/equipment` recorded `/requests` on the trail - which means "whatever this component
+  picks by default": the newest request, on Cards. Back from the equipment map therefore landed on a
+  different request's cards. The selection is in the URL now (`?r=<itemId>&tab=compare`, written with
+  `replaceState` so the browser's own Back still leaves the page rather than walking the rail), the
+  entry reader restores the tab, and `AppShell` records `pathname + search` on the trail instead of
+  the path alone.
+  (2) «Offline» was this app's word for a lost connection AND its label for a bid that came through
+  the renter's shared link. Renamed on the BID CARD only, at the owner's second instruction the same
+  day (*"for filter keep as before, even offline invite keep it"*): the card - and the dashboard rail
+  row, which is one bid - now say «Via your link» / «عبر رابطك», while the source FILTER, the
+  comparison's «Offline · invite ↗» supplier line and the details count keep the word the renter has
+  been reading for weeks.
+  Files: `src/components/workspace/RequestsWorkspace.tsx`, `src/components/AppShell.tsx`,
+  `src/lib/i18n/en.ts`, `src/lib/i18n/ar.ts`, `tests/unit/source-wording.test.ts`.
+  Trap: `{offline}` survives as a PLACEHOLDER name inside `bidsSplit` - the guard strips `{…}` before
+  judging the sentence, and keeps a control asserting "You appear to be offline" still exists.
+
 - **2026-09-06 - The nav bar wore the wrong navy, and now nothing paints outside the palette.**
   Measured Supplier OS's own header rather than guessing: background `#1c2738` (`--navy-deep`, the
   token file's `ink-deep`), 46px tall, tabs at 12px/500 in white at 70%. This bar was `--navy`

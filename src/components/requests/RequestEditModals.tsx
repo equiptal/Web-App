@@ -157,6 +157,14 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
   const it = r.equipmentItems?.[0];
 
   // ── Equipment ──
+  /**
+   * Off-catalogue: the line has no taxonomy, and the renter's own name is the only thing that says
+   * what the machine is — so it is the one equipment field this modal can offer him to edit.
+   * `isUndefined` is the backend's derived flag; the ids come back as the empty string on such a
+   * line and must never be read as a value.
+   */
+  const offCatalogue = it?.isUndefined === true;
+  const [customName, setCustomName] = useState(s(it?.customEquipmentName));
   const [units, setUnits] = useState(s(it?.numberOfUnits ?? 1));
   const [operator, setOperator] = useState(s(it?.operatorIncluded ?? "NO"));
   const [nationality, setNationality] = useState(s(it?.operatorNationality));
@@ -255,10 +263,18 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
     patch.verifiedSuppliersOnly = verifiedOnly;
     patch.subletting = subletting;
     patch.additionalNotes = notes;
-    // The single fanned-out item — PATCH replaces it, so send the full shape (ids kept).
-    if (it?.categoryId && it.subtypeId && it.capacityId) {
+    /* The single fanned-out item — PATCH replaces it, so send the full shape (ids kept).
+
+       ⚠️ An OFF-CATALOGUE line has no ids at all (they read back as `""`), so the old guard was
+       false for it and this modal silently sent NO item at all: every equipment edit on such a
+       request — quantity, operator, fuel, dates' neighbours — appeared to save and went nowhere.
+       It now sends the item with the renter's NAME in place of the three ids, the same shape the
+       create endpoint takes. */
+    if (offCatalogue || (it?.categoryId && it.subtypeId && it.capacityId)) {
       patch.equipmentItems = [{
-        categoryId: it.categoryId, subtypeId: it.subtypeId, capacityId: it.capacityId,
+        ...(offCatalogue
+          ? { customEquipmentName: customName.trim().slice(0, 120) }
+          : { categoryId: it!.categoryId as string, subtypeId: it!.subtypeId as string, capacityId: it!.capacityId as string }),
         numberOfUnits: Number(units) || 1,
         operatorIncluded: operator || "NO",
         fuelTypePreference: fuel || "DIESEL",
@@ -351,6 +367,20 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
         <div className="px-5 py-4">
           {/* ── 1 · Equipment ── */}
           <SecH icon="construction">{L("Equipment", "المعدات")}</SecH>
+          {/* Off-catalogue: the machine's name is the renter's own text, so it is editable here and
+              nowhere else. An ordinary line's taxonomy stays uneditable, as it always has been. */}
+          {offCatalogue && (
+            <label className="mb-3 block">
+              <span className={lbl}>{L("Equipment name", "اسم المعدة")}</span>
+              <input
+                className={fld}
+                value={customName}
+                maxLength={120}
+                placeholder={L("Name the machine you need", "اكتب اسم المعدة التي تحتاجها")}
+                onChange={(e) => setCustomName(e.target.value)}
+              />
+            </label>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <Num label={L("Quantity", "الكمية")} value={units} onChange={setUnits} min={1} />
             <Sel label={L("Operator", "المشغّل")} value={operator} onChange={setOperator} opts={OPERATOR_OPTS} />

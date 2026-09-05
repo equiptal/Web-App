@@ -208,22 +208,34 @@ export function CompareMatrix({
   const router = useRouter();
 
   /** Folded groups. The money opens on the money: the two cost groups, and terms on request. */
-  const [shut, setShut] = useState<Set<GroupKey>>(() => new Set<GroupKey>(["terms"]));
+  /**
+   * -- What is open when the table opens (owner, 2026-09-06) ------------------------------------
+   * *"At first it will show Per cycle open, then the others closed. There will be a panel for the
+   * grand total which will open the other 3 cost fields."*
+   *
+   * «Per cycle» is what the renter is comparing before anything else: the rate and the two transport
+   * legs, the figures the suppliers actually quoted. The three grand totals are DERIVED from those,
+   * and the terms are a second reading — so both start as rails, one press wide.
+   */
+  const [shut, setShut] = useState<Set<GroupKey>>(() => new Set<GroupKey>(["totals", "terms"]));
   /** Folded money columns, inside an open group. */
   const [shutCols, setShutCols] = useState<Set<ColKey>>(new Set());
   const [popover, setPopover] = useState<"first" | "after" | "duration" | null>(null);
 
   /**
-   * -- One side of the table at a time (owner, 2026-09-05) ---------------------------------------
-   * *"When terms open it will collapse the price etc."*
+   * -- ONE group at a time (owner, 2026-09-05, widened 2026-09-06) -------------------------------
+   * *"When terms open it will collapse the price etc."* — and the grand total is a panel of its own
+   * that opens its three cost fields.
    *
-   * The money and the terms are two readings of the same offers, and a renter is doing one of them
-   * at a time. Opening the terms folds both money groups to their rails; opening either money group
-   * folds the terms back. Nothing is lost - a rail is one press from being a group again - and the
-   * half that is open gets the whole width, which is what stops the answers being truncated.
+   * Three groups, one open. Each is a different reading of the same offers and a renter is doing one
+   * of them: what they quoted, what it comes to, what they agreed to. Nothing is lost - a rail is
+   * one press from being a group again - and the open group gets the whole width, which is what
+   * stops the term answers being truncated and the money columns being squeezed.
    *
-   * Folding is still only folding: shutting a group opens nothing.
+   * Folding is still only folding: shutting a group opens nothing, so the renter can put them all
+   * away and read the suppliers alone.
    */
+  const ACCORDION: GroupKey[] = ["cycle", "totals", "terms"];
   const toggleGroup = (k: GroupKey) =>
     setShut((s) => {
       const next = new Set(s);
@@ -232,12 +244,7 @@ export function CompareMatrix({
         return next;
       }
       next.delete(k);
-      if (k === "terms") {
-        next.add("cycle");
-        next.add("totals");
-      } else {
-        next.add("terms");
-      }
+      for (const other of ACCORDION) if (other !== k) next.add(other);
       return next;
     });
   const toggleCol = (k: ColKey) =>
@@ -911,7 +918,11 @@ function TermColumn({
           return (
             <div
               key={b.card.id}
-              className={`${ROW} flex items-center gap-1.5 px-2.5 ${a.against ? "bg-danger-soft" : ""}`}
+              /* The conflict is RED, and only red (owner, 2026-09-06: «if conflict just in red»).
+                 The row used to be filled `bg-danger-soft` as well, which on a table of ten term
+                 columns painted whole bands of the screen and made the figures beside them hard to
+                 read. The value is what the renter is here for; the colour qualifies it. */
+              className={`${ROW} flex items-center gap-1.5 px-2.5`}
               title={a.text ?? undefined}
             >
               {/* -- The answer is READ, not cut (owner, 2026-09-05) ------------------------------
@@ -946,8 +957,32 @@ function TermColumn({
  * term; the create flow's payment labels; then a last tidy for yes/no and underscores. A value none
  * of them can name comes back tidied, not invented.
  */
+/**
+ * -- The cell states the SUPPLIER'S ANSWER (owner, 2026-09-06) ------------------------------------
+ * *"For terms show the values of the bid, not match or conflict. Show the actual value, and if
+ * conflict just in red."*
+ *
+ * ~~`row.value ?? the whole detail line ?? renteeValue`.~~ Two of those three were wrong:
+ *
+ *  · **The detail line was printed entire** - «Renter: TÜV · Supplier: SPSP» - so a column three
+ *    inches wide held both sides of an argument and clipped the half that answers the question. The
+ *    supplier's side is parsed out of it now; the renter's ask already sits in the column head.
+ *  · **`renteeValue` was the last resort on ANY state**, so a term the supplier never answered
+ *    printed the renter's own words back at him as though they were the supplier's answer. It is
+ *    used only when the term MATCHED - which is precisely the case where the supplier agreed to that
+ *    value, so stating it is stating his answer.
+ *
+ * The state itself is never printed. It is the colour: a conflict is red, everything else is not.
+ */
+const SUPPLIER_HALF = /(?:supplier|المؤجّر|المؤجر)\s*[::]\s*(.+)$/i;
+
 function readTerm(row: TermRow | null, key: string, ar: boolean, t: Dict, L: LFn): { text: string | null; against: boolean } {
-  const raw = row?.value ?? (row?.detail ? (ar ? row.detail.ar : row.detail.en) : null) ?? row?.renteeValue ?? null;
+  const detail = row?.detail ? (ar ? row.detail.ar : row.detail.en) : null;
+  // «Renter: X · Supplier: Y» — take Y. A detail with no supplier half is a sentence about the term,
+  // not a pair of values, so it is shown as it stands.
+  const fromDetail = detail ? (detail.split("·").map((p) => p.trim()).find((p) => SUPPLIER_HALF.test(p))?.match(SUPPLIER_HALF)?.[1] ?? detail) : null;
+  const agreed = row?.state === "matched" || row?.state === "agreed";
+  const raw = row?.value ?? fromDetail ?? (agreed ? row?.renteeValue ?? null : null);
   return { text: humanTerm(raw, row?.key ?? key, t, L), against: !!row && row.state === "conflict" };
 }
 

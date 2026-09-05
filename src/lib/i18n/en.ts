@@ -542,15 +542,13 @@ export const en = {
     removeConfirm: "Remove this item from the request?",
     noMatch: {
       provide: "Provide it for me?", // AC-30/31 tentative
-      // Three facts, all of them, before the renter presses Send: it is not in our list, we will not
-      // send it to anyone, and he can still post and share the link himself. Say "we won't send it",
-      // never "no supplier was found" — the request is never dispatched at all, and a renter told
-      // "none matched" waits for bids that were never solicited.
-      explainer:
-        "We don't have this equipment listed, and no Moedatech supplier is matched to it, so we won't send it to anyone. You can still post this request and share its link with your own supplier",
+      // ⚠️ These two are the CUSTOM_EQUIPMENT_ENABLED=false wording, and they are true only there: the
+      // item really is dropped from the request. With the flag on the row says the opposite, through
+      // `machineCard.notInCatalogue*` below, because the machine then goes out under the renter's own
+      // name.
+      explainer: "We couldn't find this in our catalogue. It won't be included in this request.",
       // Shown when the equipment IS in the catalogue but the requested SIZE isn't yet (a genuine new size).
-      newSizeExplainer:
-        "We carry this equipment, but not this size yet. Message us to add it. We won't send this one to any supplier, and you can still post the request and share its link with your own",
+      newSizeExplainer: "We carry this equipment, but not this size yet. Message us to add it. It won't be included in this request.",
       // AC-31: prefilled WhatsApp message to Moedatech support requesting the equipment be sourced.
       whatsappMessage: 'Hi Moedatech, I\'m creating an RFQ and need equipment that isn\'t available in the app: "{item}". Please add/source it for me so it is added to my request. Thank you!',
       // New-size variant: equipment exists, the size doesn't — ask support to add the size.
@@ -1571,6 +1569,10 @@ export const en = {
     source: "Source",
     sourceAll: "All",
     sourceApp: "Via app",
+    /* The FILTER's word, and it stays «Offline» (owner, 2026-09-06: *"for filter keep as before"*).
+       The tab sits under «Source» beside «Via app», where the pair is read as one question about
+       where bids came from — and the renter has been reading it for weeks. Only the BID CARD's own
+       line changed; see `sourceOfflineLong`. */
     sourceOffline: "Offline",
     // Empty states.
     emptyTitle: "No requests yet",
@@ -1587,7 +1589,12 @@ export const en = {
     // ── The bid card ──
     // The card's source line, said in full. The header chip above is the short form.
     sourceAppLong: "Via Moedatech app",
-    sourceOfflineLong: "Offline · added by you",
+    /* ── The card says how the bid REACHED him (owner, 2026-09-06) ────────────────────────────
+       *"Offline / added by you is not clear."* On the card there is room for a sentence and a
+       reason to be exact: this bid came back through the link he sent. «Offline» here also collided
+       with this app's own word for a lost connection ("You appear to be offline", four places), and
+       a bid is not a network state. The filter tab keeps the old word on his instruction. */
+    sourceOfflineLong: "Via your link",
     openChat: "Open the conversation",
     // "{period}" is the rental period the bid quoted in — Monthly rental, Weekly rental, and so on.
     // The price block mirrors the app's bid card (`v3_bid_card.dart`, `price_expanded_breakdown.dart`,
@@ -1638,6 +1645,8 @@ export const en = {
     // nothing. One key for one button.
     viewQuote: "View quote",
     // The next move on an off-platform row: get that supplier onto the app.
+    /* The supplier line under a name in the comparison — that bid's standing with the renter, not
+       a second supplier. Kept as it was (owner, 2026-09-06: *"offline invite keep it"*). */
     offlineInvite: "Offline · invite ↗",
     notBuiltYet: "Not available yet.",
     // ── When a bid's three counts disagree (`unit-count-notes`) ──────────────────────────────────
@@ -2213,8 +2222,16 @@ export const en = {
       notesOptional: "(optional)",
       notesPlaceholder: "Anything else the supplier should know…",
       unavailableTitle: "{equipment} isn't available from suppliers right now.",
-      // Off-catalogue: the renter names the machine himself and the request goes out carrying his
-      // words. Prefilled from what he wrote in the RFQ, so the ordinary case is a glance.
+      // ── Off-catalogue (CUSTOM_EQUIPMENT_ENABLED) ────────────────────────────────────────────
+      // Three facts, all of them, before the renter presses Send: the type is not in our list, we
+      // will not send it to anyone, and he can still post and share the link himself. Say "we won't
+      // send it", never "no supplier was found" — the request is never dispatched at all, and a
+      // renter told "none matched" waits for bids that were never solicited.
+      notInCatalogueTitle: "This equipment type isn't available yet",
+      notInCatalogueBody:
+        "We won't send it to any supplier, but you can still complete your request and share its link with your own suppliers",
+      // The renter names the machine himself and the request goes out carrying his words. Prefilled
+      // from what he wrote in the RFQ, so the ordinary case is a glance.
       customEquipment: "EQUIPMENT NAME",
       customEquipmentPlaceholder: "Name the machine you need",
       customEquipmentHint: "This name is what your supplier will see on the bid form",

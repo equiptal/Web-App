@@ -14,6 +14,7 @@ import { ProjectFiled } from "@/components/create/ProjectFiled";
 import { ShareOnPost } from "@/components/create/ShareOnPost";
 import { Icon } from "@/components/ui";
 import { btn } from "@/lib/ds";
+import { TRIAL_REQUESTS_ENABLED } from "@/lib/flags";
 
 /**
  * The RFQ create surface. Guests can now run the WHOLE flow — the account gate moved to Submit
@@ -72,7 +73,7 @@ export function CreateSurface() {
       {/* mobile/016 — trial-run ribbon. Stays above every phase of the flow (intake → wizard →
           confirmation) so it's never ambiguous whether this submission reaches real suppliers. Switching
           to a real request goes through the URL, which is the authority for the mode (see /create). */}
-      {state.isTrial && (
+      {TRIAL_REQUESTS_ENABLED && state.isTrial && (
         <div className="mb-4 flex flex-wrap items-center gap-2.5 rounded-sm border border-warn/35 bg-warn/[0.07] px-4 py-3">
           <span className="grid h-7 w-7 flex-none place-items-center rounded-sm bg-warn/15 text-warn">
             <Icon name="science" size={17} />

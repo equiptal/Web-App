@@ -41,7 +41,7 @@ describe("a no-match machine is drawn, with a way to ask us for it", () => {
     // The panel is there at all — this is the regression, in one assertion.
     expect(screen.getByText("The machine")).toBeTruthy();
     // And it says what happened, in the renter's own words, with the way out beside it.
-    expect(screen.getByText(/don't have this equipment listed/i)).toBeTruthy();
+    expect(screen.getByText(/couldn't find this in our catalogue/i)).toBeTruthy();
     // Twice on purpose: once in «YOU WROTE», once on the card that says we cannot place it.
     expect(screen.getAllByText(/floating crane barge/i).length).toBeGreaterThan(0);
   });

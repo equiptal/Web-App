@@ -231,12 +231,49 @@ export function RequestsWorkspace() {
       const itemId = wantItem && grp?.items.some((it) => it.id === wantItem) ? wantItem : null;
       setWanted({ groupId: g, itemId, bidId: null });
     }
+    // …and which side of the workspace he was reading, so Back from the equipment map returns to the
+    // COMPARE he left rather than to the cards (owner, 2026-09-06).
+    const wantTab = params?.get("tab");
+    if (wantTab === "compare" || wantTab === "cards") setTab(wantTab);
+
     const door = params?.get("share") ? "share" : params?.get("cancel") ? "cancel" : params?.get("details") ? "details" : null;
     if (!door) return;
     setDrawerShare(door === "share");
     setDrawerCancel(door === "cancel");
     setDrawerOpen(true);
   }, [entered, groups, params]);
+
+  /* ── The view the renter is looking at is IN THE URL (owner, 2026-09-06) ──────────────────────
+     *"The back button must be wired to the previous page in all cases — I clicked the equipment
+     panel in the compare and back took me to the cards of another request; it must take me to the
+     compare of the request I was in."*
+
+     It could not, and the reason was here: the chosen request and the open tab were component state
+     and nothing else. Leaving for `/bids/<id>/equipment` recorded `/requests` on the trail, and
+     `/requests` means "whatever this component picks by default" — the newest request, on Cards. The
+     renter came back to a different request and a different tab and read it, rightly, as the Back
+     button being wrong.
+
+     `replaceState`, never `push`: choosing a request is not a navigation, and pushing would make the
+     browser's own Back walk the rail one request at a time instead of leaving the page. What it
+     costs is nothing and what it buys is that the URL — the thing the trail records, the thing a
+     reload reads and the thing a renter can paste to a colleague — says which request and which tab.
+
+     `r` (not `g`) because the entry reader resolves an ITEM id to its group; the same parameter the
+     dashboard and the supplier dialog already link with. */
+  useEffect(() => {
+    if (typeof window === "undefined" || !entered) return;
+    const url = new URL(window.location.href);
+    const before = url.search;
+    if (resolved.itemId) url.searchParams.set("r", resolved.itemId);
+    else url.searchParams.delete("r");
+    if (tab !== "cards") url.searchParams.set("tab", tab);
+    else url.searchParams.delete("tab");
+    // The entry instructions are consumed on arrival; leaving them in the URL would re-open the
+    // drawer on every reload (see the note on `entered`).
+    for (const k of ["g", "i", "share", "cancel", "details"]) url.searchParams.delete(k);
+    if (url.search !== before) window.history.replaceState(window.history.state, "", url.toString());
+  }, [entered, resolved.itemId, tab]);
 
   const pickGroup = useCallback((groupId: string) => setWanted({ groupId, itemId: null, bidId: null }), []);
   const pickItem = useCallback((id: string) => setWanted((w) => ({ groupId: w.groupId, itemId: id, bidId: null })), []);

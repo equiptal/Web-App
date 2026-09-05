@@ -219,10 +219,11 @@ describe("the bids that came through the shared link", () => {
   it("says where it came from, because there is no chat behind it", async () => {
     draw();
     const row = (await screen.findByText("Najd Equipment Est.")).closest("button")!;
-    expect(within(row).getByText(en.workspace.sourceOffline)).toBeTruthy();
+    // The rail row is one BID, so it takes the card's words rather than the filter tab's.
+    expect(within(row).getByText(en.workspace.sourceOfflineLong)).toBeTruthy();
     // The app bid beside it carries no such mark.
     const app = screen.getByText("Al Faisal Heavy Equipment Rentals").closest("button")!;
-    expect(within(app).queryByText(en.workspace.sourceOffline)).toBeNull();
+    expect(within(app).queryByText(en.workspace.sourceOfflineLong)).toBeNull();
   });
 
   it("sorts the newest first, whichever source it came from", async () => {

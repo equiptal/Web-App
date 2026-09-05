@@ -8,6 +8,7 @@ import { useSession } from "@/lib/session";
 import { fetchActivity, type ActivityCounts } from "@/lib/api/client";
 import { useStartRequestGate } from "@/lib/access/start-request-gate";
 import { StartYourRequestModal, type StartRequestChoice } from "@/components/home/StartYourRequestModal";
+import { TRIAL_REQUESTS_ENABLED } from "@/lib/flags";
 import { btn, cx, PAGE_MAX, PAGE_X } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 
@@ -75,7 +76,9 @@ export function CtaBanner() {
   // straight into the form. Otherwise (they already have active requests) go straight to /create as
   // before. `offerStartChoice` is null while unknown → never blocks the button.
   const onCreateRequest = () => {
-    if (offerStartChoice === true) {
+    // Trial is off (owner, 2026-09-06), and the pop-up exists only to offer it — a dialog with one
+    // choice left is an interstitial in front of the button the renter already pressed.
+    if (TRIAL_REQUESTS_ENABLED && offerStartChoice === true) {
       setStartPopup(true);
       return;
     }
@@ -245,8 +248,11 @@ export function CtaBanner() {
       </div>
     </div>
 
-      {/* mobile/016 — first-request choice: Trial or Real, both into /create. */}
-      <StartYourRequestModal open={startPopup} onClose={() => setStartPopup(false)} onChoose={onChooseStart} />
+      {/* mobile/016 — first-request choice: Trial or Real, both into /create. Hidden while
+          TRIAL_REQUESTS_ENABLED is false; `startPopup` can then never be true. */}
+      {TRIAL_REQUESTS_ENABLED && (
+        <StartYourRequestModal open={startPopup} onClose={() => setStartPopup(false)} onChoose={onChooseStart} />
+      )}
     </>
   );
 }

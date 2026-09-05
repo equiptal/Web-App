@@ -178,7 +178,12 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
      app fell through to its own `fallback` (owner, 2026-09-04). The trail lives in `nav-trail.ts` now,
      which survives the remount and a reload, and is recorded here during render so a child asking
      during its own mount gets the answer (see the module's note). */
-  if (typeof window !== "undefined") recordTrail(pathname);
+  /* The QUERY rides with it (owner, 2026-09-06). `usePathname` answers `/requests`, and on this app
+     `/requests?r=…&tab=compare` is a different VIEW of that page — which request, and which side of
+     it. Recording the path alone is why Back from the equipment map landed on the newest request's
+     cards instead of the compare he left. Read off `location` rather than `useSearchParams` so this
+     stays a plain read with no Suspense boundary of its own. */
+  if (typeof window !== "undefined") recordTrail(pathname + window.location.search);
 
   // Read through a ref so the /api/me effect below can compare against the CURRENT tier without
   // listing `tier` as a dependency — that would re-fire the fetch on every tier change, and since

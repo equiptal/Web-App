@@ -541,11 +541,16 @@ function UnavailableCard({ item, label }: { item: EquipmentItem; label: string }
           : "flex flex-col gap-2.5 rounded-sm border border-danger/40 bg-danger/[0.06] p-3.5"
       }
     >
-      <p className={`flex items-start gap-2 text-body leading-snug ${custom ? "text-warn" : "text-danger"}`}>
-        <Icon name="error_outline" size={16} className="mt-px flex-none" />
-        {fmt(t.create.machineCard.unavailableTitle, { equipment: label })}
+      {/* Orange, and a WARNING rather than an error, when the row is nameable (owner, 2026-09-06):
+          nothing has gone wrong, the machine simply is not in the list yet and the request can still
+          be completed. The red error mark stays for the flag-off row, which really is dropped. */}
+      <p className={`flex items-start gap-2 text-body font-semibold leading-snug ${custom ? "text-warn" : "text-danger"}`}>
+        <Icon name={custom ? "warning" : "error_outline"} size={16} className="mt-px flex-none" />
+        {custom ? t.create.machineCard.notInCatalogueTitle : fmt(t.create.machineCard.unavailableTitle, { equipment: label })}
       </p>
-      <p className="text-meta leading-snug text-muted">{t.step2.noMatch.explainer}</p>
+      <p className="text-meta leading-snug text-muted">
+        {custom ? t.create.machineCard.notInCatalogueBody : t.step2.noMatch.explainer}
+      </p>
       {item.sourcingRequested ? (
         <p className="flex items-center gap-1.5 text-meta font-semibold text-ok">
           <Icon name="check_circle" size={15} /> {t.create.machineCard.sourcingRequested}

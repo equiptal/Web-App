@@ -321,6 +321,97 @@ describe("the rail that leaves the page", () => {
  * gave it a scrollbar of its own. Both of these fail silently — nothing throws, and it only shows on
  * a screenshot.
  */
+describe("the table opens on «Per cycle», one group at a time", () => {
+  it("shows the quoted figures and puts the other two on their rails", () => {
+    draw();
+    expect(screen.getAllByText("Monthly rental").length).toBeGreaterThan(0);
+    // Rails, not groups: the words are there, their columns are not.
+    expect(screen.queryByText("First cycle")).toBeNull();
+    expect(screen.queryByText("Terms you set")).toBeNull();
+  });
+
+  it("the grand-total panel opens its three cost fields", () => {
+    draw();
+    fireEvent.click(screen.getByText("Grand total"));
+    expect(screen.getAllByText("First cycle").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Every cycle after").length).toBeGreaterThan(0);
+    // …and folds the one that was open.
+    expect(screen.queryByText("Monthly rental")).toBeNull();
+  });
+
+  it("never leaves two groups open", () => {
+    draw();
+    fireEvent.click(screen.getByText("Grand total"));
+    openTerms();
+    expect(screen.getAllByText("Terms you set").length).toBeGreaterThan(0);
+    expect(screen.queryByText("First cycle")).toBeNull();
+    expect(screen.queryByText("Monthly rental")).toBeNull();
+  });
+
+  it("but folding one opens nothing — a renter may put them all away", () => {
+    draw();
+    // The open group folds by its own control; the label beside it is not a button.
+    fireEvent.click(screen.getAllByLabelText("Fold this group away")[0]);
+    expect(screen.queryByText("Monthly rental")).toBeNull();
+    expect(screen.queryByText("First cycle")).toBeNull();
+    expect(screen.queryByText("Terms you set")).toBeNull();
+  });
+});
+
+describe("a term cell states the supplier's answer, not a verdict", () => {
+  it("takes the supplier's half of a conflict detail, and marks it red", () => {
+    draw([
+      wb(bc({
+        id: "x",
+        supplierName: "A",
+        terms: {
+          equipment: [{
+            key: "certs",
+            labelEn: "Equipment certificate",
+            labelAr: "شهادة المعدة",
+            state: "conflict",
+            detail: { en: "Renter: TÜV · Supplier: SPSP", ar: "المستأجر: TÜV · المؤجّر: SPSP" },
+          }],
+          contract: [],
+          supplier: [],
+        },
+      })),
+    ]);
+    openTerms();
+    // His answer, alone — the renter's ask is in the column head, not in the cell.
+    const cell = screen.getByText("SPSP");
+    expect(cell).toBeTruthy();
+    expect(cell.className).toContain("text-danger");
+    expect(screen.queryByText(/Renter: TÜV/)).toBeNull();
+  });
+
+  it("states the agreed value when the term matched", () => {
+    draw([
+      wb(bc({
+        id: "x",
+        supplierName: "A",
+        terms: { equipment: [], contract: [{ key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: "matched", renteeValue: "net_30" }], supplier: [] },
+      })),
+    ]);
+    openTerms();
+    // «matched» means he accepted the renter's value, so printing it IS printing his answer.
+    expect(screen.getAllByText(/Net 30/i).length).toBeGreaterThan(0);
+  });
+
+  it("does NOT print the renter's ask back at him on a term nobody answered", () => {
+    draw([
+      wb(bc({
+        id: "x",
+        supplierName: "A",
+        terms: { equipment: [], contract: [{ key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "زمن الاستجابة", state: "grey", renteeValue: "TWENTY_FOUR_HR" }], supplier: [] },
+      })),
+    ]);
+    openTerms();
+    expect(screen.getByText("Didn't say")).toBeTruthy();
+    expect(screen.queryByText("24 hours")).toBeNull();
+  });
+});
+
 describe("only the columns scroll, and only sideways", () => {
   const scroller = (c: HTMLElement) => c.querySelector('[data-pin="30.1"]') as HTMLElement;
 
@@ -334,6 +425,9 @@ describe("only the columns scroll, and only sideways", () => {
 
   it("draws the money breakdown OUTSIDE that strip, so nothing overhangs it", () => {
     const { container } = draw();
+    // The totals are a rail until pressed (owner, 2026-09-06: the table opens on «Per cycle»), so
+    // this opens the panel that holds the three cost fields before reaching for one of them.
+    fireEvent.click(screen.getByText("Grand total"));
     // The «i» beside a money column opens the breakdown.
     // The «i» — the LAST control carrying that name; the first is the column's own sort button.
     fireEvent.click(screen.getAllByRole("button", { name: "First cycle" }).at(-1)!);

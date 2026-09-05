@@ -810,10 +810,12 @@ export function HomeRequests() {
                   <span className="mt-0.5 flex items-baseline gap-1.5 text-meta text-muted">
                     {/* A bid that came through the shared link has no account and no chat behind it,
                         so the row says where it came from rather than leaving the renter to find out
-                        by pressing it. The workspace's own word for this source. */}
+                        by pressing it. It takes the BID CARD's words («Via your link»), not the
+                        filter tab's — a rail row is one bid, and the filter is a question about all
+                        of them (owner, 2026-09-06). */}
                     {b.offPlatform && (
                       <span className="flex-none rounded-sm bg-surface2 px-1.5 text-label font-semibold text-muted-dark">
-                        {t.workspace.sourceOffline}
+                        {t.workspace.sourceOfflineLong}
                       </span>
                     )}
                     <span className="min-w-0 flex-1 truncate">{b.machine || "—"}</span>

@@ -6,6 +6,7 @@ import { AppShell, PageBack } from "@/components/AppShell";
 import { RfqProvider, useRfq } from "@/lib/store/rfq-store";
 import { CreateSurface } from "@/components/CreateSurface";
 import { StartYourRequestModal, type StartRequestChoice } from "@/components/home/StartYourRequestModal";
+import { TRIAL_REQUESTS_ENABLED } from "@/lib/flags";
 import { useStartRequestGate } from "@/lib/access/start-request-gate";
 import { useT } from "@/lib/i18n";
 
@@ -106,8 +107,10 @@ function FirstRequestGate() {
   const [asked, setAsked] = useState(false);
 
   useEffect(() => {
-    if (mode === "trial" && !isTrial) actions.setTrial(true);
-    else if (mode === "real" && isTrial) actions.setTrial(false);
+    // Trial is off (owner, 2026-09-06): a bookmarked `?mode=trial` must not create one, so it is
+    // read as a real request rather than honoured.
+    if (mode === "trial" && !isTrial && TRIAL_REQUESTS_ENABLED) actions.setTrial(true);
+    else if ((mode === "real" || !TRIAL_REQUESTS_ENABLED) && isTrial) actions.setTrial(false);
     // `actions` is rebuilt each render but only wraps dispatch; depending on it would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, isTrial]);
@@ -115,7 +118,7 @@ function FirstRequestGate() {
   // Suppressed when `mode` settled the choice, and when a saved draft is in play — that renter is
   // resuming an existing request, not starting one, and the draft's continue/start-over prompt owns
   // the screen. `offerStartChoice` is null while unknown → never surfaces (app parity).
-  const show = !mode && !draft && !asked && offerStartChoice === true;
+  const show = TRIAL_REQUESTS_ENABLED && !mode && !draft && !asked && offerStartChoice === true;
 
   // Stamp the choice into the URL as well as the store, so this entry ends up in exactly the state a
   // home-pop-up entry would: the URL stays the authority for the mode, a reload keeps the choice, and

@@ -39,6 +39,7 @@ import { applyProjectDefaults, applyMachineTerms, machineTermsOf } from "@/lib/c
 import { blankTerms, type MachineTerms } from "@/lib/contract/work-order";
 import { draftToRfqCorrection } from "@/lib/api/agent-adapters";
 import { useSession } from "@/lib/session";
+import { TRIAL_REQUESTS_ENABLED } from "@/lib/flags";
 
 export type Phase = "intake" | "processing" | "wizard" | "confirmation";
 
@@ -1100,8 +1101,10 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
           preferences: s.draft.preferences,
           ...filing,
           simulateError: s.simulateError,
-          // mobile/016 — sent only for a trial run; a real request's payload is unchanged.
-          ...(s.isTrial ? { isTrial: true } : {}),
+          // mobile/016 — sent only for a trial run; a real request's payload is unchanged. The flag
+          // is the belt to the URL's braces: with trial hidden, a persisted draft carrying `isTrial`
+          // from before must not quietly post a trial nobody can see they asked for.
+          ...(TRIAL_REQUESTS_ENABLED && s.isTrial ? { isTrial: true } : {}),
           // Started from a store → DIRECT to that supplier (app parity). Absent for a broadcast, so a
           // normal request's payload is byte-identical to before.
           ...(s.direct ? { direct: s.direct } : {}),
