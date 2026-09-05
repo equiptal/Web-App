@@ -1781,6 +1781,14 @@ export interface MailDnsRecord {
  * renter a list of records to forward would be sending him on an errand with no end.
  */
 export type ShareEmailReason =
+  /** The renter has not connected Outlook. Offer the button. */
+  | "NOT_CONNECTED"
+  /** The stored token was rejected and dropped. Same button, worded as reconnect. */
+  | "RECONNECT_REQUIRED"
+  /** Graph refused mid-flight, usually consent revoked. Same button. */
+  | "SEND_REJECTED"
+  /** This stage has no Azure app registration, so there is nothing to connect to. */
+  | "NOT_CONFIGURED"
   | "DOMAIN_NOT_VERIFIED"
   | "PERSONAL_DOMAIN"
   | "NO_SENDER_ADDRESS"
@@ -1788,9 +1796,39 @@ export type ShareEmailReason =
   /** Ours, not the backend's: the call failed, or this deployment has no agents backend. */
   | "UNAVAILABLE";
 
+const SHARE_EMAIL_REASONS: ShareEmailReason[] = [
+  "NOT_CONNECTED", "RECONNECT_REQUIRED", "SEND_REJECTED", "NOT_CONFIGURED",
+  "DOMAIN_NOT_VERIFIED", "PERSONAL_DOMAIN", "NO_SENDER_ADDRESS", "NO_RECIPIENTS",
+];
+
 export type ShareEmailResult =
-  | { sent: true; from: string; recipients: number; messageId: string; skipped: number }
-  | { sent: false; reason: ShareEmailReason; from: string | null; domain: string | null; dns: MailDnsRecord[] };
+  | {
+      sent: true;
+      from: string;
+      /** Which engine put it on the wire. `graph` is the renter's own mailbox. */
+      via: "graph" | "ses" | null;
+      /** A string on the SES path, null on Graph. Never a delivery receipt either way. */
+      messageId: string | null;
+      /** True only on the Graph path: the message is in the renter's own Sent folder. */
+      inSentFolder: boolean;
+      recipients: number;
+      skipped: number;
+    }
+  | {
+      sent: false;
+      reason: ShareEmailReason;
+      from: string | null;
+      domain: string | null;
+      dns: MailDnsRecord[];
+      /**
+       * Where to start the Outlook connection, or null when there is nothing to connect to.
+       *
+       * ⚠️ **This, not the reason, decides whether the button is drawn.** The plan is explicit
+       * about it: a web that lists reasons has to be redeployed the day the backend adds one, and it
+       * would offer a button that leads nowhere on a stage with no app registration.
+       */
+      connectPath: string | null;
+    };
 
 const dnsRecords = (v: unknown): MailDnsRecord[] =>
   Array.isArray(v)
@@ -1825,7 +1863,8 @@ export async function shareRequestEmail(
   renterSupplierIds: string[],
   message: { subject: string; html: string; text: string },
 ): Promise<ShareEmailResult> {
-  const nope = (reason: ShareEmailReason): ShareEmailResult => ({ sent: false, reason, from: null, domain: null, dns: [] });
+  const nope = (reason: ShareEmailReason): ShareEmailResult =>
+    ({ sent: false, reason, from: null, domain: null, dns: [], connectPath: null });
   if (!renterSupplierIds.length) return nope("NO_RECIPIENTS");
 
   try {
@@ -1837,25 +1876,92 @@ export async function shareRequestEmail(
       return {
         sent: true,
         from: typeof raw.from === "string" ? raw.from : "",
+        via: raw.via === "graph" || raw.via === "ses" ? raw.via : null,
+        // Null on the Graph path by design, so it stays nullable rather than being coerced to "".
+        messageId: typeof raw.messageId === "string" ? raw.messageId : null,
+        inSentFolder: raw.inSentFolder === true,
         recipients: typeof raw.recipients === "number" ? raw.recipients : renterSupplierIds.length,
-        messageId: typeof raw.messageId === "string" ? raw.messageId : "",
         skipped: typeof raw.skipped === "number" ? raw.skipped : 0,
       };
     }
     const reason = raw?.reason;
     return {
       sent: false,
-      reason:
-        reason === "PERSONAL_DOMAIN" || reason === "NO_SENDER_ADDRESS" || reason === "NO_RECIPIENTS" || reason === "DOMAIN_NOT_VERIFIED"
-          ? reason
-          : "UNAVAILABLE",
+      // An unknown reason degrades to UNAVAILABLE, which the panel treats as "open the window".
+      reason: SHARE_EMAIL_REASONS.includes(reason as ShareEmailReason) ? (reason as ShareEmailReason) : "UNAVAILABLE",
       from: typeof raw?.from === "string" ? raw.from : null,
       domain: typeof raw?.domain === "string" ? raw.domain : null,
       dns: dnsRecords(raw?.dns),
+      connectPath: typeof raw?.connectPath === "string" && raw.connectPath ? raw.connectPath : null,
     };
   } catch {
     // A refusal we could not reach is still a refusal to send. The window opens, the share goes out.
     return nope("UNAVAILABLE");
+  }
+}
+
+/**
+ * Connecting the renter's own Outlook (SUP-BE-23, Graph path).
+ *
+ * ⚠️ **`configured` and `connected` are two different facts, and collapsing them draws a
+ * button that leads nowhere.** `configured: false` means this stage has no Azure app registration at
+ * all, so there is nothing to connect to and nothing should be offered. `connected: false` on a
+ * configured stage is an ordinary renter who simply has not pressed it yet.
+ */
+export interface MailConnectStatus {
+  configured: boolean;
+  connected: boolean;
+  provider: string | null;
+  accountEmail: string | null;
+  connectedAt: string | null;
+}
+
+/** Never throws: a status we cannot reach is the same as nothing to offer. */
+export async function mailConnectStatus(): Promise<MailConnectStatus> {
+  const none: MailConnectStatus = { configured: false, connected: false, provider: null, accountEmail: null, connectedAt: null };
+  try {
+    const raw = await projectFetch<Record<string, unknown>>("/api/mail-connect/status");
+    return {
+      configured: raw?.configured === true,
+      connected: raw?.connected === true,
+      provider: typeof raw?.provider === "string" ? raw.provider : null,
+      accountEmail: typeof raw?.accountEmail === "string" ? raw.accountEmail : null,
+      connectedAt: typeof raw?.connectedAt === "string" ? raw.connectedAt : null,
+    };
+  } catch {
+    return none;
+  }
+}
+
+/**
+ * Where to send the renter to grant consent, or null when this stage cannot.
+ *
+ * ⚠️ `returnTo` is checked against a host allow-list on the backend. An off-domain URL is
+ * refused and the renter lands on a bare page on the API host, so this must be a real product URL.
+ */
+export async function mailConnectUrl(returnTo: string): Promise<string | null> {
+  try {
+    const raw = await projectFetch<Record<string, unknown>>(
+      `/api/mail-connect/authorize?returnTo=${encodeURIComponent(returnTo)}`,
+    );
+    return raw?.available === true && typeof raw.url === "string" ? raw.url : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Forget the token we hold.
+ *
+ * ⚠️ **This is not a revocation and must never be worded as one.** Only the renter can
+ * withdraw the grant on Microsoft's side; the backend answers `revokedAtProvider: false` and says so.
+ */
+export async function mailDisconnect(): Promise<boolean> {
+  try {
+    await projectFetch("/api/mail-connect", { method: "DELETE" });
+    return true;
+  } catch {
+    return false;
   }
 }
 

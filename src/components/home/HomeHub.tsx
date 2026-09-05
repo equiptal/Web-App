@@ -1,5 +1,6 @@
 "use client";
 
+import { HomeNotificationBubble } from "@/components/home/HomeNotificationBubble";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/session";
@@ -69,7 +70,15 @@ export function HomeHub() {
   if (status !== "authed") return null;
 
   return (
-    <div {...pin("home-hub")} className="flex flex-col gap-7">
+    /* ONE gap between every block (`gap-7`), and the bottom room belongs here rather than to
+       whichever block happens to be last — the chat dock floats over that corner and a page ending on
+       its final row reads as truncated (owner, 2026-08-31 · 2026-09-05). */
+    <div {...pin("home-hub")} className="flex flex-col gap-7 pb-24">
+      {/* Under the bell, not in this column: it hangs off the header and points at the control it is
+          speaking for (owner, 2026-09-05). Rendered HERE because it belongs to the dashboard alone —
+          a renter deep in the create flow must not be tapped on the shoulder. */}
+      <HomeNotificationBubble />
+
       <CtaBanner />
 
       {/* ── The requests, and the bids beside them (owner, 2026-08-29) ────────────────────────────

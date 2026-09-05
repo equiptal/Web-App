@@ -865,7 +865,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
      same thing — this is not an answer yet — while holding the room the answer will need. */
   if (embedded && !projects) {
     return (
-      <div className="flex flex-col gap-5 pb-24">
+      <div className="flex flex-col gap-5">
         <div className="flex items-center gap-3">
           <Skeleton className="size-[38px] flex-none rounded-sm" />
           <div className="min-w-0">
@@ -883,10 +883,11 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   }
 
   return (
-    /* `pb-24`: the page must not end on the chart's last pixel either — a surface whose final row is
-       also the last thing above the viewport edge reads as truncated, and the chat dock floats over
-       that corner (owner, 2026-08-31). */
-    <div ref={board} className="flex flex-col gap-5 pb-24">
+    /* ~~`pb-24`: the page must not end on the chart's last pixel, and the chat dock floats over that
+       corner (owner, 2026-08-31).~~ Both are still true and both are the PAGE's business: this block
+       is one of three on the dashboard, and padding under it is a gap between sections rather than a
+       margin at the foot. `HomeHub` carries it (owner, 2026-09-05). */
+    <div ref={board} className="flex flex-col gap-5">
       <SectionHeader count={projects?.length ?? 0} />
 
       {notice && <p className="rounded-sm border border-danger/40 bg-danger/5 px-3 py-2 text-body text-danger">{notice}</p>}

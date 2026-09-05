@@ -165,6 +165,20 @@ describe("requestDocLabel — one word for one paper, on both surfaces", () => {
     expect(requestDocLabel("saso-registration", L)).toBe("SASO registration");
   });
 
+  it("names every certificate the map can now ask for by its own name", () => {
+    // Owner, 2026-09-05: the card must mention exactly the document that was requested. The map used
+    // to send the category for all but TÜV and SPSP; it sends the paper now, so these are the words
+    // the supplier reads on the card.
+    expect(requestDocLabel("saso", L)).toBe("SASO certificate");
+    expect(requestDocLabel("saso_technical_inspection", L)).toBe("SASO certificate");
+    expect(requestDocLabel("insurance", L)).toBe("Insurance");
+    expect(requestDocLabel("tuv", L)).toBe("TÜV certificate");
+    expect(requestDocLabel("spsp", L)).toBe("SPSP certificate");
+    // And the ownership papers, which have named themselves since 2026-08-12.
+    expect(requestDocLabel("custom_card", L)).toBe("Customs card");
+    expect(requestDocLabel("sale_contract", L)).toBe("Sale contract");
+  });
+
   it("humanises an unknown type rather than shouting a database column", () => {
     expect(requestDocLabel("third_party_liability", L)).toBe("Third party liability");
   });

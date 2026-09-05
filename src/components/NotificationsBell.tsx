@@ -22,6 +22,17 @@ import { pin } from "@/lib/uiPins";
  */
 const POLL_MS = 30_000;
 
+/**
+ * The bell's own element id, so the home page's bubble can measure where the bell IS and hang itself
+ * under it. A measured anchor rather than a guessed offset: the header is 52px today, the gutter is
+ * `px-4` on a phone and `px-7` from `sm`, and the bell is not the last control on the row.
+ */
+export const BELL_ANCHOR_ID = "notifications-bell-anchor";
+
+/** «+2 more» on the bubble opens this dropdown. The bell owns `open`, so the ask travels as an
+ *  event rather than as a prop through a shell that does not render the bubble. */
+export const OPEN_BELL_EVENT = "moeda:open-notifications";
+
 type DayGroup = "today" | "yesterday" | "earlier";
 
 function dayGroupOf(iso: string): DayGroup {
@@ -36,7 +47,8 @@ function dayGroupOf(iso: string): DayGroup {
   return "earlier";
 }
 
-function relativeTime(iso: string, locale: string, justNow: string): string {
+/** Shared with the home bubble, which prints the same age in the same words. */
+export function relativeTime(iso: string, locale: string, justNow: string): string {
   const then = new Date(iso);
   if (Number.isNaN(then.getTime())) return "";
   const diffMs = Date.now() - then.getTime();
@@ -111,6 +123,13 @@ export function NotificationsBell() {
     if (href) router.push(href);
   };
 
+  // «+n more» on the home bubble, and anything else that wants the full list open.
+  useEffect(() => {
+    const openIt = () => setOpen(true);
+    window.addEventListener(OPEN_BELL_EVENT, openIt);
+    return () => window.removeEventListener(OPEN_BELL_EVENT, openIt);
+  }, []);
+
   const onMarkAll = () => {
     setItems((prev) => prev.map((x) => ({ ...x, isRead: true })));
     setUnread(0);
@@ -139,7 +158,7 @@ export function NotificationsBell() {
   const isEmpty = !loading && !error && items.length === 0;
 
   return (
-    <div {...pin("notifications-bell")} className="relative">
+    <div {...pin("notifications-bell")} id={BELL_ANCHOR_ID} className="relative">
       {/* The bell is the header prototype's outline, not Material's glyph, and it inherits the bar's
           `var(--muted-dark)` rather than setting its own colour — it and the inbox are one pair, and the pair
           is coloured by the group that holds them (owner, 2026-08-25). */}

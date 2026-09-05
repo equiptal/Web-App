@@ -210,7 +210,12 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
   }, [toast]);
 
   return (
-    <div className={embedded ? "flex flex-col gap-3 pb-24" : "mx-auto w-full max-w-[1560px] px-4 py-5 sm:px-6 xl:px-8"}>
+    /* ~~`pb-24` on the embedded root.~~ It was written when this was the LAST block on the
+       dashboard, and stopped being true the moment another one followed it (owner, 2026-09-05:
+       *"use consistent spacing between sections in the dashboard"*) — 96px of it landed between My
+       Suppliers and My Projects, where the hub's own `gap-7` was the only spacing meant to be. The
+       breathing room at the foot of the page belongs to the PAGE, and `HomeHub` carries it now. */
+    <div className={embedded ? "flex flex-col gap-3" : "mx-auto w-full max-w-[1560px] px-4 py-5 sm:px-6 xl:px-8"}>
       <header className={cx("flex flex-wrap items-center gap-3", !embedded && "mb-3")}>
         <span className="grid h-[38px] w-[38px] flex-none place-items-center rounded-sm bg-navy text-surface">
           <Icon name="groups" size={22} />

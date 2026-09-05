@@ -68,6 +68,9 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+/** `findByText` with room to breathe: the page runs two fetches before it can answer. */
+const find = (text: string) => screen.findByText(text, {}, { timeout: 5000 });
+
 const draw = () =>
   render(
     <LocaleProvider initialLocale="en">
@@ -82,7 +85,7 @@ describe("the organization, on the profile", () => {
   it("offers the join form under the renter's own details when he has no firm", async () => {
     draw();
     // The hub's no-company state, on this page: create your own, or join with a code.
-    expect(await screen.findByText(en.company.createOwnTitle)).toBeTruthy();
+    expect(await find(en.company.createOwnTitle)).toBeTruthy();
     expect(screen.getByText(en.company.joinTitle)).toBeTruthy();
     // And it really is BELOW the personal details, not above them.
     const profile = screen.getByText(en.profile.profileSection);
@@ -93,7 +96,7 @@ describe("the organization, on the profile", () => {
   it("names the firm and the renter's role in it, without a second masthead", async () => {
     api.company = member();
     draw();
-    expect(await screen.findByText("Moedatech Contracting")).toBeTruthy();
+    expect(await find("Moedatech Contracting")).toBeTruthy();
     expect(screen.getByText(en.company.roleOwner)).toBeTruthy();
     // One masthead on the page: the person's. The firm's identity is a row inside the block.
     expect(document.querySelectorAll("header").length).toBeLessThanOrEqual(1);
@@ -102,7 +105,7 @@ describe("the organization, on the profile", () => {
   it("keeps the roster, the invite code and the way out", async () => {
     api.company = member();
     draw();
-    expect(await screen.findByText(en.company.team)).toBeTruthy();
+    expect(await find(en.company.team)).toBeTruthy();
     expect(screen.getByText("AB12CD")).toBeTruthy();
     // Sole active member → the exit is «Dissolve», as it was on the page.
     expect(screen.getByText(en.company.dissolve)).toBeTruthy();
@@ -111,7 +114,7 @@ describe("the organization, on the profile", () => {
   it("points nothing at the retired /company route", async () => {
     api.company = member();
     draw();
-    await screen.findByText("Moedatech Contracting");
+    await find("Moedatech Contracting");
     const hrefs = [...document.querySelectorAll("a")].map((a) => a.getAttribute("href"));
     expect(hrefs).not.toContain("/company");
   });

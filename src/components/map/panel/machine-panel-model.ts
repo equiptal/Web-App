@@ -1325,34 +1325,40 @@ function equipmentCertRowLabel(code: string): Bilingual {
 /**
  * The wire type a **not-yet-uploaded** row asks for.
  *
- * **Deliberately coarse, and this is the reversible half of a thing this repo cannot verify.** An ask
- * is validated server-side against `EquipmentDocumentType.documentKey` and one unknown type fails the
- * whole request (`rentee-request.ts` — `assertKnownDocTypes`, and `canonicalDocType`'s note that an
- * unaliased name is "passed through untouched and refused by the backend if it is unknown"). The only
- * operator/equipment names *proven* to resolve into that catalogue are the ones `DOC_TYPE_ALIASES`
- * maps — `tuv → tuv_cert`, `spsp → spsp_cert`, `equipment_safety_certificate → safety_cert`,
- * `operator_safety_certificate → operator_license`, `istimara`. `operator_tuv` and friends are the
- * *upload* vocabulary (`web-handoff.md:16`); whether they are also catalogue keys cannot be checked
- * from this repo, and guessing wrong turns the renter's most common ask into a 400 he can do nothing
- * with.
+ * ── It names the PAPER now, not the category (owner, 2026-09-05) ────────────────────────────────
  *
- * So the **rows** stay per-certificate — the renter sees exactly which paper is missing and opens
- * exactly the one that is there — while the outgoing type names the category. Swapping in precise keys
- * once someone confirms the catalogue is a one-line change to these two maps.
+ * *"When the renter asks about a specific document of the equipment, it is sent as a general safety
+ * document — the request card in the chat must mention exactly the requested document name."*
  *
- * ~~⚠️ **Known gap** — `documentAskSatisfied` matches an ask to a held paper by exact `canonicalDocType`
- * equality, and the operator category resolves to `operator_license` while a machine's own operator papers
- * are typed `operator_tuv` / `operating_license`, none of which canonicalise to it, so an operator document
- * ask reads *waiting* even after the lessor uploads.~~ **Out of this file's reach since 2026-08-08** and
- * further out of it since the UAT of 2026-08-11, which removed the operator's rows from this tab
- * entirely (see {@link equipmentDocGroups}), so this surface emits no operator ask for that mismatch to
- * strand. The gap is kept written down rather
- * than deleted because it is real for whoever *does* raise one — the fix is one alias
- * (`operating_license → operator_license`) or catalogue rows per operator cert, and it belongs with
- * whoever owns `DOC_TYPE_ALIASES`. `tuv` and `spsp` never had the problem: both sides fold to
- * `tuv_cert` / `spsp_cert`, which is why they are named precisely above.
+ * ~~Deliberately coarse: only `tuv` and `spsp` were sent precisely and every other certificate went
+ * out as `equipment_safety_certificate`, which the card renders as «Safety certificate».~~ The reason
+ * was real at the time — an ask is validated server-side and ONE unknown type fails the whole
+ * request, and this repo could not check the catalogue — but it stopped being true on 2026-08-12,
+ * when the backend started judging an ask against the LISTING vocabulary as well as the catalogue
+ * (`apps/backend/src/services/utils/document-type.ts`, `ASKABLE_DOCUMENT_TYPES`, built from the same
+ * enums the upload path validates: `tuv` · `spsp` · `saso` · `saso_registration` ·
+ * `saso_technical_inspection` · `insurance`, plus the ownership papers and the photo slots).
+ *
+ * So every certificate the platform can actually store on a machine is named by its own key, and the
+ * supplier reads «SASO certificate» or «Equipment insurance» instead of a category.
+ *
+ * ⚠️ **`aramco` still goes out coarse, and that is not an oversight.** A request may require an
+ * Aramco certificate (`options.ts`), but the platform has nowhere to file one: it is in neither
+ * `EQUIPMENT_CERT_TYPES` nor the seeded catalogue, so naming it would be a 400 on the renter's most
+ * ordinary act. It needs a backend row before this map can carry it — see the note in
+ * `docs/` / the change log. The same fallback covers a free-text «other» cert for the same reason.
+ *
+ * ⚠️ The row CODES are `canonicalCertCode`'s (`tuv` · `spsp` · `saso` · `aramco` · `insurance`), so
+ * the SASO family arrives here already folded to `saso` — which is why one entry covers the
+ * certificate under all its spellings. `saso_registration` never reaches this map: it is an ownership
+ * paper, it keeps its own code, and its row sends its own name.
  */
-const EQUIPMENT_ASK_TYPE: Record<string, string> = { tuv: "tuv", spsp: "spsp" };
+const EQUIPMENT_ASK_TYPE: Record<string, string> = {
+  tuv: "tuv",
+  spsp: "spsp",
+  saso: "saso",
+  insurance: "insurance",
+};
 const equipmentAskType = (code: string): string => EQUIPMENT_ASK_TYPE[code] ?? "equipment_safety_certificate";
 
 const filesOf = (docs: OfferedUnitDoc[]): DocFile[] =>

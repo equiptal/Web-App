@@ -1079,15 +1079,32 @@ describe("the batch ask raised from the equipment's papers (RM3-AC-38)", () => {
    * it is stronger — that no operator row can reach the composer however the selection was arrived at —
    * and it lives in "the operator's group participates in nothing" below. */
 
-  it("an equipment ask names the precise cert where the catalogue is known to accept it", () => {
-    const g = groupBy(machine({ docs: [] }), asking(["tuv", "spsp", "aramco"]));
+  it("names the PAPER the renter ticked, not the category it belongs to", () => {
+    /**
+     * Owner, 2026-09-05: *"When the renter asks about a specific document of the equipment, it is
+     * sent as a general safety document — the card in the chat must mention exactly the requested
+     * document name."*
+     *
+     * ~~Only TÜV and SPSP went out precisely; SASO and the insurance went out as
+     * `equipment_safety_certificate`, which the supplier read as «Safety certificate».~~ Every
+     * certificate the platform can store on a machine is named now — the backend judges an ask
+     * against the listing vocabulary as well as the catalogue (`ASKABLE_DOCUMENT_TYPES`).
+     */
+    const g = groupBy(machine({ docs: [] }), asking(["tuv", "spsp", "saso", "insurance"]));
     const rows = papers(g).filter((r) => r.key.startsWith("doc:equipment_cert:"));
     const draft = batchDocumentRequest("eq-1", rows, new Set(rows.map((r) => r.key)));
-    expect(draft && draft.kind === "document" && draft.docTypes).toEqual([
-      "tuv",
-      "spsp",
-      "equipment_safety_certificate",
-    ]);
+    expect(draft && draft.kind === "document" && draft.docTypes).toEqual(["tuv", "spsp", "saso", "insurance"]);
+  });
+
+  it("still asks coarsely for a certificate the platform cannot file", () => {
+    // An Aramco certificate can be REQUIRED by a request and stored nowhere: it is in neither the
+    // listing enum nor the seeded catalogue, so naming it would 400 the whole ask. It goes out as the
+    // category until the backend has a row for it — the one case where the supplier still reads
+    // «Safety certificate», and the reason the fallback survives.
+    const g = groupBy(machine({ docs: [] }), asking(["aramco"]));
+    const rows = papers(g).filter((r) => r.key.startsWith("doc:equipment_cert:"));
+    const draft = batchDocumentRequest("eq-1", rows, new Set(rows.map((r) => r.key)));
+    expect(draft && draft.kind === "document" && draft.docTypes).toEqual(["equipment_safety_certificate"]);
   });
 
   it("asks for the paper, not for a second copy of one already on the file", () => {

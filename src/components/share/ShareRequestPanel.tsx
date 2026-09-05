@@ -11,10 +11,14 @@ import { ar } from "@/lib/i18n/ar";
 import {
   bidShareUrl,
   listRenterSuppliers,
+  mailConnectStatus,
+  mailConnectUrl,
+  mailDisconnect,
   recordRequestShare,
   setBidDeadline,
   shareRequestEmail,
   updateRenterSupplier,
+  type MailConnectStatus,
   type RenterSupplier,
   type ShareEmailResult,
 } from "@/lib/api/client";
@@ -26,6 +30,7 @@ import { bidCardHtml } from "@/lib/bidCardHtml";
 import { copyShareMessage, shareMessageHtml } from "@/lib/copyShareMessage";
 import { useBidCard } from "@/lib/useBidCard";
 import {
+  cardBlock,
   clearTemplate,
   defaultTemplate,
   isDefaultTemplate,
@@ -252,6 +257,29 @@ export function ShareRequestPanel({
    */
   const [reopen, setReopen] = useState<Compose | null>(null);
   const [dnsCopied, setDnsCopied] = useState(false);
+  const [msgCopied, setMsgCopied] = useState(false);
+  /**
+   * The addresses Outlook's compose window did not receive.
+   *
+   * ⚠️ Empty unless a send actually fell back to that window. Outlook's deeplink discards
+   * `bcc` without a word, so its window opens addressed to nobody; every other route, including a
+   * server-side send, carries the recipients itself and needs no paste at all.
+   */
+  const [pasteAddresses, setPasteAddresses] = useState<string[]>([]);
+  const [addrCopied, setAddrCopied] = useState(false);
+  /**
+   * Whether this renter has connected their own Outlook (SUP-BE-23, the Graph path).
+   *
+   * ⚠️ **`configured` and `connected` are two different facts.** A stage with no Azure app
+   * registration answers `configured: false`, and offering a Connect button there would send the
+   * renter to a dead end. So the offer is drawn on `configured && !connected`, never on
+   * `!connected` alone.
+   */
+  const [connect, setConnect] = useState<MailConnectStatus | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [connectNote, setConnectNote] = useState<"connected" | "denied" | "failed" | null>(null);
+  /** The popup poll, held so an unmount mid-consent does not leave a timer running. */
+  const connectTimer = useRef<number | null>(null);
 
   useEffect(() => setUuid(requestUuid), [requestUuid]);
   useEffect(() => setProvider(loadEmailProvider()), []);
@@ -264,6 +292,78 @@ export function ShareRequestPanel({
       .then(setRows)
       .catch(() => setRows([]));
   }, []);
+
+  // Asked once, on mount: it decides whether an offer is drawn at all, and it never throws.
+  useEffect(() => {
+    void mailConnectStatus().then(setConnect);
+    return () => {
+      if (connectTimer.current !== null) window.clearInterval(connectTimer.current);
+    };
+  }, []);
+
+  /**
+   * Coming back from Microsoft.
+   *
+   * The backend appends one word to the URL it was given: `connected`, `denied`, `unavailable` or
+   * `error`. This is the REDIRECT path, taken when the pop-up was blocked; the pop-up path resolves
+   * in `startConnect` instead. Both end in the same place, which is why the word is read here rather
+   * than only in one of them.
+   *
+   * ⚠️ The parameter is stripped straight away. Left in place, a reload would re-announce a
+   * consent that happened once, and a link the renter copied out of the bar would carry it to
+   * somebody else.
+   */
+  useEffect(() => {
+    const u = new URL(window.location.href);
+    const v = u.searchParams.get("mailConnect");
+    if (!v) return;
+    setConnectNote(v === "connected" ? "connected" : v === "denied" ? "denied" : "failed");
+    u.searchParams.delete("mailConnect");
+    window.history.replaceState(null, "", u.toString());
+    if (v === "connected") void mailConnectStatus().then(setConnect);
+  }, []);
+
+  /**
+   * Send him to Microsoft, and notice when he comes back.
+   *
+   * A pop-up rather than a redirect, because a redirect takes the whole panel with it: his picks,
+   * his wording and, in `post` mode, a draft that has not been posted yet. When the browser refuses
+   * the pop-up we redirect instead and pick the answer up from the URL above, which is the lesser
+   * loss of the two.
+   *
+   * ⚠️ **`window.closed` is the only signal available.** The consent page is Microsoft's and
+   * the landing page is the backend's, so there is nothing of ours inside the pop-up to talk to us.
+   * So the status is re-read on close and IT decides the outcome: a renter who closed the window
+   * without deciding looks exactly like one who refused, and both mean "not connected".
+   */
+  const startConnect = async () => {
+    if (connecting) return;
+    setConnecting(true);
+    setConnectNote(null);
+    const url = await mailConnectUrl(window.location.href);
+    if (!url) {
+      setConnecting(false);
+      setConnectNote("failed");
+      return;
+    }
+    const win = window.open(url, "moeda-mail-connect", "width=520,height=700");
+    if (!win) {
+      // Blocked. Take the whole tab there rather than leaving a button that does nothing.
+      window.location.href = url;
+      return;
+    }
+    if (connectTimer.current !== null) window.clearInterval(connectTimer.current);
+    connectTimer.current = window.setInterval(() => {
+      if (!win.closed) return;
+      if (connectTimer.current !== null) window.clearInterval(connectTimer.current);
+      connectTimer.current = null;
+      setConnecting(false);
+      void mailConnectStatus().then((st) => {
+        setConnect(st);
+        setConnectNote(st.connected ? "connected" : "denied");
+      });
+    }, 700);
+  };
 
   // The Supplier OS host, not this app's origin, so there is nothing to read off `window` and the
   // value is already final on the server render.
@@ -307,6 +407,54 @@ export function ShareRequestPanel({
 
   /** The same message in its halves, so the preview can show which of them he may edit. */
   const parts = card ? shareMessageParts(card.model, shareUrl, { template, renterName, lang }) : null;
+
+  /**
+   * The terms, the deadline and the no-account line, exactly as `shareMessageHtml` emits them.
+   *
+   * ⚠️ **The preview was missing this, so it was not showing what gets sent** (owner,
+   * 2026-09-05: *"make sure the preview now is same as the one will be sent in the outlook
+   * really"*). The e-mail body is greeting, intro, card, THESE POINTS, sign-off, link; the preview
+   * drew greeting, intro, card, sign-off. A renter approved a message whose entire middle he had
+   * never seen.
+   *
+   * `omitHead` for the same reason it is omitted there: the card directly above already names the
+   * machine and the site, and repeating them is the duplication this template was rebuilt to end.
+   *
+   * ⚠️ Only drawn when the CARD renders as artwork. Without it `parts.card` is shown as text
+   * and already carries the head and these points together, which is what the plain-text flavour
+   * sends. Adding this there would print the points twice.
+   */
+  const detail = card ? cardBlock(card.model, lang, { omitHead: true }) : "";
+
+  /**
+   * Take the whole message away.
+   *
+   * ⚠️ **Not the same control as «Copy link», and the difference is the owner's rule** (owner,
+   * 2026-09-02: *"copy link must only copy the link not the message"*). Copy link answers *give me
+   * the URL*; this answers *give me what you were going to send*. Two questions, two buttons, and
+   * folding them together is what made Copy ambiguous the first time.
+   *
+   * ⚠️ **Both flavours, in one clipboard item.** The receiving app chooses: Gmail and Outlook
+   * keep the HTML and draw the card, a chat takes the words. Writing only one of them would decide
+   * for an app we cannot see, and the card is the half that has been missing everywhere.
+   *
+   * ⚠️ Locked until the request is posted, the same rule as the link itself: the message ends
+   * with a URL that does not exist yet, so copying early hands him a message with a hole in it.
+   */
+  const copyMessage = async () => {
+    if (!uuid || !card) return;
+    const url = bidShareUrl(uuid);
+    await copyShareMessage(
+      renderShareMessage(card.model, url, { template, renterName, lang }),
+      shareMessageHtml(card.model, url, card.imageUrl || `${window.location.origin}/bid/${uuid}/og?lang=${lang}`, {
+        template,
+        renterName,
+        lang,
+      }),
+    ).catch(() => {});
+    setMsgCopied(true);
+    setTimeout(() => setMsgCopied(false), 2400);
+  };
 
   /**
    * `RFQ for Crawler Excavator 20 ton` (owner, 2026-09-03).
@@ -442,53 +590,27 @@ export function ShareRequestPanel({
 
     if (ch === "email") {
       /**
-       * ── ONE paste, and which one depends on the provider (owner, 2026-09-03) ──────────────────
+       * ── Nothing touches the clipboard here any more (owner, 2026-09-05) ───────────────────────
        *
-       * *"he will be so confused once he will paste contacts and once he will paste the template."*
-       * He would have been, and worse: **the clipboard holds one thing.** Copying the card on every
-       * e-mail send and also offering an addresses button meant the second quietly destroyed the
-       * first, and whichever he pasted, the other was gone.
+       * *"there is a copy of the link and copy of the email, different ones."*
        *
-       * They are never both needed. Each provider is missing exactly one thing, and it is a
-       * different thing:
+       * ⚠️ **The clipboard holds ONE thing, and this branch used to take it without asking.**
+       * Pressing Send with e-mail silently overwrote whatever the renter had just copied: for
+       * Outlook with the supplier addresses, for Gmail with the card. So *Copy message*, pressed a
+       * second earlier, was gone by the time he pasted, and nothing on screen said why. Two more
+       * writers were added on top of two visible buttons, and the last one to fire won.
        *
-       *   - **Outlook** discards `bcc` from a URL, so its window opens with no recipients — and its
-       *     composer builds the card itself from the link. He needs the ADDRESSES.
-       *   - **Gmail** takes `bcc` properly, so its recipients are already filled in — and its
-       *     composer never fetches a link, so no card will ever appear. He needs the CARD.
+       * ~~The card copy for Gmail.~~ Gone outright: *Copy message* copies the card and the whole
+       * message around it, on a press, which is strictly more than this did.
        *
-       * So the clipboard carries the one thing his provider cannot supply, and the panel names it
-       * and says where it goes. One paste, never two, and never a choice about which.
+       * ~~The address copy for Outlook.~~ Now a BUTTON, drawn beside the preview only when the send
+       * has actually fallen back to a compose window, which is the only situation where Outlook's
+       * missing Bcc is the renter's problem. A press, so it cannot overwrite anything he did not
+       * ask it to.
        *
-       * Not awaited, deliberately: `window.open` must fire inside the click that caused it, and an
-       * `await` first hands the pop-up blocker a reason to swallow the compose window.
-       *
-       * ⚠️ **Written BEFORE the mail API is asked, even though a verified domain will make it
-       * useless.** A clipboard write also needs live user activation, and Safari drops that on the
-       * first `await` — so writing it afterwards, on the branch that actually needs it, would be
-       * the branch where it silently fails. For Outlook the clipboard IS the recipients, so a
-       * failed write there is a message addressed to nobody. Wasting it on a send that turned out
-       * not to need it costs nothing.
+       * The rule this leaves: **nothing writes the clipboard without a press**, so what is on it is
+       * always the thing he last pressed.
        */
-      if (provider === "outlook") {
-        if (reachable.length) {
-          void navigator.clipboard?.writeText(reachable.map((x) => x.email).join("; ")).catch(() => {});
-        }
-      } else if (card) {
-        void copyShareMessage(
-          url,
-          bidCardHtml(
-            {
-              title: card.model.cardTitle,
-              description: card.model.where ?? "",
-              imageUrl: card.imageUrl || `${window.location.origin}/bid/${id}/og?lang=${lang}`,
-              url,
-            },
-            card.model,
-            lang,
-          ),
-        ).catch(() => {});
-      }
 
       /**
        * ── We send it ourselves when we may, and only then (SUP-BE-23) ───────────────────────────
@@ -529,6 +651,10 @@ export function ShareRequestPanel({
 
         const args: Compose = { bcc: reachable.map((x) => x.email as string), subject, body: message, provider };
         setReopen(args);
+        /* ⚠️ Kept so *Copy addresses* has something to copy, and set ONLY on the fallback: a
+           send that went out server-side put the recipients on the message itself, so offering a
+           paste there would be offering a fix for a problem that did not happen. */
+        setPasteAddresses(provider === "outlook" ? reachable.map((x) => x.email as string) : []);
         const openedIt = openEmailCompose(args);
         // Too long for a URL, and a truncated body loses its tail, which is where the link is. The
         // request is posted and the link is on screen; say so rather than sending half a message.
@@ -1060,6 +1186,42 @@ export function ShareRequestPanel({
                 </button>
               ))}
             </span>
+
+            {/* ⚠️ **The way out when a channel does not work** (owner, 2026-09-05: *"can we
+                have an option to copy paste the template so if share doesnt work?"*). The clipboard
+                is the one channel nothing can block: no compose window, no consent, no deeplink. It
+                sits here rather than in the toolbar because what it copies is what this column
+                shows, and it is disabled before the post for the same reason Copy link is. */}
+            <button
+              type="button"
+              onClick={() => void copyMessage()}
+              disabled={!uuid || !card}
+              title={c.copyMessageHint}
+              className={cx(btn("secondary", "sm"), "flex-none")}
+            >
+              <Icon name={msgCopied ? "check" : "content_copy"} size={14} />
+              {msgCopied ? c.copyMessageDone : c.copyMessage}
+            </button>
+
+            {/* ⚠️ **The one paste Outlook genuinely cannot do without**, and only when it is
+                real: its deeplink discards `bcc`, so the window opened addressed to nobody. Drawn
+                only after a fallback actually happened, because a server-side send carries the
+                recipients on the message and has nothing to paste. */}
+            {pasteAddresses.length > 0 && (
+              <button
+                type="button"
+                title={c.copyAddressesHint}
+                className={cx(btn("secondary", "sm"), "flex-none")}
+                onClick={() => {
+                  void navigator.clipboard?.writeText(pasteAddresses.join("; ")).catch(() => {});
+                  setAddrCopied(true);
+                  setTimeout(() => setAddrCopied(false), 2400);
+                }}
+              >
+                <Icon name={addrCopied ? "check" : "contact_mail"} size={14} />
+                {addrCopied ? c.copyAddressesDone : c.copyAddresses}
+              </button>
+            )}
           </span>
 
           <span className="text-label text-muted">{c.editHint}</span>
@@ -1086,6 +1248,8 @@ export function ShareRequestPanel({
               <div className="min-h-0 flex-1 overflow-auto bg-surface2 p-3">
                 <Message
                   parts={parts}
+                  detail={detail}
+                  linkUrl={uuid ? shareUrl : null}
                   template={template}
                   onChange={patchTemplate}
                   c={c}
@@ -1105,6 +1269,8 @@ export function ShareRequestPanel({
               <div className="max-w-[94%] rounded-md rounded-ss-none bg-surface px-3 py-2">
                 <Message
                   parts={parts}
+                  detail={detail}
+                  linkUrl={uuid ? shareUrl : null}
                   template={template}
                   onChange={patchTemplate}
                   c={c}
@@ -1294,7 +1460,73 @@ export function ShareRequestPanel({
                 {/* A supplier he picked who has no address is not in that count, and a count that
                     quietly omits him is how a renter comes to believe eight people were written to. */}
                 {mailer.skipped > 0 && ` ${fmt(c.mailSkipped, { n: mailer.skipped })}`}
+                {/* ⚠️ Only on the Graph path, where the message really did pass through his own
+                    mailbox. On the SES path we send AS him without touching it, so there is no copy
+                    in his Sent folder and saying otherwise would send him looking for one. */}
+                {mailer.inSentFolder && <span className="block font-semibold text-ok-deep">{c.mailInSent}</span>}
               </span>
+            </span>
+          )}
+
+          {/* ── Connect Outlook (SUP-BE-23, the Graph path) ────────────────────────────────────
+              Drawn in two situations, and they are the same offer:
+
+                - he has chosen E-mail, this stage HAS a registration and he has not connected;
+                - a send was refused and the answer carried a `connectPath`.
+
+              ⚠️ **`connectPath`, never the reason, decides the second one.** Listing reasons
+              in the web means a redeploy the day the backend adds one, and a stage with no app
+              registration would get a button that leads nowhere. */}
+          {connect?.configured && !connect.connected && (channel === "email" || (mailer?.sent === false && mailer.connectPath)) && (
+            <div className="mt-1 rounded-md border border-border bg-surface2 p-3">
+              <p className="text-meta text-navy-mid">{c.mailConnectWhy}</p>
+              <button
+                type="button"
+                onClick={() => void startConnect()}
+                disabled={connecting}
+                className={cx(btn("secondary", "sm"), "mt-2")}
+              >
+                <Icon name={connecting ? "hourglass_top" : "link"} size={15} />
+                {connecting
+                  ? c.mailConnecting
+                  : mailer?.sent === false && (mailer.reason === "RECONNECT_REQUIRED" || mailer.reason === "SEND_REJECTED")
+                    ? c.mailReconnect
+                    : c.mailConnect}
+              </button>
+            </div>
+          )}
+
+          {/* Connected, said once and quietly: it changes what Send does, so it belongs on screen,
+              but it is a settled fact rather than news. */}
+          {connect?.connected && connect.accountEmail && channel === "email" && (
+            <span className="flex items-center gap-2 text-meta text-muted">
+              <Icon name="check_circle" size={14} className="flex-none text-ok-deep" />
+              {fmt(c.mailConnected, { email: connect.accountEmail })}
+              <button
+                type="button"
+                className={cx(btn("link"), "text-meta")}
+                onClick={() => void mailDisconnect().then(() => mailConnectStatus().then(setConnect))}
+              >
+                {c.mailDisconnect}
+              </button>
+            </span>
+          )}
+
+          {/* ⚠️ «denied» is not necessarily a refusal. Many Microsoft tenants block consent for
+              outside apps, and there is no way to tell that apart in advance, so the wording names
+              both rather than telling a renter he declined something he never saw. */}
+          {connectNote && (
+            <span
+              className={cx(
+                "text-meta",
+                connectNote === "connected" ? "font-semibold text-ok-deep" : "text-muted-dark",
+              )}
+            >
+              {connectNote === "connected"
+                ? c.mailConnectedNow
+                : connectNote === "denied"
+                  ? c.mailConnectDenied
+                  : c.mailConnectFailed}
             </span>
           )}
 
@@ -1435,6 +1667,8 @@ export function ShareRequestPanel({
  */
 function Message({
   parts,
+  detail,
+  linkUrl,
   template,
   onChange,
   c,
@@ -1442,6 +1676,10 @@ function Message({
   unfurl,
 }: {
   parts: ShareMessageParts;
+  /** The points under the card, as `shareMessageHtml` emits them. Empty before there is a card. */
+  detail: string;
+  /** The link as its own line, once it exists. Null while the request is still a draft. */
+  linkUrl: string | null;
   template: ShareTemplate;
   onChange: (field: keyof ShareTemplate, value: string) => void;
   c: ReturnType<typeof useT>["intake"]["postShare"];
@@ -1475,14 +1713,32 @@ function Message({
         </p>
       )}
 
-      {linkPending && (
+      {/* ⚠️ **The points, under the card, because that is where the e-mail puts them.** Without
+          them the preview ended at the card and the renter never saw the terms, the deadline or the
+          no-account line he was about to send. Only on the artwork path: the text fallback above is
+          `parts.card`, which already carries the head and these points as one block. */}
+      {unfurl && detail && (
+        <p className="whitespace-pre-wrap text-meta leading-relaxed text-navy">{detail}</p>
+      )}
+
+      <Editable value={template.signoff} display={parts.signoff} onChange={(v) => onChange("signoff", v)} label={c.tplSignoff} />
+
+      {/* ⚠️ **The link is a LINE of its own, after the sign-off, and it was missing entirely.**
+          `shareMessageHtml` ends with it deliberately: a client that strips the card still leaves a
+          way in. Before the post there is no link, so the mask stands in its place, which is the
+          same position it will occupy. */}
+      {linkPending ? (
         <p className="flex items-center gap-1.5 font-mono text-label text-muted-light">
           <Icon name="lock" size={11} />
           {c.linkMasked}
         </p>
+      ) : (
+        linkUrl && (
+          <p dir="ltr" className="break-all font-mono text-meta text-info">
+            {linkUrl}
+          </p>
+        )
       )}
-
-      <Editable value={template.signoff} display={parts.signoff} onChange={(v) => onChange("signoff", v)} label={c.tplSignoff} />
     </div>
   );
 }

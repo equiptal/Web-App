@@ -29,11 +29,19 @@ beforeEach(() => {
 
 describe("shareRequestEmail", () => {
   it("Given a verified domain, Then it reports the send and who it went to", async () => {
-    stub(200, { sent: true, from: "bandar@shibhaljazira.com", messageId: "0100-abc", recipients: 4 });
+    stub(200, { sent: true, from: "bandar@shibhaljazira.com", via: "ses", messageId: "0100-abc", inSentFolder: false, recipients: 4 });
 
     const out = await shareRequestEmail("req-1", ["a", "b", "c", "d"], MSG);
 
-    expect(out).toEqual({ sent: true, from: "bandar@shibhaljazira.com", recipients: 4, messageId: "0100-abc", skipped: 0 });
+    expect(out).toEqual({
+      sent: true,
+      from: "bandar@shibhaljazira.com",
+      via: "ses",
+      recipients: 4,
+      messageId: "0100-abc",
+      inSentFolder: false,
+      skipped: 0,
+    });
     expect(calls[0].url).toBe("/api/requests/req-1/share-email");
   });
 
@@ -151,5 +159,58 @@ describe("shareRequestEmail", () => {
     if (!out.sent) throw new Error("unreachable");
     expect(out.recipients).toBe(3);
     expect(out.skipped).toBe(2);
+  });
+
+  it("Given the GRAPH path, Then messageId is null and the Sent-folder copy is real", async () => {
+    /**
+     * ⚠️ Graph returns no message id, so this stays NULLABLE rather than being coerced to "". An
+     * empty string would read as "we have an id and it is blank" to anything checking for one.
+     */
+    stub(200, { sent: true, from: "bandar@zahid.sa", via: "graph", messageId: null, inSentFolder: true, recipients: 2 });
+
+    const out = await shareRequestEmail("req-1", ["a", "b"], MSG);
+    if (!out.sent) throw new Error("unreachable");
+    expect(out.via).toBe("graph");
+    expect(out.messageId).toBeNull();
+    expect(out.inSentFolder).toBe(true);
+  });
+
+  it("Given NOT_CONNECTED, Then the connect path comes back so the panel can offer the button", async () => {
+    stub(200, {
+      sent: false,
+      reason: "NOT_CONNECTED",
+      from: "bandar@zahid.sa",
+      domain: "zahid.sa",
+      dns: [],
+      connectPath: "/agents/mail-connect/authorize",
+    });
+
+    const out = await shareRequestEmail("req-1", ["a"], MSG);
+    if (out.sent) throw new Error("unreachable");
+    expect(out.reason).toBe("NOT_CONNECTED");
+    expect(out.connectPath).toBe("/agents/mail-connect/authorize");
+  });
+
+  it("Given NOT_CONFIGURED, Then connectPath is null — there is nothing to send him to", async () => {
+    /**
+     * ⚠️ `connectPath`, not the reason, is what the panel branches on. A stage with no Azure app
+     * registration has no consent screen, so a button here would lead nowhere.
+     */
+    stub(200, { sent: false, reason: "NOT_CONFIGURED", connectPath: null, dns: [] });
+
+    const out = await shareRequestEmail("req-1", ["a"], MSG);
+    if (out.sent) throw new Error("unreachable");
+    expect(out.reason).toBe("NOT_CONFIGURED");
+    expect(out.connectPath).toBeNull();
+  });
+
+  it("Given SEND_REJECTED, Then it is a refusal with a way back, not an error", async () => {
+    // Graph refused mid-flight, usually consent revoked. The window opens and he can reconnect.
+    stub(200, { sent: false, reason: "SEND_REJECTED", connectPath: "/agents/mail-connect/authorize", dns: [] });
+
+    const out = await shareRequestEmail("req-1", ["a"], MSG);
+    if (out.sent) throw new Error("unreachable");
+    expect(out.reason).toBe("SEND_REJECTED");
+    expect(out.connectPath).toBeTruthy();
   });
 });

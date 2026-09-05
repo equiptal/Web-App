@@ -90,20 +90,25 @@ describe("composeRenteeRequest — one composer, four entry points (RM3-AC-17)",
     expect(draft?.docTypes).toEqual(["photo_front", "safety_cert", "operator_license", "vat_cert"]);
   });
 
-  it("leaves an ambiguous name alone rather than guessing which paper it means", () => {
-    // Both `local_content` and `saso` are catalogue keys now (company segment, added 2026-08-08), and
-    // BOTH still pass through untouched — that is the point. `saso` names four different papers across
-    // the tree (the firm's registration, `saso_registration`, `saso_inspection`, and the bare `saso` a
-    // listing carries for its safety cert); an alias that folded any onto another would have the
-    // supplier upload the wrong paper. Scope decides which resolver reads the key, never a rename.
+  it("folds the SASO CERTIFICATE's spellings, and never the SASO registration", () => {
+    // ~~Every SASO spelling survived verbatim, on the reasoning that `saso` names four different
+    // papers and folding any onto another would have the supplier upload the wrong one.~~ Half of
+    // that was right and half of it cost the renter his answer (owner, 2026-09-05): `saso`,
+    // `saso_inspection` and `saso_technical_inspection` are ONE safety certificate under three
+    // spellings — a machine files a fresh one as `saso_technical_inspection`, a request asks for bare
+    // `saso` — so leaving them apart meant the certificate could never answer the ask for it.
+    //
+    // `saso_registration` is the proof of OWNERSHIP and keeps its own name, so an ownership paper can
+    // never close an ask for a certificate. This is exactly the fold the backend applies
+    // (`apps/backend/src/services/utils/document-type.ts`).
+    for (const t of ["saso", "saso_cert", "saso_inspection", "saso_technical_inspection"]) {
+      expect(canonicalDocType(t)).toBe("saso");
+    }
+    expect(canonicalDocType("saso_registration")).toBe("saso_registration");
+    // Unrelated names still pass through untouched: scope decides which resolver reads a key, never
+    // a rename.
     expect(canonicalDocType("local_content")).toBe("local_content");
     expect(canonicalDocType("istimara")).toBe("istimara");
-    // Every SASO spelling survives verbatim. A machine's `documentKeys` can carry several of them and
-    // only a machine's list ever answers an ask now, so an alias folding one onto another would have
-    // the supplier upload the wrong paper.
-    for (const t of ["saso", "saso_registration", "saso_inspection", "saso_technical_inspection"]) {
-      expect(canonicalDocType(t)).toBe(t);
-    }
   });
 
   it("collapses the two names for one photo onto one key, so the card asks once", () => {

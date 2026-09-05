@@ -97,6 +97,7 @@ export const en = {
     empty: "You're all caught up.",
     emptyUnread: "No unread notifications.",
     loadError: "Couldn't load notifications.",
+    bubbleMore: "+{n} more",
     justNow: "Just now",
   },
   home: {
@@ -341,6 +342,25 @@ export const en = {
       mailSetupCopy: "Copy the records",
       mailSetupCopied: "Records copied",
       mailSetupWait: "Records take up to a day to take effect. Nothing changes for you until they do.",
+      /* ── SUP-BE-23, the Graph path: the renter connects his own Outlook once ──────────────── */
+      copyAddresses: "Copy addresses",
+      copyAddressesDone: "Addresses copied",
+      copyAddressesHint: "Outlook drops blind copies from a link, so paste these into its Bcc field",
+      copyMessage: "Copy message",
+      copyMessageDone: "Copied",
+      copyMessageHint: "Copies the whole message, card included, so you can paste it anywhere",
+      mailConnect: "Connect Outlook",
+      mailReconnect: "Reconnect Outlook",
+      mailConnectWhy:
+        "Connect Outlook once and Moedatech sends this from your own address, with the card in the message and your suppliers in blind copy. No compose window, and a copy lands in your Sent folder",
+      mailConnecting: "Waiting for Outlook",
+      mailConnected: "Sending from {email}",
+      mailDisconnect: "Disconnect",
+      mailConnectedNow: "Outlook connected. Press Send again to use it",
+      mailConnectDenied:
+        "Consent was not granted. Large organisations often need an administrator to approve it, so ask your IT if you did not refuse it yourself",
+      mailConnectFailed: "Outlook could not be connected, so your e-mail opens instead",
+      mailInSent: "A copy is in your Sent folder",
       mailPersonal:
         "Your address is a personal one, so Moedatech cannot send on its behalf. Your e-mail opens instead, which is what it does today.",
     },

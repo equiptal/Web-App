@@ -2,6 +2,36 @@
 
 ## Change log
 
+- **2026-09-05 - A document ask on the map names the PAPER, not "safety certificate".**
+  `equipmentAskType` sent `tuv` and `spsp` precisely and every other certificate as
+  `equipment_safety_certificate`, which the chat card renders as «Safety certificate» - so a renter
+  ticking SASO or the equipment insurance asked the supplier for a category. The coarseness was
+  correct when written (one unknown type 400s the whole ask, and the catalogue could not be checked
+  from this repo) and stopped being correct on 2026-08-12, when the backend began judging an ask
+  against the LISTING vocabulary too (`apps/backend/src/services/utils/document-type.ts`,
+  `ASKABLE_DOCUMENT_TYPES`). Now: `tuv` · `spsp` · `saso` · `insurance` by name; ownership papers
+  already named themselves.
+  Files: `src/components/map/panel/machine-panel-model.ts`, `src/lib/contract/rentee-request.ts`,
+  `src/lib/contract/request-card.ts`.
+  Trap: `aramco` is still sent coarsely ON PURPOSE - a request may require it and the platform can
+  file it nowhere (absent from `EQUIPMENT_CERT_TYPES` and from the seeded catalogue), so naming it
+  would 400 the renter's most ordinary act. Needs a backend row before the map can carry it.
+  Also: `canonicalDocType` now folds the SASO CERTIFICATE's spellings (`saso` / `saso_cert` /
+  `saso_inspection` / `saso_technical_inspection`) onto one name, exactly as the backend does, so an
+  ask for the certificate can be answered by the certificate. `saso_registration` is ownership and is
+  deliberately never folded.
+
+- **2026-09-05 - The dashboard has one gap between its blocks again.**
+  `My Suppliers` and `My Projects` each carried `pb-24` on their EMBEDDED root, written back when
+  each was the last block on the page. With both stacked, the middle one's 96px landed on top of the
+  hub's 28px `gap-7` and the page had a hole between two sections and normal spacing between the
+  rest. Rule now: an embedded block owns the space inside it, the page owns the space between and
+  after, so `HomeHub` carries the bottom room (chat dock, truncated-looking last row).
+  Files: `src/components/home/HomeHub.tsx`, `src/components/projects/ProjectsSurface.tsx`,
+  `src/components/suppliers/SuppliersPage.tsx`, `tests/unit/dashboard-spacing.test.ts`.
+  Trap: it fails silently - nothing throws and no unit test noticed, it only shows on a screenshot,
+  which is why the new test asserts it against the source.
+
 - **2026-09-04 — The bid form reads `"On Supplier"`, not just `"Supplier"`.**
   `GET /public/bid-form/{token}` changed its VALUES on 2026-09-02 (app `c304828a`), not only its
   labels: `deliveryBy`, `returnBy` and `requiredTerms.fuel` gained an `"On "` prefix. Six web readers

@@ -431,6 +431,10 @@ const DOC_TYPE_LABELS: Record<string, [string, string]> = {
   spsp_cert: ["SPSP certificate", "شهادة SPSP"],
   spsp_certificate: ["SPSP certificate", "شهادة SPSP"],
   saso_inspection: ["SASO certificate", "شهادة ساسو"],
+  // The spelling a machine's own certificate is filed under, so a card naming it reads as the paper
+  // rather than as `Saso technical inspection` (owner, 2026-09-05).
+  saso_technical_inspection: ["SASO certificate", "شهادة ساسو"],
+  saso_cert: ["SASO certificate", "شهادة ساسو"],
   safety_cert: ["Safety certificate", "شهادة السلامة"],
   equipment_insurance: ["Insurance", "التأمين"],
   custom_card: ["Customs card", "البطاقة الجمركية"],

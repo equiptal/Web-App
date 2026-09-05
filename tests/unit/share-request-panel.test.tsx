@@ -4,6 +4,8 @@ import { LocaleProvider } from "@/lib/i18n";
 import { en } from "@/lib/i18n/en";
 import { ar } from "@/lib/i18n/ar";
 import { defaultTemplate } from "@/lib/shareTemplate";
+import { shareMessageHtml } from "@/lib/copyShareMessage";
+import { bidCardModel, type BidCardModel } from "@/lib/bidCardModel";
 import { ShareRequestPanel } from "@/components/share/ShareRequestPanel";
 import type { BidFormData } from "@/lib/contract/link-bids";
 
@@ -24,8 +26,22 @@ const api = vi.hoisted(() => ({
    * has not added the DNS records — and therefore the behaviour every OTHER test in this file has
    * always described. Only the cases below change it.
    */
-  mail: { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [] } as Record<string, unknown>,
+  mail: { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null } as Record<string, unknown>,
   mailCalls: [] as unknown[][],
+  /**
+   * Outlook connection state. Default: this stage has NO Azure app registration, which is what
+   * staging answers until one exists, so no Connect button is drawn and every other test in this
+   * file sees the panel it has always seen.
+   */
+  connect: { configured: false, connected: false, provider: null, accountEmail: null, connectedAt: null } as {
+    configured: boolean;
+    connected: boolean;
+    provider: string | null;
+    accountEmail: string | null;
+    connectedAt: string | null;
+  },
+  connectUrl: null as string | null,
+  disconnected: 0,
 }));
 
 vi.mock("@/lib/api/client", () => ({
@@ -38,6 +54,13 @@ vi.mock("@/lib/api/client", () => ({
   shareRequestEmail: (...args: unknown[]) => {
     api.mailCalls.push(args);
     return Promise.resolve(api.mail);
+  },
+  mailConnectStatus: () => Promise.resolve(api.connect),
+  mailConnectUrl: () => Promise.resolve(api.connectUrl),
+  mailDisconnect: () => {
+    api.disconnected += 1;
+    api.connect = { configured: true, connected: false, provider: null, accountEmail: null, connectedAt: null };
+    return Promise.resolve(true);
   },
   updateRenterSupplier: () => Promise.resolve({}),
   bidShareUrl: (id: string) => `https://os.moedatech.net/bid/${id}`,
@@ -81,7 +104,10 @@ const opened = vi.fn();
 beforeEach(() => {
   api.shares = [];
   api.mailCalls = [];
-  api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [] };
+  api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
+  api.connect = { configured: false, connected: false, provider: null, accountEmail: null, connectedAt: null };
+  api.connectUrl = null;
+  api.disconnected = 0;
   api.rows = [
     { id: "1", name: "Al Faisal Rentals", email: "ops@alfaisal.sa", phone: "+966501112233", verified: true },
     // No address: he is in the list, he is pickable, and he is honestly named as skipped.
@@ -561,15 +587,16 @@ describe("the link preview (owner, 2026-09-02)", () => {
 });
 
 describe("what rides the clipboard on an e-mail send", () => {
-  it("Given an e-mail send, Then the ADDRESSES go on the clipboard, not the card", async () => {
+  it("Given an e-mail send, Then the addresses are OFFERED rather than taken", async () => {
     /**
-     * ⚠️ The provider choice is gone (owner, 2026-09-03: *"remove the outlook or gmail option"*), so
-     * there is one composer and it is Outlook's deeplink — which discards `bcc`. The one thing it
-     * cannot carry is therefore the recipients, and that is what the clipboard holds.
+     * The provider choice is gone (owner, 2026-09-03: *"remove the outlook or gmail option"*), so
+     * there is one composer and it is Outlook's deeplink, which discards `bcc`. The one thing it
+     * cannot carry is the recipients, and that paste is real.
      *
-     * The CARD in an e-mail waits for a connected mailbox, which is the owner's own plan: *"user can
-     * then select what he want to connect when we apply api."* Until then no compose URL can carry
-     * HTML, so there is nothing to choose between.
+     * ⚠️ ~~It used to be written to the clipboard by the SEND.~~ Silently, and the clipboard holds
+     * one thing, so it destroyed whatever the renter had just copied with no word on screen (owner,
+     * 2026-09-05: *"there is a copy of the link and copy of the email, different ones"*). Now the
+     * send touches nothing and the addresses wait behind a button.
      */
     const writeText = vi.fn(async (_t: string) => {});
     vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
@@ -584,6 +611,10 @@ describe("what rides the clipboard on an e-mail send", () => {
     fireEvent.click(screen.getByText(c.sendToSuppliers));
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
+    // The send itself left the clipboard alone.
+    expect(writeText).not.toHaveBeenCalled();
+    // And the paste it DOES need is one press away, with the right value behind it.
+    fireEvent.click(await screen.findByText(c.copyAddresses));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("ops@alfaisal.sa"));
   });
 
@@ -860,7 +891,7 @@ describe("the mail we send ourselves", () => {
      * ⚠️ This is the one outcome on this panel the renter cannot see for himself. Every other press
      * puts a window in front of him; this one puts nothing, so silence would read as a dead button.
      */
-    api.mail = { sent: true, from: "bandar@shibhaljazira.com", recipients: 1, messageId: "0100-abc", skipped: 0 };
+    api.mail = { sent: true, from: "bandar@shibhaljazira.com", via: "ses", recipients: 1, messageId: "0100-abc", inSentFolder: false, skipped: 0 };
     await sendByEmail();
 
     await waitFor(() => expect(screen.getByText(/bandar@shibhaljazira\.com/)).toBeTruthy());
@@ -873,7 +904,7 @@ describe("the mail we send ourselves", () => {
      * Recording a second one here would file a claim that the renter declared the same send from
      * his own client, which is a different fact and not a true one.
      */
-    api.mail = { sent: true, from: "b@x.sa", recipients: 1, messageId: "m", skipped: 0 };
+    api.mail = { sent: true, from: "b@x.sa", via: "ses", recipients: 1, messageId: "m", inSentFolder: false, skipped: 0 };
     await sendByEmail();
 
     await waitFor(() => expect(api.mailCalls).toHaveLength(1));
@@ -994,5 +1025,337 @@ describe("the message's language", () => {
 
     fireEvent.click(screen.getByText("العربية"));
     await waitFor(() => expect(seen.some((u) => u.includes("/preview?lang=ar"))).toBe(true));
+  });
+});
+
+
+/**
+ * ── Connecting the renter's own Outlook (SUP-BE-23, the Graph path) ─────────────────────────────
+ *
+ * The DNS route puts his address in a `From` line by proving his COMPANY owns the domain, which
+ * needs his IT. This one proves it by his own mailbox, which needs one press from him. Same result
+ * in the message; a different person has to act.
+ */
+describe("connecting Outlook", () => {
+  const pickEmail = async () => {
+    draw();
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.email));
+  };
+
+  it("Given a stage with no app registration, Then nothing is offered", async () => {
+    /**
+     * ⚠️ `configured` and `connected` are two different facts. Reading `!connected` alone would draw
+     * a Connect button on every stage that has no Azure registration, and it would lead nowhere:
+     * `authorize` answers `NOT_CONFIGURED` and there is no consent screen to reach.
+     */
+    api.connect = { configured: false, connected: false, provider: null, accountEmail: null, connectedAt: null };
+    await pickEmail();
+
+    await waitFor(() => expect(screen.getByText(c.email)).toBeTruthy());
+    expect(screen.queryByText(c.mailConnect)).toBeNull();
+  });
+
+  it("Given a configured stage he has not connected, Then E-mail offers it before he presses Send", async () => {
+    // Offered on the CHOICE, not after a refusal: the first send then already goes the good way,
+    // instead of failing once to teach him the button exists.
+    api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
+    await pickEmail();
+
+    await waitFor(() => expect(screen.getByText(c.mailConnect)).toBeTruthy());
+  });
+
+  it("Given he is connected, Then it says which address, and offers to disconnect", async () => {
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
+    await pickEmail();
+
+    await waitFor(() => expect(screen.getByText(/bandar@zahid\.sa/)).toBeTruthy());
+    fireEvent.click(screen.getByText(c.mailDisconnect));
+    await waitFor(() => expect(api.disconnected).toBe(1));
+  });
+
+  it("Given the token was dropped, Then the button says RECONNECT rather than connect", async () => {
+    api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
+    api.mail = {
+      sent: false,
+      reason: "RECONNECT_REQUIRED",
+      from: "bandar@zahid.sa",
+      domain: "zahid.sa",
+      dns: [],
+      connectPath: "/agents/mail-connect/authorize",
+    };
+    await pickEmail();
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(screen.getByText(c.mailReconnect)).toBeTruthy());
+    // And the share still went out the old way while he sorts it out.
+    expect(opened).toHaveBeenCalled();
+  });
+
+  it("Given Graph sent it, Then it says the copy is in his Sent folder", async () => {
+    /**
+     * ⚠️ Only on the Graph path. SES sends AS him without touching his mailbox, so there is no copy
+     * there, and saying otherwise sends him looking for something that does not exist.
+     */
+    api.mail = { sent: true, from: "bandar@zahid.sa", via: "graph", recipients: 2, messageId: null, inSentFolder: true, skipped: 0 };
+    await pickEmail();
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(screen.getByText(c.mailInSent)).toBeTruthy());
+    expect(opened).not.toHaveBeenCalled();
+  });
+
+  it("Given SES sent it, Then it does NOT claim a Sent folder copy", async () => {
+    api.mail = { sent: true, from: "bandar@zahid.sa", via: "ses", recipients: 2, messageId: "0100-x", inSentFolder: false, skipped: 0 };
+    await pickEmail();
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(screen.getByText(/bandar@zahid\.sa/)).toBeTruthy());
+    expect(screen.queryByText(c.mailInSent)).toBeNull();
+  });
+
+  it("Given some picks had no address, Then the left-out are counted rather than hidden", async () => {
+    // A count that quietly omits them is how a renter comes to believe eight people were written to.
+    api.mail = { sent: true, from: "b@x.sa", via: "graph", recipients: 1, messageId: null, inSentFolder: true, skipped: 2 };
+    await pickEmail();
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(screen.getByText(new RegExp(String(2)))).toBeTruthy());
+  });
+});
+
+
+/**
+ * ── The preview IS the message (owner, 2026-09-05) ──────────────────────────────────────────────
+ *
+ * *"make sure the preview now is same as the one will be sent in the outlook really."*
+ *
+ * It was not. `shareMessageHtml` sends greeting, intro, card, THE POINTS, sign-off, link. The
+ * preview drew greeting, intro, card, sign-off: no points, no link. A renter approved a message
+ * whose entire middle he had never seen, and the terms a supplier prices against were the part
+ * missing.
+ *
+ * These pin the pieces rather than the markup, so wording and styling stay free to change and the
+ * ORDER and the PRESENCE cannot.
+ */
+describe("the preview and the sent e-mail carry the same message", () => {
+  const model: BidCardModel = {
+    ref: "CEX-020902",
+    imageHeadline: "Excavator 20 ton · with operator ×2",
+    cardTitle: "Excavator 20 ton · with operator ×2",
+    items: [],
+    where: "Diriyah · 4 months & extendable",
+    terms: [
+      { label: "Mobilization", value: "On Renter" },
+      { label: "Fuel", value: "On Supplier · diesel" },
+    ],
+    closing: "Bidding closes 12 Sep 2026",
+    accepting: true,
+    cta: "Submit your bid",
+  };
+
+  const URL_ = "https://os.moedatech.net/bid/abc-123";
+
+  it("Given the sent HTML, Then it carries greeting, card, POINTS, sign-off and the link, in that order", () => {
+    const html = shareMessageHtml(model, URL_, `${URL_}/og`, { renterName: "Shibh Al Jazira", lang: "en" });
+
+    const at = (needle: string) => {
+      const i = html.indexOf(needle);
+      expect(i, `missing from the sent e-mail: ${needle}`).toBeGreaterThan(-1);
+      return i;
+    };
+
+    // ⚠️ «Mobilization» is the piece that was absent from the preview. It is a term a supplier
+    // prices against, so a preview without it is a preview of a different message.
+    expect(at("Hello,")).toBeLessThan(at("invites you to bid"));
+    expect(at("invites you to bid")).toBeLessThan(at("Excavator 20 ton"));
+    expect(at("Excavator 20 ton")).toBeLessThan(at("Mobilization"));
+    expect(at("Mobilization")).toBeLessThan(at("Thanks,"));
+    expect(html.lastIndexOf(URL_)).toBeGreaterThan(at("Thanks,"));
+  });
+
+  it("Given the panel's preview, Then every one of those pieces is on screen", async () => {
+    /**
+     * ⚠️ The card renders as ARTWORK here, which is the path that was wrong: the text fallback
+     * (`parts.card`) always carried the points, so the gap only appeared once a real card existed,
+     * which is every posted request.
+     */
+    draw({ draftForm: DRAFT });
+    await screen.findByText("Al Faisal Rentals");
+
+    const sent = shareMessageHtml(
+      bidCardModel(null, { title: "", description: "" }, "en", DRAFT),
+      "https://os.moedatech.net/bid/abc-123",
+      "",
+      { lang: "en" },
+    );
+
+    // Whatever the sent message says about the transport legs, the preview says it too.
+    for (const piece of ["Mobilization", "Demobilization", "Fuel"]) {
+      expect(sent).toContain(piece);
+      expect(screen.getAllByText(new RegExp(piece)).length, `${piece} missing from the preview`).toBeGreaterThan(0);
+    }
+  });
+
+  it("Given no link yet, Then the preview shows the mask where the link will go", async () => {
+    // Before the post there is no URL, so the placeholder stands in its place rather than the line
+    // simply being absent: the renter must see that a link is part of what he is sending.
+    draw({ mode: "post", requestUuid: null, draftForm: DRAFT, onPost: async () => "new-uuid" });
+    await screen.findByText("Al Faisal Rentals");
+
+    expect(screen.getByText(c.linkMasked)).toBeTruthy();
+  });
+});
+
+
+/**
+ * ── Copy message: the channel nothing can block (owner, 2026-09-05) ─────────────────────────────
+ *
+ * *"can we have an option to copy paste the template so if share doesnt work?"*
+ *
+ * Every other route out of this panel depends on something we do not control: a compose window that
+ * discards Bcc, a consent screen a tenant can refuse, a deeplink that carries text only. The
+ * clipboard depends on nothing, so it is the fallback that always exists, and it was there all along
+ * buried inside «More»'s failure path where nobody would find it.
+ */
+describe("copy message", () => {
+  it("Given a posted request, Then BOTH flavours go on the clipboard", async () => {
+    /**
+     * ⚠️ The receiving app chooses: Gmail and Outlook keep the HTML and draw the card, a chat takes
+     * the words. Writing only one would decide for an app we cannot see, and the card is the half
+     * that has been missing everywhere.
+     */
+    const write = vi.fn(async () => {});
+    const flavours: Record<string, unknown>[] = [];
+    vi.stubGlobal("ClipboardItem", class {
+      constructor(parts: Record<string, unknown>) {
+        flavours.push(parts);
+      }
+    });
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { write, writeText: async () => {} } });
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText(c.copyMessage));
+
+    await waitFor(() => expect(write).toHaveBeenCalled());
+    expect(Object.keys(flavours[0]).sort()).toEqual(["text/html", "text/plain"]);
+  });
+
+  it("Given no link yet, Then it is locked — the same rule as Copy link", async () => {
+    /**
+     * ⚠️ The message ends with a URL that does not exist before the post, so copying early hands
+     * him a message with a hole where the link goes. Owner's rule for the link itself
+     * (2026-09-02): nothing is copyable before the request is posted.
+     */
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="post" draftForm={DRAFT} onPost={async () => "new-uuid"} />
+      </LocaleProvider>,
+    );
+    await screen.findByText("Al Faisal Rentals");
+
+    expect(screen.getByText(c.copyMessage).closest("button")!.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("Given it copied, Then it says so and then stops saying so", async () => {
+    // A label that stays changed is a button that looks broken the next time he needs it.
+    vi.stubGlobal("ClipboardItem", class {
+      constructor(public parts: Record<string, unknown>) {}
+    });
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { write: async () => {}, writeText: async () => {} } });
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText(c.copyMessage));
+
+    await waitFor(() => expect(screen.getByText(c.copyMessageDone)).toBeTruthy());
+  });
+});
+
+
+/**
+ * ── One writer, and it is always a press (owner, 2026-09-05) ────────────────────────────────────
+ *
+ * *"there is a copy of the link and copy of the email, different ones."*
+ *
+ * ⚠️ **The clipboard holds ONE thing.** Five places in this panel used to write it and only two were
+ * buttons, so pressing Send with e-mail silently threw away whatever the renter had just copied and
+ * nothing on screen said why. The rule now: nothing writes the clipboard without a press, so what is
+ * on it is always the thing he last pressed.
+ */
+describe("the clipboard has one writer at a time", () => {
+  const clip = () => {
+    const writeText = vi.fn(async () => {});
+    const write = vi.fn(async () => {});
+    vi.stubGlobal("ClipboardItem", class {
+      constructor(public parts: Record<string, unknown>) {}
+    });
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { write, writeText } });
+    return { write, writeText };
+  };
+
+  it("Given an e-mail send, Then it does NOT touch the clipboard on its own", async () => {
+    /**
+     * ⚠️ This is the whole bug. A renter presses «Copy message», then presses Send, and the e-mail
+     * branch used to overwrite it with the supplier addresses (Outlook) or the card (Gmail). He
+     * pasted, and got something he never asked for.
+     */
+    const { write, writeText } = clip();
+    api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(opened).toHaveBeenCalled());
+    expect(write).not.toHaveBeenCalled();
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it("Given the send fell back to Outlook, Then the addresses are offered as a BUTTON", async () => {
+    /**
+     * ⚠️ Outlook's deeplink discards `bcc` without a word, so its window opens addressed to nobody.
+     * That paste is real and it stays, but as a press rather than a theft.
+     */
+    const { writeText } = clip();
+    api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    const button = await screen.findByText(c.copyAddresses);
+    fireEvent.click(button);
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("ops@alfaisal.sa"));
+  });
+
+  it("Given nothing was sent yet, Then no addresses button exists", async () => {
+    // It answers a problem that has not happened. Drawn up front it would be a paste offered for a
+    // window nobody opened.
+    clip();
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.email));
+
+    expect(screen.queryByText(c.copyAddresses)).toBeNull();
+  });
+
+  it("Given WE sent it, Then no addresses button either — the message carried them", async () => {
+    /**
+     * ⚠️ A server-side send puts the recipients on the message itself. Offering a paste there would
+     * be offering a fix for a problem that did not happen, and the renter would reasonably wonder
+     * what he was supposed to do with it.
+     */
+    clip();
+    api.mail = { sent: true, from: "b@x.sa", via: "graph", recipients: 1, messageId: null, inSentFolder: true, skipped: 0 };
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(api.mailCalls).toHaveLength(1));
+    expect(screen.queryByText(c.copyAddresses)).toBeNull();
   });
 });
