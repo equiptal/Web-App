@@ -42,7 +42,7 @@ export function FileUploader({
     : undefined;
 
   const errMsg = (code: string) =>
-    code === "too_large" ? L("File exceeds 10 MB", "الملف يتجاوز ١٠ ميجابايت")
+    code === "too_large" ? L("File exceeds 10 MB", "الملف يتجاوز 10 ميجابايت")
       : code === "unsupported_type" ? L("Only images or PDF are allowed", "الصور أو ملفات PDF فقط")
         : L("Upload failed — please try again", "فشل الرفع — حاول مرة أخرى");
 
@@ -118,7 +118,7 @@ export function FileUploader({
           <span className="u-slot-ic material-icons-outlined">description</span>
           <span className="u-slot-tx">
             <span className="u-slot-nm">{kinds[0]?.label}</span>
-            <span className="u-slot-hint">{busy ? L("Uploading…", "جارٍ الرفع…") : L("Drag & drop or tap · PDF or image · max 10 MB", "اسحب وأفلت أو انقر · PDF أو صورة · بحد أقصى ١٠ ميجابايت")}</span>
+            <span className="u-slot-hint">{busy ? L("Uploading…", "جارٍ الرفع…") : L("Drag & drop or tap · PDF or image · max 10 MB", "اسحب وأفلت أو انقر · PDF أو صورة · بحد أقصى 10 ميجابايت")}</span>
           </span>
           <span className="u-slot-plus material-icons-outlined">add</span>
         </button>

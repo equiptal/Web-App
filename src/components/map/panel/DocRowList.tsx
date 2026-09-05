@@ -292,7 +292,7 @@ export function DocRowList({
       <div className="mp-grp-h">
         <span>{groupLabel}</span>
         {/* The prototype's own wording, both halves (2026-08-09): «يحتاج انتباه» over our «بحاجة إلى
-            إجراء», and «مكتملة» over «لا ينقص شيء». The owner's screenshot says «١ يحتاج انتباه» too,
+            إجراء», and «مكتملة» over «لا ينقص شيء». The owner's screenshot says «1 يحتاج انتباه» too,
             so this is one of the places where both sources agree and we had drifted. */}
         <span className={`mp-att-pill${attention === 0 ? " done" : ""}`}>
           {attention === 0

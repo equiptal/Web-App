@@ -81,7 +81,48 @@ const RESPONSIBILITY: Record<string, [string, string]> = {
   SHARED: ["Shared", "مشتركة"],
   EITHER: ["Either", "أيّهما"],
 };
-export const responsibilityLabel = (v: string, L: LFn): string => lookup(RESPONSIBILITY, v, L);
+export const responsibilityLabel = (v: string, L: LFn): string => lookup(RESPONSIBILITY, partyToken(v), L);
+
+/**
+ * A responsibility value with the endpoint's display prefix taken off.
+ *
+ * ⚠️ **`GET /public/bid-form/{token}` changed its VALUES on 2026-09-02**, not just its labels (app
+ * commit `c304828a`): `deliveryBy`, `returnBy` and the `requiredTerms` party values now read
+ * `"On Supplier"` / `"On Renter"` where they read `"Supplier"` / `"Renter"` before. Every reader
+ * compared the two old words exactly, so the new spelling matched nothing and fell through to the
+ * branch meaning *the other party* — which took the delivery price input away from the supplier who
+ * owns the leg, and submitted 0 for it.
+ *
+ * Both spellings stay valid and both must keep working: an older backend still sends the bare
+ * tokens, and so do surfaces that build their items locally. So this STRIPS the prefix rather than
+ * remapping the value, leaving every existing comparison and lookup keyed exactly as it was.
+ *
+ * The Arabic «على » is deliberately NOT stripped: those values arrive as finished display text and
+ * are printed, not compared.
+ *
+ * Returns "" for null/undefined, so a caller can compare without a null check — the same shape the
+ * `(v || "").toLowerCase()` idiom it replaces already had.
+ */
+/**
+ * Arabic-Indic numerals → Latin, in a string that arrives already written.
+ *
+ * Digits are Latin app-wide, in Arabic too (owner, via the app's `1aabf6db` of 2026-09-04: *"the
+ * numbers should be in eng even in arabic"*). Our own strings were swept, but some Arabic text is not
+ * ours to sweep: `t3_platform_defaults.options` is seeded «صافي ٣٠ يوم» and «٢٤ ساعة», and
+ * `getBidForm` sends `valueAr: "٢٤ ساعة"`. Those are rows in a live database, so a seed edit only
+ * lands on a re-seed and changes nothing already stored. The app solved it the same way
+ * (`core/utils/latin_digits.dart`) — normalise at the one place the value is RENDERED, not at every
+ * draw site.
+ *
+ * Digits only. Arabic letters, punctuation and «٪» are left exactly as they arrived.
+ */
+export function latinDigits(v: string | null | undefined): string {
+  return String(v ?? "").replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660));
+}
+
+export function partyToken(v: string | null | undefined): string {
+  return String(v ?? "").trim().replace(/^on\s+/i, "");
+}
 
 /**
  * City names.

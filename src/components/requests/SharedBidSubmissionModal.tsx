@@ -8,6 +8,7 @@ import { fetchBidFormData } from "@/lib/api/client";
 import { hasVatInclusiveNote, stripVatInclusiveNote, vatLines } from "@/lib/contract/vat-inclusive";
 import { computeRentalTotal, durationDaysBetween } from "@/lib/pricing/rental";
 import { qualityFromSubmission, qualityFromSubmissionItem } from "@/lib/contract/bid-quality";
+import { partyToken } from "@/lib/contract/labels";
 import { QualityRing } from "@/components/bid/QualityRing";
 import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
 // The `.slb-*` overlay/modal styles live here and are scoped under `.rproto`. Import them (and put
@@ -26,7 +27,12 @@ import "@/components/requests/requests-proto.css";
  */
 
 // Mirrors the bid form's TERM_KEYS so the renter reads back exactly the terms the supplier confirmed.
-const TERM_KEYS = ["operator", "nationality", "nightShift", "fatFood", "fatTransport", "fuel", "fuelType", "year", "operatorCert", "equipmentCert"] as const;
+// `fuelType` is NOT here (2026-09-05, following the app's `f48793ec`). It is the renter's
+// `fuelTypePreference` — what fuel they ASKED for — and it is a different fact from `fuel`,
+// which is fuel RESPONSIBILITY and stays. The renter is not really choosing it either: the
+// system prefills it, so asking a supplier to confirm a value nobody chose added a row and
+// settled nothing. Still stored, still matched on; simply not shown to the supplier.
+const TERM_KEYS = ["operator", "nationality", "nightShift", "fatFood", "fatTransport", "fuel", "year", "operatorCert", "equipmentCert"] as const;
 type TermKey = (typeof TERM_KEYS)[number];
 const TERM_LABEL: Record<TermKey, [string, string]> = {
   operator: ["Operator", "المشغّل"],
@@ -35,7 +41,6 @@ const TERM_LABEL: Record<TermKey, [string, string]> = {
   fatFood: ["Food (F.A.T)", "الطعام"],
   fatTransport: ["Accommodation & transport", "السكن والمواصلات"],
   fuel: ["Fuel responsibility", "مسؤولية الوقود"],
-  fuelType: ["Fuel type", "نوع الوقود"],
   year: ["Equipment year", "سنة الصنع"],
   operatorCert: ["Operator certificate", "شهادة المشغّل"],
   equipmentCert: ["Equipment certificate", "شهادة المعدة"],
@@ -173,7 +178,10 @@ export function SharedBidSubmissionModal({
     if (form && form.contractTerms.length) return form.contractTerms;
     const rt = (submission?.items[0]?.requiredTerms ?? {}) as Record<string, string | null>;
     const labels: Record<string, [string, string]> = { payment: ["Payment type", "نوع الدفع"], overtime: ["Overtime rate", "أجر العمل الإضافي"], breakdownSla: ["Breakdown response", "زمن الاستجابة للأعطال"] };
-    return (["payment", "overtime", "breakdownSla"] as const)
+    // "overtime" dropped 2026-09-05: retired as a term, and a legacy request carries the truthy
+    // string '0', which `.filter((k) => rt[k])` lets through and then prints as a rate nobody was
+    // ever asked for. `labels` keeps its entry so restoring is one word.
+    return (["payment", "breakdownSla"] as const)
       .filter((k) => rt[k])
       .map((k) => ({ key: k, label: L(labels[k][0], labels[k][1]), value: rt[k] as string }));
   }, [form, submission, L]);
@@ -457,7 +465,7 @@ export function SharedBidSubmissionModal({
                         return (
                           <div className="itot">
                             <span className="r">{L("Subtotal", "المجموع")}<b>{sub ? nf(lines.subtotal) : "—"} {sar}</b></span>
-                            <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{sub ? nf(lines.vat) : "—"} {sar}</b></span>
+                            <span className="r">{L("VAT 15%", "ضريبة 15٪")}<b>{sub ? nf(lines.vat) : "—"} {sar}</b></span>
                             <span className="r t">{L("Item total", "إجمالي البند")}<b>{sub ? nf(lines.total) : "—"} {sar}</b></span>
                           </div>
                         );
@@ -498,7 +506,7 @@ export function SharedBidSubmissionModal({
                 {vatInclusive && (
                   <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 12px", padding: "10px 14px", borderRadius: "var(--r-md)", background: "var(--action-dim)", border: "1px solid rgba(247,144,9,.3)", fontSize: 12.5, fontWeight: 700, color: "var(--navy-mid)" }}>
                     <span className="material-icons-outlined" style={{ fontSize: 18, color: "var(--action)", flexShrink: 0 }}>receipt_long</span>
-                    {L("The supplier quoted VAT-inclusive prices. Amounts here are shown net of 15% VAT — the grand total is exactly what they entered.", "قدّم المؤجّر أسعارًا شاملة لضريبة القيمة المضافة. تُعرض المبالغ هنا صافية من ضريبة ١٥٪ — والإجمالي الكلي هو ما أدخله تمامًا.")}
+                    {L("The supplier quoted VAT-inclusive prices. Amounts here are shown net of 15% VAT — the grand total is exactly what they entered.", "قدّم المؤجّر أسعارًا شاملة لضريبة القيمة المضافة. تُعرض المبالغ هنا صافية من ضريبة 15٪ — والإجمالي الكلي هو ما أدخله تمامًا.")}
                   </div>
                 )}
 
@@ -577,7 +585,7 @@ function RoField({ label, value, multiline, empty }: { label: string; value: str
 }
 
 function partyLabel(v: string | null | undefined, L: (e: string, a: string) => string) {
-  const u = (v ?? "").toLowerCase();
+  const u = partyToken(v).toLowerCase();
   return u === "renter" || u === "rentee" ? L("Renter", "المستأجر") : u === "supplier" ? L("Supplier", "المؤجّر") : (v ?? "—");
 }
 

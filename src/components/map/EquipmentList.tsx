@@ -226,8 +226,8 @@ export function EquipmentList({
     <>
       {/* ── V17 · the filter bar ─────────────────────────────────────────────────────────────────
           Absent entirely when the model offers no group — an empty control row is worse than none.
-          The count renders whether or not anything is filtered, because «٨ من ٨» is the sentence that
-          makes «٣ من ٨» readable later. */}
+          The count renders whether or not anything is filtered, because «8 من 8» is the sentence that
+          makes «3 من 8» readable later. */}
       {(view.groups.length > 0 || view.active.length > 0) && (
         <div className="bm-eqf" role="group" aria-label={t.bidMap.eqFilterLabel}>
           <div className="bm-eqf-top">
@@ -337,7 +337,7 @@ export function EquipmentList({
           </div>
 
           {/* The foot carries rule 3 a second time, and that is the point of covering the list: with
-              the cards hidden, «٣ من ٨» is the only thing telling the renter what a chip just cost
+              the cards hidden, «3 من 8» is the only thing telling the renter what a chip just cost
               him — and it still names the WHOLE offer as the denominator. «امسح التصفية» is here as
               well as in the bar because the bar is behind this panel: a renter three chips deep with
               no way out would have to close the panel to find the control that undoes it. */}
@@ -405,7 +405,7 @@ export function EquipmentList({
       )}
 
       {/* ── The expander (owner, 2026-08-19) ─────────────────────────────────────────────────────
-          «+٣ أخرى في أسطوله» — the machines this supplier has that this offer does not name. It
+          «+3 أخرى في أسطوله» — the machines this supplier has that this offer does not name. It
           closes the list because that is where the question arises: a renter reaches the end of what
           he is being sold and asks whether that is everything the supplier has.
 
@@ -710,7 +710,7 @@ function EquipmentCard({
               {km != null ? (
                 <>
                   {/* `distanceDigits`, never `arabicIndicDigits` — that one truncates, which is right
-                      for a count and would silently turn 7.5 km into «٧». One decimal always, trailing
+                      for a count and would silently turn 7.5 km into «7». One decimal always, trailing
                       `.0` and all, so a column of distances is one shape to scan down. */}
                   <span className="bm-eq-km" dir="ltr">{distanceDigits(km, ar)}</span>
                   <span className="bm-eq-kmu">{t.bidMap.eqDistanceUnit}</span>

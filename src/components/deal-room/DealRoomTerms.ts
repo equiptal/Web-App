@@ -23,6 +23,7 @@ type LFn = (en: string, ar: string) => string;
 
 /** A locally-collected resolution for one term (app parity: nothing is sent until Counter/Accept). */
 export type TermResolution = { action: "accept" | "counter"; value?: unknown };
+import { partyToken } from "@/lib/contract/labels";
 export type ResolutionsMap = Record<string, TermResolution>;
 
 /**
@@ -38,7 +39,10 @@ export function valText(v: unknown, L: LFn): string {
   if (v == null || v === "") return "—";
   if (Array.isArray(v)) return v.length ? v.map((x) => String(x)).join(", ") : "—";
   if (typeof v === "boolean") return v ? L("Yes", "نعم") : L("No", "لا");
-  const str = String(v);
+  // `partyToken` is precautionary here: this reads RAW enums today. The 2026-09-02 prefix lives on
+  // `GET /public/bid-form/{token}` and on the backend's own quotation PDF, not on this payload.
+  // Stripping it costs nothing and makes the next such rename harmless.
+  const str = partyToken(String(v));
   if (str === "supplier") return L("Supplier", "المؤجّر");
   if (str === "rentee") return L("Rentee", "المستأجر");
   if (str === "either") return L("Either", "أيّهما");

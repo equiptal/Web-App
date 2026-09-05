@@ -339,7 +339,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
                 (2026-08-09, the prototype's own typography). It used to be one wrapping muted
                 sentence with a filled chip leading it. Two things were wrong with that: a filled
                 chip is the loudest object on the panel and availability is not the first question
-                the line answers, and «١٢ كم من مشروعك» set at 11 px alongside the yard made the one
+                the line answers, and «12 كم من مشروعك» set at 11 px alongside the yard made the one
                 number the renter is actually comparing between machines the hardest thing to find.
 
                 Now: the kilometres at 20 px, the band word and the yard after them, and the chip
@@ -356,7 +356,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
                     {/* ONE DECIMAL, never a whole kilometre (owner, 2026-08-11) — and through the
                         SAME `distanceDigits` the card and the marker's chip use, so the three cannot
                         state one machine's distance three ways. `arDigits` truncates, which is right
-                        for the document count above and would have turned 7.5 km into «٧» here. */}
+                        for the document count above and would have turned 7.5 km into «7» here. */}
                     <span className="mp-km" dir="ltr">{distanceDigits(km, ar)}</span>
                     <span className="mp-band">{band ? L(`km · ${band.en}`, `كم · ${band.ar}`) : L("km", "كم")}</span>
                   </>

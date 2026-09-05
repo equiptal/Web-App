@@ -6,8 +6,10 @@ import { useRfq, agentMatches } from "@/lib/store/rfq-store";
 import { Card, Field, Icon, Seg2, SelChips, Stepper, TextInput } from "@/components/ui";
 import {
   RENTAL_BASES,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for the hidden overtime picker; delete together if it is never restored
   OVERTIME_RATES,
   type RentalBasis,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for the hidden overtime picker; delete together if it is never restored
   type OvertimeRate,
 } from "@/lib/contract";
 
@@ -175,9 +177,15 @@ export function Step1Project() {
           <Field label={t.step1.advanced.workingDays} agent={agentMatches(project.advanced.workingDaysPerWeek, ap?.advanced.workingDaysPerWeek)}>
             <Stepper value={project.advanced.workingDaysPerWeek} min={1} max={7} onChange={(v) => actions.patchAdvanced({ workingDaysPerWeek: v })} />
           </Field>
+          {/* ── OVERTIME RATE — HIDDEN (2026-09-05, following the app's `2b095d63`).
+              Neither side is asked for a rate any more: the app removed the renter's picker and the
+              supplier's row, `submitBid` made `overtimeRate` optional, and `overtime_rate` joined the
+              T3 keys a bid need not declare. State and `OVERTIME_RATES` stay so a request created
+              BEFORE this still reads back, and restoring is uncommenting rather than rebuilding.
+
           <Field label={t.step1.advanced.overtime} agent={agentMatches(project.advanced.overtimeRate, ap?.advanced.overtimeRate)}>
             <Seg2<OvertimeRate> value={project.advanced.overtimeRate} onChange={(v) => actions.patchAdvanced({ overtimeRate: v })} options={opt(OVERTIME_RATES, t.options.overtime)} />
-          </Field>
+          </Field> */}
         </div>
       </Card>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent } from "react";
 import { postAuth, type AuthKind } from "./authClient";
 import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
@@ -71,6 +71,38 @@ export function CodeEntry({
     setBoxes([0, 1, 2, 3].map((i) => text[i] ?? ""));
     inputs.current[Math.min(text.length, 3)]?.focus();
   };
+
+  /**
+   * **WebOTP — the browser reads the SMS itself** (Chrome on Android; a no-op everywhere else).
+   *
+   * `autoComplete="one-time-code"` below is the iOS half: Safari offers the code above the keyboard.
+   * It is all the web had, and on Android it does nothing, which is why a renter was opening the
+   * Messages app and copying the code by hand.
+   *
+   * ⚠️ **Inert until the SMS carries the binding line.** WebOTP only fires for a message whose LAST
+   * line is `@<origin-host> #<code>` — e.g. `@moedatech.net #1234`. Without it the promise simply
+   * never resolves, which is why this is safe to ship first and costs nothing if the message never
+   * changes. It is also why `autoComplete` stays: the two mechanisms are independent.
+   *
+   * Aborted on unmount, so leaving the screen does not leave a live SMS listener behind — and so two
+   * code screens can never hold two listeners at once, which Chrome does not define.
+   */
+  useEffect(() => {
+    if (typeof window === "undefined" || !("OTPCredential" in window)) return;
+    const ac = new AbortController();
+    navigator.credentials
+      .get({ otp: { transport: ["sms"] }, signal: ac.signal } as CredentialRequestOptions)
+      .then((cred) => {
+        const otp = (cred as { code?: string } | null)?.code?.replace(/\D/g, "").slice(0, 4);
+        if (!otp) return;
+        setBoxes([0, 1, 2, 3].map((i) => otp[i] ?? ""));
+        inputs.current[Math.min(otp.length, 3)]?.focus();
+      })
+      .catch(() => {
+        /* aborted, dismissed, or unsupported — the renter types it, exactly as before */
+      });
+    return () => ac.abort();
+  }, []);
 
   const resetBoxes = () => {
     setBoxes(["", "", "", ""]);

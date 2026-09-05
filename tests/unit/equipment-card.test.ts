@@ -569,23 +569,24 @@ describe("distanceDigits — the one formatter every surface's distance goes thr
     expect(distanceDigits(140.3, false)).toBe("140.3");
   });
 
-  it("writes Arabic-Indic digits with the ARABIC decimal separator, U+066B — not a Latin full stop", () => {
-    // Checked against `Intl.NumberFormat('ar-SA-u-nu-arab')`, which formats 7.5 as ٧٫٥. A Latin `.`
-    // would have LOOKED correct on screen — both characters are bidi class AN inside the `dir="ltr"`
-    // isolate the numeral carries — while being the wrong character in every string copied off it.
+  it("writes Latin digits and a Latin decimal separator, in both locales", () => {
+    /**
+     * It used to answer «٧٫٥» in Arabic — Arabic-Indic digits around U+066B, the Arabic decimal
+     * separator, matching `Intl.NumberFormat('ar-SA-u-nu-arab')`. Withdrawn 2026-09-04: digits are
+     * Latin app-wide, in Arabic too (owner, via the app's `1aabf6db`), and a distance reading
+     * «٨٫٢ كم» beside a price reading `8,200` was the mismatch the ruling exists to end.
+     */
     const arabic = distanceDigits(7.5, true);
-    expect(arabic).toBe("٧٫٥");
-    expect([...arabic].map((c) => c.codePointAt(0))).toEqual([0x0667, 0x066b, 0x0665]);
-    expect(arabic).not.toContain(".");
-    expect(distanceDigits(8, true)).toBe("٨٫٠");
-    // …and it agrees with the platform's own answer, so the separator is not our invention.
-    expect(arabic).toBe(new Intl.NumberFormat("ar-SA-u-nu-arab", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(7.5));
+    expect(arabic).toBe("7.5");
+    expect(arabic).toBe(distanceDigits(7.5, false)); // the locale no longer changes the answer
+    expect(arabic).not.toMatch(/[٠-٩٫]/);
+    expect(distanceDigits(8, true)).toBe("8.0"); // the trailing .0 is still kept, always
   });
 
   it("is NOT `arabicIndicDigits`, which truncates — the mutation this whole rule exists to stop", () => {
     // The count formatter is right for counts and silently wrong for a measurement: it would state a
-    // 7.5 km yard as «٧». The two being separate functions is the fix.
-    expect(arabicIndicDigits(7.5)).toBe("٧");
+    // 7.5 km yard as «7». The two being separate functions is still the fix; only the digits moved.
+    expect(arabicIndicDigits(7.5)).toBe("7");
     expect(distanceDigits(7.5, true)).not.toBe(arabicIndicDigits(7.5));
   });
 

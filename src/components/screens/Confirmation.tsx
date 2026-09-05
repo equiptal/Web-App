@@ -226,7 +226,7 @@ function HowItWorks({ ar, L }: { ar: boolean; L: (e: string, a: string) => strin
           <span style={{ width: 30, height: 30, borderRadius: 9, background: OR, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>▶</span>
           <div>
             <div style={{ fontSize: 14, fontWeight: 800, color: "#fff", lineHeight: 1.1 }}>{L("How it works", "كيف تعمل")}</div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "#7C8DA6" }}>{L(`Step ${step + 1} of 4`, `الخطوة ${step + 1} من ٤`)} · {sc.tag}</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "#7C8DA6" }}>{L(`Step ${step + 1} of 4`, `الخطوة ${step + 1} من 4`)} · {sc.tag}</div>
           </div>
         </div>
         <button onClick={() => setPlaying((p) => !p)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 9, border: "1px solid #2E3F58", background: "#1A2B42", color: "#DCE6F2", fontFamily: "inherit", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
@@ -370,8 +370,8 @@ function SceneCompare({ L }: { ar: boolean; L: (e: string, a: string) => string 
   return (
     <div style={{ position: "absolute", inset: 0, padding: "18px 20px", animation: "rlv-fade .35s ease both" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 11 }}>
-        <span style={{ fontSize: 12, fontWeight: 800, color: "#16263F" }}>{L("Forklift · 10 ton — 3 bids", "رافعة شوكية · ١٠ طن — ٣ عروض")}</span>
-        <span style={{ fontSize: 10, fontWeight: 800, color: "#15803D", background: "#EAF7EF", padding: "3px 8px", borderRadius: 20 }}>{L("1/1 fulfilled", "١/١ مكتمل")}</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: "#16263F" }}>{L("Forklift · 10 ton — 3 bids", "رافعة شوكية · 10 طن — 3 عروض")}</span>
+        <span style={{ fontSize: 10, fontWeight: 800, color: "#15803D", background: "#EAF7EF", padding: "3px 8px", borderRadius: 20 }}>{L("1/1 fulfilled", "1/1 مكتمل")}</span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {rows.map((c) => (

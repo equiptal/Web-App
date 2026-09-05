@@ -85,7 +85,7 @@ const C = {
 const RESP_META: { key: CostResponsibility["key"]; en: string; ar: string; icon: string }[] = [
   { key: "fuel", en: "Fuel", ar: "الوقود", icon: "local_gas_station" },
   { key: "maintenance", en: "Maintenance", ar: "الصيانة", icon: "build" },
-  { key: "overtime", en: "Overtime", ar: "العمل الإضافي", icon: "more_time" },
+  // { key: "overtime", en: "Overtime", ar: "العمل الإضافي", icon: "more_time" }, // retired with the term
   { key: "operator_food", en: "Operator food", ar: "طعام المشغّل", icon: "restaurant" },
   { key: "operator_transport_accommodation", en: "Operator transport & accom", ar: "تنقّل وإقامة المشغّل", icon: "card_travel" },
 ];

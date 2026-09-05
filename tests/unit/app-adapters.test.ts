@@ -214,11 +214,26 @@ describe("draftToCreateRequest — ALIGNMENT rules", () => {
 });
 
 describe("draftToCreateRequest — §4.2 fields", () => {
-  it("maps hours/days/overtime with the enum", () => {
+  it("maps hours and days with the enum", () => {
     const p = draftToCreateRequest(makeDraft(), "46");
     expect(p.workingHoursPerDay).toBe(10);
     expect(p.workingDaysPerWeek).toBe(6);
-    expect(p.overtimeRate).toBe("0"); // default "without"
+  });
+
+  it("omits the overtime rate rather than writing the '0' sentinel", () => {
+    /**
+     * The picker is retired and the draft default is "without", which mapped to the string '0'.
+     * '0' is TRUTHY, so it read back as a rate: the quotation printed "Overtime 0" and the deal room
+     * raised a phantom conflict on a term neither side was asked about. The backend now normalises it
+     * away (app `2b095d63`); the web stops creating it.
+     */
+    expect(draftToCreateRequest(makeDraft(), "46").overtimeRate).toBeUndefined();
+  });
+
+  it("still sends a rate a draft genuinely carries from before", () => {
+    const project = defaultProjectDetails();
+    project.advanced.overtimeRate = "1.5x";
+    expect(draftToCreateRequest(makeDraft({ project }), "46").overtimeRate).toBe("1.5X");
   });
 
   it("routes free-text 'other' cert to notes (never the gating cert list); maps fixed certs to canonical tokens", () => {

@@ -36,9 +36,10 @@ export function requestDetailRows(r: RequestRecord, ar: boolean, L: (en: string,
   const qty = (n: unknown, unit: [string, string]) => (n == null ? null : `${Number(n).toLocaleString(ar ? "ar-SA-u-ca-gregory" : "en-US")} ${L(unit[0], unit[1])}`);
   const rentalMap = { DAILY: ["Daily", "يومي"], WEEKLY: ["Weekly", "أسبوعي"], MONTHLY: ["Monthly", "شهري"], PER_JOB: ["Per job", "للمهمة"], LONG_TERM: ["Long term", "طويل الأمد"] } as Record<string, [string, string]>;
   const urgencyMap = { ASAP: ["ASAP", "عاجل"], SOON: ["Soon", "قريبًا"], FAR_FUTURE: ["Future", "مستقبلًا"] } as Record<string, [string, string]>;
-  const payMap = { UPFRONT: ["Upfront", "مقدمًا"], DAILY: ["Daily", "يومي"], "NET-30": ["Net 30 days", "صافي ٣٠ يومًا"], "NET-60": ["Net 60 days", "صافي ٦٠ يومًا"], "END-OF-JOB": ["End of job", "نهاية المهمة"] } as Record<string, [string, string]>;
-  const slaMap = { FOUR_HR: ["4 hours", "٤ ساعات"], EIGHT_HR: ["8 hours", "٨ ساعات"], TWENTY_FOUR_HR: ["24 hours", "٢٤ ساعة"], FORTY_EIGHT_HR: ["48 hours", "٤٨ ساعة"], SEVENTY_TWO_HR: ["72 hours", "٧٢ ساعة"] } as Record<string, [string, string]>;
+  const payMap = { UPFRONT: ["Upfront", "مقدمًا"], DAILY: ["Daily", "يومي"], "NET-30": ["Net 30 days", "صافي 30 يومًا"], "NET-60": ["Net 60 days", "صافي 60 يومًا"], "END-OF-JOB": ["End of job", "نهاية المهمة"] } as Record<string, [string, string]>;
+  const slaMap = { FOUR_HR: ["4 hours", "4 ساعات"], EIGHT_HR: ["8 hours", "8 ساعات"], TWENTY_FOUR_HR: ["24 hours", "24 ساعة"], FORTY_EIGHT_HR: ["48 hours", "48 ساعة"], SEVENTY_TWO_HR: ["72 hours", "72 ساعة"] } as Record<string, [string, string]>;
   const maintMap = { SUPPLIER: ["Supplier", "المؤجّر"], RENTER: ["Renter", "المستأجر"], RENTEE: ["Renter", "المستأجر"] } as Record<string, [string, string]>;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for the hidden overtime picker; delete together if it is never restored
   const otMap = { "0": ["None", "بدون"], WITHOUT: ["None", "بدون"], "1.5X": ["1.5×", "1.5×"], "2X": ["2×", "2×"] } as Record<string, [string, string]>;
   const rows: [string, ReactNode][] = [
     [L("Rental basis", "أساس الإيجار"), enumL(r.rentalType, rentalMap)],
@@ -47,7 +48,11 @@ export function requestDetailRows(r: RequestRecord, ar: boolean, L: (en: string,
     [L("Working hours", "ساعات العمل"), qty(r.workingHoursPerDay, ["hrs/day", "ساعة/يوم"])],
     [L("Working days / week", "أيام العمل/أسبوع"), r.workingDaysPerWeek ?? null],
     [L("Estimated job hours", "ساعات المهمة التقديرية"), qty(r.jobEstimatedHours, ["hrs", "ساعة"])],
-    [L("Overtime rate", "أجر العمل الإضافي"), enumL(r.overtimeRate, otMap)],
+    // Overtime is retired (2026-09-05, with the app's `2b095d63`): the renter is not asked for a
+  // rate and the supplier does not declare one. `'0'` is the "without overtime" sentinel every
+  // request written while the field was mandatory carries, and it is a TRUTHY string — printing
+  // it raw is how a quotation came to read "Overtime 0" for a term nobody was asked about.
+    // [L("Overtime rate", "أجر العمل الإضافي"), enumL(r.overtimeRate, otMap)],
     [L("Terrain", "التضاريس"), enumL(r.terrainType, {})],
     [L("Fulfillment", "نوع التنفيذ"), enumL(r.fulfillmentType, {})],
     [L("Payment terms", "شروط الدفع"), enumL(r.paymentTerms, payMap)],
@@ -386,20 +391,21 @@ const RENTAL_OPTS: Opt[] = [
   { v: "MONTHLY", en: "Monthly", ar: "شهري" }, { v: "PER_JOB", en: "Per job", ar: "بالمهمة" },
   { v: "LONG_TERM", en: "Long term", ar: "طويل الأمد" },
 ];
-const OVERTIME_OPTS: Opt[] = [{ v: "0", en: "None", ar: "بدون" }, { v: "1.5X", en: "1.5×", ar: "١.٥×" }, { v: "2X", en: "2×", ar: "٢×" }];
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for the hidden overtime picker; delete together if it is never restored
+const OVERTIME_OPTS: Opt[] = [{ v: "0", en: "None", ar: "بدون" }, { v: "1.5X", en: "1.5×", ar: "1.5×" }, { v: "2X", en: "2×", ar: "2×" }];
 const PAYTERMS_OPTS: Opt[] = [
   { v: "upfront", en: "Upfront", ar: "مقدماً" }, { v: "per_day", en: "Per day", ar: "يومياً" },
-  { v: "net_30", en: "Net 30", ar: "خلال ٣٠ يوم" }, { v: "net_60", en: "Net 60", ar: "خلال ٦٠ يوم" },
+  { v: "net_30", en: "Net 30", ar: "خلال 30 يوم" }, { v: "net_60", en: "Net 60", ar: "خلال 60 يوم" },
   { v: "end_of_job", en: "End of job", ar: "نهاية المهمة" },
 ];
 const MAINT_OPTS: Opt[] = [{ v: "supplier", en: "Supplier", ar: "المؤجّر" }, { v: "rentee", en: "Me (renter)", ar: "أنا (المستأجر)" }];
 const SLA_OPTS: Opt[] = [
-  { v: "FOUR_HR", en: "4 hours", ar: "٤ ساعات" }, { v: "EIGHT_HR", en: "8 hours", ar: "٨ ساعات" },
-  { v: "TWENTY_FOUR_HR", en: "24 hours", ar: "٢٤ ساعة" }, { v: "FORTY_EIGHT_HR", en: "48 hours", ar: "٤٨ ساعة" },
-  { v: "SEVENTY_TWO_HR", en: "72 hours", ar: "٧٢ ساعة" },
+  { v: "FOUR_HR", en: "4 hours", ar: "4 ساعات" }, { v: "EIGHT_HR", en: "8 hours", ar: "8 ساعات" },
+  { v: "TWENTY_FOUR_HR", en: "24 hours", ar: "24 ساعة" }, { v: "FORTY_EIGHT_HR", en: "48 hours", ar: "48 ساعة" },
+  { v: "SEVENTY_TWO_HR", en: "72 hours", ar: "72 ساعة" },
 ];
 const FULFILL_OPTS: Opt[] = [{ v: "SINGLE_SUPPLIER", en: "Single supplier", ar: "مؤجّر واحد" }, { v: "MULTIPLE_SUPPLIERS", en: "Multiple suppliers", ar: "عدة مؤجّرين" }];
-const OFFER_OPTS: Opt[] = [{ v: "24H", en: "24 hours", ar: "٢٤ ساعة" }, { v: "48H", en: "48 hours", ar: "٤٨ ساعة" }, { v: "72H", en: "72 hours", ar: "٧٢ ساعة" }, { v: "1W", en: "1 week", ar: "أسبوع" }];
+const OFFER_OPTS: Opt[] = [{ v: "24H", en: "24 hours", ar: "24 ساعة" }, { v: "48H", en: "48 hours", ar: "48 ساعة" }, { v: "72H", en: "72 hours", ar: "72 ساعة" }, { v: "1W", en: "1 week", ar: "أسبوع" }];
 const OPERATOR_OPTS: Opt[] = [{ v: "YES", en: "With operator", ar: "مع مشغّل" }, { v: "NO", en: "Without operator", ar: "بدون مشغّل" }];
 const FUEL_OPTS: Opt[] = [{ v: "DIESEL", en: "Diesel", ar: "ديزل" }, { v: "PETROL", en: "Petrol", ar: "بنزين" }, { v: "ELECTRIC", en: "Electric", ar: "كهربائي" }];
 // Match the create form (ItemRow): operator nationality is Restricted / Any (values sent to the backend).
@@ -415,7 +421,7 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
   const [endDate, setEndDate] = useState(s(r.endDate).slice(0, 10));
   const [hours, setHours] = useState(s(r.workingHoursPerDay));
   const [days, setDays] = useState(s((r as Record<string, unknown>).workingDaysPerWeek));
-  const [overtime, setOvertime] = useState(s((r as Record<string, unknown>).overtimeRate));
+  // const [overtime, setOvertime] = useState(s((r as Record<string, unknown>).overtimeRate)); // retired with the field
   const [terrain, setTerrain] = useState(s((r as Record<string, unknown>).terrainType));
   // Equipment (single item — fan-out)
   const [units, setUnits] = useState(s(it?.numberOfUnits ?? 1));
@@ -448,7 +454,7 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
     if (endDate) patch.endDate = new Date(`${endDate}T00:00:00Z`).toISOString();
     if (hours) patch.workingHoursPerDay = Number(hours);
     if (days) patch.workingDaysPerWeek = Number(days);
-    if (overtime) patch.overtimeRate = overtime;
+    // if (overtime) patch.overtimeRate = overtime; // retired — an edit no longer restates it
     patch.terrainType = terrain || undefined;
     if (payTerms) patch.paymentTerms = payTerms;
     if (maint) patch.maintenanceResponsibility = maint;
@@ -527,7 +533,7 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
           <SecH icon="event">{L("Project & timing", "المشروع والتوقيت")}</SecH>
           <div className="grid grid-cols-2 gap-3">
             <Sel label={L("Rental basis", "أساس الإيجار")} value={rentalType} onChange={setRentalType} opts={RENTAL_OPTS} />
-            <Sel label={L("Overtime rate", "معدل العمل الإضافي")} value={overtime} onChange={setOvertime} opts={OVERTIME_OPTS} />
+            {/* <Sel label={L("Overtime rate", "معدل العمل الإضافي")} value={overtime} onChange={setOvertime} opts={OVERTIME_OPTS} /> */}
             <label><span className={lbl}>{L("Start date", "تاريخ البدء")}</span><input type="date" className={fld} value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
             <label><span className={lbl}>{L("End date", "تاريخ الانتهاء")}</span><input type="date" className={fld} value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
             <Num label={L("Working hours/day", "ساعات العمل/يوم")} value={hours} onChange={setHours} min={1} max={24} />

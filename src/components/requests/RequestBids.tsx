@@ -522,7 +522,7 @@ export function RequestBids({
                   {/* The fixed-divisor assumption, stated whether or not this period is exact (app parity). */}
                   {periodSubtitle && (
                     <span className="psub">
-                      {periodSubtitle === "weekly" ? L("6 working days/week", "٦ أيام عمل/أسبوع") : L("26 working days/month", "٢٦ يوم عمل/شهر")}
+                      {periodSubtitle === "weekly" ? L("6 working days/week", "6 أيام عمل/أسبوع") : L("26 working days/month", "26 يوم عمل/شهر")}
                     </span>
                   )}
                 </span>
@@ -543,7 +543,7 @@ export function RequestBids({
                   <div className="prow"><span className="pl2">{L("Delivery to site", "النقل إلى الموقع")}{b.mobLeadTime && <span className="lead">{L("delivery within", "تسليم خلال")} {b.mobLeadTime}</span>}</span><span className="pv">{legText(mobLeg)}</span></div>
                   <div className="prow"><span className="pl2">{L("Return from site", "النقل من الموقع")}{b.demobLeadTime && <span className="lead">{L("return within", "إرجاع خلال")} {b.demobLeadTime}</span>}</span><span className="pv">{legText(demobLeg)}</span></div>
                   <div className="prow"><span className="pl2">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="pv">{formatSar(t.perUnit.subtotal)}</span></div>
-                  <div className="prow"><span className="pl2">{L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)")}</span><span className="pv">{formatSar(t.perUnit.vat)}</span></div>
+                  <div className="prow"><span className="pl2">{L("VAT (15%)", "ضريبة القيمة المضافة (15٪)")}</span><span className="pv">{formatSar(t.perUnit.vat)}</span></div>
                   <div className="grandcard">
                     <span className="gl">{L("Grand total · incl. VAT", "الإجمالي · شامل الضريبة")}</span>
                     <span className="gv">{formatSar(t.perUnit.total)} {L("SAR", "ر.س")}</span>

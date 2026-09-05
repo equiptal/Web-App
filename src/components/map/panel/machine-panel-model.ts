@@ -30,11 +30,15 @@ export interface Bilingual {
   ar: string;
 }
 
-const ARABIC_INDIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
-/** Western digits → Arabic-Indic, per digit. Mirrors `bid-map.ts`'s helper; kept local because that
- *  one is private there and this file must not reach into another surface's internals. */
+/**
+ * The numeral as every surface now prints it: **Latin, in Arabic too** (owner, via the app's
+ * `1aabf6db` of 2026-09-04: *"the numbers should be in eng even in arabic"*).
+ *
+ * It used to convert to Arabic-Indic. The name and the call sites stay so the ruling landed as one
+ * edit rather than a dozen; this is the place to delete once they call `String(n)` themselves.
+ */
 export function arDigits(n: number | string): string {
-  return String(n).replace(/\d/g, (d) => ARABIC_INDIC_DIGITS[Number(d)]);
+  return String(n);
 }
 
 const norm = (s: string): string => s.trim().toLowerCase().replace(/[\s-]+/g, "_");

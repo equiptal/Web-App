@@ -142,7 +142,9 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   const [allUnitsIds, setAllUnitsIds] = useState<Set<string>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [selectMode, setSelectMode] = useState(false); // prototype: pick bids to compare/export  const [termsBid, setTermsBid] = useState<GroupBid | null>(null);  const [langPick, setLangPick] = useState(false); // quotation language chooser (Arabic | English)
+  const [selectMode, setSelectMode] = useState(false); // prototype: pick bids to compare/export
+  const [termsBid, setTermsBid] = useState<GroupBid | null>(null);
+  const [langPick, setLangPick] = useState(false); // quotation language chooser (Arabic | English)
   // Bids captured the instant "Download quotations" is clicked. The language/verify modals aren't part
   // of the selection UI, so opening one trips the click-outside handler and CLEARS `selected` before the
   // download fires — which then fell back to exporting EVERY supplier. Snapshotting here keeps the PDF
@@ -624,7 +626,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                     </div>
                     <div className={`fp-opt fp-check${fKm ? " on" : ""}`} onClick={() => setFKm((v) => !v)}>
                       <span className="box"><span className="material-icons-outlined">check</span></span>
-                      <span className="material-icons-outlined fp-ic" style={{ color: "var(--navy-mid)" }}>place</span>{L("Within 50 km of site", "ضمن ٥٠ كم من الموقع")}
+                      <span className="material-icons-outlined fp-ic" style={{ color: "var(--navy-mid)" }}>place</span>{L("Within 50 km of site", "ضمن 50 كم من الموقع")}
                     </div>
                   </>
                 )}
@@ -923,7 +925,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                     ...legRow(L("Delivery to site", "النقل إلى الموقع"), cq.perUnit.mob, b.mobExcluded, b.mobPrice, b.mobLeadTime, L),
                     ...legRow(L("Return from site", "الإرجاع من الموقع"), cq.perUnit.demob, b.demobExcluded, b.demobPrice, b.demobLeadTime, L),
                     [L("Subtotal before VAT", "المجموع قبل الضريبة"), cq.perUnit.subtotal, null],
-                    [L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"), cq.perUnit.vat, null],
+                    [L("VAT (15%)", "ضريبة القيمة المضافة (15٪)"), cq.perUnit.vat, null],
                   ] as [string, number | string, string | null][]).map(([lab, val, note], i) => (
                     <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 0", borderBottom: "1px solid #F2F5F8" }}>
                       <span style={{ fontSize: 13.5, color: "#2a4f72", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>{lab}{note ? <span style={{ fontSize: 11, color: "#6b8fa8", background: "#eff4f9", padding: "1px 7px", borderRadius: 20, whiteSpace: "nowrap" }}>{note}</span> : null}</span>

@@ -255,7 +255,7 @@ export function SharedLinkBidCard({
               ...(deliv ? [[L(`Delivery to site (${nf(bid.mobPrice ?? 0)} × ${u} unit${u > 1 ? "s" : ""})`, `النقل إلى الموقع (${nf(bid.mobPrice ?? 0)} × ${u})`), deliv]] as [string, number][] : []),
               ...(ret ? [[L(`Return from site (${nf(bid.demobPrice ?? 0)} × ${u} unit${u > 1 ? "s" : ""})`, `الإرجاع من الموقع (${nf(bid.demobPrice ?? 0)} × ${u})`), ret]] as [string, number][] : []),
               [L("Subtotal before VAT", "المجموع قبل الضريبة"), sub],
-              [L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"), vat],
+              [L("VAT (15%)", "ضريبة القيمة المضافة (15٪)"), vat],
             ] as [string, number][]).map(([lab, val], i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 0", borderBottom: "1px solid #F2F5F8" }}>
                 <span style={{ fontSize: 13.5, color: "#2a4f72", fontWeight: 600 }}>{lab}</span>

@@ -54,10 +54,7 @@ import { ensureDealRoom } from "@/lib/chat/ensure-deal-room";
 import type { BidCard } from "@/lib/contract/bids";
 import { priceFooterModel } from "@/lib/contract/price-footer";
 import { computeQuoteTotals } from "@/lib/pricing/rental";
-import { fmt, useLocale, useT } from "@/lib/i18n";
-
-const ARABIC_INDIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
-const arDigits = (s: string): string => s.replace(/\d/g, (d) => ARABIC_INDIC_DIGITS[Number(d)]);
+import { fmt, useT } from "@/lib/i18n";
 
 export interface PriceFooterProps {
   bid: BidCard;
@@ -72,8 +69,6 @@ export interface PriceFooterProps {
 
 export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooterProps) {
   const t = useT();
-  const { locale } = useLocale();
-  const ar = locale === "ar";
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   /** The breakdown popover. Closed on every mount: it explains the figure, it is not the figure. */
@@ -110,13 +105,14 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
    * `fmtEN(rate)` for exactly this reason. One bid was reading as two different prices depending on
    * which screen you were standing on.
    *
-   * COUNTS are the other way round and stay so: `num` below still renders «٣» / «٥», which is what
-   * the count pills, the distance and the prototype's `AR()` all do. Money is Latin, counts are not.
+   * COUNTS used to be the other way round — «٣», «٥» — and are not any more. Digits are Latin
+   * everywhere as of 2026-09-04, so money and counts finally agree instead of one line of a price
+   * breakdown being written in a different numeral system from the line above it.
    */
   const money = (n: number): string => Math.round(n).toLocaleString("en-US");
-  const num = (n: number): string => (ar ? arDigits(String(n)) : String(n));
+  const num = (n: number): string => String(n);
   /** The billing period the rate is quoted over — «ر.س / يوم» for the rate, and the plural for the
-   *  breakdown's basis line («× ١٤ يوم»). */
+   *  breakdown's basis line («× 14 يوم»). */
   const periodWord = (plural: boolean): string => {
     switch ((totals.priceUnit || "PER_DAY").toUpperCase()) {
       case "PER_WEEK": return plural ? t.priceFooter.weeks : t.priceFooter.week;

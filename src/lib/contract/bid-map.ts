@@ -550,13 +550,6 @@ function clusterByProximity<P extends { x: number; y: number }>(projected: reado
 
 /* ───────────────────────────────── unit count label ───────────────────────────────── */
 
-const ARABIC_INDIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
-
-/** Western digits → Arabic-Indic, per digit. */
-function toArabicIndic(n: number): string {
-  return String(Math.trunc(Math.abs(n))).replace(/\d/g, (d) => ARABIC_INDIC_DIGITS[Number(d)]);
-}
-
 /**
  * `١ وحدة` · `٢ وحدة` · `١١ وحدة` — **one literal form for every count** (AC-146).
  *
@@ -568,25 +561,26 @@ function toArabicIndic(n: number): string {
  * form is the same everywhere the Arabic surface renders, so there is nothing for i18n to decide.
  */
 export function unitCountLabel(n: number): string {
-  return `${toArabicIndic(n)} وحدة`;
+  return `${Math.trunc(Math.abs(n))} وحدة`;
 }
 
-/** The bare numeral in Arabic-Indic digits — for a pill whose noun comes from the taxonomy rather than
- *  from `unitCountLabel`'s literal «وحدة». Same formatter, without the noun.
+/**
+ * The bare numeral for a pill whose noun comes from the taxonomy rather than from `unitCountLabel`'s
+ * literal «وحدة». Same formatter, without the noun.
  *
- *  **Counts only.** It TRUNCATES, which is right for a count — there is no such thing as 2.4 machines —
- *  and silently wrong for anything measured: `arabicIndicDigits(7.5)` is «٧». A distance goes through
- *  {@link distanceDigits} instead, and that is the whole reason the two are separate functions. */
+ * ⚠️ **It no longer converts.** Digits are Latin app-wide, in Arabic too (owner, via the app's
+ * `1aabf6db` of 2026-09-04: *"the numbers should be in eng even in arabic"*). The name is kept only
+ * so the call sites did not all have to move in one commit; it is the place to delete once they read
+ * `String(n)` directly.
+ *
+ * **Counts only.** It TRUNCATES, which is right for a count — there is no such thing as 2.4 machines —
+ * and silently wrong for anything measured. A distance goes through {@link distanceDigits} instead,
+ * and that is the whole reason the two are separate functions.
+ */
 export function arabicIndicDigits(n: number): string {
-  return toArabicIndic(n);
+  return String(Math.trunc(Math.abs(n)));
 }
 
-/** **The Arabic decimal separator, U+066B «٫»** — not a Latin full stop. Checked rather than assumed:
- *  `Intl.NumberFormat('ar-SA-u-nu-arab')` formats 7.5 as `٧٫٥`, which is U+0667 U+066B U+0665. Both
- *  this and the Arabic-Indic digits are bidi class AN, so the run renders correctly inside the
- *  `dir="ltr"` isolate every numeral on this surface already carries — a Latin `.` would have LOOKED
- *  right there while being the wrong character in every string that leaves the page. */
-const ARABIC_DECIMAL_SEPARATOR = "٫";
 
 /**
  * **One distance, one decimal, in the reader's digits** (owner, 2026-08-11: *"do not round, always keep
@@ -607,10 +601,12 @@ const ARABIC_DECIMAL_SEPARATOR = "٫";
  * Callers keep the null case themselves — an unknown distance is a sentence, not a number, and must
  * never be allowed to become `0.0`.
  */
-export function distanceDigits(km: number, ar: boolean): string {
-  const fixed = Math.abs(km).toFixed(1);
-  if (!ar) return fixed;
-  return fixed.replace(/\d/g, (d) => ARABIC_INDIC_DIGITS[Number(d)]).replace(".", ARABIC_DECIMAL_SEPARATOR);
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- the locale no longer changes the answer
+export function distanceDigits(km: number, _ar: boolean): string {
+  // `_ar` is kept so no call site changes: the Arabic branch is gone, not the parameter. Digits are
+  // Latin in both locales now, and with them the Arabic decimal separator «٫» — a distance reading
+  // «٨٫٢ كم» beside a price reading `8,200` was the mismatch the ruling exists to end.
+  return Math.abs(km).toFixed(1);
 }
 
 /**

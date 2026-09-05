@@ -327,7 +327,7 @@ export function renderQuotationSection(doc: QuotationDoc): string {
       ${priceExtras}
       <div class="totals">
         <div class="trow"><span>${esc(L("Subtotal before VAT", "الإجمالي قبل الضريبة"))}</span><b>${money2(doc.totals.subtotal)}</b></div>
-        <div class="trow"><span>${esc(L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"))}</span><b>${money2(doc.totals.vat)}</b></div>
+        <div class="trow"><span>${esc(L("VAT (15%)", "ضريبة القيمة المضافة (15٪)"))}</span><b>${money2(doc.totals.vat)}</b></div>
         <div class="trow grand"><span>${esc(grandLabel)}</span><b>${grandValue}</b></div>
       </div>
       <div class="words"><div class="wl">${esc(L("Amount in words", "المبلغ كتابةً"))}</div>${esc(words)}</div>
@@ -342,8 +342,8 @@ export function renderQuotationSection(doc: QuotationDoc): string {
 /** The standard Saudi quotation legal clauses (bilingual). */
 export function quotationLegal(L: (en: string, ar: string) => string): string[] {
   return [
-    L("This quotation is valid for seven (7) days from the issue date and expires automatically thereafter unless confirmed through the Moedatech platform.", "هذا العرض ساري المفعول لمدة سبعة (٧) أيام من تاريخ الإصدار، وتسقط صلاحيته تلقائيًا بعد ذلك ما لم يتم تأكيده عبر منصة معداتك."),
-    L("Prices are inclusive of items explicitly listed in the pricing table above. VAT at 15% applies per Saudi tax law.", "الأسعار شاملة لِما ذُكر صراحةً في جدول التسعير أعلاه، وضريبة القيمة المضافة بنسبة ١٥٪ مفروضة وفقًا للنظام السعودي."),
+    L("This quotation is valid for seven (7) days from the issue date and expires automatically thereafter unless confirmed through the Moedatech platform.", "هذا العرض ساري المفعول لمدة سبعة (7) أيام من تاريخ الإصدار، وتسقط صلاحيته تلقائيًا بعد ذلك ما لم يتم تأكيده عبر منصة معداتك."),
+    L("Prices are inclusive of items explicitly listed in the pricing table above. VAT at 15% applies per Saudi tax law.", "الأسعار شاملة لِما ذُكر صراحةً في جدول التسعير أعلاه، وضريبة القيمة المضافة بنسبة 15٪ مفروضة وفقًا للنظام السعودي."),
     L("The supplier is responsible for the equipment's roadworthiness and technical safety on the delivery date, and for satisfying mandated safety certifications.", "المُورِّد مسؤول عن صلاحية المعدة وسلامتها الفنية في تاريخ التسليم، وعن استيفاء شهادات السلامة والوثائق المطلوبة نظامًا."),
     L("This quotation is governed by the laws of the Kingdom of Saudi Arabia; competent Saudi courts have exclusive jurisdiction over any dispute.", "يخضع هذا العرض لأنظمة المملكة العربية السعودية، وتختصُّ المحاكم السعودية المختصة بالفصل في أي نزاع."),
     L("This document is issued electronically via the Moedatech platform and is legally equivalent to a signed document under the Saudi Electronic Transactions Law.", "تَمَّ إصدار هذا المستند إلكترونيًا عبر منصة معداتك، ويُعدّ مكافئًا قانونيًا للمستند الموقَّع وفقًا لنظام التعاملات الإلكترونية السعودي."),
