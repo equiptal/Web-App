@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { Photo } from "@/components/Photo";
 
 /**
@@ -35,24 +37,33 @@ export const SHOP_PAGE = "mx-auto w-full max-w-[1360px] px-6 pb-20";
  * `object-contain`, never `cover`: a mark is a shape with its own proportions, and cropping it to
  * fill a square cuts the company name off half of these.
  *
- * `placeholderSize` is small on purpose. The glyph has to sit inside a 24px chip as readily as a
- * 56px square, and a photograph's default would overflow both.
  */
 export function ShopLogo({
   src,
   name,
   className,
-  placeholderSize = 20,
 }: {
   src: string | null;
   name: string;
   /** The box. Size, radius and any ground colour belong here. */
   className: string;
-  placeholderSize?: number;
 }) {
+  const [failed, setFailed] = useState(false);
+  if (src && !failed) {
+    return (
+      <span className={`${className} grid place-items-center overflow-hidden`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={name} onError={() => setFailed(true)} className="h-full w-full object-contain" />
+      </span>
+    );
+  }
+  /* ⚠️ **A missing LOGO is not a missing photograph.** The app's placeholder is the platform's own
+     artwork and it reads «No Equipment Photo Available» — true on a machine's tile, false and
+     confusing in a 24px chip beside a supplier's name. A mark we do not have becomes the store's
+     own initial, which at least says WHICH supplier is missing one. */
   return (
-    <span className={`${className} grid place-items-center overflow-hidden`}>
-      <Photo src={src} alt={name} className="h-full w-full object-contain" placeholderSize={placeholderSize} />
+    <span className={`${className} grid place-items-center overflow-hidden bg-shop-fill font-shop-bold text-shop-ink`}>
+      {name.trim()[0]?.toUpperCase() ?? "?"}
     </span>
   );
 }

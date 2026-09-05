@@ -25,6 +25,14 @@ import type { RenterSupplier } from "@/lib/contract/renter-suppliers";
  * The word sits next to a list of companies, and a renter has every reason to fear it. So the dialog
  * says the number of suppliers that stay, and the button says what it removes. Nobody should have to
  * find out by trying it.
+ *
+ * ── The same menu on the share panel (owner, 2026-09-03) ────────────────────────────────────────
+ *
+ * *"I want to show same group dropdown in the my suppliers, use same component."* The panel's
+ * recipient list is the SAME list, so it had no business carrying a second, plainer group control (a
+ * bare `<select>`). It is the same component now, with `onRename` / `onDelete` / `onCreate` left off:
+ * a picker narrows the list, it does not administer it. With no handlers and no groups there is
+ * nothing to offer, so the menu renders nothing at all rather than an empty door.
  */
 
 export function GroupsMenu({
@@ -37,23 +45,30 @@ export function GroupsMenu({
   onDelete,
   onCreate,
   total,
+  align = "end",
 }: {
   groups: { name: string; count: number }[];
   active: string;
   open: boolean;
   onOpen: (next: boolean) => void;
   onPick: (name: string) => void;
-  onRename: (name: string) => void;
-  onDelete: (name: string) => void;
-  onCreate: () => void;
+  /** Left off where the menu is only a FILTER (the share panel): no pen, no bin, no «New group». */
+  onRename?: (name: string) => void;
+  onDelete?: (name: string) => void;
+  onCreate?: () => void;
   total: number;
+  /** Which edge the panel hangs from. `end` under a trailing button (My Suppliers), `start` under a
+   *  leading one (the share panel), where hanging the other way would run off the container. */
+  align?: "start" | "end";
 }) {
   const t = useT();
   const c = t.suppliers;
 
   // No groups yet: one button, and nothing to open. The menu is what a group list looks like once
-  // there is a list — offering it while empty is a menu with a single "create" in it.
+  // there is a list — offering it while empty is a menu with a single "create" in it. A filter-only
+  // menu has no button to fall back to, so it stays out of the row entirely.
   if (!groups.length) {
+    if (!onCreate) return null;
     return (
       <button type="button" onClick={onCreate} className={btn("secondary", "sm")}>
         <Icon name="label" size={14} />
@@ -72,7 +87,12 @@ export function GroupsMenu({
       </button>
 
       {open && (
-        <span className="absolute end-0 top-[calc(100%+6px)] z-50 min-w-[260px] overflow-hidden rounded-md border border-border-strong bg-surface">
+        <span
+          className={cx(
+            "absolute top-[calc(100%+6px)] z-50 min-w-[260px] overflow-hidden rounded-md border border-border-strong bg-surface",
+            align === "start" ? "start-0" : "end-0",
+          )}
+        >
           <Row label={c.allGroups} count={total} current={active === ""} onPick={() => onPick("")} />
           {groups.map((g) => (
             <Row
@@ -81,18 +101,20 @@ export function GroupsMenu({
               count={g.count}
               current={active === g.name}
               onPick={() => onPick(g.name)}
-              onRename={() => onRename(g.name)}
-              onDelete={() => onDelete(g.name)}
+              onRename={onRename && (() => onRename(g.name))}
+              onDelete={onDelete && (() => onDelete(g.name))}
             />
           ))}
-          <button
-            type="button"
-            onClick={onCreate}
-            className="flex w-full items-center gap-2 bg-brand-soft px-2.5 py-2.5 text-start text-meta font-extrabold text-brand-deep transition hover:bg-brand-pale"
-          >
-            <Icon name="add" size={15} />
-            {c.newGroup}
-          </button>
+          {onCreate && (
+            <button
+              type="button"
+              onClick={onCreate}
+              className="flex w-full items-center gap-2 bg-brand-soft px-2.5 py-2.5 text-start text-meta font-extrabold text-brand-deep transition hover:bg-brand-pale"
+            >
+              <Icon name="add" size={15} />
+              {c.newGroup}
+            </button>
+          )}
         </span>
       )}
     </span>

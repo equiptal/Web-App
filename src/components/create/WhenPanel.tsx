@@ -19,7 +19,8 @@ import { useRfq } from "@/lib/store/rfq-store";
 import { Icon, Toggle } from "@/components/ui";
 import { CanvasField, CheckFromProject, ChoiceRow, PanelDot } from "@/components/create/Provenance";
 import { useProvenance } from "@/components/create/hooks";
-import { computeChargedDays, OVERTIME_RATES, RENTAL_BASES, type OvertimeRate, type RentalBasis } from "@/lib/contract";
+import { computeChargedDays, RENTAL_BASES, type RentalBasis } from "@/lib/contract";
+// Re-add `OVERTIME_RATES, type OvertimeRate` here when the overtime picker below comes back.
 import { arabicIndicDigits } from "@/lib/contract/bid-map";
 import { pin } from "@/lib/uiPins";
 
@@ -51,14 +52,13 @@ export function WhenPanel({
 
   const project = state.draft?.project;
   if (!project) return null;
-  const { timing, advanced } = project;
+  const { timing } = project; // `advanced` was read only by the hidden overtime picker below.
   const charged = computeChargedDays(timing);
   const num = (n: number) => (locale === "ar" ? arabicIndicDigits(n) : String(n));
 
   const agentTiming = prov.agentProject?.timing;
   const basisSource = prov.projectSource("timing.rental_basis", timing.rentalBasis, agentTiming?.rentalBasis);
   const hoursSource = prov.projectSource("timing.hours_per_day", timing.hoursPerDay, agentTiming?.hoursPerDay, true);
-  const overtimeSource = prov.projectSource("advanced.overtime_rate", advanced.overtimeRate, prov.agentProject?.advanced?.overtimeRate, true);
 
   const setTiming = (patch: Parameters<typeof actions.patchTiming>[0], key: string) => {
     prov.touchRaw(key);
@@ -304,7 +304,8 @@ export function WhenPanel({
               <Icon name={moreOpen ? "expand_less" : "expand_more"} size={16} className="text-muted" />
             </button>
             {moreOpen && (
-              <div className="grid gap-4 px-4 pb-4 md:grid-cols-2">
+              // One field left, so no second column. Restore `md:grid-cols-2` with the picker below.
+              <div className="grid gap-4 px-4 pb-4">
                 <CanvasField label={t.create.whenPanel.hours} source={hoursSource} hint={t.create.whenPanel.hoursStandard}>
                   <ChoiceRow<string>
                     columns={HOURS_OPTIONS.length}
@@ -313,17 +314,24 @@ export function WhenPanel({
                     options={HOURS_OPTIONS.map((h) => ({ value: String(h), label: num(h) }))}
                   />
                 </CanvasField>
-                <CanvasField label={t.create.whenPanel.overtime} source={overtimeSource}>
-                  <ChoiceRow<OvertimeRate>
-                    columns={OVERTIME_RATES.length}
-                    value={advanced.overtimeRate}
-                    onChange={(v) => {
-                      prov.touchRaw("advanced.overtime_rate");
-                      actions.patchAdvanced({ overtimeRate: v });
-                    }}
-                    options={OVERTIME_RATES.map((o) => ({ value: o, label: t.options.overtime[o] }))}
-                  />
-                </CanvasField>
+                {/* ── OVERTIME RATE — HIDDEN (2026-09-04, following the app's own retirement of it).
+                    Neither side is asked for an overtime rate any more: the app removed the renter's
+                    picker and the supplier's row on 2026-08-30, `submitBid` made `overtimeRate`
+                    optional, and `overtime_rate` joined the T3 keys a bid need not declare. The state
+                    and the option list stay, so a request created BEFORE this still reads back and
+                    re-enabling is uncommenting rather than rebuilding.
+
+                    <CanvasField label={t.create.whenPanel.overtime} source={overtimeSource}>
+                      <ChoiceRow<OvertimeRate>
+                        columns={OVERTIME_RATES.length}
+                        value={advanced.overtimeRate}
+                        onChange={(v) => {
+                          prov.touchRaw("advanced.overtime_rate");
+                          actions.patchAdvanced({ overtimeRate: v });
+                        }}
+                        options={OVERTIME_RATES.map((o) => ({ value: o, label: t.options.overtime[o] }))}
+                      />
+                    </CanvasField> */}
               </div>
             )}
           </div>

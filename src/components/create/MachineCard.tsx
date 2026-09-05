@@ -118,7 +118,9 @@ export function MachineCard({
     <div {...pin("machine-card")} className="min-w-0 flex-1 rounded-sm border border-border bg-surface p-3.5">
       <div {...pin("machine-card-head")} className="mb-4 flex items-center justify-between gap-2">
         <span className="flex items-center gap-2">
-          <PanelDot complete={gaps.length === 0} />
+          {/* Not complete when the catalogue has nothing to offer: no gate can fire on a no-match
+              row, so `gaps` is empty for it, and empty would otherwise read as answered. */}
+          <PanelDot complete={gaps.length === 0 && !notAvailable} />
           <h2 className="whitespace-nowrap text-subhead font-extrabold text-navy">{t.create.machine}</h2>
         </span>
         {onCollapse && (

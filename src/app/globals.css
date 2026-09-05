@@ -16,79 +16,158 @@
    ══════════════════════════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* ── Navy / neutral ramp ─────────────────────────────────────────────────────────────────────
-     Twelve steps, dark to light. Eighty-seven distinct blues were doing this work before; each of
-     these twelve has a job none of the others can do. */
-  /* The dark end was re-cut from a swatch the owner supplied (2026-08-29): #1c2738, a navy that is
-     both darker and much less saturated than the #1c3550 that stood here. Only `--navy` was asked
-     for; `--navy-deep` and `--navy-mid` follow it because a ramp is a set of distances, not three
-     independent colours — each keeps the exact channel ratio to `--navy` it already had, so the
-     steps are unchanged and only the family moved. Left alone, `--navy-deep` would have landed
-     within 1.5 points of relative luminance of the new `--navy` and flattened all six
-     `linear-gradient(var(--navy), var(--navy-deep))` surfaces into a solid block. */
-  --navy-deep: #161c2c;      /* dark headers, overlay grounds — deeper than a navy block */
-  --navy: #1c2738;           /* foreground text, navy blocks */
-  --navy-mid: #2a3a50;       /* the step up from navy: hover on a navy surface, secondary text */
-  --muted-dark: #5a6b82;     /* secondary text that still has to carry weight */
-  --muted: #6b8fa8;          /* secondary text */
-  --muted-light: #9aa7b8;    /* tertiary text, placeholders, disabled */
-  --border-strong: #c3d2e0;  /* a divider that has to be seen */
-  --border: #d4e0ec;         /* the default border */
-  --surface3: #e4edf5;       /* pressed, selected */
-  --surface2: #eff4f9;       /* inset panels, tinted fills, hover */
-  --background: #f5f8fc;     /* the page ground */
+  /* ══════════════════════════════════════════════════════════════════════════════════════════
+     The palette is the SUPPLIER OS palette (owner, 2026-09-04), carried here from
+     `docs/design-tokens.md` — the file he handed over, kept in the repo so the next change starts
+     from the same numbers.
+
+     Two products, one set of colours. The OS and this app were drifting apart a shade at a time:
+     navy #1c2738 here against #22384e there, orange #f79009 against #f97316, a blue-tinted neutral
+     ramp against a flat grey one. None of those differences was a decision anybody made; they were
+     three separate derivations of "the brand". The OS set is now the source, and both names live
+     here — ours, because 122 files read them, and the OS's, because that is the vocabulary the
+     token file speaks and the one to write new code in.
+
+     ⚠️ **Where the OS file has no equivalent, the value is DERIVED from one that does and says so.**
+     It defines no hover, press or tint step for the brand, and this app needs all three. Each is a
+     stated mix of the OS brand hex, never a fourth guess at "the orange". */
+
+  /* ── Ink / neutral ramp ──────────────────────────────────────────────────────────────────────
+     Twelve steps, dark to light, now on the OS's flat grey ramp rather than a blue-tinted one. */
+  --navy-deep: #1c2738;      /* dark headers, overlay grounds — OS `ink-deep` */
+  --navy: #22384e;           /* foreground text, navy blocks — OS `ink` / `navy` / `text-primary` */
+  --navy-mid: #33506d;       /* the step up from navy: hover on a navy surface — OS `navy-soft` */
+  --muted-dark: #444f57;     /* secondary text that still has to carry weight — OS `text-secondary` */
+  --muted: #59646e;          /* secondary text — OS `text-muted` */
+  --muted-light: #8a95a0;    /* tertiary text, placeholders, disabled — OS `neutral` */
+  --border-strong: #c6c6c6;  /* a divider that has to be seen */
+  --border: #dcdcdc;         /* the default border — OS `border-soft` */
+  --surface3: #e8e8e8;       /* pressed, selected — OS `chrome-press` */
+  --surface2: #f4f4f4;       /* inset panels, tinted fills, hover — OS `chrome` */
+  --background: #f4f4f4;     /* the page ground — OS `desktop-base` */
   --surface: #ffffff;        /* cards, floating layers */
-  --foreground: #1c2738;   /* tracks `--navy` on purpose — see the note in `ds-colors.ts` */
+  --foreground: #22384e;     /* tracks `--navy` on purpose — see the note in `ds-colors.ts` */
+
+  /* The OS names for the same ink, and the two tiers our ramp had no word for. */
+  --ink: #22384e;
+  --ink-deep: #1c2738;
+  --navy-soft: #33506d;
+  --text-primary: #22384e;
+  --text-secondary: #444f57;
+  --text-tertiary: #515a64;
+  --text-muted: #59646e;
+  --text-faint: #6f695a;
+  --text-on-dark: #c8d4e4;
+  --text-on-dark-dim: #8698b0;
+
+  /* The OS chrome ramp, in full. `surface2`/`surface3` above are two of these under our names. */
+  --desktop-base: #f4f4f4;
+  --desktop-hi: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-alt: #fafafa;
+  --chrome: #f4f4f4;
+  --chrome-press: #e8e8e8;
+  --chrome-deep: #e0e0e0;
+  --neutral-btn: #e0e0e0;
+  --neutral-btn-hi: #d4d4d4;
+  --map-plate: #dfe3e7;
+
+  /* Four borders where we had two. `--border` is `border-soft`; the other three are new. */
+  --border-mid: #d0d0d0;
+  --border-hair: #e4e4e4;
+  --border-hair2: #e0e0e0;
 
   /* ── Brand ───────────────────────────────────────────────────────────────────────────────────
-     #f79009 is the brand orange, confirmed against the mobile app (`apps/mobile/lib/core/theme/
-     app_colors.dart`, the `action` token). The mobile standards document still names #E8650A;
-     neither product's code agrees with it, so the document is the thing that is wrong. */
-  --brand-deep: #b45309;     /* brand text on a light ground */
-  --brand: #f79009;          /* the primary CTA */
-  --brand-hover: #e58108;
-  --brand-press: #cc7207;
-  --brand-light: #fbbf6b;    /* accents, dots */
-  --brand-pale: #fde8cc;     /* fills, progress tracks */
-  --brand-soft: #fff4e5;     /* tinted backgrounds, selected chips */
+     #f97316 is the orange, and it is a FILL. At 2.80:1 on white it cannot carry small text; orange
+     TEXT is `--brand-deep` #c2570f (4.50:1, AA). That split is the OS file's own rule. */
+  --brand: #f97316;          /* the primary CTA — OS `brand` / `accent` */
+  --brand-deep: #c2570f;     /* brand text on a light ground — OS `brand-dark` */
+  /* Derived, because the OS set defines no interaction steps: the brand mixed toward black at 12%
+     and 24%. Pressed is a visible step past hover rather than the same value twice. */
+  --brand-hover: #db6513;
+  --brand-press: #bd5711;
+  --brand-light: #e8b64c;    /* accents, dots — OS `warn-amber` */
+  /* Derived: the brand at 22% and 10% over white. The OS set has no orange tint, and using its
+     amber background here would put a yellow wash under an orange control. */
+  --brand-pale: #fee0cc;     /* fills, progress tracks */
+  --brand-soft: #fef1e8;     /* tinted backgrounds, selected chips */
   --brand-fg: #ffffff;
-  --gold: #b8860b;           /* the mark's own colour — not a UI state */
+  --gold: #b8860b;           /* the mark's own colour — not a UI state, and not in the OS set */
 
   /* ── Status ──────────────────────────────────────────────────────────────────────────────────
-     Three tiers each. `base` is the colour itself, `soft` is a background you can lay it on, and
-     `deep` is the text colour that stays readable on that background.
+     Three tiers each, and the same fill/text split the brand has: `--warn` fills at 2.97:1 and
+     `--warn-deep` is the amber that may carry text. */
+  --ok: #1d9e55;             /* OS `success` */
+  --ok-soft: #e2efe7;        /* OS `success-bg` */
+  --ok-deep: #1d7a45;        /* OS `success-ink` */
+  --warn: #b98a1d;           /* OS `warn` — FILL only */
+  --warn-soft: #f7edd8;      /* OS `warn-bg` */
+  --warn-deep: #8a6412;      /* OS `warn-ink` — text */
+  --warn-border: #e0c583;
+  --warn-amber: #e8b64c;
+  --danger: #c02626;         /* OS `danger` */
+  --danger-soft: #f7e3e3;    /* OS `danger-bg` */
+  --danger-deep: #b91c1c;    /* OS `bad`, the darker red for text on a tint */
+  --danger-border: #e8c1c1;
+  --danger-wash: #fbeeee;
+  /* Derived, as with the brand: the danger red mixed toward black at 12% and 24%. */
+  --danger-hover: #a92121;
+  --danger-press: #921d1d;
+  /* ⚠️ **The ONE hex here that the token file does not define, and it is deliberate.**
+     RM3-AC-33 says the bid map's ask control is blue and NEVER navy, and `equipment-card.test.ts`
+     measures the channels to prove it. The OS palette has no true blue by design — its `info` is a
+     slate that "sits in the ink family" (#3b556e, blue channel 110), which is exactly the navy the
+     AC forbids. So the ask keeps the blue it shipped with, under a name that says it is the ask's
+     colour rather than a general "info", and `--info` below takes the OS value as written. */
+  --action: #1a7ec8;
+  --info: #3b556e;           /* OS `info` — slate, deliberately not cyan */
+  --info-soft: #e7ebee;      /* OS `info-bg` */
+  --info-deep: #22384e;      /* the ink, which is where this family lives */
+  --ai: #6d4fc4;
+  --ai-bg: #eee9fa;
+  --neutral: #8a95a0;
+  --neutral-bg: #eceae3;
 
-     ~~Warning is coral and danger is deep red, deliberately far apart.~~ **Withdrawn 2026-08-26**,
-     same day, by the owner: he did not like them — the coral, and the grey-red tint under it, read
-     wrong to him. Both are back to the values the app has always used.
+  /* ── Machine status, and the brighter pips beside them ───────────────────────────────────────
+     Text and border tones first, then the LED colours, which are the same states louder. Nothing in
+     this app draws them yet; they are here so the two products name a machine's state alike. */
+  --st-idle: #b98a1d;
+  --st-reserved: #5d6b77;
+  --st-transit: #c2570f;
+  --st-active: #1d7a45;
+  --st-mnt: #c02626;
+  --st-hold: #8a95a0;
+  --led-idle: #e8b64c;
+  --led-reserved: #8698b0;
+  --led-transit: #f97316;
+  --led-active: #38b06a;
+  --led-mnt: #ff6b5e;
+  --led-hold: #8a95a0;
+  --tick-up: #38e07d;
+  --tick-down: #ff6b5e;
 
-     What that restores is also the objection they were meant to answer, and it is worth writing
-     down rather than losing: `--warn` #d4780a is an orange one shade off `--brand` #f79009, so a
-     caution and a button meant to be pressed are told apart by darkness alone. The clearest case is
-     the "you wrote" block in `create/Canvas.tsx`, which uses one orange for its warning label and
-     for the link inside it, thirteen pixels apart. If that ever needs solving again, the answer is
-     not a redder warning — it is to stop `--warn` being an orange at all, or to let the icon and
-     the wording carry the caution and leave the hue to the CTA. */
-  --ok: #1daf58;
-  /* The VERIFIED badge's own green (owner's artwork, 2026-09-02). Deliberately not `--ok`: that one
-     is a status — "this went well" — and it moves with the status palette. A badge that moved with
-     it would stop being recognisable as the same mark. See `VerifiedMark`. */
-  --verified: #10a64a;
-  --ok-soft: #e7f7ee;
-  --ok-deep: #15803d;
-  --warn: #d4780a;
-  --warn-soft: #fff3e0;
-  /* The app's own darkened orange for warning text on a warning tint (9 uses before the sweep). */
-  --warn-deep: #8a4f08;
-  --danger: #d9362a;
-  --danger-soft: #fcebea;
-  /* The app's own dark red, for danger text on a danger tint. */
-  --danger-deep: #b03636;
-  --danger-hover: #c22e23;
-  --danger-press: #a8281e;
-  --info: #1a7ec8;
-  --info-soft: #e6f2fb;
-  --info-deep: #0e4f7e;
+  /* ── Dark cards, the terminal, and the document facsimiles ───────────────────────────────────
+     The OS's dark surfaces. Carried whole so a screen that needs one does not invent it. */
+  --dark-card: #1c2738;
+  --dark-card-border: #2c3a4e;
+  --dark-card-well: #141d2b;
+  --dark-card-chip: #2c3a4e;
+  --term-bg: #16202c;
+  --term-bar: #0f1722;
+  --term-border: #2b3850;
+  --term-barline: #223047;
+  --term-text: #8698b0;
+  --term-caret: #38e07d;
+  --term-close: #4d5e75;
+  --doc-registration: #2f6b4f;
+  --doc-customs: #2f4d8a;
+  --doc-insurance: #4d7d74;
+  --doc-inspection: #6a7fae;
+  --doc-reference: #b9bdc9;
+
+  /* The OS's own legacy pair, which its login screen still reads. */
+  --sand: #e4e1d8;
+  --paper: #faf9f6;
 
   /* ── Storefront ──────────────────────────────────────────────────────────────────────────────
      The supplier-facing three — Browse, the equipment sheet, the store profile — drawn from the
@@ -144,7 +223,7 @@
   /* ── Floating layers ─────────────────────────────────────────────────────────────────────────
      Nothing in this app casts a shadow. A modal, sheet, dropdown or tooltip is separated from the
      page by its own border and by the page dimming behind it. */
-  --scrim: rgba(28, 53, 80, 0.45);
+  --scrim: rgba(34, 56, 78, 0.45);
   /* The pills and controls laid over a photo (storefront). Alpha, because they have to read on any
      image — a solid navy would go black over a dark machine and disappear over a bright sky. Four
      strengths, and the prototype uses each for a different job. */
@@ -196,6 +275,73 @@
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
   --color-info-deep: var(--info-deep);
+  /* ── The Supplier OS vocabulary ───────────────────────────────────────────────────────────
+     The names the token file speaks, as utilities. Ours above are the same colours under the names
+     122 files already read; these are what new code should use. */
+  --color-action: var(--action);
+  --color-ink: var(--ink);
+  --color-ink-deep: var(--ink-deep);
+  --color-navy-soft: var(--navy-soft);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-text-muted: var(--text-muted);
+  --color-text-faint: var(--text-faint);
+  --color-text-on-dark: var(--text-on-dark);
+  --color-text-on-dark-dim: var(--text-on-dark-dim);
+  --color-desktop-base: var(--desktop-base);
+  --color-desktop-hi: var(--desktop-hi);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-alt: var(--surface-alt);
+  --color-chrome: var(--chrome);
+  --color-chrome-press: var(--chrome-press);
+  --color-chrome-deep: var(--chrome-deep);
+  --color-neutral-btn: var(--neutral-btn);
+  --color-neutral-btn-hi: var(--neutral-btn-hi);
+  --color-map-plate: var(--map-plate);
+  --color-border-mid: var(--border-mid);
+  --color-border-hair: var(--border-hair);
+  --color-border-hair2: var(--border-hair2);
+  --color-warn-border: var(--warn-border);
+  --color-warn-amber: var(--warn-amber);
+  --color-danger-border: var(--danger-border);
+  --color-danger-wash: var(--danger-wash);
+  --color-ai: var(--ai);
+  --color-ai-bg: var(--ai-bg);
+  --color-neutral: var(--neutral);
+  --color-neutral-bg: var(--neutral-bg);
+  --color-st-idle: var(--st-idle);
+  --color-st-reserved: var(--st-reserved);
+  --color-st-transit: var(--st-transit);
+  --color-st-active: var(--st-active);
+  --color-st-mnt: var(--st-mnt);
+  --color-st-hold: var(--st-hold);
+  --color-led-idle: var(--led-idle);
+  --color-led-reserved: var(--led-reserved);
+  --color-led-transit: var(--led-transit);
+  --color-led-active: var(--led-active);
+  --color-led-mnt: var(--led-mnt);
+  --color-led-hold: var(--led-hold);
+  --color-tick-up: var(--tick-up);
+  --color-tick-down: var(--tick-down);
+  --color-dark-card: var(--dark-card);
+  --color-dark-card-border: var(--dark-card-border);
+  --color-dark-card-well: var(--dark-card-well);
+  --color-dark-card-chip: var(--dark-card-chip);
+  --color-term-bg: var(--term-bg);
+  --color-term-bar: var(--term-bar);
+  --color-term-border: var(--term-border);
+  --color-term-barline: var(--term-barline);
+  --color-term-text: var(--term-text);
+  --color-term-caret: var(--term-caret);
+  --color-term-close: var(--term-close);
+  --color-doc-registration: var(--doc-registration);
+  --color-doc-customs: var(--doc-customs);
+  --color-doc-insurance: var(--doc-insurance);
+  --color-doc-inspection: var(--doc-inspection);
+  --color-doc-reference: var(--doc-reference);
+  --color-sand: var(--sand);
+  --color-paper: var(--paper);
   --color-shop-ink: var(--shop-ink);
   --color-shop-ink-2: var(--shop-ink-2);
   --color-shop-ink-3: var(--shop-ink-3);
@@ -218,12 +364,18 @@
   --color-disabled-border: var(--disabled-border);
 
   /* ── Font families ───────────────────────────────────────────────────────────────────────── */
-  --font-sans: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  /* The token file's stacks (owner, 2026-09-04). Latin first, Arabic behind it in the sans stack so
+     a mixed line does not fall to the browser's guess; `--font-mono` deliberately resolves to TEXT
+     faces, and true monospace is the explicit opt-in `.keep-mono` below. */
+  --font-sans: var(--font-inter), var(--font-almarai), ui-sans-serif, system-ui, sans-serif;
   /* The CTA banner headline only. Oswald first; the Arabic face behind it, because Oswald has
      no Arabic and an Arabic headline must not fall to the browser's guess. The system stack
      closes it, so a blocked webfont degrades to the same face as the rest of the app. */
-  --font-hero: var(--font-oswald), var(--font-arabic), "Segoe UI", system-ui, sans-serif;
-  --font-mono: var(--font-plex);
+  --font-hero: var(--font-oswald), var(--font-almarai), var(--font-inter), system-ui, sans-serif;
+  --font-arabic: var(--font-almarai), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-inter), var(--font-almarai), ui-sans-serif, system-ui, sans-serif;
+  --font-mono-data: var(--font-jetbrains-mono), var(--font-almarai), ui-monospace, monospace;
+  --font-display: var(--font-inter), var(--font-almarai), ui-sans-serif, system-ui, sans-serif;
 }
 
 /* The scales below are literal values rather than references into `:root`, so they belong in a
@@ -335,13 +487,21 @@ body {
   overflow-x: clip;
 }
 
-/* Arabic uses IBM Plex Sans Arabic — the prototype's own face (owner, 2026-08-19; `layout.tsx` carries
-   the full reasoning and the three things it fixed). ~~Tajawal.~~ Withdrawn: it runs wider at the same
-   sizes, and every RTL screen's geometry is measured against Plex Arabic in the prototype.
+/* Arabic is ALMARAI (owner, 2026-09-04, from `docs/design-tokens.md`; `layout.tsx` carries what this
+   overturns). ~~IBM Plex Sans Arabic~~, itself ~~Tajawal~~ before that.
    Layout is RTL-capable via logical properties (AC-46, flag-gated). */
 :lang(ar) body,
 [dir="rtl"] body {
-  font-family: var(--font-arabic), "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  font-family: var(--font-almarai), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Almarai has no 500 (the family is 300/400/700/800), so an Arabic `font-medium` heading would
+   render at 400 and lose the emphasis its Latin twin keeps. The token file's own fix: 500 becomes
+   700 inside Arabic, and nowhere else. */
+:lang(ar) [style*="font-weight: 500"],
+:lang(ar) .font-semibold,
+[dir="rtl"] .font-semibold {
+  font-weight: 700;
 }
 
 /* ── Focus ──────────────────────────────────────────────────────────────────────────────────────
@@ -396,7 +556,7 @@ body {
   line-height: 1;
 }
 .tabular {
-  font-family: var(--font-plex), monospace;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
 }
 
 /* ── Control heights ────────────────────────────────────────────────────────────────────────────

@@ -240,7 +240,10 @@ export function RequestsWorkspace() {
 
   const pickGroup = useCallback((groupId: string) => setWanted({ groupId, itemId: null, bidId: null }), []);
   const pickItem = useCallback((id: string) => setWanted((w) => ({ groupId: w.groupId, itemId: id, bidId: null })), []);
-  const pickBid = useCallback((bidId: string) => setWanted((w) => ({ groupId: w.groupId, itemId: w.itemId, bidId })), []);
+  /* ~~`pickBid` — the comparison's chosen supplier.~~ Gone with the picker itself (owner,
+     2026-09-04): the table no longer asks for a supplier, and the map it leads to carries every
+     offer on the request in its own header. `WorkspaceSelection.bidId` still exists and still
+     resolves to the first bid; nothing sets it by hand any more. */
 
   /**
    * Which bids the quotation download covers — by TICK, not by click (owner, 2026-08-30).
@@ -250,8 +253,9 @@ export function RequestsWorkspace() {
    * asked for yet, and there was no way to pick two. A checkbox says what it does and lets him take
    * three of the five.
    *
-   * `resolved.bidId` is untouched — the comparison matrix still uses it to decide which column is
-   * the subject, which is a genuinely single-valued question. Only the download changed hands.
+   * `resolved.bidId` is untouched, and since 2026-09-04 nothing PICKS one: the comparison stopped
+   * asking for a supplier, so the field simply resolves to the first bid on the item. Only the
+   * download ever changed hands.
    */
   const [checkedBids, setCheckedBids] = useState<Set<string>>(new Set());
   const toggleBid = useCallback((bidId: string) => {
@@ -343,7 +347,7 @@ export function RequestsWorkspace() {
   const counts = useMemo(() => sourceCounts(bids), [bids]);
   /* ~~The picked bid's card.~~ The strip drew it above the tabs — the machine offered, its yard
      ribbon, its fact chips — which is the bid card's own job, done twice. With the strip gone
-     nothing at this level needs the bid itself; `resolved.bidId` still says which one is picked. */
+     nothing at this level needs the bid itself; `resolved.bidId` is now only the item's first bid. */
 
   /** The export: the browser's own print dialog over the plain Moedatech sheet. */
   /**
@@ -728,7 +732,20 @@ export function RequestsWorkspace() {
               So the pane is `overflow-hidden` and hands its height to whichever tab is open. The
               cards stretch to it; the comparison table keeps its own horizontal scroll, which is a
               table's business and not a page's. */}
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {/* ── One scroller, and it is not the table's (owner, 2026-09-04) ──────────────────────
+              The cards tab keeps the 2026-08-25 rule exactly: nothing scrolls downwards, the bids are
+              a row you travel sideways, `overflow-hidden`.
+
+              The compare tab does not. A matrix with twenty bids had TWO vertical bars — this pane's
+              and the table's own — so dragging the outer one moved nothing and the figures sat under
+              a fold with no visible edge. The table renders whole now (`CompareMatrix` is `flex-none`)
+              and this pane is the only thing that scrolls it.
+
+              ⚠️ **This is still a scroller inside the page, not the page itself.** `/requests` is
+              `fullBleed` — pinned to the viewport by the same 2026-08-25 ruling — so there is no
+              document scroll to hand the table to. Making the PAGE scroll means that page dropping
+              `fullBleed`, which is the owner's call, not this component's. */}
+          <div className={`flex min-h-0 flex-1 flex-col ${tab === "compare" ? "overflow-y-auto" : "overflow-hidden"}`}>
           {tab === "cards" ? (
             <BidCards
               bids={shown}
@@ -744,10 +761,8 @@ export function RequestsWorkspace() {
               // Everything the source filter allows, benched or not — the matrix draws the bench
               // itself, so it needs the bids it is not currently comparing.
               bids={shownAll}
-              selectedId={resolved.bidId}
               durationDays={item?.durationDays ?? null}
               startDate={item?.startDate ?? null}
-              onSelect={pickBid}
               benched={benched}
               onBench={benchBid}
               ranking={ranking}

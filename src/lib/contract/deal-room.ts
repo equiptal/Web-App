@@ -5,6 +5,7 @@
  */
 import { computeRentalTotal, divisorNote, rentalDivisor, VAT_RATE } from "@/lib/pricing/rental";
 import { cityLabel, urgencyLabel, rentalTypeLabel, fulfillmentLabel, termValueLabel } from "@/lib/contract/labels";
+import { partyToken } from "./labels";
 // Type-only — the deal-room quotation BUILDER lives here (pure, testable in the node suite); the
 // rendering itself stays in the shared template module.
 import type { QuotationDoc, QuotationLineItem, QuotationCard } from "@/lib/quotation/render";
@@ -698,7 +699,10 @@ export function buildDealRoomQuotationDoc(
     if (v == null || v === "") return "—";
     if (Array.isArray(v)) return v.length ? v.map(String).join(", ") : "—";
     if (typeof v === "boolean") return v ? L("Yes", "نعم") : L("No", "لا");
-    const x = String(v).toLowerCase();
+    // `partyToken` because the same 2026-09-02 change that prefixed the bid form's values did it here
+    // too: `quotation.service.ts` and `term-matching.ts` now map SUPPLIER to "On Supplier". The
+    // Arabic gained «على » the same way and is left as sent — it is already display text.
+    const x = partyToken(String(v)).toLowerCase();
     if (x === "supplier") return L("Supplier", "المؤجّر");
     if (x === "rentee" || x === "renter") return L("Rentee", "المستأجر");
     if (x === "true" || x === "included" || x === "yes") return L("Yes", "نعم");
@@ -787,7 +791,15 @@ export function buildDealRoomQuotationDoc(
   // the LIVE room only — the second loop over the snapshot's copy went with the rest of the hybrid.
   const isCost = (k: string) => COST_TERM_KEYS.has(k);
   const priceExtras: { label: string; value: string }[] = [];
-  if (dd.overtimeRate) priceExtras.push({ label: L("Overtime rate", "سعر العمل الإضافي"), value: /^\d+(\.\d+)?$/.test(dd.overtimeRate) ? `${dd.overtimeRate}x` : dd.overtimeRate });
+  // Overtime is retired, and `'0'` is the "without overtime" sentinel every request written while
+  // the field was mandatory carries. It is a TRUTHY string AND it matches the numeric test below,
+  // so this printed «سعر العمل الإضافي: 0x» onto the quotation — a rate of zero times, for a term
+  // neither side was ever asked about. The backend normalises the same four spellings away in
+  // `quotation.service.ts`; normalise here rather than dropping the line, because a quotation is a
+  // historical document and a request that genuinely agreed 1.5x must keep saying so.
+  const otRaw = (dd.overtimeRate ?? "").trim().toUpperCase();
+  const otRate = otRaw === "" || otRaw === "0" || otRaw === "WITHOUT" || otRaw === "NONE" ? null : dd.overtimeRate!;
+  if (otRate) priceExtras.push({ label: L("Overtime rate", "سعر العمل الإضافي"), value: /^\d+(\.\d+)?$/.test(otRate) ? `${otRate}x` : otRate });
   const seenCost = new Set<string>();
   for (const term of room.terms) {
     if (!isCost(term.key) || seenCost.has(term.key)) continue;
@@ -866,7 +878,7 @@ export function buildDealRoomQuotationDoc(
       ...(kind === "preview"
         ? [L("Draft — reflects the current offer, final once the supplier confirms.", "مسودة — تعكس العرض الحالي، وتُعتمد بعد تأكيد المورد.")]
         : []),
-      L("This quotation is generated electronically via Moedatech, valid for 7 days from the issue date. Prices exclude anything not listed above; VAT at 15% applies per Saudi tax law.", "صدر هذا العرض إلكترونيًا عبر منصة معداتك، وهو ساري المفعول لمدة ٧ أيام من تاريخ الإصدار. الأسعار لا تشمل ما لم يُذكر أعلاه، وتُطبَّق ضريبة القيمة المضافة بنسبة ١٥٪ وفقًا للنظام السعودي."),
+      L("This quotation is generated electronically via Moedatech, valid for 7 days from the issue date. Prices exclude anything not listed above; VAT at 15% applies per Saudi tax law.", "صدر هذا العرض إلكترونيًا عبر منصة معداتك، وهو ساري المفعول لمدة 7 أيام من تاريخ الإصدار. الأسعار لا تشمل ما لم يُذكر أعلاه، وتُطبَّق ضريبة القيمة المضافة بنسبة 15٪ وفقًا للنظام السعودي."),
     ],
   };
 }

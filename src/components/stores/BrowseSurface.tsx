@@ -11,6 +11,9 @@ import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 import { PinIcon } from "@/components/stores/shop";
 
+/** Cards per page. The directory is paginated; «Show more» asks for the next one. */
+const PAGE_SIZE = 60;
+
 interface CityOpt {
   value: string;
   label: string;
@@ -80,6 +83,9 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
   const [debounced, setDebounced] = useState("");
 
   const [stores, setStores] = useState<StoreCardData[] | null>(null);
+  const [page, setPage] = useState(1);
+  const [more, setMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [expanded, setExpanded] = useState(false);
@@ -144,23 +150,54 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
     sync();
   }, [categoryId, city, debounced, router]);
 
+  /**
+   * The directory is PAGED, and the page after the first was unreachable.
+   *
+   * `limit=60` with no way forward showed 60 of the 89 suppliers on staging as though that were the
+   * market (owner, 2026-09-03: *"only the first page"*). The backend has always answered with a
+   * `meta.totalPages`; this screen simply never asked for page two, and the BFF was dropping the
+   * count on the floor. Now the first page loads on every change of filter, and «Show more» appends
+   * the next one — appending rather than replacing, because a renter who has scrolled to the bottom
+   * of sixty cards is not asking to be sent back to the top.
+   */
   useEffect(() => {
     setError(false);
     setStores(null);
+    setPage(1);
+    setMore(false);
+  }, [debounced, city, categoryId, reloadKey]);
+
+  useEffect(() => {
     const qs = new URLSearchParams();
     if (debounced) qs.set("search", debounced);
     if (city) qs.set("city", city);
     if (categoryId) qs.set("category", categoryId);
-    qs.set("limit", "60");
+    qs.set("limit", String(PAGE_SIZE));
+    qs.set("page", String(page));
     const ctrl = new AbortController();
+    setLoadingMore(page > 1);
     fetch(`/api/stores?${qs.toString()}`, { cache: "no-store", signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
-      .then((d: { stores: StoreCardData[] }) => setStores(d.stores ?? []))
+      .then((d: { stores: StoreCardData[] }) => {
+        const rows = d.stores ?? [];
+        // A page beyond the first ADDS. Deduplicated by id, because page 1 of this directory merges
+        // the featured suppliers in and page 2 can legitimately repeat one.
+        setStores((prev) => (page === 1 || prev == null ? rows : [...prev, ...rows.filter((r) => !prev.some((x) => x.id === r.id))]));
+        /* A FULL page means there is probably another; a short one is the end.
+         *
+         * The backend's own `meta.totalPages` would say so exactly, and cannot reach us: both call
+         * helpers unwrap the envelope to `.data` before the BFF sees it (see the note there). The
+         * heuristic costs one empty fetch when the total is an exact multiple of the page, and that
+         * fetch corrects the button on arrival — `>=` rather than `===` because page one merges the
+         * featured suppliers in and can come back longer than it asked for. */
+        setMore(rows.length >= PAGE_SIZE);
+      })
       .catch((e) => {
         if (e?.name !== "AbortError") setError(true);
-      });
+      })
+      .finally(() => setLoadingMore(false));
     return () => ctrl.abort();
-  }, [debounced, city, categoryId, reloadKey]);
+  }, [debounced, city, categoryId, reloadKey, page]);
 
   const all = stores ?? [];
   const canToggle = previewCount != null && all.length > previewCount;
@@ -246,11 +283,22 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
       ) : (
         /* Five to a row at the prototype's 1360, stepping down rather than shrinking a card below the
            width its chips need. */
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {shown.map((s) => (
-            <StoreCard key={s.id} store={s} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {shown.map((s) => (
+              <StoreCard key={s.id} store={s} />
+            ))}
+          </div>
+          {/* Only when there IS another page, and never inside a preview — the dashboard's eight-card
+              strip has its own View-all and this would be a second answer to the same question. */}
+          {more && previewCount == null && (
+            <div className="mt-5 flex justify-center">
+              <button onClick={() => setPage((p) => p + 1)} disabled={loadingMore} className={btn("secondary", "md")}>
+                {loadingMore ? t.browse.loading : t.browse.showMore}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

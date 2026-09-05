@@ -159,7 +159,7 @@ describe("every finding on the grid is one of four shapes", () => {
     /^.+ — لم يُطلب$/,
     /^لم يُطلب شيء$/,
     /^موجودة في ملف الوحدة$/,
-    /^[٠-٩]+ مطلوبة — غير مسجّلة في ملف الوحدة$/,
+    /^[0-9]+ مطلوبة — غير مسجّلة في ملف الوحدة$/,
   ];
   const machines = [
     machine({ photos: ALL_FOUR, docs: [{ type: "istimara" }, { type: "tuv" }, { type: "operator_tuv" }] }),
@@ -227,7 +227,7 @@ describe("year & manufacturer", () => {
     // ~~"no year asked for"~~ — one of the three spellings of "nobody asked" the owner read side by
     // side on 2026-08-11. Shape 3, which is now the only way this grid says it about one thing.
     expect(c.en).toBe("2011 · Caterpillar — not requested");
-    expect(c.ar).toBe("٢٠١١ · Caterpillar — لم يُطلب");
+    expect(c.ar).toBe("2011 · Caterpillar — لم يُطلب");
   });
 
   it("still states what the file holds when nobody asked — a grey cell must not waste the row", () => {
@@ -253,7 +253,7 @@ describe("year & manufacturer", () => {
     const c = cellsBy(machine({ year: 2016 }), { reqMinYear: 2020 }).year_make;
     expect(c.state).toBe("red");
     expect(c.en).toBe("Missing 2020 or newer — 2016 · Caterpillar");
-    expect(c.ar).toBe("مفقود: ٢٠٢٠ أو أحدث — ٢٠١٦ · Caterpillar");
+    expect(c.ar).toBe("مفقود: 2020 أو أحدث — 2016 · Caterpillar");
   });
 
   it("reds when a year was asked for and the machine's file carries none", () => {
@@ -303,7 +303,7 @@ describe("attachments — grey by decision, never red", () => {
     const c = cellsBy(machine(), { attachmentIds: ["a1", "a2"], customAttachments: ["ripper"] }).attachments;
     expect(c.state).toBe("grey");
     expect(c.en).toBe("3 requested — not recorded on the unit's file");
-    expect(c.ar).toBe("٣ مطلوبة — غير مسجّلة في ملف الوحدة");
+    expect(c.ar).toBe("3 مطلوبة — غير مسجّلة في ملف الوحدة");
     // Grey never says «Missing»: a cell the platform did not score cannot report a gap.
     expect(c.en).not.toContain("Missing");
   });
@@ -324,7 +324,7 @@ describe("equipment photos — the fraction, over the slots the lessor is actual
     // The count, in shape 1 — the cell the owner pointed at when he asked for a cell to open its
     // evidence: *"clicking on any document field here, like '2 of 2 unit photos'"*.
     expect(both.en).toBe("2 of 2 — on the unit's file");
-    expect(both.ar).toBe("٢ من ٢ — موجودة في ملف الوحدة");
+    expect(both.ar).toBe("2 من 2 — موجودة في ملف الوحدة");
     // All four reads the same: the optional shots are not a higher score, they are simply optional.
     const all = cellsBy(machine({ photos: ALL_FOUR }), {}).photos;
     expect(all.state).toBe("green");
@@ -1452,7 +1452,7 @@ describe("selection is a MODE, inferred from the first tick", () => {
     expect(batch.map((t) => t.url)).toEqual(["https://x/ist", "https://x/ist2"]);
     // Two files of one row would otherwise land on disk under one name.
     expect(batch.map((t) => t.label.en)).toEqual(["Registration (Istimara) 1", "Registration (Istimara) 2"]);
-    expect(batch.map((t) => t.label.ar)).toEqual(["الاستمارة ١", "الاستمارة ٢"]);
+    expect(batch.map((t) => t.label.ar)).toEqual(["الاستمارة 1", "الاستمارة 2"]);
   });
 
   it("a single-file row keeps the ROW's own name — nothing is numbered that has no sibling", () => {

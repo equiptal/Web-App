@@ -73,7 +73,9 @@ export function ReadyToSend() {
   const tt = t.preview.table;
   const headers = [
     tt.equipment, tt.category, tt.size, tt.qty, tt.year, tt.operator, tt.operatorCert,
-    tt.food, tt.transport, tt.fuel, tt.fuelResp, tt.delivery, tt.return, tt.certificate, tt.notes,
+    // `tt.fuel` (the fuel TYPE column) is gone — the renter does not choose it, the system prefills
+    // it, and it left the item pills for the same reason. `tt.fuelResp`, who PAYS for it, stays.
+    tt.food, tt.transport, tt.fuelResp, tt.delivery, tt.return, tt.certificate, tt.notes,
   ];
   const cell = (r: SpecRow) => [
     r.equipment,
@@ -85,7 +87,6 @@ export function ReadyToSend() {
     r.operatorCert.length ? r.operatorCert.map((c) => t.options.safetyCert[c]).join(", ") : "—",
     r.fatFood ? t.options.party[r.fatFood] : "—",
     r.fatTransport ? t.options.party[r.fatTransport] : "—",
-    t.options.fuelType[r.fuelType],
     t.options.party[r.fuelResp],
     t.options.party[r.delivery],
     t.options.party[r.ret],
@@ -279,8 +280,10 @@ export function ReadyToSend() {
               .filter(Boolean)
               .join(" · ")}
           </Tile>
-          <Tile label={t.create.ready.hoursOvertime}>
-            {`${num(project.timing.hoursPerDay)} ${L("hrs/day", "ساعة/يوم")} · ${t.options.overtime[project.advanced.overtimeRate]}`}
+          {/* Hours only — the overtime half is hidden with the picker that set it.
+              Was: `… · ${t.options.overtime[project.advanced.overtimeRate]}` under `ready.hoursOvertime`. */}
+          <Tile label={t.create.ready.hours}>
+            {`${num(project.timing.hoursPerDay)} ${L("hrs/day", "ساعة/يوم")}`}
           </Tile>
           <Tile label={t.create.ready.chargedDays}>{charged.known ? num(charged.chargedDays) : "—"}</Tile>
         </div>

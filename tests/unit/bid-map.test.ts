@@ -412,10 +412,12 @@ describe("requestTypeWord — the type word comes from the REQUEST's own type (R
 });
 
 describe("arabicIndicDigits — the pill's numeral, without `unitCountLabel`'s noun", () => {
-  it("converts per digit and never appends a word", () => {
-    expect(arabicIndicDigits(3)).toBe("٣");
-    expect(arabicIndicDigits(11)).toBe("١١");
-    expect(arabicIndicDigits(0)).toBe("٠");
+  /** Digits are Latin app-wide, in Arabic too (owner, 2026-09-04: "the numbers should be in eng
+   * even in arabic"). These formatters used to convert; they no longer do. */
+  it("writes Latin digits and never appends a word", () => {
+    expect(arabicIndicDigits(3)).toBe("3");
+    expect(arabicIndicDigits(11)).toBe("11");
+    expect(arabicIndicDigits(0)).toBe("0");
   });
 });
 
@@ -517,15 +519,15 @@ describe("decollide — screen-space fan-out (§6.2)", () => {
 
 describe("unitCountLabel — one literal Arabic form (RMAP-AC-146 — spec 001 v2, no RM3 equivalent)", () => {
   it("returns the three literal forms, with no dual and no plural", () => {
-    expect(unitCountLabel(1)).toBe("١ وحدة");
-    expect(unitCountLabel(2)).toBe("٢ وحدة");
-    expect(unitCountLabel(11)).toBe("١١ وحدة");
+    expect(unitCountLabel(1)).toBe("1 وحدة");
+    expect(unitCountLabel(2)).toBe("2 وحدة");
+    expect(unitCountLabel(11)).toBe("11 وحدة");
   });
 
   it("never inflects — 3 and 10 read exactly like 1", () => {
-    expect(unitCountLabel(3)).toBe("٣ وحدة");
-    expect(unitCountLabel(10)).toBe("١٠ وحدة");
-    expect(unitCountLabel(0)).toBe("٠ وحدة");
+    expect(unitCountLabel(3)).toBe("3 وحدة");
+    expect(unitCountLabel(10)).toBe("10 وحدة");
+    expect(unitCountLabel(0)).toBe("0 وحدة");
   });
 });
 

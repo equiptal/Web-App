@@ -280,13 +280,16 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
  * right about every corner forever. See {@link Launcher}.
  */
 /**
- * The four destinations the nav bar names, and their subtrees.
+ * The destinations the nav bar names, and their subtrees.
  *
  * `/` is exact and the rest own their subtree — the same rule `AppNav.isActive` uses to decide which
  * tab is lit, kept identical on purpose: the bubble is present exactly where a tab is highlighted, so
  * "is support here?" has the same answer as "where am I?".
+ *
+ * ~~`/company`.~~ Dropped with the tab (owner, 2026-09-04): the bar names three places now, and the
+ * firm is a block on `/profile`, which has never been one of them.
  */
-const LAUNCHER_ROUTES = ["/", "/browse", "/requests", "/company"] as const;
+const LAUNCHER_ROUTES = ["/", "/browse", "/requests"] as const;
 
 /** Where the renter parked the bubble, in viewport pixels from the top-left of the window. */
 type BubbleAt = { x: number; y: number };

@@ -423,6 +423,51 @@ describe("finding a supplier", () => {
   });
 });
 
+/**
+ * The group control is My Suppliers' own menu (owner, 2026-09-03: *"I want to show same group
+ * dropdown in the my suppliers, use same component"*). It was a bare `<select>` here and a menu
+ * there, for one list and one set of names.
+ */
+describe("the group filter is the suppliers menu", () => {
+  beforeEach(() => {
+    api.rows = [
+      { id: "1", name: "Al Faisal Rentals", email: "ops@alfaisal.sa", phone: "+966501112233", groups: ["test"] },
+      { id: "2", name: "Najd Equipment Est.", email: "bids@najd.sa", phone: null, groups: ["test2"] },
+    ];
+  });
+
+  it("Given groups, Then the menu lists them with their counts and narrows the list", async () => {
+    draw();
+    fireEvent.click(await screen.findByText(en.suppliers.allGroups));
+
+    // Every group, and how many suppliers are in it — the rows My Suppliers draws.
+    const menu = screen.getByText("test2").closest("span")!;
+    expect(within(menu).getByText("1")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("test2"));
+    expect(screen.queryByText("Al Faisal Rentals")).toBeNull();
+    expect(screen.getByText("Najd Equipment Est.")).toBeTruthy();
+  });
+
+  it("Given the picker, Then the menu administers nothing — no pen, no bin, no «New group»", async () => {
+    // Renaming and deleting a group belong to the screen that owns the groups. Here it only filters.
+    draw();
+    fireEvent.click(await screen.findByText(en.suppliers.allGroups));
+
+    expect(screen.queryByTitle(en.suppliers.rename)).toBeNull();
+    expect(screen.queryByTitle(en.suppliers.deleteGroup)).toBeNull();
+    expect(screen.queryByText(en.suppliers.newGroup)).toBeNull();
+  });
+
+  it("Given no groups at all, Then the row carries no group control", async () => {
+    api.rows = [{ id: "1", name: "Al Faisal Rentals", email: "ops@alfaisal.sa", phone: null }];
+    draw();
+    await screen.findByText("Al Faisal Rentals");
+    expect(screen.queryByText(en.suppliers.allGroups)).toBeNull();
+    expect(screen.queryByText(en.suppliers.createGroup)).toBeNull();
+  });
+});
+
 describe("one channel at a time (owner, 2026-09-02)", () => {
   it("Given WhatsApp is pressed, Then E-mail goes off — two tabs cannot open on one press", async () => {
     /**

@@ -408,7 +408,7 @@ function SupplierCard({
     <section className="rounded-shop-card border border-shop-line bg-white p-5">
       <div className="flex items-start justify-between gap-3.5">
         <div className="flex min-w-0 items-center gap-3">
-          <ShopLogo src={store?.logoUrl ?? null} name={name} className="h-12 w-12 flex-none rounded-shop-logo-md" placeholderSize={26} />
+          <ShopLogo src={store?.logoUrl ?? null} name={name} className="h-12 w-12 flex-none rounded-shop-logo-md" />
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="text-shop-lead font-shop-bold text-shop-ink">
@@ -499,7 +499,7 @@ function Gallery({
   if (photos.length === 0) {
     return (
       <div className="h-[280px] overflow-hidden rounded-shop-media border border-shop-line lg:h-full">
-        <PhotoPlaceholder size={72} />
+        <PhotoPlaceholder />
       </div>
     );
   }
@@ -565,7 +565,7 @@ function Gallery({
               }`}
               aria-label={`${t.store.photos} ${i + 1}`}
             >
-              <Photo src={p} alt="" placeholderSize={26} />
+              <Photo src={p} alt="" />
             </button>
           ))}
         </div>

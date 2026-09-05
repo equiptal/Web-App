@@ -237,7 +237,12 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
     // §4.2 header fields:
     workingHoursPerDay: project.timing.hoursPerDay, // AC-14/15 (default 8)
     workingDaysPerWeek: project.advanced.workingDaysPerWeek, // AC-15 (default 6)
-    overtimeRate: OVERTIME_MAP[project.advanced.overtimeRate], // AC-15
+    // AC-15, narrowed 2026-09-04. Sent ONLY when the renter actually chose a rate. The picker is
+    // hidden and the draft default is "without", which mapped to the string '0' — the very sentinel
+    // the backend now has to normalise away ('0' is truthy, so it printed as a rate). A draft that
+    // still carries a real 1.5x/2x from before keeps sending it.
+    overtimeRate:
+      project.advanced.overtimeRate === "without" ? undefined : OVERTIME_MAP[project.advanced.overtimeRate],
     paymentTerms: preferences.payment.terms ? PAYMENT_TERMS_MAP[preferences.payment.terms] : undefined, // AC-36
     paymentMethod: preferences.payment.method ? PAYMENT_METHOD_MAP[preferences.payment.method] : undefined, // AC-36
     maintenanceResponsibility: MAINTENANCE_RESP_MAP[preferences.maintenance.responsibility], // AC-37 (default supplier)

@@ -267,7 +267,7 @@ function buildCostResponsibilities(bid: BidCard, requestSides: Partial<Record<Co
   const meta: { key: CostResponsibility["key"]; en: string; ar: string }[] = [
     { key: "fuel", en: "Fuel", ar: "الوقود" },
     { key: "maintenance", en: "Maintenance", ar: "الصيانة" },
-    { key: "overtime", en: "Overtime", ar: "العمل الإضافي" },
+    // { key: "overtime", en: "Overtime", ar: "العمل الإضافي" }, // retired with the term itself
     { key: "operator_food", en: "Operator food", ar: "طعام المشغّل" },
     { key: "operator_transport_accommodation", en: "Operator transport & accommodation", ar: "تنقّل وسكن المشغّل" },
   ];

@@ -18,7 +18,8 @@ import {
   type RenterSupplier,
   type ShareEmailResult,
 } from "@/lib/api/client";
-import { canBeEmailed, isOnMoedatech } from "@/lib/contract/renter-suppliers";
+import { canBeEmailed, groupsWithCounts, isOnMoedatech } from "@/lib/contract/renter-suppliers";
+import { GroupsMenu } from "@/components/suppliers/SupplierGroups";
 import { AddSuppliersDialog } from "@/components/suppliers/AddSuppliersDialog";
 import type { BidFormData } from "@/lib/contract/link-bids";
 import { bidCardHtml } from "@/lib/bidCardHtml";
@@ -206,6 +207,7 @@ export function ShareRequestPanel({
   const [query, setQuery] = useState("");
   /** Which group the list is cut to. Empty is all of them. */
   const [group, setGroup] = useState("");
+  const [groupMenu, setGroupMenu] = useState(false);
   const [expiry, setExpiry] = useState("");
   const [busy, setBusy] = useState(false);
   const [uuid, setUuid] = useState<string | null>(requestUuid);
@@ -389,8 +391,9 @@ export function ShareRequestPanel({
       (!query.trim() || r.name.toLowerCase().includes(query.trim().toLowerCase())),
   );
 
-  /** Every group the renter actually uses, in the order he sees them on My Suppliers. */
-  const groups = [...new Set((rows ?? []).flatMap((r) => r.groups ?? []))].sort((a, b) => a.localeCompare(b));
+  /** Every group the renter actually uses, with its size — the same shape, from the same helper,
+   *  that My Suppliers hands its own menu, so the two lists can never disagree about a name. */
+  const groups = groupsWithCounts(rows ?? []);
 
   /**
    * Tick everything the list is currently showing — which is how a GROUP gets sent to.
@@ -762,21 +765,22 @@ export function ShareRequestPanel({
                 view is still a pick, and the count above says so. */}
             {!!rows?.length && (
               <span className="flex flex-wrap items-center gap-2">
-                {!!groups.length && (
-                  <select
-                    value={group}
-                    onChange={(e) => setGroup(e.target.value)}
-                    aria-label={c.allGroups}
-                    className="h-[30px] flex-none rounded-md border border-border bg-surface px-2 text-meta font-semibold text-navy outline-none"
-                  >
-                    <option value="">{c.allGroups}</option>
-                    {groups.map((g) => (
-                      <option key={g} value={g}>
-                        {g}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                {/* My Suppliers' own group menu, not a second control for the same job (owner,
+                    2026-09-03). It arrives without `onRename` / `onDelete` / `onCreate`: here the
+                    menu narrows the list, and administering the groups stays on the screen that
+                    owns them. */}
+                <GroupsMenu
+                  groups={groups}
+                  active={group}
+                  open={groupMenu}
+                  total={rows?.length ?? 0}
+                  align="start"
+                  onOpen={setGroupMenu}
+                  onPick={(g) => {
+                    setGroup(g);
+                    setGroupMenu(false);
+                  }}
+                />
                 <span className="flex h-[30px] min-w-[140px] flex-1 items-center gap-2 rounded-md border border-border px-2.5">
                 <Icon name="search" size={14} className="flex-none text-muted" />
                 <input
@@ -1255,11 +1259,12 @@ export function ShareRequestPanel({
           {moedatechOnly ? c.moedatechOnlyHint : c.alwaysHint}
         </p>
 
-          {/* Said plainly: the alternative is a renter who believes four people were messaged. */}
-          {channel === "whatsapp" && handedOff === null && (
-            <span className="text-meta text-muted">
-              {firstWithPhone ? fmt(c.whatsappFirst, { name: firstWithPhone.name }) : c.whatsappNoPhone}
-            </span>
+          {/* Said plainly: the alternative is a renter who believes four people were messaged.
+              Nothing is said when NONE of them has a number (owner, 2026-09-03): the panel already
+              marks those rows «no phone», and repeating it under the buttons was a note about the
+              list, printed away from the list. */}
+          {channel === "whatsapp" && handedOff === null && firstWithPhone && (
+            <span className="text-meta text-muted">{fmt(c.whatsappFirst, { name: firstWithPhone.name })}</span>
           )}
           {tooLong && (
             <span className="flex items-start gap-1.5 text-meta font-semibold text-danger-deep">

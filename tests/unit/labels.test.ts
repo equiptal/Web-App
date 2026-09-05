@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cityLabel, urgencyLabel, rentalTypeLabel, fulfillmentLabel, slaLabel, responsibilityLabel, termValueLabel } from "@/lib/contract/labels";
+import { cityLabel, urgencyLabel, rentalTypeLabel, fulfillmentLabel, slaLabel, responsibilityLabel, termValueLabel, partyToken } from "@/lib/contract/labels";
 import { mapDealRoom, buildDealRoomQuotationDoc } from "@/lib/contract/deal-room";
 
 /**
@@ -144,5 +144,43 @@ describe("the quotation prints words, not codes", () => {
       const values = doc(isAr ? ar : en, isAr).cards.flatMap((c) => c.rows.map((r) => r.value));
       for (const v of values) expect(v, `raw code on the quotation: ${v}`).not.toMatch(/^[A-Z][A-Z_]{3,}$/);
     }
+  });
+});
+
+describe("partyToken — the bid form's \"On \" prefix", () => {
+  /**
+   * `GET /public/bid-form/{token}` began sending `"On Supplier"` / `"On Renter"` on 2026-09-02 where
+   * it had sent `"Supplier"` / `"Renter"`. Readers that compared the two old words exactly fell
+   * through to the branch meaning the OTHER party, which on the public form took the delivery price
+   * input away from the supplier who owns the leg and submitted 0 for it.
+   */
+  it("reads both spellings as the same party", () => {
+    expect(partyToken("On Supplier").toLowerCase()).toBe("supplier");
+    expect(partyToken("On Renter").toLowerCase()).toBe("renter");
+    expect(partyToken("Supplier").toLowerCase()).toBe("supplier");
+    expect(partyToken("Renter").toLowerCase()).toBe("renter");
+  });
+
+  it("keeps the older bare tokens working, prefix or not", () => {
+    // The draft preview builds its items locally and still emits these (draftBidForm.ts).
+    expect(partyToken("SUPPLIER")).toBe("SUPPLIER");
+    expect(partyToken("RENTER")).toBe("RENTER");
+    expect(partyToken("  on supplier ").toLowerCase()).toBe("supplier");
+  });
+
+  it("strips only a leading On, never a word that merely starts with it", () => {
+    expect(partyToken("Onsite crew")).toBe("Onsite crew");
+    expect(partyToken("Owner")).toBe("Owner");
+  });
+
+  it("answers an empty string for nothing, so a caller can compare without a null check", () => {
+    expect(partyToken(null)).toBe("");
+    expect(partyToken(undefined)).toBe("");
+    expect(partyToken("   ")).toBe("");
+  });
+
+  it("labels a prefixed responsibility instead of printing it raw", () => {
+    expect(responsibilityLabel("On Supplier", en)).toBe("Supplier");
+    expect(responsibilityLabel("On Renter", ar)).toBe("المستأجر");
   });
 });

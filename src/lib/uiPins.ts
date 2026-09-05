@@ -88,6 +88,7 @@ export const PIN_REGISTRY = {
   "app-header": { n: "2", label: "Header bar (navy)", file: "src/components/AppShell.tsx" },
   "header-logo": { n: "2.1", label: "Header — logo", file: "src/components/AppShell.tsx" },
   "header-nav-slot": { n: "2.2", label: "Header — centred nav slot", file: "src/components/AppShell.tsx" },
+  "header-beta": { n: "2.3", label: "Header — beta mark", file: "src/components/AppShell.tsx" },
   "app-nav": { n: "3", label: "Nav tabs — desktop", file: "src/components/AppNav.tsx" },
   "nav-tab": { n: "3.1", label: "Nav tab — one link", file: "src/components/AppNav.tsx" },
   "app-nav-mobile": { n: "4", label: "Nav tabs — mobile", file: "src/components/AppNav.tsx" },

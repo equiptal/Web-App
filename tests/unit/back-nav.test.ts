@@ -11,11 +11,13 @@ import { backNameKey, backTarget } from "@/lib/contract/back-nav";
  */
 
 describe("naming a place", () => {
-  it("names the four tabs and the places reached from them", () => {
+  it("names the tabs and the places reached from them", () => {
     expect(backNameKey("/")).toBe("home");
     expect(backNameKey("/browse")).toBe("browse");
     expect(backNameKey("/requests")).toBe("marketplace");
-    expect(backNameKey("/company")).toBe("company");
+    // `/company` was retired on 2026-09-04 — the firm is part of `/profile` now, and the edge 308s
+    // the old route there. A place the product no longer has must not be nameable.
+    expect(backNameKey("/company")).toBeNull();
     expect(backNameKey("/suppliers")).toBe("suppliers");
     expect(backNameKey("/inbox")).toBe("inbox");
     expect(backNameKey("/profile")).toBe("profile");
@@ -59,17 +61,36 @@ describe("choosing where back goes", () => {
     expect(backTarget("/create", null, "/")).toEqual({ href: "/", key: "home" });
   });
 
-  it("falls back when the previous page is not a place we name", () => {
-    // `/create` → `/create?mode=trial` is a real navigation and a useless destination.
+  it("goes to a page it cannot NAME, now that the label no longer names it", () => {
+    // Owner, 2026-09-04: back goes where he actually was. «Back» is a plain word since 2026-09-03,
+    // so a destination the product has no name for is still a destination.
     expect(backTarget("/legal/terms-of-use", "/legal/privacy-policy", "/profile")).toEqual({
-      href: "/profile",
-      key: "profile",
+      href: "/legal/privacy-policy",
+      key: null,
+    });
+    expect(backTarget("/create", "/equipment/e1", "/")).toEqual({ href: "/equipment/e1", key: null });
+  });
+
+  it("keeps the query, so a view of a page is not flattened to the page", () => {
+    // The workspace's drawer lives in the query: dropping it would return him to the list.
+    expect(backTarget("/create", "/requests?g=g1&details=1", "/")).toEqual({
+      href: "/requests?g=g1&details=1",
+      key: "marketplace",
     });
   });
 
   it("never sends the renter to the page he is standing on", () => {
-    // Two visits to `/requests` in a row would otherwise make Back a no-op that looks broken.
+    // A reload, or a query-string change on the same route: Back would be a no-op that looks broken.
+    expect(backTarget("/requests", "/requests?g=g1", "/")).toEqual({ href: "/", key: "home" });
+    expect(backTarget("/create", "/create?mode=trial", "/")).toEqual({ href: "/", key: "home" });
+  });
+
+  it("never sends him to a route the product retired", () => {
+    // `/requests/abc` and `/compare` 308 to the workspace; `/company` 308s to the profile. A Back
+    // that lands on a redirect — or back where it was pressed — reads as a broken control.
     expect(backTarget("/requests", "/requests/abc", "/")).toEqual({ href: "/", key: "home" });
+    expect(backTarget("/profile", "/company", "/")).toEqual({ href: "/", key: "home" });
+    expect(backTarget("/create", "/compare", "/")).toEqual({ href: "/", key: "home" });
   });
 
   it("carries a fallback it cannot name, rather than refusing to draw", () => {

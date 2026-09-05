@@ -181,6 +181,28 @@ describe("bidCardModel", () => {
     expect(m.terms.some((r) => r.label === "Fuel")).toBe(true);
   });
 
+  it("Given the endpoint's newer \"On Supplier\" spelling, When built, Then the card reads the same party", () => {
+    /**
+     * `getBidForm.ts` began sending `"On Supplier"` / `"On Renter"` on 2026-09-02. `party()` matched
+     * the bare words only, so the prefixed value fell past both branches and the card printed the raw
+     * English string — on an Arabic card too.
+     */
+    const m = bidCardModel(
+      preview,
+      copy,
+      "en",
+      form({
+        items: [
+          item({ deliveryBy: "On Supplier", returnBy: "On Supplier" }),
+          item({ requestItemId: "i2", deliveryBy: "On Renter", returnBy: "On Renter" }),
+        ],
+      }),
+    );
+
+    expect(m.items[0].terms).toContainEqual({ label: "Mobilization", value: "Supplier" });
+    expect(m.items[1].terms).toContainEqual({ label: "Mobilization", value: "Renter" });
+  });
+
   it("Given a year and a certificate, When built, Then the card asks for them", () => {
     /**
      * Owner, 2026-09-02: the card carries *"cert or year if required"*. A supplier who brings a 2009

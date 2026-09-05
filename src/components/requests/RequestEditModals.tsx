@@ -88,24 +88,25 @@ const RENTAL_OPTS: Opt[] = [
   { v: "MONTHLY", en: "Monthly", ar: "شهري" }, { v: "PER_JOB", en: "Per job", ar: "بالمهمة" },
   { v: "LONG_TERM", en: "Long term", ar: "طويل الأمد" },
 ];
-const OVERTIME_OPTS: Opt[] = [{ v: "0", en: "None", ar: "بدون" }, { v: "1.5X", en: "1.5×", ar: "١.٥×" }, { v: "2X", en: "2×", ar: "٢×" }];
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for the hidden overtime picker
+const OVERTIME_OPTS: Opt[] = [{ v: "0", en: "None", ar: "بدون" }, { v: "1.5X", en: "1.5×", ar: "1.5×" }, { v: "2X", en: "2×", ar: "2×" }];
 const PAYTERMS_OPTS: Opt[] = [
   { v: "upfront", en: "Upfront", ar: "مقدماً" }, { v: "per_day", en: "Per day", ar: "يومياً" },
-  { v: "net_30", en: "Net 30", ar: "خلال ٣٠ يوم" }, { v: "net_60", en: "Net 60", ar: "خلال ٦٠ يوم" },
+  { v: "net_30", en: "Net 30", ar: "خلال 30 يوم" }, { v: "net_60", en: "Net 60", ar: "خلال 60 يوم" },
   { v: "end_of_job", en: "End of job", ar: "نهاية المهمة" },
 ];
 const MAINT_OPTS: Opt[] = [{ v: "supplier", en: "Supplier", ar: "المؤجّر" }, { v: "rentee", en: "Me (renter)", ar: "أنا (المستأجر)" }];
 const SLA_OPTS: Opt[] = [
-  { v: "FOUR_HR", en: "4 hours", ar: "٤ ساعات" }, { v: "EIGHT_HR", en: "8 hours", ar: "٨ ساعات" },
-  { v: "TWENTY_FOUR_HR", en: "24 hours", ar: "٢٤ ساعة" }, { v: "FORTY_EIGHT_HR", en: "48 hours", ar: "٤٨ ساعة" },
-  { v: "SEVENTY_TWO_HR", en: "72 hours", ar: "٧٢ ساعة" },
+  { v: "FOUR_HR", en: "4 hours", ar: "4 ساعات" }, { v: "EIGHT_HR", en: "8 hours", ar: "8 ساعات" },
+  { v: "TWENTY_FOUR_HR", en: "24 hours", ar: "24 ساعة" }, { v: "FORTY_EIGHT_HR", en: "48 hours", ar: "48 ساعة" },
+  { v: "SEVENTY_TWO_HR", en: "72 hours", ar: "72 ساعة" },
 ];
 /* ~~`FULFILL_OPTS`.~~ Gone with the Fulfillment field (owner, 2026-09-01). The create canvas never
    asks it, so it is not one of the renter's answers and this form does not put it to him. Nor does
    the details list — see `request-fields.ts`. Same for Terrain, Working days/week and Payment
    method: all four are stored columns an older form or a mobile build can fill, and none is part of
    the conversation the create flow has. */
-const OFFER_OPTS: Opt[] = [{ v: "24H", en: "24 hours", ar: "٢٤ ساعة" }, { v: "48H", en: "48 hours", ar: "٤٨ ساعة" }, { v: "72H", en: "72 hours", ar: "٧٢ ساعة" }, { v: "1W", en: "1 week", ar: "أسبوع" }];
+const OFFER_OPTS: Opt[] = [{ v: "24H", en: "24 hours", ar: "24 ساعة" }, { v: "48H", en: "48 hours", ar: "48 ساعة" }, { v: "72H", en: "72 hours", ar: "72 ساعة" }, { v: "1W", en: "1 week", ar: "أسبوع" }];
 const OPERATOR_OPTS: Opt[] = [{ v: "YES", en: "With operator", ar: "مع مشغّل" }, { v: "NO", en: "Without operator", ar: "بدون مشغّل" }];
 const FUEL_OPTS: Opt[] = [{ v: "DIESEL", en: "Diesel", ar: "ديزل" }, { v: "PETROL", en: "Petrol", ar: "بنزين" }, { v: "ELECTRIC", en: "Electric", ar: "كهربائي" }];
 // Match the create form (ItemRow): operator nationality is Restricted / Any (values sent to the backend).
@@ -207,7 +208,7 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
   const [rentalType, setRentalType] = useState(s(r.rentalType));
   const [extendable, setExtendable] = useState(!!(r as Record<string, unknown>).extendable);
   const [hours, setHours] = useState(s(r.workingHoursPerDay));
-  const [overtime, setOvertime] = useState(s((r as Record<string, unknown>).overtimeRate));
+  // const [overtime, setOvertime] = useState(s((r as Record<string, unknown>).overtimeRate)); // retired with the field
 
   // ── Preferences ──
   const [payTerms, setPayTerms] = useState(s(r.paymentTerms));
@@ -242,7 +243,7 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
     if (endDate) patch.endDate = new Date(`${endDate}T00:00:00Z`).toISOString();
     patch.extendable = extendable;
     if (hours) patch.workingHoursPerDay = Number(hours);
-    if (overtime) patch.overtimeRate = overtime;
+    // if (overtime) patch.overtimeRate = overtime; // retired — an edit no longer restates it
     if (payTerms) patch.paymentTerms = payTerms;
     if (maint) patch.maintenanceResponsibility = maint;
     /* Cleared rather than left behind when the renter hands maintenance back to himself: the field
@@ -437,7 +438,7 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
             <label><span className={lbl}>{L("End date", "تاريخ الانتهاء")}</span><input type="date" min={startDate || undefined} className={fld} value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
             <Sel label={L("Rental basis", "أساس الإيجار")} value={rentalType} onChange={setRentalType} opts={RENTAL_OPTS} />
             <Num label={L("Working hours/day", "ساعات العمل/يوم")} value={hours} onChange={setHours} min={1} max={24} />
-            <Sel label={L("Overtime rate", "معدل العمل الإضافي")} value={overtime} onChange={setOvertime} opts={OVERTIME_OPTS} />
+            {/* <Sel label={L("Overtime rate", "معدل العمل الإضافي")} value={overtime} onChange={setOvertime} opts={OVERTIME_OPTS} /> */}
           </div>
           <Chk label={L("Extendable", "قابل للتمديد")} value={extendable} onChange={setExtendable} />
 

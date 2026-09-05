@@ -483,7 +483,7 @@ export function mapRequestListItem(r: RequestRecord): RequestListItem {
 export function parseAddress(label: string | null | undefined): { city: string | null; neighbourhood: string | null } {
   if (!label || !label.trim()) return { city: null, neighbourhood: null };
   const COUNTRY = /^(saudi arabia|ksa|kingdom of saudi arabia|المملكة العربية السعودية|السعودية)$/i;
-  const POSTCODE = /[\s,-]*[\d٠-٩]{4,}(?:[\s-][\d٠-٩]{4})?\s*$/; // trailing 4+ digit code
+  const POSTCODE = /[\s,-]*[\d٠-٩]{4,}(?:[\s-][\d٠-٩]{4})?\s*$/; // trailing 4+ digit code, either numeral system
   const parts = label.split(",").map((s) => s.trim()).filter(Boolean);
   if (parts.length && COUNTRY.test(parts[parts.length - 1])) parts.pop();
   if (parts.length === 0) return { city: null, neighbourhood: null };

@@ -51,7 +51,7 @@ const YOU_SET: { label: (t: Dict) => string; keys: string[] }[] = [
 const THEY_OFFERED: { label: (t: Dict) => string; keys: string[] }[] = [
   { label: (t) => t.workspace.termPayment, keys: ["payment_terms", "payment"] },
   { label: (t) => t.workspace.termSla, keys: ["breakdown_response_sla", "breakdown_sla"] },
-  { label: (t) => t.workspace.termOvertime, keys: ["overtime_rate", "overtime"] },
+  // { label: (t) => t.workspace.termOvertime, keys: ["overtime_rate", "overtime"] }, // retired
   { label: (t) => t.workspace.termNationality, keys: ["operator_nationality", "nationality"] },
 ];
 
@@ -64,10 +64,8 @@ const HEAD = "h-[36px] flex-none box-border border-b border-border";
 
 export function CompareMatrix({
   bids,
-  selectedId,
   durationDays,
   startDate,
-  onSelect,
   benched,
   onBench,
   ranking,
@@ -75,13 +73,11 @@ export function CompareMatrix({
   onRank,
 }: {
   bids: WorkspaceBid[];
-  selectedId: string | null;
   /** The request's duration — what the third total column is measured over, and named after. */
   durationDays: number | null;
   /** The request's start date. Without it the Fridays cannot be located, so the duration column
    *  falls back to the bare rate and says so rather than claiming a day count. */
   startDate: string | null;
-  onSelect: (bidId: string) => void;
   /**
    * Bids taken off the comparison, owned by the WORKSPACE (owner, 2026-08-25).
    *
@@ -218,7 +214,18 @@ export function CompareMatrix({
    * row the renter is reading; with nothing picked it opens on the first row, which is the one the
    * ordering put in front of him.
    */
-  const equipmentTarget = rows.find((b) => b.card.id === selectedId) ?? rows[0] ?? null;
+  /**
+   * The map opens on the WHOLE request, not on a chosen supplier (owner, 2026-09-04).
+   *
+   * The surface it opens is keyed on a bid — `/bids/[bidId]/equipment` — so one of them has to be
+   * the door, and the door is the table's FIRST ROW: whatever the renter's own sort has put at the
+   * top, which is the offer he is most likely reading. Every other offer on the request is in that
+   * map's header, so where he lands is a starting point rather than a choice made for him.
+   *
+   * The recommendation wins the door when there is one: an agent that has ranked these bids has said
+   * something about where to start, and a silent first-row default would ignore it.
+   */
+  const equipmentTarget = (ranking ? rows.find((b) => b.card.id === ranking.bidId) : null) ?? rows[0] ?? null;
   const openEquipment = () => {
     if (!equipmentTarget) return;
     router.push(`/bids/${encodeURIComponent(equipmentTarget.card.id)}/equipment`);
@@ -291,8 +298,8 @@ export function CompareMatrix({
                   c.info && popover === c.info ? (
                     <BuildPopover
                       which={c.info}
-                      totals={pickTotals(totals, selectedId, rows)}
-                      priceUnit={pickBid(selectedId, rows).card.priceUnit}
+                      totals={pickTotals(totals, rows)}
+                      priceUnit={rows[0].card.priceUnit}
                       onClose={() => setPopover(null)}
                     />
                   ) : null
@@ -305,7 +312,6 @@ export function CompareMatrix({
                   win={!!c.win?.has(b.card.id)}
                   vat={c.vat}
                   excluded={c.excluded?.(b)}
-                  picked={b.card.id === selectedId}
                 />
               ))}
             </div>
@@ -316,38 +322,50 @@ export function CompareMatrix({
   );
 
   return (
-    // The pane no longer scrolls the page for anyone, so a table that outgrows it scrolls itself
-    // (owner, 2026-08-25). That is a table's own business: a comparison with twenty rows has to stay
-    // readable, and clipping its tail would hide the very figures it exists to line up.
-    <div {...pin("compare-matrix")} className="min-h-0 flex-1 overflow-y-auto">
+    /* ── The table does NOT scroll itself; the PAGE scrolls (owner, 2026-09-04) ────────────────────
+       ~~"a table that outgrows its pane scrolls itself" (owner, 2026-08-25)~~ — withdrawn. A scroller
+       inside a scroller is two bars for one list: the renter drags the outer one, the rows do not
+       move, and the figures he is comparing sit below a fold he cannot see the edge of. The matrix
+       now renders at its full height and the page carries it.
+
+       The HORIZONTAL scroller below stays. It is a different problem with a different answer: the
+       columns are a fixed set the renter reads left to right, and removing that one would clip the
+       last money column rather than reveal it. */
+    <div {...pin("compare-matrix")} className="flex-none">
       <div {...pin("matrix-scroller")} className="flex items-stretch overflow-x-auto">
         {/* ── The suppliers, on the inline-start edge ── */}
         <div {...pin("matrix-supplier-col")} className="w-[185px] flex-none border-e border-border">
           <div className="box-border flex h-[72px] items-end border-b border-border bg-surface2/60 px-3 pb-2">
+            {/* «Supplier», and nothing after it: the «pick one» that stood here was an instruction
+                for a choice this table no longer asks for (owner, 2026-09-04). */}
             <span className="flex min-w-0 items-baseline gap-1.5">
               <span className="flex-none text-label font-extrabold uppercase tracking-wide text-muted">
                 {t.workspace.supplier}
               </span>
-              <span className="min-w-0 truncate text-label font-semibold uppercase tracking-wide text-brand">
-                {t.workspace.pickOne}
-              </span>
             </span>
           </div>
 
+          {/* ── No supplier is PICKED here any more (owner, 2026-09-04) ─────────────────────────
+              *"I don't want an option to select the supplier in the bid comparison table. He clicks
+              the orange panel and it just takes him to the map with all bids instead of the selected
+              one."*
+
+              ~~Each row was a button that set the comparison's chosen bid, and the choice then
+              decided one thing only: whose yard the equipment rail opened.~~ Withdrawn. The map
+              carries every offer on the request in its own header now, so choosing one before
+              leaving decided nothing except which supplier the renter happened to land on first —
+              a decision the table asked him to make and then did not use.
+
+              A row is a LABEL again: who the column belongs to and where he stands with them. The ✕
+              stays, because removing a column is a statement about the comparison rather than a
+              choice of supplier, and the bench under the table is how it comes back. */}
           {rows.map((b) => {
-            const picked = b.card.id === selectedId;
             const recommended = ranking?.bidId === b.card.id;
             return (
-              <button
+              <div
                 key={b.card.id}
-                type="button"
-                onClick={() => onSelect(b.card.id)}
-                aria-current={picked ? "true" : undefined}
-                className={`${ROW} group relative flex w-full items-center gap-2.5 px-3 text-start transition hover:bg-surface2/50 ${
-                  picked ? "bg-brand-soft/50" : ""
-                }`}
+                className={`${ROW} group relative flex w-full items-center gap-2.5 px-3 text-start`}
               >
-                {picked && <span className="absolute inset-y-0 start-0 w-[3px] bg-brand" />}
                 <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-navy text-label font-semibold text-white">
                   {initials(b.card.supplierName)}
                 </span>
@@ -363,20 +381,18 @@ export function CompareMatrix({
                           : t.workspace.awaitingReply}
                   </span>
                 </span>
-                <span
-                  role="button"
-                  tabIndex={-1}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onBench(b.card.id, true);
-                  }}
+                <button
+                  type="button"
+                  // A real button now that the row around it is not one — it was a `span[role]` only
+                  // because a button cannot be nested inside a button.
+                  onClick={() => onBench(b.card.id, true)}
                   aria-label={t.workspace.removeColumn}
                   title={t.workspace.removeColumn}
                   className="flex-none rounded px-1 py-0.5 text-body font-semibold text-muted/50 transition hover:bg-danger-soft hover:text-danger"
                 >
                   ✕
-                </span>
-              </button>
+                </button>
+              </div>
             );
           })}
         </div>
@@ -419,10 +435,10 @@ export function CompareMatrix({
             </div>
             <div className="flex flex-1">
               {YOU_SET.map((col) => (
-                <TermColumn key={col.keys[0]} label={col.label(t)} keys={col.keys} rows={rows} selectedId={selectedId} ar={ar} L={L} asked />
+                <TermColumn key={col.keys[0]} label={col.label(t)} keys={col.keys} rows={rows} ar={ar} L={L} asked />
               ))}
               {THEY_OFFERED.map((col) => (
-                <TermColumn key={col.keys[0]} label={col.label(t)} keys={col.keys} rows={rows} selectedId={selectedId} ar={ar} L={L} />
+                <TermColumn key={col.keys[0]} label={col.label(t)} keys={col.keys} rows={rows} ar={ar} L={L} />
               ))}
             </div>
           </div>
@@ -433,8 +449,10 @@ export function CompareMatrix({
           type="button"
           onClick={openEquipment}
           disabled={!equipmentTarget}
-          title={t.workspace.checkAvailability}
-          aria-label={t.workspace.checkAvailability}
+          // What the press DOES, said plainly: it leaves the table for the map, and the map has every
+          // offer on it (owner, 2026-09-04). «Check availability» described one supplier's yard.
+          title={t.workspace.mapAllOffers}
+          aria-label={t.workspace.mapAllOffers}
           className="flex w-11 flex-none flex-col items-center justify-center gap-2.5 overflow-hidden border-s border-brand/25 bg-brand-soft transition hover:bg-brand/15 disabled:cursor-default disabled:bg-disabled-bg disabled:text-disabled-fg"
         >
           <span className="grid h-5 w-5 flex-none place-items-center rounded-full border border-brand/30 bg-surface text-brand">
@@ -489,18 +507,13 @@ function initials(name: string): string {
   return parts[0].slice(0, 1).toUpperCase();
 }
 
-/** Whose totals the ⓘ panels explain: the picked row, else the first one on the table. */
-function pickTotals(totals: Map<string, CycleTotals>, selectedId: string | null, rows: WorkspaceBid[]): CycleTotals {
-  return (selectedId ? totals.get(selectedId) : null) ?? totals.get(rows[0].card.id)!;
-}
-
-/**
- * The bid those totals belong to — picked by the same rule, so the popover explains the figures it
- * is standing over. It needs the price unit: the divisor in the sentence is 6 on a weekly bid and 26
- * on a monthly one, and reading it off the totals is not possible because they are only money.
- */
-function pickBid(selectedId: string | null, rows: WorkspaceBid[]): WorkspaceBid {
-  return (selectedId ? rows.find((b) => b.card.id === selectedId) : null) ?? rows[0];
+/** Whose totals the ⓘ panels explain: the FIRST row on the table.
+ *
+ *  It read the picked row first, and since 2026-09-04 there is no picked row — the table stopped
+ *  asking the renter to choose a supplier, so the only ordering left is his own sort, and the top of
+ *  it is what the popover stands over. */
+function pickTotals(totals: Map<string, CycleTotals>, rows: WorkspaceBid[]): CycleTotals {
+  return totals.get(rows[0].card.id)!;
 }
 
 /** The word above a group of columns, and the control that folds the group away. */
@@ -585,12 +598,12 @@ function MoneyHead({
 }
 
 /** One figure. Winners carry the green ground; the totals carry «with VAT» under them. */
-function Money({ v, win, vat, excluded, picked }: { v: number | null | undefined; win: boolean; vat?: boolean; excluded?: boolean | null; picked?: boolean }) {
+function Money({ v, win, vat, excluded }: { v: number | null | undefined; win: boolean; vat?: boolean; excluded?: boolean | null }) {
   const t = useT();
   return (
     <div
       className={`${ROW} relative flex items-center justify-center overflow-hidden px-2 ${
-        win ? "bg-ok-soft/70" : picked ? "bg-brand-soft/25" : ""
+        win ? "bg-ok-soft/70" : ""
       }`}
     >
       {v == null ? (
@@ -627,7 +640,6 @@ function TermColumn({
   label,
   keys,
   rows,
-  selectedId,
   ar,
   L,
   asked,
@@ -635,7 +647,6 @@ function TermColumn({
   label: string;
   keys: string[];
   rows: WorkspaceBid[];
-  selectedId: string | null;
   ar: boolean;
   L: LFn;
   /** A term the RENTER set: its header carries what he asked for, under the label. */
@@ -670,11 +681,10 @@ function TermColumn({
       ) : (
         rows.map((b, i) => {
           const a = answers[i];
-          const picked = b.card.id === selectedId;
           return (
             <div
               key={b.card.id}
-              className={`${ROW} flex items-center gap-1.5 px-3 ${a.against ? "bg-danger-soft" : picked ? "bg-brand-soft/25" : ""}`}
+              className={`${ROW} flex items-center gap-1.5 px-3 ${a.against ? "bg-danger-soft" : ""}`}
             >
               <span
                 className={`truncate text-body leading-snug ${

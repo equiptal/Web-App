@@ -29,6 +29,7 @@
  */
 
 import { CERT_LABEL, type BidCard, type TermRow } from "@/lib/contract/bids";
+import { partyToken } from "@/lib/contract/labels";
 import { computeQuoteTotals, computeRentalTotal, divisorNote, rentalDivisor, VAT_RATE } from "@/lib/pricing/rental";
 import {
   quotationLegal,
@@ -324,10 +325,13 @@ export function buildBidQuotationDoc(input: BuildBidQuotationInput): QuotationDo
 
   // ── Terms cards ──────────────────────────────────────────────────────────────────────────────────
   const tfmt = {
-    sla: (v: string | null) => { if (!v) return null; const m: Record<string, [string, string]> = { FOUR_HR: ["4 hours", "٤ ساعات"], EIGHT_HR: ["8 hours", "٨ ساعات"], TWENTY_FOUR_HR: ["24 hours", "٢٤ ساعة"], FORTY_EIGHT_HR: ["48 hours", "٤٨ ساعة"], SEVENTY_TWO_HR: ["72 hours", "٧٢ ساعة"] }; const x = m[v.toUpperCase()]; return x ? L(x[0], x[1]) : v; },
+    sla: (v: string | null) => { if (!v) return null; const m: Record<string, [string, string]> = { FOUR_HR: ["4 hours", "4 ساعات"], EIGHT_HR: ["8 hours", "8 ساعات"], TWENTY_FOUR_HR: ["24 hours", "24 ساعة"], FORTY_EIGHT_HR: ["48 hours", "48 ساعة"], SEVENTY_TWO_HR: ["72 hours", "72 ساعة"] }; const x = m[v.toUpperCase()]; return x ? L(x[0], x[1]) : v; },
     overtime: (v: string | null) => { if (v == null) return null; const u = v.toUpperCase(); if (u === "0" || u === "WITHOUT") return L("None", "بدون"); if (u === "1.5X") return "1.5×"; if (u === "2X") return "2×"; return v; },
-    maint: (v: string | null) => { if (!v) return null; const u = v.toLowerCase(); if (u === "supplier") return L("Supplier", "المؤجّر"); if (u === "renter" || u === "rentee") return L("Renter", "المستأجر"); return v; },
-    payTerms: (v: string | null) => { if (!v) return null; const k = v.toLowerCase().replace(/[_-]/g, ""); const m: Record<string, [string, string]> = { upfront: ["Upfront", "مقدمًا"], daily: ["Daily", "يومي"], net0: ["Net 0", "فوري"], net30: ["Net 30 days", "صافي ٣٠ يومًا"], net60: ["Net 60 days", "صافي ٦٠ يومًا"], net90: ["Net 90 days", "صافي ٩٠ يومًا"], endofjob: ["End of job", "نهاية المهمة"] }; const x = m[k]; return x ? L(x[0], x[1]) : v; },
+    // `partyToken` because the same 2026-09-02 change that prefixed the bid form's values did it here
+    // too: `quotation.service.ts` and `term-matching.ts` now map SUPPLIER to "On Supplier". The
+    // Arabic gained «على » the same way and is left as sent — it is already display text.
+    maint: (v: string | null) => { if (!v) return null; const u = partyToken(v).toLowerCase(); if (u === "supplier") return L("Supplier", "المؤجّر"); if (u === "renter" || u === "rentee") return L("Renter", "المستأجر"); return v; },
+    payTerms: (v: string | null) => { if (!v) return null; const k = v.toLowerCase().replace(/[_-]/g, ""); const m: Record<string, [string, string]> = { upfront: ["Upfront", "مقدمًا"], daily: ["Daily", "يومي"], net0: ["Net 0", "فوري"], net30: ["Net 30 days", "صافي 30 يومًا"], net60: ["Net 60 days", "صافي 60 يومًا"], net90: ["Net 90 days", "صافي 90 يومًا"], endofjob: ["End of job", "نهاية المهمة"] }; const x = m[k]; return x ? L(x[0], x[1]) : v; },
     fuel: (v: string | null) => { if (!v) return null; const m: Record<string, [string, string]> = { DIESEL: ["Diesel", "ديزل"], PETROL: ["Petrol", "بنزين"], ELECTRIC: ["Electric", "كهربائي"] }; const x = m[v.toUpperCase()]; return x ? L(x[0], x[1]) : v; },
     operator: (inc: string | null, nat: string | null) => { if (inc == null) return null; if (inc.toUpperCase() !== "YES") return L("No operator", "بدون مشغّل"); return L("Includes operator", "يشمل مشغّلاً") + (nat ? ` · ${L("Nationality", "الجنسية")}: ${nat}` : ""); },
   };

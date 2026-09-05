@@ -9,6 +9,7 @@ import { JOIN_URL } from "@/lib/config/store-links";
 // Both were written and tested for the bid list this workspace retired, and have had no caller since
 // (owner, 2026-08-25). The rules did not stop being true when their surface went away.
 import { bidCounterDelta } from "@/lib/contract/bid-counter-delta";
+import { ensureDealRoom } from "@/lib/chat/ensure-deal-room";
 import { distinctMachinesOffered, unitCountNotes } from "@/lib/contract/unit-count-notes";
 import { liveRentalUnits } from "@/lib/contract/comparison";
 import { computeQuoteTotals, computeRentalTotal, divisorNote, formatSar, headlineAmount, legDisplay } from "@/lib/pricing/rental";
@@ -252,8 +253,36 @@ function BidCardTile({
    * row freezes the supplier's offered count; the dock's own rule is that opening a tab creates
    * nothing and the first SEND creates the room (RM3-AC-47). Pressing chat is no longer an act.
    */
+  const [countering, setCountering] = useState(false);
+
   const openRoom = () => {
     router.push(`/bids/${encodeURIComponent(card.id)}/equipment?chat=1`);
+  };
+
+  /**
+   * «Counter this price» opens the THREE-STYLES SHEET, always (owner, 2026-09-04).
+   *
+   * It only did when the bid already had a deal room. With no room — which is every bid nobody has
+   * spoken to yet, so most of them — the button fell through to `openRoom()` and landed the renter in
+   * the CHAT, on the machine tab, with no sheet and no counter in sight. Two different screens behind
+   * one button, and the one you got depended on whether you had chatted before.
+   *
+   * The map's own footer has always done it properly (`PriceFooter.handOff`): resolve or create the
+   * room first — countering is one of exactly three acts allowed to create one (004a §4.5) — then
+   * `?act=counter`, which is what opens the sheet. Same two lines here.
+   *
+   * A failure leaves the renter where he is rather than dumping him in a room he did not ask for:
+   * `ensureDealRoom` throwing means no room, and no room means no sheet to open.
+   */
+  const openCounter = async () => {
+    if (countering) return;
+    setCountering(true);
+    try {
+      const roomId = await ensureDealRoom(card.id, card.dealRoomId ?? null);
+      router.push(`/deal-room/${encodeURIComponent(roomId)}?act=counter`);
+    } catch {
+      setCountering(false);
+    }
   };
 
   return (
@@ -605,9 +634,9 @@ function BidCardTile({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              if (card.dealRoomId) router.push(`/deal-room/${encodeURIComponent(card.dealRoomId)}?act=counter`);
-              else void openRoom();
+              void openCounter();
             }}
+            disabled={countering}
             className={btn("primary", "lg", { className: "flex-1 transition" })}
           >
             {/* ── The button carries the ROUND, once there has been one (owner, 2026-08-25) ────────
@@ -647,8 +676,7 @@ function BidCardTile({
           onNegotiate={() => {
             setTermsOpen(false);
             if (offline) setSubOpen(true);
-            else if (card.dealRoomId) router.push(`/deal-room/${encodeURIComponent(card.dealRoomId)}?act=counter`);
-            else void openRoom();
+            else void openCounter();
           }}
           ar={ar}
           L={L}

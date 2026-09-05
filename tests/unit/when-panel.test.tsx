@@ -184,13 +184,21 @@ describe("working days per week is not offered (MREQ-AC-35)", () => {
   });
 });
 
-describe("hours and overtime (MREQ-AC-37)", () => {
-  it("offers the platform's hour and overtime options", async () => {
+describe("hours (MREQ-AC-37)", () => {
+  it("offers the platform's hour options", async () => {
     const handle = await panel();
     await handle.run(() => screen.getByText(/MORE DETAILS/).closest("button")!.click());
 
     for (const h of ["8", "10", "12"]) expect(screen.getByRole("button", { name: h })).toBeTruthy();
-    for (const o of ["Without", "1.5×", "2×"]) expect(screen.getByRole("button", { name: o })).toBeTruthy();
+  });
+
+  it("no longer asks for an overtime rate", async () => {
+    // Retired 2026-09-04 with the app: neither side is asked for one, so a picker here could only
+    // write a term the supplier is never shown and the quotation must then hide.
+    const handle = await panel();
+    await handle.run(() => screen.getByText(/MORE DETAILS/).closest("button")!.click());
+
+    for (const o of ["Without", "1.5×", "2×"]) expect(screen.queryByRole("button", { name: o })).toBeNull();
   });
 
   it("changing the hours re-asks the acknowledgement, since the sentence quotes them", async () => {

@@ -127,7 +127,7 @@ describe("what survives a reload (MREQ-AC-56/60)", () => {
 });
 
 describe("Arabic (MREQ-AC-51)", () => {
-  it("resolves every canvas string and renders figures in Arabic-Indic digits", async () => {
+  it("resolves every canvas string, and renders figures in Latin digits even in Arabic", async () => {
     await renderCanvas(<Canvas />, {
       locale: "ar",
       draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
@@ -138,9 +138,10 @@ describe("Arabic (MREQ-AC-51)", () => {
     // The schedule is open, so equipment is collapsed to its strip — which is the label to assert.
     expect(screen.getByText("الآلة والمشغّل")).toBeTruthy();
     expect(screen.getByText("مدة التشغيل")).toBeTruthy();
-    // 155 charged days, in the digits the rest of the app uses.
-    expect(screen.getByText("١٥٥")).toBeTruthy();
-    expect(screen.queryByText("155")).toBeNull();
+    // 155 charged days, in the digits the rest of the app uses — Latin, Arabic locale included
+    // (owner, 2026-09-04). This asserted «١٥٥» and the ABSENCE of "155" until that ruling.
+    expect(screen.getByText("155")).toBeTruthy();
+    expect(screen.queryByText("١٥٥")).toBeNull();
   });
 
   it("leaves no English canvas label behind", async () => {

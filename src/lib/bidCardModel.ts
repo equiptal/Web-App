@@ -24,6 +24,7 @@
 import type { BidPreview } from "@/lib/api/bidPreview";
 import { bidCardDetails } from "@/lib/bidCardDetails";
 import type { BidFormData, BidFormItem } from "@/lib/contract/link-bids";
+import { partyToken } from "@/lib/contract/labels";
 
 export interface BidCardTerm {
   label: string;
@@ -240,7 +241,7 @@ export function cityOf(label: string | null | undefined): string | null {
 
 /** Whose responsibility a term is. Anything that is not one of the two parties shows as it arrived. */
 function party(v: string | null | undefined, lang: "en" | "ar"): string | null {
-  const s = (v ?? "").trim();
+  const s = partyToken(v);
   if (!s) return null;
   const u = s.toUpperCase();
   if (u === "RENTER" || u === "RENTEE") return COPY[lang].onRenter;

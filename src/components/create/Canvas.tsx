@@ -23,7 +23,7 @@ import { WherePanel } from "@/components/create/WherePanel";
 import { WhenPanel } from "@/components/create/WhenPanel";
 import { CarryForwardModal } from "@/components/create/CarryForwardModal";
 import { PanelDot } from "@/components/create/Provenance";
-import { gateWhen, gateWhere, itemGaps, postableItems, requiredGaps, resolveRef, taxName, transportGaps } from "@/lib/contract";
+import { gateWhen, gateWhere, itemGaps, requiredGaps, resolveRef, taxName, transportGaps } from "@/lib/contract";
 import type { RequiredGap } from "@/lib/contract";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
@@ -159,7 +159,28 @@ export function Canvas() {
 
   if (!draft) return null;
 
-  const live = postableItems(draft.items);
+  /**
+   * What the canvas DRAWS, which is not what it posts.
+   *
+   * ~~`postableItems(draft.items)`~~ — that filter drops no-match rows as well as removed ones, and
+   * it was the list the panel read, so an item the taxonomy could not place vanished off the screen
+   * entirely. Type "floating crane barge" and the machine panel simply was not there; type it alone
+   * and the canvas said "add at least one machine" about the machine the renter had just described.
+   *
+   * The ACs always said otherwise. AC-31's row "STAYS visible in a pending state" (`draft.ts`), and
+   * `useItemVerdict` says in as many words that "a no-match item never blocks and never posts, so
+   * the canvas shows it without gating on it" — which is exactly right and was exactly not happening.
+   * `UnavailableCard`, written for this state, was unreachable: it sits behind a verdict the panel
+   * could never receive.
+   *
+   * Removed rows stay dropped: those the renter dismissed himself.
+   *
+   * **Nothing here weakens AC-33.** A no-match item still cannot reach a supplier — every gate
+   * (`itemAppGaps`, `itemWebGaps`, `transportGaps`) returns early on the verdict, `requiredGaps`
+   * counts only postable rows, the review screen lists only postable rows, and submit posts
+   * `postableItems`. This list is the screen's, and the screen's alone.
+   */
+  const live = draft.items.filter((i) => !i.removed);
   const index = Math.min(state.itemIndex, Math.max(0, live.length - 1));
   const item = live[index];
   const isFirstItem = index === 0;
@@ -168,6 +189,16 @@ export function Canvas() {
   const gaps = requiredGaps(draft, state.chargedDaysUnderstood);
   gapsRef.current = gaps;
   const equipmentGaps = item ? [...itemGaps(item, draft), ...transportGaps([item], draft.project)] : [];
+  /**
+   * A machine we cannot supply is not an ANSWERED machine.
+   *
+   * Every gate returns early on a no-match verdict, which is right — the renter cannot be asked to
+   * pick a category for a thing the catalogue does not carry — but it leaves `equipmentGaps` empty,
+   * and empty is what paints this panel green and its dot complete. A row that says "we couldn't
+   * find this in our catalogue" under a green tick is the panel contradicting itself.
+   */
+  const itemUnavailable = item?.verdict === "no-match";
+  const equipmentDone = equipmentGaps.length === 0 && !itemUnavailable;
   const whenOk = gateWhen(draft.project, state.chargedDaysUnderstood).ok;
 
   /**
@@ -427,12 +458,12 @@ export function Canvas() {
             type="button"
             onClick={() => actions.openSection("equipment")}
             className={`mb-3.5 flex w-full items-center justify-between gap-3 rounded-sm border px-5 py-4 text-start transition ${
-              equipmentGaps.length === 0 ? "border-ok/40 bg-ok/[0.06]" : "border-border bg-surface"
+              equipmentDone ? "border-ok/40 bg-ok/[0.06]" : "border-border bg-surface"
             }`}
             aria-expanded={false}
           >
             <span className="flex min-w-0 items-center gap-2">
-              <PanelDot complete={equipmentGaps.length === 0} />
+              <PanelDot complete={equipmentDone} />
               <Icon name="construction" size={16} className="flex-none text-navy" />
               <span className="flex-none text-subhead font-extrabold text-navy">{t.create.ready.machineAndOperator}</span>
               <span className="truncate text-body text-muted">{equipmentSummary}</span>

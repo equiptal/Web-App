@@ -25,9 +25,9 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AppShell, PageBack } from "@/components/AppShell";
 import { useAuthGate } from "@/components/auth/AuthGate";
-import { BidMapWorkspace } from "@/components/map/BidMapWorkspace";
+import { BidMapWorkspace, type SiblingBid } from "@/components/map/BidMapWorkspace";
 import { Icon } from "@/components/ui";
-import { fetchBidDetail } from "@/lib/api/client";
+import { fetchBidDetail, fetchReceivedBids } from "@/lib/api/client";
 import { isOffPlatformBid, isOffPlatformBidId } from "@/lib/contract/bid-equipment-access";
 import type { BidCard } from "@/lib/contract/bids";
 import type { RequestRecord } from "@/lib/contract/requests";
@@ -106,6 +106,8 @@ function BidEquipment({ bidId }: { bidId: string }) {
   const openChat = useSearchParams().get("chat") === "1";
   const [bid, setBid] = useState<BidCard | null>(null);
   const [request, setRequest] = useState<RequestRecord | null>(null);
+  /** The other offers on this same request — the header's strip (owner, 2026-09-04). */
+  const [siblings, setSiblings] = useState<SiblingBid[]>([]);
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const lastFetchRef = useRef(0);
@@ -144,6 +146,46 @@ function BidEquipment({ bidId }: { bidId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bidId]);
 
+  /**
+   * The other offers on this request, for the header's supplier strip.
+   *
+   * **Read off the inbox, not off a new endpoint.** `GET /api/me/received-bids` already answers every
+   * bid offered to this renter with the request it belongs to on each one, so the siblings are a
+   * filter over a list the app fetches anyway — no backend work, and no second definition of "the
+   * offers on this request".
+   *
+   * It runs ONCE per bid and never blocks the map: a failure leaves the strip empty, which is a
+   * header with no strip, and the surface behind it is untouched. Ordered by price, cheapest first,
+   * because a row a renter travels along is easier to keep his place in when it has an order at all;
+   * offers with no price sit at the end rather than at an invented zero.
+   */
+  useEffect(() => {
+    let live = true;
+    const rid = request?.id ?? null;
+    if (!rid) return;
+    void (async () => {
+      try {
+        const r = await fetchReceivedBids();
+        if (!live) return;
+        setSiblings(
+          r.bids
+            .filter((b) => b.request.id === rid)
+            .sort((a, b) => (a.currentPrice ?? Infinity) - (b.currentPrice ?? Infinity))
+            .map((b) => ({
+              bidId: b.bidId,
+              supplierName: b.supplierName,
+              supplierLogoUrl: b.supplierLogoUrl,
+              currentPrice: b.currentPrice,
+              priceUnit: b.priceUnit,
+            })),
+        );
+      } catch {
+        // No strip, and nothing said about it: the map is what the renter came for.
+      }
+    })();
+    return () => { live = false; };
+  }, [request?.id]);
+
   // Focus — the renter comes back from the supplier's reply and expects to see it.
   useEffect(() => {
     const onFocus = () => { void load(false); };
@@ -177,6 +219,9 @@ function BidEquipment({ bidId }: { bidId: string }) {
       // `?chat=1` — the chat icon on a bid card lands here now: the conversation lives in this dock,
       // and the deal room is no longer somewhere a renter is sent to talk (owner, 2026-08-26).
       openChat={openChat}
+      // Every offer on this request, so the header is a way ACROSS the suppliers and not just a
+      // label for the one in front of him (owner, 2026-09-04).
+      siblings={siblings}
       // The surface owns its own writes now (V11/V12): the four requests, the chat dock's first
       // message and the footer's hand-off each create the deal room themselves, and none of them
       // needs a handler from here. V9's company panel still lands with the ticket that owns it, so

@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
-import { IBM_Plex_Sans, IBM_Plex_Sans_Arabic, Oswald } from "next/font/google";
+import { Almarai, IBM_Plex_Sans, Inter, JetBrains_Mono, Oswald } from "next/font/google";
 import "./globals.css";
 import { LocaleProvider } from "@/lib/i18n";
 import { SessionProvider } from "@/lib/session";
@@ -47,11 +47,33 @@ import type { RenterUser } from "@/lib/contract/auth";
  * behind it so an Arabic headline lands on Plex Arabic rather than on whatever the browser picks.
  */
 const oswald = Oswald({ variable: "--font-oswald", subsets: ["latin"], weight: ["500", "600", "700"] });
+
+/* ── The three faces the token file names (owner, 2026-09-04) ──────────────────────────────────
+ *
+ * `docs/design-tokens.md` sets the type as well as the colour: **Inter** for Latin, **Almarai** for
+ * Arabic, **JetBrains Mono** for data codes only. Both products now load the same three.
+ *
+ * ⚠️ **This overturns two earlier rulings, deliberately, and they are worth knowing.**
+ *   · The Latin face was the SYSTEM font (owner, 2026-08-30) — Segoe UI on Windows, San Francisco
+ *     on a Mac — chosen to avoid a webfont download entirely. Inter costs that download back.
+ *   · The Arabic face was IBM Plex Sans Arabic (owner, 2026-08-19), picked because the RTL
+ *     prototype is drawn in it. Almarai is a different Arabic face and RTL screens will shift.
+ *
+ * Both are self-hosted by `next/font` at build time, so neither is an external request in
+ * production. Almarai ships 300/400/700/800 and has no 500: `globals.css` maps `font-weight: 500`
+ * to 700 inside `[lang='ar']`, so an Arabic `font-medium` heading keeps its emphasis instead of
+ * quietly rendering as body text.
+ *
+ * Weights follow the token file — 400/500 Latin, 400/700 Arabic — plus the 600 and 800 this app's
+ * own scale asks for and the file does not mention. */
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"] });
+const almarai = Almarai({ variable: "--font-almarai", subsets: ["arabic"], weight: ["400", "700", "800"], preload: false });
+/* Data codes only — an RFQ number, a model number — and nothing else reads it: `.keep-mono` is the
+ * single opt-in. Numeric alignment everywhere else comes from `tabular-nums`, which Inter carries. */
+const jetbrains = JetBrains_Mono({ variable: "--font-jetbrains-mono", subsets: ["latin"], weight: ["400", "500"], preload: false });
+/* Plex stays loaded ONLY for `--font-plex`, which the quotation and the clipboard card still name.
+ * It is no longer any screen's face. */
 const plex = IBM_Plex_Sans({ variable: "--font-plex", subsets: ["latin"], weight: ["400", "500", "600", "700"], preload: false });
-// 800 is carried because the surface asks for it (titles, chips, pills). Plex Arabic ships no 900; the
-// few 900s in the stylesheets fall back to 700 rather than being synthesised, which is the safe
-// direction — a faux-bold Arabic is worse than a slightly lighter one.
-const plexArabic = IBM_Plex_Sans_Arabic({ variable: "--font-arabic", subsets: ["arabic"], weight: ["400", "500", "600", "700"], preload: false });
 
 const siteUrl = "https://web.moedatech.net";
 
@@ -125,7 +147,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,500,0,0" />
       </head>
-      <body className={`${oswald.variable} ${plex.variable} ${plexArabic.variable} antialiased`}>
+      <body className={`${oswald.variable} ${plex.variable} ${almarai.variable} ${inter.variable} ${jetbrains.variable} antialiased`}>
         <LocaleProvider>
           <SessionProvider initialUser={initialUser}>
             {children}

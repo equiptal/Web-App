@@ -457,7 +457,7 @@ export interface BidCard {
   lockedTerms: { key: string; value: unknown }[]; // agreed terms + their negotiated value
   unreadTerms: string[]; // term keys with a counter the renter hasn't seen
   progress: { agreed: number; total: number }; // agreed-terms meter
-  lastEventAr: string | null; // last-event copy (e.g. "منذ ٣ دقائق")
+  lastEventAr: string | null; // last-event copy (e.g. "منذ 3 دقائق")
   round: number; // negotiation round
   /** Deal-room turn state (app parity — getBidList `uiState`): drives the top status banner.
    *  `new` = just submitted, `fresh` = updated, `your-turn` = supplier countered (renter acts),
@@ -645,6 +645,7 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   // Project rows reused by both the bid-card "Project" bucket and the comparison's negotiable set.
   const rPayment: TermRow = { key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: negContractState("payment_terms"), renteeValue: s(req.paymentTerms) };
   const rSla: TermRow = { key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "زمن الاستجابة للأعطال", state: negContractState("breakdown_response_sla"), renteeValue: s(req.breakdownResponseSla) };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- built, not rendered; see `contract` below
   const rOvertime: TermRow = { key: "overtime_rate", labelEn: "Overtime", labelAr: "العمل الإضافي", state: negContractState("overtime_rate"), renteeValue: s(req.overtimeRate) };
   const rMaint: TermRow = { key: "maintenance_responsibility", labelEn: "Maintenance", labelAr: "الصيانة", state: maintenance };
 
@@ -690,7 +691,10 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
       { key: "attachments", labelEn: "Attachments", labelAr: "الملحقات", state: "grey" },
       { key: "operator", labelEn: "Operator", labelAr: "المشغّل", state: operator, detail: operatorDetail },
     ],
-    contract: [rPayment, rSla, rOvertime, rMaint],
+    // Overtime is retired (2026-09-04, with the app's `2b095d63`): the renter is not asked for a
+  // rate and the supplier does not declare one, so a row here could only restate a term neither
+  // side was offered. `rOvertime` is kept built so the restore is one word in two arrays.
+    contract: [rPayment, rSla, rMaint],
     // COMPARISON-only expanded set (the web side-by-side "Negotiable terms" section) — NOT on the bid
     // card. Carries the full deal-room negotiable + acknowledge terms with live overlay states.
     negotiable: [
@@ -701,7 +705,7 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
       { key: "fat_food", labelEn: "Operator FAT — Food", labelAr: "الإعاشة (F.A.T) — الطعام", state: contractState("fat_food", fatFood), renteeValue: fatFood },
       { key: "fat_accommodation_transport", labelEn: "Operator FAT — Accommodation/Transport", labelAr: "الإعاشة (F.A.T) — الإقامة/النقل", state: contractState("fat_accommodation_transport", fatAccom), renteeValue: fatAccom },
       { key: "fuel_responsibility", labelEn: "Fuel responsibility", labelAr: "مسؤولية الوقود", state: contractState("fuel_responsibility", fuelResp), renteeValue: fuelResp },
-      rPayment, rSla, rOvertime, rMaint,
+      rPayment, rSla, rMaint, // rOvertime retired — see the `contract` bucket above
       // mobilization_lead_time — CONFLICT_ELIGIBLE / Negotiable (app moved it Priced → Negotiable).
       { key: "mobilization_lead_time", labelEn: "Mobilization lead time", labelAr: "مهلة التعبئة", state: negContractState("mobilization_lead_time") },
       { key: "mobilization_pricing", labelEn: "Mobilization pricing", labelAr: "تسعير النقل", state: "grey" },

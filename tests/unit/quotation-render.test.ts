@@ -103,6 +103,43 @@ describe("shared quotation renderer", () => {
     expect(html).toContain("pill-ver");
   });
 
+  /* The pill is the FALLBACK, never the answer when a number is known.
+   *
+   * A quotation is the document a renter files with his own accounts and forwards to his own client,
+   * and "✓ Verified" where the CR should be is not a number anyone can check. So: a value prints as
+   * itself, and being verified never replaces one. The row above proves the other half — that a
+   * verified party with NO value still says something rather than leaving a blank line. */
+  it("prints the real CR and VAT when they are known, and never the pill in their place", () => {
+    const doc = bidDoc();
+    doc.supplier.idRows = [
+      { label: "CR #", value: "1010101010", verified: true },
+      { label: "VAT #", value: "300000000000003", verified: true },
+    ];
+    const html = renderQuotationSection(doc);
+    expect(html).toContain("1010101010");
+    expect(html).toContain("300000000000003");
+    // Both rows carry a value, so nothing on this party falls back.
+    expect(html.split('class="pid-row"').filter((chunk) => chunk.includes("pill-ver")).length).toBe(0);
+  });
+
+  it("prints the renter's own company and CR in the Rentee block", () => {
+    const doc = bidDoc();
+    doc.rentee = {
+      label: "Rentee",
+      name: "Sigma Almimariya Contracting Co.",
+      sub: "Yara Fadwa",
+      idRows: [
+        { label: "CR #", value: "4030200100", verified: true },
+        { label: "VAT #", value: "310000000000003", verified: true },
+      ],
+      chips: ["Verified"],
+    };
+    const html = renderQuotationSection(doc);
+    expect(html).toContain("Sigma Almimariya Contracting Co.");
+    expect(html).toContain("4030200100");
+    expect(html).toContain("310000000000003");
+  });
+
   // A pre-confirmation draft must be unmistakable once it leaves the browser as a PDF — the whole
   // failure mode is a renter (or a third party they forward it to) reading it as a committed deal.
   it("marks a draft with a badge + watermark and suppresses the signed block", () => {

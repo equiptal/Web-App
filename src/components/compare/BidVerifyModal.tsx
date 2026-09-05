@@ -231,7 +231,7 @@ export function BidVerifyModal({
                   </table>
                   <div className="itot">
                     <span className="r">{vatMode === "incl" ? L("Net (before VAT)", "الصافي (قبل الضريبة)") : L("Subtotal", "المجموع")}<b>{net ? nf(net) : "—"} {sar}</b></span>
-                    <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{net ? nf(net * VAT_RATE) : "—"} {sar}</b></span>
+                    <span className="r">{L("VAT 15%", "ضريبة 15٪")}<b>{net ? nf(net * VAT_RATE) : "—"} {sar}</b></span>
                     <span className="r t">{L("Item total", "إجمالي البند")}<b>{net ? nf(itemTotal) : "—"} {sar}</b></span>
                   </div>
                 </div>

@@ -24,7 +24,20 @@
   /* The card's own hue, set by its state below. Everything that follows reads it, so a new state is
      one variable rather than a sweep through the file. */
   --rq-accent: #e8890c;
-  --rq-tint: #fef8f0;
+  /* ── ONE background for every ask (owner, 2026-09-05) ──────────────────────────────────────
+     *"I want all cards of the 3 requests in the equipment map chat to be in the same card
+     background colour: light grey and white."*
+
+     ~~A tint per state: cream while open, green once answered, red once refused — the app's
+     `alphaBlend(accent @ 6%, white)`, and the owner's own 2026-08-17 ruling that an open ask must
+     not be the palest card on the screen.~~ Withdrawn. Three asks sitting in one thread read as
+     three different KINDS of object when each carries its own fill, and the thread they sit in is
+     white: the card has to be a card first and a verdict second.
+
+     So the fill is white and the identity strip is grey, on every card. The state is not lost — it
+     is in the frame, in the ask's name and in the status row's dot, all of which still move with
+     `--rq-accent`. */
+  --rq-tint: var(--surface);
   /* 55%, the app's tinted value; its untinted 35% disappeared against a filled card. Spelled as a
      literal per state rather than mixed from `--rq-accent`: this is the card's FRAME, and a browser
      that cannot parse the mix drops the whole declaration and renders a frameless card. */
@@ -47,9 +60,9 @@
    to no fill at all, where a border that fails the same way merely renders untinted. 6% is the app's
    measured value — enough to name the outcome down a scrolling thread, not enough to fight the navy
    text on top of it. */
-.bm-rq.is-open { --rq-accent: #e8890c; --rq-tint: #fef8f0; --rq-edge: color-mix(in srgb, var(--brand) 55%, transparent); --rq-rule: color-mix(in srgb, var(--brand) 22%, transparent); }
-.bm-rq.is-done { --rq-accent: var(--ok); --rq-tint: #f1faf5; --rq-edge: color-mix(in srgb, var(--ok) 55%, transparent); --rq-rule: color-mix(in srgb, var(--ok) 22%, transparent); }
-.bm-rq.is-refused { --rq-accent: var(--danger); --rq-tint: #fdf3f2; --rq-edge: color-mix(in srgb, var(--danger) 55%, transparent); --rq-rule: color-mix(in srgb, var(--danger) 22%, transparent); }
+.bm-rq.is-open { --rq-accent: #e8890c; --rq-edge: color-mix(in srgb, var(--brand) 55%, transparent); --rq-rule: color-mix(in srgb, var(--brand) 22%, transparent); }
+.bm-rq.is-done { --rq-accent: var(--ok); --rq-edge: color-mix(in srgb, var(--ok) 55%, transparent); --rq-rule: color-mix(in srgb, var(--ok) 22%, transparent); }
+.bm-rq.is-refused { --rq-accent: var(--danger); --rq-edge: color-mix(in srgb, var(--danger) 55%, transparent); --rq-rule: color-mix(in srgb, var(--danger) 22%, transparent); }
 /* The DRAFT is the same card, in blue and lifted — the prototype's only two differences besides the
    buttons. It has to read as "not yet in the conversation" at a glance, from the frame alone. */
 .bm-rq.is-draft { border-color: #2563eb; }
@@ -90,9 +103,11 @@
   gap: 9px;
   width: 100%;
   padding: 9px 11px;
-  /* Translucent, so it reads as a band ON the tinted card rather than as a white strip fighting it.
-     A fixed var(--surface) looked right only while every card was white. */
-  background: rgba(255, 255, 255, 0.55);
+  /* LIGHT GREY on a white card (owner, 2026-09-05) — the two tones the card is now made of, and the
+     band is the grey one so the machine it names is told apart from the ask below it.
+     ~~`rgba(255,255,255,0.55)`~~: translucent white was how a band stayed visible on a card whose
+     fill moved with its state. Nothing moves now, so the band can state its own colour. */
+  background: var(--surface2);
   border: 0;
   border-bottom: 1px solid var(--rq-rule);
   font: inherit;
@@ -172,7 +187,8 @@
   font-size: 9.5px;
   font-weight: 700;
   color: var(--navy);
-  background: rgba(255, 255, 255, 0.6);
+  /* Grey, for the same reason the strip is: translucent white on a white card is no chip at all. */
+  background: var(--surface2);
   border: 1px solid color-mix(in srgb, var(--muted) 22%, transparent);
   /* r12 and 8/3 — the app's doc-chip geometry. */
   border-radius: var(--radius-md);

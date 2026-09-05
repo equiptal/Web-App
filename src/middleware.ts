@@ -43,6 +43,18 @@ export function isRetiredRequestsRoute(pathname: string): boolean {
   return pathname === "/compare" || pathname.startsWith("/compare/") || pathname.startsWith("/requests/");
 }
 
+/**
+ * `/company` and everything under it (owner, 2026-09-04).
+ *
+ * The organization is a block on the renter's PROFILE now, not a page of its own, so the route that
+ * held it sends him where its contents went. Same treatment as the retired request pages, and for
+ * the same reason: a notification written last week, a bookmark, or the app's own deep link must not
+ * land on a 404.
+ */
+export function isRetiredCompanyRoute(pathname: string): boolean {
+  return pathname === "/company" || pathname.startsWith("/company/");
+}
+
 function safeNext(next: string | null): string {
   // Only allow same-origin relative paths (block protocol-relative `//host`).
   return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
@@ -104,6 +116,15 @@ export function middleware(req: NextRequest) {
   if (isRetiredRequestsRoute(pathname)) {
     const dest = req.nextUrl.clone();
     dest.pathname = "/requests";
+    dest.search = "";
+    return NextResponse.redirect(dest, 308);
+  }
+
+  // The organization page, now a block on the profile (owner, 2026-09-04). Same 308, same edge, and
+  // the query is dropped for the same reason: nothing on the profile reads `/company`'s parameters.
+  if (isRetiredCompanyRoute(pathname)) {
+    const dest = req.nextUrl.clone();
+    dest.pathname = "/profile";
     dest.search = "";
     return NextResponse.redirect(dest, 308);
   }

@@ -12,6 +12,16 @@ import { extractStoreList, mapStoreCard } from "@/lib/contract/stores";
  */
 const PASS = ["page", "limit", "search", "category", "city", "measurement", "verified"] as const;
 
+/*
+ * ⚠️ **`meta` cannot be forwarded from here, and it was tried.**
+ *
+ * Both backends answer `{ success, data, meta: { page, total, totalPages } }`, but `appPublicCall`
+ * and `withAuthedBackend`'s `call` both unwrap to `.data` before this handler sees anything — so a
+ * `meta` read here is always null. Rather than widen those helpers for one screen, the directory
+ * decides from what it received: a page that comes back FULL means there is probably another, and a
+ * page that comes back short is the end. See the note in `BrowseSurface`.
+ */
+
 export async function GET(req: Request) {
   const inUrl = new URL(req.url);
   const qs = new URLSearchParams();

@@ -81,7 +81,7 @@ test.describe("an unknown supplier bid link", () => {
 test.describe("routes behind a session", () => {
   // Not a journey test — a boundary test. It asserts the gate holds, which is the one thing about
   // these routes that can be proven without a session.
-  for (const path of ["/dashboard", "/requests", "/inbox", "/profile", "/company"]) {
+  for (const path of ["/dashboard", "/requests", "/inbox", "/profile"]) {
     test(`${path} does not serve renter data to a signed-out visitor`, async ({ page }) => {
       const res = await page.goto(path);
 

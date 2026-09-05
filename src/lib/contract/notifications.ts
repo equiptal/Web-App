@@ -92,7 +92,10 @@ export function notificationHref(n: NotificationItem): string | null {
   // All open the hub — including `removed`/`dissolved`, where it correctly shows the join form and so
   // explains why the firm's shared requests and equipment just vanished. Without this the owner's
   // "New join request" would be a dead, unclickable row with no route to the Approve button.
-  if (n.type.startsWith("company.")) return "/company";
+  //
+  // `/profile`, not `/company`: the hub is a block on the profile since 2026-09-04. The old route
+  // still 308s there from the edge, so an already-delivered notification is not broken either.
+  if (n.type.startsWith("company.")) return "/profile";
   // equipment.* / job.* / support.reply / admin.* / message.new / referral.* → display-only.
   return null;
 }

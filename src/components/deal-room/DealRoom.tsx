@@ -941,7 +941,7 @@ export function DealRoom({ id, onTitle, initialFlow }: {
           <div className="pb-breakdown">
             {/* The bid card's shape (owner, 2026-08-19): every line below is for ONE machine, and the
                 count is applied once, at the foot. A multi-unit deal says so in a heading rather than
-                by hanging «× ٣» off each row — three multipliers down a column is arithmetic the
+                by hanging «× 3» off each row — three multipliers down a column is arithmetic the
                 reader has to carry, and the overall row is where it lands anyway. */}
             {multi && <div className="pb-bhead">{L("Per unit", "لكل وحدة")}</div>}
             <div className="pb-brow"><span className="l">{L("Rental", "الإيجار")} ({rentalLabel})</span><span className="v">{nf(perUnit.rental)}</span></div>
@@ -952,7 +952,7 @@ export function DealRoom({ id, onTitle, initialFlow }: {
               ? <div className="pb-brow"><span className="l">{L("Return", "الإرجاع: ديموب")}</span><span className="v ex">{L("Not included", "غير مشمول")}</span></div>
               : room.demobPrice ? <div className="pb-brow"><span className="l">{L("Return", "الإرجاع: ديموب")}</span><span className="v">{nf(perUnit.demob)}</span></div> : null}
             <div className="pb-brow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{nf(perUnit.subtotal)}</span></div>
-            <div className="pb-brow"><span className="l">{L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)")}</span><span className="v">{nf(perUnit.vat)}</span></div>
+            <div className="pb-brow"><span className="l">{L("VAT (15%)", "ضريبة القيمة المضافة (15٪)")}</span><span className="v">{nf(perUnit.vat)}</span></div>
             <div className="pb-brow tot"><span className="l">{L("Estimated total", "الإجمالي التقديري")}</span><span className="v">{nf(perUnit.total)} {L("SAR", "ر.س")}</span></div>
 
             {/* NOT per-unit × units. The transport legs carry their own negotiated counts — a room with
@@ -1171,7 +1171,9 @@ function RequestSummaryModal({ room, ar, L, onClose }: {
         [L("Urgency", "الاستعجال"), urgency],
         [L("Subletting", "التأجير من الباطن"), yn(d.subletting, ["Allowed", "مسموح"], ["Not allowed", "غير مسموح"])],
         [L("Local content", "المحتوى المحلي"), yn(d.localContent, ["Required", "مطلوب"], ["Not required", "غير مطلوب"])],
-        [L("Overtime rate", "أجر العمل الإضافي"), d.overtimeRate],
+        // Overtime is retired (see WhenPanel). This row printed `d.overtimeRate` raw, so a legacy
+        // request read «أجر العمل الإضافي: 0» — the sentinel, not a rate.
+        // [L("Overtime rate", "أجر العمل الإضافي"), d.overtimeRate],
         [L("Notes", "ملاحظات"), d.additionalNotes],
       ],
     },
@@ -1716,7 +1718,7 @@ function CounterFlow({
               </table></div>
               <div className="qp-totals">
                 <div className="qp-trow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{money(subtotal)}</span></div>
-                <div className="qp-trow"><span className="l">{L("VAT 15%", "ضريبة القيمة المضافة ١٥٪")}</span><span className="v">{money(vat)}</span></div>
+                <div className="qp-trow"><span className="l">{L("VAT 15%", "ضريبة القيمة المضافة 15٪")}</span><span className="v">{money(vat)}</span></div>
                 <div className="qp-trow net"><span className="l">{L("Net incl. VAT", "الصافي شامل الضريبة")}</span><span className="v">{money(total)}</span></div>
               </div>
               <div className="qp-words"><span className="k">{L("Amount in words", "المبلغ بالحروف")}</span>{nf(total)} {L("Saudi Riyals only", "ريال سعودي فقط لا غير")}</div>
@@ -1837,7 +1839,7 @@ function CounterFlow({
                       <div className="qp-trow"><span className="l">{L("Mobilization", "التعبئة (موب)")}</span><span className="v">{mEx ? L("Excluded", "غير مشمولة") : money(mobLine)}</span></div>
                       <div className="qp-trow"><span className="l">{L("Return", "الإرجاع (ديموب)")}</span><span className="v">{dEx ? L("Excluded", "غير مشمول") : money(demobLine)}</span></div>
                       <div className="qp-trow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{money(subtotal)}</span></div>
-                      <div className="qp-trow"><span className="l">{L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)")}</span><span className="v">{money(vat)}</span></div>
+                      <div className="qp-trow"><span className="l">{L("VAT (15%)", "ضريبة القيمة المضافة (15٪)")}</span><span className="v">{money(vat)}</span></div>
                       <div className="qp-trow net"><span className="l">{L("Net incl. VAT", "الصافي · شامل الضريبة")}</span><span className="v">{money(total)}</span></div>
                     </div>
                     {showCompare && <span className={`qp-sumbadge${priceDiff === 0 ? " match" : " diff"}`}>{priceDiff === 0 ? L("Matches supplier's offer", "مطابق لعرض المورد") : `${L("Differs from supplier", "يختلف عن عرض المورد")} (${nf(priceDiff)})`}</span>}
@@ -1898,7 +1900,7 @@ function CounterFlow({
           {/* zoom rail — fixed in the desk's side margin (right in RTL, left in LTR) */}
           <div className="qp-zoom">
             <button type="button" title={L("Zoom in", "تكبير")} onClick={() => setPaperZoom((z) => Math.min(1.8, Math.round((z + 0.15) * 100) / 100))}>+</button>
-            <button type="button" className="pct" title={L("Fit (85%)", "ملاءمة ٨٥٪")} onClick={() => setPaperZoom(0.85)}>{Math.round(paperZoom * 100)}%</button>
+            <button type="button" className="pct" title={L("Fit (85%)", "ملاءمة 85٪")} onClick={() => setPaperZoom(0.85)}>{Math.round(paperZoom * 100)}%</button>
             <button type="button" title={L("Zoom out", "تصغير")} onClick={() => setPaperZoom((z) => Math.max(0.5, Math.round((z - 0.15) * 100) / 100))}>−</button>
           </div>
         </div>

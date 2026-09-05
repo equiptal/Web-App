@@ -190,7 +190,11 @@ export interface BidFormData {
   renter: { name: string | null; contactName: string | null; city: string | null; verified: boolean; logoUrl: string | null };
   /** Read-only project terms + contract terms (for-all-items), from the request. */
   projectTerms: BidFormProjectTerms | null;
-  contractTerms: { key: string; label: string; value: string }[];
+  /** ⚠️ `labelAr` / `valueAr` are the backend's own Arabic, added 2026-09-02 (`c304828a`). Before
+   *  them this payload carried ENGLISH ONLY, so an Arabic-speaking off-platform supplier read every
+   *  other line of the card in Arabic and these in English. Optional: an older backend sends neither,
+   *  and the English falls through. */
+  contractTerms: { key: string; label: string; labelAr: string | null; value: string; valueAr: string | null }[];
   /** The renter's free-text notes for the whole request (read-only). */
   notes: string | null;
   items: BidFormItem[];
@@ -339,7 +343,14 @@ export function mapBidFormData(raw: unknown): BidFormData {
         }
       : null,
     // Exclude `maintenance` (not a supplier-confirmed term here) + `overtime` when it's effectively none (0).
-    contractTerms: ct.map((c) => ({ key: s(c.key) ?? "", label: s(c.label) ?? "", value: s(c.value) ?? "" }))
+    contractTerms: ct
+      .map((c) => ({
+        key: s(c.key) ?? "",
+        label: s(c.label) ?? "",
+        labelAr: s(c.labelAr),
+        value: s(c.value) ?? "",
+        valueAr: s(c.valueAr),
+      }))
       .filter((c) => c.key && c.value && c.key !== "maintenance" && !(c.key === "overtime" && ["0", "0×", "none", "without"].includes(c.value.toLowerCase()))),
     notes: s(r.notes),
     items: items.map((i) => {

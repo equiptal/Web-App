@@ -556,10 +556,10 @@ describe("the distance bands v2 shipped, reinstated (RM3-AC-28, RM3-AC-28c)", ()
     expect(group?.options.map((o) => o.matches)).toEqual([1, 2]);
   });
 
-  it("labels a band in both locales, with Arabic-Indic numerals in the Arabic one", () => {
+  it("labels a band in both locales, with Latin numerals in both", () => {
     const list = listedMachines(fleet([{ id: "a", km: 10 }, { id: "c", km: 300 }]));
     const group = equipmentFilters(list, asking()).find((g) => g.kind === "distance");
-    expect(group?.options[0].label).toEqual({ en: "≤ 50 km", ar: "≤ ٥٠ كم" });
+    expect(group?.options[0].label).toEqual({ en: "≤ 50 km", ar: "≤ 50 كم" });
   });
 });
 
@@ -759,7 +759,7 @@ describe("the filtered empty state is not RM3-AC-26's (RM3-AC-28e)", () => {
     expect(emptied.emptiedByFilter).toBe(true);
     // Rule 3 survives the empty state: the whole offer is still stated.
     expect(emptied.total).toBe(3);
-    expect(emptied.active.map((o) => o.label.ar)).toEqual(["≤ ٥٠ كم", "TÜV"]);
+    expect(emptied.active.map((o) => o.label.ar)).toEqual(["≤ 50 كم", "TÜV"]);
   });
 
   it("never flags an offer that registered no machine — that is a fact about the LESSOR", () => {

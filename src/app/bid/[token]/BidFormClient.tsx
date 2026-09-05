@@ -10,6 +10,7 @@ import { computeQuoteTotals, computeRentalTotal, durationDaysBetween, rentalDivi
 import { FileUploader, type UploaderKind } from "@/components/bid/FileUploader";
 import { QualityRing } from "@/components/bid/QualityRing";
 import { computeBidQuality } from "@/lib/contract/bid-quality";
+import { latinDigits, partyToken } from "@/lib/contract/labels";
 import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
 import { equipmentIcon } from "@/components/requests/EquipImg";
 
@@ -31,7 +32,13 @@ import { equipmentIcon } from "@/components/requests/EquipImg";
 // supplier bidding through the link was never told. The backend sends it ONLY when the renter
 // switched it on (null otherwise), so an untouched toggle stays hidden instead of adding a
 // "Night shift: No" row to every bid.
-const TERM_KEYS = ["operator", "nationality", "nightShift", "fatFood", "fatTransport", "fuel", "fuelType", "year", "operatorCert", "equipmentCert"] as const;
+// `fuelType` is NOT here (2026-09-04, following the app's `f48793ec`). It is the renter's
+// `fuelTypePreference` — what fuel they asked for — and it is a different fact from `fuel`,
+// which is fuel RESPONSIBILITY and stays. The renter is not really choosing it either: the
+// system prefills it (owner, 2026-09-03, when the same chip left the item pills), so asking a
+// supplier to confirm a value nobody chose added a row and settled nothing. Still stored, still
+// matched on; simply not shown to the supplier.
+const TERM_KEYS = ["operator", "nationality", "nightShift", "fatFood", "fatTransport", "fuel", "year", "operatorCert", "equipmentCert"] as const;
 type TermKey = (typeof TERM_KEYS)[number];
 // Term names mirror the web app's canonical labels (bids.ts negotiable terms) so renter + supplier see the same wording.
 const TERM_LABEL: Record<TermKey, [string, string]> = {
@@ -41,7 +48,6 @@ const TERM_LABEL: Record<TermKey, [string, string]> = {
   fatFood: ["Operator Food", "طعام المشغّل"],
   fatTransport: ["Operator Accommodation & Transport", "سكن وتنقّل المشغّل"],
   fuel: ["Fuel responsibility", "مسؤولية الوقود"],
-  fuelType: ["Fuel type", "نوع الوقود"],
   year: ["Equipment year", "سنة الصنع"],
   operatorCert: ["Operator certificate", "شهادة المشغّل"],
   equipmentCert: ["Equipment certificate", "شهادة المعدة"],
@@ -49,7 +55,7 @@ const TERM_LABEL: Record<TermKey, [string, string]> = {
 // A Material glyph per term, so each term card reads at a glance.
 const TERM_ICON: Record<TermKey, string> = {
   operator: "engineering", nationality: "public", nightShift: "bedtime", fatFood: "restaurant", fatTransport: "night_shelter",
-  fuel: "local_gas_station", fuelType: "local_gas_station", year: "event", operatorCert: "workspace_premium", equipmentCert: "verified",
+  fuel: "local_gas_station", year: "event", operatorCert: "workspace_premium", equipmentCert: "verified",
 };
 // App-download links for the footer CTA (off-platform suppliers → install the app to keep getting requests).
 // Source: linktr.ee/moedatech (the official app links).
@@ -335,8 +341,8 @@ export default function BidFormClient({ token }: { token: string }) {
       perUnitRental: rental.total,
       rentalUnits: units,
       // Legs are only the supplier's when the renter said so; otherwise there is no price to add.
-      mob: { amount: (it.deliveryBy || "").toLowerCase() === "supplier" ? strip(num(a?.deliveryPrice ?? "")) : 0 },
-      demob: { amount: (it.returnBy || "").toLowerCase() === "supplier" ? strip(num(a?.returnPrice ?? "")) : 0 },
+      mob: { amount: partyToken(it.deliveryBy).toLowerCase() === "supplier" ? strip(num(a?.deliveryPrice ?? "")) : 0 },
+      demob: { amount: partyToken(it.returnBy).toLowerCase() === "supplier" ? strip(num(a?.returnPrice ?? "")) : 0 },
     });
     return { units, rental, ...totals };
   };
@@ -591,8 +597,10 @@ export default function BidFormClient({ token }: { token: string }) {
                       const ans = contract[c.key];
                       return (
                         <div key={c.key} className={`treqcell${ans === true ? " ok" : ""}${ans === false ? " declined" : ""}${showErrors && ans === undefined ? " needpick" : ""}`}>
-                          <div className="tc-main"><div className="tc-name"><span className="material-icons-outlined">gavel</span>{c.label}</div></div>
-                          <div className="tc-rw"><span className="q">{L("Renter's choice", "اختيار المستأجر")}</span> <i>{choiceLabel(c.value, ar)}</i></div>
+                          <div className="tc-main"><div className="tc-name"><span className="material-icons-outlined">gavel</span>{(ar && c.labelAr) || c.label}</div></div>
+                          {/* The backend's own Arabic where it sends it, and its digits normalised to
+                              Latin on the way in — `valueAr` is seeded «٢٤ ساعة». */}
+                          <div className="tc-rw"><span className="q">{L("Renter's choice", "اختيار المستأجر")}</span> <i>{ar && c.valueAr ? latinDigits(c.valueAr) : choiceLabel(c.value, ar)}</i></div>
                           <div className="tc-sw"><span className="q">{L("Your choice", "اختيارك")}</span><YesNo L={L} value={ans} onChange={(v) => setContract((p) => ({ ...p, [c.key]: v }))} /></div>
                         </div>
                       );
@@ -636,8 +644,13 @@ export default function BidFormClient({ token }: { token: string }) {
             const sub = pr.overall.subtotal;
             const line = (v: string) => (num(v) ? num(v) * oq : 0);
             // Supplier prices delivery/return ONLY when they handle it; if the renter does, no price row.
-            const delBySup = (it.deliveryBy || "").toLowerCase() === "supplier";
-            const retBySup = (it.returnBy || "").toLowerCase() === "supplier";
+            // null = the leg does not exist (self-mobile equipment drives itself to site). Distinct from
+            // "Renter", which means the renter handles a leg that does exist. `!= null` on purpose: it
+            // covers an older backend that omits the field, and won't hide a row on an empty string.
+            const delApplies = it.deliveryBy != null;
+            const retApplies = it.returnBy != null;
+            const delBySup = partyToken(it.deliveryBy).toLowerCase() === "supplier";
+            const retBySup = partyToken(it.returnBy).toLowerCase() === "supplier";
             const multiItem = data.items.length > 1; // opt-out only makes sense when there's more than one item
             const skip = skipped.has(it.requestItemId);
             return (
@@ -764,8 +777,9 @@ export default function BidFormClient({ token }: { token: string }) {
                       <td className="num"><input className={`ptbl-in${showErrors && num(a?.rentalRate ?? "") <= 0 ? " invalid" : ""}`} inputMode="numeric" value={a?.rentalRate ?? ""} onChange={(e) => setPrice(it.requestItemId, "rentalRate", e.target.value)} placeholder="0" /></td>
                       <td className="num tot">{num(a?.rentalRate ?? "") ? nf(pr.overall.rental * vatMul) : "—"}</td>
                     </tr>
-                    {/* Delivery/Return are always shown. When the RENTER handles them, they're read-only
-                        (no price input) — the supplier just sees the renter is responsible. */}
+                    {/* A leg is shown only when it exists. When the RENTER handles an existing leg, the row is
+                        read-only (no price input) — the supplier just sees the renter is responsible. */}
+                    {delApplies && (
                     <tr>
                       <td><div className="it-lbl">{L("Delivery to site", "النقل إلى الموقع")}</div><div className="it-sub2">{delBySup ? L("price × qty", "السعر × العدد") : L("handled by the renter", "على المستأجر")}</div></td>
                       <td className="num">{L("Trip", "رحلة")}</td><td className="num">{oq}</td>
@@ -774,6 +788,8 @@ export default function BidFormClient({ token }: { token: string }) {
                         : <td className="num"><span className="byrenter">{L("Renter", "المستأجر")}</span></td>}
                       <td className="num tot">{delBySup ? (num(a?.deliveryPrice ?? "") ? nf(line(a!.deliveryPrice)) : "—") : "—"}</td>
                     </tr>
+                    )}
+                    {retApplies && (
                     <tr>
                       <td><div className="it-lbl">{L("Return from site", "النقل من الموقع")}</div><div className="it-sub2">{retBySup ? L("price × qty", "السعر × العدد") : L("handled by the renter", "على المستأجر")}</div></td>
                       <td className="num">{L("Trip", "رحلة")}</td><td className="num">{oq}</td>
@@ -782,6 +798,7 @@ export default function BidFormClient({ token }: { token: string }) {
                         : <td className="num"><span className="byrenter">{L("Renter", "المستأجر")}</span></td>}
                       <td className="num tot">{retBySup ? (num(a?.returnPrice ?? "") ? nf(line(a!.returnPrice)) : "—") : "—"}</td>
                     </tr>
+                    )}
                   </tbody>
                 </table></div>
                 {/* Why the rental total isn't just the rate — the single most surprising number on this
@@ -796,7 +813,7 @@ export default function BidFormClient({ token }: { token: string }) {
                 )}
                 <div className="itot">
                   <span className="r">{vatIncluded ? L("Net (before VAT)", "الصافي (قبل الضريبة)") : L("Subtotal", "المجموع")}<b>{sub ? nf(sub) : "—"} {sar}</b></span>
-                  <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{sub ? nf(sub * VAT_RATE) : "—"} {sar}</b></span>
+                  <span className="r">{L("VAT 15%", "ضريبة 15٪")}<b>{sub ? nf(sub * VAT_RATE) : "—"} {sar}</b></span>
                   <span className="r t">{vatIncluded ? L("Item total (incl. VAT)", "إجمالي البند (شامل الضريبة)") : L("Item total", "إجمالي البند")}<b>{sub ? nf(sub * 1.15) : "—"} {sar}</b></span>
                 </div>
 
@@ -1043,7 +1060,7 @@ function Countdown({ iso, L, fmtDate }: { iso: string; L: (e: string, a: string)
 }
 
 function partyLabel(v: string | null | undefined, L: (e: string, a: string) => string) {
-  const u = (v ?? "").toLowerCase();
+  const u = partyToken(v).toLowerCase();
   return u === "renter" || u === "rentee" ? L("Renter", "المستأجر") : u === "supplier" ? L("Supplier", "المؤجّر") : (v ?? "—");
 }
 
@@ -1060,16 +1077,16 @@ const AR_TERM_VALUE: Record<string, string> = {
   // yes/no · included
   YES: "نعم", NO: "لا", TRUE: "نعم", FALSE: "لا", INCLUDED: "مشمول", EXCLUDED: "غير مشمول",
   // payment terms
-  "NET-0": "صافي فوري", "NET-15": "صافي ١٥ يومًا", "NET-30": "صافي ٣٠ يومًا", "NET-60": "صافي ٦٠ يومًا", "NET-90": "صافي ٩٠ يومًا",
+  "NET-0": "صافي فوري", "NET-15": "صافي 15 يومًا", "NET-30": "صافي 30 يومًا", "NET-60": "صافي 60 يومًا", "NET-90": "صافي 90 يومًا",
   UPFRONT: "مقدمًا", ADVANCE: "دفعة مقدمة", "END-OF-JOB": "نهاية المهمة", DAILY: "يومي", "UPON-DELIVERY": "عند التسليم", MILESTONE: "دفعات مرحلية",
   // breakdown SLA
-  FOUR_HR: "٤ ساعات", EIGHT_HR: "٨ ساعات", TWENTY_FOUR_HR: "٢٤ ساعة", FORTY_EIGHT_HR: "٤٨ ساعة", SEVENTY_TWO_HR: "٧٢ ساعة",
+  FOUR_HR: "4 ساعات", EIGHT_HR: "8 ساعات", TWENTY_FOUR_HR: "24 ساعة", FORTY_EIGHT_HR: "48 ساعة", SEVENTY_TWO_HR: "72 ساعة",
   // overtime
-  "2X": "٢×", "1.5X": "١٫٥×", WITHOUT: "بدون", "0": "بدون",
+  "2X": "2×", "1.5X": "1.5×", WITHOUT: "بدون", "0": "بدون",
 };
 function localizeTermValue(v: string | null | undefined): string | null {
   if (v == null || String(v).trim() === "") return v ?? null;
-  const s = String(v).trim();
+  const s = partyToken(v);
   return AR_TERM_VALUE[s.toUpperCase()] ?? s;
 }
 
@@ -1081,7 +1098,7 @@ const PARTY_VALUES: Record<string, [string, string]> = {
 };
 function choiceLabel(v: string | null | undefined, ar: boolean): string | null {
   if (v == null || String(v).trim() === "") return v ?? null;
-  const party = PARTY_VALUES[String(v).trim().toUpperCase()];
+  const party = PARTY_VALUES[partyToken(v).toUpperCase()];
   if (party) return ar ? party[1] : party[0];
   return ar ? localizeTermValue(v) : String(v);
 }

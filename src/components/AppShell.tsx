@@ -14,6 +14,7 @@ import { AuthGateProvider, useAuthGate } from "@/components/auth/AuthGate";
 import { fetchDealRoomUnread } from "@/lib/api/client";
 import { btn, cx, OVERLAY, PAGE_BACK, PAGE_MAX, PAGE_X, PAGE_Y, POPOVER, SCRIM } from "@/lib/ds";
 import { backTarget } from "@/lib/contract/back-nav";
+import { previousPath, recordTrail } from "@/lib/nav-trail";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { AppNav, AppNavMobile, type NavItem } from "@/components/AppNav";
 import { ArrowBackIcon, MailIcon, CountBadge } from "@/components/HeaderIcons";
@@ -171,17 +172,13 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
   const [back, setBack] = useState<BackSpec>(null);
   const registerBack = useCallback((spec: BackSpec) => setBack(() => spec), []);
 
-  /* ── The last in-app route, kept so Back can NAME where it goes ───────────────────────────────
-     A ref rather than state: it must not re-render anything when it changes, and it is read only
-     while a back control is being drawn. `prev` is updated AFTER the render that used it, so the
-     page currently on screen still sees the page before it. */
-  const prevPath = useRef<string | null>(null);
-  const seenPath = useRef<string | null>(null);
-  useEffect(() => {
-    if (seenPath.current === pathname) return;
-    prevPath.current = seenPath.current;
-    seenPath.current = pathname;
-  }, [pathname]);
+  /* ── The last in-app route, kept so Back can point where the renter actually was ──────────────
+     ~~Two refs on this component.~~ They could not work: this shell is rendered by each PAGE, not by
+     the layout, so a navigation unmounts it and the refs came back `null` — every Back control in the
+     app fell through to its own `fallback` (owner, 2026-09-04). The trail lives in `nav-trail.ts` now,
+     which survives the remount and a reload, and is recorded here during render so a child asking
+     during its own mount gets the answer (see the module's note). */
+  if (typeof window !== "undefined") recordTrail(pathname);
 
   // Read through a ref so the /api/me effect below can compare against the CURRENT tier without
   // listing `tier` as a dependency — that would re-fire the fetch on every tier change, and since
@@ -244,21 +241,24 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
   // NOT HERE, and each for its own reason: INBOX is an icon in the account cluster, because it
   // carries a count and a word cannot; PROFILE is the avatar beside it; SETTINGS is inside that
   // avatar's menu, next to Sign out, where a reader looks for it.
-  /* BROWSE leads for a guest, and follows Dashboard once there is an account (owner, 2026-08-30).
-     A visitor has no requests and no organization, so the first tab has to be the one with something
-     in it; a signed-in renter came for his own work, so his does. Same four destinations either way
-     — only the order moves, because a nav that gains and loses tabs on sign-in teaches nothing. */
-  const guest = status === "anon";
-  const dashboardTab: NavItem = { key: "dashboard", label: t.shell.dashboard, href: "/" };
-  const browseTab: NavItem = { key: "browse", label: t.shell.browse, href: "/browse" };
+  /* ── THREE places, with the dashboard in the middle (owner, 2026-09-04) ──────────────────────
+     *"Nav bar will have dashboard at center and on one side browse and other side is requests."*
+
+     ~~The order swapped on sign-in: Browse first for a guest, Dashboard first once there was an
+     account.~~ It is the same row for everyone now, which is what makes the middle a place rather
+     than a coincidence — a guest and a member point at the same tab to reach the same page. What
+     changes for a guest is only what the DASHBOARD says: he lands on Browse on a cold entry, and
+     pressing Dashboard shows him the sign-in prompt every other account-bound page shows
+     (`HomeHub`).
+
+     ~~My Organization.~~ Gone from the bar and gone as a page (owner, 2026-09-04): the firm is part
+     of the renter's own profile now, under his personal details, so it is reached where the rest of
+     his account is. ~~My Suppliers~~ left the bar the same way on 2026-09-01, for the dashboard. */
   const navItems: NavItem[] = [
-    ...(guest ? [browseTab, dashboardTab] : [dashboardTab, browseTab]),
+    { key: "browse", label: t.shell.browse, href: "/browse" },
+    { key: "dashboard", label: t.shell.dashboard, href: "/" },
     // The KEY stays «requests»: it is the route's name, and it is what the active tab is matched on.
-    { key: "requests", label: t.shell.marketplace, href: "/requests" },
-    // ~~My Suppliers.~~ It is on the dashboard now, under the projects (owner, 2026-09-01) — a
-    // renter asks who to send a request to while he is looking at the request, and a fifth tab was
-    // one more thing to remember rather than one more thing to find.
-    { key: "company", label: t.shell.company, href: "/company" },
+    { key: "requests", label: t.shell.requests, href: "/requests" },
   ];
   const initials = (name.trim() ? name.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("") : "").toUpperCase();
   // Tier badge beside the avatar: green = verified, blue = basic, grey = guest.
@@ -336,6 +336,20 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/moedatech-logo.svg" alt="Moedatech" className="block h-5 w-auto brightness-0 invert" />
           </Link>
+
+          {/* ── «Beta», beside the mark (owner, 2026-09-04) ──────────────────────────────────────
+              It belongs to the PRODUCT, not to any page, so it sits with the wordmark rather than in
+              a page's own chrome. Outside the logo link: it says what the app is, and a reader
+              pressing the word for the state of the product would be sent to the dashboard.
+
+              An outlined pill in white at reduced strength, the same treatment every other mark on
+              the navy bar takes, so it reads as a note on the logo and never competes with it. */}
+          <span
+            {...pin("header-beta")}
+            className="flex-none rounded-full border border-white/25 px-1.5 py-px text-label font-extrabold uppercase tracking-wide text-white/70"
+          >
+            {t.shell.beta}
+          </span>
 
           {/* ── The nav sits DEAD CENTRE of the bar, not after the title ────────────────────────────
               Absolutely placed, so it is centred on the HEADER rather than on whatever space the
@@ -603,7 +617,7 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
                    Plain text, not a button skin: this leaves the page, it does not act on it, and a
                    bordered box gave it the weight of a primary control at the top of every screen. */
                 const isFn = typeof back === "function";
-                const target = isFn ? null : backTarget(pathname, prevPath.current, back.fallback);
+                const target = isFn ? null : backTarget(pathname, previousPath(), back.fallback);
                 return (
                   <button
                     onClick={() => (isFn ? back() : router.push(target!.href))}

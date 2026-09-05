@@ -27,13 +27,13 @@ const NAMED: { prefix: string; key: BackNameKey; exact?: boolean }[] = [
   { prefix: "/browse", key: "browse" },
   { prefix: "/requests", key: "marketplace" },
   { prefix: "/suppliers", key: "suppliers" },
-  { prefix: "/company", key: "company" },
   { prefix: "/inbox", key: "inbox" },
   { prefix: "/profile", key: "profile" },
   { prefix: "/stores", key: "browse" },
 ];
 
-export type BackNameKey = "home" | "browse" | "marketplace" | "suppliers" | "company" | "inbox" | "profile";
+/** ~~`company`~~ — `/company` was retired on 2026-09-04; the firm is part of `/profile` now. */
+export type BackNameKey = "home" | "browse" | "marketplace" | "suppliers" | "inbox" | "profile";
 
 /**
  * Which of the named places a path belongs to, or `null`.
@@ -54,19 +54,52 @@ export function backNameKey(path: string | null): BackNameKey | null {
   return null;
 }
 
+/** A path with its query and hash taken off, which is what "the same page" means here. */
+const clean = (path: string): string => path.split("?")[0].split("#")[0];
+
+/**
+ * Routes the product retired, and which the edge now redirects (`middleware.ts`).
+ *
+ * They must never be a back TARGET: pressing Back to reach a 308 that lands somewhere else — or,
+ * worse, back on the page he pressed it from — reads as a broken control. Duplicated here as
+ * prefixes rather than imported, because `middleware.ts` pulls in `next/server` and this module is
+ * deliberately dependency-free.
+ */
+const RETIRED = ["/company", "/compare", "/requests/"];
+
+const retired = (path: string): boolean =>
+  RETIRED.some((r) => (r.endsWith("/") ? path.startsWith(r) : path === r || path.startsWith(`${r}/`)));
+
 /**
  * The target a page's back control should point at.
  *
- * The trail wins when it names a place we can label AND is not the page we are standing on — a
- * renter who reloaded `/create` twice must not be sent to `/create`. Otherwise the page's own
- * `fallback`, which is where that page belongs when nobody can say where he came from.
+ * ── Any page he was actually on, not only the ones we can name (owner, 2026-09-04) ──────────────
+ *
+ * *"All back buttons, whether from the web itself or browser, must be wired to the page where he
+ * was actually on."*
+ *
+ * ~~The trail won only when it named one of the places in `NAMED`.~~ That rule came from when the
+ * control SAID where it went («Back to browse»): an unnameable page could not be offered because
+ * there was no word for it. The label is plain «Back» since 2026-09-03, so the constraint outlived
+ * its reason — and it was sending a renter who came from a store's equipment page, or from a legal
+ * document, to the page's `fallback` instead of to the page he had just left.
+ *
+ * Three things still send him to the `fallback` instead:
+ *   · no trail at all — a deep link, a fresh tab, a cold reload;
+ *   · a trail pointing at THIS page — a reload, or a query-string change on the same route;
+ *   · a trail pointing at a route the product retired, which would redirect him elsewhere anyway.
+ *
+ * The query is KEPT on the href: `/requests?g=…&details=1` is a different view of the workspace, and
+ * dropping it would return him to the list rather than to the request he was reading.
  */
 export function backTarget(
   here: string | null,
   from: string | null,
   fallback: string,
 ): { href: string; key: BackNameKey | null } {
-  const fromKey = backNameKey(from);
-  if (from && fromKey && backNameKey(here) !== fromKey) return { href: from, key: fromKey };
+  if (from) {
+    const there = clean(from);
+    if (!retired(there) && there !== clean(here ?? "")) return { href: from, key: backNameKey(from) };
+  }
   return { href: fallback, key: backNameKey(fallback) };
 }

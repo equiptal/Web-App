@@ -580,7 +580,7 @@ export function HomeRequests() {
         </div>
 
         {/* The bids rail — supplier, price, machine, site. One line of each, newest first. */}
-        <aside className={cx(CARD, "flex min-h-0 flex-col overflow-hidden")}>
+        <aside className={cx(CARD, "@container/bidrail flex min-h-0 flex-col overflow-hidden")}>
           {/* ── One orange on the page (owner, 2026-08-30) ────────────────────────────────────────
               ~~`text-brand-deep` on both.~~ #b45309 was a SECOND orange sitting beside the #f79009
               buttons, and it existed for a good reason: the brand orange on this peach strip is
@@ -596,7 +596,15 @@ export function HomeRequests() {
               {fmt(t.home.newBidsCount, { n: String(bidList.length) })}
             </h3>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          {/* ── The rail scrolls DOWN and never sideways (owner, 2026-09-04) ────────────────────
+              *"Make sure all these fit in one notification card and doesn't require to scroll
+              horizontal, it looks weird."* It did, and not because of the content: `overflow-y-auto`
+              alone leaves overflow-x at `visible`, and CSS computes `visible` to `auto` when the
+              other axis scrolls. So the column had a horizontal scrollbar the moment a supplier's
+              name, a price and a site were wider than 300px — which is most of them. Stated on both
+              axes, the row is clipped and truncated instead, which is what the truncation below is
+              for. */}
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
             {newest.map((b) => (
               <button
                 key={b.bidId}
@@ -607,14 +615,28 @@ export function HomeRequests() {
                 <span className="grid size-7 flex-none place-items-center rounded-full border border-border bg-surface3 text-label font-extrabold text-navy">
                   {b.supplierName.trim().charAt(0) || "?"}
                 </span>
+                {/* Four facts, two lines, one card (owner, 2026-09-04): who bid and for how much,
+                    then the machine he bid on and where the job is. The price is the only thing that
+                    never yields — a number cut in half is a wrong number, so it keeps its width and
+                    the NAME truncates beside it.
+
+                    The site is the one that goes when the card is tight: it is the least of the four
+                    (the renter usually knows where his own job is), so below 260px of rail it is
+                    dropped rather than shortened to two letters. `@container` measures the RAIL, not
+                    the viewport — this card is 300px beside the table on a desktop and full width on
+                    a phone, so a viewport breakpoint would hide it in exactly the wrong one. */}
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline gap-2">
                     <span className="min-w-0 truncate text-body font-extrabold text-navy">{b.supplierName}</span>
                     <span className="ms-auto flex-none text-body font-semibold tabular text-navy">{money(b.currentPrice)}</span>
                   </span>
                   <span className="mt-0.5 flex items-baseline gap-1.5 text-meta text-muted">
-                    <span className="min-w-0 truncate">{b.equipmentName ?? b.request.equipmentSummary ?? "—"}</span>
-                    {b.request.location && <span className="flex-none">· {b.request.location}</span>}
+                    <span className="min-w-0 flex-1 truncate">{b.equipmentName ?? b.request.equipmentSummary ?? "—"}</span>
+                    {b.request.location && (
+                      <span className="hidden min-w-0 max-w-[45%] shrink-0 truncate @[260px]/bidrail:block">
+                        · {b.request.location}
+                      </span>
+                    )}
                   </span>
                 </span>
               </button>

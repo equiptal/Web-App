@@ -15,7 +15,9 @@
 import type { LinkBidSubmission } from "@/lib/contract/link-bids";
 
 /** The per-item terms the form asks the supplier to confirm (matches the form's TERM_KEYS). */
-const ITEM_TERM_KEYS = ["operator", "nationality", "fatFood", "fatTransport", "fuel", "fuelType", "year", "operatorCert", "equipmentCert"] as const;
+// `fuelType` dropped with the form's own TERM_KEYS — a term the supplier is never shown cannot be
+// counted against the completeness of their answer.
+const ITEM_TERM_KEYS = ["operator", "nationality", "fatFood", "fatTransport", "fuel", "year", "operatorCert", "equipmentCert"] as const;
 
 const OWNERSHIP_TYPES = new Set(["istimara", "customs_card", "sales_contract", "saso_registration", "combined"]);
 const EQUIP_CERT_TYPES = new Set(["tuv", "spsp", "saso", "other"]);

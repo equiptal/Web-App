@@ -229,8 +229,8 @@ export function rentalPeriodSubtitle(unit: string | null | undefined): "weekly" 
  */
 export function divisorNote(unit: string | null | undefined, L: (en: string, ar: string) => string): string | null {
   const p = rentalPeriodSubtitle(unit);
-  if (p === "weekly") return L("6 working days/week", "٦ أيام عمل/أسبوع");
-  if (p === "monthly") return L("26 working days/month", "٢٦ يوم عمل/شهر");
+  if (p === "weekly") return L("6 working days/week", "6 أيام عمل/أسبوع");
+  if (p === "monthly") return L("26 working days/month", "26 يوم عمل/شهر");
   return null;
 }
 

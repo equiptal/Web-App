@@ -1,3 +1,9 @@
+/* ── The blue on this surface is `--action`, not `--info` (2026-09-04) ────────────────────────
+   The shared palette's `--info` became a SLATE that sits in the ink family, and RM3-AC-33 says the
+   ask is blue and never navy. Every blue on this surface is that same action blue — the ask's
+   control, its focus ring, the hover borders — so they all moved together rather than the ask
+   drifting away from the accents around it. `--info` still exists and is still the info family;
+   nothing on this surface means "informational" by drawing it blue. */
 /* Deal-room equipment verification (spec 004 v3) — **V7 / V8 / V9** panel styles.
    Own stylesheet, own `.mp-` prefix: `map-proto.css` belongs to the map surface (V1–V6, V10) and is
    owned elsewhere, so nothing here reaches into a `.bm-*` rule and nothing there has to know these
@@ -13,7 +19,7 @@
    the prototype's own `const C` in the decoded source, NOT off design-v3.md, which mis-transcribes two
    of them:
      deep var(--navy-deep) · navy var(--navy) · muted var(--muted) · border var(--surface2) · blt var(--background) · surface var(--surface2)
-     s2 var(--surface) · blue var(--info) · green var(--ok) · red var(--danger) · amber var(--warn)
+     s2 var(--surface) · blue var(--action) · green var(--ok) · red var(--danger) · amber var(--warn)
 
    ~~deep var(--navy-deep) · blt var(--surface3)~~ — **wrong, corrected 2026-08-09** alongside the same correction in
    `map-proto.css`. The comment named the prototype's `deep` and `blt` and then used two colours that
@@ -23,7 +29,7 @@
    hairlines, the tab strip's rule. `rgba(15, 34, 56, …)` survives untouched wherever it appears: that
    is the prototype's own shadow ink, written as an rgba literal in its source and never as `deep`.
 
-   Two deliberate overrides of the prototype, both documented: `var(--info)` where the prototype's action
+   Two deliberate overrides of the prototype, both documented: `var(--action)` where the prototype's action
    colour is its own navy (AC-33), and `var(--danger)` — the palette's red — where the prototype hard-codes
    `var(--danger)` (AC-19, AC-168, and see the missing-document rules below). */
 
@@ -446,7 +452,7 @@ button.mp-cell {
    fill of its own (`.mp-row.open`, and the note there for why emphasis rather than a second colour).
    Selection on this surface is navy wherever it happens: a ticked row, a ticked box, a framed row, a
    framed cell (owner, 2026-08-11 — *"use consistent styling on any selection of a row, whether here or
-   any other surface"*). `var(--info)` remains the ACTION colour and never a state.
+   any other surface"*). `var(--action)` remains the ACTION colour and never a state.
    The border-color override has to beat `.mp-cell.green`, which is why it is written with the state
    class beside it rather than relying on source order. */
 .mp-cell.press.open,
@@ -564,7 +570,7 @@ button.mp-cell {
   background: var(--surface);
 }
 /* A PICKED row wears the prototype's navy `var(--navy-deep)`, not the action blue (owner, 2026-08-10). The
-   same move `.mp-doc` already made on 2026-08-09 and for the same reason: `var(--info)` is this surface's
+   same move `.mp-doc` already made on 2026-08-09 and for the same reason: `var(--action)` is this surface's
    ACTION colour — it is what «اطلب التأكيد» is painted in, and AC-33 requires it there precisely
    because that control must read as pressable beside a red chip. A selected row is not an action; it
    is a state. Sharing the action's colour made a ticked row look like something still to be pressed.
@@ -577,7 +583,7 @@ button.mp-cell {
 /* **The row that is IN THE FRAME** (owner, 2026-08-11). The prototype marks it with the navy border
    and a `color-mix(in srgb, var(--navy-deep) 5%, transparent)` fill — but the prototype has no other state to confuse it with, because
    there selection is the checkbox and nothing else. Here navy-plus-fill is already `.picked`, and
-   `.picked` is settled (owner, 2026-08-10: a selection is navy, `var(--info)` is the ACTION).
+   `.picked` is settled (owner, 2026-08-10: a selection is navy, `var(--action)` is the ACTION).
 
    So the framed row takes the same navy and states it a different way: the hairline DOUBLED by an
    inset ring, and no fill of its own. Emphasis rather than a second colour — which keeps the surface's
@@ -641,7 +647,7 @@ span.mp-rowopen { cursor: default; }
    palette settles as `var(--navy-deep)`. The block above already cited `box()` for the 22px, the r6 and the
    1.5px border and then diverged on the one value that is visible only once the renter acts. It also
    left a picked row wearing navy (`.mp-row.picked`) and its own tick wearing blue — two colours for
-   one selection. `var(--info)` on this surface is the request ACTION (AC-33), not a selection. */
+   one selection. `var(--action)` on this surface is the request ACTION (AC-33), not a selection. */
 .mp-tick.on { border-color: #16304f; background: #16304f; }
 /* The other mode's checkbox. `disabled` already refuses the click and drops it out of the tab order;
    this only makes the cursor say so before the renter tries. */
@@ -749,7 +755,7 @@ span.mp-rowopen { cursor: default; }
    Two things were wrapped in one rule and neither has a record behind it. The FILL said the first
    file on a row outranks the second, which is a claim about a lessor's upload order, not about the
    renter's question — on a row holding an istimara and a customs card there is no primary paper. And
-   the blue HUE was this file's `var(--info)` reaching a control the prototype paints navy; AC-33 buys the
+   the blue HUE was this file's `var(--action)` reaching a control the prototype paints navy; AC-33 buys the
    blue override for a control read against the availability chip beside it, and nothing wider.
 
    What IS documented survives untouched: the narrowing to view-only, with the per-row download glyph

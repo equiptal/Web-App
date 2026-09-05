@@ -46,11 +46,12 @@ export const en = {
     backTo: "Back to {place}",
     suppliers: "Suppliers",
     profile: "Profile",
-    /* The tab over `/requests` (owner, 2026-09-03: *"call the requests tab in the nav bar
-       Marketplace"*). The route, the page and the word «request» everywhere else are unchanged: this
-       is the NAME OF THE PLACE, and the place is where a renter's requests meet the suppliers who
-       answer them. «Requests» named the contents of one screen; a tab names a destination. */
-    marketplace: "Marketplace",
+    /* The tab over `/requests`. ~~«Marketplace» (owner, 2026-09-03).~~ Back to «Requests» (owner,
+       2026-09-04): the row is three words now, one per place, and the renter's own requests are what
+       he goes there to read. */
+    requests: "Requests",
+    /* The product's own state, beside the wordmark. Not a page label. */
+    beta: "Beta",
     compare: "Compare bids",
     dashboard: "Dashboard",
     browse: "Browse",
@@ -100,6 +101,11 @@ export const en = {
   },
   home: {
     title: "Home",
+    /* The guest dashboard (owner, 2026-09-04). A visitor who presses Dashboard is shown the same
+       prompt every other account-bound page shows him, rather than being bounced to Browse — he
+       asked for this page, so it answers for itself. */
+    signInTitle: "Sign in to see your dashboard",
+    signInBody: "Your requests, the bids on them, your sites and your suppliers all live here once you sign in",
     statSuppliers: "Verified Suppliers",
     statEquipment: "Equipment Listed",
     statCities: "Cities Covered",
@@ -192,6 +198,7 @@ export const en = {
     allCategories: "All",
     // Beside the page title: «13 stores across Saudi Arabia».
     storesAcross: "stores across Saudi Arabia",
+    showMore: "Show more suppliers",
     empty: "No suppliers match your filters.",
     error: "We couldn't load suppliers.",
     retry: "Retry",
@@ -267,7 +274,6 @@ export const en = {
       loading: "Loading…",
       recipients: "Send to my suppliers",
       selected: "{n} selected",
-      allGroups: "All groups",
       noSuppliers: "No suppliers on your list yet.",
       noEmail: "no e-mail",
       addEmail: "Add e-mail",
@@ -276,7 +282,6 @@ export const en = {
       email: "E-mail",
       whatsapp: "WhatsApp",
       whatsappFirst: "Opens one chat, with {name}. WhatsApp cannot take several at once.",
-      whatsappNoPhone: "None of the ones you picked has a phone.",
       preview: "What they receive",
       subject: "RFQ for {equipment}",
       skipping: "{n} of the ones you picked have no e-mail and will be left out.",
@@ -1270,12 +1275,15 @@ export const en = {
     // Three steps, in the order they happen. It replaced two paragraphs that said the same true
     // things in prose (owner, 2026-08-31) — prose is where a renter looking at a red number stops
     // reading, and what he wants to know is where he is in a flow and what the end of it gets him.
-    eqYardStep1T: "Today it stands here",
-    eqYardStep1B: "This is the machine's own location right now, read off its file. Not a delivery distance quoted for your job.",
-    eqYardStep2T: "Nobody has promised it",
-    eqYardStep2B: "The supplier hasn't named the yard this machine would move from for your offer, so red means unanswered. Not refused, and not unavailable.",
-    eqYardStep3T: "Ask him, and it turns green",
-    eqYardStep3B: "The question goes into your chat with him, ready to send. When he names the yard, this distance turns green and the machine counts as confirmed for your offer.",
+    /** ── The modal's three lines (owner, 2026-09-04: "very clear and simple just few lines") ──
+     *  One sentence each, in the order the renter's questions arrive: what the number is, why it is
+     *  red, what pressing the button does. They REPLACE `eqYardStep1T`…`eqYardStep3B`, the numbered
+     *  tutorial this layer used to carry: same three facts, one line apiece, on a modal that stands
+     *  between him and the press it exists to explain. */
+    eqYardLine1: "This is where the machine stands today, read off its file. It is not a delivery distance for your job.",
+    eqYardLine2: "Red means the supplier has not yet named the yard it would move from for your offer. Not refused.",
+    eqYardLine3: "Ask him and the question lands in your chat. When he answers, this turns green and the machine counts as confirmed.",
+    otherBids: "Other offers",
     eqYardExplainCta: "Ask the supplier",
     eqYardExplainLater: "Not now",
     // The same surface, in the state where the question is already out. It shows what was asked and
@@ -1682,6 +1690,7 @@ export const en = {
     termNo: "No",
     // The equipment rail is a door, not a group: availability is a machine-by-machine question and
     // the map already answers it in full, so pressing it opens the picked bid's machines there.
+    mapAllOffers: "Open the equipment map, with every offer on it",
     checkAvailability: "Check availability",
     // ── The suggestion bar under the comparison ──
     aiSuggestion: "AI suggestion",
@@ -2223,7 +2232,7 @@ export const en = {
       extendable: "Extendable",
       quoteRate: "Suppliers quote you a {basis} rate.",
       moreDetails: "MORE DETAILS",
-      moreDetailsHint: "hours a day, overtime",
+      moreDetailsHint: "hours a day",
       hours: "HOURS A DAY",
       hoursStandard: "KSA STANDARD",
       overtime: "OVERTIME RATE",
@@ -2302,7 +2311,8 @@ export const en = {
       preferences: "Preferences",
       equipment: "Equipment",
       billingDuration: "BILLING & DURATION",
-      hoursOvertime: "HOURS & OVERTIME",
+      hours: "HOURS",
+      hoursOvertime: "HOURS & OVERTIME", // unused while the overtime picker is hidden
       chargedDays: "DAYS CHARGED",
       equipmentTile: "EQUIPMENT",
       logistics: "LOGISTICS",

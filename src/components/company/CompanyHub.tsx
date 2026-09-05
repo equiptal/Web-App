@@ -24,7 +24,7 @@ import {
   type CompanyResult,
 } from "@/lib/api/company-client";
 import type { CompanyMember, MyCompany } from "@/lib/contract/company";
-import { btn } from "@/lib/ds";
+import { btn, cx } from "@/lib/ds";
 import { SkeletonFields, SkeletonRows, SkeletonSection } from "@/components/Skeleton";
 import { pin } from "@/lib/uiPins";
 
@@ -42,8 +42,16 @@ import { pin } from "@/lib/uiPins";
  * Everything mutating confirms first, because none of it is reversible in-product: joining hands over
  * records one-way, leaving forfeits access to records you brought in, and dissolving retires the
  * company's verification.
+ *
+ * ── It is PART OF THE PROFILE now, not a page (owner, 2026-09-04) ───────────────────────────────
+ *
+ * *"My Organization will be removed in the nav bar and we will not have it as a separate page, but
+ * just part of the user profile below his personal info."* `/company` is gone; `ProfileView` renders
+ * this with `embedded`, which drops the page furniture this component brought with it — the outer
+ * page padding, the `dir` (the profile already sets it) and the firm's masthead, which would be a
+ * second slab under the renter's own. The states, the copy and every act are unchanged.
  */
-export function CompanyHub() {
+export function CompanyHub({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useT();
   const c = t.company;
   const { locale } = useLocale();
@@ -131,7 +139,7 @@ export function CompanyHub() {
        pages are now the shell's width and both split into two columns at `lg`.
 
        The shell already caps at 1440 and owns the gutter, so this takes no width of its own. */
-    <div {...pin("company-hub")} className="w-full pb-10" dir={ar ? "rtl" : "ltr"}>
+    <div {...pin("company-hub")} className={cx("w-full", !embedded && "pb-10")} dir={embedded ? undefined : ar ? "rtl" : "ltr"}>
       {toast && (
         <p className="mb-4 flex items-center gap-2 rounded-sm border border-ok/30 bg-ok-soft px-3.5 py-2.5 text-body font-semibold text-ok">
           <Icon name="check_circle" size={16} /> {toast}
@@ -179,6 +187,7 @@ export function CompanyHub() {
       ) : (
         <ActiveCompany
           company={company}
+          embedded={embedded}
           busy={busy}
           onApprove={(m) => void run(() => approveMember(m.userId))}
           onRemove={(m) => void run(() => removeMember(m.userId))}
@@ -450,6 +459,7 @@ function PendingPanel({
 
 function ActiveCompany({
   company,
+  embedded,
   busy,
   onApprove,
   onRemove,
@@ -459,6 +469,8 @@ function ActiveCompany({
   onCopied,
 }: {
   company: MyCompany;
+  /** Inside the profile: no masthead, and one column — the profile's own is already narrow. */
+  embedded?: boolean;
   busy: boolean;
   onApprove: (m: CompanyMember) => void;
   onRemove: (m: CompanyMember) => void;
@@ -572,19 +584,46 @@ function ActiveCompany({
 
   return (
     <div>
-      <PageMasthead
-        tone="plain"
-        icon={<Icon name="business_center" size={26} className="text-white" />}
-        title={company.name}
-        subtitle={company.isOwner ? c.roleOwner : c.roleMember}
-        badge={
-          company.isVerified ? (
-            <MastheadPill tone="ok" onLight>
-              <VerifiedMark size={13} /> {c.verified}
-            </MastheadPill>
-          ) : undefined
-        }
-      />
+      {/* ── The firm's own line, inside the profile (owner, 2026-09-04) ───────────────────────────
+          A masthead is a page's opening statement, and this block does not open a page any more — it
+          sits under the renter's personal details, below his. Two slabs stacked would read as two
+          pages glued together, and the second would look like the more important of the two.
+
+          So embedded says the same three facts as a row: the firm, the renter's role in it, and
+          whether it is verified. The standalone masthead is kept for nothing else today; it is what
+          this shape has to beat if the firm ever gets a page again. */}
+      {embedded ? (
+        <div className="flex flex-wrap items-center gap-2.5 rounded-sm border border-border bg-surface2 px-4 py-3">
+          <span className="grid size-8 flex-none place-items-center rounded-full bg-brand-soft text-brand">
+            <Icon name="business_center" size={17} />
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-body font-extrabold text-navy">{company.name}</span>
+            <span className="block text-meta text-muted">{company.isOwner ? c.roleOwner : c.roleMember}</span>
+          </span>
+          {company.isVerified && (
+            <span className="ms-auto flex-none">
+              <MastheadPill tone="ok" onLight>
+                <VerifiedMark size={13} /> {c.verified}
+              </MastheadPill>
+            </span>
+          )}
+        </div>
+      ) : (
+        <PageMasthead
+          tone="plain"
+          icon={<Icon name="business_center" size={26} className="text-white" />}
+          title={company.name}
+          subtitle={company.isOwner ? c.roleOwner : c.roleMember}
+          badge={
+            company.isVerified ? (
+              <MastheadPill tone="ok" onLight>
+                <VerifiedMark size={13} /> {c.verified}
+              </MastheadPill>
+            ) : undefined
+          }
+        />
+      )}
 
       {/* ── Two columns, filling the page (owner, 2026-08-30) ───────────────────────────
           The papers on one side, the people on the other: *what proves this firm* and *who is in
@@ -602,13 +641,20 @@ function ActiveCompany({
           has anything to say under — `CompanyDetails` draws nothing for a firm with no verified
           submission, and a two-column grid with an empty half is worse than the single column it
           replaced. An unverified active company keeps the one column, with the team in it. */}
-      {company.isVerified ? (
+      {/* Embedded, there is no room to split: this is already ONE column of the profile, so the
+          papers and the people stack in it. */}
+      {company.isVerified && !embedded ? (
         <div className="mt-5 grid gap-5 lg:grid-cols-2">
           <div className="flex min-w-0 flex-col">
             <CompanyDetails grow />
           </div>
           <div className="flex min-w-0 flex-col">{team}</div>
         </div>
+      ) : company.isVerified ? (
+        <>
+          <CompanyDetails />
+          {team}
+        </>
       ) : (
         team
       )}

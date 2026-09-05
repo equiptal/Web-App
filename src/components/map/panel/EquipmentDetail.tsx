@@ -240,7 +240,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
              photograph-shaped space, and what belongs in it when there is no photograph is the shape of
              one. The words stay as the label, so a screen reader still hears the fact. */
           <div className="mp-hero-empty" aria-label={L("No photo on this equipment's file", "لا توجد صورة على ملف هذه المعدّة")}>
-            <PhotoPlaceholder size={64} />
+            <PhotoPlaceholder />
           </div>
         ) : framedBroken ? (
           /* **The paper renders HERE, not in a message about the paper** (owner, UAT of 2026-08-11 —

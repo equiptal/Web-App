@@ -1,9 +1,10 @@
 # The design system
 
-Four files hold it, and they are the only four:
+Five files hold it, and they are the only five:
 
 | | |
 |---|---|
+| `docs/design-tokens.md` | the **palette itself**, shared with Supplier OS — where a colour is decided |
 | `src/app/globals.css` | every **value** a screen may use |
 | `src/lib/ds.ts` | every **combination** of those values |
 | `src/lib/ds-colors.ts` | the same palette as **literals**, for the surfaces with no stylesheet |
@@ -11,6 +12,24 @@ Four files hold it, and they are the only four:
 
 Nothing else decides what the app looks like. If you need something these do not
 have, change these — do not write the value where you need it.
+
+## The palette is shared with Supplier OS (owner, 2026-09-04)
+
+`docs/design-tokens.md` is the source, handed over from the OS and kept here so
+the next change starts from the same numbers. The two products had drifted a
+shade at a time: navy `#1c2738` here against `#22384e` there, orange `#f79009`
+against `#f97316`, a blue-tinted neutral ramp against a flat grey one. None of
+those was a decision anyone made.
+
+`globals.css` now carries both vocabularies over one set of hexes: the OS names
+(`--ink`, `--text-secondary`, `--st-active`, `--dark-card`) and the names this
+app's files already read (`--navy`, `--muted-dark`, `--ok`, `--border`). **Write
+new code against the OS names**; the older ones stay because 122 files read them
+and renaming them buys nothing.
+
+Two families are deliberately outside it, and both say so where they are defined:
+`--shop-*`, matched to the storefront prototype at the owner's instruction on
+2026-09-01, and `--gold`, the mark's own colour.
 
 ### The three surfaces that never see `globals.css`
 

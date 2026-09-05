@@ -72,6 +72,7 @@
  */
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { createPortal } from "react-dom";
 // Two numeral formatters, and the split is deliberate: `arabicIndicDigits` truncates, which is what a
 // COUNT wants, and `distanceDigits` keeps one decimal, which is what a measured distance wants.
 import { arabicIndicDigits, distanceDigits } from "@/lib/contract/bid-map";
@@ -411,10 +412,17 @@ export function EquipmentList({
       )}
 
       {/* ── What a red distance means, and the ask behind it (owner, 2026-08-28) ──────────────────
-          `.bm-eqfp`'s idiom, and deliberately so: the filter panel and the company documents already
-          open this way, and a surface with two ways of saying "a second layer" teaches the renter
-          neither. Absolutely placed against `.bm-panel`, so it escapes the list's scroll and covers
-          the column whole rather than scrolling away with the card it is about.
+          ~~`.bm-eqfp`'s idiom: a layer filling the equipment column.~~ Withdrawn by the owner on
+          2026-09-04 — «i want this to open as modal and very clear and simple just few lines and will
+          open over the chat panel on the left in the background so he can send the request directly».
+
+          So it is a MODAL over the whole surface now, not a panel inside one column. Two reasons, and
+          both are about the press it leads to: covering the column hid the very card the renter was
+          reading, and the ask it offers lands in the CHAT, which the column layer could not show him.
+          Centred on the veil, the chat sits behind it dimmed but legible, and «Ask the supplier» is a
+          thing he watches arrive where it goes.
+
+          `position: fixed`, so the panel it is rendered inside does not clip it.
 
           Two states, one layer. The FIRST press on an unconfirmed distance explains what the colour
           means and then offers the ask — because "not confirmed" is the one fact on this card a
@@ -424,22 +432,37 @@ export function EquipmentList({
           On a machine already asked about it says so and shows nothing to press: the question is in
           the room, and a second «Ask» would post a duplicate card the backend's own guard refuses.
 
-          `role="dialog"` with a name and deliberately no `aria-modal`: nothing here traps focus, and
-          `aria-modal` would tell a screen reader that everything else is hidden — a claim the
-          keyboard disproves by tabbing straight out into the list behind it. */}
+          `role="dialog"` with a name, and `aria-modal` is now TRUE where it was false: a veil covers
+          the surface, so "everything else is hidden" is the claim the screen actually makes. */}
       {yardExplain && (() => {
         /* One model call for the whole layer: the machine's name, and the number the two specimens
            below are drawn with. The specimen shows THIS machine's distance in both colours — an
            invented figure would be a screenshot of a different machine. */
         const explainCard = equipmentCardModel(yardExplain.machine, request);
         const sampleKm = explainCard.km != null ? distanceDigits(explainCard.km, ar) : "—";
-        return (
-        <div className="bm-eqfp bm-eqyx" role="dialog" aria-label={yardExplain.asked ? t.bidMap.eqYardAskedTitle : t.bidMap.eqYardExplainTitle}>
-          <div className="bm-eqfp-head">
-            <span className="bm-eqfp-t">{yardExplain.asked ? t.bidMap.eqYardAskedTitle : t.bidMap.eqYardExplainTitle}</span>
+        /* ── Out of the panel, into the document (owner, 2026-09-04) ────────────────────────────
+           The chat is `z-index: 31` and this column is `z-index: 24`, so ANY layer rendered inside
+           the panel paints under the conversation — including one that says «over the chat». A
+           portal to `<body>` is what puts the veil above both. That is also why the modal's rules in
+           `map-proto.css` carry no `.bidmap` ancestor: outside the surface's own subtree, they would
+           never match. */
+        return createPortal(
+        <div
+          className="bm-eqyx-veil"
+          onClick={(e) => {
+            // The veil closes; the card on it does not. Without the target check every press inside
+            // the dialog would bubble out here and shut it.
+            if (e.target === e.currentTarget) setYardExplain(null);
+          }}
+        >
+        <div className="bm-eqyx" role="dialog" aria-modal="true" aria-label={yardExplain.asked ? t.bidMap.eqYardAskedTitle : t.bidMap.eqYardExplainTitle}>
+          <div className="bm-eqyx-head">
+            <span className="bm-eqyx-t">{yardExplain.asked ? t.bidMap.eqYardAskedTitle : t.bidMap.eqYardExplainTitle}</span>
             <button
               type="button"
-              className="bm-eqfp-x"
+              // Its own class, not `.bm-eqfp-x`: that rule is scoped to `.bidmap`, and this dialog
+              // is portalled out of it.
+              className="bm-eqyx-x"
               aria-label={t.common.close}
               title={t.common.close}
               onClick={() => setYardExplain(null)}
@@ -448,8 +471,8 @@ export function EquipmentList({
             </button>
           </div>
 
-          <div className="bm-eqfp-body bm-eqyx-body">
-            {/* The machine this is about, so a layer covering the column still says which card it
+          <div className="bm-eqyx-body">
+            {/* The machine this is about, so a layer covering the surface still says which card it
                 came off. */}
             <div className="bm-eqyx-eq">
               <span className="bm-eqyx-name">{ar ? explainCard.title.ar : explainCard.title.en}</span>
@@ -478,39 +501,35 @@ export function EquipmentList({
                     the red one in front of him; putting the green one beside it is what makes
                     «turns green» a thing he has seen rather than a promise in a paragraph. */}
                 <div className="bm-eqyx-demo" aria-hidden="true">
+                  {/* The specimens carry the mark where the CARD carries it — trailing — or the demo
+                      stops being a picture of the thing the renter is looking at. */}
                   <span className="bm-eqyx-spec no">
-                    <span className="material-icons-outlined">help_outline</span>
                     <span className="bm-eqyx-specn" dir="ltr">{sampleKm}</span>
                     <span className="bm-eqyx-specu">{t.bidMap.eqDistanceUnit}</span>
+                    <span className="material-icons-outlined">help_outline</span>
                   </span>
                   <span className="bm-eqyx-arrow material-icons-outlined">arrow_forward</span>
                   <span className="bm-eqyx-spec ok">
-                    <span className="material-icons-outlined">check_circle</span>
                     <span className="bm-eqyx-specn" dir="ltr">{sampleKm}</span>
                     <span className="bm-eqyx-specu">{t.bidMap.eqDistanceUnit}</span>
+                    <span className="material-icons-outlined">check_circle</span>
                   </span>
                 </div>
 
-                {/* ── Three steps, in the order they happen ──────────────────────────────────────
-                    A tutorial rather than two paragraphs (owner, 2026-08-31). The old copy said the
-                    same true things in prose, and prose is where a renter looking at a red number
-                    stops reading. Numbered steps say *this is a flow, you are at step 1, here is
-                    what step 3 gets you* — which is the question the colour actually raises. */}
-                <ol className="bm-eqyx-steps">
-                  {[
-                    { t: t.bidMap.eqYardStep1T, b: t.bidMap.eqYardStep1B },
-                    { t: t.bidMap.eqYardStep2T, b: t.bidMap.eqYardStep2B },
-                    { t: t.bidMap.eqYardStep3T, b: t.bidMap.eqYardStep3B },
-                  ].map((step, i) => (
-                    <li key={step.t} className="bm-eqyx-step">
-                      <span className="bm-eqyx-stepn" aria-hidden="true">{num(i + 1)}</span>
-                      <span className="bm-eqyx-stept">
-                        <b className="bm-eqyx-steph">{step.t}</b>
-                        <span className="bm-eqyx-stepb">{step.b}</span>
-                      </span>
+                {/* ── Three lines, not three paragraphs (owner, 2026-09-04) ──────────────────────
+                    ~~A numbered tutorial with a heading and a body per step.~~ Withdrawn. It was
+                    right about the ORDER and wrong about the length: this layer stands between the
+                    renter and the one press he came for, so it earns its place in the seconds it
+                    takes to read. One sentence each — what the number is, why it is red, what the
+                    press does — and the button is already under his eye. */}
+                <ul className="bm-eqyx-lines">
+                  {[t.bidMap.eqYardLine1, t.bidMap.eqYardLine2, t.bidMap.eqYardLine3].map((line) => (
+                    <li key={line} className="bm-eqyx-line">
+                      <span className="bm-eqyx-dot" aria-hidden="true" />
+                      <span>{line}</span>
                     </li>
                   ))}
-                </ol>
+                </ul>
               </>
             )}
           </div>
@@ -540,6 +559,8 @@ export function EquipmentList({
             </div>
           )}
         </div>
+        </div>,
+        document.body,
         );
       })()}
 
@@ -597,7 +618,7 @@ export function EquipmentList({
       )}
 
       {/* ── The expander (owner, 2026-08-19) ─────────────────────────────────────────────────────
-          «+٣ أخرى في أسطوله» — the machines this supplier has that this offer does not name. It
+          «+3 أخرى في أسطوله» — the machines this supplier has that this offer does not name. It
           closes the list because that is where the question arises: a renter reaches the end of what
           he is being sold and asks whether that is everything the supplier has.
 
@@ -745,7 +766,7 @@ function EquipmentCard({
               a paragraph standing where a picture goes, and it read as an error rather than as an
               absence. `Photo` also covers the case the old branch could not see: a machine that NAMES
               a photograph the bucket does not hold, which drew the browser's broken glyph. */}
-          <Photo src={photo} alt="" className="bm-eq-art" placeholderSize={30} />
+          <Photo src={photo} alt="" className="bm-eq-art" />
         </span>
 
         <div className="bm-eq-tx">
@@ -827,10 +848,14 @@ function EquipmentCard({
                  distance whose colour is the availability, and one fact may only have one ink. */
               onClick={() => onYardPress(machine, yard === "asked")}
             >
+              {/* The mark sits AFTER the distance (owner, 2026-09-04). Leading, it was the first thing
+                  the eye met on a row whose whole point is the number — a question mark introducing a
+                  figure reads as doubt about the row, not as a control. Trailing, the number leads and
+                  the mark is what it is: the way to ask about it. */}
+              <Distance km={km} ar={ar} t={t} />
               <span className="material-icons-outlined" aria-hidden="true">
                 {yard === "asked" ? "schedule" : "help_outline"}
               </span>
-              <Distance km={km} ar={ar} t={t} />
             </button>
           )}
 

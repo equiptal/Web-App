@@ -11,6 +11,7 @@ import { Icon } from "@/components/ui";
 import type { RenterProfile, VerificationStatus } from "@/lib/contract/onboarding";
 import { updateLanguage } from "@/lib/api/profile-client";
 import { Field, FieldGrid, MastheadPill, PageMasthead, Row, RowList, Section } from "@/components/PageSection";
+import { CompanyHub } from "@/components/company/CompanyHub";
 import { EditProfileForm } from "./EditProfileForm";
 import { ChangePhoneModal } from "./ChangePhoneModal";
 import { DeleteAccountModal } from "./DeleteAccountModal";
@@ -161,10 +162,11 @@ export function ProfileView() {
       {/* Tier banner — basic renter → verify (verified shows the company card verified state below). */}
       {!loading && tier === "basic" && verification !== "pending" && verification !== "verified" && (
         <button
-          // → /company, matching the sidebar "Get verified" and the "Start verification" card below.
-          // This banner renders alongside that card, so pointing them at different destinations would
-          // give the same page two verification nudges that disagree.
-          onClick={() => router.push("/company")}
+          // → /verify, which is where a company is actually minted. It pointed at `/company`, and
+          // that page is gone (owner, 2026-09-04): the firm is a block on THIS page now, so the old
+          // target would have been a nudge to scroll. `CreateOwnCompanyCard`, in that block, sends
+          // him to the same form, so the two nudges still agree.
+          onClick={() => router.push("/verify")}
           className={btn("secondary", "lg", { full: true, className: "mt-4 flex justify-between text-start transition" })}
         >
           <div>
@@ -245,10 +247,24 @@ export function ProfileView() {
           </Section>
         )}
 
-          {/* ~~The door to the organization page.~~ Removed (owner, 2026-08-30). The firm has its own
-            entry in the account menu and its own page; a row here was a third place the same subject
-            appeared, and it was the shortest of the three. Nothing became unreachable — the
-            «Get verified» nudge above still points at `/company`, and so does the menu. */}
+          {/* ── THE FIRM, under the person (owner, 2026-09-04) ─────────────────────────────────
+              *"The my organization will be removed in the nav bar and we will not have it as
+              separate page but just part of user profile below his personal info."*
+
+              ~~A row here linking to `/company`, itself removed on 2026-08-30 as a third door to the
+              same subject.~~ There is no page to link to now: the whole hub renders here — join by
+              code, the papers, the roster, the invite code, the way out — under the renter's own
+              details, which is the order of the fact. His account is his, and the firm is something
+              his account belongs to.
+
+              It keeps the LEFT column, beside the settings, because that column is «who you are» and
+              this is part of that answer. `embedded` drops the page furniture the hub used to bring
+              (its own padding, its own `dir`, the firm's masthead) — see `CompanyHub`. */}
+          {!loading && (
+            <div className="mt-5">
+              <CompanyHub embedded />
+            </div>
+          )}
 
         </div>
 

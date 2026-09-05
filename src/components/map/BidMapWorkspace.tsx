@@ -36,6 +36,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useRouter } from "next/navigation";
 import { VerifiedMark } from "@/components/VerifiedMark";
 import dynamic from "next/dynamic";
 import { ChatDock } from "@/components/map/ChatDock";
@@ -137,6 +138,26 @@ export interface BidMapWorkspaceProps {
   openCompanyDocs?: boolean;
   /** Arriving from a chat icon: the dock opens with the surface (owner, 2026-08-26). */
   openChat?: boolean;
+  /**
+   * The OTHER offers on the same request, so the renter can walk from one supplier's yard to the
+   * next without going back (owner, 2026-09-04: *"show other bids on the equipment request he is
+   * checking so he navigates to other suppliers' equipment maps through it instead of going back and
+   * forth between the map and the bid cards"*).
+   *
+   * This bid is included, and marks itself. The list is the route's to fetch: this surface has one
+   * fetch owner for the bid and one for the fleet, and a third here would give the same rule two
+   * implementations. Empty until it answers, and empty is simply a header with no strip.
+   */
+  siblings?: SiblingBid[];
+}
+
+/** One other offer on this request, in the few fields a chip can show. */
+export interface SiblingBid {
+  bidId: string;
+  supplierName: string;
+  supplierLogoUrl: string | null;
+  currentPrice: number | null;
+  priceUnit: string | null;
 }
 
 export function BidMapWorkspace({
@@ -148,8 +169,10 @@ export function BidMapWorkspace({
   onOpenCompanyDocs,
   openCompanyDocs = false,
   openChat = false,
+  siblings = [],
 }: BidMapWorkspaceProps) {
   const t = useT();
+  const router = useRouter();
   const { locale } = useLocale();
   const ar = locale === "ar";
   /** bidId → its supplier's qualifying fleet. Keyed by BID for the reason in the file header. */
@@ -990,6 +1013,57 @@ export function BidMapWorkspace({
                   </button>
                 </div>
               </div>
+
+              {/* ── The other offers on this request (owner, 2026-09-04) ───────────────────────────
+                  *"Show other bids on the equipment request he is checking, so he navigates to other
+                  suppliers' equipment maps through it instead of going back and forth between the map
+                  and the bid cards in the requests."*
+
+                  A ROW OF SUPPLIERS under the one whose yard is on screen, and pressing one loads
+                  that supplier's map. It belongs in the identity band because that band is the
+                  answer to "whose machines am I looking at" — the strip is the same question with
+                  the other answers beside it.
+
+                  Names alone, no prices: this is a way to travel, not a comparison, and the
+                  comparison already exists one screen back with every figure on it. The current
+                  supplier is in the row and marked rather than removed from it — a row that dropped
+                  him would renumber itself under his feet each time he moved.
+
+                  Nothing renders with fewer than two offers: a strip listing only the supplier named
+                  directly above it is furniture. */}
+              {siblings.length > 1 && (
+                <div className="bm-sibs" role="tablist" aria-label={t.bidMap.otherBids}>
+                  <span className="bm-sibs-l">{t.bidMap.otherBids}</span>
+                  <div className="bm-sibs-row">
+                    {siblings.map((sb) => {
+                      const here = sb.bidId === bid.id;
+                      return (
+                        <button
+                          key={sb.bidId}
+                          type="button"
+                          role="tab"
+                          aria-selected={here}
+                          className={`bm-sib${here ? " on" : ""}`}
+                          title={sb.supplierName}
+                          // The one being read is not a link to itself: pressing it would refetch the
+                          // bid and the fleet and land the renter exactly where he stands.
+                          onClick={() => { if (!here) router.push(`/bids/${encodeURIComponent(sb.bidId)}/equipment`); }}
+                        >
+                          <span className="bm-sib-av">
+                            {sb.supplierLogoUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={sb.supplierLogoUrl} alt="" />
+                            ) : (
+                              sb.supplierName.trim().slice(0, 1).toUpperCase()
+                            )}
+                          </span>
+                          <span className="bm-sib-n">{sb.supplierName}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </header>
 
             {/* ── V3 · the count pills ───────────────────────────────────────────────────────────

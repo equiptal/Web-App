@@ -622,7 +622,9 @@ describe("the surface's stylesheet carries the same colour tokens the models do"
     // The card's prompt takes its ink from the model inline (asserted in the card block above), so the
     // stylesheet's share of this rule is the layer's CTA — the one control the renter is meant to
     // press once the red has been explained to him. Beside a red explanation, navy reads as disabled.
-    const cta = cssBlock(css, ".bidmap .bm-eqyx-cta {");
+    // Unscoped since 2026-09-05: the explainer is a MODAL portalled to `<body>`, so a `.bidmap`
+    // ancestor would never match it. Same control, same rule.
+    const cta = cssBlock(css, ".bm-eqyx-cta {");
     expect(hex(cta)).toContain(hex(REQUEST_ACTION_COLOUR));
     for (const navy of NAVY_TOKENS) expect(hex(cta)).not.toContain(navy);
   });

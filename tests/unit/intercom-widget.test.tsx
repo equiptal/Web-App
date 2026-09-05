@@ -226,16 +226,16 @@ describe("where the launcher draws", () => {
     route.value = "/";
   });
 
-  it("draws on each of the four nav tabs", async () => {
-    for (const path of ["/", "/browse", "/requests", "/company"]) {
+  it("draws on each of the nav tabs", async () => {
+    // Three since 2026-09-04: `/company` left the bar with the page.
+    for (const path of ["/", "/browse", "/requests"]) {
       expect(await shows(path), path).toBe(true);
     }
   });
 
   it("draws on a tab's own subtree", async () => {
-    // `/requests?g=…` and `/company/documents` are still the tab the renter is on.
+    // `/requests?g=…` is still the tab the renter is on.
     expect(await shows("/requests/abc")).toBe(true);
-    expect(await shows("/company/documents")).toBe(true);
   });
 
   it("does NOT draw on the equipment map", async () => {

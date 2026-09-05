@@ -66,11 +66,11 @@ export function requestDetailRows(r: RequestRecord, ar: boolean, L: Pick): Row[]
 
   const rentalMap = { DAILY: ["Daily", "يومي"], WEEKLY: ["Weekly", "أسبوعي"], MONTHLY: ["Monthly", "شهري"], PER_JOB: ["Per job", "للمهمة"], LONG_TERM: ["Long term", "طويل الأمد"] } as Record<string, [string, string]>;
   /* `urgencyMap` went with the Urgency row: the value is computed from the start date, not asked. */
-  const payMap = { UPFRONT: ["Upfront", "مقدمًا"], DAILY: ["Daily", "يومي"], "NET-30": ["Net 30 days", "صافي ٣٠ يومًا"], "NET-60": ["Net 60 days", "صافي ٦٠ يومًا"], "END-OF-JOB": ["End of job", "نهاية المهمة"] } as Record<string, [string, string]>;
-  const slaMap = { FOUR_HR: ["4 hours", "٤ ساعات"], EIGHT_HR: ["8 hours", "٨ ساعات"], TWENTY_FOUR_HR: ["24 hours", "٢٤ ساعة"], FORTY_EIGHT_HR: ["48 hours", "٤٨ ساعة"], SEVENTY_TWO_HR: ["72 hours", "٧٢ ساعة"] } as Record<string, [string, string]>;
+  const payMap = { UPFRONT: ["Upfront", "مقدمًا"], DAILY: ["Daily", "يومي"], "NET-30": ["Net 30 days", "صافي 30 يومًا"], "NET-60": ["Net 60 days", "صافي 60 يومًا"], "END-OF-JOB": ["End of job", "نهاية المهمة"] } as Record<string, [string, string]>;
+  const slaMap = { FOUR_HR: ["4 hours", "4 ساعات"], EIGHT_HR: ["8 hours", "8 ساعات"], TWENTY_FOUR_HR: ["24 hours", "24 ساعة"], FORTY_EIGHT_HR: ["48 hours", "48 ساعة"], SEVENTY_TWO_HR: ["72 hours", "72 ساعة"] } as Record<string, [string, string]>;
   const maintMap = { SUPPLIER: ["Supplier", "المؤجّر"], RENTER: ["Renter", "المستأجر"], RENTEE: ["Renter", "المستأجر"], SHARED: ["Shared", "مشتركة"] } as Record<string, [string, string]>;
   const otMap = { "0": ["None", "بدون"], WITHOUT: ["None", "بدون"], "1.5X": ["1.5×", "1.5×"], "2X": ["2×", "2×"] } as Record<string, [string, string]>;
-  const offerMap = { "24H": ["24 hours", "٢٤ ساعة"], "48H": ["48 hours", "٤٨ ساعة"], "72H": ["72 hours", "٧٢ ساعة"], "1W": ["1 week", "أسبوع"] } as Record<string, [string, string]>;
+  const offerMap = { "24H": ["24 hours", "24 ساعة"], "48H": ["48 hours", "48 ساعة"], "72H": ["72 hours", "72 ساعة"], "1W": ["1 week", "أسبوع"] } as Record<string, [string, string]>;
 
   /* ── What the RENTER asked for, and nothing the system decided (owner, 2026-09-01) ───────────
      *"For the request details it has toooo much info — I want to show him the request fields that
