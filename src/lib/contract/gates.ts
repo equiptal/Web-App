@@ -26,6 +26,38 @@
 import { EquipmentItem, ProjectDetails, RfqDraft } from "./draft";
 import { isCompleteRef } from "./taxonomy";
 import { computeChargedDays } from "./charged-days";
+import { CUSTOM_EQUIPMENT_ENABLED } from "@/lib/flags";
+
+/**
+ * An off-catalogue line: the agent could not place it, and the renter is allowed to NAME it instead
+ * of picking a subtype. Such a line posts with `customEquipmentName` and no taxonomy ids.
+ *
+ * ⚠️ **A picked SUBTYPE ends it.** The trio stays on screen for a no-match line, so a renter who can
+ * find his machine in the list still can; the moment he does, the line is an ordinary one and is
+ * gated and posted like any other. The subtype is the test rather than the whole ref because a
+ * no-match line can arrive with a category id and no subtype (see `deriveVerdict`), and a payload
+ * carrying one or two ids is a 422 — the backend refuses a partial triple on purpose.
+ *
+ * ⚠️ Behind the flag on purpose. With the flag off this returns false for every line, so every
+ * no-match line keeps its old treatment to the letter — never gated, never posted.
+ */
+export function isCustomLine(item: EquipmentItem): boolean {
+  return CUSTOM_EQUIPMENT_ENABLED && !item.removed && item.verdict === "no-match" && !item.ref.subcategoryId;
+}
+
+/**
+ * The name an off-catalogue line goes out under, trimmed. Empty string when there is none, which is
+ * what blocks the line and keeps it out of the post.
+ *
+ * `rawLabel` is the seed, not a second answer: it is the renter's OWN words as they appeared in his
+ * RFQ, so a line he never touched is already named by him and asking him to retype it would be
+ * asking the same question twice. `??` and not `||` on purpose — clearing the box stores `""`, and
+ * an empty string is an answer ("I have not named it"), not a missing one, so it must NOT fall back
+ * to the seed and silently re-name the machine he just cleared.
+ */
+export function customName(item: EquipmentItem): string {
+  return (item.customEquipment ?? item.rawLabel ?? "").trim();
+}
 
 export interface GateResult {
   ok: boolean;
@@ -58,9 +90,10 @@ export function isTouched(draft: Pick<RfqDraft, "touchedFields">, key: string): 
 /**
  * Whether a single item blocks advancing (MREQ-AC-09/14).
  *
- * Removed and no-match items never block: no-match is excluded from the broadcast entirely
- * (`postableItems`), so demanding the renter complete one would gate them on equipment that is not
- * going to be sent.
+ * Removed items never block. Nor does a no-match line the renter cannot name — it is excluded from
+ * the broadcast entirely (`postableItems`), so demanding he complete one would gate him on equipment
+ * that is not going to be sent. An off-catalogue line he CAN name does block, on the name alone:
+ * that line is going out.
  */
 export function itemBlocksAdvance(item: EquipmentItem): boolean {
   return itemAppGaps(item).length > 0;
@@ -75,7 +108,25 @@ export function itemBlocksAdvance(item: EquipmentItem): boolean {
  * the canvas but not of the item.
  */
 export function itemAppGaps(item: EquipmentItem): RequiredGap[] {
-  if (item.removed || item.verdict === "no-match") return [];
+  if (item.removed) return [];
+  /**
+   * Off-catalogue: the NAME replaces the taxonomy trio as this line's required answer.
+   *
+   * It blocks when it is blank, which a no-match line never did before. That is the point — the line
+   * now posts, so an unnamed one would reach a supplier as an unnamed machine. A renter who does not
+   * want to name it removes the row, which is the same door he had before.
+   */
+  if (isCustomLine(item)) {
+    const gaps: RequiredGap[] = [];
+    if (!customName(item)) {
+      gaps.push({ panel: "equipment", itemId: item.id, field: "custom_equipment", reason: "gate.customEquipmentMissing" });
+    }
+    if (!Number.isFinite(item.quantity) || item.quantity < 1) {
+      gaps.push({ panel: "equipment", itemId: item.id, field: "quantity", reason: "gate.quantityMissing" });
+    }
+    return gaps;
+  }
+  if (item.verdict === "no-match") return [];
   const gaps: RequiredGap[] = [];
   const at = (field: string, reason: string) => gaps.push({ panel: "equipment", itemId: item.id, field, reason });
 
@@ -100,7 +151,10 @@ export function itemAppGaps(item: EquipmentItem): RequiredGap[] {
  * whole thing these exist to prevent.
  */
 export function itemWebGaps(item: EquipmentItem, draft: Pick<RfqDraft, "touchedFields">): RequiredGap[] {
-  if (item.removed || item.verdict === "no-match") return [];
+  if (item.removed) return [];
+  // An off-catalogue line is gated like any other: both answers are posted for it and both are shown
+  // to the supplier on the bid form. A no-match line that cannot be named keeps its early return.
+  if (item.verdict === "no-match" && !isCustomLine(item)) return [];
   const gaps: RequiredGap[] = [];
   const at = (field: string, reason: string) => gaps.push({ panel: "equipment", itemId: item.id, field, reason });
 
@@ -137,7 +191,7 @@ export function itemGaps(item: EquipmentItem, draft: Pick<RfqDraft, "touchedFiel
 export function transportGaps(items: EquipmentItem[], project: ProjectDetails): RequiredGap[] {
   const gaps: RequiredGap[] = [];
   for (const item of items) {
-    if (item.removed || item.verdict === "no-match") continue;
+    if (item.removed || (item.verdict === "no-match" && !isCustomLine(item))) continue;
     if ((item.deliveryOverride ?? project.deliveryToSite) == null) {
       gaps.push({ panel: "equipment", itemId: item.id, field: "delivery", reason: "gate.deliveryMissing" });
     }
@@ -197,7 +251,7 @@ const WHEN_GAP_FIELD: Record<string, string> = {
  * the source of which blocks shake on a refused move (MREQ-AC-15).
  */
 export function requiredGaps(draft: RfqDraft, chargedDaysUnderstood: boolean): RequiredGap[] {
-  const live = draft.items.filter((i) => !i.removed && i.verdict !== "no-match");
+  const live = draft.items.filter((i) => !i.removed && (i.verdict !== "no-match" || isCustomLine(i)));
   const gaps: RequiredGap[] = [];
 
   if (live.length === 0) {
@@ -220,7 +274,12 @@ export function panelGaps(gaps: RequiredGap[], panel: RequiredGap["panel"]): Req
   return gaps.filter((g) => g.panel === panel);
 }
 
-/** Items that actually post (mapped, not removed, not no-match) — AC-33/34/43. */
+/**
+ * Items that actually post (mapped, not removed) — AC-33/34/43.
+ *
+ * An off-catalogue line posts too, but only once the renter has NAMED it: the payload carries his
+ * name and no taxonomy ids. Unnamed, it is dropped exactly as every no-match line was before.
+ */
 export function postableItems(items: EquipmentItem[]): EquipmentItem[] {
-  return items.filter((i) => !i.removed && i.verdict !== "no-match");
+  return items.filter((i) => !i.removed && (i.verdict !== "no-match" || (isCustomLine(i) && customName(i) !== "")));
 }

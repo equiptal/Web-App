@@ -25,6 +25,7 @@
 
 import { requestedMinYear } from "@/lib/contract/bids";
 import type { RequestItem, RequestRecord } from "@/lib/contract/requests";
+import { customEquipmentLabel } from "@/lib/contract/requests";
 
 /** `L(en, ar)` — the caller's own bilingual picker, passed in so this file holds no locale state. */
 export type Pick = (en: string, ar: string) => string;
@@ -168,8 +169,11 @@ export function itemDetailRows(it: RequestItem, ar: boolean, L: Pick): Row[] {
   ]);
 }
 
-/** The machine's own name, as the enriched taxonomy can give it. */
+/** The machine's own name, as the enriched taxonomy can give it — or, off-catalogue, as the renter
+ *  wrote it (same words in both locales). */
 export function itemDisplayName(it: RequestItem, ar: boolean): string {
+  const custom = customEquipmentLabel(it);
+  if (custom) return custom;
   const parts = ar
     ? [it.subtypeNameAr ?? it.subtypeName, it.capacityNameAr ?? it.capacityName]
     : [it.subtypeName, it.capacityName];

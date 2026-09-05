@@ -150,7 +150,7 @@ describe("who it goes to", () => {
     draw();
     fireEvent.click(await screen.findByText("Najd Equipment Est."));
     // No channel is on by default, so the e-mail warning belongs to the e-mail channel.
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     expect(screen.getByText(c.skipping.replace("{n}", "1"))).toBeTruthy();
   });
 
@@ -172,14 +172,20 @@ describe("how it goes", () => {
     expect(mark.closest("button")).toBeNull();
 
     // With an extra channel on, the line says Moedatech is the floor rather than the whole of it.
-    fireEvent.click(screen.getByText(c.email));
-    expect(screen.getByText(c.alwaysHint)).toBeTruthy();
+    fireEvent.click(screen.getByText(c.outlook));
+    /**
+     * ⚠️ ~~«Every request goes to Moedatech. You can share it via other channels too.»~~ Removed
+     * (owner, 2026-09-06). On every state but one it restated the row directly above it — the chip
+     * is locked on and the other buttons are right there — costing a line the supplier list and the
+     * preview both wanted.
+     */
+    expect(screen.queryByText(c.alwaysHint)).toBeNull();
   });
 
   it("Given e-mail, Then the recipients are the ticked suppliers", async () => {
     draw();
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers));
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
@@ -206,7 +212,7 @@ describe("how it goes", () => {
     // from their suppliers fine."* The compose window opens with the message and no recipient.
     draw();
     await screen.findByText("Al Faisal Rentals");
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers));
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
@@ -236,7 +242,7 @@ describe("how it goes", () => {
 
     // `Najd Equipment Est.` has a phone and no e-mail; E-mail is the channel that is on.
     fireEvent.click(await screen.findByText("Najd Equipment Est."));
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     const button = screen.getByText(c.sendToSuppliers).closest("button")!;
     expect(button.hasAttribute("disabled")).toBe(false);
 
@@ -310,7 +316,7 @@ describe("how it goes", () => {
 
     // The two TICKS are there — they choose, they do not send.
     expect(screen.getByText(c.whatsapp)).toBeTruthy();
-    expect(screen.getByText(c.email)).toBeTruthy();
+    expect(screen.getByText(c.outlook)).toBeTruthy();
     // The one control that would have sent is not.
     expect(screen.queryByText(c.other)).toBeNull();
     expect(posted).not.toHaveBeenCalled();
@@ -363,7 +369,7 @@ describe("how it goes", () => {
   it("Given a share went out, Then it is recorded against the request", async () => {
     draw();
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers));
 
     await waitFor(() => expect(api.shares).toHaveLength(1));
@@ -430,7 +436,7 @@ describe("the words around the card", () => {
     await screen.findByLabelText(c.tplAbove);
 
     // Pick e-mail and the e-mail frame is drawn: subject line and From.
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     expect(screen.getByText(/RFQ for/)).toBeTruthy();
 
     // ONE channel at a time: pressing WhatsApp is the whole act, and E-mail goes off with it.
@@ -523,26 +529,48 @@ describe("one channel at a time (owner, 2026-09-02)", () => {
     // already exists, so a second press is a second CHANNEL, never a second request.
     draw();
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers));
 
     // The button renames itself; the three narration lines under it went on 2026-09-03.
     await waitFor(() => expect(screen.getByText(c.shareAgain)).toBeTruthy());
 
     // And the channel it has used says so, so he can see where it has been.
-    expect(screen.getByText(c.email).closest("button")!.textContent).toContain("check");
+    expect(screen.getByText(c.outlook).closest("button")!.textContent).toContain("check");
   });
 
-  it("Given E-mail, Then no provider is asked for — it is just e-mail", async () => {
+  it("Given the channel row, Then OUTLOOK and GMAIL are the two e-mail buttons", async () => {
     /**
-     * Owner, 2026-09-03: *"remove the outlook or gmail option it will be just email and user can
-     * then select what he want to connect when we apply api."* Until a mailbox can be connected,
-     * asking which webmail he uses is asking him to solve our problem.
+     * Owner, 2026-09-05: *"can u add option for gmail so it is gmail or outlook instead of general
+     * email."*
+     *
+     * ~~One «E-mail» button and a hidden provider, removed on 2026-09-03 when both behaved
+     * identically badly.~~ They no longer do. Gmail carries `bcc` in its compose URL, so its window
+     * opens with the suppliers in the Bcc line where he can read them, today, with no connection.
+     * Outlook discards `bcc` without a word, which is why it has the connector. Handing a Gmail
+     * renter an Outlook window was the gap this closes.
      */
     draw();
-    fireEvent.click(await screen.findByText(c.email));
-    expect(screen.queryByText(c.outlook)).toBeNull();
-    expect(screen.queryByText(c.gmail)).toBeNull();
+    expect(await screen.findByText(c.outlook)).toBeTruthy();
+    expect(screen.getByText(c.gmail)).toBeTruthy();
+  });
+
+  it("Given GMAIL, Then no Microsoft consent is asked for — its window already carries the Bcc", async () => {
+    // ⚠️ A consent there would be a detour to solve a problem he does not have.
+    api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
+    api.connectUrl = "https://login.microsoftonline.com/x";
+    api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.gmail));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(opened).toHaveBeenCalled());
+    const urls = opened.mock.calls.map((call) => String(call[0]));
+    expect(urls.some((u) => u.includes("login.microsoftonline.com"))).toBe(false);
+    // And the recipients really are on the Gmail window, which is the whole point.
+    expect(urls.some((u) => u.includes("mail.google.com") && u.includes("bcc="))).toBe(true);
   });
 });
 
@@ -588,7 +616,7 @@ describe("the link preview (owner, 2026-09-02)", () => {
      * until a mailbox is connected.
      */
     drawDraft();
-    fireEvent.click(await screen.findByText(c.email));
+    fireEvent.click(await screen.findByText(c.outlook));
 
     // Same template, same card, whichever channel is chosen — no per-channel caveat on the message.
     // ⚠️ The mark appears twice on this screen: the locked Moedatech chip and the card's band.
@@ -619,7 +647,7 @@ describe("what rides the clipboard on an e-mail send", () => {
       </LocaleProvider>,
     );
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers));
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
@@ -638,7 +666,7 @@ describe("what rides the clipboard on an e-mail send", () => {
       </LocaleProvider>,
     );
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers));
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
@@ -725,7 +753,7 @@ describe("the panel narrates nothing after a send (owner, 2026-09-03)", () => {
      */
     draw();
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers));
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
@@ -808,7 +836,7 @@ describe("what onShared tells the caller (owner, 2026-09-03)", () => {
       </LocaleProvider>,
     );
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers));
 
     await waitFor(() => expect(onShared).toHaveBeenCalled());
@@ -842,7 +870,7 @@ describe("copying", () => {
     vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
 
     draw();
-    fireEvent.click(await screen.findByText(c.copyShort));
+    fireEvent.click(await screen.findByLabelText(c.copy));
 
     await waitFor(() => expect(writeText).toHaveBeenCalled());
     // The URL, whole and alone: no greeting, no card, nothing to trim out of a CRM field.
@@ -870,7 +898,7 @@ describe("what they receive", () => {
      * of these, not two.
      */
     expect(screen.getByText(c.linkMasked)).toBeTruthy();
-    expect(screen.getByText(c.copyShort).closest("button")!.hasAttribute("disabled")).toBe(true);
+    expect(screen.getByLabelText(c.copy).closest("button")!.hasAttribute("disabled")).toBe(true);
   });
 
   it("Given no equipment yet, Then it says so rather than drawing an empty card", async () => {
@@ -895,7 +923,7 @@ describe("the mail we send ourselves", () => {
   const sendByEmail = async () => {
     draw();
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
   };
 
@@ -1026,19 +1054,35 @@ describe("the message's language", () => {
      * passing a language down — so there was no neutral fallback, only the wrong one.
      */
     const seen: string[] = [];
+    /**
+     * The preview must ANSWER, or `useBidCard` clears the card and the frame (with the toggle
+     * inside it) never draws — a 404 here would make the test pass on an empty column.
+     */
+    const preview = {
+      title: "T",
+      description: "D",
+      en: { title: "T", description: "D" },
+      ar: { title: "ت", description: "د" },
+      imageUrl: "",
+    };
     vi.stubGlobal("fetch", async (url: string) => {
       seen.push(String(url));
-      return { ok: false, status: 404, json: async () => ({}) };
+      return String(url).includes("/preview")
+        ? { ok: true, status: 200, json: async () => preview }
+        : { ok: false, status: 404, json: async () => ({}) };
     });
 
     // ⚠️ A real UUID: the card only loads for a link whose token parses, so a placeholder id
     // would make this test pass by fetching nothing.
-    draw({ requestUuid: "a319541b-9762-43dd-a3d2-030bf3a3850d" });
+    // A draft supplies the card, so the frame (and the toggle inside it) exists while fetch 404s.
+    draw({ requestUuid: "a319541b-9762-43dd-a3d2-030bf3a3850d", draftForm: DRAFT });
     await screen.findByText("Al Faisal Rentals");
     // On mount it asks in the interface's language.
     await waitFor(() => expect(seen.some((u) => u.includes("/preview?lang=en"))).toBe(true));
 
-    fireEvent.click(screen.getByText("العربية"));
+    // ⚠️ The toggle lives INSIDE the card now, so a frame has to be on screen to reach it.
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(await screen.findByText("العربية"));
     await waitFor(() => expect(seen.some((u) => u.includes("/preview?lang=ar"))).toBe(true));
   });
 });
@@ -1055,7 +1099,7 @@ describe("connecting Outlook", () => {
   const pickEmail = async () => {
     draw();
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
   };
 
   it("Given a stage with no app registration, Then nothing is offered", async () => {
@@ -1067,7 +1111,7 @@ describe("connecting Outlook", () => {
     api.connect = { configured: false, connected: false, provider: null, accountEmail: null, connectedAt: null };
     await pickEmail();
 
-    await waitFor(() => expect(screen.getByText(c.email)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(c.outlook)).toBeTruthy());
     expect(screen.queryByText(c.mailConnect)).toBeNull();
   });
 
@@ -1081,7 +1125,7 @@ describe("connecting Outlook", () => {
     api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
     await pickEmail();
 
-    await waitFor(() => expect(screen.getByText(c.email)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(c.outlook)).toBeTruthy());
     expect(screen.queryByText(c.mailConnect)).toBeNull();
   });
 
@@ -1342,7 +1386,7 @@ describe("the clipboard has one writer at a time", () => {
 
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
@@ -1360,7 +1404,7 @@ describe("the clipboard has one writer at a time", () => {
 
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
 
     const button = await screen.findByText(c.copyAddresses);
@@ -1374,7 +1418,7 @@ describe("the clipboard has one writer at a time", () => {
     clip();
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
 
     expect(screen.queryByText(c.copyAddresses)).toBeNull();
   });
@@ -1390,7 +1434,7 @@ describe("the clipboard has one writer at a time", () => {
 
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
 
     await waitFor(() => expect(api.mailCalls).toHaveLength(1));
@@ -1429,13 +1473,13 @@ describe("what he typed is still there next time", () => {
     // ⚠️ The subject only exists on the E-MAIL frame: WhatsApp has no subject line, so drawing a
     // field for one there would offer him something that goes nowhere.
     draw({ draftForm: DRAFT });
-    fireEvent.click(await screen.findByText(c.email));
+    fireEvent.click(await screen.findByText(c.outlook));
     const title = (await screen.findByLabelText(c.tplTitle)) as HTMLTextAreaElement;
     fireEvent.change(title, { target: { value: "Quote needed: {equipment}" } });
 
     cleanup();
     draw({ draftForm: DRAFT });
-    fireEvent.click(await screen.findByText(c.email));
+    fireEvent.click(await screen.findByText(c.outlook));
 
     const again = (await screen.findByLabelText(c.tplTitle)) as HTMLTextAreaElement;
     // Shown filled, because that is what gets sent; the token is his when he clicks in.
@@ -1490,7 +1534,7 @@ describe("what he typed is still there next time", () => {
 describe("a wording per channel", () => {
   it("Given he edits E-MAIL, Then WhatsApp keeps its own", async () => {
     draw({ draftForm: DRAFT });
-    fireEvent.click(await screen.findByText(c.email));
+    fireEvent.click(await screen.findByText(c.outlook));
     fireEvent.change(screen.getByLabelText(c.tplAbove), { target: { value: "Formal letter" } });
 
     fireEvent.click(screen.getByText(c.whatsapp));
@@ -1501,7 +1545,7 @@ describe("a wording per channel", () => {
     fireEvent.change(screen.getByLabelText(c.tplAbove), { target: { value: "Two lines" } });
 
     // Back to e-mail: the letter is still the letter.
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     await waitFor(() =>
       expect((screen.getByLabelText(c.tplAbove) as HTMLTextAreaElement).value).toBe("Formal letter"),
     );
@@ -1509,7 +1553,7 @@ describe("a wording per channel", () => {
 
   it("Given both are set, Then a fresh mount still has both", async () => {
     draw({ draftForm: DRAFT });
-    fireEvent.click(await screen.findByText(c.email));
+    fireEvent.click(await screen.findByText(c.outlook));
     fireEvent.change(screen.getByLabelText(c.tplAbove), { target: { value: "Mail wording" } });
     fireEvent.click(screen.getByText(c.whatsapp));
     fireEvent.change(screen.getByLabelText(c.tplAbove), { target: { value: "Chat wording" } });
@@ -1521,7 +1565,7 @@ describe("a wording per channel", () => {
     await waitFor(() =>
       expect((screen.getByLabelText(c.tplAbove) as HTMLTextAreaElement).value).toBe("Chat wording"),
     );
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     await waitFor(() =>
       expect((screen.getByLabelText(c.tplAbove) as HTMLTextAreaElement).value).toBe("Mail wording"),
     );
@@ -1530,7 +1574,7 @@ describe("a wording per channel", () => {
   it("Given RESET, Then only the channel he is reading goes back to ours", async () => {
     // He pressed it while reading one message. Taking the other two would undo work he cannot see.
     draw({ draftForm: DRAFT });
-    fireEvent.click(await screen.findByText(c.email));
+    fireEvent.click(await screen.findByText(c.outlook));
     fireEvent.change(screen.getByLabelText(c.tplAbove), { target: { value: "Mail wording" } });
     fireEvent.click(screen.getByText(c.whatsapp));
     fireEvent.change(screen.getByLabelText(c.tplAbove), { target: { value: "Chat wording" } });
@@ -1540,7 +1584,7 @@ describe("a wording per channel", () => {
       expect((screen.getByLabelText(c.tplAbove) as HTMLTextAreaElement).value).toContain("bid on my equipment request"),
     );
 
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     await waitFor(() =>
       expect((screen.getByLabelText(c.tplAbove) as HTMLTextAreaElement).value).toBe("Mail wording"),
     );
@@ -1587,7 +1631,7 @@ describe("Send opens the connector itself", () => {
 
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
@@ -1614,7 +1658,7 @@ describe("Send opens the connector itself", () => {
 
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
 
     await waitFor(() =>
@@ -1630,7 +1674,7 @@ describe("Send opens the connector itself", () => {
 
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
 
     await waitFor(() => expect(api.mailCalls).toHaveLength(1));
@@ -1645,10 +1689,67 @@ describe("Send opens the connector itself", () => {
 
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.email));
+    fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
     expect(String(opened.mock.calls[0][0])).not.toContain("login.microsoftonline.com");
+  });
+});
+
+
+/**
+ * -- The two Copies, and the share sheet (owner, 2026-09-05) -------------------------------------
+ */
+describe("the message's own controls live on the message", () => {
+  it("Given the preview, Then the language and Copy template are INSIDE the card", async () => {
+    /**
+     * ⚠️ *"the 2 copies for the link and for the template is very confusing."*
+     *
+     * ~~One in this row saying «Copy», one in the preview heading saying «Copy message».~~ Two
+     * near-identical buttons in two places, each naming a different thing in the same word, and no
+     * screen on which he could see both to tell them apart. Side by side they explain each other.
+     */
+    /**
+     * ⚠️ **Inside the card, not above it** (owner, 2026-09-05). In the column heading they read as
+     * settings for the panel; against the subject line they read as what they are — this letter's
+     * language, and this letter on the clipboard.
+     */
+    draw({ draftForm: DRAFT });
+    await screen.findByText("Al Faisal Rentals");
+    fireEvent.click(screen.getByText(c.outlook));
+
+    const card = (await screen.findByLabelText(c.tplTitle)).closest("div")!.parentElement!;
+    expect(within(card).getByText("العربية")).toBeTruthy();
+    expect(within(card).getByText(c.copyMessage)).toBeTruthy();
+    // And the link row carries a glyph only: the accessible name is there, the WORD is not.
+    expect(screen.getByLabelText(c.copy)).toBeTruthy();
+    expect(screen.getByLabelText(c.copy).textContent).not.toContain(c.copy);
+  });
+});
+
+describe("More hands the sheet a URL", () => {
+  it("Given the share sheet, Then the link is its own field, not buried in the text", async () => {
+    /**
+     * 🔴 Windows and Android draw the link tile, the QR button and the copy-link button from the
+     * `url` FIELD. With only `text` they fall back to a bare list of apps with no preview of what is
+     * being sent, which is not the sheet the owner asked for.
+     *
+     * ⚠️ And the URL is trimmed off the end of `text`, or every target that concatenates the two
+     * shows it twice.
+     */
+    const share = vi.fn(async (_d: { url?: string; text?: string; title?: string }) => undefined);
+    vi.stubGlobal("navigator", { ...navigator, share, clipboard: { writeText: async () => {} } });
+
+    draw({ draftForm: DRAFT });
+    // Share mode already has a link, so «More» is on screen without a post.
+    await screen.findByText("Al Faisal Rentals");
+    fireEvent.click(screen.getByText(c.other));
+
+    await waitFor(() => expect(share).toHaveBeenCalled());
+    const arg = share.mock.calls[0][0];
+    expect(arg.url).toContain("/bid/");
+    expect(arg.text).toContain("Crawler Excavator");
+    expect(arg.text!.endsWith(arg.url!)).toBe(false);
   });
 });

@@ -23,7 +23,7 @@ import { WherePanel } from "@/components/create/WherePanel";
 import { WhenPanel } from "@/components/create/WhenPanel";
 import { CarryForwardModal } from "@/components/create/CarryForwardModal";
 import { PanelDot } from "@/components/create/Provenance";
-import { gateWhen, gateWhere, itemGaps, requiredGaps, resolveRef, taxName, transportGaps } from "@/lib/contract";
+import { gateWhen, gateWhere, isCustomLine, itemGaps, requiredGaps, resolveRef, taxName, transportGaps } from "@/lib/contract";
 import type { RequiredGap } from "@/lib/contract";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
@@ -175,10 +175,12 @@ export function Canvas() {
    *
    * Removed rows stay dropped: those the renter dismissed himself.
    *
-   * **Nothing here weakens AC-33.** A no-match item still cannot reach a supplier — every gate
-   * (`itemAppGaps`, `itemWebGaps`, `transportGaps`) returns early on the verdict, `requiredGaps`
-   * counts only postable rows, the review screen lists only postable rows, and submit posts
-   * `postableItems`. This list is the screen's, and the screen's alone.
+   * **Nothing here weakens AC-33.** A no-match item the renter has not named still cannot reach a
+   * supplier — every gate (`itemAppGaps`, `itemWebGaps`, `transportGaps`) returns early on the
+   * verdict, `requiredGaps` counts only postable rows, the review screen lists only postable rows,
+   * and submit posts `postableItems`. This list is the screen's, and the screen's alone.
+   * (An OFF-CATALOGUE item he HAS named is a different row: `isCustomLine` lets the gates see it,
+   * and it posts by name with no taxonomy ids.)
    */
   const live = draft.items.filter((i) => !i.removed);
   const index = Math.min(state.itemIndex, Math.max(0, live.length - 1));
@@ -190,14 +192,17 @@ export function Canvas() {
   gapsRef.current = gaps;
   const equipmentGaps = item ? [...itemGaps(item, draft), ...transportGaps([item], draft.project)] : [];
   /**
-   * A machine we cannot supply is not an ANSWERED machine.
+   * A machine we cannot supply is not an ANSWERED machine — unless the renter has named it.
    *
-   * Every gate returns early on a no-match verdict, which is right — the renter cannot be asked to
-   * pick a category for a thing the catalogue does not carry — but it leaves `equipmentGaps` empty,
-   * and empty is what paints this panel green and its dot complete. A row that says "we couldn't
-   * find this in our catalogue" under a green tick is the panel contradicting itself.
+   * Every gate returns early on a no-match verdict the renter cannot act on, which is right (he
+   * cannot be asked to pick a category for a thing the catalogue does not carry), but it leaves
+   * `equipmentGaps` empty, and empty is what paints this panel green. A row saying "we couldn't find
+   * this in our catalogue" under a green tick is the panel contradicting itself.
+   *
+   * An OFF-CATALOGUE row is the other case: it is gated on the name he types, so `equipmentGaps`
+   * speaks for it and green means green.
    */
-  const itemUnavailable = item?.verdict === "no-match";
+  const itemUnavailable = item ? item.verdict === "no-match" && !isCustomLine(item) : false;
   const equipmentDone = equipmentGaps.length === 0 && !itemUnavailable;
   const whenOk = gateWhen(draft.project, state.chargedDaysUnderstood).ok;
 

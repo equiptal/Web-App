@@ -31,6 +31,7 @@ import { useItemAttachments, useItemOverrides, useItemTaxonomy, useProvenance } 
 import { pin } from "@/lib/uiPins";
 import {
   equipmentYears,
+  isCustomLine,
   isTouched,
   FUEL_TYPES,
   type EquipmentItem,
@@ -105,6 +106,8 @@ export function MachineCard({
   };
 
   const notAvailable = item.verdict === "no-match";
+  /** Off-catalogue and nameable: the trio stays on screen, unstarred, with the name box under it. */
+  const custom = isCustomLine(item);
   /**
    * Supplier first, the renter second — the order the prototype uses on every one of these, and the
    * reason it is written out rather than mapped from `PARTIES`, which is ["me","supplier"].
@@ -118,9 +121,10 @@ export function MachineCard({
     <div {...pin("machine-card")} className="min-w-0 flex-1 rounded-sm border border-border bg-surface p-3.5">
       <div {...pin("machine-card-head")} className="mb-4 flex items-center justify-between gap-2">
         <span className="flex items-center gap-2">
-          {/* Not complete when the catalogue has nothing to offer: no gate can fire on a no-match
-              row, so `gaps` is empty for it, and empty would otherwise read as answered. */}
-          <PanelDot complete={gaps.length === 0 && !notAvailable} />
+          {/* An unnameable no-match row is never complete: no gate can fire on it, so `gaps` is
+              empty, and empty would otherwise read as answered. An off-catalogue row the renter CAN
+              name is gated like any other, so `gaps` tells the truth for it. */}
+          <PanelDot complete={gaps.length === 0 && (custom || !notAvailable)} />
           <h2 className="whitespace-nowrap text-subhead font-extrabold text-navy">{t.create.machine}</h2>
         </span>
         {onCollapse && (
@@ -306,10 +310,14 @@ export function MachineCard({
 
         {/* ---------------- Right column: three boxes, 16px apart ---------------- */}
         <div className="flex min-w-0 flex-col gap-4">
-          {notAvailable ? (
-            <UnavailableCard item={item} label={item.rawLabel ?? tax.subtypeName ?? ""} />
-          ) : (
-            /* The amber-tinted taxonomy trio, at the prototype's minmax columns. */
+          {notAvailable && <UnavailableCard item={item} label={item.rawLabel ?? tax.subtypeName ?? ""} />}
+
+          {notAvailable && !custom ? null : (
+            /* The amber-tinted taxonomy trio, at the prototype's minmax columns.
+
+               It stays on screen for an off-catalogue row (owner, 2026-09-05): the renter names his
+               machine below it, but a renter who CAN find it in the list must not have the list taken
+               away from him. Unstarred there, because nothing in the catalogue can satisfy it. */
             <div className="grid gap-2.5 rounded-sm bg-surface2 p-3.5 sm:grid-cols-[minmax(132px,1fr)_minmax(150px,1.5fr)_minmax(104px,0.9fr)]">
               {/* Derived, never picked. The renter chooses a TYPE and the category follows from it —
                   so this shows the taxonomy's `tag` (its canonical grouping, e.g. "Earthmoving") as a
@@ -328,7 +336,7 @@ export function MachineCard({
                 missing={gapFor("subtype") || gapFor("category")}
                 shake={shake("subtype") || shake("category")}
                 required={owed("subtype") || owed("category")}
-                star
+                star={!custom}
                 source={prov.itemSource("subtype", item.ref.subcategoryId)}
               >
                 <SearchSelect
@@ -354,7 +362,7 @@ export function MachineCard({
                 missing={gapFor("capacity")}
                 shake={shake("capacity")}
                   required={owed("capacity")}
-                star
+                star={!custom}
                 source={prov.itemSource("capacity", item.ref.measurementId)}
               >
                 <SearchSelect
@@ -368,6 +376,30 @@ export function MachineCard({
                     prov.touch("capacity");
                     actions.setItemMeasurement(item.id, v);
                   }}
+                />
+              </CanvasField>
+            </div>
+          )}
+
+          {/* ── The renter's own name for a machine the catalogue cannot place ──────────────────
+              Prefilled from what he wrote in the RFQ, and never written into state until he types:
+              a name nobody looked at must not reach a supplier. It is this row's required answer in
+              place of the trio, so it carries the star and the shake the type and size would have. */}
+          {custom && (
+            <div className="rounded-sm bg-surface2 p-3.5">
+              <CanvasField
+                label={t.create.machineCard.customEquipment}
+                missing={gapFor("custom_equipment")}
+                shake={shake("custom_equipment")}
+                required={owed("custom_equipment")}
+                star
+                hint={t.create.machineCard.customEquipmentHint}
+              >
+                <TextInput
+                  value={item.customEquipment ?? item.rawLabel ?? ""}
+                  maxLength={120}
+                  placeholder={t.create.machineCard.customEquipmentPlaceholder}
+                  onChange={(e) => set("custom_equipment", { customEquipment: e.target.value })}
                 />
               </CanvasField>
             </div>
@@ -497,10 +529,19 @@ export function MachineCard({
 function UnavailableCard({ item, label }: { item: EquipmentItem; label: string }) {
   const t = useT();
   const { actions } = useRfq();
+  // Off-catalogue and nameable: the row is no longer a dead end, so it is drawn as a notice rather
+  // than a refusal — the machine still goes out, and the copy under it says how.
+  const custom = isCustomLine(item);
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-sm border border-danger/40 bg-danger/[0.06] p-3.5">
-      <p className="flex items-start gap-2 text-body leading-snug text-danger">
+    <div
+      className={
+        custom
+          ? "flex flex-col gap-2.5 rounded-sm border border-warn/30 bg-warn-soft p-3.5"
+          : "flex flex-col gap-2.5 rounded-sm border border-danger/40 bg-danger/[0.06] p-3.5"
+      }
+    >
+      <p className={`flex items-start gap-2 text-body leading-snug ${custom ? "text-warn" : "text-danger"}`}>
         <Icon name="error_outline" size={16} className="mt-px flex-none" />
         {fmt(t.create.machineCard.unavailableTitle, { equipment: label })}
       </p>

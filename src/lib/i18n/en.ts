@@ -542,11 +542,15 @@ export const en = {
     removeConfirm: "Remove this item from the request?",
     noMatch: {
       provide: "Provide it for me?", // AC-30/31 tentative
-      // Both explainers state the outcome up front: a no-match item never goes out to suppliers
-      // (AC-33), whether or not the renter messages us — so the row shouldn't imply otherwise.
-      explainer: "We couldn't find this in our catalogue. It won't be included in this request.",
+      // Three facts, all of them, before the renter presses Send: it is not in our list, we will not
+      // send it to anyone, and he can still post and share the link himself. Say "we won't send it",
+      // never "no supplier was found" — the request is never dispatched at all, and a renter told
+      // "none matched" waits for bids that were never solicited.
+      explainer:
+        "We don't have this equipment listed, and no Moedatech supplier is matched to it, so we won't send it to anyone. You can still post this request and share its link with your own supplier",
       // Shown when the equipment IS in the catalogue but the requested SIZE isn't yet (a genuine new size).
-      newSizeExplainer: "We carry this equipment, but not this size yet. Message us to add it. It won't be included in this request.",
+      newSizeExplainer:
+        "We carry this equipment, but not this size yet. Message us to add it. We won't send this one to any supplier, and you can still post the request and share its link with your own",
       // AC-31: prefilled WhatsApp message to Moedatech support requesting the equipment be sourced.
       whatsappMessage: 'Hi Moedatech, I\'m creating an RFQ and need equipment that isn\'t available in the app: "{item}". Please add/source it for me so it is added to my request. Thank you!',
       // New-size variant: equipment exists, the size doesn't — ask support to add the size.
@@ -782,6 +786,9 @@ export const en = {
     // MREQ-AC-54 — web-only gates, each satisfied by an explicit "nothing" answer.
     yearMissing: "Choose a minimum year, or Any year.",
     certMissing: "Choose a certificate, or No certificate.",
+    // Off-catalogue: the name replaces the taxonomy trio as this line's required answer, so a blank
+    // one blocks. A renter who won't name it removes the row.
+    customEquipmentMissing: "Name this machine, or remove it",
     confirmChargedDays: "Confirm how many days you'll be charged for.",
   },
   errors: {
@@ -2206,6 +2213,11 @@ export const en = {
       notesOptional: "(optional)",
       notesPlaceholder: "Anything else the supplier should know…",
       unavailableTitle: "{equipment} isn't available from suppliers right now.",
+      // Off-catalogue: the renter names the machine himself and the request goes out carrying his
+      // words. Prefilled from what he wrote in the RFQ, so the ordinary case is a glance.
+      customEquipment: "EQUIPMENT NAME",
+      customEquipmentPlaceholder: "Name the machine you need",
+      customEquipmentHint: "This name is what your supplier will see on the bid form",
       unavailableWhatsapp: "Message us on WhatsApp",
       unavailableChoose: "Choose another type",
       sourcingRequested: "We're looking for this one. We'll be in touch.",

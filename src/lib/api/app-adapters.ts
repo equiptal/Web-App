@@ -1,5 +1,5 @@
 import type { Taxonomy } from "@/lib/contract";
-import { postableItems, normalizeSafetyCert } from "@/lib/contract";
+import { postableItems, normalizeSafetyCert, customName, isCustomLine } from "@/lib/contract";
 import type { EquipmentItem } from "@/lib/contract";
 import type { RfqRequestPayload } from "@/lib/contract";
 import type { TaxonomyNode, CreateRequestPayload, CreateRequestItem } from "@/lib/contract/app";
@@ -256,10 +256,23 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
     equipmentItems: items.map((i) => {
       const fuelParty = i.fuelResponsibilityOverride ?? project.fuelResponsibility ?? "me"; // AC-26 override → request-wide → default me
       const operatorIncluded = i.operatorNeeded === "yes";
+      /**
+       * Off-catalogue: the renter's own name instead of the three ids.
+       *
+       * The ids are OMITTED rather than nulled — they are `.optional()` on the backend, not
+       * `.nullable()`, so an explicit `null` 422s where an absent key passes. All three go or none
+       * do: a no-match line can carry a category id with no subtype (`deriveVerdict`), and a partial
+       * triple is refused by design.
+       */
+      const custom = isCustomLine(i) ? customName(i) : "";
       return {
-        categoryId: i.ref.categoryId as string,
-        subtypeId: i.ref.subcategoryId as string,
-        capacityId: i.ref.measurementId as string,
+        ...(custom
+          ? { customEquipmentName: custom.slice(0, 120) }
+          : {
+              categoryId: i.ref.categoryId as string,
+              subtypeId: i.ref.subcategoryId as string,
+              capacityId: i.ref.measurementId as string,
+            }),
         // Per-item attachments: admin-defined ids + free-text customs (trimmed, de-duped, blanks dropped).
         attachmentIds: i.attachmentIds ?? [],
         customAttachments: [...new Set((i.customAttachments ?? []).map((s) => s.trim()).filter(Boolean))],

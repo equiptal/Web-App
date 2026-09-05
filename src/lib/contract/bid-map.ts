@@ -649,6 +649,10 @@ export interface RequestTypeSource {
   subtypeNameAr?: string | null;
   capacityName?: string | null;
   capacityNameAr?: string | null;
+  /** Off-catalogue: the renter's own name for a machine the taxonomy cannot place, read in both
+   *  locales and never pluralised — it is his sentence, not a taxonomy head noun. */
+  customEquipmentName?: string | null;
+  isUndefined?: boolean | null;
 }
 
 /**
@@ -667,6 +671,11 @@ export interface RequestTypeSource {
  */
 export function requestTypeWord(item: RequestTypeSource | null | undefined, n: number): { en: string; ar: string } {
   const join = (head: string | null, capacity: string | null) => [head, capacity].filter(Boolean).join(" ").trim();
+  // Off-catalogue: his words, unchanged, in both locales. `englishTypePlural` is skipped on purpose —
+  // it inflects a known head noun, and inflecting free text produces "floating crane barges" from
+  // "floating crane barge" only by luck.
+  const custom = item?.isUndefined ? (item.customEquipmentName ?? "").trim() : "";
+  if (custom) return { en: custom, ar: custom };
   const enSubtype = item?.subtypeName ?? item?.subtypeNameAr ?? null;
   const arSubtype = item?.subtypeNameAr ?? item?.subtypeName ?? null;
   return {

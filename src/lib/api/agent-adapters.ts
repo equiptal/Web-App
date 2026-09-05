@@ -603,7 +603,9 @@ export function draftToRfqCorrection(
     const licenseLevels = it.operator.certificate.map((c) => CERT_OUT[c]).filter((c): c is AgentOperatorLicenseLevel => !!c);
     const safety = (it.safetyCertsOverride ?? project.certificates.safety).map((c) => SAFETY_CERT_OUT[c]).filter(Boolean) as string[];
     return {
-      input_equipment: it.rawLabel ?? names.category ?? "",
+      // The renter's own name for an off-catalogue machine comes first: on a line the agent could not
+      // place, it is the only description anybody wrote on purpose.
+      input_equipment: it.customEquipment?.trim() || it.rawLabel || names.category || "",
       category: names.category || it.agentNames?.category || "",
       subtype: names.subtype || it.agentNames?.subtype || "",
       capacity: names.capacity || it.agentNames?.capacity || it.rawSize || "",

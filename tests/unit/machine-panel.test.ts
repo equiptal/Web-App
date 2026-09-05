@@ -1989,7 +1989,7 @@ describe("one selection colour on this surface (owner, UAT of 2026-08-11)", () =
     // cell — or "they all agree" is trivially true of an empty list.
     expect(rules.length).toBeGreaterThanOrEqual(5);
     for (const rule of rules) {
-      expect(rule.body.toLowerCase()).toContain("#16304f");
+      expect(rule.body.toLowerCase()).toContain("var(--navy)");
       // `var(--info)` is this surface's ACTION colour (AC-33), never a state. A selection wearing it reads
       // as something still to be pressed.
       expect(rule.body.toLowerCase()).not.toContain("var(--info)");

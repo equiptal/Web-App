@@ -760,6 +760,10 @@ export function reducer(state: RfqState, a: Action): RfqState {
             ref: { ...i.ref, subcategoryId: a.subcategoryId, measurementId: null },
             operatorNeeded,
             resolved: false,
+            // Off-catalogue no longer: the renter found his machine in the list, so the name he typed
+            // for it goes with the state it belonged to. Leaving it would post a line carrying both a
+            // subtype and a free-text name, and the ids win — the text would ride along unread.
+            customEquipment: null,
           };
           // No cert seeding here either. This used to "rescue" an uncertified line by stamping the
           // category default once the subcategory refined the lifting test (`_onEquipmentVariantPicked`)

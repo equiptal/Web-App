@@ -414,17 +414,17 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
            05:143) — the border on incoming made every one of the supplier's remarks a boxed notice. */
     const head = cssBlockOf(cssSrc, ".bidmap .bm-chat-head {");
     expect(head.toLowerCase()).toMatch(/background:\s*var\(--surface\)/);
-    expect(head.toLowerCase()).not.toContain("#2563eb");
+    expect(head.toLowerCase()).not.toContain("var(--action)");
     // A hairline the eye can find: a translucent-white rule, which is what it carried against blue,
     // is no divider at all on white.
-    expect(head.toLowerCase()).toMatch(/border-bottom:\s*1px solid #e1e9f1/);
+    expect(head.toLowerCase()).toMatch(/border-bottom:\s*1px solid var\(--border\)/);
     expect(head).toMatch(/height:\s*64px/); // still on the panel's own line
     // The name has to be legible on it — white ink on a white band was the way this would break.
     expect(cssSrc).toContain(".bidmap .bm-chat-who");
-    expect(/\.bidmap \.bm-chat-who \{[^}]*color: #0f2238/i.test(cssSrc)).toBe(true);
+    expect(/\.bidmap \.bm-chat-who \{[^}]*color: var\(--navy-deep\)/i.test(cssSrc)).toBe(true);
     // The avatar the band is built around — the prototype's 42px circle of initials.
     expect(cssBlockOf(cssSrc, ".bidmap .bm-chat-av {")).toMatch(/width:\s*42px/);
-    expect(cssBlockOf(cssSrc, ".bidmap .bm-chat-body {").toLowerCase()).toContain("#e9eef3");
+    expect(cssBlockOf(cssSrc, ".bidmap .bm-chat-body {").toLowerCase()).toContain("var(--surface2)");
     /* ── The bubbles now live in the BASE, and BOTH routes wear them (owner, 2026-08-19) ──────────
        *"we have now 2 chats style… i want both to be the same, the style i want is the one in the
        map."* This block used to be `.bidmap .bm-chat .msg.*` — an override that let the deal room
@@ -441,8 +441,8 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
     // Outgoing is the PALE fill with dark ink, not a brand colour with white text — the single change
     // a reader of the deal room actually sees, and the one most likely to be "fixed" back.
     const mine = cssBlockOf(dealCss, ".dlproto .msg.mine {");
-    expect(mine.toLowerCase()).toContain("#d9eeff");
-    expect(mine.toLowerCase()).toContain("#16304f");
+    expect(mine.toLowerCase()).toContain("color-mix(in srgb, var(--action) 12%, white)");
+    expect(mine.toLowerCase()).toContain("var(--navy)");
     expect(mine).not.toContain("var(--rentee)"); // the blue fill it used to carry
     // And the fork is GONE, not merely equal. Two blocks holding the same values is how they came to
     // hold different ones.
@@ -926,8 +926,8 @@ describe("the dock's composer sends what the deal room sends, the way the deal r
     expect(input).toMatch(/border-radius:\s*999px/);
     expect(input).toMatch(/padding:\s*10px 14px/);
     expect(input).toMatch(/font-size:\s*12\.5px/);
-    expect(input.toLowerCase()).toContain("#f8fafc");
-    expect(input.toLowerCase()).toContain("#c8d8e8");
+    expect(input.toLowerCase()).toContain("var(--surface2)");
+    expect(input.toLowerCase()).toContain("var(--border-strong)");
     // The recorder renders `.ib`, and the deal room styles that under `.composer` — a selector that
     // does not reach this surface. Without a rule here the two new controls would be unstyled
     // buttons, which is the one way "reuse the component" quietly fails to look reused.

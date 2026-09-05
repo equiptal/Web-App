@@ -174,7 +174,8 @@ export function useItemVerdict(item: EquipmentItem) {
     return {
       notAvailable,
       sourcingRequested: !!item.sourcingRequested,
-      /** A no-match item never blocks and never posts, so the canvas shows it without gating on it. */
+      /** A no-match item the renter cannot act on never blocks and never posts, so the canvas shows
+       *  it without gating on it. An off-catalogue item he CAN name does both — see `isCustomLine`. */
       blocks: !notAvailable && !item.removed,
     };
   }, [item]);

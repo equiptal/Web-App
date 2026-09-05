@@ -38,7 +38,6 @@ export function ShareOnPost() {
   const c = t.intake.postShare;
   const { state, actions } = useRfq();
   const { tier } = useSession();
-  const [coach, setCoach] = useState(true);
   const [showAccount, setShowAccount] = useState(false);
   /**
    * ── The tick waits for the channel to be handed off (owner, 2026-09-03) ─────────────────────
@@ -146,30 +145,18 @@ export function ShareOnPost() {
   };
 
   return (
-    <section className={cx("relative mt-6 rounded-lg border border-border bg-surface p-6", coach && "pt-16")}>
-      {/* The coach mark: a pointer at the thing, dismissible, gone for good once dismissed. Not a
-          banner — a banner is permanent furniture, and this has one job on a renter's first visit.
-
-          ── It sits INSIDE the card now (owner, 2026-09-03) ──────────────────────────────────
-          ~~`-top-2.5` with `-translate-y-full`, which lifted it clear of the card and onto the page
-          above.~~ There is a page up there: it landed across «Ready to send», so the heading of the
-          screen was covered by a hint about one card on it.
-
-          It is anchored to the card's own top edge instead, and the card takes `pt-16` while it is
-          showing — the mark makes room for itself rather than being laid over the content it is
-          pointing at. Dismiss it and the padding goes with it.
-
-          `font-semibold`, not `font-extrabold` (same instruction): it is a hint, and it was set
-          heavier than the heading it was sitting on. */}
-      {coach && (
-        <div className="absolute top-3 start-6 z-10 flex items-center gap-2 rounded-md bg-navy px-3 py-2 text-label font-semibold text-surface">
-          {c.coach}
-          <button type="button" onClick={() => setCoach(false)} aria-label={t.common.close} className="text-surface/60 hover:text-surface">
-            <Icon name="close" size={12} />
-          </button>
-          <span aria-hidden className="absolute -bottom-1 start-5 h-2.5 w-2.5 rotate-45 bg-navy" />
-        </div>
-      )}
+    <section className="relative mt-6 rounded-lg border border-border bg-surface p-6">
+      {/*
+        * — The coach mark lived here —
+        *
+        * «Share with your supplier to bid», a navy tab pinned to the card's top edge, with the card
+        * taking `pt-16` to make room for it. Removed (owner, 2026-09-06).
+        *
+        * ⚠️ It was a hint pointing at a card that already says what it is: the heading, the
+        * supplier list and the Send button are all on screen underneath it. It cost sixteen pixels
+        * of padding plus its own height, at the top of the one screen where the supplier list and
+        * the message preview are both fighting for room.
+        */}
 
       {/* ── A refused post must SAY it was refused ─────────────────────────────────────────────
           The submit already carried everything needed to explain itself — `errorDetail` holds the

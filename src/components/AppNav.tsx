@@ -66,8 +66,18 @@ export function AppNav({ items }: { items: NavItem[] }) {
 
                Both states carry the same padding, so the row does not shift by a pixel when the
                active item changes — which is what the drawn rule was protecting. */
-            className={`whitespace-nowrap rounded-full px-4 py-1.5 text-body transition ${
-              active ? "bg-white font-extrabold text-navy" : "font-semibold text-white/70 hover:bg-surface/10 hover:text-white"
+            /* The TYPE is the OS's too (owner, 2026-09-06): its tabs are 12px at weight 500 in
+               white at 70%, where these were 13px at 600 — a heavier, larger row that read as a
+               different product's chrome even once the colours matched. `text-meta` (12.5px) is
+               this app's nearest step; its weight scale has three steps and no 500, so the resting
+               tab takes `font-normal` at a slightly stronger white rather than inventing a fourth.
+
+               The active PILL stays: it is the owner's own reference from 2026-08-26 — "the place
+               you are on drawn as a white lozenge" — and the OS's public pages show no active tab
+               to copy. Only its ink softens from extrabold to semibold, so the two states differ by
+               the fill rather than by two steps of weight. */
+            className={`whitespace-nowrap rounded-full px-4 py-1.5 text-meta transition ${
+              active ? "bg-white font-semibold text-navy" : "font-normal text-white/75 hover:bg-surface/10 hover:text-white"
             }`}
           >
             {it.label}
@@ -130,7 +140,7 @@ export function AppNavMobile({ items, children }: { items: NavItem[]; children?:
       {open && (
         <>
           {/* Under the sheet but over the page. The header is z-30, and the sheet has to clear it. */}
-          <div className="fixed inset-0 top-[62px] z-30 bg-navy/20" onClick={() => setOpen(false)} />
+          <div className="fixed inset-0 top-[62px] z-30 bg-navy-deep/20" onClick={() => setOpen(false)} />
           {/* Pinned to the VIEWPORT's edges rather than the button's, so it spans the bar's full
               width whichever end the button sits at — the row mirrors itself in Arabic. */}
           <div

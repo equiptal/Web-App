@@ -2,6 +2,65 @@
 
 ## Change log
 
+- **2026-09-06 - The nav bar wore the wrong navy, and now nothing paints outside the palette.**
+  Measured Supplier OS's own header rather than guessing: background `#1c2738` (`--navy-deep`, the
+  token file's `ink-deep`), 46px tall, tabs at 12px/500 in white at 70%. This bar was `--navy`
+  (`#22384e`) - the INK, one step lighter - with 13px/600 tabs, which is why it still read as another
+  product after the palette landed. Bar and type now match; the ACTIVE white pill stays (owner's own
+  reference, 2026-08-26) and the height stays 52px, because this row carries a 34px avatar, bell and
+  inbox that the OS's does not.
+  Files: `src/components/AppShell.tsx`, `src/components/AppNav.tsx`, `tests/unit/palette-drift.test.ts`.
+  ⚠️ The OS's tabs are weight 500 and this design system has three weights (400/600/800, lint-
+  enforced). The resting tab takes `font-normal` at white/75 rather than inventing a fourth.
+  Also: the drift guard now scans every `src/**/*.{ts,tsx,css}` for a raw hex, comments stripped -
+  exempt are `globals.css`, `ds-colors.ts`, the staging-only `UiPins` overlay, and two third-party
+  marks (WhatsApp `#25d366`, Google Play `#ffcd00`).
+
+- **2026-09-06 - The palette was bound but not USED: 330 raw colours in six stylesheets.**
+  `docs/design-tokens.md` is byte-identical to the file the owner handed over, and every hex in it was
+  already in `globals.css` (verified: 84 of 86, the two misses being the OS's own legacy `--color-ok`
+  alias). The app still did not look like Supplier OS because the prototype stylesheets - map, panel,
+  request cards, deal room, requests, comparison - carried their own palette from before the tokens:
+  navy `#16304f` against the token's `#22384e`, a blue `#2563eb` the OS palette does not contain, and
+  a bluish grey ramp where the OS is neutral. All 330 now read `var(--token)`.
+  Files: the six `*-proto.css` / `request-card.css`, `docs/design-tokens.md`,
+  `tests/unit/palette-drift.test.ts`, plus seven colour assertions in existing tests that pinned the
+  raw hexes and now pin the tokens.
+  ⚠️ Exempt on purpose: `#25d366` (WhatsApp's green, on the button that opens WhatsApp) and the
+  Google Play mark's `#ffcd00`. Someone else's brand is not one of our states.
+  ⚠️ `--action` (#1a7ec8) stays out of the palette and must not fold into `--info`: RM3-AC-33 says the
+  ask is blue and never navy, and this palette has no true blue.
+  Trap: a token file cannot be the source of truth while a stylesheet holds its own copy of the
+  answer, and nothing catches it - no test fails, the screen is merely the wrong colour. The new
+  guard reads the stylesheets, not the render.
+
+- **2026-09-06 - A machine the catalogue cannot place can be NAMED by the renter, and posted.**
+  A `no-match` line was drawn and then dropped (`postableItems`), so a renter whose only machine is
+  off-catalogue could not send a request at all, and the row promised "it won't be included". Now the
+  taxonomy trio STAYS on screen (unstarred, so a renter who can find his machine still can) with a
+  free-text name under it, seeded from `rawLabel` - his own words from his RFQ, so an untouched line
+  is already named - and the line posts carrying `customEquipmentName` and NO taxonomy ids. Reading
+  back, every surface branches on the backend's derived `isUndefined` flag, never on the ids.
+  Files: `src/lib/flags.ts`, `src/lib/contract/gates.ts` (`isCustomLine`, `customName`),
+  `src/lib/contract/draft.ts`, `src/lib/contract/app.ts`, `src/lib/api/app-adapters.ts`,
+  `src/components/create/MachineCard.tsx`, `src/components/create/Canvas.tsx`,
+  `src/lib/contract/{requests,request-fields,sibling-tabs,inbox,deal-room,bid-map}.ts`,
+  `src/lib/draftBidForm.ts`, `src/lib/i18n/{en,ar}.ts`, `tests/unit/custom-equipment.test.ts` (new).
+  Contract: `docs/plans/custom-equipment-request/web-app-changes.md`, written by the backend.
+  Trap: the three ids are OMITTED from the body, never sent as `null` - they are `.optional()` on the
+  backend, not `.nullable()`, so an explicit null 422s where an absent key passes. And ALL THREE go or
+  none do: a no-match line can arrive with a category id and no subtype (`deriveVerdict`), and a
+  partial triple is refused on purpose. The test asserts `"categoryId" in item === false`, because
+  `=== undefined` passes for a key that is present and null.
+  Trap: `customName` reads `customEquipment ?? rawLabel`, with `??` and never `||` - clearing the box
+  stores `""`, which is an ANSWER ("I have not named it") and must block, not fall back to the seed
+  and silently re-name the machine the renter just cleared.
+  ⚠️ Behind `NEXT_PUBLIC_CUSTOM_EQUIPMENT` (default OFF) and INERT until the backend is deployed:
+  `POST /agents/requests` still 422s an item with no ids. With the flag off every no-match line keeps
+  its old behaviour to the letter, which is what `canvas-no-match.test.tsx` still pins.
+  ⚠️ Such a request reaches NO supplier by broadcast, and DIRECT is no exception - the share link is
+  the only supplier-facing route, which is why the row's copy now names it.
+
 - **2026-09-05 - The compare table's phantom vertical scrollbar, for the second time.**
   The matrix was made to render at full height with the PAGE carrying it (2026-09-04), and a 130px
   scrollbar came back inside it anyway - over a screen with half a page of empty space beneath. Not a

@@ -8,7 +8,6 @@ import { postableItems } from "@/lib/contract";
 import { fetchRequestSubmissions, bidShareUrl, setBidDeadline, setShareLinkLogo } from "@/lib/api/client";
 import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
 import { pin } from "@/lib/uiPins";
-import { ProjectFiled } from "@/components/create/ProjectFiled";
 
 /**
  * AC-42 confirmation — "Your request is live" (prototype: Request Sent). Animated success hero,
@@ -192,20 +191,16 @@ export function Confirmation() {
         ar={ar}
         L={L}
       />
-      {/* PROJ (W-T24) — the offer, after a PROJECTLESS submit only. A renter who already filed
-          this under a site has been asked nothing and is asked nothing now.
-
-          It opens ITSELF as a dialog (owner, 2026-08-31): as a panel it sat under *View request &
-          bids*, which is the control a renter presses the moment this screen appears, so the offer
-          was below the thing that navigates away from it. No wrapper here — the dialog owns its own
-          geometry, and its own "already dismissed" check decides whether it renders at all. */}
-      {!draft?.projectId && draft && (
-        <ProjectFiled
-          requestId={state.requestUuids[0] ?? null}
-          project={draft.project}
-          preferences={draft.preferences}
-        />
-      )}
+      {/*
+        * — `ProjectFiled` lived here —
+        *
+        * 🔴 It only ever ran on THIS screen, and `CreateSurface` stopped rendering this screen for
+        * a post made from the share card. So every request posted that way was filed under no
+        * project at all, and no project was created for it either: not two projects, none.
+        *
+        * Moved to `CreateSurface`, beside `ShareOnPost` and outside the phase switch, for the same
+        * reason that card lives there — it has to survive which screen won.
+        */}
     </div>
   );
 }

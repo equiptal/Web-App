@@ -40,11 +40,25 @@ export interface SubtypeAttachmentOption {
   preSelected?: boolean;
 }
 
-/** One equipment line in POST /agents/requests. All 3 ids required (422 if null). */
+/**
+ * One equipment line in POST /agents/requests.
+ *
+ * Either **all three taxonomy ids**, or **`customEquipmentName` and none of them** (off-catalogue
+ * equipment the catalogue cannot place). Never neither, and never one or two: a partial triple is a
+ * 422 on purpose, because two of three ids resolves to nothing the matcher can use and would post a
+ * request that looks ordinary everywhere and reaches nobody.
+ *
+ * ⚠️ The ids are OMITTED for a custom line, never sent as `null`. They are `.optional()` on the
+ * backend, not `.nullable()`, so an explicit `null` fails validation where an absent key passes.
+ * `JSON.stringify` drops `undefined`, and `draftToCreateRequest` spreads each id in only when it has
+ * one.
+ */
 export interface CreateRequestItem {
-  categoryId: string;
-  subtypeId: string;
-  capacityId: string;
+  categoryId?: string;
+  subtypeId?: string;
+  capacityId?: string;
+  /** The renter's own name for a machine the catalogue cannot place. Trimmed, 1–120 chars. */
+  customEquipmentName?: string;
   /** Per-item equipment attachments: admin-defined SubtypeAttachment ids selected for this item.
    *  Backend `attachment_ids` (Json); the agents create schema defaults to []. */
   attachmentIds?: string[];

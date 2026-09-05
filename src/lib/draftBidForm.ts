@@ -20,7 +20,7 @@
  */
 
 import { resolveRef, type Taxonomy } from "@/lib/contract/taxonomy";
-import { postableItems } from "@/lib/contract/gates";
+import { customName, isCustomLine, postableItems } from "@/lib/contract/gates";
 import type { EquipmentItem, ProjectDetails } from "@/lib/contract/draft";
 import type { BidFormData, BidFormItem } from "@/lib/contract/link-bids";
 import type { Party } from "@/lib/contract/options";
@@ -45,9 +45,12 @@ function draftItem(it: EquipmentItem, project: ProjectDetails, taxonomy: Taxonom
   const { subcategory, measurement } = resolveRef(taxonomy, it.ref);
   // The taxonomy name is the one the supplier will read on the posted request; `rawLabel` is what the
   // renter happened to type, and is the fallback only while the item has not resolved to a node.
-  const label = taxName(subcategory, false) ?? it.agentNames?.subtype ?? it.rawLabel;
-  const labelAr = taxName(subcategory, true) ?? it.agentNames?.subtypeAr ?? null;
-  const size = taxName(measurement, false) ?? it.rawSize;
+  // Off-catalogue first: on a line the catalogue cannot place, the renter's own name is what the
+  // posted form will show the supplier, in both locales, so the preview must show the same.
+  const custom = isCustomLine(it) ? customName(it) : "";
+  const label = custom || taxName(subcategory, false) || it.agentNames?.subtype || it.rawLabel;
+  const labelAr = custom || taxName(subcategory, true) || it.agentNames?.subtypeAr || null;
+  const size = custom ? null : taxName(measurement, false) ?? it.rawSize;
   const safety = it.safetyCertsOverride ?? project.certificates.safety;
 
   return {
@@ -55,7 +58,7 @@ function draftItem(it: EquipmentItem, project: ProjectDetails, taxonomy: Taxonom
     label,
     labelAr,
     size,
-    sizeAr: taxName(measurement, true),
+    sizeAr: custom ? null : taxName(measurement, true),
     numberOfUnits: it.quantity,
     priceUnit: project.timing.rentalBasis ? BASIS[project.timing.rentalBasis] ?? null : null,
     deliveryBy: partyWord(it.deliveryOverride ?? project.deliveryToSite),

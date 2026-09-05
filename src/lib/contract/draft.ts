@@ -160,6 +160,21 @@ export interface EquipmentItem {
    * no-match item regardless (AC-33), and `itemBlocksAdvance` lets it through.
    */
   sourcingRequested?: boolean;
+  /**
+   * The renter's OWN name for a machine the catalogue cannot place (off-catalogue equipment).
+   *
+   * Set only on a `no-match` line, and the one thing that makes such a line postable: with it the
+   * request goes out carrying `customEquipmentName` and NO taxonomy ids; without it the line is
+   * dropped exactly as before (`postableItems`).
+   *
+   * ⚠️ Not `rawLabel`. That is the AGENT's echo of the words in the RFQ, a display aid we may
+   * re-derive at any time; this is the renter's answer, typed and owned by him. The box is prefilled
+   * from `rawLabel` at render time so the ordinary case costs one glance, but the prefill is never
+   * written into state — a value nobody looked at must not reach a supplier.
+   *
+   * Cleared when the renter picks a subtype: the line is no longer off-catalogue, and the ids win.
+   */
+  customEquipment?: string | null;
 
   // Per-item options:
   quantity: number; // AC-55 default 1, min 1

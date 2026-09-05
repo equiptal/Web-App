@@ -62,8 +62,12 @@ function mapRow(raw: Record<string, unknown>): InboxBid {
   const eq = (raw.equipment ?? {}) as Record<string, unknown>;
   const items = Array.isArray(req.equipmentItems) ? (req.equipmentItems as Record<string, unknown>[]) : [];
   const item0 = items[0] ?? {};
+  // Off-catalogue: the request's line has no taxonomy at all, so the renter's own words are the only
+  // name it has — in both locales, since he typed one language.
+  const custom = item0.isUndefined === true ? s(item0.customEquipmentName) : null;
   const equipmentName =
     [s(eq.manufacturer), s(eq.modelName)].filter(Boolean).join(" ") ||
+    custom ||
     s(item0.subtypeName) ||
     s(item0.categoryName) ||
     null;
@@ -93,15 +97,15 @@ function mapRow(raw: Record<string, unknown>): InboxBid {
       id: s(req.id) ?? "",
       displayId: s(req.displayId),
       shortCode: s(req.shortCode),
-      equipmentSummary: s(item0.subtypeName) ?? equipmentName,
+      equipmentSummary: custom ?? s(item0.subtypeName) ?? equipmentName,
       // `requestGroupId` collapses a multi-item RFQ's fan-out siblings — null until the backend adds it.
       groupId: s(req.requestGroupId) ?? s(req.groupId),
       location: s(req.projectAddressLabel),
     },
-    equipmentType: { id: s(item0.subtypeId) ?? s(item0.categoryId), name: s(item0.subtypeName) ?? s(item0.categoryName) ?? equipmentName },
+    equipmentType: { id: s(item0.subtypeId) ?? s(item0.categoryId), name: custom ?? s(item0.subtypeName) ?? s(item0.categoryName) ?? equipmentName },
     equipment: {
-      subtype: s(item0.subtypeName) ?? s(item0.categoryName),
-      subtypeAr: s(item0.subtypeNameAr) ?? s(item0.categoryNameAr),
+      subtype: custom ?? s(item0.subtypeName) ?? s(item0.categoryName),
+      subtypeAr: custom ?? s(item0.subtypeNameAr) ?? s(item0.categoryNameAr),
       size: s(item0.capacityName),
       sizeAr: s(item0.capacityNameAr),
     },

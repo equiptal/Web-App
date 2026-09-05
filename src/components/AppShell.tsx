@@ -303,7 +303,17 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
             white hairline rather than as an edge. The bar does not need one: it is navy, the page
             under it is not, and where the hero DOES sit under it the two navies meet and the join is
             the point — a rule drawn across it is the only thing that ever made it visible. */}
-        <header {...pin("app-header")} className="sticky top-0 z-30 flex h-[52px] items-center gap-3 bg-navy px-4 text-white sm:px-7 relative">
+        {/* ── The bar is the OS's bar (owner, 2026-09-06: *"like the nav bar is different, I see
+            it"*) ────────────────────────────────────────────────────────────────────────────────
+            Measured off Supplier OS's own header rather than guessed: `#1c2738` — `--navy-deep`,
+            the token file's `ink-deep` — not `--navy` (`#22384e`), which is the INK, one step
+            lighter, and which this bar had been wearing since it went dark on 2026-08-26. Two
+            products whose chrome is a shade apart read as two products, and that shade was the
+            most visible thing left after the palette landed.
+
+            Height stays 52px: the OS's is 46, but its row carries no 34px avatar, bell and inbox,
+            and shrinking those to reach parity would cost more than the six pixels are worth. */}
+        <header {...pin("app-header")} className="sticky top-0 z-30 flex h-[52px] items-center gap-3 bg-navy-deep px-4 text-white sm:px-7 relative">
           {/* ~~The Back arrow led this row.~~ It is on the PAGE now, under the bar (owner,
               2026-08-26) — see `usePageBack` and the block at the top of `<main>`. The bar carries
               only what is true of the app on every route; back is true of one page. */}

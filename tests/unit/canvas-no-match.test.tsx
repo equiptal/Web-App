@@ -8,6 +8,10 @@ import { confirmedProject, makeAgentDraft, makeItem, renderCanvas } from "../set
 /**
  * A machine the catalogue does not carry is SHOWN, and never sent (AC-30/31/33).
  *
+ * ⚠️ These describe the behaviour with `CUSTOM_EQUIPMENT_ENABLED` OFF, which is the default and the
+ * deployed state until the backend accepts an item with no taxonomy ids. Named off-catalogue
+ * equipment — the flag on, the renter's own name, the line posting — is `custom-equipment.test.ts`.
+ *
  * It used to be neither: the canvas drew `postableItems`, which drops a no-match row along with a
  * removed one, so the renter's own words vanished off the screen. Typed alone, the whole machine
  * panel disappeared and the page asked them to "add at least one machine" about the machine they
@@ -37,7 +41,7 @@ describe("a no-match machine is drawn, with a way to ask us for it", () => {
     // The panel is there at all — this is the regression, in one assertion.
     expect(screen.getByText("The machine")).toBeTruthy();
     // And it says what happened, in the renter's own words, with the way out beside it.
-    expect(screen.getByText(/couldn't find this in our catalogue/i)).toBeTruthy();
+    expect(screen.getByText(/don't have this equipment listed/i)).toBeTruthy();
     // Twice on purpose: once in «YOU WROTE», once on the card that says we cannot place it.
     expect(screen.getAllByText(/floating crane barge/i).length).toBeGreaterThan(0);
   });

@@ -30,3 +30,15 @@ export const BID_VERIFY_ENABLED = process.env.NEXT_PUBLIC_BID_VERIFY_ENABLED !==
  * email-only login (email lookup → send code / EMAIL_AMBIGUOUS / needsSignup) — no other change needed.
  */
 export const EMAIL_FIRST_AUTH_ENABLED: boolean = true;
+
+/**
+ * CUSTOM_EQUIPMENT_ENABLED — off-catalogue equipment: a `no-match` line the renter NAMES himself,
+ * posted with `customEquipmentName` and no taxonomy ids.
+ *
+ * OFF by default, and deliberately so: `POST /agents/requests` 422s an item with no ids until the
+ * backend half is deployed (migration → agents-equipment → marketplace/partner/admin), so turning
+ * this on early would refuse the whole request rather than degrade. With it off the create flow
+ * behaves exactly as before — a no-match line is shown, never named, and never posted.
+ * Set NEXT_PUBLIC_CUSTOM_EQUIPMENT=1 once that deploy is done.
+ */
+export const CUSTOM_EQUIPMENT_ENABLED = process.env.NEXT_PUBLIC_CUSTOM_EQUIPMENT === "1";

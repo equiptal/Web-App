@@ -480,7 +480,10 @@ export function BidMapWorkspace({
   // generic icon inside the pin. The taxonomy bucket differs per env, so the URL is rebuilt against
   // the public one exactly as the rest of the app does.
   const itemImageUrl = publicTaxonomyUrl(item?.subtypeImageUrl ?? item?.categoryImageUrl ?? null);
-  const itemName = (ar ? item?.subtypeNameAr ?? item?.subtypeName : item?.subtypeName ?? item?.subtypeNameAr) ?? item?.subtypeName ?? null;
+  // Off-catalogue: the line has no taxonomy name in either locale, so the renter's own words are it.
+  const customItemName = item?.isUndefined ? (item.customEquipmentName ?? "").trim() || null : null;
+  const itemName =
+    customItemName ?? (ar ? item?.subtypeNameAr ?? item?.subtypeName : item?.subtypeName ?? item?.subtypeNameAr) ?? item?.subtypeName ?? null;
 
   /* ── One opener for BOTH surfaces (owner, 2026-08-11) ──────────────────────────────────────────
      *"Clicking an equipment on the map must open the panel of this selected equipment."* A marker

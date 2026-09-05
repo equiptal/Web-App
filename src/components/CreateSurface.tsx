@@ -10,6 +10,7 @@ import { Processing } from "@/components/screens/Processing";
 import { Confirmation } from "@/components/screens/Confirmation";
 import { Canvas } from "@/components/create/Canvas";
 import { ReadyToSend } from "@/components/create/ReadyToSend";
+import { ProjectFiled } from "@/components/create/ProjectFiled";
 import { ShareOnPost } from "@/components/create/ShareOnPost";
 import { Icon } from "@/components/ui";
 import { btn } from "@/lib/ds";
@@ -127,6 +128,26 @@ export function CreateSurface() {
           he was writing next. Pinning it to `confirmation` says what it always meant: this card
           belongs to the review it is posting, and to the moment just after. */}
       {(state.readyToSend || (state.phase === "confirmation" && state.shareOnPost)) && <ShareOnPost />}
+
+      {/* ── Filing the request under a site, whichever screen won ─────────────────────────────
+          🔴 **It used to live inside `Confirmation`, and the share card replaced that screen.**
+          `shareOnPost` returns `<ReadyToSend />` in its place, so a request posted from the share
+          card was never filed under a project and no project was created for it either. Not a wrong
+          project: none at all, silently, since that branch was added on 2026-09-03.
+
+          Here for the same reason `ShareOnPost` is here: it must outlive the question of which
+          screen is showing. It draws its own dialog and returns null when it has nothing to say, so
+          rendering it costs nothing on the paths where it does not apply.
+
+          ⚠️ Gated on `confirmation`, so it runs after a post and never during the review, and on
+          a PROJECTLESS draft — a renter who already filed this under a site is asked nothing. */}
+      {state.phase === "confirmation" && state.draft && !state.draft.projectId && (
+        <ProjectFiled
+          requestId={state.requestUuids[0] ?? null}
+          project={state.draft.project}
+          preferences={state.draft.preferences}
+        />
+      )}
       {/* The shared dialog, not a scrim of its own (owner, 2026-08-28: one design for every modal).
           This drew `bg-black/50` where the system's scrim is navy at 45%, and its own panel and
           heading with no way out but the two buttons — a prompt with no close is the one thing a

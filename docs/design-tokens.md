@@ -17,6 +17,19 @@
 > ⚠️ **Two families in `globals.css` are deliberately NOT from this file**: the `--shop-*` storefront
 > palette, matched to the storefront prototype at the owner's instruction on 2026-09-01, and
 > `--gold`, which is the mark's own colour rather than a UI state.
+>
+> **The stylesheets read it too, since 2026-09-06.** Binding the palette in `globals.css` was only
+> half the job: six prototype stylesheets — the bid map, its panel, the request cards, the deal room,
+> the requests surfaces and the comparison — still carried **330 raw colours of their own**, written
+> before this file existed. A different navy (`#16304f` against `#22384e`), a blue (`#2563eb`) that
+> is not in this palette at all, and a bluish grey ramp where this one is neutral. That is why the app
+> still did not look like the OS after the tokens landed. All 330 now read `var(--token)`;
+> `tests/unit/palette-drift.test.ts` fails if a raw hex comes back.
+>
+> ⚠️ Two colours are exempt and stay raw: **`#25d366`**, WhatsApp's own green on the button that opens
+> WhatsApp, and the Google Play mark's `#ffcd00` in the bid form. Someone else's brand is not one of
+> our states. The map's **`--action` (`#1a7ec8`)** is also not from this file, and must not be folded
+> into `--info`: RM3-AC-33 says the ask is blue and never navy, and this palette has no true blue.
 
 # Supplier OS — Colors & Fonts
 

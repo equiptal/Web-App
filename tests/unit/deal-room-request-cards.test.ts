@@ -390,7 +390,7 @@ describe("`partial` — one card, amber, on both surfaces", () => {
     ];
     for (const rule of partialRules) {
       expect(rule).not.toContain("--success");
-      expect(rule).not.toContain("#16a34a");
+      expect(rule).not.toContain("var(--ok)");
     }
   });
 

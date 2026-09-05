@@ -143,9 +143,22 @@ export type Urgency = "ASAP" | "SOON" | "FAR_FUTURE" | string;
 /** One enriched equipment line as the backend returns it (taxonomy names folded in). */
 export interface RequestItem {
   id?: string;
+  /** ⚠️ For an off-catalogue line these come back as the EMPTY STRING, not null — they are NOT NULL
+   *  columns and `''` is the backend's sentinel. Never render them, and never test for `''`:
+   *  {@link RequestItem.isUndefined} is the contract. */
   categoryId: string | null;
   subtypeId: string | null;
   capacityId: string | null;
+  /**
+   * The renter's own name for a machine the catalogue cannot place, and the flag that says to read
+   * it. `isUndefined` is DERIVED by the backend on every read, never stored — branch on it, never
+   * recompute it from the ids.
+   *
+   * On such a line every taxonomy name is null in BOTH locales: the renter typed one language, and
+   * both locales show his words rather than an invented translation.
+   */
+  customEquipmentName?: string | null;
+  isUndefined?: boolean;
   categoryName: string | null;
   categoryNameAr: string | null;
   subtypeName: string | null;
@@ -380,12 +393,31 @@ export function publicTaxonomyUrl(value: string | null | undefined): string | nu
   return `${TAXONOMY_ASSET_BASE}/${enc}`;
 }
 
-/** Best-effort item display name from the enriched taxonomy names (EN or AR). */
-function itemName(it: RequestItem, ar: boolean): string {
+/**
+ * Best-effort item display name from the enriched taxonomy names (EN or AR).
+ *
+ * An off-catalogue line has no taxonomy at all, so it reads the renter's own words instead — the
+ * same words in both locales, because he typed one language and we do not invent the other.
+ */
+export function itemName(it: RequestItem, ar: boolean): string {
+  const custom = customEquipmentLabel(it);
+  if (custom) return custom;
   const parts = ar
     ? [it.subtypeNameAr ?? it.subtypeName, it.capacityNameAr ?? it.capacityName]
     : [it.subtypeName, it.capacityName];
   return parts.filter(Boolean).join(" · ") || (ar ? it.categoryNameAr ?? "" : it.categoryName ?? "") || "—";
+}
+
+/**
+ * The renter's name for an off-catalogue line, or "" for an ordinary one — the one place the
+ * `isUndefined` branch is written, so no surface has to remember it.
+ *
+ * Accepts the loose shape every projection shares (the inbox, the deal room and the chat dock each
+ * carry their own item type) rather than only {@link RequestItem}.
+ */
+export function customEquipmentLabel(it: { isUndefined?: boolean | null; customEquipmentName?: string | null } | null | undefined): string {
+  if (!it?.isUndefined) return "";
+  return (it.customEquipmentName ?? "").trim();
 }
 
 /** Pull the list array out of whatever envelope the backend uses. */

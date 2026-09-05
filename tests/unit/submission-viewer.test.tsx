@@ -170,7 +170,9 @@ describe("the terms step reads back as answered", () => {
   it("counts the answered terms over the asked ones", async () => {
     // Six asked (one contract term + five item terms); `nationality` was never answered.
     const terms = await step("Terms");
-    expect(within(terms).getByText("5 / 6")).toBeTruthy();
+    // `findBy`, not `getBy`: the heading is drawn from the submission alone, but the COUNT needs the
+    // request's form payload, which lands a tick later (and later still under the whole suite).
+    expect(await within(terms).findByText("5 / 6", {}, { timeout: 5000 })).toBeTruthy();
     expect(within(terms).getByText("answered")).toBeTruthy();
   });
 
@@ -236,6 +238,9 @@ describe("the money", () => {
     // would undo that and print rows a renter cannot add. Read the printed figures back and add them.
     draw();
     await screen.findByText("The quotation");
+    // The card draws from the submission alone, but its FIGURES need the request's period, which
+    // arrives with the form payload — so wait for the prorated caption, not just the heading.
+    await screen.findAllByText(new RegExp(`${money.rental.billable} billable days`), {}, { timeout: 5000 });
     const card = screen.getByText("The quotation").closest("div")!.parentElement!;
     const text = (card.textContent ?? "").replace(/\s+/g, " ");
     // The first figure printed after each label. Each of the three appears once in this card.
@@ -255,6 +260,9 @@ describe("the money", () => {
   it("splits the quotation into the lines the supplier priced", async () => {
     draw();
     await screen.findByText("The quotation");
+    // The card draws from the submission alone, but its FIGURES need the request's period, which
+    // arrives with the form payload — so wait for the prorated caption, not just the heading.
+    await screen.findAllByText(new RegExp(`${money.rental.billable} billable days`), {}, { timeout: 5000 });
     const card = screen.getByText("The quotation").closest("div")!.parentElement!;
     const text = (card.textContent ?? "").replace(/\s+/g, " ");
     expect(text).toContain("Rental");

@@ -422,8 +422,8 @@ describe("the card carries three things, and the ask is the largest of them", ()
     // button the same ink would have turned the FIGURE blue: *"keep the font of distance red"*. One
     // fact, one ink — the number and how trustworthy it is are a single statement.
     expect(list).not.toContain("askAvailability.colour");
-    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-yard.no,")).toMatch(/color:\s*#d9362a/);
-    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-yard.ok {")).toMatch(/color:\s*#0d6c38/);
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-yard.no,")).toMatch(/color:\s*var\(--danger\)/);
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-yard.ok {")).toMatch(/color:\s*var\(--ok-deep\)/);
     // The figure itself never sets its own colour — it inherits the state's.
     expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-km {")).toMatch(/color:\s*currentColor/);
   });

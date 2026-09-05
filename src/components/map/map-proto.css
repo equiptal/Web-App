@@ -66,7 +66,7 @@
   max-height: 100dvh;
   overflow: hidden;
   font-size: 14px;
-  color: #16304f;
+  color: var(--navy);
 }
 
 /* ── ONE interaction language for the whole surface ──────────────────────────────────────────────
@@ -88,7 +88,7 @@
 .bidmap button:not(:disabled) { cursor: pointer; }
 .bidmap button:not(:disabled):hover { filter: brightness(0.975); }
 .bidmap button:not(:disabled):active { transform: translateY(1px) scale(0.995); }
-.bidmap button:focus-visible { outline: 2px solid #16304f; outline-offset: 2px; }
+.bidmap button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 /* Rows and cells the renter picks from — the prototype's shared names for a pressable row (documents,
    eligibility cells, list items). Kept under the prototype's own class names so a surface that mounts
    inside this panel inherits the vocabulary instead of re-deriving it. */
@@ -96,7 +96,7 @@
 .bidmap .dpRow:hover { transform: translateY(-1px); }
 .bidmap .dpCell { transition: transform 0.15s ease; }
 .bidmap .dpCell:hover { transform: translateY(-1px); }
-.bidmap input:focus { border-color: #16304f; outline: 3px solid color-mix(in srgb, var(--navy-deep) 13%, transparent); outline-offset: 0; }
+.bidmap input:focus { border-color: var(--navy); outline: 3px solid color-mix(in srgb, var(--navy-deep) 13%, transparent); outline-offset: 0; }
 .bidmap input, .bidmap .dpRow, .bidmap .dpCell { -webkit-tap-highlight-color: transparent; }
 
 /* The ground under the tiles, seen while they load and in the gutters of a fit. Pale, because the
@@ -107,10 +107,10 @@
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  background: #f2eee9;
+  background: var(--sand);
 }
-.bidmap .bm-leaflet { position: absolute; inset: 0; z-index: 0; background: #f2eee9; }
-.bidmap .bm-leaflet .leaflet-container { height: 100%; width: 100%; background: #f2eee9; font: inherit; }
+.bidmap .bm-leaflet { position: absolute; inset: 0; z-index: 0; background: var(--sand); }
+.bidmap .bm-leaflet .leaflet-container { height: 100%; width: 100%; background: var(--sand); font: inherit; }
 
 /* ── The project pin — `siteIcon()`, decoded lines 262–265 ────────────────────────────────────────
    A `divIcon`, so Leaflet's own LTR canvas is overridden per pin (AC-30, AC-98).
@@ -128,7 +128,7 @@
      `iconAnchor` of [20,40] is where it lands. */
   border-radius: 50% 50% 50% 0;
   transform: rotate(-45deg);
-  background: #16304f;
+  background: var(--navy);
   border: 2px solid var(--surface);
   box-sizing: border-box;
   /* Blue-cast, and deliberately not a neutral drop: the prototype's own value. */
@@ -152,7 +152,7 @@
   /* Genuinely `var(--navy-deep)` and NOT the `deep` token — the prototype hard-codes this one ink on the site
      label (decoded line 265), which is how `var(--navy-deep)` got mistaken for `deep` in the first place. Left
      literal so correcting `deep` cannot silently move it. */
-  color: #0f2238;
+  color: var(--navy-deep);
 
   /* Ours, not the prototype's: the label may carry the request's own address string after «مشروعك»,
      and an unbounded one would run the width of the map. */
@@ -350,7 +350,7 @@
   /* Blue, like every other selection cue on this surface — and like the blue ring the disc takes.
      The prototype's own tick is `C.blue`, which in its palette IS the navy; ours follows AC-33's
      blue instead, the same override the ask control records. */
-  background: #2563eb;
+  background: var(--action);
   color: var(--surface);
   font-size: 10px;
   font-weight: 900;
@@ -415,12 +415,12 @@
 .bm-pin .bm-pin-tag {
   margin-top: 5px;
   background: var(--surface);
-  border: 1px solid #e1e9f1;
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 2px 8px;
   font-size: 9.5px;
   font-weight: 800;
-  color: #16304f;
+  color: var(--navy);
   white-space: nowrap;
 
   animation: dpTagIn 0.3s ease 0.1s both;
@@ -474,7 +474,7 @@
   font-size: 13px;
   font-weight: 800;
   line-height: 1.35;
-  color: #16304f;
+  color: var(--navy);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -532,12 +532,12 @@
   white-space: nowrap;
 }
 .bm-pin .bm-pinfo-cert.held {
-  color: #0d6c38;
+  color: var(--ok-deep);
   background: color-mix(in srgb, var(--ok-deep) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--ok-deep) 32%, transparent);
 }
 .bm-pin .bm-pinfo-cert.missing {
-  color: #a82c22;
+  color: var(--danger-press);
   background: color-mix(in srgb, var(--danger) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--danger) 32%, transparent);
 }
@@ -563,7 +563,7 @@
   align-items: center;
   gap: 8px;
   background: rgba(255, 255, 255, 0.97);
-  border: 1px solid #e1e9f1;
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 7px 13px;
   font-size: 10.5px;
@@ -575,7 +575,7 @@
   height: 12px;
   border-radius: 50%;
   border: 2px solid color-mix(in srgb, var(--action) 25%, transparent);
-  border-top-color: #2563eb;
+  border-top-color: var(--action);
   animation: bmSpin 0.8s linear infinite;
 }
 @keyframes bmSpin { to { transform: rotate(360deg); } }
@@ -592,11 +592,11 @@
   inset-inline-end: 18px;
   max-width: min(330px, calc(100% - 130px));
   background: rgba(255, 255, 255, 0.97);
-  border: 1px solid #e1e9f1;
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 10px 13px;
 }
-.bidmap .bm-info-t { font-size: 10.5px; font-weight: 800; color: #16304f; }
+.bidmap .bm-info-t { font-size: 10.5px; font-weight: 800; color: var(--navy); }
 .bidmap .bm-info-s { font-size: 9.5px; font-weight: 600; color: var(--muted); margin-top: 4px; line-height: 1.7; }
 
 /* A request with no `projectLat/Lng` still renders the canvas (AC-21) — it just says so. */
@@ -608,7 +608,7 @@
   inset-inline-end: 18px;
   max-width: 300px;
   background: rgba(255, 255, 255, 0.97);
-  border: 1px solid #e1e9f1;
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 10px 13px;
   font-size: 11px;
@@ -656,9 +656,9 @@
      the pills and the shortfall each carry their own fill; making the column white behind them left
      the pills and the shortfall floating on one shade and the list on another. The takeovers
      (`.mp`, `.mp-over`) set their own white and are unaffected. */
-  background: #edf2f7;
+  background: var(--surface2);
   /* The divider is on whichever edge FACES THE MAP, which is now the trailing one. */
-  border-inline-end: 1px solid #e1e9f1;
+  border-inline-end: 1px solid var(--border);
 }
 
 /* ── The resize grip ─────────────────────────────────────────────────────────────────────────────
@@ -685,14 +685,14 @@
   width: 3px;
   height: 46px;
   border-radius: 999px;
-  background: #c8d8e8;
+  background: var(--border-strong);
   opacity: 0;
   transition: opacity 0.14s ease, background 0.14s ease;
 }
 .bidmap .bm-resize:hover .bm-resize-grip,
 .bidmap .bm-resize:focus-visible .bm-resize-grip { opacity: 1; }
-.bidmap .bm-resize:focus-visible { outline: 2px solid #16304f; outline-offset: -2px; }
-.bidmap .bm-resize:active .bm-resize-grip { opacity: 1; background: #2563eb; }
+.bidmap .bm-resize:focus-visible { outline: 2px solid var(--navy); outline-offset: -2px; }
+.bidmap .bm-resize:active .bm-resize-grip { opacity: 1; background: var(--action); }
 @media (prefers-reduced-motion: reduce) {
   .bidmap .bm-resize-grip { transition: none; }
 }
@@ -706,7 +706,7 @@
    The gradient and the sheen are the prototype's too. The sheen sweeps ONCE on open (`dpSheen`, one of
    the five keyframes §7 recorded as missing from the extract) — the panel reads as handed over rather
    than swapped. `overflow: hidden` is what keeps the 42% band inside the header. */
-.bidmap .bm-head { flex-shrink: 0; border-bottom: 1px solid #e1e9f1; }
+.bidmap .bm-head { flex-shrink: 0; border-bottom: 1px solid var(--border); }
 /* The 64 px band is the IDENTITY ROW, not the whole header. RM3-AC-02 keeps the documents entry in
    the header — a test asserts it by reading that region — and a fixed 64 px with `overflow: hidden`
    around both would have clipped the entry rather than merely crowding it. */
@@ -799,14 +799,14 @@
   gap: 6px;
   max-width: 150px;
   padding: 3px 9px 3px 3px;
-  border: 1px solid #e1e9f1;
+  border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface);
   cursor: pointer;
   font-family: inherit;
 }
 [dir="rtl"] .bidmap .bm-sib { padding: 3px 3px 3px 9px; }
-.bidmap .bm-sib:hover { border-color: #c8d8e8; }
+.bidmap .bm-sib:hover { border-color: var(--border-strong); }
 /* The one on screen: brand-tinted and NOT pressable. It is a position marker, not a destination. */
 .bidmap .bm-sib.on {
   border-color: color-mix(in srgb, var(--brand) 40%, transparent);
@@ -821,8 +821,8 @@
   place-items: center;
   overflow: hidden;
   border-radius: 999px;
-  background: #eef4fa;
-  color: #16304f;
+  background: color-mix(in srgb, var(--action) 8%, white);
+  color: var(--navy);
   font-size: 10px;
   font-weight: 800;
 }
@@ -834,13 +834,13 @@
   white-space: nowrap;
   font-size: 11px;
   font-weight: 700;
-  color: #16304f;
+  color: var(--navy);
 }
 .bidmap .bm-sib.on .bm-sib-n { color: var(--brand-deep); }
 .bidmap .bm-title {
   font-size: 16px;
   font-weight: 800;
-  color: #16304f;
+  color: var(--navy);
   /* The name asks for its own WIDTH, and the chip is what yields (owner, 2026-08-19/20).
      `min-width: 0` let the name absorb every pixel the chip and the documents pill wanted, since
      `nowrap` with `overflow: hidden` gives an element a min-content width of nothing — that is how it
@@ -870,7 +870,7 @@
   flex-shrink: 0;
   font-size: 10px;
   font-weight: 800;
-  color: #16a34a;
+  color: var(--ok);
   background: color-mix(in srgb, var(--ok-deep) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent);
   border-radius: 999px;
@@ -890,7 +890,7 @@
   align-items: center;
   gap: 5px;
   background: var(--surface);
-  border: 1px solid #c8d8e8;
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   padding: 5px 10px;
   font-size: 10.5px;
@@ -951,14 +951,14 @@
   align-items: baseline;
   gap: 5px;
   background: var(--surface);
-  border: 1px solid #e1e9f1;
+  border: 1px solid var(--border);
   border-radius: 999px;
   /* `3px 9px`, from `4px 11px` — the pill is read once, and the number inside it is what carries the
      weight, not the ring of white around the number. */
   padding: 3px 9px;
   white-space: nowrap;
 }
-.bidmap .bm-pill-n { font-size: 12.5px; font-weight: 800; color: #16304f; }
+.bidmap .bm-pill-n { font-size: 12.5px; font-weight: 800; color: var(--navy); }
 .bidmap .bm-pill-l { font-size: 10px; font-weight: 700; color: var(--muted); }
 
 /* ── V4 · shortfall alert (§6.3) ─────────────────────────────────────────────────────────────────
@@ -1013,7 +1013,7 @@
   flex-shrink: 0;
   background: var(--surface);
   border: 1px solid color-mix(in srgb, var(--action) 22%, transparent);
-  color: #2563eb;
+  color: var(--action);
   border-radius: var(--radius-sm);
   padding: 4px 9px;
   font-size: 10px;
@@ -1040,7 +1040,7 @@
   min-height: 0;
   overflow-y: auto;
   padding: 11px 14px;
-  background: #edf2f7;
+  background: var(--surface2);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1057,7 +1057,7 @@
   flex-shrink: 0;
   width: 100%;
   background: var(--surface);
-  border: 1.5px dashed #c8d8e8;
+  border: 1.5px dashed var(--border-strong);
   color: var(--navy);
   border-radius: var(--radius-md);
   padding: 11px;
@@ -1095,7 +1095,7 @@
   position: relative;
   flex-shrink: 0;
   background: var(--surface);
-  border: 1.5px solid #e1e9f1;
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;
 
@@ -1105,13 +1105,13 @@
   transition: 0.15s;
   animation: dpCardIn 0.34s cubic-bezier(0.22, 0.9, 0.3, 1) both;
 }
-.bidmap .bm-eq:hover { border-color: #b9c9d8; }
+.bidmap .bm-eq:hover { border-color: var(--border-strong); }
 
 /* ── SELECTED, and unmistakably so (owner, 2026-08-28) ───────────────────────────────────────────
    ~~A navy border and a pale slate fill.~~ Withdrawn on sight: *"the selected card show navy borders
    but it doesnt seem as selected"*. Two things were working against it. The border went from 1.5px
-   #e1e9f1 to 1.5px navy — a colour change at a width the eye reads as the card's outline either way
-   — and `#f2f6fa` against `var(--surface)` is a two-percent step that the panel's own background
+   var(--border) to 1.5px navy — a colour change at a width the eye reads as the card's outline either way
+   — and `var(--surface2)` against `var(--surface)` is a two-percent step that the panel's own background
    already sits at. Nothing about the card CHANGED SHAPE, so nothing announced.
 
    What announces now: the border doubles to 2.5px and takes an inset navy ring at .12, so the edge
@@ -1120,7 +1120,7 @@
    surface's colours belong to the machines — it is simply louder in the one channel that reads as
    chosen at a glance down a column. */
 /* **The fill is gone** (owner, 2026-08-31: *"selecting a card only highlight its borders but doesnt
-   make it grey"*). `#eaf1f8` under the content was the one channel of selection that touched what
+   make it grey"*). `color-mix(in srgb, var(--action) 8%, white)` under the content was the one channel of selection that touched what
    the card SAYS — it greyed the photograph's surround and cooled every value on it, and the card's
    own states are already carrying colour that must not move. The outline does the whole job: a
    2.5px navy border, the accent bar down the leading edge, and the file control going navy. */
@@ -1130,7 +1130,7 @@
   border-width: 2.5px;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--navy) 12%, transparent);
 }
-.bidmap .bm-eq.on:hover { border-color: #16304f; }
+.bidmap .bm-eq.on:hover { border-color: var(--navy); }
 .bidmap .bm-eq .bm-eq-acc {
   position: absolute;
   z-index: 2;
@@ -1140,7 +1140,7 @@
   width: 6px;
   /* Decoration over the stretched select button — it must never eat the click on the card's edge. */
   pointer-events: none;
-  background: linear-gradient(180deg, var(--navy), #16304f);
+  background: linear-gradient(180deg, var(--navy), var(--navy));
   /* Its OWN arrival, faster than the card's (decoded 3974). The accent appears when the renter selects
      a card that is already on screen, so it has to animate on its own account — the card's `dpCardIn`
      ran once, at list build, and never runs again. */
@@ -1160,7 +1160,7 @@
   cursor: pointer;
   font-family: inherit;
 }
-.bidmap .bm-eq .bm-eq-select:focus-visible { outline: 2px solid #16304f; outline-offset: -3px; }
+.bidmap .bm-eq .bm-eq-select:focus-visible { outline: 2px solid var(--navy); outline-offset: -3px; }
 
 /* ── The machine's own picture, back where it was (owner, 2026-08-29) ────────────────────
    *"I want the images of the front image of equipment back."* It was cut on 08-28 as furniture and it
@@ -1190,13 +1190,13 @@
   align-items: center;
   justify-content: center;
   background-color: var(--surface2);
-  background-image: linear-gradient(90deg, #e8eff6 20%, #f4f8fc 40%, #e8eff6 60%);
+  background-image: linear-gradient(90deg, var(--surface2) 20%, var(--surface2) 40%, var(--surface2) 60%);
   background-size: 220% 100%;
   animation: dpShimmer 1.25s linear infinite;
-  border-inline-end: 1px solid #e1e9f1;
+  border-inline-end: 1px solid var(--border);
 }
 .bidmap .bm-eq .bm-eq-photo.is-empty { background-image: none; animation: none; }
-.bidmap .bm-eq .bm-eq-photo:focus-visible { outline: 2px solid var(--action, #2563eb); outline-offset: -3px; }
+.bidmap .bm-eq .bm-eq-photo:focus-visible { outline: 2px solid var(--action, var(--action)); outline-offset: -3px; }
 .bidmap .bm-eq .bm-eq-art { width: 100%; height: 100%; object-fit: cover; transition: transform 0.35s cubic-bezier(0.22, 0.9, 0.3, 1); }
 .bidmap .bm-eq:hover .bm-eq-art { transform: scale(1.06); }
 .bidmap .bm-eq .bm-eq-nophoto { font-size: 9.5px; font-weight: 700; color: var(--muted); text-align: center; padding: 0 6px; }
@@ -1246,12 +1246,12 @@
    column then begins and ends on the same two verticals, which is the whole point of the layout —
    a 54px bar floating mid-row was a third alignment in a column that has two. */
 .bidmap .bm-eq .bm-eq-rd { display: flex; flex: 1; min-width: 0; align-items: center; gap: 8px; }
-.bidmap .bm-eq .bm-eq-rdbar { display: block; flex: 1; min-width: 24px; height: 5px; border-radius: 999px; background: #dbe6ef; overflow: hidden; }
-.bidmap .bm-eq .bm-eq-rdfill { display: block; height: 100%; border-radius: 999px; background: #c8d8e8; transition: width 0.25s ease; }
+.bidmap .bm-eq .bm-eq-rdbar { display: block; flex: 1; min-width: 24px; height: 5px; border-radius: 999px; background: var(--border-mid); overflow: hidden; }
+.bidmap .bm-eq .bm-eq-rdfill { display: block; height: 100%; border-radius: 999px; background: var(--border-strong); transition: width 0.25s ease; }
 .bidmap .bm-eq .bm-eq-rdn { font-size: 10px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
-.bidmap .bm-eq .bm-eq-rd.green .bm-eq-rdfill { background: #16a34a; }
+.bidmap .bm-eq .bm-eq-rd.green .bm-eq-rdfill { background: var(--ok); }
 .bidmap .bm-eq .bm-eq-rd.yellow .bm-eq-rdfill { background: var(--warn-deep); }
-.bidmap .bm-eq .bm-eq-rd.red .bm-eq-rdfill { background: #d9362a; }
+.bidmap .bm-eq .bm-eq-rd.red .bm-eq-rdfill { background: var(--danger); }
 
 /* «Details ›» as a word is gone (owner, 2026-08-28). The icon is the file under a magnifier, which is
    what the control has always done, and it costs the card no line of its own.
@@ -1268,19 +1268,19 @@
   width: 28px;
   height: 28px;
   padding: 0;
-  background: #f2f6fa;
-  border: 1px solid #e1e9f1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  color: #5b7794;
+  color: var(--navy-mid);
   cursor: pointer;
   font-family: inherit;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
-.bidmap .bm-eq .bm-eq-open:hover { background: var(--surface); border-color: #c8d8e8; color: #16304f; }
+.bidmap .bm-eq .bm-eq-open:hover { background: var(--surface); border-color: var(--border-strong); color: var(--navy); }
 /* On a selected card the ground IS `var(--background)`, so the tint above would vanish into it — the control
    goes navy instead, which is the slate the accent bar already uses. */
 .bidmap .bm-eq.on .bm-eq-open { background: var(--navy); border-color: var(--navy); color: var(--surface); }
-.bidmap .bm-eq.on .bm-eq-open:hover { background: #16304f; border-color: #16304f; }
+.bidmap .bm-eq.on .bm-eq-open:hover { background: var(--navy); border-color: var(--navy); }
 
 /* ── The distance, and it IS the card ────────────────────────────────────────────────────────────
    The dominant object, painted with the one thing that qualifies it: whether the supplier has
@@ -1317,7 +1317,7 @@
    tone is the same across all even if selected."*
 
    These fills were `color-mix(…, transparent)` — a tint, which composites over whatever is behind
-   it. On a selected card that is `#eaf1f8` rather than white, so the same machine's green went one
+   it. On a selected card that is `color-mix(in srgb, var(--action) 8%, white)` rather than white, so the same machine's green went one
    step cooler the moment the renter pressed it, and a column with one card selected showed two
    greens for one state. The reader then has to decide whether the difference means anything. It
    does not: availability is a fact about the SUPPLIER, and selection is a fact about the renter's
@@ -1327,7 +1327,7 @@
    the ground under it cannot reach through. Every other channel of selection — the border, the fill,
    the accent bar, the file icon — is untouched and still says which card is chosen. */
 .bidmap .bm-eq .bm-eq-yard.ok {
-  color: #0d6c38;
+  color: var(--ok-deep);
   background: color-mix(in srgb, var(--ok-deep) 10%, var(--surface));
   border-color: color-mix(in srgb, var(--ok) 34%, var(--surface));
 }
@@ -1337,13 +1337,13 @@
 .bidmap .bm-eq .bm-eq-yard.asked {
   pointer-events: auto;
   cursor: pointer;
-  color: #d9362a;
+  color: var(--danger);
   background: color-mix(in srgb, var(--danger-deep) 10%, var(--surface));
   border-color: color-mix(in srgb, var(--danger-deep) 30%, var(--surface));
 }
 .bidmap .bm-eq .bm-eq-yard.no:hover,
 .bidmap .bm-eq .bm-eq-yard.asked:hover { background: color-mix(in srgb, var(--danger-deep) 16%, var(--surface)); }
-.bidmap .bm-eq .bm-eq-yard.asked { color: #a82c22; }
+.bidmap .bm-eq .bm-eq-yard.asked { color: var(--danger-press); }
 .bidmap .bm-eq .bm-eq-yard:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 
 .bidmap .bm-eq .bm-eq-dist { display: inline-flex; align-items: baseline; gap: 5px; min-width: 0; overflow: hidden; }
@@ -1369,7 +1369,7 @@
   font-size: 12.5px;
   font-weight: 700;
   line-height: 1.35;
-  color: #16304f;
+  color: var(--navy);
   /* ~~Centred under the distance.~~ The card's bottom LEADING corner (owner, 2026-08-31): the name
      is what the renter reads last and quotes back, and a name on the reading edge is findable down a
      column in a way a centred one is not. `margin-top: auto` is what pins it to the bottom of a text
@@ -1409,7 +1409,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid #e1e9f1;
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: 0 18px 48px color-mix(in srgb, var(--navy) 28%, transparent);
@@ -1433,10 +1433,10 @@
   align-items: center;
   gap: 10px;
   padding: 0 14px;
-  border-bottom: 1px solid #e1e9f1;
-  background: linear-gradient(180deg, #fbfdff, #f2f7fc);
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--surface), var(--surface2));
 }
-.bm-eqyx-t { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 800; color: #16304f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bm-eqyx-t { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 800; color: var(--navy); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* `.bm-eqfp-x`'s twin, unscoped, for the same reason the rest of this block is unscoped. */
 .bm-eqyx-x {
   flex-shrink: 0;
@@ -1445,7 +1445,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #e1e9f1;
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--muted);
@@ -1453,7 +1453,7 @@
   font-family: inherit;
 }
 .bm-eqyx-x .material-icons-outlined { font-size: 16px; }
-.bm-eqyx-x:hover { border-color: #c8d8e8; color: #16304f; }
+.bm-eqyx-x:hover { border-color: var(--border-strong); color: var(--navy); }
 /* Scrolls only if a long machine name and three lines outgrow 560px, which on a phone they can. */
 .bm-eqyx-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 14px; }
 .bm-eqyx-eq {
@@ -1462,12 +1462,12 @@
   gap: 3px;
   padding: 10px 12px;
   border-radius: var(--radius-md);
-  background: #f2f6fa;
-  border: 1px solid #dbe6ef;
+  background: var(--surface2);
+  border: 1px solid var(--border-mid);
 }
-.bm-eqyx-name { font-size: 12.5px; font-weight: 800; color: #16304f; }
+.bm-eqyx-name { font-size: 12.5px; font-weight: 800; color: var(--navy); }
 .bm-eqyx-km { font-size: 11px; font-weight: 700; color: var(--muted); }
-.bm-eqyx-p { margin: 0; font-size: 12px; font-weight: 600; line-height: 1.85; color: #16304f; }
+.bm-eqyx-p { margin: 0; font-size: 12px; font-weight: 600; line-height: 1.85; color: var(--navy); }
 
 /* ── The tutorial (owner, 2026-08-31) ────────────────────────────────────────────────────────────
    Two specimens of the SAME distance, before and after he answers, then three numbered steps. The
@@ -1480,8 +1480,8 @@
   gap: 10px;
   padding: 14px 10px;
   border-radius: var(--radius-md);
-  background: #f4f8fc;
-  border: 1px solid #e1e9f1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
 }
 .bm-eqyx-spec {
   display: inline-flex;
@@ -1493,12 +1493,12 @@
 }
 .bm-eqyx-spec .material-icons-outlined { font-size: 17px; line-height: 1; }
 .bm-eqyx-spec.no {
-  color: #d9362a;
+  color: var(--danger);
   background: color-mix(in srgb, var(--danger-deep) 10%, var(--surface));
   border-color: color-mix(in srgb, var(--danger-deep) 30%, var(--surface));
 }
 .bm-eqyx-spec.ok {
-  color: #0d6c38;
+  color: var(--ok-deep);
   background: color-mix(in srgb, var(--ok-deep) 10%, var(--surface));
   border-color: color-mix(in srgb, var(--ok) 34%, var(--surface));
 }
@@ -1518,7 +1518,7 @@
   font-size: 12px;
   font-weight: 600;
   line-height: 1.65;
-  color: #16304f;
+  color: var(--navy);
 }
 .bm-eqyx-dot {
   flex-shrink: 0;
@@ -1538,13 +1538,13 @@
   border: 1px solid color-mix(in srgb, var(--action) 24%, transparent);
 }
 .bm-eqyx-qh { font-size: 10px; font-weight: 800; letter-spacing: 0.02em; color: var(--muted); }
-.bm-eqyx-qt { font-size: 12px; font-weight: 700; line-height: 1.7; color: #16304f; }
+.bm-eqyx-qt { font-size: 12px; font-weight: 700; line-height: 1.7; color: var(--navy); }
 .bm-eqyx-foot {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 12px 14px;
-  border-top: 1px solid #e1e9f1;
+  border-top: 1px solid var(--border);
 }
 .bm-eqyx-later {
   flex-shrink: 0;
@@ -1578,7 +1578,7 @@
 
 /* RM3-AC-26 — a price and a count were given, and that is the whole statement. No card furniture. */
 .bidmap .bm-eqnone { padding: 18px 6px; text-align: center; }
-.bidmap .bm-eqnone-t { font-size: 12.5px; font-weight: 800; color: #16304f; }
+.bidmap .bm-eqnone-t { font-size: 12.5px; font-weight: 800; color: var(--navy); }
 .bidmap .bm-eqnone-s { font-size: 11px; font-weight: 600; color: var(--muted); margin-top: 5px; line-height: 1.8; }
 
 /* ── V17 · the filter bar (§6.4a) ────────────────────────────────────────────────────────────────
@@ -1619,7 +1619,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #e1e9f1;
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--muted);
@@ -1627,10 +1627,10 @@
   font-family: inherit;
 }
 .bidmap .bm-eqf-btn .material-icons-outlined { font-size: 16px; }
-.bidmap .bm-eqf-btn:hover { border-color: #c8d8e8; color: #16304f; }
+.bidmap .bm-eqf-btn:hover { border-color: var(--border-strong); color: var(--navy); }
 /* OPEN is navy, matching the surface's one selection colour — the panel over it is a state, and
    `var(--action)` here is the request action (AC-33), not "this is showing". */
-.bidmap .bm-eqf-btn.on { background: #16304f; border-color: #16304f; color: var(--surface); }
+.bidmap .bm-eqf-btn.on { background: var(--navy); border-color: var(--navy); color: var(--surface); }
 /* The count of ACTIVE filters, so a collapsed panel still says the list is not the whole offer. */
 .bidmap .bm-eqf-btn-n {
   position: absolute;
@@ -1640,7 +1640,7 @@
   height: 15px;
   padding: 0 4px;
   border-radius: 999px;
-  background: #2563eb;
+  background: var(--action);
   border: 2px solid var(--surface);
   color: var(--surface);
   font-size: 9px;
@@ -1671,7 +1671,7 @@
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  border-inline-end: 1px solid #e1e9f1;
+  border-inline-end: 1px solid var(--border);
 
   animation: bmFilterIn 0.16s ease;
 }
@@ -1693,10 +1693,10 @@
   align-items: center;
   gap: 10px;
   padding: 0 14px;
-  border-bottom: 1px solid #e1e9f1;
-  background: linear-gradient(180deg, #fbfdff, #f2f7fc);
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--surface), var(--surface2));
 }
-.bidmap .bm-eqfp-t { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 800; color: #16304f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bidmap .bm-eqfp-t { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 800; color: var(--navy); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* An X, not a back chevron: the renter is putting a tool away, not travelling back to something. 28px
    at r9 — the surface's own small-control size, the same one the filter button that opened it wears. */
 .bidmap .bm-eqfp-x {
@@ -1706,7 +1706,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #e1e9f1;
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--muted);
@@ -1714,7 +1714,7 @@
   font-family: inherit;
 }
 .bidmap .bm-eqfp-x .material-icons-outlined { font-size: 16px; }
-.bidmap .bm-eqfp-x:hover { border-color: #c8d8e8; color: #16304f; }
+.bidmap .bm-eqfp-x:hover { border-color: var(--border-strong); color: var(--navy); }
 /* Its own scroller: a request naming eight certificates makes eight chips, and a panel that grew past
    the column would put the clear control below the fold. */
 .bidmap .bm-eqfp-body {
@@ -1734,12 +1734,12 @@
   align-items: center;
   gap: 10px;
   padding: 9px 14px;
-  border-top: 1px solid #e1e9f1;
-  background: #f8fafc;
+  border-top: 1px solid var(--border);
+  background: var(--surface2);
 }
 /* «٣ من ٨» — rule 3. Prominent enough to be read before the cards it describes, because a hidden
    machine must never let the offer read as smaller than it is. */
-.bidmap .bm-eqf-count { font-size: 11px; font-weight: 800; color: #16304f; letter-spacing: 0.01em; }
+.bidmap .bm-eqf-count { font-size: 11px; font-weight: 800; color: var(--navy); letter-spacing: 0.01em; }
 .bidmap .bm-eqf-count > span { unicode-bidi: isolate; }
 /* Blue, like every other action on this surface (AC-33): clearing is what the renter came to the row
    to do when it stopped helping, and a grey control there reads as switched off. */
@@ -1747,7 +1747,7 @@
   background: none;
   border: 0;
   padding: 2px 0;
-  color: #2563eb;
+  color: var(--action);
   font-size: 10.5px;
   font-weight: 800;
   cursor: pointer;
@@ -1761,20 +1761,20 @@
   align-items: center;
   gap: 5px;
   background: var(--surface);
-  border: 1px solid #d7e3ec;
+  border: 1px solid var(--border-mid);
   border-radius: 999px;
   padding: 4px 9px;
   font-size: 10.5px;
   font-weight: 700;
-  color: #33546e;
+  color: var(--navy-mid);
   cursor: pointer;
   font-family: inherit;
   transition: background 0.14s, border-color 0.14s, color 0.14s;
 }
-.bidmap .bm-eqf-chip:hover { border-color: #9fb9cd; }
+.bidmap .bm-eqf-chip:hover { border-color: var(--muted-light); }
 /* Pressed is slate, not blue — the same reasoning the card's selection accent records: on a surface
    whose only other colour is availability, a saturated accent reads as a third machine state. */
-.bidmap .bm-eqf-chip.on { background: #16304f; border-color: #16304f; color: var(--surface); }
+.bidmap .bm-eqf-chip.on { background: var(--navy); border-color: var(--navy); color: var(--surface); }
 /* The chip's own count, so the renter can see what a press will cost him before he pays it. */
 .bidmap .bm-eqf-n { font-size: 9.5px; font-weight: 800; opacity: 0.62; }
 
@@ -1784,15 +1784,15 @@
 .bidmap .bm-eqfnone {
   padding: 16px 14px;
   background: var(--surface);
-  border: 1px solid #e6eef5;
+  border: 1px solid var(--surface2);
   border-radius: var(--radius-lg);
   text-align: start;
 }
-.bidmap .bm-eqfnone-t { font-size: 12px; font-weight: 800; color: #16304f; }
+.bidmap .bm-eqfnone-t { font-size: 12px; font-weight: 800; color: var(--navy); }
 .bidmap .bm-eqfnone-s { font-size: 10.5px; font-weight: 600; color: var(--muted); margin-top: 5px; line-height: 1.8; }
 .bidmap .bm-eqfnone-act {
   margin-top: 10px;
-  background: #2563eb;
+  background: var(--action);
   border: 0;
   color: var(--surface);
   border-radius: var(--radius-sm);
@@ -1822,7 +1822,7 @@
 .bidmap .bm-count {
   font-size: 10.5px;
   font-weight: 700;
-  color: #2563eb;
+  color: var(--action);
   background: color-mix(in srgb, var(--action) 8%, transparent);
   border: 1px solid color-mix(in srgb, var(--action) 22%, transparent);
   border-radius: var(--radius-sm);
@@ -1837,7 +1837,7 @@
   gap: 5px;
   background: color-mix(in srgb, var(--ok-deep) 9%, transparent);
   border: 1px solid color-mix(in srgb, var(--ok) 25%, transparent);
-  color: #16a34a;
+  color: var(--ok);
   border-radius: var(--radius-sm);
   padding: 3px 9px;
   font-size: 9.5px;
@@ -1869,7 +1869,7 @@
 .bidmap .bm-sort.on {
   background: var(--surface);
   border-color: color-mix(in srgb, var(--navy-deep) 22%, transparent);
-  color: #16304f;
+  color: var(--navy);
 }
 /* No project location → the nearest sort is DISABLED, not silently meaningless (AC-21). */
 .bidmap .bm-sort:disabled { cursor: default; opacity: 0.45; }
@@ -1882,7 +1882,7 @@
   display: flex;
   flex-direction: column;
   gap: 9px;
-  background: #f8fafc;
+  background: var(--surface2);
 }
 
 /* ── Bid row (design.md §4.1) ─────────────────────────────────────────────────────────────────── */
@@ -1895,7 +1895,7 @@
   flex-direction: column;
   gap: 9px;
   background: var(--surface);
-  border: 1.5px solid #e1e9f1;
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-lg);
   /* asymmetric on purpose: the extra inline-start padding is the accent bar's room */
   padding: 12px 13px 12px 17px;
@@ -1911,15 +1911,15 @@
    the row from reading as a button (AC-33, AC-74). */
 .bidmap .bm-row.on {
   background: color-mix(in srgb, var(--navy-deep) 7%, transparent);
-  border-color: #16304f;
+  border-color: var(--navy);
 }
 /* Selection is single and replacing, so the others must visibly recede (AC-74). */
 .bidmap .bm-row.dim { opacity: 0.55; }
-.bidmap .bm-row.flash { animation: dpPing 1.2s ease-out 2; border-color: #2563eb; }
+.bidmap .bm-row.flash { animation: dpPing 1.2s ease-out 2; border-color: var(--action); }
 
 /* Selection is ROW STATE — an accent bar plus a tick, never a "select" button. Logical insets, per the
    prototype, so the accent hugs the reading edge in both directions. */
-.bidmap .bm-row .bm-acc { position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: 4px; background: #2563eb; }
+.bidmap .bm-row .bm-acc { position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: 4px; background: var(--action); }
 .bidmap .bm-row .bm-tick {
   position: absolute;
   top: 10px;
@@ -1927,7 +1927,7 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #2563eb;
+  background: var(--action);
   color: var(--surface);
   font-size: 11px;
   font-weight: 900;
@@ -1943,7 +1943,7 @@
   font-size: 8.5px;
   font-weight: 800;
   color: var(--surface);
-  background: #16a34a;
+  background: var(--ok);
   border-radius: var(--radius-lg);
   padding: 2px 8px;
 }
@@ -1961,7 +1961,7 @@
   font-size: 12.5px;
   flex-shrink: 0;
 }
-.bidmap .bm-supname { font-size: 12.5px; font-weight: 700; color: #16304f; display: flex; gap: 4px; align-items: center; }
+.bidmap .bm-supname { font-size: 12.5px; font-weight: 700; color: var(--navy); display: flex; gap: 4px; align-items: center; }
 .bidmap .bm-supsub { font-size: 10px; color: var(--muted); font-weight: 600; margin-top: 2px; }
 .bidmap .bm-offbadge {
   flex-shrink: 0;
@@ -1974,16 +1974,16 @@
   padding: 2px 7px;
 }
 
-.bidmap .bm-figs { display: flex; align-items: flex-end; gap: 10px; border-top: 1px dashed #e1e9f1; padding-top: 9px; }
+.bidmap .bm-figs { display: flex; align-items: flex-end; gap: 10px; border-top: 1px dashed var(--border); padding-top: 9px; }
 .bidmap .bm-flab { font-size: 9px; font-weight: 700; color: var(--muted); margin-bottom: 1px; }
-.bidmap .bm-rate { font-size: 17px; font-weight: 800; color: #16304f; letter-spacing: -0.2px; }
+.bidmap .bm-rate { font-size: 17px; font-weight: 800; color: var(--navy); letter-spacing: -0.2px; }
 .bidmap .bm-rateunit { font-size: 10px; font-weight: 600; color: var(--muted); margin-inline-start: 3px; }
 .bidmap .bm-cheapest {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   font-size: 9.5px;
-  color: #16a34a;
+  color: var(--ok);
   font-weight: 800;
   margin-top: 3px;
   background: color-mix(in srgb, var(--ok) 9%, transparent);
@@ -2001,20 +2001,20 @@
   flex-direction: column;
   gap: 5px;
   align-self: stretch;
-  background: #f8fafc;
-  border: 1px solid #e1e9f1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 8px 9px;
 }
-.bidmap .bm-units .u-off { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; color: #16304f; }
-.bidmap .bm-units .u-id { display: flex; align-items: center; gap: 6px; font-size: 9.5px; font-weight: 700; color: #16a34a; }
+.bidmap .bm-units .u-off { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; color: var(--navy); }
+.bidmap .bm-units .u-id { display: flex; align-items: center; gap: 6px; font-size: 9.5px; font-weight: 700; color: var(--ok); }
 .bidmap .bm-units .u-un { display: flex; align-items: center; gap: 6px; font-size: 9.5px; font-weight: 700; color: var(--warn-deep); }
 
 /* ── Colour key (T15) — hosted INSIDE the panel, below the scroll area. Never a floating overlay: at a
    low z-index with `inset-inline-end` it renders BEHIND this panel in RTL, which is how the key became
    invisible in the one state that needed it (§6.9.2, AC-131). `flex-shrink: 0` outside the scroller is
    also what keeps expanding it from scrolling the list away (AC-132). */
-.bidmap .bm-key { flex-shrink: 0; border-top: 1px solid #e1e9f1; background: var(--surface); }
+.bidmap .bm-key { flex-shrink: 0; border-top: 1px solid var(--border); background: var(--surface); }
 .bidmap .bm-key-btn {
   width: 100%;
   display: flex;
@@ -2033,14 +2033,14 @@
   flex-shrink: 0;
   background: color-mix(in srgb, var(--action) 8%, transparent);
   border: 1px solid color-mix(in srgb, var(--action) 22%, transparent);
-  color: #2563eb;
+  color: var(--action);
   font-size: 10px;
   font-weight: 900;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.bidmap .bm-key-lbl { flex: 1; text-align: start; font-size: 10.5px; font-weight: 800; color: #16304f; }
+.bidmap .bm-key-lbl { flex: 1; text-align: start; font-size: 10.5px; font-weight: 800; color: var(--navy); }
 .bidmap .bm-key-chev { color: var(--muted); font-size: 11px; transition: 0.15s; }
 .bidmap .bm-key-chev.open { transform: rotate(90deg); }
 .bidmap .bm-key-body { padding: 0 14px 12px; }
@@ -2062,7 +2062,7 @@
 .bidmap .bm-key-clause {
   margin-top: 9px;
   padding-top: 8px;
-  border-top: 1px solid #e1e9f1;
+  border-top: 1px solid var(--border);
   font-size: 9.5px;
   font-weight: 600;
   color: var(--muted);
@@ -2079,13 +2079,13 @@
   width: 392px;
   max-width: calc(100% - 130px);
   background: rgba(255, 255, 255, 0.97);
-  border: 1px solid #e1e9f1;
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
 
   padding: 18px;
   text-align: center;
 }
-.bidmap .bm-empty-t { font-size: 13.5px; font-weight: 800; color: #16304f; }
+.bidmap .bm-empty-t { font-size: 13.5px; font-weight: 800; color: var(--navy); }
 .bidmap .bm-empty-s { font-size: 11px; font-weight: 600; color: var(--muted); margin-top: 6px; line-height: 1.7; }
 
 /* T11's `[list │ map]` toggle is gone with V1: the surface is a ROUTE keyed by `bidId`, entered by
@@ -2118,7 +2118,7 @@
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--danger) 7%, transparent);
   border: 1px solid color-mix(in srgb, var(--danger) 24%, transparent);
-  color: #9a2820;
+  color: var(--danger-press);
   font-size: 10.5px;
   font-weight: 800;
   line-height: 1.6;
@@ -2267,7 +2267,7 @@
   flex-shrink: 0;
   background: var(--surface);
   border: 1px solid var(--surface);
-  color: #0f2238;
+  color: var(--navy-deep);
   border-radius: var(--radius-md);
   /* Sized so the ENGLISH pair — «Counter this price» beside «Approve», the longer of the two — still
      shares one line with the hero rate inside the panel's 392px. Arabic has room to spare. */
@@ -2285,11 +2285,11 @@
 .bidmap .bm-foot-cta.is-confirm {
   background: var(--ok);
   border-color: var(--ok);
-  color: #fff;
+  color: var(--surface);
   font-weight: 800;
   padding: 11px 16px;
 }
-.bidmap .bm-foot-cta.is-confirm:hover { background: var(--ok-deep, #15803d); border-color: var(--ok-deep, #15803d); }
+.bidmap .bm-foot-cta.is-confirm:hover { background: var(--ok-deep, var(--ok-deep)); border-color: var(--ok-deep, var(--ok-deep)); }
 .bidmap .bm-foot-cta:disabled { opacity: 0.55; cursor: default; }
 /* ── V12 · the chat dock (§6.9) ──────────────────────────────────────────────────────────────────
    Floating over the surface, on the inline-START edge — the panel owns the END edge, and a dock that
@@ -2307,7 +2307,7 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  background: #16304f;
+  background: var(--navy);
   border: 2px solid var(--surface);
   color: var(--surface);
   border-radius: 999px;
@@ -2317,7 +2317,7 @@
   font-weight: 800;
   cursor: pointer;
 }
-.bidmap .bm-dock.is-open { background: #2563eb; }
+.bidmap .bm-dock.is-open { background: var(--action); }
 .bidmap .bm-dock .material-icons-outlined { font-size: 17px; }
 /* The unread badge PINGS (decoded 3878). Ours was a static 18 px peach chip with brown text — the
    colour of a disabled control, and silent on a surface the renter is not looking at. Unread is the
@@ -2351,7 +2351,7 @@
    the one arrival a renter must not miss still looks different before it is read. Warm, never red:
    red on this surface belongs to availability alone. */
 .bidmap .bm-dock-notice {
-  --notice-tone: #1d4ed8;
+  --notice-tone: var(--action);
   --notice-tint: color-mix(in srgb, var(--action) 10%, transparent);
   position: absolute;
   z-index: 30;
@@ -2370,7 +2370,7 @@
 /* The rail is on the leading edge, so it turns with the script rather than sitting on the left of an
    Arabic card. A tinted chip alone is READ; this is seen. */
 .bidmap .bm-dock-notice.is-refusal {
-  --notice-tone: #b26206;
+  --notice-tone: var(--warn-deep);
   --notice-tint: color-mix(in srgb, var(--brand-deep) 12%, transparent);
   border-inline-start: 3px solid var(--notice-tone);
 }
@@ -2422,7 +2422,7 @@
   min-width: 0;
   font-size: 12px;
   font-weight: 900;
-  color: #0f2238;
+  color: var(--navy-deep);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2456,7 +2456,7 @@
   background: none;
   border: 0;
   padding: 0 2px;
-  color: #94a9bd;
+  color: var(--muted-light);
   font-size: 12px;
   font-weight: 900;
   line-height: 1;
@@ -2502,7 +2502,7 @@
   inset-inline-end: 0;
   width: 420px;
   max-width: calc(100% - 470px);
-  border-inline-start: 1px solid #e1e9f1;
+  border-inline-start: 1px solid var(--border);
 }
 /* The shadow falls AWAY from the map, so it turns with the script. */
 .bidmap[dir="rtl"] .bm-chat.is-mirror, [dir="rtl"] .bidmap .bm-chat.is-mirror { }
@@ -2536,7 +2536,7 @@
   align-items: center;
   gap: 11px;
   padding: 0 18px;
-  border-bottom: 1px solid #e1e9f1;
+  border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
 /* The prototype's 42px circle: the firm's initials, in the green it uses to say "this is a party to
@@ -2548,7 +2548,7 @@
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  background: #16a34a;
+  background: var(--ok);
   border: 0;
   color: var(--surface);
   font-size: 13px;
@@ -2558,13 +2558,13 @@
   justify-content: center;
   overflow: hidden;
 }
-.bidmap .bm-chat-who { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 900; color: #0f2238; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bidmap .bm-chat-who { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 900; color: var(--navy-deep); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The name opens the company's papers (owner, 2026-08-26), so it has to LOOK pressable: the hover
    underline and the pointer are the whole affordance — a button chrome here would compete with the
    call and kebab controls beside it for a band that is 64px tall. */
 .bidmap .bm-chat-who.is-link { cursor: pointer; }
 .bidmap .bm-chat-who.is-link:hover { text-decoration: underline; text-underline-offset: 3px; }
-.bidmap .bm-chat-who.is-link:focus-visible { outline: 2px solid #2f6fed; outline-offset: 3px; border-radius: var(--radius-sm); }
+.bidmap .bm-chat-who.is-link:focus-visible { outline: 2px solid var(--action); outline-offset: 3px; border-radius: var(--radius-sm); }
 /* The tick the prototype writes as a bare '✓' after the name. A glyph rather than the panel's full
    «شركة موثّقة» chip: the panel two columns away already carries that chip, and repeating it here
    would state the same credential twice on one screen. Green, matching the avatar — it is the same
@@ -2572,7 +2572,7 @@
 /* A stroked check now, not Material's filled rosette (owner, 2026-08-19) — the panel header's
    glyph and the prototype's, so one company reads one way wherever it is named. `font-size` went with
    the glyph: an svg is sized by its own attributes. */
-.bidmap .bm-chat-tick { flex-shrink: 0; color: #16a34a; }
+.bidmap .bm-chat-tick { flex-shrink: 0; color: var(--ok); }
 /* The placement control — the prototype's one square button, 30px at r9. It changes WHERE the
    conversation sits and nothing about the conversation, which is why it is a quiet outline rather
    than an action. Outlined in the surface's own border tone now that the band is white: the
@@ -2583,7 +2583,7 @@
   height: 30px;
   border-radius: var(--radius-sm);
   background: var(--surface);
-  border: 1.5px solid #c8d8e8;
+  border: 1.5px solid var(--border-strong);
   color: var(--muted);
   display: inline-flex;
   align-items: center;
@@ -2598,7 +2598,7 @@
   height: 30px;
   border-radius: 50%;
   background: var(--surface);
-  border: 1.5px solid #c8d8e8;
+  border: 1.5px solid var(--border-strong);
   color: var(--muted);
   display: inline-flex;
   align-items: center;
@@ -2618,8 +2618,8 @@
   height: 30px;
   border-radius: 50%;
   background: var(--surface);
-  border: 1.5px solid #c8d8e8;
-  color: #2563eb;
+  border: 1.5px solid var(--border-strong);
+  color: var(--action);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2628,8 +2628,8 @@
 }
 .bidmap .bm-chat-call .material-icons-outlined { font-size: 16px; }
 .bidmap .bm-chat-call:hover { background: color-mix(in srgb, var(--action) 8%, transparent); border-color: color-mix(in srgb, var(--action) 34%, transparent); }
-.bidmap .bm-chat-call.is-locked { color: #c8d8e8; cursor: default; }
-.bidmap .bm-chat-call.is-locked:hover { background: var(--surface); border-color: #c8d8e8; }
+.bidmap .bm-chat-call.is-locked { color: var(--border-strong); cursor: default; }
+.bidmap .bm-chat-call.is-locked:hover { background: var(--surface); border-color: var(--border-strong); }
 /* Rendered ONLY when this counterparty holds more than one bid in the RFQ group (RM3-AC-44). */
 .bidmap .bm-chat-tabs { flex-shrink: 0; display: flex; gap: 6px; padding: 8px 18px; overflow-x: auto; background: var(--surface); border-bottom: 1px solid var(--surface2); }
 .bidmap .bm-chat-tab {
@@ -2638,7 +2638,7 @@
   align-items: center;
   gap: 5px;
   background: var(--surface2);
-  border: 1px solid #e1e9f1;
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 5px 10px;
   font: inherit;
@@ -2648,14 +2648,14 @@
   cursor: pointer;
   max-width: 160px;
 }
-.bidmap .bm-chat-tab.is-on { background: color-mix(in srgb, var(--action) 10%, transparent); border-color: color-mix(in srgb, var(--action) 30%, transparent); color: #2563eb; }
+.bidmap .bm-chat-tab.is-on { background: color-mix(in srgb, var(--action) 10%, transparent); border-color: color-mix(in srgb, var(--action) 30%, transparent); color: var(--action); }
 .bidmap .bm-chat-tab-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bidmap .bm-chat-tab-n { flex-shrink: 0; min-width: 15px; height: 15px; border-radius: var(--radius-sm); background: #f3a77a; color: #3a1f0b; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
+.bidmap .bm-chat-tab-n { flex-shrink: 0; min-width: 15px; height: 15px; border-radius: var(--radius-sm); background: var(--brand-light); color: var(--warn-deep); font-size: 9px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
 /* The stream's own values, from `pChat` (prototype 05:28): `padding: 16px`, `gap: 8px`, and a TINTED
    ground — the prototype's own `var(--surface3)`, not the panel's white and not the blue-leaning `var(--surface2)`
    this carried. The tint is what separates the conversation from the chrome around it; on white the
    bubbles had nothing to sit on and the stream ran into the composer. */
-.bidmap .bm-chat-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 16px; background: #e9eef3; }
+.bidmap .bm-chat-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 16px; background: var(--surface2); }
 .bidmap .bm-chat-note { margin: auto 0; text-align: center; font-size: 10.5px; font-weight: 600; color: var(--muted); line-height: 1.8; padding: 14px 6px; }
 /* ── The bubbles moved to the BASE (owner, 2026-08-19) ───────────────────────────────────────────
    *"we have now 2 chats style… i want both to be the same, the style i want is the one in the map."*
@@ -2708,11 +2708,11 @@
   gap: 8px;
   padding: 0 18px;
   background: var(--surface);
-  border-top: 1px solid #e1e9f1;
+  border-top: 1px solid var(--border);
 }
-.bidmap .bm-chat-input { flex: 1; min-width: 0; border: 1px solid #c8d8e8; border-radius: 999px; /* a capsule: this control is round by shape, not by scale */ padding: 10px 14px; font: inherit; font-size: 12.5px; color: #16304f; background: #f8fafc; }
+.bidmap .bm-chat-input { flex: 1; min-width: 0; border: 1px solid var(--border-strong); border-radius: 999px; /* a capsule: this control is round by shape, not by scale */ padding: 10px 14px; font: inherit; font-size: 12.5px; color: var(--navy); background: var(--surface2); }
 .bidmap .bm-chat-input:disabled { opacity: 0.65; }
-.bidmap .bm-chat-send { flex-shrink: 0; background: #2563eb; border: 0; color: var(--surface); border-radius: 50%; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.bidmap .bm-chat-send { flex-shrink: 0; background: var(--action); border: 0; color: var(--surface); border-radius: 50%; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .bidmap .bm-chat-send:disabled { opacity: 0.5; cursor: default; }
 .bidmap .bm-chat-send .material-icons-outlined { font-size: 18px; }
 /* The send glyph points the way the message travels, so it mirrors with the script. */
@@ -2729,7 +2729,7 @@
   width: 38px;
   height: 38px;
   padding: 0;
-  border: 1px solid #c8d8e8;
+  border: 1px solid var(--border-strong);
   border-radius: 50%;
   background: var(--surface);
   color: var(--muted);
@@ -2742,7 +2742,7 @@
 .bidmap .bm-chat-compose .ib .material-icons-outlined { font-size: 17px; }
 /* The recorder's own send, while it holds the row. Same fill as the composer's, so "send" is one
    colour on this surface whatever is being sent. */
-.bidmap .bm-chat-compose .ib.send { background: #2563eb; border-color: #2563eb; color: var(--surface); }
+.bidmap .bm-chat-compose .ib.send { background: var(--action); border-color: var(--action); color: var(--surface); }
 .bidmap[dir="rtl"] .bm-chat-compose .ib.send .material-icons-outlined, [dir="rtl"] .bidmap .bm-chat-compose .ib.send .material-icons-outlined { transform: scaleX(-1); }
 /* The recorder's running row — `VoiceRecorder` sizes itself inline; this only keeps its text from
    overflowing a card this narrow. */
@@ -2754,9 +2754,9 @@
 .bidmap .bm-chat-err {
   flex-shrink: 0;
   padding: 7px 18px;
-  border-top: 1px solid #f2d9d6;
+  border-top: 1px solid var(--danger-border);
   background: color-mix(in srgb, var(--danger) 7%, transparent);
-  color: #a32a20;
+  color: var(--danger-press);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.5;
@@ -2853,7 +2853,7 @@
   justify-content: center;
   gap: 6px;
   background: var(--surface);
-  border: 1px solid #c8d8e8;
+  border: 1px solid var(--border-strong);
   color: var(--navy);
   border-radius: var(--radius-md);
   padding: 10px 11px;
@@ -2882,15 +2882,15 @@
   padding: 4px 10px;
   border-radius: 999px;
   background: var(--surface);
-  border: 1px solid #cfe6f7;
-  color: #2563eb;
+  border: 1px solid color-mix(in srgb, var(--action) 20%, white);
+  color: var(--action);
   font-size: 10.5px;
   font-weight: 800;
   white-space: nowrap;
 }
 .bidmap .bm-chat-phase .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.bidmap .bm-chat-phase.is-done { color: #16a34a; border-color: color-mix(in srgb, var(--ok) 32%, transparent); }
-.bidmap .bm-chat-phase.is-off { color: var(--muted); border-color: #dbe6ef; }
+.bidmap .bm-chat-phase.is-done { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 32%, transparent); }
+.bidmap .bm-chat-phase.is-off { color: var(--muted); border-color: var(--border-mid); }
 
 /* The ⋮ — the same 30px round control the close button is, because they sit on one row and a kebab
    that outweighed the close would read as the louder act. */
@@ -2901,7 +2901,7 @@
   padding: 0;
   border-radius: 50%;
   background: var(--surface);
-  border: 1.5px solid #c8d8e8;
+  border: 1.5px solid var(--border-strong);
   color: var(--muted);
   display: inline-flex;
   align-items: center;
@@ -2921,7 +2921,7 @@
   inset-inline-end: 10px;
   min-width: 200px;
   background: var(--surface);
-  border: 1px solid #e1e9f1;
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
 
   padding: 6px;
@@ -2937,17 +2937,17 @@
   font: inherit;
   font-size: 12.5px;
   font-weight: 700;
-  color: #16304f;
+  color: var(--navy);
   background: none;
   border: 0;
   border-radius: var(--radius-md);
   padding: 9px 11px;
   cursor: pointer;
 }
-.bidmap .bm-chat-menu button:hover { background: #f2f6fa; }
+.bidmap .bm-chat-menu button:hover { background: var(--surface2); }
 .bidmap .bm-chat-menu button .material-icons-outlined { font-size: 18px; color: var(--muted); }
 .bidmap .bm-chat-menu button.danger,
-.bidmap .bm-chat-menu button.danger .material-icons-outlined { color: #d9362a; }
+.bidmap .bm-chat-menu button.danger .material-icons-outlined { color: var(--danger); }
 .bidmap .bm-chat-menu button.danger:hover { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 
 /* What the conversation is ABOUT — the room's `assignment` chip as a quiet strip under the identity
@@ -2971,7 +2971,7 @@
   gap: 6px;
   font-size: 11.5px;
   font-weight: 800;
-  color: #16304f;
+  color: var(--navy);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

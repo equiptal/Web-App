@@ -23,7 +23,7 @@
 .bm-rq {
   /* The card's own hue, set by its state below. Everything that follows reads it, so a new state is
      one variable rather than a sweep through the file. */
-  --rq-accent: #e8890c;
+  --rq-accent: var(--brand-hover);
   /* ── ONE background for every ask (owner, 2026-09-05) ──────────────────────────────────────
      *"I want all cards of the 3 requests in the equipment map chat to be in the same card
      background colour: light grey and white."*
@@ -60,12 +60,12 @@
    to no fill at all, where a border that fails the same way merely renders untinted. 6% is the app's
    measured value — enough to name the outcome down a scrolling thread, not enough to fight the navy
    text on top of it. */
-.bm-rq.is-open { --rq-accent: #e8890c; --rq-edge: color-mix(in srgb, var(--brand) 55%, transparent); --rq-rule: color-mix(in srgb, var(--brand) 22%, transparent); }
+.bm-rq.is-open { --rq-accent: var(--brand-hover); --rq-edge: color-mix(in srgb, var(--brand) 55%, transparent); --rq-rule: color-mix(in srgb, var(--brand) 22%, transparent); }
 .bm-rq.is-done { --rq-accent: var(--ok); --rq-edge: color-mix(in srgb, var(--ok) 55%, transparent); --rq-rule: color-mix(in srgb, var(--ok) 22%, transparent); }
 .bm-rq.is-refused { --rq-accent: var(--danger); --rq-edge: color-mix(in srgb, var(--danger) 55%, transparent); --rq-rule: color-mix(in srgb, var(--danger) 22%, transparent); }
 /* The DRAFT is the same card, in blue and lifted — the prototype's only two differences besides the
    buttons. It has to read as "not yet in the conversation" at a glance, from the frame alone. */
-.bm-rq.is-draft { border-color: #2563eb; }
+.bm-rq.is-draft { border-color: var(--action); }
 
 /* ── V12c · the answer's arrival cue (owner, 2026-08-11) ─────────────────────────────────────────
    *"light plumbing or something to show the answer when opening the chat"*.
@@ -134,18 +134,18 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #f1f6fb;
+  background: var(--surface2);
   border: 1px solid var(--surface3);
   box-sizing: border-box;
-  color: #1e4a7a;
+  color: var(--navy-mid);
 }
 /* A real photograph fills the frame — no border under it, and nothing of the tile showing through. */
-.bm-rq-tile.has-photo { background: #e9eef3; border-color: transparent; }
+.bm-rq-tile.has-photo { background: var(--surface2); border-color: transparent; }
 /* The firm, not a machine — the prototype's second gradient, so the two scopes are told apart before
    the title is read. A company card names no equipment, so there is no picture to show instead. */
-/* Two blues, dark into bright — the prototype ran #1e4a7a into #2563eb, and the direction is the
+/* Two blues, dark into bright — the prototype ran var(--navy-mid) into var(--action), and the direction is the
    point: the tile lifts toward the light rather than sinking. */
-.bm-rq-tile.is-co { background: linear-gradient(135deg, #1e4a7a, #2563eb); border-color: transparent; color: var(--surface); }
+.bm-rq-tile.is-co { background: linear-gradient(135deg, var(--navy-mid), var(--action)); border-color: transparent; color: var(--surface); }
 .bm-rq-tile img { width: 100%; height: 100%; object-fit: cover; }
 .bm-rq-tile .material-icons-outlined { font-size: 22px; }
 .bm-rq-who { flex: 1; min-width: 0; display: block; }
@@ -153,7 +153,7 @@
   display: block;
   font-size: 11.5px;
   font-weight: 800;
-  color: #0f2238;
+  color: var(--navy-deep);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -172,8 +172,8 @@
    the row rather than hiding: a code that appears only sometimes is one the reader
    has to hunt for on the one occasion he needs it. Dropped from the notification
    body entirely, where there is no such occasion. */
-.bm-rq-ref { flex-shrink: 0; font-size: 8px; font-weight: 600; color: #a9bccc; letter-spacing: 0.02em; }
-.bm-rq-go { flex-shrink: 0; font-size: 16px; color: #c8d8e8; }
+.bm-rq-ref { flex-shrink: 0; font-size: 8px; font-weight: 600; color: var(--muted-light); letter-spacing: 0.02em; }
+.bm-rq-go { flex-shrink: 0; font-size: 16px; color: var(--border-strong); }
 [dir="rtl"] .bm-rq-go { transform: scaleX(-1); }
 .bm-rq-body { padding: 10px 11px; }
 /* The ask's NAME, in the card's own colour and at the size the app sets (12/900).
@@ -212,7 +212,7 @@
   color: var(--muted);
 }
 .bm-rq-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: currentcolor; }
-.bm-rq-state.is-answered { color: #16a34a; }
+.bm-rq-state.is-answered { color: var(--ok); }
 /* Amber, not red: red on this surface means "not available" on a machine, and a supplier's «no» to a
    question is not that (the same rule the arrival bubble's warm fill follows). */
 .bm-rq-state.is-refused { color: var(--warn); }
@@ -221,7 +221,7 @@
    refusal he did not make. Its own amber rather than `is-refused`'s — one step deeper — so the two
    verdicts can be told apart at a glance and either can be restyled without moving the other. */
 .bm-rq-state.is-partial { color: var(--brand-deep); }
-.bm-rq-state.is-draft { color: #2563eb; }
+.bm-rq-state.is-draft { color: var(--action); }
 /* Every card in a conversation carries its time (AC-16), including this one. Quiet and at the
    trailing edge — the card's subject is the ask, not the minute it was made in. */
 .bm-rq-at { margin-top: 7px; text-align: end; font-size: 9px; font-weight: 700; color: var(--muted); }
@@ -235,6 +235,6 @@
   cursor: pointer;
 }
 .bm-rq-btn:disabled { opacity: 0.55; cursor: default; }
-.bm-rq-btn.ghost { flex: 1; background: var(--surface); border: 1.5px solid #c8d8e8; color: var(--navy); }
+.bm-rq-btn.ghost { flex: 1; background: var(--surface); border: 1.5px solid var(--border-strong); color: var(--navy); }
 /* `flex: 2` — the prototype's own weighting. The send is the action; the cancel is the way out. */
-.bm-rq-btn.go { flex: 2; background: #2563eb; border: 0; color: var(--surface); }
+.bm-rq-btn.go { flex: 2; background: var(--action); border: 0; color: var(--surface); }

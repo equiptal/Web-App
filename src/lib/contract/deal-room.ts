@@ -544,8 +544,10 @@ export function mapDealRoom(raw: unknown): DealRoomView {
   const details: DealItemDetails = {
     // Equipment name = subtype (matches the request/bid cards); capacity = size. Fall back to the older
     // keys, then to the accepted bid's equipment (make + model) since getDealRoom omits taxonomy names.
-    equipmentLabel: s(pick("subtypeName", "label", "equipmentName", "name", "subcategoryName", "categoryName")) ?? bidEqLabel,
-    equipmentLabelAr: s(pick("subtypeNameAr")),
+    // `customEquipmentName` comes first: off-catalogue, it is the only name the line has, and every
+    // taxonomy key beside it is null. It reads in both locales, so the Arabic label takes it too.
+    equipmentLabel: s(pick("customEquipmentName", "subtypeName", "label", "equipmentName", "name", "subcategoryName", "categoryName")) ?? bidEqLabel,
+    equipmentLabelAr: s(pick("subtypeNameAr", "customEquipmentName")),
     equipmentSize: s(pick("capacityName", "size", "capacity")),
     equipmentSizeAr: s(pick("capacityNameAr")),
     // getDealRoom exposes the site as `projectAddressLabel`.

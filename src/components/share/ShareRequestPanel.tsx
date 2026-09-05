@@ -45,6 +45,7 @@ import {
 import {
   loadEmailProvider,
   openEmailCompose,
+  saveEmailProvider,
   type Compose,
   type EmailProvider,
 } from "@/lib/composeEmail";
@@ -415,19 +416,14 @@ export function ShareRequestPanel({
 
   const card = useBidCard(shareUrl, lang, draftForm);
 
-  /**
-   * What a supplier actually opens.
+  /*
+   * — `formUrl` lived here —
    *
-   * ⚠️ ~~The static `supplier-bid-v2.html` mock before the request exists.~~ Removed (owner,
-   * 2026-09-05: *"preview must show how the form will look like, it shows now the old template with
-   * mock data i dont know what is this preview"*). It was a hand-written page in `public/` that
-   * stopped tracking the real form some time ago, so the one control offering to show him what he
-   * was sending showed him a different request, with invented equipment on it.
-   *
-   * There is no honest preview before the token exists, so there is no preview: the control locks,
-   * the same rule the link, Copy link and Copy message already follow on this panel.
+   * It fed «Preview form», which opened the real bid form in a new tab and a static mock in
+   * `public/` before the request existed. Both are gone (owner, 2026-09-05 and 2026-09-06): the
+   * mock had stopped tracking the real form, and once the control was locked until the post it was
+   * a disabled button on the row a renter reads for his LINK.
    */
-  const formUrl = shareUrl;
 
   /** Which of the three he is editing and sending. Moedatech-only reads the e-mail wording. */
   const tplKey = channelKey(channel);
@@ -679,7 +675,10 @@ export function ShareRequestPanel({
        * ⚠️ Only when there is something to connect TO. A stage with no app registration answers
        * `configured: false`, and a renter already connected has nothing to do.
        */
-      if (connect?.configured && !connect.connected) await startConnect();
+      /* ⚠️ Outlook only. Gmail's compose URL carries `bcc`, so its window already opens with the
+         suppliers in it: a Microsoft consent there would be a detour to solve a problem he does not
+         have. */
+      if (provider === "outlook" && connect?.configured && !connect.connected) await startConnect();
 
       const outcome = await shareRequestEmail(id, reachable.map((x) => x.id), {
         subject,
@@ -748,8 +747,20 @@ export function ShareRequestPanel({
        * a cancel as well as on a failure — so a rejection is never treated as an error, it just
        * falls through to the clipboard, which is what a desktop browser gets anyway.
        */
+      /**
+       * 🔴 **`url` is passed SEPARATELY, and that is what makes the sheet look like a share sheet.**
+       *
+       * ~~The link rode inside `text` and nothing else was given.~~ Windows and Android draw the
+       * link tile, the QR button and the copy-link button from the `url` FIELD; with only `text`
+       * they fall back to a bare list of apps with no preview of what is being sent (owner,
+       * 2026-09-05, with the sheet he wants in a screenshot).
+       *
+       * ⚠️ The URL is then trimmed off the end of `text`, or every target that concatenates the
+       * two shows it twice.
+       */
+      const body = message.endsWith(url) ? message.slice(0, -url.length).trimEnd() : message;
       const shared = await navigator
-        .share?.({ title: subject, text: message })
+        .share?.({ title: subject, text: body, url })
         .then(() => true)
         .catch(() => false);
       if (!shared) {
@@ -908,34 +919,23 @@ export function ShareRequestPanel({
               setCopied(true);
               setTimeout(() => setCopied(false), 1600);
             }}
-            className={cx(btn("secondary", "md"), "flex-none")}
+            title={c.copy}
+            aria-label={c.copy}
+            className={cx(btn("secondary", "md", { icon: true }), "flex-none")}
           >
-            <Icon name={copied ? "check" : "content_copy"} size={14} />
-            {/* One word each (owner, 2026-09-03): «Copy link» and «Preview form» named their object
-                twice, since the object is the field they sit beside. */}
-            {copied ? c.copied : c.copyShort}
+            {/* ⚠️ **A glyph, with no word** (owner, 2026-09-05). It sits against the link field and
+                copies the link: the field IS the label, and «Copy» beside it named the object twice
+                while taking room from the URL, which is the half a person actually reads. */}
+            <Icon name={copied ? "check" : "content_copy"} size={15} />
           </button>
-          {/* ── See the form a supplier fills in, BEFORE posting ──────────────────────────────
-              The real page once there is a token; the static mock in `public/` until then, which is
-              the same document the confirmation screen has always linked. A renter deciding whether
-              to send something should be able to look at what he is sending, and «post it and find
-              out» is not an answer. */}
-          {formUrl ? (
-            <a
-              href={formUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={cx(btn("secondary", "md"), "flex-none")}
-            >
-              <Icon name="visibility" size={14} />
-              {c.previewShort}
-            </a>
-          ) : (
-            <button type="button" disabled title={c.linkHint} className={cx(btn("secondary", "md"), "flex-none")}>
-              <Icon name="lock" size={14} />
-              {c.previewShort}
-            </button>
-          )}
+          {/*
+            * — «Preview form» lived here —
+            *
+            * It opened the real bid form in a new tab, and a static mock in `public/` before the
+            * request existed. Removed (owner, 2026-09-05): the mock had stopped tracking the real
+            * form, and once it was locked until the post it was a disabled button on the row a
+            * renter reads for his LINK. The preview that matters is the one on this screen.
+            */}
         </div>
       </div>
       )}
@@ -950,7 +950,7 @@ export function ShareRequestPanel({
 
           Only from `lg`. Stacked on a narrow screen there is no «beside», and a fixed height there
           would be an arbitrary crop. */}
-      <div className="grid gap-6 lg:h-[27rem] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
+      <div className="grid gap-6 lg:h-[34rem] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
         {/* ── Left: who, and how ─────────────────────────────────────────────────────────────── */}
         <div className="flex min-h-0 flex-col gap-4">
           <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -1245,44 +1245,7 @@ export function ShareRequestPanel({
                 (owner, 2026-09-03). */}
             <Icon name="visibility" size={14} className="flex-none text-muted" />
             <span className={label}>{c.preview}</span>
-
-            {/* ── Which language the message is written in ──────────────────────────────────────
-                Here rather than in the toolbar because it changes what he is READING in this
-                column, and a control that changes a thing belongs beside the thing. Two segments,
-                each naming its own language in that language: «العربية» is legible to the renter
-                who wants it whatever the interface is set to. */}
-            <span className="ms-auto flex items-center rounded-sm border border-border bg-surface2 p-0.5">
-              {(["en", "ar"] as const).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => setLang(v)}
-                  aria-pressed={lang === v}
-                  className={cx(
-                    "rounded-sm px-2 py-0.5 text-label transition-colors",
-                    lang === v ? "bg-brand text-brand-fg" : "text-navy-mid hover:text-navy",
-                  )}
-                >
-                  {v === "en" ? "English" : "العربية"}
-                </button>
-              ))}
-            </span>
-
-            {/* ⚠️ **The way out when a channel does not work** (owner, 2026-09-05: *"can we
-                have an option to copy paste the template so if share doesnt work?"*). The clipboard
-                is the one channel nothing can block: no compose window, no consent, no deeplink. It
-                sits here rather than in the toolbar because what it copies is what this column
-                shows, and it is disabled before the post for the same reason Copy link is. */}
-            <button
-              type="button"
-              onClick={() => void copyMessage()}
-              disabled={!uuid || !card}
-              title={c.copyMessageHint}
-              className={cx(btn("secondary", "sm"), "flex-none")}
-            >
-              <Icon name={msgCopied ? "check" : "content_copy"} size={14} />
-              {msgCopied ? c.copyMessageDone : c.copyMessage}
-            </button>
+            <span className="ms-auto" />
 
             {/* ⚠️ **The one paste Outlook genuinely cannot do without**, and only when it is
                 real: its deeplink discards `bcc`, so the window opened addressed to nobody. Drawn
@@ -1327,7 +1290,17 @@ export function ShareRequestPanel({
                   label={c.tplTitle}
                   className="text-meta font-extrabold text-navy"
                 />
-                <div className="mt-0.5 text-label text-muted">{fmt(c.fromLine, { name: renterName || c.fromYou })}</div>
+                <div className="mt-0.5 flex items-center gap-2 text-label text-muted">
+                  <span className="min-w-0 truncate">{fmt(c.fromLine, { name: renterName || c.fromYou })}</span>
+                  <PreviewTools
+                    lang={lang}
+                    setLang={setLang}
+                    onCopy={() => void copyMessage()}
+                    copied={msgCopied}
+                    disabled={!uuid || !card}
+                    c={c}
+                  />
+                </div>
               </div>
               {/* One scroll region for the whole message. It used to be three, nested — the body,
                   the card under it and the dialog around both — and a renter reading a message he is
@@ -1356,6 +1329,16 @@ export function ShareRequestPanel({
                is a separate block under the body, because that is where a mail client puts it. Same
                card, drawn where each client actually draws it. */
             <div className="min-h-0 flex-1 overflow-auto rounded-md border border-border bg-surface2 p-3">
+              <div className="mb-2 flex justify-end">
+                <PreviewTools
+                  lang={lang}
+                  setLang={setLang}
+                  onCopy={() => void copyMessage()}
+                  copied={msgCopied}
+                  disabled={!uuid || !card}
+                  c={c}
+                />
+              </div>
               <div className="max-w-[94%] rounded-md rounded-ss-none bg-surface px-3 py-2">
                 <Message
                   parts={parts}
@@ -1454,11 +1437,43 @@ export function ShareRequestPanel({
             label={c.whatsapp}
             done={sent.includes("whatsapp")}
           />
+          {/* ⚠️ **Two buttons, because they are two different sends** (owner, 2026-09-05: *"can u
+              add option for gmail so it is gmail or outlook instead of general email"*).
+
+              ~~One «E-mail» button and a hidden provider.~~ It was removed on 2026-09-03 when both
+              behaved identically badly, and they no longer do:
+
+                - **Gmail** carries `bcc` in its compose URL, so the window opens with his suppliers
+                  in the Bcc line where he can READ them, today, with no connection and no backend.
+                - **Outlook** discards `bcc` without a word, which is why it has the connector: a
+                  draft in his own mailbox is the only way that half ever shows him a recipient.
+
+              Handing a Gmail renter an Outlook window was the gap this closes, and it is the same
+              gap that has been open since the picker was taken out.
+
+              ⚠️ Both set `channel: "email"` and differ only in `provider`, so the wording, the
+              template and the recipient rules stay one thing. A mail client is a transport, not a
+              different message. */}
           <Channel
-            on={channel === "email"}
-            onClick={() => setChannel((v) => (v === "email" ? "none" : "email"))}
+            on={channel === "email" && provider === "outlook"}
+            onClick={() => {
+              setProvider("outlook");
+              saveEmailProvider("outlook");
+              setChannel((v) => (v === "email" && provider === "outlook" ? "none" : "email"));
+            }}
             icon="mail"
-            label={c.email}
+            label={c.outlook}
+            done={sent.includes("email") && provider === "outlook"}
+          />
+          <Channel
+            on={channel === "email" && provider === "gmail"}
+            onClick={() => {
+              setProvider("gmail");
+              saveEmailProvider("gmail");
+              setChannel((v) => (v === "email" && provider === "gmail" ? "none" : "email"));
+            }}
+            icon="alternate_email"
+            label={c.gmail}
             done={sent.includes("email")}
           />
           {/**
@@ -1509,15 +1524,23 @@ export function ShareRequestPanel({
           </button>
         </div>
 
-        <p
-          className={cx(
-            "text-meta",
-            moedatechOnly ? "flex items-center gap-1.5 font-semibold text-ok-deep" : "text-navy-mid",
-          )}
-        >
-          {moedatechOnly && <Icon name="check_circle" size={14} className="flex-none" />}
-          {moedatechOnly ? c.moedatechOnlyHint : c.alwaysHint}
-        </p>
+        {/* ⚠️ **Only when Moedatech is the ONLY channel** (owner, 2026-09-06: *"Every request goes
+            to Moedatech. You can share it via other channels too. remove this"*).
+
+            ~~A line under the row on every state.~~ On any state but one it restated the row
+            directly above it: the Moedatech chip is already locked on and the other buttons are
+            already there, so the sentence was the picture in words, costing a line the supplier
+            list and the preview both wanted.
+
+            The Moedatech-only case keeps its line, because that one is NOT visible in the row: two
+            unticked buttons look identical to a renter who has not realised Send still does
+            something. */}
+        {moedatechOnly && (
+          <p className="flex items-center gap-1.5 text-meta font-semibold text-ok-deep">
+            <Icon name="check_circle" size={14} className="flex-none" />
+            {c.moedatechOnlyHint}
+          </p>
+        )}
 
           {/* Said plainly: the alternative is a renter who believes four people were messaged.
               Nothing is said when NONE of them has a number (owner, 2026-09-03): the panel already
@@ -1843,6 +1866,68 @@ function Message({
         )
       )}
     </div>
+  );
+}
+
+/**
+ * The two controls that belong to the message itself: which language it is in, and take it away.
+ *
+ * ⚠️ **Inside the card, not above it** (owner, 2026-09-05). In the column heading they read as
+ * settings for the panel; against the subject line they read as what they are — this letter's
+ * language, and this letter on the clipboard. It also gave the heading back a line, which the two
+ * columns needed more than a toolbar did.
+ *
+ * ⚠️ Each language names itself in itself. «العربية» is legible to the renter who wants it
+ * whatever the interface happens to be set to.
+ */
+function PreviewTools({
+  lang,
+  setLang,
+  onCopy,
+  copied,
+  disabled,
+  c,
+}: {
+  lang: "en" | "ar";
+  setLang: (v: "en" | "ar") => void;
+  onCopy: () => void;
+  copied: boolean;
+  /** No link yet: the message ends in a URL that does not exist, so there is nothing whole to copy. */
+  disabled: boolean;
+  c: ReturnType<typeof useT>["intake"]["postShare"];
+}) {
+  return (
+    <span className="ms-auto flex flex-none items-center gap-1.5">
+      <span className="flex items-center rounded-sm border border-border bg-surface p-0.5">
+        {(["en", "ar"] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setLang(v)}
+            aria-pressed={lang === v}
+            className={cx(
+              "rounded-sm px-1.5 py-0.5 text-label transition-colors",
+              lang === v ? "bg-brand text-brand-fg" : "text-navy-mid hover:text-navy",
+            )}
+          >
+            {v === "en" ? "English" : "العربية"}
+          </button>
+        ))}
+      </span>
+      <button
+        type="button"
+        onClick={onCopy}
+        disabled={disabled}
+        title={c.copyMessageHint}
+        className={cx(
+          "inline-flex h-[22px] items-center gap-1 rounded-sm border border-border bg-surface px-2 text-label transition-colors",
+          disabled ? "text-muted-light" : "text-navy-mid hover:text-navy",
+        )}
+      >
+        <Icon name={copied ? "check" : "article"} size={13} />
+        {copied ? c.copyMessageDone : c.copyMessage}
+      </button>
+    </span>
   );
 }
 
