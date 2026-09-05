@@ -380,12 +380,20 @@ describe("the words around the card", () => {
       </LocaleProvider>,
     );
 
-  it("Given the default wording, Then a greeting, an intro, our card and a sign-off", async () => {
+  it("Given the default wording, Then his words above, our card, his words below", async () => {
     drawDraft();
-    expect(await screen.findByText("Hello,")).toBeTruthy();
-    expect(screen.getByText(/invites you to bid/)).toBeTruthy();
+    /**
+     * ⚠️ ONE box above and one below (owner, 2026-09-05). The greeting and the invitation are a
+     * single value, so they are read out of the field rather than found as separate text nodes.
+     */
+    const above = (await screen.findByLabelText(c.tplAbove)) as HTMLTextAreaElement;
+    expect(above.value.startsWith("Hello,")).toBe(true);
+    expect(above.value).toContain("invites you to bid");
+    expect((screen.getByLabelText(c.tplBelow) as HTMLTextAreaElement).value).toContain("Thanks,");
     // The details sit between them AS THE CARD — the template is greeting, card, sign-off.
-    expect(screen.getByText("MOEDATECH")).toBeTruthy();
+    // ⚠️ The mark appears twice on this screen: the locked Moedatech chip and the card's band.
+    // The band is identified by its own content, not by a logo the chip also has.
+    expect(screen.getAllByAltText("Moedatech").length).toBeGreaterThan(1);
     expect(screen.getByText(/Open the link to submit your bid/)).toBeTruthy();
   });
 
@@ -396,7 +404,7 @@ describe("the words around the card", () => {
      * thing he types are one object, which is what makes the preview honest.
      */
     drawDraft();
-    const greeting = await screen.findByLabelText(c.tplGreeting);
+    const greeting = await screen.findByLabelText(c.tplAbove);
     fireEvent.change(greeting, { target: { value: "Dear partner," } });
 
     expect((greeting as HTMLTextAreaElement).value).toBe("Dear partner,");
@@ -419,7 +427,7 @@ describe("the words around the card", () => {
   it("Given the channel, Then the preview follows it with no tabs to press", async () => {
     // The channel row already says which one he is sending; a tab strip asks the same question again.
     drawDraft();
-    await screen.findByLabelText(c.tplGreeting);
+    await screen.findByLabelText(c.tplAbove);
 
     // Pick e-mail and the e-mail frame is drawn: subject line and From.
     fireEvent.click(screen.getByText(c.email));
@@ -561,9 +569,11 @@ describe("the link preview (owner, 2026-09-02)", () => {
      * fell back to is a navy rectangle with the logo and nothing else, so the half of the card a
      * supplier sees first was the one part of the preview that was untrue.
      */
-    await waitFor(() => expect(screen.getByText("MOEDATECH")).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByAltText("Moedatech").length).toBeGreaterThan(1));
     expect(document.querySelector('img[src="/og-bid.png"]')).toBeNull();
-    expect(screen.getByText("MOEDATECH")).toBeTruthy();
+    // ⚠️ The mark appears twice on this screen: the locked Moedatech chip and the card's band.
+    // The band is identified by its own content, not by a logo the chip also has.
+    expect(screen.getAllByAltText("Moedatech").length).toBeGreaterThan(1);
     expect(screen.getByText(/Open the link to submit your bid/)).toBeTruthy();
   });
 
@@ -581,7 +591,9 @@ describe("the link preview (owner, 2026-09-02)", () => {
     fireEvent.click(await screen.findByText(c.email));
 
     // Same template, same card, whichever channel is chosen — no per-channel caveat on the message.
-    expect(screen.getByText("MOEDATECH")).toBeTruthy();
+    // ⚠️ The mark appears twice on this screen: the locked Moedatech chip and the card's band.
+    // The band is identified by its own content, not by a logo the chip also has.
+    expect(screen.getAllByAltText("Moedatech").length).toBeGreaterThan(1);
     expect(screen.getByText(/Open the link to submit your bid/)).toBeTruthy();
   });
 });
@@ -651,13 +663,14 @@ describe("the preview says what is SENT, not what is stored", () => {
       </LocaleProvider>,
     );
 
-    const intro = (await screen.findByLabelText(c.tplIntro)) as HTMLTextAreaElement;
-    expect(intro.value).toBe("Shibh Al Jazira invites you to bid on my equipment request.");
-    expect(intro.value).not.toContain("{name}");
+    const above = (await screen.findByLabelText(c.tplAbove)) as HTMLTextAreaElement;
+    // ⚠️ ONE box now (owner, 2026-09-05), so the greeting and the invitation are one value.
+    expect(above.value).toBe("Hello,\n\nShibh Al Jazira invites you to bid on my equipment request.");
+    expect(above.value).not.toContain("{name}");
 
     // Clicking in hands him the token back, because that is the thing he edits.
-    fireEvent.focus(intro);
-    await waitFor(() => expect((screen.getByLabelText(c.tplIntro) as HTMLTextAreaElement).value).toContain("{name}"));
+    fireEvent.focus(above);
+    await waitFor(() => expect((screen.getByLabelText(c.tplAbove) as HTMLTextAreaElement).value).toContain("{name}"));
   });
 
   it("Given no company name, Then the default reads properly instead of losing a word", async () => {
@@ -666,8 +679,8 @@ describe("the preview says what is SENT, not what is stored", () => {
         <ShareRequestPanel mode="post" draftForm={DRAFT} onPost={async () => "u"} />
       </LocaleProvider>,
     );
-    const intro = (await screen.findByLabelText(c.tplIntro)) as HTMLTextAreaElement;
-    expect(intro.value).toBe("You are invited to bid on my equipment request.");
+    const above = (await screen.findByLabelText(c.tplAbove)) as HTMLTextAreaElement;
+    expect(above.value).toBe("Hello,\n\nYou are invited to bid on my equipment request.");
   });
 
   it("Given the details, Then they appear ONCE — as the card, not as the card AND the text", async () => {
@@ -684,7 +697,7 @@ describe("the preview says what is SENT, not what is stored", () => {
         <ShareRequestPanel mode="post" draftForm={DRAFT} renterName="Shibh Al Jazira" onPost={async () => "u"} />
       </LocaleProvider>,
     );
-    await screen.findByLabelText(c.tplGreeting);
+    await screen.findByLabelText(c.tplAbove);
 
     /**
      * The details block names the machine ONCE. The subject line names it too since 2026-09-03
@@ -994,13 +1007,15 @@ describe("the message's language", () => {
     await screen.findByText("Al Faisal Rentals");
 
     // It starts in the interface's language, which is the best guess anyone has.
-    expect(screen.getByDisplayValue(defaultTemplate("en").greeting)).toBeTruthy();
+    const above = () => (screen.getByLabelText(c.tplAbove) as HTMLTextAreaElement).value;
+    expect(above()).toContain("Hello,");
+    expect(above()).toContain("bid on my equipment request");
 
     fireEvent.click(screen.getByText("العربية"));
 
-    await waitFor(() => expect(screen.getByDisplayValue(defaultTemplate("ar").greeting)).toBeTruthy());
+    await waitFor(() => expect(above()).toContain("مرحباً،"));
     // And the English wording is gone rather than sitting beside it.
-    expect(screen.queryByDisplayValue(defaultTemplate("en").greeting)).toBeNull();
+    expect(above()).not.toContain("bid on my equipment request");
   });
 
   it("Given Arabic is chosen, Then the CARD PICTURE is asked for in Arabic too", async () => {
@@ -1056,13 +1071,36 @@ describe("connecting Outlook", () => {
     expect(screen.queryByText(c.mailConnect)).toBeNull();
   });
 
-  it("Given a configured stage he has not connected, Then E-mail offers it before he presses Send", async () => {
-    // Offered on the CHOICE, not after a refusal: the first send then already goes the good way,
-    // instead of failing once to teach him the button exists.
+  it("Given he only TICKED e-mail, Then nothing about Microsoft is on screen yet", async () => {
+    /**
+     * ⚠️ Owner, 2026-09-05: *"this isnt here, when i click email and send to suppliers then it
+     * will ask to connect just the normal flow."* Offered on the tick, it put a paragraph about
+     * consent in front of a renter who had not asked to send anything, above the button he was
+     * reaching for.
+     */
     api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
     await pickEmail();
 
+    await waitFor(() => expect(screen.getByText(c.email)).toBeTruthy());
+    expect(screen.queryByText(c.mailConnect)).toBeNull();
+  });
+
+  it("Given the send was refused, Then the offer appears — at the moment it answers a question", async () => {
+    api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
+    api.mail = {
+      sent: false,
+      reason: "NOT_CONNECTED",
+      from: "bandar@zahid.sa",
+      domain: "zahid.sa",
+      dns: [],
+      connectPath: "/agents/mail-connect/authorize",
+    };
+    await pickEmail();
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
     await waitFor(() => expect(screen.getByText(c.mailConnect)).toBeTruthy());
+    // And the share still went out the old way while he decides.
+    expect(opened).toHaveBeenCalled();
   });
 
   it("Given he is connected, Then it says which address, and offers to disconnect", async () => {
@@ -1359,3 +1397,161 @@ describe("the clipboard has one writer at a time", () => {
     expect(screen.queryByText(c.copyAddresses)).toBeNull();
   });
 });
+
+
+/**
+ * -- His wording comes back (owner, 2026-09-05) --------------------------------------------------
+ *
+ * *"if user edited a template and get back to it later will be saved? i wanna save it for him so it
+ * is used always."*
+ *
+ * It is the whole reason the template is stored rather than rebuilt: a firm that opens every request
+ * with the same sentence should type it once, not forty times. These close the loop the storage
+ * tests leave open, which is that the PANEL reads it back on a fresh mount.
+ */
+describe("what he typed is still there next time", () => {
+  it("Given he edits and comes back, Then his words are what the panel opens with", async () => {
+    draw({ draftForm: DRAFT });
+    const above = (await screen.findByLabelText(c.tplAbove)) as HTMLTextAreaElement;
+    fireEvent.change(above, { target: { value: "Dear partner, please quote by Sunday." } });
+
+    // A different mount, as though he closed the page and came back tomorrow.
+    cleanup();
+    draw({ draftForm: DRAFT });
+
+    const again = (await screen.findByLabelText(c.tplAbove)) as HTMLTextAreaElement;
+    expect(again.value).toBe("Dear partner, please quote by Sunday.");
+  });
+
+  it("Given he edits the SUBJECT, Then that comes back too", async () => {
+    // ⚠️ It is part of the template now, not a line we rebuild each render, so it has to persist
+    // like the rest of his wording or it would silently reset every visit.
+    // ⚠️ The subject only exists on the E-MAIL frame: WhatsApp has no subject line, so drawing a
+    // field for one there would offer him something that goes nowhere.
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText(c.email));
+    const title = (await screen.findByLabelText(c.tplTitle)) as HTMLTextAreaElement;
+    fireEvent.change(title, { target: { value: "Quote needed: {equipment}" } });
+
+    cleanup();
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText(c.email));
+
+    const again = (await screen.findByLabelText(c.tplTitle)) as HTMLTextAreaElement;
+    // Shown filled, because that is what gets sent; the token is his when he clicks in.
+    expect(again.value).toContain("Quote needed:");
+    expect(again.value).toContain("Crawler Excavator");
+  });
+
+  it("Given he resets, Then it is ours again and STAYS ours after a reload", async () => {
+    draw({ draftForm: DRAFT });
+    const above = (await screen.findByLabelText(c.tplAbove)) as HTMLTextAreaElement;
+    fireEvent.change(above, { target: { value: "Mine" } });
+    fireEvent.click(await screen.findByText(c.tplReset));
+
+    cleanup();
+    draw({ draftForm: DRAFT });
+
+    const again = (await screen.findByLabelText(c.tplAbove)) as HTMLTextAreaElement;
+    expect(again.value).not.toBe("Mine");
+    expect(again.value).toContain("bid on my equipment request");
+  });
+
+  it("Given ARABIC, Then it keeps its OWN wording — the two do not overwrite each other", async () => {
+    /**
+     * ⚠️ Stored per language, and that is deliberate: a renter who writes an Arabic greeting has
+     * not thereby replaced his English one. One slot for both would mean switching the toggle
+     * silently destroyed whichever he had written first.
+     */
+    draw({ draftForm: DRAFT });
+    fireEvent.change(await screen.findByLabelText(c.tplAbove), { target: { value: "English wording" } });
+    fireEvent.click(screen.getByText("العربية"));
+    fireEvent.change(screen.getByLabelText(c.tplAbove), { target: { value: "نص عربي" } });
+
+    cleanup();
+    draw({ draftForm: DRAFT });
+
+    // Back in English, his English words. The Arabic ones did not land on top of them.
+    const again = (await screen.findByLabelText(c.tplAbove)) as HTMLTextAreaElement;
+    expect(again.value).toBe("English wording");
+  });
+});
+
+
+/**
+ * -- One wording per channel, kept on his account (owner, 2026-09-05) ----------------------------
+ *
+ * *"different template per channel but i want it stored in his profile."*
+ *
+ * An e-mail and a WhatsApp message are read in different frames and at different lengths, so a
+ * renter who writes a proper letter for one and two lines for the other was choosing which of the
+ * two to write badly. And wording kept in one browser met our default on every other machine.
+ */
+describe("a wording per channel", () => {
+  it("Given he edits E-MAIL, Then WhatsApp keeps its own", async () => {
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText(c.email));
+    fireEvent.change(screen.getByLabelText(c.tplAbove), { target: { value: "Formal letter" } });
+
+    fireEvent.click(screen.getByText(c.whatsapp));
+    await waitFor(() =>
+      expect((screen.getByLabelText(c.tplAbove) as HTMLTextAreaElement).value).not.toBe("Formal letter"),
+    );
+
+    fireEvent.change(screen.getByLabelText(c.tplAbove), { target: { value: "Two lines" } });
+
+    // Back to e-mail: the letter is still the letter.
+    fireEvent.click(screen.getByText(c.email));
+    await waitFor(() =>
+      expect((screen.getByLabelText(c.tplAbove) as HTMLTextAreaElement).value).toBe("Formal letter"),
+    );
+  });
+
+  it("Given both are set, Then a fresh mount still has both", async () => {
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText(c.email));
+    fireEvent.change(screen.getByLabelText(c.tplAbove), { target: { value: "Mail wording" } });
+    fireEvent.click(screen.getByText(c.whatsapp));
+    fireEvent.change(screen.getByLabelText(c.tplAbove), { target: { value: "Chat wording" } });
+
+    cleanup();
+    draw({ draftForm: DRAFT });
+
+    fireEvent.click(await screen.findByText(c.whatsapp));
+    await waitFor(() =>
+      expect((screen.getByLabelText(c.tplAbove) as HTMLTextAreaElement).value).toBe("Chat wording"),
+    );
+    fireEvent.click(screen.getByText(c.email));
+    await waitFor(() =>
+      expect((screen.getByLabelText(c.tplAbove) as HTMLTextAreaElement).value).toBe("Mail wording"),
+    );
+  });
+
+  it("Given RESET, Then only the channel he is reading goes back to ours", async () => {
+    // He pressed it while reading one message. Taking the other two would undo work he cannot see.
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText(c.email));
+    fireEvent.change(screen.getByLabelText(c.tplAbove), { target: { value: "Mail wording" } });
+    fireEvent.click(screen.getByText(c.whatsapp));
+    fireEvent.change(screen.getByLabelText(c.tplAbove), { target: { value: "Chat wording" } });
+
+    fireEvent.click(await screen.findByText(c.tplReset));
+    await waitFor(() =>
+      expect((screen.getByLabelText(c.tplAbove) as HTMLTextAreaElement).value).toContain("bid on my equipment request"),
+    );
+
+    fireEvent.click(screen.getByText(c.email));
+    await waitFor(() =>
+      expect((screen.getByLabelText(c.tplAbove) as HTMLTextAreaElement).value).toBe("Mail wording"),
+    );
+  });
+});
+
+/*
+ * -- `describe("his wording follows him off this browser")` lived here --
+ *
+ * Three cases covering the account copy: it wins over an empty browser, an empty account never
+ * overwrites what he typed here, and an unreachable account still lets him edit. Removed with the
+ * feature on 2026-09-05 (owner: *"for now keep it browser"*). They are worth restoring alongside
+ * `docs/implementation-plans/renter-suppliers/share-template-on-account.md`.
+ */

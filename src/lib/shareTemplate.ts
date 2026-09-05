@@ -31,19 +31,35 @@
 import type { BidCardModel } from "@/lib/bidCardModel";
 
 export interface ShareTemplate {
-  /** `Hello,` — opens the message. */
-  greeting: string;
-  /** The line that introduces the request, above the card. */
-  intro: string;
-  /** `Thanks,` and whatever follows it. */
-  signoff: string;
+  /**
+   * The subject line, and his to write.
+   *
+   * ⚠️ It was ours, built from `t.subject` on every render, so a renter could read it and not
+   * change it (owner, 2026-09-05: *"make the template title editable"*). It carries
+   * `{equipment}` for the same reason the body carries `{name}`: the wording is his and stays put
+   * across requests, while the machine it names changes every time.
+   */
+  title: string;
+  /**
+   * Everything above the card, as ONE box.
+   *
+   * ⚠️ ~~A greeting field and an intro field.~~ Two boxes for two sentences that are always
+   * read as one paragraph (owner, 2026-09-05: *"no need to seperate the edit per hello or per you
+   * are invited etc, keep them one text box above the card"*). Splitting them made the renter place
+   * his cursor twice to change one thought, and it fixed a blank line between them he could not
+   * remove.
+   */
+  above: string;
+  /** Everything below the card, as one box: the sign-off, and anything else he wants to add. */
+  below: string;
 }
 
 /**
- * The one placeholder, spelled the same in both languages so a renter who switches keeps his wording.
- * Anything else he types is his own text and is sent verbatim.
+ * The two placeholders, spelled the same in both languages so a renter who switches keeps his
+ * wording. Anything else he types is his own text and is sent verbatim.
  */
 export const NAME_TOKEN = "{name}";
+export const EQUIPMENT_TOKEN = "{equipment}";
 
 /**
  * ⚠️ Two forms of the same default, because a sentence is not a slot.
@@ -55,25 +71,48 @@ export const NAME_TOKEN = "{name}";
  */
 const DEFAULTS = {
   en: {
-    greeting: "Hello,",
-    intro: `${NAME_TOKEN} invites you to bid on my equipment request.`,
-    introNoName: "You are invited to bid on my equipment request.",
-    signoff: `Thanks,\n${NAME_TOKEN}`,
-    signoffNoName: "Thanks,",
+    title: `RFQ for ${EQUIPMENT_TOKEN}`,
+    above: `Hello,\n\n${NAME_TOKEN} invites you to bid on my equipment request.`,
+    aboveNoName: "Hello,\n\nYou are invited to bid on my equipment request.",
+    below: `Thanks,\n${NAME_TOKEN}`,
+    belowNoName: "Thanks,",
   },
   ar: {
-    greeting: "مرحباً،",
-    intro: `يدعوك ${NAME_TOKEN} لتقديم عرض على طلب معدات.`,
-    introNoName: "أنت مدعوٌّ لتقديم عرض على طلب معدات.",
-    signoff: `شكراً لك،\n${NAME_TOKEN}`,
-    signoffNoName: "شكراً لك،",
+    title: `طلب عرض سعر لـ ${EQUIPMENT_TOKEN}`,
+    above: `مرحباً،\n\nيدعوك ${NAME_TOKEN} لتقديم عرض على طلب معدات.`,
+    aboveNoName: "مرحباً،\n\nأنت مدعوٌّ لتقديم عرض على طلب معدات.",
+    below: `شكراً لك،\n${NAME_TOKEN}`,
+    belowNoName: "شكراً لك،",
   },
 } as const;
+
+/**
+ * The channels that carry a message, and therefore the ones that can carry different wording.
+ *
+ * ⚠️ **Moedatech is not among them.** Posting to Moedatech sends no message at all: the request
+ * lands in the marketplace and suppliers read it there. A template for it would be wording nobody
+ * ever receives.
+ */
+export const SHARE_CHANNELS = ["email", "whatsapp", "other"] as const;
+export type ShareChannelKey = (typeof SHARE_CHANNELS)[number];
+
+/** One wording per channel (owner, 2026-09-05: *"different template per channel"*). */
+export type ShareTemplateSet = Record<ShareChannelKey, ShareTemplate>;
+
+/**
+ * Which wording a channel reads.
+ *
+ * ⚠️ Moedatech-only still has to show a preview, and it shows the e-mail one: it is the longest
+ * of the three and the one a renter is most likely to be about to use. Showing nothing would leave
+ * the column blank on the state a renter reaches by doing nothing.
+ */
+export const channelKey = (channel: string | null | undefined): ShareChannelKey =>
+  channel === "whatsapp" || channel === "other" ? channel : "email";
 
 /** The wording a renter starts with, before he has changed anything. */
 export function defaultTemplate(lang: "en" | "ar" = "en"): ShareTemplate {
   const d = DEFAULTS[lang];
-  return { greeting: d.greeting, intro: d.intro, signoff: d.signoff };
+  return { title: d.title, above: d.above, below: d.below };
 }
 
 /**
@@ -82,48 +121,103 @@ export function defaultTemplate(lang: "en" | "ar" = "en"): ShareTemplate {
  * A field he has edited is his, and is sent as he typed it with the token taken out. A field he has
  * left alone is ours to phrase properly.
  */
-function withoutName(field: "intro" | "signoff", value: string, lang: "en" | "ar"): string | null {
+function withoutName(field: "above" | "below", value: string, lang: "en" | "ar"): string | null {
   const d = DEFAULTS[lang];
-  if (field === "intro" && value === d.intro) return d.introNoName;
-  if (field === "signoff" && value === d.signoff) return d.signoffNoName;
+  if (field === "above" && value === d.above) return d.aboveNoName;
+  if (field === "below" && value === d.below) return d.belowNoName;
   return null;
 }
 
 const key = (lang: "en" | "ar") => `moeda.shareTemplate.${lang}`;
 
+/** The three, all starting from the same wording: differing them is his choice, not our guess. */
+export function defaultTemplateSet(lang: "en" | "ar" = "en"): ShareTemplateSet {
+  const d = defaultTemplate(lang);
+  return { email: { ...d }, whatsapp: { ...d }, other: { ...d } };
+}
+
+const isTemplate = (v: unknown): v is ShareTemplate =>
+  !!v && typeof v === "object" && ["title", "above", "below"].some((k) => typeof (v as Record<string, unknown>)[k] === "string");
+
+/** One channel's wording out of a stored blob, field by field, falling back per field. */
+function readOne(raw: unknown, base: ShareTemplate, legacy: ShareTemplate | null): ShareTemplate {
+  const o = (raw ?? {}) as Partial<ShareTemplate>;
+  const from = legacy ?? base;
+  return {
+    title: typeof o.title === "string" ? o.title : from.title,
+    above: typeof o.above === "string" ? o.above : from.above,
+    below: typeof o.below === "string" ? o.below : from.below,
+  };
+}
+
 /**
- * His saved wording, or the default.
+ * The wording behind an OLDER blob, whatever shape it was in.
+ *
+ * 🔴 **Two migrations live here, and both protect writing a renter did once and expects to keep.**
+ * That is the only reason any of this is stored.
+ *
+ *   - `{greeting, intro, signoff}` — before the boxes merged. Greeting and intro rejoin with the
+ *     blank line that always sat between them on screen.
+ *   - `{title, above, below}` — before the channels split. It becomes the wording of ALL THREE,
+ *     because that is what he meant when he wrote it: at the time it was the only template there
+ *     was, and it went out on every channel.
+ */
+function legacyTemplate(saved: Record<string, unknown>, base: ShareTemplate): ShareTemplate | null {
+  const g = typeof saved.greeting === "string" ? saved.greeting : null;
+  const i = typeof saved.intro === "string" ? saved.intro : null;
+  const sg = typeof saved.signoff === "string" ? saved.signoff : null;
+  const flat = isTemplate(saved) ? (saved as unknown as Partial<ShareTemplate>) : null;
+
+  if (!g && !i && !sg && !flat) return null;
+  return {
+    title: typeof flat?.title === "string" ? flat.title : base.title,
+    above:
+      typeof flat?.above === "string"
+        ? flat.above
+        : g || i
+          ? [g, i].filter((v): v is string => !!v && v.trim() !== "").join("\n\n")
+          : base.above,
+    below: typeof flat?.below === "string" ? flat.below : (sg ?? base.below),
+  };
+}
+
+/**
+ * His saved wording for every channel, or the defaults.
  *
  * Every read is guarded: private mode, blocked storage and a half-written value are all ordinary,
- * and none of them is worth a screen that will not draw. A missing field falls back to its default
- * rather than to an empty string — a template saved before a field existed must not silently delete
- * the greeting from every message he sends.
+ * and none of them is worth a screen that will not draw.
  */
-export function loadTemplate(lang: "en" | "ar" = "en"): ShareTemplate {
-  const base = defaultTemplate(lang);
+export function loadTemplates(lang: "en" | "ar" = "en"): ShareTemplateSet {
+  const base = defaultTemplateSet(lang);
   try {
     const raw = window.localStorage.getItem(key(lang));
     if (!raw) return base;
-    const saved = JSON.parse(raw) as Partial<ShareTemplate>;
+    const saved = JSON.parse(raw) as Record<string, unknown>;
+    const legacy = legacyTemplate(saved, base.email);
     return {
-      greeting: typeof saved.greeting === "string" ? saved.greeting : base.greeting,
-      intro: typeof saved.intro === "string" ? saved.intro : base.intro,
-      signoff: typeof saved.signoff === "string" ? saved.signoff : base.signoff,
+      email: readOne(saved.email, base.email, legacy),
+      whatsapp: readOne(saved.whatsapp, base.whatsapp, legacy),
+      other: readOne(saved.other, base.other, legacy),
     };
   } catch {
     return base;
   }
 }
 
-export function saveTemplate(t: ShareTemplate, lang: "en" | "ar" = "en"): void {
+/** One channel's wording. */
+export function loadTemplate(lang: "en" | "ar" = "en", channel: ShareChannelKey = "email"): ShareTemplate {
+  return loadTemplates(lang)[channel];
+}
+
+export function saveTemplates(set: ShareTemplateSet, lang: "en" | "ar" = "en"): void {
   try {
-    window.localStorage.setItem(key(lang), JSON.stringify(t));
+    window.localStorage.setItem(key(lang), JSON.stringify(set));
   } catch {
     /* nothing here is worth a broken share */
   }
 }
 
-export function clearTemplate(lang: "en" | "ar" = "en"): void {
+export function clearTemplates(lang: "en" | "ar" = "en"): void {
   try {
     window.localStorage.removeItem(key(lang));
   } catch {
@@ -131,10 +225,10 @@ export function clearTemplate(lang: "en" | "ar" = "en"): void {
   }
 }
 
-/** Has he changed anything? Drives whether *Reset to default* is worth offering. */
+/** Has he changed THIS channel's wording? Drives whether *Reset to default* is worth offering. */
 export function isDefaultTemplate(t: ShareTemplate, lang: "en" | "ar" = "en"): boolean {
   const d = defaultTemplate(lang);
-  return t.greeting === d.greeting && t.intro === d.intro && t.signoff === d.signoff;
+  return t.title === d.title && t.above === d.above && t.below === d.below;
 }
 
 /**
@@ -155,16 +249,29 @@ export function fillName(text: string, renterName: string | null | undefined): s
 }
 
 /**
+ * Fill `{equipment}` in the subject.
+ *
+ * ⚠️ Simpler than `fillName` on purpose. A missing machine name means the request has no
+ * equipment on it yet, which is a state the panel already refuses to preview, so there is no
+ * "sentence without a slot" to rescue — the token simply goes, and the renter's own words stand.
+ */
+export function fillEquipment(text: string, equipment: string | null | undefined): string {
+  const e = equipment?.trim();
+  return text.split(EQUIPMENT_TOKEN).join(e ?? "").replace(/\s{2,}/g, " ").trim();
+}
+
+/**
  * The template as the renter reads it on screen, with the card's own block shown as one fixed piece.
  *
  * Kept beside the renderer so the preview and the sent message cannot come from two places.
  */
 export interface ShareMessageParts {
-  greeting: string;
-  intro: string;
+  /** The subject line, tokens filled. Not part of the body. */
+  title: string;
+  above: string;
   /** Ours. Not editable. */
   card: string;
-  signoff: string;
+  below: string;
   url: string;
 }
 
@@ -192,22 +299,22 @@ export function shareMessageParts(
   const own = note?.trim();
 
   const named = !!renterName?.trim();
-  const intro = named
-    ? fillName(tpl.intro, renterName)
-    : (withoutName("intro", tpl.intro, lang) ?? fillName(tpl.intro, renterName));
-  const signoff = named
-    ? fillName(tpl.signoff, renterName)
-    : (withoutName("signoff", tpl.signoff, lang) ?? fillName(tpl.signoff, renterName));
+  const above = named
+    ? fillName(tpl.above, renterName)
+    : (withoutName("above", tpl.above, lang) ?? fillName(tpl.above, renterName));
+  const below = named
+    ? fillName(tpl.below, renterName)
+    : (withoutName("below", tpl.below, lang) ?? fillName(tpl.below, renterName));
 
   return {
-    greeting: fillName(tpl.greeting, renterName),
-    // The renter's line for THIS request sits under his standing intro: the standing one says who
+    title: fillEquipment(fillName(tpl.title, renterName), m.imageHeadline),
+    // The renter's line for THIS request sits under his standing wording: the standing one says who
     // is asking, and the one-off says what is special about today. Above the card either way — it
     // is the part a person actually reads, and under the details it would be read after the
     // decision was already made.
-    intro: [intro, own || null].filter(Boolean).join("\n\n"),
+    above: [above, own || null].filter(Boolean).join("\n\n"),
     card: cardBlock(m, lang),
-    signoff,
+    below,
     url,
   };
 }
@@ -219,7 +326,7 @@ export function renderShareMessage(
   opts: { template?: ShareTemplate; renterName?: string | null; note?: string | null; lang?: "en" | "ar" } = {},
 ): string {
   const p = shareMessageParts(m, url, opts);
-  return [p.greeting, p.intro, p.card, p.signoff, p.url]
+  return [p.above, p.card, p.below, p.url]
     .map((s) => s.trim())
     .filter(Boolean)
     .join("\n\n")
@@ -228,8 +335,18 @@ export function renderShareMessage(
 }
 
 const FIXED = {
-  en: { noAccount: "No account is needed. The link opens the form.", closed: "This request is no longer accepting bids." },
-  ar: { noAccount: "لا حاجة لحساب. الرابط يفتح النموذج مباشرة.", closed: "لم يعد هذا الطلب يقبل العروض." },
+  /**
+   * ⚠️ ~~"No account is needed. The link opens the form."~~ Removed (owner, 2026-09-05).
+   *
+   * It answered a question nobody had asked yet, in the place a supplier reads the terms he is about
+   * to price, and it ended every message on a note about US rather than about the job. The bid page
+   * itself makes the point better by simply opening.
+   *
+   * The CLOSED line stays. It is not reassurance, it is the one fact that changes what a supplier
+   * does with the link: a request that no longer takes bids and does not say so wastes his time.
+   */
+  en: { closed: "This request is no longer accepting bids." },
+  ar: { closed: "لم يعد هذا الطلب يقبل العروض." },
 } as const;
 
 /**
@@ -296,8 +413,8 @@ export function cardBlock(
 
     m.closing ? "" : null,
     m.closing,
-    "",
-    m.accepting ? t.noAccount : t.closed,
+    // Only when it is closed. An open request says nothing here at all.
+    ...(m.accepting ? [] : ["", t.closed]),
   ];
 
   return lines
@@ -306,3 +423,20 @@ export function cardBlock(
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
+
+/*
+ * -- On his account, rather than in this browser -------------------------------------------------
+ *
+ * Built on 2026-09-05 and taken back out the same day (owner: *"keep it as a note but for now keep
+ * it browser"*). `fetchAccountTemplates`, `saveAccountTemplates` and `loadStore` lived here, over a
+ * table in the partners domain.
+ *
+ * ⚠️ **This is per BROWSER, and that is the whole of its limit.** It survives closing the tab and
+ * months of not using it; it does not survive a second laptop, a phone, a different browser, or
+ * cleared site data. A renter who writes his wording at the office and shares from his phone on
+ * site meets our default.
+ *
+ * The design, the migration, the handler and its eleven tests are kept verbatim in
+ * `docs/implementation-plans/renter-suppliers/share-template-on-account.md`, so restoring it is
+ * copy-and-paste rather than a redesign.
+ */

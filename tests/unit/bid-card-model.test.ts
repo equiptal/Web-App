@@ -221,7 +221,14 @@ describe("bidCardModel", () => {
     );
 
     expect(m.terms).toContainEqual({ label: "Equipment year", value: "2015" });
-    expect(m.terms).toContainEqual({ label: "Certificates", value: "TÜV, SPSP" });
+    /**
+     * ⚠️ **Two rows, not one** (owner, 2026-09-05). `Certificates: TÜV, SPSP` does not say
+     * whether the MACHINE must hold the inspection or the OPERATOR must hold the licence, and a
+     * supplier pricing the wrong one either quotes for a certificate he does not need or turns up
+     * without the one he does.
+     */
+    expect(m.terms).toContainEqual({ label: "Equipment cert", value: "TÜV" });
+    expect(m.terms).toContainEqual({ label: "Operator cert", value: "SPSP" });
   });
 
   it("Given a year of «any», Then no row — it is the absence of a requirement", () => {

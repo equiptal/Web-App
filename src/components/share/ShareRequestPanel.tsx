@@ -6,8 +6,6 @@ import { VendorMark } from "@/components/VendorMark";
 import { MoedatechBadge } from "@/components/MoedatechBadge";
 import { btn, cx } from "@/lib/ds";
 import { fmt, useLocale, useT } from "@/lib/i18n";
-import { en } from "@/lib/i18n/en";
-import { ar } from "@/lib/i18n/ar";
 import {
   bidShareUrl,
   listRenterSuppliers,
@@ -31,15 +29,18 @@ import { copyShareMessage, shareMessageHtml } from "@/lib/copyShareMessage";
 import { useBidCard } from "@/lib/useBidCard";
 import {
   cardBlock,
-  clearTemplate,
+  channelKey,
   defaultTemplate,
+  defaultTemplateSet,
+  fillEquipment,
   isDefaultTemplate,
-  loadTemplate,
+  loadTemplates,
   renderShareMessage,
-  saveTemplate,
+  saveTemplates,
   shareMessageParts,
   type ShareMessageParts,
   type ShareTemplate,
+  type ShareTemplateSet,
 } from "@/lib/shareTemplate";
 import {
   loadEmailProvider,
@@ -208,7 +209,14 @@ export function ShareRequestPanel({
   const [copiedMessage, setCopiedMessage] = useState(false);
   const [provider, setProvider] = useState<EmailProvider>("outlook");
   /** The renter's own wording, kept on this browser so every request after this one carries it. */
-  const [template, setTemplate] = useState<ShareTemplate>(() => defaultTemplate("en"));
+  /**
+   * One wording per channel (owner, 2026-09-05: *"different template per channel"*).
+   *
+   * ⚠️ An e-mail and a WhatsApp message are read in different frames and at different lengths. A
+   * renter who writes a proper letter for one and two lines for the other was, until now, choosing
+   * which of the two to write badly.
+   */
+  const [templates, setTemplates] = useState<ShareTemplateSet>(() => defaultTemplateSet("en"));
   const [query, setQuery] = useState("");
   /** Which group the list is cut to. Empty is all of them. */
   const [group, setGroup] = useState("");
@@ -285,7 +293,8 @@ export function ShareRequestPanel({
   useEffect(() => setProvider(loadEmailProvider()), []);
   // After mount, and per language: `localStorage` does not exist on the server, and the two
   // languages hold two wordings.
-  useEffect(() => setTemplate(loadTemplate(lang)), [lang]);
+  useEffect(() => setTemplates(loadTemplates(lang)), [lang]);
+
 
   useEffect(() => {
     listRenterSuppliers()
@@ -391,13 +400,20 @@ export function ShareRequestPanel({
   /**
    * What a supplier actually opens.
    *
-   * The real bid form once the request exists; the static mock in `public/` before that. Not a
-   * different idea — `Confirmation` has linked the same pair since this feature shipped.
+   * ⚠️ ~~The static `supplier-bid-v2.html` mock before the request exists.~~ Removed (owner,
+   * 2026-09-05: *"preview must show how the form will look like, it shows now the old template with
+   * mock data i dont know what is this preview"*). It was a hand-written page in `public/` that
+   * stopped tracking the real form some time ago, so the one control offering to show him what he
+   * was sending showed him a different request, with invented equipment on it.
+   *
+   * There is no honest preview before the token exists, so there is no preview: the control locks,
+   * the same rule the link, Copy link and Copy message already follow on this panel.
    */
-  const formUrl = useMemo(() => {
-    if (shareUrl) return shareUrl;
-    return typeof window === "undefined" ? "" : `${window.location.origin}/supplier-bid-v2.html?preview=1`;
-  }, [shareUrl]);
+  const formUrl = shareUrl;
+
+  /** Which of the three he is editing and sending. Moedatech-only reads the e-mail wording. */
+  const tplKey = channelKey(channel);
+  const template = templates[tplKey];
 
   const chosen = (rows ?? []).filter((s) => picked[s.id]);
   const reachable = chosen.filter(canBeEmailed);
@@ -465,12 +481,14 @@ export function ShareRequestPanel({
    * rest — and a subject line is cut at about sixty characters.
    */
   /**
-   * ⚠️ Read from the MESSAGE's dictionary, not the interface's `c`. The subject is the first line
-   * the supplier reads; an English «RFQ for» over an Arabic body is the same split this toggle
-   * exists to close.
+   * The subject line, and it is the renter's now.
+   *
+   * WARNMARK ~~Built from the message language's own `t.subject` on every render.~~ Ours, so he could
+   * read it and not change it (owner, 2026-09-05: *"make the template title editable"*). It lives in
+   * the template beside his other wording, carries `{equipment}` so the machine still changes per
+   * request while his phrasing stays, and is saved per language like the rest.
    */
-  const subjectTpl = (lang === "ar" ? ar : en).intake.postShare.subject;
-  const subject = card ? fmt(subjectTpl, { equipment: card.model.imageHeadline }) : subjectTpl.replace("{equipment}", "").trim();
+  const subject = parts?.title ?? fillEquipment(template.title, card?.model.imageHeadline ?? null);
 
   /**
    * The card the LINK turns into in the supplier's app — the thing WhatsApp draws, and the thing a
@@ -719,9 +737,17 @@ export function ShareRequestPanel({
    * a wording he typed and then sent without pressing anything must still be there next month.
    */
   const patchTemplate = (field: keyof ShareTemplate, value: string) => {
-    const next = { ...template, [field]: value };
-    setTemplate(next);
-    saveTemplate(next, lang);
+    const next: ShareTemplateSet = { ...templates, [tplKey]: { ...template, [field]: value } };
+    setTemplates(next);
+    /**
+     * Written on every keystroke, and there is no Save button because there is nothing to press.
+     *
+     * ⚠️ **This browser only.** Not his account: that was built and withdrawn on 2026-09-05
+     * (owner: *"for now keep it browser"*), and the whole design is kept in
+     * `docs/implementation-plans/renter-suppliers/share-template-on-account.md`. So his wording
+     * survives closing the tab and months away, and it does not reach his phone.
+     */
+    saveTemplates(next, lang);
   };
 
   /** Saves whichever contact the chosen channel is missing — an address, or a number. */
@@ -846,15 +872,22 @@ export function ShareRequestPanel({
               the same document the confirmation screen has always linked. A renter deciding whether
               to send something should be able to look at what he is sending, and «post it and find
               out» is not an answer. */}
-          <a
-            href={formUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cx(btn("secondary", "md"), "flex-none")}
-          >
-            <Icon name="visibility" size={14} />
-            {c.previewShort}
-          </a>
+          {formUrl ? (
+            <a
+              href={formUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cx(btn("secondary", "md"), "flex-none")}
+            >
+              <Icon name="visibility" size={14} />
+              {c.previewShort}
+            </a>
+          ) : (
+            <button type="button" disabled title={c.linkHint} className={cx(btn("secondary", "md"), "flex-none")}>
+              <Icon name="lock" size={14} />
+              {c.previewShort}
+            </button>
+          )}
         </div>
       </div>
       )}
@@ -1236,7 +1269,16 @@ export function ShareRequestPanel({
                2026-09-01), so the From line names HIM. */
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-surface">
               <div className="flex-none border-b border-border bg-surface2 px-3 py-2">
-                <div className="text-meta font-extrabold text-navy">{subject}</div>
+                {/* WARNMARK The subject is a FIELD now, drawn as the line it will become rather than
+                    as a boxed input: the same rule as his other wording, so what he edits and what
+                    he reads are one object. */}
+                <Editable
+                  value={template.title}
+                  display={subject}
+                  onChange={(v) => patchTemplate("title", v)}
+                  label={c.tplTitle}
+                  className="text-meta font-extrabold text-navy"
+                />
                 <div className="mt-0.5 text-label text-muted">{fmt(c.fromLine, { name: renterName || c.fromYou })}</div>
               </div>
               {/* One scroll region for the whole message. It used to be three, nested — the body,
@@ -1285,8 +1327,12 @@ export function ShareRequestPanel({
             <button
               type="button"
               onClick={() => {
-                clearTemplate(lang);
-                setTemplate(defaultTemplate(lang));
+                /* ⚠️ THIS channel's wording, not all three. He pressed reset while reading one
+                   message; taking the other two with it would be a button that undoes work he is
+                   not looking at. */
+                const next: ShareTemplateSet = { ...templates, [tplKey]: defaultTemplate(lang) };
+                setTemplates(next);
+                saveTemplates(next, lang);
               }}
               className="self-start text-meta font-semibold text-brand"
             >
@@ -1469,15 +1515,19 @@ export function ShareRequestPanel({
           )}
 
           {/* ── Connect Outlook (SUP-BE-23, the Graph path) ────────────────────────────────────
-              Drawn in two situations, and they are the same offer:
+              ⚠️ **Only after a send has actually been refused** (owner, 2026-09-05: *"this isnt
+              here, when i click email and send to suppliers then it will ask to connect just the
+              normal flow"*).
 
-                - he has chosen E-mail, this stage HAS a registration and he has not connected;
-                - a send was refused and the answer carried a `connectPath`.
+              ~~Also offered the moment he ticked E-mail.~~ That put a paragraph about Microsoft
+              consent in front of a renter who had not asked to send anything yet, sitting above the
+              button he was reaching for. The offer belongs at the moment it answers a question he
+              actually has: he pressed Send, a compose window opened instead, and this is why.
 
-              ⚠️ **`connectPath`, never the reason, decides the second one.** Listing reasons
-              in the web means a redeploy the day the backend adds one, and a stage with no app
-              registration would get a button that leads nowhere. */}
-          {connect?.configured && !connect.connected && (channel === "email" || (mailer?.sent === false && mailer.connectPath)) && (
+              ⚠️ **`connectPath`, never the reason, decides it.** Listing reasons in the web means
+              a redeploy the day the backend adds one, and a stage with no app registration would get
+              a button that leads nowhere. */}
+          {connect?.configured && !connect.connected && mailer?.sent === false && mailer.connectPath && (
             <div className="mt-1 rounded-md border border-border bg-surface2 p-3">
               <p className="text-meta text-navy-mid">{c.mailConnectWhy}</p>
               <button
@@ -1688,8 +1738,12 @@ function Message({
 }) {
   return (
     <div className="grid gap-3">
-      <Editable value={template.greeting} display={parts.greeting} onChange={(v) => onChange("greeting", v)} label={c.tplGreeting} />
-      <Editable value={template.intro} display={parts.intro} onChange={(v) => onChange("intro", v)} label={c.tplIntro} />
+      {/* WARNMARK **One box, not two** (owner, 2026-09-05: *"no need to seperate the edit per hello
+          or per you are invited etc, keep them one text box above the card"*). The greeting and the
+          line that introduces the request are read as one paragraph, so editing them as two fields
+          meant placing the cursor twice to change one thought, with a blank line between them the
+          renter could not remove. */}
+      <Editable value={template.above} display={parts.above} onChange={(v) => onChange("above", v)} label={c.tplAbove} />
 
       {/* ── The CARD is the details, and it carries the link (owner, 2026-09-03) ──────────────────
           *"greetings, {name} invites you to bid on my equipment request, then the card with the
@@ -1721,7 +1775,8 @@ function Message({
         <p className="whitespace-pre-wrap text-meta leading-relaxed text-navy">{detail}</p>
       )}
 
-      <Editable value={template.signoff} display={parts.signoff} onChange={(v) => onChange("signoff", v)} label={c.tplSignoff} />
+      {/* The other box: the sign-off and anything else he wants under the request. */}
+      <Editable value={template.below} display={parts.below} onChange={(v) => onChange("below", v)} label={c.tplBelow} />
 
       {/* ⚠️ **The link is a LINE of its own, after the sign-off, and it was missing entirely.**
           `shareMessageHtml` ends with it deliberately: a client that strips the card still leaves a
@@ -1764,6 +1819,7 @@ function Editable({
   display,
   onChange,
   label,
+  className,
 }: {
   /** What is stored and edited — with `{name}` in it. */
   value: string;
@@ -1771,6 +1827,8 @@ function Editable({
   display: string;
   onChange: (v: string) => void;
   label: string;
+  /** Extra type classes, so the subject can carry the weight a subject line has. */
+  className?: string;
 }) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
   const [editing, setEditing] = useState(false);
@@ -1804,7 +1862,10 @@ function Editable({
         onFocus={() => setEditing(true)}
         onBlur={() => setEditing(false)}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full resize-none overflow-hidden rounded-sm border border-border bg-surface2/60 py-1 pe-7 ps-2 text-meta leading-relaxed text-navy outline-none transition hover:border-border-strong focus:border-brand focus:bg-surface"
+        className={cx(
+          "w-full resize-none overflow-hidden rounded-sm border border-border bg-surface2/60 py-1 pe-7 ps-2 leading-relaxed outline-none transition hover:border-border-strong focus:border-brand focus:bg-surface",
+          className ?? "text-meta text-navy",
+        )}
       />
       <Icon
         name="edit"

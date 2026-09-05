@@ -31,6 +31,7 @@
  */
 
 import { COLORS, RADII } from "@/lib/ds-colors";
+import { logoDataUri } from "@/lib/bidOgAssets";
 import type { BidCardModel } from "@/lib/bidCardModel";
 
 export interface BidCardPreview {
@@ -57,10 +58,13 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-/** Host for the card's source-domain line — the trust signal (element 4 in the prototype). */
-function hostOf(url: string): string {
-  return url.replace(/^https?:\/\//, "").split("/")[0].toUpperCase();
-}
+/*
+ * — `hostOf` lived here —
+ *
+ * It upper-cased the link's domain for the band's source line. Both are gone (owner, 2026-09-05):
+ * the card is inside an `<a>`, so it IS the link, and every unfurling client draws its own domain
+ * line anyway.
+ */
 
 /*
  * — `JOIN_LINE` lived here —
@@ -90,14 +94,30 @@ function hostOf(url: string): string {
  * equipment, the call to bid, and the host underneath. Not a replica of the pixels — a statement of
  * the same facts, which is what a preview owes.
  */
-function navyBand(model: BidCardModel, host: string, align: string): string {
+function navyBand(model: BidCardModel, align: string): string {
   const headline = escapeHtml(model.imageHeadline);
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;background:${COLORS.navy};">
-      <tr><td align="${align}" style="padding:16px 18px 14px;">
-        <div style="font-size:13px;font-weight:800;letter-spacing:1px;color:${COLORS.surface};">MOEDATECH</div>
+      <tr><td align="${align}" style="padding:16px 18px 16px;">
+        ${
+          /* WARNMARK **The MARK, not the word** (owner, 2026-09-05: *"make sure moedatech show the
+             moedatech logo not the text"*). `MOEDATECH` in letter-spaced caps was a stand-in that
+             outlived its excuse: the real card at `/bid/<token>/og` has drawn the logo all along, so
+             the preview was showing a different brand from the thing it previews.
+
+             The same `logoDataUri` that route uses, white on navy. A data URI rather than a path,
+             because this markup is also what a paste carries into a mail client, and a client
+             fetching `/moedatech-logo.svg` from wherever it happens to be would fetch nothing. */ ""
+        }
+        <img src="${logoDataUri(COLORS.surface)}" alt="Moedatech" width="96" height="36" style="display:block;width:96px;height:auto;border:0;outline:none;">
         <div style="font-size:${headline.length > 46 ? 16 : 20}px;font-weight:700;color:${COLORS.surface};line-height:1.2;padding-top:16px;">${headline}</div>
         <div style="font-size:12px;font-weight:700;color:${model.accepting ? COLORS.brand : COLORS.dangerHover};padding-top:10px;">${escapeHtml(model.cta)}</div>
-        <div style="font-size:9.5px;letter-spacing:1.5px;color:rgba(255,255,255,0.48);padding-top:14px;">${escapeHtml(host.toUpperCase())}</div>
+        ${
+          /* WARNMARK ~~The host, small and grey under the call to bid.~~ Removed (owner, 2026-09-05).
+             It was a trust signal when the card was the whole message, and it is noise now: the
+             whole block is inside an `<a>`, so the card IS the link, and `WEB-PRODUCTION-DE3C8.
+             UP.RAILWAY.APP` under a request reads as machinery rather than as reassurance. The same
+             line was removed from the white half on 2026-09-03; this copy was missed. */ ""
+        }
       </td></tr>
     </table>`;
 }
@@ -145,7 +165,7 @@ export function bidCardHtml(card: BidCardPreview, model: BidCardModel | null, la
                style carry it, because Outlook reads the attributes and ignores the style. */
             `<img src="${escapeHtml(card.imageUrl)}" alt="" width="440" height="231" style="display:block;width:440px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;background-color:${COLORS.navy};">`
           : model
-            ? navyBand(model, hostOf(card.url), align)
+            ? navyBand(model, align)
             : ""
       }
     </td></tr>

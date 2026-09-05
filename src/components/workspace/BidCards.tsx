@@ -37,6 +37,8 @@ export function BidCards({
   submissionsByBid,
   durationDays,
   startDate,
+  mobByRentee = null,
+  demobByRentee = null,
   onToggle,
 }: {
   bids: WorkspaceBid[];
@@ -49,6 +51,13 @@ export function BidCards({
   unreadByBid: Record<string, number>;
   /** The raw submission behind an off-platform card, for the viewer. */
   submissionsByBid: Record<string, LinkBidSubmission>;
+  /**
+   * Whose transport legs these are, off the renter's own request (`RequestListItem.mobByRentee`).
+   * `true` = his, so the supplier was never asked for a price and the row must say so rather than
+   * printing his silence, or the shared form's stored 0, as a quote.
+   */
+  mobByRentee?: boolean | null;
+  demobByRentee?: boolean | null;
   onToggle: (bidId: string) => void;
 }) {
   const t = useT();
@@ -92,6 +101,8 @@ export function BidCards({
           submission={submissionsByBid[b.card.id] ?? null}
           durationDays={durationDays}
           startDate={startDate}
+          mobByRentee={mobByRentee}
+          demobByRentee={demobByRentee}
           onSelect={() => onToggle(b.card.id)}
         />
       ))}
@@ -106,6 +117,8 @@ function BidCardTile({
   submission,
   durationDays,
   startDate,
+  mobByRentee,
+  demobByRentee,
   onSelect,
 }: {
   bid: WorkspaceBid;
@@ -114,6 +127,8 @@ function BidCardTile({
   submission: LinkBidSubmission | null;
   durationDays: number | null;
   startDate: string | null;
+  mobByRentee?: boolean | null;
+  demobByRentee?: boolean | null;
   onSelect: () => void;
 }) {
   const t = useT();
@@ -461,8 +476,10 @@ function BidCardTile({
             {/* The rental, prorated across the billable days — what the headline's rate adds up to
                 over this request. Dropped when the headline already is the total. */}
             {showRentalRow && <Row label={rentalRowLabel} value={totals.perUnit.rental} />}
-            <LegRow label={t.workspace.deliveryToSite} amount={card.mobPrice} excluded={card.mobExcluded} />
-            <LegRow label={t.workspace.returnFromSite} amount={card.demobPrice} excluded={card.demobExcluded} />
+            {/* The legs name the party when the request kept one (owner, 2026-09-05) — see
+                `legDisplay`, which is where the three misreadings of a renter-owned leg are set out. */}
+            <LegRow label={t.workspace.deliveryToSite} amount={card.mobPrice} excluded={card.mobExcluded} onRentee={mobByRentee === true} />
+            <LegRow label={t.workspace.returnFromSite} amount={card.demobPrice} excluded={card.demobExcluded} onRentee={demobByRentee === true} />
             <div className="flex flex-col gap-1.5 border-t border-border/70 pt-2">
               <Row label={t.priceFooter.subtotal} value={totals.perUnit.subtotal} muted />
               <Row label={t.priceFooter.vat} value={totals.perUnit.vat} muted />
@@ -566,13 +583,35 @@ function BidCardTile({
       <div className="mt-auto flex flex-none gap-2 px-3.5 pb-3.5 pt-0.5">
         {offline ? (
           <>
+            {/* ── «View quote» leads, «Invite» follows (owner, 2026-09-05) ───────────────────────
+                ~~Invite was the primary and took the width; «View quote» was the small secondary.~~
+                Swapped. Reading what the supplier actually quoted is why a renter opens this card;
+                inviting him onto the app is something he may do afterwards, and it was wearing the
+                emphasis of the act he came for.
+
+                ── It VIEWS the bid; it never edited one (owner, 2026-08-31) ───────────────────
+                ~~«Edit quote».~~ What it opens is `SharedBidSubmissionModal`, read-only by
+                construction — the supplier's own answers in the bid form's shape, Yes/No as static
+                chips and prices as static values. A renter editing another firm's quote is not a
+                thing the product does. */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSubOpen(true);
+              }}
+              className={btn("primary", "lg", { className: "flex-1 transition" })}
+            >
+              {t.workspace.viewQuote}
+            </button>
+
             {/* ── Invite him onto the app (owner, 2026-08-25) ────────────────────────────────────
                 Off-platform only, by decision: a supplier who bid THROUGH the app already has it.
 
                 The mechanism is «Provide it for me?»'s, not a new one (`MachineCard.tsx:327`) — fill a
                 template, open WhatsApp at the number, and let the renter press send. It reaches the
                 supplier from the renter's OWN account, which is what the owner asked for, and it
-                needs no endpoint and no projection: `supplierPhone` is already on the bid.
+                needs no endpoint and no projection: `supplierPhone` is on the bid.
 
                 The destination is `JOIN_URL`, not a URL inside the sentence (SUP-T01) — the supplier
                 list sends this same invitation, and two copies of a link drift apart the first time
@@ -580,7 +619,9 @@ function BidCardTile({
 
                 Where we hold no number the control still renders, disabled, saying why — a button
                 that vanished would read as «this supplier cannot be invited», when the truth is only
-                that this bid arrived without a way to reach him. */}
+                that this bid arrived without a way to reach him. Until 2026-09-05 that was EVERY
+                off-platform bid: the submission's phone sits in `contactInfo` and the mapper never
+                copied it to `supplierPhone` (`link-bids.ts`). */}
             {invitePhone ? (
               <button
                 type="button"
@@ -590,7 +631,7 @@ function BidCardTile({
                   window.open(`https://wa.me/${invitePhone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
                   setInvited(true);
                 }}
-                className={btn("primary", "lg", { className: "flex-1 transition" })}
+                className={btn("secondary", "lg", { className: "flex-none transition" })}
               >
                 {/* The same glyph the supplier row and the profile dialog use for this act, so a
                     renter meets one «invite» across the product rather than three. */}
@@ -603,31 +644,12 @@ function BidCardTile({
                 disabled
                 title={t.workspace.inviteNoContact}
                 onClick={(e) => e.stopPropagation()}
-                className={btn("primary", "lg", { className: "flex-1" })}
+                className={btn("secondary", "lg", { className: "flex-none" })}
               >
                 <Icon name="person_add" size={16} />
                 {t.workspace.inviteToApp}
               </button>
             )}
-            {/* ── It VIEWS the bid; it never edited one (owner, 2026-08-31) ───────────────────
-                ~~«Edit quote».~~ What it opens is `SharedBidSubmissionModal`, which is read-only by
-                construction — the supplier's own answers laid out in the bid form's shape, Yes/No as
-                static chips and prices as static values. Nothing in it can be changed, and nothing
-                should be: this is what the SUPPLIER submitted through the shared link, and a renter
-                editing another firm's quote is not a thing the product does.
-
-                The label was describing a different button that never existed. It is «View quote»,
-                which is the key that was already sitting in the dictionary unused beside it. */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setSubOpen(true);
-              }}
-              className={btn("secondary", "lg", { className: "transition" })}
-            >
-              {t.workspace.viewQuote}
-            </button>
           </>
         ) : (
           <button
@@ -707,9 +729,9 @@ function Row({ label, value, muted }: { label: string; value: number; muted?: bo
  * first, then a price that was never quoted. A zero would claim the supplier delivers free, and a
  * blank would claim nothing at all — both say more than the quote does.
  */
-function LegRow({ label, amount, excluded }: { label: string; amount: number | null; excluded?: boolean | null }) {
+function LegRow({ label, amount, excluded, onRentee }: { label: string; amount: number | null; excluded?: boolean | null; onRentee?: boolean }) {
   const t = useT();
-  const leg = legDisplay({ amount, excluded });
+  const leg = legDisplay({ amount, excluded, onRentee });
   return (
     <div className="flex items-baseline justify-between gap-2 text-navy">
       <span className="text-meta font-semibold">{label}</span>
@@ -718,6 +740,8 @@ function LegRow({ label, amount, excluded }: { label: string; amount: number | n
           <>
             {formatSar(leg.amount)} <span className="text-label font-semibold text-muted">{t.priceFooter.currency}</span>
           </>
+        ) : leg.kind === "on_rentee" ? (
+          t.workspace.onRentee
         ) : leg.kind === "excluded" ? (
           t.priceFooter.excluded
         ) : (

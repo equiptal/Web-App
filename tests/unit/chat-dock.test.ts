@@ -49,6 +49,7 @@ const row = (over: Partial<InboxBid> = {}): InboxBid => ({
   equipmentName: null,
   request: { id: "r1", displayId: null, shortCode: null, equipmentSummary: null, groupId: "g1", location: null },
   equipmentType: { id: "t1", name: "Excavator" },
+  equipment: { subtype: "Crawler excavator", subtypeAr: null, size: "20 ton", sizeAr: null },
   createdAt: null,
   supplierStarted: false,
   ...over,

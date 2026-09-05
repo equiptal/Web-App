@@ -235,13 +235,27 @@ export function divisorNote(unit: string | null | undefined, L: (en: string, ar:
 }
 
 /** How one transport leg reads when it has no number to show (priority order, mobile §7). */
-export type LegDisplay = { kind: "amount"; amount: number } | { kind: "excluded" | "bundled" | "not_quoted" };
+export type LegDisplay = { kind: "amount"; amount: number } | { kind: "on_rentee" | "excluded" | "bundled" | "not_quoted" };
 
 export function legDisplay(leg: {
+  /**
+   * The RENTER's request put this leg on him, so no supplier was ever asked to price it.
+   *
+   * First in the order, above a stated amount, because it is the only one of these states that is a
+   * fact about the REQUEST rather than about the offer — and because both of the figures that reach
+   * here in that case are lies. An app bid sends no price (the backend only demands one when the leg
+   * IS the supplier's), so the leg reads «Not quoted», as though he had ducked a mandatory answer.
+   * An off-platform bid stores 0: the public form hides the input, its `num("")` returns 0, and
+   * `submitBidForm`'s own `num()` would store 0 even if the field were omitted. That prints
+   * «Delivery to site · 0 SAR», which reads as free delivery from a supplier who was never asked to
+   * deliver.
+   */
+  onRentee?: boolean | null;
   excluded?: boolean | null;
   bundled?: boolean | null;
   amount?: number | null;
 }): LegDisplay {
+  if (leg.onRentee) return { kind: "on_rentee" };
   if (leg.excluded) return { kind: "excluded" };
   if (leg.bundled) return { kind: "bundled" };
   if (leg.amount == null || !Number.isFinite(Number(leg.amount))) return { kind: "not_quoted" };

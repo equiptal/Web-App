@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui";
 import { useSession } from "@/lib/session";
@@ -10,6 +10,7 @@ import type { InboxBid } from "@/lib/contract/inbox";
 import { requestExpiry, expiryState, type ExpiryState } from "@/lib/contract/request-expiry";
 import { submissionToBidCard } from "@/lib/contract/link-bids";
 import type { WorkspaceBid } from "@/lib/contract/workspace";
+import type { BidCard } from "@/lib/contract/bids";
 import { hiddenRequests, hideRequest, unhideRequest } from "@/lib/access/hidden-requests";
 import { RequestDetailsModal, type ShareLinkMeta } from "@/components/workspace/RequestDetailsModal";
 import { ConfirmCancelModal } from "@/components/requests/RequestEditModals";
@@ -34,6 +35,35 @@ import { pin } from "@/lib/uiPins";
  * table showing three, which reads as a broken list rather than as a summary of one.
  */
 const BIDS_SHOWN = 5;
+/** How many of the renter's request groups the rail reads shared-link bids for — see the effect. */
+const LINK_FANOUT_MAX = 20;
+
+/** «Excavator · 20 ton» — and just «Excavator» when the request named no size. */
+const machineWords = (subtype: string | null, size: string | null): string =>
+  [subtype, size].filter(Boolean).join(" · ");
+
+/** One off-platform bid, as the rail needs it: the card the workspace builds, plus the two facts the
+ *  submission cannot know about itself — which request it answers, and where that job is. */
+interface LinkRailBid {
+  card: BidCard;
+  requestId: string;
+  machine: string;
+  location: string | null;
+}
+
+/** A row of the rail, from EITHER source. Four facts and a destination — see the merge below. */
+interface RailBid {
+  key: string;
+  name: string;
+  price: number | null;
+  priceUnit: string | null;
+  machine: string | null;
+  location: string | null;
+  /** Arrived through the renter's shared link rather than through an account. */
+  offPlatform: boolean;
+  at: string | null;
+  href: string;
+}
 const SHOWN = BIDS_SHOWN;
 /** One height for a bid row and a request row alike — see {@link BIDS_SHOWN}. */
 const ROW_H = "h-[52px]";
@@ -86,6 +116,43 @@ export function HomeRequests() {
   const [bids, setBids] = useState<InboxBid[] | null>(null);
   /** Keyed by group id — resolved after the rows are known, so the table paints before the dates do. */
   const [expiry, setExpiry] = useState<Record<string, ExpiryState>>({});
+  /**
+   * ── The bids that arrived OFF the platform (owner, 2026-09-05) ────────────────────────────────
+   *
+   * *"I want these bids to even show the off-platform bids."*
+   *
+   * The rail read `fetchReceivedBids`, which is the app's own projection: it knows nothing about a
+   * supplier who answered the renter's shared link, so a request whose only offers came that way said
+   * «no bids yet» on the dashboard while the workspace listed three. One rail, both sources now.
+   *
+   * They arrive per REQUEST — there is no "all my submissions" endpoint on the agents service — so
+   * they are fanned out over the renter's own groups. One call per group, shared with the deadline
+   * lookup below through `loadSubs`, so adding this source costs no extra round trip for a row the
+   * table was already dating.
+   */
+  const [linkBids, setLinkBids] = useState<LinkRailBid[]>([]);
+
+  /**
+   * One read of a request's shared-link envelope, however many callers want it.
+   *
+   * Two do: the deadline resolver below wants its `bidDeadline`, and the rail wants its
+   * `submissions`. Before this they would have been two calls for one payload on every row the table
+   * dates. Memoised by request id for the life of the mount, and never cleared on error — a failed
+   * read answers `null` to both callers, which is what each of them already handles.
+   */
+  const subsOnce = useRef(new Map<string, Promise<Awaited<ReturnType<typeof fetchRequestSubmissions>> | null>>());
+  const loadSubs = useCallback((requestId: string) => {
+    const cached = subsOnce.current.get(requestId);
+    if (cached) return cached;
+    const p = fetchRequestSubmissions(requestId).catch(() => null);
+    subsOnce.current.set(requestId, p);
+    return p;
+  }, []);
+  // A new account (or a sign-in) must not read the previous renter's envelopes back out of the cache.
+  useEffect(() => {
+    subsOnce.current = new Map();
+    setLinkBids([]);
+  }, [sessionKey]);
 
   /** Both cards open in place rather than navigating away (owner, 2026-08-30). They grow to fit every
    *  row: nothing is hidden behind an inner scrollbar, at the cost of the two cards no longer ending
@@ -132,7 +199,7 @@ export function HomeRequests() {
     let live = true;
     void Promise.all([
       fetchBids(first.id).catch(() => ({ bids: [] })),
-      fetchRequestSubmissions(first.id).catch(() => null),
+      loadSubs(first.id),
     ]).then(([app, link]) => {
       if (!live) return;
       // One card per item of a submission, as the workspace cuts them: an off-platform supplier can
@@ -148,7 +215,7 @@ export function HomeRequests() {
     return () => {
       live = false;
     };
-  }, [open]);
+  }, [open, loadSubs]);
 
   /** Re-read the requests after something changed them — an edit saved, a cancellation taken. */
   const reload = useCallback(() => {
@@ -180,6 +247,53 @@ export function HomeRequests() {
     };
   }, [sessionKey, status]);
 
+
+  /**
+   * The off-platform bids for the renter's own requests, fanned out over his groups.
+   *
+   * One call per GROUP, not per item: the agents endpoint resolves the whole fan-out from any of its
+   * request ids and returns every submission on it, so asking for the first item covers the rest.
+   *
+   * Capped at `LINK_FANOUT_MAX` groups, newest first. A renter with sixty live requests would
+   * otherwise open his dashboard on sixty parallel reads to state a count in a card five rows tall;
+   * the workspace remains the place that shows every bid on a request, and it reads that request
+   * directly.
+   */
+  useEffect(() => {
+    // Skipped only while the session is still resolving — the same guard the received-bids read
+    // above uses. Stricter than that (`=== "authed"`) and a dashboard whose session is revalidating
+    // shows the app's bids and silently drops the shared-link ones for the same renter.
+    if (!groups?.length || status === "loading") return;
+    let live = true;
+    void Promise.all(
+      groups.slice(0, LINK_FANOUT_MAX).map(async (g) => {
+        const first = g.items[0];
+        if (!first) return [] as LinkRailBid[];
+        const envelope = await loadSubs(first.id);
+        // One rail row per ITEM of a submission, the same cut the workspace makes: an off-platform
+        // supplier can answer several lines of one RFQ, and each line is its own offer with its own
+        // price.
+        return (envelope?.submissions ?? []).flatMap((sub) =>
+          (sub.items.length ? sub.items : [undefined]).map((it) => {
+            const requestId = it?.requestId ?? first.id;
+            // The machine as the REQUEST names it — subtype · size — read off the group's own item
+            // rather than off the submission, which carries only the label the form showed.
+            const row = g.items.find((x) => x.id === requestId) ?? first;
+            return {
+              card: submissionToBidCard(sub, it),
+              requestId,
+              machine: (ar ? row.item?.nameAr || row.item?.name : row.item?.name) ?? it?.label ?? "",
+              location: g.locationLabel,
+            };
+          }),
+        );
+      }),
+    ).then((rows) => live && setLinkBids(rows.flat()));
+    return () => {
+      live = false;
+    };
+  }, [groups, status, loadSubs, ar]);
+
   /** Resolve the deadline for the rows on screen, link first and the window only if it is unset.
    *  A row the status has already answered is skipped — there is nothing a date could add to it. */
   useEffect(() => {
@@ -201,7 +315,7 @@ export function HomeRequests() {
       void (async () => {
         let bidDeadline: string | null = null;
         try {
-          bidDeadline = (await fetchRequestSubmissions(first.id)).bidDeadline;
+          bidDeadline = (await loadSubs(first.id))?.bidDeadline ?? null;
         } catch {
           /* the link tracker is optional — fall through to the window */
         }
@@ -247,7 +361,7 @@ export function HomeRequests() {
     return () => {
       live = false;
     };
-  }, [groups, allRequests]);
+  }, [groups, allRequests, loadSubs]);
 
   if (groups && !groups.length) return null;
 
@@ -255,12 +369,59 @@ export function HomeRequests() {
      both count what is actually on screen. */
   const visible = (groups ?? []).filter((g) => !hidden.includes(g.id));
   const rows = allRequests ? visible : visible.slice(0, SHOWN);
-  const bidList = bids ?? [];
-  const fresh = bidList.reduce((n, b) => n + (b.unreadCount || 0), 0);
+  const appBids = bids ?? [];
+  const fresh = appBids.reduce((n, b) => n + (b.unreadCount || 0), 0);
+
+  /* ── One rail, two sources (owner, 2026-09-05) ────────────────────────────────────────────────
+     App bids and shared-link submissions are different records with different fields, and the rail
+     is one list of one thing: somebody offered a price on a machine. So both are flattened to the
+     four facts the card states — who, how much, which machine, where — and merged newest first.
+
+     `at` sorts them: an off-platform bid submitted this morning belongs above an app bid from
+     Tuesday. A row with no date sorts last rather than first, so a missing timestamp cannot push a
+     bid to the top of the renter's attention. */
+  const railRow = (b: InboxBid): RailBid => ({
+    key: `app:${b.bidId}`,
+    name: b.supplierName,
+    price: b.currentPrice,
+    priceUnit: b.priceUnit,
+    // The machine the REQUEST names, not the model the supplier listed (owner, 2026-09-05).
+    machine: machineWords(
+      ar ? b.equipment.subtypeAr ?? b.equipment.subtype : b.equipment.subtype,
+      ar ? b.equipment.sizeAr ?? b.equipment.size : b.equipment.size,
+    ) || b.request.equipmentSummary || b.equipmentName,
+    location: b.request.location,
+    offPlatform: false,
+    at: b.createdAt,
+    // Every app bid opens the workspace; `r` names the request so it lands on the right one.
+    href: b.request.id ? `/requests?r=${encodeURIComponent(b.request.id)}` : "/requests",
+  });
+  const linkRow = (b: LinkRailBid): RailBid => ({
+    key: `link:${b.card.id}`,
+    name: b.card.supplierName,
+    price: b.card.price,
+    priceUnit: b.card.priceUnit,
+    machine: b.machine,
+    location: b.location,
+    offPlatform: true,
+    at: b.card.submittedAt,
+    href: `/requests?r=${encodeURIComponent(b.requestId)}`,
+  });
+  const bidList: RailBid[] = [...appBids.map(railRow), ...linkBids.map(linkRow)].sort(
+    (x, y) => (y.at ?? "").localeCompare(x.at ?? ""),
+  );
   const newest = allBids ? bidList : bidList.slice(0, BIDS_SHOWN);
   const restBids = Math.max(0, bidList.length - BIDS_SHOWN);
 
   const money = (n: number | null): string => (n == null ? "—" : Math.round(n).toLocaleString("en-US"));
+  /** «/ month», «/ day» — the same four words the store's own prices carry, so one rental basis is
+   *  written one way across the product (owner, 2026-09-05). Nothing for a basis nobody sent. */
+  const priceUnitWord = (unit: string | null): string | null =>
+    unit === "PER_MONTH" ? t.store.perMonth
+    : unit === "PER_WEEK" ? t.store.perWeek
+    : unit === "PER_JOB" ? t.store.perJob
+    : unit === "PER_DAY" ? t.store.perDay
+    : null;
 
   /**
    * The dismissal explainer, shown ONCE per device.
@@ -607,18 +768,29 @@ export function HomeRequests() {
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
             {newest.map((b) => (
               <button
-                key={b.bidId}
+                key={b.key}
                 type="button"
-                onClick={() => router.push("/requests")}
+                onClick={() => router.push(b.href)}
                 className={cx(ROW_H, "flex w-full items-center gap-2.5 border-b border-border px-3 text-start transition last:border-b-0 hover:bg-surface2")}
               >
                 <span className="grid size-7 flex-none place-items-center rounded-full border border-border bg-surface3 text-label font-extrabold text-navy">
-                  {b.supplierName.trim().charAt(0) || "?"}
+                  {b.name.trim().charAt(0) || "?"}
                 </span>
                 {/* Four facts, two lines, one card (owner, 2026-09-04): who bid and for how much,
                     then the machine he bid on and where the job is. The price is the only thing that
                     never yields — a number cut in half is a wrong number, so it keeps its width and
                     the NAME truncates beside it.
+
+                    The MACHINE is the request's own words — subtype · size, «Excavator · 20 ton» —
+                    not the supplier's listing (owner, 2026-09-05: *"show equipment subtype and size,
+                    not model and year"*). «Caterpillar 320» answers which machine he is offering; on
+                    a rail of incoming bids the renter is scanning for which machine was ASKED for,
+                    and two firms offering the same 20-tonner under different model numbers read as
+                    two unrelated machines.
+
+                    The price carries its UNIT for the same reason (owner, same day): 500 a day and
+                    500 a month are not comparable numbers, and the rail sits next to a table of
+                    requests whose rental basis varies row by row.
 
                     The site is the one that goes when the card is tight: it is the least of the four
                     (the renter usually knows where his own job is), so below 260px of rail it is
@@ -627,24 +799,34 @@ export function HomeRequests() {
                     a phone, so a viewport breakpoint would hide it in exactly the wrong one. */}
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline gap-2">
-                    <span className="min-w-0 truncate text-body font-extrabold text-navy">{b.supplierName}</span>
-                    <span className="ms-auto flex-none text-body font-semibold tabular text-navy">{money(b.currentPrice)}</span>
+                    <span className="min-w-0 truncate text-body font-extrabold text-navy">{b.name}</span>
+                    <span className="ms-auto flex-none whitespace-nowrap text-body font-semibold tabular text-navy">
+                      {money(b.price)}
+                      {b.price != null && priceUnitWord(b.priceUnit) && (
+                        <span className="text-label font-semibold text-muted"> {priceUnitWord(b.priceUnit)}</span>
+                      )}
+                    </span>
                   </span>
                   <span className="mt-0.5 flex items-baseline gap-1.5 text-meta text-muted">
-                    <span className="min-w-0 flex-1 truncate">{b.equipmentName ?? b.request.equipmentSummary ?? "—"}</span>
-                    {b.request.location && (
+                    {/* A bid that came through the shared link has no account and no chat behind it,
+                        so the row says where it came from rather than leaving the renter to find out
+                        by pressing it. The workspace's own word for this source. */}
+                    {b.offPlatform && (
+                      <span className="flex-none rounded-sm bg-surface2 px-1.5 text-label font-semibold text-muted-dark">
+                        {t.workspace.sourceOffline}
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1 truncate">{b.machine || "—"}</span>
+                    {b.location && (
                       <span className="hidden min-w-0 max-w-[45%] shrink-0 truncate @[260px]/bidrail:block">
-                        · {b.request.location}
+                        · {b.location}
                       </span>
                     )}
                   </span>
                 </span>
               </button>
             ))}
-            {/* «No bids yet» is an ANSWER, so it waits until there is one (owner, 2026-08-30). While
-                the read was in flight `bids` was `[]`, which is indistinguishable from a renter who
-                has none — so the rail opened by telling every account it had nothing and then took
-                it back. It skeletons instead, at the row height it will fill. */}
+            {/* ── Loading looks like loading here too ────────────────────────────────────────── */}
             {bids === null &&
               Array.from({ length: BIDS_SHOWN }, (_, i) => (
                 <div key={`skb-${i}`} className={cx(ROW_H, "flex items-center gap-2.5 border-b border-border px-3 last:border-b-0")}>

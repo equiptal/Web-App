@@ -97,7 +97,8 @@ const COPY = {
       accom: "Accommodation & transport",
       fuel: "Fuel",
       year: "Equipment year",
-      cert: "Certificates",
+      certEquipment: "Equipment cert",
+      certOperator: "Operator cert",
     },
   },
   ar: {
@@ -123,7 +124,8 @@ const COPY = {
       accom: "السكن والنقل",
       fuel: "الوقود",
       year: "سنة الصنع",
-      cert: "الشهادات",
+      certEquipment: "شهادة المعدة",
+      certOperator: "شهادة المشغّل",
     },
   },
 } as const;
@@ -365,10 +367,17 @@ export function bidCardModel(
     const fuel = party(i.requiredTerms?.fuel, lang);
     const fuelType = i.requiredTerms?.fuelType?.trim();
     const year = i.requiredTerms?.year?.trim();
-    const cert = [i.requiredTerms?.equipmentCert, i.requiredTerms?.operatorCert]
-      .map((v) => v?.trim())
-      .filter(Boolean)
-      .join(", ");
+    /**
+     * WARNMARK **Two certificates, and they are not the same question** (owner, 2026-09-05:
+     * *"this on the card details must be specific equipment or operator cert"*).
+     *
+     * ~~Both joined under one «Certificates» row.~~ `Certificates: tuv` does not say whether the
+     * MACHINE must hold a TUV inspection or the OPERATOR must hold a TUV licence, and a supplier
+     * pricing the wrong one either quotes for a certificate he does not need or turns up without
+     * the one he does. Two rows, each naming what it belongs to, and either can be absent.
+     */
+    const equipmentCert = i.requiredTerms?.equipmentCert?.trim();
+    const operatorCert = i.requiredTerms?.operatorCert?.trim();
     return (
       [
         { label: t.terms.mob, value: party(i.deliveryBy, lang) },
@@ -378,7 +387,8 @@ export function bidCardModel(
         { label: t.terms.fuel, value: fuel && fuelType ? `${fuel} · ${fuelType.toLowerCase()}` : fuel },
         // "any" is the absence of a requirement, not a requirement to be any age.
         { label: t.terms.year, value: year && year.toLowerCase() !== "any" ? year : null },
-        { label: t.terms.cert, value: cert || null },
+        { label: t.terms.certEquipment, value: equipmentCert || null },
+        { label: t.terms.certOperator, value: operatorCert || null },
       ] as { label: string; value: string | null }[]
     ).flatMap((r) => (r.value ? [{ label: r.label, value: r.value }] : []));
   };

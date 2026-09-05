@@ -73,12 +73,11 @@ export function shareMessageHtml(
 
   return [
     `<div dir="${lang === "ar" ? "rtl" : "ltr"}" style="font-family:'Segoe UI',Roboto,Arial,sans-serif;">`,
-    para(p.greeting),
-    para(p.intro),
+    para(p.above),
     card,
     `<div style="height:12px;"></div>`,
     para(detail),
-    para(p.signoff),
+    para(p.below),
     // The link in words as well as in the card: a client that strips the card still leaves a way in.
     url ? `<p style="margin:0;font-size:13px;"><a href="${escapeHtml(url)}" style="color:${COLORS.info};">${escapeHtml(url)}</a></p>` : "",
     `</div>`,

@@ -33,6 +33,19 @@ export interface InboxBid {
    *  is null until the backend projects it on received-bids — grouping falls back to the request id. */
   request: { id: string; displayId: string | null; shortCode: string | null; equipmentSummary: string | null; groupId: string | null; location: string | null };
   equipmentType: { id: string | null; name: string | null };
+  /**
+   * The machine as the REQUEST names it: its SUBTYPE and its SIZE, in both locales (owner,
+   * 2026-09-05: *"show equipment subtype and size, not model and year"*).
+   *
+   * `equipmentName` above is the supplier's LISTING — «Caterpillar 320» — which answers a different
+   * question: it says which machine he is offering, not which machine was asked for. On a renter's
+   * rail of incoming bids the second is what he is scanning for, and two suppliers offering the same
+   * 20-ton excavator under different model numbers read as two unrelated machines.
+   *
+   * Both halves come off the request's own enriched item (`subtypeName` / `capacityName`), so they
+   * are the same words the request card and the workspace print.
+   */
+  equipment: { subtype: string | null; subtypeAr: string | null; size: string | null; sizeAr: string | null };
   createdAt: string | null;
   /** Derived: a supplier opened the room and messaged before the renter entered (OPEN + unread). */
   supplierStarted: boolean;
@@ -86,6 +99,12 @@ function mapRow(raw: Record<string, unknown>): InboxBid {
       location: s(req.projectAddressLabel),
     },
     equipmentType: { id: s(item0.subtypeId) ?? s(item0.categoryId), name: s(item0.subtypeName) ?? s(item0.categoryName) ?? equipmentName },
+    equipment: {
+      subtype: s(item0.subtypeName) ?? s(item0.categoryName),
+      subtypeAr: s(item0.subtypeNameAr) ?? s(item0.categoryNameAr),
+      size: s(item0.capacityName),
+      sizeAr: s(item0.capacityNameAr),
+    },
     createdAt: s(raw.createdAt) ?? s(raw.lastUpdatedAt),
     supplierStarted: dealRoomStatus === "OPEN" && unreadCount > 0,
   };

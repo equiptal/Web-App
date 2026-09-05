@@ -454,6 +454,16 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     // same firm look like one counterparty with one chat, which off-platform offers do not have.
     supplierCompanyId: null,
     supplierName: sub.companyName || "Supplier",
+    /**
+     * The number the supplier typed into the form's «The supplier's details» step.
+     *
+     * It was never mapped, so `BidCards`'s «Invite to Moedatech» was permanently disabled with
+     * "we hold no number for this supplier" — on the one kind of bid the control exists for. The
+     * field is `contactInfo` on a link submission (the backend stores the phone in that column,
+     * normalised to E.164) and `supplierPhone` on a bid card; the two names are why nobody noticed.
+     */
+    supplierPhone: sub.contactInfo ?? null,
+    supplierEmail: sub.contactEmail ?? null,
     verified: false,
     rating: null,
     distanceKm: null, // the form captures no supplier location
@@ -513,7 +523,15 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
         c.fatFood != null && termRow("fat_food", "Food (F.A.T)", "الطعام", c.fatFood, rt.fatFood),
         c.fatTransport != null && termRow("fat_transport", "Accommodation & transport", "السكن والمواصلات", c.fatTransport, rt.fatTransport),
         c.fuel != null && termRow("fuel_responsibility", "Fuel responsibility", "مسؤولية الوقود", c.fuel, rt.fuel),
-        c.fuelType != null && termRow("fuel_type", "Fuel type", "نوع الوقود", c.fuelType, rt.fuelType),
+        /* ~~`fuel_type` — «Fuel type · Diesel», answered Yes or No.~~ Removed 2026-09-05.
+           The bid form stopped ASKING it on 2026-09-04 (app parity, `f48793ec`): fuel type is the
+           renter's own `fuelTypePreference`, prefilled by the system, so a supplier confirming it
+           settled nothing. `SharedBidSubmissionModal` dropped it from the review list the same day —
+           but this mapper kept emitting the row, and off-platform cards count EVERY answered term
+           (`bucketBidTerms`, `all: true`). So a submission carrying a stale `fuelType: false` drew a
+           RED conflict on the card over a question the supplier was never shown, and pressing «View
+           quote» showed no such conflict, because the viewer had already stopped listing it.
+           One list, one count. */
         c.operatorCert != null && termRow("operator_cert", "Operator certificate", "شهادة المشغّل", c.operatorCert, up(rt.operatorCert)),
         c.payment != null && termRow("payment", "Payment type", "نوع الدفع", c.payment, rt.payment),
         c.overtime != null && termRow("overtime", "Overtime rate", "أجر العمل الإضافي", c.overtime, rt.overtime),

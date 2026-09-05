@@ -255,7 +255,29 @@ describe("rentalPeriodSubtitle — the fixed-divisor assumption under the headli
   });
 });
 
-describe("legDisplay — excluded → bundled → not quoted → amount", () => {
+describe("legDisplay — on rentee → excluded → bundled → not quoted → amount", () => {
+  /**
+   * A leg the RENTER kept outranks every other state, including a stored number (owner, 2026-09-05).
+   *
+   * Both figures that reach here in that case are false: an app bid sends no price, because the
+   * backend demands one only when the leg IS the supplier's, so the row read «Not quoted» as though
+   * he had ducked a mandatory answer; an off-platform bid stores 0, because the public form hides
+   * the input and coerces the empty string — and `submitBidForm` would store 0 even for an omitted
+   * field — so the row read «0 SAR», which is free delivery from a supplier who was never asked to
+   * deliver.
+   */
+  it("a leg on the renter beats a price, an exclusion and a gap alike", () => {
+    expect(legDisplay({ onRentee: true, amount: 1500 })).toEqual({ kind: "on_rentee" });
+    expect(legDisplay({ onRentee: true, amount: 0 })).toEqual({ kind: "on_rentee" });
+    expect(legDisplay({ onRentee: true, excluded: true })).toEqual({ kind: "on_rentee" });
+    expect(legDisplay({ onRentee: true })).toEqual({ kind: "on_rentee" });
+  });
+
+  it("and changes nothing when the request never kept the leg", () => {
+    expect(legDisplay({ onRentee: false, amount: 1500 })).toEqual({ kind: "amount", amount: 1500 });
+    expect(legDisplay({ onRentee: null, amount: null })).toEqual({ kind: "not_quoted" });
+  });
+
   it("bundled is unreachable in prod — the app hardcodes it false, so we keep it inert", () => {
     // `my_offers_v3_tab_content.dart:787` is the ONLY construction site and passes a literal false;
     // no bid field or backend column feeds it. Kept wired so a real field is a one-line change.

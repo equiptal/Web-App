@@ -91,7 +91,14 @@ describe("the navy band before the request exists", () => {
     );
 
     // The same three things the `og` route draws, in the same order.
-    expect(html).toContain("MOEDATECH");
+    /**
+     * ⚠️ **The MARK, not the word** (owner, 2026-09-05: *"make sure moedatech show the moedatech
+     * logo not the text"*). `MOEDATECH` in letter-spaced caps was a stand-in that outlived its
+     * excuse: `/bid/<token>/og` has drawn the logo all along, so the preview showed a different
+     * brand from the thing it previews. Same `logoDataUri`, so they cannot drift.
+     */
+    expect(html).toContain('alt="Moedatech"');
+    expect(html).not.toContain(">MOEDATECH<");
     expect(html).toContain("Excavator 20 ton");
     expect(html).toContain("Open the link to submit your bid");
     /**
@@ -100,9 +107,14 @@ describe("the navy band before the request exists", () => {
      * before the equipment. He has the link, and the link knows which request it is.
      */
     expect(html).not.toContain("CEX-020964");
-    // And no picture of nothing.
+    // And no picture of NOTHING: the generic navy rectangle is never stood in for a real card.
     expect(html).not.toContain("og-bid.png");
-    expect(html).not.toContain("<img");
+    /**
+     * ⚠️ The band does carry ONE image now, the wordmark, inline as a data URI (owner,
+     * 2026-09-05). What must stay absent is a remote picture: the band exists precisely because
+     * there is no rendered card yet.
+     */
+    expect(html).not.toContain('src="http');
   });
 });
 

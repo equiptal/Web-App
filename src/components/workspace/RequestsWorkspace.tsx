@@ -754,6 +754,10 @@ export function RequestsWorkspace() {
               submissionsByBid={submissionsByBid}
               durationDays={item?.durationDays ?? null}
               startDate={item?.startDate ?? null}
+              // The same two flags the comparison reads: a leg the request kept is not a leg the
+              // supplier declined to price.
+              mobByRentee={item?.mobByRentee ?? null}
+              demobByRentee={item?.demobByRentee ?? null}
               onToggle={toggleBid}
             />
           ) : (
@@ -763,6 +767,12 @@ export function RequestsWorkspace() {
               bids={shownAll}
               durationDays={item?.durationDays ?? null}
               startDate={item?.startDate ?? null}
+              // Whose transport legs these are, off the renter's own request. Already on the item
+              // (`mobByRentee` / `demobByRentee`, from `equipmentItems[0].mobilizationByRentee`) —
+              // the matrix simply never asked for it, so the Delivery and Return columns had no way
+              // to tell "the supplier said nothing" from "it was never his to say".
+              mobByRentee={item?.mobByRentee ?? null}
+              demobByRentee={item?.demobByRentee ?? null}
               benched={benched}
               onBench={benchBid}
               ranking={ranking}

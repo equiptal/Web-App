@@ -46,7 +46,12 @@ describe("bidCardText", () => {
     expect(out).toContain("Fuel: Renter · diesel");
     expect(out).toContain("Bidding closes 21 Aug 2026");
     expect(out).toContain(URL_);
-    expect(out).toContain("No account is needed");
+    /**
+     * ⚠️ ~~"No account is needed. The link opens the form."~~ Removed (owner, 2026-09-05). It
+     * answered a question nobody had asked, in the place a supplier reads the terms he is about to
+     * price, and it ended every message on a note about US rather than about the job.
+     */
+    expect(out).not.toContain("No account is needed");
   });
 
   it("Given the renter's own line, Then it is above the card, under the line that says who is asking", () => {
@@ -75,7 +80,7 @@ describe("bidCardText", () => {
   it("Given the renter's own wording, Then it is sent instead of ours", () => {
     const out = bidCardText(model(), URL_, {
       renterName: "Shibh Al Jazira",
-      template: { greeting: "Dear partner,", intro: "Please quote the below by Sunday.", signoff: "Regards, {name}" },
+      template: { title: "RFQ", above: "Dear partner,\n\nPlease quote the below by Sunday.", below: "Regards, {name}" },
     });
 
     expect(out.startsWith("Dear partner,")).toBe(true);

@@ -114,7 +114,9 @@ const draw = (over: Partial<LinkBidSubmission> = {}) =>
 /** Draw, then hand back the numbered step whose heading this is. */
 const step = async (title: string) => {
   draw();
-  return (await screen.findByRole("heading", { name: title })).closest("section")!;
+  // A generous window: the viewer fetches the request's own form payload before it can draw, and
+  // under the whole suite that lands well past the default second. A slow machine is not a defect.
+  return (await screen.findByRole("heading", { name: title }, { timeout: 5000 })).closest("section")!;
 };
 
 /** What this fixture's money must come to, from the same pricing contract the viewer uses. */
@@ -145,15 +147,22 @@ describe("it is the bid form's own shape", () => {
     expect(screen.getByText("Q-2026-CEX-4F21")).toBeTruthy();
   });
 
-  it("carries the rail: the request, then the quotation", async () => {
+  /**
+   * ~~"Carries the rail: the request, then the quotation."~~ Overturned by the owner on 2026-09-05:
+   * *"I want the view submission quote to not show the right request details, no need, just the
+   * submission values."*
+   *
+   * The rail is the SUPPLIER's figures alone now. The renter's own request — its rental basis, its
+   * period, its working days, its site — is a thing he wrote and can read on the request itself, and
+   * here it was pushing the total he came for below the fold.
+   */
+  it("carries a rail of the supplier's figures, and nothing of the renter's request", async () => {
     draw();
-    expect(await screen.findByText("The request")).toBeTruthy();
-    expect(screen.getByText("The quotation")).toBeTruthy();
-    // The request's own facts, as the form's rail states them.
-    expect(screen.getByText("Rental basis")).toBeTruthy();
-    expect(screen.getByText("Monthly")).toBeTruthy();
-    expect(screen.getByText("Working days / week")).toBeTruthy();
-    expect(screen.getByText("An Narjis, Riyadh").getAttribute("href")).toContain("maps?q=24.9,46.6");
+    expect(await screen.findByText("The quotation")).toBeTruthy();
+    expect(screen.queryByText("The request")).toBeNull();
+    for (const gone of ["Rental basis", "Working days / week", "Bids close", "An Narjis, Riyadh"]) {
+      expect(screen.queryByText(gone), gone).toBeNull();
+    }
   });
 });
 

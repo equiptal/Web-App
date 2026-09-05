@@ -2,6 +2,53 @@
 
 ## Change log
 
+- **2026-09-05 - The compare table's phantom vertical scrollbar, for the second time.**
+  The matrix was made to render at full height with the PAGE carrying it (2026-09-04), and a 130px
+  scrollbar came back inside it anyway - over a screen with half a page of empty space beneath. Not a
+  layout regression: `overflow-x-auto` alone is not "scrolls sideways". CSS computes the OTHER axis
+  from `visible` to `auto` as soon as one axis scrolls, so any child overhanging the column strip gave
+  it a scroller of its own. The child was the money breakdown («How every cycle after is built»), an
+  absolutely-placed 200px panel hanging out of a 144px strip. It is drawn in a PORTAL now, measured
+  against its column header and re-placed on scroll (capture: true, so the strip's own sideways
+  scrolling counts) and resize; the strip states `overflow-y-clip` beside its `overflow-x-auto`.
+  Files: `src/components/workspace/CompareMatrix.tsx`, `tests/unit/compare-matrix.test.tsx`.
+  ⚠️ Same CSS trap as the dashboard's bid rail the day before. If a third surface grows a scrollbar
+  nobody asked for, look for a single-axis `overflow-*-auto` before looking at heights.
+  Also: on the LAST money column that panel was being clipped by the horizontal scroller rather than
+  overhanging it - nobody had reported it, and the portal fixes it in the same move.
+
+- **2026-09-05 - The dashboard's notification bubble is one line, and its ✕ survives a new login.**
+  It was a 268px card - title row, two clamped lines of body, a «+n more» footer - hanging from a
+  sticky header, so four lines reached the hero and covered the Create-request button the page exists
+  to offer. Now a single 34px strip (dot · title · «+n more» · age · ✕) with the BODY dropped (the
+  bell holds the sentence), hung from the bell's TRAILING edge instead of centred on it, because a
+  wide strip centred on the bell grows back across the middle of the hero.
+  Files: `src/components/home/HomeNotificationBubble.tsx`, `tests/unit/home-bubble.test.tsx`.
+  Trap: ✕ used to write the id to `sessionStorage`, which looks identical on screen and is gone by
+  the next sign-in. It marks the notification READ now, through the endpoint the bell's own rows use
+  - the only dismissal this product can make stick, since the flag is the renter's and server-side
+  and the strip only ever raises unread rows. The local note stays as the fallback for a failed call
+  and moved to `localStorage` keyed by ACCOUNT, so a shared browser cannot hide one renter's
+  notification behind another's dismissal.
+
+- **2026-09-05 - The dashboard's bid rail shows off-platform bids, the machine asked for, and the price's basis.**
+  Three owner notes on one card. (1) The rail read `fetchReceivedBids` only, the app's own projection,
+  so a request whose offers all arrived through the renter's shared link said "no bids yet" while the
+  workspace listed three. There is no "all my submissions" endpoint on the agents service, so the
+  rail fans out `fetchRequestSubmissions` over the renter's groups - one call per GROUP (the endpoint
+  resolves the whole fan-out from any of its request ids), capped at 20, and shared with the deadline
+  lookup through a memoised `loadSubs` so the extra source costs no extra round trip on a row the
+  table was already dating. (2) The machine is the REQUEST's subtype + size ("Crawler excavator · 20
+  ton"), not the supplier's listing ("Caterpillar 320") - `InboxBid.equipment` carries it now, off
+  `subtypeName`/`capacityName`, which the projection already sent and the mapper dropped. (3) The
+  price carries its basis (`/ month`), reusing `t.store.per*`.
+  Files: `src/components/home/HomeRequests.tsx`, `src/lib/contract/inbox.ts`,
+  `tests/unit/home-bid-rail.test.tsx`.
+  Trap: the fan-out effect first guarded on `status === "authed"`, which is stricter than the
+  neighbouring received-bids read (`status === "loading"`). `SessionProvider` revalidates over
+  `fetch` a tick after mount, so on any surface where that read resolves anon the rail silently
+  showed the app's bids and dropped the same renter's link bids. Both guards are the same shape now.
+
 - **2026-09-05 - A document ask on the map names the PAPER, not "safety certificate".**
   `equipmentAskType` sent `tuv` and `spsp` precisely and every other certificate as
   `equipment_safety_certificate`, which the chat card renders as «Safety certificate» - so a renter

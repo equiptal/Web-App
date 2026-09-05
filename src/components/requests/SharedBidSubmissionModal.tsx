@@ -272,14 +272,11 @@ export function SharedBidSubmissionModal({
   // the shared company details; otherwise the whole-submission score.
   const focusedSub = focusItemId ? submission?.items.find((a) => a.requestItemId === focusItemId) : null;
   const quality = submission ? (focusedSub ? qualityFromSubmissionItem(submission, focusedSub) : qualityFromSubmission(submission)) : null;
-  // Supplier's quote expiry ("Valid until") + the renter's bid deadline ("Bids close").
+  // The supplier's own quote expiry. The renter's «Bids close» date left with the request rail on
+  // 2026-09-05 — it is a fact about his request, not about this submission.
   const validUntil = submission?.validUntil ?? null;
   const vDaysLeft = validUntil ? Math.ceil((new Date(validUntil).getTime() - Date.now()) / 86400000) : null;
   const vExpired = vDaysLeft != null && vDaysLeft < 0;
-  const bidsClose = form?.deadline ?? null;
-
-  const projectTerms = form?.projectTerms ?? null;
-  const renterNotes = form?.notes ?? null;
   const dir = ar ? "rtl" : "ltr";
 
   // VAT-inclusive pricing has no backend flag — the form carries it as a "[VAT-INCLUSIVE]" line in the
@@ -610,85 +607,20 @@ export function SharedBidSubmissionModal({
                 </p>
               </div>
 
-              {/* ── The rail: the request, then the quotation ───────────────────────────────────── */}
-              <aside className="flex min-w-0 flex-col gap-4">
-                <div className={cx(CARD, "overflow-hidden")}>
-                  <div className="flex items-center gap-2 border-b border-border px-3.5 py-2.5">
-                    <Icon name="sell" size={17} className="text-muted" />
-                    <h3 className="text-body font-extrabold text-navy">{L("The request", "الطلب")}</h3>
-                  </div>
-                  <div className="flex flex-col gap-3 p-3.5">
-                    {shownItems.map((it) => {
-                      const a = ansFor(it.requestItemId);
-                      const q = (a?.numberOfUnits ?? it.numberOfUnits) || 1;
-                      const size = (ar ? it.sizeAr : it.size) || it.size;
-                      return (
-                        <div key={it.requestItemId} className="flex items-center gap-2.5">
-                          {it.imageUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={it.imageUrl} alt="" className="size-11 flex-none rounded-sm border border-border object-cover" />
-                          ) : (
-                            <span className="grid size-11 flex-none place-items-center rounded-sm border border-border bg-surface2 text-muted">
-                              <Icon name="construction" size={20} />
-                            </span>
-                          )}
-                          <span className="min-w-0">
-                            <span className="block truncate text-body font-extrabold text-navy">
-                              {(ar ? it.labelAr : it.label) || it.label || L("Equipment", "المعدة")}
-                            </span>
-                            {size && <span className="block truncate text-meta text-muted">{size}</span>}
-                            <span className="mt-1 flex flex-wrap items-center gap-1.5">
-                              <span className="rounded-full bg-brand-soft px-2 py-px text-label font-extrabold text-brand-deep">×{nf(q)}</span>
-                              <span className="rounded-full border border-border px-2 py-px text-label font-semibold text-muted-dark">{unitWord(it.priceUnit)}</span>
-                            </span>
-                          </span>
-                        </div>
-                      );
-                    })}
-                    {projectTerms && (
-                      <div className="flex flex-col">
-                        {projectTerms.rentalBasis && <RailRow k={L("Rental basis", "أساس الإيجار")} v={rentalBasisLabel(projectTerms.rentalBasis, L)} />}
-                        {(projectTerms.startDate || projectTerms.endDate) && (
-                          <RailRow
-                            k={L("Rental period", "مدة الإيجار")}
-                            v={`${projectTerms.startDate ? fmtDate(projectTerms.startDate) : "—"} → ${projectTerms.endDate ? fmtDate(projectTerms.endDate) : L("Open-ended", "بدون نهاية")}`}
-                          />
-                        )}
-                        {railBillable && !railBillable.raw && <RailRow k={L("Billable days", "الأيام المحتسبة")} v={nf(railBillable.billable)} />}
-                        {projectTerms.hoursPerDay != null && <RailRow k={L("Hours per day", "ساعات/يوم")} v={nf(projectTerms.hoursPerDay)} />}
-                        {projectTerms.workingDaysPerWeek != null && <RailRow k={L("Working days / week", "أيام العمل/أسبوع")} v={nf(projectTerms.workingDaysPerWeek)} />}
-                        {projectTerms.location && (
-                          <RailRow
-                            k={L("Location", "الموقع")}
-                            v={
-                              projectTerms.lat != null && projectTerms.lng != null ? (
-                                <a
-                                  className="font-extrabold text-brand-deep underline decoration-brand/40 underline-offset-2 hover:decoration-brand"
-                                  href={`https://www.google.com/maps?q=${projectTerms.lat},${projectTerms.lng}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  {projectTerms.location}
-                                </a>
-                              ) : (
-                                projectTerms.location
-                              )
-                            }
-                          />
-                        )}
-                        {bidsClose && <RailRow k={L("Bids close", "إغلاق العروض")} v={fmtDate(bidsClose)} />}
-                        {submission.createdAt && <RailRow k={L("Bid received", "تاريخ العرض")} v={fmtDate(submission.createdAt)} />}
-                      </div>
-                    )}
-                    {renterNotes && (
-                      <p className="rounded-md bg-surface2 px-3 py-2.5 text-meta leading-relaxed text-muted-dark">
-                        <b className="font-extrabold text-navy">{L("Your notes", "ملاحظاتك")}: </b>
-                        {renterNotes}
-                      </p>
-                    )}
-                  </div>
-                </div>
+              {/* ── The rail: the quotation, and nothing else (owner, 2026-09-05) ──────────────
+                  *"I want the view submission quote to not show the right request details, no need,
+                  just the submission values."*
 
+                  ~~«The request» sat above it — the items with their counts, the rental basis, the
+                  period, the billable days, the hours, the location, the closing date and the
+                  renter's own notes.~~ Removed. All of it is the renter's OWN request, which he
+                  wrote and can read on the request itself; here it filled the rail that the figures
+                  he came for should own, and pushed the total below the fold on a laptop.
+
+                  What the SUPPLIER sent stays, whole: the money rows, the tax, the total and the
+                  validity. The steps in the left column still carry the request's terms next to each
+                  answer, which is where a comparison actually belongs. */}
+              <aside className="flex min-w-0 flex-col gap-4">
                 <div className={cx(CARD, "overflow-hidden")}>
                   <div className="flex items-center gap-2 border-b border-border px-3.5 py-2.5">
                     <Icon name="receipt_long" size={17} className="text-muted" />
@@ -850,16 +782,6 @@ function MoneyRow({ label, sub, value, strong }: { label: string; sub?: string; 
   );
 }
 
-/** A key/value row in the rail's request card. */
-function RailRow({ k, v }: { k: string; v: React.ReactNode }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-border py-2 last:border-b-0">
-      <span className="flex-none text-meta text-muted">{k}</span>
-      <span className="min-w-0 text-end text-meta font-extrabold text-navy">{v}</span>
-    </div>
-  );
-}
-
 /** A request or quotation code, in the form's own mono chip. */
 function CodeChip({ children }: { children: React.ReactNode }) {
   return (
@@ -921,8 +843,4 @@ function RoField({
   );
 }
 
-function rentalBasisLabel(v: string, L: (e: string, a: string) => string) {
-  const m: Record<string, [string, string]> = { DAILY: ["Daily", "يومي"], WEEKLY: ["Weekly", "أسبوعي"], MONTHLY: ["Monthly", "شهري"], PER_JOB: ["Per job", "للمهمة"], LONG_TERM: ["Long term", "طويل الأمد"] };
-  const e = m[String(v).toUpperCase()];
-  return e ? L(e[0], e[1]) : v;
-}
+

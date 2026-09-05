@@ -38,7 +38,7 @@ describe("shareMessageHtml", () => {
   it("Given his own wording, Then it is what the paste carries", () => {
     const html = shareMessageHtml(model, URL_, IMG, {
       renterName: "Shibh Al Jazira",
-      template: { greeting: "Dear partner,", intro: "Please quote by Sunday.", signoff: "Regards, {name}" },
+      template: { title: "RFQ", above: "Dear partner,\n\nPlease quote by Sunday.", below: "Regards, {name}" },
     });
 
     expect(html).toContain("Dear partner,");
@@ -49,7 +49,7 @@ describe("shareMessageHtml", () => {
   it("Given wording with markup in it, Then it is escaped rather than rendered", () => {
     // It is HIS text, pasted into somebody else's mail client. Nothing he types may become markup.
     const html = shareMessageHtml(model, URL_, IMG, {
-      template: { greeting: "<b>Hi</b>", intro: "a & b", signoff: 'say "hello"' },
+      template: { title: "RFQ", above: "<b>Hi</b>\n\na & b", below: 'say "hello"' },
     });
 
     expect(html).toContain("&lt;b&gt;Hi&lt;/b&gt;");
