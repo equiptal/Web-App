@@ -116,7 +116,7 @@ function navyBand(model: BidCardModel, align: string): string {
              the two files together. Satori cannot read a CSS variable, so the hex travels through
              `ds-colors.ts` rather than the card inventing a navy of its own. */ ""
         }
-        <img src="${logoDataUri(COLORS.surface)}" alt="Moedatech" width="72" height="27" style="display:block;width:72px;height:auto;border:0;outline:none;">
+        <img src="${logoDataUri(COLORS.surface)}" alt="Moedatech" width="72" height="27" style="display:block;width:72px;max-width:72px;height:auto;border:0;outline:none;">
         <div style="font-size:${headline.length > 46 ? 16 : 20}px;font-weight:700;color:${COLORS.surface};line-height:1.2;padding-top:16px;">${headline}</div>
         <div style="font-size:12px;font-weight:700;color:${model.accepting ? COLORS.brand : COLORS.dangerHover};padding-top:10px;">${escapeHtml(model.cta)}</div>
         ${

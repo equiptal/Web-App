@@ -82,9 +82,15 @@ describe("itemAppGaps — the app's required set (MREQ-AC-09)", () => {
 
   // MREQ-AC-14 — a no-match item is dropped from the broadcast entirely, so gating on it would block
   // the renter over equipment that is never sent.
-  it("ignores no-match and removed items", () => {
-    expect(itemAppGaps(makeItem({ verdict: "no-match", ref: { categoryId: null, subcategoryId: null, measurementId: null } }))).toEqual([]);
+  it("ignores a removed item, and asks an off-catalogue one for its NAME instead of a taxonomy", () => {
+    // Off-catalogue (no subtype, and the RFQ gave no words to seed the box): the name is the one
+    // answer owed, and none of the three taxonomy gaps is raised — nothing in the catalogue could
+    // satisfy them. See `custom-equipment.test.ts` for the whole rule.
+    const offCatalogue = itemAppGaps(makeItem({ verdict: "no-match", ref: { categoryId: null, subcategoryId: null, measurementId: null } }));
+    expect(offCatalogue.map((g) => g.reason)).toEqual(["gate.customEquipmentMissing"]);
+
     expect(itemAppGaps(makeItem({ removed: true, quantity: 0 }))).toEqual([]);
+    // A no-match line the renter has already resolved to a subtype is an ordinary line again.
     expect(itemBlocksAdvance(makeItem({ verdict: "no-match" }))).toBe(false);
   });
 
@@ -208,9 +214,25 @@ describe("requiredGaps — the 'N things need you' count (MREQ-AC-12)", () => {
     expect(gaps.find((g) => g.reason === "gate.confirmChargedDays")?.panel).toBe("when");
   });
 
-  it("counts only live items", () => {
+  it("counts only live items, and an unnamed off-catalogue one is live", () => {
     const draft = makeDraft([makeItem({ id: "a" })], { project: confirmedProject() });
     draft.items.push(makeItem({ id: "b", verdict: "no-match", ref: { categoryId: null, subcategoryId: null, measurementId: null } }));
+    /* The off-catalogue row now posts under the renter's own name, so it is counted like any other:
+       the name in place of the taxonomy, plus the two web-only answers (year, certificate) that are
+       posted for it and shown to the supplier on the bid form. */
+    expect(requiredGaps(draft, true).map((g) => `${g.itemId}:${g.reason}`)).toEqual([
+      "b:gate.customEquipmentMissing",
+      "b:gate.yearMissing",
+      "b:gate.certMissing",
+    ]);
+
+    // Named (here by the words the RFQ itself used) and answered, it asks for nothing.
+    draft.items[1] = { ...draft.items[1], rawLabel: "floating crane barge" };
+    draft.touchedFields = [
+      ...(draft.touchedFields ?? []),
+      itemFieldKey("b", "equipment_year"),
+      itemFieldKey("b", "safety_certificates"),
+    ];
     expect(requiredGaps(draft, true)).toEqual([]);
   });
 });

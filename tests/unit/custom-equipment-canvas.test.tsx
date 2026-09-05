@@ -2,18 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen } from "@testing-library/react";
 
 /**
- * The canvas with `NEXT_PUBLIC_CUSTOM_EQUIPMENT=1`: the renter NAMES the machine the catalogue could
- * not place, and the row stops being a dead end.
+ * The canvas with off-catalogue equipment ON (the default): the renter NAMES the machine the
+ * catalogue could not place, and the row stops being a dead end.
  *
  * The flag is read at module load, so the component tree is imported inside each case, after the
- * environment is set. `canvas-no-match.test.tsx` is the same screen with the flag off.
+ * environment is set. `canvas-no-match.test.tsx` is the same screen with the kill switch thrown.
  */
 const FLAG = "NEXT_PUBLIC_CUSTOM_EQUIPMENT";
 const REAL = process.env[FLAG];
 
 async function withFlag() {
   vi.resetModules();
-  process.env[FLAG] = "1";
+  delete process.env[FLAG]; // ON by default
   const setup = await import("../setup/canvas");
   const { Canvas } = await import("@/components/create/Canvas");
   const gates = await import("@/lib/contract/gates");
@@ -45,13 +45,22 @@ describe("naming a machine the catalogue does not carry", () => {
 
     const box = screen.getByPlaceholderText("Name the machine you need") as HTMLInputElement;
     expect(box.value).toBe("floating crane barge");
-    // The list is NOT taken away: a renter who can find his machine in it still can.
+    // The list is NOT taken away: a renter who can find his machine in it still can. It renders
+    // ABOVE the note and the box, which is the order the row reads in (owner, 2026-09-06).
     expect(screen.getAllByText("TYPE").length).toBeGreaterThan(0);
     expect(screen.getAllByText("SIZE").length).toBeGreaterThan(0);
+    const order = ["TYPE", "isn't available yet", "Name the machine you need"].map((needle) =>
+      document.body.innerHTML.indexOf(needle),
+    );
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
     // And the row says what will happen to it, including the one route to a supplier.
     expect(screen.getByText(/isn't available yet/i)).toBeTruthy();
     expect(screen.getByText(/share its link with your own suppliers/i)).toBeTruthy();
-  });
+    // «Message us» sits on the note's own line, small and secondary — the route into the catalogue,
+    // not a second decision stacked under the sentence.
+    expect(screen.getByText(/^Message us$/)).toBeTruthy();
+  }, 20_000);
 
   it("blocks the send when he clears it, and the reason names the box", async () => {
     const { confirmedProject, makeAgentDraft, makeItem, gates } = await withFlag();
@@ -83,5 +92,5 @@ describe("naming a machine the catalogue does not carry", () => {
     const box = screen.getByPlaceholderText("Name the machine you need") as HTMLInputElement;
     fireEvent.change(box, { target: { value: "split hopper barge" } });
     expect((screen.getByPlaceholderText("Name the machine you need") as HTMLInputElement).value).toBe("split hopper barge");
-  });
+  }, 20_000);
 });

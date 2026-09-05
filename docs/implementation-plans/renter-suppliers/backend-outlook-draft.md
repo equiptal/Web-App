@@ -144,6 +144,43 @@ a run. Two points to confirm on the first real consent, before calling this done
 
 ---
 
+## 4b. The `To` line — a second small change, same file
+
+Owner, 2026-09-06: *"i want it to the renter himself."*
+
+**Every path sends with an empty `To` today.** `sendAsRenter` passes `ToAddresses: input.to`, and the
+handler always passes `[]`; the Graph send sets none either. It delivers, and it costs something:
+the recipient sees *"undisclosed-recipients"*, and corporate filters score an addressed-to-nobody
+message down. That is deliverability given back on the one path whose whole purpose is
+deliverability.
+
+**Put the sender in `To`, and drop him from the bcc set.**
+
+```diff
+-  const bcc = Array.from(new Set([...input.bcc, input.sender.email]));
++  const bcc = Array.from(new Set(input.bcc));
+   …
+-        ToAddresses: input.to,
++        // The renter himself: the header is complete, he keeps his own copy without a separate
++        // trick, and reply-all from a blind-copied supplier reaches him and nobody else.
++        ToAddresses: [input.sender.email],
+         BccAddresses: bcc,
+```
+
+`sendAsRenter` currently bcc's the renter so he has a copy. `To` gives him the same copy and fills
+the header, so the bcc entry becomes redundant.
+
+Same for the draft in section 2.1: `toRecipients` = the renter, `bccRecipients` = the suppliers.
+
+🔴 **Never a supplier in `To`.** It is the one thing that breaks the promise the feature rests on:
+none of them learns who else was asked. It is also the reason an empty `To` is dangerous on the
+compose path — a renter staring at an empty To box types a supplier into it.
+
+⚠️ The web already does this on the compose path, reading his address from `/api/me` and leaving
+`To` empty when there is none. Three tests pin it in `share-request-panel.test.tsx`.
+
+---
+
 ## 5. Not changing
 
 - **The SES path.** A verified domain still sends outright, and that stays right: there is no

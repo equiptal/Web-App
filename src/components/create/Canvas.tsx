@@ -301,6 +301,31 @@ export function Canvas() {
       shakeNext();
       return;
     }
+    /* ── The site, the schedule and the charged days gate «Next equipment» too ────────────────────
+       (owner, 2026-09-06: *"in multi item I can click next equipment without filling location or
+       date or acknowledge — the rules of shaking when I click review and send must be the same
+       behaviour when I click next equipment"*.)
+
+       They are REQUEST-WIDE: one address, one schedule, one acknowledgement for every machine on the
+       request. So they are owed before the second machine, not after the last one — a renter who
+       answers five machines and only then meets the dates has been asked in the wrong order, and the
+       second machine's transport questions are decided by the site he has not named yet.
+
+       ⚠️ **Only the request-wide ones.** The note above this function records what happens when the
+       two bars are conflated: requiring the WHOLE draft to reach the next machine deadlocks the
+       flow, because items 2-5 can only be answered by getting past item 1. So the filter is on
+       `where` / `when` — the panels that belong to no single machine — and never on another
+       machine's own gaps. The last item keeps the full bar, unchanged, below. */
+    if (!isLastItem) {
+      const shared = gaps.filter((g) => g.panel === "where" || g.panel === "when");
+      if (shared.length > 0) {
+        const first = shared[0];
+        if (state.activeSection !== first.panel) actions.openSection(first.panel);
+        shakeNow(first.panel);
+        shakeNext();
+        return;
+      }
+    }
     if (!isLastItem) {
       setCarryTo({ index: index + 1, isNew: false });
       return;

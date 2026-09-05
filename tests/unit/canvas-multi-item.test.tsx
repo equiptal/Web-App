@@ -184,10 +184,13 @@ describe("the bar for the next machine is this machine", () => {
   it("moves on with the current machine done, even while later ones are not", async () => {
     const handle = await renderCanvas(<Canvas />, {
       draft: twoItems(),
-      // Only item 1 answered; item 2 deliberately left open.
+      // Only item 1 answered; item 2 deliberately left open. The schedule IS acknowledged, because
+      // that is request-wide and gates every move (owner, 2026-09-06) — the point of this test is the
+      // other machine's gaps, which must not block.
       prepare: (store) => {
         store.actions.touchField("line_items[a0].equipment_year");
         store.actions.touchField("line_items[a0].safety_certificates");
+        store.actions.setChargedDaysUnderstood(true);
       },
     });
     expect(handle.store().state.draft!.touchedFields).not.toContain("line_items[a1].equipment_year");
@@ -197,6 +200,49 @@ describe("the bar for the next machine is this machine", () => {
 
     await handle.run(() => screen.getByRole("button", { name: "Continue" }).click());
     expect(handle.store().state.itemIndex).toBe(1);
+  });
+
+  /**
+   * ── The site, the schedule and the charged days gate «Next equipment» as well ─────────────────
+   *
+   * Owner, 2026-09-06: *"In multi item I can click next equipment without filling location or date
+   * or acknowledge — the rules of shaking when I click review and send must be the same behaviour
+   * when I click next equipment."*
+   *
+   * They are one address, one schedule and one acknowledgement for the whole request, so they are
+   * owed before the SECOND machine rather than after the last one — and the second machine's own
+   * transport questions are decided by the site the renter has not named yet.
+   */
+  it("refuses the next machine while the request-wide schedule is unanswered", async () => {
+    const handle = await renderCanvas(<Canvas />, {
+      draft: twoItems(),
+      // This machine is finished; the charged days are NOT acknowledged.
+      prepare: (store) => {
+        store.actions.touchField("line_items[a0].equipment_year");
+        store.actions.touchField("line_items[a0].safety_certificates");
+      },
+    });
+
+    await handle.run(() => screen.getByText(/Next equipment/).closest("button")!.click());
+
+    // No carry-forward prompt, no move: the same refusal «Review & send» gives, on the same panel.
+    expect(screen.queryByText(/Anything else on this job/)).toBeNull();
+    expect(handle.store().state.itemIndex).toBe(0);
+    expect(handle.store().state.activeSection).toBe("when");
+  });
+
+  it("lets the same press through once the schedule is answered", async () => {
+    const handle = await renderCanvas(<Canvas />, {
+      draft: twoItems(),
+      prepare: (store) => {
+        store.actions.touchField("line_items[a0].equipment_year");
+        store.actions.touchField("line_items[a0].safety_certificates");
+        store.actions.setChargedDaysUnderstood(true);
+      },
+    });
+
+    await handle.run(() => screen.getByText(/Next equipment/).closest("button")!.click());
+    expect(screen.getByText("Equipment #2")).toBeTruthy();
   });
 
   it("still refuses the next machine while THIS one is unanswered", async () => {

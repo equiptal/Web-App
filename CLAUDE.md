@@ -2,6 +2,36 @@
 
 ## Change log
 
+- **2026-09-06 - «Next equipment» now refuses on the site, the schedule and the charged days.**
+  On a multi-item request the renter could walk from machine to machine without naming the site,
+  the dates or acknowledging the billable days, and only met that bar at «Review & send». Those three
+  are REQUEST-WIDE - one address, one schedule, one acknowledgement for every machine - so they are
+  owed before the second machine, and the second machine's own transport questions are decided by the
+  site he has not named yet. Same refusal as review: open the panel, shake it, shake the button.
+  Files: `src/components/create/Canvas.tsx`, `tests/unit/canvas-multi-item.test.tsx`.
+  ⚠️ Only the request-wide gaps (`where` / `when`) gate the move. Conflating the two bars is what
+  deadlocked this flow once before - requiring the WHOLE draft to reach the next machine is a trap,
+  because items 2-5 can only be answered by getting past item 1 - and the note above `advance()`
+  records it. Another machine's gaps still never block.
+
+- **2026-09-06 - Off-catalogue equipment is ON by default, and its support link is small and plain.**
+  The feature shipped behind `NEXT_PUBLIC_CUSTOM_EQUIPMENT=1`, so the deployed app still drew the OLD
+  red «it won't be included» card with no name box and no taxonomy selects - which is exactly what the
+  owner screenshotted. The backend went live and was verified end to end the same day (absent id keys
+  accepted; `null` ids and a partial triple both 422), so the flag flipped to the PUBLIC_WEB_ENABLED
+  shape: on unless `=0`. «Message Us On WhatsApp» is «Message us», at `size="sm"` - the route into the
+  catalogue, not the way out of the request.
+  Files: `src/lib/flags.ts`, `.env.example`, `src/components/create/MachineCard.tsx`,
+  `src/lib/i18n/{en,ar}.ts`, `tests/unit/{canvas-no-match,gates,machine-card}.test.*`.
+  Trap: three suites encoded the flag-OFF behaviour as if it were the only behaviour.
+  `canvas-no-match.test.tsx` is now explicitly the KILL-SWITCH suite (imports its tree after setting
+  `=0`), and `gates.test.ts` states the new rule: an unnamed off-catalogue row raises
+  `customEquipmentMissing` PLUS the year and certificate gates, because those two answers are posted
+  for it and shown to the supplier.
+  ⚠️ A flag read at module load cannot be flipped by a test's `beforeEach` - the import has already
+  happened. Every case that needs the other state re-imports the tree behind `vi.resetModules()`, and
+  the render ones need a 20s timeout because of it.
+
 - **2026-09-06 - Trial requests are hidden on the web, and an off-catalogue row says so in orange.**
   Owner: *"no trial request on the web for now"*, and the no-match row must warn rather than refuse.
   `TRIAL_REQUESTS_ENABLED = false` (a code toggle, not an env var - it is a product decision, not a

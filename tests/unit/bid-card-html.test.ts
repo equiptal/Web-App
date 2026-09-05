@@ -98,6 +98,14 @@ describe("the navy band before the request exists", () => {
      * brand from the thing it previews. Same `logoDataUri`, so they cannot drift.
      */
     expect(html).toContain('alt="Moedatech"');
+    /**
+     * ⚠️ **`max-width` as well as `width`, and it is load-bearing.** The share panel renders this
+     * markup inside a container carrying `[&_img]:!w-full`, written so the CARD picture scales to
+     * the column. The logo is an `img` too, so `!important` beat its inline width and the mark
+     * filled the card edge to edge (owner, 2026-09-06, with a screenshot of it). `max-width` is a
+     * different property, so it constrains the computed width without fighting `!important`.
+     */
+    expect(html).toContain("max-width:72px");
     expect(html).not.toContain(">MOEDATECH<");
     expect(html).toContain("Excavator 20 ton");
     expect(html).toContain("Open the link to submit your bid");

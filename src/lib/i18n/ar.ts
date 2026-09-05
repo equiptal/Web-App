@@ -1917,7 +1917,7 @@ export const ar: Dictionary = {
       customEquipment: "اسم المعدة",
       customEquipmentPlaceholder: "اكتب اسم المعدة التي تحتاجها",
       customEquipmentHint: "هذا الاسم هو ما سيراه مورّدك في نموذج العرض",
-      unavailableWhatsapp: "راسلنا على واتساب",
+      unavailableWhatsapp: "راسلنا",
       unavailableChoose: "اختر نوعاً آخر",
       sourcingRequested: "نبحث عن هذه المعدة: سنتواصل معك.",
     },

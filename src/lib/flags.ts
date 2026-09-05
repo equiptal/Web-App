@@ -35,13 +35,16 @@ export const EMAIL_FIRST_AUTH_ENABLED: boolean = true;
  * CUSTOM_EQUIPMENT_ENABLED — off-catalogue equipment: a `no-match` line the renter NAMES himself,
  * posted with `customEquipmentName` and no taxonomy ids.
  *
- * OFF by default, and deliberately so: `POST /agents/requests` 422s an item with no ids until the
- * backend half is deployed (migration → agents-equipment → marketplace/partner/admin), so turning
- * this on early would refuse the whole request rather than degrade. With it off the create flow
- * behaves exactly as before — a no-match line is shown, never named, and never posted.
- * Set NEXT_PUBLIC_CUSTOM_EQUIPMENT=1 once that deploy is done.
+ * ON by default since 2026-09-06, when the backend half went live and the contract was verified
+ * against it end to end (an item with the three id keys ABSENT is accepted; `null` ids and a partial
+ * triple are both 422).
+ *
+ * `=0` is the kill switch, same shape as PUBLIC_WEB_ENABLED: it restores the old behaviour to the
+ * letter — the no-match row is shown, never named, never posted — for an environment whose backend
+ * is older than this. Build-time, like every NEXT_PUBLIC_ variable: rebuild the branch after
+ * changing it.
  */
-export const CUSTOM_EQUIPMENT_ENABLED = process.env.NEXT_PUBLIC_CUSTOM_EQUIPMENT === "1";
+export const CUSTOM_EQUIPMENT_ENABLED = process.env.NEXT_PUBLIC_CUSTOM_EQUIPMENT !== "0";
 
 /**
  * TRIAL_REQUESTS_ENABLED — the «Trial Request» path (mobile/016): the first-request pop-up offering

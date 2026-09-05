@@ -178,7 +178,8 @@ describe("the terms step reads back as answered", () => {
 
   it("puts the contract term in the group the form marks «Applies to every item»", async () => {
     const terms = await step("Terms");
-    expect(within(terms).getByText("Applies to every item")).toBeTruthy();
+    // The contract term comes from the request's form payload, so it arrives after the heading.
+    expect(await within(terms).findByText("Applies to every item", {}, { timeout: 5000 })).toBeTruthy();
     const row = within(terms).getByText("Payment Terms").closest("div")!;
     expect(row.textContent).toContain("net_30");
   });
@@ -213,8 +214,9 @@ describe("the price step is the form's, frozen", () => {
     const price = await step("The price");
     expect(within(price).getByText("18,000")).toBeTruthy();
     expect(within(price).getByText(/SAR \/ month/)).toBeTruthy();
-    // 1 Sept → 31 Dec is 122 days; the rate is monthly, so the form prorates rather than charging one month.
-    expect(within(price).getAllByText(/billable days/).length).toBeGreaterThan(0);
+    // 1 Sept → 31 Dec is 122 days; the rate is monthly, so the form prorates rather than charging one
+    // month. The day count needs the request's own period, which lands with the form payload.
+    expect((await within(price).findAllByText(/billable days/, {}, { timeout: 5000 })).length).toBeGreaterThan(0);
   });
 
   it("adds the transport leg the supplier priced, and no leg he did not", async () => {

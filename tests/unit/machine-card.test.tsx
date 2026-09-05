@@ -306,7 +306,7 @@ describe("logistics — the prototype's labels and options (MREQ-AC-62/63)", () 
 });
 
 describe("an item the marketplace cannot supply (MREQ-AC-24)", () => {
-  it("shows the red panel and hands off to WhatsApp without dropping the row", async () => {
+  it("shows the red panel and hands off to support without dropping the row", async () => {
     const open = vi.fn();
     vi.stubGlobal("open", open);
     const handle = await card({
@@ -318,7 +318,7 @@ describe("an item the marketplace cannot supply (MREQ-AC-24)", () => {
     expect(screen.queryByText("TYPE")).toBeNull();
 
     await handle.run(() => {
-      screen.getByText(/Message us on WhatsApp/).closest("button")!.click();
+      screen.getByText(/^Message us$/).closest("button")!.click();
     });
 
     expect(open).toHaveBeenCalledOnce();

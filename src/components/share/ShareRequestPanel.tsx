@@ -268,6 +268,19 @@ export function ShareRequestPanel({
   const [dnsCopied, setDnsCopied] = useState(false);
   const [msgCopied, setMsgCopied] = useState(false);
   /**
+   * The renter's own address, for the `To` line.
+   *
+   * 🔴 **A message with no `To` is what we sent before**, on every path. It delivers, but the
+   * recipient sees *"undisclosed-recipients"*, some corporate filters score it down, and in Gmail's
+   * composer he was left staring at an empty To box on a message he was about to send — which
+   * invites him to type a supplier into it, exposing that one to all the others.
+   *
+   * ⚠️ **Read here rather than passed in.** `renterName` is a prop threaded through six call
+   * sites; a seventh would have to be added to all of them and forgotten in one. This is the one
+   * component that needs it.
+   */
+  const [myEmail, setMyEmail] = useState<string | null>(null);
+  /**
    * The addresses Outlook's compose window did not receive.
    *
    * ⚠️ Empty unless a send actually fell back to that window. Outlook's deeplink discards
@@ -304,6 +317,20 @@ export function ShareRequestPanel({
   }, []);
 
   // Asked once, on mount: it decides whether an offer is drawn at all, and it never throws.
+  useEffect(() => {
+    /* ⚠️ `fetch` itself can be missing — a test renderer, an old embedded browser — and calling it
+       then throws INSIDE the effect, where `.catch` never sees it and React takes the whole tree
+       down with it. An absent address costs a `To` line; nothing here may cost the screen. */
+    try {
+      void fetch("/api/me", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((me: { email?: string | null } | null) => setMyEmail(me?.email?.trim() || null))
+        .catch(() => setMyEmail(null));
+    } catch {
+      setMyEmail(null);
+    }
+  }, []);
+
   useEffect(() => {
     void mailConnectStatus().then(setConnect);
     return () => {
@@ -346,17 +373,35 @@ export function ShareRequestPanel({
    * So the status is re-read on close and IT decides the outcome: a renter who closed the window
    * without deciding looks exactly like one who refused, and both mean "not connected".
    */
-  const startConnect = async (): Promise<boolean> => {
+  /**
+   * 🔴 **The window must be opened INSIDE the click, and it cannot be, so it is opened EMPTY and
+   * aimed afterwards.**
+   *
+   * A browser allows `window.open` only while it still counts the click as live. From the Send
+   * button there are two awaits before we know where to send him — posting the request, then asking
+   * the backend for the consent URL — and by then the activation is spent: Chrome blocks it silently
+   * and the renter gets *"Outlook could not be connected"* instead of an account chooser (owner,
+   * 2026-09-06, with a screenshot of exactly that).
+   *
+   * So `send` opens a BLANK pop-up in the same tick as the press and hands it here, and this
+   * navigates it once the URL exists. An empty window a renter can see opening is also the honest
+   * signal that something is happening while the post is in flight.
+   */
+  const startConnect = async (pre?: Window | null): Promise<boolean> => {
     if (connecting) return false;
     setConnecting(true);
     setConnectNote(null);
     const url = await mailConnectUrl(window.location.href);
     if (!url) {
+      pre?.close();
       setConnecting(false);
       setConnectNote("failed");
       return false;
     }
-    const win = window.open(url, "moeda-mail-connect", "width=520,height=700");
+    let win: Window | null = pre ?? null;
+    if (win) win.location.href = url;
+    // No window was pre-opened, so this is a real button press and the activation is still live.
+    else win = window.open(url, "moeda-mail-connect", "width=520,height=700");
     /**
      * 🔴 **Blocked: leave the button, do NOT redirect.**
      *
@@ -597,6 +642,23 @@ export function ShareRequestPanel({
   const send = async (override?: "none" | "email" | "whatsapp" | "other") => {
     const ch = override ?? channel;
     if (busy) return;
+
+    /**
+     * 🔴 **Opened here, before anything is awaited, or the browser blocks it.**
+     *
+     * This is the first statement of the click. Everything below it awaits, and a pop-up opened
+     * after an await is a pop-up the browser refuses — which is why the renter was being shown
+     * *"Outlook could not be connected"* rather than Microsoft's account chooser.
+     *
+     * ⚠️ Outlook only, and only when there is something to connect to. Gmail's compose URL carries
+     * `bcc`, so its own window already shows the recipients and a Microsoft consent there would be a
+     * detour to solve a problem he does not have.
+     */
+    const consentWindow =
+      ch === "email" && provider === "outlook" && connect?.configured && !connect.connected
+        ? window.open("", "moeda-mail-connect", "width=520,height=700")
+        : null;
+
     setBusy(true);
     setTooLong(false);
 
@@ -606,6 +668,8 @@ export function ShareRequestPanel({
     let id = uuid;
     if (!id && mode === "post" && onPost) id = await onPost();
     if (!id) {
+      // Nothing was posted, so there is nothing to consent for. Do not leave a blank window open.
+      consentWindow?.close();
       setBusy(false);
       return;
     }
@@ -678,7 +742,8 @@ export function ShareRequestPanel({
       /* ⚠️ Outlook only. Gmail's compose URL carries `bcc`, so its window already opens with the
          suppliers in it: a Microsoft consent there would be a detour to solve a problem he does not
          have. */
-      if (provider === "outlook" && connect?.configured && !connect.connected) await startConnect();
+      if (provider === "outlook" && connect?.configured && !connect.connected) await startConnect(consentWindow);
+      else consentWindow?.close();
 
       const outcome = await shareRequestEmail(id, reachable.map((x) => x.id), {
         subject,
@@ -714,7 +779,25 @@ export function ShareRequestPanel({
         // his own compose window to address himself. Nothing is recorded, because nobody was named.
         if (reachable.length) void recordRequestShare(id, reachable.map((x) => x.id), "email");
 
-        const args: Compose = { bcc: reachable.map((x) => x.email as string), subject, body: message, provider };
+        /**
+         * 🔴 **`To` is the renter himself. Never a supplier.**
+         *
+         * This is how a blind broadcast is addressed in practice, and it is what Gmail's and
+         * Microsoft's own guidance says to do: from him, to him, blind-copied to the others. The
+         * header is complete, he keeps his own copy without a separate trick, and **reply-all is
+         * safe** — a blind-copied recipient's client sees only `To` and `Cc`, so a reply-all reaches
+         * the renter and no supplier can reach the others even by accident.
+         *
+         * ⚠️ Empty when we could not read his address, which is exactly today's behaviour. A
+         * missing `To` is worse than a filled one and better than a wrong one.
+         */
+        const args: Compose = {
+          to: myEmail ? [myEmail] : [],
+          bcc: reachable.map((x) => x.email as string),
+          subject,
+          body: message,
+          provider,
+        };
         setReopen(args);
         /* ⚠️ Kept so *Copy addresses* has something to copy, and set ONLY on the fallback: a
            send that went out server-side put the recipients on the message itself, so offering a
@@ -1280,6 +1363,20 @@ export function ShareRequestPanel({
                2026-09-01), so the From line names HIM. */
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-surface">
               <div className="flex-none border-b border-border bg-surface2 px-3 py-2">
+                {/* ⚠️ **Above the subject** (owner, 2026-09-06). On the From line they read as part
+                    of the message's own header, as though the language were something the supplier
+                    would see. Above the title they read as what they are: controls FOR this preview,
+                    sitting over the thing they change. */}
+                <div className="mb-1.5 flex items-center">
+                  <PreviewTools
+                    lang={lang}
+                    setLang={setLang}
+                    onCopy={() => void copyMessage()}
+                    copied={msgCopied}
+                    disabled={!uuid || !card}
+                    c={c}
+                  />
+                </div>
                 {/* ⚠️ The subject is a FIELD now, drawn as the line it will become rather than
                     as a boxed input: the same rule as his other wording, so what he edits and what
                     he reads are one object. */}
@@ -1290,16 +1387,8 @@ export function ShareRequestPanel({
                   label={c.tplTitle}
                   className="text-meta font-extrabold text-navy"
                 />
-                <div className="mt-0.5 flex items-center gap-2 text-label text-muted">
-                  <span className="min-w-0 truncate">{fmt(c.fromLine, { name: renterName || c.fromYou })}</span>
-                  <PreviewTools
-                    lang={lang}
-                    setLang={setLang}
-                    onCopy={() => void copyMessage()}
-                    copied={msgCopied}
-                    disabled={!uuid || !card}
-                    c={c}
-                  />
+                <div className="mt-0.5 truncate text-label text-muted">
+                  {fmt(c.fromLine, { name: renterName || c.fromYou })}
                 </div>
               </div>
               {/* One scroll region for the whole message. It used to be three, nested — the body,

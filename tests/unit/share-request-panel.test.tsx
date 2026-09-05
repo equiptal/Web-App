@@ -1613,9 +1613,16 @@ describe("a wording per channel", () => {
  * it is not a detour, it is the next step of the thing he pressed.
  */
 describe("Send opens the connector itself", () => {
-  /** A pop-up that is already closed, so the poll resolves on its first tick. */
+  /**
+   * A pop-up that is already closed, so the poll resolves on its first tick.
+   *
+   * 🔴 It carries a `location`, because the consent URL is no longer passed to `window.open`. The
+   * window is opened BLANK inside the click and aimed afterwards: opened after the two awaits that
+   * `send` needs (the post, then the authorize call) the browser refuses it outright, which is what
+   * put *"Outlook could not be connected"* on screen instead of an account chooser.
+   */
   const popup = () => {
-    const win = { closed: true } as Window;
+    const win = { closed: true, location: { href: "" }, close: () => {} } as unknown as Window;
     opened.mockReturnValue(win);
     return win;
   };
@@ -1627,15 +1634,18 @@ describe("Send opens the connector itself", () => {
 
     // Not connected at the moment of the press; connected by the time the pop-up closes.
     api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
-    popup();
+    const win = popup();
 
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
 
+    // 🔴 The window is opened BLANK, in the same tick as the click, or the browser blocks it.
     await waitFor(() => expect(opened).toHaveBeenCalled());
-    expect(String(opened.mock.calls[0][0])).toContain("login.microsoftonline.com");
+    expect(String(opened.mock.calls[0][0])).toBe("");
+    // And it is aimed at Microsoft once the authorize call has answered.
+    await waitFor(() => expect(win.location.href).toContain("login.microsoftonline.com"));
   });
 
   it("Given a DRAFT came back, Then it opens so he can read the Bcc and press Send himself", async () => {
@@ -1695,7 +1705,45 @@ describe("Send opens the connector itself", () => {
     await waitFor(() => expect(opened).toHaveBeenCalled());
     expect(String(opened.mock.calls[0][0])).not.toContain("login.microsoftonline.com");
   });
+
+  it("Given GMAIL, Then no window is pre-opened at all", async () => {
+    // Its compose URL carries the recipients, so there is no consent to reach and nothing to hold
+    // a window open for.
+    api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
+    api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.gmail));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(opened).toHaveBeenCalled());
+    // The FIRST window is the Gmail composer, not a blank one waiting for a consent URL.
+    expect(String(opened.mock.calls[0][0])).toContain("mail.google.com");
+  });
+
+  it("Given the POST fails, Then the blank window is closed rather than left open", async () => {
+    /**
+     * 🔴 It is opened before the post, because it has to be. A post that then fails would leave an
+     * empty pop-up sitting on his screen with nothing in it and no way to know what it was for.
+     */
+    api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
+    const closed = vi.fn();
+    opened.mockReturnValue({ closed: false, location: { href: "" }, close: closed } as unknown as Window);
+
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="post" draftForm={DRAFT} onPost={async () => null} />
+      </LocaleProvider>,
+    );
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(closed).toHaveBeenCalled());
+  });
 });
+
 
 
 /**
@@ -1751,5 +1799,68 @@ describe("More hands the sheet a URL", () => {
     expect(arg.url).toContain("/bid/");
     expect(arg.text).toContain("Crawler Excavator");
     expect(arg.text!.endsWith(arg.url!)).toBe(false);
+  });
+});
+
+
+/**
+ * -- Who the message is addressed to (owner, 2026-09-06) -----------------------------------------
+ *
+ * *"i want it to the renter himself."*
+ *
+ * 🔴 Every path sent with an EMPTY `To` before this. It delivers, but the recipient sees
+ * "undisclosed-recipients", corporate filters score it down, and in Gmail's composer the renter was
+ * left staring at an empty To box on a message he was about to send — which invites him to type a
+ * supplier into it and expose that one to all the others.
+ */
+describe("the To line", () => {
+  const withMe = (email: string | null) =>
+    vi.stubGlobal("fetch", async (url: string) =>
+      String(url).includes("/api/me")
+        ? { ok: true, status: 200, json: async () => ({ email }) }
+        : { ok: false, status: 404, json: async () => ({}) },
+    );
+
+  const sendByGmail = async () => {
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.gmail));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    await waitFor(() => expect(opened).toHaveBeenCalled());
+    return new URL(String(opened.mock.calls[0][0]));
+  };
+
+  it("Given his address, Then HE is in To and the suppliers stay blind", async () => {
+    /**
+     * ⚠️ **Reply-all is safe this way.** A blind-copied recipient's client sees only `To` and
+     * `Cc`, so a reply-all reaches the renter and no supplier can reach the others by accident.
+     */
+    api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
+    withMe("bandar@zahid.sa");
+
+    const url = await sendByGmail();
+    expect(url.searchParams.get("to")).toBe("bandar@zahid.sa");
+    expect(url.searchParams.get("bcc")).toContain("ops@alfaisal.sa");
+  });
+
+  it("Given a supplier, Then he is NEVER in To", async () => {
+    // 🔴 The one thing that breaks the promise the feature rests on: none of them learns who else
+    // was asked.
+    api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
+    withMe("bandar@zahid.sa");
+
+    const url = await sendByGmail();
+    expect(url.searchParams.get("to")).not.toContain("alfaisal");
+    expect(url.searchParams.get("to")).not.toContain("najd");
+  });
+
+  it("Given no address for him, Then To is simply absent — today's behaviour, not a wrong one", async () => {
+    api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
+    withMe(null);
+
+    const url = await sendByGmail();
+    expect(url.searchParams.get("to")).toBeNull();
+    // And the share still goes out.
+    expect(url.searchParams.get("bcc")).toContain("ops@alfaisal.sa");
   });
 });

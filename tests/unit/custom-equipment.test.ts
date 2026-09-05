@@ -7,16 +7,15 @@ import type { EquipmentItem } from "@/lib/contract";
  * Off-catalogue equipment: a machine the catalogue cannot place, NAMED by the renter and posted.
  *
  * The old behaviour — the row is drawn, gates nothing and posts nothing — is
- * `canvas-no-match.test.tsx`, and it is still what ships until the backend accepts an item with no
- * taxonomy ids. Everything here is behind `NEXT_PUBLIC_CUSTOM_EQUIPMENT=1`, read at module load, so
- * each case re-imports the modules with the flag on.
+ * `canvas-no-match.test.tsx`, which now holds the KILL-SWITCH state (`NEXT_PUBLIC_CUSTOM_EQUIPMENT=0`).
+ * The flag is read at module load, so each case re-imports the modules with the environment it wants.
  */
 const FLAG = "NEXT_PUBLIC_CUSTOM_EQUIPMENT";
 const REAL = process.env[FLAG];
 
 async function withFlag() {
   vi.resetModules();
-  process.env[FLAG] = "1";
+  delete process.env[FLAG]; // ON by default since the backend went live
   return {
     gates: await import("@/lib/contract/gates"),
     adapters: await import("@/lib/api/app-adapters"),
@@ -60,9 +59,9 @@ describe("what makes a line off-catalogue", () => {
     expect(gates.isCustomLine(makeItem())).toBe(false);
   });
 
-  it("is nobody's business with the flag off — the old behaviour, to the letter", async () => {
+  it("is nobody's business with the kill switch thrown — the old behaviour, to the letter", async () => {
     vi.resetModules();
-    delete process.env[FLAG];
+    process.env[FLAG] = "0";
     const gates = await import("@/lib/contract/gates");
     expect(gates.isCustomLine(barge())).toBe(false);
     expect(gates.postableItems([barge()])).toHaveLength(0);

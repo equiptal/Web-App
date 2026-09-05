@@ -2235,7 +2235,9 @@ export const en = {
       customEquipment: "EQUIPMENT NAME",
       customEquipmentPlaceholder: "Name the machine you need",
       customEquipmentHint: "This name is what your supplier will see on the bid form",
-      unavailableWhatsapp: "Message us on WhatsApp",
+      // Small and quiet: it is the way to get the machine into the catalogue, not the way out of the
+      // request. Named for what it does, not for the app it opens (owner, 2026-09-06).
+      unavailableWhatsapp: "Message us",
       unavailableChoose: "Choose another type",
       sourcingRequested: "We're looking for this one. We'll be in touch.",
     },

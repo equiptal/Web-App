@@ -310,14 +310,17 @@ export function MachineCard({
 
         {/* ---------------- Right column: three boxes, 16px apart ---------------- */}
         <div className="flex min-w-0 flex-col gap-4">
-          {notAvailable && <UnavailableCard item={item} label={item.rawLabel ?? tax.subtypeName ?? ""} />}
-
+          {/* ── The order on an off-catalogue row (owner, 2026-09-06) ──────────────────────────
+              the taxonomy trio, marked as unanswerable · the note, with «Message us» on its own line
+              · the name box. The trio first because it is what the renter looked for; the note next,
+              explaining why it is empty; the box last, as the answer he gives instead. */}
           {notAvailable && !custom ? null : (
             /* The amber-tinted taxonomy trio, at the prototype's minmax columns.
 
                It stays on screen for an off-catalogue row (owner, 2026-09-05): the renter names his
                machine below it, but a renter who CAN find it in the list must not have the list taken
-               away from him. Unstarred there, because nothing in the catalogue can satisfy it. */
+               away from him. Marked red there and never starred: red says the catalogue has nothing
+               for this, the star would say the renter owes an answer he cannot give. */
             <div className="grid gap-2.5 rounded-sm bg-surface2 p-3.5 sm:grid-cols-[minmax(132px,1fr)_minmax(150px,1.5fr)_minmax(104px,0.9fr)]">
               {/* Derived, never picked. The renter chooses a TYPE and the category follows from it —
                   so this shows the taxonomy's `tag` (its canonical grouping, e.g. "Earthmoving") as a
@@ -333,7 +336,7 @@ export function MachineCard({
               </CanvasField>
               <CanvasField
                 label={t.create.machineCard.type}
-                missing={gapFor("subtype") || gapFor("category")}
+                missing={custom || gapFor("subtype") || gapFor("category")}
                 shake={shake("subtype") || shake("category")}
                 required={owed("subtype") || owed("category")}
                 star={!custom}
@@ -359,7 +362,7 @@ export function MachineCard({
               </CanvasField>
               <CanvasField
                 label={t.create.machineCard.size}
-                missing={gapFor("capacity")}
+                missing={custom || gapFor("capacity")}
                 shake={shake("capacity")}
                   required={owed("capacity")}
                 star={!custom}
@@ -380,6 +383,8 @@ export function MachineCard({
               </CanvasField>
             </div>
           )}
+
+          {notAvailable && <UnavailableCard item={item} label={item.rawLabel ?? tax.subtypeName ?? ""} />}
 
           {/* ── The renter's own name for a machine the catalogue cannot place ──────────────────
               Prefilled from what he wrote in the RFQ, and never written into state until he types:
@@ -548,17 +553,21 @@ function UnavailableCard({ item, label }: { item: EquipmentItem; label: string }
         <Icon name={custom ? "warning" : "error_outline"} size={16} className="mt-px flex-none" />
         {custom ? t.create.machineCard.notInCatalogueTitle : fmt(t.create.machineCard.unavailableTitle, { equipment: label })}
       </p>
-      <p className="text-meta leading-snug text-muted">
-        {custom ? t.create.machineCard.notInCatalogueBody : t.step2.noMatch.explainer}
-      </p>
-      {item.sourcingRequested ? (
-        <p className="flex items-center gap-1.5 text-meta font-semibold text-ok">
-          <Icon name="check_circle" size={15} /> {t.create.machineCard.sourcingRequested}
+      {/* The note and «Message us» share one line (owner, 2026-09-06): asking us to add the machine
+          is a footnote to the sentence, not a second decision stacked under it. It wraps on a narrow
+          card rather than squeezing the sentence. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <p className="min-w-[12rem] flex-1 text-meta leading-snug text-muted">
+          {custom ? t.create.machineCard.notInCatalogueBody : t.step2.noMatch.explainer}
         </p>
-      ) : (
-        <div className="flex flex-wrap gap-2">
+        {item.sourcingRequested ? (
+          <p className="flex flex-none items-center gap-1.5 text-meta font-semibold text-ok">
+            <Icon name="check_circle" size={15} /> {t.create.machineCard.sourcingRequested}
+          </p>
+        ) : (
           <Button
             variant="secondary"
+            size="sm"
             onClick={() => {
               const msg = fmt(t.step2.noMatch.whatsappMessage, { item: item.rawLabel ?? label });
               window.open(`https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
@@ -567,8 +576,8 @@ function UnavailableCard({ item, label }: { item: EquipmentItem; label: string }
           >
             <Icon name="chat" size={15} /> {t.create.machineCard.unavailableWhatsapp}
           </Button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
