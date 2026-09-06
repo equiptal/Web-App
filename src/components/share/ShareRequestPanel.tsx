@@ -24,6 +24,7 @@ import {
 import { canBeEmailed, groupsWithCounts, isOnMoedatech } from "@/lib/contract/renter-suppliers";
 import { GroupsMenu } from "@/components/suppliers/SupplierGroups";
 import { AddSuppliersDialog } from "@/components/suppliers/AddSuppliersDialog";
+import { MAIL_UI, MailField, MailChips, type MailPerson } from "@/components/share/mail-chrome";
 import type { BidFormData } from "@/lib/contract/link-bids";
 import { bidCardHtml } from "@/lib/bidCardHtml";
 import { copyShareMessage, shareMessageHtml } from "@/lib/copyShareMessage";
@@ -517,8 +518,21 @@ export function ShareRequestPanel({
    * falls back to its linked account's. The panel must not rearrange itself under him when the real
    * answer arrives.
    */
-  const envelopeTo = preview?.to.length ? preview.to : myEmail ? [myEmail] : [];
-  const envelopeBcc = preview?.bcc.length ? preview.bcc : reachable.map((x) => x.email as string);
+  /**
+   * ⚠️ **Addresses come from the server; the NAMES live here.** The backend holds no opinion about
+   * what this renter calls his suppliers, and should not — but a header showing `ops@alfaisal.sa`
+   * asks him to decode it, while «Al Faisal Rentals» is the thing he actually recognises. So the
+   * list is the server's and the labels are ours, matched on the address.
+   */
+  const nameFor = (address: string): string | null => {
+    const hit = (rows ?? []).find((r) => r.email?.trim().toLowerCase() === address.trim().toLowerCase());
+    if (hit?.name) return hit.name;
+    return address.trim().toLowerCase() === (myEmail ?? "").trim().toLowerCase() ? renterName : null;
+  };
+  const asPeople = (list: string[]): MailPerson[] => list.map((address) => ({ address, name: nameFor(address) }));
+
+  const envelopeTo = asPeople(preview?.to.length ? preview.to : myEmail ? [myEmail] : []);
+  const envelopeBcc = asPeople(preview?.bcc.length ? preview.bcc : reachable.map((x) => x.email as string));
 
   const skippedNames = preview
     ? preview.skippedIds.map((id) => (rows ?? []).find((r) => r.id === id)?.name).filter((n): n is string => !!n)
@@ -981,6 +995,12 @@ export function ShareRequestPanel({
    * `tab` is set by the channel buttons and only ever shows a channel that is actually on.
    */
   const previewIsEmail = channel === "email";
+  /**
+   * ⚠️ **The chrome follows the CHANNEL he picked.** An Outlook frame around a message going out
+   * through Gmail is a preview of the wrong client, which is the one failure this window exists to
+   * avoid — he can no longer open the real one.
+   */
+  const skin = MAIL_UI[provider];
   /** The app's own field-title style (`Tile` in `ReadyToSend`). Extrabold made these shout over
    *  every other label on the review, and a title is not the thing being read. */
   const label = "text-label font-semibold uppercase tracking-[0.05em] text-muted";
@@ -1392,6 +1412,14 @@ export function ShareRequestPanel({
                 (owner, 2026-09-03). */}
             <Icon name="visibility" size={14} className="flex-none text-muted" />
             <span className={label}>{c.preview}</span>
+            {/* On the heading's OWN line (owner, 2026-09-06). It was a second line under it, and a
+                sentence of grey 11px prose across the top of the preview pushed the message itself
+                down and read as a paragraph rather than as a note about the heading. It truncates
+                rather than wrapping: the column is narrow, and a hint that grows the header is the
+                thing this move is undoing. */}
+            <span className="min-w-0 flex-1 truncate text-label text-muted" title={c.editHint}>
+              {c.editHint}
+            </span>
             <span className="ms-auto" />
 
             {/* ⚠️ **The one paste Outlook genuinely cannot do without**, and only when it is
@@ -1415,7 +1443,6 @@ export function ShareRequestPanel({
             )}
           </span>
 
-          <span className="text-label text-muted">{c.editHint}</span>
 
           {!card || !parts ? (
             <p className="rounded-md border border-dashed border-border bg-surface2 px-3 py-6 text-center text-meta text-muted">
@@ -1425,71 +1452,91 @@ export function ShareRequestPanel({
             /* ⚠️ The prototype's From says `Moedatech <notifications@moedatech.net>`. It is a mock,
                and it is not what happens: this goes out from the renter's own account (owner,
                2026-09-01), so the From line names HIM. */
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-surface">
-              <div className="flex-none border-b border-border bg-surface2 px-3 py-2">
-                {/* ⚠️ **Above the subject** (owner, 2026-09-06). On the From line they read as part
-                    of the message's own header, as though the language were something the supplier
-                    would see. Above the title they read as what they are: controls FOR this preview,
-                    sitting over the thing they change. */}
-                <div className="mb-1.5 flex items-center">
-                  <PreviewTools
-                    lang={lang}
-                    setLang={setLang}
-                    onCopy={() => void copyMessage()}
-                    copied={msgCopied}
-                    disabled={!uuid || !card}
-                    c={c}
-                  />
-                </div>
-                {/* ⚠️ The subject is a FIELD now, drawn as the line it will become rather than
-                    as a boxed input: the same rule as his other wording, so what he edits and what
-                    he reads are one object. */}
-                <Editable
-                  value={template.title}
-                  display={subject}
-                  onChange={(v) => patchTemplate("title", v)}
-                  label={c.tplTitle}
-                  className="text-body font-extrabold text-navy"
+            <div
+              className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md"
+              style={{ background: skin.ground, border: `1px solid ${skin.divider}`, fontFamily: skin.font }}
+            >
+              {/* ⚠️ Ours, and deliberately OUTSIDE the client's chrome: the language and Copy are
+                  controls for the preview, not fields of the message. Kept on our own surface so the
+                  imitation below starts cleanly at the To line. */}
+              <div className="flex flex-none items-center border-b border-border bg-surface2 px-3 py-1.5">
+                <PreviewTools
+                  lang={lang}
+                  setLang={setLang}
+                  onCopy={() => void copyMessage()}
+                  copied={msgCopied}
+                  disabled={!uuid || !card}
+                  c={c}
                 />
-                {/* ── The envelope, drawn as a message header (owner, 2026-09-06) ─────────────
-                    *"since the user will not be able to check the outlook so the preview must be
-                    able to be very customizable and clear like a real outlook view."*
+              </div>
 
-                    🔴 **This is now the ONLY place he ever sees who the message goes to.** The
-                    draft in his own Outlook is gone — it needed `Mail.ReadWrite` and real tenants
-                    refuse it — so a grey line of comma-joined addresses is no longer good enough.
-                    It has to read the way a mail client reads: sender with a face, recipients as
-                    separate things he can count, and the ones being left out named. */}
-                <div className="mt-2 grid gap-2 border-t border-border pt-2">
-                  {/* The sender. Initials rather than a photo: we have no photo, and a grey circle
-                      with two letters is what every mail client falls back to anyway. */}
-                  <div className="flex items-center gap-2">
-                    <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-navy text-label font-extrabold text-surface">
-                      {initialsOf(preview?.from || renterName || myEmail)}
-                    </span>
-                    <span className="min-w-0">
-                      <b className="block truncate text-meta font-semibold text-navy">{renterName || c.fromYou}</b>
-                      <span className="block truncate text-label text-muted">
-                        {preview?.from || myEmail || ""}
-                      </span>
-                    </span>
-                  </div>
+              {/* ── The client's own compose header (owner, 2026-09-06) ──────────────────────────
+                  *"use exactly as outlook ui, same colors same icons same background same text."*
 
-                  <Recipients label={c.envTo} people={envelopeTo} empty={null} />
-                  {/* ⚠️ Each supplier is his OWN chip, not an item in a comma list. He is checking
-                      a list of people before it leaves; a run-on string is the shape you skim. */}
-                  <Recipients label={c.envBcc} people={envelopeBcc} empty={c.envNoRecipients} />
+                  🔴 **He can no longer open the real window.** The draft in his own mailbox needed
+                  `Mail.ReadWrite`, and real tenants refuse it, so this frame is the only sight he
+                  gets of the message before it leaves. Field order, label casing, chip shape and
+                  divider weight are all copied from the live composer, because those are what make
+                  a header read as a mail client rather than as a form.
 
-                  {/* ⚠️ The ones being LEFT OUT, by name. A count he cannot act on is not a
-                      preview, and this is the line that stops him believing eight were written to
-                      when six were. */}
+                  ⚠️ Fields in the composer's order: To, Bcc, then Subject. Ours put Subject first,
+                  which no client does. */}
+              {/* ── The card scrolls as ONE (owner, 2026-09-06: *"make the scroll over the whole
+                  preview card without freezing the top fields"*) ────────────────────────────────
+                  Only the BODY used to scroll, so To / Bcc / Subject stood frozen over it and the
+                  message read through a letterbox — on a short column the renter was moving two
+                  lines of mail inside a card that was mostly envelope. The scroller is this wrapper
+                  now: the fields, the status line and the body move together, exactly as they do in
+                  a real client. Our own toolbar above stays put, because it is a control for the
+                  preview rather than part of the message. */}
+              <div className="min-h-0 flex-1 overflow-auto">
+              <div className="flex-none" style={{ background: skin.fieldGround }}>
+                {/* ⚠️ **From, and it leads** (owner, 2026-09-06: *"make it look like email bcc,
+                    from, title etc"*). ~~Dropped when the header was rebuilt.~~ It is the field that
+                    answers the question a supplier asks first, and the one this whole feature is
+                    built to control: the message goes out as HIM. */}
+                <MailField label={c.envFrom} skin={skin}>
+                  <span className="block truncate py-1 text-meta" style={{ color: skin.text }}>
+                    {renterName ? <b className="font-semibold">{renterName}</b> : null}
+                    {renterName ? " · " : null}
+                    <span dir="ltr" style={{ color: skin.label }}>{preview?.from || myEmail || c.fromYou}</span>
+                  </span>
+                </MailField>
+
+                <MailField label={c.envTo} skin={skin}>
+                  <MailChips people={envelopeTo} empty={null} skin={skin} />
+                </MailField>
+                <MailField label={c.envBcc} skin={skin}>
+                  <MailChips people={envelopeBcc} empty={c.envNoRecipients} skin={skin} />
+                </MailField>
+                <MailField label={c.envSubject} skin={skin}>
+                  {/* ⚠️ Still his to type in. A composer's subject IS an input, so it needs no
+                      separate treatment to look editable — but it keeps our pen, because nothing
+                      else on this screen says which parts are his. */}
+                  <Editable
+                    value={template.title}
+                    display={subject}
+                    onChange={(v) => patchTemplate("title", v)}
+                    label={c.tplTitle}
+                    className="text-body font-semibold"
+                    style={{ color: skin.subject }}
+                  />
+                </MailField>
+              </div>
+
+              {/* ⚠️ The two things a composer does NOT say, under the fields rather than inside
+                  one: they are warnings about the list, not recipients in it. */}
+              {(skippedNames.length > 0 || preview?.via === "graph") && (
+                <div
+                  className="flex-none px-3 py-1.5"
+                  style={{ borderBottom: `1px solid ${skin.divider}` }}
+                >
                   {skippedNames.length > 0 && (
                     <span className="flex items-start gap-1.5 text-label font-semibold text-warn-deep">
                       <Icon name="error_outline" size={13} className="mt-px flex-none" />
                       {fmt(c.envSkipped, { names: skippedNames.join(", ") })}
                     </span>
                   )}
-
                   {preview?.via === "graph" && (
                     <span className="flex items-center gap-1.5 text-label text-ok-deep">
                       <Icon name="check_circle" size={13} className="flex-none" />
@@ -1497,14 +1544,16 @@ export function ShareRequestPanel({
                     </span>
                   )}
                 </div>
-              </div>
-              {/* One scroll region for the whole message. It used to be three, nested — the body,
-                  the card under it and the dialog around both — and a renter reading a message he is
-                  about to send should not have to work out which of three bars moves what. */}
-              {/* Grey ground, so the white card inside reads as a card (owner, 2026-09-03: *"i want
-                  it light grey instead of white so it is shown as card with white background"*).
-                  On white it had no edge, and a card with no edge is a paragraph. */}
-              <div className="min-h-0 flex-1 overflow-auto bg-surface2 p-3">
+              )}
+
+              {/* ⚠️ The body sits on the client's OWN ground, white in both, rather than on our
+                  grey. A composer does not tint the area you type in, and the card inside carries
+                  its own border. */}
+              <div
+                // Not a scroller of its own any more — the wrapper above carries the whole card.
+                className="p-3"
+                style={{ background: skin.bodyGround, color: skin.text }}
+              >
                 <Message
                   parts={parts}
                   detail={detail}
@@ -1515,6 +1564,7 @@ export function ShareRequestPanel({
                   linkPending={!uuid}
                   unfurl={unfurl}
                 />
+              </div>
               </div>
             </div>
           ) : (
@@ -2069,50 +2119,13 @@ function Message({
   );
 }
 
-/**
- * One addressed line, with each person as their own chip.
- *
- * ⚠️ Chips rather than a comma-joined string, because he is CHECKING a list of people before it
- * leaves and a run-on line is the shape an eye slides off. It is also the only way the count is
- * readable at a glance, which is the question he is actually asking.
- */
-function Recipients({ label, people, empty }: { label: string; people: string[]; empty: string | null }) {
-  if (!people.length && !empty) return null;
-  return (
-    <div className="flex items-start gap-2">
-      <span className="w-[68px] flex-none pt-0.5 text-label font-semibold text-muted">{label}</span>
-      <span className="flex min-w-0 flex-wrap gap-1">
-        {people.length === 0 ? (
-          <span className="pt-0.5 text-label text-muted-light">{empty}</span>
-        ) : (
-          people.map((who) => (
-            <span
-              key={who}
-              dir="ltr"
-              className="inline-flex h-[22px] max-w-full items-center truncate rounded-full border border-border bg-surface px-2 text-label text-navy"
-            >
-              {who}
-            </span>
-          ))
-        )}
-      </span>
-    </div>
-  );
-}
 
-/**
- * Two letters for the sender's circle.
+/*
+ * — `initialsOf` lived here —
  *
- * ⚠️ From a NAME where we have one, an address where we do not, and never empty: a blank circle
- * reads as a broken image rather than as an unknown sender.
+ * It drew the sender's avatar. Gone with it: an avatar belongs to a message being READ, and this is
+ * a message being written.
  */
-function initialsOf(who: string | null | undefined): string {
-  const v = (who ?? "").trim();
-  if (!v) return "?";
-  const words = v.split(/[\s@._-]+/).filter(Boolean);
-  const letters = words.slice(0, 2).map((w) => w[0]).join("");
-  return (letters || v[0]).toUpperCase();
-}
 
 /**
  * The two controls that belong to the message itself: which language it is in, and take it away.
@@ -2198,6 +2211,7 @@ function Editable({
   onChange,
   label,
   className,
+  style,
 }: {
   /** What is stored and edited — with `{name}` in it. */
   value: string;
@@ -2207,6 +2221,8 @@ function Editable({
   label: string;
   /** Extra type classes, so the subject can carry the weight a subject line has. */
   className?: string;
+  /** ⚠️ For the imitated composers only: their own text colour, which is not one of our tokens. */
+  style?: React.CSSProperties;
 }) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
   const [editing, setEditing] = useState(false);
@@ -2240,6 +2256,7 @@ function Editable({
         onFocus={() => setEditing(true)}
         onBlur={() => setEditing(false)}
         onChange={(e) => onChange(e.target.value)}
+        style={style}
         className={cx(
           "w-full resize-none overflow-hidden rounded-sm border border-border bg-surface2/60 py-1 pe-7 ps-2 leading-relaxed outline-none transition hover:border-border-strong focus:border-brand focus:bg-surface",
           className ?? "text-meta text-navy",

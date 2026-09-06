@@ -1827,9 +1827,14 @@ describe("the message's own controls live on the message", () => {
     await screen.findByText("Al Faisal Rentals");
     fireEvent.click(screen.getByText(c.outlook));
 
-    const card = (await screen.findByLabelText(c.tplTitle)).closest("div")!.parentElement!;
-    expect(within(card).getByText("العربية")).toBeTruthy();
-    expect(within(card).getByText(c.copyMessage)).toBeTruthy();
+    /**
+     * ⚠️ The frame now imitates the CLIENT's own composer, so our two controls sit in a strip of
+     * ours at the top of it rather than among its fields: they are controls for the preview, not
+     * fields of the message. Still inside the card, still over the thing they change.
+     */
+    const frame = (await screen.findByLabelText(c.tplTitle)).closest("div.flex.min-h-0")!;
+    expect(within(frame as HTMLElement).getByText("العربية")).toBeTruthy();
+    expect(within(frame as HTMLElement).getByText(c.copyMessage)).toBeTruthy();
     // And the link row carries a glyph only: the accessible name is there, the WORD is not.
     expect(screen.getByLabelText(c.copy)).toBeTruthy();
     expect(screen.getByLabelText(c.copy).textContent).not.toContain(c.copy);
@@ -1959,17 +1964,23 @@ describe("the envelope reads like a message header", () => {
      */
     await preview();
 
-    // Two separate elements, not one containing both. (The address also appears on the supplier
-    // row on the left, which is why these are getAll.)
-    expect(screen.getAllByText("ops@alfaisal.sa").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("bids@zahid.sa").length).toBeGreaterThan(0);
+    /**
+     * ⚠️ **The chip shows the NAME**, like both clients do: he knows «Al Faisal Rentals», he does
+     * not necessarily know `ops@alfaisal.sa` belongs to them. An address with no name behind it
+     * stands alone, because a chip with nothing readable on it is worse than a raw address.
+     */
+    expect(screen.getAllByText("Al Faisal Rentals").length).toBeGreaterThan(1);
+    expect(screen.getByText("bids@zahid.sa")).toBeTruthy();
+    // Two separate elements, never one run-on line.
     expect(screen.queryByText("ops@alfaisal.sa, bids@zahid.sa")).toBeNull();
   });
 
   it("Given the preview, Then To and Bcc are labelled apart", async () => {
     await preview();
+    expect(screen.getByText(c.envFrom)).toBeTruthy();
     expect(screen.getByText(c.envTo)).toBeTruthy();
     expect(screen.getByText(c.envBcc)).toBeTruthy();
+    expect(screen.getByText(c.envSubject)).toBeTruthy();
   });
 
   it("Given a supplier with no address, Then he is NAMED, not counted", async () => {
@@ -2005,7 +2016,10 @@ describe("the envelope reads like a message header", () => {
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
 
-    await waitFor(() => expect(screen.getAllByText("ops@alfaisal.sa").length).toBeGreaterThan(1));
+    // The Bcc chip carries his supplier's NAME, so it appears twice: the row, and the chip.
+    await waitFor(() => expect(screen.getAllByText("Al Faisal Rentals").length).toBeGreaterThan(1));
     await waitFor(() => expect(screen.getByText(c.envTo)).toBeTruthy());
+    // ⚠️ And From leads, because it is the field this whole feature exists to control.
+    expect(screen.getByText(c.envFrom)).toBeTruthy();
   });
 });
