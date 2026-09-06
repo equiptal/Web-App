@@ -24,11 +24,17 @@ import { btn } from "@/lib/ds";
  *
  * ── The photograph is the owner's own comp ──────────────────────────────────────────────────────
  *
- * `/auth-panel.webp` is the excavator arm from his sign-in reference (2026-08-31), lifted out of the
- * comp itself: the clean strip of frame to the right of the form panel, cropped clear of the close
- * control, then doubled with a Lanczos resample for retina. It is a screenshot-sourced asset and
- * therefore SOFTER than a real export would be — replacing this file with the original photograph
- * changes nothing else, because nothing else references it.
+ * `/auth-panel.webp` is the excavator arm from his sign-in reference (2026-08-31).
+ *
+ * ~~Lifted out of the comp itself — a screenshot-sourced asset, and therefore softer than a real
+ * export would be.~~ **The owner supplied the photograph on 2026-09-06** and it is that file now:
+ * 1920×1071, cropped 3:4 around the linkage (the subject sits right of centre; the blurred yard on
+ * the left is what the mark and the top gradient sit on), resized to 900×1200 for retina and
+ * encoded at WebP q82 — 85 KB, a hair over the screenshot it replaces and genuinely sharp.
+ *
+ * Nothing else references the file, so swapping it again is a one-line job: keep the 3:4 portrait,
+ * because this panel is a column and `object-cover` will crop anything wider from the middle, which
+ * is where this photograph keeps its subject.
  *
  * ── What the comp has that this does not ────────────────────────────────────────────────────────
  * **The «5.0 ★★★★★ from 200+ reviews» row and its avatar stack.** Deliberately absent: we hold no

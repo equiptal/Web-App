@@ -2,6 +2,32 @@
 
 ## Change log
 
+- **2026-09-06 - A guest meets the page behind glass, not a prompt in an empty column.**
+  Owner sent Supplier OS's guarded pages as the reference: the surface renders blurred and inert with
+  a small card centred on it («Join Moedatech», what the page is, one line of what it holds, one
+  button). `GuestWall` does that for the dashboard and the requests workspace, opening this app's own
+  auth modal. The backdrop is the page's own SKELETON, deliberately: a guest has no requests, no bids
+  and no suppliers, and rendering plausible rows of somebody's business behind a blur would be
+  inventing a dashboard he does not have.
+  Files: `src/components/common/GuestWall.tsx` (new), `src/components/home/HomeHub.tsx`,
+  `src/components/workspace/RequestsWorkspace.tsx`, `src/lib/i18n/*`, `src/lib/uiPins.ts`,
+  `tests/unit/shell-nav.test.tsx`.
+  ⚠️ The workspace's EMPTY state (a signed-in renter with no requests) keeps its `SignInPrompt` - it
+  is a different question with a different answer («create your first request»), and the wall would
+  argue for an account he already has.
+
+- **2026-09-06 - Request details follows the app's order, and «created at» moved to the top.**
+  Owner sent the app's own request screen as the reference: status, then EQUIPMENT DETAILS, then
+  PROJECT LOCATION (the site, with the rental basis and the hours beside «extendable»), then PROJECT
+  DETAILS (everything else the request states, working days / week included). The web had the same
+  spine under different names, with the basis and hours filed as «terms» and the created-at date
+  buried among the job's own dates - a different clock: those say when the machine is needed, that
+  one says when he put the request out, which is what he counts the silence from.
+  Files: `src/components/workspace/RequestDetailsModal.tsx`.
+  ⚠️ `requestDetailRows` already emits «Working days / week»; it is dropped when the value is null,
+  which is the ordinary case for a request that never set one - so if it is missing on a given
+  request, that is the DATA, not the layout.
+
 - **2026-09-06 - Picking a subtype on an off-catalogue row no longer makes the row vanish.**
   Owner: *"when i try to click a subtype from existing taxonomy it is vanished"*. `isCustomLine` reads
   the SUBTYPE (a partial triple is a 422, so a half-picked line must not post ids), and the pick

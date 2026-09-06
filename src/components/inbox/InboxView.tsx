@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { fetchReceivedBids, fetchMyRequests, startDealRoom, fetchRequestSubmissions } from "@/lib/api/client";
@@ -22,6 +22,19 @@ export function InboxView() {
   const ar = locale === "ar";
   const L = (en: string, a: string) => (ar ? a : en);
   const router = useRouter();
+  /**
+   * Opened on ONE supplier, from his profile's «deal rooms» card (owner, 2026-09-06: *"u can
+   * redirect them to the inbox but to the specific supplier"*).
+   *
+   * ⚠️ **No backend change was needed, and I had said one was.** The profile carries a COUNT of
+   * deal rooms and no ids, so I read that as "cannot open one" — but the inbox already receives
+   * `supplierId` and `supplierCompanyId` on every bid, so the room can be reached from the other
+   * end. The count still cannot link to a specific room; it does not have to.
+   *
+   * ⚠️ Matched on either id: a supplier row may be linked to a person's account or to a firm's,
+   * and a renter thinking "show me Al Faisal" means the firm either way.
+   */
+  const only = useSearchParams().get("supplier");
   const [bids, setBids] = useState<InboxBid[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   // requestId → requestGroupId, from `my-requests` (same source the requests page groups by). Lets the
@@ -101,12 +114,21 @@ export function InboxView() {
     );
   }
 
+  /**
+   * ⚠️ Applied AFTER the empty check above, so a renter whose inbox is genuinely empty still gets
+   * the empty state rather than a filtered view of nothing.
+   */
+  const shown = only
+    ? bids.filter((b) => String(b.supplierId ?? "") === only || String(b.supplierCompanyId ?? "") === only)
+    : bids;
+  const filteredName = only ? (shown[0]?.supplierName ?? null) : null;
+
   // Two-level grouping: RFQ group (fan-out `requestGroupId`, falling back to the individual request
   // until the backend projects it) → equipment type (subtype) → bid rows.
   type Sub = { key: string; label: string; rows: InboxBid[] };
   type Grp = { key: string; label: string; code: string | null; subs: Map<string, Sub>; count: number };
   const groups = new Map<string, Grp>();
-  for (const b of bids) {
+  for (const b of shown) {
     const gKey = groupMap.get(b.request.id) ?? b.request.groupId ?? b.request.id ?? b.bidId;
     const gLabel = b.request.location || b.request.displayId || b.request.shortCode || L("Request", "طلب");
     // Per-request code fallback (REQ-…) shown until the RFQ group short code (RFQ-…) is available —
@@ -121,6 +143,26 @@ export function InboxView() {
     sub.rows.push(b);
     g.count += 1;
   }
+
+  /**
+   * ⚠️ **A filtered list must say it is filtered, and offer the way back.** Otherwise a renter
+   * arriving from a supplier's profile sees his inbox with most of it missing and no explanation.
+   */
+  const banner = only ? (
+    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface2 px-3 py-2">
+      <Icon name="filter_alt" size={14} className="flex-none text-muted" />
+      <span className="min-w-0 flex-1 truncate text-meta text-navy">
+        {filteredName ?? L("This supplier", "هذا المورّد")}
+      </span>
+      <button
+        type="button"
+        onClick={() => router.push("/inbox")}
+        className="flex-none text-meta font-semibold text-brand hover:text-brand-hover"
+      >
+        {L("Show everyone", "اعرض الجميع")}
+      </button>
+    </div>
+  ) : null;
 
   const row = (b: InboxBid) => (
     <div key={b.bidId} className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3">
@@ -159,6 +201,14 @@ export function InboxView() {
 
   return (
     <div {...pin("inbox-view")} dir={ar ? "rtl" : "ltr"} className="mx-auto w-full max-w-3xl">
+      {banner}
+      {/* ⚠️ The filter can empty the list while the inbox itself is not empty, which is a different
+          state and needs its own sentence. */}
+      {only && shown.length === 0 && (
+        <p className="rounded-md border border-dashed border-border bg-surface2 px-4 py-6 text-center text-meta text-muted">
+          {L("Nothing from this supplier yet.", "لا شيء من هذا المورّد بعد.")}
+        </p>
+      )}
       {[...groups.values()].map((g) => (
         <div key={g.key} className="mb-6">
           {/* Level 1 — the RFQ group: the short code first (RFQ-NNNNN when available, else the REQ- code —

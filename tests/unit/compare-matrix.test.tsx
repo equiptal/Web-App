@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { CompareMatrix } from "@/components/workspace/CompareMatrix";
 import type { BidCard, TermRow } from "@/lib/contract/bids";
 import type { WorkspaceBid } from "@/lib/contract/workspace";
+import type { LinkBidSubmission } from "@/lib/contract/link-bids";
 import { LocaleProvider } from "@/lib/i18n";
 
 /**
@@ -38,7 +39,11 @@ const wb = (card: BidCard, source: "app" | "offline" = "app"): WorkspaceBid =>
   ({ card, source } as WorkspaceBid);
 
 /** Two offers whose terms go well past the five the table used to know. */
-function draw(bids?: WorkspaceBid[], legs?: { mobByRentee?: boolean | null; demobByRentee?: boolean | null }) {
+function draw(
+  bids?: WorkspaceBid[],
+  legs?: { mobByRentee?: boolean | null; demobByRentee?: boolean | null },
+  submissions?: Record<string, LinkBidSubmission>,
+) {
   const rows = bids ?? [
     wb(
       bc({
@@ -80,6 +85,7 @@ function draw(bids?: WorkspaceBid[], legs?: { mobByRentee?: boolean | null; demo
         startDate={null}
         mobByRentee={legs?.mobByRentee ?? null}
         demobByRentee={legs?.demobByRentee ?? null}
+        submissions={submissions ?? {}}
         benched={new Set()}
         onBench={() => {}}
         ranking={null}
@@ -121,11 +127,16 @@ describe("every term the bids carry gets a column", () => {
     expect(screen.queryByText("VAT")).toBeNull();
   });
 
-  it("splits «you set» from «they offered» by whether the renter's own value is on the row", () => {
-    draw();
+  it("draws ONE heading, and puts the terms the renter set first", () => {
+    /* ~~«Terms you set» / «They offered on their own».~~ Removed (owner, 2026-09-06): the split
+       asked the reader to hold a distinction that changed nothing he does. The ORDER carries it. */
+    const { container } = draw();
     openTerms();
-    expect(screen.getByText("Terms you set")).toBeTruthy();
-    expect(screen.getByText("They offered on their own")).toBeTruthy();
+    expect(screen.queryByText("Terms you set")).toBeNull();
+    expect(screen.queryByText("They offered on their own")).toBeNull();
+    const html = container.innerHTML;
+    // «Operator» and «Food» were set by the request; «Payment» was volunteered.
+    expect(html.indexOf("Operator")).toBeLessThan(html.indexOf("Payment"));
   });
 });
 
@@ -196,6 +207,42 @@ describe("a term the request never mentioned draws no column", () => {
     expect(screen.queryByText("Fuel type")).toBeNull();
     expect(screen.getByText("Fuel")).toBeTruthy();
     expect(screen.getAllByText("On supplier").length).toBe(1);
+  });
+});
+
+describe("an off-platform confirmation reads as the value it confirms", () => {
+  /**
+   * The public bid form asks these as confirmations: the renter's requirement is printed and the
+   * supplier presses Yes or No. Carrying his word through made a column read «Yes · Yes · Yes»,
+   * which says nothing about what he offered and cannot be compared with an in-app bid, where the
+   * same facts arrive as values (owner, 2026-09-06).
+   */
+  const linkRow = (key: string, label: string, ok: boolean, reqVal: string): TermRow => ({
+    key,
+    labelEn: label,
+    labelAr: label,
+    state: ok ? "matched" : "conflict",
+    value: ok ? reqVal : null,
+    detail: { en: `Renter: ${reqVal} · Supplier: ${ok ? reqVal : "Not confirmed"}`, ar: "" },
+  });
+
+  it("prints the requested value on a Yes", () => {
+    draw([wb(bc({ id: "x", supplierName: "A", terms: { equipment: [linkRow("year", "Equipment year", true, "2018")], contract: [], supplier: [] } }), "offline")]);
+    openTerms();
+    expect(screen.getByText("2018")).toBeTruthy();
+    expect(screen.queryByText("Yes")).toBeNull();
+  });
+
+  it("shows the value he did NOT meet, in red, on a No", () => {
+    /* Owner, 2026-09-06: *"Just show the value of the request that the supplier didn't match."* A
+       refusal names no alternative, so «Not confirmed» only repeated the red the cell already wears
+       — the fact worth printing is the requirement he failed. */
+    draw([wb(bc({ id: "x", supplierName: "A", terms: { equipment: [linkRow("year", "Equipment year", false, "2018")], contract: [], supplier: [] } }), "offline")]);
+    openTerms();
+    const cell = screen.getByText("2018");
+    expect(cell.className).toContain("text-danger");
+    expect(screen.queryByText("Not confirmed")).toBeNull();
+    expect(screen.queryByText("No")).toBeNull();
   });
 });
 
@@ -288,16 +335,113 @@ describe("one side of the table at a time", () => {
     openTerms();
     // Both money groups are rails now — their column heads are gone.
     expect(screen.queryByText("Monthly rental")).toBeNull();
-    expect(screen.queryByText("First cycle")).toBeNull();
+    expect(screen.queryByText("Delivered cost")).toBeNull();
   });
 
   it("and folds the terms again when a money group is reopened", () => {
     draw();
     openTerms();
-    expect(screen.getAllByText("Terms you set").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Maintenance").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByText("Per cycle"));
-    expect(screen.queryByText("Terms you set")).toBeNull();
+    expect(screen.queryByText("Maintenance")).toBeNull();
     expect(screen.getAllByText("Monthly rental").length).toBeGreaterThan(0);
+  });
+});
+
+describe("«Rank with AI» belongs to the suppliers", () => {
+  it("stands over the supplier column, not inside the terms group", () => {
+    const { container } = draw();
+    const rank = screen.getByText(/Rank with AI/i).closest("button")!;
+    const supplierCol = container.querySelector('[data-pin="30.2"]');
+    // It ranks every bid on price AND terms, and writes the ★ that appears in this column.
+    expect(supplierCol?.contains(rank) ?? false).toBe(true);
+  });
+
+  it("is reachable whichever group is open — the terms are folded by default", () => {
+    draw();
+    expect(screen.queryByText("Maintenance")).toBeNull();
+    expect(screen.getByText(/Rank with AI/i)).toBeTruthy();
+  });
+});
+
+describe("a document sits IN the term it proves", () => {
+  /**
+   * *"They are part of the term: whenever a document is required, like TÜV in the request."*
+   *
+   * Not a group of its own (owner, 2026-09-06, correcting the first attempt). A certificate and the
+   * file that proves it are ONE fact: the cell says what the supplier offers, and the eye beside it
+   * opens his proof. Both sources arrive in the same shape — uploaded on the shared form, or held on
+   * his own equipment.
+   */
+  const submission = (id: string): LinkBidSubmission =>
+    ({
+      id,
+      createdAt: null,
+      companyName: "A",
+      items: [
+        {
+          requestItemId: "i1",
+          numberOfUnits: 1,
+          // On READ, `BidAttachment.key` is the presigned URL — the contract
+          // `submissionToBidDocuments` maps from, and what the eye opens.
+          documents: [
+            { key: "https://files.example/tuv.pdf", type: "tuv", filename: "tuv.pdf" },
+            { key: "https://files.example/istimara.pdf", type: "istimara", filename: "istimara.pdf" },
+          ],
+          photos: [],
+        },
+      ],
+      companyDocuments: [{ key: "https://files.example/cr.pdf", type: "cr", filename: "cr.pdf" }],
+    }) as unknown as LinkBidSubmission;
+
+  const certBid = (id: string) =>
+    wb(
+      bc({
+        id,
+        supplierName: "A",
+        terms: {
+          equipment: [{ key: "certs", labelEn: "Equipment certificate", labelAr: "شهادة المعدة", state: "matched", value: "TÜV" }],
+          contract: [{ key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: "matched", renteeValue: "net_30" }],
+          supplier: [],
+        },
+      }),
+      "offline",
+    );
+
+  it("puts an eye beside the certificate the supplier proved", () => {
+    draw([certBid("link-s1")], {}, { "link-s1": submission("s1") });
+    openTerms();
+    const eye = screen.getByRole("link", { name: /A$/ });
+    expect(eye.getAttribute("href")).toBe("https://files.example/tuv.pdf");
+    expect(eye.getAttribute("target")).toBe("_blank");
+    expect(eye.getAttribute("rel")).toContain("noopener");
+    // The value is still the answer; the eye is only its proof.
+    expect(screen.getByText("TÜV")).toBeTruthy();
+  });
+
+  it("puts no eye on a term no paper proves", () => {
+    draw([certBid("link-s1")], {}, { "link-s1": submission("s1") });
+    openTerms();
+    // The istimara and the CR are on the bid, but «Payment terms» is not a term a file answers, so
+    // exactly one eye is drawn on the row.
+    expect(screen.getAllByRole("link", { name: /A$/ }).length).toBe(1);
+  });
+
+  it("draws none at all when the supplier attached nothing", () => {
+    draw([certBid("link-s2")], {}, {});
+    openTerms();
+    expect(screen.queryByRole("link", { name: /A$/ })).toBeNull();
+    expect(screen.getByText("TÜV")).toBeTruthy();
+  });
+
+  it("never asks the documents endpoint for a synthetic off-platform id", () => {
+    // `link-…` cannot be resolved by `GET /api/me/bids/{id}/documents`; it would 404 on every
+    // off-platform bid on the table.
+    const spy = vi.spyOn(globalThis, "fetch");
+    draw([certBid("link-s1")], {}, { "link-s1": submission("s1") });
+    openTerms();
+    expect(spy.mock.calls.some(([u]) => String(u).includes("/documents"))).toBe(false);
+    spy.mockRestore();
   });
 });
 
@@ -326,25 +470,47 @@ describe("the table opens on «Per cycle», one group at a time", () => {
     draw();
     expect(screen.getAllByText("Monthly rental").length).toBeGreaterThan(0);
     // Rails, not groups: the words are there, their columns are not.
-    expect(screen.queryByText("First cycle")).toBeNull();
-    expect(screen.queryByText("Terms you set")).toBeNull();
+    expect(screen.queryByText("Delivered cost")).toBeNull();
+    expect(screen.queryByText("Maintenance")).toBeNull();
   });
 
-  it("the grand-total panel opens its three cost fields", () => {
+  it("the grand-total panel opens its three cost fields, ALONE", () => {
     draw();
     fireEvent.click(screen.getByText("Grand total"));
-    expect(screen.getAllByText("First cycle").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Every cycle after").length).toBeGreaterThan(0);
-    // …and folds the one that was open.
+    // The two names from `docs/bid-price-naming.md`; Delivered cost appears twice, once per duration.
+    expect(screen.getAllByText("Delivered cost").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Running rate").length).toBeGreaterThan(0);
+    // Pressed deliberately while the rate was on screen, it takes the width for itself.
     expect(screen.queryByText("Monthly rental")).toBeNull();
   });
 
-  it("never leaves two groups open", () => {
+  it("states what each total CONTAINS, under its name", () => {
+    // "Show under each, so nobody guesses" — and Delivered cost is never stated without a duration.
+    draw();
+    fireEvent.click(screen.getByText("Grand total"));
+    expect(screen.getByText("rental + mobilization + demobilization · one cycle")).toBeTruthy();
+    expect(screen.getByText("rental value only, per cycle")).toBeTruthy();
+  });
+
+  it("«Per cycle» opens the money WHOLE — the quoted figures and their totals", () => {
+    // Owner, 2026-09-06: the totals cannot be checked without the rate and legs that produced them.
+    draw();
+    fireEvent.click(screen.getByText("Grand total")); // leave the default state behind
+    fireEvent.click(screen.getByText("Per cycle"));
+    expect(screen.getAllByText("Monthly rental").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Delivered cost").length).toBeGreaterThan(0);
+    // Both readings are always drawn — neither hides behind a toggle (naming spec, Rules).
+    expect(screen.getAllByText("Running rate").length).toBeGreaterThan(0);
+    // The terms are the other reading, and they stay away.
+    expect(screen.queryByText("Maintenance")).toBeNull();
+  });
+
+  it("the terms take the table alone, whatever money was open", () => {
     draw();
     fireEvent.click(screen.getByText("Grand total"));
     openTerms();
-    expect(screen.getAllByText("Terms you set").length).toBeGreaterThan(0);
-    expect(screen.queryByText("First cycle")).toBeNull();
+    expect(screen.getAllByText("Maintenance").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Delivered cost")).toBeNull();
     expect(screen.queryByText("Monthly rental")).toBeNull();
   });
 
@@ -353,8 +519,8 @@ describe("the table opens on «Per cycle», one group at a time", () => {
     // The open group folds by its own control; the label beside it is not a button.
     fireEvent.click(screen.getAllByLabelText("Fold this group away")[0]);
     expect(screen.queryByText("Monthly rental")).toBeNull();
-    expect(screen.queryByText("First cycle")).toBeNull();
-    expect(screen.queryByText("Terms you set")).toBeNull();
+    expect(screen.queryByText("Delivered cost")).toBeNull();
+    expect(screen.queryByText("Maintenance")).toBeNull();
   });
 });
 
@@ -430,8 +596,8 @@ describe("only the columns scroll, and only sideways", () => {
     fireEvent.click(screen.getByText("Grand total"));
     // The «i» beside a money column opens the breakdown.
     // The «i» — the LAST control carrying that name; the first is the column's own sort button.
-    fireEvent.click(screen.getAllByRole("button", { name: "First cycle" }).at(-1)!);
-    const panel = screen.getByText("How first cycle is built");
+    fireEvent.click(screen.getAllByRole("button", { name: "Delivered cost" }).at(-1)!);
+    const panel = screen.getByText("How the delivered cost is built");
     // In the page, not in the strip: an absolutely-placed panel inside it is what forced the bar,
     // and on the last column it was clipped by the horizontal scroller instead of overhanging it.
     expect(scroller(container).contains(panel)).toBe(false);

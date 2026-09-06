@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui";
 import { PAGE_MAX, PAGE_X } from "@/components/AppShell";
 import { Skeleton } from "@/components/Skeleton";
 import { SignInPrompt } from "@/components/common/SignInPrompt";
+import { GuestRequestsPreview, GuestWall } from "@/components/common/GuestWall";
 import { fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail, recommendBids } from "@/lib/api/client";
 import { groupRequests, requestCodeOf, type RequestGroup } from "@/lib/contract/requests";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
@@ -530,16 +531,14 @@ export function RequestsWorkspace() {
   const Standalone = ({ children }: { children: React.ReactNode }) => (
     <div className="mx-auto flex h-full w-full max-w-[560px] flex-col justify-center px-6 py-8">{children}</div>
   );
+  /* The same wall the dashboard shows (owner, 2026-09-06): this surface, blurred, with the card on
+     it. ~~A prompt centred in an empty 560px column.~~ On a full-bleed page that was a lot of
+     nothing, and it argued for the account by asserting rather than by showing. */
   if (status === "anon") {
     return (
-      <Standalone>
-        <SignInPrompt
-          icon="assignment"
-          title={t.workspace.signedOutTitle}
-          body={t.workspace.signedOutBody}
-          ctaLabel={t.workspace.signedOutCta}
-        />
-      </Standalone>
+      <div className="min-h-0 flex-1 overflow-hidden p-4">
+        <GuestWall title={t.guestWall.requestsTitle} body={t.guestWall.requestsBody} preview={<GuestRequestsPreview />} />
+      </div>
     );
   }
   if (groups === null) {
@@ -810,6 +809,10 @@ export function RequestsWorkspace() {
               // to tell "the supplier said nothing" from "it was never his to say".
               mobByRentee={item?.mobByRentee ?? null}
               demobByRentee={item?.demobByRentee ?? null}
+              // The files an off-platform supplier attached to the form. The cards tab already holds
+              // them, so the comparison reads the same objects rather than fetching them again — and
+              // there is no endpoint that could answer for a `link-…` id anyway.
+              submissions={submissionsByBid}
               benched={benched}
               onBench={benchBid}
               ranking={ranking}

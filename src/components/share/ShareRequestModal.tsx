@@ -39,7 +39,9 @@ import { ShareRequestPanel } from "./ShareRequestPanel";
  */
 function requestLabel(r: RequestListItem, lang: "en" | "ar"): string {
   const name = (lang === "ar" ? r.item?.nameAr || r.item?.name : r.item?.name)?.trim();
-  const qty = (r.item?.qty ?? 1) > 1 ? ` ×${r.item?.qty}` : "";
+  /* ⚠️ The picker's row, in the same words as the card it opens. */
+  const n = r.item?.qty ?? 1;
+  const qty = n > 1 ? (lang === "ar" ? ` ${n === 2 ? "وحدتان" : `${n} وحدات`}` : ` ${n} units`) : "";
   const { city, neighbourhood } = parseAddress(r.city);
   const where = prettyLocation(city ? (neighbourhood ? `${city} — ${neighbourhood}` : city) : (r.city ?? ""));
   return [name ? `${name}${qty}` : null, where || null, r.displayId].filter(Boolean).join(" · ");

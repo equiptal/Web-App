@@ -49,17 +49,20 @@ describe("naming a machine the catalogue does not carry", () => {
     // ABOVE the note and the box, which is the order the row reads in (owner, 2026-09-06).
     expect(screen.getAllByText("TYPE").length).toBeGreaterThan(0);
     expect(screen.getAllByText("SIZE").length).toBeGreaterThan(0);
-    const order = ["TYPE", "Not in our catalogue", "Name the machine you need"].map((needle) =>
+    const order = ["TYPE", "not available right now", "Name the machine you need"].map((needle) =>
       document.body.innerHTML.indexOf(needle),
     );
     expect(order.every((i) => i >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    // And the row says what will happen to it, including the one route to a supplier.
-    expect(screen.getByText(/Not in our catalogue/i)).toBeTruthy();
-    expect(screen.getByText(/share the link with your own/i)).toBeTruthy();
-    // «Message us» sits on the note's own line, small and secondary — the route into the catalogue,
-    // not a second decision stacked under the sentence.
-    expect(screen.getByText(/^Message us$/)).toBeTruthy();
+    // And the row says what will happen to it, in the owner's own words (2026-09-06).
+    expect(screen.getByText(/This equipment type is not available right now/i)).toBeTruthy();
+    expect(screen.getByText(/share the link with your suppliers/i)).toBeTruthy();
+    /* ~~«Message us», beside the sentence.~~ Removed the same day (owner). The note already tells
+       the renter what to do — post it, share the link — and a control there sent him into another
+       app in the middle of filling in a request. The sourcing ask survives only on the kill-switch
+       row, where the machine really is dropped and there is nothing else to press. */
+    expect(screen.queryByText(/^Message us$/)).toBeNull();
+    expect(screen.queryByText(/We're looking for this one/i)).toBeNull();
   }, 20_000);
 
   it("blocks the send when he clears it, and the reason names the box", async () => {

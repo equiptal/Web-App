@@ -9,8 +9,9 @@ import { ar } from "@/lib/i18n/ar";
  * «Offline» was wrong twice over. This app already uses the word for **no connection** — four
  * strings in `en.ts` say "You appear to be offline" — so a bid was labelled with a network state.
  * And it described our plumbing rather than the renter's own act: he sent a link, somebody answered
- * it. The vocabulary is «Via your link» now, which sits beside «Via app» as its opposite and cannot
- * be misread.
+ * it. The vocabulary is «Offline · via your link» now: the owner asked the same day for the word to
+ * come back in front of the phrase, so the line states the KIND of bid and then how it reached him.
+ * The phrase after the dot is what removes the ambiguity the word carries on its own.
  *
  * Pinned because copy drifts back, and because the collision is invisible in review: both sentences
  * are correct English about different things.
@@ -24,11 +25,13 @@ import { ar } from "@/lib/i18n/ar";
  * and the details count keep the word the renter has been reading.
  */
 describe("the bid card names the link; everything else is unchanged", () => {
-  it("says «Via your link» on the card, in both locales", () => {
-    // «Offline» on a CARD collided with this app's own word for a lost connection, and said how our
-    // plumbing works rather than what the renter did: he sent a link and this came back through it.
-    expect(en.workspace.sourceOfflineLong).toBe("Via your link");
+  it("says «Offline · via your link» on the card, in both locales", () => {
+    // The word alone collided with this app's own «you appear to be offline», and said how our
+    // plumbing works rather than what the renter did. Kept, with the phrase that disambiguates it:
+    // he sent a link and this came back through it (owner, 2026-09-06).
+    expect(en.workspace.sourceOfflineLong).toBe("Offline · via your link");
     expect(ar.workspace.sourceOfflineLong).toContain("رابطك");
+    expect(ar.workspace.sourceOfflineLong).toContain("خارج التطبيق");
     // Its opposite on the same line of the same card.
     expect(en.workspace.sourceAppLong).toContain("app");
   });

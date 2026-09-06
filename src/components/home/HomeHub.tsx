@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/session";
 import { useT } from "@/lib/i18n";
-import { SignInPrompt } from "@/components/common/SignInPrompt";
+import { GuestDashboardPreview, GuestWall } from "@/components/common/GuestWall";
 import { previousPath } from "@/lib/nav-trail";
 import { CtaBanner } from "@/components/home/CtaBanner";
 import { HomeRequests } from "@/components/home/HomeRequests";
@@ -57,11 +57,13 @@ export function HomeHub() {
   /* The same prompt the inbox, the profile and the workspace give a guest — one component, one
      shape, one door (`SignInPrompt` opens the auth modal; there is no /login page). Drawn only once
      the redirect has been ruled out, so a cold arrival never flashes it on the way to Browse. */
+  /* ── The page behind the glass, and the card over it (owner, 2026-09-06) ──────────────────────
+     ~~A bordered `SignInPrompt` alone in a column.~~ It told a guest the page needed an account and
+     showed him nothing of what the account was for. The dashboard's own shape, blurred, with the
+     card centred on it says both — the Supplier OS pattern, in this app's own modal. */
   if (status === "anon") {
     return landed ? (
-      <div className="mx-auto max-w-xl">
-        <SignInPrompt icon="dashboard" title={t.home.signInTitle} body={t.home.signInBody} />
-      </div>
+      <GuestWall title={t.guestWall.dashboardTitle} body={t.guestWall.dashboardBody} preview={<GuestDashboardPreview />} />
     ) : null;
   }
 

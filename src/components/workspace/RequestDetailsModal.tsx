@@ -151,7 +151,14 @@ export function RequestDetailsModal({
   const certs = subject?.requiredCerts ?? [];
   /** The request-level parameters. Read off the subject: the group copies them to every item. */
   const subjectRecord = subject ? records[subject.id] ?? null : null;
-  const paramRows = subjectRecord ? requestDetailRows(subjectRecord, ar, L) : [];
+  const allParamRows = subjectRecord ? requestDetailRows(subjectRecord, ar, L) : [];
+  /* Two of these rows describe the JOB rather than its terms — how it is rented and how long a day
+     runs — and the app prints them under the site, beside «extendable». Split by label because that
+     is what `requestDetailRows` returns; it is one list and this is the only place that cares which
+     half a row belongs to. */
+  const siteLabels = [L("Rental basis", "أساس الإيجار"), L("Working hours", "ساعات العمل")];
+  const siteRows = allParamRows.filter(([label]) => siteLabels.includes(label));
+  const projectRows = allParamRows.filter(([label]) => !siteLabels.includes(label));
   /**
    * Extendable, said with the dates and not with the terms (owner, 2026-09-02).
    *
@@ -321,6 +328,11 @@ export function RequestDetailsModal({
                 }
               />
               <Fact label={L("Reference", "المرجع")} value={group.groupRef ?? subject?.displayId ?? group.id} />
+              {/* WHEN he asked, at the top with the rest of what the request IS (owner, 2026-09-06:
+                  *"show created at, at top"*). It sat twenty rows down among the dates of the JOB,
+                  which is a different clock: those say when the machine is needed, this says when he
+                  put the request out — and it is what he counts the silence from. */}
+              <Fact label={t.workspace.factRequested} value={fmt(group.createdAt)} />
             </dl>
           </Section>
 
@@ -329,7 +341,7 @@ export function RequestDetailsModal({
               machine's own parameters (operator, fuel, who delivers it, night shift) are per ITEM,
               not per request, so they belong on the machine and nowhere else. They appear as the
               records arrive; until then the row is what it always was. */}
-          <Section title={L("Equipment", "المعدات")}>
+          <Section title={L("Equipment details", "تفاصيل المعدات")}>
             <div className="space-y-2">
               {group.items.map((it) => {
                 const focused = it.id === subject?.id;
@@ -377,11 +389,15 @@ export function RequestDetailsModal({
           {/* When and where. Duration sits with the dates it is derived from, which is why
               `requestDetailRows` deliberately leaves it out — a field printed twice makes a reader
               wonder which of the two is authoritative. */}
-          <Section title={L("Period and site", "المدة والموقع")}>
+          <Section title={L("Project location", "موقع المشروع")}>
             <dl className="divide-y divide-border">
               <Fact label={t.workspace.factStarts} value={fmt(subject?.startDate ?? null)} />
               {subject?.endDate && <Fact label={L("Ends", "ينتهي")} value={fmt(subject.endDate)} />}
               {extendable && <Fact label={L("Extendable", "قابل للتمديد")} value={extendable} />}
+              {/* The basis and the hours, where the app puts them. */}
+              {siteRows.map(([label, value]) => (
+                <Fact key={label} label={label} value={String(value)} />
+              ))}
               <Fact
                 label={t.workspace.factDuration}
                 value={subject?.durationDays ? t.workspace.daysValue.replace("{n}", String(subject.durationDays)) : "—"}
@@ -416,7 +432,6 @@ export function RequestDetailsModal({
                   );
                 })()}
               />
-              <Fact label={t.workspace.factRequested} value={fmt(group.createdAt)} />
               {/* Split by source, because "4 bids" hides that two of them were typed in by hand. */}
               <Fact
                 label={t.workspace.factBidsIn}
@@ -441,9 +456,15 @@ export function RequestDetailsModal({
               its answer. Three to a line, label directly over value, the whole set is one block a
               reader takes in at a glance, and what the request actually states is a third of the
               height it was. */}
-          {paramRows.length > 0 && (
-            <Section title={L("Terms and preferences", "الشروط والتفضيلات")}>
-              <FactGrid rows={paramRows} />
+          {/* ── «Project details», and it is the app's own section (owner, 2026-09-06) ──────────
+              *"Can we show it like this order… in project details we show working days / week,
+              preferences."* The app puts the basis and the hours WITH the site — they qualify the
+              job's shape, not its terms — and keeps everything else, working days included, under
+              one «project details» heading. `requestDetailRows` already states them all; this only
+              decides which of the two places each is read in. */}
+          {projectRows.length > 0 && (
+            <Section title={L("Project details", "تفاصيل المشروع")}>
+              <FactGrid rows={projectRows} />
             </Section>
           )}
 

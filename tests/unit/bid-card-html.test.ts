@@ -37,8 +37,8 @@ describe("the card is the shape an unfurl builds", () => {
      */
     const html = bidCardHtml(card, {
       ref: null,
-      imageHeadline: "Excavator 20 ton · with operator ×2",
-      cardTitle: "Excavator 20 ton · with operator ×2",
+      imageHeadline: "Excavator 20 ton · with operator 2 units",
+      cardTitle: "Excavator 20 ton · with operator 2 units",
       items: [],
       where: "Riyadh · 4 months & extendable",
       terms: [
@@ -79,8 +79,8 @@ describe("the navy band before the request exists", () => {
       { ...card, imageUrl: "" },
       {
         ref: "CEX-020964",
-        imageHeadline: "Excavator 20 ton · with operator ×2",
-        cardTitle: "Excavator 20 ton · with operator ×2",
+        imageHeadline: "Excavator 20 ton · with operator 2 units",
+        cardTitle: "Excavator 20 ton · with operator 2 units",
         items: [],
         where: "Riyadh · 4 months",
         terms: [],
@@ -105,7 +105,13 @@ describe("the navy band before the request exists", () => {
      * filled the card edge to edge (owner, 2026-09-06, with a screenshot of it). `max-width` is a
      * different property, so it constrains the computed width without fighting `!important`.
      */
-    expect(html).toContain("max-width:72px");
+    /**
+     * ⚠️ The band's numbers are the RENDERED card's, scaled by 440/1200: 84 x 32 mark, 29px
+     * headline, 23/27 padding. They were eyeballed before and the two drew the same facts at
+     * visibly different sizes. `max-width` is still the load-bearing half — the panel wraps this
+     * markup in `[&_img]:!w-full`, and `!important` beats an inline `width`.
+     */
+    expect(html).toContain("max-width:84px");
     expect(html).not.toContain(">MOEDATECH<");
     expect(html).toContain("Excavator 20 ton");
     expect(html).toContain("Open the link to submit your bid");

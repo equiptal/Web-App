@@ -119,7 +119,7 @@ describe("bidCardModel", () => {
     const m = bidCardModel(preview, copy, "en", form());
 
     expect(m.ref).toBe("EXC-170845");
-    expect(m.imageHeadline).toBe("Tower light 9m · with operator ×6");
+    expect(m.imageHeadline).toBe("Tower light 9m · with operator 6 units");
     // The machine is already in the title, so it is not repeated as a row below it.
     expect(m.items).toEqual([]);
     expect(m.where).toBe("Riyadh · 1 month · 18 Aug → 17 Sep 2026");
@@ -149,11 +149,11 @@ describe("bidCardModel", () => {
     );
 
     // The image names one machine and counts the rest in words a supplier reads at a glance.
-    expect(m.imageHeadline).toBe("Tower light 9m · with operator ×6 + 2 other equipment items");
+    expect(m.imageHeadline).toBe("Tower light 9m · with operator 6 units + 2 other equipment items");
     expect(m.cardTitle).toBe("3 machines · Riyadh");
     expect(m.items).toHaveLength(3);
     expect(m.items[1].label).toBe("Generator 250 kVA · with operator");
-    expect(m.items[1].units).toBe("×2");
+    expect(m.items[1].units).toBe("2 units");
     // These three agree on every term, so nothing hangs off the individual rows.
     expect(m.items[1].terms).toEqual([]);
   });
@@ -281,10 +281,12 @@ describe("bidCardModel", () => {
     expect(m.terms).toEqual([]);
   });
 
-  it("Given Arabic, When built, Then the labels and the month are Arabic and the count is not", () => {
+  it("Given Arabic, When built, Then the labels, the month AND the unit word are Arabic", () => {
     const m = bidCardModel(preview, copy, "ar", form());
 
-    expect(m.imageHeadline).toBe("برج إنارة ٩م · مع مشغّل ×6");
+    // ⚠️ «6 وحدات», not «6 units» and not «×6» (owner, 2026-09-06). The digits stay Latin, which
+    // is the existing rule for this card, but the counted noun is a WORD and words are translated.
+    expect(m.imageHeadline).toBe("برج إنارة ٩م · مع مشغّل 6 وحدات");
     // The city is read out of `projectAddressLabel`, which is whatever Google returned when the site
     // was made — usually English, on an Arabic card too. Translating it here would be inventing a
     // name for somebody's site.

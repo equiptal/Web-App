@@ -13,8 +13,8 @@ import type { BidCardModel } from "@/lib/bidCardModel";
 
 const model = (over: Partial<BidCardModel> = {}): BidCardModel => ({
   ref: "EXC-170845",
-  imageHeadline: "Tower light 9m · with operator ×6",
-  cardTitle: "Tower light 9m · with operator ×6",
+  imageHeadline: "Tower light 9m · with operator 6 units",
+  cardTitle: "Tower light 9m · with operator 6 units",
   items: [],
   where: "Riyadh · 1 month · 18 Aug → 17 Sep 2026",
   terms: [
@@ -39,7 +39,7 @@ describe("bidCardText", () => {
      * templates"*). It is our filing, not his: a supplier reading `CEX-020902:` before the equipment
      * is handed an internal code as the first thing he sees. The card still carries it, to one side.
      */
-    expect(out).toContain("Tower light 9m · with operator ×6");
+    expect(out).toContain("Tower light 9m · with operator 6 units");
     expect(out).not.toContain("EXC-170845");
     expect(out).toContain("Riyadh · 1 month · 18 Aug → 17 Sep 2026");
     expect(out).toContain("Mobilization: Supplier");
@@ -87,21 +87,21 @@ describe("bidCardText", () => {
     expect(out).toContain("Please quote the below by Sunday.");
     expect(out).toContain("Regards, Shibh Al Jazira");
     // The card between them is still ours, unchanged.
-    expect(out).toContain("Tower light 9m · with operator ×6");
+    expect(out).toContain("Tower light 9m · with operator 6 units");
   });
 
   it("Given several machines, Then every one is listed — the image can only name the first", () => {
     const out = bidCardText(
       model({
         items: [
-          { label: "Tower light 9m", units: "×6", terms: [] },
-          { label: "Generator 250 kVA", units: "×2", terms: [{ label: "Fuel", value: "Supplier" }] },
+          { label: "Tower light 9m", units: "6 units", terms: [] },
+          { label: "Generator 250 kVA", units: "2 units", terms: [{ label: "Fuel", value: "Supplier" }] },
         ],
       }),
       URL_,
     );
-    expect(out).toContain("• Tower light 9m ×6");
-    expect(out).toContain("• Generator 250 kVA ×2");
+    expect(out).toContain("• Tower light 9m 6 units");
+    expect(out).toContain("• Generator 250 kVA 2 units");
     // And the term only the generator carries sits under it, indented, not in the shared block.
     expect(out).toContain("   Fuel: Supplier");
   });

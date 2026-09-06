@@ -28,8 +28,8 @@ import type { BidCardModel } from "@/lib/bidCardModel";
 
 const model = (over: Partial<BidCardModel> = {}): BidCardModel => ({
   ref: "EXC-170845",
-  imageHeadline: "Tower light 9m · with operator ×6",
-  cardTitle: "Tower light 9m · with operator ×6",
+  imageHeadline: "Tower light 9m · with operator 6 units",
+  cardTitle: "Tower light 9m · with operator 6 units",
   items: [],
   where: "Riyadh · 1 month",
   terms: [{ label: "Mobilization", value: "Supplier" }],
@@ -63,7 +63,7 @@ describe("the subject line is his", () => {
 
   it("Given a request, Then the token becomes the machine", () => {
     const p = shareMessageParts(model(), "https://x/bid/1", { lang: "en" });
-    expect(p.title).toBe("RFQ for Tower light 9m · with operator ×6");
+    expect(p.title).toBe("RFQ for Tower light 9m · with operator 6 units");
   });
 
   it("Given his own title, Then it is used and the token still fills", () => {
@@ -77,7 +77,7 @@ describe("the subject line is his", () => {
       lang: "en",
       template: { title: `Quote needed: ${EQUIPMENT_TOKEN}`, above: "Hi", below: "Thanks" },
     });
-    expect(p.title).toBe("Quote needed: Tower light 9m · with operator ×6");
+    expect(p.title).toBe("Quote needed: Tower light 9m · with operator 6 units");
   });
 
   it("Given no machine, Then the token goes and his words stand", () => {

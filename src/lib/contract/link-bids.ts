@@ -380,12 +380,37 @@ const termRow = (key: string, en: string, ar: string, ok?: boolean, reqVal?: str
   labelAr: ar,
   // Yes → matches the request, No → conflict, undefined (not asked) → grey.
   state: (ok == null ? "grey" : ok ? "matched" : "conflict") as TermState,
+  /**
+   * ── The ANSWER is the value, not the word «Yes» (owner, 2026-09-06) ──────────────────────────
+   * *"Why are the values «No» and «Yes»?"*
+   *
+   * The public bid form asks these as confirmations — the renter's requirement is printed and the
+   * supplier presses Yes or No — so a Yes is not the answer, it is the supplier ADOPTING the answer
+   * the renter wrote. Carrying his own word through meant the comparison read «Operator: Yes ·
+   * Equipment year: Yes · Certificate: Yes» down a column, which says nothing about what he offered
+   * and cannot be compared with an in-app bid, where the same facts arrive as values («2019»,
+   * «TÜV», «On supplier»).
+   *
+   * So a confirmed term carries the REQUESTED VALUE as its own, and a refused one says it was not
+   * confirmed. `reqVal` is missing on the two CR/VAT rows, which are held/not-held rather than
+   * values — those keep Yes/No, which is exactly what they mean.
+   */
+  value: ok == null ? null : ok ? (reqVal || YES_NO(true).en) : null,
   // What the renter required vs what the supplier answered (shown on conflicts in the terms panel).
   detail:
     ok == null
       ? undefined
-      : { en: `Renter: ${reqVal || "—"} · Supplier: ${ok ? "Yes" : "No"}`, ar: `المستأجر: ${reqVal || "—"} · المؤجّر: ${ok ? "نعم" : "لا"}` },
+      : {
+          en: `Renter: ${reqVal || "—"} · Supplier: ${ok ? reqVal || YES_NO(true).en : NOT_CONFIRMED.en}`,
+          ar: `المستأجر: ${reqVal || "—"} · المؤجّر: ${ok ? reqVal || YES_NO(true).ar : NOT_CONFIRMED.ar}`,
+        },
 });
+
+/** The bare confirmation, for the rows that ARE a yes/no (a CR on file, a VAT number). */
+const YES_NO = (v: boolean) => (v ? { en: "Yes", ar: "نعم" } : { en: "No", ar: "لا" });
+/** A term the supplier declined to confirm. Never «No»: the question was "can you meet this?", and
+ *  the answer is about the requirement, not about a yes/no fact of his own. */
+const NOT_CONFIRMED = { en: "Not confirmed", ar: "غير مؤكد" };
 
 /**
  * Map a submission (optionally scoped to one request item for the per-item comparison) into a

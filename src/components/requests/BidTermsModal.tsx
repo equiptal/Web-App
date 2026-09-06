@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Dialog, DialogButton } from "@/components/Dialog";
-import { bucketBidTerms, type TermRow, type TermState } from "@/lib/contract/bids";
+import { bucketBidTerms, termSides, type TermRow, type TermState } from "@/lib/contract/bids";
 
 /**
  * Per-term status modal (app parity: "Terms — <supplier>"). Every term the bid touches — equipment,
@@ -119,7 +119,36 @@ export function BidTermsModal({
                 <div key={`${r.key}-${i}`} className="flex items-center justify-between gap-3 border-b border-border py-3">
                   <span className="text-subhead font-semibold text-navy">
                     {ar ? r.labelAr : r.labelEn}
-                    {r.detail && (r.state === "conflict" || r.state === "negotiating") && <span className="font-semibold text-muted"> · {ar ? r.detail.ar : r.detail.en}</span>}
+                    {/* ── ONE value, unless he offered another (owner, 2026-09-06) ───────────────
+                        *"No need to show «renter: — supplier: —» on each term. Just show the value
+                        of the request the supplier did not match… unless the supplier proposes a
+                        different value, like the renter wants TÜV and the supplier said SPSP — then
+                        mention each side."*
+
+                        ~~The whole «Renter: X · Supplier: Y» sentence, on every conflicted and
+                        negotiating row.~~ On a refusal its second half only ever repeated the state
+                        the row is already painted in: «Supplier: Not confirmed» beside a red
+                        «Conflict». So a refusal now shows the RENTER'S value alone, in red — the
+                        thing the supplier did not meet, which is the fact he needs — and both sides
+                        appear only where the supplier actually named something else.
+
+                        `termSides` (bids.ts) is what tells the two apart: it returns `offered: null`
+                        for a refusal, a dash or an empty half. */}
+                    {(r.state === "conflict" || r.state === "negotiating") && (() => {
+                      const { asked, offered } = termSides(r, ar);
+                      if (offered && asked && offered !== asked) {
+                        return (
+                          <span className="font-semibold">
+                            {" · "}
+                            <span className="text-muted">{asked}</span>
+                            <span aria-hidden="true" className="text-muted/70">{ar ? " ← " : " → "}</span>
+                            <span className="text-danger">{offered}</span>
+                          </span>
+                        );
+                      }
+                      const only = offered ?? asked;
+                      return only ? <span className="font-semibold text-danger"> · {only}</span> : null;
+                    })()}
                   </span>
                   <span style={{ fontSize: 14.5, fontWeight: 800, color: st.c, whiteSpace: "nowrap" }}>{st.mark} {word || okWord}</span>
                 </div>

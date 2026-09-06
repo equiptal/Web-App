@@ -133,16 +133,30 @@ export function EditSupplierDialog({
       }
     >
       <div className="grid gap-3">
-        <Field label={c.fName} value={supplier.name} onChange={() => undefined} disabled hint={platform ? c.nameIsTheirs : undefined} />
+        {/* ── Two rows of two, and ONE note under the pair that needs it (owner, 2026-09-06) ───────
+            *"Make the company name and contact fields in the same row, then below, the phone and
+            email in the same row, and show a note below them both."*
+
+            The four fields are two questions, not four: WHO the firm is (its name and the person
+            there), and HOW to reach them (the two addresses a request can be sent to). Pairing them
+            that way puts the reachable pair on one line, which is what the note below is about —
+            it used to hang off the e-mail alone and said nothing about the phone, though the share
+            sheet needs either one. */}
         <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={c.fName} value={supplier.name} onChange={() => undefined} disabled hint={platform ? c.nameIsTheirs : undefined} />
           <Field label={c.fContact} value={contactName} onChange={setContactName} />
-          <Field label={c.fEmail} value={email} onChange={setEmail} type="email" hint={c.emailHint} />
         </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={c.fPhone} value={phone} onChange={setPhone} placeholder="+966 5X XXX XXXX" />
+          <Field label={c.fEmail} value={email} onChange={setEmail} type="email" />
+        </div>
+        {/* Under BOTH, because either one is enough to reach them and the renter is choosing which
+            channel he will have. */}
+        <p className="-mt-1 text-meta text-muted">{c.contactHint}</p>
         {/* ~~CR number.~~ Removed (owner, 2026-09-01): a renter does not hold his suppliers'
             commercial registrations, so the field was either empty or filled from memory — and the CR
             is the strongest key we have for matching an off-platform firm to an account, so a
             remembered one matches the wrong company. It arrives on the supplier's own bid or not at all. */}
-        <Field label={c.fPhone} value={phone} onChange={setPhone} placeholder="+966 5X XXX XXXX" />
 
         <div className="grid gap-1.5">
           <span className="text-label font-extrabold uppercase tracking-wide text-muted">{c.colGroups}</span>

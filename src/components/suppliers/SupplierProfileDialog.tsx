@@ -5,6 +5,7 @@ import { VerifiedMark } from "@/components/VerifiedMark";
 import { VendorMark } from "@/components/VendorMark";
 import { MoedatechBadge } from "@/components/MoedatechBadge";
 import { Dialog } from "@/components/Dialog";
+import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui";
 import { btn, cx } from "@/lib/ds";
 import { fmt, useLocale, useT } from "@/lib/i18n";
@@ -15,7 +16,6 @@ import {
   canBeEmailed,
   groupsOf,
   isOnMoedatech,
-  supplierTier,
   type SupplierProfile,
 } from "@/lib/contract/renter-suppliers";
 
@@ -69,7 +69,15 @@ export function SupplierProfileDialog({
       onClose={onClose}
       size="lg"
       icon={<Icon name={off ? "person" : "verified_user"} size={18} />}
-      title={p?.name ?? "…"}
+      /* ⚠️ **The badges belong ON the header** (owner, 2026-09-06). As a row of their own under
+         it they read as a section, which invited the eye to stop at them; beside the firm's name
+         they are what they are — three facts about that firm. */
+      title={
+        <span className="flex flex-wrap items-center gap-2">
+          <span>{p?.name ?? "…"}</span>
+          {p && <Badges p={p} />}
+        </span>
+      }
       subtitle={p?.contactName || c.noContactName}
       footer={
         <div className="flex w-full items-center justify-end gap-2">
@@ -94,14 +102,18 @@ export function SupplierProfileDialog({
         <p className="py-6 text-center text-meta text-muted">{c.loading}</p>
       ) : (
         <div className="grid gap-4">
-          <Badges p={p} />
-          <Grade p={p} />
-          <BidsSummary p={p} onOpen={() => onOpenBids(p.id)} />
-          <InsideTheApp p={p} />
-          <Papers p={p} />
-          <Awards p={p} />
-          <Sent p={p} />
+          {/* ── The order (owner, 2026-09-06) ────────────────────────────────────────────────
+              Contact first, because it is the thing a renter opens this dialog to look up. Then the
+              four counts, which are the whole history in one row. Then the documents, then what he
+              has sent.
+
+              ⚠️ ~~A grade row, a bids block and an awards list.~~ All three said again what the
+              four counts already say: «New, no bid yet» over «0 bids on Moedatech», and a list
+              whose length was printed above it. Gone. */}
           <ContactAndGroups p={p} />
+          <Stats p={p} onOpenBids={() => onOpenBids(p.id)} />
+          <Papers p={p} />
+          <Sent p={p} />
           {p.extra && Object.keys(p.extra).length > 0 && <Extra p={p} />}
         </div>
       )}
@@ -172,112 +184,80 @@ function Badges({ p }: { p: SupplierProfile }) {
   );
 }
 
-/** The word, the dots that grade it, and the reason — never a bare label. */
-function Grade({ p }: { p: SupplierProfile }) {
-  const c = useT().suppliers;
-  const { tier, dots, quiet } = supplierTier(p);
-  const why =
-    tier === "new"
-      ? c.whyNew
-      : tier === "bidding"
-        ? c.whyBidding
-        : tier === "working"
-          ? c.whyWorking
-          : fmt(c.whyCore, { n: p.rollup?.awards ?? 2 });
+/*
+ * — `Grade`, `BidsSummary`, `InsideTheApp` and `Awards` lived here —
+ *
+ * Four components saying one thing between them. The grade printed «New · no bid yet» directly above
+ * a card reading «0 bids on Moedatech»; the bids block printed a total the four counts already
+ * carried; the awards list printed rows whose number was on screen a hand's width above it.
+ *
+ * `Stats` below is what is left: the four counts, each a way IN to the thing it counts.
+ */
 
-  return (
-    <div className="flex items-center gap-2.5 rounded-md border border-border bg-surface2 px-3 py-2.5">
-      <span className="flex flex-none gap-1" aria-hidden="true">
-        {[0, 1, 2].map((i) => (
-          <i
-            key={i}
-            className={cx(
-              "block h-[7px] w-[7px] rounded-full border",
-              i < dots
-                ? quiet
-                  ? "border-muted-light bg-muted-light"
-                  : tier === "core"
-                    ? "border-ok-deep bg-ok-deep"
-                    : "border-navy bg-navy"
-                : "border-border-strong bg-surface3",
-            )}
-          />
-        ))}
-      </span>
-      <span>
-        <b className="block text-subhead font-extrabold text-navy">
-          {c[`tier_${tier}` as "tier_new"]}
-          {quiet && <span className="font-semibold text-muted-light"> · {c.quiet}</span>}
-        </b>
-        <span className="block text-meta text-muted">{why}</span>
-      </span>
-      {!!p.rollup?.awards && (
-        <span className="ms-auto inline-flex h-[23px] flex-none items-center gap-1.5 rounded-full border border-brand-pale bg-brand-soft px-2.5 text-label font-extrabold text-brand-deep">
-          <Icon name="workspace_premium" size={13} />
-          {fmt(c.awarded, { n: p.rollup.awards })}
-        </span>
-      )}
-    </div>
-  );
-}
-
-/** Summarised here and read elsewhere — the list is the other dialog's job. */
-function BidsSummary({ p, onOpen }: { p: SupplierProfile; onOpen: () => void }) {
+/**
+ * The whole relationship in four numbers, each one a door.
+ *
+ * ⚠️ **A count with nowhere to go is trivia.** «9 deal rooms» tells a renter something happened
+ * and leaves him to find it; the point of the row is that pressing a number takes him to what it
+ * counted. Where we cannot open the thing, the card says where it lives rather than pretending.
+ */
+function Stats({ p, onOpenBids }: { p: SupplierProfile; onOpenBids: () => void }) {
   const c = useT().suppliers;
-  const n = bidCount(p);
-  return (
-    <Section label={c.colBids}>
-      <div className="flex items-center gap-2 rounded-md bg-surface2 px-3 py-2.5 text-meta text-muted-dark">
-        <Icon name="gavel" size={15} className="flex-none" />
-        <span className="min-w-0">
-          {n === 0 ? (
-            c.noBids
-          ) : (
-            <>
-              <b className="font-extrabold text-navy">{n === 1 ? fmt(c.bidOne, { n }) : fmt(c.bidMany, { n })}</b>
-              {!!p.rollup?.bidsApp && <> · {fmt(c.onApp, { n: p.rollup.bidsApp })}</>}
-              {!!p.rollup?.bidsLink && <> · {fmt(c.viaLink, { n: p.rollup.bidsLink })}</>}
-            </>
-          )}
-        </span>
-        {n > 0 && (
-          <button type="button" onClick={onOpen} className={cx(btn("secondary", "sm"), "ms-auto flex-none")}>
-            {c.openBids}
-          </button>
-        )}
-      </div>
-    </Section>
-  );
-}
-
-function InsideTheApp({ p }: { p: SupplierProfile }) {
-  const c = useT().suppliers;
+  const router = useRouter();
   const r = p.rollup;
-  // No account and nothing to show: say why, rather than four zeros that read as a bad relationship.
-  if (p.kind === "own" && !r?.rooms && !r?.awards) {
-    return (
-      <Section label={c.insideApp}>
-        <Note icon="info">{c.noAccountBody}</Note>
-      </Section>
-    );
-  }
-  const cells: [number, string][] = [
-    [r?.bidsApp ?? 0, c.kOnApp],
-    [r?.bidsLink ?? 0, c.kViaLink],
-    [r?.rooms ?? 0, c.kRooms],
-    [r?.awards ?? 0, c.kAwards],
+  const bids = bidCount(p);
+  /**
+   * ⚠️ **The inbox, filtered to him** (owner, 2026-09-06). ~~«Open them from your inbox», a
+   * sentence rather than a door.~~ It needed no backend after all: this payload has a count and no
+   * room ids, but the INBOX already carries `supplierId` on every bid, so the rooms are reachable
+   * from the other end. I had called this blocked; it was not.
+   */
+  const supplierKey = p.supplierId != null ? String(p.supplierId) : null;
+
+  const cards: { n: number; label: string; go?: () => void; note?: string }[] = [
+    { n: r?.bidsApp ?? 0, label: c.kOnApp, go: bids ? onOpenBids : undefined },
+    { n: r?.bidsLink ?? 0, label: c.kViaLink, go: bids ? onOpenBids : undefined },
+    /**
+     * ⚠️ It cannot open ONE room — this payload has no room ids — and it does not need to. It
+     * opens the inbox showing only this supplier, which is the list those rooms live in.
+     */
+    {
+      n: r?.rooms ?? 0,
+      label: c.kRooms,
+      go: (r?.rooms ?? 0) > 0 && supplierKey ? () => router.push(`/inbox?supplier=${encodeURIComponent(supplierKey)}`) : undefined,
+    },
+    { n: r?.awards ?? 0, label: c.kAwards },
   ];
+
   return (
-    <Section label={c.insideApp}>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {cells.map(([n, label]) => (
-          <div key={label} className="rounded-md border border-border bg-surface2 px-3 py-2.5">
-            <b className="block font-mono text-title tabular-nums text-navy">{n}</b>
-            <span className="block text-label font-extrabold uppercase tracking-wide text-muted">{label}</span>
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {cards.map((card) => {
+        const inner = (
+          <>
+            <b className="block font-mono text-title tabular-nums text-navy">{card.n}</b>
+            <span className="mt-0.5 flex items-center gap-1 text-label font-extrabold uppercase tracking-wide text-muted">
+              <span className="min-w-0 truncate">{card.label}</span>
+              {card.go && <Icon name="chevron_right" size={13} className="flex-none" />}
+            </span>
+            {card.note && <span className="mt-1 block text-label text-muted-light">{card.note}</span>}
+          </>
+        );
+        return card.go ? (
+          <button
+            key={card.label}
+            type="button"
+            onClick={card.go}
+            className="rounded-md border border-border bg-surface2 px-3 py-2.5 text-start transition hover:border-border-strong hover:bg-surface3"
+          >
+            {inner}
+          </button>
+        ) : (
+          <div key={card.label} className="rounded-md border border-border bg-surface2 px-3 py-2.5">
+            {inner}
           </div>
-        ))}
-      </div>
-    </Section>
+        );
+      })}
+    </div>
   );
 }
 
@@ -340,7 +320,7 @@ function Papers({ p }: { p: SupplierProfile }) {
           const soon =
             held && d?.expiryDate ? new Date(d.expiryDate).getTime() - Date.now() < 60 * 86_400_000 : false;
           const title = !held
-            ? c.docNotProvided
+            ? c.docMissing
             : d?.renewsAnnually
               ? c.docRenews
               : d?.expiryDate
@@ -352,21 +332,35 @@ function Papers({ p }: { p: SupplierProfile }) {
               title={`${label[k]} — ${title}`}
               className={cx(
                 "inline-flex h-[28px] items-center gap-1.5 rounded-full border px-3 text-meta font-extrabold",
+                /**
+                 * ⚠️ **🔴 when it is missing** (owner, 2026-09-06). ~~Dashed and grey.~~ A grey
+                 * pill reads as "not applicable"; a renter deciding whether to trust a firm needs
+                 * "they have not given us this", which is a different thing and worth a colour.
+                 */
                 !held
-                  ? "border-dashed border-border-strong text-muted-light"
+                  ? "border-danger/40 bg-danger-soft text-danger-deep"
                   : soon
                     ? "border-warn/40 bg-warn-soft text-warn-deep"
                     : "border-ok/40 bg-ok-soft text-ok-deep",
               )}
             >
               {label[k]}
-              {/* Only where there is a file to open. A presence-only row has nothing behind it. */}
+              {/**
+               * ⚠️ **The eye appears only where there is a file to open.** A held document with no
+               * `downloadUrl` is a presence-only row — the supplier said he has it and never
+               * uploaded one — and an eye there would open nothing, which is worse than no eye.
+               *
+               * 🔴 It opens whatever the backend gave us, whether that came from the app or from
+               * the public bid form: `fetchBidCompanyDocuments` returns one shape for both, so this
+               * does not care which route the paper arrived by.
+               */}
               {held && d?.downloadUrl && (
                 <a
                   href={d.downloadUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  title={c.viewDoc}
+                  title={c.docOpen}
+                  aria-label={`${label[k]} — ${c.docOpen}`}
                   className="-me-1 grid h-5 w-5 place-items-center rounded-full transition hover:bg-ok/15"
                 >
                   <Icon name="visibility" size={14} />
@@ -380,69 +374,57 @@ function Papers({ p }: { p: SupplierProfile }) {
   );
 }
 
-function Awards({ p }: { p: SupplierProfile }) {
-  const c = useT().suppliers;
-  if (!p.awards.length) {
-    return (
-      <Section label={c.awardedToThem}>
-        <Note icon="info">{c.noAwards}</Note>
-      </Section>
-    );
-  }
-  return (
-    <Section label={c.awardedToThem}>
-      <div className="overflow-hidden rounded-md border border-border">
-        {p.awards.map((a, i) => (
-          <div key={i} className="flex items-center gap-2.5 border-b border-border px-3 py-2.5 last:border-b-0">
-            <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-brand-soft text-brand-deep">
-              <Icon name="workspace_premium" size={13} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <b className="block text-body font-extrabold text-navy">
-                {a.equipment} ×{a.units}
-              </b>
-              <span className="block text-meta text-muted">
-                {[a.projectTitle, a.start && a.end ? `${a.start} → ${a.end}` : null].filter(Boolean).join(" · ")}
-              </span>
-            </span>
-            {a.price !== null && <span className="flex-none font-mono text-meta font-semibold text-navy">{a.price}</span>}
-          </div>
-        ))}
-      </div>
-    </Section>
-  );
-}
+/*
+ * — `Awards` lived here —
+ *
+ * It listed every award as a row, directly under a card that printed how many there were. Removed
+ * with the grade and the bids block (owner, 2026-09-06): the four counts are the history, and a
+ * list whose length is already on screen is the same fact twice.
+ */
 
+/**
+ * The requests he has shared with this supplier.
+ *
+ * 🔴 **«Opened» is gone, and it was never knowable.** Every supplier on one request is handed the
+ * SAME link, so the public bid page sees a visit and never whose. It printed «not opened yet» on
+ * every row forever — including rows a supplier had read an hour earlier — because the backend has
+ * never sent the field and `undefined` is falsy (owner, 2026-09-06: *"i think we cant track opened
+ * or not so just remove this"*, and he is right).
+ *
+ * ⚠️ **What it says now is the honest half.** ~~«Requests you shared with them in Outlook»~~ — the
+ * payload carries no CHANNEL. The backend records one (`email` · `whatsapp` · `sms` · `copy`) and
+ * does not return it here, so naming Outlook would be a guess printed as a fact.
+ *
+ * ⚠️ And the row shows the reference, not the equipment and the site, for the same reason:
+ * `SupplierSend` carries `requestCode` and a date. Naming the machine needs the backend to send it,
+ * or a second read of the renter's own requests to match the code against.
+ */
 function Sent({ p }: { p: SupplierProfile }) {
   const c = useT().suppliers;
-  if (!p.sends.length) {
+  const { locale } = useLocale();
+  const shares = p.sends.filter((e) => e.kind === "share");
+
+  if (!shares.length) {
     return (
-      <Section label={c.whatYouSent}>
-        <Note icon="outgoing_mail">{c.nothingSent}</Note>
+      <Section label={c.sharedWith}>
+        <Note icon="outgoing_mail">{c.sharedNothing}</Note>
       </Section>
     );
   }
+
   return (
-    <Section label={c.whatYouSent}>
-      <div>
-        {p.sends.map((e, i) => (
-          <div key={i} className="flex items-center gap-2.5 border-b border-border py-2 last:border-b-0">
+    <Section label={c.sharedWith}>
+      <div className="overflow-hidden rounded-md border border-border">
+        {shares.map((e, i) => (
+          <div key={i} className="flex items-center gap-2.5 border-b border-border px-3 py-2 last:border-b-0">
             <span className="grid h-[22px] w-[22px] flex-none place-items-center rounded-full bg-surface3 text-navy-mid">
-              <Icon name={e.kind === "share" ? "share" : "person_add"} size={13} />
+              <Icon name="share" size={13} />
             </span>
-            <span className="min-w-0 flex-1">
-              <b className="block text-body font-semibold text-navy">
-                {e.kind === "share" ? `${c.requestShared}${e.requestCode ?? ""}` : c.invitationSent}
-              </b>
-              <span className="block text-meta text-muted">
-                {e.kind === "share"
-                  ? e.opened
-                    ? c.theyOpened
-                    : c.notOpened
-                  : e.joined
-                    ? c.theyJoined
-                    : c.notJoined}
-              </span>
+            <b className="min-w-0 flex-1 truncate text-body font-semibold text-navy">
+              {e.requestCode ?? c.sharedWith}
+            </b>
+            <span className="flex-none text-meta text-muted">
+              {new Date(e.at).toLocaleDateString(locale === "ar" ? "ar" : "en", { day: "numeric", month: "short" })}
             </span>
           </div>
         ))}
@@ -451,29 +433,68 @@ function Sent({ p }: { p: SupplierProfile }) {
   );
 }
 
+/**
+ * Who to call, and which lists he is on.
+ *
+ * ⚠️ **One bordered card with labelled rows**, not two loose columns (owner, 2026-09-06). The
+ * groups half used to be bare text beside a tinted box, so the two sides of one card were drawn in
+ * two different styles and the eye read them as unrelated.
+ *
+ * It sits directly under the header because it is what a renter opens this dialog to look up.
+ */
 function ContactAndGroups({ p }: { p: SupplierProfile }) {
   const c = useT().suppliers;
   const groups = groupsOf(p);
-  return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      <Section label={c.colContact}>
-        <Note icon="contact_mail">
-          {canBeEmailed(p) ? (
-            p.email
-          ) : (
-            <b className="font-extrabold">{c.noEmailCannotShare}</b>
-          )}
-          <br />
-          <span className="font-mono" dir="ltr">
-            {p.phone || "—"}
-          </span>
-        </Note>
-      </Section>
-      <Section label={c.colGroups}>
-        <span className={cx("text-meta", groups.length ? "font-semibold text-muted-dark" : "text-muted-light")}>
-          {groups.length ? groups.join(" · ") : c.noGroup}
+
+  const rows: { icon: string; label: string; value: React.ReactNode }[] = [
+    {
+      icon: "mail",
+      label: c.colContact,
+      value: canBeEmailed(p) ? (
+        <span dir="ltr" className="truncate">{p.email}</span>
+      ) : (
+        /* ⚠️ Not a blank: no address is why a request cannot reach him, and it is the one gap a
+           renter can close himself. */
+        <span className="font-semibold text-warn-deep">{c.noEmailCannotShare}</span>
+      ),
+    },
+    {
+      icon: "call",
+      label: c.colPhone,
+      value: p.phone ? (
+        <span dir="ltr" className="font-mono">{p.phone}</span>
+      ) : (
+        <span className="text-muted-light">{c.noPhone}</span>
+      ),
+    },
+    {
+      icon: "sell",
+      label: c.colGroups,
+      value: groups.length ? (
+        <span className="flex flex-wrap gap-1">
+          {groups.map((g) => (
+            <span key={g} className="inline-flex h-[20px] items-center rounded-full bg-surface3 px-2 text-label text-navy-mid">
+              {g}
+            </span>
+          ))}
         </span>
-      </Section>
+      ) : (
+        <span className="text-muted-light">{c.noGroup}</span>
+      ),
+    },
+  ];
+
+  return (
+    <div className="overflow-hidden rounded-md border border-border">
+      {rows.map((row) => (
+        <div key={row.label} className="flex items-start gap-2.5 border-b border-border px-3 py-2 last:border-b-0">
+          <Icon name={row.icon} size={14} className="mt-0.5 flex-none text-muted" />
+          <span className="w-[64px] flex-none pt-px text-label font-semibold uppercase tracking-wide text-muted">
+            {row.label}
+          </span>
+          <span className="min-w-0 flex-1 text-meta text-navy">{row.value}</span>
+        </div>
+      ))}
     </div>
   );
 }

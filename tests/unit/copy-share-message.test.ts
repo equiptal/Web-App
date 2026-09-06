@@ -12,8 +12,8 @@ import type { BidCardModel } from "@/lib/bidCardModel";
 
 const model: BidCardModel = {
   ref: "EXC-170845",
-  imageHeadline: "Tower light 9m · with operator ×6",
-  cardTitle: "Tower light 9m · with operator ×6",
+  imageHeadline: "Tower light 9m · with operator 6 units",
+  cardTitle: "Tower light 9m · with operator 6 units",
   items: [],
   where: "Riyadh · 1 month",
   terms: [{ label: "Mobilization", value: "Supplier" }],

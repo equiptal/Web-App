@@ -15,6 +15,7 @@ import { fetchDealRoomUnread } from "@/lib/api/client";
 import { btn, cx, OVERLAY, PAGE_BACK, PAGE_MAX, PAGE_X, PAGE_Y, POPOVER, SCRIM } from "@/lib/ds";
 import { backTarget } from "@/lib/contract/back-nav";
 import { previousPath, recordTrail } from "@/lib/nav-trail";
+import { HelpManual } from "@/components/help/HelpManual";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { AppNav, AppNavMobile, type NavItem } from "@/components/AppNav";
 import { ArrowBackIcon, MailIcon, CountBadge } from "@/components/HeaderIcons";
@@ -140,6 +141,9 @@ export function AppShell(props: AppShellProps) {
 }
 
 function AppShellInner({ children, title, fullBleed }: AppShellProps) {
+  /** The manual, opened from the header's «?». Local to the shell: it is the same book on every
+   *  page, and nothing else needs to know it is open. */
+  const [helpOpen, setHelpOpen] = useState(false);
   const { locale, setLocale } = useLocale();
   const t = useT();
   const { tier, status, signOut, refresh: refreshSession } = useSession();
@@ -429,13 +433,33 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
                 prototype spaces them by. Same picture, and a pressable target instead of a 20px one
                 (owner, 2026-08-25: "make sure all icons in the nav bar is consistent"). */}
             {status === "authed" && (
+              /* 30px boxes, no gap (owner, 2026-09-06: *"reduce the space between icons"*). The
+                 34px box is the bar's size for a control that stands ALONE; three of them in a row
+                 put four pixels of dead gutter between each glyph. The hit area stays comfortably
+                 past the 24px minimum. */
               <div {...pin("header-icons")} className="flex items-center gap-0 text-white/70">
+                {/* ── The manual (owner, 2026-09-06) ──────────────────────────────────────────
+                    A circled question mark, the material glyph the owner's reference draws, in the
+                    bar's own ink rather than as an image: an asset would need its own white and
+                    would not follow the group's hover.
+
+                    First in the group, before the inbox and the bell: those two are what the
+                    PRODUCT has to say to him, and this is what he can ask of it. */}
+                <button
+                  type="button"
+                  onClick={() => setHelpOpen(true)}
+                  aria-label={t.help.title}
+                  title={t.help.title}
+                  className="grid h-[30px] w-[30px] place-items-center rounded-full transition hover:text-white"
+                >
+                  <Icon name="help_outline" size={19} />
+                </button>
                 <Link
                   href="/inbox"
                   aria-label={t.shell.inbox}
                   title={t.shell.inbox}
                   aria-current={pathname.startsWith("/inbox") ? "page" : undefined}
-                  className={`grid h-[34px] w-[34px] place-items-center rounded-full transition hover:text-white ${
+                  className={`grid h-[30px] w-[30px] place-items-center rounded-full transition hover:text-white ${
                     pathname.startsWith("/inbox") ? "text-white" : ""
                   }`}
                 >
@@ -452,6 +476,8 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
 
             {/* The prototype's separator: 1px by 24px, between what the app says to you and who you
                 are signed in as. */}
+            <HelpManual open={helpOpen} onClose={() => setHelpOpen(false)} />
+
             {status === "authed" && <span aria-hidden="true" className="h-6 w-px flex-none bg-white/15" />}
 
               {/* ── The avatar opens TWO doors (owner, 2026-08-31) ────────────────────────────────

@@ -100,6 +100,15 @@ export const en = {
     bubbleMore: "+{n} more",
     justNow: "Just now",
   },
+  /* The wall a guest meets on a page that is his once he signs in. The kicker is the OS's own
+     («Join Moedatech»); the title and the line under it belong to each page. */
+  guestWall: {
+    join: "Join Moedatech",
+    dashboardTitle: "Your dashboard needs an account",
+    dashboardBody: "Your requests, the bids on them, your sites and your suppliers, all on one page",
+    requestsTitle: "Your requests need an account",
+    requestsBody: "Every request you send, the bids that come back, and the comparison between them",
+  },
   home: {
     title: "Home",
     /* The guest dashboard (owner, 2026-09-04). A visitor who presses Dashboard is shown the same
@@ -1519,6 +1528,49 @@ export const en = {
   /* ── The requests workspace (docs/implementation-plans/requests-workspace/plan.md) ──
      One page for every request, its items and its bids. Phase 1 is the shell: the rail, the strip
      that names what is selected, and the two tabs. */
+  /**
+   * ── The manual (owner, 2026-09-06) ────────────────────────────────────────────────────────────
+   * Nine sections, in the order a renter meets them. Three lines each at most: what the feature is,
+   * and the one thing that trips people on it. Anything longer belongs on the screen itself.
+   */
+  help: {
+    title: "How Moedatech works",
+    subtitle: "Seven short answers, in the order you will need them",
+    contact: "Reach us",
+    whatsapp: "Message us on WhatsApp",
+    call: "Call",
+    follow: "Follow Moedatech",
+    sections: {
+      post: {
+        t: "Post a request with the assistant",
+        b: "Describe the machine you need in your own words and the assistant fills the form. Then pick the project defaults from one of your earlier requests: the dates, the site, the hours and the terms come across, so the whole request takes minutes instead of a form filled from scratch.",
+      },
+      share: {
+        t: "Share the request with your suppliers",
+        b: "Send the request to your own suppliers on email, WhatsApp or any channel you already use. It goes as one template carrying the request details, and the supplier prices it and sends it back without needing an account.",
+      },
+      bids: {
+        t: "View your bids, and compare them",
+        b: "Every offer you receive lands in Requests. Read them one at a time in the cards view, or open Compare: a table that builds itself from the offers on the table and puts their cost and their terms side by side.",
+      },
+      suppliers: {
+        t: "Build your suppliers list",
+        b: "Add the suppliers you already deal with, your registered vendors, or pick them from the Moedatech suppliers. Group them, and a request goes to the group you choose instead of the whole market.",
+      },
+      map: {
+        t: "The equipment map",
+        b: "See the equipment registered on a supplier, and check its availability from the yards it would move from. A red distance means he has not confirmed which yard; ask him from the card, and his answer turns it green.",
+      },
+      counter: {
+        t: "Counter the price",
+        b: "Counter the price a supplier offered to bring it down. You name the price and the terms you want and send them as one offer; he answers with his own, and the round shows on his card until one of you accepts.",
+      },
+      accept: {
+        t: "Accept a deal",
+        b: "Accept a supplier's deal from the deal room, where the price and terms you both settled on are held. Everything agreed there is what the two of you are bound to.",
+      },
+    },
+  },
   workspace: {
     title: "My Requests",
     // The rail's first tile. It is an action, not a request, so it says what it makes.
@@ -1609,7 +1661,11 @@ export const en = {
        reason to be exact: this bid came back through the link he sent. «Offline» here also collided
        with this app's own word for a lost connection ("You appear to be offline", four places), and
        a bid is not a network state. The filter tab keeps the old word on his instruction. */
-    sourceOfflineLong: "Via your link",
+    /* «Offline» is back in front of it (owner, 2026-09-06, same day): *"On the bid card header I want
+       it «offline - via your link»."* Both facts, in the order he reads them — what KIND of bid this
+       is, then how it reached him. The word's collision with a lost connection stands as a note, not
+       as a reason to drop it: nothing else on a bid card talks about the network. */
+    sourceOfflineLong: "Offline · via your link",
     openChat: "Open the conversation",
     // "{period}" is the rental period the bid quoted in — Monthly rental, Weekly rental, and so on.
     // The price block mirrors the app's bid card (`v3_bid_card.dart`, `price_expanded_breakdown.dart`,
@@ -1685,13 +1741,17 @@ export const en = {
     perCycle: "Per cycle",
     colRate: "Rental",
     // The three totals. The third is named after the request's own duration.
+    deliveredCost: "Delivered cost",
+    deliveredCostOneCycle: "rental + mobilization + demobilization · one cycle",
+    runningRate: "Running rate",
+    runningRateSub: "rental value only, per cycle",
     firstCycle: "First cycle",
     everyCycleAfter: "Every cycle after",
     overDays: "{n} days",
     // Their popovers. Each lists the lines the figure was added from, in that order.
-    howFirstCycle: "How first cycle is built",
-    howEveryCycle: "How every cycle after is built",
-    howDuration: "How {n} days is built",
+    howFirstCycle: "How the delivered cost is built",
+    howEveryCycle: "How the running rate is built",
+    howDuration: "How the delivered cost over {n} days is built",
     // The duration column charges billable days, so its popover names them rather than claiming a
     // count of whole months. Ruled 2026-08-12: the shared pricing module governs this figure, and it
     // prorates at rate ÷ divisor a day with Fridays excluded — the same equation the deal room and
@@ -1710,9 +1770,7 @@ export const en = {
     paidOnce: "paid once, cycle 1",
     vatNote: "All figures in SAR. VAT applied at 15% on the taxable lines above.",
     // The terms split: what the request asked for, against what suppliers volunteered.
-    termsYouSet: "Terms you set",
-    noVolunteeredTerms: "No supplier added a term of their own",
-    theyOffered: "They offered on their own",
+    noVolunteeredTerms: "This request set no terms, and no supplier added one",
     termOperator: "Operator",
     termFuel: "Fuel",
     termPayment: "Payment",
@@ -2238,12 +2296,15 @@ export const en = {
       notesPlaceholder: "Anything else the supplier should know…",
       unavailableTitle: "{equipment} isn't available from suppliers right now.",
       // ── Off-catalogue (CUSTOM_EQUIPMENT_ENABLED) ────────────────────────────────────────────
-      // Three facts, all of them, before the renter presses Send: the type is not in our list, we
-      // will not send it to anyone, and he can still post and share the link himself. Say "we won't
-      // send it", never "no supplier was found" — the request is never dispatched at all, and a
-      // renter told "none matched" waits for bids that were never solicited.
+      // The owner's own wording (2026-09-06). It says the two things that decide what the renter does
+      // next: the type is not available right now, and the request still goes out under his own link.
+      //
+      // ~~"Not in our catalogue: no supplier is sent it, but you can post and share the link with
+      // your own."~~ It led with OUR filing system and spent half its width on the dispatch rule.
+      // "Not available right now" is the same fact in the renter's terms, and "right now" is honest:
+      // the type is being added, not refused.
       notInCatalogueNote:
-        "Not in our catalogue: no supplier is sent it, but you can post and share the link with your own",
+        "This equipment type is not available right now, but you can still post and share the link with your suppliers",
       // The renter names the machine himself and the request goes out carrying his words. Prefilled
       // from what he wrote in the RFQ, so the ordinary case is a glance.
       customEquipment: "EQUIPMENT NAME",
@@ -2532,11 +2593,18 @@ export const en = {
     openBids: "Open bids",
     insideApp: "Inside the app",
     noAccountBody: "They have no Moedatech account, so there is no deal room and no award: every bid reached you through your shared form.",
-    kOnApp: "on Moedatech",
-    kViaLink: "via your link",
+    kOnApp: "bids on Moedatech",
+    kViaLink: "offline bids",
     kRooms: "deal rooms",
     kAwards: "awards",
-    papers: "Company papers",
+    noPhone: "No phone",
+    docMissing: "Not provided",
+    docOpen: "Open the document",
+    sharedWith: "Requests you shared with them",
+    sharedNothing: "You have not shared a request with them yet",
+    openRequest: "Open the request",
+    roomsNoLink: "Open them from your inbox",
+    papers: "Company documents",
     papersNeedBid: "A supplier's papers reach you through a bid. They have not bid yet, so there is nothing to show.",
     papersNoAccess: "Their papers came through a bid you can no longer reach.",
     docCr: "CR",
@@ -2548,7 +2616,6 @@ export const en = {
     docRenews: "reissued every year",
     docValidUntil: "valid until {date}",
     docNoExpiry: "no expiry recorded",
-    viewDoc: "View the document",
     awardedToThem: "Awarded to them",
     noAwards: "You have not awarded them anything yet.",
     whatYouSent: "What you sent them",
@@ -2580,7 +2647,11 @@ export const en = {
     editTitle: "Edit supplier",
     editPlatformSub: "Name and store come from their Moedatech account. You can only edit what is yours.",
     nameIsTheirs: "Read from their Moedatech account.",
-    emailHint: "Without it, the request's share sheet skips them.",
+    /* ── One note under the phone AND the e-mail (owner, 2026-09-06) ────────────────────────────
+       ~~«Without it, the request's share sheet skips them.»~~ It hung off the e-mail alone and said
+       what the renter LOSES; the pair is what he is filling in, either one is enough to reach the
+       firm, and the sentence should say what he GAINS. */
+    contactHint: "Add them so you can share your request to their e-mail or WhatsApp",
     addToGroup: "Add to a group",
     removeFromGroup: "Remove from this group",
     groupsHint: "Removing a group here only unlabels this supplier. The group itself stays.",

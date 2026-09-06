@@ -366,15 +366,42 @@ describe("how it goes", () => {
     expect(screen.queryByText(c.shareAgain)).toBeNull();
   });
 
-  it("Given a share went out, Then it is recorded against the request", async () => {
-    draw();
+  it("Given a share out of a compose window, Then NOTHING is recorded", async () => {
+    /**
+     * 🔴 **We only record what we can prove** (owner, 2026-09-06: *"i will only track the accurate
+     * actions we are really sure about"*).
+     *
+     * ~~It recorded when the WINDOW OPENED.~~ A renter who opened Outlook, thought better of it and
+     * closed the tab still got a row in his file saying he had shared the request with four
+     * suppliers. The record over-reported, silently, with no way to tell a real send from an
+     * abandoned one.
+     *
+     * ⚠️ The only send we can prove is the one WE make: `share-email` derives the recipients on
+     * the backend, puts the message on the wire and stamps the row with the mail server's own id.
+     * That row is written server-side and needs nothing from here.
+     */
+    api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
+
+    draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
 
-    await waitFor(() => expect(api.shares).toHaveLength(1));
-    expect(api.shares[0]).toEqual(["abc-123", ["1"], "email"]);
+    await waitFor(() => expect(opened).toHaveBeenCalled());
+    expect(api.shares).toHaveLength(0);
   });
+
+  it("Given WHATSAPP, Then nothing is recorded either — we never see that chat", async () => {
+    // ⚠️ `wa.me` opens a chat and tells us nothing back. A row there was always a guess.
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.whatsapp));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(opened).toHaveBeenCalled());
+    expect(api.shares).toHaveLength(0);
+  });
+
 });
 
 describe("the words around the card", () => {
@@ -959,7 +986,8 @@ describe("the mail we send ourselves", () => {
     await sendByEmail();
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
-    expect(api.shares).toHaveLength(1);
+    // ⚠️ Nothing recorded: the window opening is not a send.
+    expect(api.shares).toHaveLength(0);
   });
 
   it("Given an unverified domain, Then the records his IT adds are on screen", async () => {
@@ -1183,7 +1211,9 @@ describe("connecting Outlook", () => {
     await pickEmail();
     fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
 
-    await waitFor(() => expect(screen.getByText(c.mailInSent)).toBeTruthy());
+    // ⚠️ It rides on the SAME line as the send now, not a block of its own (owner, 2026-09-06),
+    // so it is matched inside the sentence rather than as an element.
+    await waitFor(() => expect(screen.getByText(new RegExp(c.mailInSent))).toBeTruthy());
     expect(opened).not.toHaveBeenCalled();
   });
 
@@ -1223,8 +1253,8 @@ describe("connecting Outlook", () => {
 describe("the preview and the sent e-mail carry the same message", () => {
   const model: BidCardModel = {
     ref: "CEX-020902",
-    imageHeadline: "Excavator 20 ton · with operator ×2",
-    cardTitle: "Excavator 20 ton · with operator ×2",
+    imageHeadline: "Excavator 20 ton · with operator 2 units",
+    cardTitle: "Excavator 20 ton · with operator 2 units",
     items: [],
     where: "Diriyah · 4 months & extendable",
     terms: [

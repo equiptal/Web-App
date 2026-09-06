@@ -97,7 +97,7 @@ function escapeHtml(s: string): string {
 function navyBand(model: BidCardModel, align: string): string {
   const headline = escapeHtml(model.imageHeadline);
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;background:${COLORS.navy};">
-      <tr><td align="${align}" style="padding:16px 18px 16px;">
+      <tr><td align="${align}" style="padding:23px 27px;height:231px;vertical-align:middle;">
         ${
           /* ⚠️ **The MARK, not the word** (owner, 2026-09-05: *"make sure moedatech show the
              moedatech logo not the text"*). `MOEDATECH` in letter-spaced caps was a stand-in that
@@ -108,17 +108,28 @@ function navyBand(model: BidCardModel, align: string): string {
              because this markup is also what a paste carries into a mail client, and a client
              fetching `/moedatech-logo.svg` from wherever it happens to be would fetch nothing.
 
-             ⚠️ 72px on a 440px card is 16%, matching the proportion the rendered card at
-             `/bid/<token>/og` draws (228 of 1200, 19%) rather than shouting over the equipment
-             name below it. It is a mark, not a masthead: the supplier is here to read the machine.
+             ⚠️ **Every number here is the rendered card's, scaled by 440/1200.** They were
+             eyeballed before, and the two drew the same facts at visibly different sizes — the panel
+             showed one card before the post and another after it (owner, 2026-09-06: *"the preview
+             still show a template card before the request different from post request, make sure it
+             is always the same and as sent"*).
+
+             `route.tsx` draws at 1200 x 630 with 62/74 padding, a 228 x 86 mark, a 78px headline
+             (56 when it runs long), a 37px call to bid and -1.5 letter-spacing. At 0.3667 that is
+             23/27, 84 x 32, 29 (21), 14 and -0.55, which is what this now uses. The box is given
+             the scaled height, 231, with the content centred, so the vertical rhythm matches too.
+
+             🔴 **Change one and change the other.** They are two renderers of one picture: this
+             markup stands in until a token exists, and the PNG replaces it the moment one does. A
+             number edited on one side alone puts the difference straight back.
 
              ⚠️ The ground is `COLORS.navy`, which IS `--navy` from `globals.css` — a test pins
              the two files together. Satori cannot read a CSS variable, so the hex travels through
              `ds-colors.ts` rather than the card inventing a navy of its own. */ ""
         }
-        <img src="${logoDataUri(COLORS.surface)}" alt="Moedatech" width="72" height="27" style="display:block;width:72px;max-width:72px;height:auto;border:0;outline:none;">
-        <div style="font-size:${headline.length > 46 ? 16 : 20}px;font-weight:700;color:${COLORS.surface};line-height:1.2;padding-top:16px;">${headline}</div>
-        <div style="font-size:12px;font-weight:700;color:${model.accepting ? COLORS.brand : COLORS.dangerHover};padding-top:10px;">${escapeHtml(model.cta)}</div>
+        <img src="${logoDataUri(COLORS.surface)}" alt="Moedatech" width="84" height="32" style="display:block;width:84px;max-width:84px;height:auto;border:0;outline:none;">
+        <div style="font-size:${headline.length > 46 ? 21 : 29}px;font-weight:700;color:${COLORS.surface};line-height:1.1;letter-spacing:-0.55px;padding-top:26px;">${headline}</div>
+        <div style="font-size:14px;font-weight:700;letter-spacing:0.07px;color:${model.accepting ? COLORS.brand : COLORS.dangerHover};padding-top:14px;">${escapeHtml(model.cta)}</div>
         ${
           /* ⚠️ ~~The host, small and grey under the call to bid.~~ Removed (owner, 2026-09-05).
              It was a trust signal when the card was the whole message, and it is noise now: the

@@ -42,7 +42,7 @@ export interface BidCardTerm {
 export interface BidCardItem {
   /** `Excavator 20 ton · with operator` */
   label: string;
-  /** `×2`, or empty for a single unit. */
+  /** `2 units`, or empty for a single one. */
   units: string;
   /** This item's own answers, where they differ from the shared block. */
   terms: BidCardTerm[];
@@ -84,6 +84,9 @@ const COPY = {
     machines: (n: number) => `${n} machines`,
     more: (n: number) => (n === 1 ? " + 1 other equipment item" : ` + ${n} other equipment items`),
     withOperator: "with operator",
+    /** ⚠️ «12 units», not «×12» (owner, 2026-09-06). A multiplication sign is a spreadsheet's
+        shorthand; a supplier reading a request reads a count. */
+    units: (n: number) => `${n} ${n === 1 ? "unit" : "units"}`,
     onRenter: "Renter",
     onSupplier: "Supplier",
     days: (n: number) => `${n} ${n === 1 ? "day" : "days"}`,
@@ -110,6 +113,7 @@ const COPY = {
     machines: (n: number) => `${n} معدات`,
     more: (n: number) => (n === 1 ? " + معدّة أخرى" : ` + ${n} معدات أخرى`),
     withOperator: "مع مشغّل",
+    units: (n: number) => (n === 1 ? "وحدة واحدة" : n === 2 ? "وحدتان" : `${n} وحدات`),
     varies: "يختلف حسب المعدة",
     onRenter: "على المستأجر",
     onSupplier: "على المؤجّر",
@@ -329,7 +333,10 @@ export function bidCardModel(
 
   const items = form.items;
   const multi = items.length > 1;
-  const count = (n: number) => (n > 1 ? ` ×${n}` : "");
+  /* ⚠️ «2 units», not «×2» (owner, 2026-09-06). A multiplication sign is a spreadsheet's
+     shorthand; a supplier reading a request reads a count. One unit says nothing, because one is
+     what a bare machine name already means. */
+  const count = (n: number) => (n > 1 ? ` ${t.units(n)}` : "");
   const first = `${itemLabel(items[0], lang)}${count(items[0].numberOfUnits ?? 1)}`;
   const city = cityOf(form.projectTerms?.location);
 
@@ -423,7 +430,7 @@ export function bidCardModel(
     items: multi
       ? items.map((i, n) => ({
           label: itemLabel(i, lang),
-          units: (i.numberOfUnits ?? 1) > 1 ? `×${i.numberOfUnits}` : "",
+          units: (i.numberOfUnits ?? 1) > 1 ? t.units(i.numberOfUnits ?? 1) : "",
           terms: perItem[n].filter((r) => !isShared(r)),
         }))
       : [],

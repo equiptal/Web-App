@@ -9,7 +9,11 @@ import { formatSar, rentalDivisor } from "@/lib/pricing/rental";
 import { computeCycleTotals, type CycleTotals } from "@/lib/contract/cycle-totals";
 import { cheapest, findTerm, type WorkspaceBid } from "@/lib/contract/workspace";
 import { partyToken, termValueLabel } from "@/lib/contract/labels";
-import type { TermRow } from "@/lib/contract/bids";
+import { termSides, type TermRow } from "@/lib/contract/bids";
+import type { DealRoomDocument } from "@/lib/contract/deal-room";
+import { submissionToBidDocuments, type LinkBidSubmission } from "@/lib/contract/link-bids";
+import { isOffPlatformBidId } from "@/lib/contract/bid-equipment-access";
+import { fetchBidDocuments } from "@/lib/api/client";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 
@@ -101,6 +105,24 @@ const TERM_ORDER = [
  * · `cr` / `vat` — company details, not terms. They belong to the equipment-and-docs check, and
  *   `bucketBidTerms` already excludes them from the card's own tally for the same reason.
  */
+/**
+ * ── The file behind a term (owner, 2026-09-06) ──────────────────────────────────────────────────
+ * *"They are part of the term: whenever a document is required, like TÜV in the request."*
+ *
+ * Not every term has a file, and the ones that do are the CERTIFICATES — the only terms a request
+ * can ask for by naming a paper. The supplier proves them by uploading, on the shared form or in his
+ * own equipment file, and both arrive here as the same `{type, url}` shape. So the eye belongs in
+ * the cell beside the answer: the value says what he offers, the eye is the proof of it.
+ *
+ * Matched on the document's TYPE, not on the term's label: `tuv`, `spsp` and `saso` are equipment
+ * certificates whatever the request called them, and the operator's own carry the `operator_`
+ * prefix. A term with no entry here never shows an eye, however many files the bid carries.
+ */
+const TERM_DOC_TYPES: Record<string, (type: string) => boolean> = {
+  equipment_cert: (ty) => ty === "tuv" || ty === "spsp" || ty === "saso" || ty === "saso_registration",
+  operator_cert: (ty) => ty.startsWith("operator_"),
+};
+
 const TERM_HIDDEN = new Set(["overtime", "overtime_rate", "fuel_type", "fuel", "cr", "vat"]);
 
 /**
@@ -164,6 +186,7 @@ export function CompareMatrix({
   startDate,
   mobByRentee = null,
   demobByRentee = null,
+  submissions = {},
   benched,
   onBench,
   ranking,
@@ -187,6 +210,9 @@ export function CompareMatrix({
    */
   mobByRentee?: boolean | null;
   demobByRentee?: boolean | null;
+  /** The raw submission behind each off-platform bid — where its uploaded files live. Keyed by bid
+   *  id, exactly as the cards tab receives it, so neither view fetches what the other already has. */
+  submissions?: Record<string, LinkBidSubmission>;
   /**
    * Bids taken off the comparison, owned by the WORKSPACE (owner, 2026-08-25).
    *
@@ -223,18 +249,29 @@ export function CompareMatrix({
   const [popover, setPopover] = useState<"first" | "after" | "duration" | null>(null);
 
   /**
-   * -- ONE group at a time (owner, 2026-09-05, widened 2026-09-06) -------------------------------
-   * *"When terms open it will collapse the price etc."* — and the grand total is a panel of its own
-   * that opens its three cost fields.
+   * -- What opens with what (owner, 2026-09-06) --------------------------------------------------
+   * *"When I click Per cycle on the left it is open WITH the grand total; but if I click Grand total
+   * while I am on Per cycle, it will open the grand total ONLY."*
    *
-   * Three groups, one open. Each is a different reading of the same offers and a renter is doing one
-   * of them: what they quoted, what it comes to, what they agreed to. Nothing is lost - a rail is
-   * one press from being a group again - and the open group gets the whole width, which is what
-   * stops the term answers being truncated and the money columns being squeezed.
+   * So the two money groups are not peers of each other the way they are peers of the terms:
    *
-   * Folding is still only folding: shutting a group opens nothing, so the renter can put them all
-   * away and read the suppliers alone.
+   *  · **«Per cycle» opens the money whole** — the quoted figures and the three totals they add up
+   *    to, side by side. That is the ordinary reading, and the totals are meaningless to check
+   *    without the rate and the legs that produced them.
+   *  · **«Grand total» opens alone**, taking the width for its three cost fields. A renter who
+   *    presses it while the rate is already on screen has asked for the totals SPECIFICALLY.
+   *  · **«Terms» opens alone.** It is the other reading of the same offers, and it needs the width.
+   *
+   * Folding is still only folding: shutting a group opens nothing, so all three can be put away and
+   * the suppliers read on their own.
    */
+  const OPENS_WITH: Record<GroupKey, GroupKey[]> = {
+    cycle: ["cycle", "totals"],
+    totals: ["totals"],
+    terms: ["terms"],
+    // The equipment rail is a door out of the page, never a group that opens here.
+    equipment: [],
+  };
   const ACCORDION: GroupKey[] = ["cycle", "totals", "terms"];
   const toggleGroup = (k: GroupKey) =>
     setShut((s) => {
@@ -243,8 +280,11 @@ export function CompareMatrix({
         next.add(k);
         return next;
       }
-      next.delete(k);
-      for (const other of ACCORDION) if (other !== k) next.add(other);
+      const keep = new Set(OPENS_WITH[k]);
+      for (const g of ACCORDION) {
+        if (keep.has(g)) next.delete(g);
+        else next.add(g);
+      }
       return next;
     });
   const toggleCol = (k: ColKey) =>
@@ -263,6 +303,8 @@ export function CompareMatrix({
    * default — cheapest to start is the figure a renter reads first, and the fact that cheapest to
    * FINISH is often a different supplier is exactly what one press on another column reveals.
    */
+  /* Delivered Cost orders the table by default: "it is the number he pays first"
+     (`docs/bid-price-naming.md`, Rules). `firstCycle` is that column's key. */
   const [sortKey, setSortKey] = useState<ColKey>("firstCycle");
   const [sortDir, setSortDir] = useState<1 | -1>(1);
   const sortBy = (k: ColKey) => {
@@ -327,6 +369,55 @@ export function CompareMatrix({
   }, [bids, benched, totals, sortKey, sortDir]);
 
   /**
+   * ── The papers behind each offer (owner, 2026-09-06) ──────────────────────────────────────────
+   * *"Put an eye icon on each document if it exists, whether uploaded in the form or in the
+   * supplier's equipment, and show it when the eye is clicked. Same behaviour as the existing
+   * compare."*
+   *
+   * Two sources, one shape, because a renter comparing offers does not care which pipe a file came
+   * down:
+   *
+   *  · **Off-platform** — the files the supplier attached to the shared form. They are already in
+   *    hand: `submissionToBidDocuments` reads them off the submission this workspace has loaded, so
+   *    there is nothing to fetch and nothing to fail.
+   *  · **In-app** — the supplier's own equipment and company papers, `GET /api/me/bids/{id}/documents`,
+   *    which answers presigned URLs. One request per bid, once, and a failure leaves that bid's
+   *    column empty rather than the table broken.
+   *
+   * `link-…` ids are never fetched: that endpoint cannot resolve a synthetic id and would 404 on
+   * every off-platform bid on the table.
+   */
+  const [docsByBid, setDocsByBid] = useState<Record<string, DealRoomDocument[]>>({});
+  useEffect(() => {
+    let live = true;
+    const wanted = rows.map((b) => b.card.id).filter((id) => !(id in docsByBid));
+    if (wanted.length === 0) return;
+    const local: Record<string, DealRoomDocument[]> = {};
+    const remote: string[] = [];
+    for (const id of wanted) {
+      const sub = submissions[id];
+      if (sub) local[id] = [...submissionToBidDocuments(sub).equipmentDocuments, ...submissionToBidDocuments(sub).companyDocuments];
+      else if (isOffPlatformBidId(id)) local[id] = [];
+      else remote.push(id);
+    }
+    if (Object.keys(local).length) setDocsByBid((p) => ({ ...p, ...local }));
+    for (const id of remote) {
+      void fetchBidDocuments(id)
+        .then((d) => {
+          if (live) setDocsByBid((p) => ({ ...p, [id]: [...(d.equipmentDocuments ?? []), ...(d.companyDocuments ?? [])] }));
+        })
+        .catch(() => {
+          // An offer whose papers cannot be read shows none, and says so with a dash like any other
+          // blank cell. It must not take the comparison down with it.
+          if (live) setDocsByBid((p) => ({ ...p, [id]: [] }));
+        });
+    }
+    return () => { live = false; };
+    // `docsByBid` is READ here to skip what is already loaded; re-running on it would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, submissions]);
+
+  /**
    * The term columns this table actually needs: one per term ANY bid on it answers.
    *
    * `asked` is what puts a column under «You set» rather than «They offered» — a term is the
@@ -353,10 +444,13 @@ export function CompareMatrix({
       }
     }
     const known = (g: string) => { const i = TERM_ORDER.indexOf(g); return i === -1 ? Number.MAX_SAFE_INTEGER : i; };
-    return [...byGroup.values()].sort((a, b) => known(a.group) - known(b.group) || a.labelEn.localeCompare(b.labelEn));
+    /* The terms the RENTER set come first — that ordering is what the «Terms you set» heading used
+       to say out loud before it was removed (owner, 2026-09-06). Within each half, the known reading
+       order, then anything new alphabetically. */
+    return [...byGroup.values()].sort(
+      (a, b) => Number(b.asked) - Number(a.asked) || known(a.group) - known(b.group) || a.labelEn.localeCompare(b.labelEn),
+    );
   }, [rows]);
-  const youSet = termCols.filter((c) => c.asked);
-  const theyOffered = termCols.filter((c) => !c.asked);
 
   const lowRate = useMemo(() => cheapest(rows, (b) => b.card.price), [rows]);
   const lowFirst = useMemo(() => cheapest(rows, (b) => totals.get(b.card.id)?.firstCycle.total ?? null), [rows, totals]);
@@ -425,13 +519,50 @@ export function CompareMatrix({
     { key: "mob", label: t.priceFooter.mobilisation, value: (b) => (b.card.mobExcluded ? null : b.card.mobPrice), excluded: (b) => !!b.card.mobExcluded, onRentee: mobByRentee === true },
     { key: "demob", label: t.priceFooter.demobilisation, value: (b) => (b.card.demobExcluded ? null : b.card.demobPrice), excluded: (b) => !!b.card.demobExcluded, onRentee: demobByRentee === true },
   ];
+  /**
+   * ── Delivered Cost and Running Rate (owner, `docs/bid-price-naming.md`, applied 2026-09-06) ────
+   * *"A supplier quoting a low rental with high mobilization looks cheapest on one and expensive on
+   * the other, and which one wins flips with the rental duration."*
+   *
+   * ~~«First cycle» / «Every cycle after» / «121 days».~~ Those named the ARITHMETIC — which cycle a
+   * figure covers — and left the renter to work out what was inside it. The two names say what the
+   * money IS:
+   *
+   *  · **Delivered Cost** — rental + mobilization + demobilization, always FOR A STATED DURATION.
+   *    The spec is explicit that the phrase means nothing without one, so the duration rides in the
+   *    subtitle of each: one cycle, or the request's own N days.
+   *  · **Running Rate** — the rental alone, per cycle, once the machine is on site.
+   *
+   * Both are always drawn and neither hides behind a toggle: the flip between them IS the point, and
+   * a renter who sees only one is choosing on half the fact.
+   */
   const totalCols: MoneyCol[] = [
-    { key: "firstCycle", label: t.workspace.firstCycle, value: (b) => totals.get(b.card.id)?.firstCycle.total ?? null, win: lowFirst, vat: true, info: "first" },
-    { key: "everyCycle", label: t.workspace.everyCycleAfter, value: (b) => totals.get(b.card.id)?.everyCycleAfter?.total ?? null, win: lowAfter, vat: true, info: "after" },
+    {
+      key: "firstCycle",
+      label: t.workspace.deliveredCost,
+      // «for one cycle» — Delivered Cost with no duration attached is meaningless (spec, Rules).
+      sub: t.workspace.deliveredCostOneCycle,
+      value: (b) => totals.get(b.card.id)?.firstCycle.total ?? null,
+      win: lowFirst,
+      vat: true,
+      info: "first",
+    },
+    {
+      key: "everyCycle",
+      label: t.workspace.runningRate,
+      sub: t.workspace.runningRateSub,
+      value: (b) => totals.get(b.card.id)?.everyCycleAfter?.total ?? null,
+      win: lowAfter,
+      vat: true,
+      info: "after",
+    },
     ...(durationDays
       ? [{
           key: "duration" as ColKey,
-          label: t.workspace.overDays.replace("{n}", String(durationDays)),
+          label: t.workspace.deliveredCost,
+          // The same money over the request's OWN horizon. The two Delivered Cost columns differ by
+          // their duration alone, which is why the duration is the subtitle and not a suffix.
+          sub: t.workspace.overDays.replace("{n}", String(durationDays)),
           value: (b: WorkspaceBid) => totals.get(b.card.id)?.duration?.total ?? null,
           win: lowDuration,
           vat: true,
@@ -518,7 +649,7 @@ export function CompareMatrix({
       <div {...pin("matrix-scroller")} className="flex items-stretch overflow-x-auto overflow-y-clip">
         {/* ── The suppliers, on the inline-start edge ── */}
         <div {...pin("matrix-supplier-col")} className="w-[185px] flex-none border-e border-border">
-          <div className="box-border flex h-[72px] items-end border-b border-border bg-surface2/60 px-3 pb-2">
+          <div className="box-border flex h-[72px] flex-col justify-end gap-1.5 border-b border-border bg-surface2/60 px-3 pb-2">
             {/* «Supplier», and nothing after it: the «pick one» that stood here was an instruction
                 for a choice this table no longer asks for (owner, 2026-09-04). */}
             <span className="flex min-w-0 items-baseline gap-1.5">
@@ -526,6 +657,22 @@ export function CompareMatrix({
                 {t.workspace.supplier}
               </span>
             </span>
+            {/* ── The ranking belongs to the SUPPLIERS (owner, 2026-09-06) ──────────────────────
+                *"Why is «rank with AI» shown on «they offered»?"* — it was not about that half, or
+                about the terms at all: it ranks every bid on the table, on price and terms together,
+                and it writes the ★ that appears in this column. It sat in the terms band only
+                because that band had room. It sits over the column it marks now, and stays reachable
+                whichever group is open. */}
+            <button
+              type="button"
+              onClick={() => onRank(rows)}
+              disabled={rankBusy || rows.length === 0}
+              className={`w-full whitespace-nowrap rounded-full border px-2.5 py-1 text-label font-semibold transition disabled:bg-disabled-bg disabled:text-disabled-fg ${
+                ranking ? "border-ok/40 bg-ok-soft text-ok" : "border-border bg-surface text-navy-mid"
+              }`}
+            >
+              ✦ {ranking ? t.workspace.aiRanked : t.workspace.rankWithAi}
+            </button>
           </div>
 
           {/* ── No supplier is PICKED here any more (owner, 2026-09-04) ─────────────────────────
@@ -588,64 +735,51 @@ export function CompareMatrix({
           ? <GroupRail label={t.workspace.grandTotal} hint={t.workspace.openTotals} onClick={() => toggleGroup("totals")} glyph="dot" />
           : moneyGroup("totals", t.workspace.grandTotal, totalCols, true)}
 
-        {/* ── The terms: what the renter asked for, then what suppliers volunteered ── */}
+        {/* ── The terms, in one block ── */}
         {shut.has("terms") ? (
           <GroupRail label={t.workspace.groupTerms} hint={t.workspace.openTerms} onClick={() => toggleGroup("terms")} glyph="square" />
         ) : (
-          /* -- The terms take the table (owner, 2026-09-05) ---------------------------------
-             Open, this group is the widest thing on the row and the money is folded to two rails
-             beside it, because a term column sharing the width with six money columns truncates
-             every answer in it.
+          /* ── ONE heading, and the columns under it (owner, 2026-09-06) ──────────────────────────
+             *"What is this «they offered on their own»? What does it mean?"* — asked twice, which is
+             the answer: it meant «your request did not state this term, but a supplier declared it
+             anyway», and no renter reading a table should have to work that out from a heading.
 
-             Each half is its own section, holding its own heading band AND its columns, so the
-             «You set» / «They offered» boundary lands exactly on the column boundary whatever
-             the counts are. The bands were `flex-[2]` and `flex-[4]` against a hard-coded 2 and 4;
-             with a dynamic column list that arithmetic silently stops matching. */
-          <div className="flex min-w-0 flex-[9_1_0] items-stretch border-s border-border">
-            {youSet.length > 0 && (
-              <div className="flex min-w-0 flex-col" style={{ flex: `${youSet.length} 1 0` }}>
-                <div className={`${HEAD} flex items-center gap-1.5 bg-surface2/60 px-3`}>
-                  <span className="truncate text-label font-extrabold uppercase tracking-wide text-navy-mid">
-                    {t.workspace.termsYouSet}
-                  </span>
-                  <FoldButton onClick={() => toggleGroup("terms")} hint={t.workspace.hideGroup} />
+             ~~Two bands, «Terms you set» and «They offered on their own», each sized to its own
+             column count.~~ Gone. The terms are one set of facts about one offer, and the split
+             asked the reader to hold a distinction that changes nothing he does: he reads the
+             answer, and the colour says whether it meets what he wanted. The terms he set still come
+             FIRST — `termCols` sorts them that way — so the ORDER carries what the heading used to
+             announce.
+
+             Open, this group is the widest thing on the row and the money is folded to rails beside
+             it, because a term column sharing the width with six money columns truncates every
+             answer in it. */
+          <div className="flex min-w-0 flex-[9_1_0] flex-col border-s border-border">
+            <div className={`${HEAD} flex items-center gap-1.5 bg-surface2/60 px-3`}>
+              <span className="truncate text-label font-extrabold uppercase tracking-wide text-navy-mid">
+                {t.workspace.groupTerms}
+              </span>
+              <FoldButton onClick={() => toggleGroup("terms")} hint={t.workspace.hideGroup} />
+            </div>
+            <div className="flex flex-1">
+              {termCols.map((col) => (
+                <TermColumn
+                  key={col.group}
+                  label={ar ? col.labelAr : col.labelEn}
+                  keys={col.keys}
+                  rows={rows}
+                  ar={ar}
+                  L={L}
+                  // The proof, where the term is one a paper can prove. Never a column of its own:
+                  // a certificate and its file are one fact (owner, 2026-09-06).
+                  docFor={(bidId) => docForTerm(col.group, docsByBid[bidId] ?? [])}
+                />
+              ))}
+              {termCols.length === 0 && (
+                <div className="flex flex-1 items-center justify-center px-3 py-4 text-center text-label font-semibold text-muted">
+                  {t.workspace.noVolunteeredTerms}
                 </div>
-                <div className="flex flex-1">
-                  {youSet.map((col) => (
-                    <TermColumn key={col.group} label={ar ? col.labelAr : col.labelEn} keys={col.keys} rows={rows} ar={ar} L={L} asked />
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="flex min-w-0 flex-col border-s border-border" style={{ flex: `${Math.max(theyOffered.length, 1)} 1 0` }}>
-              <div className={`${HEAD} flex items-center justify-center gap-2.5 bg-surface3/50 px-3`}>
-                <span className="flex-none text-label font-extrabold uppercase tracking-wide text-navy-mid">
-                  {t.workspace.theyOffered}
-                </span>
-                {/* The fold lives here when nothing was «set», or the renter has no way to shut the
-                    group he just opened. */}
-                {youSet.length === 0 && <FoldButton onClick={() => toggleGroup("terms")} hint={t.workspace.hideGroup} />}
-                <button
-                  type="button"
-                  onClick={() => onRank(rows)}
-                  disabled={rankBusy || rows.length === 0}
-                  className={`flex-none whitespace-nowrap rounded-full border px-2.5 py-1 text-label font-semibold transition disabled:bg-disabled-bg disabled:text-disabled-fg ${
-                    ranking ? "border-ok/40 bg-ok-soft text-ok" : "border-border bg-surface text-navy-mid"
-                  }`}
-                >
-                  ✦ {ranking ? t.workspace.aiRanked : t.workspace.rankWithAi}
-                </button>
-              </div>
-              <div className="flex flex-1">
-                {theyOffered.map((col) => (
-                  <TermColumn key={col.group} label={ar ? col.labelAr : col.labelEn} keys={col.keys} rows={rows} ar={ar} L={L} />
-                ))}
-                {theyOffered.length === 0 && (
-                  <div className="flex flex-1 items-center justify-center px-3 py-4 text-center text-label font-semibold text-muted">
-                    {t.workspace.noVolunteeredTerms}
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           </div>
         )}
@@ -697,6 +831,10 @@ export function CompareMatrix({
 interface MoneyCol {
   key: ColKey;
   label: string;
+  /** What the column CONTAINS, under its name — «rental + mobilization + demobilization», «per
+   *  cycle, rental only», «121 days». The naming spec requires it: "show under each, so nobody
+   *  guesses". */
+  sub?: string;
   value: (b: WorkspaceBid) => number | null | undefined;
   win?: Set<string>;
   vat?: boolean;
@@ -786,13 +924,24 @@ function MoneyHead({
       className={`${HEAD} relative flex items-center justify-center gap-1.5 px-2`}
       aria-sort={on ? (sortDir === 1 ? "ascending" : "descending") : undefined}
     >
-      <button type="button" onClick={() => onSort(col.key)} className="flex min-w-0 items-center justify-center gap-1.5">
-        <span className={`truncate text-label font-semibold uppercase leading-tight tracking-wide ${on ? "text-navy" : "text-muted"}`}>
-          {col.label}
+      {/* Two lines inside the same 36px band: the NAME, and what it contains. The band's height is
+          shared with the supplier column's 72px header, so it cannot grow — but a 10px name over a
+          9px subtitle sits inside it comfortably, and the subtitle is what the naming spec calls
+          for so nobody has to guess what a column adds up. */}
+      <button type="button" onClick={() => onSort(col.key)} className="flex min-w-0 flex-col items-center justify-center leading-none">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className={`truncate text-label font-semibold uppercase leading-tight tracking-wide ${on ? "text-navy" : "text-muted"}`}>
+            {col.label}
+          </span>
+          <span aria-hidden="true" className={`flex-none text-label font-semibold ${on ? "text-brand" : "text-muted/50"}`}>
+            {on ? (sortDir === 1 ? "▲" : "▼") : "↕"}
+          </span>
         </span>
-        <span aria-hidden="true" className={`flex-none text-label font-semibold ${on ? "text-brand" : "text-muted/50"}`}>
-          {on ? (sortDir === 1 ? "▲" : "▼") : "↕"}
-        </span>
+        {col.sub && (
+          /* `text-label` (11px) with the scale, not an arbitrary 9px: this app has six type steps
+             and a seventh invented for one subtitle is how a scale stops being one. */
+          <span className="mt-0.5 max-w-full truncate text-label font-semibold leading-none text-muted/80">{col.sub}</span>
+        )}
       </button>
       {onInfo && (
         <button
@@ -868,6 +1017,13 @@ function Money({ v, win, vat, excluded, onRentee }: { v: number | null | undefin
  *  the table's own horizontal scroller is the honest answer to «more terms than width». */
 const TERM_MIN_PX = 118;
 
+/** The paper that proves this term for one bid, if the bid carries one. */
+function docForTerm(group: string, docs: DealRoomDocument[]): DealRoomDocument | null {
+  const wants = TERM_DOC_TYPES[group];
+  if (!wants) return null;
+  return docs.find((d) => !!d.url && wants(d.type)) ?? null;
+}
+
 function TermColumn({
   label,
   keys,
@@ -875,6 +1031,7 @@ function TermColumn({
   ar,
   L,
   asked,
+  docFor,
 }: {
   label: string;
   keys: string[];
@@ -883,6 +1040,8 @@ function TermColumn({
   L: LFn;
   /** A term the RENTER set: its header carries what he asked for, under the label. */
   asked?: boolean;
+  /** The file that proves this term for a given bid — drawn as an eye beside the answer. */
+  docFor?: (bidId: string) => DealRoomDocument | null;
 }) {
   const t = useT();
   const answers = rows.map((b) => readTerm(findTerm(b.card, keys), keys[0], ar, t, L));
@@ -894,20 +1053,21 @@ function TermColumn({
 
   return (
     <div className="flex min-w-0 flex-1 flex-col border-e border-border last:border-e-0" style={{ minWidth: TERM_MIN_PX }}>
-      {/* The head keeps its 36px, so it truncates where it must - but it now carries the whole
-          string on `title`, which is what a renter checking «Net 30 on delivery» actually needs. */}
+      {/* ── The term, and nothing else (owner, 2026-09-06) ────────────────────────────────────
+          *"No need to mention what the rentee asked — just red or green."*
+
+          ~~«PAYMENT · you asked: Net 30».~~ The renter wrote the request; repeating his own words
+          back at him spent the width that the supplier's answer needs, and on a table of eight term
+          columns it doubled the reading for nothing. The verdict is the colour now: green means the
+          answer meets what he asked for, red means it does not. The full string still rides on
+          `title` for the one head too long to draw. */}
       <div className={`${HEAD} flex items-center gap-1.5 bg-surface/60 px-2.5`} title={askedFor ? `${label} — ${t.workspace.youAsked}: ${askedFor}` : label}>
-        <span className="flex-none text-label font-semibold uppercase leading-tight tracking-wide text-muted">{label}</span>
-        {askedFor && (
-          <span className="min-w-0 truncate text-label font-semibold leading-tight text-muted/80">
-            {t.workspace.youAsked} · {askedFor}
-          </span>
-        )}
+        <span className="min-w-0 truncate text-label font-semibold uppercase leading-tight tracking-wide text-muted">{label}</span>
       </div>
 
       {merged ? (
         <div style={{ height: rows.length * ROW_PX }} className="flex flex-none flex-col items-center justify-center gap-1 bg-surface/40 px-3">
-          <span className="text-center text-meta font-semibold leading-[1.35] text-muted">{first.text}</span>
+          <span className={`text-center text-meta font-semibold leading-[1.35] ${first.met ? "text-ok" : "text-muted"}`}>{first.text}</span>
           <span className="text-center text-label font-semibold leading-snug text-muted/80">
             {t.workspace.sameFromAll.replace("{n}", String(rows.length))}
           </span>
@@ -915,6 +1075,7 @@ function TermColumn({
       ) : (
         rows.map((b, i) => {
           const a = answers[i];
+          const doc = docFor?.(b.card.id) ?? null;
           return (
             <div
               key={b.card.id}
@@ -934,12 +1095,28 @@ function TermColumn({
                   rare one that does not. `break-words` so a single long token breaks rather than
                   widening the column and pushing the money off the screen. */}
               <span
-                className={`line-clamp-2 break-words text-meta leading-[1.3] ${
-                  a.against ? "font-semibold text-danger" : a.text ? "font-semibold text-navy" : "font-semibold text-muted"
+                className={`line-clamp-2 break-words text-meta font-semibold leading-[1.3] ${
+                  a.against ? "text-danger" : a.met ? "text-ok" : a.text ? "text-navy" : "text-muted"
                 }`}
               >
                 {a.text ?? t.workspace.didntSay}
               </span>
+              {doc && (
+                /* The eye opens the file itself, in a new tab, on the presigned URL the backend
+                   answered — the deal room's behaviour and the app's. No viewer of our own: a renter
+                   checking a TÜV certificate wants his browser's PDF reader. */
+                <a
+                  href={doc.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  title={ar ? doc.labelAr ?? doc.label : doc.label}
+                  aria-label={`${ar ? doc.labelAr ?? doc.label : doc.label} — ${b.card.supplierName}`}
+                  className="flex-none rounded px-1 py-0.5 text-action transition hover:bg-surface2"
+                >
+                  <Icon name={doc.fileType === "pdf" ? "picture_as_pdf" : "visibility"} size={14} />
+                </a>
+              )}
             </div>
           );
         })
@@ -974,16 +1151,20 @@ function TermColumn({
  *
  * The state itself is never printed. It is the colour: a conflict is red, everything else is not.
  */
-const SUPPLIER_HALF = /(?:supplier|المؤجّر|المؤجر)\s*[::]\s*(.+)$/i;
-
-function readTerm(row: TermRow | null, key: string, ar: boolean, t: Dict, L: LFn): { text: string | null; against: boolean } {
-  const detail = row?.detail ? (ar ? row.detail.ar : row.detail.en) : null;
-  // «Renter: X · Supplier: Y» — take Y. A detail with no supplier half is a sentence about the term,
-  // not a pair of values, so it is shown as it stands.
-  const fromDetail = detail ? (detail.split("·").map((p) => p.trim()).find((p) => SUPPLIER_HALF.test(p))?.match(SUPPLIER_HALF)?.[1] ?? detail) : null;
+function readTerm(row: TermRow | null, key: string, ar: boolean, t: Dict, L: LFn): { text: string | null; against: boolean; met: boolean } {
+  // `termSides` is the one place «Renter: X · Supplier: Y» is taken apart (`bids.ts`). `offered` is
+  // null when the supplier named no alternative — a refusal, not an offer — and on a conflict that
+  // is exactly when the renter's OWN value is the thing worth printing, in red.
+  const { asked, offered } = termSides(row, ar);
   const agreed = row?.state === "matched" || row?.state === "agreed";
-  const raw = row?.value ?? fromDetail ?? (agreed ? row?.renteeValue ?? null : null);
-  return { text: humanTerm(raw, row?.key ?? key, t, L), against: !!row && row.state === "conflict" };
+  const raw = offered ?? (agreed || row?.state === "conflict" ? asked : null);
+  return {
+    text: humanTerm(raw, row?.key ?? key, t, L),
+    against: !!row && row.state === "conflict",
+    // «Just red or green» (owner, 2026-09-06). Green is the answer that MEETS what the renter asked
+    // — matched, or settled in the deal room. Anything unresolved stays in the ink of the table.
+    met: agreed,
+  };
 }
 
 function humanTerm(raw: string | null, key: string, t: Dict, L: LFn): string | null {

@@ -13,7 +13,6 @@ import {
   mailConnectStatus,
   mailConnectUrl,
   mailDisconnect,
-  recordRequestShare,
   setBidDeadline,
   shareRequestEmail,
   updateRenterSupplier,
@@ -777,6 +776,26 @@ export function ShareRequestPanel({
     const message = card ? renderShareMessage(card.model, url, { template, renterName, lang }) : url;
     let reached = 0;
 
+    /*
+     * — `recordRequestShare` was called from three places here —
+     *
+     * 🔴 **Nothing on this screen records a share any more** (owner, 2026-09-06: *"i will only
+     * track the accurate actions we are really sure about"*).
+     *
+     * Every one of those calls fired when a WINDOW OPENED, not when a message left: the Gmail
+     * composer, the Outlook fallback, the WhatsApp chat. A renter who opened Outlook, thought
+     * better of it and closed the tab still got a row in his file saying he had shared the request
+     * with four suppliers. The record over-reported, silently, and there was no way to tell a real
+     * send from an abandoned one.
+     *
+     * ⚠️ **The only send we can prove is the one WE make.** `share-email` derives the recipients
+     * on the backend, puts the message on the wire and stamps the row with the mail server's own
+     * message id. That row is written server-side and needs nothing from here.
+     *
+     * ⚠️ The consequence, stated plainly: while nobody has connected a mailbox and no domain is
+     * verified, NOTHING is recorded at all, and «Requests you shared with them» stays empty. That
+     * is the honest reading of what we know, and it fills in the day a real send happens.
+     */
     if (ch === "email") {
       /**
        * ── Nothing touches the clipboard here any more (owner, 2026-09-05) ───────────────────────
@@ -815,7 +834,7 @@ export function ShareRequestPanel({
        *
        * ⚠️ **The recording is on the OTHER side of this branch now.** When we send it, the backend
        * writes the row itself and stamps it with the SES message id — a fact it can prove. Calling
-       * `recordRequestShare` as well would file a second row saying the renter DECLA🔴 the same
+       * `recordRequestShare` as well would file a second row saying the renter DECLARED the same
        * send from his own client, which is a different claim and not a true one.
        */
       /**
@@ -832,11 +851,23 @@ export function ShareRequestPanel({
        * ⚠️ Only when there is something to connect TO. A stage with no app registration answers
        * `configured: false`, and a renter already connected has nothing to do.
        */
-      /* ⚠️ Outlook only. Gmail's compose URL carries `bcc`, so its window already opens with the
-         suppliers in it: a Microsoft consent there would be a detour to solve a problem he does not
-         have. */
-      if (provider === "outlook" && connect?.configured && !connect.connected) await startConnect(consentWindow);
-      else consentWindow?.close();
+      /**
+       * 🔴 **GMAIL NEVER TOUCHES THE SERVER PATH.**
+       *
+       * ~~Both providers went through `share-email`.~~ That endpoint sends through whatever the
+       * renter CONNECTED, which is a Microsoft mailbox — so pressing Gmail asked him to connect
+       * Outlook and then sent his message out through Outlook (owner, 2026-09-06: *"when i click
+       * gmail it is using outlook and ask to send again, gmail is different"*).
+       *
+       * Gmail's compose URL carries `bcc` properly, so his own Gmail window opens with the
+       * suppliers already in it and he presses Send there. That is the whole reason the two are
+       * separate buttons, and it needs no connection, no consent and no confirm step.
+       */
+      if (provider === "gmail") {
+        consentWindow?.close();
+        reached += openCompose(id, message) ? reachable.length : 0;
+      } else {
+      if (connect?.configured && !connect.connected) await startConnect(consentWindow);
 
       const body = {
         subject,
@@ -901,10 +932,6 @@ export function ShareRequestPanel({
          * above, before this ran.
          */
       } else {
-        // No pick at all is a legitimate share (owner, 2026-09-02): the renter wants the message in
-        // his own compose window to address himself. Nothing is recorded, because nobody was named.
-        if (reachable.length) void recordRequestShare(id, reachable.map((x) => x.id), "email");
-
         /**
          * 🔴 **`To` is the renter himself. Never a supplier.**
          *
@@ -917,23 +944,12 @@ export function ShareRequestPanel({
          * ⚠️ Empty when we could not read his address, which is exactly today's behaviour. A
          * missing `To` is worse than a filled one and better than a wrong one.
          */
-        const args: Compose = {
-          to: myEmail ? [myEmail] : [],
-          bcc: reachable.map((x) => x.email as string),
-          subject,
-          body: message,
-          provider,
-        };
-        setReopen(args);
-        /* ⚠️ Kept so *Copy addresses* has something to copy, and set ONLY on the fallback: a
-           send that went out server-side put the recipients on the message itself, so offering a
-           paste there would be offering a fix for a problem that did not happen. */
-        setPasteAddresses(provider === "outlook" ? reachable.map((x) => x.email as string) : []);
-        const openedIt = openEmailCompose(args);
+        const openedIt = openCompose(id, message);
         // Too long for a URL, and a truncated body loses its tail, which is where the link is. The
         // request is posted and the link is on screen; say so rather than sending half a message.
         if (openedIt) reached += reachable.length;
         else setTooLong(true);
+      }
       }
     }
     if (ch === "whatsapp") {
@@ -945,7 +961,7 @@ export function ShareRequestPanel({
        * With nobody picked it opens WhatsApp's own chooser instead, which is the same share with
        * the recipient left to him.
        */
-      if (firstWithPhone) void recordRequestShare(id, [firstWithPhone.id], "whatsapp");
+
       const phone = (firstWithPhone?.phone ?? "").replace(/\D/g, "");
       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank", "noopener");
       if (firstWithPhone) reached += 1;
@@ -997,6 +1013,30 @@ export function ShareRequestPanel({
     postedHere.current = false;
     onShared?.(reached, ch);
     setBusy(false);
+  };
+
+  /**
+   * Open his own webmail with the message in it.
+   *
+   * ⚠️ One place, because two callers reach it for opposite reasons: **Gmail** uses it as the
+   * normal route, since its compose URL carries `bcc`; **Outlook** falls back to it when the server
+   * could not send. Written twice they would drift, and the second copy is the one nobody tests.
+   */
+  const openCompose = (id: string, message: string): boolean => {
+    const args: Compose = {
+      to: myEmail ? [myEmail] : [],
+      bcc: reachable.map((x) => x.email as string),
+      subject,
+      body: message,
+      provider,
+    };
+    setReopen(args);
+    /* ⚠️ The paste is Outlook's problem alone: its deeplink discards `bcc` without a word, and
+       Gmail's carries it. */
+    setPasteAddresses(provider === "outlook" ? reachable.map((x) => x.email as string) : []);
+    const opened = openEmailCompose(args);
+    if (!opened) setTooLong(true);
+    return opened;
   };
 
   /**
@@ -1895,10 +1935,13 @@ export function ShareRequestPanel({
                 {/* A supplier he picked who has no address is not in that count, and a count that
                     quietly omits him is how a renter comes to believe eight people were written to. */}
                 {mailer.skipped > 0 && ` ${fmt(c.mailSkipped, { n: mailer.skipped })}`}
-                {/* ⚠️ Only on the Graph path, where the message really did pass through his own
+                {/* ⚠️ One line, not two (owner, 2026-09-06). It was a block of its own under the
+                    sentence, which read as a second piece of news about the same send.
+
+                    Only on the Graph path, where the message really did pass through his own
                     mailbox. On the SES path we send AS him without touching it, so there is no copy
                     in his Sent folder and saying otherwise would send him looking for one. */}
-                {mailer.inSentFolder && <span className="block font-semibold text-ok-deep">{c.mailInSent}</span>}
+                {mailer.inSentFolder && ` ${c.mailInSent}`}
               </span>
             </span>
           )}
@@ -1937,7 +1980,11 @@ export function ShareRequestPanel({
 
           {/* Connected, said once and quietly: it changes what Send does, so it belongs on screen,
               but it is a settled fact rather than news. */}
-          {connect?.connected && connect.accountEmail && channel === "email" && (
+          {/* ⚠️ Hidden once it HAS sent (owner, 2026-09-06: *"there are 2 similar lines"*).
+              «Sending from bandar@…» beneath «Sent from bandar@… to 1 supplier» is the same fact in
+              the present tense, under the past one. It is a standing note about the connection, so
+              it belongs on the screen he is about to send from, not on the report of a send. */}
+          {connect?.connected && connect.accountEmail && channel === "email" && !mailer?.sent && (
             <span className="flex items-center gap-2 text-meta text-muted">
               <Icon name="check_circle" size={14} className="flex-none text-ok-deep" />
               {fmt(c.mailConnected, { email: connect.accountEmail })}
@@ -2069,7 +2116,8 @@ export function ShareRequestPanel({
         open={confirming && !!preview}
         onClose={() => setConfirming(false)}
         size="sm"
-        icon={<Icon name="outgoing_mail" size={18} />}
+        /* ⚠️ No icon. It sat on top of the title in the rendered dialog, and a one-line question
+           with two buttons has nothing an icon would add. */
         title={c.confirmTitle}
         footer={
           <div className="flex w-full items-center justify-end gap-2">

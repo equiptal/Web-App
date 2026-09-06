@@ -97,6 +97,7 @@ export const PIN_REGISTRY = {
   "header-icons": { n: "5.2", label: "Header — inbox + bell pair", file: "src/components/AppShell.tsx" },
   "header-avatar": { n: "5.3", label: "Header — avatar", file: "src/components/AppShell.tsx" },
   "notifications-bell": { n: "6", label: "Notifications bell", file: "src/components/NotificationsBell.tsx" },
+  "help-manual": { n: "6.1", label: "Help manual modal", file: "src/components/help/HelpManual.tsx" },
   "page-main": { n: "7", label: "Page body (gutters live here)", file: "src/components/AppShell.tsx" },
   "page-back": { n: "8", label: "Back arrow", file: "src/components/AppShell.tsx" },
   "page-section": { n: "9", label: "Page section", file: "src/components/PageSection.tsx" },
@@ -184,6 +185,7 @@ export const PIN_REGISTRY = {
   "onboarding-form": { n: "76", label: "Onboarding form", file: "src/components/onboarding/OnboardingForm.tsx" },
   "verification-flow": { n: "77", label: "Verification flow", file: "src/components/onboarding/VerificationFlow.tsx" },
   "auth-gate": { n: "78", label: "Sign-in / register modal", file: "src/components/onboarding/AccountModal.tsx" },
+  "guest-wall": { n: "9.5", label: "Guest wall — blurred page + sign-in card", file: "src/components/common/GuestWall.tsx" },
   "sign-in-prompt": { n: "79", label: "Sign-in prompt", file: "src/components/common/SignInPrompt.tsx" },
 
   /* ── 90–99  primitives ────────────────────────────────────────────────────────────────────── */

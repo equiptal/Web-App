@@ -67,7 +67,7 @@ describe("draftBidForm", () => {
     const m = bidCardModel(null, { title: "", description: "" }, "en", form);
 
     // The machine, its size, its count and the operator — everything a supplier scans for.
-    expect(m.cardTitle).toBe("Crawler Excavator 20 ton · with operator ×2");
+    expect(m.cardTitle).toBe("Crawler Excavator 20 ton · with operator 2 units");
     expect(m.where).toContain("Riyadh");
     // `extendable` is drawn only when the renter said yes, and he did.
     expect(m.where).toContain("extendable");

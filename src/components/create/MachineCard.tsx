@@ -564,14 +564,17 @@ function UnavailableCard({ item, label }: { item: EquipmentItem; label: string }
      `Notice` carries `NOTICE_TONE.warn`, the same token every other warning in the app wears, so
      this box cannot drift a shade away from them — it was hand-rolled amber before. A warning and
      not an error: nothing has gone wrong, the machine is simply not in the list yet, and the request
-     still goes out. «Message us» rides on the same line as a footnote to the sentence. */
+     still goes out.
+
+     ~~«Message us», and the green «We're looking for this one» it turned into.~~ Removed by the
+     owner the same day it was added. The row already tells the renter what to DO — post it, share
+     the link — and a second control beside that sentence offered him a different errand, in another
+     app, at the moment he was filling in a request. The sourcing ask survives on the kill-switch
+     row below, where the machine really is dropped and there is nothing else to press. */
   if (custom) {
     return (
       <Notice tone="warn" icon="warning">
-        <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-          <span className="min-w-[12rem] flex-1 leading-snug">{t.create.machineCard.notInCatalogueNote}</span>
-          {askUsControl}
-        </span>
+        <span className="block leading-snug">{t.create.machineCard.notInCatalogueNote}</span>
       </Notice>
     );
   }

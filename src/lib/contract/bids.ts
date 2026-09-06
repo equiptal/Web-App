@@ -1202,6 +1202,53 @@ const COUNTED_TERM_GROUP: Record<string, string> = {
 const bucketOfTermState = (s: TermState): TermBucket =>
   s === "conflict" ? "conflict" : s === "matched" || s === "agreed" ? "matched" : "pending";
 
+/**
+ * ── The two sides of a term, told apart (owner, 2026-09-06) ────────────────────────────────────
+ * *"No need to show on each term «renter: — supplier: —». Just show the value of the request the
+ * supplier did not match… unless the supplier proposes a different value, like the renter wants TÜV
+ * and the supplier said SPSP — then mention each side."*
+ *
+ * `detail` is built as one sentence, «Renter: X · Supplier: Y», by two different mappers (in-app
+ * `bidTerms`, off-platform `termRow`), and every reader printed it whole. That sentence is right for
+ * the one case it was written for — a supplier who offers something ELSE — and noise everywhere
+ * else: on a refusal it says «Supplier: Not confirmed», which is the state the row is already
+ * painted in.
+ *
+ * So the halves are parsed apart here, once, and each surface decides what to draw:
+ *
+ *  · `asked`   — what the renter's request stated. Falls back to `renteeValue`.
+ *  · `offered` — what the supplier put against it, and NULL when he simply did not meet it: a dash,
+ *                an empty half, or the words this codebase uses for a refusal. That null is the
+ *                signal "he named no alternative", which is what decides whether a reader shows one
+ *                value or two.
+ */
+export function termSides(row: TermRow | null | undefined, ar: boolean): { asked: string | null; offered: string | null } {
+  const clean = (v: string | null | undefined): string | null => {
+    const t = (v ?? "").trim();
+    if (!t || t === "—" || t === "-") return null;
+    // A refusal is not an offer. Both locales, both mappers.
+    if (/^(not confirmed|no)$/i.test(t) || t === "غير مؤكد" || t === "لا") return null;
+    return t;
+  };
+  const detail = row?.detail ? (ar ? row.detail.ar : row.detail.en) : null;
+  let asked: string | null = null;
+  let offered: string | null = null;
+  if (detail) {
+    for (const part of detail.split("·").map((x) => x.trim())) {
+      const askedHit = part.match(/^(?:renter|rentee|المستأجر)\s*[::]\s*(.+)$/i);
+      const offerHit = part.match(/^(?:supplier|المؤجّر|المؤجر)\s*[::]\s*(.+)$/i);
+      if (askedHit) asked = clean(askedHit[1]);
+      else if (offerHit) offered = clean(offerHit[1]);
+      else if (!asked && !offered) {
+        // A detail that is a sentence rather than a pair — it describes the term, so it reads as the
+        // supplier's side, which is the half every caller draws.
+        offered = clean(part);
+      }
+    }
+  }
+  return { asked: asked ?? clean(row?.renteeValue), offered: offered ?? clean(row?.value) };
+}
+
 export function bucketBidTerms(
   terms: { equipment: TermRow[]; contract: TermRow[]; supplier: TermRow[] },
   negotiable?: TermRow[],

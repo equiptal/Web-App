@@ -21,7 +21,9 @@ const OPTIONS = Array.from({ length: 9 }, (_, i) => ({
 function open() {
   render(
     <LocaleProvider>
-      <Dropdown label="Request" value="r0" options={OPTIONS} onChange={() => {}} searchable />
+      {/* Nine options: past `options.length > 7`, the search box appears and the list gets a
+          scrollbar of its own — the state the bug lived in. */}
+      <Dropdown label="Request" placeholder="Pick a request" value="r0" options={OPTIONS} onChange={() => {}} />
     </LocaleProvider>,
   );
   fireEvent.click(screen.getByRole("combobox"));

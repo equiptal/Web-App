@@ -121,14 +121,17 @@ describe("a guest on the dashboard", () => {
     recordTrail("/");
     guestHub();
     await waitFor(() => expect(nav.replaced).toEqual(["/browse"]));
-    expect(screen.queryByText(en.home.signInTitle)).toBeNull();
+    expect(screen.queryByText(en.guestWall.dashboardTitle)).toBeNull();
   });
 
-  it("gets the sign-in prompt when he PRESSED the tab", async () => {
+  it("gets the guest WALL when he PRESSED the tab — the page, blurred, with the card on it", async () => {
+    // Owner, 2026-09-06: *"show dashboard and requests as a blurry page with a sign-in modal at the
+    // front, kind of as marketing."* The prompt used to be a bordered card alone in a column.
     recordTrail("/browse");
     recordTrail("/");
     guestHub();
-    expect(await screen.findByText(en.home.signInTitle)).toBeTruthy();
+    expect(await screen.findByText(en.guestWall.dashboardTitle)).toBeTruthy();
+    expect(screen.getByText(en.guestWall.join)).toBeTruthy();
     // He asked for this page, so he stays on it.
     expect(nav.replaced).toEqual([]);
   });
@@ -137,7 +140,7 @@ describe("a guest on the dashboard", () => {
     recordTrail("/requests");
     recordTrail("/");
     guestHub();
-    await screen.findByText(en.home.signInTitle);
+    await screen.findByText(en.guestWall.dashboardTitle);
     expect(screen.getByText(en.shell.signIn)).toBeTruthy();
     // No route in that button: the prompt raises the auth modal in place.
     expect(screen.getByText(en.shell.signIn).closest("a")).toBeNull();

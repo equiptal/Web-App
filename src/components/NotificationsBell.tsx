@@ -164,7 +164,12 @@ export function NotificationsBell() {
           is coloured by the group that holds them (owner, 2026-08-25). */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="grid h-[34px] w-[34px] place-items-center rounded-full transition hover:text-navy-deep"
+        /* ── The hover was painting it OUT (owner, 2026-09-06) ────────────────────────────────
+           `hover:text-navy-deep` on a `bg-navy` bar: the glyph darkened into its own background, so
+           pointing at the bell made it vanish and leave a hole where the icon had been. Its
+           neighbour in the same group has always used `hover:text-white`, which is the bar's rule —
+           these two are one pair and are coloured by the group that holds them. */
+        className="grid h-[30px] w-[30px] place-items-center rounded-full transition hover:text-white"
         aria-label={t.notifications.title}
         aria-haspopup="menu"
         aria-expanded={open}
