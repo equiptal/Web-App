@@ -392,3 +392,37 @@ describe("operator_included arrives in two shapes", () => {
     expect(quickItemsToDraft(withOperator(undefined) as never, null, "x").items[0].operatorNeeded ?? null).toBeNull();
   });
 });
+
+/**
+ * ⚠️ The owner's second report of the same shape: *"with project settings it doesn't behave the same
+ * as if it's plain text"* (2026-09-06).
+ *
+ * A project routes a short line to the fast lane, and the fast lane built every item from
+ * `newManualItem`, whose seeded verdict is `needs-validation`. So a machine the catalogue cannot
+ * place came back as an empty «Needs your OK» row demanding a subtype nothing in the list could
+ * satisfy — no name box, no way past the gate — while the SAME sentence without a project took the
+ * full path, was called `no-match`, and let the renter name the machine himself.
+ */
+describe("a machine the catalogue cannot place, on the fast lane", () => {
+  const line = (over: Record<string, unknown>) => ({
+    line_items: [{ input_equipment: "jeep truck", quantity: 1, ...over }],
+  });
+
+  it("is no-match when no subtype resolves, so the renter can name it", () => {
+    const d = quickItemsToDraft(line({ subtype: "Jeep Truck", capacity: null }) as never, TAX, "jeep truck");
+    expect(d.items[0].verdict).toBe("no-match");
+    expect(d.items[0].ref.subcategoryId).toBeNull();
+    // His own words survive as the seed for the name box.
+    expect(d.items[0].rawLabel).toBe("jeep truck");
+  });
+
+  it("stays needs-validation when the MACHINE resolved and only the size is open", () => {
+    const d = quickItemsToDraft(
+      line({ subtype: "Crawler Excavator", capacity: null, input_equipment: "crawler excavator" }) as never,
+      TAX,
+      "crawler excavator",
+    );
+    expect(d.items[0].ref.subcategoryId).toBe("s-crawler");
+    expect(d.items[0].verdict).toBe("needs-validation");
+  });
+});

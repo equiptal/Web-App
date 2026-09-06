@@ -18,6 +18,7 @@ import {
   updateRenterSupplier,
   type MailConnectStatus,
   type RenterSupplier,
+  type ShareEmailPreview,
   type ShareEmailResult,
 } from "@/lib/api/client";
 import { canBeEmailed, groupsWithCounts, isOnMoedatech } from "@/lib/contract/renter-suppliers";
@@ -254,7 +255,8 @@ export function ShareRequestPanel({
    * cached «not verified» would keep opening a compose window for a renter whose records went live
    * an hour ago.
    */
-  const [mailer, setMailer] = useState<ShareEmailResult | null>(null);
+  /** ⚠️ Never a preview: that has its own state, because it is a success and a different shape. */
+  const [mailer, setMailer] = useState<Exclude<ShareEmailResult, ShareEmailPreview> | null>(null);
   /**
    * The compose window's arguments, kept so the renter can open it again himself.
    *
@@ -280,6 +282,18 @@ export function ShareRequestPanel({
    * component that needs it.
    */
   const [myEmail, setMyEmail] = useState<string | null>(null);
+  /**
+   * The envelope the backend says it would send, waiting for him to confirm.
+   *
+   * 🔴 **The recipient list is DERIVED on the server**, including the fallback to a linked
+   * account's address when a supplier row carries no e-mail of its own. The panel cannot work out
+   * which suppliers actually get written to, nor which get dropped for having none — so a preview
+   * assembled here would not merely drift from the send, it could not be correct.
+   *
+   * ⚠️ Cleared whenever the selection or the wording changes, so he can never confirm an envelope
+   * that no longer matches the screen.
+   */
+  const [preview, setPreview] = useState<ShareEmailPreview | null>(null);
   /**
    * The addresses Outlook's compose window did not receive.
    *
@@ -471,6 +485,16 @@ export function ShareRequestPanel({
    */
 
   /** Which of the three he is editing and sending. Moedatech-only reads the e-mail wording. */
+  /**
+   * ⚠️ A confirmed envelope is only good for the picks and the wording it was drawn from. Any
+   * change and it goes, so the next press previews again rather than sending the old one.
+   */
+  const pickedKey = JSON.stringify([Object.keys(picked).filter((k) => picked[k]).sort(), templates, lang, channel, provider]);
+  const previewFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (previewFor.current !== null && previewFor.current !== pickedKey) setPreview(null);
+  }, [pickedKey]);
+
   const tplKey = channelKey(channel);
   const template = templates[tplKey];
 
@@ -478,6 +502,28 @@ export function ShareRequestPanel({
   const reachable = chosen.filter(canBeEmailed);
   const unreachable = chosen.filter((s) => !canBeEmailed(s));
   const firstWithPhone = chosen.find((s) => s.phone?.trim()) ?? null;
+
+  /**
+   * The suppliers the send will drop, named.
+   *
+   * ⚠️ The server answers with row IDS, and the names live here — it holds no opinion about what
+   * the renter calls his suppliers, and should not. Before a preview exists this falls back to the
+   * rows we can see have no address, which is the same set for the ordinary case.
+   */
+  /**
+   * ⚠️ Server first, ours second, and the SHAPE never changes between them. Before the first press
+   * this is what we know: him in To, the ticked rows in Bcc. After it, it is what the backend says
+   * it will actually send — a list only it can derive, because a row with no address of its own
+   * falls back to its linked account's. The panel must not rearrange itself under him when the real
+   * answer arrives.
+   */
+  const envelopeTo = preview?.to.length ? preview.to : myEmail ? [myEmail] : [];
+  const envelopeBcc = preview?.bcc.length ? preview.bcc : reachable.map((x) => x.email as string);
+
+  const skippedNames = preview
+    ? preview.skippedIds.map((id) => (rows ?? []).find((r) => r.id === id)?.name).filter((n): n is string => !!n)
+    : unreachable.map((x) => x.name);
+
   const noPhone = chosen.filter((s) => !s.phone?.trim());
 
   /** The same message in its halves, so the preview can show which of them he may edit. */
@@ -745,7 +791,7 @@ export function ShareRequestPanel({
       if (provider === "outlook" && connect?.configured && !connect.connected) await startConnect(consentWindow);
       else consentWindow?.close();
 
-      const outcome = await shareRequestEmail(id, reachable.map((x) => x.id), {
+      const body = {
         subject,
         html: card
           ? shareMessageHtml(card.model, url, card.imageUrl || `${window.location.origin}/bid/${id}/og?lang=${lang}`, {
@@ -755,25 +801,43 @@ export function ShareRequestPanel({
             })
           : message,
         text: message,
-      });
+      };
+
+      /**
+       * -- Preview, then confirm (2026-09-06) ---------------------------------------------------
+       *
+       * The first press ASKS what would be sent and sends nothing. The envelope it answers with is
+       * drawn into the card he is already reading, and the button becomes *Confirm and send*.
+       *
+       * 🔴 **This replaced opening a draft in his Outlook.** That needed `Mail.ReadWrite`, and real
+       * tenants refuse it: Moedatech's own granted `Mail.Send` with no administrator and refused the
+       * wider scope with "Need admin approval" two hours later. The requirement never moved — he
+       * still sees every recipient before anything leaves — only the place he sees it.
+       *
+       * ⚠️ Nothing is recorded on a preview, so an abandoned share leaves no trace.
+       */
+      const firstPress = !preview;
+      const outcome = await shareRequestEmail(id, reachable.map((x) => x.id), body, { dryRun: firstPress });
+
+      if (outcome.sent === false && outcome.reason === "PREVIEW") {
+        setPreview(outcome);
+        previewFor.current = pickedKey;
+        setMailer(null);
+        setBusy(false);
+        return;
+      }
+      setPreview(null);
+      previewFor.current = null;
       setMailer(outcome);
 
       if (outcome.sent) {
         reached += outcome.recipients;
-        /**
-         * 🔴 **A draft is the only way he ever SEES the Bcc** (owner, 2026-09-05: *"make sure he
-         * can see the bcc emails"*). The compose deeplink discards blind copies without a word, and
-         * a message the server sent on his behalf shows him nothing at all — he is told a number
-         * and asked to believe it.
+        /*
+         * — the draft tab opened here —
          *
-         * So when the backend drafts rather than sends, this opens the draft in his own Outlook:
-         * his recipients in the Bcc line where he can read them, the card in the body, and Send is
-         * his to press.
-         *
-         * ⚠️ Null on today's backend, which calls `POST /me/sendMail`. Until it drafts, the
-         * message has already gone and there is nothing to open.
+         * Gone with `Mail.ReadWrite`. He has already seen every recipient, in the confirm panel
+         * above, before this ran.
          */
-        if (outcome.draftUrl) window.open(outcome.draftUrl, "_blank", "noopener");
       } else {
         // No pick at all is a legitimate share (owner, 2026-09-02): the renter wants the message in
         // his own compose window to address himself. Nothing is recorded, because nobody was named.
@@ -1385,10 +1449,53 @@ export function ShareRequestPanel({
                   display={subject}
                   onChange={(v) => patchTemplate("title", v)}
                   label={c.tplTitle}
-                  className="text-meta font-extrabold text-navy"
+                  className="text-body font-extrabold text-navy"
                 />
-                <div className="mt-0.5 truncate text-label text-muted">
-                  {fmt(c.fromLine, { name: renterName || c.fromYou })}
+                {/* ── The envelope, drawn as a message header (owner, 2026-09-06) ─────────────
+                    *"since the user will not be able to check the outlook so the preview must be
+                    able to be very customizable and clear like a real outlook view."*
+
+                    🔴 **This is now the ONLY place he ever sees who the message goes to.** The
+                    draft in his own Outlook is gone — it needed `Mail.ReadWrite` and real tenants
+                    refuse it — so a grey line of comma-joined addresses is no longer good enough.
+                    It has to read the way a mail client reads: sender with a face, recipients as
+                    separate things he can count, and the ones being left out named. */}
+                <div className="mt-2 grid gap-2 border-t border-border pt-2">
+                  {/* The sender. Initials rather than a photo: we have no photo, and a grey circle
+                      with two letters is what every mail client falls back to anyway. */}
+                  <div className="flex items-center gap-2">
+                    <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-navy text-label font-extrabold text-surface">
+                      {initialsOf(preview?.from || renterName || myEmail)}
+                    </span>
+                    <span className="min-w-0">
+                      <b className="block truncate text-meta font-semibold text-navy">{renterName || c.fromYou}</b>
+                      <span className="block truncate text-label text-muted">
+                        {preview?.from || myEmail || ""}
+                      </span>
+                    </span>
+                  </div>
+
+                  <Recipients label={c.envTo} people={envelopeTo} empty={null} />
+                  {/* ⚠️ Each supplier is his OWN chip, not an item in a comma list. He is checking
+                      a list of people before it leaves; a run-on string is the shape you skim. */}
+                  <Recipients label={c.envBcc} people={envelopeBcc} empty={c.envNoRecipients} />
+
+                  {/* ⚠️ The ones being LEFT OUT, by name. A count he cannot act on is not a
+                      preview, and this is the line that stops him believing eight were written to
+                      when six were. */}
+                  {skippedNames.length > 0 && (
+                    <span className="flex items-start gap-1.5 text-label font-semibold text-warn-deep">
+                      <Icon name="error_outline" size={13} className="mt-px flex-none" />
+                      {fmt(c.envSkipped, { names: skippedNames.join(", ") })}
+                    </span>
+                  )}
+
+                  {preview?.via === "graph" && (
+                    <span className="flex items-center gap-1.5 text-label text-ok-deep">
+                      <Icon name="check_circle" size={13} className="flex-none" />
+                      {c.envSentCopy}
+                    </span>
+                  )}
                 </div>
               </div>
               {/* One scroll region for the whole message. It used to be three, nested — the body,
@@ -1603,7 +1710,11 @@ export function ShareRequestPanel({
             <Icon name="send" size={16} />
             {busy
               ? c.posting
-              : sent.length
+              : /* ⚠️ It says what THIS press does. A preview is on screen, so the next press is the
+                   one that sends, and the button must stop offering to preview again. */
+                preview
+                ? c.confirmSend
+                : sent.length
                 ? c.shareAgain
                 : moedatechOnly
                   ? mode === "post"
@@ -1956,6 +2067,51 @@ function Message({
       )}
     </div>
   );
+}
+
+/**
+ * One addressed line, with each person as their own chip.
+ *
+ * ⚠️ Chips rather than a comma-joined string, because he is CHECKING a list of people before it
+ * leaves and a run-on line is the shape an eye slides off. It is also the only way the count is
+ * readable at a glance, which is the question he is actually asking.
+ */
+function Recipients({ label, people, empty }: { label: string; people: string[]; empty: string | null }) {
+  if (!people.length && !empty) return null;
+  return (
+    <div className="flex items-start gap-2">
+      <span className="w-[68px] flex-none pt-0.5 text-label font-semibold text-muted">{label}</span>
+      <span className="flex min-w-0 flex-wrap gap-1">
+        {people.length === 0 ? (
+          <span className="pt-0.5 text-label text-muted-light">{empty}</span>
+        ) : (
+          people.map((who) => (
+            <span
+              key={who}
+              dir="ltr"
+              className="inline-flex h-[22px] max-w-full items-center truncate rounded-full border border-border bg-surface px-2 text-label text-navy"
+            >
+              {who}
+            </span>
+          ))
+        )}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Two letters for the sender's circle.
+ *
+ * ⚠️ From a NAME where we have one, an address where we do not, and never empty: a blank circle
+ * reads as a broken image rather than as an unknown sender.
+ */
+function initialsOf(who: string | null | undefined): string {
+  const v = (who ?? "").trim();
+  if (!v) return "?";
+  const words = v.split(/[\s@._-]+/).filter(Boolean);
+  const letters = words.slice(0, 2).map((w) => w[0]).join("");
+  return (letters || v[0]).toUpperCase();
 }
 
 /**

@@ -352,6 +352,14 @@ export const en = {
       copyMessage: "Copy message",
       copyMessageDone: "Copied",
       copyMessageHint: "Copies the whole message, card included, so you can paste it anywhere",
+      envFrom: "From",
+      envNoRecipients: "Nobody yet, tick a supplier",
+      envTo: "To",
+      envBcc: "Blind copy",
+      envSkipped: "{names} has no e-mail on file, so they are left out",
+      envSentCopy: "A copy will be saved to your Sent folder",
+      confirmSend: "Confirm and send",
+      previewChanged: "Your picks changed, so this is checked again before it goes",
       mailConnect: "Connect Outlook",
       mailReconnect: "Reconnect Outlook",
       mailConnectWhy:
@@ -2227,9 +2235,8 @@ export const en = {
       // will not send it to anyone, and he can still post and share the link himself. Say "we won't
       // send it", never "no supplier was found" — the request is never dispatched at all, and a
       // renter told "none matched" waits for bids that were never solicited.
-      notInCatalogueTitle: "This equipment type isn't available yet",
-      notInCatalogueBody:
-        "We won't send it to any supplier, but you can still complete your request and share its link with your own suppliers",
+      notInCatalogueNote:
+        "Not in our catalogue: no supplier is sent it, but you can post and share the link with your own",
       // The renter names the machine himself and the request goes out carrying his words. Prefilled
       // from what he wrote in the RFQ, so the ordinary case is a glance.
       customEquipment: "EQUIPMENT NAME",

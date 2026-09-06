@@ -162,6 +162,27 @@ describe("a location from the project arrives confirmed", () => {
     expect(next.project.location.source).toBe("project");
   });
 
+  it("does NOT confirm a project whose site is an address with no pin", () => {
+    /**
+     * Owner, 2026-09-06: *"Location confirmed is automatic only when location is selected from a
+     * project."* True — and with one condition inside it: the project must carry a POINT.
+     *
+     * Confirmation is a statement about a pin. A project typed as an address and never pinned fills
+     * the label and leaves `lat`/`lng` empty; claiming it confirmed put «Location confirmed» beside
+     * «drop a pin where the machine goes» and dead-ended the flow, because `gateWhere` refuses on
+     * `locationMissing` before it ever reads the flag. This is that case, kept honest.
+     */
+    const { draft, agentOrigin } = draftWith();
+    const { draft: next } = applyProjectDefaults(
+      draft,
+      QIDDIYA,
+      { ...SITE, label: "Second industrial city, Dammam", lat: null, lng: null },
+      agentOrigin,
+    );
+    expect(next.project.location.label).toBe("Second industrial city, Dammam");
+    expect(next.project.location.confirmed).toBe(false);
+  });
+
   it("still leaves a location the AGENT extracted alone, unconfirmed", () => {
     // The guard AC-16 was actually written for: text nobody has checked against a map.
     const { draft, agentOrigin } = draftWith();

@@ -316,6 +316,14 @@ export const ar: Dictionary = {
       copyMessage: "انسخ الرسالة",
       copyMessageDone: "نُسخت",
       copyMessageHint: "ينسخ الرسالة كاملة، بما فيها البطاقة، لتلصقها في أي مكان",
+      envFrom: "من",
+      envNoRecipients: "لا أحد بعد، اختر مورّدًا",
+      envTo: "إلى",
+      envBcc: "نسخة مخفية",
+      envSkipped: "{names} بلا بريد إلكتروني، لذلك استُبعدوا",
+      envSentCopy: "ستُحفظ نسخة في مجلد المُرسَل",
+      confirmSend: "أكّد وأرسل",
+      previewChanged: "تغيّرت اختياراتك، لذلك يُراجَع هذا مرة أخرى قبل الإرسال",
       mailConnect: "اربط أوتلوك",
       mailReconnect: "أعد ربط أوتلوك",
       mailConnectWhy:
@@ -1911,9 +1919,8 @@ export const ar: Dictionary = {
       notesPlaceholder: "أي شيء آخر ينبغي أن يعرفه المورّد…",
       unavailableTitle: "{equipment} غير متوفرة لدى المورّدين حالياً.",
       // خارج الكتالوج: ثلاث حقائق قبل الإرسال، ثم المستأجر يسمّي المعدة بنفسه.
-      notInCatalogueTitle: "هذا النوع من المعدات غير متوفر حالياً",
-      notInCatalogueBody:
-        "لن نرسله إلى أي مورّد، لكن يمكنك إكمال طلبك ومشاركة رابطه مع مورّديك",
+      notInCatalogueNote:
+        "غير موجودة في كتالوجنا: لن تُرسل إلى أي مورّد، لكن يمكنك نشر الطلب ومشاركة الرابط مع مورّديك",
       customEquipment: "اسم المعدة",
       customEquipmentPlaceholder: "اكتب اسم المعدة التي تحتاجها",
       customEquipmentHint: "هذا الاسم هو ما سيراه مورّدك في نموذج العرض",

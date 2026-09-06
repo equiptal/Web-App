@@ -2,6 +2,34 @@
 
 ## Change log
 
+- **2026-09-06 - The fast lane calls an unplaceable machine no-match, as the full path always did.**
+  Owner: *"with project settings it doesn't behave the same as if it's plain text"*. A project routes
+  a short line to Tier 0/1 (`decideTier`), and `quickItemsToDraft` built every item from
+  `newManualItem`, whose seeded verdict is `needs-validation`. So «jeep truck» with a project drew an
+  empty «Needs your OK» row demanding a subtype the catalogue does not have - no name box, no way
+  past the gate - while the same sentence WITHOUT a project took the full path, was called
+  `no-match` by `deriveVerdict`, and let the renter name the machine. The fast lane now derives the
+  same verdict: no subtype id ⇒ `no-match`.
+  Files: `src/lib/agent/quick-draft.ts`, `tests/unit/agent-tier.test.ts`.
+  Trap: the SUBTYPE is the test, not the whole ref. A resolved subtype with an open size is the
+  ordinary «pick a size» state and must keep `needs-validation` - reading the whole ref would have
+  turned every size question into an off-catalogue line.
+  ⚠️ Same shape as the 2026-08-31 cert bug on this file: *detected without a project, lost with one*.
+  When a report says «with a project it behaves differently», look at this lane first - it is the one
+  a project turns on, and it reconstructs the draft from a narrower payload than the full path.
+
+- **2026-09-06 - Back on the create flow walks the flow before it leaves it.**
+  On the review screen Back was `<PageBack fallback="/">`, so it left the page for wherever the
+  renter had been — usually the requests workspace, since that is where a request is started from.
+  The review is not a page he arrived at; it is the last step of the one he is standing on. Back now
+  walks the store's own three-stop chain: review → canvas → «Your request» → out (to the trail).
+  Files: `src/components/create/CreateBack.tsx` (new), `src/app/create/page.tsx`,
+  `tests/unit/create-back.test.tsx`.
+  ⚠️ **Register ONCE.** The first cut called `usePageBack(null)` and rendered `<PageBack>` beneath it
+  for the leave case; child effects run before the parent's, so `PageBack`'s spec landed first and the
+  parent's `null` overwrote it — the page drew no Back control at all, silently. Both cases go
+  through one hook now, and the value decides which.
+
 - **2026-09-06 - «Next equipment» now refuses on the site, the schedule and the charged days.**
   On a multi-item request the renter could walk from machine to machine without naming the site,
   the dates or acknowledging the billable days, and only met that bar at «Review & send». Those three

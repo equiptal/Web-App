@@ -143,14 +143,33 @@ export function quickItemsToDraft(
     // renter can fix than a silently wrong id.
     const byName = resolve(tree, subtype, capacity);
     const base = newManualItem(`i${i + 1}`);
+    const ref = {
+      categoryId: (r.category_id as string) ?? byName.categoryId,
+      subcategoryId: (r.subtype_id as string) ?? byName.subcategoryId,
+      measurementId: (r.capacity_id as string) ?? byName.measurementId,
+    };
+
+    /* ── A machine the catalogue cannot place is OFF-CATALOGUE here too ──────────────────────────
+     *
+     * `newManualItem` seeds `needs-validation`, which is right for a line whose SIZE is open and
+     * wrong for one whose machine does not exist: it drew an empty «Needs your OK» row demanding a
+     * subtype nothing in the list could satisfy, with no name box and no way past the gate. The full
+     * path calls that state `no-match` (`deriveVerdict`: no subtype id ⇒ no-match), and the renter
+     * then names the machine himself.
+     *
+     * So the fast lane says the same thing. Reported as *"with project settings it doesn't behave
+     * the same as plain text"* (owner, 2026-09-06) — a project is exactly what routes a short line
+     * to this lane, so the two paths disagreed about the same sentence.
+     *
+     * The SUBTYPE is the test, not the whole ref: a resolved subtype with an open size is the
+     * ordinary «pick a size» state and keeps its `needs-validation`.
+     */
+    const verdict: EquipmentItem["verdict"] = ref.subcategoryId ? base.verdict : "no-match";
 
     return {
       ...base,
-      ref: {
-        categoryId: (r.category_id as string) ?? byName.categoryId,
-        subcategoryId: (r.subtype_id as string) ?? byName.subcategoryId,
-        measurementId: (r.capacity_id as string) ?? byName.measurementId,
-      },
+      ref,
+      verdict,
       rawLabel: (r.input_equipment as string) ?? subtype ?? "",
       rawSize: capacity,
       quantity: typeof r.quantity === "number" && r.quantity > 0 ? r.quantity : 1,

@@ -49,14 +49,14 @@ describe("naming a machine the catalogue does not carry", () => {
     // ABOVE the note and the box, which is the order the row reads in (owner, 2026-09-06).
     expect(screen.getAllByText("TYPE").length).toBeGreaterThan(0);
     expect(screen.getAllByText("SIZE").length).toBeGreaterThan(0);
-    const order = ["TYPE", "isn't available yet", "Name the machine you need"].map((needle) =>
+    const order = ["TYPE", "Not in our catalogue", "Name the machine you need"].map((needle) =>
       document.body.innerHTML.indexOf(needle),
     );
     expect(order.every((i) => i >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
     // And the row says what will happen to it, including the one route to a supplier.
-    expect(screen.getByText(/isn't available yet/i)).toBeTruthy();
-    expect(screen.getByText(/share its link with your own suppliers/i)).toBeTruthy();
+    expect(screen.getByText(/Not in our catalogue/i)).toBeTruthy();
+    expect(screen.getByText(/share the link with your own/i)).toBeTruthy();
     // «Message us» sits on the note's own line, small and secondary — the route into the catalogue,
     // not a second decision stacked under the sentence.
     expect(screen.getByText(/^Message us$/)).toBeTruthy();

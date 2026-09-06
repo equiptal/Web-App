@@ -2,9 +2,10 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AppShell, PageBack } from "@/components/AppShell";
+import { AppShell } from "@/components/AppShell";
 import { RfqProvider, useRfq } from "@/lib/store/rfq-store";
 import { CreateSurface } from "@/components/CreateSurface";
+import { CreateBack } from "@/components/create/CreateBack";
 import { StartYourRequestModal, type StartRequestChoice } from "@/components/home/StartYourRequestModal";
 import { TRIAL_REQUESTS_ENABLED } from "@/lib/flags";
 import { useStartRequestGate } from "@/lib/access/start-request-gate";
@@ -28,7 +29,7 @@ export default function CreatePage() {
         <FirstRequestGate />
       </Suspense>
       <AppShell title={t.shell.request}>
-        <PageBack fallback="/" />
+        <CreateBack />
         <CreateSurface />
       </AppShell>
     </RfqProvider>

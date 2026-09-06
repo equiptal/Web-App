@@ -40,8 +40,6 @@ describe("shareRequestEmail", () => {
       recipients: 4,
       messageId: "0100-abc",
       inSentFolder: false,
-      // ⚠️ Null on the SES path: nothing was drafted, the message has already gone.
-      draftUrl: null,
       skipped: 0,
     });
     expect(calls[0].url).toBe("/api/requests/req-1/share-email");
@@ -81,7 +79,7 @@ describe("shareRequestEmail", () => {
     const out = await shareRequestEmail("req-1", ["a"], MSG);
 
     expect(out.sent).toBe(false);
-    if (out.sent) throw new Error("unreachable");
+    if (out.sent || out.reason === "PREVIEW") throw new Error("unreachable");
     expect(out.reason).toBe("DOMAIN_NOT_VERIFIED");
     expect(out.domain).toBe("shibhaljazira.com");
     expect(out.dns).toHaveLength(2);
@@ -97,7 +95,7 @@ describe("shareRequestEmail", () => {
 
     const out = await shareRequestEmail("req-1", ["a"], MSG);
     expect(out.sent).toBe(false);
-    if (out.sent) throw new Error("unreachable");
+    if (out.sent || out.reason === "PREVIEW") throw new Error("unreachable");
     expect(out.reason).toBe("PERSONAL_DOMAIN");
     expect(out.dns).toEqual([]);
   });
@@ -107,7 +105,7 @@ describe("shareRequestEmail", () => {
 
     const out = await shareRequestEmail("req-1", ["a"], MSG);
     expect(out.sent).toBe(false);
-    if (out.sent) throw new Error("unreachable");
+    if (out.sent || out.reason === "PREVIEW") throw new Error("unreachable");
     expect(out.reason).toBe("UNAVAILABLE");
   });
 
@@ -136,7 +134,7 @@ describe("shareRequestEmail", () => {
 
     const out = await shareRequestEmail("req-1", ["a"], MSG);
     expect(out.sent).toBe(false);
-    if (out.sent) throw new Error("unreachable");
+    if (out.sent || out.reason === "PREVIEW") throw new Error("unreachable");
     expect(out.reason).toBe("UNAVAILABLE");
   });
 
@@ -150,7 +148,7 @@ describe("shareRequestEmail", () => {
     });
 
     const out = await shareRequestEmail("req-1", ["a"], MSG);
-    if (out.sent) throw new Error("unreachable");
+    if (out.sent || out.reason === "PREVIEW") throw new Error("unreachable");
     expect(out.dns).toEqual([{ type: "CNAME", name: "a", value: "b" }]);
   });
 
@@ -188,7 +186,7 @@ describe("shareRequestEmail", () => {
     });
 
     const out = await shareRequestEmail("req-1", ["a"], MSG);
-    if (out.sent) throw new Error("unreachable");
+    if (out.sent || out.reason === "PREVIEW") throw new Error("unreachable");
     expect(out.reason).toBe("NOT_CONNECTED");
     expect(out.connectPath).toBe("/agents/mail-connect/authorize");
   });
@@ -201,7 +199,7 @@ describe("shareRequestEmail", () => {
     stub(200, { sent: false, reason: "NOT_CONFIGURED", connectPath: null, dns: [] });
 
     const out = await shareRequestEmail("req-1", ["a"], MSG);
-    if (out.sent) throw new Error("unreachable");
+    if (out.sent || out.reason === "PREVIEW") throw new Error("unreachable");
     expect(out.reason).toBe("NOT_CONFIGURED");
     expect(out.connectPath).toBeNull();
   });
@@ -211,38 +209,57 @@ describe("shareRequestEmail", () => {
     stub(200, { sent: false, reason: "SEND_REJECTED", connectPath: "/agents/mail-connect/authorize", dns: [] });
 
     const out = await shareRequestEmail("req-1", ["a"], MSG);
-    if (out.sent) throw new Error("unreachable");
+    if (out.sent || out.reason === "PREVIEW") throw new Error("unreachable");
     expect(out.reason).toBe("SEND_REJECTED");
     expect(out.connectPath).toBeTruthy();
   });
 
-  it("Given a DRAFT, Then its link comes back so the panel can open it", async () => {
+  
+
+  
+  it("Given a DRY RUN, Then the envelope comes back and NOTHING is sent", async () => {
     /**
-     * 🔴 A draft is the only way the renter ever SEES the Bcc (owner, 2026-09-05). The compose
-     * deeplink discards blind copies without a word, and a message the server sent on his behalf
-     * shows him nothing at all — he is handed a number and asked to believe it.
+     * 🔴 **`sent: false` with `reason: "PREVIEW"` is a SUCCESS, and it is the only one.** Every
+     * other `sent: false` means "we could not send, open the compose window". Branching on `sent`
+     * alone would treat a working preview as a failure and open a window behind it.
      */
     stub(200, {
-      sent: true,
+      sent: false,
+      reason: "PREVIEW",
       from: "bandar@zahid.sa",
       via: "graph",
-      messageId: null,
-      inSentFolder: false,
-      recipients: 3,
-      draftUrl: "https://outlook.office.com/mail/deeplink/read/AAMk123",
+      to: ["bandar@zahid.sa"],
+      bcc: ["ops@alfaisal.sa", "rfq@najd.sa"],
+      subject: "RFQ for Crawler Excavator 20 ton",
+      recipients: 2,
+      skippedIds: ["4e7d556a"],
     });
 
-    const out = await shareRequestEmail("req-1", ["a", "b", "c"], MSG);
-    if (!out.sent) throw new Error("unreachable");
-    expect(out.draftUrl).toBe("https://outlook.office.com/mail/deeplink/read/AAMk123");
+    const out = await shareRequestEmail("req-1", ["a", "b", "c"], MSG, { dryRun: true });
+
+    expect((calls[0].body as Record<string, unknown>).dryRun).toBe(true);
+    if (out.sent || out.reason !== "PREVIEW") throw new Error("unreachable");
+    expect(out.to).toEqual(["bandar@zahid.sa"]);
+    expect(out.bcc).toEqual(["ops@alfaisal.sa", "rfq@najd.sa"]);
+    expect(out.via).toBe("graph");
+    // ⚠️ Row IDS, not a count: a number he cannot act on is not a preview.
+    expect(out.skippedIds).toEqual(["4e7d556a"]);
   });
 
-  it("Given no draft link, Then it is null rather than an empty string", async () => {
-    // An empty string would read as "we have a link and it is blank" to anything checking for one.
-    stub(200, { sent: true, from: "b@x.sa", via: "graph", messageId: null, inSentFolder: true, recipients: 1, draftUrl: "" });
+  it("Given no dryRun, Then the flag is absent rather than false", async () => {
+    // A backend reading it as present-and-false would preview when it was asked to send.
+    stub(200, { sent: true, from: "b@x.sa", via: "ses", messageId: "m", inSentFolder: false, recipients: 1 });
+    await shareRequestEmail("req-1", ["a"], MSG);
+    expect((calls[0].body as Record<string, unknown>).dryRun).toBeUndefined();
+  });
 
-    const out = await shareRequestEmail("req-1", ["a"], MSG);
-    if (!out.sent) throw new Error("unreachable");
-    expect(out.draftUrl).toBeNull();
+  it("Given a preview with junk in its lists, Then only strings survive", async () => {
+    stub(200, { sent: false, reason: "PREVIEW", from: "b@x.sa", to: ["a@b.c", 7, null], bcc: "nope", skippedIds: [1] });
+
+    const out = await shareRequestEmail("req-1", ["a"], MSG, { dryRun: true });
+    if (out.sent || out.reason !== "PREVIEW") throw new Error("unreachable");
+    expect(out.to).toEqual(["a@b.c"]);
+    expect(out.bcc).toEqual([]);
+    expect(out.skippedIds).toEqual([]);
   });
 });

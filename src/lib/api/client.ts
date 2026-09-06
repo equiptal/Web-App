@@ -1781,6 +1781,12 @@ export interface MailDnsRecord {
  * renter a list of records to forward would be sending him on an errand with no end.
  */
 export type ShareEmailReason =
+  /**
+   * 🔴 **The one `sent: false` that is a SUCCESS.** Every other value means "we could not send,
+   * open the compose window"; this one means "here is the envelope, draw it and ask him". Branching
+   * on `sent` alone would treat a working preview as a failure and open a window behind it.
+   */
+  | "PREVIEW"
   /** The renter has not connected Outlook. Offer the button. */
   | "NOT_CONNECTED"
   /** The stored token was rejected and dropped. Same button, worded as reconnect. */
@@ -1797,11 +1803,39 @@ export type ShareEmailReason =
   | "UNAVAILABLE";
 
 const SHARE_EMAIL_REASONS: ShareEmailReason[] = [
+  "PREVIEW",
   "NOT_CONNECTED", "RECONNECT_REQUIRED", "SEND_REJECTED", "NOT_CONFIGURED",
   "DOMAIN_NOT_VERIFIED", "PERSONAL_DOMAIN", "NO_SENDER_ADDRESS", "NO_RECIPIENTS",
 ];
 
+/**
+ * The envelope, before anything leaves.
+ *
+ * 🔴 **`bcc` and `skipped` MUST come from the server, and that is the whole reason the preview is
+ * a round trip.** The recipient list is derived on the backend from the renter's own supplier rows,
+ * including the fallback to a linked account's address when a row carries no e-mail of its own. The
+ * panel cannot work out which suppliers actually get written to, nor which get dropped for having
+ * none. A preview built from what the client happens to know would not merely drift from the send:
+ * it could not be correct in the first place.
+ *
+ * The same code path produces the preview and the send, so what he confirms is what goes out.
+ */
+export interface ShareEmailPreview {
+  sent: false;
+  reason: "PREVIEW";
+  from: string;
+  /** `graph` also means a copy lands in his Sent folder. */
+  via: "graph" | "ses" | null;
+  to: string[];
+  bcc: string[];
+  subject: string;
+  recipients: number;
+  /** ⚠️ Row IDS, not a count. A number he cannot act on is not a preview. */
+  skippedIds: string[];
+}
+
 export type ShareEmailResult =
+  | ShareEmailPreview
   | {
       sent: true;
       from: string;
@@ -1811,23 +1845,28 @@ export type ShareEmailResult =
       messageId: string | null;
       /** True only on the Graph path: the message is in the renter's own Sent folder. */
       inSentFolder: boolean;
-      /**
-       * A DRAFT waiting in his own Outlook, for him to read and send himself.
+      /*
+       * — `draftUrl` lived here —
        *
-       * ⚠️ **Present only when the backend drafted instead of sending**, which is the flow the
-       * owner asked for on 2026-09-05: *"open the outlook for him and see who is bcc then click
-       * send so he send it by him self."* A draft is the only way he ever sees the Bcc — the
-       * compose deeplink discards it, and a send he did not make shows him nothing at all.
+       * The Outlook path briefly created a DRAFT in the renter's mailbox and handed back a link to
+       * open. It needed `Mail.ReadWrite`, and real tenants refuse it: Moedatech's own granted
+       * `Mail.Send` at 20:31 on 2026-09-05 with no administrator, and refused the wider scope at
+       * 22:14 with "Need admin approval". An admin asked to approve *send mail as this user* often
+       * will; almost none will approve *read and write all their mail*.
        *
-       * Null on today's backend, which calls `POST /me/sendMail` and sends outright.
+       * The requirement did not move, the mechanism did: he still sees every recipient and confirms
+       * before anything leaves, in OUR panel rather than in Outlook's composer.
        */
-      draftUrl: string | null;
       recipients: number;
       skipped: number;
     }
   | {
       sent: false;
-      reason: ShareEmailReason;
+      /**
+       * ⚠️ **Never `PREVIEW`.** That variant is a success and carries a different shape entirely,
+       * so excluding it here is what lets a reader narrow on the reason and reach the envelope.
+       */
+      reason: Exclude<ShareEmailReason, "PREVIEW">;
       from: string | null;
       domain: string | null;
       dns: MailDnsRecord[];
@@ -1873,15 +1912,21 @@ export async function shareRequestEmail(
   requestId: string,
   renterSupplierIds: string[],
   message: { subject: string; html: string; text: string },
+  /**
+   * Ask what WOULD be sent, and send nothing.
+   *
+   * ⚠️ Nothing is recorded on a preview, so it can be called as often as the selection changes.
+   */
+  opts: { dryRun?: boolean } = {},
 ): Promise<ShareEmailResult> {
-  const nope = (reason: ShareEmailReason): ShareEmailResult =>
+  const nope = (reason: Exclude<ShareEmailReason, "PREVIEW">): ShareEmailResult =>
     ({ sent: false, reason, from: null, domain: null, dns: [], connectPath: null });
   if (!renterSupplierIds.length) return nope("NO_RECIPIENTS");
 
   try {
     const raw = await projectFetch<Record<string, unknown>>(
       `/api/requests/${encodeURIComponent(requestId)}/share-email`,
-      { method: "POST", body: { renterSupplierIds, ...message } },
+      { method: "POST", body: { renterSupplierIds, ...message, ...(opts.dryRun ? { dryRun: true } : {}) } },
     );
     if (raw?.sent === true) {
       return {
@@ -1891,16 +1936,34 @@ export async function shareRequestEmail(
         // Null on the Graph path by design, so it stays nullable rather than being coerced to "".
         messageId: typeof raw.messageId === "string" ? raw.messageId : null,
         inSentFolder: raw.inSentFolder === true,
-        draftUrl: typeof raw.draftUrl === "string" && raw.draftUrl ? raw.draftUrl : null,
         recipients: typeof raw.recipients === "number" ? raw.recipients : renterSupplierIds.length,
         skipped: typeof raw.skipped === "number" ? raw.skipped : 0,
       };
     }
+    const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+
+    if (raw?.reason === "PREVIEW") {
+      return {
+        sent: false,
+        reason: "PREVIEW",
+        from: typeof raw.from === "string" ? raw.from : "",
+        via: raw.via === "graph" || raw.via === "ses" ? raw.via : null,
+        to: strings(raw.to),
+        bcc: strings(raw.bcc),
+        subject: typeof raw.subject === "string" ? raw.subject : message.subject,
+        recipients: typeof raw.recipients === "number" ? raw.recipients : strings(raw.bcc).length,
+        skippedIds: strings(raw.skippedIds),
+      };
+    }
+
     const reason = raw?.reason;
     return {
       sent: false,
       // An unknown reason degrades to UNAVAILABLE, which the panel treats as "open the window".
-      reason: SHARE_EMAIL_REASONS.includes(reason as ShareEmailReason) ? (reason as ShareEmailReason) : "UNAVAILABLE",
+      reason:
+        SHARE_EMAIL_REASONS.includes(reason as ShareEmailReason) && reason !== "PREVIEW"
+          ? (reason as Exclude<ShareEmailReason, "PREVIEW">)
+          : "UNAVAILABLE",
       from: typeof raw?.from === "string" ? raw.from : null,
       domain: typeof raw?.domain === "string" ? raw.domain : null,
       dns: dnsRecords(raw?.dns),

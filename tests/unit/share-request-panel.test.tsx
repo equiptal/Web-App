@@ -1648,22 +1648,27 @@ describe("Send opens the connector itself", () => {
     await waitFor(() => expect(win.location.href).toContain("login.microsoftonline.com"));
   });
 
-  it("Given a DRAFT came back, Then it opens so he can read the Bcc and press Send himself", async () => {
+  it("Given the FIRST press, Then it previews and sends nothing", async () => {
     /**
-     * 🔴 **This is the only point in the whole feature where he SEES the recipients.** Outlook's
-     * compose deeplink discards blind copies without a word, and a send the server made on his
-     * behalf shows him nothing at all.
+     * 🔴 **`sent: false` with `reason: "PREVIEW"` is a success.** Every other `sent: false` means
+     * "open the compose window"; this one means "draw the envelope and ask him". A reader branching
+     * on `sent` alone would open a window behind a working preview.
+     *
+     * ⚠️ This replaced opening a draft in his Outlook. That needed `Mail.ReadWrite`, and real
+     * tenants refuse it: Moedatech's own granted `Mail.Send` with no administrator and answered
+     * "Need admin approval" to the wider scope two hours later.
      */
     api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
     api.mail = {
-      sent: true,
-      from: "b@x.sa",
+      sent: false,
+      reason: "PREVIEW",
+      from: "bandar@zahid.sa",
       via: "graph",
-      recipients: 3,
-      messageId: null,
-      inSentFolder: false,
-      skipped: 0,
-      draftUrl: "https://outlook.office.com/mail/deeplink/read/AAMk123",
+      to: ["bandar@zahid.sa"],
+      bcc: ["ops@alfaisal.sa"],
+      subject: "RFQ",
+      recipients: 1,
+      skippedIds: [],
     };
 
     draw({ draftForm: DRAFT });
@@ -1671,10 +1676,65 @@ describe("Send opens the connector itself", () => {
     fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
 
-    await waitFor(() =>
-      expect(opened.mock.calls.some((call) => String(call[0]).includes("deeplink/read/AAMk123"))).toBe(true),
-    );
+    // The envelope is drawn IN THE CARD he is already reading, and the button now says so.
+    await waitFor(() => expect(screen.getByText(c.confirmSend)).toBeTruthy());
+    // It appears twice: once on the From line, once in To. Both are correct and both are his.
+    expect(screen.getAllByText(/bandar@zahid\.sa/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/ops@alfaisal\.sa/).length).toBeGreaterThan(0);
+    // Nothing left, and nothing was opened.
+    expect(opened).not.toHaveBeenCalled();
   });
+
+  it("Given the CONFIRM press, Then it sends for real", async () => {
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
+    api.mail = { sent: false, reason: "PREVIEW", from: "b@x.sa", via: "graph", to: ["b@x.sa"], bcc: ["ops@alfaisal.sa"], subject: "RFQ", recipients: 1, skippedIds: [] };
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    await waitFor(() => expect(screen.getByText(c.confirmSend)).toBeTruthy());
+
+    // The second press is the send, and it must NOT ask for a dry run again.
+    api.mail = { sent: true, from: "b@x.sa", via: "graph", recipients: 1, messageId: null, inSentFolder: true, skipped: 0 };
+    fireEvent.click(screen.getByText(c.confirmSend).closest("button")!);
+
+    await waitFor(() => expect(api.mailCalls).toHaveLength(2));
+    expect((api.mailCalls[0][3] as { dryRun?: boolean } | undefined)?.dryRun).toBe(true);
+    expect((api.mailCalls[1][3] as { dryRun?: boolean } | undefined)?.dryRun).toBeFalsy();
+  });
+
+  it("Given a supplier with no address, Then he is NAMED as left out", async () => {
+    /**
+     * ⚠️ The server answers with row IDS; the names live in the panel. A count he cannot act on is
+     * not a preview, and this is the line that stops him believing three people were written to when
+     * two were.
+     */
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
+    api.mail = { sent: false, reason: "PREVIEW", from: "b@x.sa", via: "ses", to: ["b@x.sa"], bcc: ["ops@alfaisal.sa"], subject: "RFQ", recipients: 1, skippedIds: ["2"] };
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(screen.getByText(/Najd Equipment Est\./)).toBeTruthy());
+  });
+
+  it("Given SES, Then no Sent-folder promise is made", async () => {
+    // ⚠️ Only Graph puts a copy in his mailbox. SES sends AS him without touching it.
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
+    api.mail = { sent: false, reason: "PREVIEW", from: "b@x.sa", via: "ses", to: ["b@x.sa"], bcc: ["ops@alfaisal.sa"], subject: "RFQ", recipients: 1, skippedIds: [] };
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(screen.getByText(c.confirmSend)).toBeTruthy());
+    expect(screen.queryByText(c.envSentCopy)).toBeNull();
+  });
+
 
   it("Given no draft link, Then nothing is opened — the message has already gone", async () => {
     // ⚠️ Today's backend calls `POST /me/sendMail`. There is no draft to show, so opening
@@ -1862,5 +1922,90 @@ describe("the To line", () => {
     expect(url.searchParams.get("to")).toBeNull();
     // And the share still goes out.
     expect(url.searchParams.get("bcc")).toContain("ops@alfaisal.sa");
+  });
+});
+
+
+/**
+ * -- The preview IS the Outlook view now (owner, 2026-09-06) -------------------------------------
+ *
+ * *"since the user will not be able to check the outlook so the preview must be very customizable
+ * and clear like a real outlook view."*
+ *
+ * 🔴 The draft in his own mailbox is gone: it needed `Mail.ReadWrite` and real tenants refuse it.
+ * So this card is the ONLY place he ever sees who the message goes to, and it has to read like a
+ * mail client rather than like a grey line of comma-joined addresses.
+ */
+describe("the envelope reads like a message header", () => {
+  const preview = async () => {
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
+    api.mail = {
+      sent: false, reason: "PREVIEW", from: "bandar@zahid.sa", via: "graph",
+      to: ["bandar@zahid.sa"], bcc: ["ops@alfaisal.sa", "bids@zahid.sa"],
+      subject: "RFQ", recipients: 2, skippedIds: ["2"],
+    };
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    await waitFor(() => expect(screen.getByText(c.confirmSend)).toBeTruthy());
+  };
+
+  it("Given the preview, Then each recipient is its OWN chip, not one comma list", async () => {
+    /**
+     * ⚠️ He is CHECKING a list of people before it leaves. A run-on string is the shape an eye
+     * slides off, and it is the only way the count stops being readable at a glance — which is the
+     * question he is actually asking.
+     */
+    await preview();
+
+    // Two separate elements, not one containing both. (The address also appears on the supplier
+    // row on the left, which is why these are getAll.)
+    expect(screen.getAllByText("ops@alfaisal.sa").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("bids@zahid.sa").length).toBeGreaterThan(0);
+    expect(screen.queryByText("ops@alfaisal.sa, bids@zahid.sa")).toBeNull();
+  });
+
+  it("Given the preview, Then To and Bcc are labelled apart", async () => {
+    await preview();
+    expect(screen.getByText(c.envTo)).toBeTruthy();
+    expect(screen.getByText(c.envBcc)).toBeTruthy();
+  });
+
+  it("Given a supplier with no address, Then he is NAMED, not counted", async () => {
+    // 🔴 The line that stops him believing three people were written to when two were.
+    await preview();
+    expect(screen.getAllByText(/Najd Equipment Est\./).length).toBeGreaterThan(1);
+  });
+
+  it("Given no supplier ticked, Then Bcc says so rather than sitting empty", async () => {
+    // An empty row reads as broken. It should say what is missing.
+    draw({ draftForm: DRAFT });
+    await screen.findByText("Al Faisal Rentals");
+    fireEvent.click(screen.getByText(c.outlook));
+
+    expect(screen.getByText(c.envNoRecipients)).toBeTruthy();
+  });
+
+  it("Given no preview yet, Then the SHAPE is already there, filled from what we know", async () => {
+    /**
+     * ⚠️ The panel must not rearrange itself under him when the real answer arrives. Before the
+     * first press this shows him in To and the ticked rows in Bcc; after it, the server's own list,
+     * which is the only correct one because a row with no address falls back to its linked
+     * account's.
+     */
+    // A signed-in renter has an address; that is what fills To before any preview exists.
+    vi.stubGlobal("fetch", async (u: string) =>
+      String(u).includes("/api/me")
+        ? { ok: true, status: 200, json: async () => ({ email: "bandar@zahid.sa" }) }
+        : { ok: false, status: 404, json: async () => ({}) },
+    );
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+
+    await waitFor(() => expect(screen.getAllByText("ops@alfaisal.sa").length).toBeGreaterThan(1));
+    await waitFor(() => expect(screen.getByText(c.envTo)).toBeTruthy());
   });
 });

@@ -22,7 +22,7 @@ import { useState } from "react";
 import { fmt, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
-import { Button, Icon, TextArea, TextInput } from "@/components/ui";
+import { Button, Icon, Notice, TextArea, TextInput } from "@/components/ui";
 import { equipmentIcon } from "@/components/requests/EquipImg";
 import { CanvasField, ChoiceChips, ChoiceRow, PanelDot } from "@/components/create/Provenance";
 import { CertSelect } from "@/components/create/CertSelect";
@@ -321,7 +321,13 @@ export function MachineCard({
                machine below it, but a renter who CAN find it in the list must not have the list taken
                away from him. Marked red there and never starred: red says the catalogue has nothing
                for this, the star would say the renter owes an answer he cannot give. */
-            <div className="grid gap-2.5 rounded-sm bg-surface2 p-3.5 sm:grid-cols-[minmax(132px,1fr)_minmax(150px,1.5fr)_minmax(104px,0.9fr)]">
+            <div
+              className={`grid gap-2.5 rounded-sm p-3.5 sm:grid-cols-[minmax(132px,1fr)_minmax(150px,1.5fr)_minmax(104px,0.9fr)] ${
+                // Red, and the whole box (owner, 2026-09-06): the three controls are the thing that
+                // could not be answered, and a dot beside each label was too quiet to say it.
+                custom ? "border border-danger/40 bg-danger-soft" : "bg-surface2"
+              }`}
+            >
               {/* Derived, never picked. The renter chooses a TYPE and the category follows from it —
                   so this shows the taxonomy's `tag` (its canonical grouping, e.g. "Earthmoving") as a
                   read-only box, exactly as the prototype does. No chevron, because there is nothing
@@ -538,46 +544,48 @@ function UnavailableCard({ item, label }: { item: EquipmentItem; label: string }
   // than a refusal — the machine still goes out, and the copy under it says how.
   const custom = isCustomLine(item);
 
+  const askUs = () => {
+    const msg = fmt(t.step2.noMatch.whatsappMessage, { item: item.rawLabel ?? label });
+    window.open(`https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
+    actions.requestSourcing(item.id);
+  };
+
+  const askUsControl = item.sourcingRequested ? (
+    <span className="flex flex-none items-center gap-1.5 text-meta font-semibold text-ok">
+      <Icon name="check_circle" size={15} /> {t.create.machineCard.sourcingRequested}
+    </span>
+  ) : (
+    <Button variant="secondary" size="sm" onClick={askUs}>
+      <Icon name="chat" size={15} /> {t.create.machineCard.unavailableWhatsapp}
+    </Button>
+  );
+
+  /* ── Off-catalogue: ONE line, in the house warning tone (owner, 2026-09-06) ─────────────────────
+     `Notice` carries `NOTICE_TONE.warn`, the same token every other warning in the app wears, so
+     this box cannot drift a shade away from them — it was hand-rolled amber before. A warning and
+     not an error: nothing has gone wrong, the machine is simply not in the list yet, and the request
+     still goes out. «Message us» rides on the same line as a footnote to the sentence. */
+  if (custom) {
+    return (
+      <Notice tone="warn" icon="warning">
+        <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <span className="min-w-[12rem] flex-1 leading-snug">{t.create.machineCard.notInCatalogueNote}</span>
+          {askUsControl}
+        </span>
+      </Notice>
+    );
+  }
+
+  /* The kill-switch row (`NEXT_PUBLIC_CUSTOM_EQUIPMENT=0`): this machine really is dropped from the
+     request, so it stays an error, and it keeps the fuller wording that says so. */
   return (
-    <div
-      className={
-        custom
-          ? "flex flex-col gap-2.5 rounded-sm border border-warn/30 bg-warn-soft p-3.5"
-          : "flex flex-col gap-2.5 rounded-sm border border-danger/40 bg-danger/[0.06] p-3.5"
-      }
-    >
-      {/* Orange, and a WARNING rather than an error, when the row is nameable (owner, 2026-09-06):
-          nothing has gone wrong, the machine simply is not in the list yet and the request can still
-          be completed. The red error mark stays for the flag-off row, which really is dropped. */}
-      <p className={`flex items-start gap-2 text-body font-semibold leading-snug ${custom ? "text-warn" : "text-danger"}`}>
-        <Icon name={custom ? "warning" : "error_outline"} size={16} className="mt-px flex-none" />
-        {custom ? t.create.machineCard.notInCatalogueTitle : fmt(t.create.machineCard.unavailableTitle, { equipment: label })}
+    <div className="flex flex-col gap-2.5 rounded-sm border border-danger/40 bg-danger/[0.06] p-3.5">
+      <p className="flex items-start gap-2 text-body font-semibold leading-snug text-danger">
+        <Icon name="error_outline" size={16} className="mt-px flex-none" />
+        {fmt(t.create.machineCard.unavailableTitle, { equipment: label })}
       </p>
-      {/* The note and «Message us» share one line (owner, 2026-09-06): asking us to add the machine
-          is a footnote to the sentence, not a second decision stacked under it. It wraps on a narrow
-          card rather than squeezing the sentence. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <p className="min-w-[12rem] flex-1 text-meta leading-snug text-muted">
-          {custom ? t.create.machineCard.notInCatalogueBody : t.step2.noMatch.explainer}
-        </p>
-        {item.sourcingRequested ? (
-          <p className="flex flex-none items-center gap-1.5 text-meta font-semibold text-ok">
-            <Icon name="check_circle" size={15} /> {t.create.machineCard.sourcingRequested}
-          </p>
-        ) : (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              const msg = fmt(t.step2.noMatch.whatsappMessage, { item: item.rawLabel ?? label });
-              window.open(`https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
-              actions.requestSourcing(item.id);
-            }}
-          >
-            <Icon name="chat" size={15} /> {t.create.machineCard.unavailableWhatsapp}
-          </Button>
-        )}
-      </div>
+      <p className="text-meta leading-snug text-muted">{t.step2.noMatch.explainer}</p>
+      <div className="flex flex-wrap gap-2">{askUsControl}</div>
     </div>
   );
 }
