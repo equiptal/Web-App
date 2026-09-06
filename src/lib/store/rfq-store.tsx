@@ -761,9 +761,21 @@ export function reducer(state: RfqState, a: Action): RfqState {
             ref: { ...i.ref, subcategoryId: a.subcategoryId, measurementId: null },
             operatorNeeded,
             resolved: false,
-            // Off-catalogue no longer: the renter found his machine in the list, so the name he typed
-            // for it goes with the state it belonged to. Leaving it would post a line carrying both a
-            // subtype and a free-text name, and the ids win — the text would ride along unread.
+            /* ── A picked subtype ENDS the off-catalogue state, verdict and all ──────────────────
+             *
+             * The renter found his machine in the list, so the name he typed for it goes with the
+             * state it belonged to: leaving it would post a line carrying both a subtype and free
+             * text, and the ids win, so the text would ride along unread.
+             *
+             * ⚠️ And the VERDICT has to move with it. It did not, and the row vanished under the
+             * renter's own hand (owner, 2026-09-06: *"when i try to click a subtype from existing
+             * taxonomy it is vanished"*): the pick cleared `isCustomLine` (which reads the subtype)
+             * while `verdict` stayed `no-match`, so the card swapped the taxonomy trio back for the
+             * red «not available» panel — hiding the very control he had just used — and
+             * `postableItems` still dropped the line. `needs-validation` is what the app calls a
+             * line whose machine is known and whose size is not, which is exactly what he now has.
+             */
+            verdict: i.verdict === "no-match" ? ("needs-validation" as const) : i.verdict,
             customEquipment: null,
           };
           // No cert seeding here either. This used to "rescue" an uncertified line by stamping the

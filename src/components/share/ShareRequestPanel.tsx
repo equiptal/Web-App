@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Icon } from "@/components/ui";
+import { Dialog } from "@/components/Dialog";
 import { VendorMark } from "@/components/VendorMark";
 import { MoedatechBadge } from "@/components/MoedatechBadge";
 import { btn, cx } from "@/lib/ds";
@@ -295,6 +296,15 @@ export function ShareRequestPanel({
    * that no longer matches the screen.
    */
   const [preview, setPreview] = useState<ShareEmailPreview | null>(null);
+  /** The last step, and the only one with a way out. */
+  const [confirming, setConfirming] = useState(false);
+  /**
+   * Whether THIS press is the one that minted the request.
+   *
+   * ⚠️ Only true in `post` mode, and only until it is announced. In `share` mode the request
+   * already existed, so there is nothing to tell him about.
+   */
+  const postedHere = useRef(false);
   /**
    * The addresses Outlook's compose window did not receive.
    *
@@ -339,7 +349,13 @@ export function ShareRequestPanel({
     try {
       void fetch("/api/me", { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : null))
-        .then((me: { email?: string | null } | null) => setMyEmail(me?.email?.trim() || null))
+        /**
+         * 🔴 **The body is `{ user, verification }`, not the user.** Reading `email` off the
+         * envelope gave `undefined` every time, so `To` rendered as a label with nothing after it
+         * (owner, 2026-09-06: *"why to doesnt show anything"*). `ShareOnPost` has the same bug for
+         * `companyName`, which is why the From line has been falling back to "you".
+         */
+        .then((body: { user?: { email?: string | null } } | null) => setMyEmail(body?.user?.email?.trim() || null))
         .catch(() => setMyEmail(null));
     } catch {
       setMyEmail(null);
@@ -406,7 +422,18 @@ export function ShareRequestPanel({
     if (connecting) return false;
     setConnecting(true);
     setConnectNote(null);
-    const url = await mailConnectUrl(window.location.href);
+    /**
+     * 🔴 **A tiny page of ours, not the panel's own URL.**
+     *
+     * ~~`window.location.href`.~~ After consent the 520×700 pop-up loaded the WHOLE application —
+     * nav, sidebar, review screen — squeezed into it (owner, 2026-09-06). It worked, in that the
+     * panel noticed the window close, and it showed the renter a second broken copy of the product
+     * and left him to work out he should shut it.
+     *
+     * ⚠️ Same origin, deliberately: the backend checks `returnTo` against a host allow-list, and
+     * the page closes itself by script, which a cross-origin document cannot be trusted to do.
+     */
+    const url = await mailConnectUrl(`${window.location.origin}/mail-connected`);
     if (!url) {
       pre?.close();
       setConnecting(false);
@@ -493,7 +520,10 @@ export function ShareRequestPanel({
   const pickedKey = JSON.stringify([Object.keys(picked).filter((k) => picked[k]).sort(), templates, lang, channel, provider]);
   const previewFor = useRef<string | null>(null);
   useEffect(() => {
-    if (previewFor.current !== null && previewFor.current !== pickedKey) setPreview(null);
+    if (previewFor.current !== null && previewFor.current !== pickedKey) {
+      setPreview(null);
+      setConfirming(false);
+    }
   }, [pickedKey]);
 
   const tplKey = channelKey(channel);
@@ -726,7 +756,10 @@ export function ShareRequestPanel({
     // that is deliberate — the post is what the renter came here for, and rolling it back to tidy up
     // a failed mail window would throw away the thing that succeeded.
     let id = uuid;
-    if (!id && mode === "post" && onPost) id = await onPost();
+    if (!id && mode === "post" && onPost) {
+      id = await onPost();
+      if (id) postedHere.current = true;
+    }
     if (!id) {
       // Nothing was posted, so there is nothing to consent for. Do not leave a blank window open.
       consentWindow?.close();
@@ -834,14 +867,29 @@ export function ShareRequestPanel({
       const outcome = await shareRequestEmail(id, reachable.map((x) => x.id), body, { dryRun: firstPress });
 
       if (outcome.sent === false && outcome.reason === "PREVIEW") {
+        /**
+         * ⚠️ **A modal, not a changed button** (owner, 2026-09-06: *"it will show one line
+         * confirmation popup, confirm or cancel, that's it — so it is a modal after click send to
+         * suppliers, not on the review screen"*).
+         *
+         * ~~The button relabelled itself to «Confirm and send» and the envelope filled in behind
+         * it.~~ A renter who pressed Send and watched the same button change its own wording has no
+         * reason to believe anything happened, and nothing stopped him pressing it twice. A dialog
+         * is the one shape that says *this is the last step* and offers a way out.
+         *
+         * The envelope still fills the card underneath, because that is where he CHECKS it. This
+         * asks one question about it.
+         */
         setPreview(outcome);
         previewFor.current = pickedKey;
         setMailer(null);
+        setConfirming(true);
         setBusy(false);
         return;
       }
       setPreview(null);
       previewFor.current = null;
+      setConfirming(false);
       setMailer(outcome);
 
       if (outcome.sent) {
@@ -946,8 +994,29 @@ export function ShareRequestPanel({
     // Cumulative, because a second press is a second channel, not a correction of the first.
     setHandedOff({ channel: ch, n: reached });
     if (ch !== "none") setSent((prev) => (prev.includes(ch) ? prev : [...prev, ch]));
+    postedHere.current = false;
     onShared?.(reached, ch);
     setBusy(false);
+  };
+
+  /**
+   * He backed out of the e-mail.
+   *
+   * 🔴 **The request is already POSTED by this point, and saying nothing made Cancel a lie.** The
+   * post happens before the preview, deliberately — the recipient list is derived from a request
+   * that has to exist — so pressing Cancel left a live request on Moedatech and a renter who
+   * believed he had called the whole thing off. The green "your request is posted" pop-up only ever
+   * fired through `onShared`, and the preview branch returns before it.
+   *
+   * ⚠️ Announced as the MOEDATECH-ONLY case, because that is exactly what happened: it is live,
+   * nothing was e-mailed. `ShareOnPost` already draws the right dialog for that, and its own
+   * `announced` guard stops a second press repeating it.
+   */
+  const cancelSend = () => {
+    setConfirming(false);
+    if (!postedHere.current) return;
+    postedHere.current = false;
+    onShared?.(0, "none");
   };
 
   /**
@@ -1504,7 +1573,10 @@ export function ShareRequestPanel({
                 </MailField>
 
                 <MailField label={c.envTo} skin={skin}>
-                  <MailChips people={envelopeTo} empty={null} skin={skin} />
+                  {/* ⚠️ **Never blank.** Until we know his address there is still something true
+                      to say — it goes to him — and a labelled row with nothing after it reads as
+                      broken rather than as pending. */}
+                  <MailChips people={envelopeTo} empty={c.fromYou} skin={skin} />
                 </MailField>
                 <MailField label={c.envBcc} skin={skin}>
                   <MailChips people={envelopeBcc} empty={c.envNoRecipients} skin={skin} />
@@ -1760,11 +1832,7 @@ export function ShareRequestPanel({
             <Icon name="send" size={16} />
             {busy
               ? c.posting
-              : /* ⚠️ It says what THIS press does. A preview is on screen, so the next press is the
-                   one that sends, and the button must stop offering to preview again. */
-                preview
-                ? c.confirmSend
-                : sent.length
+              : sent.length
                 ? c.shareAgain
                 : moedatechOnly
                   ? mode === "post"
@@ -1993,6 +2061,55 @@ export function ShareRequestPanel({
 
           Stacked over this panel rather than replacing it, and the list reloads on success, so the
           firm he has just typed in is in the list with the picks he had already made still ticked. */}
+      {/* ── The last step ────────────────────────────────────────────────────────────────────
+          One line and two buttons. Everything it summarises is already on the card behind it; this
+          exists so that pressing Send is a decision rather than a reflex, and so there is a way out
+          of it. */}
+      <Dialog
+        open={confirming && !!preview}
+        onClose={() => setConfirming(false)}
+        size="sm"
+        icon={<Icon name="outgoing_mail" size={18} />}
+        title={c.confirmTitle}
+        footer={
+          <div className="flex w-full items-center justify-end gap-2">
+            <button type="button" onClick={cancelSend} className={btn("secondary", "md")}>
+              {c.confirmNo}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirming(false);
+                void send();
+              }}
+              className={btn("primary", "md")}
+            >
+              <Icon name="send" size={15} />
+              {c.confirmYes}
+            </button>
+          </div>
+        }
+      >
+        <p className="text-body text-navy">
+          {preview &&
+            fmt(
+              preview.recipients === 1
+                ? c.confirmBodyOne
+                : provider === "gmail"
+                  ? c.confirmBodyGmail
+                  : c.confirmBodyOutlook,
+              { from: preview.from, n: preview.recipients },
+            )}
+        </p>
+        {/* ⚠️ The one thing the sentence above cannot carry: who is being LEFT OUT. */}
+        {skippedNames.length > 0 && (
+          <p className="mt-2 flex items-start gap-1.5 text-meta font-semibold text-warn-deep">
+            <Icon name="error_outline" size={14} className="mt-px flex-none" />
+            {fmt(c.envSkipped, { names: skippedNames.join(", ") })}
+          </p>
+        )}
+      </Dialog>
+
       <AddSuppliersDialog
         open={addingSupplier}
         onClose={() => setAddingSupplier(false)}

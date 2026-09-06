@@ -1677,7 +1677,7 @@ describe("Send opens the connector itself", () => {
     fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
 
     // The envelope is drawn IN THE CARD he is already reading, and the button now says so.
-    await waitFor(() => expect(screen.getByText(c.confirmSend)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(c.confirmTitle)).toBeTruthy());
     // It appears twice: once on the From line, once in To. Both are correct and both are his.
     expect(screen.getAllByText(/bandar@zahid\.sa/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/ops@alfaisal\.sa/).length).toBeGreaterThan(0);
@@ -1693,11 +1693,11 @@ describe("Send opens the connector itself", () => {
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
-    await waitFor(() => expect(screen.getByText(c.confirmSend)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(c.confirmTitle)).toBeTruthy());
 
     // The second press is the send, and it must NOT ask for a dry run again.
     api.mail = { sent: true, from: "b@x.sa", via: "graph", recipients: 1, messageId: null, inSentFolder: true, skipped: 0 };
-    fireEvent.click(screen.getByText(c.confirmSend).closest("button")!);
+    fireEvent.click(screen.getByText(c.confirmYes).closest("button")!);
 
     await waitFor(() => expect(api.mailCalls).toHaveLength(2));
     expect((api.mailCalls[0][3] as { dryRun?: boolean } | undefined)?.dryRun).toBe(true);
@@ -1731,7 +1731,7 @@ describe("Send opens the connector itself", () => {
     fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
 
-    await waitFor(() => expect(screen.getByText(c.confirmSend)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(c.confirmTitle)).toBeTruthy());
     expect(screen.queryByText(c.envSentCopy)).toBeNull();
   });
 
@@ -1879,10 +1879,19 @@ describe("More hands the sheet a URL", () => {
  * supplier into it and expose that one to all the others.
  */
 describe("the To line", () => {
+  /**
+   * 🔴 **The real body is `{ user, verification }`, and these stubs used to return a flat
+   * `{ email }`.** So they passed while the panel read `me.email` off the envelope and got
+   * `undefined` on every real page: the To row rendered as a label with nothing after it, and the
+   * tests said it was fine (owner, 2026-09-06: *"why to doesnt show anything"*).
+   *
+   * A stub that does not match the route it stands in for is worse than no stub: it makes the suite
+   * agree with the bug.
+   */
   const withMe = (email: string | null) =>
     vi.stubGlobal("fetch", async (url: string) =>
       String(url).includes("/api/me")
-        ? { ok: true, status: 200, json: async () => ({ email }) }
+        ? { ok: true, status: 200, json: async () => ({ user: { email }, verification: { status: "none" } }) }
         : { ok: false, status: 404, json: async () => ({}) },
     );
 
@@ -1953,7 +1962,7 @@ describe("the envelope reads like a message header", () => {
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
-    await waitFor(() => expect(screen.getByText(c.confirmSend)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(c.confirmTitle)).toBeTruthy());
   };
 
   it("Given the preview, Then each recipient is its OWN chip, not one comma list", async () => {
@@ -2008,7 +2017,7 @@ describe("the envelope reads like a message header", () => {
     // A signed-in renter has an address; that is what fills To before any preview exists.
     vi.stubGlobal("fetch", async (u: string) =>
       String(u).includes("/api/me")
-        ? { ok: true, status: 200, json: async () => ({ email: "bandar@zahid.sa" }) }
+        ? { ok: true, status: 200, json: async () => ({ user: { email: "bandar@zahid.sa" } }) }
         : { ok: false, status: 404, json: async () => ({}) },
     );
 
@@ -2021,5 +2030,141 @@ describe("the envelope reads like a message header", () => {
     await waitFor(() => expect(screen.getByText(c.envTo)).toBeTruthy());
     // ⚠️ And From leads, because it is the field this whole feature exists to control.
     expect(screen.getByText(c.envFrom)).toBeTruthy();
+  });
+});
+
+
+/**
+ * -- The last step is a dialog (owner, 2026-09-06) -----------------------------------------------
+ *
+ * *"it will show one line confirmation popup, confirm you want to send your email through outlook,
+ * just confirm or cancel, that's it — so it is a modal after click send to suppliers, not on the
+ * review screen."*
+ */
+describe("the confirm dialog", () => {
+  const toConfirm = async () => {
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
+    api.mail = {
+      sent: false, reason: "PREVIEW", from: "bandar@zahid.sa", via: "graph",
+      to: ["bandar@zahid.sa"], bcc: ["ops@alfaisal.sa"], subject: "RFQ", recipients: 1, skippedIds: [],
+    };
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    await waitFor(() => expect(screen.getByText(c.confirmTitle)).toBeTruthy());
+  };
+
+  it("Given Cancel, Then nothing is sent and the dialog goes", async () => {
+    /**
+     * 🔴 **The way out is the point.** Without one, pressing Send is a reflex rather than a
+     * decision, and there was nothing to stop him pressing the same button twice.
+     */
+    await toConfirm();
+    expect(api.mailCalls).toHaveLength(1);
+
+    fireEvent.click(screen.getByText(c.confirmNo).closest("button")!);
+
+    await waitFor(() => expect(screen.queryByText(c.confirmTitle)).toBeNull());
+    // Still one call: the dry run. Nothing left.
+    expect(api.mailCalls).toHaveLength(1);
+  });
+
+  it("Given a changed selection, Then the dialog cannot be confirmed against the old envelope", async () => {
+    // ⚠️ He ticked another supplier after previewing three. Confirming now would send an envelope
+    // that no longer matches the screen, so it is thrown away and the next press previews again.
+    await toConfirm();
+    fireEvent.click(screen.getByText("Najd Equipment Est."));
+
+    await waitFor(() => expect(screen.queryByText(c.confirmTitle)).toBeNull());
+  });
+
+  it("Given a supplier with no address, Then the dialog names him too", async () => {
+    // ⚠️ The one thing the sentence cannot carry: who is being left out.
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
+    api.mail = {
+      sent: false, reason: "PREVIEW", from: "b@x.sa", via: "ses",
+      to: ["b@x.sa"], bcc: ["ops@alfaisal.sa"], subject: "RFQ", recipients: 1, skippedIds: ["2"],
+    };
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(screen.getByText(c.confirmTitle)).toBeTruthy());
+    expect(screen.getAllByText(/Najd Equipment Est\./).length).toBeGreaterThan(1);
+  });
+});
+
+
+/**
+ * -- Cancel must not hide the post (owner, 2026-09-06: *"why not shown? it was"*) ----------------
+ *
+ * 🔴 It WAS shown, and the preview step broke it. `send()` used to run straight through to
+ * `onShared`, which is what raises the green "your request is posted" pop-up. Preview-then-confirm
+ * put an early `return` in the middle, so the first press never reached it — and since the post
+ * happens BEFORE the preview, pressing Cancel left a live request on Moedatech and a renter who
+ * believed he had called the whole thing off.
+ */
+describe("what Cancel says about the post", () => {
+  const shared = vi.fn();
+
+  const toConfirm = async () => {
+    shared.mockReset();
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
+    api.mail = {
+      sent: false, reason: "PREVIEW", from: "b@x.sa", via: "graph",
+      to: ["b@x.sa"], bcc: ["ops@alfaisal.sa"], subject: "RFQ", recipients: 1, skippedIds: [],
+    };
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="post" draftForm={DRAFT} onPost={async () => "new-uuid"} onShared={shared} />
+      </LocaleProvider>,
+    );
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    await waitFor(() => expect(screen.getByText(c.confirmTitle)).toBeTruthy());
+  };
+
+  it("Given Cancel, Then the post IS announced — it is live either way", async () => {
+    /**
+     * ⚠️ Announced as the Moedatech-only case, because that is exactly what happened: the request
+     * is live and nothing was e-mailed. It is the one state where saying nothing is a lie.
+     */
+    await toConfirm();
+    expect(shared).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText(c.confirmNo).closest("button")!);
+
+    await waitFor(() => expect(shared).toHaveBeenCalledWith(0, "none"));
+  });
+
+  it("Given Send, Then it is announced ONCE, with the channel it went out on", async () => {
+    await toConfirm();
+    api.mail = { sent: true, from: "b@x.sa", via: "graph", recipients: 1, messageId: null, inSentFolder: true, skipped: 0 };
+    fireEvent.click(screen.getByText(c.confirmYes).closest("button")!);
+
+    await waitFor(() => expect(shared).toHaveBeenCalledWith(1, "email"));
+    expect(shared).toHaveBeenCalledTimes(1);
+  });
+
+  it("Given SHARE mode, Then Cancel announces nothing — no post happened here", async () => {
+    // ⚠️ The request already existed. There is nothing to tell him about.
+    shared.mockReset();
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
+    api.mail = {
+      sent: false, reason: "PREVIEW", from: "b@x.sa", via: "graph",
+      to: ["b@x.sa"], bcc: ["ops@alfaisal.sa"], subject: "RFQ", recipients: 1, skippedIds: [],
+    };
+    draw({ draftForm: DRAFT, onShared: shared });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    await waitFor(() => expect(screen.getByText(c.confirmTitle)).toBeTruthy());
+
+    fireEvent.click(screen.getByText(c.confirmNo).closest("button")!);
+    await waitFor(() => expect(screen.queryByText(c.confirmTitle)).toBeNull());
+    expect(shared).not.toHaveBeenCalled();
   });
 });

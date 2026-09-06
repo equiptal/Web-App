@@ -93,4 +93,46 @@ describe("naming a machine the catalogue does not carry", () => {
     fireEvent.change(box, { target: { value: "split hopper barge" } });
     expect((screen.getByPlaceholderText("Name the machine you need") as HTMLInputElement).value).toBe("split hopper barge");
   }, 20_000);
+
+  /**
+   * ⚠️ The row vanished under the renter's own hand (owner, 2026-09-06).
+   *
+   * Picking a subtype cleared `isCustomLine` — it reads the subtype — while the verdict stayed
+   * `no-match`, so the card swapped the taxonomy trio he had just used back for the «not available»
+   * panel, and the line still did not post. The pick now ends the off-catalogue state outright.
+   */
+  it("keeps the row when the renter finds his machine in the list after all", async () => {
+    const { confirmedProject, makeAgentDraft, makeItem, gates } = await withFlag();
+    const { reducer, initialState } = await import("@/lib/store/rfq-store");
+
+    const barge = makeItem({
+      id: "nm1",
+      rawLabel: "jeep truck",
+      rawSize: null,
+      ref: { categoryId: null, subcategoryId: null, measurementId: null },
+      verdict: "no-match",
+      resolved: false,
+    });
+    // `makeAgentDraft` returns the AGENT's half of a draft (no preferences — the store seeds those),
+    // which is the shape `PROCESS_SUCCESS` consumes; the reducer only reads `items` here.
+    const before = {
+      ...initialState,
+      draft: makeAgentDraft({ items: [barge], project: confirmedProject() }),
+    } as unknown as Parameters<typeof reducer>[0];
+    expect(gates.isCustomLine(before.draft!.items[0])).toBe(true);
+
+    // Both dispatches, in the card's own order: the picker sets the parent category from the chosen
+    // subtype before setting the subtype itself.
+    const withCat = reducer(before, { t: "SET_ITEM_CATEGORY", id: "nm1", categoryId: "cat-earth" });
+    const after = reducer(withCat, { t: "SET_ITEM_SUBCATEGORY", id: "nm1", subcategoryId: "sub-crawler" });
+    const item = after.draft!.items[0];
+
+    // No longer off-catalogue in ANY of the three senses that decide what the card draws.
+    expect(item.verdict).toBe("needs-validation");
+    expect(gates.isCustomLine(item)).toBe(false);
+    expect(item.customEquipment ?? null).toBeNull();
+    // And it is a real line again: it posts, and it asks for the size like any other.
+    expect(gates.postableItems([item]).map((i) => i.id)).toEqual(["nm1"]);
+    expect(gates.itemAppGaps(item).map((g) => g.field)).toEqual(["capacity"]);
+  });
 });

@@ -132,10 +132,17 @@ export function Dropdown({
   // A combobox has to name the popup it controls, or assistive tech cannot follow the relationship.
   const listId = useId();
 
-  /* Close on an outside click, on Escape, and on ANY ancestor scrolling (capture). The list is a
+  /* Close on an outside click, on Escape, and on an ancestor scrolling (capture). The list is a
      fixed layer: chasing the trigger down the page would re-render the row on every scroll event —
      the bug that made the chart's row menu shake — and leaving it where it was opened is worse. A
-     menu closing when the surface under it moves is what every platform does. */
+     menu closing when the surface under it moves is what every platform does.
+
+     ⚠️ **Except its OWN scroll** (owner, 2026-09-06: *"when I scroll it is closed, I think a bug"*).
+     The options box is `max-h-56 overflow-auto`, so a picker with more than six entries — a renter
+     choosing among his requests, which is where this was seen — has a scrollbar of its own. In the
+     CAPTURE phase a scroll inside that box reaches this listener too, so dragging the list's own bar
+     shut the list. A scroll INSIDE the menu is the reader moving through it, not the surface moving
+     under it; only the latter closes. */
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
@@ -147,7 +154,13 @@ export function Dropdown({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
-    const away = () => setOpen(false);
+    const away = (e: Event) => {
+      const node = e.target as Node | null;
+      // `e.target` on an element scroll is the element itself; on a page scroll it is `document`,
+      // which no element contains — so the page still closes it.
+      if (node && listRef.current?.contains(node)) return;
+      setOpen(false);
+    };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
     window.addEventListener("scroll", away, true);

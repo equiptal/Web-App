@@ -102,7 +102,12 @@ export function ShareOnPost() {
     try {
       void fetch("/api/me", { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : null))
-        .then((me: { companyName?: string | null } | null) => setRenterName(me?.companyName?.trim() || null))
+        /* 🔴 `/api/me` answers `{ user, verification }`. Reading `companyName` off the envelope
+           gave `undefined`, so the From line has been saying "you" for every renter who has a
+           company name on file. Found while chasing the empty To row (owner, 2026-09-06). */
+        .then((body: { user?: { companyName?: string | null } } | null) =>
+          setRenterName(body?.user?.companyName?.trim() || null),
+        )
         .catch(() => setRenterName(null));
     } catch {
       setRenterName(null);

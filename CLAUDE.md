@@ -2,6 +2,19 @@
 
 ## Change log
 
+- **2026-09-06 - Picking a subtype on an off-catalogue row no longer makes the row vanish.**
+  Owner: *"when i try to click a subtype from existing taxonomy it is vanished"*. `isCustomLine` reads
+  the SUBTYPE (a partial triple is a 422, so a half-picked line must not post ids), and the pick
+  cleared it while `verdict` stayed `no-match` - so the card fell back to the branch that swaps the
+  taxonomy trio for the red «not available» panel, hiding the control the renter had just used, and
+  `postableItems` still dropped the line. `SET_ITEM_SUBCATEGORY` now moves the verdict too:
+  `no-match` becomes `needs-validation`, which is what this app calls a line whose machine is known
+  and whose size is not.
+  Files: `src/lib/store/rfq-store.tsx`, `tests/unit/custom-equipment-canvas.test.tsx`.
+  Trap: three different things say «off-catalogue» - the verdict, `isCustomLine`, and the presence of
+  the free-text name - and they have to move together. The reducer clears the name in the same
+  branch; the test asserts all three plus «it posts now» and «it asks for the size».
+
 - **2026-09-06 - The fast lane calls an unplaceable machine no-match, as the full path always did.**
   Owner: *"with project settings it doesn't behave the same as if it's plain text"*. A project routes
   a short line to Tier 0/1 (`decideTier`), and `quickItemsToDraft` built every item from

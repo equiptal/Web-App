@@ -80,7 +80,11 @@ export function InviteSupplierDialog({
     try {
       void fetch("/api/me", { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : null))
-        .then((me: { companyName?: string | null } | null) => setRenterName(me?.companyName?.trim() || null))
+        /* 🔴 `/api/me` answers `{ user, verification }`. Read off the envelope this was always
+           `undefined`, so the invitation has been going out unsigned by the firm that sent it. */
+        .then((body: { user?: { companyName?: string | null } } | null) =>
+          setRenterName(body?.user?.companyName?.trim() || null),
+        )
         .catch(() => setRenterName(null));
     } catch {
       setRenterName(null);
