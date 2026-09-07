@@ -1119,10 +1119,16 @@ export function ShareRequestPanel({
   const label = "text-label font-semibold uppercase tracking-[0.05em] text-muted";
 
   return (
-    <div className="grid gap-5">
+    /* ── `minmax(0,1fr)`, not the implicit `auto` (2026-09-07) ──────────────────────────────────
+       A grid column is `auto` by default, which means MAX-CONTENT: one nowrap row inside — a supplier's
+       e-mail, the link, «Send to my suppliers · 0 selected» — pushed this column to 566px inside a
+       340px card, and the whole document went 902px wide on a 372px phone. Every `truncate` in here
+       was inert for the same reason: text cannot be truncated to fit a parent that grows to fit it.
+       Stating the column fixes both, and changes nothing at desktop width. */
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
       {/* ── The link ──────────────────────────────────────────────────────────────────────────── */}
       {showLink && (
-      <div className="grid gap-2">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-2">
         <div className="flex flex-wrap items-center gap-2">
           {/* The heading rides this row — see `heading`. */}
           {heading}
@@ -1158,7 +1164,9 @@ export function ShareRequestPanel({
               dir={uuid ? "ltr" : undefined}
               className={cx(
                 "block min-w-0 truncate text-meta",
-                uuid ? "flex-1 font-mono text-navy" : "flex-none font-mono text-muted-light",
+                // Both variants shrink. `flex-none` on the masked one meant the stub host stuck 48px
+                // out of a phone-width card, the one element still overflowing after the grid fix.
+                uuid ? "flex-1 font-mono text-navy" : "flex-1 font-mono text-muted-light",
               )}
             >
               {uuid ? shareUrl.replace(/^https?:\/\//, "") : maskedLink}
@@ -1230,16 +1238,20 @@ export function ShareRequestPanel({
 
           Only from `lg`. Stacked on a narrow screen there is no «beside», and a fixed height there
           would be an arbitrary crop. */}
-      <div className="grid gap-6 lg:h-[34rem] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
+      {/* The base column is stated for the same reason as the panel's own: below `lg` this is ONE
+          implicit column, and an implicit column is max-content. */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:h-[34rem] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
         {/* ── Left: who, and how ─────────────────────────────────────────────────────────────── */}
         <div className="flex min-h-0 flex-col gap-4">
           <div className="flex min-h-0 flex-1 flex-col gap-2">
-            <span className="flex items-center gap-2">
+            {/* `min-w-0` + `truncate`: the heading and the count are two nowrap runs, and on a phone
+                they were 566px of one line rather than a heading and a count. */}
+            <span className="flex min-w-0 items-center gap-2">
               {/* A glyph on each column heading (owner, 2026-09-03): the two halves of this screen
                   are «who» and «what», and at label size the words alone are two grey lines. */}
               <Icon name="group" size={14} className="flex-none text-muted" />
-              <span className={label}>{c.recipients}</span>
-              <span className="ms-auto text-meta font-semibold text-navy-mid">{fmt(c.selected, { n: chosen.length })}</span>
+              <span className={cx(label, "truncate")}>{c.recipients}</span>
+              <span className="ms-auto flex-none text-meta font-semibold text-navy-mid">{fmt(c.selected, { n: chosen.length })}</span>
             </span>
 
             {/* ── A LIST, not a row of pills (owner, 2026-09-02) ────────────────────────────────
@@ -1251,7 +1263,7 @@ export function ShareRequestPanel({
                 because narrowing the list must never change who is ticked. A pick scrolled out of
                 view is still a pick, and the count above says so. */}
             {!!rows?.length && (
-              <span className="flex flex-wrap items-center gap-2">
+              <span className="flex min-w-0 flex-wrap items-center gap-2">
                 {/* My Suppliers' own group menu, not a second control for the same job (owner,
                     2026-09-03). It arrives without `onRename` / `onDelete` / `onCreate`: here the
                     menu narrows the list, and administering the groups stays on the screen that

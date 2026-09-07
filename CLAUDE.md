@@ -2,6 +2,51 @@
 
 ## Change log
 
+- **2026-09-08 - A refused term is SAID, not tinted; and «Ask» is a drawer, not a one-line box.**
+  Owner: *"How can TÜV be a conflict and a match at the same time? If he says no, show it like ✗ TUV.
+  And if it has an opposite value - not «on rentee», so it will be «on supplier» - show that."* The
+  compare table printed the term's value and coloured it by the row's state, so a supplier who
+  ACCEPTED «TÜV» and one who REFUSED it both read «TÜV» - one green, one red - and the only thing
+  telling them apart was a colour the reader has to compare across rows to notice. Now `readTerm`
+  returns `refused`, and a conflict with no counter-offer splits two ways: a term that IS a party
+  assignment (`TERM_PARTY`: fuel, maintenance, the operator's food, transport) flips to the OTHER
+  party through `oppositeParty`, because «on supplier» and «on rentee» are the whole vocabulary, so
+  refusing one IS the other; everything else (a certificate, a year, a payment term) keeps the
+  requirement and takes a `✗` in front of it. The agent's pick also carries the row tint and a green
+  edge rather than a star and a word, and `rankAsk` («Ask the assistant») opens `AiChatDrawer` with
+  the turn count on the button.
+  Files: `src/components/workspace/CompareMatrix.tsx`, `src/components/workspace/AiRankPanel.tsx`,
+  `src/lib/i18n/{en,ar}.ts`, `tests/unit/compare-matrix.test.tsx`,
+  `tests/unit/ai-rank-panel.test.tsx` (new).
+  Trap: `oppositeParty` returns null for anything the party map cannot read, and the caller falls
+  through to marking the requirement refused - never to a guess at the other side.
+
+- **2026-09-08 - The dashboard, My Suppliers and the share panel stop dragging the page sideways on a phone.**
+  Audited the deployed staging build at a 372px layout viewport, LTR and RTL, over ten routes. Three
+  surfaces made the whole DOCUMENT wider than the screen, which moves the nav, the hero and every
+  card with it: `/suppliers` (906px) and the dashboard that embeds it (890px), both from the
+  eight-column supplier table, and the share step (902px) from a grid column nobody had stated.
+  Fixes: the table lives in an `overflow-x-auto overflow-y-clip` box with `min-w-[620px]`, so the
+  COLUMNS scroll and the page does not; the share panel's three grids state
+  `grid-cols-[minmax(0,1fr)]`, and the masked link lost its `flex-none`.
+  Files: `src/components/suppliers/SuppliersPage.tsx`, `src/components/share/ShareRequestPanel.tsx`.
+  Trap: **an implicit grid column is `auto`, which means MAX-CONTENT.** One nowrap run inside - a
+  supplier's e-mail, the share link, «Send to my suppliers · 0 selected» - grew a 340px card's column
+  to 566px, and every `truncate` in that subtree was inert for the same reason: text cannot be
+  truncated to fit a parent that grows to fit the text. `lg:grid-cols-[…]` alone does not help, since
+  below `lg` the column is the implicit one.
+  Trap: both overflow axes are stated on the table box. CSS computes the other axis from `visible` to
+  `auto` as soon as one scrolls - the third time this repo has met that (the bid rail, the compare
+  matrix, now this).
+  Clean at 372px, both directions: `/browse`, `/requests`, `/profile`, `/inbox`, `/legal/*`,
+  `/stores/{id}`, `/bid/{token}`.
+  ⚠️ Verified by patching the live DOM and re-measuring, not on a deployed build of the fix - the fix
+  itself is unshipped. Re-measure after the next deploy.
+  ⚠️ NOT covered: the deal room and the bid map (no id reachable from the phone-width list), the
+  compare workspace, and tap-target sizes - a dozen icon-only controls are 20-28px against the 44px
+  guideline (`ios_share`, `close`, `chevron_right`, the bell's count, «+12 more», ✕ on the
+  notification strip). Both are their own passes.
+
 - **2026-09-07 - A request started from a store opens on the FORM, not on «describe your request».**
   Owner: *"i don't want the direct request from a store take him to the same flow, check in the app
   how the direct behave and mimick it"*. The web pushed the machine's NAME into the intake box

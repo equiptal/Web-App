@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Icon } from "@/components/ui";
 import { btn } from "@/lib/ds";
 import { useT } from "@/lib/i18n";
@@ -27,9 +27,12 @@ import { pin } from "@/lib/uiPins";
  *
  *  · **Four presets** — the agent's own enum (`best_overall`, `lowest_cost`, `newest_machine`,
  *    `most_trusted`), so pressing one is the renter saying what "best" means to him today.
- *  · **A question box** — his own words, answered in the agent's, with the table re-ordered behind
- *    the answer. The exchange stays on screen, because a ranking whose reason has scrolled away is
- *    a number nobody can check.
+ *  · **«Ask the assistant»**, which opens a CHAT PANEL on the inline-end edge (owner, 2026-09-08:
+ *    *"in prod it opened a chat panel, so instead of this small text box just show the ranking
+ *    criteria with «ask AI» that opens the panel on the right to chat"*). ~~A one-line input under
+ *    the presets.~~ A conversation in a text field the width of a sentence is a conversation nobody
+ *    has: prod gives it a column of its own, and so does this. The exchange lives in the panel and
+ *    stays there, because a ranking whose reason has scrolled away is a number nobody can check.
  *  · **The pick and its reason**, which is what the ★ on the supplier column comes from.
  *
  * **Every figure it sends is the web's own.** `buildItemComparison` computes the deterministic layer
@@ -64,7 +67,7 @@ export function AiRankPanel({
   const [turns, setTurns] = useState<Turn[]>([]);
   const [text, setText] = useState("");
   const [failed, setFailed] = useState(false);
-  const box = useRef<HTMLInputElement | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
 
   /** The deterministic layer, computed here and sent as-is. */
   const computed = () => {
@@ -119,7 +122,6 @@ export function AiRankPanel({
       setFailed(true);
     } finally {
       setBusy(false);
-      box.current?.focus();
     }
   };
 
@@ -153,35 +155,114 @@ export function AiRankPanel({
         <p className="text-meta font-semibold leading-[1.6] text-navy-mid">{ranking.note}</p>
       )}
 
-      {/* The conversation, oldest first: a re-ranking whose reason has scrolled away is a number
-          nobody can check. */}
-      {turns.map((turn, i) => (
-        <div key={i} className="flex flex-col gap-1.5 border-t border-border pt-2.5">
-          <span className="text-label font-semibold text-muted">{turn.me}</span>
-          <span className="text-meta font-semibold leading-[1.6] text-navy">{turn.reply}</span>
-          {turn.reading && <span className="text-label font-semibold text-muted/80">{turn.reading}</span>}
-        </div>
-      ))}
-
       <div className="flex items-center gap-2">
-        <input
-          ref={box}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void ask();
-          }}
-          placeholder={t.workspace.rankAskPlaceholder}
-          className="min-w-0 flex-1 rounded-sm border border-border px-2.5 py-1.5 text-meta outline-none focus:border-brand"
-        />
-        <button type="button" disabled={busy || !text.trim()} onClick={() => void ask()} className={btn("secondary", "sm", { className: "flex-none" })}>
-          {t.workspace.rankAsk}
+        <button type="button" onClick={() => setChatOpen(true)} className={btn("secondary", "sm", { className: "flex-none" })}>
+          <Icon name="forum" size={14} /> {t.workspace.rankAsk}
+          {turns.length > 0 && (
+            <span className="rounded-full bg-surface2 px-1.5 text-label font-semibold text-muted">{turns.length}</span>
+          )}
         </button>
+        <span className="text-label font-semibold text-muted">{t.workspace.rankAskHint}</span>
       </div>
 
       {/* A failure says so and nothing more: an assistant that cannot answer must not leave the
           renter reading a stale ranking as though it were an answer to what he just asked. */}
       {failed && <span className="text-label font-semibold text-danger">{t.workspace.rankFailed}</span>}
+
+      {chatOpen && (
+        <AiChatDrawer
+          turns={turns}
+          busy={busy}
+          text={text}
+          onText={setText}
+          onSend={() => void ask()}
+          onClose={() => setChatOpen(false)}
+          failed={failed}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * The conversation, in a column on the reading-end edge.
+ *
+ * `fixed inset-y-0 end-0`, not a modal: the renter is comparing a table and asking about it, so the
+ * table must stay visible while he does. That is why there is no scrim either — dimming the thing
+ * the question is about would be the one layout mistake this panel exists to avoid.
+ *
+ * It is the app's own drawer geometry (the map's chat dock): a 380px column, its own header, the
+ * exchange scrolling in the middle, the box pinned at the foot.
+ */
+function AiChatDrawer({
+  turns,
+  busy,
+  text,
+  onText,
+  onSend,
+  onClose,
+  failed,
+}: {
+  turns: Turn[];
+  busy: boolean;
+  text: string;
+  onText: (v: string) => void;
+  onSend: () => void;
+  onClose: () => void;
+  failed: boolean;
+}) {
+  const t = useT();
+  return (
+    <aside
+      role="dialog"
+      aria-label={t.workspace.rankAsk}
+      className="fixed inset-y-0 end-0 z-50 flex w-[380px] max-w-[92vw] flex-col border-s border-border bg-surface"
+    >
+      <div className="flex flex-none items-center gap-2 border-b border-border px-3.5 py-2.5">
+        <span className="grid size-6 flex-none place-items-center rounded-full bg-surface2 text-label font-semibold text-muted">✦</span>
+        <span className="min-w-0 flex-1 truncate text-body font-extrabold text-navy">{t.workspace.aiSuggestion}</span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t.common.close}
+          className="grid size-7 flex-none place-items-center rounded-full text-muted transition hover:bg-surface2 hover:text-navy"
+        >
+          <Icon name="close" size={16} />
+        </button>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3.5">
+        {turns.length === 0 && (
+          <p className="text-meta leading-[1.6] text-muted">{t.workspace.rankAskPlaceholder}</p>
+        )}
+        {turns.map((turn, i) => (
+          <div key={i} className="flex flex-col gap-1.5">
+            {/* His own words on the trailing edge, the agent's on the leading one — the shape every
+                conversation in this product already has. */}
+            <span className="self-end rounded-md bg-navy px-2.5 py-1.5 text-meta font-semibold text-white">{turn.me}</span>
+            <span className="rounded-md bg-surface2 px-2.5 py-2 text-meta font-semibold leading-[1.6] text-navy">{turn.reply}</span>
+            {turn.reading && <span className="text-label font-semibold text-muted">{turn.reading}</span>}
+          </div>
+        ))}
+        {busy && <span className="text-label font-semibold text-muted">{t.workspace.rankThinking}</span>}
+        {failed && <span className="text-label font-semibold text-danger">{t.workspace.rankFailed}</span>}
+      </div>
+
+      <div className="flex flex-none items-center gap-2 border-t border-border p-3">
+        <input
+          autoFocus
+          value={text}
+          onChange={(e) => onText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onSend();
+          }}
+          placeholder={t.workspace.rankAskShort}
+          className="min-w-0 flex-1 rounded-sm border border-border px-2.5 py-1.5 text-meta outline-none focus:border-brand"
+        />
+        <button type="button" disabled={busy || !text.trim()} onClick={onSend} className={btn("primary", "sm", { className: "flex-none" })}>
+          <Icon name="send" size={14} />
+        </button>
+      </div>
+    </aside>
   );
 }
