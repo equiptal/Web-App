@@ -278,18 +278,6 @@ export function ShareRequestPanel({
    * printed `yarafarouq555@gmail.com` above a footer that said the message would leave from
    * `yara@moedatech.net` (owner, 2026-09-07). Gone with the guess it supported.
    */
-  /**
-   * The envelope the backend says it would send, waiting for him to confirm.
-   *
-   * 🔴 **The recipient list is DERIVED on the server**, including the fallback to a linked
-   * account's address when a supplier row carries no e-mail of its own. The panel cannot work out
-   * which suppliers actually get written to, nor which get dropped for having none — so a preview
-   * assembled here would not merely drift from the send, it could not be correct.
-   *
-   * ⚠️ Cleared whenever the selection or the wording changes, so he can never confirm an envelope
-   * that no longer matches the screen.
-   */
-  const [preview, setPreview] = useState<ShareEmailPreview | null>(null);
   /** The last step, and the only one with a way out. */
   const [confirming, setConfirming] = useState(false);
   /**
@@ -489,16 +477,12 @@ export function ShareRequestPanel({
 
   /** Which of the three he is editing and sending. Moedatech-only reads the e-mail wording. */
   /**
-   * ⚠️ A confirmed envelope is only good for the picks and the wording it was drawn from. Any
-   * change and it goes, so the next press previews again rather than sending the old one.
+   * ⚠️ **A confirmation is only good for the list it was drawn from.** Tick another supplier, or
+   * change a word, and the dialog closes, so he can never confirm one envelope and send another.
    */
   const pickedKey = JSON.stringify([Object.keys(picked).filter((k) => picked[k]).sort(), templates, lang, channel, provider]);
-  const previewFor = useRef<string | null>(null);
   useEffect(() => {
-    if (previewFor.current !== null && previewFor.current !== pickedKey) {
-      setPreview(null);
-      setConfirming(false);
-    }
+    setConfirming(false);
   }, [pickedKey]);
 
   const tplKey = channelKey(channel);
@@ -537,13 +521,10 @@ export function ShareRequestPanel({
    * `yara@moedatech.net`, which the panel's own footer named two inches below it (owner,
    * 2026-09-07). Graph sends as the mailbox that consented, whatever the account is called here.
    *
-   * ⚠️ Order is: what the server SAID it would use, then the mailbox he connected, then his
-   * profile. Each one is closer to the truth than the next.
+   * ⚠️ One source, and it is the mailbox that CONSENTED. Nothing else on this screen knows which
+   * account will send.
    */
-  const sendingFrom =
-    preview?.from ||
-    (connect?.connected && provider === "outlook" ? connect.accountEmail : null) ||
-    null;
+  const sendingFrom = connect?.connected && provider === "outlook" ? connect.accountEmail : null;
 
   /**
    * 🔴 **No guess when we do not know which mailbox sends** (owner, 2026-09-07: *"if gmail or still
@@ -572,12 +553,18 @@ export function ShareRequestPanel({
   };
   const asPeople = (list: string[]): MailPerson[] => list.map((address) => ({ address, name: nameFor(address) }));
 
-  const envelopeTo = asPeople(preview?.to.length ? preview.to : sendingFrom ? [sendingFrom] : []);
-  const envelopeBcc = asPeople(preview?.bcc.length ? preview.bcc : reachable.map((x) => x.email as string));
-
-  const skippedNames = preview
-    ? preview.skippedIds.map((id) => (rows ?? []).find((r) => r.id === id)?.name).filter((n): n is string => !!n)
-    : unreachable.map((x) => x.name);
+  /**
+   * 🔴 **Drawn from the picks, not from a server dry run** (2026-09-07). The dry run needed a
+   * request that EXISTS, and the confirmation now stands in front of the post, so there is nothing
+   * to ask the server about yet. What he confirms is the list he ticked, which is his own.
+   *
+   * The cost, stated plainly: a supplier row whose address comes from its linked Moedatech account
+   * is shown by NAME here rather than by the address the server resolves for it. He is confirming
+   * WHO, and the who is right.
+   */
+  const envelopeTo = asPeople(sendingFrom ? [sendingFrom] : []);
+  const envelopeBcc = asPeople(reachable.map((x) => x.email as string));
+  const skippedNames = unreachable.map((x) => x.name);
 
   const noPhone = chosen.filter((s) => !s.phone?.trim());
 
@@ -930,8 +917,6 @@ export function ShareRequestPanel({
        * the who is right.
        */
       const outcome = await shareRequestEmail(id, reachable.map((x) => x.id), body);
-      setPreview(null);
-      previewFor.current = null;
       setConfirming(false);
       /* ⚠️ A PREVIEW cannot come back on this call — we never ask for one — but the type still
          admits it, so it is refused here rather than assumed away. */
@@ -1661,25 +1646,22 @@ export function ShareRequestPanel({
                 </MailField>
               </div>
 
-              {/* ⚠️ The two things a composer does NOT say, under the fields rather than inside
-                  one: they are warnings about the list, not recipients in it. */}
-              {(skippedNames.length > 0 || preview?.via === "graph") && (
+              {/* ⚠️ The one thing a composer does NOT say, under the fields rather than inside
+                  one: it is a warning about the list, not a recipient in it.
+
+                  ~~The «a copy is in your Sent folder» line stood here too.~~ It read off the
+                  server's dry run, and there is no dry run any more, so it would have been a
+                  promise made before the send it describes. It is still made afterwards, by the
+                  status line under the button, which knows what actually happened. */}
+              {skippedNames.length > 0 && (
                 <div
                   className="flex-none px-3 py-1.5"
                   style={{ borderBottom: `1px solid ${skin.divider}` }}
                 >
-                  {skippedNames.length > 0 && (
-                    <span className="flex items-start gap-1.5 text-label font-semibold text-warn-deep">
-                      <Icon name="error_outline" size={13} className="mt-px flex-none" />
-                      {fmt(c.envSkipped, { names: skippedNames.join(", ") })}
-                    </span>
-                  )}
-                  {preview?.via === "graph" && (
-                    <span className="flex items-center gap-1.5 text-label text-ok-deep">
-                      <Icon name="check_circle" size={13} className="flex-none" />
-                      {c.envSentCopy}
-                    </span>
-                  )}
+                  <span className="flex items-start gap-1.5 text-label font-semibold text-warn-deep">
+                    <Icon name="error_outline" size={13} className="mt-px flex-none" />
+                    {fmt(c.envSkipped, { names: skippedNames.join(", ") })}
+                  </span>
                 </div>
               )}
 

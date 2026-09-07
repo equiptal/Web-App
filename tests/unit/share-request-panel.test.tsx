@@ -131,6 +131,31 @@ const c = en.intake.postShare;
 const enShare = en.intake.postShare;
 const arShare = ar.intake.postShare;
 
+/**
+ * The confirm button inside the dialog, whichever of its two labels it is wearing.
+ *
+ * ⚠️ It says «Post and send» before the request exists and «Send» afterwards, because those are
+ * two different promises. Read from inside `role="dialog"` so it can never match the panel's own
+ * Send button.
+ */
+const confirmButton = () =>
+  Array.from(document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')).find(
+    (b) => (b.textContent ?? "").includes(c.confirmDoBoth) || (b.textContent ?? "").includes(c.confirmDoSend),
+  ) ?? null;
+
+/**
+ * Press Send, and get past the confirmation that now stands in front of BOTH halves.
+ *
+ * 🔴 **On e-mail, the first press posts NOTHING** (owner, 2026-09-07). The dialog comes first, so
+ * a test that presses once and expects a send is describing the old flow. Every case that is not
+ * about the dialog itself goes through here. The other channels open no dialog and are unaffected.
+ */
+const pressSend = () => {
+  fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+  const yes = confirmButton();
+  if (yes) fireEvent.click(yes);
+};
+
 describe("who it goes to", () => {
   it("Given suppliers, Then they are a LIST — each row carrying the address it will be sent to", async () => {
     /**
@@ -186,7 +211,7 @@ describe("how it goes", () => {
     draw();
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers));
+    pressSend();
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
     const url = new URL(opened.mock.calls[0][0] as string);
@@ -213,7 +238,7 @@ describe("how it goes", () => {
     draw();
     await screen.findByText("Al Faisal Rentals");
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers));
+    pressSend();
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
     const q = new URL(opened.mock.calls[0][0] as string).searchParams;
@@ -247,7 +272,9 @@ describe("how it goes", () => {
     expect(button.hasAttribute("disabled")).toBe(false);
 
     fireEvent.click(button);
-    // The request is CREATED, which is the thing the disabled button used to prevent.
+    /* ⚠️ The confirmation stands in front of the post now, so the request is created on the
+       CONFIRM press. That the button was pressable at all is what this case is about. */
+    fireEvent.click(confirmButton()!);
     await waitFor(() => expect(posted).toHaveBeenCalled());
   });
 
@@ -385,7 +412,7 @@ describe("how it goes", () => {
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
     expect(api.shares).toHaveLength(0);
@@ -396,7 +423,7 @@ describe("how it goes", () => {
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.whatsapp));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
     expect(api.shares).toHaveLength(0);
@@ -545,7 +572,7 @@ describe("one channel at a time (owner, 2026-09-02)", () => {
     draw();
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.whatsapp));
-    fireEvent.click(screen.getByText(c.sendToSuppliers));
+    pressSend();
 
     await waitFor(() => expect(opened).toHaveBeenCalledTimes(1));
     expect(String(opened.mock.calls[0][0])).toContain("wa.me");
@@ -557,7 +584,7 @@ describe("one channel at a time (owner, 2026-09-02)", () => {
     draw();
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers));
+    pressSend();
 
     // The button renames itself; the three narration lines under it went on 2026-09-03.
     await waitFor(() => expect(screen.getByText(c.shareAgain)).toBeTruthy());
@@ -591,7 +618,7 @@ describe("one channel at a time (owner, 2026-09-02)", () => {
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.gmail));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
     const urls = opened.mock.calls.map((call) => String(call[0]));
@@ -675,7 +702,7 @@ describe("what rides the clipboard on an e-mail send", () => {
     );
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers));
+    pressSend();
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
     // The send itself left the clipboard alone.
@@ -694,7 +721,7 @@ describe("what rides the clipboard on an e-mail send", () => {
     );
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers));
+    pressSend();
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
     const body = new URL(String(opened.mock.calls[0][0])).searchParams.get("body")!;
@@ -790,7 +817,7 @@ describe("the panel narrates nothing after a send (owner, 2026-09-03)", () => {
     draw();
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers));
+    pressSend();
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
     expect(screen.queryByText(/on the clipboard/i)).toBeNull();
@@ -873,7 +900,7 @@ describe("what onShared tells the caller (owner, 2026-09-03)", () => {
     );
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers));
+    pressSend();
 
     await waitFor(() => expect(onShared).toHaveBeenCalled());
     expect(onShared.mock.calls[0][1]).toBe("email");
@@ -960,7 +987,7 @@ describe("the mail we send ourselves", () => {
     draw();
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
   };
 
   it("Given a verified domain, Then NO compose window opens and the send is stated", async () => {
@@ -1049,7 +1076,7 @@ describe("the mail we send ourselves", () => {
     draw();
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.whatsapp));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
     expect(api.mailCalls).toHaveLength(0);
@@ -1177,7 +1204,7 @@ describe("connecting Outlook", () => {
       connectPath: "/agents/mail-connect/authorize",
     };
     await pickEmail();
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
 
     await waitFor(() => expect(screen.getByText(c.mailConnect)).toBeTruthy());
     // And the share still went out the old way while he decides.
@@ -1204,7 +1231,7 @@ describe("connecting Outlook", () => {
       connectPath: "/agents/mail-connect/authorize",
     };
     await pickEmail();
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
 
     await waitFor(() => expect(screen.getByText(c.mailReconnect)).toBeTruthy());
     // And the share still went out the old way while he sorts it out.
@@ -1218,7 +1245,7 @@ describe("connecting Outlook", () => {
      */
     api.mail = { sent: true, from: "bandar@zahid.sa", via: "graph", recipients: 2, messageId: null, inSentFolder: true, skipped: 0 };
     await pickEmail();
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
 
     // ⚠️ It rides on the SAME line as the send now, not a block of its own (owner, 2026-09-06),
     // so it is matched inside the sentence rather than as an element.
@@ -1229,7 +1256,7 @@ describe("connecting Outlook", () => {
   it("Given SES sent it, Then it does NOT claim a Sent folder copy", async () => {
     api.mail = { sent: true, from: "bandar@zahid.sa", via: "ses", recipients: 2, messageId: "0100-x", inSentFolder: false, skipped: 0 };
     await pickEmail();
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
 
     await waitFor(() => expect(screen.getByText(/bandar@zahid\.sa/)).toBeTruthy());
     expect(screen.queryByText(c.mailInSent)).toBeNull();
@@ -1239,7 +1266,7 @@ describe("connecting Outlook", () => {
     // A count that quietly omits them is how a renter comes to believe eight people were written to.
     api.mail = { sent: true, from: "b@x.sa", via: "graph", recipients: 1, messageId: null, inSentFolder: true, skipped: 2 };
     await pickEmail();
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
 
     await waitFor(() => expect(screen.getByText(new RegExp(String(2)))).toBeTruthy());
   });
@@ -1339,8 +1366,18 @@ describe("the preview and the sent e-mail carry the same message", () => {
  * clipboard depends on nothing, so it is the fallback that always exists, and it was there all along
  * buried inside «More»'s failure path where nobody would find it.
  */
-describe("copy message", () => {
-  it("Given a posted request, Then BOTH flavours go on the clipboard", async () => {
+/**
+ * -- Copy is two buttons, on the two fields it fills (owner, 2026-09-07) -------------------------
+ *
+ * *"the copy message i want it to be separate one on the title as copy title and one on the body as
+ * copy body."*
+ *
+ * ⚠️ ~~One «Copy message».~~ A renter pasting into a mail client he already has open fills a
+ * subject box and a body box. One button that copied both left him pasting everything into the
+ * subject line and deleting most of it again.
+ */
+describe("copy subject, copy body", () => {
+  it("Given the body, Then BOTH flavours go on the clipboard", async () => {
     /**
      * ⚠️ The receiving app chooses: Gmail and Outlook keep the HTML and draw the card, a chat takes
      * the words. Writing only one would decide for an app we cannot see, and the card is the half
@@ -1356,17 +1393,38 @@ describe("copy message", () => {
     vi.stubGlobal("navigator", { ...navigator, clipboard: { write, writeText: async () => {} } });
 
     draw({ draftForm: DRAFT });
-    fireEvent.click(await screen.findByText(c.copyMessage));
+    fireEvent.click((await screen.findAllByText(c.copyBodyBtn))[0].closest("button")!);
 
     await waitFor(() => expect(write).toHaveBeenCalled());
     expect(Object.keys(flavours[0]).sort()).toEqual(["text/html", "text/plain"]);
   });
 
-  it("Given no link yet, Then it is locked — the same rule as Copy link", async () => {
+  it("Given the subject, Then it is PLAIN text and nothing else", async () => {
     /**
-     * ⚠️ The message ends with a URL that does not exist before the post, so copying early hands
-     * him a message with a hole where the link goes. Owner's rule for the link itself
-     * (2026-09-02): nothing is copyable before the request is posted.
+     * 🔴 **A subject line is one line.** Writing the HTML flavour here would let a mail client
+     * paste a rendered card into a field that cannot hold one.
+     */
+    const writeText = vi.fn(async (_text: string) => {});
+    const write = vi.fn(async () => {});
+    vi.stubGlobal("ClipboardItem", class {
+      constructor(public parts: Record<string, unknown>) {}
+    });
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { write, writeText } });
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click((await screen.findAllByText(c.copyTitleBtn))[0].closest("button")!);
+
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
+    expect(String(writeText.mock.calls[0][0])).toContain("Crawler Excavator");
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("Given no link yet, Then the BODY is locked and the SUBJECT is not", async () => {
+    /**
+     * ⚠️ The message ends with a URL that does not exist before the post, so copying the body
+     * early hands him a message with a hole where the link goes. The subject has no link in it: it
+     * names the machine, and that is true before anything is published.
      */
     render(
       <LocaleProvider>
@@ -1374,8 +1432,10 @@ describe("copy message", () => {
       </LocaleProvider>,
     );
     await screen.findByText("Al Faisal Rentals");
+    fireEvent.click(screen.getByText(c.outlook));
 
-    expect(screen.getByText(c.copyMessage).closest("button")!.hasAttribute("disabled")).toBe(true);
+    expect(screen.getAllByText(c.copyBodyBtn)[0].closest("button")!.hasAttribute("disabled")).toBe(true);
+    expect(screen.getAllByText(c.copyTitleBtn)[0].closest("button")!.hasAttribute("disabled")).toBe(false);
   });
 
   it("Given it copied, Then it says so and then stops saying so", async () => {
@@ -1386,11 +1446,12 @@ describe("copy message", () => {
     vi.stubGlobal("navigator", { ...navigator, clipboard: { write: async () => {}, writeText: async () => {} } });
 
     draw({ draftForm: DRAFT });
-    fireEvent.click(await screen.findByText(c.copyMessage));
+    fireEvent.click((await screen.findAllByText(c.copyBodyBtn))[0].closest("button")!);
 
-    await waitFor(() => expect(screen.getByText(c.copyMessageDone)).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText(c.copied).length).toBeGreaterThan(0));
   });
 });
+
 
 
 /**
@@ -1426,7 +1487,7 @@ describe("the clipboard has one writer at a time", () => {
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
     expect(write).not.toHaveBeenCalled();
@@ -1444,7 +1505,7 @@ describe("the clipboard has one writer at a time", () => {
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
 
     const button = await screen.findByText(c.copyAddresses);
     fireEvent.click(button);
@@ -1474,7 +1535,7 @@ describe("the clipboard has one writer at a time", () => {
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
 
     await waitFor(() => expect(api.mailCalls).toHaveLength(1));
     expect(screen.queryByText(c.copyAddresses)).toBeNull();
@@ -1678,7 +1739,7 @@ describe("Send opens the connector itself", () => {
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
 
     // 🔴 The window is opened BLANK, in the same tick as the click, or the browser blocks it.
     await waitFor(() => expect(opened).toHaveBeenCalled());
@@ -1687,60 +1748,75 @@ describe("Send opens the connector itself", () => {
     await waitFor(() => expect(win.location.href).toContain("login.microsoftonline.com"));
   });
 
-  it("Given the FIRST press, Then it previews and sends nothing", async () => {
+  it("Given the FIRST press, Then NOTHING happens — not the post, not the mail", async () => {
     /**
-     * 🔴 **`sent: false` with `reason: "PREVIEW"` is a success.** Every other `sent: false` means
-     * "open the compose window"; this one means "draw the envelope and ask him". A reader branching
-     * on `sent` alone would open a window behind a working preview.
+     * 🔴 **The confirmation stands in front of BOTH halves** (owner, 2026-09-07: *"i want the send
+     * confirmation of outlook to be with the post on moedatech not only the send, so it will not
+     * automatically send to moedatech"*).
      *
-     * ⚠️ This replaced opening a draft in his Outlook. That needed `Mail.ReadWrite`, and real
-     * tenants refuse it: Moedatech's own granted `Mail.Send` with no administrator and answered
-     * "Need admin approval" to the wider scope two hours later.
+     * ~~The request was minted first and the dialog asked only about the e-mail.~~ A renter who
+     * pressed Send to read what it said had already published his request, and Cancel could only
+     * call off the half that had not happened yet.
      */
-    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
-    api.mail = {
-      sent: false,
-      reason: "PREVIEW",
-      from: "bandar@zahid.sa",
-      via: "graph",
-      to: ["bandar@zahid.sa"],
-      bcc: ["ops@alfaisal.sa"],
-      subject: "RFQ",
-      recipients: 1,
-      skippedIds: [],
-    };
+    const posted = vi.fn(async () => "new-uuid");
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
 
-    draw({ draftForm: DRAFT });
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="post" draftForm={DRAFT} onPost={posted} />
+      </LocaleProvider>,
+    );
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
 
-    // The envelope is drawn IN THE CARD he is already reading, and the button now says so.
-    await waitFor(() => expect(screen.getByText(c.confirmTitle)).toBeTruthy());
-    // It appears twice: once on the From line, once in To. Both are correct and both are his.
-    expect(screen.getAllByText(/bandar@zahid\.sa/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/ops@alfaisal\.sa/).length).toBeGreaterThan(0);
-    // Nothing left, and nothing was opened.
+    // The dialog, and the wording that says the post is part of what he is approving.
+    await waitFor(() => expect(screen.getByText(c.confirmPostTitle)).toBeTruthy());
+    expect(screen.getByText(c.confirmPostLine)).toBeTruthy();
+    // ⚠️ Nothing published, nothing sent, nothing opened.
+    expect(posted).not.toHaveBeenCalled();
+    expect(api.mailCalls).toHaveLength(0);
     expect(opened).not.toHaveBeenCalled();
   });
 
-  it("Given the CONFIRM press, Then it sends for real", async () => {
-    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
-    api.mail = { sent: false, reason: "PREVIEW", from: "b@x.sa", via: "graph", to: ["b@x.sa"], bcc: ["ops@alfaisal.sa"], subject: "RFQ", recipients: 1, skippedIds: [] };
+  it("Given it is ALREADY posted, Then the dialog asks about the mail alone", async () => {
+    /**
+     * ⚠️ A renter coming back to share with a second supplier must not be asked to approve a post
+     * that happened yesterday. Same dialog, two different promises.
+     */
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
 
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
-    await waitFor(() => expect(screen.getByText(c.confirmTitle)).toBeTruthy());
 
-    // The second press is the send, and it must NOT ask for a dry run again.
-    api.mail = { sent: true, from: "b@x.sa", via: "graph", recipients: 1, messageId: null, inSentFolder: true, skipped: 0 };
-    fireEvent.click(screen.getByText(c.confirmYes).closest("button")!);
+    await waitFor(() => expect(screen.getByText(c.confirmSendTitle)).toBeTruthy());
+    expect(screen.getByText(c.confirmPostedAlready)).toBeTruthy();
+    expect(screen.queryByText(c.confirmPostLine)).toBeNull();
+  });
 
-    await waitFor(() => expect(api.mailCalls).toHaveLength(2));
-    expect((api.mailCalls[0][3] as { dryRun?: boolean } | undefined)?.dryRun).toBe(true);
-    expect((api.mailCalls[1][3] as { dryRun?: boolean } | undefined)?.dryRun).toBeFalsy();
+  it("Given the CONFIRM press, Then it posts and sends, once", async () => {
+    const posted = vi.fn(async () => "new-uuid");
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
+    api.mail = { sent: true, from: "bandar@zahid.sa", via: "graph", recipients: 1, messageId: null, inSentFolder: true, skipped: 0 };
+
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="post" draftForm={DRAFT} onPost={posted} />
+      </LocaleProvider>,
+    );
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    await waitFor(() => expect(screen.getByText(c.confirmPostTitle)).toBeTruthy());
+
+    fireEvent.click(confirmButton()!);
+
+    await waitFor(() => expect(posted).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(api.mailCalls).toHaveLength(1));
+    // ⚠️ And no dry run: there is no preview call left on this path.
+    expect((api.mailCalls[0][3] as { dryRun?: boolean } | undefined)?.dryRun).toBeFalsy();
   });
 
   it("Given a supplier with no address, Then he is NAMED as left out", async () => {
@@ -1755,25 +1831,30 @@ describe("Send opens the connector itself", () => {
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
 
     await waitFor(() => expect(screen.getByText(/Najd Equipment Est\./)).toBeTruthy());
   });
 
   it("Given SES, Then no Sent-folder promise is made", async () => {
-    // ⚠️ Only Graph puts a copy in his mailbox. SES sends AS him without touching it.
+    /**
+     * ⚠️ Only Graph puts a copy in his mailbox. SES sends AS him without touching it.
+     *
+     * ~~It was checked on the envelope card.~~ That line read off the server's dry run, and there is
+     * no dry run any more, so the promise is made where it can be true: AFTER the send, by the
+     * status line, which knows what actually happened.
+     */
     api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
-    api.mail = { sent: false, reason: "PREVIEW", from: "b@x.sa", via: "ses", to: ["b@x.sa"], bcc: ["ops@alfaisal.sa"], subject: "RFQ", recipients: 1, skippedIds: [] };
+    api.mail = { sent: true, from: "b@x.sa", via: "ses", recipients: 1, messageId: "m1", inSentFolder: false, skipped: 0 };
 
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
 
-    await waitFor(() => expect(screen.getByText(c.confirmTitle)).toBeTruthy());
-    expect(screen.queryByText(c.envSentCopy)).toBeNull();
+    await waitFor(() => expect(api.mailCalls).toHaveLength(1));
+    expect(screen.queryByText(new RegExp(c.mailInSent))).toBeNull();
   });
-
 
   it("Given no draft link, Then nothing is opened — the message has already gone", async () => {
     // ⚠️ Today's backend calls `POST /me/sendMail`. There is no draft to show, so opening
@@ -1784,7 +1865,7 @@ describe("Send opens the connector itself", () => {
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
 
     await waitFor(() => expect(api.mailCalls).toHaveLength(1));
     expect(opened).not.toHaveBeenCalled();
@@ -1799,7 +1880,7 @@ describe("Send opens the connector itself", () => {
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
     expect(String(opened.mock.calls[0][0])).not.toContain("login.microsoftonline.com");
@@ -1814,7 +1895,7 @@ describe("Send opens the connector itself", () => {
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.gmail));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
     // The FIRST window is the Gmail composer, not a blank one waiting for a consent URL.
@@ -1837,7 +1918,7 @@ describe("Send opens the connector itself", () => {
     );
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
 
     await waitFor(() => expect(closed).toHaveBeenCalled());
   });
@@ -1873,7 +1954,10 @@ describe("the message's own controls live on the message", () => {
      */
     const frame = (await screen.findByLabelText(c.tplTitle)).closest("div.flex.min-h-0")!;
     expect(within(frame as HTMLElement).getByText("العربية")).toBeTruthy();
-    expect(within(frame as HTMLElement).getByText(c.copyMessage)).toBeTruthy();
+    /* ⚠️ Two copies now, each on the field it fills: the subject beside the Subject line, the
+       body beside the body. Both still inside the frame, over the thing they take. */
+    expect(within(frame as HTMLElement).getByText(c.copyTitleBtn)).toBeTruthy();
+    expect(within(frame as HTMLElement).getByText(c.copyBodyBtn)).toBeTruthy();
     // And the link row carries a glyph only: the accessible name is there, the WORD is not.
     expect(screen.getByLabelText(c.copy)).toBeTruthy();
     expect(screen.getByLabelText(c.copy).textContent).not.toContain(c.copy);
@@ -1927,7 +2011,7 @@ describe("the To line", () => {
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(channel));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    pressSend();
     await waitFor(() => expect(opened).toHaveBeenCalled());
     /**
      * ⚠️ Skip the BLANK window and the consent screen. An unconnected Outlook opens an empty
@@ -2009,18 +2093,21 @@ describe("the To line", () => {
  * mail client rather than like a grey line of comma-joined addresses.
  */
 describe("the envelope reads like a message header", () => {
+  /**
+   * 🔴 **No press, and no server round trip** (2026-09-07). The envelope used to be a dry run the
+   * backend answered, which needed a request that EXISTS; the confirmation now stands in front of
+   * the post, so there is nothing to ask about yet. It is drawn from the ticks and from the mailbox
+   * that consented, which is everything this header states.
+   */
   const preview = async () => {
-    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
-    api.mail = {
-      sent: false, reason: "PREVIEW", from: "bandar@zahid.sa", via: "graph",
-      to: ["bandar@zahid.sa"], bcc: ["ops@alfaisal.sa", "bids@zahid.sa"],
-      subject: "RFQ", recipients: 2, skippedIds: ["2"],
-    };
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
+    // A second addressable supplier, so «its own chip» has two chips to be true of.
+    api.rows = [...api.rows, { id: "4", name: "Zahid Tractor", email: "bids@zahid.sa", phone: null, verified: true }];
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(await screen.findByText("Zahid Tractor"));
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
-    await waitFor(() => expect(screen.getByText(c.confirmTitle)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(c.envBcc)).toBeTruthy());
   };
 
   it("Given the preview, Then each recipient is its OWN chip, not one comma list", async () => {
@@ -2037,9 +2124,13 @@ describe("the envelope reads like a message header", () => {
      * stands alone, because a chip with nothing readable on it is worse than a raw address.
      */
     expect(screen.getAllByText("Al Faisal Rentals").length).toBeGreaterThan(1);
-    expect(screen.getByText("bids@zahid.sa")).toBeTruthy();
+    expect(screen.getAllByText("Zahid Tractor").length).toBeGreaterThan(1);
     // Two separate elements, never one run-on line.
     expect(screen.queryByText("ops@alfaisal.sa, bids@zahid.sa")).toBeNull();
+    /* ⚠️ The chip carries the NAME and keeps the address on its `title`, which is what both
+       clients do: he knows «Al Faisal Rentals», he does not necessarily know `ops@alfaisal.sa`
+       belongs to them. */
+    expect(document.querySelector('[title="Zahid Tractor · bids@zahid.sa"]')).toBeTruthy();
   });
 
   it("Given the preview, Then To and Bcc are labelled apart", async () => {
@@ -2053,7 +2144,8 @@ describe("the envelope reads like a message header", () => {
   it("Given a supplier with no address, Then he is NAMED, not counted", async () => {
     // 🔴 The line that stops him believing three people were written to when two were.
     await preview();
-    expect(screen.getAllByText(/Najd Equipment Est\./).length).toBeGreaterThan(1);
+    fireEvent.click(screen.getByText("Najd Equipment Est."));
+    await waitFor(() => expect(screen.getAllByText(/Najd Equipment Est\./).length).toBeGreaterThan(1));
   });
 
   it("Given no supplier ticked, Then Bcc says so rather than sitting empty", async () => {
@@ -2093,87 +2185,84 @@ describe("the envelope reads like a message header", () => {
 
 
 /**
- * -- The last step is a dialog (owner, 2026-09-06) -----------------------------------------------
+ * -- The last step is a dialog, and it stands in front of BOTH halves ---------------------------
  *
- * *"it will show one line confirmation popup, confirm you want to send your email through outlook,
- * just confirm or cancel, that's it — so it is a modal after click send to suppliers, not on the
- * review screen."*
+ * Owner, 2026-09-06: *"it will show one line confirmation popup, confirm you want to send your
+ * email through outlook, just confirm or cancel."*
+ *
+ * Owner, 2026-09-07: *"i want the send confirmation of outlook to be with the post on moedatech not
+ * only the send... the confirmation must be clear and big so user can really confirm that his
+ * requests will be sent to these suppliers through outlook and on moedatech."*
  */
 describe("the confirm dialog", () => {
-  const toConfirm = async () => {
-    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
-    api.mail = {
-      sent: false, reason: "PREVIEW", from: "bandar@zahid.sa", via: "graph",
-      to: ["bandar@zahid.sa"], bcc: ["ops@alfaisal.sa"], subject: "RFQ", recipients: 1, skippedIds: [],
-    };
-    draw({ draftForm: DRAFT });
+  const toConfirm = async (props: Partial<React.ComponentProps<typeof ShareRequestPanel>> = {}) => {
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
+    draw({ draftForm: DRAFT, ...props });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
-    await waitFor(() => expect(screen.getByText(c.confirmTitle)).toBeTruthy());
+    await waitFor(() => expect(confirmButton()).toBeTruthy());
   };
 
   it("Given Cancel, Then nothing is sent and the dialog goes", async () => {
     /**
-     * 🔴 **The way out is the point.** Without one, pressing Send is a reflex rather than a
-     * decision, and there was nothing to stop him pressing the same button twice.
+     * 🔴 **The way out is the point, and now it is a real one.** With the post happening first,
+     * Cancel left a live request and a renter who believed he had called the whole thing off.
+     * Nothing has happened when this dialog opens, so Cancel really is a cancel.
      */
     await toConfirm();
-    expect(api.mailCalls).toHaveLength(1);
+    expect(api.mailCalls).toHaveLength(0);
 
     fireEvent.click(screen.getByText(c.confirmNo).closest("button")!);
 
-    await waitFor(() => expect(screen.queryByText(c.confirmTitle)).toBeNull());
-    // Still one call: the dry run. Nothing left.
-    expect(api.mailCalls).toHaveLength(1);
+    await waitFor(() => expect(confirmButton()).toBeNull());
+    expect(api.mailCalls).toHaveLength(0);
   });
 
-  it("Given a changed selection, Then the dialog cannot be confirmed against the old envelope", async () => {
-    // ⚠️ He ticked another supplier after previewing three. Confirming now would send an envelope
-    // that no longer matches the screen, so it is thrown away and the next press previews again.
+  it("Given a changed selection, Then the dialog closes rather than sending the old list", async () => {
+    // ⚠️ He ticked another supplier while the dialog was open. Confirming would send an envelope
+    // that no longer matches the screen, so it goes and he presses Send again.
     await toConfirm();
     fireEvent.click(screen.getByText("Najd Equipment Est."));
 
-    await waitFor(() => expect(screen.queryByText(c.confirmTitle)).toBeNull());
+    await waitFor(() => expect(confirmButton()).toBeNull());
+  });
+
+  it("Given the suppliers, Then they are NAMED, every one of them", async () => {
+    /**
+     * 🔴 A number is not something he can check, and this is the last screen before his request
+     * reaches other firms.
+     */
+    await toConfirm();
+    // Twice: the row in the list, and the chip in the dialog.
+    expect(screen.getAllByText("Al Faisal Rentals").length).toBeGreaterThan(1);
+    // And the mailbox that will send it, by name.
+    expect(screen.getByText(c.confirmMailLine.replace("{from}", "bandar@zahid.sa"))).toBeTruthy();
   });
 
   it("Given a supplier with no address, Then the dialog names him too", async () => {
     // ⚠️ The one thing the sentence cannot carry: who is being left out.
-    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
-    api.mail = {
-      sent: false, reason: "PREVIEW", from: "b@x.sa", via: "ses",
-      to: ["b@x.sa"], bcc: ["ops@alfaisal.sa"], subject: "RFQ", recipients: 1, skippedIds: ["2"],
-    };
-    draw({ draftForm: DRAFT });
-    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
-
-    await waitFor(() => expect(screen.getByText(c.confirmTitle)).toBeTruthy());
+    await toConfirm({ preselect: ["1", "2"] });
     expect(screen.getAllByText(/Najd Equipment Est\./).length).toBeGreaterThan(1);
   });
 });
 
 
 /**
- * -- Cancel must not hide the post (owner, 2026-09-06: *"why not shown? it was"*) ----------------
+ * -- What the caller is told, and when ----------------------------------------------------------
  *
- * 🔴 It WAS shown, and the preview step broke it. `send()` used to run straight through to
- * `onShared`, which is what raises the green "your request is posted" pop-up. Preview-then-confirm
- * put an early `return` in the middle, so the first press never reached it — and since the post
- * happens BEFORE the preview, pressing Cancel left a live request on Moedatech and a renter who
- * believed he had called the whole thing off.
+ * `onShared` is what raises the green "your request is posted" pop-up.
+ *
+ * 🔴 With the post happening BEFORE the dialog, Cancel had to raise it anyway — the request was
+ * live whatever he chose. Now the post is inside the confirm, so Cancel announces nothing, because
+ * nothing happened.
  */
-describe("what Cancel says about the post", () => {
+describe("what the caller is told", () => {
   const shared = vi.fn();
 
   const toConfirm = async () => {
     shared.mockReset();
-    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
-    api.mail = {
-      sent: false, reason: "PREVIEW", from: "b@x.sa", via: "graph",
-      to: ["b@x.sa"], bcc: ["ops@alfaisal.sa"], subject: "RFQ", recipients: 1, skippedIds: [],
-    };
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
     render(
       <LocaleProvider>
         <ShareRequestPanel mode="post" draftForm={DRAFT} onPost={async () => "new-uuid"} onShared={shared} />
@@ -2182,47 +2271,25 @@ describe("what Cancel says about the post", () => {
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
     fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
-    await waitFor(() => expect(screen.getByText(c.confirmTitle)).toBeTruthy());
+    await waitFor(() => expect(confirmButton()).toBeTruthy());
   };
 
-  it("Given Cancel, Then the post IS announced — it is live either way", async () => {
-    /**
-     * ⚠️ Announced as the Moedatech-only case, because that is exactly what happened: the request
-     * is live and nothing was e-mailed. It is the one state where saying nothing is a lie.
-     */
+  it("Given Cancel, Then NOTHING is announced — there is no request yet", async () => {
     await toConfirm();
-    expect(shared).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByText(c.confirmNo).closest("button")!);
 
-    await waitFor(() => expect(shared).toHaveBeenCalledWith(0, "none"));
+    await waitFor(() => expect(confirmButton()).toBeNull());
+    expect(shared).not.toHaveBeenCalled();
   });
 
-  it("Given Send, Then it is announced ONCE, with the channel it went out on", async () => {
+  it("Given Confirm, Then it is announced ONCE, with the channel it went out on", async () => {
     await toConfirm();
-    api.mail = { sent: true, from: "b@x.sa", via: "graph", recipients: 1, messageId: null, inSentFolder: true, skipped: 0 };
-    fireEvent.click(screen.getByText(c.confirmYes).closest("button")!);
+    api.mail = { sent: true, from: "bandar@zahid.sa", via: "graph", recipients: 1, messageId: null, inSentFolder: true, skipped: 0 };
+
+    fireEvent.click(confirmButton()!);
 
     await waitFor(() => expect(shared).toHaveBeenCalledWith(1, "email"));
     expect(shared).toHaveBeenCalledTimes(1);
-  });
-
-  it("Given SHARE mode, Then Cancel announces nothing — no post happened here", async () => {
-    // ⚠️ The request already existed. There is nothing to tell him about.
-    shared.mockReset();
-    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
-    api.mail = {
-      sent: false, reason: "PREVIEW", from: "b@x.sa", via: "graph",
-      to: ["b@x.sa"], bcc: ["ops@alfaisal.sa"], subject: "RFQ", recipients: 1, skippedIds: [],
-    };
-    draw({ draftForm: DRAFT, onShared: shared });
-    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
-    await waitFor(() => expect(screen.getByText(c.confirmTitle)).toBeTruthy());
-
-    fireEvent.click(screen.getByText(c.confirmNo).closest("button")!);
-    await waitFor(() => expect(screen.queryByText(c.confirmTitle)).toBeNull());
-    expect(shared).not.toHaveBeenCalled();
   });
 });
