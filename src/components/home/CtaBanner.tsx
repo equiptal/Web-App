@@ -117,8 +117,12 @@ export function CtaBanner() {
            two doors before he knew what was behind either.
 
         The palette is the repo's tokens, not the comp's hexes: `--brand` for the button (the one
-        primary orange this app uses everywhere) and `--brand-light` for the word and the sparkle,
-        which is the accent the new-bids banner already wears on a dark ground. */}
+        primary orange this app uses everywhere) and — since 2026-09-07 — `--brand` for «our AI
+        assistant» too. ~~`--brand-light`~~ is `#e8b64c`, the OS's `warn-amber`, and on this navy it
+        read yellow rather than branded: the one coloured phrase in the headline was wearing the
+        WARNING accent while the button beside it wore the brand (owner: *"i want it more to orange
+        not this yellow"*). Same token as the button now, so the phrase and the control the renter
+        presses are one colour. */}
     <div
       {...pin("home-hero")}
       /* ── Full window, and flush under the nav bar (owner, 2026-08-30) ────────────────────
@@ -233,7 +237,7 @@ export function CtaBanner() {
               reason — Oswald at 800 fills its own counters at this size. */}
           <h1 className="font-hero text-display font-semibold leading-tight text-white sm:text-hero">
             {t.home.ctaTitleBefore}
-            <span className="text-brand-light">{t.home.ctaTitleAi}</span>
+            <span className="text-brand">{t.home.ctaTitleAi}</span>
             {t.home.ctaTitleAfter}
           </h1>
           <p className="mt-2.5 max-w-[480px] text-subhead leading-relaxed text-white/70">{t.home.ctaSubtitle}</p>
