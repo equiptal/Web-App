@@ -312,7 +312,7 @@ export const PAGE_Y = "py-6 sm:py-7";
  *
  * `AppShell` renders this itself for any page that registered a handler, so no page positions it.
  */
-export const PAGE_BACK = "mb-4 inline-flex";
+export const PAGE_BACK = "mb-4 flex w-full items-center gap-4";
 
 /**
  * A row of buttons.

@@ -269,7 +269,7 @@ export function ShareRequestPanel({
    */
   const [reopen, setReopen] = useState<Compose | null>(null);
   const [dnsCopied, setDnsCopied] = useState(false);
-  const [msgCopied, setMsgCopied] = useState(false);
+  const [copiedPart, setCopiedPart] = useState<"subject" | "body" | null>(null);
   /*
    * — `myEmail`, the address off his Moedatech profile, lived here —
    *
@@ -603,23 +603,32 @@ export function ShareRequestPanel({
   const detail = card ? cardBlock(card.model, lang, { omitHead: true }) : "";
 
   /**
-   * Take the whole message away.
+   * ⚠️ **Two controls, because they go in two different boxes** (owner, 2026-09-07: *"i want the
+   * copy message... one on the title as copy title and one on the body as copy body"*).
    *
-   * ⚠️ **Not the same control as «Copy link», and the difference is the owner's rule** (owner,
-   * 2026-09-02: *"copy link must only copy the link not the message"*). Copy link answers *give me
-   * the URL*; this answers *give me what you were going to send*. Two questions, two buttons, and
-   * folding them together is what made Copy ambiguous the first time.
+   * A renter pasting into a mail client he has open puts the subject in one field and the message
+   * in another. One button that copied both left him pasting the whole thing into the subject line
+   * and then deleting most of it.
    *
-   * ⚠️ **Both flavours, in one clipboard item.** The receiving app chooses: Gmail and Outlook
-   * keep the HTML and draw the card, a chat takes the words. Writing only one of them would decide
-   * for an app we cannot see, and the card is the half that has been missing everywhere.
+   * ⚠️ **Neither is «Copy link»** (owner, 2026-09-02: *"copy link must only copy the link not the
+   * message"*). Copy link answers *give me the URL*; these answer *give me what you were going to
+   * send*. Folding them together is what made Copy ambiguous the first time.
    *
-   * ⚠️ Locked until the request is posted, the same rule as the link itself: the message ends
-   * with a URL that does not exist yet, so copying early hands him a message with a hole in it.
+   * ⚠️ The body is locked until the request is posted, the same rule as the link itself: the
+   * message ends with a URL that does not exist yet. The SUBJECT is not, because it names the
+   * machine and is true before anything is published.
    */
-  const copyMessage = async () => {
+  const copySubject = async () => {
+    await navigator.clipboard?.writeText(subject).catch(() => {});
+    setCopiedPart("subject");
+    setTimeout(() => setCopiedPart(null), 2400);
+  };
+
+  const copyBody = async () => {
     if (!uuid || !card) return;
     const url = bidShareUrl(uuid);
+    /* ⚠️ Both flavours, as before: the receiving app chooses. Gmail and Outlook keep the HTML and
+       draw the card; a chat takes the words. */
     await copyShareMessage(
       renderShareMessage(card.model, url, { template, renterName, lang }),
       shareMessageHtml(card.model, url, card.imageUrl || `${window.location.origin}/bid/${uuid}/og?lang=${lang}`, {
@@ -628,8 +637,8 @@ export function ShareRequestPanel({
         lang,
       }),
     ).catch(() => {});
-    setMsgCopied(true);
-    setTimeout(() => setMsgCopied(false), 2400);
+    setCopiedPart("body");
+    setTimeout(() => setCopiedPart(null), 2400);
   };
 
   /**
@@ -740,9 +749,26 @@ export function ShareRequestPanel({
    * `override` exists for *More*, which sends on its own press: `setChannel` has not landed yet at
    * that moment, so the channel is passed in rather than read out of state a render too early.
    */
-  const send = async (override?: "none" | "email" | "whatsapp" | "other") => {
+  const send = async (override?: "none" | "email" | "whatsapp" | "other", confirmed = false) => {
     const ch = override ?? channel;
     if (busy) return;
+
+    /**
+     * 🔴 **Nothing happens until he confirms, INCLUDING the post** (owner, 2026-09-07: *"i want the
+     * send confirmation of outlook to be with the post on moedatech not only the send, so it will
+     * not automatically send to moedatech"*).
+     *
+     * ~~The request was minted first and the dialog asked only about the e-mail.~~ So a renter who
+     * pressed Send to read the confirmation had already published his request, and Cancel could only
+     * call off the half that had not happened yet. The dialog now stands in front of both.
+     *
+     * ⚠️ It returns without opening a pop-up. The Confirm press is its own gesture, so the blank
+     * consent window can be opened there — which is the only moment a browser allows it.
+     */
+    if (ch === "email" && !confirmed) {
+      setConfirming(true);
+      return;
+    }
 
     /**
      * 🔴 **Opened here, before anything is awaited, or the browser blocks it.**
@@ -894,46 +920,22 @@ export function ShareRequestPanel({
       };
 
       /**
-       * -- Preview, then confirm (2026-09-06) ---------------------------------------------------
+       * ⚠️ **No dry run any more.** It existed to draw the envelope the server would use, and the
+       * server can only derive that from a request that EXISTS — which stopped being true when the
+       * confirmation moved in front of the post. What he confirms now is the list he ticked, which
+       * is his own and needs no round trip.
        *
-       * The first press ASKS what would be sent and sends nothing. The envelope it answers with is
-       * drawn into the card he is already reading, and the button becomes *Confirm and send*.
-       *
-       * 🔴 **This replaced opening a draft in his Outlook.** That needed `Mail.ReadWrite`, and real
-       * tenants refuse it: Moedatech's own granted `Mail.Send` with no administrator and refused the
-       * wider scope with "Need admin approval" two hours later. The requirement never moved — he
-       * still sees every recipient before anything leaves — only the place he sees it.
-       *
-       * ⚠️ Nothing is recorded on a preview, so an abandoned share leaves no trace.
+       * The cost, stated: a linked supplier row whose address comes from its Moedatech account is
+       * shown by NAME rather than by the address the server will resolve. He is confirming who, and
+       * the who is right.
        */
-      const firstPress = !preview;
-      const outcome = await shareRequestEmail(id, reachable.map((x) => x.id), body, { dryRun: firstPress });
-
-      if (outcome.sent === false && outcome.reason === "PREVIEW") {
-        /**
-         * ⚠️ **A modal, not a changed button** (owner, 2026-09-06: *"it will show one line
-         * confirmation popup, confirm or cancel, that's it — so it is a modal after click send to
-         * suppliers, not on the review screen"*).
-         *
-         * ~~The button relabelled itself to «Confirm and send» and the envelope filled in behind
-         * it.~~ A renter who pressed Send and watched the same button change its own wording has no
-         * reason to believe anything happened, and nothing stopped him pressing it twice. A dialog
-         * is the one shape that says *this is the last step* and offers a way out.
-         *
-         * The envelope still fills the card underneath, because that is where he CHECKS it. This
-         * asks one question about it.
-         */
-        setPreview(outcome);
-        previewFor.current = pickedKey;
-        setMailer(null);
-        setConfirming(true);
-        setBusy(false);
-        return;
-      }
+      const outcome = await shareRequestEmail(id, reachable.map((x) => x.id), body);
       setPreview(null);
       previewFor.current = null;
       setConfirming(false);
-      setMailer(outcome);
+      /* ⚠️ A PREVIEW cannot come back on this call — we never ask for one — but the type still
+         admits it, so it is refused here rather than assumed away. */
+      setMailer(outcome.sent === false && outcome.reason === "PREVIEW" ? null : outcome);
 
       if (outcome.sent) {
         reached += outcome.recipients;
@@ -1066,12 +1068,15 @@ export function ShareRequestPanel({
    * nothing was e-mailed. `ShareOnPost` already draws the right dialog for that, and its own
    * `announced` guard stops a second press repeating it.
    */
-  const cancelSend = () => {
-    setConfirming(false);
-    if (!postedHere.current) return;
-    postedHere.current = false;
-    onShared?.(0, "none");
-  };
+  /**
+   * He backed out.
+   *
+   * ⚠️ **Nothing to announce any more, because nothing happened.** When the post came FIRST this
+   * had to raise the «your request is posted» pop-up, or Cancel left a live request and a renter
+   * who believed he had called it off. The dialog now stands in front of the post, so Cancel is
+   * simply a cancel.
+   */
+  const cancelSend = () => setConfirming(false);
 
   /**
    * One of his own lines changed.
@@ -1583,14 +1588,7 @@ export function ShareRequestPanel({
                   controls for the preview, not fields of the message. Kept on our own surface so the
                   imitation below starts cleanly at the To line. */}
               <div className="flex flex-none items-center border-b border-border bg-surface2 px-3 py-1.5">
-                <PreviewTools
-                  lang={lang}
-                  setLang={setLang}
-                  onCopy={() => void copyMessage()}
-                  copied={msgCopied}
-                  disabled={!uuid || !card}
-                  c={c}
-                />
+                <PreviewTools lang={lang} setLang={setLang} />
               </div>
 
               {/* ── The client's own compose header (owner, 2026-09-06) ──────────────────────────
@@ -1637,7 +1635,18 @@ export function ShareRequestPanel({
                 <MailField label={c.envBcc} skin={skin}>
                   <MailChips people={envelopeBcc} empty={c.envNoRecipients} skin={skin} />
                 </MailField>
-                <MailField label={c.envSubject} skin={skin}>
+                <MailField
+                  label={c.envSubject}
+                  skin={skin}
+                  action={
+                    <CopyBit
+                      label={copiedPart === "subject" ? c.copied : c.copyTitleBtn}
+                      done={copiedPart === "subject"}
+                      onClick={() => void copySubject()}
+                      disabled={!card}
+                    />
+                  }
+                >
                   {/* ⚠️ Still his to type in. A composer's subject IS an input, so it needs no
                       separate treatment to look editable — but it keeps our pen, because nothing
                       else on this screen says which parts are his. */}
@@ -1682,6 +1691,15 @@ export function ShareRequestPanel({
                 className="p-3"
                 style={{ background: skin.bodyGround, color: skin.text }}
               >
+                {/* ⚠️ On the body, because that is the field it fills. */}
+                <div className="mb-2 flex justify-end">
+                  <CopyBit
+                    label={copiedPart === "body" ? c.copied : c.copyBodyBtn}
+                    done={copiedPart === "body"}
+                    onClick={() => void copyBody()}
+                    disabled={!uuid || !card}
+                  />
+                </div>
                 <Message
                   parts={parts}
                   detail={detail}
@@ -1703,15 +1721,15 @@ export function ShareRequestPanel({
                is a separate block under the body, because that is where a mail client puts it. Same
                card, drawn where each client actually draws it. */
             <div className="min-h-0 flex-1 overflow-auto rounded-md border border-border bg-surface2 p-3">
-              <div className="mb-2 flex justify-end">
-                <PreviewTools
-                  lang={lang}
-                  setLang={setLang}
-                  onCopy={() => void copyMessage()}
-                  copied={msgCopied}
+              {/* ⚠️ No subject on a chat, so the one copy here is the body. */}
+              <div className="mb-2 flex items-center gap-1.5">
+                <CopyBit
+                  label={copiedPart === "body" ? c.copied : c.copyBodyBtn}
+                  done={copiedPart === "body"}
+                  onClick={() => void copyBody()}
                   disabled={!uuid || !card}
-                  c={c}
                 />
+                <PreviewTools lang={lang} setLang={setLang} />
               </div>
               <div className="max-w-[94%] rounded-md rounded-ss-none bg-surface px-3 py-2">
                 <Message
@@ -2124,54 +2142,95 @@ export function ShareRequestPanel({
 
           Stacked over this panel rather than replacing it, and the list reloads on success, so the
           firm he has just typed in is in the list with the picks he had already made still ticked. */}
-      {/* ── The last step ────────────────────────────────────────────────────────────────────
-          One line and two buttons. Everything it summarises is already on the card behind it; this
-          exists so that pressing Send is a decision rather than a reflex, and so there is a way out
-          of it. */}
+      {/* ── The last step, and it stands in front of BOTH halves ──────────────────────────────
+          Owner, 2026-09-07: *"the confirmation must be clear and big so user can really confirm
+          that his requests will be sent to these suppliers through outlook and on moedatech"*.
+
+          🔴 **Nothing has happened when this opens.** The request is not posted and no mail has
+          left, so Cancel really does call the whole thing off — which is what a Cancel button
+          promises and what the old one could not keep.
+
+          ⚠️ It says one of two things, and the difference is real: the FIRST press publishes the
+          request as well as e-mailing it, a later one only e-mails, because it is already live. A
+          renter sharing with a second supplier must not be asked to approve a post that happened
+          yesterday. */}
       <Dialog
-        open={confirming && !!preview}
-        onClose={() => setConfirming(false)}
-        size="sm"
-        /* ⚠️ No icon. It sat on top of the title in the rendered dialog, and a one-line question
-           with two buttons has nothing an icon would add. */
-        title={c.confirmTitle}
+        open={confirming}
+        onClose={cancelSend}
+        size="lg"
+        title={uuid ? c.confirmSendTitle : c.confirmPostTitle}
         footer={
           <div className="flex w-full items-center justify-end gap-2">
-            <button type="button" onClick={cancelSend} className={btn("secondary", "md")}>
+            <button type="button" onClick={cancelSend} className={btn("secondary", "lg")}>
               {c.confirmNo}
             </button>
             <button
               type="button"
               onClick={() => {
                 setConfirming(false);
-                void send();
+                /* ⚠️ Sent from THIS press, so the browser still counts the click and the blank
+                   consent window can be opened inside `send`. */
+                void send(undefined, true);
               }}
-              className={btn("primary", "md")}
+              className={cx(btn("primary", "lg"), "px-6")}
             >
-              <Icon name="send" size={15} />
-              {c.confirmYes}
+              <Icon name="send" size={16} />
+              {uuid ? c.confirmDoSend : c.confirmDoBoth}
             </button>
           </div>
         }
       >
-        <p className="text-body text-navy">
-          {preview &&
-            fmt(
-              preview.recipients === 1
-                ? c.confirmBodyOne
-                : provider === "gmail"
-                  ? c.confirmBodyGmail
-                  : c.confirmBodyOutlook,
-              { from: preview.from, n: preview.recipients },
+        <div className="grid gap-4">
+          {/* One line per thing that is about to happen, each with its own mark, so he can count
+              them rather than parse a sentence. */}
+          <div className="grid gap-2.5">
+            {!uuid && (
+              <span className="flex items-start gap-2.5 text-body text-navy">
+                <Icon name="public" size={18} className="mt-px flex-none text-brand" />
+                {c.confirmPostLine}
+              </span>
             )}
-        </p>
-        {/* ⚠️ The one thing the sentence above cannot carry: who is being LEFT OUT. */}
-        {skippedNames.length > 0 && (
-          <p className="mt-2 flex items-start gap-1.5 text-meta font-semibold text-warn-deep">
-            <Icon name="error_outline" size={14} className="mt-px flex-none" />
-            {fmt(c.envSkipped, { names: skippedNames.join(", ") })}
-          </p>
-        )}
+            {uuid && (
+              <span className="flex items-start gap-2.5 text-body text-muted">
+                <Icon name="check_circle" size={18} className="mt-px flex-none text-ok-deep" />
+                {c.confirmPostedAlready}
+              </span>
+            )}
+            <span className="flex items-start gap-2.5 text-body text-navy">
+              <Icon name={provider === "gmail" ? "alternate_email" : "mail"} size={18} className="mt-px flex-none text-brand" />
+              {sendingFrom ? fmt(c.confirmMailLine, { from: sendingFrom }) : c.confirmMailLineAnon}
+            </span>
+          </div>
+
+          {/* ⚠️ **The suppliers by NAME, every one of them.** A number is not something he can
+              check, and this is the last screen before his request reaches other firms. */}
+          {reachable.length > 0 && (
+            <div className="rounded-md border border-border bg-surface2 p-3">
+              <span className="text-label font-semibold uppercase tracking-wide text-muted">
+                {c.envBcc} · {reachable.length}
+              </span>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {reachable.map((x) => (
+                  <span
+                    key={x.id}
+                    title={x.email ?? undefined}
+                    className="inline-flex h-[26px] max-w-full items-center rounded-full border border-border bg-surface px-3 text-meta text-navy"
+                  >
+                    <span className="truncate">{x.name}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ⚠️ The ones being left out, named. It is the last moment he can add an address. */}
+          {skippedNames.length > 0 && (
+            <span className="flex items-start gap-2 text-meta font-semibold text-warn-deep">
+              <Icon name="error_outline" size={15} className="mt-px flex-none" />
+              {fmt(c.envSkipped, { names: skippedNames.join(", ") })}
+            </span>
+          )}
+        </div>
       </Dialog>
 
       <AddSuppliersDialog
@@ -2309,66 +2368,55 @@ function Message({
  */
 
 /**
- * The two controls that belong to the message itself: which language it is in, and take it away.
+ * Which language the message is written in.
  *
- * ⚠️ **Inside the card, not above it** (owner, 2026-09-05). In the column heading they read as
- * settings for the panel; against the subject line they read as what they are — this letter's
- * language, and this letter on the clipboard. It also gave the heading back a line, which the two
- * columns needed more than a toolbar did.
+ * ⚠️ **The copy buttons left this strip** (owner, 2026-09-07). They now sit ON the two things they
+ * copy: the subject beside the Subject field, the body beside the body. A renter pasting into a mail
+ * client he already has open fills two fields, and one button that copied both left him pasting
+ * everything into the subject line and deleting most of it.
  *
  * ⚠️ Each language names itself in itself. «العربية» is legible to the renter who wants it
  * whatever the interface happens to be set to.
  */
-function PreviewTools({
-  lang,
-  setLang,
-  onCopy,
-  copied,
-  disabled,
-  c,
-}: {
-  lang: "en" | "ar";
-  setLang: (v: "en" | "ar") => void;
-  onCopy: () => void;
-  copied: boolean;
-  /** No link yet: the message ends in a URL that does not exist, so there is nothing whole to copy. */
-  disabled: boolean;
-  c: ReturnType<typeof useT>["intake"]["postShare"];
-}) {
+function PreviewTools({ lang, setLang }: { lang: "en" | "ar"; setLang: (v: "en" | "ar") => void }) {
   return (
-    <span className="ms-auto flex flex-none items-center gap-1.5">
-      <span className="flex items-center rounded-sm border border-border bg-surface p-0.5">
-        {(["en", "ar"] as const).map((v) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => setLang(v)}
-            aria-pressed={lang === v}
-            className={cx(
-              "rounded-sm px-1.5 py-0.5 text-label transition-colors",
-              lang === v ? "bg-brand text-brand-fg" : "text-navy-mid hover:text-navy",
-            )}
-          >
-            {v === "en" ? "English" : "العربية"}
-          </button>
-        ))}
-      </span>
-      <button
-        type="button"
-        onClick={onCopy}
-        disabled={disabled}
-        title={c.copyMessageHint}
-        className={cx(
-          "inline-flex h-[22px] items-center gap-1 rounded-sm border border-border bg-surface px-2 text-label transition-colors",
-          disabled ? "text-muted-light" : "text-navy-mid hover:text-navy",
-        )}
-      >
-        <Icon name={copied ? "check" : "article"} size={13} />
-        {copied ? c.copyMessageDone : c.copyMessage}
-      </button>
+    <span className="ms-auto flex flex-none items-center rounded-sm border border-border bg-surface p-0.5">
+      {(["en", "ar"] as const).map((v) => (
+        <button
+          key={v}
+          type="button"
+          onClick={() => setLang(v)}
+          aria-pressed={lang === v}
+          className={cx(
+            "rounded-sm px-1.5 py-0.5 text-label transition-colors",
+            lang === v ? "bg-brand text-brand-fg" : "text-navy-mid hover:text-navy",
+          )}
+        >
+          {v === "en" ? "English" : "العربية"}
+        </button>
+      ))}
     </span>
   );
 }
+
+/** One small copy control, drawn on the thing it copies. */
+function CopyBit({ label, done, onClick, disabled }: { label: string; done: boolean; onClick: () => void; disabled: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cx(
+        "inline-flex h-[22px] flex-none items-center gap-1 rounded-sm border border-border bg-surface px-2 text-label transition-colors",
+        disabled ? "text-muted-light" : "text-navy-mid hover:text-navy",
+      )}
+    >
+      <Icon name={done ? "check" : "content_copy"} size={12} />
+      {label}
+    </button>
+  );
+}
+
 
 /**
  * One of the renter's own lines: a field that looks like the text it will be.

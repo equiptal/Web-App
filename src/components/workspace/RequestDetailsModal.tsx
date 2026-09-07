@@ -156,9 +156,17 @@ export function RequestDetailsModal({
      runs — and the app prints them under the site, beside «extendable». Split by label because that
      is what `requestDetailRows` returns; it is one list and this is the only place that cares which
      half a row belongs to. */
-  const siteLabels = [L("Rental basis", "أساس الإيجار"), L("Working hours", "ساعات العمل")];
-  const siteRows = allParamRows.filter(([label]) => siteLabels.includes(label));
-  const projectRows = allParamRows.filter(([label]) => !siteLabels.includes(label));
+  /* ── Three groups, the app's own (owner, 2026-09-07, with the app's screens beside it) ───────
+     · **The strip under the site** — how it is rented and how a day runs, plus the payment term and
+       whether the dates can move. Four cells, as the app draws them: they qualify the JOB.
+     · **Project details** — the working week, and nothing else the app puts there.
+     · **Preferences** — every remaining term the renter expressed: maintenance, overtime, the
+       breakdown response, the budget. The app's own last section, and its own heading. */
+  const stripLabels = [L("Rental basis", "أساس الإيجار"), L("Working hours", "ساعات العمل"), L("Payment terms", "شروط الدفع")];
+  const projectLabels = [L("Working days / week", "أيام العمل/أسبوع")];
+  const siteRows = allParamRows.filter(([label]) => stripLabels.includes(label));
+  const projectRows = allParamRows.filter(([label]) => projectLabels.includes(label));
+  const preferenceRows = allParamRows.filter(([label]) => !stripLabels.includes(label) && !projectLabels.includes(label));
   /**
    * Extendable, said with the dates and not with the terms (owner, 2026-09-02).
    *
@@ -169,6 +177,19 @@ export function RequestDetailsModal({
    */
   const extendable = subjectRecord ? requestFieldFormatters(ar, L).yn(subjectRecord.extendable) : null;
   const notes = typeof subjectRecord?.additionalNotes === "string" ? subjectRecord.additionalNotes.trim() : "";
+  /** «31/8 – 7/10», the app's own compact period. Both ends, because a start with no end is a
+   *  different promise from a fixed window, and the strip is where a reader checks that. */
+  const period = (() => {
+    const a = subject?.startDate ? fmt(subject.startDate) : null;
+    const b = subject?.endDate ? fmt(subject.endDate) : null;
+    if (a && b) return `${a} – ${b}`;
+    return a ?? b ?? "";
+  })();
+  /** The urgency the renter chose, made readable — `FAR_FUTURE` is not a word. */
+  const urgency = (() => {
+    const raw = (subjectRecord as { urgency?: string | null } | null)?.urgency ?? null;
+    return raw ? raw.replace(/[_-]+/g, " ").toLowerCase().replace(/\w/g, (c) => c.toUpperCase()) : "";
+  })();
   // The Supplier OS host, not this app's origin — so no `typeof window` guard and no SSR-empty value.
   const shareUrl = bidShareUrl(group.id);
 
@@ -305,36 +326,49 @@ export function RequestDetailsModal({
         }
       >
         <div {...pin("request-details")}>
-          {/* ── What the request IS ─────────────────────────────────────────────────────────────
-              Its state and its reach. Neither is a field the renter typed, which is why they were
-              missing — but "what did I ask for" includes whether it is still open and whether it went
-              to the market or to one supplier, and this modal is the only place that answers either.
+          {/* ── The header strip, first (owner, 2026-09-07) ──────────────────────────────────────
+              *"First thing the header, with period, duration and urgency, and created at."*
 
-              Per ITEM, not per group: a fanned-out RFQ where one machine was accepted and the rest
-              are still open has no single status, and rolling them into one would say something
-              untrue about both. This states the item in focus, which is what the rest of the modal
-              is about. */}
-          <Section title={L("Request", "الطلب")}>
-            <dl className="divide-y divide-border">
-              {subject && (
-                <Fact label={L("Status", "الحالة")} value={ar ? statusMeta(subject.status).ar : statusMeta(subject.status).en} />
-              )}
-              <Fact
-                label={L("Reach", "نطاق الإرسال")}
-                value={
-                  (subject?.type ?? group.type) === "DIRECT"
-                    ? L("One supplier", "مؤجّر واحد")
-                    : L("Open to the market", "مفتوح للسوق")
-                }
-              />
-              <Fact label={L("Reference", "المرجع")} value={group.groupRef ?? subject?.displayId ?? group.id} />
-              {/* WHEN he asked, at the top with the rest of what the request IS (owner, 2026-09-06:
-                  *"show created at, at top"*). It sat twenty rows down among the dates of the JOB,
-                  which is a different clock: those say when the machine is needed, this says when he
-                  put the request out — and it is what he counts the silence from. */}
-              <Fact label={t.workspace.factRequested} value={fmt(group.createdAt)} />
-            </dl>
-          </Section>
+              The app's own opening band, four cells on the navy: the four facts that place a request
+              in time before any of its terms matter. ~~A «Request» section of label-left rows —
+              status, reach, reference, requested-on — above the machines.~~ Status and reach are
+              CHIPS beside the title now, where the app puts them, and the reference sits with them:
+              a reader checking the code is not reading a field, he is copying an identifier. */}
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            {subject && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-navy px-2.5 py-1 text-label font-semibold text-white">
+                <span className="size-1.5 rounded-full bg-ok" />
+                {ar ? statusMeta(subject.status).ar : statusMeta(subject.status).en}
+              </span>
+            )}
+            <span className="rounded-full bg-surface2 px-2.5 py-1 text-label font-semibold text-navy-mid">
+              {(subject?.type ?? group.type) === "DIRECT" ? L("One supplier", "مؤجّر واحد") : L("Open to the market", "مفتوح للسوق")}
+            </span>
+            <span className="keep-mono rounded-full border border-border px-2.5 py-1 text-label font-semibold text-muted">
+              {group.groupRef ?? subject?.displayId ?? group.id}
+            </span>
+            {/* How many offers came back, split by source — «4 bids» hides that three of them were
+                typed in by hand. It sat in the site section, which was never a fact about the site. */}
+            <span className="rounded-full border border-border px-2.5 py-1 text-label font-semibold text-muted">
+              {bids.length === 0
+                ? t.workspace.noBidsYet
+                : `${bids.length} · ${t.workspace.bidsSplit.replace("{app}", String(viaApp)).replace("{offline}", String(offline))}`}
+            </span>
+          </div>
+
+          <div className="mb-4 grid grid-cols-2 overflow-hidden rounded-md bg-navy sm:grid-cols-4">
+            {[
+              [t.workspace.factPeriod, period],
+              [t.workspace.factDuration, subject?.durationDays ? t.workspace.daysValue.replace("{n}", String(subject.durationDays)) : "—"],
+              [t.workspace.factUrgency, urgency],
+              [t.workspace.factRequested, fmt(group.createdAt)],
+            ].map(([label, value]) => (
+              <span key={String(label)} className="flex min-w-0 flex-col gap-0.5 border-e border-white/10 px-3 py-2.5 last:border-e-0">
+                <span className="truncate text-label font-semibold uppercase tracking-wide text-white/60">{label}</span>
+                <span className="truncate text-body font-extrabold text-white">{value || "—"}</span>
+              </span>
+            ))}
+          </div>
 
           {/* ── The machines, each with its own terms (owner, 2026-08-29) ────────────────────────
               Every line of the group is listed and the one in focus is marked, as before — but a
@@ -372,12 +406,27 @@ export function RequestDetailsModal({
                       </div>
                     </div>
                     {rows.length > 0 && (
-                      /* Inside the machine's own box, under a rule — these are ITS terms, and a
-                         list floating below the row would read as the request's. Same grid as the
-                         request-level terms below: one shape for «a set of answers», so a reader
-                         does not learn two layouts inside one modal. */
-                      <div className="border-t border-border px-3 py-2.5">
-                        <FactGrid rows={rows} cell="bg-surface" />
+                      /* ── OPERATOR · LOGISTICS · CERTIFICATES (owner, 2026-09-07) ────────────────
+                         The app's own three groups, and the order is the order a renter asks the
+                         questions in: who runs it, how it gets there and back, what it must hold.
+
+                         ~~One flat grid of every item row.~~ It printed «Operator», «Delivery to
+                         site», «Return from site», «Night shift», «Fuel» and the year as six
+                         equal-weight boxes, so nothing said which of them belonged together — and
+                         the two transport rows, which are one decision taken twice, sat apart.
+
+                         A group with nothing in it is not drawn, so a machine that stated only its
+                         year shows one line rather than three empty headings. */
+                      <div className="flex flex-col gap-2 border-t border-border px-3 py-2.5">
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <ItemGroup icon="person" title={L("Operator", "المشغّل")} rows={groupOf(rows, OPERATOR_LABELS(L))} />
+                          <ItemGroup icon="local_shipping" title={L("Logistics", "النقل")} rows={groupOf(rows, LOGISTICS_LABELS(L))} />
+                        </div>
+                        <ItemGroup icon="verified_user" title={L("Certificates", "الشهادات")} rows={groupOf(rows, CERT_LABELS(L))} chips />
+                        {/* Whatever the machine states that is none of the three — the year, the
+                            fuel, its own notes. Kept, because a request that names a 2020 minimum
+                            has said something a supplier must meet. */}
+                        <ItemGroup icon="tune" title={L("Also asked", "مطلوب أيضًا")} rows={groupOf(rows, null, [...OPERATOR_LABELS(L), ...LOGISTICS_LABELS(L), ...CERT_LABELS(L), L("Units", "العدد")])} />
                       </div>
                     )}
                   </div>
@@ -386,62 +435,56 @@ export function RequestDetailsModal({
             </div>
           </Section>
 
-          {/* When and where. Duration sits with the dates it is derived from, which is why
-              `requestDetailRows` deliberately leaves it out — a field printed twice makes a reader
-              wonder which of the two is authoritative. */}
+          {/* ── The site, as the app draws it (owner, 2026-09-07) ────────────────────────────────
+              A block that opens the map, the address under it, and the four-cell strip beneath —
+              rental basis, payment term, hours a day, extendable. ~~A column of label-left rows
+              carrying the dates, the duration, the site and the bid count.~~ The dates and the
+              duration moved to the header strip, where the owner asked for them; the bid count is
+              not a fact about the site at all and now sits with the machines' own count of offers.
+
+              A SEARCH on the address, not a pin: the my-requests payload carries no coordinates —
+              checked against staging — and the stored address is what a person would paste into
+              Maps themselves. Inventing a point from a label would put a pin somewhere nobody
+              agreed to. Text-only when there is no address, rather than a link that searches for
+              nothing. */}
           <Section title={L("Project location", "موقع المشروع")}>
-            <dl className="divide-y divide-border">
-              <Fact label={t.workspace.factStarts} value={fmt(subject?.startDate ?? null)} />
-              {subject?.endDate && <Fact label={L("Ends", "ينتهي")} value={fmt(subject.endDate)} />}
-              {extendable && <Fact label={L("Extendable", "قابل للتمديد")} value={extendable} />}
-              {/* The basis and the hours, where the app puts them. */}
-              {siteRows.map(([label, value]) => (
-                <Fact key={label} label={label} value={String(value)} />
-              ))}
-              <Fact
-                label={t.workspace.factDuration}
-                value={subject?.durationDays ? t.workspace.daysValue.replace("{n}", String(subject.durationDays)) : "—"}
-              />
-              {/* The site, as a link to Google Maps (owner, 2026-08-31).
-                  A renter reading a request wants to know where it is, and an address they cannot
-                  press is an address they retype into another tab.
-
-                  A SEARCH on the address, not a pin: the my-requests payload carries no coordinates
-                  — checked against staging, there is no lat/lng on the wire — and the full stored
-                  address is what a person would paste into Maps themselves. The supplier-facing bid
-                  form links by lat/lng because its payload has them; this one cannot, and inventing
-                  a point from a label would put a pin somewhere nobody agreed to.
-
-                  Text-only when there is no address at all, rather than a link that searches for
-                  nothing. */}
-              <Fact
-                label={t.workspace.factSite}
-                value={(() => {
-                  const where = group.address ?? group.locationLabel;
-                  if (!where?.trim()) return "—";
-                  return (
+            {(() => {
+              const where = group.address ?? group.locationLabel;
+              return (
+                <div className="overflow-hidden rounded-md border border-border">
+                  {where?.trim() ? (
                     <a
-                      className="inline-flex items-center gap-1 underline decoration-border underline-offset-2 hover:text-brand"
+                      className="flex items-center gap-3 bg-surface2 px-3.5 py-3 transition hover:bg-surface3"
                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(where)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      {where}
-                      <span className="material-icons-outlined text-label">place</span>
+                      <span className="grid size-9 flex-none place-items-center rounded-full bg-surface text-brand">
+                        <Icon name="place" size={19} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-body font-extrabold text-navy">{where}</span>
+                        <span className="block text-label font-semibold text-muted">{L("Open in Maps", "افتح في الخرائط")}</span>
+                      </span>
+                      <span className="flex-none text-muted">{ar ? "‹" : "›"}</span>
                     </a>
-                  );
-                })()}
-              />
-              {/* Split by source, because "4 bids" hides that two of them were typed in by hand. */}
-              <Fact
-                label={t.workspace.factBidsIn}
-                value={
-                  bids.length === 0
-                    ? t.workspace.noBidsYet
-                    : `${bids.length} · ${t.workspace.bidsSplit.replace("{app}", String(viaApp)).replace("{offline}", String(offline))}`
-                }
-              />
-            </dl>
+                  ) : (
+                    <p className="bg-surface2 px-3.5 py-3 text-body font-semibold text-muted">{L("No site named", "لم يُحدد موقع")}</p>
+                  )}
+
+                  {/* The strip: how it is rented, what it pays on, how long a day runs, and whether
+                      the dates can move. Four cells because they qualify one another. */}
+                  <div className="grid grid-cols-2 divide-x divide-border border-t border-border sm:grid-cols-4 rtl:divide-x-reverse">
+                    {[...siteRows, ...(extendable ? [[L("Extendable", "قابل للتمديد"), extendable] as Row] : [])].map(([label, value]) => (
+                      <span key={label} className="flex min-w-0 flex-col gap-0.5 px-3 py-2.5 text-center">
+                        <span className="truncate text-label font-semibold uppercase tracking-wide text-muted">{label}</span>
+                        <span className="truncate text-body font-extrabold text-navy">{value}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </Section>
 
           {/* ── Everything else the request stores ──────────────────────────────────────────────
@@ -465,6 +508,19 @@ export function RequestDetailsModal({
           {projectRows.length > 0 && (
             <Section title={L("Project details", "تفاصيل المشروع")}>
               <FactGrid rows={projectRows} />
+            </Section>
+          )}
+
+          {/* ── Preferences, the app's own last section (owner, 2026-09-07) ─────────────────────
+              *"Finally a preferences section: maintenance or payment or whatever."*
+
+              Everything the renter expressed that is neither the job's shape nor the working week:
+              maintenance, the breakdown response, overtime, the budget, the offer's own duration.
+              The section disappears when he stated none of them, because a heading over nothing
+              reads as a fetch that failed. */}
+          {preferenceRows.length > 0 && (
+            <Section title={L("Preferences", "التفضيلات")}>
+              <FactGrid rows={preferenceRows} />
             </Section>
           )}
 
@@ -573,6 +629,65 @@ export function RequestDetailsModal({
  *
  * `first:mt-0` so the top block sits against the panel's own padding instead of doubling it.
  */
+/* ── Which of a machine's answers belong together (owner, 2026-09-07) ────────────────────────────
+   The app groups them as OPERATOR · LOGISTICS · CERTIFICATES, and these are the labels
+   `itemDetailRows` returns for each. Matched on the LABEL because that list returns `[label, value]`
+   and nothing else — the alternative is a second vocabulary of keys kept in step with it by hand. */
+const OPERATOR_LABELS = (L: (en: string, ar: string) => string) => [
+  L("Operator", "المشغّل"),
+  L("Operator nationality", "جنسية المشغّل"),
+  L("Food & accommodation", "الإعاشة والسكن"),
+  L("Night shift", "وردية ليلية"),
+];
+const LOGISTICS_LABELS = (L: (en: string, ar: string) => string) => [
+  L("Delivery to site", "التوصيل للموقع"),
+  L("Return from site", "الإرجاع من الموقع"),
+];
+const CERT_LABELS = (L: (en: string, ar: string) => string) => [L("Safety certificates", "شهادات السلامة")];
+
+/** The rows whose label is in `wanted` — or, with `wanted` null, every row NOT in `except`. */
+function groupOf(rows: Row[], wanted: string[] | null, except: string[] = []): Row[] {
+  return wanted ? rows.filter(([l]) => wanted.includes(l)) : rows.filter(([l]) => !except.includes(l));
+}
+
+/**
+ * One labelled group inside a machine's box: a heading with its glyph, then the answers.
+ *
+ * `chips` draws them as pills rather than rows — a certificate is a badge the machine either holds
+ * or does not, and the app draws it that way; a responsibility is a sentence with two sides and
+ * reads as label-and-value.
+ */
+function ItemGroup({ icon, title, rows, chips }: { icon: string; title: string; rows: Row[]; chips?: boolean }) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="rounded-sm bg-surface p-2.5">
+      <span className="mb-1.5 flex items-center gap-1.5 text-label font-semibold uppercase tracking-wide text-muted">
+        <Icon name={icon} size={13} /> {title}
+      </span>
+      {chips ? (
+        <span className="flex flex-wrap gap-1.5">
+          {rows.flatMap(([, value]) =>
+            value.split("·").map((one) => (
+              <span key={one} className="inline-flex items-center gap-1 rounded-full border border-ok/30 bg-ok-soft px-2 py-0.5 text-label font-semibold text-ok">
+                <Icon name="verified" size={12} /> {one.trim()}
+              </span>
+            )),
+          )}
+        </span>
+      ) : (
+        <dl className="flex flex-col gap-1">
+          {rows.map(([label, value]) => (
+            <div key={label} className="flex items-baseline justify-between gap-2">
+              <dt className="min-w-0 truncate text-label font-semibold text-muted">{label}</dt>
+              <dd className="flex-none text-meta font-semibold text-navy">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  );
+}
+
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="mt-5 first:mt-0">
@@ -609,14 +724,6 @@ function FactGrid({ rows, cell = "bg-surface2" }: { rows: Row[]; cell?: string }
   );
 }
 
-function Fact({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-4 py-2.5">
-      <dt className="text-label font-extrabold uppercase tracking-wide text-muted">{label}</dt>
-      <dd className="text-end text-body font-semibold text-navy">{value}</dd>
-    </div>
-  );
-}
 
 function Confirm({
   title,

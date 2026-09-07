@@ -122,16 +122,19 @@ export function notificationHref(n: NotificationItem): string | null {
 
   /** The one request, in the workspace that replaced the per-request pages. */
   const request = requestId ? `/requests?r=${encodeURIComponent(requestId)}` : null;
-  /** The conversation. It lives in the MAP's dock now (owner, 2026-08-26: the deal room is no longer
-   *  somewhere a renter is sent to talk), so a bid id beats a room id when both are on the row. */
-  const chat = bidId
-    ? `/bids/${encodeURIComponent(bidId)}/equipment?chat=1`
-    : dealRoomId
-      ? `/deal-room/${encodeURIComponent(dealRoomId)}`
-      : null;
+  /** The conversation. It lives in the MAP's dock (owner, 2026-08-26: the deal room is no longer
+   *  somewhere a renter is sent to talk), so a bid id is what opens it.
+   *
+   *  ⚠️ A room id alone no longer routes anywhere of its own: the room view was retired on
+   *  2026-09-07 and `/deal-room/[id]` with no act forwards to this same chat. Sending a renter
+   *  through that forward would show him a blank frame first, so a row carrying only a room id goes
+   *  to his offers instead — which is where a notification about one belongs. */
+  const chat = bidId ? `/bids/${encodeURIComponent(bidId)}/equipment?chat=1` : dealRoomId ? "/requests" : null;
   /** The three-styles negotiation sheet, which is what `?act=counter` opens. */
   const sheet = dealRoomId ? `/deal-room/${encodeURIComponent(dealRoomId)}?act=counter` : null;
-  const room = dealRoomId ? `/deal-room/${encodeURIComponent(dealRoomId)}` : null;
+  /** The room, for the two rows that are ABOUT the settled document. The sheet-bearing acts keep
+   *  the route; a bare room id does not (see `chat` above). */
+  const room = dealRoomId ? `/deal-room/${encodeURIComponent(dealRoomId)}?act=accept` : null;
 
   switch (n.type) {
     /* ── The bid lifecycle · every one of these is ABOUT a request, so it opens that request ───── */

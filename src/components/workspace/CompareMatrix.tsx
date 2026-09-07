@@ -423,7 +423,7 @@ export function CompareMatrix({
    * simple request still draws a simple table.
    */
   const termCols = useMemo(() => {
-    const byGroup = new Map<string, { group: string; keys: string[]; labelEn: string; labelAr: string; asked: boolean }>();
+    const byGroup = new Map<string, { group: string; keys: string[]; labelEn: string; labelAr: string; asked: boolean; answered: boolean }>();
     for (const b of rows) {
       // `supplier` is deliberately absent: CR and VAT are company details (see TERM_HIDDEN).
       for (const r of [...(b.card.negotiableTerms ?? []), ...b.card.terms.contract, ...b.card.terms.equipment]) {
@@ -431,12 +431,32 @@ export function CompareMatrix({
         if (!saysSomething(r)) continue;
         const group = TERM_CANON[r.key] ?? r.key;
         if (TERM_HIDDEN.has(group)) continue;
+        /* ── A column must have something to SAY (owner, 2026-09-07) ───────────────────────
+           *"If something is not set by the request and doesn't have at least one value across the
+           suppliers' bids, don't show it — meaningless to show all «doesn't say»."*
+
+           Two ways to earn a column, and a term needs one of them:
+             · the REQUEST set it — `renteeValue` on any bid's row; or
+             · a SUPPLIER answered it — a value, or the supplier half of a detail.
+
+           `saysSomething` above only drops a row that is grey AND bare, which let a term through on
+           a state alone: «Maintenance» was `matched` with no value anywhere, so the table drew a
+           column of «Didn't say» about a question nobody had asked in words. */
+        const sides = termSides(r, ar);
         const at = byGroup.get(group);
         if (at) {
           if (!at.keys.includes(r.key)) at.keys.push(r.key);
-          at.asked = at.asked || r.renteeValue != null;
+          at.asked = at.asked || sides.asked != null;
+          at.answered = at.answered || sides.offered != null;
         } else {
-          byGroup.set(group, { group, keys: [r.key], labelEn: r.labelEn, labelAr: r.labelAr, asked: r.renteeValue != null });
+          byGroup.set(group, {
+            group,
+            keys: [r.key],
+            labelEn: r.labelEn,
+            labelAr: r.labelAr,
+            asked: sides.asked != null,
+            answered: sides.offered != null,
+          });
         }
       }
     }
@@ -444,10 +464,11 @@ export function CompareMatrix({
     /* The terms the RENTER set come first — that ordering is what the «Terms you set» heading used
        to say out loud before it was removed (owner, 2026-09-06). Within each half, the known reading
        order, then anything new alphabetically. */
-    return [...byGroup.values()].sort(
-      (a, b) => Number(b.asked) - Number(a.asked) || known(a.group) - known(b.group) || a.labelEn.localeCompare(b.labelEn),
-    );
-  }, [rows]);
+    return [...byGroup.values()]
+      // Nothing asked and nothing answered is a column of dashes; it does not draw.
+      .filter((c) => c.asked || c.answered)
+      .sort((a, b) => Number(b.asked) - Number(a.asked) || known(a.group) - known(b.group) || a.labelEn.localeCompare(b.labelEn));
+  }, [rows, ar]);
 
   const lowRate = useMemo(() => cheapest(rows, (b) => b.card.price), [rows]);
   const lowFirst = useMemo(() => cheapest(rows, (b) => totals.get(b.card.id)?.firstCycle.total ?? null), [rows, totals]);

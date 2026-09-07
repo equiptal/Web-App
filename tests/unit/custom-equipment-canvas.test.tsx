@@ -45,11 +45,13 @@ describe("naming a machine the catalogue does not carry", () => {
 
     const box = screen.getByPlaceholderText("Name the machine you need") as HTMLInputElement;
     expect(box.value).toBe("floating crane barge");
-    // The list is NOT taken away: a renter who can find his machine in it still can. It renders
-    // ABOVE the note and the box, which is the order the row reads in (owner, 2026-09-06).
+    /* The list is NOT taken away: a renter who can find his machine in it still can. And the name
+       field sits in the SAME box as the list, under it, with the note after both (owner,
+       2026-09-06): one question — which machine is this — answered two ways, then the sentence
+       saying why the first way came up empty. Two separate cards read as two unrelated asks. */
     expect(screen.getAllByText("TYPE").length).toBeGreaterThan(0);
     expect(screen.getAllByText("SIZE").length).toBeGreaterThan(0);
-    const order = ["TYPE", "not available right now", "Name the machine you need"].map((needle) =>
+    const order = ["TYPE", "Name the machine you need", "not available right now"].map((needle) =>
       document.body.innerHTML.indexOf(needle),
     );
     expect(order.every((i) => i >= 0)).toBe(true);

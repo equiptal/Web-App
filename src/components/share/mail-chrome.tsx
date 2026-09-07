@@ -59,7 +59,18 @@ export type MailSkin = (typeof MAIL_UI)[keyof typeof MAIL_UI];
  * ⚠️ The label column is fixed so Subject, From, To and Bcc line up down the left edge. That
  * alignment IS what makes a block of text read as a mail header rather than as a paragraph.
  */
-export function MailField({ label, skin, children }: { label: string; skin: MailSkin; children: ReactNode }) {
+export function MailField({
+  label,
+  skin,
+  children,
+  /** ⚠️ A control that belongs to THIS field, drawn at its end. Only «Copy subject» uses it. */
+  action,
+}: {
+  label: string;
+  skin: MailSkin;
+  children: ReactNode;
+  action?: ReactNode;
+}) {
   return (
     <div className="flex items-start gap-3 px-3 py-1.5" style={{ borderBottom: `1px solid ${skin.divider}` }}>
       {/* ⚠️ Sentence case, not our uppercase label style. Neither client shouts its field names,
@@ -68,6 +79,7 @@ export function MailField({ label, skin, children }: { label: string; skin: Mail
         {label}
       </span>
       <span className="min-w-0 flex-1">{children}</span>
+      {action ? <span className="flex-none pt-0.5">{action}</span> : null}
     </div>
   );
 }

@@ -156,6 +156,24 @@ describe("it is the bid form's own shape", () => {
    * period, its working days, its site — is a thing he wrote and can read on the request itself, and
    * here it was pushing the total he came for below the fold.
    */
+  it("puts the bid's quality at the top, beside who the bid is from", async () => {
+    /* Owner, 2026-09-07. It sat beside «Photos and documents», three sections down — which is where
+       the SUPPLIER meets it while filling the form. Reading a bid back, how complete it arrived is
+       what decides how much of the rest the renter trusts, so it belongs in the masthead. */
+    const { container } = draw();
+    await screen.findByText("Bid from");
+    // The masthead is the card that carries «Bid from»; the ring must be inside THAT card, not
+    // three sections down beside «Photos and documents».
+    // The ring is an `svg[role="img"]`; find it by that rather than by the first svg on the page,
+    // which is any icon the masthead happens to draw.
+    const ring = container.querySelector('svg[role="img"]');
+    expect(ring, "the quality ring renders").toBeTruthy();
+    // «Bid from» and the ring share the masthead card: walk up from the label until the node holds
+    // both, and assert that node is the card and not the whole dialog.
+    const card = screen.getByText("Bid from").closest("div")?.parentElement?.parentElement ?? null;
+    expect(card?.contains(ring!) ?? false).toBe(true);
+  });
+
   it("carries a rail of the supplier's figures, and nothing of the renter's request", async () => {
     draw();
     expect(await screen.findByText("The quotation")).toBeTruthy();

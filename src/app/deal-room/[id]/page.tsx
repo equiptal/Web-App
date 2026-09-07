@@ -1,12 +1,14 @@
 "use client";
 
 import { Suspense, use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { useAuthGate } from "@/components/auth/AuthGate";
 import { DealRoom } from "@/components/deal-room/DealRoom";
+import { fetchDealRoom } from "@/lib/api/client";
 import { Icon } from "@/components/ui";
 import { btn } from "@/lib/ds";
 
@@ -65,5 +67,44 @@ function DealRoomGate({ id, onTitle }: { id: string; onTitle: (t: string) => voi
     );
   }
   if (status !== "authed") return null; // resolving session — avoid flashing the gate
+  /* ── The old room view is retired (owner, 2026-09-07) ──────────────────────────────────────────
+     *"This view must be retired from all routes, even in a deal-room-closed notification."*
+
+     What it was: a supplier masthead, a price hero and a chat — and on a settled room, two lines
+     saying it had been cancelled and nothing to do about it. The conversation moved to the MAP's
+     dock on 2026-08-26 («the deal room is no longer somewhere a renter is sent to talk»), and the
+     negotiation moved to the three-styles sheet. So arriving here with no act to perform is
+     arriving at a screen with no job: it forwards to the conversation, beside the supplier's yards.
+
+     The two ACTS keep the route, because the sheet is what they open and the sheet lives here. */
+  if (!initialFlow) return <RetiredRoom id={id} />;
   return <DealRoom id={id} onTitle={onTitle} initialFlow={initialFlow} />;
+}
+
+/**
+ * A room reached with nothing to do → the conversation on the map, which is where it lives.
+ *
+ * The room knows its own bid (`DealRoom.bidId` is unique — one bid, one item, one room), so the
+ * forward is one read. A room that cannot be resolved lands on the requests workspace rather than
+ * on an error: the renter came from a notification about an offer, and that is where his offers are.
+ */
+function RetiredRoom({ id }: { id: string }) {
+  const router = useRouter();
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const room = await fetchDealRoom(id);
+        if (!live) return;
+        router.replace(room.bidId ? `/bids/${encodeURIComponent(room.bidId)}/equipment?chat=1` : "/requests");
+      } catch {
+        if (live) router.replace("/requests");
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [id, router]);
+  // Nothing is drawn while it forwards: a flash of the retired room is the thing being removed.
+  return null;
 }

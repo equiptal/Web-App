@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui";
 import { useSession } from "@/lib/session";
@@ -17,6 +17,7 @@ import { ConfirmCancelModal } from "@/components/requests/RequestEditModals";
 import { Dialog } from "@/components/Dialog";
 import { btn, CARD, cx } from "@/lib/ds";
 import { fmt, useLocale, useT } from "@/lib/i18n";
+import { useUrlOverlay } from "@/lib/nav/useUrlOverlay";
 import { pin } from "@/lib/uiPins";
 
 /**
@@ -169,8 +170,28 @@ export function HomeRequests() {
 
      `RequestDetailsModal` is a component, so it is mounted here and the dashboard stays put. */
 
-  /** The group whose details are open, and whether it opened straight onto the share sheet. */
-  const [open, setOpen] = useState<{ group: RequestGroup; share: boolean } | null>(null);
+  /* ── The open modal is a STEP, and a step lives in the URL (owner, 2026-09-07) ────────────────
+     *"He was on home, opened a modal, clicked a row inside it that took him somewhere else — Back
+     must return him to home WITH the modal."*
+
+     ~~`useState`.~~ Nothing outside this component knew the modal existed, so leaving the page
+     recorded `/` on the trail and `/` means the dashboard with nothing open. The request's id is a
+     search parameter now (`?req=`), opening it is one history entry, and closing it walks that entry
+     back — so Back and Close are the same motion. `useUrlOverlay` holds the mechanics and the why.
+
+     The SHARE door stays in component state on purpose: it is which page of the drawer to open on,
+     not which record is open, and a renter coming back to the modal wants the request he was reading
+     rather than the sheet he happened to enter by. */
+  const overlay = useUrlOverlay("req");
+  const [openShare, setOpenShare] = useState(false);
+  const open = useMemo(() => {
+    const g = (groups ?? []).find((x) => x.id === overlay.value);
+    return g ? { group: g, share: openShare } : null;
+  }, [groups, overlay.value, openShare]);
+  const showDetails = (group: RequestGroup, share: boolean) => {
+    setOpenShare(share);
+    overlay.open(group.id);
+  };
   /** The bids and the share-link settings the modal needs — fetched only once one is opened. */
   const [openBids, setOpenBids] = useState<WorkspaceBid[]>([]);
   const [openLink, setOpenLink] = useState<ShareLinkMeta | null>(null);
@@ -583,13 +604,13 @@ export function HomeRequests() {
                        stops the press from reaching the row, so a share never lands on details. */
                     <tr
                       key={it.id}
-                      onClick={() => setOpen({ group: g, share: false })}
+                      onClick={() => showDetails(g, false)}
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
-                          setOpen({ group: g, share: false });
+                          showDetails(g, false);
                         }
                       }}
                       title={t.home.reqOpenDetails}
@@ -683,7 +704,7 @@ export function HomeRequests() {
                             {t.home.compareBids}
                           </button>
 
-                          <RowAction icon="ios_share" label={t.home.reqShare} onPress={() => setOpen({ group: g, share: true })} />
+                          <RowAction icon="ios_share" label={t.home.reqShare} onPress={() => showDetails(g, true)} />
                           {/* ── One ✕, two meanings, and the row's state decides which ─────────
                               While the request can still be cancelled, ✕ cancels it. Once it is
                               closed it can't be, and the ✕ takes it off the feed instead — which
@@ -870,7 +891,10 @@ export function HomeRequests() {
           bids={openBids}
           link={openLink}
           openShare={open.share}
-          onClose={() => setOpen(null)}
+          onClose={() => {
+            setOpenShare(false);
+            overlay.close();
+          }}
           onChanged={reload}
         />
       )}

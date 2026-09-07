@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
-import { fetchReceivedBids, fetchMyRequests, startDealRoom, fetchRequestSubmissions } from "@/lib/api/client";
+import { fetchReceivedBids, fetchMyRequests, fetchRequestSubmissions } from "@/lib/api/client";
 import type { InboxBid } from "@/lib/contract/inbox";
 import { pin } from "@/lib/uiPins";
 
@@ -36,7 +36,8 @@ export function InboxView() {
    */
   const only = useSearchParams().get("supplier");
   const [bids, setBids] = useState<InboxBid[] | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  /* ~~`busyId`.~~ Opening a row is a navigation now, not a room being created, so there is nothing
+     to wait for and nothing to disable (owner, 2026-09-07). */
   // requestId → requestGroupId, from `my-requests` (same source the requests page groups by). Lets the
   // inbox cluster a multi-item RFQ's fan-out siblings without any received-bids backend change.
   const [groupMap, setGroupMap] = useState<Map<string, string>>(new Map());
@@ -67,16 +68,16 @@ export function InboxView() {
     return () => { active = false; };
   }, []);
 
-  async function open(b: InboxBid) {
-    if (busyId) return;
-    if (b.dealRoomId) { router.push(`/deal-room/${b.dealRoomId}`); return; }
-    setBusyId(b.bidId);
-    try {
-      const { id } = await startDealRoom(b.bidId);
-      router.push(`/deal-room/${encodeURIComponent(id)}`);
-    } catch {
-      setBusyId(null);
-    }
+  /**
+   * ── The inbox opens the CONVERSATION (owner, 2026-09-07) ───────────────────────────────────────
+   * ~~`/deal-room/<id>`, and `startDealRoom` first when the bid had no room.~~ Both are wrong now:
+   * the room view was retired, and the conversation lives in the map's dock beside the supplier's
+   * yards (owner, 2026-08-26). The bid id is all that is needed, and it is already on the row — so
+   * opening a message no longer CREATES anything either, which is the better behaviour: reading is
+   * not one of the three acts allowed to open a room (004a §4.5).
+   */
+  function open(b: InboxBid) {
+    router.push(`/bids/${encodeURIComponent(b.bidId)}/equipment?chat=1`);
   }
 
   const statusLabel = (b: InboxBid) => {
@@ -190,7 +191,6 @@ export function InboxView() {
       </div>
       <button
         type="button"
-        disabled={busyId === b.bidId}
         onClick={() => open(b)}
         className={`flex-none rounded-sm px-3.5 py-2 text-meta font-semibold ${b.supplierStarted ? "bg-brand text-white" : "border border-border bg-surface text-navy"} disabled:bg-disabled-bg disabled:text-disabled-fg`}
       >

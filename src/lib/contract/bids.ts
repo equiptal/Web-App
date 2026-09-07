@@ -647,7 +647,19 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   const rSla: TermRow = { key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "زمن الاستجابة للأعطال", state: negContractState("breakdown_response_sla"), renteeValue: s(req.breakdownResponseSla) };
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- built, not rendered; see `contract` below
   const rOvertime: TermRow = { key: "overtime_rate", labelEn: "Overtime", labelAr: "العمل الإضافي", state: negContractState("overtime_rate"), renteeValue: s(req.overtimeRate) };
-  const rMaint: TermRow = { key: "maintenance_responsibility", labelEn: "Maintenance", labelAr: "الصيانة", state: maintenance };
+  /* ⚠️ `renteeValue` was missing here, and it is the whole content of the row (owner, 2026-09-07:
+     *"why does maintenance appear? Is it set by the request?"*). The STATE said matched — the request
+     had set a side, so the supplier accepts it by bidding — while the row carried no value at all,
+     so the comparison drew a «Maintenance» column in which every cell read «Didn't say» about a term
+     the renter had answered. Its two neighbours, payment and breakdown response, have always carried
+     the request's own value; this one was built without it. */
+  const rMaint: TermRow = {
+    key: "maintenance_responsibility",
+    labelEn: "Maintenance",
+    labelAr: "الصيانة",
+    state: maintenance,
+    renteeValue: s(req.maintenanceResponsibility),
+  };
 
   // Conflict detail (Renter: X · Supplier: Y) — app parity with link bids, so an in-app conflict in
   // the Terms modal names BOTH sides, not just the term. Cert terms carry the exact codes.
@@ -959,6 +971,8 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
     // Company name FIRST — the supplier's own profile field, not the verification-queue company row
     // (nor the backend's `supplierDisplayName`, which resolves that row ahead of the profile). Falls
     // back to the verified firm's brand, then the backend's resolved name, then the person's name.
+    // `readSupplierDisplayName` is this same precedence over the flat received-bids shape; the two
+    // must move together, or one surface names the firm while another names the member.
     supplierName:
       supProfileCompanyName ??
       supCompanyBrand ??
@@ -1122,6 +1136,35 @@ export function readSupplierCompanyId(raw: Record<string, unknown>): string | nu
     profiles.map((o) => sid(o.companyId ?? o.company_id) ?? sid(o.supplierCompanyId ?? o.supplier_company_id)).find((x) => x != null) ??
     null
   );
+}
+
+/**
+ * The counterparty's DISPLAY NAME, read the same way out of either projection.
+ *
+ * ── Why it is shared (owner, 2026-09-07) ────────────────────────────────────────────────────────
+ * *"This must show other offers' suppliers on this request… it will show other suppliers' names
+ * which are bidders on this equipment request."* The map's «Other offers» strip printed «Murad
+ * alabdullah» — the bidding PERSON — beside a header naming «Al-Faisal Contracting Est.», the FIRM,
+ * for the same offer. Two names for one counterparty, because there were two derivations: `mapBid`
+ * put the supplier's own profile company name first, and `mapReceivedBids` read the backend's
+ * `supplierDisplayName`, which resolves the member ahead of the firm.
+ *
+ * The precedence is `mapBid`'s, unchanged: the supplier's OWN company-name field, then the brand of
+ * a verified firm, then the backend's resolved name, then the person. A renter reads the firm he is
+ * dealing with; the individual who typed the bid is not a party to anything.
+ */
+export function readSupplierDisplayName(raw: Record<string, unknown>): string {
+  const sup = obj(raw.supplier);
+  const company = obj(sup.company);
+  const profiles = [obj(sup.supplierProfile), sup, obj(sup.profile), obj(raw.supplierProfile), obj(raw.profile)];
+  const own = profiles.map((o) => s(o.companyName) ?? s(o.company_name)).find(Boolean);
+  // The firm's brand counts only while the firm is actually verified and alive — the same guard
+  // `mapBid` applies, so an ops-created placeholder row cannot rename a supplier.
+  const brand = company.isVerified === true && !company.deletedAt ? s(company.name) : null;
+  const person = [s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ");
+  // `||` on the last step, not `??`: an absent first and last name joins to the EMPTY STRING, which
+  // `??` would keep and print as a nameless chip.
+  return own ?? brand ?? s(raw.supplierDisplayName) ?? s(raw.supplierName) ?? (person || "Supplier");
 }
 
 /** The bidding MEMBER, likewise read out of either shape — nested `raw.supplier.id` on the bid list,

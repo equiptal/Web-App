@@ -110,6 +110,26 @@ export function usePageBack(spec: BackSpec) {
 }
 
 /**
+ * ── The back bar's trailing slot (owner, 2026-09-07) ──────────────────────────────────
+ *
+ * *"These tabs must be in the back header, not on the company header."*
+ *
+ * The bar is the shell's, drawn once so every screen's Back sits in the same place — which is also
+ * why a page cannot simply render into it. This hands back the bar's own trailing element, and the
+ * page portals into it: the shell keeps owning the geometry, and the page owns what it puts there.
+ *
+ * A DOM node rather than a registered React node on purpose. A node passed through context is a new
+ * value on every render of the caller, so registering one in the shell's state would re-render the
+ * whole shell in a loop; a portal target is stable and re-renders only the page.
+ *
+ * `null` until the bar exists — there is no bar on a page with no Back, and no slot either.
+ */
+const BackAsideContext = createContext<HTMLElement | null>(null);
+export function useBackBarSlot(): HTMLElement | null {
+  return useContext(BackAsideContext);
+}
+
+/**
  * The back control, as a line a page can drop inside its `<AppShell>`.
  *
  * `usePageBack` is a hook and the shell IS the provider, so a page component cannot call it: at the
@@ -174,6 +194,8 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
   // A child page may register a Back handler; the arrow then draws at the top of `<main>`, on the
   // page's own gutter. Never in the bar — see `usePageBack`.
   const [back, setBack] = useState<BackSpec>(null);
+  /** The bar's trailing element, handed to pages through `useBackBarSlot` (see the note above it). */
+  const [backAside, setBackAside] = useState<HTMLElement | null>(null);
   const registerBack = useCallback((spec: BackSpec) => setBack(() => spec), []);
 
   /* ── The last in-app route, kept so Back can point where the renter actually was ──────────────
@@ -280,6 +302,7 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
 
   return (
     <BackContext.Provider value={registerBack}>
+    <BackAsideContext.Provider value={backAside}>
     {/* `fullBleed` pins the shell to EXACTLY the viewport instead of merely filling it. `min-h-screen`
         alone lets the page grow past the fold, and on a surface whose own footer is the last thing in
         the column — the bid map's price bar — the page's scrollbar is what takes that bar off screen.
@@ -637,6 +660,8 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
 
               A full-bleed surface has no gutter of its own to sit on, so the control brings one. */}
           {back && (
+            // `flex` across the full width rather than `inline-flex`: the bar carries a trailing slot
+            // now, and the control itself stays exactly where it was, first on the line.
             <div {...pin("page-back")} className={cx(PAGE_BACK, fullBleed && `${PAGE_X} pt-4`)}>
               {(() => {
                 /* ── ONE control, one word, one place (owner, 2026-09-03) ───────────────────────
@@ -669,6 +694,8 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
                   </button>
                 );
               })()}
+              {/* What a page puts beside Back. Empty and zero-width until something portals in. */}
+              <div ref={setBackAside} className="ms-auto flex min-w-0 items-center justify-end" />
             </div>
           )}
           {children}
@@ -676,6 +703,7 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
       </div>
 
     </div>
+    </BackAsideContext.Provider>
     </BackContext.Provider>
   );
 }

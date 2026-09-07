@@ -89,8 +89,6 @@ function draw(
         benched={new Set()}
         onBench={() => {}}
         ranking={null}
-        rankBusy={false}
-        onRank={() => {}}
       />
     </LocaleProvider>,
   );
@@ -171,6 +169,50 @@ describe("a term the request never mentioned draws no column", () => {
     for (const gone of ["Attachments", "Measurement", "Breakdown response"]) {
       expect(screen.queryByText(gone), gone).toBeNull();
     }
+  });
+
+  it("drops a term nobody asked for and nobody answered, whatever its state", () => {
+    /* Owner, 2026-09-07: *"if something is not set by the request and doesn't have at least one
+       value across the suppliers' bids, don't show it — meaningless to show all «doesn't say»."*
+       «Maintenance» was the case that raised it: `matched` because the request had a side, and no
+       value anywhere, so the column read «Didn't say» in every cell. */
+    draw([
+      wb(bc({
+        id: "x",
+        supplierName: "A",
+        terms: {
+          equipment: [],
+          contract: [
+            // Matched, and empty: nothing asked in words, nothing answered.
+            { key: "maintenance_responsibility", labelEn: "Maintenance", labelAr: "الصيانة", state: "matched" },
+            // Asked: it earns its column.
+            { key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: "matched", renteeValue: "net_30" },
+          ],
+          supplier: [],
+        },
+      })),
+    ]);
+    openTerms();
+    expect(screen.queryByText("Maintenance")).toBeNull();
+    expect(screen.getByText("Payment terms")).toBeTruthy();
+  });
+
+  it("keeps a term the SUPPLIER answered even when the request never asked", () => {
+    // The other way to earn a column: he volunteered a value.
+    draw([
+      wb(bc({
+        id: "x",
+        supplierName: "A",
+        terms: {
+          equipment: [],
+          contract: [{ key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "الاستجابة", state: "grey", value: "24 hours" }],
+          supplier: [],
+        },
+      })),
+    ]);
+    openTerms();
+    expect(screen.getByText("Breakdown response")).toBeTruthy();
+    expect(screen.getAllByText(/24 hours/i).length).toBeGreaterThan(0);
   });
 
   it("keeps a grey row that still carries a conflict or an answer", () => {

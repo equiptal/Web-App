@@ -759,22 +759,24 @@
    above it means this almost never fires — it is the escape hatch for a genuinely long name, not the
    normal state. `row-gap` is tight so the two lines read as one block rather than as two rows. */
 .bidmap .bm-head-name { flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 2px 7px; }
-/* ── The other offers on this request (owner, 2026-09-04) ───────────────────────────────────────
-   A row of suppliers under the one on screen, and a press travels to that supplier's map. It lives
-   INSIDE `.bm-head` but outside the 64px identity band: the band is one geometry shared with the
-   company and chat headers (see the note below), and growing it here would move all three.
+/* ── The other suppliers on this request (owner, 2026-09-04, moved 2026-09-07) ──────────
+   A row of the firms that bid on this request, and a press travels to that firm's map.
 
-   It scrolls sideways rather than wrapping. Eight offers wrapped would push the machines off the
-   bottom of a 392px column at the moment the renter is choosing between them — the same reasoning
-   that took the filter groups out of the list. */
-.bidmap .bm-sibs {
+   ~~It lived inside `.bm-head`, under the supplier's own name.~~ Which made it read as a property of
+   that supplier ("his other offers") rather than as the other bidders, which is the owner's
+   correction. It is in the page's BACK HEADER now, so these rules are no longer scoped under
+   `.bidmap`: the strip renders outside that surface, and it brings no background or gutter of its
+   own because the bar it sits in has both.
+
+   It scrolls sideways rather than wrapping. Eight offers wrapped would push the bar's own height
+   into the map. */
+.bm-sibs {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 0 18px 9px;
-  background: var(--surface);
+  min-width: 0;
 }
-.bidmap .bm-sibs-l {
+.bm-sibs-l {
   flex-shrink: 0;
   font-size: 9.5px;
   font-weight: 800;
@@ -782,7 +784,7 @@
   text-transform: uppercase;
   color: var(--muted);
 }
-.bidmap .bm-sibs-row {
+.bm-sibs-row {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -791,8 +793,8 @@
   scrollbar-width: none;
   padding-bottom: 2px;
 }
-.bidmap .bm-sibs-row::-webkit-scrollbar { display: none; }
-.bidmap .bm-sib {
+.bm-sibs-row::-webkit-scrollbar { display: none; }
+.bm-sib {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -805,15 +807,15 @@
   cursor: pointer;
   font-family: inherit;
 }
-[dir="rtl"] .bidmap .bm-sib { padding: 3px 3px 3px 9px; }
-.bidmap .bm-sib:hover { border-color: var(--border-strong); }
+[dir="rtl"] .bm-sib { padding: 3px 3px 3px 9px; }
+.bm-sib:hover { border-color: var(--border-strong); }
 /* The one on screen: brand-tinted and NOT pressable. It is a position marker, not a destination. */
-.bidmap .bm-sib.on {
+.bm-sib.on {
   border-color: color-mix(in srgb, var(--brand) 40%, transparent);
   background: var(--brand-soft);
   cursor: default;
 }
-.bidmap .bm-sib-av {
+.bm-sib-av {
   flex-shrink: 0;
   width: 22px;
   height: 22px;
@@ -826,8 +828,8 @@
   font-size: 10px;
   font-weight: 800;
 }
-.bidmap .bm-sib-av img { width: 100%; height: 100%; object-fit: cover; }
-.bidmap .bm-sib-n {
+.bm-sib-av img { width: 100%; height: 100%; object-fit: cover; }
+.bm-sib-n {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -836,7 +838,7 @@
   font-weight: 700;
   color: var(--navy);
 }
-.bidmap .bm-sib.on .bm-sib-n { color: var(--brand-deep); }
+.bm-sib.on .bm-sib-n { color: var(--brand-deep); }
 .bidmap .bm-title {
   font-size: 16px;
   font-weight: 800;

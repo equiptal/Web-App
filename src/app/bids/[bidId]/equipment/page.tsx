@@ -21,14 +21,17 @@
  */
 
 import { Suspense, use, useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { AppShell, PageBack } from "@/components/AppShell";
+import { AppShell, PageBack, useBackBarSlot } from "@/components/AppShell";
 import { useAuthGate } from "@/components/auth/AuthGate";
-import { BidMapWorkspace, type SiblingBid } from "@/components/map/BidMapWorkspace";
+import { BidMapWorkspace } from "@/components/map/BidMapWorkspace";
+import { OtherOffers } from "@/components/map/OtherOffers";
 import { Icon } from "@/components/ui";
 import { fetchBidDetail, fetchReceivedBids } from "@/lib/api/client";
 import { isOffPlatformBid, isOffPlatformBidId } from "@/lib/contract/bid-equipment-access";
+import { otherOffers, type OtherOffer } from "@/lib/contract/other-offers";
 import type { BidCard } from "@/lib/contract/bids";
 import type { RequestRecord } from "@/lib/contract/requests";
 import { useT } from "@/lib/i18n";
@@ -106,8 +109,10 @@ function BidEquipment({ bidId }: { bidId: string }) {
   const openChat = useSearchParams().get("chat") === "1";
   const [bid, setBid] = useState<BidCard | null>(null);
   const [request, setRequest] = useState<RequestRecord | null>(null);
-  /** The other offers on this same request — the header's strip (owner, 2026-09-04). */
-  const [siblings, setSiblings] = useState<SiblingBid[]>([]);
+  /** The other suppliers on this request — the back header's strip (owner, 2026-09-04). */
+  const [siblings, setSiblings] = useState<OtherOffer[]>([]);
+  /** The bar the shell draws around Back, so the strip can render in it (owner, 2026-09-07). */
+  const backSlot = useBackBarSlot();
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const lastFetchRef = useRef(0);
@@ -147,17 +152,20 @@ function BidEquipment({ bidId }: { bidId: string }) {
   }, [bidId]);
 
   /**
-   * The other offers on this request, for the header's supplier strip.
+   * The other SUPPLIERS who bid on this request, for the back header's strip.
    *
    * **Read off the inbox, not off a new endpoint.** `GET /api/me/received-bids` already answers every
-   * bid offered to this renter with the request it belongs to on each one, so the siblings are a
-   * filter over a list the app fetches anyway — no backend work, and no second definition of "the
-   * offers on this request".
+   * bid offered to this renter with the request it belongs to on each one, so these are a filter over
+   * a list the app fetches anyway — no backend work, and no second definition of "the offers on this
+   * request".
    *
-   * It runs ONCE per bid and never blocks the map: a failure leaves the strip empty, which is a
-   * header with no strip, and the surface behind it is untouched. Ordered by price, cheapest first,
-   * because a row a renter travels along is easier to keep his place in when it has an order at all;
-   * offers with no price sit at the end rather than at an invented zero.
+   * One chip per COUNTERPARTY, and which bid each one travels to: `otherOffers` holds that rule and
+   * the owner's correction behind it (2026-09-07).
+   *
+   * It runs ONCE per bid and never blocks the map: a failure leaves the strip empty, which is a bar
+   * with no strip, and the surface behind it is untouched. Ordered by price, cheapest first, because
+   * a row a renter travels along is easier to keep his place in when it has an order at all; offers
+   * with no price sit at the end rather than at an invented zero.
    */
   useEffect(() => {
     let live = true;
@@ -167,24 +175,13 @@ function BidEquipment({ bidId }: { bidId: string }) {
       try {
         const r = await fetchReceivedBids();
         if (!live) return;
-        setSiblings(
-          r.bids
-            .filter((b) => b.request.id === rid)
-            .sort((a, b) => (a.currentPrice ?? Infinity) - (b.currentPrice ?? Infinity))
-            .map((b) => ({
-              bidId: b.bidId,
-              supplierName: b.supplierName,
-              supplierLogoUrl: b.supplierLogoUrl,
-              currentPrice: b.currentPrice,
-              priceUnit: b.priceUnit,
-            })),
-        );
+        setSiblings(otherOffers(r.bids, rid, bidId));
       } catch {
         // No strip, and nothing said about it: the map is what the renter came for.
       }
     })();
     return () => { live = false; };
-  }, [request?.id]);
+  }, [bidId, request?.id]);
 
   // Focus — the renter comes back from the supplier's reply and expects to see it.
   useEffect(() => {
@@ -207,6 +204,10 @@ function BidEquipment({ bidId }: { bidId: string }) {
   if (isOffPlatformBid(bid)) return <OffPlatformState />;
 
   return (
+    <>
+      {/* The strip lives in the page's BACK HEADER (owner, 2026-09-07), which the shell draws — so it
+          goes in through the bar's own trailing slot. `OtherOffers` renders nothing below two. */}
+      {backSlot && createPortal(<OtherOffers offers={siblings} currentBidId={bid.id} />, backSlot)}
     <BidMapWorkspace
       bid={bid}
       request={request}
@@ -219,14 +220,12 @@ function BidEquipment({ bidId }: { bidId: string }) {
       // `?chat=1` — the chat icon on a bid card lands here now: the conversation lives in this dock,
       // and the deal room is no longer somewhere a renter is sent to talk (owner, 2026-08-26).
       openChat={openChat}
-      // Every offer on this request, so the header is a way ACROSS the suppliers and not just a
-      // label for the one in front of him (owner, 2026-09-04).
-      siblings={siblings}
       // The surface owns its own writes now (V11/V12): the four requests, the chat dock's first
       // message and the footer's hand-off each create the deal room themselves, and none of them
       // needs a handler from here. V9's company panel still lands with the ticket that owns it, so
       // its entry stays visible and inert rather than pretending a panel opened.
     />
+    </>
   );
 }
 

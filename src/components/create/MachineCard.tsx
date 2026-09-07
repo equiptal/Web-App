@@ -311,21 +311,24 @@ export function MachineCard({
         {/* ---------------- Right column: three boxes, 16px apart ---------------- */}
         <div className="flex min-w-0 flex-col gap-4">
           {/* ── The order on an off-catalogue row (owner, 2026-09-06) ──────────────────────────
-              the taxonomy trio, marked as unanswerable · the note, with «Message us» on its own line
-              · the name box. The trio first because it is what the renter looked for; the note next,
-              explaining why it is empty; the box last, as the answer he gives instead. */}
+              ONE box holding the taxonomy trio AND the name field, then the note under it. The list
+              first because it is what the renter looked for; his own name in the same box, because
+              the two are one question — «which machine is this» — answered two ways, and two
+              separate cards read as two unrelated asks. */}
           {notAvailable && !custom ? null : (
-            /* The amber-tinted taxonomy trio, at the prototype's minmax columns.
+            /* The taxonomy trio, at the prototype's minmax columns.
 
                It stays on screen for an off-catalogue row (owner, 2026-09-05): the renter names his
                machine below it, but a renter who CAN find it in the list must not have the list taken
-               away from him. Marked red there and never starred: red says the catalogue has nothing
-               for this, the star would say the renter owes an answer he cannot give. */
+               away from him. Never starred there: nothing in the catalogue can satisfy it, and a star
+               would say the renter owes an answer he cannot give. */
             <div
               className={`grid gap-2.5 rounded-sm p-3.5 sm:grid-cols-[minmax(132px,1fr)_minmax(150px,1.5fr)_minmax(104px,0.9fr)] ${
-                // Red, and the whole box (owner, 2026-09-06): the three controls are the thing that
-                // could not be answered, and a dot beside each label was too quiet to say it.
-                custom ? "border border-danger/40 bg-danger-soft" : "bg-surface2"
+                /* The house WARNING tone, the same `--warn` family the note wears (owner,
+                   2026-09-06). It was `danger-soft` for a day and read as an error: nothing has gone
+                   wrong here, the machine is simply not in the list, so the box and the note must be
+                   the same colour or the row tells the renter two different stories. */
+                custom ? "border border-warn/40 bg-warn-soft" : "bg-surface2"
               }`}
             >
               {/* Derived, never picked. The renter chooses a TYPE and the category follows from it —
@@ -342,7 +345,7 @@ export function MachineCard({
               </CanvasField>
               <CanvasField
                 label={t.create.machineCard.type}
-                missing={custom || gapFor("subtype") || gapFor("category")}
+                missing={gapFor("subtype") || gapFor("category")}
                 shake={shake("subtype") || shake("category")}
                 required={owed("subtype") || owed("category")}
                 star={!custom}
@@ -368,7 +371,7 @@ export function MachineCard({
               </CanvasField>
               <CanvasField
                 label={t.create.machineCard.size}
-                missing={custom || gapFor("capacity")}
+                missing={gapFor("capacity")}
                 shake={shake("capacity")}
                   required={owed("capacity")}
                 star={!custom}
@@ -387,34 +390,38 @@ export function MachineCard({
                   }}
                 />
               </CanvasField>
+
+              {/* ── The renter's own name for a machine the catalogue cannot place ──────────────
+                  Inside the same box as the list, across all three columns, under a hairline: the
+                  list and the name answer one question, and the renter reads down from «not in
+                  there» to «then call it this».
+
+                  Prefilled from what he wrote in the RFQ, and never written into state until he
+                  types: a name nobody looked at must not reach a supplier. It is this row's required
+                  answer in place of the trio, so it carries the star and the shake. */}
+              {custom && (
+                <div className="border-t border-warn/30 pt-3 sm:col-span-3">
+                  <CanvasField
+                    label={t.create.machineCard.customEquipment}
+                    missing={gapFor("custom_equipment")}
+                    shake={shake("custom_equipment")}
+                    required={owed("custom_equipment")}
+                    star
+                    hint={t.create.machineCard.customEquipmentHint}
+                  >
+                    <TextInput
+                      value={item.customEquipment ?? item.rawLabel ?? ""}
+                      maxLength={120}
+                      placeholder={t.create.machineCard.customEquipmentPlaceholder}
+                      onChange={(e) => set("custom_equipment", { customEquipment: e.target.value })}
+                    />
+                  </CanvasField>
+                </div>
+              )}
             </div>
           )}
 
           {notAvailable && <UnavailableCard item={item} label={item.rawLabel ?? tax.subtypeName ?? ""} />}
-
-          {/* ── The renter's own name for a machine the catalogue cannot place ──────────────────
-              Prefilled from what he wrote in the RFQ, and never written into state until he types:
-              a name nobody looked at must not reach a supplier. It is this row's required answer in
-              place of the trio, so it carries the star and the shake the type and size would have. */}
-          {custom && (
-            <div className="rounded-sm bg-surface2 p-3.5">
-              <CanvasField
-                label={t.create.machineCard.customEquipment}
-                missing={gapFor("custom_equipment")}
-                shake={shake("custom_equipment")}
-                required={owed("custom_equipment")}
-                star
-                hint={t.create.machineCard.customEquipmentHint}
-              >
-                <TextInput
-                  value={item.customEquipment ?? item.rawLabel ?? ""}
-                  maxLength={120}
-                  placeholder={t.create.machineCard.customEquipmentPlaceholder}
-                  onChange={(e) => set("custom_equipment", { customEquipment: e.target.value })}
-                />
-              </CanvasField>
-            </div>
-          )}
 
           {/* Logistics, at the prototype's geometry: all three choices on ONE row — the two haulage
               legs inside a single box, fuel in its own — as a 2fr/1fr split, which lands the three

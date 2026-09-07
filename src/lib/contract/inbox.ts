@@ -5,7 +5,7 @@
  * chatted first) before the renter ever taps: `dealRoomStatus === "OPEN"` + `unreadCount > 0` is the
  * "supplier started" signal. Reuses the app-backend; no new backend.
  */
-import { readSupplierCompanyId, readSupplierId } from "./bids";
+import { readSupplierCompanyId, readSupplierDisplayName, readSupplierId } from "./bids";
 
 export type InboxDealRoomStatus = "OPEN" | "NEGOTIATING" | "AWAITING_SUPPLIER_CONFIRMATION" | "CLOSED" | "ABANDONED" | string;
 
@@ -83,7 +83,9 @@ function mapRow(raw: Record<string, unknown>): InboxBid {
     priceUnit: s(raw.priceUnit),
     agreedUnits: n(raw.agreedUnits),
     unitsOffered: Array.isArray(raw.unitsOffered) ? raw.unitsOffered.length : (n(raw.unitsOffered) ?? 1),
-    supplierName: s(raw.supplierDisplayName) ?? s(raw.supplierName) ?? "Supplier",
+    // The FIRM, by the same derivation the bid card uses — `readSupplierDisplayName` says why one
+    // counterparty cannot have two names (owner, 2026-09-07).
+    supplierName: readSupplierDisplayName(raw),
     // The SAME derivation the bid list uses (`mapBid`), not a second one that reads the flat keys
     // only. The chat dock keys its anchor tab from a `BidCard` and its rows from these `InboxBid`s
     // (004a §2); on any projection that nests the company id, a narrower reader here made the anchor

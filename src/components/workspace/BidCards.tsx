@@ -603,7 +603,11 @@ function BidCardTile({
               /* Twice the invite's width (owner, 2026-09-06). `flex-1` against a `flex-none`
                  invite left the two near-equal, because «Invite to Moedatech» is a long label — the
                  emphasis has to be stated as a RATIO, not left to the words. */
-              className={btn("primary", "lg", { className: "flex-[2_1_0] transition" })}
+              /* Takes whatever the invite leaves. The pair was `2:1`, which squeezed «Invite to
+                 Moedatech» narrower than its own words and wrapped it onto two lines (owner,
+                 2026-09-07). The emphasis is still the ratio in practice — the invite is as wide as
+                 its label and no wider — and it cannot squeeze the label away. */
+              className={btn("primary", "lg", { className: "flex-1 transition" })}
             >
               {t.workspace.viewQuote}
             </button>
@@ -637,7 +641,7 @@ function BidCardTile({
                 /* LIGHT GREY (owner, 2026-09-06) — `tinted`, the house's own `--surface2` fill, not
                    a white bordered button. It is the quieter of the two acts and now reads that way
                    at a glance rather than only by size. */
-                className={btn("tinted", "lg", { className: "flex-[1_1_0] transition" })}
+                className={btn("tinted", "lg", { className: "flex-none whitespace-nowrap transition" })}
               >
                 {/* The same glyph the supplier row and the profile dialog use for this act, so a
                     renter meets one «invite» across the product rather than three. */}
@@ -650,7 +654,7 @@ function BidCardTile({
                 disabled
                 title={t.workspace.inviteNoContact}
                 onClick={(e) => e.stopPropagation()}
-                className={btn("tinted", "lg", { className: "flex-[1_1_0]" })}
+                className={btn("tinted", "lg", { className: "flex-none whitespace-nowrap" })}
               >
                 <Icon name="person_add" size={16} />
                 {t.workspace.inviteToApp}

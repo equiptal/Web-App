@@ -38,6 +38,7 @@ import { buildBidQuotationDoc, quotationSupplierInitials, quotationSupplierKey }
 import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
 import { quotationDownloadName } from "@/lib/compare/quotation-token";
 import { btn, cx } from "@/lib/ds";
+import { useUrlOverlay } from "@/lib/nav/useUrlOverlay";
 import { pin } from "@/lib/uiPins";
 
 type Tab = "cards" | "compare";
@@ -72,11 +73,20 @@ export function RequestsWorkspace() {
   const [tab, setTab] = useState<Tab>("cards");
   const [source, setSource] = useState<SourceFilter>("all");
   const [reloads, setReloads] = useState(0);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  // «Share» on the strip is the same drawer, entered at its share sheet.
-  const [drawerShare, setDrawerShare] = useState(false);
+  /* ── The open drawer is a STEP, so it lives in the URL (owner, 2026-09-07) ────────────────────
+     *"Back must take the user back to the step he was in, not only the page screen."*
+
+     ~~`useState(false)`.~~ The drawer is where a renter reads the request and where he presses the
+     rows that lead OUT of this page — edit, the map, the bid form. Held in component state, leaving
+     recorded `/requests?r=…` on the trail and coming back drew the page with the drawer shut, which
+     is not the step he left. `?open=details|share|cancel` is one history entry, so Back reopens it
+     on the door he was reading and Close is the same motion. `useUrlOverlay` holds the mechanics. */
+  const drawer = useUrlOverlay("open");
+  const drawerOpen = drawer.value !== null;
+  // «Share» on the strip is the same drawer, entered at its share sheet…
+  const drawerShare = drawer.value === "share";
   // …and «Cancel» is the same drawer entered at its confirm step, for the dashboard's row action.
-  const [drawerCancel, setDrawerCancel] = useState(false);
+  const drawerCancel = drawer.value === "cancel";
   // The public bid link's own settings, which the share sheet edits.
   const [link, setLink] = useState<ShareLinkMeta | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -236,10 +246,10 @@ export function RequestsWorkspace() {
 
     const door = params?.get("share") ? "share" : params?.get("cancel") ? "cancel" : params?.get("details") ? "details" : null;
     if (!door) return;
-    setDrawerShare(door === "share");
-    setDrawerCancel(door === "cancel");
-    setDrawerOpen(true);
-  }, [entered, groups, params]);
+    // Arriving on a link that names a door: opening it here adds the entry, so the renter's first
+    // Back closes the drawer and leaves him on the workspace rather than off the app.
+    drawer.open(door);
+  }, [drawer, entered, groups, params]);
 
   /* ── The view the renter is looking at is IN THE URL (owner, 2026-09-06) ──────────────────────
      *"The back button must be wired to the previous page in all cases — I clicked the equipment
@@ -591,7 +601,7 @@ export function RequestsWorkspace() {
         tiles={tiles}
         activeKey={resolved.groupId}
         onPick={pickGroup}
-        onShare={() => { setDrawerShare(true); setDrawerCancel(false); setDrawerOpen(true); }}
+        onShare={() => drawer.open("share")}
         onHide={hide}
       />
 
@@ -620,7 +630,7 @@ export function RequestsWorkspace() {
             <RequestContextBar
               group={group}
               item={item}
-              onOpenRequest={() => { setDrawerShare(false); setDrawerCancel(false); setDrawerOpen(true); }}
+              onOpenRequest={() => drawer.open("details")}
             />
           </div>
           <div className="flex flex-none items-end gap-0.5">
@@ -836,7 +846,7 @@ export function RequestsWorkspace() {
           link={link}
           openShare={drawerShare}
           openCancel={drawerCancel}
-          onClose={() => setDrawerOpen(false)}
+          onClose={drawer.close}
           // An edit or a cancellation changes the rail and the bids under it, so both are re-read
           // rather than patched in place — the page has one source for its data and keeps it.
           onChanged={() => {

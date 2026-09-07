@@ -375,7 +375,15 @@ export function SharedBidSubmissionModal({
           {!submission ? (
             <p className="py-10 text-center text-body text-muted">{L("Submission details aren't available.", "تفاصيل العرض غير متاحة.")}</p>
           ) : (
-            <div className="mx-auto grid max-w-[1100px] items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+            /* ── ONE column, and the quotation is its LAST section (owner, 2026-09-07) ─────────
+               ~~A 320px rail beside the steps.~~ It read as a summary standing apart from the thing
+               it summarises: the renter walked the terms, then the prices, then the details, with the
+               total sitting still on the right the whole way. Now it comes where it belongs — after
+               everything it adds up, which is also the order the supplier's own form built it in.
+
+               `max-w-[860px]` rather than the 1100 the two-column layout needed: a single column of
+               reading matter at 1100px runs to lines nobody follows. */
+            <div className="mx-auto flex max-w-[860px] flex-col gap-4">
               {/* ── The three steps, in the form's own order ────────────────────────────────────── */}
               <div className="flex min-w-0 flex-col gap-3">
                 {/* The form's masthead names who the request is FROM, because a supplier is reading
@@ -393,6 +401,16 @@ export function SharedBidSubmissionModal({
                     {submission.groupRef && <CodeChip>{submission.groupRef}</CodeChip>}
                     {!submission.groupRef && submission.rfqRef && <CodeChip>{submission.rfqRef}</CodeChip>}
                   </span>
+                  {/* ── The bid's quality, top right (owner, 2026-09-07) ────────────────────────
+                      It sat beside «Photos and documents», three sections down, which is where the
+                      SUPPLIER meets it while he fills the form. A renter reading the bid back wants
+                      it at the top: how complete this offer arrived is the first thing that decides
+                      how much of the rest he trusts. */}
+                  {quality && (
+                    <span className="flex-none">
+                      <QualityRing quality={quality} L={L} size={56} />
+                    </span>
+                  )}
                 </div>
 
                 {/* ── 1 · Terms ─────────────────────────────────────────────────────────────────
@@ -537,15 +555,9 @@ export function SharedBidSubmissionModal({
                   {/* Photos and documents — the form's own panel, with the ring it draws while the
                       supplier fills it. Read back, that percentage is how complete the bid arrived. */}
                   <div className="mt-4 border-t border-border pt-4">
+                    {/* ~~The ring, here.~~ It moved to the masthead (owner, 2026-09-07); this panel
+                        keeps the two lines that say what the renter is looking at. */}
                     <div className="flex items-start gap-3">
-                      {/* The ring's own `.qring` layout class lives in `BID_FORM_CSS`, which this
-                          viewer no longer injects — so the wrapper brings the two lines of layout
-                          that class provided (centred column, never stretched). */}
-                      {quality && (
-                        <span className="inline-flex flex-none flex-col items-center gap-1">
-                          <QualityRing quality={quality} L={L} size={64} />
-                        </span>
-                      )}
                       <span className="min-w-0">
                         <span className="block text-body font-extrabold text-navy">{L("Photos and documents", "الصور والمستندات")}</span>
                         <span className="block text-meta text-muted">
@@ -620,7 +632,8 @@ export function SharedBidSubmissionModal({
                   What the SUPPLIER sent stays, whole: the money rows, the tax, the total and the
                   validity. The steps in the left column still carry the request's terms next to each
                   answer, which is where a comparison actually belongs. */}
-              <aside className="flex min-w-0 flex-col gap-4">
+              {/* ── 4 · The quotation, last ─────────────────────────────────────────────────── */}
+              <div className="flex min-w-0 flex-col gap-4">
                 <div className={cx(CARD, "overflow-hidden")}>
                   <div className="flex items-center gap-2 border-b border-border px-3.5 py-2.5">
                     <Icon name="receipt_long" size={17} className="text-muted" />
@@ -653,7 +666,7 @@ export function SharedBidSubmissionModal({
                     )}
                   </div>
                 </div>
-              </aside>
+              </div>
             </div>
           )}
         </div>

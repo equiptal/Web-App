@@ -94,13 +94,23 @@ describe("the negotiation rows open the sheet, and the conversation opens the ch
       .toBe("/bids/b3/equipment?chat=1");
   });
 
-  it("and falls back to the room when it names only the room", () => {
-    expect(notificationHref(row("deal.message", { dealRoomId: "d9" }))).toBe("/deal-room/d9");
+  it("sends a room-only row to his offers — the room view is retired", () => {
+    /* Owner, 2026-09-07: the old deal-room screen is gone from every route, and `/deal-room/[id]`
+       with no act now FORWARDS to this same chat. Routing a notification through that forward would
+       show a blank frame first, so a row carrying only a room id goes where his offers are. */
+    expect(notificationHref(row("deal.message", { dealRoomId: "d9" }))).toBe("/requests");
   });
 
   it("an unknown deal.* still lands somewhere — the family grows faster than this file", () => {
-    expect(notificationHref(row("deal.brand_new", { dealRoomId: "d9" }))).toBe("/deal-room/d9");
+    expect(notificationHref(row("deal.brand_new", { dealRoomId: "d9", bidId: "b3" }))).toBe("/bids/b3/equipment?chat=1");
+    expect(notificationHref(row("deal.brand_new", { dealRoomId: "d9" }))).toBe("/requests");
     expect(notificationHref(row("deal.brand_new"))).toBe("/inbox");
+  });
+
+  it("the two rows ABOUT the settled document keep the route, with an act on it", () => {
+    // The sheet lives at `/deal-room/[id]`, and an act is what opens it — that is the only reason
+    // the route still exists.
+    expect(notificationHref(row("deal.closed", { dealRoomId: "d9" }))).toBe("/deal-room/d9?act=accept");
   });
 });
 

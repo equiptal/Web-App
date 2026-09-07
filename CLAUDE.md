@@ -2,6 +2,51 @@
 
 ## Change log
 
+- **2026-09-07 - The step is in the URL, so Back restores it; and the map's offers stopped looping.**
+  Owner: *"back … must take the user back to the STEP he was in, not only the page screen — he was on
+  home, opened a modal, clicked a row inside it that took him somewhere else, so back must be home
+  WITH the modal"*, and *"I have a loop of back in the map view: in viewing offers, back just takes me
+  to the other offer in a loop"*.
+  (1) `src/lib/nav/useUrlOverlay.ts` (new) puts an overlay's identity in a search parameter: open is
+  ONE `pushState`, a re-open `replaceState`s (so a renter never presses Back twice to leave), close is
+  `history.back()` when we own the entry and a param strip when we arrived on a link. `HomeRequests`
+  (`?req=<groupId>`) and the requests drawer (`?open=details|share|cancel`) are through it.
+  (2) The map's sibling-offer press was `router.push`, so each switch stacked an entry and Back walked
+  A → B → A forever. It is `router.replace` — reading another supplier's offer on the same request is
+  a lateral move across one surface.
+  Files: `src/lib/nav/useUrlOverlay.ts`, `src/components/home/HomeRequests.tsx`,
+  `src/components/workspace/RequestsWorkspace.tsx`, `src/components/map/OtherOffers.tsx`,
+  `tests/unit/url-overlay.test.tsx`.
+  ⚠️ Not `router.push` and not `useSearchParams` for an overlay: the first refetches the route tree to
+  draw a modal over content already on screen, the second is BLIND to a bare `pushState`. The hook
+  reads `location.search` and listens for `popstate` itself.
+  ⚠️ Still component state, on purpose or not yet done: the My Suppliers dialogs, the map's machine
+  detail panel, and the home modal's SHARE door (which sheet to enter by is not which record is open).
+
+- **2026-09-07 - «Other offers» lists the other SUPPLIERS, in the back header, under the firm's name.**
+  Owner: *"this must show other offers' suppliers on this request, not other offers from this
+  supplier … and these tabs must be in the back header, not on the company header"*. Three faults in
+  one strip. (1) It listed BIDS: a firm answering a multi-item request submits one per line, so the
+  same supplier appeared twice and read as his own other offers. `otherOffers()`
+  (`src/lib/contract/other-offers.ts`) collapses by `bidSupplierKey` (company → member → name), keeps
+  the bid ON SCREEN as its supplier's chip and otherwise travels to that supplier's cheapest.
+  (2) It printed the bidding MEMBER while the panel header above it printed the FIRM — two
+  derivations of one counterparty's name. `readSupplierDisplayName` is now shared, with `mapBid`'s
+  precedence (own profile company name → verified firm's brand → backend's resolved name → person).
+  (3) It moved out of the panel's identity band into the page's back bar: `AppShell` hands pages the
+  bar's trailing element (`useBackBarSlot`) and the route portals `OtherOffers` into it.
+  Files: `src/lib/contract/other-offers.ts`, `src/components/map/OtherOffers.tsx`,
+  `src/app/bids/[bidId]/equipment/page.tsx`, `src/components/AppShell.tsx`, `src/lib/ds.ts`,
+  `src/components/map/BidMapWorkspace.tsx`, `src/components/map/map-proto.css`,
+  `src/lib/contract/{bids,inbox}.ts`, `tests/unit/other-offers.test.tsx`.
+  ⚠️ **`readSupplierDisplayName` is a SHARED change**: every received-bids reader renames with it —
+  the inbox rows, the chat dock's tabs, the dashboard's bid rail. All of them now say the firm, which
+  is the point, but it is not only the map.
+  ⚠️ A DOM node through context, not a registered React node: a node re-created each render would
+  re-render the shell forever. `PAGE_BACK` went from `inline-flex` to a full-width `flex` row so the
+  slot has somewhere to sit; the control itself did not move.
+  ⚠️ `.bm-sibs*` is no longer scoped under `.bidmap` — the strip renders outside that surface now.
+
 - **2026-09-07 - The typed company name is gone, and the profile's firm block is the firm plus its people.**
   Owner: *"remove it from the form UI now, and even in the company details don't show it - just show
   profile, company, and the code with team members. And even if the document is empty in one slot,

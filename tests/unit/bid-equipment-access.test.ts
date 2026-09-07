@@ -149,9 +149,15 @@ describe("the route resolves exactly one bidId (RM3-AC-01)", () => {
    */
   it("may list the other offers on the request, as links and nothing more", () => {
     expect(page).toContain("fetchReceivedBids");
-    expect(page).toContain("siblings={siblings}");
-    // The filter is what keeps the strip about THIS request rather than the renter's whole inbox.
-    expect(page).toMatch(/b\.request\.id === rid/);
+    /* The list must be DRAWN, but not by a prop name this test owns: the strip moved from a
+       `siblings=` prop on the workspace to `<OtherOffers>` portalled beside the Back control, and a
+       test that pins the plumbing fails on a refactor that kept the behaviour. What matters is that
+       the fetched list reaches the render. */
+    expect(page).toMatch(/offers=\{siblings\}|siblings=\{siblings\}/);
+    /* The scoping is what keeps the strip about THIS request rather than the renter's whole inbox.
+       `otherOffers(bids, rid, bidId)` is where that now lives — the route reads the request id and
+       hands it to the helper along with the bid it must not list twice. */
+    expect(page).toMatch(/otherOffers\(\s*r\.bids,\s*rid|b\.request\.id === rid/);
   });
 });
 
