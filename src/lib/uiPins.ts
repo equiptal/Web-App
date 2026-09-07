@@ -65,19 +65,28 @@
  *
  * An ALLOWLIST, not a check for production: a new domain — a preview branch, a second prod host, a
  * marketing mirror — arrives with pins off and has to be named here to get them, which is the safe
- * direction to be wrong in. Production (`web.moedatech.net`) is simply absent.
+ * direction to be wrong in. Production (`web.moedatech.net`) is simply absent, and so is BETA.
+ *
+ * ⚠️ There used to be a blanket `host.endsWith(".amplifyapp.com")` beside this list, on the premise
+ * that an Amplify branch host is a preview and "staging by definition". That premise died the day
+ * the `beta` branch was created: `beta.<appId>.amplifyapp.com` serves a renter-facing build against
+ * the PRODUCTION backends, and `main.<appId>.amplifyapp.com` is production itself. A blanket rule
+ * inside an allowlist is not an allowlist, so the Amplify host that may show pins is named too.
  *
  * Read from `window.location` rather than an env var, because this needs no per-branch setting in
  * the Amplify console: one build behaves correctly on every host it is served from.
  */
-const PIN_HOSTS = ["webstaging.moedatech.net", "localhost", "127.0.0.1"];
+const PIN_HOSTS = [
+  "webstaging.moedatech.net",
+  "staging.dgdtg4fmrwwfn.amplifyapp.com",
+  "localhost",
+  "127.0.0.1",
+];
 
 /** Whether this browser, on this host, may show the overlay. Client-only — the server never can. */
 export function uiPinsAllowed(): boolean {
   if (typeof window === "undefined") return false;
-  const host = window.location.hostname;
-  // Amplify branch previews get a generated `*.amplifyapp.com` host; those are staging by definition.
-  return PIN_HOSTS.includes(host) || host.endsWith(".amplifyapp.com");
+  return PIN_HOSTS.includes(window.location.hostname);
 }
 
 export type PinEntry = { n: string; label: string; file: string };
