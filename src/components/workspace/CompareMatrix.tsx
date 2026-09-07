@@ -703,10 +703,18 @@ export function CompareMatrix({
           {rows.map((b) => {
             const recommended = ranking?.bidId === b.card.id;
             return (
+              /* ── The agent's pick, in green (owner, 2026-09-08) ───────────────────────────────
+                 A star and a green word were the whole of it, and on a table of five suppliers that
+                 is one small line among five identical rows. The row now carries the tint and an
+                 edge, so the recommendation is visible from the money columns without reading the
+                 names — which is where a renter's eye is when he wants it. */
               <div
                 key={b.card.id}
-                className={`${ROW} group relative flex w-full items-center gap-2.5 px-3 text-start`}
+                className={`${ROW} group relative flex w-full items-center gap-2.5 px-3 text-start ${
+                  recommended ? "bg-ok-soft/70" : ""
+                }`}
               >
+                {recommended && <span className="absolute inset-y-0 start-0 w-[3px] bg-ok" />}
                 <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-navy text-label font-semibold text-white">
                   {initials(b.card.supplierName)}
                 </span>
@@ -779,6 +787,7 @@ export function CompareMatrix({
                 <TermColumn
                   key={col.group}
                   label={ar ? col.labelAr : col.labelEn}
+                  group={col.group}
                   keys={col.keys}
                   rows={rows}
                   ar={ar}
@@ -1030,6 +1039,21 @@ function Money({ v, win, vat, excluded, onRentee }: { v: number | null | undefin
  *  the table's own horizontal scroller is the honest answer to «more terms than width». */
 const TERM_MIN_PX = 118;
 
+/**
+ * The other side of a two-sided term.
+ *
+ * Only for the terms that ARE a party assignment (`TERM_PARTY`): «on supplier» and «on rentee» are
+ * the whole vocabulary, so a refusal of one IS the other. Anything the party map cannot read comes
+ * back null and the caller falls through to marking the requirement refused — never to a guess.
+ */
+function oppositeParty(asked: string | null, t: Dict): string | null {
+  if (!asked) return null;
+  const token = partyToken(asked).toLowerCase();
+  if (token === "supplier") return t.workspace.onRentee;
+  if (token === "rentee" || token === "renter" || token === "me") return t.workspace.onSupplier;
+  return null;
+}
+
 /** The paper that proves this term for one bid, if the bid carries one. */
 function docForTerm(group: string, docs: DealRoomDocument[]): DealRoomDocument | null {
   const wants = TERM_DOC_TYPES[group];
@@ -1039,6 +1063,7 @@ function docForTerm(group: string, docs: DealRoomDocument[]): DealRoomDocument |
 
 function TermColumn({
   label,
+  group,
   keys,
   rows,
   ar,
@@ -1047,6 +1072,8 @@ function TermColumn({
   docFor,
 }: {
   label: string;
+  /** The canonical term this column draws — what decides whether a refusal has an opposite side. */
+  group: string;
   keys: string[];
   rows: WorkspaceBid[];
   ar: boolean;
@@ -1057,7 +1084,7 @@ function TermColumn({
   docFor?: (bidId: string) => DealRoomDocument | null;
 }) {
   const t = useT();
-  const answers = rows.map((b) => readTerm(findTerm(b.card, keys), keys[0], ar, t, L));
+  const answers = rows.map((b) => readTerm(findTerm(b.card, keys), keys[0], ar, t, L, group));
   const askedFor = asked
     ? rows.map((b) => humanTerm(findTerm(b.card, keys)?.renteeValue ?? null, keys[0], t, L)).find((v): v is string => !!v) ?? null
     : null;
@@ -1112,6 +1139,9 @@ function TermColumn({
                   a.against ? "text-danger" : a.met ? "text-ok" : a.text ? "text-navy" : "text-muted"
                 }`}
               >
+                {/* ✗ before a requirement he did not meet: the mark is what stops «TÜV» in red and
+                    «TÜV» in green being the same word twice. */}
+                {a.refused && <span aria-hidden="true">✗ </span>}
                 {a.text ?? t.workspace.didntSay}
               </span>
               {doc && (
@@ -1164,14 +1194,38 @@ function TermColumn({
  *
  * The state itself is never printed. It is the colour: a conflict is red, everything else is not.
  */
-function readTerm(row: TermRow | null, key: string, ar: boolean, t: Dict, L: LFn): { text: string | null; against: boolean; met: boolean } {
-  // `termSides` is the one place «Renter: X · Supplier: Y» is taken apart (`bids.ts`). `offered` is
-  // null when the supplier named no alternative — a refusal, not an offer — and on a conflict that
-  // is exactly when the renter's OWN value is the thing worth printing, in red.
+function readTerm(
+  row: TermRow | null,
+  key: string,
+  ar: boolean,
+  t: Dict,
+  L: LFn,
+  group?: string,
+): { text: string | null; against: boolean; met: boolean; refused: boolean } {
+  /* ── The same words must not mean two things (owner, 2026-09-08) ────────────────────────────
+     *"How can TÜV be a conflict and a match at the same time? If he says no, show it like ✗ TUV.
+     And if it has an opposite value — not «on rentee», so it will be «on supplier» — show that."*
+
+     The table printed the value and coloured it by the row's state, so a supplier who ACCEPTED «TÜV»
+     and one who REFUSED it both read «TÜV», one green and one red. Two identical words in one column
+     meaning opposite things, and the only thing telling them apart was a colour a reader has to
+     compare across rows to notice.
+
+     A refusal is now said, not tinted:
+
+      · **A term with two sides** — fuel, maintenance, the operator's food, transport — has an
+        opposite, so a refusal is stated as the OTHER party. The renter asked for it on the supplier;
+        the supplier says no; the cost is on the renter, and that is what the cell says.
+      · **Anything else** — a certificate, a year, a payment term — has no opposite, so the cell
+        keeps the requirement and marks it refused. `refused` is what puts the ✗ on it. */
   const { asked, offered } = termSides(row, ar);
   const agreed = row?.state === "matched" || row?.state === "agreed";
-  const raw = offered ?? (agreed || row?.state === "conflict" ? asked : null);
+  const conflict = row?.state === "conflict";
+  const flipped = conflict && !offered && group && TERM_PARTY.has(group) ? oppositeParty(asked, t) : null;
+  const raw = offered ?? flipped ?? (agreed || conflict ? asked : null);
+  const refused = conflict && !offered && !flipped;
   return {
+    refused,
     text: humanTerm(raw, row?.key ?? key, t, L),
     against: !!row && row.state === "conflict",
     // «Just red or green» (owner, 2026-09-06). Green is the answer that MEETS what the renter asked

@@ -1810,7 +1810,9 @@ export const en = {
     // ── The suggestion bar under the comparison ──
     rankPresets: { best: "Best overall", lowest: "Lowest cost", newest: "Newest machine", trusted: "Most trusted" },
     rankThinking: "Reading the offers…",
-    rankAsk: "Ask",
+    rankAsk: "Ask the assistant",
+    rankAskHint: "Ask about these offers in your own words",
+    rankAskShort: "Cheapest with an operator…",
     rankAskPlaceholder: "Ask about these offers: cheapest with an operator, who can start soonest…",
     rankFailed: "The assistant could not answer that. Try again, or read the table as it stands",
     aiSuggestion: "AI suggestion",

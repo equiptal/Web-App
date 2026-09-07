@@ -288,6 +288,53 @@ describe("an off-platform confirmation reads as the value it confirms", () => {
   });
 });
 
+describe("a refusal is SAID, not tinted", () => {
+  /**
+   * Owner, 2026-09-08: *"How can TÜV be a conflict and a match at the same time?"* — because the
+   * table printed the requirement and coloured it by the row's state, so the supplier who accepted
+   * it and the one who refused it both read «TÜV», one green and one red.
+   */
+  it("marks a refused requirement with a ✗ instead of printing it plain", () => {
+    draw([
+      wb(bc({
+        id: "yes",
+        supplierName: "A",
+        terms: { equipment: [{ key: "certs", labelEn: "Equipment certificate", labelAr: "شهادة", state: "matched", renteeValue: "TUV" }], contract: [], supplier: [] },
+      })),
+      wb(bc({
+        id: "no",
+        supplierName: "B",
+        terms: { equipment: [{ key: "certs", labelEn: "Equipment certificate", labelAr: "شهادة", state: "conflict", renteeValue: "TUV" }], contract: [], supplier: [] },
+      })),
+    ]);
+    openTerms();
+    // The one who met it, in green, with no mark.
+    const met = screen.getAllByText("TUV").find((n) => n.className.includes("text-ok"));
+    expect(met, "the accepted certificate reads plain and green").toBeTruthy();
+    // The one who did not, marked — «✗ TUV», not a second «TUV» that happens to be red.
+    /* The ✗ is its own `aria-hidden` span beside the word, so the text is split across two nodes —
+       match on the cell, not on a string. */
+    const refused = screen.getAllByText("TUV").find((n) => n.className.includes("text-danger"));
+    expect(refused, "the refused certificate reads red").toBeTruthy();
+    expect(refused?.textContent).toMatch(/✗/);
+  });
+
+  it("states the OTHER side when the term has one", () => {
+    /* «Not on rentee» means on the supplier, so the cell says so rather than repeating the ask in
+       red. Only for terms that are a party assignment — a certificate has no opposite. */
+    draw([
+      wb(bc({
+        id: "x",
+        supplierName: "A",
+        terms: { equipment: [], contract: [{ key: "fuel_responsibility", labelEn: "Fuel", labelAr: "الوقود", state: "conflict", renteeValue: "supplier" }], supplier: [] },
+      })),
+    ]);
+    openTerms();
+    expect(screen.getByText("On rentee")).toBeTruthy();
+    expect(screen.queryByText(/✗/)).toBeNull();
+  });
+});
+
 describe("a responsibility says whose it is", () => {
   it("prints «On supplier» / «On rentee», never the bare party", () => {
     draw();
