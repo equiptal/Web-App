@@ -2,6 +2,27 @@
 
 ## Change log
 
+- **2026-09-07 - The legal pages printed their own markup; the profile printed two company names.**
+  (1) `/legal/[key]` rendered the document with `{body}`, so a renter opening the terms read `<h2>`
+  and `<p>`. The MOBILE app has always rendered it (`legal_content_page.dart` hands the same field to
+  `HtmlWidget`). The web renders it now through an allow-list (`src/lib/contract/legal-html.ts`) with
+  a `.legal-doc` block in `globals.css` carrying the same few rules the app styles - headings,
+  paragraphs, lists, links. Plain-text documents still print as text, so their line breaks survive.
+  (2) The profile drew `profile.companyName` - free text typed at signup - beside the firm block that
+  names the COMPANY the account belongs to. The row now draws only when there is no firm.
+  (3) The settings card no longer stretches: `grow` is gone, reversing the 2026-08-30 both-columns-
+  end-level ruling, which stopped being right when the firm moved onto this page and made the left
+  column much taller.
+  Files: `src/app/legal/[key]/page.tsx`, `src/lib/contract/legal-html.ts`, `src/app/globals.css`,
+  `src/components/profile/ProfileView.tsx`, `src/components/company/CompanyHub.tsx`,
+  `tests/unit/legal-html.test.ts`, `tests/unit/profile-company.test.tsx`.
+  ⚠️ No sanitiser DEPENDENCY: the allow-list is ~40 lines because a legal document's vocabulary is
+  small. If a third surface ever renders authored HTML, reach for DOMPurify then.
+  ⚠️ Support «doesn't work» on web.moedatech.net because that build has **no Intercom at all** -
+  verified in the browser: `window.Intercom` undefined, no snippet, and none of the five scripts on
+  the page mentions `widget.intercom.io`. Same host is still serving the pre-token palette. It is a
+  DEPLOY, not code.
+
 - **2026-09-06 - A guest meets the page behind glass, not a prompt in an empty column.**
   Owner sent Supplier OS's guarded pages as the reference: the surface renders blurred and inert with
   a small card centred on it («Join Moedatech», what the page is, one line of what it holds, one

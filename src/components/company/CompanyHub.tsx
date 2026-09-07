@@ -51,7 +51,14 @@ import { pin } from "@/lib/uiPins";
  * page padding, the `dir` (the profile already sets it) and the firm's masthead, which would be a
  * second slab under the renter's own. The states, the copy and every act are unchanged.
  */
-export function CompanyHub({ embedded = false }: { embedded?: boolean } = {}) {
+export function CompanyHub({
+  embedded = false,
+  onCompany,
+}: {
+  embedded?: boolean;
+  /** Reports the firm (or its absence) to the page around it — the profile prints one name, not two. */
+  onCompany?: (company: MyCompany | null) => void;
+} = {}) {
   const t = useT();
   const c = t.company;
   const { locale } = useLocale();
@@ -92,9 +99,12 @@ export function CompanyHub({ embedded = false }: { embedded?: boolean } = {}) {
     else {
       setLoadError(false);
       setCompany(result);
+      // The page around this one prints the firm's name in its own field; told here so the two can
+      // never disagree, and only on a read that actually answered.
+      onCompany?.(result);
     }
     setLoading(false);
-  }, []);
+  }, [onCompany]);
 
   useEffect(() => {
     void load();

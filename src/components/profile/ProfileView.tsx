@@ -46,6 +46,8 @@ export function ProfileView() {
   const [showChangePhone, setShowChangePhone] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
+  /** The firm this account belongs to, reported up by the block below — see the Company field. */
+  const [firmName, setFirmName] = useState<string | null>(null);
   const [langBusy, setLangBusy] = useState(false);
 
   useEffect(() => {
@@ -240,7 +242,15 @@ export function ProfileView() {
                 <Field icon="location_on" label={p.city} value={profile.city || "—"} />
                 <Field icon="work" label={p.jobTitle} value={profile.jobTitle || "—"} />
                 <Field icon="mail" label={p.email} value={profile.email || "—"} ltr />
-                <Field icon="domain" label={p.companyName} value={profile.companyName || "—"} />
+                {/* ── ONE name for the firm, and only where it is the only one (owner, 2026-09-07:
+                    *"how yesr test and EQ Rental, 2 names? which one"*) ──────────────────────────
+                    Two different things were printed under one word. `profile.companyName` is FREE
+                    TEXT typed at signup; the block further down names the COMPANY he actually
+                    belongs to — the record that decides what he can see and what his bids are filed
+                    under. So this row draws only when there is NO firm, where the typed value is the
+                    only thing anyone has said about his company. With a firm, the block below is the
+                    answer and repeating it here is the second name he was reading. */}
+                {!firmName && <Field icon="domain" label={p.companyName} value={profile.companyName || "—"} />}
                 <Field icon="chat" label={p.whatsapp} value={profile.whatsapp || "—"} ltr />
               </FieldGrid>
             )}
@@ -262,7 +272,7 @@ export function ProfileView() {
               (its own padding, its own `dir`, the firm's masthead) — see `CompanyHub`. */}
           {!loading && (
             <div className="mt-5">
-              <CompanyHub embedded />
+              <CompanyHub embedded onCompany={(co) => setFirmName(co?.name ?? null)} />
             </div>
           )}
 
@@ -278,7 +288,12 @@ export function ProfileView() {
             than a separate destination (owner, 2026-08-26). */}
         {!loading && (
           <>
-            <Section title={p.settings} grow>
+            {/* ~~`grow`, so the two columns ended level (owner, 2026-08-30).~~ Withdrawn (owner,
+                2026-09-07: *"the settings card is too long, fit its height to the content"*). The
+                left column grew a great deal when the firm moved onto this page, and matching it
+                stretched five rows of settings down a screen of empty card — a box mostly made of
+                nothing, which is worse than two columns ending at different heights. */}
+            <Section title={p.settings}>
               <RowList>
                 <Row icon="language" label={p.language} hint={ar ? p.arabic : p.english} chevron={false}>
                   <span className="flex flex-none overflow-hidden rounded-sm border border-border">

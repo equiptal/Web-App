@@ -666,3 +666,22 @@ body {
     animation: none;
   }
 }
+
+/* ══ The legal documents ════════════════════════════════════════════════════════════════════════
+   `/legal/[key]` renders admin-authored HTML (privacy policy, terms of use). Tailwind resets every
+   tag to nothing, so an unstyled `<h2>` reads at body size and an `<ul>` loses its bullets — which
+   is how a rendered document still looks broken. These are the same few rules the mobile app hands
+   `HtmlWidget` (`legal_content_page.dart`): headings, paragraphs, lists, links. Scoped to the one
+   class, so nothing else in the app inherits a prose stylesheet.                                */
+.legal-doc h1, .legal-doc h2 { font-size: 17px; font-weight: 800; color: var(--navy); margin: 22px 0 8px; }
+.legal-doc h1:first-child, .legal-doc h2:first-child { margin-top: 0; }
+.legal-doc h3, .legal-doc h4 { font-size: 15px; font-weight: 800; color: var(--navy); margin: 18px 0 6px; }
+.legal-doc p { margin: 0 0 10px; }
+.legal-doc ul, .legal-doc ol { margin: 0 0 12px; padding-inline-start: 22px; }
+.legal-doc ul { list-style: disc; }
+.legal-doc ol { list-style: decimal; }
+.legal-doc li { margin: 0 0 6px; }
+.legal-doc strong, .legal-doc b { font-weight: 700; color: var(--navy); }
+.legal-doc a { color: var(--brand-deep); text-decoration: underline; text-underline-offset: 2px; }
+.legal-doc hr { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
+.legal-doc blockquote { margin: 0 0 12px; padding-inline-start: 12px; border-inline-start: 2px solid var(--border); color: var(--muted-dark); }

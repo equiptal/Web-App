@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { AppShell, PageBack } from "@/components/AppShell";
+import { looksLikeHtml, sanitizeLegalHtml } from "@/lib/contract/legal-html";
 import { Icon } from "@/components/ui";
 import { Section } from "@/components/PageSection";
 import { SkeletonText } from "@/components/Skeleton";
@@ -82,8 +83,25 @@ export default function LegalPage({ params }: { params: Promise<{ key: string }>
               </div>
             )}
 
+            {/* ── The document is HTML, and it is rendered as HTML (owner, 2026-09-07) ───────────
+                *"Privacy policy and terms of use are showing plain html — what is this issue!!"*
+                They were: `{body}` printed the markup as text, so the reader met `<h2>` and `<p>`.
+                The mobile app has rendered this field since it shipped (`legal_content_page.dart` →
+                `HtmlWidget`, styling h1-h3, p/li/span and a), and this is the web's half of it.
+
+                Through an allow-list (`sanitizeLegalHtml`), because the string arrives over the
+                network and goes in with `dangerouslySetInnerHTML` — see that file for why the list
+                is small and why there is no dependency. A document stored as plain paragraphs is
+                still printed as text, so nothing loses its line breaks. */}
             {!loading && !failed && (
-              <article className="whitespace-pre-wrap text-body leading-[1.9] text-navy">{body}</article>
+              looksLikeHtml(body) ? (
+                <article
+                  className="legal-doc text-body leading-[1.9] text-navy"
+                  dangerouslySetInnerHTML={{ __html: sanitizeLegalHtml(body) }}
+                />
+              ) : (
+                <article className="whitespace-pre-wrap text-body leading-[1.9] text-navy">{body}</article>
+              )
             )}
           </div>
         </Section>

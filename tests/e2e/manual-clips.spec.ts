@@ -94,12 +94,22 @@ async function moveTo(page: Page, target: Locator) {
   await page.waitForTimeout(300);
 }
 
+/**
+ * Move the pointer for the camera, then press the ELEMENT.
+ *
+ * ⚠️ It used to press the coordinates — `mouse.down()` where the pointer had arrived — and that is a
+ * press on whatever is topmost at that point. On a canvas with a sticky footer the choice rows sit
+ * under the bar, so the billing basis was clicked five runs in a row and never answered, and the gate
+ * kept reporting it missing. `locator.click()` waits for the element to be actionable and presses IT.
+ * The cursor still glides there first, which is all the clip needs from the mouse.
+ */
 async function click(page: Page, target: Locator, beat = 900) {
   await expect(target).toBeVisible({ timeout: 25_000 });
   await moveTo(page, target);
-  await page.mouse.down();
-  await page.waitForTimeout(120);
-  await page.mouse.up();
+  await target.click({ timeout: 15_000 }).catch(async () => {
+    // Covered by something the page draws over it: press it where it stands.
+    await target.click({ force: true, timeout: 5_000 }).catch(() => {});
+  });
   await page.waitForTimeout(beat);
 }
 
@@ -197,13 +207,24 @@ test("1+2 · post a request with the assistant, then share it", async ({ browser
        ⚠️ Worth a product look, not just a script workaround: a required field that shows no star and
        fails a press without saying why is the same trap that took four attempts here. */
     await step("answer the year and the certificate", async () => {
-      for (const label of [/certificate/i, /minimum year/i]) {
-        const control = page.getByRole("button", { name: label }).first();
-        if (!(await control.count())) continue;
-        await click(page, control, 700);
-        const option = page.getByRole("option").first();
-        if (await option.count()) await click(page, option, 700);
-        else await page.keyboard.press("Escape");
+      /* Two different controls, and reaching for both as `button` is why the earlier cuts answered
+         neither: `CertSelect` IS a button (`aria-label="CERTIFICATE"`), but the year is a
+         `SearchSelect`, which is the house `Dropdown` — a COMBOBOX. A `getByRole("button")` for it
+         matches nothing, silently, and the gate keeps holding.
+
+         Both answers are the explicit "none": «No certificate» and «Any year». That is what the gate
+         wants — a decision, not a value — and it is the honest thing for a spider lift the renter
+         described in four words. */
+      const cert = page.getByRole("button", { name: /^certificate$/i }).first();
+      if (await cert.count()) {
+        await click(page, cert, 600);
+        await click(page, page.getByRole("option", { name: /no certificate/i }).first(), 700);
+      }
+
+      const year = page.getByRole("combobox", { name: /minimum year/i }).first();
+      if (await year.count()) {
+        await click(page, year, 600);
+        await click(page, page.getByRole("option", { name: /any year/i }).first(), 700);
       }
     });
 
@@ -214,9 +235,45 @@ test("1+2 · post a request with the assistant, then share it", async ({ browser
     await step("open «Where it goes» and confirm the site", async () => {
       const where = page.getByRole("button", { name: /where it goes/i }).first();
       if (await where.count()) await click(page, where, 900);
-      const confirm = page.getByRole("button", { name: /confirm location|confirm/i }).first();
+      /* The control says «This is the right spot», not «Confirm» — `confirmAction` in the dictionary
+         is a different string that this panel does not use. Matching on the word «confirm» found
+         nothing and the gate went on holding, with `* Required` on a panel the clip had just opened. */
+      const confirm = page.getByRole("button", { name: /this is the right spot|confirm location/i }).first();
       if (await confirm.count()) await click(page, confirm, 1200);
       else console.log("      (no confirm control — the site may already be confirmed)");
+    });
+
+    /* One more of the same shape, on the schedule: «HOW YOU'RE BILLED*» reads «Monthly» in the
+       panel's own summary, and the gate still wants it PRESSED. A value the project carried is not
+       yet the renter's answer. */
+    await step("open «When it runs», pick the billing, tick the days", async () => {
+      /* ⚠️ Order and STATE both matter here, and getting either wrong costs a run:
+         · the panel header is a toggle — pressing it on an already-open panel shuts it;
+         · the acknowledgement only EXISTS once a basis is chosen (there is nothing to acknowledge
+           without one), so it must be looked for after the press, not before;
+         · a blocked «Review & send» collapses the panels again, so a later pass has to reopen. */
+      const monthly = () => page.getByRole("button", { name: /^monthly$/i });
+      if (!(await monthly().count())) {
+        const when = page.getByRole("button", { name: /when it runs/i }).first();
+        if (await when.count()) await click(page, when, 900);
+      }
+      if (await monthly().count()) await click(page, monthly().first(), 900);
+
+      const ack = page.locator('input[type="checkbox"]').first();
+      if (await ack.count()) {
+        /* The pointer goes to the LABEL (that is what a renter aims at, and what the camera should
+           show), and the state is set on the input itself with `check`, which does not care that the
+           box is a 16px target under a sticky bar. A plain click on the input reported «false»
+           afterwards — pressed, and not ticked. */
+        // No `label` lookup here: `locator("label", { has: … })` on a page-level locator resolves
+        // slowly enough to eat the whole test budget, and the pointer has one job — be near the tick.
+        await moveTo(page, ack).catch(() => {});
+        await ack.check({ force: true, timeout: 8_000 }).catch(() => {});
+        await page.waitForTimeout(700);
+        console.log(`      charged days acknowledged: ${await ack.isChecked().catch(() => false)}`);
+      } else {
+        console.log("      (the acknowledgement is not on screen — the basis may not have taken)");
+      }
     });
 
     /* ── Through the canvas ────────────────────────────────────────────────────────────────────
@@ -254,6 +311,29 @@ test("1+2 · post a request with the assistant, then share it", async ({ browser
         await click(page, cta, 900);
         await page.waitForTimeout(400);
       }
+      /* If it did not land, say WHY in the log rather than in another debugging session: every field
+         the canvas has marked «Required», by its own label. */
+      if (!(await ready.isVisible().catch(() => false))) {
+        const owed = await page.evaluate(() => {
+          const out: string[] = [];
+          for (const el of Array.from(document.querySelectorAll("*"))) {
+            if (el.children.length || !/Required/.test(el.textContent ?? "")) continue;
+            const field = el.closest("div");
+            const label = field?.querySelector("span,label")?.textContent?.replace(/\s+/g, " ").trim();
+            if (label) out.push(label.slice(0, 60));
+          }
+          return [...new Set(out)];
+        });
+        console.log(`      still owed: ${owed.join(" · ") || "(nothing marked — the gate is elsewhere)"}`);
+        const where = await page.evaluate(() => ({
+          url: location.pathname + location.search,
+          heads: Array.from(document.querySelectorAll("h1,h2")).map((h) => (h.textContent ?? "").trim()).slice(0, 4),
+          ctas: Array.from(document.querySelectorAll("button")).map((b) => (b.textContent ?? "").replace(/\s+/g, " ").trim()).filter((t) => /send|review/i.test(t)).slice(0, 4),
+          tail: (document.body.innerText || "").replace(/\s+/g, " ").slice(-260),
+        }));
+        console.log(`      at ${where.url} | heads: ${where.heads.join(" / ")} | ctas: ${where.ctas.join(" | ")}`);
+        console.log(`      tail: ${where.tail}`);
+      }
       await beat(page, 1500);
     });
 
@@ -281,5 +361,234 @@ test("1+2 · post a request with the assistant, then share it", async ({ browser
     });
   } finally {
     await saveClip(context, page, "post");
+  }
+});
+
+/** What this account holds, asked of the app's own API through a signed-in page. */
+async function findData(page: Page) {
+  const bids = await page.evaluate(async () => {
+    const r = await fetch("/api/me/received-bids?limit=100", { cache: "no-store" });
+    return r.ok
+      ? ((await r.json()) as {
+          bids: { bidId: string; dealRoomId: string | null; dealRoomStatus: string | null; supplierName: string; request: { id: string; groupId: string | null } }[];
+        }).bids
+      : [];
+  });
+  const byRequest = new Map<string, typeof bids>();
+  for (const b of bids) byRequest.set(b.request?.id ?? "", [...(byRequest.get(b.request?.id ?? "") ?? []), b]);
+  const [requestId, onIt] = [...byRequest.entries()].sort((a, b) => b[1].length - a[1].length)[0] ?? ["", []];
+  return { bids, requestId, onIt, bidId: onIt[0]?.bidId ?? "" };
+}
+
+test("3 · view the bids, then compare them", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const { context, page } = await newClip(browser, "bids");
+  try {
+    await page.goto("/requests", { waitUntil: "domcontentloaded" });
+    const { requestId } = await findData(page);
+    await step("open the request with the most offers", async () => {
+      await page.goto(`/requests?r=${encodeURIComponent(requestId)}`, { waitUntil: "domcontentloaded" });
+      await expect(page.getByText(/counter this price|view quote/i).first()).toBeVisible({ timeout: 25_000 });
+      await beat(page, 2000);
+    });
+    await step("switch to Compare", async () => {
+      await click(page, page.getByRole("button", { name: /^compare$/i }).first(), 2000);
+    });
+    /* The two rails, in the order the owner reads them: what it comes to, then what they agreed to.
+       Each opens alone, which is the behaviour the section is describing. */
+    await step("open the grand total", async () => {
+      await click(page, page.getByText(/^grand total$/i).first(), 2200);
+    });
+    await step("open the terms", async () => {
+      await click(page, page.getByText(/^terms$/i).first(), 2400);
+    });
+  } finally {
+    await saveClip(context, page, "bids");
+  }
+});
+
+test("4 · build a suppliers group", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const { context, page } = await newClip(browser, "suppliers");
+  try {
+    await step("open My Suppliers", async () => {
+      await page.goto("/suppliers", { waitUntil: "domcontentloaded" });
+      await page.waitForLoadState("networkidle").catch(() => {});
+      await beat(page, 1500);
+    });
+    /* ⚠️ A WRITE: this creates a group on the account (owner-authorised, staging). The name is the
+       owner's own — «Cranes». */
+    await step("create the group «Cranes»", async () => {
+      const create = page.getByRole("button", { name: /create group|new group/i }).first();
+      if (!(await create.count())) {
+        console.log("      (no group control on this page)");
+        return;
+      }
+      await click(page, create, 900);
+      const name = page.getByPlaceholder(/earthmoving|group/i).or(page.locator('input[type="text"]')).first();
+      if (await name.count()) await type(page, name, "Cranes");
+      /* Its members are ticked in the same sheet: the first supplier row is enough to show what a
+         group IS without turning the clip into a data-entry session. */
+      const firstRow = page.getByRole("checkbox").first();
+      if (await firstRow.count()) await click(page, firstRow, 700);
+      const confirm = page.getByRole("button", { name: /create|save|done/i }).last();
+      if (await confirm.count()) await click(page, confirm, 2200);
+    });
+    await beat(page, 2000);
+  } finally {
+    await saveClip(context, page, "suppliers");
+  }
+});
+
+test("5 · the equipment map, and the papers behind it", async ({ browser }) => {
+  test.setTimeout(240_000);
+  const { context, page } = await newClip(browser, "map");
+  try {
+    await page.goto("/requests", { waitUntil: "domcontentloaded" });
+    const { requestId, onIt } = await findData(page);
+    /* The owner's supplier for this: `0502165558`, «Murad alabdullah» — the only account authorised
+       for a send in these clips. */
+    const target = onIt.find((b) => /murad/i.test(b.supplierName)) ?? onIt[0];
+
+    await step("open the bid card's equipment & docs", async () => {
+      await page.goto(`/requests?r=${encodeURIComponent(requestId)}`, { waitUntil: "domcontentloaded" });
+      await expect(page.getByText(/equipment & docs/i).first()).toBeVisible({ timeout: 25_000 });
+      await beat(page, 1400);
+      await click(page, page.getByText(/equipment & docs/i).first(), 1800);
+    });
+
+    await step("open the map for that supplier", async () => {
+      await page.goto(`/bids/${encodeURIComponent(target?.bidId ?? "")}/equipment`, { waitUntil: "domcontentloaded" });
+      await expect(page.locator(".leaflet-container").first()).toBeVisible({ timeout: 30_000 });
+      await beat(page, 2500);
+    });
+
+    await step("press a red distance and read what it means", async () => {
+      const red = page.locator(".bm-eq-yard, [class*='bm-eq-km']").first();
+      if (await red.count()) await click(page, red, 2200);
+      else console.log("      (no unconfirmed distance on this offer)");
+    });
+
+    /* ⚠️ A WRITE when `PW_SEND=1`: it puts an availability question in the conversation with the
+       supplier. Authorised for this one supplier only. */
+    await step("ask him to confirm availability", async () => {
+      const ask = page.getByRole("button", { name: /ask the supplier|اسأل/i }).first();
+      if (!(await ask.count())) {
+        console.log("      (no ask control on screen)");
+        return;
+      }
+      await moveTo(page, ask);
+      await beat(page, 1000);
+      if (process.env.PW_SEND === "1") await click(page, ask, 2500);
+      else console.log("      the clip stops on «Ask the supplier» (set PW_SEND=1 to send)");
+    });
+
+    await step("open the documents", async () => {
+      const docs = page.getByRole("button", { name: /company documents|documents/i }).first();
+      if (await docs.count()) await click(page, docs, 2400);
+      await beat(page, 1800);
+    });
+  } finally {
+    await saveClip(context, page, "map");
+  }
+});
+
+test("6 · counter the price", async ({ browser }) => {
+  test.setTimeout(240_000);
+  const { context, page } = await newClip(browser, "counter");
+  try {
+    await page.goto("/requests", { waitUntil: "domcontentloaded" });
+    const { requestId, onIt } = await findData(page);
+    const target = onIt.find((b) => /murad/i.test(b.supplierName)) ?? onIt[0];
+
+    await step("press «Counter this price» on the card", async () => {
+      await page.goto(`/requests?r=${encodeURIComponent(requestId)}`, { waitUntil: "domcontentloaded" });
+      const counter = page.getByRole("button", { name: /counter this price/i }).first();
+      await expect(counter).toBeVisible({ timeout: 25_000 });
+      await beat(page, 1200);
+      await click(page, counter, 3000);
+      await page.waitForLoadState("networkidle").catch(() => {});
+    });
+
+    await step("name a lower price", async () => {
+      // The sheet's own price cell — the first editable amount on the quotation.
+      const price = page.locator('input[inputmode="numeric"], input[type="number"]').first();
+      if (await price.count()) {
+        await click(page, price, 400);
+        await page.keyboard.press("Control+A");
+        await page.keyboard.type("14000", { delay: 60 });
+        await beat(page, 1200);
+      } else console.log("      (no editable price on the sheet)");
+    });
+
+    await step("walk to the terms and the review", async () => {
+      for (const name of [/next: terms/i, /next: review|review/i]) {
+        const cta = page.getByRole("button", { name }).first();
+        if (await cta.count()) await click(page, cta, 1800);
+      }
+    });
+
+    /* ⚠️ THE WRITE: this sends the counter to the supplier. `PW_SEND=1` only. */
+    await step("send the counter", async () => {
+      const send = page.getByRole("button", { name: /^send|send counter|send offer/i }).first();
+      if (!(await send.count())) {
+        console.log("      (no send control on the sheet)");
+        return;
+      }
+      await moveTo(page, send);
+      await beat(page, 1200);
+      if (process.env.PW_SEND === "1") await click(page, send, 3000);
+      else console.log("      the clip stops on the send button (set PW_SEND=1 to send)");
+    });
+  } finally {
+    await saveClip(context, page, "counter");
+  }
+});
+
+test("7 · accept the deal, and take the quotation", async ({ browser }) => {
+  test.setTimeout(240_000);
+  const { context, page } = await newClip(browser, "accept");
+  try {
+    await page.goto("/requests", { waitUntil: "domcontentloaded" });
+    const { bids } = await findData(page);
+    /* A room that is still open if there is one; otherwise the settled room, which at least shows
+       what accepting produces — the quotation, and the download beside it. */
+    const rank: Record<string, number> = { OPEN: 0, ACTIVE: 0, NEGOTIATING: 1, AWAITING_CONFIRMATION: 2, CLOSED: 3 };
+    const room = bids
+      .filter((b) => b.dealRoomId && rank[(b.dealRoomStatus ?? "").toUpperCase()] != null)
+      .sort((a, b) => rank[(a.dealRoomStatus ?? "").toUpperCase()] - rank[(b.dealRoomStatus ?? "").toUpperCase()])[0];
+    if (!room) {
+      console.log("      (no deal room on this account)");
+      return;
+    }
+
+    await step("open the deal room", async () => {
+      await page.goto(`/deal-room/${encodeURIComponent(room.dealRoomId!)}`, { waitUntil: "domcontentloaded" });
+      await page.waitForLoadState("networkidle").catch(() => {});
+      await beat(page, 2200);
+    });
+
+    /* ⚠️ THE WRITE: accepting binds the renter to the supplier's terms. `PW_SEND=1` only. */
+    await step("accept", async () => {
+      const accept = page.getByRole("button", { name: /^accept|accept deal|قبول/i }).first();
+      if (!(await accept.count())) {
+        console.log("      (nothing to accept — this room is already settled)");
+        return;
+      }
+      await moveTo(page, accept);
+      await beat(page, 1200);
+      if (process.env.PW_SEND === "1") await click(page, accept, 3000);
+      else console.log("      the clip stops on «Accept» (set PW_SEND=1 to accept)");
+    });
+
+    await step("the quotation", async () => {
+      const quote = page.getByRole("button", { name: /download quote|final quotation|quotation/i }).first();
+      if (await quote.count()) {
+        await moveTo(page, quote);
+        await beat(page, 1800);
+      } else console.log("      (no quotation control on this room)");
+    });
+  } finally {
+    await saveClip(context, page, "accept");
   }
 });
