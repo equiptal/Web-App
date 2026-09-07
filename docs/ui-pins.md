@@ -8,7 +8,7 @@ The number every surface answers to on staging. Three ways in:
 - `Ctrl+Shift+U`
 - `?pins=1` on any URL — and `?pins=0` to switch it off again
 
-If none of those show anything, the host is not on the list in `uiPinsAllowed()`: staging, localhost and `*.amplifyapp.com` only. The console says `[ui-pins] ready` where it is live.
+If none of those show anything, the host is not on the list in `uiPinsAllowed()`: `webstaging.moedatech.net`, `staging.dgdtg4fmrwwfn.amplifyapp.com`, localhost and `127.0.0.1` only — beta and production are deliberately absent. The console says `[ui-pins] ready` where it is live.
 
 Three levels, and the panel switches between them.
 

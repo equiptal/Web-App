@@ -2,6 +2,23 @@
 
 ## Change log
 
+- **2026-09-07 - The pin overlay is off on beta, because «an Amplify host is staging» stopped being true.**
+  `uiPinsAllowed()` was an allowlist of three hosts OR a blanket `host.endsWith(".amplifyapp.com")`,
+  written when every generated Amplify host really was a preview branch. The `beta` branch broke that
+  premise: `beta.dgdtg4fmrwwfn.amplifyapp.com` serves a renter-facing build against the PRODUCTION
+  backends, so the developer overlay - numbered boxes over every surface - was drawn over it. The
+  blanket rule is gone and the one Amplify host that may show pins is named
+  (`staging.dgdtg4fmrwwfn.amplifyapp.com`).
+  Files: `src/lib/uiPins.ts`, `docs/ui-pins.md`.
+  ⚠️ `main.dgdtg4fmrwwfn.amplifyapp.com` is PRODUCTION and was inside the blanket too - the
+  overlay was one URL away from a renter on the live build, and the file's own «a new domain arrives
+  with pins off» rule had been quietly broken by the OR beside it.
+  ⚠️ A branch preview that is genuinely for restyling now arrives with pins OFF and must be
+  added to `PIN_HOSTS` by name. That is the direction this file argues for, but it is a change of
+  behaviour for anyone who relied on the blanket.
+  ⚠️ Made on `beta`, which is cut from `staging`. Re-cutting `beta` LOSES this unless it is
+  forward-ported to `staging`.
+
 - **2026-09-07 - The step is in the URL, so Back restores it; and the map's offers stopped looping.**
   Owner: *"back … must take the user back to the STEP he was in, not only the page screen — he was on
   home, opened a modal, clicked a row inside it that took him somewhere else, so back must be home
