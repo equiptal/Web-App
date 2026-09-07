@@ -47,6 +47,19 @@ export const EMAIL_FIRST_AUTH_ENABLED: boolean = true;
 export const CUSTOM_EQUIPMENT_ENABLED = process.env.NEXT_PUBLIC_CUSTOM_EQUIPMENT !== "0";
 
 /**
+ * HELP_MANUAL_ENABLED — the «?» in the header and the manual behind it.
+ *
+ * OFF by default (owner, 2026-09-07: *"can you hide the manual for now"*). The seven sections and
+ * their pictures are written and wired; what they are waiting for is the screenshots being recut
+ * against a build with the CARTO key set, and the two flows whose clips are not finished. A manual
+ * that shows a watermarked map teaches the watermark.
+ *
+ * Switched on with `NEXT_PUBLIC_HELP_MANUAL=1` — a flag rather than a deletion, so turning it back
+ * on is one env var and no code archaeology.
+ */
+export const HELP_MANUAL_ENABLED = process.env.NEXT_PUBLIC_HELP_MANUAL === "1";
+
+/**
  * TRIAL_REQUESTS_ENABLED — the «Trial Request» path (mobile/016): the first-request pop-up offering
  * Trial or Real, the amber trial ribbon, and `isTrial: true` on the submit.
  *

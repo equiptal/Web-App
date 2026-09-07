@@ -15,6 +15,7 @@ import { fetchDealRoomUnread } from "@/lib/api/client";
 import { btn, cx, OVERLAY, PAGE_BACK, PAGE_MAX, PAGE_X, PAGE_Y, POPOVER, SCRIM } from "@/lib/ds";
 import { backTarget } from "@/lib/contract/back-nav";
 import { previousPath, recordTrail } from "@/lib/nav-trail";
+import { HELP_MANUAL_ENABLED } from "@/lib/flags";
 import { HelpManual } from "@/components/help/HelpManual";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { AppNav, AppNavMobile, type NavItem } from "@/components/AppNav";
@@ -468,15 +469,17 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
 
                     First in the group, before the inbox and the bell: those two are what the
                     PRODUCT has to say to him, and this is what he can ask of it. */}
-                <button
-                  type="button"
-                  onClick={() => setHelpOpen(true)}
-                  aria-label={t.help.title}
-                  title={t.help.title}
-                  className="grid h-[30px] w-[30px] place-items-center rounded-full transition hover:text-white"
-                >
-                  <Icon name="help_outline" size={19} />
-                </button>
+                {HELP_MANUAL_ENABLED && (
+                  <button
+                    type="button"
+                    onClick={() => setHelpOpen(true)}
+                    aria-label={t.help.title}
+                    title={t.help.title}
+                    className="grid h-[30px] w-[30px] place-items-center rounded-full transition hover:text-white"
+                  >
+                    <Icon name="help_outline" size={19} />
+                  </button>
+                )}
                 <Link
                   href="/inbox"
                   aria-label={t.shell.inbox}
@@ -499,7 +502,7 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
 
             {/* The prototype's separator: 1px by 24px, between what the app says to you and who you
                 are signed in as. */}
-            <HelpManual open={helpOpen} onClose={() => setHelpOpen(false)} />
+            {HELP_MANUAL_ENABLED && <HelpManual open={helpOpen} onClose={() => setHelpOpen(false)} />}
 
             {status === "authed" && <span aria-hidden="true" className="h-6 w-px flex-none bg-white/15" />}
 
