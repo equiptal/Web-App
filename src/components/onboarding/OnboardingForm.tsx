@@ -93,7 +93,6 @@ export function OnboardingForm({
   const [lastName, setLastName] = useState("");
   const [city, setCity] = useState("");
   const [jobTitle, setJobTitle] = useState("");
-  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [cities, setCities] = useState<Opt[]>(FALLBACK_CITIES);
@@ -193,7 +192,6 @@ export function OnboardingForm({
         lastName: lastName.trim(),
         city: city.trim(),
         jobTitle: jobTitle.trim(),
-        companyName: companyName.trim() || undefined,
         whatsapp: whatsapp.trim() || undefined,
       });
       setBusy(false);
@@ -222,8 +220,7 @@ export function OnboardingForm({
           lastName: lastName.trim(),
           city: city.trim(),
           jobTitle: jobTitle.trim(),
-          companyName: companyName.trim() || undefined,
-          email: showEmail ? email.trim() || undefined : undefined,
+            email: showEmail ? email.trim() || undefined : undefined,
           whatsapp: whatsapp.trim() || undefined,
         }),
       });
@@ -391,12 +388,16 @@ export function OnboardingForm({
           </div>
         </div>
 
-        <div>
-          <label className={labelCls}>
-            {o.companyName} <span className="text-label font-semibold text-muted">— {o.optional}</span>
-          </label>
-          <input className={inputCls} value={companyName} onChange={(e) => setCompanyName(e.target.value)} maxLength={200} placeholder={o.companyNamePlaceholder} />
-        </div>
+        {/* ~~«Company name — optional».~~ Removed (owner, 2026-09-07: *"remove it from the form UI
+            now"*). It was the second of two answers to one question: a renter typed a name here at
+            signup and the FIRM he later verified carried its own, and the profile printed both. The
+            firm's record is the one the platform acts on — company-shared visibility, whose requests
+            he can see, what his bids are filed under — so the typed one had no reader left.
+
+            Nothing is posted for it any more, which the backend already handles: `companyName` is
+            optional on `completeProfileSchema`, and `company.service`'s naming chain
+            (`submission.companyName → profile.companyName → companyLegalName → 'My Company'`) simply
+            falls through the middle step it used to fill. */}
 
         <div className={`grid grid-cols-1 gap-3 ${showEmail ? "sm:grid-cols-2" : ""}`}>
           {showEmail && (

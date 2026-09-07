@@ -146,13 +146,19 @@ export function bidCardHtml(card: BidCardPreview, model: BidCardModel | null, la
   const align = lang === "ar" ? "right" : "left";
   const url = escapeHtml(card.url);
 
-  /**
-   * The headline lives in the picture. When there IS no picture and we draw the band as markup, the
-   * band already carries it — repeating it as the title directly underneath is the machine's name
-   * twice in twenty vertical pixels, which is what a real unfurl never does.
+  /*
+   * — `bandIsMarkup` lived here —
+   *
+   * 🔴 It suppressed the white title block whenever the band was drawn as markup, on the reasoning
+   * that the band already carries the headline. True, and the PICTURE carries it too — so the real
+   * card, the one a supplier unfurls, shows the machine twice and this showed it once.
+   *
+   * The result was a card that changed shape the moment a request was posted: a tall band and
+   * nothing under it before, a smaller band over a white block with the title and the site after
+   * (owner, 2026-09-07, with the two side by side). Whatever the repetition costs, the preview's job
+   * is to be the thing, not to improve on it.
    */
-  const bandIsMarkup = !card.imageUrl && !!model;
-  const title = bandIsMarkup ? "" : model?.cardTitle || card.title;
+  const title = model?.cardTitle || card.title;
 
   /**
    * ── The card names the request; the MESSAGE carries the detail (owner, 2026-09-03) ───────────

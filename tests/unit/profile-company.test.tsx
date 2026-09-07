@@ -137,6 +137,23 @@ describe("the organization, on the profile", () => {
     expect(screen.getByText("Yesr Test")).toBeTruthy();
   });
 
+  it("shows the firm and its people, and not the verification papers", async () => {
+    /**
+     * Owner, 2026-09-07: *"even in the company details don't show it — just show profile, company,
+     * and the code with team members."* The particulars were a read-only copy of the form he filled
+     * once; under his own details they turned the profile into a filing cabinet.
+     */
+    api.company = member();
+    draw();
+    await find(en.company.team);
+    // The firm, the code and the roster — the three things he acts on.
+    expect(screen.getByText("Moedatech Contracting")).toBeTruthy();
+    expect(screen.getByText("AB12CD")).toBeTruthy();
+    // Not the papers.
+    expect(screen.queryByText(en.profile.companyVerifiedTitle)).toBeNull();
+    expect(screen.queryByText(/Authority role|National ID/)).toBeNull();
+  });
+
   it("points nothing at the retired /company route", async () => {
     api.company = member();
     draw();

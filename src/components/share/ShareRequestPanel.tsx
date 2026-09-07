@@ -270,19 +270,14 @@ export function ShareRequestPanel({
   const [reopen, setReopen] = useState<Compose | null>(null);
   const [dnsCopied, setDnsCopied] = useState(false);
   const [msgCopied, setMsgCopied] = useState(false);
-  /**
-   * The renter's own address, for the `To` line.
+  /*
+   * — `myEmail`, the address off his Moedatech profile, lived here —
    *
-   * 🔴 **A message with no `To` is what we sent before**, on every path. It delivers, but the
-   * recipient sees *"undisclosed-recipients"*, some corporate filters score it down, and in Gmail's
-   * composer he was left staring at an empty To box on a message he was about to send — which
-   * invites him to type a supplier into it, exposing that one to all the others.
-   *
-   * ⚠️ **Read here rather than passed in.** `renterName` is a prop threaded through six call
-   * sites; a seventh would have to be added to all of them and forgotten in one. This is the one
-   * component that needs it.
+   * 🔴 It filled the From and To lines, and it is not the sender on any remaining path: Outlook
+   * sends from the mailbox that CONSENTED, Gmail from whatever account he is signed into. So it
+   * printed `yarafarouq555@gmail.com` above a footer that said the message would leave from
+   * `yara@moedatech.net` (owner, 2026-09-07). Gone with the guess it supported.
    */
-  const [myEmail, setMyEmail] = useState<string | null>(null);
   /**
    * The envelope the backend says it would send, waiting for him to confirm.
    *
@@ -341,25 +336,6 @@ export function ShareRequestPanel({
   }, []);
 
   // Asked once, on mount: it decides whether an offer is drawn at all, and it never throws.
-  useEffect(() => {
-    /* ⚠️ `fetch` itself can be missing — a test renderer, an old embedded browser — and calling it
-       then throws INSIDE the effect, where `.catch` never sees it and React takes the whole tree
-       down with it. An absent address costs a `To` line; nothing here may cost the screen. */
-    try {
-      void fetch("/api/me", { cache: "no-store" })
-        .then((r) => (r.ok ? r.json() : null))
-        /**
-         * 🔴 **The body is `{ user, verification }`, not the user.** Reading `email` off the
-         * envelope gave `undefined` every time, so `To` rendered as a label with nothing after it
-         * (owner, 2026-09-06: *"why to doesnt show anything"*). `ShareOnPost` has the same bug for
-         * `companyName`, which is why the From line has been falling back to "you".
-         */
-        .then((body: { user?: { email?: string | null } } | null) => setMyEmail(body?.user?.email?.trim() || null))
-        .catch(() => setMyEmail(null));
-    } catch {
-      setMyEmail(null);
-    }
-  }, []);
 
   useEffect(() => {
     void mailConnectStatus().then(setConnect);
@@ -553,14 +529,50 @@ export function ShareRequestPanel({
    * asks him to decode it, while «Al Faisal Rentals» is the thing he actually recognises. So the
    * list is the server's and the labels are ours, matched on the address.
    */
+  /**
+   * The address this message will really leave from.
+   *
+   * 🔴 **The CONNECTED mailbox wins over the profile's address**, and reading the profile's was
+   * wrong: the From line showed `yarafarouq555@gmail.com` on a message about to go out through
+   * `yara@moedatech.net`, which the panel's own footer named two inches below it (owner,
+   * 2026-09-07). Graph sends as the mailbox that consented, whatever the account is called here.
+   *
+   * ⚠️ Order is: what the server SAID it would use, then the mailbox he connected, then his
+   * profile. Each one is closer to the truth than the next.
+   */
+  const sendingFrom =
+    preview?.from ||
+    (connect?.connected && provider === "outlook" ? connect.accountEmail : null) ||
+    null;
+
+  /**
+   * 🔴 **No guess when we do not know which mailbox sends** (owner, 2026-09-07: *"if gmail or still
+   * no connected email just show 'your e-mail' without specific address"*).
+   *
+   * ~~It fell back to the address on his Moedatech profile.~~ That is not the sender on either
+   * remaining path: **Gmail** sends from whatever account he happens to be signed into, and an
+   * **unconnected Outlook** sends from whatever he picks in the window. Printing his profile address
+   * as the From line states a fact we do not have, on the one screen whose whole job is showing what
+   * really goes out.
+   *
+   * ⚠️ And what is not SHOWN is not SENT: the compose window's `to` follows the same value, so a
+   * renter is never told one thing while the URL carries another.
+   */
+
   const nameFor = (address: string): string | null => {
-    const hit = (rows ?? []).find((r) => r.email?.trim().toLowerCase() === address.trim().toLowerCase());
-    if (hit?.name) return hit.name;
-    return address.trim().toLowerCase() === (myEmail ?? "").trim().toLowerCase() ? renterName : null;
+    /**
+     * 🔴 **His own address is checked FIRST, and it has to be.** A renter who has added himself to
+     * his own supplier list — which he has, as `gg` — matched that row instead, so the To line read
+     * «G gg» on a message addressed to him. The sender is never a supplier, whatever else the list
+     * happens to say.
+     */
+    const same = (a: string | null | undefined) => !!a && a.trim().toLowerCase() === address.trim().toLowerCase();
+    if (same(sendingFrom)) return renterName;
+    return (rows ?? []).find((r) => same(r.email))?.name ?? null;
   };
   const asPeople = (list: string[]): MailPerson[] => list.map((address) => ({ address, name: nameFor(address) }));
 
-  const envelopeTo = asPeople(preview?.to.length ? preview.to : myEmail ? [myEmail] : []);
+  const envelopeTo = asPeople(preview?.to.length ? preview.to : sendingFrom ? [sendingFrom] : []);
   const envelopeBcc = asPeople(preview?.bcc.length ? preview.bcc : reachable.map((x) => x.email as string));
 
   const skippedNames = preview
@@ -1024,7 +1036,9 @@ export function ShareRequestPanel({
    */
   const openCompose = (id: string, message: string): boolean => {
     const args: Compose = {
-      to: myEmail ? [myEmail] : [],
+      /* ⚠️ The connected mailbox where there is one: it is the address the message leaves from,
+         so it is the address a copy should come back to. */
+      to: sendingFrom ? [sendingFrom] : [],
       bcc: reachable.map((x) => x.email as string),
       subject,
       body: message,
@@ -1608,7 +1622,7 @@ export function ShareRequestPanel({
                   <span className="block truncate py-1 text-meta" style={{ color: skin.text }}>
                     {renterName ? <b className="font-semibold">{renterName}</b> : null}
                     {renterName ? " · " : null}
-                    <span dir="ltr" style={{ color: skin.label }}>{preview?.from || myEmail || c.fromYou}</span>
+                    <span dir="ltr" style={{ color: skin.label }}>{sendingFrom || c.envYourMail}</span>
                   </span>
                 </MailField>
 
@@ -1616,7 +1630,9 @@ export function ShareRequestPanel({
                   {/* ⚠️ **Never blank.** Until we know his address there is still something true
                       to say — it goes to him — and a labelled row with nothing after it reads as
                       broken rather than as pending. */}
-                  <MailChips people={envelopeTo} empty={c.fromYou} skin={skin} />
+                  {/* ⚠️ A named chip only where the address is known. Otherwise the row still says
+                      where it goes — to him — without inventing which of his mailboxes. */}
+                  <MailChips people={envelopeTo} empty={c.envYourMail} skin={skin} />
                 </MailField>
                 <MailField label={c.envBcc} skin={skin}>
                   <MailChips people={envelopeBcc} empty={c.envNoRecipients} skin={skin} />

@@ -764,7 +764,16 @@ describe("the preview says what is SENT, not what is stored", () => {
      * twice — a text block, then the card underneath — which is what the owner kept reading as
      * duplication, and he was right: nobody designs a letter that says everything twice.
      */
-    expect(screen.getAllByText(/Crawler Excavator 20 ton · with operator/, { selector: "div" })).toHaveLength(1);
+    /**
+     * ⚠️ **Twice, and that is the real card.** The picture names the machine and the white block
+     * under it names it again — which is what a supplier unfurling the link actually sees. The
+     * markup band used to suppress the second one, so the preview changed shape the moment a request
+     * was posted (owner, 2026-09-07). The preview's job is to be the thing, not to improve on it.
+     *
+     * What must still never happen is the details appearing as a TEXT BLOCK as well as a card, which
+     * is the duplication this test was written for.
+     */
+    expect(screen.getAllByText(/Crawler Excavator 20 ton · with operator/, { selector: "div" }).length).toBeLessThanOrEqual(2);
   });
 });
 
@@ -1909,65 +1918,84 @@ describe("More hands the sheet a URL", () => {
  * supplier into it and expose that one to all the others.
  */
 describe("the To line", () => {
-  /**
-   * 🔴 **The real body is `{ user, verification }`, and these stubs used to return a flat
-   * `{ email }`.** So they passed while the panel read `me.email` off the envelope and got
-   * `undefined` on every real page: the To row rendered as a label with nothing after it, and the
-   * tests said it was fine (owner, 2026-09-06: *"why to doesnt show anything"*).
-   *
-   * A stub that does not match the route it stands in for is worse than no stub: it makes the suite
-   * agree with the bug.
-   */
-  const withMe = (email: string | null) =>
-    vi.stubGlobal("fetch", async (url: string) =>
-      String(url).includes("/api/me")
-        ? { ok: true, status: 200, json: async () => ({ user: { email }, verification: { status: "none" } }) }
-        : { ok: false, status: 404, json: async () => ({}) },
-    );
-
-  const sendByGmail = async () => {
-    draw({ draftForm: DRAFT });
-    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
-    fireEvent.click(screen.getByText(c.gmail));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
-    await waitFor(() => expect(opened).toHaveBeenCalled());
-    return new URL(String(opened.mock.calls[0][0]));
+  const outlookConnected = (email: string) => {
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: email, connectedAt: null };
   };
 
-  it("Given his address, Then HE is in To and the suppliers stay blind", async () => {
-    /**
-     * ⚠️ **Reply-all is safe this way.** A blind-copied recipient's client sees only `To` and
-     * `Cc`, so a reply-all reaches the renter and no supplier can reach the others by accident.
-     */
+  const send = async (channel: string) => {
     api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
-    withMe("bandar@zahid.sa");
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(channel));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    await waitFor(() => expect(opened).toHaveBeenCalled());
+    /**
+     * ⚠️ Skip the BLANK window and the consent screen. An unconnected Outlook opens an empty
+     * pop-up as the first statement of the click — it has to, or the browser refuses it — so
+     * `calls[0]` is `""` on that path and only the compose URL is the one under test.
+     */
+    const url = opened.mock.calls
+      .map((x) => String(x[0]))
+      .find((u) => u.startsWith("http") && !u.includes("login.microsoftonline.com"));
+    return new URL(url ?? "https://example.invalid/");
+  };
 
-    const url = await sendByGmail();
-    expect(url.searchParams.get("to")).toBe("bandar@zahid.sa");
+  it("Given OUTLOOK connected, Then the connected mailbox is in To", async () => {
+    /**
+     * 🔴 **The mailbox that CONSENTED, not the address on his profile.** Graph sends as whatever
+     * mailbox granted consent, so reading the profile printed `yarafarouq555@gmail.com` on a message
+     * about to leave from `yara@moedatech.net`, which the panel's own footer said two inches below
+     * it (owner, 2026-09-07).
+     */
+    outlookConnected("yara@moedatech.net");
+    const url = await send(c.outlook);
+
+    expect(url.searchParams.get("to")).toBe("yara@moedatech.net");
+    /**
+     * ⚠️ **And NO `bcc` on this URL, which is Outlook behaving as documented.** Its compose
+     * deeplink discards blind copies without a word, so putting them there would address the window
+     * to nobody and tell the renter otherwise. The panel offers «Copy addresses» instead. Gmail's
+     * URL carries them properly, and the case below checks that.
+     */
+    expect(url.searchParams.get("bcc")).toBeNull();
+  });
+
+  it("Given GMAIL, Then To carries NO address, and the screen says so", async () => {
+    /**
+     * ⚠️ Gmail sends from whatever account he is signed into. We do not know which, so the row
+     * says «Your e-mail» rather than naming one (owner, 2026-09-07).
+     *
+     * ⚠️ And what is not shown is not sent: the compose URL carries no `to` either, so he is never
+     * told one thing while the link does another.
+     */
+    outlookConnected("yara@moedatech.net");
+    const url = await send(c.gmail);
+
+    expect(url.searchParams.get("to")).toBeNull();
+    // Gmail DOES carry the blind copies, which is why it is a separate button.
     expect(url.searchParams.get("bcc")).toContain("ops@alfaisal.sa");
+    expect(screen.getAllByText(c.envYourMail).length).toBeGreaterThan(0);
+  });
+
+  it("Given Outlook NOT connected, Then the same: no address invented", async () => {
+    api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
+    const url = await send(c.outlook);
+
+    expect(url.searchParams.get("to")).toBeNull();
+    expect(screen.getAllByText(c.envYourMail).length).toBeGreaterThan(0);
   });
 
   it("Given a supplier, Then he is NEVER in To", async () => {
     // 🔴 The one thing that breaks the promise the feature rests on: none of them learns who else
     // was asked.
-    api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
-    withMe("bandar@zahid.sa");
+    outlookConnected("yara@moedatech.net");
+    const url = await send(c.outlook);
 
-    const url = await sendByGmail();
     expect(url.searchParams.get("to")).not.toContain("alfaisal");
     expect(url.searchParams.get("to")).not.toContain("najd");
   });
-
-  it("Given no address for him, Then To is simply absent — today's behaviour, not a wrong one", async () => {
-    api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
-    withMe(null);
-
-    const url = await sendByGmail();
-    expect(url.searchParams.get("to")).toBeNull();
-    // And the share still goes out.
-    expect(url.searchParams.get("bcc")).toContain("ops@alfaisal.sa");
-  });
 });
+
 
 
 /**

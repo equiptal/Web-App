@@ -109,11 +109,13 @@ export function CompanyDetails({ grow = false }: {
 
   /** CR, VAT and the national-address certificate are FILES, not numbers — so the answer is a way to
    *  open one, and «Verified» only when the presigned URL did not come back. */
+  /* Only the ones with a file (owner, 2026-09-07). `DocPill` refuses to draw an empty slot, so the
+     heading has to go with them — «Documents» over nothing is the same claim in a larger font. */
   const docs = [
     { label: L("CR document", "وثيقة السجل التجاري"), url: info.docs?.crDocUrl ?? null },
     { label: L("VAT document", "وثيقة الرقم الضريبي"), url: info.docs?.vatDocUrl ?? null },
     { label: L("National Address certificate", "شهادة العنوان الوطني"), url: info.docs?.nationalAddressDocUrl ?? null },
-  ];
+  ].filter((d) => d.url);
 
   /**
    * ── The papers are not fields (owner's reference, 2026-08-26) ─────────────────────────────────
@@ -130,6 +132,7 @@ export function CompanyDetails({ grow = false }: {
         ))}
       </FieldGrid>
 
+      {docs.length > 0 && (
       <div className="border-t border-border px-4 pb-4 pt-3.5">
         <h3 className="mb-2 text-label font-semibold uppercase tracking-wide text-muted">{L("Documents", "المستندات")}</h3>
         {/* Two across, like the facts, so a card of three papers does not run down the page as three
@@ -146,6 +149,7 @@ export function CompanyDetails({ grow = false }: {
           ))}
         </div>
       </div>
+      )}
     </Section>
   );
 }

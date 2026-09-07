@@ -208,9 +208,27 @@ export interface SupplierAward {
 export interface SupplierSend {
   kind: "share" | "invite";
   requestCode: string | null;
-  at: string;
-  opened?: boolean;
-  joined?: boolean;
+  /**
+   * 🔴 **`declaredAt`, and the reader used to say `at`.** Nothing ever set `at`, so every row on the
+   * profile printed «Invalid Date» — `new Date(undefined)` — for as long as the section has existed
+   * (owner, 2026-09-07, with a screenshot of eight of them). The backend's own name is `declaredAt`,
+   * deliberately: it is when the renter SAID he sent it, never proof that anything arrived.
+   */
+  declaredAt: string;
+  /** The request it was about. Null on an invitation, which is about no request. */
+  requestId?: string | null;
+  /** ⚠️ The fanned GROUP's key where there is one — what a renter thinks of as «the request». */
+  requestKey?: string | null;
+  equipment?: string | null;
+  /** ⚠️ The city, never the address: this list is readable by a colleague. */
+  city?: string | null;
+  channel?: "email" | "whatsapp" | "sms" | "copy" | null;
+  /**
+   * ⚠️ Present only where WE put the message on the wire. Every row written from a compose window
+   * has none, because a window opening is not a send.
+   */
+  sentMessageId?: string | null;
+  sentVia?: "graph" | "ses" | null;
 }
 
 /** The link row plus the whole history behind it. */

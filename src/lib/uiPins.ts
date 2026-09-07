@@ -149,6 +149,7 @@ export const PIN_REGISTRY = {
   "bid-card-header": { n: "29.2", label: "Bid card — header", file: "src/components/workspace/BidCards.tsx" },
   "bid-card-footer": { n: "29.3", label: "Bid card — bottom row", file: "src/components/workspace/BidCards.tsx" },
   "compare-matrix": { n: "30", label: "Compare matrix", file: "src/components/workspace/CompareMatrix.tsx" },
+  "ai-rank-panel": { n: "30.9", label: "Compare — the assistant under the table", file: "src/components/workspace/AiRankPanel.tsx" },
   "matrix-scroller": { n: "30.1", label: "Matrix — horizontal scroller", file: "src/components/workspace/CompareMatrix.tsx" },
   "matrix-supplier-col": { n: "30.2", label: "Matrix — supplier column", file: "src/components/workspace/CompareMatrix.tsx" },
   "terms-panel": { n: "36", label: "Terms panel", file: "src/components/requests/TermsPanel.tsx" },

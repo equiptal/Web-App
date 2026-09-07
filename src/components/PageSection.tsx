@@ -317,6 +317,13 @@ export function Field({
  * green instead of a dead link, which is the same rule the old field-shaped version held.
  */
 export function DocPill({ label, url, viewLabel, verifiedLabel }: { label: ReactNode; url: string | null; viewLabel: string; verifiedLabel: string }) {
+  /* ── An empty slot is not a row (owner, 2026-09-07: *"even if the document is empty in one slot
+     then don't show view"*) ──────────────────────────────────────────────────────────────────────
+     A pill with no file behind it offered «Verified» where the control belongs — a word that reads
+     as a claim about a paper nobody can open, on a row that cannot be pressed. Three of them made a
+     card of documents out of an account that had filed none. A slot draws only when there is
+     something to open; a card whose every slot is empty draws no Documents block at all. */
+  if (!url) return null;
   const body = (
     <>
       <span className="flex-none rounded-sm bg-navy px-1.5 py-0.5 text-label font-extrabold uppercase tracking-wide text-white">

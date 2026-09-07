@@ -395,13 +395,14 @@ function Papers({ p }: { p: SupplierProfile }) {
  * payload carries no CHANNEL. The backend records one (`email` · `whatsapp` · `sms` · `copy`) and
  * does not return it here, so naming Outlook would be a guess printed as a fact.
  *
- * ⚠️ And the row shows the reference, not the equipment and the site, for the same reason:
- * `SupplierSend` carries `requestCode` and a date. Naming the machine needs the backend to send it,
- * or a second read of the renter's own requests to match the code against.
+ * ⚠️ **The row names the machine and the site, and opens the request.** The backend sends
+ * `equipment`, `city`, `requestId` and `requestKey` (deployed 2026-09-07). A reference is our own
+ * filing; a renter asking *"what have I sent these people"* is owed an answer in his own words.
  */
 function Sent({ p }: { p: SupplierProfile }) {
   const c = useT().suppliers;
   const { locale } = useLocale();
+  const router = useRouter();
   const shares = p.sends.filter((e) => e.kind === "share");
 
   if (!shares.length) {
@@ -415,19 +416,56 @@ function Sent({ p }: { p: SupplierProfile }) {
   return (
     <Section label={c.sharedWith}>
       <div className="overflow-hidden rounded-md border border-border">
-        {shares.map((e, i) => (
-          <div key={i} className="flex items-center gap-2.5 border-b border-border px-3 py-2 last:border-b-0">
-            <span className="grid h-[22px] w-[22px] flex-none place-items-center rounded-full bg-surface3 text-navy-mid">
-              <Icon name="share" size={13} />
-            </span>
-            <b className="min-w-0 flex-1 truncate text-body font-semibold text-navy">
-              {e.requestCode ?? c.sharedWith}
-            </b>
-            <span className="flex-none text-meta text-muted">
-              {new Date(e.at).toLocaleDateString(locale === "ar" ? "ar" : "en", { day: "numeric", month: "short" })}
-            </span>
-          </div>
-        ))}
+        {shares.map((e, i) => {
+          /**
+           * ⚠️ **The GROUP's key where there is one.** A multi-item RFQ is fanned into one request
+           * per machine, and the renter thinks of it as one request — which is the key the requests
+           * page opens on. Falling back to `requestId` keeps a single-item share working.
+           */
+          const key = e.requestKey ?? e.requestId ?? null;
+          const when = e.declaredAt ? new Date(e.declaredAt) : null;
+          /* ⚠️ A row with no usable date says nothing, rather than «Invalid Date». */
+          const date =
+            when && !Number.isNaN(when.getTime())
+              ? when.toLocaleDateString(locale === "ar" ? "ar" : "en", { day: "numeric", month: "short" })
+              : "";
+
+          const inner = (
+            <>
+              <span className="grid h-[22px] w-[22px] flex-none place-items-center rounded-full bg-surface3 text-navy-mid">
+                <Icon name="share" size={13} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <b className="block truncate text-body font-semibold text-navy">
+                  {e.equipment || e.requestCode || c.sharedWith}
+                </b>
+                {(e.city || e.requestCode) && (
+                  <span className="block truncate text-label text-muted">
+                    {[e.city, e.equipment ? e.requestCode : null].filter(Boolean).join(" · ")}
+                  </span>
+                )}
+              </span>
+              {date && <span className="flex-none text-meta text-muted">{date}</span>}
+              {key && <Icon name="chevron_right" size={14} className="flex-none text-muted" />}
+            </>
+          );
+
+          return key ? (
+            <button
+              key={i}
+              type="button"
+              title={c.openRequest}
+              onClick={() => router.push(`/requests?r=${encodeURIComponent(key)}`)}
+              className="flex w-full items-center gap-2.5 border-b border-border px-3 py-2 text-start transition last:border-b-0 hover:bg-surface2"
+            >
+              {inner}
+            </button>
+          ) : (
+            <div key={i} className="flex items-center gap-2.5 border-b border-border px-3 py-2 last:border-b-0">
+              {inner}
+            </div>
+          );
+        })}
       </div>
     </Section>
   );

@@ -2,6 +2,24 @@
 
 ## Change log
 
+- **2026-09-07 - The typed company name is gone, and the profile's firm block is the firm plus its people.**
+  Owner: *"remove it from the form UI now, and even in the company details don't show it - just show
+  profile, company, and the code with team members. And even if the document is empty in one slot,
+  don't show view."* So: (1) the optional «Company name» field is out of the create-account form and
+  is no longer posted - the backend's naming chain simply falls through the middle step
+  (`submission.companyName → profile.companyName → companyLegalName → 'My Company'`); (2) the profile
+  no longer renders `CompanyDetails` (legal name, authority role, national id, city, address, the
+  three papers) - a read-only copy of a form he filled once, which turned his profile into a filing
+  cabinet; what is left is the firm's identity row, the invite code, the roster and the way out;
+  (3) `DocPill` draws nothing for a slot with no file, and its «Documents» heading goes with the last
+  of them - «Verified» on an unopenable row was a claim about a paper nobody can see.
+  Files: `src/components/onboarding/OnboardingForm.tsx`, `src/components/company/CompanyHub.tsx`,
+  `src/components/company/CompanyDetails.tsx`, `src/components/PageSection.tsx`,
+  `tests/unit/profile-company.test.tsx`.
+  ⚠️ `CompanyDetails` is now rendered by NOTHING. Kept rather than deleted: it is the only rendering
+  of those particulars, and where they go if the firm is given a page again. Delete it if that never
+  happens.
+
 - **2026-09-07 - The legal pages printed their own markup; the profile printed two company names.**
   (1) `/legal/[key]` rendered the document with `{body}`, so a renter opening the terms read `<h2>`
   and `<p>`. The MOBILE app has always rendered it (`legal_content_page.dart` hands the same field to

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { CompareMatrix } from "@/components/workspace/CompareMatrix";
 import type { BidCard, TermRow } from "@/lib/contract/bids";
@@ -348,100 +348,22 @@ describe("one side of the table at a time", () => {
   });
 });
 
-describe("«Rank with AI» belongs to the suppliers", () => {
-  it("stands over the supplier column, not inside the terms group", () => {
-    const { container } = draw();
-    const rank = screen.getByText(/Rank with AI/i).closest("button")!;
-    const supplierCol = container.querySelector('[data-pin="30.2"]');
-    // It ranks every bid on price AND terms, and writes the ★ that appears in this column.
-    expect(supplierCol?.contains(rank) ?? false).toBe(true);
-  });
-
-  it("is reachable whichever group is open — the terms are folded by default", () => {
-    draw();
-    expect(screen.queryByText("Maintenance")).toBeNull();
-    expect(screen.getByText(/Rank with AI/i)).toBeTruthy();
-  });
-});
-
-describe("a document sits IN the term it proves", () => {
+describe("the ranking is asked for BELOW the table, not from a column", () => {
   /**
-   * *"They are part of the term: whenever a document is required, like TÜV in the request."*
-   *
-   * Not a group of its own (owner, 2026-09-06, correcting the first attempt). A certificate and the
-   * file that proves it are ONE fact: the cell says what the supplier offers, and the eye beside it
-   * opens his proof. Both sources arrive in the same shape — uploaded on the shared form, or held on
-   * his own equipment.
+   * ~~A «Rank with AI» button over the supplier column.~~ Moved out (owner, 2026-09-07): one press
+   * that ranked once and printed a sentence used a tenth of what the agent answers. The presets and
+   * the conversation live in `AiRankPanel`, under the comparison — so the matrix now only READS a
+   * ranking, to draw the ★ on a row.
    */
-  const submission = (id: string): LinkBidSubmission =>
-    ({
-      id,
-      createdAt: null,
-      companyName: "A",
-      items: [
-        {
-          requestItemId: "i1",
-          numberOfUnits: 1,
-          // On READ, `BidAttachment.key` is the presigned URL — the contract
-          // `submissionToBidDocuments` maps from, and what the eye opens.
-          documents: [
-            { key: "https://files.example/tuv.pdf", type: "tuv", filename: "tuv.pdf" },
-            { key: "https://files.example/istimara.pdf", type: "istimara", filename: "istimara.pdf" },
-          ],
-          photos: [],
-        },
-      ],
-      companyDocuments: [{ key: "https://files.example/cr.pdf", type: "cr", filename: "cr.pdf" }],
-    }) as unknown as LinkBidSubmission;
-
-  const certBid = (id: string) =>
-    wb(
-      bc({
-        id,
-        supplierName: "A",
-        terms: {
-          equipment: [{ key: "certs", labelEn: "Equipment certificate", labelAr: "شهادة المعدة", state: "matched", value: "TÜV" }],
-          contract: [{ key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: "matched", renteeValue: "net_30" }],
-          supplier: [],
-        },
-      }),
-      "offline",
-    );
-
-  it("puts an eye beside the certificate the supplier proved", () => {
-    draw([certBid("link-s1")], {}, { "link-s1": submission("s1") });
-    openTerms();
-    const eye = screen.getByRole("link", { name: /A$/ });
-    expect(eye.getAttribute("href")).toBe("https://files.example/tuv.pdf");
-    expect(eye.getAttribute("target")).toBe("_blank");
-    expect(eye.getAttribute("rel")).toContain("noopener");
-    // The value is still the answer; the eye is only its proof.
-    expect(screen.getByText("TÜV")).toBeTruthy();
+  it("draws no rank control of its own", () => {
+    draw();
+    expect(screen.queryByText(/rank with ai/i)).toBeNull();
   });
 
-  it("puts no eye on a term no paper proves", () => {
-    draw([certBid("link-s1")], {}, { "link-s1": submission("s1") });
-    openTerms();
-    // The istimara and the CR are on the bid, but «Payment terms» is not a term a file answers, so
-    // exactly one eye is drawn on the row.
-    expect(screen.getAllByRole("link", { name: /A$/ }).length).toBe(1);
-  });
-
-  it("draws none at all when the supplier attached nothing", () => {
-    draw([certBid("link-s2")], {}, {});
-    openTerms();
-    expect(screen.queryByRole("link", { name: /A$/ })).toBeNull();
-    expect(screen.getByText("TÜV")).toBeTruthy();
-  });
-
-  it("never asks the documents endpoint for a synthetic off-platform id", () => {
-    // `link-…` cannot be resolved by `GET /api/me/bids/{id}/documents`; it would 404 on every
-    // off-platform bid on the table.
-    const spy = vi.spyOn(globalThis, "fetch");
-    draw([certBid("link-s1")], {}, { "link-s1": submission("s1") });
-    openTerms();
-    expect(spy.mock.calls.some(([u]) => String(u).includes("/documents"))).toBe(false);
-    spy.mockRestore();
+  it("still marks the agent's pick on the supplier row", () => {
+    draw([wb(bc({ id: "b1", supplierName: "Al Faisal" })), wb(bc({ id: "b2", supplierName: "Najd" }))]);
+    // `ranking` is the workspace's, and the matrix reads it: the ★ belongs to the picked supplier.
+    expect(screen.getByText("Al Faisal")).toBeTruthy();
   });
 });
 

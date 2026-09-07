@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { VerifiedMark } from "@/components/VerifiedMark";
 import { Dialog } from "@/components/Dialog";
-import { CompanyDetails } from "@/components/company/CompanyDetails";
 import { MastheadPill, PageMasthead, RowList, Section } from "@/components/PageSection";
 import { useRouter } from "next/navigation";
 import { useT, useLocale } from "@/lib/i18n";
@@ -651,23 +650,19 @@ function ActiveCompany({
           has anything to say under — `CompanyDetails` draws nothing for a firm with no verified
           submission, and a two-column grid with an empty half is worse than the single column it
           replaced. An unverified active company keeps the one column, with the team in it. */}
-      {/* Embedded, there is no room to split: this is already ONE column of the profile, so the
-          papers and the people stack in it. */}
-      {company.isVerified && !embedded ? (
-        <div className="mt-5 grid gap-5 lg:grid-cols-2">
-          <div className="flex min-w-0 flex-col">
-            <CompanyDetails grow />
-          </div>
-          <div className="flex min-w-0 flex-col">{team}</div>
-        </div>
-      ) : company.isVerified ? (
-        <>
-          <CompanyDetails />
-          {team}
-        </>
-      ) : (
-        team
-      )}
+      {/* ── The firm, and the people in it. Nothing else (owner, 2026-09-07) ─────────────────────
+          *"Even in the company details don't show it — just show profile, company, and the code with
+          team members."*
+
+          ~~`CompanyDetails`, the verification particulars: legal name, authority role, national id,
+          city, national address, and the three papers.~~ Gone from this page. They are a copy of the
+          form he filled once, none of it is editable here, and stacked under his own details they
+          made the profile a filing cabinet. What is left is what he acts on: the firm's identity row,
+          the invite code, the roster, and the way out.
+
+          The component is not deleted — it is the only rendering of those particulars, and it is
+          where they go if the firm is ever given a page of its own again. Nothing renders it today. */}
+      {team}
     </div>
   );
 

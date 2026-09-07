@@ -190,8 +190,6 @@ export function CompareMatrix({
   benched,
   onBench,
   ranking,
-  rankBusy,
-  onRank,
 }: {
   bids: WorkspaceBid[];
   /** The request's duration — what the third total column is measured over, and named after. */
@@ -222,10 +220,9 @@ export function CompareMatrix({
    */
   benched: Set<string>;
   onBench: (bidId: string, off: boolean) => void;
-  /** The agent's pick, held by the workspace so the suggestion bar under the card can read it too. */
+  /** The agent's pick, held by the workspace so the assistant under the table can read it too. The
+   *  matrix only READS it — the ranking is asked for below the table now, not from this column. */
   ranking: { bidId: string | null; note: string | null } | null;
-  rankBusy: boolean;
-  onRank: (bids: WorkspaceBid[]) => void;
 }) {
   const t = useT();
   const { locale } = useLocale();
@@ -648,7 +645,12 @@ export function CompareMatrix({
           genuinely needs to overhang the strip — the breakdown — is drawn in a portal instead. */}
       <div {...pin("matrix-scroller")} className="flex items-stretch overflow-x-auto overflow-y-clip">
         {/* ── The suppliers, on the inline-start edge ── */}
-        <div {...pin("matrix-supplier-col")} className="w-[185px] flex-none border-e border-border">
+        {/* 220px, and the name WRAPS (owner, 2026-09-07: *"the supplier names on the left must show
+            the name fully"*). At 185px with `truncate`, «Al Faisal Heavy Equipment Est.» read as «Al
+            Faisal Heavy…» — the column identifies who each row belongs to, and a name cut off has
+            lost the only job it has. The rows keep their 52px, so nothing else on the table moves:
+            two lines of 11px fit inside it. */}
+        <div {...pin("matrix-supplier-col")} className="w-[220px] flex-none border-e border-border">
           <div className="box-border flex h-[72px] flex-col justify-end gap-1.5 border-b border-border bg-surface2/60 px-3 pb-2">
             {/* «Supplier», and nothing after it: the «pick one» that stood here was an instruction
                 for a choice this table no longer asks for (owner, 2026-09-04). */}
@@ -657,22 +659,10 @@ export function CompareMatrix({
                 {t.workspace.supplier}
               </span>
             </span>
-            {/* ── The ranking belongs to the SUPPLIERS (owner, 2026-09-06) ──────────────────────
-                *"Why is «rank with AI» shown on «they offered»?"* — it was not about that half, or
-                about the terms at all: it ranks every bid on the table, on price and terms together,
-                and it writes the ★ that appears in this column. It sat in the terms band only
-                because that band had room. It sits over the column it marks now, and stays reachable
-                whichever group is open. */}
-            <button
-              type="button"
-              onClick={() => onRank(rows)}
-              disabled={rankBusy || rows.length === 0}
-              className={`w-full whitespace-nowrap rounded-full border px-2.5 py-1 text-label font-semibold transition disabled:bg-disabled-bg disabled:text-disabled-fg ${
-                ranking ? "border-ok/40 bg-ok-soft text-ok" : "border-border bg-surface text-navy-mid"
-              }`}
-            >
-              ✦ {ranking ? t.workspace.aiRanked : t.workspace.rankWithAi}
-            </button>
+            {/* ~~«Rank with AI», over this column.~~ Moved OUT (owner, 2026-09-07): a single button
+                that ranked once and said one sentence is not what the agent can do. The assistant
+                lives under the table now, with the presets and the conversation prod has, and this
+                column keeps only the ★ the ranking writes on a row. */}
           </div>
 
           {/* ── No supplier is PICKED here any more (owner, 2026-09-04) ─────────────────────────
@@ -700,7 +690,9 @@ export function CompareMatrix({
                   {initials(b.card.supplierName)}
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="truncate text-body font-extrabold leading-tight text-navy">{b.card.supplierName}</span>
+                  <span className="line-clamp-2 break-words text-meta font-extrabold leading-[1.25] text-navy" title={b.card.supplierName}>
+                    {b.card.supplierName}
+                  </span>
                   <span className={`truncate text-label font-semibold leading-none ${recommended ? "text-ok" : "text-muted"}`}>
                     {recommended
                       ? `★ ${t.workspace.recommended}`

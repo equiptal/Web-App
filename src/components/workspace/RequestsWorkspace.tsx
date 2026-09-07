@@ -9,7 +9,7 @@ import { PAGE_MAX, PAGE_X } from "@/components/AppShell";
 import { Skeleton } from "@/components/Skeleton";
 import { SignInPrompt } from "@/components/common/SignInPrompt";
 import { GuestRequestsPreview, GuestWall } from "@/components/common/GuestWall";
-import { fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail, recommendBids } from "@/lib/api/client";
+import { fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail } from "@/lib/api/client";
 import { groupRequests, requestCodeOf, type RequestGroup } from "@/lib/contract/requests";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import {
@@ -30,9 +30,8 @@ import { RequestContextBar } from "@/components/workspace/RequestContextBar";
 import { ItemTier } from "@/components/workspace/ItemTier";
 import { BidCards } from "@/components/workspace/BidCards";
 import { CompareMatrix } from "@/components/workspace/CompareMatrix";
+import { AiRankPanel } from "@/components/workspace/AiRankPanel";
 import { RequestDetailsModal, type ShareLinkMeta } from "@/components/workspace/RequestDetailsModal";
-import { buildItemComparison } from "@/lib/contract/comparison";
-import { bidColumnToComputed } from "@/lib/contract/agent-bids";
 import { workspaceExportTotals } from "@/lib/contract/workspace-export";
 import { formatSar } from "@/lib/pricing/rental";
 import { buildBidQuotationDoc, quotationSupplierInitials, quotationSupplierKey } from "@/lib/quotation/bid-quotation";
@@ -89,8 +88,6 @@ export function RequestsWorkspace() {
    * reading the other's local state.
    */
   const [ranking, setRanking] = useState<{ bidId: string | null; note: string | null } | null>(null);
-  const [rankBusy, setRankBusy] = useState(false);
-  const [tipOpen, setTipOpen] = useState(false);
   /**
    * The selected request's own code, when the LIST row arrived without one.
    *
@@ -342,27 +339,11 @@ export function RequestsWorkspace() {
   // A bench is about the comparison being read, and the next item is a different comparison.
   useEffect(() => { setBenched(new Set()); }, [itemId]);
   // So is a ranking: it ranked THIS item's bids, and the next item's are other bids entirely.
-  useEffect(() => { setRanking(null); setTipOpen(false); }, [itemId]);
+  useEffect(() => { setRanking(null); }, [itemId]);
 
-  /** Ask the agent to rank what is on the comparison. The web owns every figure it sends. */
-  const rank = useCallback(async (list: WorkspaceBid[]) => {
-    if (rankBusy || list.length === 0) return;
-    setRankBusy(true);
-    try {
-      const { columns } = buildItemComparison(list.map((r) => r.card), { requestDurationDays: item?.durationDays ?? undefined });
-      const res = await recommendBids({ bids: columns.map(bidColumnToComputed) });
-      const rec = res.result?.recommendation ?? null;
-      // The agent's own pick, and its first reason in its own words — not a paraphrase.
-      setRanking({
-        bidId: rec?.pick_bid_id ?? res.result?.ranking?.[0]?.bid_id ?? null,
-        note: rec?.reasons?.[0]?.text ?? res.result?.interpretation ?? null,
-      });
-    } catch {
-      setRanking(null);
-    } finally {
-      setRankBusy(false);
-    }
-  }, [rankBusy, item]);
+  /* ~~`rank`, and the `rankBusy` flag beside it.~~ The ranking is the assistant's own act now
+     (`AiRankPanel`), which owns the presets, the conversation and the busy state — the workspace
+     keeps only the RESULT, because the matrix draws a ★ from it and the item switch clears it. */
 
   /** What the source filter allows, minus what the renter benched. Both panes and the export read it. */
   const shown = useMemo(
@@ -816,8 +797,6 @@ export function RequestsWorkspace() {
               benched={benched}
               onBench={benchBid}
               ranking={ranking}
-              rankBusy={rankBusy}
-              onRank={rank}
             />
           )}
           </div>
@@ -828,52 +807,17 @@ export function RequestsWorkspace() {
             the table's border would read as another one of its rows. Collapsed it is a single line —
             the agent's own words, unpadded — and it opens into the full note. Nothing appears until
             the renter has asked for a ranking, because an empty assistant is furniture. */}
+        {/* ── The assistant, under the table (owner, 2026-09-07) ────────────────────────────────
+            ~~A one-line strip that showed the agent's sentence once a ranking existed, and a «Rank
+            with AI» button inside the terms band.~~ Both are `AiRankPanel` now: the four presets, a
+            question box, and the exchange kept on screen. It is the last section on the page, which
+            is where the owner asked for it — after the offers, not over them.
+
+            Under the card, not in it: it is the agent's reading OF the comparison, and a panel
+            inside the table's border would read as another one of its rows (owner, 2026-08-25). */}
         {tab === "compare" && shown.length > 0 && (
           <div className="mt-3.5 flex-none">
-            {ranking?.note && !tipOpen ? (
-              <button
-                type="button"
-                onClick={() => setTipOpen(true)}
-                className={btn("secondary", "md", { pill: true, full: true, className: "max- pe-4 ps-2 transition" })}
-              >
-                <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface2 text-label font-semibold text-muted">✦</span>
-                <span className="flex-none text-label font-semibold text-navy-mid">{t.workspace.aiSuggestion}</span>
-                <span className="min-w-0 truncate text-label font-semibold text-muted">{ranking.note}</span>
-                <span className="flex-none text-label font-semibold text-muted/70">⌄</span>
-              </button>
-            ) : ranking?.note && tipOpen ? (
-              <div className="flex items-start gap-3 rounded-lg border border-border bg-surface px-4 py-3.5">
-                <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface2 text-label font-semibold text-muted">✦</span>
-                <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-                  <div className="flex items-baseline gap-2.5">
-                    <span className="text-label font-semibold text-muted">{t.workspace.aiWhatIdDo}</span>
-                    <span className="font-mono text-label font-semibold tracking-[.09em] text-muted/70">{t.workspace.aiBrand}</span>
-                  </div>
-                  <p className="text-meta font-semibold leading-[1.5] text-navy-mid">{ranking.note}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setTipOpen(false)}
-                  aria-label={t.common.cancel}
-                  className="flex-none self-start rounded-sm px-2 py-1 text-label font-semibold text-muted/70 transition hover:bg-surface2 hover:text-navy-mid"
-                >
-                  ⌃
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => void rank(shown)}
-                disabled={rankBusy}
-                className={btn("secondary", "md", { pill: true, className: "pe-4 ps-2 transition" })}
-              >
-                <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface2 text-label font-semibold text-muted">✦</span>
-                <span className="text-label font-semibold text-navy-mid">{t.workspace.aiSuggestion}</span>
-                <span className="text-label font-semibold text-muted">
-                  {rankBusy ? t.workspace.aiRanking : t.workspace.aiRankPrompt}
-                </span>
-              </button>
-            )}
+            <AiRankPanel bids={shown} durationDays={item?.durationDays ?? null} ranking={ranking} onRanking={setRanking} />
           </div>
         )}
       </div>
