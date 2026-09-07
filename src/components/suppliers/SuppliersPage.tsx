@@ -387,7 +387,18 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
         ) : visible.length === 0 ? (
           <Empty filtered={rows.length > 0} c={c} />
         ) : (
-          <table className="w-full border-collapse">
+          /* ── The table scrolls sideways on a phone; the PAGE does not (2026-09-07) ─────────────
+             Eight columns — supplier, CR, phone, e-mail, city, groups, verified, ⋮ — do not fit in
+             372px and never will, so the box carries them and the renter swipes inside it. Without
+             this the whole document was 906px wide at that width, which moves the nav, the hero and
+             every card sideways with it. It is worse than it sounds on the DASHBOARD, which embeds
+             this list: the page there scrolled to 890px and nothing on screen said why.
+
+             ⚠️ Both axes are stated. CSS computes the other axis from `visible` to `auto` as soon as
+             one scrolls, so `overflow-x-auto` alone grows a vertical scrollbar inside the box — the
+             same trap the compare matrix and the dashboard's bid rail each hit once. */
+          <div className="overflow-x-auto overflow-y-clip">
+          <table className="w-full min-w-[620px] border-collapse">
             <thead>
               <tr>
                 {picking && (
@@ -449,6 +460,7 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
