@@ -2,6 +2,31 @@
 
 ## Change log
 
+- **2026-09-07 - A request started from a store opens on the FORM, not on «describe your request».**
+  Owner: *"i don't want the direct request from a store take him to the same flow, check in the app
+  how the direct behave and mimick it"*. The web pushed the machine's NAME into the intake box
+  (`?prefill=`) and had the agent parse it - so the renter was asked to write down, in prose, the row
+  he had just tapped, and then wait while we guessed which catalogue row he meant. The guess misses:
+  «Tuv Certfied Service Jeep» is a real answer for a real listing. The app never had that step
+  (`public_equipment_detail_sheet.dart` → `EquipmentPrefill` + `WizardPrefill.forDirectRequest`): it
+  opens its wizard with the equipment ALREADY CHOSEN, by id. The store link now carries
+  `catId/subId/capId` (+ the listing's `fuel` and `year`), and `/create` seeds a one-item draft
+  through `PROCESS_SUCCESS`, landing the renter on the canvas with the machine answered.
+  Files: `src/lib/agent/direct-draft.ts` (new), `src/components/stores/EquipmentDetailSurface.tsx`,
+  `src/app/create/page.tsx`, `src/lib/store/rfq-store.tsx` (`seedDraft`),
+  `tests/unit/direct-from-store.test.ts` (new, 7 cases).
+  Trap: ALL THREE ids or none. The backend refuses a partial triple (one or two ids is a 422 by
+  design), so `canSeedDirect` requires the whole triple and a listing missing one falls back to the
+  typed path - today's behaviour, nothing lost. `?prefill=` therefore stays: it is the «YOU WROTE»
+  label and the fallback, not dead weight.
+  Trap: it reuses `PROCESS_SUCCESS` rather than adding a reducer branch, so the project's defaults,
+  the template's terms, the origin snapshot and the empty `touchedFields` behave identically to a
+  parsed draft. A second branch meaning «the same thing but without the model» would have drifted.
+  ⚠️ Deliberately NOT copied from the listing: price, make and model. A request states what the
+  renter needs, not what one supplier stocks - a make on the request narrows the question he is
+  asking, and the price is the supplier's to offer. Identity travels as taxonomy; the make survives
+  only as display text in `rawLabel`.
+
 - **2026-09-07 - The pin overlay is off on beta, because «an Amplify host is staging» stopped being true.**
   `uiPinsAllowed()` was an allowlist of three hosts OR a blanket `host.endsWith(".amplifyapp.com")`,
   written when every generated Amplify host really was a preview branch. The `beta` branch broke that
@@ -16,8 +41,6 @@
   ⚠️ A branch preview that is genuinely for restyling now arrives with pins OFF and must be
   added to `PIN_HOSTS` by name. That is the direction this file argues for, but it is a change of
   behaviour for anyone who relied on the blanket.
-  ⚠️ Made on `beta`, which is cut from `staging`. Re-cutting `beta` LOSES this unless it is
-  forward-ported to `staging`.
 
 - **2026-09-07 - The step is in the URL, so Back restores it; and the map's offers stopped looping.**
   Owner: *"back … must take the user back to the STEP he was in, not only the page screen — he was on

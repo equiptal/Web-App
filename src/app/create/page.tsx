@@ -7,6 +7,7 @@ import { RfqProvider, useRfq } from "@/lib/store/rfq-store";
 import { CreateSurface } from "@/components/CreateSurface";
 import { CreateBack } from "@/components/create/CreateBack";
 import { StartYourRequestModal, type StartRequestChoice } from "@/components/home/StartYourRequestModal";
+import { canSeedDirect, directRequestDraft, type DirectPrefill } from "@/lib/agent/direct-draft";
 import { TRIAL_REQUESTS_ENABLED } from "@/lib/flags";
 import { useStartRequestGate } from "@/lib/access/start-request-gate";
 import { useT } from "@/lib/i18n";
@@ -46,9 +47,18 @@ export default function CreatePage() {
  * `/create` with no `supplierId` clears one left over from a previous run rather than quietly
  * re-addressing the next request.
  *
- * `?prefill=` carries the equipment's own words into the intake box (the app seeds the form with the
- * machine the renter was looking at). It is a starting text, not a fact: the renter edits it, and the
- * agent reads what he ends up with — the taxonomy is never forced behind him.
+ * ── The machine comes by ID, and the intake is SKIPPED (app parity, Epic 008) ───────────────────
+ *
+ * `?catId=&subId=&capId=` (plus the listing's `fuel` and `year`) is the equipment itself, and with
+ * them this gate opens the CANVAS directly — no describe-your-request screen, no parse, no wait.
+ * That is what the app does: `public_equipment_detail_sheet.dart` builds an `EquipmentPrefill` from
+ * the row the renter tapped and opens its wizard with the machine already chosen. Asking him to
+ * write down the machine he just pressed, and then guessing which catalogue row he meant, was the
+ * web inventing a step the app never had — and the guess can miss.
+ *
+ * `?prefill=` stays: it is the label the canvas shows under «YOU WROTE», and the FALLBACK for a
+ * listing whose triple is incomplete (an older payload, a half-filled row). Without the ids the flow
+ * is exactly what it was — the words in the box, the renter's to edit, the agent's to read.
  */
 function DirectRequestGate() {
   const params = useSearchParams();
@@ -57,6 +67,14 @@ function DirectRequestGate() {
   const supplierName = params.get("supplierName");
   const storeId = params.get("storeId");
   const prefill = params.get("prefill");
+  const equipment: DirectPrefill = {
+    categoryId: params.get("catId"),
+    subtypeId: params.get("subId"),
+    capacityId: params.get("capId"),
+    label: prefill,
+    fuel: params.get("fuel"),
+    year: Number(params.get("year")) || null,
+  };
   const { direct, draft, text } = state;
   const seeded = useRef(false);
 
@@ -64,9 +82,18 @@ function DirectRequestGate() {
     const same = (direct?.supplierId ?? null) === (supplierId ?? null);
     if (same) return;
     actions.setDirect(supplierId ? { supplierId, supplierName, storeId } : null);
-    // The prefill seeds an EMPTY box only, and only once: a renter who has already typed owns what
-    // he wrote, and a re-render must not push his words back to the machine's name.
-    if (supplierId && prefill && !draft && !text.trim() && !seeded.current) {
+    if (!supplierId || draft || seeded.current) return;
+    if (canSeedDirect(equipment)) {
+      // The machine is known, so the flow starts where the renter's own answers begin. Guarded on
+      // `!draft` above: a renter who came back to a request in progress keeps it.
+      seeded.current = true;
+      actions.seedDraft(directRequestDraft(equipment));
+      return;
+    }
+    // No usable triple: the prefill seeds an EMPTY box only, and only once — a renter who has
+    // already typed owns what he wrote, and a re-render must not push his words back to the
+    // machine's name.
+    if (prefill && !text.trim()) {
       seeded.current = true;
       actions.setText(prefill);
     }

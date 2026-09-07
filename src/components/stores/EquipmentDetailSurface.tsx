@@ -178,6 +178,19 @@ export function EquipmentDetailSurface({
         if (ownerStoreId) qs.set("storeId", ownerStoreId);
         const label = [heading, eq?.manufacturer, eq?.modelName].filter(Boolean).join(" ");
         if (label) qs.set("prefill", label);
+        /* ── The MACHINE, by id, not by its name in prose (app parity, Epic 008) ────────────────
+           The renter tapped a row in a catalogue; sending its words for the agent to parse asked
+           him to describe what he had just pointed at, and let the parse miss. The app builds an
+           `EquipmentPrefill` off the listing — the taxonomy triple, its fuel, its year — and opens
+           the form with the machine already chosen. `prefill` above stays as the label the canvas
+           shows under «YOU WROTE», and as the fallback for a listing whose triple is incomplete. */
+        if (eq?.categoryId && eq.subcategoryId && eq.measurementId) {
+          qs.set("catId", eq.categoryId);
+          qs.set("subId", eq.subcategoryId);
+          qs.set("capId", eq.measurementId);
+          if (eq.fuel) qs.set("fuel", eq.fuel);
+          if (eq.year) qs.set("year", String(eq.year));
+        }
         router.push(`/create?${qs.toString()}`);
       })();
     });

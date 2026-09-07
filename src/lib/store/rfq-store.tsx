@@ -926,6 +926,16 @@ const RfqContext = createContext<RfqContextValue | null>(null);
 function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState) {
   return {
     setText: (text: string) => dispatch({ t: "SET_TEXT", text }),
+
+    /**
+     * Open the flow on a draft nobody parsed — the machine the renter tapped in a store.
+     *
+     * The same door `PROCESS_SUCCESS` opens for a parsed draft, deliberately: the project's
+     * defaults, the template's terms, the origin snapshot and the empty `touchedFields` all have to
+     * behave identically, and a second reducer branch for "the same thing but without the model"
+     * would drift from this one within a month. See `direct-draft.ts` for what the store fills.
+     */
+    seedDraft: (draft: AgentDraft) => dispatch({ t: "PROCESS_SUCCESS", draft }),
     /** Mark (or unmark) the line a template typed, so the box can colour it. */
     markProjectTyped: (line: string | null) => dispatch({ t: "PROJECT_TYPED", line }),
     addFiles: (files: { name: string; type: string; data?: string }[]) => dispatch({ t: "ADD_FILES", files }),
