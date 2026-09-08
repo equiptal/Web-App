@@ -21,11 +21,19 @@ import { en } from "@/lib/i18n/en";
 
 type Outcome = { handedOff: boolean; mail?: { from: string; recipients: number; inSentFolder: boolean } };
 
-const hoisted = vi.hoisted(() => ({ fire: null as null | ((n: number, ch: string, o?: Outcome) => void) }));
+const hoisted = vi.hoisted(() => ({
+  fire: null as null | ((n: number, ch: string, o?: Outcome) => void),
+  /** The panel's own «post it» handler, so a test can mint the request the way Send does. */
+  post: null as null | (() => Promise<string | null>),
+}));
 
 vi.mock("@/components/share/ShareRequestPanel", () => ({
-  ShareRequestPanel: (props: { onShared?: (n: number, ch: string, o?: Outcome) => void }) => {
+  ShareRequestPanel: (props: {
+    onShared?: (n: number, ch: string, o?: Outcome) => void;
+    onPost?: () => Promise<string | null>;
+  }) => {
     hoisted.fire = (n, ch, o) => props.onShared?.(n, ch, o);
+    hoisted.post = props.onPost ?? null;
     return <div data-testid="panel" />;
   },
 }));
@@ -45,6 +53,7 @@ const c = en.intake.postShare;
 
 beforeEach(() => {
   hoisted.fire = null;
+  hoisted.post = null;
   vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ user: { companyName: "Zahid" } }), { status: 200 }));
 });
 afterEach(cleanup);
@@ -129,5 +138,62 @@ describe("a channel that took the browser away", () => {
     fireEvent(window, new Event("focus"));
     // Still gone: the panel reports a second channel inline, not with the big tick again.
     await waitFor(() => expect(screen.queryByText(c.postedTitle)).toBeNull());
+  });
+});
+
+/* ── The queue the page reads (owner, 2026-09-08) ────────────────────────────────── */
+
+/**
+ * *"I want the same post-to-Moedatech modal to show the e-mail too, so they are together, then the
+ * project modal after them."*
+ *
+ * `ProjectFiled` mounts on the same phase flip as this card, so the two dialogs raced. `CreateSurface`
+ * now holds the project one back while `onAnnouncing` is true — and what these pin is the SIGNAL,
+ * since the signal is what decides the order.
+ */
+describe("what the page is told about the queue", () => {
+  it("claims the screen from the post until the tick has been read", async () => {
+    const owed: boolean[] = [];
+    render(
+      <LocaleProvider initialLocale="en">
+        <ShareOnPost onAnnouncing={(v) => owed.push(v)} />
+      </LocaleProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId("panel")).toBeTruthy());
+    // Before anything is posted there is nothing to wait for: the project dialog is free to open.
+    expect(owed.at(-1)).toBe(false);
+
+    // The post mints the request. The send lands a tick later, so the claim must start HERE — a
+    // project dialog opening in that gap would be in front of a tick that has not appeared yet.
+    await act(async () => {
+      await hoisted.post!();
+    });
+    expect(owed.at(-1)).toBe(true);
+
+    hoisted.fire!(1, "email", { handedOff: false, mail: { from: "b@m.net", recipients: 1, inSentFolder: true } });
+    await screen.findByText(c.postedTitle);
+    // Still ours: he is reading it.
+    expect(owed.at(-1)).toBe(true);
+
+    fireEvent.click(screen.getByText(c.postedKeepSharing));
+    await waitFor(() => expect(owed.at(-1)).toBe(false));
+  });
+
+  it("releases the screen when the tick is dismissed by its close, not only by its button", async () => {
+    const owed: boolean[] = [];
+    render(
+      <LocaleProvider initialLocale="en">
+        <ShareOnPost onAnnouncing={(v) => owed.push(v)} />
+      </LocaleProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId("panel")).toBeTruthy());
+    await act(async () => {
+      await hoisted.post!();
+    });
+    hoisted.fire!(0, "none", { handedOff: false });
+    await screen.findByText(c.postedTitle);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(owed.at(-1)).toBe(false));
   });
 });

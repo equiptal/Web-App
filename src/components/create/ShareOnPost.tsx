@@ -33,7 +33,7 @@ import { ShareRequestPanel } from "@/components/share/ShareRequestPanel";
  * this is rendered by `CreateSurface`, which owns the switch and survives it — the flip happens
  * behind the card and the renter sees one continuous act.
  */
-export function ShareOnPost() {
+export function ShareOnPost({ onAnnouncing }: { onAnnouncing?: (owed: boolean) => void } = {}) {
   const t = useT();
   const c = t.intake.postShare;
   const { state, actions } = useRfq();
@@ -75,6 +75,26 @@ export function ShareOnPost() {
   /** What the server sent, when it sent it: the confirmation states the e-mail as well as the post. */
   const [mail, setMail] = useState<{ from: string; recipients: number; inSentFolder: boolean } | null>(null);
   const announced = useRef(false);
+  /**
+   * ── The two dialogs are a QUEUE, not a pile (owner, 2026-09-08) ─────────────────────
+   *
+   * *"I want the same post-to-Moedatech modal to show the e-mail too, so they are together, then the
+   * project modal after them."*
+   *
+   * `ProjectFiled` files the request under a site and reports it in a dialog of its own, and both
+   * mount on the same phase flip — so two dialogs raced for the screen and the renter met whichever
+   * won. These two states let the page order them: the post is announced first, with the send in it,
+   * and the project follows once he has read it.
+   *
+   * `owed` runs from the moment OUR post mints a request until the tick has been dismissed, which is
+   * deliberately wider than the dialog itself: the send happens a tick after the post, and a project
+   * dialog opening in that gap would be in front of a tick that had not appeared yet.
+   */
+  const [minted, setMinted] = useState(false);
+  const [toldHim, setToldHim] = useState(false);
+  useEffect(() => {
+    onAnnouncing?.(minted && !toldHim);
+  }, [minted, toldHim, onAnnouncing]);
   /** The request cap has a dialog of its own on the review above; this banner leaves it to it. */
   const isLimit = state.errorDetail?.backendCode === "E8009";
   /** The renter's own firm, for the From line. Read once, and a failure just leaves it unnamed. */
@@ -148,6 +168,8 @@ export function ShareOnPost() {
     // Keeps this card mounted once the phase flips to confirmation, and keeps the REVIEW on screen
     // behind it rather than the confirmation page — see `CreateSurface`.
     actions.setShareOnPost(true);
+    // From here the tick is owed, so nothing else may take the screen until it has been read.
+    setMinted(true);
     return uuid;
   };
 
@@ -237,7 +259,14 @@ export function ShareOnPost() {
           the shape the reference has.
 
           The message is unchanged, and so is the rule under it. */}
-      <Dialog open={posted} onClose={() => setPosted(false)} size="sm">
+      <Dialog
+        open={posted}
+        onClose={() => {
+          setPosted(false);
+          setToldHim(true);
+        }}
+        size="sm"
+      >
         <div className="flex flex-col items-center px-2 pb-1 pt-4 text-center">
           <SuccessTick />
           <h2 className="mt-5 text-title font-extrabold capitalize text-navy">{c.postedTitle}</h2>
@@ -266,7 +295,10 @@ export function ShareOnPost() {
               takes the whole row rather than hiding on a trailing edge. */}
           <button
             type="button"
-            onClick={() => setPosted(false)}
+            onClick={() => {
+              setPosted(false);
+              setToldHim(true);
+            }}
             className={cx(btn("primary", "lg", { full: true }), "mt-6")}
           >
             {c.postedKeepSharing}

@@ -2,6 +2,27 @@
 
 ## Change log
 
+- **2026-09-08 - The post (with its e-mail) is announced first; the project modal follows it.**
+  Owner: *"i want the same post to moedatech modal to show the email too so they are together, then
+  the project modal after them"*. `ShareOnPost`'s tick and `ProjectFiled`'s dialog both mount on the
+  same phase flip (`CreateSurface`), so they RACED for the screen and the renter met whichever won -
+  usually the project one, in front of the tick that answers the button he pressed. There is a queue
+  now: `ShareOnPost` reports `onAnnouncing(owed)`, true from the moment ITS post mints a request
+  until the tick has been read, and `CreateSurface` passes that to `ProjectFiled` as `hold`.
+  The e-mail line inside the same tick landed earlier the same day (see the entry below).
+  Files: `src/components/create/ShareOnPost.tsx`, `src/components/create/ProjectFiled.tsx`,
+  `src/components/CreateSurface.tsx`, `tests/unit/posted-confirmation.test.tsx`,
+  `tests/unit/project-filed-hold.test.tsx`.
+  ⚠️ **`hold` holds the DIALOG and never the write.** The filing happens on mount, and queueing it
+  too would mean a renter who closes the tab before reading the tick ends up with a request filed
+  under nothing - which is the silent bug `ProjectFiled` exists to fix. The test asserts the assign
+  call happens while held, and that lifting the hold does not file a second time.
+  ⚠️ The claim starts at the POST, not at the tick: the send lands a tick later, and a project
+  dialog opening in that gap would stand in front of a tick that had not appeared yet.
+  ⚠️ It cannot deadlock: the only early return after the post is «nothing was posted» (so nothing
+  was claimed), and `shareRequestEmail` never throws - it answers a refusal, so `onShared` always
+  runs. Both ways out of the tick (its button and the dialog's own close) release the queue.
+
 - **2026-09-08 - A send the SERVER performed is announced at once, and it says the mail went.**
   Owner: *"when i sent a request through outlook and moedatech it must show sent successfully with
   the post request confirmation in the same modal and immediately after post and send the outlook

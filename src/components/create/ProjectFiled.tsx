@@ -55,12 +55,23 @@ export function ProjectFiled({
   project,
   preferences,
   onDone,
+  hold = false,
 }: {
   /** The request just posted. Without an id there is nothing to file, so nothing happens at all. */
   requestId: string | null;
   project: ProjectDetails;
   preferences: Preferences;
   onDone?: () => void;
+  /**
+   * Hold the DIALOG while something else has the screen (owner, 2026-09-08: *"then the project modal
+   * after them"*).
+   *
+   * ⚠️ It holds the dialog and **never the write**. The filing is a convenience that happens on
+   * mount; queueing that as well would mean a renter who closes the tab before reading the tick ends
+   * up with a request filed under nothing, which is the silent bug this component was written to
+   * fix in the first place.
+   */
+  hold?: boolean;
 }) {
   const t = useT();
   const o = t.projects.offer;
@@ -111,8 +122,9 @@ export function ProjectFiled({
     };
   }, [address, requestId, seed]);
 
-  // Nothing to say yet, nothing to say at all, or already answered.
-  if (gone || site === null || site === false) return null;
+  // Nothing to say yet, nothing to say at all, or already answered — and nothing while another
+  // dialog is being read (`hold`), though the filing above has already happened by then.
+  if (gone || hold || site === null || site === false) return null;
 
   function close() {
     setGone(true);

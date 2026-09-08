@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@/components/Dialog";
@@ -24,6 +26,8 @@ import { TRIAL_REQUESTS_ENABLED } from "@/lib/flags";
  * screen so the renter explicitly chooses to resume the draft or reset (web-app/002 draft UX).
  */
 export function CreateSurface() {
+  /** True while the post/share tick is still owed or on screen — see `ProjectFiled`'s `hold`. */
+  const [announcing, setAnnouncing] = useState(false);
   const { state, actions } = useRfq();
   const t = useT();
   const router = useRouter();
@@ -128,7 +132,9 @@ export function CreateSurface() {
           back to the canvas carried a card advertising the PREVIOUS request's link into the request
           he was writing next. Pinning it to `confirmation` says what it always meant: this card
           belongs to the review it is posting, and to the moment just after. */}
-      {(state.readyToSend || (state.phase === "confirmation" && state.shareOnPost)) && <ShareOnPost />}
+      {(state.readyToSend || (state.phase === "confirmation" && state.shareOnPost)) && (
+        <ShareOnPost onAnnouncing={setAnnouncing} />
+      )}
 
       {/* ── Filing the request under a site, whichever screen won ─────────────────────────────
           🔴 **It used to live inside `Confirmation`, and the share card replaced that screen.**
@@ -147,6 +153,16 @@ export function CreateSurface() {
           requestId={state.requestUuids[0] ?? null}
           project={state.draft.project}
           preferences={state.draft.preferences}
+          /* ── One at a time, in the order he did them (owner, 2026-09-08) ────────────────
+             *"I want the same post-to-Moedatech modal to show the e-mail too, so they are together,
+             then the project modal after them."*
+
+             Both dialogs mount on the same phase flip, so they raced and the renter met whichever
+             won — usually the project one, in front of the tick that answers the button he pressed.
+             The post (with its send) is announced first; the project follows when he closes it.
+
+             The filing itself is NOT held: only this dialog waits. */
+          hold={announcing}
         />
       )}
       {/* The shared dialog, not a scrim of its own (owner, 2026-08-28: one design for every modal).
