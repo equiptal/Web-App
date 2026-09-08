@@ -2383,6 +2383,7 @@ export const ar: Dictionary = {
     phonesNormalized: "تُعرض أرقام الجوال بالشكل الذي ستُحفظ به (+966…)",
     phoneTruncated: "اختصر Excel رقماً أو أكثر عند حفظ الملف بصيغة CSV (9.66503E+11 تعني 966,503,000,000، فآخر الخانات لم تُحفظ في الملف). اكتب الرقم في الجدول أدناه، أو ارفع ملف .xlsx حيث الرقم كامل",
     rPhoneTruncated: "اختصر Excel الرقم",
+    rowShort: "لم تُضاف بعد — {reason}",
     rPhoneUnreadable: "تعذّرت قراءة الرقم",
   },
 };

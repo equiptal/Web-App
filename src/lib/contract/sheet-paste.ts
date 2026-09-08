@@ -139,5 +139,27 @@ export function mapRows(table: SheetTable, mapping: SheetField[]): MappedRow[] {
   });
 }
 
-/** A row is worth importing once it names a firm AND carries a way to reach it — the add rule. */
-export const importable = (r: MappedRow): boolean => !!r.name.trim() && !!(r.email.trim() || r.phone.trim());
+/**
+ * A row is worth adding once it names a firm AND carries a way to reach it.
+ *
+ * ── ONE rule, both doors (owner, 2026-09-08) ───────────────────────────────────────
+ * *"Why doesn't it import a missing company or e-mail or phone, while adding them manually allows
+ * it? No sense."* He was right, and the inconsistency was ours: the import began asking whether the
+ * phone could actually be READ, while the typed form went on accepting any non-empty string — so
+ * `9.66503E+11` or «call the office» was a contact when typed and not a contact when imported. Both
+ * doors post to the same endpoint, which normalises the phone and refuses a row with no reachable
+ * key, so the looser side was not more permissive: it just moved the refusal to after the press.
+ *
+ * The rule now lives here, once, and both dialogs use it. `phoneOk` is injected rather than imported
+ * so this file keeps its promise of no dependencies beyond itself.
+ */
+export const contactable = (
+  r: Pick<MappedRow, "name" | "email" | "phone">,
+  phoneOk: (v: string) => boolean,
+): boolean => !!r.name.trim() && !!(r.email.trim() || phoneOk(r.phone));
+
+/**
+ * ~~The old rule: any non-empty phone counts.~~ Kept for nothing — every caller passes through
+ * `contactable` now. Deleted rather than deprecated on purpose: two spellings of the add rule is how
+ * the two doors disagreed in the first place.
+ */

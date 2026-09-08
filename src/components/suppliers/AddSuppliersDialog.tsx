@@ -5,6 +5,9 @@ import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 import { btn, cx } from "@/lib/ds";
 import { fmt, useT } from "@/lib/i18n";
+import type { Dictionary } from "@/lib/i18n/en";
+import { contactable } from "@/lib/contract/sheet-paste";
+import { normalizePhone, phoneE164 } from "@/lib/contract/phone-normalize";
 import { VendorMark } from "@/components/VendorMark";
 import { addRenterSuppliersBulk, type NewRenterSupplier } from "@/lib/api/client";
 import { SupplierImportPanel } from "./SupplierImportPanel";
@@ -56,8 +59,30 @@ type Row = { name: string; contactName: string; email: string; phone: string; ve
 
 const blank = (): Row => ({ name: "", contactName: "", email: "", phone: "", vendor: true });
 
-/** A row is real once it names a firm AND carries a way to reach it. */
-const usable = (r: Row) => !!r.name.trim() && !!(r.email.trim() || r.phone.trim());
+/**
+ * A row is real once it names a firm AND carries a way to reach it — `contactable`, the same rule
+ * the import uses (owner, 2026-09-08: *"why doesn't it import a missing company or e-mail or phone,
+ * while adding them manually allows it? No sense"*).
+ *
+ * The phone has to be one we can READ, not merely one that was typed. `9.66503E+11` pasted out of a
+ * spreadsheet and «call the office» both used to pass here and then be refused by the backend after
+ * the press, which is the same refusal arriving later and with less to show for it.
+ */
+const usable = (r: Row) => contactable(r, (v) => phoneE164(v) != null);
+
+/** Which half of the rule a row breaks, in the renter's words — the import's sentences, reused. */
+function whyNot(r: Row, c: Dictionary["suppliers"]): string | null {
+  if (usable(r)) return null;
+  // A row nobody has typed in yet is not a mistake; it is the next empty line.
+  if (!r.name.trim() && !r.contactName.trim() && !r.email.trim() && !r.phone.trim()) return null;
+  if (!r.name.trim()) return c.rMissingName;
+  if (!r.email.trim() && !r.phone.trim()) return c.rMissingContact;
+  const trouble = normalizePhone(r.phone);
+  if (trouble && "problem" in trouble) {
+    return trouble.problem === "truncated" ? c.rPhoneTruncated : c.rPhoneUnreadable;
+  }
+  return c.rMissingContact;
+}
 
 /** Four columns and the flag — the grid is declared once so the header and the rows cannot drift. */
 /**
@@ -102,7 +127,9 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
         name: r.name.trim(),
         contactName: r.contactName.trim() || null,
         email: r.email.trim() || null,
-        phone: r.phone.trim() || null,
+        // E.164, exactly as the import sends it: one supplier typed twice in two places must produce
+        // one key, or the backend's dedupe sees two counterparties.
+        phone: phoneE164(r.phone) ?? (r.phone.trim() || null),
         vendorRegistered: r.vendor,
       }));
       /**
@@ -190,8 +217,11 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
               <span />
             </div>
 
-            {rows.map((r, i) => (
-              <div key={i} className={GRID}>
+            {rows.map((r, i) => {
+              const short = whyNot(r, c);
+              return (
+              <div key={i} className="grid gap-1">
+              <div className={GRID}>
                 <Field value={r.name} onChange={(v) => patch(i, { name: v })} placeholder={c.fName} />
                 <Field value={r.contactName} onChange={(v) => patch(i, { contactName: v })} placeholder={c.fContact} />
                 <Field value={r.email} onChange={(v) => patch(i, { email: v })} placeholder="name@company.com" type="email" />
@@ -221,7 +251,20 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
                   <Icon name="close" size={13} />
                 </button>
               </div>
-            ))}
+              {/* ── Say it here, not after the press (owner, 2026-09-08) ─────────────────────
+                  A row short of the rule used to be dropped in SILENCE: the button counted the rows
+                  that qualified and the others simply did not go, which is why the typed form looked
+                  as though it allowed what the import refuses. Same sentences as the import, under
+                  the row they are about. */}
+              {short && (
+                <span className="flex items-center gap-1.5 ps-0.5 text-meta text-danger-deep">
+                  <Icon name="error_outline" size={13} className="flex-none" />
+                  {fmt(c.rowShort, { reason: short })}
+                </span>
+              )}
+              </div>
+              );
+            })}
 
             {/* ── One row: add another on the left, mark-them-all on the right (owner, 2026-09-03) ──
                 *"This needs no long box, make it a box on the right at the same row as the Add

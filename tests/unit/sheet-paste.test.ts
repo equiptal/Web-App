@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { guessField, importable, mapRows, parseSheet, type SheetField } from "@/lib/contract/sheet-paste";
+import { contactable, guessField, mapRows, parseSheet, type SheetField } from "@/lib/contract/sheet-paste";
 
 describe("reading a supplier list out of a spreadsheet", () => {
   it("takes a paste from Excel — tab separated", () => {
@@ -85,9 +85,16 @@ describe("mapping", () => {
     expect(mapRows(table, skipped)[0].extra).toEqual({});
   });
 
-  it("a row is importable only with a name AND a way to reach them", () => {
-    expect(importable(mapRows(table, mapping)[0])).toBe(true);
+  it("a row is addable only with a name AND a way to reach them", () => {
+    // `contactable` takes the phone test from its caller, so this file stays dependency-free: both
+    // dialogs pass the real normaliser (owner, 2026-09-08 — ONE rule for the typed form and the
+    // import, because a phone nobody can read is not a contact in either).
+    const anyPhone = (v: string) => !!v.trim();
+    expect(contactable(mapRows(table, mapping)[0], anyPhone)).toBe(true);
     const noContact = parseSheet("Company,City\nZahid,Riyadh")!;
-    expect(importable(mapRows(noContact, ["name", "extra"])[0])).toBe(false);
+    expect(contactable(mapRows(noContact, ["name", "extra"])[0], anyPhone)).toBe(false);
+    // And the half the owner reported: a phone that cannot be READ is not a way to reach anybody.
+    const unreadable = parseSheet("Company,Phone\nZahid,call the office")!;
+    expect(contactable(mapRows(unreadable, ["name", "phone"])[0], () => false)).toBe(false);
   });
 });

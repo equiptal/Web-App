@@ -7,6 +7,7 @@ import { fmt, useT } from "@/lib/i18n";
 import { addRenterSuppliersBulk, type BulkResult } from "@/lib/api/client";
 import {
   SHEET_MAX_ROWS,
+  contactable,
   guessField,
   mapRows,
   parseSheet,
@@ -145,18 +146,10 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
 
   const rows = view ? mapRows(view, mapping) : [];
 
-  /**
-   * The add rule, with the phone actually READ.
-   *
-   * `importable` counts any non-empty phone string, which is right for the typed form but wrong for
-   * a sheet: `9.66503E+11` and «call the office» are both non-empty and neither is a way to reach
-   * anybody. The backend stores an unparseable phone as NULL and then refuses the row for having no
-   * contact, so counting it here as a contact meant the panel promised an import the backend would
-   * decline.
-   */
-  const contactable = (r: MappedRow): boolean => !!r.name.trim() && !!(r.email.trim() || phoneE164(r.phone));
+  /** The add rule, shared with the typed form — `contactable` in `sheet-paste.ts` says why. */
+  const ready0 = (r: MappedRow): boolean => contactable(r, (v) => phoneE164(v) != null);
 
-  const ready = rows.filter(contactable);
+  const ready = rows.filter(ready0);
   const skipped = rows.length - ready.length;
 
   /** What is wrong with a row's phone, if anything — a warning even on a row that has an e-mail. */
@@ -169,7 +162,7 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
   const payload = () =>
     rows
       .map((r, i) => ({ r, v: vendor[i] !== false }))
-      .filter(({ r }) => contactable(r))
+      .filter(({ r }) => ready0(r))
       .map(({ r, v }) => ({
         name: r.name.trim(),
         contactName: r.contactName.trim() || null,
@@ -400,7 +393,7 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
             </thead>
             <tbody>
               {(view ?? table).rows.map((cells, r) => {
-                const ok = contactable(rows[r]);
+                const ok = ready0(rows[r]);
                 return (
                   <tr key={r} className={cx("border-b border-border last:border-b-0", !ok && "bg-danger-soft/40")}>
                     <td className="px-2.5 py-1.5 align-top">
@@ -459,7 +452,7 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
         {skipped > 0 && (
           <div className="grid gap-1 rounded-md bg-danger-soft/50 px-3 py-2 text-meta text-danger-deep">
             {rows.map((r, i) =>
-              contactable(r) ? null : (
+              ready0(r) ? null : (
                 <span key={i} className="flex items-start gap-2">
                   <Icon name="error_outline" size={14} className="mt-px flex-none" />
                   {fmt(c.planRejected, { row: i + 1, reason: whySkipped(r) })}

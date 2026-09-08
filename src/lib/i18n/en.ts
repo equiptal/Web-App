@@ -2787,6 +2787,7 @@ export const en = {
     phonesNormalized: "Phone numbers are shown as they will be saved (+966…)",
     phoneTruncated: "One or more phone numbers were shortened by Excel when this file was saved as CSV (9.66503E+11 is 966,503,000,000, so the last digits are gone from the file). Type the number into the table below, or upload the .xlsx instead, where it is still complete",
     rPhoneTruncated: "the phone was shortened by Excel",
+    rowShort: "Not added yet — {reason}",
     rPhoneUnreadable: "the phone couldn't be read",
   },
 };

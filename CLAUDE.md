@@ -2,6 +2,29 @@
 
 ## Change log
 
+- **2026-09-08 - One add rule for both doors, and a short row says so before the press.**
+  Owner: *"why doesn't it import a missing company or email or phone while adding them manually
+  allows it, no sense"*. He was right and the inconsistency was MINE, introduced the same day: the
+  import began asking whether a phone can actually be READ, while the typed form went on accepting
+  any non-empty string - so `9.66503E+11` or «call the office» was a contact when typed and not one
+  when imported. Both doors post to the same endpoint, which normalises the phone and refuses a row
+  with no reachable key, so the looser side was never more permissive: it moved the refusal to AFTER
+  the press. `contactable(row, phoneOk)` now lives in `sheet-paste.ts` and both dialogs call it, with
+  the real normaliser injected.
+  And the typed form no longer drops a short row in silence: the reason sits under the row, in the
+  import's own words (no company / no contact / the phone was shortened by Excel / the phone couldn't
+  be read), and an untouched empty row says nothing because it is the next line, not a mistake. The
+  typed phone is posted in E.164 too, so one supplier typed in two places produces one key.
+  Files: `src/lib/contract/sheet-paste.ts`, `src/components/suppliers/AddSuppliersDialog.tsx`,
+  `src/components/suppliers/SupplierImportPanel.tsx`, `src/lib/i18n/{en,ar}.ts`,
+  `tests/unit/add-suppliers-rule.test.tsx`, `tests/unit/sheet-paste.test.ts`.
+  ⚠️ `importable` is GONE rather than deprecated: two spellings of the add rule is exactly how the
+  two doors came to disagree. `contactable` takes the phone test as a parameter so `sheet-paste.ts`
+  keeps its promise of depending on nothing.
+  ⚠️ The rule cannot be loosened to «import it anyway». `bulkRenterSuppliers.ts` rejects
+  `MISSING_CONTACT` after normalising, and `createRenterSupplier.ts` answers *"An email or a phone
+  number is required"* - a row with no reachable key is refused server-side whatever the web does.
+
 - **2026-09-08 - `/en` and `/ar` are the page they name, not a 404.**
   Owner: *"fix the /en 404 on beta"*. It was never a beta regression: this app has no locale SEGMENT
   (the language is a stored choice, `moedatech.locale`, and the routes are bare), so `/en` 404ed on
