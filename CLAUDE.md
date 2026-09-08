@@ -76,6 +76,24 @@
   ⚠️ Number FORMATS are ignored, so a date column arrives as Excel's serial (`45912`). No supplier
   list keeps a date in a mapped column; such a column rides along under `extra` as the number it is.
 
+- **2026-09-08 - The workbook reader worked in every test and failed on every real upload.**
+  Owner, on a file this repo had generated itself: *"That file couldn't be read as an Excel
+  workbook."* `readEntry` handed `DecompressionStream("deflate-raw")` everything from the entry to
+  the end of the buffer, on the reasoning that inflate stops by itself at the end of the deflate
+  stream. **Node's implementation does; Chrome's errors the stream** - and in a zip something always
+  follows an entry (the next one, then the central directory), so the read threw and the panel
+  reported "not a workbook". Measured in Chrome before fixing: the exact compressed bytes inflate,
+  the same bytes plus fifty trailing ones throw. It now slices exactly the compressed length off the
+  CENTRAL DIRECTORY, with a `limit` (the next header, else the directory) for a streamed zip whose
+  sizes are 0.
+  Files: `src/lib/contract/xlsx-sheet.ts`, `tests/unit/xlsx-import.test.ts`.
+  ⚠️ **The platform difference is the trap, and vitest cannot see it.** The new test replaces
+  `DecompressionStream` with a stub as strict as the browser; verified it FAILS on the old slicing
+  and passes on the new. Any future byte-level work here must keep that test, or the same class of
+  bug ships green again.
+  Also verified in real Chrome against the owner's own test workbook: 14 rows, headers intact, the
+  12-digit phone read as `966503372850` rather than `9.66503E+11`.
+
 - **2026-09-08 - A refused term is SAID, not tinted; and «Ask» is a drawer, not a one-line box.**
   Owner: *"How can TÜV be a conflict and a match at the same time? If he says no, show it like ✗ TUV.
   And if it has an opposite value - not «on rentee», so it will be «on supplier» - show that."* The

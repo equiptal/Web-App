@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { readXlsxSheet, gridToTable } from "@/lib/contract/xlsx-sheet";
 import { normalizePhone, phoneE164, readScientific } from "@/lib/contract/phone-normalize";
 import { guessField, mapRows } from "@/lib/contract/sheet-paste";
@@ -132,7 +132,77 @@ const workbook = () => {
   });
 };
 
-/* ─────────────────────────────── the reader ─────────────────────────────── */
+/* ────────────────────── Chrome is stricter than Node ─────────────────── */
+
+/**
+ * 🔴 **The bug this file did not catch, and now does** (owner, 2026-09-08: *"That file couldn't be
+ * read as an Excel workbook"* — on a workbook this repo generated itself).
+ *
+ * `DecompressionStream("deflate-raw")` in **Node** stops at the end of the deflate stream and
+ * ignores whatever follows. **Chrome errors the stream.** In a zip something always follows an
+ * entry, so a reader that hands the inflater "everything from here to the end of the file" works in
+ * every test and fails on every real upload. Measured in Chrome: the exact compressed bytes inflate,
+ * the same bytes plus fifty trailing ones throw.
+ *
+ * So the platform's leniency is taken away for one test: this stub throws if it is given a single
+ * byte more than the deflate stream needs, which is what the browser does.
+ */
+const strictInflate = () => {
+  const real = globalThis.DecompressionStream;
+  class Strict extends TransformStream<Uint8Array, Uint8Array> {
+    constructor(format: string) {
+      const chunks: Uint8Array[] = [];
+      super({
+        transform(chunk) {
+          chunks.push(chunk);
+        },
+        async flush(controller) {
+          const all = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+          let at = 0;
+          for (const c of chunks) {
+            all.set(c, at);
+            at += c.length;
+          }
+          // Round-trip through the real implementation, then compare: re-deflating the output and
+          // getting FEWER bytes than we were given means the tail was junk the browser would
+          // refuse. (Not byte-identical re-compression — the length is what matters here.)
+          const text = await new Response(
+            new Blob([all as unknown as BlobPart]).stream().pipeThrough(new real(format as "deflate-raw")),
+          ).arrayBuffer();
+          const again = new Uint8Array(
+            await new Response(
+              new Blob([text]).stream().pipeThrough(new CompressionStream(format as "deflate-raw")),
+            ).arrayBuffer(),
+          );
+          if (all.length > again.length + 8) throw new Error("junk found after the deflate stream");
+          controller.enqueue(new Uint8Array(text));
+        },
+      });
+    }
+  }
+  globalThis.DecompressionStream = Strict as unknown as typeof globalThis.DecompressionStream;
+  return () => {
+    globalThis.DecompressionStream = real;
+  };
+};
+
+describe("with the browser's own strictness", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("hands the inflater the entry's bytes and nothing after them", async () => {
+    const restore = strictInflate();
+    try {
+      const out = await readXlsxSheet(await workbook());
+      expect(typeof out).not.toBe("string");
+      if (typeof out === "string") return;
+      expect(out.rows[0][2]).toBe("966503372850");
+    } finally {
+      restore();
+    }
+  });
+});
+
+/* ────────────────────────────── the reader ────────────────────────────── */
 
 describe("reading a workbook", () => {
   it("reads the header row and the rows under it", async () => {

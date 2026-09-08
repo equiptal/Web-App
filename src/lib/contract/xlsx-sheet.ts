@@ -37,13 +37,21 @@ import { SHEET_MAX_ROWS, type SheetTable } from "./sheet-paste";
 
 /* ─────────────────────────────── the zip container ─────────────────────────────── */
 
-/** One entry we care about: where its bytes are and how they were stored. */
+/** One entry we care about: where its bytes are, how many there are, and how they were stored. */
 interface ZipEntry {
   name: string;
   /** 0 = stored verbatim, 8 = DEFLATE. Anything else is a format we do not read. */
   method: number;
   start: number;
+  /**
+   * The COMPRESSED length, off the central directory.
+   *
+   * 🔴 Load-bearing: the inflater must be handed exactly these bytes and not one more. See
+   * `readEntry`.
+   */
   size: number;
+  /** Where this entry's bytes must end at the latest — the next header, else the directory. */
+  limit: number;
 }
 
 const u16 = (b: DataView, o: number) => b.getUint16(o, true);
@@ -89,21 +97,44 @@ function readZip(buf: Uint8Array): ZipEntry[] {
     if (localOff + 30 <= buf.length && u32(view, localOff) === 0x04034b50) {
       const lNameLen = u16(view, localOff + 26);
       const lExtraLen = u16(view, localOff + 28);
-      out.push({ name, method, start: localOff + 30 + lNameLen + lExtraLen, size });
+      out.push({ name, method, start: localOff + 30 + lNameLen + lExtraLen, size, limit: buf.length });
     }
     p += 46 + nameLen + extraLen + commentLen;
   }
+  /* A streamed zip writes 0 for the sizes and puts them in a trailing data descriptor, so such an
+     entry's length can only be inferred: it ends where the next one begins, and the last ends at the
+     central directory. Nothing Excel writes takes this path, but a zip from a server pipeline can. */
+  const byStart = [...out].sort((a, b) => a.start - b.start);
+  const cdStart = u32(view, eocd + 16);
+  byStart.forEach((e, i) => {
+    e.limit = byStart[i + 1] ? byStart[i + 1].start - 30 : cdStart;
+  });
   return out;
 }
 
-/** One entry's bytes as text. `deflate-raw` is what a zip holds — not zlib, so no header to skip. */
+/**
+ * One entry's bytes as text. `deflate-raw` is what a zip holds — not zlib, so no header to skip.
+ *
+ * 🔴 **Exactly the compressed bytes, never "the rest of the file".**
+ *
+ * ~~The first cut handed the inflater everything from this entry to the end of the buffer~~, on the
+ * reasoning that inflate stops by itself at the end of the deflate stream. **Node's implementation
+ * does; Chrome's does not** — `DecompressionStream("deflate-raw")` errors the stream when anything
+ * follows the compressed data, and in a zip something always does (the next entry, then the central
+ * directory). So every workbook read fine under vitest and every workbook was refused in the
+ * browser, with the panel reporting "that file couldn't be read as an Excel workbook" (owner,
+ * 2026-09-08, on a file this repo had generated itself). Measured in Chrome before fixing: exact
+ * bytes inflate, the same bytes plus fifty trailing ones throw.
+ *
+ * The compressed length is on the central directory, which is why it is read from there rather than
+ * from the local header — a streamed zip leaves the local header's sizes at 0, and `limit` covers
+ * that case.
+ */
 async function readEntry(buf: Uint8Array, e: ZipEntry): Promise<string> {
-  const raw = buf.subarray(e.start, e.start + (e.method === 0 ? e.size : buf.length - e.start));
+  const end = e.size > 0 ? Math.min(e.start + e.size, e.limit) : e.limit;
+  const raw = buf.subarray(e.start, end);
   if (e.method === 0) return new TextDecoder().decode(raw);
   if (e.method !== 8) throw new Error(`unsupported zip method ${e.method}`);
-  // A compressed entry's stored length is not in the local header when a data descriptor is used,
-  // so the stream is handed everything from here to the end of the file: inflate stops on its own
-  // at the end of the deflate stream and ignores the trailing bytes.
   const stream = new Blob([raw as unknown as BlobPart]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
   return new Response(stream).text();
 }
