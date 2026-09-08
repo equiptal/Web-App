@@ -785,7 +785,7 @@ var SUGGESTED = [
     why:"bid through your link 3 days ago", whyAr:"قدّم عرضاً عبر رابطك قبل 3 أيام",
     kind:"own", phone:"+966 55 447 2216", email:null },
   { key:"g2", nEn:"Saudi Lift Co.", nAr:"السعودية للرفع",
-    why:"bid on Moedatech last week", whyAr:"قدّم عرضاً على مويداتك الأسبوع الماضي",
+    why:"bid on Moedatech last week", whyAr:"قدّم عرضاً على معداتك الأسبوع الماضي",
     kind:"platform", supplierId:"u_951", phone:"+966 50 220 9964", email:"info@saudilift.sa" }
 ];
 var suggOpen = true;
@@ -892,7 +892,7 @@ function render(){
        directory is primary because the rows it makes are linked ones. */
     +   '<button class="btn btn-primary" onclick="dlgDirectory()">'
     +     '<span class="icon" aria-hidden="true">verified</span>'
-    +     L("Add from Moedatech", "إضافة من مويداتك") + '</button>'
+    +     L("Add from Moedatech", "إضافة من معداتك") + '</button>'
     +   '<button class="btn btn-tint" onclick="dlgAdd()">'
     +     '<span class="icon" aria-hidden="true">person_add</span>'
     +     L("Add my own suppliers", "إضافة مورّديني") + '</button>'
@@ -1002,7 +1002,7 @@ function row(s){
     +     '<button class="n" onclick="dlgSupplier(\'' + id + '\')">'
     +       '<span class="open">' + esc(name(s)) + '</span>'
     +       (off ? "" : '<span class="nbadge"><span class="icon" aria-hidden="true">verified_user</span>'
-                     + L("On Moedatech", "على مويداتك") + '</span>')
+                     + L("On Moedatech", "على معداتك") + '</span>')
     +       '<span class="icon" aria-hidden="true">open_in_full</span></button>'
     +     '<span class="c">' + esc(s.contact || L("no contact name", "بدون اسم جهة اتصال")) + '</span>'
     +   '</span></span></td>'
@@ -1030,7 +1030,7 @@ function row(s){
     +   '<button class="iact" title="' + L("Share a request", "مشاركة طلب") + '" '
     +     (hasEmail(s) ? 'onclick="shareOne(\'' + id + '\')"' : "disabled")
     +     '><span class="icon" aria-hidden="true">share</span></button>'
-    +   '<button class="iact" title="' + L("Invite to Moedatech", "دعوة للانضمام لمويداتك") + '" '
+    +   '<button class="iact" title="' + L("Invite to Moedatech", "دعوة للانضمام لمعداتك") + '" '
     +     (off && hasEmail(s) ? 'onclick="dlgJoinInvite(\'' + id + '\')"' : "disabled")
     +     '><span class="icon" aria-hidden="true">person_add</span></button>'
     +   '<button class="iact" title="' + L("Edit", "تعديل") + '" onclick="dlgSupplierForm(\'' + id + '\')">'
@@ -1055,7 +1055,7 @@ function relCell(s){
   }
 
   var bits = [];
-  if (a) bits.push(a + " " + L("on Moedatech", "على مويداتك"));
+  if (a) bits.push(a + " " + L("on Moedatech", "على معداتك"));
   if (l) bits.push(l + " " + L("via link", "عبر الرابط"));
   if (s.awards) bits.push('<span class="aw">' + s.awards + " " + L("awarded", "ترسية") + '</span>');
   bits.push(ago(lastBid(s)));
@@ -1077,10 +1077,10 @@ function emptyState(){
         + L("Change the search or the filters.", "غيّر البحث أو التصفية.")
       : '<b>' + L("Your list is empty", "قائمتك فارغة") + '</b>'
         + L("Moedatech has hundreds of suppliers — none of them are here until you add them.",
-            "لدى مويداتك مئات المورّدين — لا يظهر أحد هنا حتى تضيفه.")
+            "لدى معداتك مئات المورّدين — لا يظهر أحد هنا حتى تضيفه.")
         + '<div style="margin-top:12px;display:flex;gap:8px;justify-content:center">'
         + '<button class="btn btn-primary btn-sm" onclick="dlgDirectory()">'
-        + L("Add from Moedatech", "إضافة من مويداتك") + '</button>'
+        + L("Add from Moedatech", "إضافة من معداتك") + '</button>'
         + '<button class="btn btn-tint btn-sm" onclick="dlgAdd()">'
         + L("Add my own suppliers", "إضافة مورّديني") + '</button>'
         + '</div>')
@@ -1186,13 +1186,13 @@ function dlgFilters(){
     + mhead("tune", L("Filters", "تصفية"), L("Narrow the list.", "ضيّق القائمة."))
     + '<div class="mbody">'
     +   '<div class="fgroup"><span class="k">' + L("Where they are", "أين هم") + '</span><span class="fopts">'
-    +     opt("where", "platform", L("On Moedatech", "على مويداتك"),
+    +     opt("where", "platform", L("On Moedatech", "على معداتك"),
               SUPPLIERS.filter(function(s){ return s.kind === "platform"; }).length)
     +     opt("where", "off", L("Off platform", "خارج المنصة"),
               SUPPLIERS.filter(function(s){ return s.kind === "own"; }).length)
     +   '</span></div>'
     +   '<div class="fgroup"><span class="k">' + L("Bidding", "العروض") + '</span><span class="fopts">'
-    +     opt("bid", "platform", L("Bid on Moedatech", "قدّم عرضاً على مويداتك"), SUPPLIERS.filter(bidOnPlatform).length)
+    +     opt("bid", "platform", L("Bid on Moedatech", "قدّم عرضاً على معداتك"), SUPPLIERS.filter(bidOnPlatform).length)
     +     opt("bid", "link", L("Bid through my link", "قدّم عرضاً عبر رابطي"), SUPPLIERS.filter(bidViaLink).length)
     +   '</span></div>'
     + '</div>'
@@ -1211,7 +1211,7 @@ var dirPick = {}, dirVend = {};
 function dlgDirectory(){
   dirPick = {}; dirVend = {};
   openModal('<div class="modal wide">'
-    + mhead("verified", L("Add registered vendors from Moedatech", "إضافة موردين معتمدين من مويداتك"),
+    + mhead("verified", L("Add registered vendors from Moedatech", "إضافة موردين معتمدين من معداتك"),
             L("Everyone you tick joins your list — as a registered vendor unless you say otherwise.",
               "كل من تختاره يُضاف إلى قائمتك — كمورّد معتمد ما لم تحدد غير ذلك."))
     + '<div class="mbody">'
@@ -1221,7 +1221,7 @@ function dlgDirectory(){
                        "مفعّل افتراضياً — أزل التحديد عن أي مورّد أدناه لإضافته بدون العلامة. الاسم والمتجر والمعدات تبقى لهم، ولا يتم إخبارهم في الحالتين.")
     +     '</span></span></label>'
     +   '<div class="field"><input id="dq" oninput="renderDirectory()" placeholder="'
-    +     L("Search the Moedatech directory", "ابحث في دليل مويداتك") + '" /></div>'
+    +     L("Search the Moedatech directory", "ابحث في دليل معداتك") + '" /></div>'
     +   '<div id="dlist"></div>'
     + '</div>'
     + '<div class="mfoot"><span class="note" id="dcount"></span><span class="spacer"></span>'
@@ -1310,7 +1310,7 @@ function dlgAdd(){
   openModal('<div class="modal wide">'
     + mhead("person_add", L("Add my own suppliers", "إضافة مورّديني"),
             L("Suppliers you work with who are not on Moedatech yet.",
-              "مورّدون تتعامل معهم وليسوا على مويداتك بعد."))
+              "مورّدون تتعامل معهم وليسوا على معداتك بعد."))
     + '<div class="mbody" id="addbody"></div>'
     + '<div class="mfoot"><span class="spacer"></span>'
     +   '<button class="btn btn-ghost" onclick="closeModal()">' + L("Cancel", "إلغاء") + '</button>'
@@ -1456,7 +1456,7 @@ function dlgSupplierForm(id){
   openModal('<div class="modal">'
     + mhead("edit", L("Edit supplier", "تعديل مورّد"),
             platform ? L("Name and store come from their Moedatech account — you can only edit what is yours.",
-                         "الاسم والمتجر من حسابهم في مويداتك — يمكنك تعديل ما يخصّك فقط.")
+                         "الاسم والمتجر من حسابهم في معداتك — يمكنك تعديل ما يخصّك فقط.")
                      : esc(name(s)))
     + '<div class="mbody">'
     +   '<div class="field"><label>' + L("Company name", "اسم الشركة") + '</label>'
@@ -1768,7 +1768,7 @@ function dlgRemove(id){
     + mhead("delete", L("Remove from my suppliers", "إزالة من مورّديّ"), esc(name(s)))
     + '<div class="mbody"><div class="note calm"><span class="icon" aria-hidden="true">info</span><span>'
     +   L("This removes your link, your vendor flag and your groups. Their Moedatech account, their store and the bids they already sent you are untouched.",
-         "هذا يزيل ارتباطك وعلامتك ومجموعاتك. حسابهم في مويداتك ومتجرهم والعروض التي أرسلوها لا تتأثر.")
+         "هذا يزيل ارتباطك وعلامتك ومجموعاتك. حسابهم في معداتك ومتجرهم والعروض التي أرسلوها لا تتأثر.")
     + '</span></div></div>'
     + '<div class="mfoot"><span class="spacer"></span>'
     +   '<button class="btn btn-ghost" onclick="closeModal()">' + L("Cancel", "إلغاء") + '</button>'
@@ -1808,7 +1808,7 @@ function dlgBids(id){
               + '<span class="t"><b>' + esc(L(b.reqEn, b.reqAr))
               +   '<span class="bg ' + (b.via === "app" ? "bg-app" : "bg-link") + '">'
               +     '<span class="icon" aria-hidden="true">' + (b.via === "app" ? "verified_user" : "link") + '</span>'
-              +     (b.via === "app" ? L("on Moedatech", "على مويداتك") : L("via link", "عبر الرابط")) + '</span></b>'
+              +     (b.via === "app" ? L("on Moedatech", "على معداتك") : L("via link", "عبر الرابط")) + '</span></b>'
               + '<span>' + esc(L(b.siteEn, b.siteAr)) + " · " + ago(b.when) + '</span></span>'
               + '<span class="money">' + esc(b.price) + '</span>'
               + '<button class="btn btn-secondary btn-sm" onclick="goToBid(\'' + id + '\',' + i + ')">'
@@ -1842,11 +1842,11 @@ function dlgSupplier(id){
     +   '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
     +     (off ? '<span class="src src-off">' + L("Off platform", "خارج المنصة") + '</span>'
                 : '<span class="src src-plat"><span class="icon" aria-hidden="true">verified_user</span>'
-                  + L("On Moedatech", "على مويداتك") + '</span>')
+                  + L("On Moedatech", "على معداتك") + '</span>')
     +     (s.store ? '<span class="src src-off"><span class="icon" aria-hidden="true">storefront</span>'
                      + L("Has a store", "لديه متجر") + '</span>' : "")
     +     (s.verified ? '<span class="vbadge"><span class="icon" aria-hidden="true">verified</span>'
-                      + L("Verified by Moedatech", "موثّق من مويداتك") + '</span>' : "")
+                      + L("Verified by Moedatech", "موثّق من معداتك") + '</span>' : "")
     +     '<button class="vtog" aria-pressed="' + s.vendor + '" onclick="toggleVendor(\'' + id + '\');dlgSupplier(\'' + id + '\')">'
     +       '<span class="icon" aria-hidden="true">' + (s.vendor ? "verified" : "add") + '</span>'
     +       (s.vendor ? L("Registered vendor", "مورّد معتمد") : L("Mark as registered vendor", "تعيين كمورّد معتمد"))
@@ -1869,8 +1869,8 @@ function dlgSupplier(id){
     +     '<div class="note calm"><span class="icon" aria-hidden="true">gavel</span><span>'
     +       (s.bids.length
             ? '<b>' + s.bids.length + " " + (s.bids.length === 1 ? L("bid", "عرض") : L("bids", "عروض")) + '</b>'
-              + (a && l ? " · " + a + " " + L("on Moedatech", "على مويداتك") + " · " + l + " " + L("via your link", "عبر رابطك")
-                        : " · " + (a ? L("all on Moedatech", "كلها على مويداتك") : L("all via your link", "كلها عبر رابطك")))
+              + (a && l ? " · " + a + " " + L("on Moedatech", "على معداتك") + " · " + l + " " + L("via your link", "عبر رابطك")
+                        : " · " + (a ? L("all on Moedatech", "كلها على معداتك") : L("all via your link", "كلها عبر رابطك")))
               + " · " + L("last", "آخر") + " " + ago(lastBid(s))
             : L("No bids yet.", "لا عروض بعد.")) + '</span>'
     +     (s.bids.length
@@ -1885,11 +1885,11 @@ function dlgSupplier(id){
         ? '<div class="field"><label>' + L("Inside the app", "داخل التطبيق") + '</label>'
           + '<div class="note calm"><span class="icon" aria-hidden="true">info</span><span>'
           + L("They have no Moedatech account, so there is no deal room and no award — every bid reached you through your shared form.",
-               "ليس لديهم حساب في مويداتك، فلا توجد غرفة تفاوض ولا ترسية — كل عرض وصلك عبر نموذجك المشارَك.")
+               "ليس لديهم حساب في معداتك، فلا توجد غرفة تفاوض ولا ترسية — كل عرض وصلك عبر نموذجك المشارَك.")
           + '</span></div></div>'
         : '<div class="field"><label>' + L("Inside the app", "داخل التطبيق") + '</label>'
           + '<div class="kpis">'
-          + '<div class="kpi"><b>' + a + '</b><span>' + L("on Moedatech", "على مويداتك") + '</span></div>'
+          + '<div class="kpi"><b>' + a + '</b><span>' + L("on Moedatech", "على معداتك") + '</span></div>'
           + '<div class="kpi"><b>' + l + '</b><span>' + L("via your link", "عبر رابطك") + '</span></div>'
           + '<div class="kpi"><b>' + s.rooms  + '</b><span>' + L("deal rooms", "غرف تفاوض") + '</span></div>'
           + '<div class="kpi"><b>' + s.awards + '</b><span>' + L("awards", "ترسيات") + '</span></div>'
@@ -1909,7 +1909,7 @@ function dlgSupplier(id){
                 + '<span class="icon" aria-hidden="true">' + (share ? "share" : "person_add") + '</span></span>'
                 + '<span class="t"><b>'
                 +   (share ? L("Request shared — ", "طلب مُشارَك — ") + esc(L(e.reqEn, e.reqAr))
-                           : L("Invitation to join Moedatech", "دعوة للانضمام إلى مويداتك")) + '</b>'
+                           : L("Invitation to join Moedatech", "دعوة للانضمام إلى معداتك")) + '</b>'
                 + '<span>' + (share
                     ? (e.opened ? L("they opened the link", "فتحوا الرابط") : L("not opened yet", "لم يُفتح بعد"))
                     : (e.joined ? L("they joined", "انضمّوا") : L("not joined yet", "لم ينضمّوا بعد"))) + '</span></span>'
@@ -1943,7 +1943,7 @@ function dlgSupplier(id){
     +   (off
         ? '<button class="btn btn-secondary" ' + (hasEmail(s) ? 'onclick="dlgJoinInvite(\'' + id + '\')"' : "disabled") + '>'
           + '<span class="icon" aria-hidden="true">person_add</span>'
-          + L("Invite to Moedatech", "دعوة للانضمام لمويداتك") + '</button>'
+          + L("Invite to Moedatech", "دعوة للانضمام لمعداتك") + '</button>'
         : "")
     +   '<span class="spacer"></span>'
     +   '<button class="btn btn-primary" onclick="closeModal()">' + L("Close", "إغلاق") + '</button>'
@@ -2054,7 +2054,7 @@ function dlgShare(keep){
   openModal('<div class="modal wide">'
     + mhead("share", L("Share a request for bids", "مشاركة طلب لتلقّي العروض"),
             L("Pick a group or the individuals, then the request. Sent by Moedatech, with you as the reply-to.",
-              "اختر مجموعة أو أفراداً، ثم الطلب. يُرسل من مويداتك، والردود تصلك أنت."))
+              "اختر مجموعة أو أفراداً، ثم الطلب. يُرسل من معداتك، والردود تصلك أنت."))
     + '<div class="mbody" id="shbody"></div>'
     + '<div class="mfoot"><span class="note" id="shcount"></span><span class="spacer"></span>'
     +   '<button class="btn btn-ghost" onclick="closeModal()">' + L("Cancel", "إلغاء") + '</button>'
@@ -2163,7 +2163,7 @@ function shareMail(r, sendable){
     +   '<div class="lcard">'
     +     '<div class="top"><span class="plate"><span class="icon" aria-hidden="true">handyman</span></span>'
     +       '<span><b>' + esc(L(r.eqEn, r.eqAr)) + " ×" + r.units + '</b>'
-    +       '<span>' + L("Request for quotation · Moedatech", "طلب عرض سعر · مويداتك") + '</span></span></div>'
+    +       '<span>' + L("Request for quotation · Moedatech", "طلب عرض سعر · معداتك") + '</span></span></div>'
     +     '<div class="rows">'
     +       '<span class="r"><span class="k">' + L("Site", "الموقع") + '</span><span class="v">'
     +         esc(L(r.siteEn, r.siteAr)) + '</span></span>'
@@ -2220,22 +2220,22 @@ function dlgJoinInvite(id){
   var s = byId(id);
   var co = L(RENTER.coEn, RENTER.coAr);
   openModal('<div class="modal wide">'
-    + mhead("person_add", L("Invite to Moedatech", "دعوة للانضمام لمويداتك"), esc(name(s)))
+    + mhead("person_add", L("Invite to Moedatech", "دعوة للانضمام لمعداتك"), esc(name(s)))
     + '<div class="mbody">'
     +   '<div class="note calm"><span class="icon" aria-hidden="true">info</span><span>'
     +     L("This is not the request link. It asks them to join Moedatech, so their bids arrive in the app instead of through a form — and they get their own store.",
-             "هذه ليست رابط الطلب. إنها دعوة للانضمام لمويداتك حتى تصل عروضهم داخل التطبيق بدل النموذج — ويحصلون على متجرهم.") + '</span></div>'
+             "هذه ليست رابط الطلب. إنها دعوة للانضمام لمعداتك حتى تصل عروضهم داخل التطبيق بدل النموذج — ويحصلون على متجرهم.") + '</span></div>'
     +   '<div class="mail">'
     +     '<div class="mailhead">'
     +       '<div class="l"><span class="k">' + L("From", "من") + '</span><span class="v">Moedatech &lt;hello@moedatech.net&gt;</span></div>'
     +       '<div class="l"><span class="k">' + L("To", "إلى") + '</span><span class="v">' + esc(s.email) + '</span></div>'
     +       '<div class="l"><span class="k">' + L("Subject", "الموضوع") + '</span><span class="v">'
-    +         esc(L(co + " invites you to join Moedatech", co + " يدعوك للانضمام إلى مويداتك")) + '</span></div>'
+    +         esc(L(co + " invites you to join Moedatech", co + " يدعوك للانضمام إلى معداتك")) + '</span></div>'
     +     '</div>'
     +     '<div class="mailbody">'
     +       '<div>' + esc(L("Hello " + (s.contact || name(s)) + ",", "مرحباً " + (s.contact || name(s)) + "،")) + '</div>'
     +       '<div>' + L(co + " already works with you and uses Moedatech to run its equipment rentals. Join and their requests reach you in the app, with your own store, your fleet and your documents in one place.",
-                        co + " يتعامل معك بالفعل ويستخدم مويداتك لإدارة تأجير المعدات. انضم لتصلك طلباتهم داخل التطبيق، مع متجرك وأسطولك ومستنداتك في مكان واحد.") + '</div>'
+                        co + " يتعامل معك بالفعل ويستخدم معداتك لإدارة تأجير المعدات. انضم لتصلك طلباتهم داخل التطبيق، مع متجرك وأسطولك ومستنداتك في مكان واحد.") + '</div>'
     +       '<div class="stores">'
     +         '<span class="sbadge"><span class="icon" aria-hidden="true">ios_share</span>'
     +           '<span><i>' + L("Download on the", "حمّله من") + '</i><b>App Store</b></span></span>'
