@@ -149,6 +149,15 @@ export function ShareOnPost({ onAnnouncing }: { onAnnouncing?: (owed: boolean) =
     [state.draft?.project, state.draft?.items, state.taxonomy],
   );
 
+  /**
+   * Every machine on this request is off-catalogue, so no supplier on Moedatech will ever see it.
+   *
+   * 🔴 The marketplace is named three times on this screen and every one of them would be a lie
+   * here (owner, 2026-09-08). Read from the draft rather than from the posted request, because the
+   * tick is drawn the moment the post returns and the request has not been re-fetched.
+   */
+  const offCatalogue = !!draftForm?.items.length && draftForm.items.every((i) => i.isUndefined === true);
+
   const post = async (): Promise<string | null> => {
     /**
      * The account gate lives here now, because this is the button that posts.
@@ -269,13 +278,32 @@ export function ShareOnPost({ onAnnouncing }: { onAnnouncing?: (owed: boolean) =
       >
         <div className="flex flex-col items-center px-2 pb-1 pt-4 text-center">
           <SuccessTick />
-          <h2 className="mt-5 text-title font-extrabold capitalize text-navy">{c.postedTitle}</h2>
+          {/* ⚠️ **The title carries what happened** (owner, 2026-09-08: *"the title is «your
+              request is posted into moedatech and shared from yara@outlook.co», then below it «sent
+              from ... to 1 supplier, a copy is in your sent folder»"*).
+
+              ~~Title, then the post again, then the send, then the Sent folder.~~ Four lines for
+              two facts, with the address he actually sent from buried third. A server send is the
+              one channel with no window of its own to prove it happened, so it leads.
+
+              ⚠️ No `capitalize`: the title now carries an e-mail address, and the class title-cases
+              every word in it. */}
+          <h2 className="mt-5 text-title font-extrabold text-navy">
+            {mail
+              ? fmt(offCatalogue ? c.postedTitleFromOnly : c.postedTitleFrom, { from: mail.from })
+              : c.postedTitle}
+          </h2>
           {/* ⚠️ It only claims a share when one HAPPENED (owner, 2026-09-03: *"removed shared with
               your supplier if he didnt share it"*). A renter who posted to Moedatech alone being
-              told his suppliers were told is the panel lying about the one thing he pressed. */}
-          <p className="mt-2 text-body leading-relaxed text-muted-dark">
-            {reached === 0 ? c.postedLive : reached === 1 ? c.postedLiveOne : fmt(c.postedLiveMany, { n: reached })}
-          </p>
+              told his suppliers were told is the panel lying about the one thing he pressed.
+
+              ⚠️ Drawn only when the server did NOT send. With a send, the title says the post and
+              the line below says the send, and this sentence would be the third telling. */}
+          {!mail && !offCatalogue && (
+            <p className="mt-2 text-body leading-relaxed text-muted-dark">
+              {reached === 0 ? c.postedLive : reached === 1 ? c.postedLiveOne : fmt(c.postedLiveMany, { n: reached })}
+            </p>
+          )}
           {/* ── The e-mail, said here too (owner, 2026-09-08) ────────────────────────────
               A server-side send is the one channel with no window of its own to prove it happened,
               so the line above — which counts suppliers — is not enough: he asked for *sent
@@ -284,8 +312,19 @@ export function ShareOnPost({ onAnnouncing }: { onAnnouncing?: (owed: boolean) =
           {mail && (
             <p className="mt-2 flex flex-wrap items-center justify-center gap-1.5 text-meta font-semibold text-ok-deep">
               <Icon name="mark_email_read" size={15} className="flex-none" />
+              {/* ⚠️ One sentence, not two lines. The Sent-folder copy is a clause of the send, and
+                  on its own line it read as a second thing that had happened. */}
               {fmt(mail.recipients === 1 ? c.mailSentOne : c.mailSent, { from: mail.from, n: mail.recipients })}
-              {mail.inSentFolder && <span className="font-normal text-muted">{c.mailInSent}</span>}
+              {mail.inSentFolder ? `, ${c.mailCopyInSent}` : ""}
+            </p>
+          )}
+          {/* ⚠️ **The opposite sentence** (owner, 2026-09-08). This request reaches nobody by
+              broadcast, so the one thing he must not walk away believing is that suppliers on
+              Moedatech are looking at it. */}
+          {offCatalogue && (
+            <p className="mt-2 flex items-start gap-1.5 text-meta font-semibold text-warn-deep">
+              <Icon name="error_outline" size={15} className="mt-px flex-none" />
+              {c.offCatalogueLine}
             </p>
           )}
           {/* The link is already on the card behind this, so the dialog does not offer it again — it

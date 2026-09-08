@@ -51,14 +51,20 @@ describe("naming a machine the catalogue does not carry", () => {
        saying why the first way came up empty. Two separate cards read as two unrelated asks. */
     expect(screen.getAllByText("TYPE").length).toBeGreaterThan(0);
     expect(screen.getAllByText("SIZE").length).toBeGreaterThan(0);
-    const order = ["TYPE", "Name the machine you need", "not available right now"].map((needle) =>
+    /* The notice moved ONTO the name field's label (owner, 2026-09-08), so it now reads: the list,
+       then «EQUIPMENT NAME * · this type is not available…», then the box. A block of its own under
+       the field cost three lines and pushed the logistics row below the fold. */
+    const order = ["TYPE", "This equipment type is not available", "Name the machine you need"].map((needle) =>
       document.body.innerHTML.indexOf(needle),
     );
     expect(order.every((i) => i >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
     // And the row says what will happen to it, in the owner's own words (2026-09-06).
-    expect(screen.getByText(/This equipment type is not available right now/i)).toBeTruthy();
-    expect(screen.getByText(/share the link with your suppliers/i)).toBeTruthy();
+    // Twice in the DOM on purpose: beside the label from `sm` up, under the field on a phone —
+    // the label row cannot wrap, and truncating this sentence would cut the half that says he can
+    // still post.
+    expect(screen.getAllByText(/This equipment type is not available/i).length).toBe(2);
+    expect(screen.getAllByText(/share the link with your suppliers/i).length).toBe(2);
     /* ~~«Message us», beside the sentence.~~ Removed the same day (owner). The note already tells
        the renter what to do — post it, share the link — and a control there sent him into another
        app in the middle of filling in a request. The sourcing ask survives only on the kill-switch

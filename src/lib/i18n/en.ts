@@ -311,6 +311,17 @@ export const en = {
       postMoedatechOnly: "Post to Moedatech",
       sendMoedatechOnly: "Send to Moedatech",
       moedatechOnlyHint: "This request goes to Moedatech only. Nothing else is sent.",
+      /* ── The opposite sentence, for a machine the catalogue cannot place ────────────────────
+         Owner, 2026-09-08: *"for requests that have undefined taxonomy we will remove Moedatech
+         from the confirmation, from the icons list in the share and from the confirmation question,
+         and will tell the opposite since we will not have it available and no supplier."*
+
+         Such a request reaches nobody by broadcast, so every surface that announces the marketplace
+         says this instead. It is not a warning about a failure: the request is saved and the link
+         works. It is the one fact that decides what he does next. */
+      offCatalogueLine: "This equipment is not in our catalogue yet, so no supplier on Moedatech can bid on it. Your link is the only way to reach one",
+      offCataloguePost: "Post the request",
+      offCataloguePick: "Pick a way to share",
       fixedByUs: "Request details",
       tplTitle: "Subject",
       tplAbove: "Your words above the request",
@@ -340,13 +351,25 @@ export const en = {
       openedWhatsApp: "WhatsApp opened with {name}. Send it there to finish.",
       openedOther: "Handed to your share sheet. Send it there to finish.",
       postedTitle: "Your request is posted",
-      postedLive: "It is live on Moedatech now.",
-      postedLiveOne: "It is live on Moedatech now, and shared with 1 supplier.",
-      postedLiveMany: "It is live on Moedatech now, and shared with {n} suppliers.",
-      postedNext: "You can still share it anytime with more suppliers.",
+      /* ── The tick says what happened, in its title (owner, 2026-09-08) ──────────────────────
+         *"The title is «your request is posted into Moedatech and shared from yara@outlook.co»,
+         then below it «sent from ... to 1 supplier, a copy is in your Sent folder in Outlook», then
+         below «you can still...»"*
+
+         The old shape said the post in the title, the post AGAIN in the line under it, the send in
+         a third line and the Sent folder in a fourth. Four lines for two facts. */
+      postedTitleFrom: "Your request is posted to Moedatech and shared from {from}",
+      /* No marketplace to name on an off-catalogue request: nothing there can bid on it. */
+      postedTitleFromOnly: "Your request is shared from {from}",
+      /* A clause, not a sentence: it is joined to the send line with a comma. */
+      mailCopyInSent: "a copy is in your Sent folder in Outlook",
+      postedLive: "It is live on Moedatech now",
+      postedLiveOne: "It is live on Moedatech now, and shared with 1 supplier",
+      postedLiveMany: "It is live on Moedatech now, and shared with {n} suppliers",
+      postedNext: "You can still share it anytime with more suppliers",
       /* ── SUP-BE-23: the mail we send ourselves, from his own address ──────────────────────── */
-      mailSent: "Sent from {from} to {n} suppliers.",
-      mailSentOne: "Sent from {from} to 1 supplier.",
+      mailSent: "Sent from {from} to {n} suppliers",
+      mailSentOne: "Sent from {from} to 1 supplier",
       mailSkipped: "{n} of the ones you picked had no e-mail, so they were left out.",
       mailOpenInstead: "Open your e-mail",
       mailSetupTitle: "Send straight from {domain}, with no compose window",

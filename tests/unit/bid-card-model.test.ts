@@ -328,3 +328,45 @@ describe("bidCardDescription", () => {
     expect(d.endsWith("·")).toBe(false);
   });
 });
+
+
+/**
+ * -- Whether the marketplace can reach anybody at all (owner, 2026-09-08) ------------------------
+ *
+ * 🔴 An item the catalogue cannot place is broadcast to NO supplier, so every surface that
+ * announces a post to Moedatech has to say the opposite instead. This is the flag they read, and
+ * the reason it is a whole-request question rather than a per-item one.
+ */
+describe("offCatalogue", () => {
+  const preview = null;
+  const copy = { title: "", description: "" };
+
+  it("is true only when EVERY machine is off-catalogue", () => {
+    const m = bidCardModel(preview, copy, "en", form({ items: [item({ isUndefined: true })] }));
+    expect(m.offCatalogue).toBe(true);
+  });
+
+  it("is false when one machine of two is in the catalogue", () => {
+    /**
+     * 🔴 **Not «one of them is».** That request still goes out to every supplier who stocks the
+     * catalogue machine, so muting the marketplace would be a lie in the other direction.
+     */
+    const m = bidCardModel(
+      preview,
+      copy,
+      "en",
+      form({ items: [item({ isUndefined: true }), item({ requestItemId: "i2" })] }),
+    );
+    expect(m.offCatalogue).toBe(false);
+  });
+
+  it("is false when the flag is absent, which is an older backend", () => {
+    // ⚠️ An absent flag means «in the catalogue», the ordinary case and the safe assumption: at
+    // worst it names a marketplace that is genuinely open.
+    expect(bidCardModel(preview, copy, "en", form()).offCatalogue).toBe(false);
+  });
+
+  it("is false on the two-string path, where there are no items to ask", () => {
+    expect(bidCardModel(null, { title: "Crawler excavator", description: "Riyadh" }, "en", null).offCatalogue).toBe(false);
+  });
+});

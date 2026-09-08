@@ -1300,6 +1300,7 @@ describe("the preview and the sent e-mail carry the same message", () => {
     closing: "Bidding closes 12 Sep 2026",
     accepting: true,
     cta: "Submit your bid",
+    offCatalogue: false,
   };
 
   const URL_ = "https://os.moedatech.net/bid/abc-123";
@@ -2401,5 +2402,90 @@ describe("the outcome handed back to the caller", () => {
 
     await waitFor(() => expect(shared).toHaveBeenCalled());
     expect(shared.mock.calls[0][2]).toMatchObject({ handedOff: true });
+  });
+});
+
+
+/**
+ * -- A machine the catalogue cannot place has no marketplace (owner, 2026-09-08) ----------------
+ *
+ * *"For requests that have undefined taxonomy (custom equipment type) we will remove Moedatech from
+ * the confirmation, we will remove it from the icons list in the share, we will remove it from the
+ * confirmation question and will tell the opposite, since we will not have it available and no
+ * supplier. Any other surface that says it is sent to Moedatech will also be removed in this case."*
+ *
+ * 🔴 Such a request reaches NO supplier by broadcast, and direct is no exception: the share link is
+ * the only supplier-facing route. Three surfaces named the marketplace anyway.
+ */
+describe("an off-catalogue request says the opposite", () => {
+  /** The same draft, with the one thing that changes: the catalogue could not place the machine. */
+  const CUSTOM: BidFormData = {
+    ...DRAFT,
+    items: [{ ...DRAFT.items[0], label: "floating crane barge", size: null, isUndefined: true }],
+  };
+
+  it("Given every machine is off-catalogue, Then the locked Moedatech chip is not drawn", async () => {
+    /**
+     * ⚠️ The chip is a statement of fact, «this always happens», and here it is not a fact. It is
+     * the worst of the three surfaces because it cannot be pressed, so it cannot be argued with.
+     */
+    draw({ draftForm: CUSTOM });
+    await screen.findByText("Al Faisal Rentals");
+
+    await waitFor(() => expect(screen.queryByAltText("Moedatech")).toBeNull());
+    // And the line under the row says what is true instead.
+    expect(screen.getByText(c.offCatalogueLine)).toBeTruthy();
+  });
+
+  it("Given an ordinary request, Then the chip is exactly where it was", async () => {
+    // ⚠️ The rule is the WHOLE request. Every other request keeps the mark it has always had.
+    draw({ draftForm: DRAFT });
+    await screen.findByText("Al Faisal Rentals");
+
+    expect(await screen.findByAltText("Moedatech")).toBeTruthy();
+    expect(screen.queryByText(c.offCatalogueLine)).toBeNull();
+  });
+
+  it("Given ONE machine of two is off-catalogue, Then the marketplace is still named", async () => {
+    /**
+     * 🔴 **Not «one of them is».** A request with one catalogue machine and one custom line still
+     * goes out to every supplier who stocks the first, so muting Moedatech would be a lie in the
+     * other direction.
+     */
+    draw({
+      draftForm: {
+        ...DRAFT,
+        items: [{ ...DRAFT.items[0], isUndefined: true }, { ...DRAFT.items[0], requestItemId: "m2" }],
+      },
+    });
+    await screen.findByText("Al Faisal Rentals");
+
+    expect(await screen.findByAltText("Moedatech")).toBeTruthy();
+    expect(screen.queryByText(c.offCatalogueLine)).toBeNull();
+  });
+
+  it("Given the confirmation, Then it asks about the mail and warns instead of promising a market", async () => {
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
+    draw({ draftForm: CUSTOM });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(confirmButton()).toBeTruthy());
+    // ⚠️ Replaced, not dropped: saying nothing would leave him approving a send with no idea that
+    // this e-mail is the only copy of the request anyone will ever see.
+    expect(screen.getAllByText(c.offCatalogueLine).length).toBeGreaterThan(0);
+    expect(screen.queryByText(c.confirmPostedAlready)).toBeNull();
+  });
+
+  it("Given no channel picked, Then the button stops promising a post to Moedatech", async () => {
+    // ⚠️ In `share` mode the request already exists and nothing is picked, so the press has
+    // nothing left to do. It says which decision is missing rather than naming a marketplace.
+    draw({ draftForm: CUSTOM });
+    await screen.findByText("Al Faisal Rentals");
+
+    await waitFor(() => expect(screen.getByText(c.offCataloguePick)).toBeTruthy());
+    expect(screen.getByText(c.offCataloguePick).closest("button")!.hasAttribute("disabled")).toBe(true);
+    expect(screen.queryByText(c.sendMoedatechOnly)).toBeNull();
   });
 });

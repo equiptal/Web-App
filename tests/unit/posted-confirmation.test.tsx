@@ -58,6 +58,14 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+/**
+ * The tick's title, which since 2026-09-08 states the send as well as the post.
+ *
+ * ⚠️ It is one of THREE titles: with a server send it names the mailbox, on an off-catalogue
+ * request it names no marketplace, and with no send at all it is the bare line.
+ */
+const titleFrom = (from: string) => c.postedTitleFrom.replace("{from}", from);
+
 const draw = () =>
   render(
     <LocaleProvider initialLocale="en">
@@ -74,7 +82,7 @@ describe("a send the server performed", () => {
       mail: { from: "bandar@moedatech.net", recipients: 1, inSentFolder: true },
     });
     // No visibilitychange, no focus event — the renter never left, and neither did the page.
-    expect(await screen.findByText(c.postedTitle)).toBeTruthy();
+    expect(await screen.findByText(titleFrom("bandar@moedatech.net"))).toBeTruthy();
   });
 
   it("says the e-mail went, from which address", async () => {
@@ -84,18 +92,27 @@ describe("a send the server performed", () => {
       handedOff: false,
       mail: { from: "bandar@moedatech.net", recipients: 2, inSentFolder: true },
     });
-    expect(
-      await screen.findByText(c.mailSent.replace("{from}", "bandar@moedatech.net").replace("{n}", "2")),
-    ).toBeTruthy();
-    // A server send has no window of its own to prove it happened, so the copy in Sent is stated.
-    expect(screen.getByText(c.mailInSent)).toBeTruthy();
+    /* ⚠️ **The title says it, and the line under it says it again with the count** (owner,
+       2026-09-08). Both carry the address on purpose: the title answers *did it go?* and the line
+       answers *to how many?* */
+    expect(await screen.findByText(titleFrom("bandar@moedatech.net"))).toBeTruthy();
+    // A server send has no window of its own to prove it happened, so the copy in Sent is stated —
+    // as a CLAUSE of the send line now, not as a line of its own.
+    const sent = c.mailSent.replace("{from}", "bandar@moedatech.net").replace("{n}", "2");
+    expect(screen.getByText(new RegExp(`${sent}, ${c.mailCopyInSent}`))).toBeTruthy();
   });
 
   it("still counts the suppliers it reached", async () => {
     draw();
     await waitFor(() => expect(screen.getByTestId("panel")).toBeTruthy());
     hoisted.fire!(1, "email", { handedOff: false, mail: { from: "b@m.net", recipients: 1, inSentFolder: false } });
-    expect(await screen.findByText(c.postedLiveOne)).toBeTruthy();
+    /* ⚠️ **Counted in the send line, not in a line of its own** (owner, 2026-09-08). «It is live
+       on Moedatech now, and shared with 1 supplier» said the post a second time and the send a
+       second time, in a dialog whose title had already said both. */
+    expect(await screen.findByText(c.mailSentOne.replace("{from}", "b@m.net"))).toBeTruthy();
+    expect(screen.queryByText(c.postedLiveOne)).toBeNull();
+    // And no Sent-folder clause on a send that filed no copy.
+    expect(screen.queryByText(new RegExp(c.mailCopyInSent))).toBeNull();
   });
 });
 
@@ -129,9 +146,9 @@ describe("a channel that took the browser away", () => {
     draw();
     await waitFor(() => expect(screen.getByTestId("panel")).toBeTruthy());
     hoisted.fire!(1, "email", { handedOff: false, mail: { from: "b@m.net", recipients: 1, inSentFolder: true } });
-    await screen.findByText(c.postedTitle);
+    await screen.findByText(titleFrom("b@m.net"));
     fireEvent.click(screen.getByText(c.postedKeepSharing));
-    await waitFor(() => expect(screen.queryByText(c.postedTitle)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(titleFrom("b@m.net"))).toBeNull());
 
     hoisted.fire!(1, "whatsapp", { handedOff: true });
     await act(async () => {});
@@ -171,7 +188,7 @@ describe("what the page is told about the queue", () => {
     expect(owed.at(-1)).toBe(true);
 
     hoisted.fire!(1, "email", { handedOff: false, mail: { from: "b@m.net", recipients: 1, inSentFolder: true } });
-    await screen.findByText(c.postedTitle);
+    await screen.findByText(titleFrom("b@m.net"));
     // Still ours: he is reading it.
     expect(owed.at(-1)).toBe(true);
 

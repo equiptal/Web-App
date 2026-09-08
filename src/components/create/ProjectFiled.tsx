@@ -181,13 +181,13 @@ export function ProjectFiled({
      the same order, never a sixth. «Hours per day» was listed here until 2026-08-31 and the project
      has not stored it since 08-30 (`ProjectDefaults.timing` omits it by type): the panel was
      promising to remember a number nobody was keeping. */
-  const saved: Array<[string, string]> = [
+  const saved: Array<[string, string | null]> = [
     [o.fieldName, projectTitle(site)],
     [o.fieldSite, shortSite(site.location.label ?? address)],
-    [o.fieldDates, [project.timing.startDate, project.timing.endDate].filter(Boolean).join(" → ") || "—"],
-    [o.fieldBasis, project.timing.rentalBasis ?? "—"],
+    [o.fieldDates, [project.timing.startDate, project.timing.endDate].filter(Boolean).join(" → ") || null],
+    [o.fieldBasis, project.timing.rentalBasis ?? null],
     [o.fieldExtendable, project.timing.extendable ? t.common.yes : t.common.no],
-    [o.fieldPayment, preferences.payment.terms ?? "—"],
+    [o.fieldPayment, preferences.payment.terms ?? null],
   ];
 
   return (
@@ -197,7 +197,15 @@ export function ProjectFiled({
           footer. */}
       <List
         heading={o.savedHeading}
-        rows={saved}
+        /* ⚠️ **A value nobody set is not a row** (owner, 2026-09-08: *"any values not set dont
+           show it"*). «Dates —» and «Payment terms —» took two of the six lines to say nothing,
+           and an em dash beside a label reads as a value that failed to load rather than as a
+           question the renter never answered. The project and the site always stand: they are what
+           the dialog is announcing.
+
+           ⚠️ «Extendable: No» stays. It is an ANSWER, not a blank, and dropping it would tell a
+           renter the project holds nothing on the point when it holds a decision. */
+        rows={saved.filter((r): r is [string, string] => !!r[1])}
         action={
           <button
             type="button"
@@ -209,7 +217,14 @@ export function ProjectFiled({
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
+      {/* ⚠️ **One control, on the trailing edge** (owner, 2026-09-08: *"view the project must be
+          on right not left and remove this close, we already have x"*).
+
+          ~~«View the project» ranged left with a «Close» link beside it.~~ The dialog already
+          closes four ways, and the X is one of them, sitting in the corner where the eye looks for
+          it — so the link was a second way out competing with the one thing there is to do here.
+          The button now sits where a dialog's action sits. */}
+      <div className="flex justify-end">
         <Button
           onClick={() => {
             close();
@@ -218,7 +233,6 @@ export function ProjectFiled({
         >
           <Icon name="open_in_new" size={15} /> {o.viewAction}
         </Button>
-        <NotNow label={t.common.close} onClick={close} />
       </div>
     </Shell>
   );
@@ -282,10 +296,3 @@ function List({
   );
 }
 
-function NotNow({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button type="button" onClick={onClick} className="text-meta font-semibold text-muted underline underline-offset-2 hover:text-navy">
-      {label}
-    </button>
-  );
-}

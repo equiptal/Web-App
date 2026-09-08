@@ -47,7 +47,8 @@ function draftItem(it: EquipmentItem, project: ProjectDetails, taxonomy: Taxonom
   // renter happened to type, and is the fallback only while the item has not resolved to a node.
   // Off-catalogue first: on a line the catalogue cannot place, the renter's own name is what the
   // posted form will show the supplier, in both locales, so the preview must show the same.
-  const custom = isCustomLine(it) ? customName(it) : "";
+  const offCatalogue = isCustomLine(it);
+  const custom = offCatalogue ? customName(it) : "";
   const label = custom || taxName(subcategory, false) || it.agentNames?.subtype || it.rawLabel;
   const labelAr = custom || taxName(subcategory, true) || it.agentNames?.subtypeAr || null;
   const size = custom ? null : taxName(measurement, false) ?? it.rawSize;
@@ -59,6 +60,10 @@ function draftItem(it: EquipmentItem, project: ProjectDetails, taxonomy: Taxonom
     labelAr,
     size,
     sizeAr: custom ? null : taxName(measurement, true),
+    /* ⚠️ The posted request will carry the backend's own derived flag; before the post this is
+       the same fact read from the draft, so the share panel behaves identically on both sides of
+       the press rather than changing its mind once the request exists. */
+    isUndefined: offCatalogue,
     numberOfUnits: it.quantity,
     priceUnit: project.timing.rentalBasis ? BASIS[project.timing.rentalBasis] ?? null : null,
     deliveryBy: partyWord(it.deliveryOverride ?? project.deliveryToSite),

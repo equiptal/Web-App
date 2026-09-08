@@ -174,3 +174,59 @@ describe("one project per PLACE, not per first line of an address", () => {
     expect(api.assigned).toHaveLength(0);
   });
 });
+
+
+/**
+ * -- What the dialog shows, and what it leaves out (owner, 2026-09-08) ---------------------------
+ *
+ * *"Show project title then site, then any values not set don't show it. And «view the project»
+ * must be on the right not the left, and remove this «close», we already have an X."*
+ */
+describe("the filed dialog", () => {
+  const o = en.projects.offer;
+
+  it("drops a row nobody answered, and keeps the two that always stand", async () => {
+    /**
+     * ⚠️ «Dates —» and «Payment terms —» took two of six lines to say nothing, and an em dash
+     * beside a label reads as a value that failed to load rather than as a question never asked.
+     */
+    const bare = {
+      location: { label: "Riyadh, Saudi Arabia", lat: null, lng: null },
+      timing: { startDate: null, endDate: null, rentalBasis: null, extendable: false },
+    } as unknown as ProjectDetails;
+
+    render(
+      <LocaleProvider initialLocale="en">
+        <ProjectFiled
+          requestId="r-1"
+          project={bare}
+          preferences={{ payment: { terms: null } } as unknown as Preferences}
+          hold={false}
+        />
+      </LocaleProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByText(o.savedHeading)).toBeTruthy());
+    // The project and the site are what the dialog is announcing, so they always stand.
+    expect(screen.getByText(o.fieldName)).toBeTruthy();
+    expect(screen.getByText(o.fieldSite)).toBeTruthy();
+    // The three nobody answered are gone, dash and all.
+    expect(screen.queryByText(o.fieldDates)).toBeNull();
+    expect(screen.queryByText(o.fieldBasis)).toBeNull();
+    expect(screen.queryByText(o.fieldPayment)).toBeNull();
+    expect(screen.queryByText("—")).toBeNull();
+    /* ⚠️ «Extendable: No» STAYS. It is an answer, not a blank, and dropping it would tell a
+       renter the project holds nothing on the point when it holds a decision. */
+    expect(screen.getByText(o.fieldExtendable)).toBeTruthy();
+  });
+
+  it("offers one way out of itself, because the X is the other", async () => {
+    // ⚠️ The dialog already closes four ways and the X is one of them, in the corner where the eye
+    // looks for it. A «Close» link beside the action was a second exit competing with the one thing
+    // there is to do here.
+    draw(false);
+
+    await waitFor(() => expect(screen.getByText(o.viewAction)).toBeTruthy());
+    expect(screen.queryByText(en.common.close)).toBeNull();
+  });
+});

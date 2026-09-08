@@ -2,6 +2,83 @@
 
 ## Change log
 
+- **2026-09-08 - A request with no catalogue match stops naming a marketplace that cannot see it.**
+  Owner: *"for requests that have undefined taxonomy (custom equipment type) we will remove
+  Moedatech from the confirmation, we will remove it from the icons list in the share, we will
+  remove it from the confirmation question and will tell the opposite, since we will not have it
+  available and no supplier, and any other surface that says it is sent to Moedatech will also be
+  removed in this case"*. Such a request has reached NO supplier by broadcast since the feature
+  shipped (2026-09-06) - the share link is the only supplier-facing route - and three surfaces said
+  otherwise: the locked green Moedatech chip in the channel row, the «Post to Moedatech» button, and
+  the confirm dialog's «Your request goes live on Moedatech, where every supplier there can bid on
+  it». The tick after the post said it twice more.
+  `BidCardModel.offCatalogue` is the one answer, derived where the card already is, so it reads the
+  same before and after the post: `draftBidForm` sets `isUndefined` from `isCustomLine`, the
+  bid-form mapper reads the backend's own derived flag, and `bidCardModel` folds them into a
+  whole-request boolean. Every surface branches on that and prints `offCatalogueLine` instead.
+  Files: `src/lib/contract/link-bids.ts`, `src/lib/draftBidForm.ts`, `src/lib/bidCardModel.ts`,
+  `src/components/share/ShareRequestPanel.tsx`, `src/components/create/ShareOnPost.tsx`,
+  `src/lib/i18n/{en,ar}.ts`, `tests/unit/{bid-card-model,share-request-panel}.test.*`.
+  🔴 **EVERY machine, not one of them.** A request with one catalogue line and one custom line
+  still goes to every supplier who stocks the first, so muting the marketplace there would be a lie
+  in the other direction. Two tests pin the mixed case.
+  ⚠️ In `share` mode with no channel picked, an off-catalogue request's Send button is now
+  DISABLED and says «Pick a way to share». The press genuinely had nothing left to do: the request
+  exists, no channel is chosen, and the marketplace reaches nobody. In `post` mode it stays live and
+  says «Post the request», because that press still creates the request and mints the link.
+  ⚠️ The flag is false until the card loads (`share` mode fetches it), so the chip can appear for
+  one frame on a request that then mutes it. Judged acceptable against plumbing the raw form through
+  a second path; if it shows in use, pass `draftForm`'s answer down instead of waiting.
+
+- **2026-09-08 - The posted tick says the send in its TITLE, and the filed dialog drops what nobody set.**
+  Owner, on the tick: *"the title is «your request is posted into Moedatech and shared from
+  yara@outlook.co», then below it «sent from ... to 1 supplier, a copy is in your sent folder in
+  Outlook», then below «you can still...»"*. It was four lines for two facts: a title that said only
+  the post, a line that said the post AGAIN with the supplier count, the send third, and the Sent
+  folder fourth - so the address a server send actually left from, which is the one thing that
+  channel cannot prove any other way, was buried third. Now the title carries it, the send line
+  carries the count with the Sent-folder copy as a CLAUSE, and `postedLive*` is drawn only when
+  there was no server send at all.
+  And on the project dialog: *"show project title then site, then any values not set don't show it,
+  and «view the project» must be on the right not left, and remove this «close», we already have
+  an X"*. «Dates —» and «Payment terms —» took two of six rows to say nothing.
+  Files: `src/components/create/ShareOnPost.tsx`, `src/components/create/ProjectFiled.tsx`,
+  `src/lib/i18n/{en,ar}.ts`, `tests/unit/{posted-confirmation,project-filed-hold}.test.tsx`.
+  ⚠️ The title lost its `capitalize` class. It now contains an e-mail address, and that class
+  title-cases every word of one.
+  ⚠️ «Extendable: No» is KEPT while «Dates —» goes. One is an answer, the other is a blank; a rule
+  that dropped falsey values would tell a renter the project holds nothing on a point where it holds
+  a decision.
+  ⚠️ `NotNow` is deleted from `ProjectFiled`, not left unused. It had one caller.
+
+- **2026-09-07 - The confirmation stands in front of the POST, not only the e-mail.**
+  Owner: *"i want the send confirmation of Outlook to be with the post on Moedatech not only the
+  send, so it will not automatically send to Moedatech... also we have a case where he confirmed then
+  came back to share with another one on Outlook, then also we will have another confirm just for the
+  send not the post since it is already posted"*. `send()` minted the request FIRST and the dialog
+  asked only about the mail, so a renter who pressed Send to read what it said had already published
+  his request, and Cancel could call off only the half that had not happened. `send(override?,
+  confirmed = false)` now returns early on e-mail until the confirm press, which does both in one
+  gesture - and being one gesture is what keeps `window.open` inside a live user activation.
+  The dialog says one of two things: «Post this request and e-mail it?» with «Post and send», or
+  «E-mail this request?» with «Send» and «It is already live on Moedatech» when the request exists.
+  In the same pass, `Copy message` became `Copy subject` and `Copy body`, each drawn on the field it
+  fills (owner: *"one on the title as copy title and one on the body as copy body"*).
+  Files: `src/components/share/ShareRequestPanel.tsx`, `src/components/share/mail-chrome.tsx`,
+  `src/lib/i18n/{en,ar}.ts`, `tests/unit/share-request-panel.test.tsx`.
+  🔴 **The server dry run is GONE.** It drew the envelope the backend said it would send, and it
+  needed a request that EXISTS - which stopped being true the moment the confirmation moved in front
+  of the post. The envelope is drawn from the ticks and the connected mailbox instead. The cost,
+  stated: a supplier row whose address resolves from its linked Moedatech account is shown by NAME
+  rather than by that address. He is confirming WHO, and the who is right.
+  ⚠️ `Cancel` no longer announces anything. It used to have to raise the «your request is posted»
+  pop-up, because the request was live whatever he chose. Nothing happens before the confirm now, so
+  Cancel is a cancel.
+  ⚠️ The «a copy is in your Sent folder» line left the envelope card with the dry run. That promise
+  is still made, by the status line after the send, which knows what actually happened.
+  ⚠️ The SUBJECT copy is not locked before the post and the BODY is. The body ends with a link that
+  does not exist yet; the subject names the machine and is true either way.
+
 - **2026-09-08 - The certificate and the year pills have three states, and the middle one now shows.**
   Owner: *"if not set at all then show them orange with pick certificate and pick min year in warning
   orange and not captilized, then if any value is selected by user or by the agent fine will be

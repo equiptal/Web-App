@@ -416,11 +416,30 @@ export function MachineCard({
               {custom && (
                 <div className="border-t border-warn/30 pt-3 sm:col-span-3">
                   <CanvasField
-                    label={t.create.machineCard.customEquipment}
+                    /* ── The notice rides the LABEL (owner, 2026-09-08) ──────────────────────────
+                       ~~A `Notice` block under the box.~~ Three lines of furniture for one sentence
+                       the renter reads once, pushing the logistics row below the fold. Beside the
+                       title it is a footnote to the field it belongs to, which is what it always
+                       was. The star is written out here rather than passed as `star`, because that
+                       prop renders it after the whole label — which is now the sentence too.
+
+                       Hidden below `sm` and repeated under the field there: the label row does not
+                       wrap, and a phone cannot fit «EQUIPMENT NAME *» and a sentence on one line —
+                       truncating THIS sentence would cut exactly the half that says he can still
+                       post. */
+                    label={
+                      <>
+                        {t.create.machineCard.customEquipment}
+                        <span className="ms-0.5 font-extrabold text-danger">*</span>
+                        <span className="ms-2 hidden min-w-0 items-center gap-1 truncate font-semibold normal-case tracking-normal text-warn sm:inline-flex">
+                          <Icon name="warning" size={13} className="flex-none" />
+                          {t.create.machineCard.notInCatalogueNote}
+                        </span>
+                      </>
+                    }
                     missing={gapFor("custom_equipment")}
                     shake={shake("custom_equipment")}
                     required={owed("custom_equipment")}
-                    star
                     hint={t.create.machineCard.customEquipmentHint}
                   >
                     <TextInput
@@ -430,12 +449,19 @@ export function MachineCard({
                       onChange={(e) => set("custom_equipment", { customEquipment: e.target.value })}
                     />
                   </CanvasField>
+                  {/* The phone's copy of the notice — see the label above. */}
+                  <p className="mt-1.5 flex items-start gap-1 text-label leading-snug text-warn sm:hidden">
+                    <Icon name="warning" size={13} className="mt-px flex-none" />
+                    {t.create.machineCard.notInCatalogueNote}
+                  </p>
                 </div>
               )}
             </div>
           )}
 
-          {notAvailable && <UnavailableCard item={item} label={item.rawLabel ?? tax.subtypeName ?? ""} />}
+          {/* The kill-switch row keeps its card: there the machine really is dropped, and that is a
+              refusal rather than a footnote. A NAMED off-catalogue row says its piece on the label. */}
+          {notAvailable && !custom && <UnavailableCard item={item} label={item.rawLabel ?? tax.subtypeName ?? ""} />}
 
           {/* Logistics, at the prototype's geometry: all three choices on ONE row — the two haulage
               legs inside a single box, fuel in its own — as a 2fr/1fr split, which lands the three

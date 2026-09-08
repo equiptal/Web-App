@@ -723,6 +723,22 @@ export function ShareRequestPanel({
    * who is picked may stop a request from being created.
    */
   const moedatechOnly = channel === "none";
+  /**
+   * 🔴 **Every machine here is off-catalogue, so the marketplace can reach nobody** (owner,
+   * 2026-09-08: *"for requests that have undefined taxonomy we will remove Moedatech from the
+   * confirmation, from the icons list in the share and from the confirmation question, and will
+   * tell the opposite since we will not have it available and no supplier"*).
+   *
+   * The rule this panel has been built on since 2026-09-02, *Moedatech is always a destination*, is
+   * true of every request except this one. A machine the catalogue cannot place is broadcast to
+   * nobody, so the locked chip, the button and the confirmation were all naming a marketplace that
+   * would never see it.
+   *
+   * ⚠️ Read off the CARD, so it is the same answer before and after the post: `draftForm` fills
+   * the model in `post` mode and the bid-form endpoint fills it in `share` mode. Until the card
+   * loads it is false, which is the ordinary case.
+   */
+  const offCatalogue = card?.model.offCatalogue === true;
   const canSend = !busy;
 
   /**
@@ -1855,6 +1871,12 @@ export function ShareRequestPanel({
               What it does NOT take is the navy fill a chosen channel gets. Green is Moedatech's and
               navy is «you picked this»; keeping them apart is what lets a renter see, in one look,
               which parts of the row are his decision and which part is simply true. */}
+          {/* ⚠️ **Not drawn at all on an off-catalogue request** (owner, 2026-09-08). The chip
+              is a statement of fact, «this always happens», and on this one request it is not a
+              fact. A locked green mark naming a marketplace that cannot see the machine is the
+              worst of the three surfaces, because it cannot be pressed and so cannot be argued
+              with. */}
+          {!offCatalogue && (
           <span
             title={c.alwaysHint}
             className="inline-flex h-[34px] flex-none items-center gap-2 rounded-md border border-ok/30 bg-ok-soft px-3.5"
@@ -1865,8 +1887,9 @@ export function ShareRequestPanel({
             <img src="/moedatech-logo.svg" alt="Moedatech" className="h-3.5 w-auto brightness-0" />
             <Icon name="check_circle" size={15} className="text-ok-deep" />
           </span>
+          )}
 
-          <span aria-hidden className="h-7 w-px flex-none bg-border-strong" />
+          {!offCatalogue && <span aria-hidden className="h-7 w-px flex-none bg-border-strong" />}
 
           <Channel
             on={channel === "whatsapp"}
@@ -1946,7 +1969,7 @@ export function ShareRequestPanel({
           <button
             type="button"
             onClick={() => void send()}
-            disabled={!canSend}
+            disabled={!canSend || (offCatalogue && moedatechOnly && mode !== "post")}
             className={cx(btn("primary", "lg"), "ms-auto flex-none px-6")}
           >
             <Icon name="send" size={16} />
@@ -1955,9 +1978,18 @@ export function ShareRequestPanel({
               : sent.length
                 ? c.shareAgain
                 : moedatechOnly
-                  ? mode === "post"
-                    ? c.postMoedatechOnly
-                    : c.sendMoedatechOnly
+                  ? /* ⚠️ «Post to Moedatech» is the one promise this request cannot keep. In
+                       `post` mode the press still does something real, it creates the request and
+                       mints the link, so the button is named for that. In `share` mode the request
+                       already exists and no channel is picked, so the press has nothing left to do
+                       and the button says which decision is missing. */
+                    offCatalogue
+                    ? mode === "post"
+                      ? c.offCataloguePost
+                      : c.offCataloguePick
+                    : mode === "post"
+                      ? c.postMoedatechOnly
+                      : c.sendMoedatechOnly
                   : c.sendToSuppliers}
           </button>
         </div>
@@ -1973,12 +2005,19 @@ export function ShareRequestPanel({
             The Moedatech-only case keeps its line, because that one is NOT visible in the row: two
             unticked buttons look identical to a renter who has not realised Send still does
             something. */}
-        {moedatechOnly && (
+        {/* ⚠️ On an off-catalogue request this line is drawn whatever the channel, because it is
+            not a note about the channel row: it is the reason the link matters. */}
+        {offCatalogue ? (
+          <p className="flex items-start gap-1.5 text-meta font-semibold text-warn-deep">
+            <Icon name="error_outline" size={14} className="mt-px flex-none" />
+            {c.offCatalogueLine}
+          </p>
+        ) : moedatechOnly ? (
           <p className="flex items-center gap-1.5 text-meta font-semibold text-ok-deep">
             <Icon name="check_circle" size={14} className="flex-none" />
             {c.moedatechOnlyHint}
           </p>
-        )}
+        ) : null}
 
           {/* Said plainly: the alternative is a renter who believes four people were messaged.
               Nothing is said when NONE of them has a number (owner, 2026-09-03): the panel already
@@ -2230,13 +2269,21 @@ export function ShareRequestPanel({
           {/* One line per thing that is about to happen, each with its own mark, so he can count
               them rather than parse a sentence. */}
           <div className="grid gap-2.5">
-            {!uuid && (
+            {/* ⚠️ **The marketplace line is replaced, not dropped** (owner, 2026-09-08: *"will
+                tell the opposite"*). Saying nothing would leave a renter approving a send with no
+                idea that the e-mail in front of him is the only copy of this request anyone will
+                ever see. */}
+            {offCatalogue ? (
+              <span className="flex items-start gap-2.5 text-body text-navy">
+                <Icon name="error_outline" size={18} className="mt-px flex-none text-warn-deep" />
+                {c.offCatalogueLine}
+              </span>
+            ) : !uuid ? (
               <span className="flex items-start gap-2.5 text-body text-navy">
                 <Icon name="public" size={18} className="mt-px flex-none text-brand" />
                 {c.confirmPostLine}
               </span>
-            )}
-            {uuid && (
+            ) : (
               <span className="flex items-start gap-2.5 text-body text-muted">
                 <Icon name="check_circle" size={18} className="mt-px flex-none text-ok-deep" />
                 {c.confirmPostedAlready}

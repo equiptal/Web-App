@@ -48,6 +48,7 @@ describe("the card is the shape an unfurl builds", () => {
       closing: "Bidding closes 21 Aug 2026",
       accepting: true,
       cta: "Open the link to submit your bid →",
+      offCatalogue: false,
     });
 
     // Picture, name, where. No host line: the card IS the link, and every app that unfurls draws
@@ -87,6 +88,7 @@ describe("the navy band before the request exists", () => {
         closing: null,
         accepting: true,
         cta: "Open the link to submit your bid →",
+        offCatalogue: false,
       },
     );
 

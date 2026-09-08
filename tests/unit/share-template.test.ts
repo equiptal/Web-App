@@ -31,6 +31,7 @@ const model = (over: Partial<BidCardModel> = {}): BidCardModel => ({
   imageHeadline: "Tower light 9m · with operator 6 units",
   cardTitle: "Tower light 9m · with operator 6 units",
   items: [],
+  offCatalogue: false,
   where: "Riyadh · 1 month",
   terms: [{ label: "Mobilization", value: "Supplier" }],
   closing: "Bidding closes 21 Aug 2026",

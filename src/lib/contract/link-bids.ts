@@ -143,6 +143,17 @@ export interface BidFormItem {
    *  suppliers' accepted (AWAITING) + confirmed (CLOSED) deals, clamped ≥ 0. Backend (PR var(--ok-deep)) sends it
    *  per item; OPTIONAL — when absent (pre-deploy backend) the form falls back to numberOfUnits. */
   remainingUnits?: number;
+  /**
+   * The catalogue could not place this machine, so the renter named it himself.
+   *
+   * ⚠️ **DERIVED by the backend on every read, never stored** (`docs/plans/custom-equipment-
+   * request/web-app-changes.md`). Branch on this, never on «are the taxonomy ids empty».
+   *
+   * ⚠️ What it costs a request is the whole marketplace: an off-catalogue line reaches NO supplier
+   * by broadcast, so the share link is the only route to one. Surfaces that announce a post to
+   * Moedatech read this and say the opposite instead.
+   */
+  isUndefined?: boolean | null;
   /** Taxonomy image — same source the in-app bid/request cards render via EquipImg. Optional: the public
    *  bid-form endpoint doesn't send it yet (backend gap), so the item falls back to the name-derived glyph. */
   imageUrl?: string | null;
@@ -364,6 +375,9 @@ export function mapBidFormData(raw: unknown): BidFormData {
         numberOfUnits: n(i.numberOfUnits) ?? 1,
         remainingUnits: n(i.remainingUnits) ?? undefined, // absent → page falls back to numberOfUnits
         imageUrl: s(i.imageUrl),
+        // ⚠️ Only a real `true` counts. An older backend omits the key, and an absent flag is «in
+        // the catalogue», which is the ordinary case and the safe one to assume.
+        isUndefined: i.isUndefined === true,
         priceUnit: s(i.priceUnit),
         deliveryBy: s(i.deliveryBy),
         returnBy: s(i.returnBy),
