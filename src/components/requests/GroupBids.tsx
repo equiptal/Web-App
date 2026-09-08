@@ -18,6 +18,7 @@ import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiate
 import { NEGOTIATE_ENABLED } from "@/lib/config/flags";
 import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
+import { Toggle } from "@/components/ui";
 import { bidSuppliers, bidSupplierKey, bucketBidTerms, type BidCard } from "@/lib/contract/bids";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { qualityFromSubmissionItem, type BidQuality } from "@/lib/contract/bid-quality";
@@ -122,6 +123,10 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
 
   const [bids, setBids] = useState<GroupBid[] | null>(null);
   const [error, setError] = useState(false);
+  /* Summed DURING the fan-out rather than after it: each item's envelope carries its own count and
+     there is no one call to read it off. A ref, not state, so adding to it mid-fetch renders nothing
+     until the load settles and the total is published once. */
+  const heldRef = useRef(0);
   // ── RMAP · freshness ───────────────────────────────────────────────────────────────────────────
   // The `[list │ map]` toggle and its hardcoded `mapBidId` are gone with V1: the verification surface
   // is its own route, `/bids/[bidId]/equipment`, entered by opening ONE bid. This screen keeps the
@@ -165,6 +170,12 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   // Bid filter (source + refine), matching the bids-by-supplier prototype.
   const [filterOpen, setFilterOpen] = useState(false);
   const [fSource, setFSource] = useState<"all" | "link" | "platform" | "file">("all");
+  /* Bids offering a machine LARGER than the one asked for. `getBidList` answers `exact` unless the
+     call says otherwise and DROPS those bids, reporting how many it held in `sizeCounts.larger`. So
+     this is part of the request for the list, not a filter over it: flipping it refetches, and the
+     count is summed across the group's items because the fan-out is per item. */
+  const [showLarger, setShowLarger] = useState(false);
+  const [largerHeld, setLargerHeld] = useState(0);
   const [fVerified, setFVerified] = useState(false);
   const [fKm, setFKm] = useState(false);
   // Quality sub-filter (shared-link bids only) — filter by the three quality dimensions the score is
@@ -194,21 +205,22 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
     () =>
       Promise.all(
         group.items.map((it) =>
-          fetchBids(it.id)
-            .then((d) =>
-              d.bids.map((b): GroupBid => ({
+          fetchBids(it.id, showLarger)
+            .then((d) => {
+              heldRef.current += d.sizeCounts?.larger ?? 0;
+              return d.bids.map((b): GroupBid => ({
                 ...b,
                 requestId: it.id,
                 itemLabel: it.item?.name ?? it.displayId,
                 itemLabelAr: it.item?.nameAr ?? it.displayId,
                 categoryId: it.item?.categoryId ?? null,
                 itemImage: it.item?.imageUrl ?? null,
-              })),
-            )
+              }));
+            })
             .catch(() => [] as GroupBid[]),
         ),
       ).then((lists) => lists.flat()),
-    [group.items],
+    [group.items, showLarger],
   );
 
   useEffect(() => {
@@ -217,11 +229,14 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
     setError(false);
     setSupplierKey("all");
     setSelected(new Set());
+    heldRef.current = 0;
+    setLargerHeld(0);
     fetchGroupBids()
       .then((list) => {
         if (!active) return;
         lastFetchRef.current = Date.now();
         setBids(list);
+        setLargerHeld(heldRef.current);
       })
       .catch(() => active && setError(true));
     // Off-platform shared-link submissions are stored once per GROUP (a single bid covers all items),
@@ -463,7 +478,30 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   if (error) return <div className="rempty">{L("Couldn’t load the bids.", "تعذّر تحميل العروض.")}</div>;
   if (!bids) return <div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 26 }}>progress_activity</span></div>;
   const allBids = [...bids, ...subCards];
-  if (allBids.length === 0) return <div className="rempty">{L("No bids yet for this request.", "لا توجد عروض بعد لهذا الطلب.")}</div>;
+  /* «No bids yet» is a CLAIM, and it can be false: a supplier offering a bigger machine than the one
+     asked for is dropped from this list by the backend while dispatch still notifies the renter
+     about him. Nothing is said once the switch is on - then the request really is empty. */
+  const heldOnEmpty = showLarger ? 0 : largerHeld;
+  if (allBids.length === 0)
+    return (
+      <div className="rempty">
+        {L("No bids yet for this request.", "لا توجد عروض بعد لهذا الطلب.")}
+        {heldOnEmpty > 0 && (
+          <div style={{ marginTop: 10, display: "inline-flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8,
+            border: "1px solid var(--brand)", background: "var(--brand-soft)", borderRadius: 8, padding: "8px 12px" }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: "#1c3550" }}>
+              {heldOnEmpty === 1
+                ? L("1 bid offers a larger size", "عرض واحد بمقاس أكبر")
+                : L(`${heldOnEmpty} bids offer a larger size`, `${heldOnEmpty} عروض بمقاس أكبر`)}
+            </span>
+            <button type="button" onClick={() => setShowLarger(true)}
+              style={{ border: "1px solid #e2e8f0", background: "#fff", borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 700, color: "#1c3550" }}>
+              {heldOnEmpty === 1 ? L("Show it", "اعرضه") : L("Show them", "اعرضها")}
+            </button>
+          </div>
+        )}
+      </div>
+    );
 
   const suppliers = bidSuppliers(allBids);
   // Bid source: off-platform shared-link vs on-platform (no uploaded-file source on this surface yet).
@@ -500,7 +538,10 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       (!(refineActive && fVerified) || b.verified) &&
       (!(refineActive && fKm) || (b.distanceKm != null && b.distanceKm <= 50)),
   );
-  const fActive = (fSource !== "all" ? 1 : 0) + (qualityActive ? fqParts.size : 0) + (refineActive && fVerified ? 1 : 0) + (refineActive && fKm ? 1 : 0);
+  const fActive = (fSource !== "all" ? 1 : 0) + (qualityActive ? fqParts.size : 0) + (refineActive && fVerified ? 1 : 0) + (refineActive && fKm ? 1 : 0)
+    // Counted: it is the one filter that widens the list, and a renter reading offers of a size he
+    // did not ask for must be able to see that he asked for them.
+    + (showLarger ? 1 : 0);
   const selectedCount = allBids.filter((b) => selected.has(b.id)).length;
   // Item picker: one entry per request line + its bid count (off-platform included via allBids).
   const itemList = group.items.map((it) => ({
@@ -587,6 +628,22 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
             <>
               <div className="filter-backdrop" onClick={() => setFilterOpen(false)} />
               <div className="filter-pop" style={{ insetInlineStart: "auto", insetInlineEnd: 0 }}>
+                {/* The size switch leads the panel: it is the one control here that WIDENS the list
+                    rather than narrowing it, and it refetches instead of filtering what is loaded. */}
+                <div className="fp-h">{L("Equipment size", "مقاس المعدة")}</div>
+                <div className="fp-opt" style={{ cursor: "default" }}>
+                  <Toggle
+                    checked={showLarger}
+                    onChange={setShowLarger}
+                    label={
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--navy)" }}>
+                        {L("Show bids with larger size", "عرض العروض بمقاس أكبر")}
+                      </span>
+                    }
+                  />
+                  <span className="fp-n">{largerHeld}</span>
+                </div>
+                <div className="fp-div" />
                 <div className="fp-h">{L("Bid source", "مصدر العرض")}</div>
                 {([
                   ["all", L("All sources", "كل المصادر"), null, ""],
@@ -631,7 +688,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                   </>
                 )}
                 <div className="fp-foot">
-                  <button className="clr" onClick={() => { setFSource("all"); setFqParts(new Set()); setFVerified(false); setFKm(false); }}>{L("Clear all", "مسح الكل")}</button>
+                  <button className="clr" onClick={() => { setFSource("all"); setFqParts(new Set()); setFVerified(false); setFKm(false); setShowLarger(false); }}>{L("Clear all", "مسح الكل")}</button>
                   <button className="done" onClick={() => setFilterOpen(false)}>{L("Done", "تم")}</button>
                 </div>
               </div>

@@ -13,6 +13,7 @@ import { TermsPanel } from "@/components/requests/TermsPanel";
 import { DealRoomBanner, SupplierDocs, EquipmentDocs } from "@/components/requests/BidCardExtras";
 import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
+import { Toggle } from "@/components/ui";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiateRoom";
@@ -100,6 +101,11 @@ export function RequestBids({
   // web-app/006 (expanded) — real off-platform submissions via the request's shared link.
   const [submissions, setSubmissions] = useState<LinkBidSubmission[]>([]);
   const [src, setSrc] = useState<"all" | "app" | "link">("all"); // source filter
+  /* Bids offering a machine LARGER than the one asked for. The backend answers `exact` unless asked
+     otherwise and DROPS those bids, reporting how many it held in `sizeCounts.larger` - so this is
+     part of the request for the list, not a filter over it, and flipping it refetches. */
+  const [showLarger, setShowLarger] = useState(false);
+  const [largerHeld, setLargerHeld] = useState(0);
   const [submissionBid, setSubmissionBid] = useState<BidCard | null>(null);
   const [negotiateBid, setNegotiateBid] = useState<BidCard | null>(null); // web-app/006 — deal-room-style negotiate view
   const [eligBid, setEligBid] = useState<BidCard | null>(null); // bid-readiness — eligibility view for a native bid's offered units
@@ -248,8 +254,14 @@ export function RequestBids({
     setError(false);
     // The bids payload is already enriched server-side with the live deal-room state (currentPrice +
     // locked/unread terms + progress — same fields the mobile bid card reads), so no per-bid fetch.
-    fetchBids(requestId)
-      .then((d) => active && setBids(d.bids))
+    setLargerHeld(0);
+    fetchBids(requestId, showLarger)
+      .then((d) => {
+        if (!active) return;
+        setBids(d.bids);
+        // What the size switch is worth on this request, whichever way it is currently set.
+        setLargerHeld(d.sizeCounts?.larger ?? 0);
+      })
       .catch(() => active && setError(true));
     // Off-platform shared-link submissions (independent of the app bids; best-effort).
     setSubmissions([]);
@@ -259,7 +271,7 @@ export function RequestBids({
     return () => {
       active = false;
     };
-  }, [requestId]);
+  }, [requestId, showLarger]);
 
   // App parity: the deal room is a PRE-acceptance negotiation surface, so "Start negotiation" just
   // opens (or lazily creates) the room — it does NOT accept the bid. Final accept is gated inside
@@ -301,7 +313,31 @@ export function RequestBids({
   const linkCount = merged.filter(isOff).length;
   const appCount = merged.filter((b) => !isOff(b)).length;
   const allBids = merged.filter((b) => (src === "all" ? true : src === "link" ? isOff(b) : !isOff(b)));
-  if (merged.length === 0) return <div className="rempty">{L("No bids yet — suppliers' offers will appear here.", "لا توجد عروض بعد — ستظهر عروض المؤجّرين هنا.")}</div>;
+  /* «No bids yet» is a CLAIM, and it can be false: a supplier offering a bigger machine than the
+     one asked for is dropped from this list by the backend while dispatch still notifies the renter
+     about him. So the count says so, and the button is the only route to the offer. Nothing is said
+     once the switch is already on - then the request really is empty. */
+  const heldOnEmpty = showLarger ? 0 : largerHeld;
+  if (merged.length === 0)
+    return (
+      <div className="rempty">
+        {L("No bids yet — suppliers' offers will appear here.", "لا توجد عروض بعد — ستظهر عروض المؤجّرين هنا.")}
+        {heldOnEmpty > 0 && (
+          <div style={{ marginTop: 10, display: "inline-flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8,
+            border: "1px solid var(--brand)", background: "var(--brand-soft)", borderRadius: 8, padding: "8px 12px" }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: "#1c3550" }}>
+              {heldOnEmpty === 1
+                ? L("1 bid offers a larger size", "عرض واحد بمقاس أكبر")
+                : L(`${heldOnEmpty} bids offer a larger size`, `${heldOnEmpty} عروض بمقاس أكبر`)}
+            </span>
+            <button type="button" onClick={() => setShowLarger(true)}
+              style={{ border: "1px solid #e2e8f0", background: "#fff", borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 700, color: "#1c3550" }}>
+              {heldOnEmpty === 1 ? L("Show it", "اعرضه") : L("Show them", "اعرضها")}
+            </button>
+          </div>
+        )}
+      </div>
+    );
 
   return (
     <div>
@@ -312,6 +348,19 @@ export function RequestBids({
       </button>
       <div className="bids-bar">
         <span className="count">{allBids.length} {L("bids", "عروض")}</span>
+        {/* The size switch: not a filter over what is on screen, it changes what this page ASKS the
+            backend for. Always shown, because «none are being held» is an answer the renter wants
+            when a bid he was told about is not in the list. */}
+        <Toggle
+          checked={showLarger}
+          onChange={setShowLarger}
+          label={
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#1c3550" }}>
+              {L("Show bids with larger size", "عرض العروض بمقاس أكبر")}
+              {largerHeld > 0 && <span style={{ opacity: 0.6, fontWeight: 600 }}> {largerHeld}</span>}
+            </span>
+          }
+        />
         {linkCount > 0 && (
           <div className="bids-srcfilter" style={{ display: "flex", gap: 6, marginInlineStart: "auto" }}>
             {([
