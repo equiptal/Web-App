@@ -42,7 +42,7 @@ import { useT } from "@/lib/i18n";
 import { Button, Icon } from "@/components/ui";
 import { Dialog } from "@/components/Dialog";
 import { listProjects, createProject, updateProject, assignToProject } from "@/lib/api/client";
-import { projectTitle, shortSite, type ProjectSummary } from "@/lib/contract/project";
+import { leftTheSite, projectTitle, shortSite, type ProjectSummary } from "@/lib/contract/project";
 import type { ProjectDetails, Preferences } from "@/lib/contract/draft";
 import { ProjectForm, type ProjectFormValue } from "@/components/projects/ProjectForm";
 
@@ -106,8 +106,25 @@ export function ProjectFiled({
     (async () => {
       try {
         const all = await listProjects();
-        const here = shortSite(address).toLowerCase();
-        const found = all.find((p) => shortSite(p.location.label).toLowerCase() === here) ?? null;
+        /* ── What counts as «this place» (owner, 2026-09-08) ──────────────────────────────
+           *"For project auto creation, why do some requests create one and some not, while in
+           different locations?"*
+
+           ~~`shortSite(label)` string equality.~~ That reads only the text BEFORE THE FIRST COMMA,
+           and a map pin very often reverse-geocodes to nothing more than «Riyadh, Saudi Arabia» — so
+           two sites a hundred kilometres apart collapsed to one «place», the second request was
+           filed under the first project, and no new project appeared. Different locations, no
+           project: exactly the report.
+
+           `leftTheSite` is this app's own answer to the same question and was already written for
+           the draft's «you have moved off the site» warning: COORDINATES first, with a tolerance of
+           about 110 m, and the full normalised label only when one side has none. One notion of
+           «same place» across the feature, instead of a coarse one here and a careful one there. */
+        const here = { label: address, lat: project.location.lat ?? null, lng: project.location.lng ?? null };
+        const found =
+          all.find(
+            (p) => !leftTheSite({ label: p.location.label, lat: p.location.lat, lng: p.location.lng }, here),
+          ) ?? null;
         const made = found ?? (await createProject(seed()));
         await assignToProject(requestId, made.id);
         if (live) setSite(made);
@@ -120,7 +137,9 @@ export function ProjectFiled({
     return () => {
       live = false;
     };
-  }, [address, requestId, seed]);
+    /* The coordinates are in the deps because the match now reads them; they come off the same
+       submitted draft as `address` and do not change under a mounted dialog. */
+  }, [address, requestId, seed, project.location.lat, project.location.lng]);
 
   // Nothing to say yet, nothing to say at all, or already answered — and nothing while another
   // dialog is being read (`hold`), though the filing above has already happened by then.

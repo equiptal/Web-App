@@ -2,6 +2,26 @@
 
 ## Change log
 
+- **2026-09-08 - Auto-filing asks whether it is the same PLACE, not the same first line of an address.**
+  Owner: *"for project auto creation why some requests created and some not? while in different
+  locations"*. `ProjectFiled` matched an existing site with `shortSite(label)` string equality, and
+  `shortSite` is *the text before the first comma with 4+ digit runs stripped* - so a map pin that
+  reverse-geocodes to «Riyadh, Saudi Arabia» matched every other request in Riyadh. The second one
+  was filed under the FIRST project and no new project appeared: different locations, no project,
+  which is exactly the report. It now asks `leftTheSite` - this app's own comparator, written for the
+  draft's «you have moved off the site» warning: COORDINATES first with ~110 m of tolerance, the
+  full normalised label only when one side has none.
+  Files: `src/components/create/ProjectFiled.tsx`, `tests/unit/project-filed-hold.test.tsx`.
+  ⚠️ Expect MORE projects than before. That is the fix, not a side effect - and existing projects
+  that already swallowed two sites stay as they are; nothing splits retroactively.
+  ⚠️ The OTHER reasons a request ends up unfiled are unchanged and all silent by design: the draft
+  already carried a `projectId`; the location has no LABEL at all (the effect returns before any
+  read, so no project and no dialog); or the write failed, which says nothing because the request is
+  already posted and safe. The label case is pinned in the test, since it looks identical to this bug
+  from outside.
+  ⚠️ One notion of «same place» per feature. A coarse rule here and a careful one in the draft
+  warning is how a renter gets told he moved off a site the filing thinks he never left.
+
 - **2026-09-08 - The post (with its e-mail) is announced first; the project modal follows it.**
   Owner: *"i want the same post to moedatech modal to show the email too so they are together, then
   the project modal after them"*. `ShareOnPost`'s tick and `ProjectFiled`'s dialog both mount on the
