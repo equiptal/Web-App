@@ -478,6 +478,12 @@ export function MachineCard({
             <div className="min-w-0 rounded-sm bg-surface2 p-3.5">
               <CanvasField
                 label={t.create.machineCard.fuelResponsibility}
+                /* Marked like the two legs beside it: it can be empty now that the draft no longer
+                   seeds «me», so it has to be able to say so. */
+                missing={gapFor("fuel_responsibility")}
+                shake={shake("fuel_responsibility")}
+                required={owed("fuel_responsibility")}
+                star
                 source={prov.itemSource("fuel_responsibility", overrides.fuelResponsibility, "fuelResponsibilityOverride", true)}
                 icon={
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-none" aria-hidden>

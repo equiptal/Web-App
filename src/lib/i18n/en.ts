@@ -395,6 +395,19 @@ export const en = {
         "Consent was not granted. Large organisations often need an administrator to approve it, so ask your IT if you did not refuse it yourself",
       mailConnectFailed: "Outlook could not be connected, so your e-mail opens instead",
       mailInSent: "A copy is in your Sent folder",
+      /* ── The reasons that used to pass in SILENCE (owner, 2026-09-08) ─────────────────────────
+         *"My account is sending to suppliers correctly, but my colleague's Outlook account doesn't
+         send anything."* Every reason below opened his compose window and said nothing about why —
+         so from his seat the press did nothing, while the same press worked for somebody else. Each
+         one names the fact that differs between two accounts. */
+      mailNoSender:
+        "Your Moedatech account has no e-mail address on it, so nothing can be sent from you. Add one in your profile, then try again",
+      mailNoRecipients:
+        "We could not find an address for any of the suppliers you picked. They may be on a colleague's list rather than yours, so your e-mail opens instead",
+      mailNotYours:
+        "Sending from your own address is not set up for this account yet. Your e-mail opens instead, which is what it does today",
+      mailDomainWaiting:
+        "Your domain {domain} is registered but not verified yet, so we cannot send as you until your IT adds the records. Your e-mail opens instead",
       mailPersonal:
         "Your address is a personal one, so Moedatech cannot send on its behalf. Your e-mail opens instead, which is what it does today.",
     },
@@ -811,6 +824,7 @@ export const en = {
     quantityMissing: "Set how many you need.",
     deliveryMissing: "Say who delivers to site.",
     returnMissing: "Say who returns it from site.",
+    fuelPartyMissing: "Say who pays for the fuel.",
     locationMissing: "Set where the machine goes.",
     // MREQ-AC-54 — web-only gates, each satisfied by an explicit "nothing" answer.
     yearMissing: "Choose a minimum year, or Any year.",

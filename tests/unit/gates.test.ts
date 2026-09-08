@@ -51,10 +51,20 @@ function makeDraft(items: EquipmentItem[], over: Partial<RfqDraft> = {}): RfqDra
 }
 
 /** A project that satisfies gateWhere. */
+/**
+ * A project with every REQUEST-WIDE answer given — the "everything but the equipment" baseline.
+ *
+ * The three party fields are set here because they are no longer seeded (2026-09-08): a fresh draft
+ * leaves «who delivers / who returns / who pays for the fuel» unanswered on purpose, so a helper
+ * that means "nothing is missing at request level" has to say so itself.
+ */
 function confirmedProject() {
   const p = defaultProjectDetails();
   p.location = { label: "King Khalid International Airport", lat: 24.9576, lng: 46.6988, confirmed: true };
   p.timing.rentalBasis = "monthly";
+  p.deliveryToSite = "me";
+  p.returnFromSite = "me";
+  p.fuelResponsibility = "me";
   return p;
 }
 
@@ -134,24 +144,31 @@ describe("itemWebGaps — year and certificate (MREQ-AC-54/55)", () => {
   });
 });
 
-describe("transportGaps — delivery and return (MREQ-AC-53)", () => {
-  it("passes with the seeded request-wide 'me', which is what the renter sees selected", () => {
-    const project = defaultProjectDetails(); // seeds both to "me"
-    expect(transportGaps([makeItem()], project)).toEqual([]);
+describe("transportGaps — delivery, return and who pays for the fuel (MREQ-AC-53)", () => {
+  /**
+   * ⚠️ These three start UNANSWERED since 2026-09-08. `defaultProjectDetails` used to seed «me» on
+   * all three, which turned the agent's silence into three priced commitments — the renter collects
+   * the machine, returns it, and buys the fuel — and made these very gates unreachable.
+   */
+  it("blocks a fresh draft on all three, because nobody has answered them", () => {
+    expect(transportGaps([makeItem()], defaultProjectDetails()).map((g) => g.reason)).toEqual([
+      "gate.deliveryMissing",
+      "gate.returnMissing",
+      "gate.fuelPartyMissing",
+    ]);
   });
 
-  it("blocks when the shared control is cleared and the item has no override", () => {
+  it("passes once the shared controls carry an answer", () => {
     const project = defaultProjectDetails();
-    project.deliveryToSite = null;
-    project.returnFromSite = null;
-    expect(transportGaps([makeItem()], project).map((g) => g.reason)).toEqual(["gate.deliveryMissing", "gate.returnMissing"]);
+    project.deliveryToSite = "me";
+    project.returnFromSite = "me";
+    project.fuelResponsibility = "me";
+    expect(transportGaps([makeItem()], project)).toEqual([]);
   });
 
   it("reads the per-item override ahead of the shared value, exactly as submit does", () => {
     const project = defaultProjectDetails();
-    project.deliveryToSite = null;
-    project.returnFromSite = null;
-    const item = makeItem({ deliveryOverride: "supplier", returnOverride: "supplier" });
+    const item = makeItem({ deliveryOverride: "supplier", returnOverride: "supplier", fuelResponsibilityOverride: "supplier" });
     expect(transportGaps([item], project)).toEqual([]);
   });
 });
@@ -240,10 +257,17 @@ describe("requiredGaps — the 'N things need you' count (MREQ-AC-12)", () => {
 describe("gateEquipment — one item's panel", () => {
   it("combines the app gates, the web gates and transport", () => {
     const item = makeItem();
-    const project = defaultProjectDetails();
+    // `confirmedProject` because TRANSPORT is part of what this gate combines, and the three party
+    // fields are unanswered on a fresh draft since 2026-09-08 — with `defaultProjectDetails` this
+    // case would pass for the wrong reason, blocked on transport rather than on the web gates.
+    const project = confirmedProject();
     expect(gateEquipment(item, project, { touchedFields: [] }).ok).toBe(false);
     const touched = { touchedFields: [itemFieldKey(item.id, "equipment_year"), itemFieldKey(item.id, "safety_certificates")] };
     expect(gateEquipment(item, project, touched).ok).toBe(true);
+
+    // And it really does read transport: clear one party and the same answered item is blocked again.
+    const noFuelParty = { ...project, fuelResponsibility: null };
+    expect(gateEquipment(item, noFuelParty, touched).reasons).toContain("gate.fuelPartyMissing");
   });
 });
 
@@ -259,5 +283,54 @@ describe("postableItems (specs#245-AC-33/34/43)", () => {
     const sourcing = makeItem({ id: "b", verdict: "no-match", sourcingRequested: true });
     expect(postableItems([makeItem({ id: "a" }), sourcing]).map((i) => i.id)).toEqual(["a"]);
     expect(itemBlocksAdvance(sourcing)).toBe(false);
+  });
+});
+
+/**
+ * The agent's SILENCE, end to end (owner, 2026-09-08).
+ *
+ * *"The agent now might send null values for many fields, so make sure web allows a non-selected
+ * option — no need to auto-select everything. Even if required, just show it in red with «Required»
+ * if the user tried to go next."*
+ *
+ * So: nothing is chosen on the renter's behalf, every unanswered required field raises its own gap,
+ * and the gap is what the canvas paints red. These pin the FIRST half — that the gaps exist and are
+ * addressed to the control that can satisfy them; `canvas-gating.test.tsx` pins the red mark itself.
+ */
+describe("a draft where the agent stated nothing", () => {
+  const silent = () =>
+    makeDraft([makeItem({ equipmentYear: null, safetyCertsOverride: [] })], {
+      project: defaultProjectDetails(),
+      touchedFields: [],
+    });
+
+  it("chooses nothing for the renter", () => {
+    const p = defaultProjectDetails();
+    expect(p.deliveryToSite).toBeNull();
+    expect(p.returnFromSite).toBeNull();
+    expect(p.fuelResponsibility).toBeNull();
+    // Rental basis and the site were already unanswered; the year is «any» only when asked for.
+    expect(p.timing.rentalBasis).toBeNull();
+    expect(p.location.confirmed).toBe(false);
+    expect(p.advanced.equipmentYear).toBeNull();
+  });
+
+  it("raises one gap per unanswered field, each addressed to its own control", () => {
+    const fields = requiredGaps(silent(), true).map((g) => g.field);
+    for (const f of ["delivery", "return", "fuel_responsibility", "equipment_year", "safety_certificates", "location", "rental_basis"]) {
+      expect(fields, `missing a gap for ${f}`).toContain(f);
+    }
+  });
+
+  it("clears each gap as its own answer arrives, and nothing else's", () => {
+    const draft = silent();
+    const only = (d: RfqDraft) => requiredGaps(d, true).map((g) => g.field);
+
+    expect(only(draft)).toContain("fuel_responsibility");
+    const answered = { ...draft, project: { ...draft.project, fuelResponsibility: "supplier" as const } };
+    expect(only(answered)).not.toContain("fuel_responsibility");
+    // The other two are untouched by that answer — no cascade, no guessing.
+    expect(only(answered)).toContain("delivery");
+    expect(only(answered)).toContain("return");
   });
 });

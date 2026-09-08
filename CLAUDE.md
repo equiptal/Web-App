@@ -241,6 +241,36 @@
   Also verified in real Chrome against the owner's own test workbook: 14 rows, headers intact, the
   12-digit phone read as `966503372850` rather than `9.66503E+11`.
 
+- **2026-09-08 - Nothing is chosen for the renter: an unanswered required field waits, in red.**
+  Owner: *"the agent now might send null values for many fields, so make sure web allows a
+  non-selected option, no need for auto select for everything, even if required then just show it in
+  red with «required» if user tried to go next"*. `defaultProjectDetails` seeded «me» on all three
+  party fields, so the agent's silence became three priced commitments nobody made - the renter
+  collects the machine, returns it, and buys the fuel - and the gates written for them
+  (`gate.deliveryMissing`, `gate.returnMissing`) could never fire, because the fields were full from
+  the first render. All three start null now.
+  Files: `src/lib/contract/draft.ts`, `src/lib/contract/gates.ts`,
+  `src/components/create/MachineCard.tsx`, `src/components/create/ReadyToSend.tsx`,
+  `src/lib/export/spec-sheet.ts`, `src/lib/i18n/{en,ar}.ts`, `tests/unit/gates.test.ts`,
+  `tests/setup/canvas.tsx`.
+  Trap: **fuel responsibility had no gate**, because it could not be empty. Removing the seed made it
+  possible, and `draftToCreateRequest` falls back to «me» when it computes `dieselIncluded` - so
+  without a new gap («gate.fuelPartyMissing») an unanswered field would have posted as «the renter
+  pays» in silence, which is the exact failure the seeds were removed to stop.
+  Trap: two test helpers named `confirmedProject` (in `gates.test.ts` and `tests/setup/canvas.tsx`)
+  mean «nothing is missing at request level», and both were relying on the seeds - 25 tests failed
+  across five files, every one of them describing the old auto-select rather than a regression. Both
+  helpers now answer the three fields themselves.
+  ⚠️ Deliberately NOT changed, and each for a stated reason: `fuelType` keeps its diesel default
+  (owner, 2026-08-31: the system fills fuel type, the agent should not spend tokens on it);
+  `operatorNeeded` keeps «no» for an agent line that says nothing (the cheaper wrong answer, and the
+  agents repo now fills it from its own map anyway - `d97a15e`); `quantity` keeps 1 (the backend
+  backstops it and the stepper's floor is 1); hours/day, days/week and the maintenance side are the
+  APP's defaults, not the agent's fields.
+  ⚠️ `spec-sheet.ts` and the review table print «—» for an unanswered side now. They used to read
+  `?? "me"`, which would have printed a decision into an exported document that nobody had made.
+
+
 - **2026-09-08 - A refused term is SAID, not tinted; and «Ask» is a drawer, not a one-line box.**
   Owner: *"How can TÜV be a conflict and a match at the same time? If he says no, show it like ✗ TUV.
   And if it has an opposite value - not «on rentee», so it will be «on supplier» - show that."* The

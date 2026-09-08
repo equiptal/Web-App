@@ -24,9 +24,12 @@ export interface SpecRow {
   fatFood: Party | null;
   fatTransport: Party | null;
   fuelType: FuelType;
-  fuelResp: Party;
-  delivery: Party;
-  ret: Party;
+  /** Null when nobody has answered yet — the sheet prints «—» rather than inventing a side.
+   *  These three stopped being seeded «me» on 2026-09-08, so a draft exported before the renter
+   *  answers them genuinely has no value to print. */
+  fuelResp: Party | null;
+  delivery: Party | null;
+  ret: Party | null;
   /** EQUIPMENT safety certificate(s) (per-item, inheriting the request-wide default). */
   certificate: SafetyCertificate[];
   /** Text behind the "other" chip above — rendered in its place so the export names the real cert. */
@@ -53,9 +56,9 @@ export function buildSpecRows(draft: RfqDraft, taxonomy: Taxonomy): SpecRow[] {
       fatFood: item.operatorNeeded === "yes" ? item.operator.fatFood : null,
       fatTransport: item.operatorNeeded === "yes" ? item.operator.fatAccommodationTransport : null,
       fuelType: item.fuelType,
-      fuelResp: item.fuelResponsibilityOverride ?? draft.project.fuelResponsibility ?? "me",
-      delivery: item.deliveryOverride ?? draft.project.deliveryToSite ?? "me",
-      ret: item.returnOverride ?? draft.project.returnFromSite ?? "me",
+      fuelResp: item.fuelResponsibilityOverride ?? draft.project.fuelResponsibility,
+      delivery: item.deliveryOverride ?? draft.project.deliveryToSite,
+      ret: item.returnOverride ?? draft.project.returnFromSite,
       // EQUIPMENT safety cert — per-item override, else the request-wide "settings for all" default.
       certificate: item.safetyCertsOverride ?? draft.project.certificates.safety,
       certificateOther: (item.safetyCertsOtherText ?? (item.safetyCertsOverride ? "" : draft.project.certificates.safetyOther)).trim(),

@@ -87,9 +87,11 @@ export function ReadyToSend() {
     r.operatorCert.length ? r.operatorCert.map((c) => t.options.safetyCert[c]).join(", ") : "—",
     r.fatFood ? t.options.party[r.fatFood] : "—",
     r.fatTransport ? t.options.party[r.fatTransport] : "—",
-    t.options.party[r.fuelResp],
-    t.options.party[r.delivery],
-    t.options.party[r.ret],
+    // «—» for an unanswered side, the same as F.A.T above it: the three party fields are no longer
+    // seeded «me», so the sheet must be able to say nobody has decided yet.
+    r.fuelResp ? t.options.party[r.fuelResp] : "—",
+    r.delivery ? t.options.party[r.delivery] : "—",
+    r.ret ? t.options.party[r.ret] : "—",
     r.certificate.length
       ? r.certificate.map((c) => (c === "other" && r.certificateOther ? r.certificateOther : t.options.safetyCert[c])).join(", ")
       : "—",

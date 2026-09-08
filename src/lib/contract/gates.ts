@@ -198,6 +198,17 @@ export function transportGaps(items: EquipmentItem[], project: ProjectDetails): 
     if ((item.returnOverride ?? project.returnFromSite) == null) {
       gaps.push({ panel: "equipment", itemId: item.id, field: "return", reason: "gate.returnMissing" });
     }
+    /**
+     * Who pays for the fuel, asked the same way as the two legs (2026-09-08).
+     *
+     * It had no gate because it could not be empty: the draft seeded «me». Now that the seeds are
+     * gone it can be, and `draftToCreateRequest` falls back to «me» when computing `dieselIncluded`
+     * — so without a gate an unanswered field would post as *the renter pays* in silence, which is
+     * the exact failure the seeds were removed to stop.
+     */
+    if ((item.fuelResponsibilityOverride ?? project.fuelResponsibility) == null) {
+      gaps.push({ panel: "equipment", itemId: item.id, field: "fuel_responsibility", reason: "gate.fuelPartyMissing" });
+    }
   }
   return gaps;
 }
