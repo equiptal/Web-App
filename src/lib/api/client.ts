@@ -945,18 +945,54 @@ export interface ProjectChart {
   documents: AwardDocument[];
 }
 
+/**
+ * A machine on the chart whose name the CATALOGUE could not supply.
+ *
+ * ── The row that showed no machine at all (owner, 2026-09-08) ───────────────────────
+ * *"Some request items are not shown in the project if they were undefined, so let it read from the
+ * equipment taxonomy of the request or the new column, custom type, as free text."*
+ *
+ * `getChart` labels a request's item from its taxonomy pair alone (`label(subtypeId, capacityId)`),
+ * and an off-catalogue line has NEITHER id — so `label` arrives `null` and the row drew an empty
+ * name, leaving the request's code as the only thing on it. The same handler already falls back to
+ * `rawLabel` for a WORK ORDER's machines; only the request branch has no fallback.
+ *
+ * The proper fix is one line in that projection (a ticket is out). This reads the free-text name
+ * from the payload if it is there under any of the spellings the platform uses for it, so the web
+ * shows the renter's own words the moment the backend selects the column — and needs no second
+ * change when it does.
+ */
+const chartItemName = (raw: Record<string, unknown>): { label: string | null; labelAr: string | null } => {
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  const label = str(raw.label);
+  const labelAr = str(raw.labelAr);
+  if (label) return { label, labelAr };
+  /* `customEquipmentName` is the request column (2026-09-06); `rawLabel`/`rawSize` are what a work
+     order carries for the same idea. One reader for both, because a chart row draws both kinds. */
+  const custom =
+    str(raw.customEquipmentName) ??
+    str(raw.custom_equipment_name) ??
+    ([str(raw.rawLabel), str(raw.rawSize)].filter(Boolean).join(" ") || null);
+  // The renter typed his machine in ONE language, so the same words serve both directions.
+  return { label: custom, labelAr: labelAr ?? custom };
+};
+
 /** Everything the site's timeline draws, in one call. */
 export async function fetchChart(projectId: string): Promise<ProjectChart> {
   const raw = await projectFetch<{
     project: Record<string, unknown>;
     version?: number;
-    groups?: ChartGroup[];
+    groups?: Record<string, unknown>[];
     documents?: AwardDocument[];
   }>(`${projectPath(projectId)}/chart`);
+  const groups = (raw.groups ?? []).map((g) => {
+    const items = Array.isArray(g.items) ? (g.items as Record<string, unknown>[]) : [];
+    return { ...g, items: items.map((it) => ({ ...it, ...chartItemName(it) })) } as unknown as ChartGroup;
+  });
   return {
     project: mapProjectSummary(raw.project),
     version: typeof raw.version === "number" ? raw.version : (mapProjectSummary(raw.project).version ?? 1),
-    groups: raw.groups ?? [],
+    groups,
     documents: raw.documents ?? [],
   };
 }

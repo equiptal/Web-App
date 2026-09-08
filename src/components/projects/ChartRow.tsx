@@ -131,7 +131,9 @@ export function AwardRow({
           {/* The NAME is the only part that truncates. The count was inside it and got cut the
               moment two pills joined the line — «Crawler Excavator 30 ton …» with no ×1 of 3, which
               is the one number on this row a renter cannot infer from anything else. */}
-          <span className="truncate text-body font-semibold text-navy">{item.label}</span>
+          <span className="truncate text-body font-semibold text-navy">
+            {item.label || t.projects.chart.unnamedItem}
+          </span>
           <span className="flex-none text-body font-semibold text-navy">
             ×{award.units}
             {/* "of 3" only when it is not the whole line — otherwise it is noise on every row. */}
@@ -321,7 +323,7 @@ export function AwaitingRow({
     <div className="flex items-stretch border-t border-border">
       <div className="relative flex w-[400px] flex-none flex-col justify-center gap-0.5 py-2 pe-10 ps-3">
         <span className="truncate text-body font-semibold text-navy">
-          {item.label} ×{item.quantity}
+          {item.label || t.projects.chart.unnamedItem} ×{item.quantity}
         </span>
         {/* What was asked for, on one line (owner, 2026-08-31: *"show some terms like cert,
             operator, year if set — if not, just don't show"*).

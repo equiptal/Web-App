@@ -1837,6 +1837,7 @@ export const ar: Dictionary = {
       nothingYet: "لا شيء في هذا الموقع بعد. أضف أمر عمل لمعدة موجودة هنا، أو انشر طلبًا.",
     },
     chart: {
+      unnamedItem: "معدة (بلا اسم)",
       of: "من",
       pending: "قيد الانتظار",
       ownFleet: "أسطولنا",

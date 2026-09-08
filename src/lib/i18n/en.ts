@@ -2171,6 +2171,10 @@ export const en = {
       nothingYet: "Nothing on this site yet. Add a work order for a machine already here, or post a request.",
     },
     chart: {
+      /* A machine whose name nothing could supply: no taxonomy pair on the request and no free text
+         either. Said rather than drawn blank (owner, 2026-09-08) — an empty name reads as a broken
+         row, and the renter cannot tell it from a machine we simply failed to load. */
+      unnamedItem: "Equipment (not named)",
       of: "of",
       pending: "pending",
       ownFleet: "Own fleet",

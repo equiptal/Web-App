@@ -2,6 +2,31 @@
 
 ## Change log
 
+- **2026-09-08 - A project row draws the machine's name even when the catalogue has none.**
+  Owner: *"some requests items doesnt shown in the project if they were undefined so let it read
+  from equipemtn taxonamy of request or the new solumn custom type as free text"*. The backend's
+  chart projection labels a REQUEST's item from its taxonomy pair alone
+  (`getChart.ts:156`, `label(subtypeId, capacityId)`), and an off-catalogue line has NEITHER id - so
+  `label` arrives `null`, the row drew an empty name, and the request's code was the only thing on
+  it. The SAME handler already falls back to `rawLabel`/`rawSize` for a work order's machines
+  (`getChart.ts:202`); only the request branch never did, and it does not even select the free-text
+  column.
+  Web half, done here: `fetchChart` now MAPS its groups instead of passing them through, filling a
+  missing name from `customEquipmentName` / `custom_equipment_name` / `rawLabel + rawSize`, and
+  `ChartRow` says «Equipment (not named)» rather than drawing a blank.
+  Files: `src/lib/api/client.ts` (`chartItemName`), `src/components/projects/ChartRow.tsx`,
+  `src/lib/i18n/{en,ar}.ts`, `tests/unit/chart-item-name.test.ts`.
+  ⚠️ **Backend still owes the real fix**: `getChart.ts` must select `customEquipmentName` on
+  `equipmentItems` and label it `taxonomy → customEquipmentName → null`, the way the work-order
+  branch already reads. Until then the web has nothing to show for those rows and prints the
+  placeholder - the mapping here is what makes the fix land with no second web change.
+  ⚠️ `labelAr` falls back to the SAME free text. The renter typed his machine in one language and
+  there is no translation of it to prefer; printing English in an Arabic row is better than printing
+  nothing.
+  ⚠️ `fetchChart` used to pass `raw.groups` straight through, which is why nothing could be fixed
+  in the web before. Anything added to a chart item now goes through `chartItemName`'s spread - keep
+  it a pure rename of fields, never a filter, or a field the backend adds will vanish here.
+
 - **2026-09-08 - Auto-filing asks whether it is the same PLACE, not the same first line of an address.**
   Owner: *"for project auto creation why some requests created and some not? while in different
   locations"*. `ProjectFiled` matched an existing site with `shortSite(label)` string equality, and
