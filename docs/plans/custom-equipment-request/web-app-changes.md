@@ -37,7 +37,7 @@ Suggested copy, to be finalised by whoever owns the wording:
 Arabic:
 
 > **غير موجودة في قائمتنا**
-> هذه المعدة غير مدرجة لدينا ولا يوجد مورّد في مويداتك مطابق لها، لذلك لن نرسلها إلى أحد. يمكنك مع
+> هذه المعدة غير مدرجة لدينا ولا يوجد مورّد في معداتك مطابق لها، لذلك لن نرسلها إلى أحد. يمكنك مع
 > ذلك نشر الطلب ومشاركة رابطه مع مورّدك الخاص
 
 ⚠️ **Say "we will not send it", never "no supplier was found".** The request is never dispatched at

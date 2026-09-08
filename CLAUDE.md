@@ -2,6 +2,30 @@
 
 ## Change log
 
+- **2026-09-08 - The Arabic brand is «معداتك», and «مويداتك» is gone from the repo.**
+  Owner: *"do a check for any مويداتك word, it must be معداتك"*. «مويداتك» is the LATIN name
+  (Moeda-tech) transliterated back into Arabic, and it had reached 45 places: **12 shipped strings**
+  in `ar.ts` (« على مويداتك», «موثّق من مويداتك», the deal-room no-account line, the invite body, the
+  web-coming-soon note, the suggested-supplier labels), 29 in the renter-suppliers prototype and 4 in
+  two plan documents. Replaced stem-wise, so prefixed forms («لمويداتك») came out right.
+  Files: `src/lib/i18n/ar.ts`, `prototypes/renter-suppliers-v1.html`,
+  `docs/implementation-plans/renter-suppliers/plan.md`,
+  `docs/plans/custom-equipment-request/web-app-changes.md`,
+  `tests/unit/brand-spelling.test.ts` (new).
+  Trap: nothing catches this by itself - it looks like a word, it renders cleanly, and only a reader
+  who knows the company sees it. Hence a TEST that walks `src/`, `prototypes/` and `docs/` rather
+  than a one-off sweep, plus a second case asserting the correct spelling is still present at all, so
+  a future rename cannot empty the dictionary silently.
+  Checked and already correct: every surface that prints the brand outside the dictionary - the
+  public bid form's three notices, the quotation's footer and legal lines (`quotation/render.ts`,
+  `deal-room.ts`), `bid-quotation.ts`, the confirmation screen, `layout.tsx`'s title/keywords, the
+  compare screens - and the OG card, the share card HTML and the WhatsApp templates carry no Arabic
+  brand word at all.
+  ⚠️ **Outside this repo, still wrong**: `Moedatech-App/apps/mobile/lib/l10n/app_ar.arb:3002`
+  (`customEquipmentNotice`) and its generated `app_localizations_ar.dart:7728`. It came from the same
+  plan text this repo carried, so the typo travelled into the app's shipped strings; it needs the
+  fix plus a localizations regen there.
+
 - **2026-09-08 - An empty supplier list on the share panel offers the way out of itself.**
   Owner: *"make option to add suppliers here when empty"*. «Add» lives in the SEARCH row, and that
   row is drawn only when there is something to search (`{!!rows?.length && …}`) - so a renter with no
