@@ -76,6 +76,14 @@ describe("naming a chart item", () => {
     expect((await firstItem()).label).toBe("Floating crane barge");
   });
 
+  it("gives Arabic the English name rather than nothing, when the projection sends only one", async () => {
+    /* The work-order branch of `getChart` fills `labelAr` from the catalogue alone, so an
+       off-catalogue work order arrives named in `label` with `null` beside it — while a request now
+       carries the typed name in both. Same screen, two shapes; this makes them one on arrival. */
+    serve(payload([{ id: "w-1", label: "Boom truck 12 ton", labelAr: null, quantity: 1, awards: [] }]));
+    expect((await firstItem()).labelAr).toBe("Boom truck 12 ton");
+  });
+
   it("keeps everything else on the item and the group untouched", async () => {
     serve(payload([{ id: "r-1", label: "Excavator", quantity: 3, awards: [], terms: { operator: "YES" } }]));
     const chart = await fetchChart("p-1");

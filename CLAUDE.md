@@ -20,6 +20,15 @@
   `equipmentItems` and label it `taxonomy → customEquipmentName → null`, the way the work-order
   branch already reads. Until then the web has nothing to show for those rows and prints the
   placeholder - the mapping here is what makes the fix land with no second web change.
+  ⚠️ **The two halves of the chart disagree in Arabic, by design in the projection** (found by the
+  backend author, 2026-09-08): the request branch falls back to the typed name in both languages,
+  the work-order branch fills `labelAr` from the catalogue only — so an off-catalogue work order
+  arrives named in `label` with `null` beside it. `chartItemName` returns `labelAr ?? label` so no
+  consumer has to remember; `FileRequestDialog` had already written that fallback by hand.
+  ⚠️ There is NO `isUndefined` column - RequestEquipmentItem holds three NOT NULL taxonomy strings
+  and the `''` sentinel, read through `isUndefinedEquipment`. The web still reads a DERIVED
+  `isUndefined` flag on other projections (`contract/inbox.ts`), which is a different thing and must
+  keep working; the chart payload simply does not carry one, and does not need one.
   ⚠️ `labelAr` falls back to the SAME free text. The renter typed his machine in one language and
   there is no translation of it to prefer; printing English in an Arabic row is better than printing
   nothing.

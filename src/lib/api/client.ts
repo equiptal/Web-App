@@ -966,7 +966,13 @@ const chartItemName = (raw: Record<string, unknown>): { label: string | null; la
   const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
   const label = str(raw.label);
   const labelAr = str(raw.labelAr);
-  if (label) return { label, labelAr };
+  /* ── Arabic never draws blank, whichever branch produced the name ───────────────────────
+     The two halves of the chart disagree by design in the projection: the request branch now falls
+     back to the typed name in BOTH languages, while the work-order branch fills `labelAr` from the
+     catalogue only — so an off-catalogue work order arrives with a name in `label` and `null` beside
+     it (found by the backend author, 2026-09-08). `FileRequestDialog` already wrote `labelAr ||
+     label` by hand for exactly this; doing it once here means no consumer has to remember. */
+  if (label) return { label, labelAr: labelAr ?? label };
   /* `customEquipmentName` is the request column (2026-09-06); `rawLabel`/`rawSize` are what a work
      order carries for the same idea. One reader for both, because a chart row draws both kinds. */
   const custom =
