@@ -110,7 +110,29 @@ export interface ShareRequestPanelProps {
    * — the only case where nothing opened in another tab, and therefore the only case where a caller
    * should say so immediately rather than wait for the renter to come back.
    */
-  onShared?: (count: number, channel: string) => void;
+  /**
+   * A channel has been handed off.
+   *
+   * ── `handedOff` is the load-bearing part (owner, 2026-09-08) ─────────────────────────
+   * *"When I sent a request through Outlook and Moedatech it must show sent successfully with the
+   * post confirmation in the same modal, immediately."*
+   *
+   * It did not, and the reason is that a CONNECTED Outlook opens nothing at all: the message leaves
+   * from the server through Graph, the renter never leaves the page — and the caller was holding its
+   * confirmation back until the tab regained focus, which for that path never happens. So the
+   * outcome now says whether the browser actually went anywhere, and `mail` carries what the server
+   * did, so the confirmation can state the send rather than only the post.
+   */
+  onShared?: (
+    count: number,
+    channel: string,
+    outcome?: {
+      /** True when a tab, a pop-up or the device's own sheet took over. False when we sent it. */
+      handedOff: boolean;
+      /** Present only for a server-side send: what left, from where, and whether a copy was filed. */
+      mail?: { from: string; recipients: number; inSentFolder: boolean };
+    },
+  ) => void;
   /** Rows to start with ticked — the per-row share action picks one. */
   preselect?: string[];
   /** The renter's own firm, for the From line. */
@@ -775,6 +797,12 @@ export function ShareRequestPanel({
 
     setBusy(true);
     setTooLong(false);
+    /* Did the browser LEAVE? A compose tab, a WhatsApp window or the device's share sheet all take
+       focus, and the confirmation waits for the renter to come back. A Graph send takes nothing, so
+       there is nothing to wait for — see `onShared`. */
+    let handedOff = false;
+    /** What the server sent, when it was the server that sent it. */
+    let mail: { from: string; recipients: number; inSentFolder: boolean } | undefined;
 
     // `post` mode mints the request first; a share that fails afterwards leaves a LIVE request, and
     // that is deliberate — the post is what the renter came here for, and rolling it back to tidy up
@@ -890,7 +918,11 @@ export function ShareRequestPanel({
        */
       if (provider === "gmail") {
         consentWindow?.close();
-        reached += openCompose(id, message) ? reachable.length : 0;
+        const opened = openCompose(id, message);
+        if (opened) {
+          reached += reachable.length;
+          handedOff = true;
+        }
       } else {
       if (connect?.configured && !connect.connected) await startConnect(consentWindow);
 
@@ -924,6 +956,8 @@ export function ShareRequestPanel({
 
       if (outcome.sent) {
         reached += outcome.recipients;
+        // Nothing opened and nothing to come back from: this is the path the owner's report is about.
+        mail = { from: outcome.from, recipients: outcome.recipients, inSentFolder: outcome.inSentFolder };
         /*
          * — the draft tab opened here —
          *
@@ -946,8 +980,10 @@ export function ShareRequestPanel({
         const openedIt = openCompose(id, message);
         // Too long for a URL, and a truncated body loses its tail, which is where the link is. The
         // request is posted and the link is on screen; say so rather than sending half a message.
-        if (openedIt) reached += reachable.length;
-        else setTooLong(true);
+        if (openedIt) {
+          reached += reachable.length;
+          handedOff = true;
+        } else setTooLong(true);
       }
       }
     }
@@ -963,6 +999,7 @@ export function ShareRequestPanel({
 
       const phone = (firstWithPhone?.phone ?? "").replace(/\D/g, "");
       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank", "noopener");
+      handedOff = true;
       if (firstWithPhone) reached += 1;
     }
     if (ch === "other") {
@@ -987,6 +1024,7 @@ export function ShareRequestPanel({
         .share?.({ title: subject, text: body, url })
         .then(() => true)
         .catch(() => false);
+      if (shared) handedOff = true;
       if (!shared) {
         /* Both flavours here, unlike Copy: *More* means "send this somewhere", so a paste into
            Gmail should arrive as the laid-out message with the card, and a paste into a chat as the
@@ -1010,7 +1048,7 @@ export function ShareRequestPanel({
     setHandedOff({ channel: ch, n: reached });
     if (ch !== "none") setSent((prev) => (prev.includes(ch) ? prev : [...prev, ch]));
     postedHere.current = false;
-    onShared?.(reached, ch);
+    onShared?.(reached, ch, { handedOff, mail });
     setBusy(false);
   };
 

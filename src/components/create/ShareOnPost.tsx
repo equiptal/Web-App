@@ -72,6 +72,8 @@ export function ShareOnPost() {
   const [waitingToTell, setWaitingToTell] = useState(false);
   /** How many suppliers that first send actually reached — 0 when he posted to Moedatech alone. */
   const [reached, setReached] = useState(0);
+  /** What the server sent, when it sent it: the confirmation states the e-mail as well as the post. */
+  const [mail, setMail] = useState<{ from: string; recipients: number; inSentFolder: boolean } | null>(null);
   const announced = useRef(false);
   /** The request cap has a dialog of its own on the review above; this banner leaves it to it. */
   const isLimit = state.errorDetail?.backendCode === "E8009";
@@ -199,12 +201,23 @@ export function ShareOnPost() {
         draftForm={draftForm}
         onPost={post}
         renterName={renterName}
-        onShared={(n, channel) => {
+        onShared={(n, channel, outcome) => {
           if (announced.current) return;
           announced.current = true;
           setReached(n);
-          // Moedatech alone opens no tab, so there is nothing to come back FROM.
-          if (channel === "none") setPosted(true);
+          setMail(outcome?.mail ?? null);
+          /* ── Wait only when he actually WENT somewhere (owner, 2026-09-08) ─────────────────
+             *"When I sent a request through Outlook and Moedatech it must show sent successfully with
+             the post confirmation in the same modal, immediately after post and send."*
+
+             ~~Every channel but Moedatech waited for `visibilitychange` / `focus`.~~ That rule was
+             written for a compose tab, and it is right for one. But a CONNECTED Outlook opens
+             nothing — the server sends it through Graph and the renter never leaves — so the wait
+             was for an event that could not arrive, and the press that did the most looked like the
+             press that did nothing.
+
+             `handedOff` is the question that was really being asked all along. */
+          if (channel === "none" || outcome?.handedOff === false) setPosted(true);
           else setWaitingToTell(true);
         }}
       />
@@ -234,6 +247,18 @@ export function ShareOnPost() {
           <p className="mt-2 text-body leading-relaxed text-muted-dark">
             {reached === 0 ? c.postedLive : reached === 1 ? c.postedLiveOne : fmt(c.postedLiveMany, { n: reached })}
           </p>
+          {/* ── The e-mail, said here too (owner, 2026-09-08) ────────────────────────────
+              A server-side send is the one channel with no window of its own to prove it happened,
+              so the line above — which counts suppliers — is not enough: he asked for *sent
+              successfully*, with the address it left from. Drawn only for that path, because a
+              compose window is its own evidence. */}
+          {mail && (
+            <p className="mt-2 flex flex-wrap items-center justify-center gap-1.5 text-meta font-semibold text-ok-deep">
+              <Icon name="mark_email_read" size={15} className="flex-none" />
+              {fmt(mail.recipients === 1 ? c.mailSentOne : c.mailSent, { from: mail.from, n: mail.recipients })}
+              {mail.inSentFolder && <span className="font-normal text-muted">{c.mailInSent}</span>}
+            </p>
+          )}
           {/* The link is already on the card behind this, so the dialog does not offer it again — it
               says the one thing he does not know yet and gets out of the way. */}
           <p className="mt-3 text-meta text-muted">{c.postedNext}</p>

@@ -2,6 +2,58 @@
 
 ## Change log
 
+- **2026-09-08 - A send the SERVER performed is announced at once, and it says the mail went.**
+  Owner: *"when i sent a request through outlook and moedatech it must show sent successfully with
+  the post request confirmation in the same modal and immediately after post and send the outlook
+  email"*. It did not, and the cause was a rule that was right for the wrong reason: `ShareOnPost`
+  held its «Your request is posted» dialog until this tab was visible again (owner, 2026-09-03,
+  because a compose tab steals focus and the tick was being buried behind it). A CONNECTED Outlook
+  opens NOTHING - the message leaves the server through Graph and the renter never leaves the page -
+  so `visibilitychange` / `focus` could not arrive and the press that did the most looked like the
+  press that did nothing.
+  `onShared` now carries the outcome: `handedOff` (did a tab, a pop-up or the device sheet take
+  over?) and, for a server send, `mail` (`from`, `recipients`, `inSentFolder`). Nothing handed off
+  ⇒ announce immediately; and the dialog draws the e-mail line - «Sent from … to N suppliers» plus
+  the copy in his Sent folder - because that channel has no window of its own to prove it happened.
+  Files: `src/components/share/ShareRequestPanel.tsx`, `src/components/create/ShareOnPost.tsx`,
+  `tests/unit/posted-confirmation.test.tsx`, `tests/unit/share-request-panel.test.tsx`.
+  ⚠️ `handedOff` is set where a WINDOW is actually opened: the Gmail compose, the Outlook fallback
+  compose, WhatsApp, and a successful `navigator.share`. A consent pop-up does not count - it closes
+  itself and focus returns here, which the announcement would then read as «he came back».
+  ⚠️ The waiting rule STAYS for every channel that does open something. It was not a mistake; it
+  was a rule applied to a case it never anticipated. Do not "simplify" it away.
+
+- **2026-09-08 - A bid offering a BIGGER machine can be asked for, and «no bids» says when it is hiding one.**
+  Owner: *"some bids of larger size of the request doesn't appear in the bids view of a request in the
+  web, it is by default filtered out in the app but we must have a filter to show larger sizes"*. The
+  backend has hidden them since 2026-08-31: `GET /marketplace/requests/{id}/bids` answers `exact`
+  unless the call says `sizeMatch=exact_or_larger`, and it reports what it held back in
+  `sizeCounts.larger` for exactly this reason - dispatch still notifies the renter about such a bid,
+  so without the count he opens the item and reads that nothing arrived. The web sent no flag and
+  dropped the counts, so the number had nowhere to be said. Now: the route passes the flag through
+  and returns `bidSizeCounts(raw)`; `fetchBids(id, showLarger)` is the widened request (a REFETCH,
+  never a filter over what is on screen); `BidSizeFilter` is the `tune` button beside the export,
+  carrying the app's own toggle plus the held count; and the empty cards tab names the held bid with
+  the one control that reaches it. The export itself dropped from `control-lg` to `control-md`, at
+  the owner's word, so the tabs are the only 44px thing on that row.
+  Files: `src/app/api/me/requests/[id]/bids/route.ts`, `src/lib/contract/bids.ts`,
+  `src/lib/api/client.ts`, `src/components/workspace/BidSizeFilter.tsx` (new),
+  `src/components/workspace/{RequestsWorkspace,BidCards}.tsx`, `src/lib/i18n/{en,ar}.ts`,
+  `src/lib/uiPins.ts`, `tests/unit/bid-size-larger.test.tsx` (new, 10 cases).
+  Trap: `sizeCounts` is counted BEFORE the filter runs and on both sides of it, so `larger` is the
+  same number whether or not those bids are showing. Deriving it from the returned bids instead would
+  print «0 hidden» in the only state where the sentence matters.
+  Trap: the empty state says nothing once `showLarger` is on. Then the item really is empty, and a
+  note about larger bids would send the renter to press a control already pressed.
+  ⚠️ The MOBILE app was changed in the same pass (`Moedatech-App`, not this repo): its per-request
+  bid list had no size control at all - the toggle existed only on the My Offers filter sheet, over a
+  different bloc - so `BidListBloc` gained `sizeMatch` / `sizeCountLarger`, the list's own filter
+  sheet gained the switch, and `AppEmptyState` there carries the same count and action.
+  ⚠️ NOT covered: the dashboard's bid rail (`HomeRequests`) and the deal room read `fetchBids` with
+  no flag, so both still show the exact-size list. That is today's behaviour, unchanged. The COMPARE
+  tab's own «no bids» state is also untouched - the filter button sits on the row above it either
+  way, dotted when bids are being held.
+
 - **2026-09-08 - One add rule for both doors, and a short row says so before the press.**
   Owner: *"why doesn't it import a missing company or email or phone while adding them manually
   allows it, no sense"*. He was right and the inconsistency was MINE, introduced the same day: the

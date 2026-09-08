@@ -2289,7 +2289,15 @@ describe("what the caller is told", () => {
 
     fireEvent.click(confirmButton()!);
 
-    await waitFor(() => expect(shared).toHaveBeenCalledWith(1, "email"));
+    // A third argument arrived on 2026-09-08: whether the browser was handed off, and what the
+    // server sent. The caller announces the post immediately when nothing opened, so it cannot be
+    // asserted away — see «the outcome handed back to the caller» below.
+    await waitFor(() =>
+      expect(shared).toHaveBeenCalledWith(1, "email", {
+        handedOff: false,
+        mail: { from: "bandar@zahid.sa", recipients: 1, inSentFolder: true },
+      }),
+    );
     expect(shared).toHaveBeenCalledTimes(1);
   });
 });
@@ -2326,5 +2334,72 @@ describe("an empty supplier list offers the way out of it", () => {
     await screen.findByText(c.noSuppliersYet);
     // The link half of the panel: its own heading is drawn whatever the supplier list holds.
     expect(screen.getByText(c.expiry)).toBeTruthy();
+  });
+});
+
+/* ── What the caller is told, so it can announce the send (owner, 2026-09-08) ─────────────────── */
+
+/**
+ * *"When I sent a request through Outlook and Moedatech it must show sent successfully with the post
+ * confirmation in the same modal, immediately after post and send."*
+ *
+ * The confirmation is `ShareOnPost`'s, and it was holding itself back until the tab regained focus —
+ * a rule written for a compose tab, and right for one. A CONNECTED Outlook opens nothing: the
+ * message leaves from the server through Graph and the renter never leaves the page, so that event
+ * could not arrive and the press that did the most looked like the press that did nothing.
+ *
+ * These pin the fact the panel now reports, which is the fact that decides it: did the browser
+ * actually go anywhere.
+ */
+describe("the outcome handed back to the caller", () => {
+  const shared = vi.fn();
+
+  beforeEach(() => shared.mockReset());
+
+  /** Tick a supplier with an address, choose Outlook, and press Send through the confirm dialog. */
+  const sendByEmail = async () => {
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    pressSend();
+  };
+
+  it("says NOTHING was handed off when the server sent it, and what it sent", async () => {
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@moedatech.net", connectedAt: null };
+    api.mail = { sent: true, from: "bandar@moedatech.net", recipients: 1, skipped: 0, inSentFolder: true };
+    draw({ onShared: shared });
+    await sendByEmail();
+
+    await waitFor(() => expect(shared).toHaveBeenCalled());
+    const [count, channel, outcome] = shared.mock.calls[0];
+    expect(channel).toBe("email");
+    expect(count).toBe(1);
+    expect(outcome).toMatchObject({
+      handedOff: false,
+      mail: { from: "bandar@moedatech.net", recipients: 1, inSentFolder: true },
+    });
+    // And no window was opened, which is the whole reason there is nothing to come back from.
+    expect(opened).not.toHaveBeenCalled();
+  });
+
+  it("says the browser DID leave when a compose window opened instead", async () => {
+    // The unsendable case: the panel falls back to his own webmail, which takes focus.
+    api.mail = { sent: false, reason: "DOMAIN_NOT_VERIFIED", from: "b@najd.sa", domain: "najd.sa", dns: [], connectPath: null };
+    draw({ onShared: shared });
+    await sendByEmail();
+
+    await waitFor(() => expect(shared).toHaveBeenCalled());
+    const [, , outcome] = shared.mock.calls[0];
+    expect(outcome).toMatchObject({ handedOff: true });
+    expect(outcome.mail).toBeUndefined();
+  });
+
+  it("says the browser left for WhatsApp, which is its own window", async () => {
+    draw({ onShared: shared });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.whatsapp));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(shared).toHaveBeenCalled());
+    expect(shared.mock.calls[0][2]).toMatchObject({ handedOff: true });
   });
 });
