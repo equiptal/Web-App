@@ -2,6 +2,101 @@
 
 ## Change log
 
+- **2026-09-08 - The catalogue note takes the hint's place, and «chosen for you» is ORANGE.**
+  Owner: *"«This name is what your supplier will see on the bid form» — remove this and put the note
+  in its place"*, and *"for the auto selected color use like this token — it lives in prod"* with a
+  screenshot of production's Timing & Hours: an ORANGE label and one thin ORANGE line round the box.
+  (1) The off-catalogue field carried three pieces of text: a hint about what a supplier sees, the
+  «not available yet» note pinned to the LABEL (its placement earlier the same day), and a second
+  copy of that note under the field for phones. The hint is gone - the string with it - and the note
+  is the field's single hint line at every width. The label is the field's name again.
+  (2) The provenance mark was `bg-warn/[0.07] ring-1 ring-warn/45 ring-offset-2`. Two things were
+  wrong against production: `--warn` in this palette is a MUSTARD (#b98a1d), not an orange; and the
+  offset ring floated two pixels off the control with a tint behind it where prod draws one line on
+  the edge. It is `ring-1 ring-brand` now, and the field's LABEL turns `brand-deep` too, which is
+  the half we never had.
+  Files: `src/components/create/Provenance.tsx`, `src/components/create/MachineCard.tsx`,
+  `src/components/create/CertSelect.tsx`, `src/components/Dropdown.tsx`, `src/lib/i18n/{en,ar}.ts`,
+  `tests/unit/{canvas-provenance,custom-equipment-canvas,cert-year-pills}.test.tsx`.
+  ⚠️ The mark is canvas-WIDE: every prefilled field on the create flow moves with it, which is the
+  point - one mark, one colour, the same as the product he compares it against.
+  ⚠️ The LABEL takes `brand-deep` (#c2570f) and never `brand`: orange text on a light ground has to
+  be the dark one to pass AA, and the brand orange is a FILL. The ring is a border, so it keeps
+  `brand`.
+  ⚠️ `custom-equipment-canvas.test.tsx` pinned the note's placement TWICE in one day (a block, then
+  the label, now the hint). It asserts DOM ORDER and a single copy; if the note moves again, that
+  test is the one that says so.
+
+- **2026-09-08 - An unfinished Outlook consent no longer hangs the send in silence.**
+  Owner: *"what if the user clicks Outlook and send and didn't complete his connection with Outlook?
+  It is showing like nothing happened, even the modal of confirming the post on Moedatech didn't
+  appear"*. Two independent silences, and the request is already POSTED before either of them, so
+  the one screen that could have told him said nothing at all.
+  (1) **The consent poll watched one thing, `window.closed`.** A renter who leaves the account
+  chooser open and comes back to this tab never closes it, so `startConnect`'s promise never
+  settled: `await startConnect(...)` inside `send` never returned, nothing after it ran (no mail, no
+  compose window, no tick), and the button sat on «Posting…». It settles three ways now: the window
+  closes (the status decides, as before), the STATUS says connected (the callback landed, so the
+  consent is done whether or not the little window has closed itself, and we close it), or a 120 s
+  deadline passes (answer «not connected», which sends him down the compose path with everything on
+  screen intact). `mailConnectUrl` is also `.catch`ed, since a throw there rejected the whole send.
+  (2) **A blocked compose window reports success.** `openEmailCompose` opens with `noopener`, and a
+  window opened that way returns NO handle - so a pop-up the browser silently refused is
+  indistinguishable from one that opened, and the panel reports `handedOff: true` either way.
+  `ShareOnPost` then waited for a `focus` / `visibilitychange` that could never come. There is a
+  2.5 s floor under the wait now: it calls the SAME `tell`, which still refuses while this tab is
+  hidden, so it fires only when nothing actually took the screen.
+  Files: `src/components/share/ShareRequestPanel.tsx` (`startConnect`, `CONNECT_WAIT_MS`),
+  `src/components/create/ShareOnPost.tsx` (`TELL_ANYWAY_MS`),
+  `tests/unit/{share-request-panel,posted-confirmation}.test.tsx` (5 cases).
+  🔴 **The window is NOT closed on the deadline.** He may still be typing a password into it, and
+  shutting it under him is worse than the wait. It closes itself when consent lands
+  (`/mail-connected`); until then it is his.
+  ⚠️ The deadline sets NO note. «Denied» would be a claim about a decision he has not made, with
+  the window still open in front of him.
+  ⚠️ The floor is not a race with the compose tab: a window that really opened takes focus long
+  before 2.5 s, and `tell` refuses while this tab is hidden. Verified the deadline test is real by
+  raising `CONNECT_WAIT_MS` and watching it fail with the original hang.
+
+- **2026-09-08 - One dialog after a post, and a moved pin gets a project of its own.**
+  Owner: *"if he changed the location more than 100 m then a new project, if he kept it it will be
+  filed under the existing one, and always a modal is shown"*, then *"but we have now 2 competing
+  modals, one for the post request success and one for the project, i dont know how to show the 2
+  modals without distracting or overwhelming him"*, then *"reduce the text, remove the «sent to» etc,
+  just keep the title"*.
+  Two faults and one design answer.
+  (1) **The gate read the wrong thing.** `CreateSurface` drew `ProjectFiled` on
+  `!state.draft.projectId`, and the draft KEEPS the site's id after the renter moves the pin off it -
+  `filingFor` is what drops it AT THE WIRE, on `leftTheSite`. So a renter who started at one site and
+  moved the pin 400 km posted a request belonging to nothing, and nothing mounted to say so or to
+  give him the project at the new place. The gate now asks the same helper the submit asks
+  (`filingFor(state.project, state.draft).projectId`), so the dialog appears exactly when the request
+  left unfiled, whatever the reason.
+  (2) **Two dialogs for one press.** `ProjectFiled` is HEADLESS now: it does the write on mount,
+  hands the site up through `onFiled`, and renders null. `ShareOnPost` draws it as a two-line block
+  inside the post tick, with «View the project» as the secondary button above «Keep sharing».
+  (3) **The tick lost three lines.** «It is live on Moedatech now, and shared with 1 supplier»,
+  «Sent from ... to N suppliers» and «A copy is in your Sent folder» all went: the title states both
+  facts, and the rest was the same news in smaller type. `postedLive*` survives for a channel we did
+  not send through, where nothing else says anything.
+  Files: `src/components/CreateSurface.tsx`, `src/components/create/ProjectFiled.tsx`,
+  `src/components/create/ShareOnPost.tsx`, `src/lib/i18n/{en,ar}.ts`,
+  `tests/unit/{posted-confirmation,project-filed-hold,project-filed-placement}.test.*`.
+  🔴 **`ProjectFiled` must stay mounted OUTSIDE the tick.** The filing happens on mount and the tick
+  opens a moment later, when the share has been handed off, so moving the write inside the dialog
+  would mean a renter who closes the tab in between ends up with a request filed under nothing -
+  which is the silent bug that component exists to fix. That is why it renders null rather than
+  simply moving. `hold` / `onAnnouncing` / `minted` / `toldHim` are gone with the queue they served.
+  ⚠️ **The block can arrive AFTER the tick is open.** Filing is two round trips. That is the trade
+  for one dialog instead of two, and it is the right way round: the tick answers the button he
+  pressed, the project is the consequence.
+  ⚠️ **The pen went with the dialog.** Editing the site's name, dates and terms is the ordinary
+  project form on the project's own page, one press away through «View the project». A form opened
+  over the top of the tick would be a dialog over a dialog.
+  ⚠️ `wherePanel.unfiledNote` was reworded. ~~"...so this request will not be part of it. Move the
+  pin back to file it there."~~ read as «otherwise it is filed under nothing», which stopped being
+  true: it now says the request gets a project of its own.
+
 - **2026-09-08 - A request with no catalogue match stops naming a marketplace that cannot see it.**
   Owner: *"for requests that have undefined taxonomy (custom equipment type) we will remove
   Moedatech from the confirmation, we will remove it from the icons list in the share, we will

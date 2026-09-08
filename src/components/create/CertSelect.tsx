@@ -105,7 +105,7 @@ export function CertSelect({
         /* The provenance ring, exactly as `CanvasField` draws it — one mark for «chosen for you»
            across the whole canvas. `ring-offset` is the navy photo here rather than `surface2`, so
            the offset is transparent and the ring reads against whatever is behind the pill. */
-        preselected && "rounded-sm ring-1 ring-warn/70 ring-offset-2 ring-offset-transparent",
+        preselected && "rounded-sm ring-1 ring-brand",
       )}
     >
       <button

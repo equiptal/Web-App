@@ -40,7 +40,10 @@ const card = (opts: Parameters<typeof renderCanvas>[1] = {}) =>
   );
 
 /** Controls ringed amber — the mark for "this was chosen for you", now the only one. */
-const ringed = (): number => document.querySelectorAll(".ring-warn\\/45").length;
+/* The provenance mark is one thin line in the BRAND orange, as production draws it round a
+   prefilled field. It was `ring-warn/45` with a tint and a 2px offset until 2026-09-08, when the
+   owner pointed at prod: `--warn` in this palette is a mustard, not an orange. */
+const ringed = (): number => document.querySelectorAll(".ring-brand").length;
 
 describe("provenance marks (MREQ-AC-57/58/59)", () => {
   /**

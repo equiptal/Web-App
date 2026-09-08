@@ -122,8 +122,17 @@ export function CanvasField({
   return (
     <div className={`min-w-0 ${shake ? "shake-error" : ""}`}>
       <div
+        /* ── A chosen-for-you field wears its name in ORANGE (owner, 2026-09-08) ───────────
+           Production marks a prefilled field on two edges at once: the label in orange and a thin
+           orange line round the box (his screenshot of «Rental basis», «Hours per day», «Working
+           days per week»). We had the box and not the label, so the mark was quieter here than in
+           the product he is comparing it with.
+
+           `brand-deep` rather than `brand`: orange TEXT on a light ground has to be #c2570f to pass
+           AA, and the brand orange is a FILL colour — the rule the token file states and
+           `palette-drift` enforces. */
         className={`mb-2 flex items-center gap-1.5 text-label font-semibold uppercase leading-tight tracking-[0.05em] ${
-          required ? "text-danger" : missing ? "text-brand" : "text-muted"
+          required ? "text-danger" : missing ? "text-brand" : isSystemChosen(source) ? "text-brand-deep" : "text-muted"
         }`}
       >
         {icon}
@@ -154,7 +163,13 @@ export function CanvasField({
           required
             ? "rounded-sm ring-1 ring-danger ring-offset-2 ring-offset-surface2"
             : isSystemChosen(source)
-              ? "rounded-sm bg-warn/[0.07] ring-1 ring-warn/45 ring-offset-2 ring-offset-surface2"
+              /* ── The prod mark: a line ON the box, in the brand orange (owner, 2026-09-08) ───
+                 ~~`bg-warn/[0.07] ring-warn/45 ring-offset-2`.~~ Two things were wrong with it
+                 against the product: `--warn` in this palette is a MUSTARD (#b98a1d), not an
+                 orange, so the mark read as a different colour from prod’s; and the offset ring
+                 floated two pixels off the control with a tint behind it, where prod draws one thin
+                 line on the edge and nothing else. */
+              ? "rounded-sm ring-1 ring-brand"
               : undefined
         }
       >

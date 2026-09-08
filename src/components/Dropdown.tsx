@@ -242,7 +242,7 @@ export function Dropdown({
         /* The provenance ring — «this was chosen for you», the same mark `CanvasField` puts around a
            prefilled control (owner, 2026-09-08). Offset against whatever is behind, because on the
            machine card this pill sits over the photo rather than on the panel. */
-        preselected && "rounded-sm ring-1 ring-warn/70 ring-offset-2 ring-offset-transparent",
+        preselected && "rounded-sm ring-1 ring-brand",
       )}
     >
       <button

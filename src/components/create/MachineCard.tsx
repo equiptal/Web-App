@@ -416,31 +416,30 @@ export function MachineCard({
               {custom && (
                 <div className="border-t border-warn/30 pt-3 sm:col-span-3">
                   <CanvasField
-                    /* ── The notice rides the LABEL (owner, 2026-09-08) ──────────────────────────
-                       ~~A `Notice` block under the box.~~ Three lines of furniture for one sentence
-                       the renter reads once, pushing the logistics row below the fold. Beside the
-                       title it is a footnote to the field it belongs to, which is what it always
-                       was. The star is written out here rather than passed as `star`, because that
-                       prop renders it after the whole label — which is now the sentence too.
+                    /* ── The note sits where the hint was (owner, 2026-09-08, second pass) ──────
+                       *"«This name is what your supplier will see on the bid form» — remove this and
+                       put the note in its place."*
 
-                       Hidden below `sm` and repeated under the field there: the label row does not
-                       wrap, and a phone cannot fit «EQUIPMENT NAME *» and a sentence on one line —
-                       truncating THIS sentence would cut exactly the half that says he can still
-                       post. */
-                    label={
-                      <>
-                        {t.create.machineCard.customEquipment}
-                        <span className="ms-0.5 font-extrabold text-danger">*</span>
-                        <span className="ms-2 hidden min-w-0 items-center gap-1 truncate font-semibold normal-case tracking-normal text-warn sm:inline-flex">
-                          <Icon name="warning" size={13} className="flex-none" />
-                          {t.create.machineCard.notInCatalogueNote}
-                        </span>
-                      </>
-                    }
+                       ~~The hint under the box, plus the notice pinned to the label and repeated
+                       under the field on a phone.~~ Three pieces of text around one input, two of
+                       them saying the same thing at two breakpoints, and the third explaining
+                       something the renter can see for himself the moment a supplier reads it.
+
+                       So: the label is the field’s name again, and the note is the single line under
+                       the box — the slot this field already had for a line of guidance, which is
+                       where a reader looks for one. One copy at every width, no duplication to keep
+                       in step. */
+                    label={t.create.machineCard.customEquipment}
+                    star
                     missing={gapFor("custom_equipment")}
                     shake={shake("custom_equipment")}
                     required={owed("custom_equipment")}
-                    hint={t.create.machineCard.customEquipmentHint}
+                    hint={
+                      <span className="flex items-start gap-1 text-warn">
+                        <Icon name="warning" size={13} className="mt-px flex-none" />
+                        {t.create.machineCard.notInCatalogueNote}
+                      </span>
+                    }
                   >
                     <TextInput
                       value={item.customEquipment ?? item.rawLabel ?? ""}
@@ -449,11 +448,6 @@ export function MachineCard({
                       onChange={(e) => set("custom_equipment", { customEquipment: e.target.value })}
                     />
                   </CanvasField>
-                  {/* The phone's copy of the notice — see the label above. */}
-                  <p className="mt-1.5 flex items-start gap-1 text-label leading-snug text-warn sm:hidden">
-                    <Icon name="warning" size={13} className="mt-px flex-none" />
-                    {t.create.machineCard.notInCatalogueNote}
-                  </p>
                 </div>
               )}
             </div>

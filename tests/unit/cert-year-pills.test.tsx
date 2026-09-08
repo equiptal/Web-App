@@ -31,7 +31,9 @@ const box = () => trigger().parentElement!;
 
 afterEach(cleanup);
 
-const RING = "ring-warn/70";
+/* The provenance mark: one thin line in the BRAND orange, as production draws it — it was
+   `ring-warn/70` with an offset until 2026-09-08, and `--warn` in this palette is a mustard. */
+const RING = "ring-brand";
 
 describe("the certificate pill", () => {
   it("asks, in sentence case, when nothing is set", () => {

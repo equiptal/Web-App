@@ -361,8 +361,6 @@ export const en = {
       postedTitleFrom: "Your request is posted to Moedatech and shared from {from}",
       /* No marketplace to name on an off-catalogue request: nothing there can bid on it. */
       postedTitleFromOnly: "Your request is shared from {from}",
-      /* A clause, not a sentence: it is joined to the send line with a comma. */
-      mailCopyInSent: "a copy is in your Sent folder in Outlook",
       postedLive: "It is live on Moedatech now",
       postedLiveOne: "It is live on Moedatech now, and shared with 1 supplier",
       postedLiveMany: "It is live on Moedatech now, and shared with {n} suppliers",
@@ -2388,7 +2386,6 @@ export const en = {
       // from what he wrote in the RFQ, so the ordinary case is a glance.
       customEquipment: "EQUIPMENT NAME",
       customEquipmentPlaceholder: "Name the machine you need",
-      customEquipmentHint: "This name is what your supplier will see on the bid form",
       // Small and quiet: it is the way to get the machine into the catalogue, not the way out of the
       // request. Named for what it does, not for the app it opens (owner, 2026-09-06).
       unavailableWhatsapp: "Message us",
@@ -2427,7 +2424,12 @@ export const en = {
     },
     wherePanel: {
       unfiledShort: "different location: not in the project",
-      unfiledNote: "This is a different place from {project}, so this request will not be part of it. Move the pin back to file it there.",
+      /* ── It no longer ends nowhere (owner, 2026-09-08) ─────────────────────────────────────
+         ~~"...so this request will not be part of it. Move the pin back to file it there."~~ That
+         second sentence read as «otherwise it is filed under nothing», which was true until the
+         post began filing a moved request under a project of its own. Saying the outcome is the
+         point: he is not losing a project, he is starting a second one. */
+      unfiledNote: "This is a different place from {project}, so it gets a project of its own. Move the pin back to keep it in {project}",
       searchPlaceholder: "Search a place, or paste a Maps link / coordinates",
       dragHint: "Drag the map, or drop a pin where the machine goes",
       confirm: "This is the right spot",
@@ -2630,7 +2632,9 @@ export const en = {
     fCr: "CR number",
     removeRow: "Remove this row",
     markAll: "Mark them all as vendor registered",
-    markAllHint: "On by default: untick any row above to add that one as a contact only.",
+    /* Off by default now (owner, 2026-09-08), so the hint names the press that MARKS rather than
+       the press that undoes it. */
+    markAllHint: "Tick this to mark every row above as a vendor you have registered",
     /* «My» is the whole distinction from the button beside it (owner, 2026-09-03). Both add
        suppliers; one picks a firm off Moedatech, this one takes the renter's own contacts. */
     addSupplier: "Add my suppliers",
@@ -2738,6 +2742,14 @@ export const en = {
     saveFailed: "That did not save. Nothing changed.",
     edit: "Edit",
     remove: "Remove",
+    removeAction: "Remove",
+    pickToRemove: "Tick the suppliers to remove from your list",
+    nSelectedToRemove: "{n} selected to remove",
+    removeConfirmOne: "Remove 1 supplier",
+    removeConfirmMany: "Remove {n} suppliers",
+    removedOne: "1 supplier removed from your list",
+    removedMany: "{n} suppliers removed from your list",
+    removedSome: "{n} removed, {failed} could not be",
     removeTitle: "Remove from my suppliers",
     removeBody: "This removes your link, your vendor flag and your groups. Their Moedatech account, their store and the bids they already sent you are untouched.",
     removed: "{name} removed",
@@ -2772,6 +2784,7 @@ export const en = {
     modeApp: "From Moedatech",
     appSearch: "Search by name",
     dirCount: "Showing {shown} of {total}",
+    dirShowAll: "Show all",
     dirPage: "{page} of {of}",
     prev: "Previous",
     next: "Next",
@@ -2830,7 +2843,7 @@ export const en = {
     columnN: "Column {n}",
     preview: "Preview",
     skippedRows: "{n} rows will be skipped. They have no company name, or no email and no phone.",
-    markAllPreviewHint: "On by default: untick any row in the preview to import that one as a contact only.",
+    markAllPreviewHint: "Tick this to mark every row in the preview as a vendor you have registered",
     startOver: "Start over",
     importN: "Import {n} suppliers",
     importNone: "Import",
