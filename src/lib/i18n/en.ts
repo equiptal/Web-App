@@ -1654,7 +1654,7 @@ export const en = {
        then find nothing here. The filter panel says how many are being held and lets him see them;
        the empty state says the same thing where it matters most. */
     filters: "Filters",
-    sizeLargerToggle: "Show bids with larger equipment",
+    sizeLargerToggle: "Show bids with larger size",
     sizeLargerHeldOne: "{n} bid offers a larger size",
     sizeLargerHeldMany: "{n} bids offer a larger size",
     sizeLargerNoneHeld: "Every bid here offers the size you asked for",

@@ -1402,7 +1402,7 @@ export const ar: Dictionary = {
     sourceOffline: "خارج التطبيق",
     // العروض بمعدات أكبر: الخادم يحجبها ما لم تطلبها القائمة، فاللوحة تقول كم منها محجوب وتعرضها.
     filters: "التصفية",
-    sizeLargerToggle: "عرض العروض بمعدات أكبر",
+    sizeLargerToggle: "عرض العروض بمقاس أكبر",
     sizeLargerHeldOne: "{n} عرض بمقاس أكبر",
     sizeLargerHeldMany: "{n} عروض بمقاس أكبر",
     sizeLargerNoneHeld: "كل العروض هنا بالمقاس المطلوب",

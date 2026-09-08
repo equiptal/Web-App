@@ -67,7 +67,7 @@ describe("BidSizeFilter", () => {
     const onChange = draw(false, 1);
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     expect(screen.getByText("1 bid offers a larger size")).toBeTruthy();
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("switch"));
     expect(onChange).toHaveBeenCalledWith(true);
   });
 
@@ -81,7 +81,7 @@ describe("BidSizeFilter", () => {
     const onChange = draw(true, 3);
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     expect(screen.getByText("3 bids offer a larger size")).toBeTruthy();
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("switch"));
     expect(onChange).toHaveBeenCalledWith(false);
   });
 });

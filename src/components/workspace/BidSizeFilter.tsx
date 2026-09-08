@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { fmt, useT } from "@/lib/i18n";
-import { Icon } from "@/components/ui";
+import { Icon, Toggle } from "@/components/ui";
 import { btn, cx, POPOVER } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 
@@ -82,25 +82,27 @@ export function BidSizeFilter({
           aria-label={t.workspace.filters}
           className={cx(POPOVER, "absolute end-0 top-[calc(100%+6px)] w-[290px] p-3")}
         >
-          <label className="flex cursor-pointer items-start gap-2.5">
-            <input
-              type="checkbox"
-              checked={showLarger}
-              onChange={(e) => onChange(e.target.checked)}
-              className="mt-0.5 size-4 flex-none accent-[var(--navy)]"
-            />
-            <span className="min-w-0">
-              <span className="block text-meta font-semibold text-navy">{t.workspace.sizeLargerToggle}</span>
-              {/* What the switch is worth, in this list, right now: the number of bids it reaches.
-                  Zero is said too — otherwise a renter flips it, sees nothing change, and reads the
-                  control as broken rather than as answered. */}
-              <span className="mt-0.5 block text-label text-muted">
-                {largerHeld > 0
-                  ? fmt(largerHeld === 1 ? t.workspace.sizeLargerHeldOne : t.workspace.sizeLargerHeldMany, { n: String(largerHeld) })
-                  : t.workspace.sizeLargerNoneHeld}
+          {/* A SWITCH, and the sentence leads it (owner, 2026-09-08). This is a setting the renter
+              turns on, not one of a set of boxes he ticks — and `Toggle` is the switch this design
+              system already has, so `flex-row-reverse` puts the words first rather than forking it. */}
+          <Toggle
+            checked={showLarger}
+            onChange={onChange}
+            className="w-full flex-row-reverse items-start justify-between gap-3 text-start"
+            label={
+              <span className="min-w-0">
+                <span className="block text-meta font-semibold text-navy">{t.workspace.sizeLargerToggle}</span>
+                {/* What the switch is worth, in this list, right now: the number of bids it reaches.
+                    Zero is said too — otherwise a renter flips it, sees nothing change, and reads the
+                    control as broken rather than as answered. */}
+                <span className="mt-0.5 block text-label text-muted">
+                  {largerHeld > 0
+                    ? fmt(largerHeld === 1 ? t.workspace.sizeLargerHeldOne : t.workspace.sizeLargerHeldMany, { n: String(largerHeld) })
+                    : t.workspace.sizeLargerNoneHeld}
+                </span>
               </span>
-            </span>
-          </label>
+            }
+          />
         </div>
       )}
     </div>
