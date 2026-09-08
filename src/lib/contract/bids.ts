@@ -1330,3 +1330,20 @@ export function mapBidList(raw: unknown): BidCard[] {
   if (!active.length && !expired.length && flat.length) return flat.map((b) => mapBid(b, false));
   return [...active.map((b) => mapBid(b, false)), ...expired.map((b) => mapBid(b, true))];
 }
+
+/** How many bids on a request offer the size asked for, and how many offer a LARGER machine. */
+export type BidSizeCounts = { exact: number; larger: number };
+
+/**
+ * `sizeCounts` off the bid-list envelope (`renteeService.getBidList`).
+ *
+ * ⚠️ Counted BEFORE the size filter is applied, on both sides of it — so `larger` is what the
+ * default `exact` list is holding back, and it stays the same number once the renter asks to see
+ * them. A surface that read it off the returned bids instead would say «0 hidden» in the only state
+ * where the sentence matters.
+ */
+export function bidSizeCounts(raw: unknown): BidSizeCounts {
+  const c = ((raw ?? {}) as Record<string, unknown>).sizeCounts as Record<string, unknown> | undefined;
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
+  return { exact: n(c?.exact), larger: n(c?.larger) };
+}

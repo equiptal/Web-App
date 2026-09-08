@@ -39,6 +39,9 @@ export function BidCards({
   startDate,
   mobByRentee = null,
   demobByRentee = null,
+  largerHeld = 0,
+  showLarger = false,
+  onShowLarger,
   onToggle,
 }: {
   bids: WorkspaceBid[];
@@ -58,16 +61,44 @@ export function BidCards({
    */
   mobByRentee?: boolean | null;
   demobByRentee?: boolean | null;
+  /**
+   * How many bids on this item offer a machine LARGER than the one asked for (`sizeCounts.larger`).
+   * They are dropped by the backend unless the list asks for them, so on an otherwise empty item
+   * this is the difference between «nobody answered» and «somebody answered with a bigger machine».
+   */
+  largerHeld?: number;
+  /** Whether those bids are already being asked for — if they are, this empty state is the truth. */
+  showLarger?: boolean;
+  onShowLarger?: () => void;
   onToggle: (bidId: string) => void;
 }) {
   const t = useT();
 
   if (bids.length === 0) {
+    /* ── «No bids» is a claim, and it can be false (owner, 2026-09-08) ────────────────────────
+       A supplier offering a bigger machine than the renter asked for is answered by dispatch and
+       then hidden here, so the renter gets a notification, opens the item and reads that nothing
+       arrived. The count says otherwise, and the button is the only route to the offer. Nothing is
+       said once the filter is already on: then the item really is empty. */
+    const held = showLarger ? 0 : largerHeld;
     return (
       <div className="grid min-h-[220px] place-items-center px-4 py-12 text-center">
         <div>
           <Icon name="inbox" size={30} className="text-muted" />
           <p className="mt-2 text-body font-semibold text-muted">{t.workspace.noBidsYet}</p>
+          {held > 0 && (
+            <div className="mt-3 inline-flex flex-wrap items-center justify-center gap-2 rounded-md border border-brand/40 bg-brand-soft px-3 py-2">
+              <span className="inline-flex items-center gap-1.5 text-meta font-semibold text-navy">
+                <Icon name="straighten" size={14} className="text-brand-deep" />
+                {fmt(held === 1 ? t.workspace.sizeLargerHeldOne : t.workspace.sizeLargerHeldMany, { n: String(held) })}
+              </span>
+              {onShowLarger && (
+                <button type="button" onClick={onShowLarger} className={btn("secondary", "sm", { className: "transition" })}>
+                  {held === 1 ? t.workspace.showLargerCtaOne : t.workspace.showLargerCtaMany}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );

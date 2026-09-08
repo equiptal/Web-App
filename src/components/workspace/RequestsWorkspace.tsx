@@ -31,6 +31,7 @@ import { ItemTier } from "@/components/workspace/ItemTier";
 import { BidCards } from "@/components/workspace/BidCards";
 import { CompareMatrix } from "@/components/workspace/CompareMatrix";
 import { AiRankPanel } from "@/components/workspace/AiRankPanel";
+import { BidSizeFilter } from "@/components/workspace/BidSizeFilter";
 import { RequestDetailsModal, type ShareLinkMeta } from "@/components/workspace/RequestDetailsModal";
 import { workspaceExportTotals } from "@/lib/contract/workspace-export";
 import { formatSar } from "@/lib/pricing/rental";
@@ -72,6 +73,16 @@ export function RequestsWorkspace() {
   const [wanted, setWanted] = useState<WorkspaceSelection>(EMPTY_SELECTION);
   const [tab, setTab] = useState<Tab>("cards");
   const [source, setSource] = useState<SourceFilter>("all");
+  /* ── Bids offering a LARGER machine (owner, 2026-09-08) ───────────────────────────────────────
+     The backend answers `exact` unless asked otherwise, and `exact` DROPS every bid whose machine
+     is bigger than the one the renter asked for. So this is not a filter over `bids`: it is part of
+     the request for them, and flipping it refetches. `largerHeld` is the envelope's own count,
+     taken before that filter runs, so it says how many such bids exist either way.
+
+     Held at the WORKSPACE, not per item: a renter who asked to see larger machines has answered a
+     question about what he will consider, not about one line of his RFQ. */
+  const [showLarger, setShowLarger] = useState(false);
+  const [largerHeld, setLargerHeld] = useState(0);
   const [reloads, setReloads] = useState(0);
   /* ── The open drawer is a STEP, so it lives in the URL (owner, 2026-09-07) ────────────────────
      *"Back must take the user back to the step he was in, not only the page screen."*
@@ -142,8 +153,9 @@ export function RequestsWorkspace() {
     let live = true;
     setBids([]);
     setSubmissionsByBid({});
+    setLargerHeld(0);
     Promise.all([
-      fetchBids(itemId).catch(() => ({ bids: [] })),
+      fetchBids(itemId, showLarger).catch(() => ({ bids: [], sizeCounts: undefined })),
       fetchRequestSubmissions(itemId).catch(() => ({ submissions: [] as Awaited<ReturnType<typeof fetchRequestSubmissions>>["submissions"] })),
     ]).then(([app, link]) => {
       if (!live) return;
@@ -153,6 +165,8 @@ export function RequestsWorkspace() {
         (sub.items.length ? sub.items : [undefined]).map((it) => ({ bid: { card: submissionToBidCard(sub, it), source: "offline" } as WorkspaceBid, sub })),
       );
       setBids([...app.bids.map((card): WorkspaceBid => ({ card, source: "app" })), ...offline.map((o) => o.bid)]);
+      // What the size filter is worth on this item, whichever way it is currently set.
+      setLargerHeld(app.sizeCounts?.larger ?? 0);
       setSubmissionsByBid(Object.fromEntries(offline.map((o) => [o.bid.card.id, o.sub])));
       // The same call already carries the public bid link's settings; the drawer's share sheet edits
       // them, so keep them rather than throwing them away with the rest of the envelope.
@@ -165,7 +179,7 @@ export function RequestsWorkspace() {
     return () => {
       live = false;
     };
-  }, [status, itemId]);
+  }, [status, itemId, showLarger]);
 
   // The code the list row lacked. One call, keyed on the item, dropped the moment the item changes so
   // a stale code can never sit over the wrong request.
@@ -670,7 +684,7 @@ export function RequestsWorkspace() {
               <button
                 type="button"
                 onClick={() => setBenched(new Set())}
-                className={btn("secondary", "lg", { className: "transition" })}
+                className={btn("secondary", "md", { className: "transition" })}
               >
                 <Icon name="done_all" size={14} /> {fmt(t.workspace.selectAll, { n: String(benched.size) })}
               </button>
@@ -678,11 +692,17 @@ export function RequestsWorkspace() {
             {/* One control, named for what THIS tab exports (owner, 2026-08-26): the cards issue the
                 quotation paper, the comparison issues the table. Both are the exports the app already
                 had; only which one the button reaches changes with the tab. */}
+            {/* ── The export is not the row's main act (owner, 2026-09-08) ─────────────────────
+                It stood at `control-lg`, 44px, the tallest control this design system has and the
+                same height as the tabs beside it, for a paper the renter takes once he is done
+                reading. `control-md` (34px) is what the context bar on the other end of this row
+                wears, so the trailing cluster now matches the leading one and the tabs are the only
+                44px thing on the line, which is right: they are what the row is FOR. */}
             <button
               type="button"
               disabled={shown.length === 0}
               onClick={() => (tab === "compare" ? printComparison() : void downloadQuotation())}
-              className={btn("secondary", "lg", { className: "whitespace-nowrap transition" })}
+              className={btn("secondary", "md", { className: "whitespace-nowrap transition" })}
             >
               {tab === "compare" ? t.workspace.exportComparison : t.workspace.downloadQuotation}
               {/* The count, only once a tick narrows it. Silent while the button means "all of
@@ -694,6 +714,9 @@ export function RequestsWorkspace() {
               )}{" "}
               <Icon name="download" size={14} />
             </button>
+            {/* The size filter, on the same line and at the same height. It narrows nothing already
+                on screen — it changes what the page ASKS the backend for (see `showLarger`). */}
+            <BidSizeFilter showLarger={showLarger} largerHeld={largerHeld} onChange={setShowLarger} />
           </div>
         </div>
 
@@ -785,6 +808,10 @@ export function RequestsWorkspace() {
               // supplier declined to price.
               mobByRentee={item?.mobByRentee ?? null}
               demobByRentee={item?.demobByRentee ?? null}
+              // So «no bids on this item» can say when that is only true of the size he asked for.
+              largerHeld={largerHeld}
+              showLarger={showLarger}
+              onShowLarger={() => setShowLarger(true)}
               onToggle={toggleBid}
             />
           ) : (

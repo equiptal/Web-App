@@ -1648,6 +1648,18 @@ export const en = {
        where bids came from — and the renter has been reading it for weeks. Only the BID CARD's own
        line changed; see `sourceOfflineLong`. */
     sourceOffline: "Offline",
+    /* ── Larger-size bids (owner, 2026-09-08) ────────────────────────────────────────────────────
+       A bid offering a machine BIGGER than the one asked for is dropped by the backend unless the
+       list asks for it (`sizeMatch=exact_or_larger`), so the renter can be notified of a bid and
+       then find nothing here. The filter panel says how many are being held and lets him see them;
+       the empty state says the same thing where it matters most. */
+    filters: "Filters",
+    sizeLargerToggle: "Show bids with larger equipment",
+    sizeLargerHeldOne: "{n} bid offers a larger size",
+    sizeLargerHeldMany: "{n} bids offer a larger size",
+    sizeLargerNoneHeld: "Every bid here offers the size you asked for",
+    showLargerCtaOne: "Show it",
+    showLargerCtaMany: "Show them",
     // Empty states.
     emptyTitle: "No requests yet",
     emptyBody: "Create your first request to start getting supplier bids. You'll set up your account when you submit.",

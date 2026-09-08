@@ -1,6 +1,6 @@
 import type { AgentDraft, RfqRequestPayload, Taxonomy } from "@/lib/contract";
 import type { RequestListItem, RequestRecord } from "@/lib/contract/requests";
-import type { BidCard } from "@/lib/contract/bids";
+import type { BidCard, BidSizeCounts } from "@/lib/contract/bids";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import type { CompanyDocsPayload } from "@/lib/contract/company-documents";
 import type { DealRoomView, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
@@ -243,9 +243,16 @@ export function updateRequest(id: string, patch: Record<string, unknown>): Promi
   return postJsonMethod(`/api/me/requests/${encodeURIComponent(id)}`, patch, "PATCH");
 }
 
-/** Bids received on a request (active then expired). */
-export function fetchBids(requestId: string): Promise<{ bids: BidCard[] }> {
-  return getJson<{ bids: BidCard[] }>(`/api/me/requests/${encodeURIComponent(requestId)}/bids`);
+/**
+ * Bids received on a request (active then expired).
+ *
+ * `showLarger` widens the list to bids offering a machine LARGER than the one asked for. The
+ * backend hides those by default, so this is a REFETCH and not a client-side filter — nothing held
+ * locally can reveal a bid that never arrived. `sizeCounts.larger` says how many are being held.
+ */
+export function fetchBids(requestId: string, showLarger = false): Promise<{ bids: BidCard[]; sizeCounts?: BidSizeCounts }> {
+  const qs = showLarger ? "?sizeMatch=exact_or_larger" : "";
+  return getJson<{ bids: BidCard[]; sizeCounts?: BidSizeCounts }>(`/api/me/requests/${encodeURIComponent(requestId)}/bids${qs}`);
 }
 
 /**

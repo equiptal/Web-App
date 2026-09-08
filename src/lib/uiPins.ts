@@ -153,6 +153,7 @@ export const PIN_REGISTRY = {
   "item-tier": { n: "26.3", label: "Item tier — one chip per machine", file: "src/components/workspace/ItemTier.tsx" },
   "request-context": { n: "27", label: "Request context bar (location + item)", file: "src/components/workspace/RequestContextBar.tsx" },
   "request-details": { n: "28", label: "Request details modal", file: "src/components/workspace/RequestDetailsModal.tsx" },
+  "bid-size-filter": { n: "28.5", label: "Bid size filter — include larger equipment", file: "src/components/workspace/BidSizeFilter.tsx" },
   "workspace-bid-cards": { n: "29", label: "Bid cards", file: "src/components/workspace/BidCards.tsx" },
   "bid-card": { n: "29.1", label: "Bid card — one tile", file: "src/components/workspace/BidCards.tsx" },
   "bid-card-header": { n: "29.2", label: "Bid card — header", file: "src/components/workspace/BidCards.tsx" },
