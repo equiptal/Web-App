@@ -18,6 +18,7 @@ import {
   itemFieldKey,
   resolveRef,
   taxName,
+  taxTag,
   type EquipmentItem,
   type FieldSource,
   type Party,
@@ -69,7 +70,7 @@ export function useItemTaxonomy(item: EquipmentItem, taxonomy: Taxonomy) {
        * inherits its parent's, so this reads off whichever is resolved. Falls back to the category's
        * own name for a taxonomy row that carries no tag.
        */
-      tagName: subcategory?.tag ?? category?.tag ?? taxName(category, locale),
+      tagName: taxTag(subcategory?.tag ?? category?.tag, locale) || taxName(category, locale),
       categoryName: taxName(category, locale),
       subtypeName: taxName(subcategory, locale),
       sizeName: taxName(measurement, locale),
