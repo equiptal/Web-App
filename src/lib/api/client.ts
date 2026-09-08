@@ -1314,7 +1314,19 @@ export async function processQuick(input: {
     const res = await fetch("/api/agent/quick", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: input.text, language: input.language, source: "web_rfq" }),
+      /* `language` is read the way `processRfq` reads it — from <html lang> — rather than left to
+         the caller. It was declared on this input and the only caller never passed it, so
+         `JSON.stringify` dropped the key and the fast lane never sent a locale at all: an Arabic
+         renter typing English got English free-text here and Arabic on the job path, for the same
+         sentence. `created_by` is deliberately NOT set here: it comes from the `mt_user` cookie,
+         which only the BFF route can read (see `api/agent/quick/route.ts`). */
+      body: JSON.stringify({
+        message: input.text,
+        language:
+          input.language ??
+          (typeof document !== "undefined" ? document.documentElement.lang : undefined),
+        source: "web_rfq",
+      }),
     });
     if (!res.ok) return { fallback: true, reason: `http_${res.status}` };
     return (await res.json()) as QuickRfqResult;

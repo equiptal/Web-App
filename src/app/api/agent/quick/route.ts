@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { serverEnv } from "@/lib/config/env";
+import { userIdFromRequest } from "@/lib/api/bids-relay";
 
 export const dynamic = "force-dynamic";
 
@@ -27,10 +28,31 @@ export const dynamic = "force-dynamic";
 const TIMEOUT_MS = 8000;
 
 export async function POST(req: Request) {
-  const body = await req.text().catch(() => "");
+  const raw = await req.text().catch(() => "");
 
   if (!serverEnv.mansourUrl) {
     return NextResponse.json({ fallback: true, reason: "not_configured" }, { status: 200 });
+  }
+
+  /* ── `created_by`, stamped here because only this side can read the cookie ──────────────────────
+     This route was an opaque pass-through, so the fast lane sent no `created_by` at all while the
+     job path has stamped it from the `mt_user` cookie for a while. Two consequences, both
+     invisible: every Tier-1 row in the corpus was attributed to the agent's `web-app` default
+     rather than to a renter, and Mansour's per-caller rate limiter keys on `created_by` — so ALL
+     website traffic arriving through this one BFF counted as a single caller and would throttle
+     together under load.
+
+     A parse failure leaves the body untouched rather than dropping the request: the renter's answer
+     matters more than the attribution, and the relay's own fallback still covers a bad body. */
+  let body = raw;
+  const userId = userIdFromRequest(req);
+  if (userId && raw) {
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      body = JSON.stringify({ created_by: userId, ...parsed });
+    } catch {
+      /* not JSON — forward it as-is and let the upstream reject it */
+    }
   }
 
   const controller = new AbortController();

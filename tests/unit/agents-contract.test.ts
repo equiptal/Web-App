@@ -543,24 +543,65 @@ tagWhen("the evidence-only tag", () => {
     expect(handler, "part of the job fingerprint").toMatch(/evidence:\$\{/);
   });
 
+  /* ⚠️ The constant became a BUILDER on 2026-09-08: `EVIDENCE_ONLY_ADDENDUM` →
+     `buildEvidenceOnlyAddendum({ equipmentOnly })`. This guard failed the moment the name moved,
+     which is exactly its job — the rename is only safe because this caught it.
+
+     Why it had to change: the addendum listed `operator_included` as omit-only, and the
+     equipment-only fast lane now FILLS that field from the operator map (owner: *"few default
+     values like operator only"*). The addendum is the LAST thing in the system prompt, so a shared
+     omit-list would have quietly overruled the fast lane's own key list however emphatic it was.
+     This app's PROJECTLESS path — `/rfq/jobs` with `evidence_only: true` — keeps operator omitted. */
   it("the agent only changes behaviour when it is set", () => {
     const service = agentFile(path.join("src", "services", "rfq.service.ts"));
-    // The addendum is conditional, so an absent tag is today's prompt byte for byte. Substrings
-    // rather than a regex: the line contains escaped newlines, and a regex over those is a test
-    // that fails on its own quoting rather than on the code.
+    // Still conditional, so an absent tag is today's prompt byte for byte. Substrings rather than a
+    // regex: the line contains escaped newlines, and a regex over those is a test that fails on its
+    // own quoting rather than on the code.
     expect(service).toContain("evidenceOnly ?");
-    expect(service).toContain("EVIDENCE_ONLY_ADDENDUM : ''");
+    expect(service).toContain("buildEvidenceOnlyAddendum({ equipmentOnly })");
+    expect(service, "an unset tag still contributes nothing").toContain(") : '') +");
   });
 
   it("and it rides the volatile tail, not the cached prefix", () => {
     const service = agentFile(path.join("src", "services", "rfq.service.ts"));
     const tail = service.slice(service.indexOf("const volatileTail"), service.indexOf("const systemBlocks"));
-    expect(tail).toContain("EVIDENCE_ONLY_ADDENDUM");
+    expect(tail).toContain("buildEvidenceOnlyAddendum");
     /* A prefix that differs per caller is a prefix that is never a cache hit, and the instructions
        plus the taxonomy are 26k tokens of it. */
-    expect(service.indexOf("EVIDENCE_ONLY_ADDENDUM", service.indexOf("const volatileTail"))).toBeLessThan(
+    expect(service.indexOf("buildEvidenceOnlyAddendum", service.indexOf("const volatileTail"))).toBeLessThan(
       service.indexOf("cache_control", service.indexOf("const systemBlocks")),
     );
+  });
+
+  /* What the tag means for THIS app's projectless path (agent, 2026-09-08).
+     Owner: *"i want the case where no project to be fast too and be evidence based depend on
+     presence"* with *"make sure no data loss"*. So `evidence_only` stopped being a 22-field omit
+     list and became one rule over every field — which matters here because that list covered only
+     7 of the full contract's 29 HEADER fields, and the header is most of what a projectless
+     request gets back. */
+  it("the tag means presence-based over EVERY field, not a named list", () => {
+    const prompt = agentFile(path.join("src", "constants", "rfq-prompt.ts"));
+    expect(prompt, "it overrides the fill-everything rule by name").toContain('OVERRIDES "EXTRACTION AMBITION"');
+    expect(prompt, "an unstated field is an absent key").toContain("OMIT THE KEY");
+    // The old shape must not creep back: a named list is what left the header uncovered.
+    expect(prompt, "no named-field omit list").not.toContain("'operator_included · '");
+  });
+
+  /* ⚠️ The half that is NOT about omitting. A model told to be brief drops stated values, and this
+     app has no project to recover them from — so the prompt has to name what must always survive.
+     `additional_notes` is the only home an off-enum cert (SASO / CE / ISO) has on the contract. */
+  it("and it forbids DROPPING what the renter stated", () => {
+    const prompt = agentFile(path.join("src", "constants", "rfq-prompt.ts"));
+    expect(prompt).toContain("NOTHING THE RENTER TYPED MAY BE LOST");
+    expect(prompt, "the catch-all is named").toContain('"additional_notes" — the per-item CATCH-ALL');
+    expect(prompt, "and the renter's own size phrase").toContain('"capacity_input_value" and "capacity_match"');
+  });
+
+  /* Mobile sends no tag, so none of the above reaches it — it keeps EXTRACTION AMBITION, which is
+     right for a caller with no project and no work order to fill a silent field from. */
+  it("leaves the fill-everything rule in place for callers without the tag", () => {
+    const prompt = agentFile(path.join("src", "constants", "rfq-prompt.ts"));
+    expect(prompt, "the rule mobile still runs on").toContain("EXTRACTION AMBITION — try to fill EVERY field");
   });
 });
 
