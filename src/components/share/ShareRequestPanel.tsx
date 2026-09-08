@@ -1322,7 +1322,21 @@ export function ShareRequestPanel({
             {rows === null ? (
               <span className="text-meta text-muted">{c.loading}</span>
             ) : rows.length === 0 ? (
-              <span className="text-meta text-muted">{c.noSuppliers}</span>
+              /* ── An empty list is a dead end without this (owner, 2026-09-08) ──────────────────
+                 The «add» control lives in the SEARCH row, and that row is drawn only when there is
+                 something to search — so the renter with no suppliers read «No suppliers on your
+                 list yet» beside a "0 selected" count and had nothing to press. The one screen where
+                 he is choosing recipients is exactly where he notices the list is empty, so the same
+                 dialog My Suppliers uses is offered right here.
+
+                 Sharing still works without it: the link, WhatsApp and «More» never needed a list,
+                 and the sentence says what the list is FOR rather than what is missing. */
+              <span className="flex flex-col items-start gap-2.5 rounded-md border border-dashed border-border-strong px-3.5 py-4">
+                <span className="text-meta text-muted">{c.noSuppliersYet}</span>
+                <button type="button" onClick={() => setAddingSupplier(true)} className={btn("secondary", "sm")}>
+                  <Icon name="add" size={15} /> {t.suppliers.addSupplier}
+                </button>
+              </span>
             ) : (
               <div className="min-h-0 flex-1 overflow-auto rounded-md border border-border lg:max-h-none">
                 <ul>

@@ -285,6 +285,9 @@ export const en = {
       recipients: "Send to my suppliers",
       selected: "{n} selected",
       noSuppliers: "No suppliers on your list yet.",
+      /* The empty state's own sentence: what the list DOES, so the offer beside it reads as worth
+         taking. The bare «none yet» above is still used where there is no room for a control. */
+      noSuppliersYet: "Add the firms you rent from and you can send this request to them in one press",
       noEmail: "no e-mail",
       addEmail: "Add e-mail",
       addPhone: "Add phone",
@@ -2720,7 +2723,7 @@ export const en = {
     appFailed: "That did not save. Nothing was added.",
     modeType: "Type them in",
     modeFile: "Upload a list",
-    importHint: "A CSV with a header row: company, contact, e-mail, phone.",
+    importHint: "Excel (.xlsx) or CSV, with a header row: company, contact, e-mail, phone.",
     previewImport: "Check the file first",
     planning: "Checking…",
     planLine: "{created} will be added · {merged} will merge into a supplier you already have · {rejected} refused",
@@ -2741,7 +2744,7 @@ export const en = {
     pastePlaceholder: "Company\tContact\tE-mail\tMobile\nZahid Tractor\tFaisal\tt@z.sa\t0551234567",
     pasteHint: "Select the rows in Excel, including the header row, and paste them here.",
     or: "or",
-    chooseCsv: "Choose a CSV file",
+    chooseCsv: "Choose a file",
     importUnreadable: "We could not read that. It needs a header row and at least one row under it.",
     importTooBig: "That file is over 2 MB. Split it and import the parts.",
     pastedRows: "Pasted rows",
@@ -2775,7 +2778,12 @@ export const en = {
     suggestedOnApp: "on Moedatech",
     addToMySuppliers: "Add to my suppliers",
     dismiss: "Dismiss",
-    xlsxNotRead: "Excel files are not read directly. Open it, select the rows including the header, and paste them above, or save it as CSV.",
+    xlsxNotRead: "That format isn't read. Open it and save as .xlsx or CSV, then choose that file",
+    xlsxUnreadable: "That file couldn't be read as an Excel workbook. It may be renamed, or saved in another format",
+    phonesNormalized: "Phone numbers are shown as they will be saved (+966…)",
+    phoneTruncated: "One or more phone numbers were shortened by Excel when this file was saved as CSV (9.66503E+11), so the digits are gone. Upload the .xlsx instead, or format the phone column as text in Excel and save again",
+    rPhoneTruncated: "the phone was shortened by Excel",
+    rPhoneUnreadable: "the phone couldn't be read",
   },
 };
 

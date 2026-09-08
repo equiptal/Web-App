@@ -2293,3 +2293,38 @@ describe("what the caller is told", () => {
     expect(shared).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * ⚠️ An EMPTY supplier list used to be a dead end (owner, 2026-09-08).
+ *
+ * «Add» lives in the search row, and the search row is drawn only when there is something to search
+ * — so the renter with no suppliers read «No suppliers on your list yet» beside a 0-selected count
+ * and had nothing to press, on the one screen where he is choosing recipients.
+ */
+describe("an empty supplier list offers the way out of it", () => {
+  beforeEach(() => {
+    api.rows = [];
+  });
+
+  it("Given no suppliers, Then the list says what it is FOR and offers Add", async () => {
+    draw();
+    expect(await screen.findByText(c.noSuppliersYet)).toBeTruthy();
+    const add = screen.getAllByText(en.suppliers.addSupplier).map((n) => n.closest("button")).filter(Boolean);
+    expect(add.length).toBeGreaterThan(0);
+  });
+
+  it("Given Add is pressed, Then the same dialog My Suppliers uses opens", async () => {
+    draw();
+    await screen.findByText(c.noSuppliersYet);
+    fireEvent.click(screen.getAllByText(en.suppliers.addSupplier)[0].closest("button")!);
+    // The dialog, not a second form of this panel's own.
+    expect(document.querySelectorAll('[role="dialog"]').length).toBeGreaterThan(0);
+  });
+
+  it("Given no suppliers, Then sharing the LINK is untouched — it never needed a list", async () => {
+    draw();
+    await screen.findByText(c.noSuppliersYet);
+    // The link half of the panel: its own heading is drawn whatever the supplier list holds.
+    expect(screen.getByText(c.expiry)).toBeTruthy();
+  });
+});

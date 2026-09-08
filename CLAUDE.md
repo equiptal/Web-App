@@ -2,6 +2,56 @@
 
 ## Change log
 
+- **2026-09-08 - An empty supplier list on the share panel offers the way out of itself.**
+  Owner: *"make option to add suppliers here when empty"*. «Add» lives in the SEARCH row, and that
+  row is drawn only when there is something to search (`{!!rows?.length && …}`) - so a renter with no
+  suppliers read «No suppliers on your list yet» beside a «0 selected» count, on the one screen where
+  he is choosing recipients, with nothing to press. The empty state is now a dashed block carrying a
+  sentence about what the list is FOR and an «Add a supplier» button that opens
+  `AddSuppliersDialog`, the same dialog My Suppliers uses; its `onAdded` already reloads the list, so
+  the row appears behind the closing dialog and the search row arrives with it.
+  Files: `src/components/share/ShareRequestPanel.tsx`, `src/lib/i18n/{en,ar}.ts` (`noSuppliersYet`),
+  `tests/unit/share-request-panel.test.tsx` (3 cases).
+  Trap: the old string stays. `postShare.noSuppliers` («No suppliers on your list yet») is still used
+  where there is no room for a control; the empty BLOCK gets its own sentence, because a sentence
+  that only reports a lack reads as a dead end next to a button.
+  ⚠️ Sharing never needed the list: the link, WhatsApp and «More» work with zero suppliers, which is
+  why this is an offer and not a gate. A test pins that the link half is untouched.
+
+- **2026-09-08 - My Suppliers imports a WORKBOOK, and the phone column is normalised on screen.**
+  Owner, on a screenshot of a phone column reading `9.66503E+11` above `503372850`: *"can't we add
+  xlsx?"* and *"normalize the numbers"*. One change, because they are one bug: the import took CSV
+  only, so a renter had to save his workbook as CSV first, and **that step is what destroys the phone
+  numbers** - Excel stores `966503372850` as a NUMBER, displays it as `9.66503E+11` and writes the
+  DISPLAYED text to CSV. The panel then drew that text without comment, the backend's
+  `normalizePhoneE164` could not parse it and stored NULL (correctly: a raw string in `phone_e164` is
+  a key that can never match), and the row was refused for having no contact after the screen had
+  promised it would import.
+  Now: (1) `.xlsx` / `.xlsm` are read directly - `src/lib/contract/xlsx-sheet.ts`, **no dependency**:
+  the ZIP central directory is walked by hand and entries inflate through the platform's own
+  `DecompressionStream("deflate-raw")`, with four XML tags read by regex. (2) Every phone is
+  normalised to E.164 IN THE PREVIEW (`src/lib/contract/phone-normalize.ts`, a mirror of the
+  backend's rules), so the renter reads what will be saved. (3) A cell Excel already truncated is
+  called truncated and names the cure, and the row counts as unreachable - which is what the backend
+  does with it.
+  Files: `src/lib/contract/xlsx-sheet.ts`, `src/lib/contract/phone-normalize.ts`,
+  `src/components/suppliers/SupplierImportPanel.tsx`, `src/lib/i18n/{en,ar}.ts`,
+  `tests/unit/xlsx-import.test.ts`, `tests/unit/supplier-import-panel.test.tsx`.
+  ⚠️ **A truncated number is NOT expanded.** `9.66503E+11` really is 966,503,000,000 - the last six
+  digits were never in the file - so `readScientific` returns `"truncated"` and refuses. It expands
+  only notation that kept all its significant digits (`9.66503372850E+11`). Guessing here would store
+  a plausible wrong phone number, which is worse than a refusal nobody can act on.
+  ⚠️ `importable` (shared with the typed add form) still counts any non-empty phone string, which is
+  right there and wrong for a sheet: «call the office» is non-empty. The panel uses its own
+  `contactable`, which asks whether the phone actually PARSES. If a third surface imports a sheet,
+  reach for that rule, not `importable`.
+  ⚠️ The worksheet is the first by FILE ORDER (`sheet1.xml`), not by tab order - resolving tab order
+  means following `r:id` through `xl/_rels/workbook.xml.rels`, and the two agree in everything Excel
+  writes. A multi-tab workbook read on the wrong tab is visible in the preview, which is why it can
+  stay this way.
+  ⚠️ Number FORMATS are ignored, so a date column arrives as Excel's serial (`45912`). No supplier
+  list keeps a date in a mapped column; such a column rides along under `extra` as the number it is.
+
 - **2026-09-08 - A refused term is SAID, not tinted; and «Ask» is a drawer, not a one-line box.**
   Owner: *"How can TÜV be a conflict and a match at the same time? If he says no, show it like ✗ TUV.
   And if it has an opposite value - not «on rentee», so it will be «on supplier» - show that."* The
