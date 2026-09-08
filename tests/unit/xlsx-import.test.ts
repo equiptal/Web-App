@@ -354,3 +354,38 @@ describe("the sheet from the owner's screenshot", () => {
     expect(rows.map((r) => phoneE164(r.phone))).toEqual(["+966503372850", "+966503372850"]);
   });
 });
+
+/* ── What a workbook made FROM the broken CSV holds ─────────────────────────────────────────────── */
+
+/**
+ * 🔴 **The trap behind "the same issue for xlsx"** (owner, 2026-09-08).
+ *
+ * Open the broken CSV in Excel and save it as `.xlsx`, and the cell no longer holds the text
+ * `9.66503E+11` — Excel has parsed it into the NUMBER 966,503,000,000, which it then displays in
+ * scientific notation again. The reader reads that number correctly, and it normalises to a
+ * perfectly well-formed Saudi mobile: `+966503000000`.
+ *
+ * There is nothing in that value to detect. It is nine digits after the country code, it starts with
+ * a 5, and no rule can tell it apart from a real number — the information that it was ever rounded
+ * died in the CSV. So this test does not assert a refusal, which would be impossible; it PINS the
+ * hazard, so the next person to read this file learns that a workbook is only trustworthy when it is
+ * the ORIGINAL, and that converting the CSV does not undo the damage.
+ */
+describe("a workbook converted from the broken CSV", () => {
+  it("yields a well-formed phone that is quietly the wrong number", async () => {
+    const buf = await zip({
+      "xl/workbook.xml": "<workbook/>",
+      "xl/sharedStrings.xml": poolXml(["COMPANY", "PHONE", "Al-Faisal Contracting Est."]),
+      // What Excel stores after parsing `9.66503E+11` from a CSV: the rounded number itself.
+      "xl/worksheets/sheet1.xml": sheetXml([
+        [{ v: "0", t: "s" }, { v: "1", t: "s" }],
+        [{ v: "2", t: "s" }, { v: "966503000000" }],
+      ]),
+    });
+    const out = await readXlsxSheet(buf);
+    if (typeof out === "string") throw new Error(out);
+    expect(out.rows[0][1]).toBe("966503000000");
+    // Indistinguishable from a real number, and NOT the supplier's: his is +966503372850.
+    expect(phoneE164(out.rows[0][1])).toBe("+966503000000");
+  });
+});

@@ -165,3 +165,51 @@ describe("unfurl crawlers on a shared bid link", () => {
     expect(res.headers.get("cache-control")).toBeNull();
   });
 });
+
+/* ── A locale-prefixed URL (owner, 2026-09-08: "fix the /en 404") ─────────────────────────────── */
+
+/**
+ * `/en` and `/ar` were a 404 on every environment — beta, staging and production all answered 404
+ * before this, because the language in this app is a stored choice and the routes are bare. They are
+ * asked for anyway: Supplier OS puts the locale in the path, so that shape gets copied here.
+ *
+ * The prefix is now stripped and the language it names rides on as `?lang=`, which the locale
+ * provider consumes once and persists.
+ */
+describe("the locale prefix", () => {
+  beforeEach(() => { delete process.env[FLAG]; });
+  afterEach(() => { delete process.env[FLAG]; });
+
+  const location = (path: string) => middleware(req(path)).headers.get("location") ?? "";
+
+  it("takes /en and /ar to the page itself, naming the language", () => {
+    expect(location("/en")).toBe("http://localhost/?lang=en");
+    expect(location("/ar")).toBe("http://localhost/?lang=ar");
+  });
+
+  it("keeps the rest of the path", () => {
+    expect(location("/en/requests")).toBe("http://localhost/requests?lang=en");
+    expect(location("/ar/bids/42/equipment")).toBe("http://localhost/bids/42/equipment?lang=ar");
+  });
+
+  it("keeps the query a shared link carries", () => {
+    // `?r=` and `?tab=` are how the workspace names the request being read; dropping them would land
+    // a colleague on a different request from the one he was sent.
+    expect(location("/en/requests?r=abc&tab=compare")).toBe("http://localhost/requests?r=abc&tab=compare&lang=en");
+  });
+
+  it("is a permanent redirect", () => {
+    expect(middleware(req("/en/requests")).status).toBe(308);
+  });
+
+  it("does NOT touch a route that merely begins with those letters", () => {
+    // `startsWith("/en")` would swallow every one of these, which is why the test is a whole segment.
+    for (const p of ["/enterprise", "/en-gb", "/arabia", "/archive"]) {
+      expect(isNext(middleware(req(p))), p).toBe(true);
+    }
+  });
+
+  it("leaves an unknown language alone — it is a 404, not a language", () => {
+    expect(isNext(middleware(req("/fr/requests")))).toBe(true);
+  });
+});

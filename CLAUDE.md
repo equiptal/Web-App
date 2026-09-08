@@ -2,6 +2,37 @@
 
 ## Change log
 
+- **2026-09-08 - `/en` and `/ar` are the page they name, not a 404.**
+  Owner: *"fix the /en 404 on beta"*. It was never a beta regression: this app has no locale SEGMENT
+  (the language is a stored choice, `moedatech.locale`, and the routes are bare), so `/en` 404ed on
+  beta, staging AND production - verified on all three before touching anything. It is asked for
+  anyway, because **Supplier OS puts the locale in the path** (`/en/bid/…`) and that shape gets
+  copied here. The edge now 308s `/en/x` → `/x?lang=en` (query preserved), and `LocaleProvider`
+  reads `?lang` once, persists it as a choice, and strips it from the URL.
+  Files: `src/middleware.ts` (`localePrefix`), `src/lib/i18n/index.tsx`,
+  `tests/unit/middleware.test.ts`, `tests/unit/locale-from-url.test.tsx`.
+  ⚠️ The match is a whole SEGMENT (`/^\/(en|ar)(\/.*)?$/`), never `startsWith("/en")`, which would
+  swallow `/enterprise`. A language we do not have (`/fr/…`) is left to 404: it is not a language,
+  it is a typo, and redirecting it would hide that.
+  ⚠️ `?lang` is STRIPPED after it is read. Left in the URL it rides into every link the renter
+  copies and it out-ranks the language switcher on the next reload - press «عربي» on a page still
+  carrying `?lang=en` and it reverts.
+
+- **2026-09-08 - A truncated phone names the remedy the renter already has.**
+  Owner, on a CSV row still reading `9.66503E+11` and skipped: *"it must normalize it as we
+  discussed, why it is not imported?"* It cannot be normalised and that is arithmetic, not a defect:
+  `9.66503E+11` IS 966,503,000,000, and the six digits that made it `966503372850` were never
+  written to the CSV. The warning now says the sum out loud and points at the two things that do
+  work - type it into the table (every cell is editable) or upload the `.xlsx`, where the number is
+  intact. That row also carried no e-mail, so it has no reachable contact at all, which is the
+  second half of why it is skipped.
+  Files: `src/lib/i18n/{en,ar}.ts`, `tests/unit/xlsx-import.test.ts`.
+  ⚠️ **Converting the broken CSV to `.xlsx` does NOT undo the damage, and hides it.** Excel parses
+  `9.66503E+11` into the rounded NUMBER, so the workbook holds `966503000000`, which normalises to
+  `+966503000000` - nine digits, starts with a 5, indistinguishable from a real Saudi mobile and not
+  the supplier's. Nothing can detect it; only the ORIGINAL workbook is trustworthy. The test pins
+  the hazard rather than asserting a refusal that is impossible.
+
 - **2026-09-08 - The Arabic brand is «معداتك», and «مويداتك» is gone from the repo.**
   Owner: *"do a check for any مويداتك word, it must be معداتك"*. «مويداتك» is the LATIN name
   (Moeda-tech) transliterated back into Arabic, and it had reached 45 places: **12 shipped strings**

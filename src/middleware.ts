@@ -55,6 +55,32 @@ export function isRetiredCompanyRoute(pathname: string): boolean {
   return pathname === "/company" || pathname.startsWith("/company/");
 }
 
+/**
+ * ── A locale-prefixed URL (owner, 2026-09-08: *"fix the /en 404"*) ─────────────────────
+ *
+ * This app has never had a locale SEGMENT — the language is a choice held in `localStorage`
+ * (`moedatech.locale`) and the routes are bare (`/requests`, `/create`) — so `/en` and `/en/requests`
+ * were a 404 on every environment, not a beta regression. Verified across all three before changing
+ * anything: beta, staging and production all answered 404.
+ *
+ * They are asked for anyway, and by people who have every reason to expect them to work: **Supplier
+ * OS puts the locale in the path** (`/en/bid/…`), so a colleague copying that shape, a hand-typed
+ * URL, or anything written against the other product lands here.
+ *
+ * So the prefix is honoured rather than merely un-404ed: it is stripped, and the language it names
+ * rides on as `?lang=`, which is already this app's own convention for saying so in a URL (the
+ * public bid form reads exactly that parameter). Nothing else about the request changes.
+ *
+ * ⚠️ **`/enterprise` must not match `/en`.** The test is the whole segment — `/en` exactly, or
+ * `/en/` followed by the rest — never `startsWith("/en")`, which would swallow every route that
+ * happens to begin with those two letters.
+ */
+export function localePrefix(pathname: string): { locale: "en" | "ar"; rest: string } | null {
+  const m = /^\/(en|ar)(\/.*)?$/.exec(pathname);
+  if (!m) return null;
+  return { locale: m[1] as "en" | "ar", rest: m[2] || "/" };
+}
+
 function safeNext(next: string | null): string {
   // Only allow same-origin relative paths (block protocol-relative `//host`).
   return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
@@ -100,6 +126,18 @@ export function middleware(req: NextRequest) {
     dest.pathname = "/api/auth/handoff";
     dest.search = `?token=${encodeURIComponent(handoff)}`;
     return NextResponse.redirect(dest);
+  }
+
+  /* The locale prefix, before any of the gating below: `/en/requests` is `/requests`, and the
+     language it asks for is carried as `?lang=` (see `localePrefix`). 308 rather than 307 — the app
+     has one canonical URL per page and this is not it — and the existing query survives, since a
+     shared link's parameters mean as much as its path. */
+  const prefixed = localePrefix(pathname);
+  if (prefixed) {
+    const dest = req.nextUrl.clone();
+    dest.pathname = prefixed.rest;
+    dest.searchParams.set("lang", prefixed.locale);
+    return NextResponse.redirect(dest, 308);
   }
 
   // Retired surfaces (docs/requests-workspace-disabled.md). The requests list, both request-detail

@@ -2785,7 +2785,7 @@ export const en = {
     xlsxNotRead: "That format isn't read. Open it and save as .xlsx or CSV, then choose that file",
     xlsxUnreadable: "That file couldn't be read as an Excel workbook. It may be renamed, or saved in another format",
     phonesNormalized: "Phone numbers are shown as they will be saved (+966…)",
-    phoneTruncated: "One or more phone numbers were shortened by Excel when this file was saved as CSV (9.66503E+11), so the digits are gone. Upload the .xlsx instead, or format the phone column as text in Excel and save again",
+    phoneTruncated: "One or more phone numbers were shortened by Excel when this file was saved as CSV (9.66503E+11 is 966,503,000,000, so the last digits are gone from the file). Type the number into the table below, or upload the .xlsx instead, where it is still complete",
     rPhoneTruncated: "the phone was shortened by Excel",
     rPhoneUnreadable: "the phone couldn't be read",
   },
