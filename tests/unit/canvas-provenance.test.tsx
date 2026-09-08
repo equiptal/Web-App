@@ -6,6 +6,12 @@ import { DRAFT_STORAGE_KEY } from "@/lib/store/rfq-store";
 import { itemGaps, transportGaps } from "@/lib/contract";
 import { confirmedProject, makeAgentDraft, makeItem, renderCanvas } from "../setup/canvas";
 
+/* The two overlay pills are addressed by their accessible NAME, and that name is the field’s noun —
+   «Certificate», «Minimum year». Their visible text is an INSTRUCTION while unanswered («Pick
+   certificate»), because a shouted noun on an empty control reads as a label for a value that is not
+   there (owner, 2026-09-08). Read by name, not by the words on the pill, so the copy can change
+   again without touching these. */
+
 /**
  * MREQ-TC-33/34/37/38 — the marks, the Arabic screen, resilience, and what survives a reload.
  *
@@ -16,9 +22,9 @@ import { confirmedProject, makeAgentDraft, makeItem, renderCanvas } from "../set
 
 /** Answer the minimum-year control through the UI, the way a renter would. */
 async function pickYear(handle: Awaited<ReturnType<typeof card>>) {
-  screen.getByRole("combobox", { name: "MINIMUM YEAR" }).click();
+  screen.getByRole("combobox", { name: "Minimum year" }).click();
   await Promise.resolve();
-  const listbox = screen.getByRole("listbox", { name: "MINIMUM YEAR" });
+  const listbox = screen.getByRole("listbox", { name: "Minimum year" });
   listbox.querySelectorAll<HTMLButtonElement>("[role=option]")[0].click();
   void handle;
 }
@@ -73,19 +79,28 @@ describe("provenance marks (MREQ-AC-57/58/59)", () => {
    * The four controls on the machine panel carry no visible label and no note — the prototype colours
    * the chip instead: amber while the renter has not answered, dark once they have. On a photo a
    * small amber caption would be unreadable, so the colour IS the mark there.
+   *
+   * Since 2026-09-08 there is a THIRD state on these two: answered by the AGENT rather than by the
+   * renter, which keeps the dark chip and adds the canvas’s provenance ring. `cert-year-pills.test.tsx`
+   * pins all three.
    */
   it("marks the panel overlays by colour rather than by a note", async () => {
     const handle = await card();
-    const year = screen.getByRole("combobox", { name: "MINIMUM YEAR" });
+    const year = screen.getByRole("combobox", { name: "Minimum year" });
     // The certificate is a multi-select now (owner, 2026-09-01), so it is a listbox opener rather
     // than a combobox — the field has always been an array everywhere else.
-    const cert = screen.getByRole("button", { name: "CERTIFICATE" });
-    expect(year.className).toContain("brand-press");
-    expect(cert.className).toContain("brand-press");
+    const cert = screen.getByRole("button", { name: "Certificate" });
+    /* `bg-brand`, not `brand-press`: the pressed shade (#bd5711) is nearly a brown and read as a
+       filled answer on an EMPTY control (owner, 2026-09-08). `toContain("bg-brand")` would also
+       match `bg-brand-press`, so the second line is what actually pins the change. */
+    expect(year.className).toContain("bg-brand");
+    expect(cert.className).toContain("bg-brand");
+    expect(year.className).not.toContain("brand-press");
+    expect(cert.className).not.toContain("brand-press");
 
     await handle.run(() => pickYear(handle));
 
-    expect(screen.getByRole("combobox", { name: "MINIMUM YEAR" }).className).toContain("navy-deep");
+    expect(screen.getByRole("combobox", { name: "Minimum year" }).className).toContain("navy-deep");
   });
 
   it("never blocks on its own (MREQ-AC-61)", async () => {

@@ -4,6 +4,12 @@ import { MachineCard } from "@/components/create/MachineCard";
 import { equipmentYears, FUEL_TYPES, SAFETY_CERTIFICATES, itemGaps, transportGaps } from "@/lib/contract";
 import { makeAgentDraft, makeItem, renderCanvas } from "../setup/canvas";
 
+/* The two overlay pills are addressed by their accessible NAME, and that name is the field’s noun —
+   «Certificate», «Minimum year». Their visible text is an INSTRUCTION while unanswered («Pick
+   certificate»), because a shouted noun on an empty control reads as a label for a value that is not
+   there (owner, 2026-09-08). Read by name, not by the words on the pill, so the copy can change
+   again without touching these. */
+
 /**
  * MREQ-TC-12/13/14/15/16 — the machine card's controls, and the vocabularies behind them.
  *
@@ -51,7 +57,7 @@ async function open(handle: Awaited<ReturnType<typeof card>>, name: string) {
   if (trigger.getAttribute("aria-expanded") !== "true") {
     await handle.run(() => trigger.click());
   }
-  return screen.getByRole("listbox", name === "CERTIFICATE" ? undefined : { name });
+  return screen.getByRole("listbox", name === "Certificate" ? undefined : { name });
 }
 
 async function close(handle: Awaited<ReturnType<typeof card>>, name: string) {
@@ -84,9 +90,9 @@ describe("the four overlay controls (MREQ-AC-16)", () => {
   it("renders certificate, quantity, fuel and minimum year", async () => {
     await card();
     // A multi-select opener: `button` + aria-haspopup, not a combobox.
-    expect(screen.getByRole("button", { name: "CERTIFICATE" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Certificate" })).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "FUEL" })).toBeTruthy();
-    expect(screen.getByRole("combobox", { name: "MINIMUM YEAR" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Minimum year" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "QUANTITY +" })).toBeTruthy();
   });
 
@@ -123,7 +129,7 @@ describe("option lists come from the contract (MREQ-AC-17/18/19)", () => {
      * way to express (owner, 2026-09-01).
      */
     const handle = await card();
-    const labels = await optionsOf(handle, "MINIMUM YEAR");
+    const labels = await optionsOf(handle, "Minimum year");
     const thisYear = new Date().getFullYear();
 
     expect(labels[0]).toBe("Any year");
@@ -136,7 +142,7 @@ describe("option lists come from the contract (MREQ-AC-17/18/19)", () => {
 
   it("offers the platform's certificates plus an explicit No certificate", async () => {
     const handle = await card();
-    const labels = await optionsOf(handle, "CERTIFICATE");
+    const labels = await optionsOf(handle, "Certificate");
     expect(labels[0]).toBe("No certificate");
     expect(labels.slice(1)).toEqual(["TÜV", "Aramco Certified", "Other"]);
     expect(SAFETY_CERTIFICATES).toEqual(["tuv", "aramco", "other"]);
@@ -151,24 +157,24 @@ describe("option lists come from the contract (MREQ-AC-17/18/19)", () => {
      * wire, and on the bid form where a supplier confirms each cert on its own row.
      */
     const handle = await card();
-    await pick(handle, "CERTIFICATE", "TÜV");
-    await pick(handle, "CERTIFICATE", "Aramco Certified");
+    await pick(handle, "Certificate", "TÜV");
+    await pick(handle, "Certificate", "Aramco Certified");
 
     expect(handle.store().state.draft!.items[0].safetyCertsOverride).toEqual(["tuv", "aramco"]);
   });
 
   it("un-ticks one without losing the other", async () => {
     const handle = await card();
-    await pick(handle, "CERTIFICATE", "TÜV");
-    await pick(handle, "CERTIFICATE", "Aramco Certified");
-    await pick(handle, "CERTIFICATE", "TÜV");
+    await pick(handle, "Certificate", "TÜV");
+    await pick(handle, "Certificate", "Aramco Certified");
+    await pick(handle, "Certificate", "TÜV");
 
     expect(handle.store().state.draft!.items[0].safetyCertsOverride).toEqual(["aramco"]);
   });
 
   it("stores No certificate as an explicit empty list, and records the answer (MREQ-AC-55)", async () => {
     const handle = await card();
-    await pick(handle, "CERTIFICATE", "No certificate");
+    await pick(handle, "Certificate", "No certificate");
 
     const item = handle.store().state.draft!.items[0];
     expect(item.safetyCertsOverride).toEqual([]);
@@ -177,7 +183,7 @@ describe("option lists come from the contract (MREQ-AC-17/18/19)", () => {
 
   it("maps Any year to the literal 'any', which yearOut turns into null (MREQ-AC-55)", async () => {
     const handle = await card();
-    await pick(handle, "MINIMUM YEAR", "Any year");
+    await pick(handle, "Minimum year", "Any year");
     expect(handle.store().state.draft!.items[0].equipmentYear).toBe("any");
   });
 });
@@ -363,7 +369,7 @@ describe("the option list opens where it can be read", () => {
     // 768-tall jsdom viewport; a control at 700 has ~34px below it and 700 above.
     atViewportY(700);
     const handle = await card();
-    const listbox = await open(handle, "MINIMUM YEAR");
+    const listbox = await open(handle, "Minimum year");
     // Above the trigger's own top edge, never below its bottom.
     expect(topOf(listbox)).toBeLessThan(700);
   });
@@ -371,7 +377,7 @@ describe("the option list opens where it can be read", () => {
   it("opens downward when there is room", async () => {
     atViewportY(80);
     const handle = await card();
-    const listbox = await open(handle, "MINIMUM YEAR");
+    const listbox = await open(handle, "Minimum year");
     // Just under the trigger's bottom edge (80 + 34 + a 4px gap).
     expect(topOf(listbox)).toBe(118);
   });
@@ -380,7 +386,7 @@ describe("the option list opens where it can be read", () => {
   it("stays downward when neither side has room", async () => {
     atViewportY(20);
     const handle = await card();
-    const listbox = await open(handle, "MINIMUM YEAR");
+    const listbox = await open(handle, "Minimum year");
     expect(topOf(listbox)).toBe(58);
   });
 });

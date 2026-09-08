@@ -47,6 +47,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@/components/Icon";
+import { cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 
 export interface DropdownOption {
@@ -75,6 +76,7 @@ export function Dropdown({
   searchPlaceholder,
   label,
   tone = "field",
+  preselected = false,
   prefix,
   triggerClass,
   disabled = false,
@@ -94,6 +96,13 @@ export function Dropdown({
    */
   label?: string;
   tone?: DropdownTone;
+  /**
+   * The value came from the agent or a default, not from the renter.
+   *
+   * Draws the canvas’s provenance ring around the trigger. Informational: it says «check this», and
+   * never blocks — `CanvasField` uses the same mark for every other prefilled field on the flow.
+   */
+  preselected?: boolean;
   /**
    * A small constant prefix inside the trigger, e.g. «BASIS monthly» in a value strip.
    *
@@ -217,10 +226,25 @@ export function Dropdown({
           ? "text-inherit hover:text-brand"
         : tone === "overlay"
           ? "bg-[color-mix(in_srgb,var(--navy-deep)_80%,transparent)] px-3 py-2 text-meta font-semibold text-white rounded-sm"
-          : "bg-brand-press px-3 py-2 text-body font-semibold text-white rounded-sm");
+          /* «brand» is the UNANSWERED skin on the machine card’s photo overlay (the year pill), so it
+             takes the palette’s orange rather than its PRESSED shade — `brand-press` (#bd5711) is
+             nearly a brown and read as a filled answer (owner, 2026-09-08). `CertSelect` carries the
+             same pair of skins and the same note. */
+          : "bg-brand px-3 py-2 text-body font-semibold text-white rounded-sm");
 
   return (
-    <div {...pin("search-select")} ref={boxRef} className={`relative ${tone === "pill" ? "inline-flex" : ""}`}>
+    <div
+      {...pin("search-select")}
+      ref={boxRef}
+      className={cx(
+        "relative",
+        tone === "pill" && "inline-flex",
+        /* The provenance ring — «this was chosen for you», the same mark `CanvasField` puts around a
+           prefilled control (owner, 2026-09-08). Offset against whatever is behind, because on the
+           machine card this pill sits over the photo rather than on the panel. */
+        preselected && "rounded-sm ring-1 ring-warn/70 ring-offset-2 ring-offset-transparent",
+      )}
+    >
       <button
         type="button"
         disabled={disabled || options.length === 0}

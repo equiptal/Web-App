@@ -32,6 +32,7 @@ import { pin } from "@/lib/uiPins";
 import {
   equipmentYears,
   isCustomLine,
+  isSystemChosen,
   isTouched,
   FUEL_TYPES,
   type EquipmentItem,
@@ -213,6 +214,15 @@ export function MachineCard({
                   values={overrides.safetyCerts}
                   touched={isTouched(state.draft!, prov.key("safety_certificates"))}
                   tone={gapFor("safety_certificates") ? "brand" : "overlay"}
+                  /* ── Three states, and the middle one was missing (owner, 2026-09-08) ────────
+                     Unanswered → orange, saying «Pick certificate». Answered by the RENTER → the plain
+                     overlay skin. Answered FOR him, by the agent reading his RFQ → the same overlay
+                     skin plus the canvas’s provenance ring, so he can see at a glance which of these
+                     answers are his own. Nothing here blocks: the gate is satisfied by a value from
+                     either hand, which is why an agent-filled cert no longer shakes. */
+                  preselected={isSystemChosen(
+                    prov.itemSource("safety_certificates", overrides.safetyCerts, "safetyCertsOverride", true),
+                  )}
                   onChange={(next) =>
                     set("safety_certificates", {
                       safetyCertsOverride: next,
@@ -290,8 +300,12 @@ export function MachineCard({
                 value={overrides.equipmentYear}
                 placeholder={t.create.machineCard.minYear}
                 searchPlaceholder={t.create.machineCard.minYear}
-                label={t.create.machineCard.minYear}
+                label={t.create.machineCard.minYearName}
                 tone={gapFor("equipment_year") ? "brand" : "overlay"}
+                /* The same three states as the certificate beside it — see the note there. */
+                preselected={isSystemChosen(
+                  prov.itemSource("equipment_year", overrides.equipmentYear, "equipmentYear", true),
+                )}
                 /* Every year from 2010 to now, newest first — the app's own list (`year_stepper.dart`),
                    and `SearchSelect` gives it the same search box the app's sheet has. A draft saved
                    with one of the old bands keeps rendering: the value is carried in so the field

@@ -2324,9 +2324,19 @@ export const en = {
       searchTypes: "Search types…",
       searchSizes: "Search sizes…",
       fuel: "FUEL",
-      minYear: "MINIMUM YEAR",
+      /* ── An ask, not a heading (owner, 2026-09-08) ───────────────────────────────
+         *"If not set at all then show them orange with pick certificate and pick min year, in
+         warning orange and not capitalised."*
+
+         ~~«MINIMUM YEAR» / «CERTIFICATE».~~ Shouted, and a NOUN — which reads as a label for a value
+         that is already there, on a control whose whole point at that moment is that nothing is.
+         The words say what to do now, in the case the rest of the card is written in. */
+      minYear: "Pick min year",
       anyYear: "Any year",
-      cert: "CERTIFICATE",
+      cert: "Pick certificate",
+      /** The field's NAME, for a screen reader and for the sheet's own heading. */
+      certName: "Certificate",
+      minYearName: "Minimum year",
       noCert: "No certificate",
       certOther: "Name the certificate",
       quantity: "QUANTITY",
@@ -2350,7 +2360,7 @@ export const en = {
       // "Not available right now" is the same fact in the renter's terms, and "right now" is honest:
       // the type is being added, not refused.
       notInCatalogueNote:
-        "This equipment type is not available right now, but you can still post and share the link with your suppliers",
+        "This equipment type is not available, but you can still post and share the link with your suppliers",
       // The renter names the machine himself and the request goes out carrying his words. Prefilled
       // from what he wrote in the RFQ, so the ordinary case is a glance.
       customEquipment: "EQUIPMENT NAME",

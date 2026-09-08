@@ -2,6 +2,39 @@
 
 ## Change log
 
+- **2026-09-08 - The certificate and the year pills have three states, and the middle one now shows.**
+  Owner: *"if not set at all then show them orange with pick certificate and pick min year in warning
+  orange and not captilized, then if any value is selected by user or by the agent fine will be
+  filled and not will be shaked when user try to move, and in case the cert or year is selected by
+  agent will show another orange borders around the box to indicate it is preselected same indicator
+  uses in other field requests"*.
+  (1) **Unanswered**: the words were «CERTIFICATE» / «MINIMUM YEAR» - shouted, and a NOUN, which
+  reads as a label for a value that is already there on a control whose point is that nothing is.
+  They are «Pick certificate» / «Pick min year», sentence case, with the field's own noun kept as the
+  `aria-label` (`certName` / `minYearName`) so a screen reader still hears a label.
+  (2) **Answered, by either hand**: nothing to do - `itemWebGaps` has always accepted a value the
+  agent extracted (`item.equipmentYear != null || isTouched(…)`), so an agent-filled pill never
+  shook. Now pinned by a test rather than only by a comment.
+  (3) **Answered FOR him**: `CertSelect` and `Dropdown` take `preselected`, which draws the canvas's
+  own provenance ring - the same `ring-warn` mark `CanvasField` puts on every other prefilled field -
+  so he can see at a glance which answers are his.
+  (4) **The tone**: the unanswered skin was `bg-brand-press` (#bd5711), the PRESSED shade, nearly a
+  brown, and it read as a filled answer. It is `bg-brand` now, the palette's orange and the closest
+  thing in it to what production serves.
+  Files: `src/components/create/CertSelect.tsx`, `src/components/Dropdown.tsx`,
+  `src/components/create/MachineCard.tsx`, `src/lib/i18n/{en,ar}.ts`,
+  `tests/unit/cert-year-pills.test.tsx` (new), `tests/unit/{machine-card,canvas-provenance}.test.tsx`.
+  ⚠️ **The exact production orange is a PALETTE change, not a component one.** Production serves
+  `--brand:#f79009` / `--warn:#d4780a`; this palette (the Supplier OS tokens, 2026-09-04) serves
+  `--brand:#f97316` / `--warn:#b98a1d`. They are one hue step apart and `bg-brand` is as close as a
+  component may get without naming its own colour, which `palette-drift.test.ts` forbids. Changing
+  `--brand` itself would move every button in the product; it needs `globals.css`, `ds-colors.ts` and
+  `docs/design-tokens.md` together, and a decision that the OS palette is no longer the source.
+  ⚠️ The ring's `ring-offset` is TRANSPARENT here, not `surface2` as in `CanvasField`: these two
+  pills sit over the machine photo, and an opaque offset would draw a grey gap around them.
+  ⚠️ Both tests that address these pills read them by their accessible NAME, which is deliberately
+  the field's noun and not the visible text - so the copy can change again without touching them.
+
 - **2026-09-08 - A project row draws the machine's name even when the catalogue has none.**
   Owner: *"some requests items doesnt shown in the project if they were undefined so let it read
   from equipemtn taxonamy of request or the new solumn custom type as free text"*. The backend's
