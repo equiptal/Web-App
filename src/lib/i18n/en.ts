@@ -371,8 +371,12 @@ export const en = {
       confirmPostTitle: "Post this request and e-mail it?",
       confirmSendTitle: "E-mail this request?",
       confirmPostLine: "Your request goes live on Moedatech, where every supplier there can bid on it",
-      confirmMailLine: "It is e-mailed from {from} to these suppliers, each in blind copy",
-      confirmMailLineAnon: "It is e-mailed from your own account to these suppliers, each in blind copy",
+      /* ~~«…, each in blind copy».~~ Dropped from the confirmation (owner, 2026-09-08). It is true and
+         it is plumbing: the renter is being asked to confirm WHO it goes to, and how the addresses
+         ride in the message is a detail he cannot act on at that moment. The Outlook hint below still
+         says it, because there the renter has to paste them into a Bcc field himself. */
+      confirmMailLine: "It is e-mailed from {from} to these suppliers",
+      confirmMailLineAnon: "It is e-mailed from your own account to these suppliers",
       confirmPostedAlready: "It is already live on Moedatech. This only sends the e-mail",
       confirmDoBoth: "Post and send",
       confirmDoSend: "Send",
