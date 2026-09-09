@@ -1013,6 +1013,36 @@ export function ShareRequestPanel({
           reached += reachable.length;
           handedOff = true;
         }
+      } else if (chosen.length > 0 && reachable.length === 0) {
+        /**
+         * 🔴 **Nobody picked has an e-mail address, so there is nothing to send and nothing to
+         * connect for.**
+         *
+         * ~~It fell through to the branch below and posted `renterSupplierIds: []`.~~ The endpoint's
+         * schema demands at least one id, so an empty list is a **400** — not a `sent: false` the
+         * fallback was written for. The branch read that as a failed send and answered by opening a
+         * compose window addressed to nobody, so the renter watched Outlook open and no mail leave.
+         *
+         * Confirmed against a real renter on 2026-09-09: the identical share worked the moment ONE
+         * supplier had an address added, because the array stopped being empty.
+         *
+         * ⚠️ **Stopping here is the honest outcome, not a silent skip.** The request is already
+         * posted, and «N have no e-mail» is on screen above the button before the press and stays
+         * there. Asking him to connect Outlook, or opening a compose window, would both be work in
+         * service of a send that cannot happen.
+         *
+         * 🔴 **`chosen.length > 0` is load-bearing and was missing in the first cut.** Ticking
+         * NOBODY is a different case with an opposite answer: the compose window must open so the
+         * renter addresses it himself (owner, 2026-09-02: *"users can share with this template in
+         * whatsapp or email without choosing from their suppliers fine"*). Guarding on
+         * `reachable.length === 0` alone swallowed that too, and the test written for it caught it.
+         *
+         * ⚠️ The blank pop-up is closed for the same reason the other early exits close it: it was
+         * opened as the first statement of the click to survive the pop-up blocker, so any path that
+         * does not use it has to clean it up or it is left stranded on `about:blank`.
+         */
+        consentWindow?.close();
+        setConfirming(false);
       } else {
       if (connect?.configured && !connect.connected) await startConnect(consentWindow);
 
@@ -2369,8 +2399,12 @@ export function ShareRequestPanel({
             </span>
           </div>
 
-          {/* ⚠️ **The suppliers by NAME, every one of them.** A number is not something he can
-              check, and this is the last screen before his request reaches other firms. */}
+          {/* ⚠️ **The suppliers by ADDRESS, every one of them** (owner, 2026-09-09: *"he must
+              show the suppliers emails that he is sending to not the supplier or company name"*). A
+              number is not something he can check, and neither is a name: what leaves this screen is
+              an address, and «Al Faisal Rentals» does not say whether it is the branch mailbox or a
+              salesman's personal one. The name is the chip's `title`, so the firm is one hover away
+              without standing in for the thing being confirmed. */}
           {reachable.length > 0 && (
             <div className="rounded-md border border-border bg-surface2 p-3">
               <span className="text-label font-semibold uppercase tracking-wide text-muted">
@@ -2380,10 +2414,10 @@ export function ShareRequestPanel({
                 {reachable.map((x) => (
                   <span
                     key={x.id}
-                    title={x.email ?? undefined}
+                    title={x.name}
                     className="inline-flex h-[26px] max-w-full items-center rounded-full border border-border bg-surface px-3 text-meta text-navy"
                   >
-                    <span className="truncate">{x.name}</span>
+                    <span className="truncate">{x.email}</span>
                   </span>
                 ))}
               </div>

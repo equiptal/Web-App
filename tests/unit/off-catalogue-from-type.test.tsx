@@ -21,6 +21,8 @@
  */
 
 import { describe, expect, it, afterEach, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { Dropdown } from "@/components/Dropdown";
 import { LocaleProvider } from "@/lib/i18n";
@@ -171,5 +173,36 @@ describe("the TYPE list's empty state offers the way out", () => {
     fireEvent.change(search(), { target: { value: "   " } });
     expect(screen.queryByText("Add a custom equipment type")).toBeNull();
     expect(onPick).not.toHaveBeenCalled();
+  });
+});
+
+/* ── 3 · the CARD hands it over, whatever the type control already holds ─────────────────────────
+   The owner asked *"for this custom why there is a case i didnt find this option"* over a screenshot
+   of the TYPE list open on a card that already had «Articulating Boom Lift» chosen, searching «wat»,
+   showing «—» and no row.
+
+   Asserted against the SOURCE rather than a render, and deliberately: driving it through the card
+   needs a taxonomy of more than seven subtypes (`Dropdown.searchable`), and the canvas harness's
+   fixture has five — extending a fixture every create suite shares, to reach a rule that is one prop,
+   costs more than it proves. What can go wrong here is the prop being made conditional on a chosen
+   value, and that is exactly what this reads. */
+describe("the card offers it whatever the TYPE control already holds", () => {
+  const src = readFileSync(resolve(process.cwd(), "src/components/create/MachineCard.tsx"), "utf8");
+  /** The TYPE control's own props, from its `value` line to the end of its `onChange`. */
+  const typeControl = src.slice(src.indexOf("value={item.ref.subcategoryId}"), src.indexOf("actions.setItemSubcategory"));
+
+  it("passes `emptyAction` on the TYPE control, gated ONLY by the feature flag", () => {
+    expect(typeControl).toContain("emptyAction=");
+    expect(typeControl).toContain("CUSTOM_EQUIPMENT_ENABLED");
+    // The mutation this catches: withholding the row once a type is chosen, which would take away
+    // the half of the owner's ask that is about EDITING a wrong choice.
+    expect(typeControl).not.toMatch(/emptyAction=\{[^}]*subcategoryId\s*[?&]/);
+  });
+
+  it("keeps it off the SIZE control, which is empty for a different reason", () => {
+    // A size list is empty until a type exists; offering to name a machine there answers a question
+    // nobody asked. The type is where the catalogue actually fails.
+    const sizeControl = src.slice(src.indexOf("value={item.ref.measurementId}"), src.indexOf("actions.setItemMeasurement"));
+    expect(sizeControl).not.toContain("emptyAction=");
   });
 });

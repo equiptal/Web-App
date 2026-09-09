@@ -32,7 +32,7 @@
 
 import { Icon } from "@/components/ui";
 import { cx } from "@/lib/ds";
-import { useT } from "@/lib/i18n";
+import { fmt, useT } from "@/lib/i18n";
 import { pin } from "@/lib/uiPins";
 
 export interface EquipmentTab {
@@ -48,12 +48,23 @@ export function EquipmentTabs({
   activeId,
   onPick,
   onAdd,
+  onRemove,
 }: {
   tabs: readonly EquipmentTab[];
   activeId: string | null;
   onPick: (id: string) => void;
   /** Absent → no + card. The canvas withholds it while this equipment is unanswered. */
   onAdd?: () => void;
+  /**
+   * **Take this equipment off the request** (owner, 2026-09-09: *"in the equipment tabs must have x
+   * button to remove it, also the x is always visible"*).
+   *
+   * Absent → no ✕ at all, which is how the canvas withholds it on a request with ONE equipment: a
+   * request with no equipment cannot be sent (`gate.noItems`), so an ✕ there would offer a press that
+   * only leads to a refusal. The canvas also decides what to do about a removed tab being the OPEN
+   * one, because where to land afterwards is a fact about the canvas's own selection.
+   */
+  onRemove?: (id: string) => void;
 }) {
   const t = useT();
   return (
@@ -80,28 +91,51 @@ export function EquipmentTabs({
       {tabs.map((tab) => {
         const on = tab.id === activeId;
         return (
-          <button
-            key={tab.id}
-            {...pin("equipment-tab")}
-            type="button"
-            role="tab"
-            aria-selected={on}
-            onClick={() => onPick(tab.id)}
-            className={cx(
-              "control-lg relative -mb-px inline-flex max-w-[240px] flex-none items-center gap-2 rounded-t-md border border-border px-3.5 text-meta font-semibold transition-colors",
-              on
-                ? "z-[2] border-b-surface bg-surface text-navy"
-                : "z-[1] bg-surface3/70 text-muted hover:text-navy-mid",
+          /* The tab and its ✕ are SIBLINGS in a wrapper, not one inside the other: a button inside a
+             button is invalid markup, and the browser's own behaviour for it is undefined. The wrapper
+             carries the tab's box; the ✕ sits inside it on the LEADING edge (`start`, so it is on the
+             left in English and mirrors in Arabic), always drawn — never on hover only, which on a
+             touch screen means never. */
+          <span key={tab.id} className="relative -mb-px inline-flex flex-none">
+            <button
+              {...pin("equipment-tab")}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => onPick(tab.id)}
+              className={cx(
+                "control-lg inline-flex max-w-[240px] items-center gap-2 rounded-t-md border border-border text-meta font-semibold transition-colors",
+                // Room for the ✕ on the leading edge, so a long label cannot run under it.
+                onRemove ? "ps-8 pe-3.5" : "px-3.5",
+                on
+                  ? "z-[2] border-b-surface bg-surface text-navy"
+                  : "z-[1] bg-surface3/70 text-muted hover:text-navy-mid",
+              )}
+            >
+              {/* Answered or not, at a glance — the same reading the panel headers give, so the strip
+                  says which equipment still owes something without opening any of them. */}
+              <span
+                aria-hidden="true"
+                className={cx("h-1.5 w-1.5 flex-none rounded-full", tab.complete ? "bg-ok" : "bg-warn")}
+              />
+              <span className="truncate">{tab.label}</span>
+            </button>
+            {onRemove && (
+              <button
+                {...pin("equipment-tab-remove")}
+                type="button"
+                onClick={() => onRemove(tab.id)}
+                aria-label={fmt(t.create.removeEquipment.label, { name: tab.label })}
+                title={fmt(t.create.removeEquipment.label, { name: tab.label })}
+                className={cx(
+                  "absolute start-0 top-1/2 z-[3] ms-1.5 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full transition",
+                  on ? "text-muted hover:bg-danger-soft hover:text-danger" : "text-muted/70 hover:bg-danger-soft hover:text-danger",
+                )}
+              >
+                <Icon name="close" size={13} />
+              </button>
             )}
-          >
-            {/* Answered or not, at a glance — the same reading the panel headers give, so the strip
-                says which equipment still owes something without opening any of them. */}
-            <span
-              aria-hidden="true"
-              className={cx("h-1.5 w-1.5 flex-none rounded-full", tab.complete ? "bg-ok" : "bg-warn")}
-            />
-            <span className="truncate">{tab.label}</span>
-          </button>
+          </span>
         );
       })}
     </div>

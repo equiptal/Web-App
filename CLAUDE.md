@@ -2,6 +2,47 @@
 
 ## Change log
 
+- **2026-09-09 - The send confirmation lists the ADDRESSES the mail goes to, not the firms' names.**
+  Owner: *"when user want to send an outlook email in the confirm modal he must show the suppliers
+  emails that he is sending to not the supplier or company name"*. The Bcc chips printed
+  `supplier.name` with the address hidden in the `title`, so the last screen before a request leaves
+  for other firms confirmed WHO and never WHAT: «Al Faisal Rentals» cannot tell a renter whether the
+  message is going to the branch mailbox or to a salesman's personal one, and a mistyped address in
+  his own supplier list is invisible behind the label he gave it. The chip is the address now and the
+  name is its `title`, so the firm is one hover away.
+  Files: `src/components/share/ShareRequestPanel.tsx`,
+  `tests/unit/share-request-panel.test.tsx` (1 case).
+  ⚠️ Only the CONFIRMATION. The envelope preview on the panel (`MailChips`) already draws the
+  address with the name beside it, and the picking list still shows names, which is what a renter
+  chooses by.
+  ⚠️ Every chip in that block has an address by construction (`reachable = chosen.filter(canBeEmailed)`),
+  so nothing can render blank; the addressless picks are named separately by `envSkipped`.
+  ⚠️ Verified the new case FAILS on the old chip - swapped the two fields back and watched it go
+  red - so it pins the ruling rather than the render.
+
+- **2026-09-09 - An equipment tab carries an ✕, and it asks before it takes the answers with it.**
+  Owner: *"in the equipment tabs must have x button to remove it also the x is always visible on the
+  left"*. The canvas had NO way to take an equipment off a request - `REMOVE_ITEM` existed in the
+  store and nothing called it, so a renter who had added one by mistake, or whose agent read a machine
+  he did not want, could only start the request again. The ✕ sits inside each tab on the LEADING edge
+  (`start-0`, left in English and mirrored in Arabic), drawn always rather than on hover: a hover-only
+  control on a touch screen is a control that does not exist.
+  It ASKS first, one line: «Remove this equipment from the request?» with «Remove» and «Keep it». The
+  answers on that card go with it - the machine, its year, its certificate, its operator, its
+  transport - and `REMOVE_ITEM` is a one-way flag, which is the same bar «Start over» and the
+  Back-to-intake confirm already clear.
+  Files: `src/components/create/EquipmentTabs.tsx` (`onRemove`), `src/components/create/Canvas.tsx`,
+  `src/lib/i18n/{en,ar}.ts` (`create.removeEquipment`), `src/lib/uiPins.ts` (17.7),
+  `tests/unit/canvas-multi-item.test.tsx` (3 cases).
+  ⚠️ **No ✕ on the only equipment.** `gate.noItems` refuses a request with none, so the press would
+  lead nowhere but a refusal. The TAB stays - one equipment is still the request's equipment.
+  ⚠️ Where it lands is worked out BEFORE the removal, because `live` excludes removed items and the
+  list shrinks under the index: removing one before the open card shifts it down by one, removing the
+  open card keeps the index (which lands on the next equipment, or on the new last one).
+  ⚠️ The tab and its ✕ are SIBLINGS in a wrapper, never nested: a button inside a button is invalid
+  markup and no browser agrees on what it does. The tab takes `ps-8` so a long label cannot run under
+  the ✕.
+
 - **2026-09-09 - A TYPE search that finds nothing is where off-catalogue BEGINS.**
   Owner: *"what if i want to add an equipment that is not in the taxonamy, like custom equipment type
   but user didnt write it in the text, he wanted to add it or to edit his chosice of existing one,

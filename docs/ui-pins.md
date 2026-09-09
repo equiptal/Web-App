@@ -64,6 +64,7 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**17.4** | Equipment tabs — the strip | `src/components/create/EquipmentTabs.tsx` |
 | &nbsp;&nbsp;**17.5** | Equipment tabs — one equipment | `src/components/create/EquipmentTabs.tsx` |
 | &nbsp;&nbsp;**17.6** | Equipment tabs — the + that adds one | `src/components/create/EquipmentTabs.tsx` |
+| &nbsp;&nbsp;**17.7** | Equipment tabs — the ✕ that removes one | `src/components/create/EquipmentTabs.tsx` |
 | **18** | Operator rail | `src/components/create/OperatorRail.tsx` |
 | &nbsp;&nbsp;**18.1** | Operator rail — head row | `src/components/create/OperatorRail.tsx` |
 | &nbsp;&nbsp;**18.2** | Operator rail — options grid | `src/components/create/OperatorRail.tsx` |

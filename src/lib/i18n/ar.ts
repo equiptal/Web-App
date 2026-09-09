@@ -1958,6 +1958,12 @@ export const ar: Dictionary = {
     machine: "المعدّة",
     equipmentTabs: { label: "معدّات هذا الطلب" },
     changeForRequest: "تغيير للطلب كله",
+    removeEquipment: {
+      label: "حذف {name}",
+      title: "هل تريد حذف هذه المعدّة من الطلب؟",
+      remove: "حذف",
+      keep: "الإبقاء عليها",
+    },
     operator: "المشغّل",
     operatorRail: "المشغّل",
     where: "وجهة المعدّة",

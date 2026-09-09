@@ -2321,6 +2321,17 @@ export const en = {
        because that is the whole reason those two panels lock: one address and one schedule for every
        equipment on the request. */
     changeForRequest: "Change for the request",
+    /* ── Taking one equipment off the request (owner, 2026-09-09) ──────────────────────────────
+       *"In the equipment tabs must have x button to remove it, also the x is always visible."*
+       `label` is the ✕'s accessible name and its tooltip, so a screen reader hears WHICH equipment
+       the press removes; the dialog is the one-line question, because the answers on that card go
+       with it and nothing brings them back. */
+    removeEquipment: {
+      label: "Remove {name}",
+      title: "Remove this equipment from the request?",
+      remove: "Remove",
+      keep: "Keep it",
+    },
     operator: "The operator",
     operatorRail: "OPERATOR",
     where: "Where it goes",

@@ -136,6 +136,7 @@ export const PIN_REGISTRY = {
   "equipment-tabs": { n: "17.4", label: "Equipment tabs — the strip", file: "src/components/create/EquipmentTabs.tsx" },
   "equipment-tab": { n: "17.5", label: "Equipment tabs — one equipment", file: "src/components/create/EquipmentTabs.tsx" },
   "equipment-tabs-add": { n: "17.6", label: "Equipment tabs — the + that adds one", file: "src/components/create/EquipmentTabs.tsx" },
+  "equipment-tab-remove": { n: "17.7", label: "Equipment tabs — the ✕ that removes one", file: "src/components/create/EquipmentTabs.tsx" },
   "locked-for-request": { n: "16.2", label: "Create — site + schedule locked strip (with «Change»)", file: "src/components/create/Canvas.tsx" },
   "when-panel": { n: "19", label: "When panel (dates)", file: "src/components/create/WhenPanel.tsx" },
   "when-panel-head": { n: "19.1", label: "When panel — head button", file: "src/components/create/WhenPanel.tsx" },

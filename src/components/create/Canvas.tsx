@@ -122,6 +122,17 @@ export function Canvas() {
    * doing that. Leaving the canvas and coming back locks them again, answered.
    */
   const [unlocked, setUnlocked] = useState(false);
+  /**
+   * ── The equipment a tab's ✕ is about to remove (owner, 2026-09-09) ────────────────────────────
+   * *"In the equipment tabs must have x button to remove it."*
+   *
+   * It asks first, and this holds what it is asking about. Removing an equipment takes its answers
+   * with it — the machine, its year, its certificate, its operator, its transport — and nothing
+   * brings them back: `REMOVE_ITEM` is a one-way flag on the item and the card is gone from the
+   * strip the moment it is set. That is the same bar «Start over» and Back-to-intake clear, so it
+   * gets the same one-line question rather than a press that costs work on a mis-tap.
+   */
+  const [removing, setRemoving] = useState<{ id: string; label: string } | null>(null);
 
   /* Every press that opens a panel records it. Declared with the other hooks, above every
      early return: a hook placed after one runs in a different order on the render that takes
@@ -597,6 +608,13 @@ export function Canvas() {
             actions.openSection("equipment");
           }}
           onAdd={equipmentGaps.length === 0 ? addMachine : undefined}
+          /* Withheld on a request with ONE equipment: `gate.noItems` refuses a request with none, so
+             the press would lead nowhere but a refusal. */
+          onRemove={
+            equipmentTabs.length > 1
+              ? (id) => setRemoving({ id, label: equipmentTabs.find((tb) => tb.id === id)?.label ?? "" })
+              : undefined
+          }
         />
       )}
 
@@ -786,6 +804,41 @@ export function Canvas() {
 
           Dismissing it is neither answer: the renter is returned to the canvas, not sent to review.
           A modal whose X means "yes, continue" is a modal that submits a request by being closed. */}
+      {/* ── «Remove this equipment from the request?» ────────────────────────────────────────────
+          One line and two buttons, the shape the leave-the-request confirm already uses: the title IS
+          the question, «Remove» is what the ✕ he pressed meant, and «Keep it» is the way out of a
+          mis-tap. Which equipment is named in the ✕'s own accessible label, so the dialog does not
+          have to repeat it. */}
+      <Modal open={removing != null} onClose={() => setRemoving(null)} title={t.create.removeEquipment.title}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button onClick={() => setRemoving(null)} className={btn("secondary", "md", { className: "transition" })}>
+            {t.create.removeEquipment.keep}
+          </button>
+          <button
+            onClick={() => {
+              const id = removing?.id;
+              setRemoving(null);
+              if (!id) return;
+              /* Where to land, worked out BEFORE the removal: `live` excludes removed items, so the
+                 list shrinks under the index. Removing one BEFORE the open card shifts it down by
+                 one; removing the open card itself keeps the index, which lands on the next
+                 equipment — or on the new last one when it was the last. */
+              const at = live.findIndex((it) => it.id === id);
+              const last = live.length - 2;
+              const to = at < index ? index - 1 : Math.min(index, last);
+              actions.removeItem(id);
+              actions.goItem(Math.max(0, to));
+              // A removal is a change of subject: open the equipment it lands on rather than leaving
+              // the renter on whichever panel happened to be open.
+              actions.openSection("equipment");
+            }}
+            className={btn("danger", "md", { className: "transition" })}
+          >
+            {t.create.removeEquipment.remove}
+          </button>
+        </div>
+      </Modal>
+
       <Modal open={askAddMore} onClose={() => setAskAddMore(false)} title={t.create.addMore.title}>
         <p className="mb-5 text-body leading-relaxed text-muted">{t.create.addMore.body}</p>
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

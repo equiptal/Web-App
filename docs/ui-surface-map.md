@@ -26,7 +26,7 @@ Two things it does not hold, on purpose:
 | `src/components/company/MyCompanyCard.tsx` | 74 My company card (`my-company-card`) |
 | `src/components/create/Canvas.tsx` | 16 Create canvas (3 columns) (`create-canvas`) · 16.2 Create — site + schedule locked strip (with «Change») (`locked-for-request`) |
 | `src/components/create/CreateBack.tsx` | 16.1 Create — «leave this request?» confirm (`create-leave-confirm`) |
-| `src/components/create/EquipmentTabs.tsx` | 17.4 Equipment tabs — the strip (`equipment-tabs`) · 17.5 Equipment tabs — one equipment (`equipment-tab`) · 17.6 Equipment tabs — the + that adds one (`equipment-tabs-add`) |
+| `src/components/create/EquipmentTabs.tsx` | 17.4 Equipment tabs — the strip (`equipment-tabs`) · 17.5 Equipment tabs — one equipment (`equipment-tab`) · 17.6 Equipment tabs — the + that adds one (`equipment-tabs-add`) · 17.7 Equipment tabs — the ✕ that removes one (`equipment-tab-remove`) |
 | `src/components/create/MachineCard.tsx` | 17 Machine card (`machine-card`) · 17.1 Machine card — head row (`machine-card-head`) · 17.2 Machine card — body grid (`machine-card-body`) · 17.3 Machine card — image well (`machine-card-image`) |
 | `src/components/create/OperatorRail.tsx` | 18 Operator rail (`operator-rail`) · 18.1 Operator rail — head row (`operator-rail-head`) · 18.2 Operator rail — options grid (`operator-rail-options`) · 18.3 Operator rail — note block (`operator-rail-note`) · 18.4 Operator rail — closed strip (72px) (`operator-rail-closed`) |
 | `src/components/create/ReadyToSend.tsx` | 21 Create — review & send screen (`ready-to-send`) |

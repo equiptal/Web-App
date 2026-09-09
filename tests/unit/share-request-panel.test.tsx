@@ -1797,6 +1797,27 @@ describe("Send opens the connector itself", () => {
     expect(screen.queryByText(c.confirmPostLine)).toBeNull();
   });
 
+  it("Given the confirmation, Then each supplier is his ADDRESS, not his name", async () => {
+    /**
+     * Owner, 2026-09-09: *"he must show the suppliers emails that he is sending to not the supplier
+     * or company name"*. What leaves this screen is an address, and a firm's name cannot tell him
+     * whether it is the branch mailbox or a salesman's own. The name stays as the chip's `title`.
+     */
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    const dialog = await waitFor(() => document.querySelector('[role="dialog"]') as HTMLElement);
+    const chip = within(dialog).getByText("ops@alfaisal.sa");
+    expect(chip).toBeTruthy();
+    expect(chip.closest("[title]")?.getAttribute("title")).toBe("Al Faisal Rentals");
+    // ⚠️ The name is not printed in the list itself; the row behind the dialog still carries it.
+    expect(within(dialog).queryByText("Al Faisal Rentals")).toBeNull();
+  });
+
   it("Given the CONFIRM press, Then it posts and sends, once", async () => {
     const posted = vi.fn(async () => "new-uuid");
     api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
@@ -2594,5 +2615,93 @@ describe("a consent the renter never finishes", () => {
     await waitFor(() => expect(shared).toHaveBeenCalled());
     // The button is pressable again, not stuck on «Posting…».
     expect(screen.queryByText(c.posting)).toBeNull();
+  });
+});
+
+/**
+ * 🔴 **Nobody picked has an e-mail address.**
+ *
+ * The share posted and then nothing was sent, and the renter watched Outlook open on a message
+ * addressed to no one. Reported by a real renter on 2026-09-09, and it fixed itself the moment ONE
+ * supplier had an address added — which is the tell: the panel posted `renterSupplierIds: []`, the
+ * endpoint's schema demands at least one id, so an empty list is a **400** rather than the
+ * `sent: false` the fallback was written for. The fallback then did what it does for a failed send.
+ *
+ * Send is deliberately never gated on a channel being able to reach anyone, because the press also
+ * POSTS the request. So the fix is not to disable the button, it is to skip the half that cannot
+ * work.
+ */
+describe("nobody picked has an e-mail address", () => {
+  const shared = vi.fn();
+
+  /** Najd has a phone and no address, which is the ordinary shape of a My Suppliers row. */
+  const onlyUnreachable = () => {
+    shared.mockReset();
+    api.rows = [{ id: "2", name: "Najd Equipment Est.", email: null, phone: "+966505556677" }];
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
+  };
+
+  const sendByOutlook = async (name: string) => {
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="share" requestUuid="abc-123" requestCode="EXC-170845" onShared={shared} />
+      </LocaleProvider>,
+    );
+    fireEvent.click(await screen.findByText(name));
+    fireEvent.click(screen.getByText(c.outlook));
+    pressSend();
+    await waitFor(() => expect(shared).toHaveBeenCalled());
+  };
+
+  it("Given nobody reachable, When sent, Then the server is NOT called", async () => {
+    onlyUnreachable();
+    await sendByOutlook("Najd Equipment Est.");
+    // ⚠️ The whole bug: an empty id list is a 400, not a refusal the fallback understands.
+    expect(api.mailCalls).toHaveLength(0);
+  });
+
+  it("Given nobody reachable, When sent, Then no compose window opens either", async () => {
+    // Opening a compose window addressed to nobody is what the renter actually saw, and it reads as
+    // the product losing his message rather than as him having no address on file.
+    onlyUnreachable();
+    await sendByOutlook("Najd Equipment Est.");
+    const composed = opened.mock.calls
+      .map((x) => String(x[0]))
+      .filter((u) => u.startsWith("http") && !u.includes("login.microsoftonline.com"));
+    expect(composed).toHaveLength(0);
+  });
+
+  it("Given nobody reachable, When sent, Then the share is still ANNOUNCED", async () => {
+    // ⚠️ The load-bearing half. Nothing about who is picked may stop the share completing; that
+    // is why Send is not gated in the first place. Skipping the mail must not skip the rest.
+    onlyUnreachable();
+    await sendByOutlook("Najd Equipment Est.");
+    expect(shared).toHaveBeenCalledTimes(1);
+  });
+
+  it("Given ONE reachable among several, When sent, Then it DOES send, to that one", async () => {
+    // The other side of the same line: a partial send is a send. This is what adding one address
+    // did for the renter who reported it.
+    shared.mockReset();
+    api.rows = [
+      { id: "1", name: "Al Faisal Rentals", email: "ops@alfaisal.sa", phone: null },
+      { id: "2", name: "Najd Equipment Est.", email: null, phone: "+966505556677" },
+    ];
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
+    api.mail = { sent: true, from: "bandar@zahid.sa", via: "graph", messageId: null, inSentFolder: true, recipients: 1, recorded: 1 };
+
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="share" requestUuid="abc-123" requestCode="EXC-170845" onShared={shared} />
+      </LocaleProvider>,
+    );
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(await screen.findByText("Najd Equipment Est."));
+    fireEvent.click(screen.getByText(c.outlook));
+    pressSend();
+
+    await waitFor(() => expect(api.mailCalls).toHaveLength(1));
+    // Only the addressable one is sent to; the phone-only row is left out rather than blocking it.
+    expect(api.mailCalls[0][1]).toEqual(["1"]);
   });
 });

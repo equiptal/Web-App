@@ -159,6 +159,50 @@ describe("the last item reviews instead of advancing", () => {
  * renter had not finished. It is now the secondary answer to the modal that a finished request
  * raises, which is the one point where it IS a question.
  */
+describe("removing an equipment from its tab (owner, 2026-09-09)", () => {
+  /* *"In the equipment tabs must have x button to remove it, also the x is always visible."*
+     It asks first: the answers on that card go with it and `REMOVE_ITEM` is one-way. */
+  const remove = () => document.querySelectorAll('[data-pin="17.7"]');
+
+  it("asks, then removes, and lands on the equipment that took its place", async () => {
+    const handle = await renderCanvas(<Canvas />, { draft: twoItems(), prepare: answered(["a0", "a1"]) });
+
+    expect(remove().length).toBe(2);
+    await handle.run(() => (remove()[0] as HTMLElement).click());
+
+    // Nothing gone yet — the question is the whole of what the press did.
+    expect(handle.store().state.draft!.items.filter((i) => !i.removed).length).toBe(2);
+    expect(screen.getByText("Remove this equipment from the request?")).toBeTruthy();
+
+    await handle.run(() => screen.getByRole("button", { name: "Remove" }).click());
+
+    const live = handle.store().state.draft!.items.filter((i) => !i.removed);
+    expect(live.map((i) => i.id)).toEqual(["a1"]);
+    // The open card was the one removed, so the index lands on what is left rather than off the end.
+    expect(handle.store().state.itemIndex).toBe(0);
+    expect(handle.store().state.activeSection).toBe("equipment");
+  });
+
+  it("«Keep it» changes nothing", async () => {
+    const handle = await renderCanvas(<Canvas />, { draft: twoItems(), prepare: answered(["a0", "a1"]) });
+    await handle.run(() => (remove()[0] as HTMLElement).click());
+    await handle.run(() => screen.getByRole("button", { name: "Keep it" }).click());
+
+    expect(handle.store().state.draft!.items.filter((i) => !i.removed).length).toBe(2);
+    expect(handle.store().state.itemIndex).toBe(0);
+  });
+
+  it("offers no ✕ on the only equipment — a request with none cannot be sent", async () => {
+    await renderCanvas(<Canvas />, {
+      draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
+      prepare: answered(["a0"]),
+    });
+    expect(document.querySelector('[data-pin="17.7"]')).toBeNull();
+    // …and the tab itself is still there: one equipment is still the request's equipment.
+    expect(document.querySelectorAll('[data-pin="17.5"]').length).toBe(1);
+  });
+});
+
 describe("adding equipment by hand", () => {
   it("appends and lands on it — from the finished-request prompt", async () => {
     const handle = await renderCanvas(<Canvas />, {
