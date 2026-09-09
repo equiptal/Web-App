@@ -614,3 +614,86 @@ describe("only the columns scroll, and only sideways", () => {
     expect(scroller(container).contains(panel)).toBe(false);
   });
 });
+
+/**
+ * ── The paper behind a term, on an OFF-PLATFORM offer (owner, 2026-09-09) ────────────────────────
+ * *"in the compare make sure if document exist in the submission offline to view it by eye icon"*.
+ *
+ * The files a shared-link supplier attached to the bid form arrive on the submission this workspace
+ * has already loaded — nothing is fetched, and `link-…` ids are never sent to `/api/me/bids/{id}/…`,
+ * which cannot resolve one. So the whole path is `submissions` → `submissionToBidDocuments` → the
+ * cell's eye, and these cases are what say it is still wired.
+ */
+describe("an offline submission's certificate is viewable from the term cell", () => {
+  const offlineSub = (docs: { key: string; type: string }[]): LinkBidSubmission => ({
+    id: "s1",
+    requestId: "r1",
+    createdAt: "2026-09-01T00:00:00.000Z",
+    companyName: "Al Faisal",
+    items: [{ requestItemId: "i1", documents: docs }],
+  });
+
+  const offlineBid = () =>
+    wb(
+      bc({
+        id: "link-s1",
+        supplierName: "Al Faisal",
+        terms: {
+          equipment: [term("equipment_cert", "Equipment certificate", "TUV", { renteeValue: "TUV" })],
+          contract: [],
+          supplier: [],
+        },
+      }),
+      "offline",
+    );
+
+  it("draws the eye on the cert cell, pointing at the presigned URL the form uploaded", () => {
+    draw([offlineBid()], undefined, { "link-s1": offlineSub([{ key: "https://files.example/tuv.pdf", type: "tuv" }]) });
+    openTerms();
+    const eye = screen.getByRole("link", { name: /TÜV/ });
+    expect(eye.getAttribute("href")).toBe("https://files.example/tuv.pdf");
+    // A new tab, never a viewer of our own — the deal room's behaviour and the app's.
+    expect(eye.getAttribute("target")).toBe("_blank");
+  });
+
+  it("draws NO eye when the submission carries no file for that term", () => {
+    // A photo is not a certificate: the match is on the document's TYPE, not on «he uploaded something».
+    draw([offlineBid()], undefined, { "link-s1": offlineSub([{ key: "https://files.example/front.jpg", type: "front_photo" }]) });
+    openTerms();
+    expect(screen.queryByRole("link", { name: /TÜV/ })).toBeNull();
+  });
+});
+
+/**
+ * ── The verdict is a light ground (owner, 2026-09-09) ────────────────────────────────────────────
+ * *"make the green and red as light highlight for the cells not text only"*. This reverses the
+ * 2026-09-06 «if conflict just in red» ruling, which dropped the fill for being too heavy.
+ */
+describe("a term cell carries its verdict as a tint, not only as ink", () => {
+  const cellFor = (container: HTMLElement, text: string) =>
+    (Array.from(container.querySelectorAll("span")).find((s) => s.textContent?.includes(text))?.parentElement as HTMLElement);
+
+  it("tints a met answer green and a refused one red, and leaves «Didn't say» plain", () => {
+    const { container } = draw([
+      wb(bc({
+        id: "b1",
+        supplierName: "A",
+        terms: {
+          equipment: [],
+          contract: [
+            term("payment_terms", "Payment", "net_30", { renteeValue: "net_30" }),
+            term("maintenance", "Maintenance", "supplier", { renteeValue: "rentee", state: "conflict" }),
+            { key: "fat_food", labelEn: "Food (F.A.T)", labelAr: "Food", state: "grey", value: null },
+          ],
+          supplier: [],
+        },
+      })),
+      wb(bc({ id: "b2", supplierName: "B", terms: { equipment: [], contract: [term("payment_terms", "Payment", "net_60")], supplier: [] } })),
+    ]);
+    openTerms();
+    expect(cellFor(container, "Net 30").className).toContain("bg-ok-soft");
+    expect(cellFor(container, "On supplier").className).toContain("bg-danger-soft");
+    expect(cellFor(container, "Didn't say").className).not.toContain("bg-ok-soft");
+    expect(cellFor(container, "Didn't say").className).not.toContain("bg-danger-soft");
+  });
+});

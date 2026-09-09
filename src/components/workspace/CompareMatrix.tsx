@@ -1106,7 +1106,10 @@ function TermColumn({
       </div>
 
       {merged ? (
-        <div style={{ height: rows.length * ROW_PX }} className="flex flex-none flex-col items-center justify-center gap-1 bg-surface/40 px-3">
+        <div
+          style={{ height: rows.length * ROW_PX }}
+          className={`flex flex-none flex-col items-center justify-center gap-1 px-3 ${first.met ? "bg-ok-soft/70" : "bg-surface/40"}`}
+        >
           <span className={`text-center text-meta font-semibold leading-[1.35] ${first.met ? "text-ok" : "text-muted"}`}>{first.text}</span>
           <span className="text-center text-label font-semibold leading-snug text-muted/80">
             {t.workspace.sameFromAll.replace("{n}", String(rows.length))}
@@ -1119,11 +1122,16 @@ function TermColumn({
           return (
             <div
               key={b.card.id}
-              /* The conflict is RED, and only red (owner, 2026-09-06: «if conflict just in red»).
-                 The row used to be filled `bg-danger-soft` as well, which on a table of ten term
-                 columns painted whole bands of the screen and made the figures beside them hard to
-                 read. The value is what the renter is here for; the colour qualifies it. */
-              className={`${ROW} flex items-center gap-1.5 px-2.5`}
+              /* ── The verdict is a light GROUND, not only ink (owner, 2026-09-09) ──────────────
+                 *"make the green and red as light highlight for the cells not text only"*.
+                 A coloured word is read one cell at a time; a tinted cell is read down the column,
+                 which is how a renter compares four offers on one term. This reverses the 2026-09-06
+                 ruling («if conflict just in red», the fill dropped for being too heavy) - the tint
+                 is the OS's own `*-bg` tone at 70%, a wash rather than the block that was removed,
+                 and «Didn't say» stays untinted so an absent answer never reads as a verdict. */
+              className={`${ROW} flex items-center gap-1.5 px-2.5 ${
+                a.against ? "bg-danger-soft/70" : a.met ? "bg-ok-soft/70" : ""
+              }`}
               title={a.text ?? undefined}
             >
               {/* -- The answer is READ, not cut (owner, 2026-09-05) ------------------------------

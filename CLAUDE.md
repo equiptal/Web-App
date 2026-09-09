@@ -2,6 +2,33 @@
 
 ## Change log
 
+- **2026-09-09 - A term cell wears its verdict as a light ground, and the offline supplier's certificate is one press away.**
+  Owner: *"in the compare make sure if document exist in the submission offline to view it by eye icon
+  make sure this exsit also make the green and red as light highlight for the cells not text only"*.
+  (1) **The tint.** The verdict was ink alone (2026-09-06, *"if conflict just in red"*, when the fill
+  was dropped for painting whole bands of the table). A coloured WORD is read one cell at a time; the
+  question a renter actually asks on this table is read down a column - who met this term and who did
+  not - and four green words scattered among four red ones do not answer it at a glance. The cell now
+  carries `bg-ok-soft/70` when the answer is met and `bg-danger-soft/70` when it goes against the
+  request, with the text colours unchanged. The merged "same from all N" cell takes the green ground
+  too. This REVERSES the fill half of 09-06 deliberately; what survives is the weight, a 70% wash of
+  the OS's own `success-bg` / `danger-bg` rather than the solid block that was removed.
+  (2) **The eye.** Verified rather than built: `submissions` reaches `CompareMatrix` from the
+  workspace, `submissionToBidDocuments` reads the form's attachments off it, `docForTerm` matches on
+  the document's TYPE (`tuv` / `spsp` / `saso` / `operator_*`), and the cell draws the link. Nothing
+  was missing; nothing pinned it either, so three cases now do.
+  Files: `src/components/workspace/CompareMatrix.tsx`, `tests/unit/compare-matrix.test.tsx` (4 cases).
+  ⚠️ **"Didn't say" is never tinted.** An absent answer is not a verdict, and a grey ground under it
+  would read as one; only `met` and `against` paint.
+  ⚠️ A conflict cell can never MERGE - `merged` requires `!a.against` on every row - so the red ground
+  is always per-supplier and the green one is the only tint the merged cell can take.
+  ⚠️ The eye's match is the document's type, not "he uploaded something": a front photo on a bid whose
+  cert column is empty draws no eye. A case pins that.
+  ⚠️ Verified by typecheck, lint and the unit suite (3105 passing, serially). Both new pins were
+  break-checked - the tint reverted and `docFor` forced to null - and both went red. NOT seen
+  rendered: the compare tab needs a signed-in renter with an off-platform submission carrying a
+  certificate file, which is a deployed build.
+
 - **2026-09-09 - The send confirmation lists the ADDRESSES the mail goes to, not the firms' names.**
   Owner: *"when user want to send an outlook email in the confirm modal he must show the suppliers
   emails that he is sending to not the supplier or company name"*. The Bcc chips printed
