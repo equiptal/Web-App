@@ -2,6 +2,96 @@
 
 ## Change log
 
+- **2026-09-09 - «Didn't say» was OURS, not the supplier's: a bid's own declarations are now the term's value.**
+  Owner: *"how can someone not say? it must say yes or no in the form, even in bid he must choose"*.
+  He is right about the form and the blank was on our side. The bid form makes every T3 term a
+  required choice and the answers arrive on the bid (`t3Declarations`: `payment_terms: "net_60"`,
+  `breakdown_response_sla: "FORTY_EIGHT_HR"`, `maintenance_responsibility: "supplier"`, the
+  nationality, both certificates, the fuel side) - verified against the two seeded staging bids,
+  which declared all thirteen keys. But `rPayment`, `rSla`, `rMaint` and the three operator/fuel rows
+  were built with a STATE and the RENTER's `renteeValue` and no supplier value at all, and the
+  comparison prints the supplier's answer with «Didn't say» as its fallback. So a bid that answered
+  everything reported silence on half of it.
+  Files: `src/lib/contract/bids.ts`, `tests/unit/bids.test.ts` (3 cases).
+  ⚠️ **The STATE is untouched.** An un-negotiated declaration stays `grey` («pending review», app
+  parity with `terms_modal.dart`) and only a backend-flagged deviation is a conflict. This adds the
+  value that state was always about, so the cell can be read without the deal room.
+  ⚠️ **`''` is silence, not an answer.** `submitBid` fills any required key the client omitted with
+  the empty string, so a bid from an older build carries the key holding nothing; `s()` returns null
+  for a blank, which is what keeps «Didn't say» honest in that case. A test pins it.
+  🔴 **The operator's FOOD and ACCOMMODATION/TRANSPORT are still unanswerable by an in-app bid.** The
+  T3 vocabulary has no `fat_food` / `fat_accommodation_transport` key (staging
+  `GET /marketplace/t3-defaults` lists thirteen terms, neither of them), so the app never puts the
+  question to the supplier while the request states it. Those two columns read the REQUEST's own side
+  when nothing deviates, and «Didn't say» when the request left them unset. Backend + app work.
+  🔴 **The shared-link form can omit a term.** `bidFormSubmitSchema.items[].confirmations` is
+  `z.record(z.boolean()).optional()` and every key inside it is optional, so a submission that skips
+  a term is accepted and a missing key maps to `null` - which is the other real «Didn't say». If the
+  form must force a yes/no, the schema is where it gets enforced.
+
+- **2026-09-09 - The compare table draws only the terms the REQUEST set.**
+  Owner: *"make it only what is set in the request these what user care about"*, answering my own
+  report that the table was not renter-only. A column earned its place two ways since 2026-09-07
+  (`asked || answered`), so a supplier could earn one by volunteering a term - his mobilisation lead
+  time, his own attachments - and it drew a question the renter never asked, mostly «Didn't say»,
+  sitting between the two he did. Such a column could not carry a verdict either: green and red are
+  a judgement against the request, and every `matched` in both mappers is gated on a renter value
+  (`contractState` returns grey without one, `negContractState` never returns matched at all), so a
+  volunteered column was navy on every row whatever the supplier wrote. The filter is `c.asked`, and
+  the table is the request's own checklist.
+  Files: `src/components/workspace/CompareMatrix.tsx`, `tests/unit/compare-matrix.test.tsx`.
+  ⚠️ **A term the request SET and nobody answered still draws**, as a column of «Didn't say». That is
+  the renter's own question going unanswered, which is the thing he came to the table to see - the
+  opposite case from a term nobody asked.
+  ⚠️ The «renter's first» sort key went with it (`Number(b.asked) - Number(a.asked)`): every column
+  is his now, so it could only ever compare equal. `TERM_ORDER` alone carries the reading order.
+  ⚠️ `answered` is DELETED from the column map rather than left computed. Two ways to earn a column
+  is exactly how the volunteered ones arrived; a flag that no longer decides anything is the next
+  agent's invitation to bring them back.
+  ⚠️ An off-platform submission carries the renter's side in the DETAIL line («Renter: X · Supplier:
+  Y»), never in `renteeValue` - `link-bids.ts` never sets that field. `termSides` parses it, which is
+  the only reason link bids draw any term column at all under this rule. Do not "simplify" `asked` to
+  a bare `renteeValue != null`.
+
+- **2026-09-09 - The compare table names the operator's food and his accommodation plainly, drops two default terms, stops drawing under the rail, and reads a file as an answer.**
+  Owner, four notes on one screenshot of the terms strip: *"call it operator food only and operator
+  accommodation and transport for the other one"*, *"make sure the table can show all fields without
+  clipping"*, *"fix the overlay also"*, *"for this data i want to remove the breakdown and the
+  maintenance from the table, it is too crowded"*, and *"how come some have «didn't say» but have a
+  document option to view"*.
+  (1) **The names.** «Operator FAT — Food» / «Operator FAT — Accommodation/Transport» became
+  «Operator food» / «Operator accommodation and transport», Arabic «طعام المشغّل» / «إقامة ونقل
+  المشغّل». F.A.T is trade shorthand for a thing the renter is being asked to pay for, and the em
+  dash split spent a third of a 118px head on punctuation.
+  (2) **Nothing clips.** `HEAD` is 48px (was 36) and the supplier column's own header 96px with it,
+  which is the one geometry that keeps a name in line with its figures; every head WRAPS instead of
+  truncating, and a term column is 132px.
+  (3) **The overlay.** The terms strip was `flex-[9_1_0] min-w-0`, so with eight terms open its
+  columns - each carrying its own `minWidth` - overflowed the box and drew straight through the
+  «Equipment» rail beside it: a head read «OPERATOR» with the rest behind the rail and two columns
+  reappeared on its far side. The strip is `flex-none` and each column a fixed width now, so the
+  table scrolls sideways, which is what the scroller around it is for.
+  (4) **`maintenance` and `breakdown` join `TERM_HIDDEN`.** Both are platform defaults nearly every
+  bid answers the same way, so they spent two columns saying «On supplier» down four rows while the
+  terms that differ were pushed off the strip.
+  (5) **A FILE is an answer.** The value came off the bid's term row and the eye off the bid's
+  documents, so a supplier who uploaded his TÜV certificate and left the term itself blank was
+  reported as having said NOTHING beside the paper that says it. Such a cell reads «Sent the
+  document» in navy, with the eye that opens it.
+  Files: `src/components/workspace/CompareMatrix.tsx`, `src/lib/contract/bids.ts`,
+  `src/lib/contract/deal-rounds.ts`, `src/lib/i18n/{en,ar}.ts` (`workspace.docAttached`),
+  `tests/unit/compare-matrix.test.tsx` (2 new cases, 45 passing).
+  ⚠️ **Off the TABLE, not retired.** The bid card, the request-details modal and the deal room still
+  state maintenance and the breakdown SLA; this is a comparison of four offers, not a reading of one.
+  ⚠️ The rename covers the compare strip and the deal-room chat labels (one file pair). The SAME two
+  facts are still spelled «Food (F.A.T)» in `contract/bid-form.ts`, `link-bids.ts`'s `termRow` and
+  `SharedBidSubmissionModal`, and «الإعاشة» in `bidCardModel`. Not touched here: they are the
+  supplier-facing form and the card, and the owner named the table. One word per fact would be the
+  next pass.
+  ⚠️ `night_shift` is NOT a party term, so its refusal prints a bare «Supplier» rather than «On
+  supplier» - which is why the tint case uses `fuel_responsibility`. A test swapped onto the wrong
+  key looks like a wording regression and is not one.
+
 - **2026-09-09 - A term cell wears its verdict as a light ground, and the offline supplier's certificate is one press away.**
   Owner: *"in the compare make sure if document exist in the submission offline to view it by eye icon
   make sure this exsit also make the green and red as light highlight for the cells not text only"*.

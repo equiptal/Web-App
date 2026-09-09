@@ -1835,6 +1835,8 @@ export const en = {
     termNationality: "Nationality",
     // A term the supplier never answered. Said out loud, because a blank cell reads as "nothing to pay".
     didntSay: "Didn't say",
+    /** He never answered the term in words, but the paper that proves it is on the bid. */
+    docAttached: "Sent the document",
     rankWithAi: "Rank with AI",
     aiRanked: "AI ranked",
     // Under the three grand totals, so a figure is never read as a pre-tax one.

@@ -643,8 +643,9 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   const safetyCertState: TermState = requiredCerts.length === 0 ? "grey" : deviationKeys.has("safety_certifications") ? "conflict" : certs;
 
   // Project rows reused by both the bid-card "Project" bucket and the comparison's negotiable set.
-  const rPayment: TermRow = { key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: negContractState("payment_terms"), renteeValue: s(req.paymentTerms) };
-  const rSla: TermRow = { key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "زمن الاستجابة للأعطال", state: negContractState("breakdown_response_sla"), renteeValue: s(req.breakdownResponseSla) };
+  const t3raw = (raw.t3Declarations ?? {}) as Record<string, unknown>;
+  const rPayment: TermRow = { key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: negContractState("payment_terms"), renteeValue: s(req.paymentTerms), value: s(t3raw.payment_terms) };
+  const rSla: TermRow = { key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "زمن الاستجابة للأعطال", state: negContractState("breakdown_response_sla"), renteeValue: s(req.breakdownResponseSla), value: s(t3raw.breakdown_response_sla) };
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- built, not rendered; see `contract` below
   const rOvertime: TermRow = { key: "overtime_rate", labelEn: "Overtime", labelAr: "العمل الإضافي", state: negContractState("overtime_rate"), renteeValue: s(req.overtimeRate) };
   /* ⚠️ `renteeValue` was missing here, and it is the whole content of the row (owner, 2026-09-07:
@@ -659,6 +660,7 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
     labelAr: "الصيانة",
     state: maintenance,
     renteeValue: s(req.maintenanceResponsibility),
+    value: s(t3raw.maintenance_responsibility),
   };
 
   // Conflict detail (Renter: X · Supplier: Y) — app parity with link bids, so an in-app conflict in
@@ -681,6 +683,29 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   // Renter/Supplier detail as the specific rows (app parity) — pick the reason that drove the conflict:
   // a missing operator, an operator-certification deviation, or an operator-nationality deviation.
   const opNatDeclared = s(t3.operator_nationality) ?? s(t3.operatorNationality);
+  /**
+   * ── What the SUPPLIER declared, so no term can read «Didn't say» when he answered it ────────────
+   * Owner, 2026-09-09: *"how can someone not say? It must say yes or no in the form, even in a bid
+   * he must choose"*. He is right, and the blank was OURS: the bid form makes every T3 term a
+   * required choice and the answers arrive in `t3Declarations` — `payment_terms: "net_60"`,
+   * `breakdown_response_sla: "FORTY_EIGHT_HR"`, `maintenance_responsibility: "supplier"` — but these
+   * rows carried a STATE and the renter's own `renteeValue` and no supplier value at all. The
+   * comparison prints the supplier's answer, falling back to «Didn't say», so a fully answered bid
+   * reported silence on half the terms it had declared.
+   *
+   * ⚠️ The STATE is untouched: an un-negotiated declaration is still `grey` («pending review», app
+   * parity with `terms_modal.dart`), and only a backend-flagged deviation is a conflict. This adds
+   * the VALUE the state was always about.
+   *
+   * ⚠️ **`''` means absent, not an answer.** `submitBid` fills any required key the client omitted
+   * with the empty string (`bid.service.ts`), so a bid from an older build carries the key with
+   * nothing in it — and `s()` already returns null for a blank, which is what keeps «Didn't say»
+   * honest for those.
+   */
+  const declared = (...keys: string[]): string | null => {
+    for (const k of keys) { const v = s(t3[k]); if (v) return v; }
+    return null;
+  };
   const operatorDetail: { en: string; ar: string } | undefined = !reqOperator
     ? undefined
     : !bidOperator
@@ -711,12 +736,12 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
     // card. Carries the full deal-room negotiable + acknowledge terms with live overlay states.
     negotiable: [
       { key: "operator_included", labelEn: "Operator included", labelAr: "تشمل مشغّل", state: operatorIncluded, renteeValue: reqOperator ? "yes" : null },
-      { key: "operator_nationality", labelEn: "Operator nationality", labelAr: "جنسية المشغّل", state: contractState("operator_nationality", opNat), renteeValue: opNat },
-      { key: "operator_certification", labelEn: "Operator certification", labelAr: "شهادة المشغّل", state: operatorCertState, detail: opCertDetail, renteeValue: reqOpCert },
+      { key: "operator_nationality", labelEn: "Operator nationality", labelAr: "جنسية المشغّل", state: contractState("operator_nationality", opNat), renteeValue: opNat, value: opNatDeclared },
+      { key: "operator_certification", labelEn: "Operator certification", labelAr: "شهادة المشغّل", state: operatorCertState, detail: opCertDetail, renteeValue: reqOpCert, value: opDeclared },
       { key: "safety_certifications", labelEn: "Equipment safety certificates", labelAr: "شهادات سلامة المعدة", state: safetyCertState, detail: safetyDetail, renteeValue: requiredCerts.length ? requiredCerts.join(",") : null },
-      { key: "fat_food", labelEn: "Operator FAT — Food", labelAr: "الإعاشة (F.A.T) — الطعام", state: contractState("fat_food", fatFood), renteeValue: fatFood },
-      { key: "fat_accommodation_transport", labelEn: "Operator FAT — Accommodation/Transport", labelAr: "الإعاشة (F.A.T) — الإقامة/النقل", state: contractState("fat_accommodation_transport", fatAccom), renteeValue: fatAccom },
-      { key: "fuel_responsibility", labelEn: "Fuel responsibility", labelAr: "مسؤولية الوقود", state: contractState("fuel_responsibility", fuelResp), renteeValue: fuelResp },
+      { key: "fat_food", labelEn: "Operator food", labelAr: "طعام المشغّل", state: contractState("fat_food", fatFood), renteeValue: fatFood },
+      { key: "fat_accommodation_transport", labelEn: "Operator accommodation and transport", labelAr: "إقامة ونقل المشغّل", state: contractState("fat_accommodation_transport", fatAccom), renteeValue: fatAccom },
+      { key: "fuel_responsibility", labelEn: "Fuel responsibility", labelAr: "مسؤولية الوقود", state: contractState("fuel_responsibility", fuelResp), renteeValue: fuelResp, value: declared("fuel_responsibility") },
       rPayment, rSla, rMaint, // rOvertime retired — see the `contract` bucket above
       // mobilization_lead_time — CONFLICT_ELIGIBLE / Negotiable (app moved it Priced → Negotiable).
       { key: "mobilization_lead_time", labelEn: "Mobilization lead time", labelAr: "مهلة التعبئة", state: negContractState("mobilization_lead_time") },

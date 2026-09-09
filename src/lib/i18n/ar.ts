@@ -1505,6 +1505,7 @@ export const ar: Dictionary = {
     termOvertime: "العمل الإضافي",
     termNationality: "الجنسية",
     didntSay: "لم يذكر",
+    docAttached: "أرسل الوثيقة",
     rankWithAi: "ترتيب بالذكاء الاصطناعي",
     aiRanked: "تم الترتيب",
     withVat: "شامل الضريبة",

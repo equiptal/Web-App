@@ -336,3 +336,44 @@ describe("offeredFrontPhotoUrl", () => {
     expect(offeredFrontPhotoUrl([unit([{ slot: "front", url: null }])])).toBeNull();
   });
 });
+
+/**
+ * ── The supplier's own declaration is the term's VALUE (owner, 2026-09-09) ───────────────────────
+ * *"How can someone not say? It must say yes or no in the form, even in a bid he must choose."*
+ * The bid form makes every T3 term a required choice, so a bid arrives with the answers in
+ * `t3Declarations`. These rows used to carry a state and the RENTER's value only, so the comparison
+ * printed «Didn't say» about terms the supplier had answered.
+ */
+describe("mapBidList — a declared term carries what the supplier chose", () => {
+  const withDecl = (t3: Record<string, unknown>) =>
+    mapBidList({
+      activeBids: [
+        {
+          id: "b1",
+          t3Declarations: t3,
+          request: { paymentTerms: "net_30", breakdownResponseSla: "TWENTY_FOUR_HR", maintenanceResponsibility: "supplier" },
+        },
+      ],
+    })[0];
+
+  const row = (b: BidCard, key: string) => (b.negotiableTerms ?? []).find((r) => r.key === key);
+
+  it("reads payment, the breakdown SLA and maintenance off the bid", () => {
+    const b = withDecl({ payment_terms: "net_60", breakdown_response_sla: "FORTY_EIGHT_HR", maintenance_responsibility: "rentee" });
+    expect(row(b, "payment_terms")?.value).toBe("net_60");
+    expect(row(b, "breakdown_response_sla")?.value).toBe("FORTY_EIGHT_HR");
+    expect(row(b, "maintenance_responsibility")?.value).toBe("rentee");
+  });
+
+  it("treats the empty string `submitBid` writes for an omitted key as NO answer", () => {
+    // The service fills any required key the client left out with '' — that is silence, not a choice.
+    const b = withDecl({ payment_terms: "", breakdown_response_sla: "  " });
+    expect(row(b, "payment_terms")?.value ?? null).toBeNull();
+    expect(row(b, "breakdown_response_sla")?.value ?? null).toBeNull();
+  });
+
+  it("leaves the STATE alone — a declaration is still pending until the deal room locks it", () => {
+    const b = withDecl({ payment_terms: "net_60" });
+    expect(row(b, "payment_terms")?.state).toBe("grey");
+  });
+});

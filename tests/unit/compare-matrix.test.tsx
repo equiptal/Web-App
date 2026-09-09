@@ -53,9 +53,9 @@ function draw(
           equipment: [term("year", "Equipment year", "2019", { renteeValue: "2018" })],
           contract: [
             term("operator_included", "Operator", "Included", { renteeValue: "Included" }),
-            term("payment_terms", "Payment", "net_30"),
+            term("payment_terms", "Payment", "net_30", { renteeValue: "net_30" }),
             term("fat_food", "Food (F.A.T)", "supplier", { renteeValue: "supplier" }),
-            term("maintenance", "Maintenance", "Supplier provides all scheduled maintenance"),
+            term("night_shift", "Night shift", "Available on the second and third shift", { renteeValue: "available" }),
             // Retired everywhere on 2026-09-04 — it must not come back with the dynamic columns.
             term("overtime_rate", "Overtime", "0"),
           ],
@@ -71,7 +71,7 @@ function draw(
         terms: {
           equipment: [term("year", "Equipment year", "2021", { renteeValue: "2018" })],
           // The other vocabulary for the same two facts: one column each, never two.
-          contract: [term("operator", "Operator", "Included", { renteeValue: "Included" }), term("payment", "Payment", "net_60")],
+          contract: [term("operator", "Operator", "Included", { renteeValue: "Included" }), term("payment", "Payment", "net_60", { renteeValue: "net_30" })],
           supplier: [],
         },
       }),
@@ -103,9 +103,25 @@ describe("every term the bids carry gets a column", () => {
   it("draws the ones the old fixed list dropped", () => {
     draw();
     openTerms();
-    for (const label of ["Operator", "Equipment year", "Payment", "Food (F.A.T)", "Maintenance"]) {
+    for (const label of ["Operator", "Equipment year", "Payment", "Food (F.A.T)", "Night shift"]) {
       expect(screen.getAllByText(label).length, label).toBeGreaterThan(0);
     }
+  });
+
+  it("draws a long term head in FULL, never clipped to an ellipsis", () => {
+    /**
+     * Owner, 2026-09-09, on «OPERATOR FAT — FO…»: *"make sure the table can show all fields without
+     * clipping"*. The head was a single-line `truncate` in a 118px column, so a term whose name is a
+     * sentence could only ever end in an ellipsis and two such columns read the same. It wraps inside
+     * the 48px band now.
+     */
+    draw();
+    openTerms();
+    const head = screen.getAllByText("Food (F.A.T)")[0];
+    expect(head.className).not.toContain("truncate");
+    expect(head.className).not.toContain("whitespace-nowrap");
+    // The full string is the node's own text, not a title standing in for it.
+    expect(head.textContent).toBe("Food (F.A.T)");
   });
 
   it("folds the two vocabularies into ONE column — `operator_included` and `operator` are one fact", () => {
@@ -125,15 +141,17 @@ describe("every term the bids carry gets a column", () => {
     expect(screen.queryByText("VAT")).toBeNull();
   });
 
-  it("draws ONE heading, and puts the terms the renter set first", () => {
+  it("draws ONE heading, and reads in the known term order", () => {
     /* ~~«Terms you set» / «They offered on their own».~~ Removed (owner, 2026-09-06): the split
-       asked the reader to hold a distinction that changed nothing he does. The ORDER carries it. */
+       asked the reader to hold a distinction that changed nothing he does. The ORDER carried it -
+       and since 2026-09-09 every column is one the request set, so the order is `TERM_ORDER` alone
+       and the «renter's first» sort key that used to lead it is gone. */
     const { container } = draw();
     openTerms();
     expect(screen.queryByText("Terms you set")).toBeNull();
     expect(screen.queryByText("They offered on their own")).toBeNull();
     const html = container.innerHTML;
-    // «Operator» and «Food» were set by the request; «Payment» was volunteered.
+    // `TERM_ORDER`: operator, then food, then payment.
     expect(html.indexOf("Operator")).toBeLessThan(html.indexOf("Payment"));
   });
 });
@@ -184,7 +202,7 @@ describe("a term the request never mentioned draws no column", () => {
           equipment: [],
           contract: [
             // Matched, and empty: nothing asked in words, nothing answered.
-            { key: "maintenance_responsibility", labelEn: "Maintenance", labelAr: "الصيانة", state: "matched" },
+            { key: "night_shift", labelEn: "Night shift", labelAr: "العمل الليلي", state: "matched" },
             // Asked: it earns its column.
             { key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: "matched", renteeValue: "net_30" },
           ],
@@ -193,26 +211,8 @@ describe("a term the request never mentioned draws no column", () => {
       })),
     ]);
     openTerms();
-    expect(screen.queryByText("Maintenance")).toBeNull();
+    expect(screen.queryByText("Night shift")).toBeNull();
     expect(screen.getByText("Payment terms")).toBeTruthy();
-  });
-
-  it("keeps a term the SUPPLIER answered even when the request never asked", () => {
-    // The other way to earn a column: he volunteered a value.
-    draw([
-      wb(bc({
-        id: "x",
-        supplierName: "A",
-        terms: {
-          equipment: [],
-          contract: [{ key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "الاستجابة", state: "grey", value: "24 hours" }],
-          supplier: [],
-        },
-      })),
-    ]);
-    openTerms();
-    expect(screen.getByText("Breakdown response")).toBeTruthy();
-    expect(screen.getAllByText(/24 hours/i).length).toBeGreaterThan(0);
   });
 
   it("keeps a grey row that still carries a conflict or an answer", () => {
@@ -221,7 +221,7 @@ describe("a term the request never mentioned draws no column", () => {
         id: "x",
         supplierName: "A",
         terms: {
-          equipment: [{ key: "year", labelEn: "Year of manufacture", labelAr: "سنة الصنع", state: "conflict", value: "2016" }],
+          equipment: [{ key: "year", labelEn: "Year of manufacture", labelAr: "سنة الصنع", state: "conflict", value: "2016", renteeValue: "2019" }],
           contract: [],
           supplier: [],
         },
@@ -229,6 +229,33 @@ describe("a term the request never mentioned draws no column", () => {
     ]);
     openTerms();
     expect(screen.getByText("Year of manufacture")).toBeTruthy();
+  });
+
+  it("keeps MAINTENANCE and the BREAKDOWN response off the table, answered or not", () => {
+    /* Owner, 2026-09-09: *"remove the breakdown and the maintenance from the table, it is too
+       crowded"*. Both are platform defaults nearly every bid answers the same way, so they spent two
+       columns saying «On supplier» down every row. Off the TABLE only: the card, the details modal
+       and the deal room still state them. */
+    draw([
+      wb(bc({
+        id: "x",
+        supplierName: "A",
+        terms: {
+          equipment: [],
+          contract: [
+            term("maintenance_responsibility", "Maintenance", "supplier", { renteeValue: "supplier" }),
+            term("breakdown_response_sla", "Breakdown response", "24 hours", { renteeValue: "TWENTY_FOUR_HR" }),
+            term("payment_terms", "Payment terms", "net_30", { renteeValue: "net_30" }),
+          ],
+          supplier: [],
+        },
+      })),
+    ]);
+    openTerms();
+    expect(screen.queryByText("Maintenance")).toBeNull();
+    expect(screen.queryByText("Breakdown response")).toBeNull();
+    // The terms that are not defaults still draw, so the strip is not empty.
+    expect(screen.getByText("Payment terms")).toBeTruthy();
   });
 
   it("never folds the retired «Fuel type» row into the fuel RESPONSIBILITY column", () => {
@@ -408,11 +435,11 @@ describe("an answer is read, never clipped", () => {
   it("wraps rather than truncating, and carries the whole string on the cell", () => {
     const { container } = draw();
     openTerms();
-    const cell = screen.getByTitle("Supplier provides all scheduled maintenance");
+    const cell = screen.getByTitle("Available on the second and third shift");
     expect(cell).toBeTruthy();
     // The value itself is on two lines at most, not cut to one.
     expect(container.querySelector(".line-clamp-2")).toBeTruthy();
-    expect(within(cell).getByText("Supplier provides all scheduled maintenance")).toBeTruthy();
+    expect(within(cell).getByText("Available on the second and third shift")).toBeTruthy();
   });
 });
 
@@ -430,9 +457,9 @@ describe("one side of the table at a time", () => {
   it("and folds the terms again when a money group is reopened", () => {
     draw();
     openTerms();
-    expect(screen.getAllByText("Maintenance").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Night shift").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByText("Per cycle"));
-    expect(screen.queryByText("Maintenance")).toBeNull();
+    expect(screen.queryByText("Night shift")).toBeNull();
     expect(screen.getAllByText("Monthly rental").length).toBeGreaterThan(0);
   });
 });
@@ -482,7 +509,7 @@ describe("the table opens on «Per cycle», one group at a time", () => {
     expect(screen.getAllByText("Monthly rental").length).toBeGreaterThan(0);
     // Rails, not groups: the words are there, their columns are not.
     expect(screen.queryByText("Delivered cost")).toBeNull();
-    expect(screen.queryByText("Maintenance")).toBeNull();
+    expect(screen.queryByText("Night shift")).toBeNull();
   });
 
   it("the grand-total panel opens its three cost fields, ALONE", () => {
@@ -513,14 +540,14 @@ describe("the table opens on «Per cycle», one group at a time", () => {
     // Both readings are always drawn — neither hides behind a toggle (naming spec, Rules).
     expect(screen.getAllByText("Running rate").length).toBeGreaterThan(0);
     // The terms are the other reading, and they stay away.
-    expect(screen.queryByText("Maintenance")).toBeNull();
+    expect(screen.queryByText("Night shift")).toBeNull();
   });
 
   it("the terms take the table alone, whatever money was open", () => {
     draw();
     fireEvent.click(screen.getByText("Grand total"));
     openTerms();
-    expect(screen.getAllByText("Maintenance").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Night shift").length).toBeGreaterThan(0);
     expect(screen.queryByText("Delivered cost")).toBeNull();
     expect(screen.queryByText("Monthly rental")).toBeNull();
   });
@@ -531,7 +558,7 @@ describe("the table opens on «Per cycle», one group at a time", () => {
     fireEvent.click(screen.getAllByLabelText("Fold this group away")[0]);
     expect(screen.queryByText("Monthly rental")).toBeNull();
     expect(screen.queryByText("Delivered cost")).toBeNull();
-    expect(screen.queryByText("Maintenance")).toBeNull();
+    expect(screen.queryByText("Night shift")).toBeNull();
   });
 });
 
@@ -580,7 +607,7 @@ describe("a term cell states the supplier's answer, not a verdict", () => {
       wb(bc({
         id: "x",
         supplierName: "A",
-        terms: { equipment: [], contract: [{ key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "زمن الاستجابة", state: "grey", renteeValue: "TWENTY_FOUR_HR" }], supplier: [] },
+        terms: { equipment: [], contract: [{ key: "insurance_cover", labelEn: "Insurance cover", labelAr: "التغطية التأمينية", state: "grey", renteeValue: "24h" }], supplier: [] },
       })),
     ]);
     openTerms();
@@ -656,6 +683,24 @@ describe("an offline submission's certificate is viewable from the term cell", (
     expect(eye.getAttribute("target")).toBe("_blank");
   });
 
+  it("says he SENT THE DOCUMENT rather than «didn't say» when only the file answers", () => {
+    /* Owner, 2026-09-09: *"how come some have «didn't say» but have a document option to view"*.
+       The value came off the term row and the eye off the documents, so a supplier who uploaded his
+       TÜV certificate and left the term blank was reported as saying nothing beside the paper that
+       says it. The paper is the answer. */
+    draw(
+      [wb(bc({ id: "link-s1", supplierName: "Al Faisal", terms: {
+        equipment: [{ key: "equipment_cert", labelEn: "Equipment certificate", labelAr: "شهادة", state: "grey", value: null, renteeValue: "TUV" }],
+        contract: [], supplier: [],
+      } }), "offline")],
+      undefined,
+      { "link-s1": offlineSub([{ key: "https://files.example/tuv.pdf", type: "tuv" }]) },
+    );
+    openTerms();
+    expect(screen.getAllByText("Sent the document").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Didn't say")).toBeNull();
+  });
+
   it("draws NO eye when the submission carries no file for that term", () => {
     // A photo is not a certificate: the match is on the document's TYPE, not on «he uploaded something».
     draw([offlineBid()], undefined, { "link-s1": offlineSub([{ key: "https://files.example/front.jpg", type: "front_photo" }]) });
@@ -682,8 +727,10 @@ describe("a term cell carries its verdict as a tint, not only as ink", () => {
           equipment: [],
           contract: [
             term("payment_terms", "Payment", "net_30", { renteeValue: "net_30" }),
-            term("maintenance", "Maintenance", "supplier", { renteeValue: "rentee", state: "conflict" }),
-            { key: "fat_food", labelEn: "Food (F.A.T)", labelAr: "Food", state: "grey", value: null },
+            /* A RESPONSIBILITY, so the refusal reads «On supplier» — the wording only party terms
+               take. (`night_shift` would print a bare «Supplier».) */
+            term("fuel_responsibility", "Fuel", "supplier", { renteeValue: "rentee", state: "conflict" }),
+            { key: "fat_food", labelEn: "Food (F.A.T)", labelAr: "Food", state: "grey", value: null, renteeValue: "supplier" },
           ],
           supplier: [],
         },
@@ -695,5 +742,49 @@ describe("a term cell carries its verdict as a tint, not only as ink", () => {
     expect(cellFor(container, "On supplier").className).toContain("bg-danger-soft");
     expect(cellFor(container, "Didn't say").className).not.toContain("bg-ok-soft");
     expect(cellFor(container, "Didn't say").className).not.toContain("bg-danger-soft");
+  });
+
+  /**
+   * ── Only what the request set (owner, 2026-09-09) ─────────────────────────────────────────────
+   * *"make it only what is set in the request these what user care about"*. A supplier could earn a
+   * column by volunteering a term, and it drew a question the renter never asked - mostly «Didn't
+   * say» - between the two he did. It also could not carry a verdict: green and red judge an answer
+   * against the request, so a volunteered column was navy on every row whatever the supplier wrote.
+   */
+  it("draws no column for a term the supplier volunteered and the request never set", () => {
+    draw([
+      wb(bc({
+        id: "b1",
+        supplierName: "A",
+        terms: {
+          equipment: [],
+          contract: [
+            term("payment_terms", "Payment", "net_30", { renteeValue: "net_30" }),
+            // Volunteered: a value, and no side from the renter - neither `renteeValue` nor a detail.
+            { key: "mobilization_lead_time", labelEn: "Mobilization lead time", labelAr: "مهلة", state: "grey", value: "3 days" },
+          ],
+          supplier: [],
+        },
+      })),
+    ]);
+    openTerms();
+    expect(screen.getAllByText("Payment").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Mobilization lead time")).toBeNull();
+    expect(screen.queryByText("3 days")).toBeNull();
+  });
+
+  it("keeps a term the request DID set even when no supplier answered it", () => {
+    // His own question going unanswered is the answer he came for; the column stays and reads
+    // «Didn't say» down its length.
+    draw([
+      wb(bc({
+        id: "b1",
+        supplierName: "A",
+        terms: { equipment: [], contract: [{ key: "insurance_cover", labelEn: "Insurance cover", labelAr: "التغطية", state: "grey", renteeValue: "24h" }], supplier: [] },
+      })),
+    ]);
+    openTerms();
+    expect(screen.getAllByText("Insurance cover").length).toBeGreaterThan(0);
+    expect(screen.getByText("Didn't say")).toBeTruthy();
   });
 });
