@@ -292,47 +292,49 @@
   justify-content: center;
 }
 
-/* ═══════════════════════════ the availability · distance · yard line ═══════════════════════════ */
+/* ═══════════════════════════ the yard card (owner, 2026-09-08) ═══════════════════════════ */
 
-/* The DISTANCE is this line's headline and the chip sits on the far corner — the prototype's own
-   typography. The kilometres at 20 px is the number the renter compares between machines; it was set
-   at 11 px inside a wrapping muted sentence, which made it the hardest thing on the line to find. */
-.mp-line {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 13px 14px 12px;
-}
-.mp-line-tx {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.mp-km {
-  font-family: ui-monospace, "SFMono-Regular", monospace;
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  color: var(--navy);
-}
-.mp-band { font-size: 12px; font-weight: 700; color: var(--muted); }
+/* ~~A 20px distance, a band word, the yard, and a tinted availability chip on the far corner, with a
+   titled section under it explaining that red is not a refusal.~~ Withdrawn: *"show it red yard and
+   distance similar to how it appears in the fleet cards … just the red card of the distance and yard
+   with maybe small badge on the card saying not confirmed"*.
+
+   So this surface now draws the FLEET CARD's own control (`.bm-eq-yard`, `map-proto.css`), which is
+   why almost nothing is left here: the skins, the geometry and the hover are that rule's, extended to
+   this mount rather than copied into it. `.mp-line`, `.mp-line-tx`, `.mp-km`, `.mp-band`, `.mp-chip`
+   and the `.mp-sect` family went with the markup they dressed — the explainer they carried is the
+   layer the card opens now, and a section that said in prose what the layer says in two lines was
+   the third statement of one fact. */
+.mp-yardbox { padding: 12px 14px; display: flex; flex-direction: column; gap: 7px; }
+/* The yard's own name, INSIDE the card now rather than beside a headline distance. It keeps its
+   size and truncates, because a yard name runs long and the figure beside it may not be pushed off. */
 .mp-yard {
   min-width: 0;
   font-size: 13px;
   font-weight: 800;
-  color: var(--navy);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* «Not confirmed» / «Asked» — SMALL, and it says only that the availability is unanswered. It takes
+   its ink from the card (`currentcolor`), so a state added to the card cannot leave the badge behind
+   in a colour that contradicts it. */
+.mp-yard-badge {
+  flex-shrink: 0;
+  border: 1px solid currentcolor;
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 9.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  opacity: 0.9;
 }
 /* «خارج مدينة الطلب» — amber, and this is the one place on the panel amber survives the 2026-08-09
    red ruling. It is not a document verdict: it says a delivery is a mobilisation, which is a thing to
    ask about rather than a thing that is missing, and the §missing family would have made it read as
    the latter. `isOutOfCity` is the contract's (bid-map.ts) — presentation only, no filtering. */
 .mp-outcity {
+  align-self: flex-start;
   border: 1px solid color-mix(in srgb, var(--warn) 25%, transparent);
   border-radius: var(--radius-lg);
   padding: 2px 8px;
@@ -342,44 +344,6 @@
   font-weight: 800;
   white-space: nowrap;
 }
-/* **TINTED, not filled** (2026-08-09, the prototype's). ~~Filled and saturated — this must read as
-   the same fact as the machine's pin.~~ It still does: same colour, same source, and it is still the
-   only red-or-green object on this panel. What the fill bought on top of that was the loudest weight
-   on the surface for a fact that is not the line's first answer — the tint keeps the statement and
-   gives the headline back to the distance.
-   Colour comes from `unitAvailability()` alone (bid-map.ts). Never from `yardConfirmed`. */
-.mp-chip {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  padding: 5px 11px;
-  font-size: 11.5px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-.mp-chip i { width: 8px; height: 8px; border-radius: 50%; background: currentcolor; }
-.mp-chip.confirmed {
-  background: color-mix(in srgb, var(--ok) 12%, transparent);
-  border-color: color-mix(in srgb, var(--ok) 34%, transparent);
-  color: var(--ok);
-}
-.mp-chip.unconfirmed {
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
-  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
-  color: var(--danger);
-}
-
-/* A titled section with a sentence under it — the panel's way of saying something the controls
-   cannot. Used once, for the unconfirmed explainer. */
-/* `14px 18px`, not `14px` — both `sect()` helpers in the prototype (`rCompanyPanel` 4130,
-   `rEquipDetail` 4196) set the wider horizontal inset, and at the panel's real 392 px every section
-   on the machine detail was sitting 4 px proud of it. */
-.mp-sect { padding: 14px 18px; border-top: 1px solid var(--border); }
-.mp-sect-h { font-size: 11px; font-weight: 800; letter-spacing: 0.3px; color: var(--muted); }
-.mp-sect-n { margin-top: 6px; font-size: 11.5px; font-weight: 600; line-height: 1.8; color: var(--navy); }
 
 /* ═══════════════════════════ the match grid (V7 §6.5.4) ═══════════════════════════ */
 
@@ -780,56 +744,19 @@ span.mp-rowopen { cursor: default; }
 
 /* ═══════════════════════════ actions ═══════════════════════════ */
 
-/* **THE MACHINE'S FOOTER** — a 76 px bar over the panel's grey, two buttons side by side, the
-   prototype's own (2026-08-09).
-
-   ~~`.mp-act` — a full-width row with a `+` tile, a title and a sub-line, stacked. Blue, never navy
-   (AC-33): beside a red availability chip, navy reads as disabled.~~ **Both withdrawn.** The stacking
-   bought a tile and two lines of explanation for controls whose labels already say what they do, and
-   it left the panel's actions wherever the renter had scrolled to. AC-33's blue went with it because
-   AC-33 is a rule about a control sitting BESIDE the availability chip; down here on its own bar,
-   with the chip a scroll away, there is no adjacency to be read as switched-off — and the documents
-   tab's own footer two rules below has been navy since 2026-08-08. Two tabs of one panel now put
-   their actions in one place and one weight.
-
-   `var(--surface2)` is the prototype's `s2` beneath both bars. */
-.mp-foot {
-  flex-shrink: 0;
-  box-sizing: border-box;
-  height: 76px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 18px;
-  border-top: 1px solid var(--border);
-  background: var(--surface2);
-}
-.mp-foot-b {
-  flex: 1;
-  min-width: 0;
-  padding: 12px 10px;
-  /* A border the colour of the fill, so the solid and the outline are exactly the same height. */
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  color: var(--navy);
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.mp-foot-b.solid { border-color: var(--navy); background: var(--navy); color: var(--surface); }
-.mp-foot-b:disabled { opacity: 0.55; cursor: not-allowed; }
+/* ~~`.mp-foot` / `.mp-foot-b` — the machine tab's own 76px action bar.~~ Gone with the two buttons
+   it carried (owner, 2026-09-08): the availability ask is the yard card at the top of the tab, and
+   «ask for another one» is the fleet list's dashed control one press behind this panel. The documents
+   tab's `.mp-sendrow` below is the only action bar this panel has now. */
 
 /* NAVY, not blue (owner, 2026-08-08, from his own prototype screenshot: «تنزيل (٢)» is the panel's dark
    navy fill). `var(--navy)` is the prototype's own `navy` token — design-v3.md §2, the same fill its selected
    chips carry — read from that palette rather than sampled by eye.
 
    ~~This does NOT reopen AC-33, which is about `.mp-act` a few rules above.~~ There is no longer a
-   `.mp-act` to distinguish this from: the machine tab's footer above is navy too, on its own bar and
-   for the same reason — AC-33 governs a control read against the availability chip beside it, and
-   neither footer sits beside anything. */
+   `.mp-act` to distinguish this from — nor a machine-tab footer beside it since 2026-09-08. AC-33
+   governs a control read against the availability chip, and this bar sits beside nothing: it is the
+   foot of the documents tab, a scroll below anything coloured. */
 .mp-send {
   width: 100%;
   margin-top: 8px;
@@ -843,7 +770,9 @@ span.mp-rowopen { cursor: default; }
   color: var(--surface);
   font-family: inherit;
   font-size: 11.5px;
-  font-weight: 800;
+  /* NOT BOLD (owner, 2026-09-08). A navy fill already carries the weight; 800 on top of it read as
+     shouting on a 392px column. */
+  font-weight: 600;
   cursor: pointer;
 }
 /* Greyed, with a PALER border than its own fill, muted text and 70% opacity — the owner's own
@@ -890,7 +819,10 @@ span.mp-rowopen { cursor: default; }
   z-index: 1;
   margin-top: auto;
   box-sizing: border-box;
-  height: 76px;
+  /* 56px, down from the prototype's 76 (owner, 2026-09-08, on this bar: *"make this also thinner and
+     don't bold the font"*). Two buttons on one line need their own padding and nothing else; the
+     extra 20px was a band of white above the last document row. */
+  height: 56px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -904,6 +836,7 @@ span.mp-rowopen { cursor: default; }
   margin-top: 0;
   flex: 1 1 0;
   min-width: 0;
+  padding-block: 9px;
   padding-inline: 10px;
   font-size: 12px;
 }

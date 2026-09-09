@@ -1300,6 +1300,7 @@ describe("the preview and the sent e-mail carry the same message", () => {
     closing: "Bidding closes 12 Sep 2026",
     accepting: true,
     cta: "Submit your bid",
+    offCatalogue: false,
   };
 
   const URL_ = "https://os.moedatech.net/bid/abc-123";
@@ -1796,6 +1797,27 @@ describe("Send opens the connector itself", () => {
     expect(screen.queryByText(c.confirmPostLine)).toBeNull();
   });
 
+  it("Given the confirmation, Then each supplier is his ADDRESS, not his name", async () => {
+    /**
+     * Owner, 2026-09-09: *"he must show the suppliers emails that he is sending to not the supplier
+     * or company name"*. What leaves this screen is an address, and a firm's name cannot tell him
+     * whether it is the branch mailbox or a salesman's own. The name stays as the chip's `title`.
+     */
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    const dialog = await waitFor(() => document.querySelector('[role="dialog"]') as HTMLElement);
+    const chip = within(dialog).getByText("ops@alfaisal.sa");
+    expect(chip).toBeTruthy();
+    expect(chip.closest("[title]")?.getAttribute("title")).toBe("Al Faisal Rentals");
+    // ⚠️ The name is not printed in the list itself; the row behind the dialog still carries it.
+    expect(within(dialog).queryByText("Al Faisal Rentals")).toBeNull();
+  });
+
   it("Given the CONFIRM press, Then it posts and sends, once", async () => {
     const posted = vi.fn(async () => "new-uuid");
     api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
@@ -2289,7 +2311,397 @@ describe("what the caller is told", () => {
 
     fireEvent.click(confirmButton()!);
 
-    await waitFor(() => expect(shared).toHaveBeenCalledWith(1, "email"));
+    // A third argument arrived on 2026-09-08: whether the browser was handed off, and what the
+    // server sent. The caller announces the post immediately when nothing opened, so it cannot be
+    // asserted away — see «the outcome handed back to the caller» below.
+    await waitFor(() =>
+      expect(shared).toHaveBeenCalledWith(1, "email", {
+        handedOff: false,
+        mail: { from: "bandar@zahid.sa", recipients: 1, inSentFolder: true },
+      }),
+    );
     expect(shared).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * ⚠️ An EMPTY supplier list used to be a dead end (owner, 2026-09-08).
+ *
+ * «Add» lives in the search row, and the search row is drawn only when there is something to search
+ * — so the renter with no suppliers read «No suppliers on your list yet» beside a 0-selected count
+ * and had nothing to press, on the one screen where he is choosing recipients.
+ */
+describe("an empty supplier list offers the way out of it", () => {
+  beforeEach(() => {
+    api.rows = [];
+  });
+
+  it("Given no suppliers, Then the list says what it is FOR and offers Add", async () => {
+    draw();
+    expect(await screen.findByText(c.noSuppliersYet)).toBeTruthy();
+    const add = screen.getAllByText(en.suppliers.addSupplier).map((n) => n.closest("button")).filter(Boolean);
+    expect(add.length).toBeGreaterThan(0);
+  });
+
+  it("Given Add is pressed, Then the same dialog My Suppliers uses opens", async () => {
+    draw();
+    await screen.findByText(c.noSuppliersYet);
+    fireEvent.click(screen.getAllByText(en.suppliers.addSupplier)[0].closest("button")!);
+    // The dialog, not a second form of this panel's own.
+    expect(document.querySelectorAll('[role="dialog"]').length).toBeGreaterThan(0);
+  });
+
+  it("Given no suppliers, Then sharing the LINK is untouched — it never needed a list", async () => {
+    draw();
+    await screen.findByText(c.noSuppliersYet);
+    // The link half of the panel: its own heading is drawn whatever the supplier list holds.
+    expect(screen.getByText(c.expiry)).toBeTruthy();
+  });
+});
+
+/* ── What the caller is told, so it can announce the send (owner, 2026-09-08) ─────────────────── */
+
+/**
+ * *"When I sent a request through Outlook and Moedatech it must show sent successfully with the post
+ * confirmation in the same modal, immediately after post and send."*
+ *
+ * The confirmation is `ShareOnPost`'s, and it was holding itself back until the tab regained focus —
+ * a rule written for a compose tab, and right for one. A CONNECTED Outlook opens nothing: the
+ * message leaves from the server through Graph and the renter never leaves the page, so that event
+ * could not arrive and the press that did the most looked like the press that did nothing.
+ *
+ * These pin the fact the panel now reports, which is the fact that decides it: did the browser
+ * actually go anywhere.
+ */
+describe("the outcome handed back to the caller", () => {
+  const shared = vi.fn();
+
+  beforeEach(() => shared.mockReset());
+
+  /** Tick a supplier with an address, choose Outlook, and press Send through the confirm dialog. */
+  const sendByEmail = async () => {
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    pressSend();
+  };
+
+  it("says NOTHING was handed off when the server sent it, and what it sent", async () => {
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@moedatech.net", connectedAt: null };
+    api.mail = { sent: true, from: "bandar@moedatech.net", recipients: 1, skipped: 0, inSentFolder: true };
+    draw({ onShared: shared });
+    await sendByEmail();
+
+    await waitFor(() => expect(shared).toHaveBeenCalled());
+    const [count, channel, outcome] = shared.mock.calls[0];
+    expect(channel).toBe("email");
+    expect(count).toBe(1);
+    expect(outcome).toMatchObject({
+      handedOff: false,
+      mail: { from: "bandar@moedatech.net", recipients: 1, inSentFolder: true },
+    });
+    // And no window was opened, which is the whole reason there is nothing to come back from.
+    expect(opened).not.toHaveBeenCalled();
+  });
+
+  it("says the browser DID leave when a compose window opened instead", async () => {
+    // The unsendable case: the panel falls back to his own webmail, which takes focus.
+    api.mail = { sent: false, reason: "DOMAIN_NOT_VERIFIED", from: "b@najd.sa", domain: "najd.sa", dns: [], connectPath: null };
+    draw({ onShared: shared });
+    await sendByEmail();
+
+    await waitFor(() => expect(shared).toHaveBeenCalled());
+    const [, , outcome] = shared.mock.calls[0];
+    expect(outcome).toMatchObject({ handedOff: true });
+    expect(outcome.mail).toBeUndefined();
+  });
+
+  it("says the browser left for WhatsApp, which is its own window", async () => {
+    draw({ onShared: shared });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.whatsapp));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(shared).toHaveBeenCalled());
+    expect(shared.mock.calls[0][2]).toMatchObject({ handedOff: true });
+  });
+});
+
+
+/**
+ * -- A machine the catalogue cannot place has no marketplace (owner, 2026-09-08) ----------------
+ *
+ * *"For requests that have undefined taxonomy (custom equipment type) we will remove Moedatech from
+ * the confirmation, we will remove it from the icons list in the share, we will remove it from the
+ * confirmation question and will tell the opposite, since we will not have it available and no
+ * supplier. Any other surface that says it is sent to Moedatech will also be removed in this case."*
+ *
+ * 🔴 Such a request reaches NO supplier by broadcast, and direct is no exception: the share link is
+ * the only supplier-facing route. Three surfaces named the marketplace anyway.
+ */
+describe("an off-catalogue request says the opposite", () => {
+  /** The same draft, with the one thing that changes: the catalogue could not place the machine. */
+  const CUSTOM: BidFormData = {
+    ...DRAFT,
+    items: [{ ...DRAFT.items[0], label: "floating crane barge", size: null, isUndefined: true }],
+  };
+
+  it("Given every machine is off-catalogue, Then the locked Moedatech chip is not drawn", async () => {
+    /**
+     * ⚠️ The chip is a statement of fact, «this always happens», and here it is not a fact. It is
+     * the worst of the three surfaces because it cannot be pressed, so it cannot be argued with.
+     */
+    draw({ draftForm: CUSTOM });
+    await screen.findByText("Al Faisal Rentals");
+
+    await waitFor(() => expect(screen.queryByAltText("Moedatech")).toBeNull());
+    // And the line under the row says what is true instead.
+    expect(screen.getByText(c.offCatalogueLine)).toBeTruthy();
+  });
+
+  it("Given an ordinary request, Then the chip is exactly where it was", async () => {
+    // ⚠️ The rule is the WHOLE request. Every other request keeps the mark it has always had.
+    draw({ draftForm: DRAFT });
+    await screen.findByText("Al Faisal Rentals");
+
+    expect(await screen.findByAltText("Moedatech")).toBeTruthy();
+    expect(screen.queryByText(c.offCatalogueLine)).toBeNull();
+  });
+
+  it("Given ONE machine of two is off-catalogue, Then the marketplace is still named", async () => {
+    /**
+     * 🔴 **Not «one of them is».** A request with one catalogue machine and one custom line still
+     * goes out to every supplier who stocks the first, so muting Moedatech would be a lie in the
+     * other direction.
+     */
+    draw({
+      draftForm: {
+        ...DRAFT,
+        items: [{ ...DRAFT.items[0], isUndefined: true }, { ...DRAFT.items[0], requestItemId: "m2" }],
+      },
+    });
+    await screen.findByText("Al Faisal Rentals");
+
+    expect(await screen.findByAltText("Moedatech")).toBeTruthy();
+    expect(screen.queryByText(c.offCatalogueLine)).toBeNull();
+  });
+
+  it("Given the confirmation, Then it asks about the mail and warns instead of promising a market", async () => {
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
+    draw({ draftForm: CUSTOM });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+
+    await waitFor(() => expect(confirmButton()).toBeTruthy());
+    // ⚠️ Replaced, not dropped: saying nothing would leave him approving a send with no idea that
+    // this e-mail is the only copy of the request anyone will ever see.
+    expect(screen.getAllByText(c.offCatalogueLine).length).toBeGreaterThan(0);
+    expect(screen.queryByText(c.confirmPostedAlready)).toBeNull();
+  });
+
+  it("Given no channel picked, Then the button stops promising a post to Moedatech", async () => {
+    // ⚠️ In `share` mode the request already exists and nothing is picked, so the press has
+    // nothing left to do. It says which decision is missing rather than naming a marketplace.
+    draw({ draftForm: CUSTOM });
+    await screen.findByText("Al Faisal Rentals");
+
+    await waitFor(() => expect(screen.getByText(c.offCataloguePick)).toBeTruthy());
+    expect(screen.getByText(c.offCataloguePick).closest("button")!.hasAttribute("disabled")).toBe(true);
+    expect(screen.queryByText(c.sendMoedatechOnly)).toBeNull();
+  });
+});
+
+
+/**
+ * -- An unfinished consent (owner, 2026-09-08) --------------------------------------------------
+ *
+ * *"What if the user clicks Outlook and Send and didn't complete his connection with Outlook? It is
+ * showing like nothing happened, even the modal confirming the post didn't appear."*
+ *
+ * 🔴 The consent poll watched ONE thing, `window.closed`. A renter who leaves the account chooser
+ * open and comes back to this tab never closes it, so the promise never settled: the send stopped
+ * dead after the post, the tick never fired, and the button sat on «Posting…» over a request that
+ * was already live.
+ */
+describe("a consent the renter never finishes", () => {
+  const shared = vi.fn();
+
+  /** A pop-up that stays OPEN, which is the whole point of these. */
+  const stuckPopup = () => {
+    const win = { closed: false, location: { href: "" }, close: vi.fn() } as unknown as Window & { close: ReturnType<typeof vi.fn> };
+    opened.mockReturnValue(win);
+    return win;
+  };
+
+  const pressSendConnecting = async () => {
+    shared.mockReset();
+    api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
+    api.connectUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?x=1";
+    api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
+
+    draw({ draftForm: DRAFT, onShared: shared });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    await waitFor(() => expect(confirmButton()).toBeTruthy());
+    fireEvent.click(confirmButton()!);
+  };
+
+  it("Given consent lands while the window is still open, Then the send carries on", async () => {
+    /**
+     * ⚠️ The status is the second signal, and it is the one that is actually true: the callback
+     * has reached the backend, so the connection exists whether or not the little window has got
+     * round to closing itself.
+     */
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const win = stuckPopup();
+      await pressSendConnecting();
+      await waitFor(() => expect(win.location.href).toContain("login.microsoftonline.com"));
+
+      // Microsoft answers; the backend flips. The window is still open on screen.
+      api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
+      api.mail = { sent: true, from: "b@x.sa", via: "graph", recipients: 1, messageId: null, inSentFolder: true, skipped: 0 };
+
+      await vi.advanceTimersByTimeAsync(1500);
+      await waitFor(() => expect(api.mailCalls).toHaveLength(1));
+      // ⚠️ And we shut the stray pop-up ourselves rather than leaving it over the panel.
+      expect(win.close).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("Given he walks away, Then the send finishes anyway rather than waiting forever", async () => {
+    /**
+     * 🔴 **This is the report.** The request is posted by the time the consent starts, so a poll
+     * that never settles leaves a live request and a screen that says nothing at all. After the
+     * deadline the answer is «not connected», which is the answer that keeps him moving: the send
+     * falls through to the compose window and the tick fires.
+     */
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const win = stuckPopup();
+      await pressSendConnecting();
+      await waitFor(() => expect(win.location.href).toContain("login.microsoftonline.com"));
+
+      // Nothing happens. He never signs in, and he never closes it.
+      await vi.advanceTimersByTimeAsync(121_000);
+
+      await waitFor(() => expect(api.mailCalls).toHaveLength(1));
+      await waitFor(() => expect(shared).toHaveBeenCalled());
+      // ⚠️ The window is NOT closed under him: he may still be typing a password into it.
+      expect(win.close).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("Given the authorize call fails, Then the send still finishes", async () => {
+    // ⚠️ It is awaited inside `send`, so a throw there rejected the whole send and `busy` never
+    // cleared. A refusal is an answer, not an exception.
+    shared.mockReset();
+    api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
+    api.connectUrl = null;
+    api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
+
+    draw({ draftForm: DRAFT, onShared: shared });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    await waitFor(() => expect(confirmButton()).toBeTruthy());
+    fireEvent.click(confirmButton()!);
+
+    await waitFor(() => expect(shared).toHaveBeenCalled());
+    // The button is pressable again, not stuck on «Posting…».
+    expect(screen.queryByText(c.posting)).toBeNull();
+  });
+});
+
+/**
+ * 🔴 **Nobody picked has an e-mail address.**
+ *
+ * The share posted and then nothing was sent, and the renter watched Outlook open on a message
+ * addressed to no one. Reported by a real renter on 2026-09-09, and it fixed itself the moment ONE
+ * supplier had an address added — which is the tell: the panel posted `renterSupplierIds: []`, the
+ * endpoint's schema demands at least one id, so an empty list is a **400** rather than the
+ * `sent: false` the fallback was written for. The fallback then did what it does for a failed send.
+ *
+ * Send is deliberately never gated on a channel being able to reach anyone, because the press also
+ * POSTS the request. So the fix is not to disable the button, it is to skip the half that cannot
+ * work.
+ */
+describe("nobody picked has an e-mail address", () => {
+  const shared = vi.fn();
+
+  /** Najd has a phone and no address, which is the ordinary shape of a My Suppliers row. */
+  const onlyUnreachable = () => {
+    shared.mockReset();
+    api.rows = [{ id: "2", name: "Najd Equipment Est.", email: null, phone: "+966505556677" }];
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
+  };
+
+  const sendByOutlook = async (name: string) => {
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="share" requestUuid="abc-123" requestCode="EXC-170845" onShared={shared} />
+      </LocaleProvider>,
+    );
+    fireEvent.click(await screen.findByText(name));
+    fireEvent.click(screen.getByText(c.outlook));
+    pressSend();
+    await waitFor(() => expect(shared).toHaveBeenCalled());
+  };
+
+  it("Given nobody reachable, When sent, Then the server is NOT called", async () => {
+    onlyUnreachable();
+    await sendByOutlook("Najd Equipment Est.");
+    // ⚠️ The whole bug: an empty id list is a 400, not a refusal the fallback understands.
+    expect(api.mailCalls).toHaveLength(0);
+  });
+
+  it("Given nobody reachable, When sent, Then no compose window opens either", async () => {
+    // Opening a compose window addressed to nobody is what the renter actually saw, and it reads as
+    // the product losing his message rather than as him having no address on file.
+    onlyUnreachable();
+    await sendByOutlook("Najd Equipment Est.");
+    const composed = opened.mock.calls
+      .map((x) => String(x[0]))
+      .filter((u) => u.startsWith("http") && !u.includes("login.microsoftonline.com"));
+    expect(composed).toHaveLength(0);
+  });
+
+  it("Given nobody reachable, When sent, Then the share is still ANNOUNCED", async () => {
+    // ⚠️ The load-bearing half. Nothing about who is picked may stop the share completing; that
+    // is why Send is not gated in the first place. Skipping the mail must not skip the rest.
+    onlyUnreachable();
+    await sendByOutlook("Najd Equipment Est.");
+    expect(shared).toHaveBeenCalledTimes(1);
+  });
+
+  it("Given ONE reachable among several, When sent, Then it DOES send, to that one", async () => {
+    // The other side of the same line: a partial send is a send. This is what adding one address
+    // did for the renter who reported it.
+    shared.mockReset();
+    api.rows = [
+      { id: "1", name: "Al Faisal Rentals", email: "ops@alfaisal.sa", phone: null },
+      { id: "2", name: "Najd Equipment Est.", email: null, phone: "+966505556677" },
+    ];
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
+    api.mail = { sent: true, from: "bandar@zahid.sa", via: "graph", messageId: null, inSentFolder: true, recipients: 1, recorded: 1 };
+
+    render(
+      <LocaleProvider>
+        <ShareRequestPanel mode="share" requestUuid="abc-123" requestCode="EXC-170845" onShared={shared} />
+      </LocaleProvider>,
+    );
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(await screen.findByText("Najd Equipment Est."));
+    fireEvent.click(screen.getByText(c.outlook));
+    pressSend();
+
+    await waitFor(() => expect(api.mailCalls).toHaveLength(1));
+    // Only the addressable one is sent to; the phone-only row is left out rather than blocking it.
+    expect(api.mailCalls[0][1]).toEqual(["1"]);
   });
 });

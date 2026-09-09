@@ -1,6 +1,6 @@
 import type { AgentDraft, RfqRequestPayload, Taxonomy } from "@/lib/contract";
 import type { RequestListItem, RequestRecord } from "@/lib/contract/requests";
-import type { BidCard } from "@/lib/contract/bids";
+import type { BidCard, BidSizeCounts } from "@/lib/contract/bids";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import type { CompanyDocsPayload } from "@/lib/contract/company-documents";
 import type { DealRoomView, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
@@ -243,9 +243,16 @@ export function updateRequest(id: string, patch: Record<string, unknown>): Promi
   return postJsonMethod(`/api/me/requests/${encodeURIComponent(id)}`, patch, "PATCH");
 }
 
-/** Bids received on a request (active then expired). */
-export function fetchBids(requestId: string): Promise<{ bids: BidCard[] }> {
-  return getJson<{ bids: BidCard[] }>(`/api/me/requests/${encodeURIComponent(requestId)}/bids`);
+/**
+ * Bids received on a request (active then expired).
+ *
+ * `showLarger` widens the list to bids offering a machine LARGER than the one asked for. The
+ * backend hides those by default, so this is a REFETCH and not a client-side filter — nothing held
+ * locally can reveal a bid that never arrived. `sizeCounts.larger` says how many are being held.
+ */
+export function fetchBids(requestId: string, showLarger = false): Promise<{ bids: BidCard[]; sizeCounts?: BidSizeCounts }> {
+  const qs = showLarger ? "?sizeMatch=exact_or_larger" : "";
+  return getJson<{ bids: BidCard[]; sizeCounts?: BidSizeCounts }>(`/api/me/requests/${encodeURIComponent(requestId)}/bids${qs}`);
 }
 
 /**
@@ -938,18 +945,60 @@ export interface ProjectChart {
   documents: AwardDocument[];
 }
 
+/**
+ * A machine on the chart whose name the CATALOGUE could not supply.
+ *
+ * ── The row that showed no machine at all (owner, 2026-09-08) ───────────────────────
+ * *"Some request items are not shown in the project if they were undefined, so let it read from the
+ * equipment taxonomy of the request or the new column, custom type, as free text."*
+ *
+ * `getChart` labels a request's item from its taxonomy pair alone (`label(subtypeId, capacityId)`),
+ * and an off-catalogue line has NEITHER id — so `label` arrives `null` and the row drew an empty
+ * name, leaving the request's code as the only thing on it. The same handler already falls back to
+ * `rawLabel` for a WORK ORDER's machines; only the request branch has no fallback.
+ *
+ * The proper fix is one line in that projection (a ticket is out). This reads the free-text name
+ * from the payload if it is there under any of the spellings the platform uses for it, so the web
+ * shows the renter's own words the moment the backend selects the column — and needs no second
+ * change when it does.
+ */
+const chartItemName = (raw: Record<string, unknown>): { label: string | null; labelAr: string | null } => {
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  const label = str(raw.label);
+  const labelAr = str(raw.labelAr);
+  /* ── Arabic never draws blank, whichever branch produced the name ───────────────────────
+     The two halves of the chart disagree by design in the projection: the request branch now falls
+     back to the typed name in BOTH languages, while the work-order branch fills `labelAr` from the
+     catalogue only — so an off-catalogue work order arrives with a name in `label` and `null` beside
+     it (found by the backend author, 2026-09-08). `FileRequestDialog` already wrote `labelAr ||
+     label` by hand for exactly this; doing it once here means no consumer has to remember. */
+  if (label) return { label, labelAr: labelAr ?? label };
+  /* `customEquipmentName` is the request column (2026-09-06); `rawLabel`/`rawSize` are what a work
+     order carries for the same idea. One reader for both, because a chart row draws both kinds. */
+  const custom =
+    str(raw.customEquipmentName) ??
+    str(raw.custom_equipment_name) ??
+    ([str(raw.rawLabel), str(raw.rawSize)].filter(Boolean).join(" ") || null);
+  // The renter typed his machine in ONE language, so the same words serve both directions.
+  return { label: custom, labelAr: labelAr ?? custom };
+};
+
 /** Everything the site's timeline draws, in one call. */
 export async function fetchChart(projectId: string): Promise<ProjectChart> {
   const raw = await projectFetch<{
     project: Record<string, unknown>;
     version?: number;
-    groups?: ChartGroup[];
+    groups?: Record<string, unknown>[];
     documents?: AwardDocument[];
   }>(`${projectPath(projectId)}/chart`);
+  const groups = (raw.groups ?? []).map((g) => {
+    const items = Array.isArray(g.items) ? (g.items as Record<string, unknown>[]) : [];
+    return { ...g, items: items.map((it) => ({ ...it, ...chartItemName(it) })) } as unknown as ChartGroup;
+  });
   return {
     project: mapProjectSummary(raw.project),
     version: typeof raw.version === "number" ? raw.version : (mapProjectSummary(raw.project).version ?? 1),
-    groups: raw.groups ?? [],
+    groups,
     documents: raw.documents ?? [],
   };
 }
@@ -1265,7 +1314,19 @@ export async function processQuick(input: {
     const res = await fetch("/api/agent/quick", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: input.text, language: input.language, source: "web_rfq" }),
+      /* `language` is read the way `processRfq` reads it — from <html lang> — rather than left to
+         the caller. It was declared on this input and the only caller never passed it, so
+         `JSON.stringify` dropped the key and the fast lane never sent a locale at all: an Arabic
+         renter typing English got English free-text here and Arabic on the job path, for the same
+         sentence. `created_by` is deliberately NOT set here: it comes from the `mt_user` cookie,
+         which only the BFF route can read (see `api/agent/quick/route.ts`). */
+      body: JSON.stringify({
+        message: input.text,
+        language:
+          input.language ??
+          (typeof document !== "undefined" ? document.documentElement.lang : undefined),
+        source: "web_rfq",
+      }),
     });
     if (!res.ok) return { fallback: true, reason: `http_${res.status}` };
     return (await res.json()) as QuickRfqResult;
@@ -1610,6 +1671,17 @@ export interface DirectorySupplier {
   city: string | null;
   verified: boolean;
   hasStore: boolean;
+  /**
+   * How many machines the firm lists.
+   *
+   * RED **Null on every row today, and that is the backend gap, not a bug here** (owner,
+   * 2026-09-08: *"show the verified ones on Moedatech with the highest number of equipment"*, the
+   * same ask as 2026-09-03). `/agents/suppliers` answers
+   * `{ id, name, company_name, city, is_verified, has_store }` and nothing about equipment, so there
+   * is nothing to sort on. The field is read here so the ordering below starts working the day it
+   * arrives, with no second web change. See `docs/supplier-directory-ranking.md`.
+   */
+  equipmentCount: number | null;
 }
 
 /** One page of the directory, with what the pager needs to know. */
@@ -1619,6 +1691,10 @@ export interface DirectoryPage {
   totalPages: number;
   total: number;
 }
+
+
+/** A count off the wire, or null when the field is absent — never 0, which would be a claim. */
+const count = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
 /**
  * Browse or search every supplier who holds an account.
@@ -1683,6 +1759,8 @@ export async function searchSupplierDirectory(q: string, page = 1, limit = 20): 
           city: typeof o.city === "string" ? o.city.trim() || null : null,
           // `is_verified` and `has_store` arrive as 0/1 from a raw query, not as booleans.
           verified: bool(o.isVerified ?? o.is_verified),
+      /* Every spelling the backend might reasonably pick, so the field lands whichever it sends. */
+      equipmentCount: count(o.equipmentCount ?? o.equipment_count ?? o.listingCount ?? o.listing_count),
           hasStore: bool(o.hasStore ?? o.has_store),
         },
       ];
@@ -1702,8 +1780,21 @@ export async function searchSupplierDirectory(q: string, page = 1, limit = 20): 
      * Ranking the directory itself is the backend's to do; see the note in
      * `docs/supplier-directory-ranking.md`. Until it does, this is an honest local tidy of
      * one page and is deliberately not dressed up as a recommendation.
+     *
+     * ⚠️ **Asked again on 2026-09-08**, and answered the same way: the equipment count is now READ
+     * (`equipmentCount`) and sorted on, so nothing here needs changing when the backend adds it. And
+     * *Show all* in the dialog fetches the whole directory in one call, which is what makes this
+     * sort a statement about all of it rather than about twenty rows.
      */
-    rows.sort((a, b) => Number(b.verified) - Number(a.verified) || Number(b.hasStore) - Number(a.hasStore));
+    rows.sort(
+      (a, b) =>
+        Number(b.verified) - Number(a.verified) ||
+        /* ⚠️ Inert until the backend sends a count: every row is null, so this compares 0 with 0
+           and the next rule decides. It is written now so the ordering the owner asked for starts
+           working the day the field arrives. */
+        (b.equipmentCount ?? 0) - (a.equipmentCount ?? 0) ||
+        Number(b.hasStore) - Number(a.hasStore),
+    );
 
     return {
       rows,

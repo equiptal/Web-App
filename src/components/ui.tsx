@@ -426,14 +426,17 @@ export function MultiChips<T extends string>(props: {
 
 /* ------------------------------------ Toggle ------------------------------------ */
 
-export function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label?: ReactNode }) {
+export function Toggle({ checked, onChange, label, className }: { checked: boolean; onChange: (v: boolean) => void; label?: ReactNode; className?: string }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className="inline-flex items-center gap-2 text-body"
+      /* `className` is for the ROW, not the switch: the label sits after the track here, and a
+         caller that needs it before (a settings row, where the sentence leads and the control
+         answers) says so with `flex-row-reverse` rather than drawing a second switch. */
+      className={cx("inline-flex items-center gap-2 text-body", className)}
     >
       <span className={cx("relative h-5 w-9 rounded-full transition-colors", checked ? "bg-brand" : "bg-border")}>
         <span className={cx("absolute top-0.5 h-4 w-4 rounded-full bg-surface transition-all", checked ? "start-4" : "start-0.5")} />

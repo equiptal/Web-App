@@ -36,7 +36,7 @@ import { pin } from "@/lib/uiPins";
  * An earlier cut let only one group be open at a time, which meant he could never see the rate and
  * the grand total together — the one comparison the page exists for.
  *
- * Geometry is fixed and shared: every header block is 72px and every data row 52px including its
+ * Geometry is fixed and shared: every header block is 96px and every data row 52px including its
  * hairline, so a supplier's name stays in line with his figures across groups whose headers differ.
  *
  * Type is the app's own scale: 11px uppercase labels, 13px answers, 15px figures, 10px currency.
@@ -104,6 +104,12 @@ const TERM_ORDER = [
  *   retired «Diesel» answer under a «Fuel» column that means who pays for it.
  * · `cr` / `vat` — company details, not terms. They belong to the equipment-and-docs check, and
  *   `bucketBidTerms` already excludes them from the card's own tally for the same reason.
+ * · `maintenance` and `breakdown` — dropped from the TABLE on 2026-09-09 (owner: *"remove the
+ *   breakdown and the maintenance from the table, it is too crowded"*). Both are platform DEFAULTS
+ *   that almost every bid answers the same way, so they spent two columns each saying «On supplier»
+ *   down all four rows while the terms that differ were pushed off the strip. They are NOT retired:
+ *   the bid card, the details modal and the deal room still state them, which is where a renter
+ *   reads one offer rather than compares four.
  */
 /**
  * ── The file behind a term (owner, 2026-09-06) ──────────────────────────────────────────────────
@@ -123,7 +129,11 @@ const TERM_DOC_TYPES: Record<string, (type: string) => boolean> = {
   operator_cert: (ty) => ty.startsWith("operator_"),
 };
 
-const TERM_HIDDEN = new Set(["overtime", "overtime_rate", "fuel_type", "fuel", "cr", "vat"]);
+const TERM_HIDDEN = new Set([
+  "overtime", "overtime_rate", "fuel_type", "fuel", "cr", "vat",
+  // Both vocabularies of each, plus the canonical group they fold onto.
+  "maintenance", "maintenance_responsibility", "breakdown", "breakdown_sla", "breakdown_response_sla",
+]);
 
 /**
  * -- A responsibility says WHO IT LANDS ON (owner, 2026-09-05) -----------------------------------
@@ -178,7 +188,16 @@ type LFn = (en: string, arr: string) => string;
 
 const ROW_PX = 52;
 const ROW = "h-[52px] flex-none box-border border-b border-border";
-const HEAD = "h-[36px] flex-none box-border border-b border-border";
+/**
+ * One header band. Two of them stack (a group's word over its columns) and the supplier column's
+ * single header matches the pair, so this number and the 96px below are ONE geometry — change both.
+ *
+ * ⚠️ **48px, raised from 36 (owner, 2026-09-09: the table must show every field without clipping).**
+ * A term column is 118px wide and the terms it names are sentences — «Operator accommodation and
+ * transport» — so a single 36px line could only ever end in an ellipsis. Every head below wraps
+ * inside this band instead of truncating.
+ */
+const HEAD = "h-[48px] flex-none box-border border-b border-border";
 
 export function CompareMatrix({
   bids,
@@ -415,15 +434,22 @@ export function CompareMatrix({
   }, [rows, submissions]);
 
   /**
-   * The term columns this table actually needs: one per term ANY bid on it answers.
+   * The term columns this table draws: one per term THE REQUEST SET, and no others.
    *
-   * `asked` is what puts a column under «You set» rather than «They offered» — a term is the
-   * renter's when at least one bid carries his `renteeValue` for it, which is exactly what the two
-   * headings claim. A term nobody was asked for and nobody answered produces no column at all, so a
-   * simple request still draws a simple table.
+   * ── Only what he asked for (owner, 2026-09-09) ─────────────────────────────────────────────────
+   * *"make it only what is set in the request these what user care about"*.
+   *
+   * ~~`asked || answered`~~ (2026-09-07). A supplier could earn a column by volunteering a term —
+   * his mobilisation lead time, his own attachments — and it drew a column the renter never asked a
+   * question in, mostly «Didn't say», sitting between the two he did ask. It also cannot carry a
+   * verdict: green and red are a judgement against the request, so a volunteered column is navy on
+   * every row whatever the supplier wrote. The comparison is now the request's own checklist.
+   *
+   * A term is the renter's when any bid carries his side of it — `renteeValue`, or the «Renter: X»
+   * half of the detail line, which is how an off-platform submission carries it (`termRow`).
    */
   const termCols = useMemo(() => {
-    const byGroup = new Map<string, { group: string; keys: string[]; labelEn: string; labelAr: string; asked: boolean; answered: boolean }>();
+    const byGroup = new Map<string, { group: string; keys: string[]; labelEn: string; labelAr: string; asked: boolean }>();
     for (const b of rows) {
       // `supplier` is deliberately absent: CR and VAT are company details (see TERM_HIDDEN).
       for (const r of [...(b.card.negotiableTerms ?? []), ...b.card.terms.contract, ...b.card.terms.equipment]) {
@@ -435,19 +461,17 @@ export function CompareMatrix({
            *"If something is not set by the request and doesn't have at least one value across the
            suppliers' bids, don't show it — meaningless to show all «doesn't say»."*
 
-           Two ways to earn a column, and a term needs one of them:
-             · the REQUEST set it — `renteeValue` on any bid's row; or
-             · a SUPPLIER answered it — a value, or the supplier half of a detail.
-
            `saysSomething` above only drops a row that is grey AND bare, which let a term through on
            a state alone: «Maintenance» was `matched` with no value anywhere, so the table drew a
-           column of «Didn't say» about a question nobody had asked in words. */
+           column of «Didn't say» about a question nobody had asked in words.
+
+           A term the REQUEST set and nobody answered still draws, as a column of «Didn't say» - that
+           is the renter's own question going unanswered, which is exactly what he is here to see. */
         const sides = termSides(r, ar);
         const at = byGroup.get(group);
         if (at) {
           if (!at.keys.includes(r.key)) at.keys.push(r.key);
           at.asked = at.asked || sides.asked != null;
-          at.answered = at.answered || sides.offered != null;
         } else {
           byGroup.set(group, {
             group,
@@ -455,19 +479,17 @@ export function CompareMatrix({
             labelEn: r.labelEn,
             labelAr: r.labelAr,
             asked: sides.asked != null,
-            answered: sides.offered != null,
           });
         }
       }
     }
     const known = (g: string) => { const i = TERM_ORDER.indexOf(g); return i === -1 ? Number.MAX_SAFE_INTEGER : i; };
-    /* The terms the RENTER set come first — that ordering is what the «Terms you set» heading used
-       to say out loud before it was removed (owner, 2026-09-06). Within each half, the known reading
-       order, then anything new alphabetically. */
+    /* The known reading order, then anything new alphabetically. The «renter's first» key that used
+       to lead this sort is gone with the volunteered columns it separated — every column is his. */
     return [...byGroup.values()]
-      // Nothing asked and nothing answered is a column of dashes; it does not draw.
-      .filter((c) => c.asked || c.answered)
-      .sort((a, b) => Number(b.asked) - Number(a.asked) || known(a.group) - known(b.group) || a.labelEn.localeCompare(b.labelEn));
+      // The request did not ask it, so there is nothing here to compare against. It does not draw.
+      .filter((c) => c.asked)
+      .sort((a, b) => known(a.group) - known(b.group) || a.labelEn.localeCompare(b.labelEn));
   }, [rows, ar]);
 
   const lowRate = useMemo(() => cheapest(rows, (b) => b.card.price), [rows]);
@@ -672,7 +694,7 @@ export function CompareMatrix({
             lost the only job it has. The rows keep their 52px, so nothing else on the table moves:
             two lines of 11px fit inside it. */}
         <div {...pin("matrix-supplier-col")} className="w-[220px] flex-none border-e border-border">
-          <div className="box-border flex h-[72px] flex-col justify-end gap-1.5 border-b border-border bg-surface2/60 px-3 pb-2">
+          <div className="box-border flex h-[96px] flex-col justify-end gap-1.5 border-b border-border bg-surface2/60 px-3 pb-2">
             {/* «Supplier», and nothing after it: the «pick one» that stood here was an instruction
                 for a choice this table no longer asks for (owner, 2026-09-04). */}
             <span className="flex min-w-0 items-baseline gap-1.5">
@@ -775,9 +797,16 @@ export function CompareMatrix({
              Open, this group is the widest thing on the row and the money is folded to rails beside
              it, because a term column sharing the width with six money columns truncates every
              answer in it. */
-          <div className="flex min-w-0 flex-[9_1_0] flex-col border-s border-border">
+          /* ── The strip is as WIDE as its columns, never squeezed under the rail beside it ──────
+               (owner, 2026-09-09: *"fix the overlay"*). It was `flex-[9_1_0] min-w-0`, so with
+               eight terms open the columns — each carrying its own `minWidth` — overflowed this box
+               and drew straight through the «Equipment» rail on its trailing edge: a head read
+               «OPERATOR» with the rest of the word behind the rail, and two columns reappeared on
+               the far side of it. It is `flex-none` now and the table scrolls sideways instead,
+               which is what the scroller around it is for. */
+          <div className="flex flex-none flex-col border-s border-border">
             <div className={`${HEAD} flex items-center gap-1.5 bg-surface2/60 px-3`}>
-              <span className="truncate text-label font-extrabold uppercase tracking-wide text-navy-mid">
+              <span className="min-w-0 text-label font-extrabold uppercase leading-tight tracking-wide text-navy-mid">
                 {t.workspace.groupTerms}
               </span>
               <FoldButton onClick={() => toggleGroup("terms")} hint={t.workspace.hideGroup} />
@@ -889,7 +918,7 @@ function GroupBand({ label, onFold, tinted }: { label: string; onFold: () => voi
   const t = useT();
   return (
     <div className={`${HEAD} flex items-center justify-center gap-1.5 px-3 ${tinted ? "bg-surface3/50" : "bg-surface2/60"}`}>
-      <span className="truncate text-label font-extrabold uppercase tracking-wide text-navy-mid">{label}</span>
+      <span className="min-w-0 text-center text-label font-extrabold uppercase leading-tight tracking-wide text-navy-mid">{label}</span>
       <FoldButton onClick={onFold} hint={t.workspace.hideGroup} />
     </div>
   );
@@ -946,13 +975,12 @@ function MoneyHead({
       className={`${HEAD} relative flex items-center justify-center gap-1.5 px-2`}
       aria-sort={on ? (sortDir === 1 ? "ascending" : "descending") : undefined}
     >
-      {/* Two lines inside the same 36px band: the NAME, and what it contains. The band's height is
-          shared with the supplier column's 72px header, so it cannot grow — but a 10px name over a
-          9px subtitle sits inside it comfortably, and the subtitle is what the naming spec calls
-          for so nobody has to guess what a column adds up. */}
+      {/* The NAME, and what it contains, inside the shared 48px band — both WRAP rather than
+          truncate (owner, 2026-09-09). Two of these bands make the supplier column's own 96px
+          header, so nothing on the table drifts out of line. */}
       <button type="button" onClick={() => onSort(col.key)} className="flex min-w-0 flex-col items-center justify-center leading-none">
         <span className="flex min-w-0 items-center gap-1.5">
-          <span className={`truncate text-label font-semibold uppercase leading-tight tracking-wide ${on ? "text-navy" : "text-muted"}`}>
+          <span className={`min-w-0 text-center text-label font-semibold uppercase leading-tight tracking-wide ${on ? "text-navy" : "text-muted"}`}>
             {col.label}
           </span>
           <span aria-hidden="true" className={`flex-none text-label font-semibold ${on ? "text-brand" : "text-muted/50"}`}>
@@ -962,7 +990,7 @@ function MoneyHead({
         {col.sub && (
           /* `text-label` (11px) with the scale, not an arbitrary 9px: this app has six type steps
              and a seventh invented for one subtitle is how a scale stops being one. */
-          <span className="mt-0.5 max-w-full truncate text-label font-semibold leading-none text-muted/80">{col.sub}</span>
+          <span className="mt-0.5 max-w-full text-center text-label font-semibold leading-tight text-muted/80">{col.sub}</span>
         )}
       </button>
       {onInfo && (
@@ -1037,7 +1065,7 @@ function Money({ v, win, vat, excluded, onRentee }: { v: number | null | undefin
  */
 /** The narrowest a term column may be. Below this an answer cannot read on two lines either, and
  *  the table's own horizontal scroller is the honest answer to «more terms than width». */
-const TERM_MIN_PX = 118;
+const TERM_MIN_PX = 132;
 
 /**
  * The other side of a two-sided term.
@@ -1092,7 +1120,7 @@ function TermColumn({
   const merged = answers.length > 1 && first.text != null && answers.every((a) => a.text === first.text && !a.against);
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col border-e border-border last:border-e-0" style={{ minWidth: TERM_MIN_PX }}>
+    <div className="flex flex-none flex-col border-e border-border last:border-e-0" style={{ width: TERM_MIN_PX }}>
       {/* ── The term, and nothing else (owner, 2026-09-06) ────────────────────────────────────
           *"No need to mention what the rentee asked — just red or green."*
 
@@ -1102,11 +1130,14 @@ function TermColumn({
           answer meets what he asked for, red means it does not. The full string still rides on
           `title` for the one head too long to draw. */}
       <div className={`${HEAD} flex items-center gap-1.5 bg-surface/60 px-2.5`} title={askedFor ? `${label} — ${t.workspace.youAsked}: ${askedFor}` : label}>
-        <span className="min-w-0 truncate text-label font-semibold uppercase leading-tight tracking-wide text-muted">{label}</span>
+        <span className="min-w-0 break-words text-label font-semibold uppercase leading-[1.15] tracking-wide text-muted">{label}</span>
       </div>
 
       {merged ? (
-        <div style={{ height: rows.length * ROW_PX }} className="flex flex-none flex-col items-center justify-center gap-1 bg-surface/40 px-3">
+        <div
+          style={{ height: rows.length * ROW_PX }}
+          className={`flex flex-none flex-col items-center justify-center gap-1 px-3 ${first.met ? "bg-ok-soft/70" : "bg-surface/40"}`}
+        >
           <span className={`text-center text-meta font-semibold leading-[1.35] ${first.met ? "text-ok" : "text-muted"}`}>{first.text}</span>
           <span className="text-center text-label font-semibold leading-snug text-muted/80">
             {t.workspace.sameFromAll.replace("{n}", String(rows.length))}
@@ -1119,11 +1150,16 @@ function TermColumn({
           return (
             <div
               key={b.card.id}
-              /* The conflict is RED, and only red (owner, 2026-09-06: «if conflict just in red»).
-                 The row used to be filled `bg-danger-soft` as well, which on a table of ten term
-                 columns painted whole bands of the screen and made the figures beside them hard to
-                 read. The value is what the renter is here for; the colour qualifies it. */
-              className={`${ROW} flex items-center gap-1.5 px-2.5`}
+              /* ── The verdict is a light GROUND, not only ink (owner, 2026-09-09) ──────────────
+                 *"make the green and red as light highlight for the cells not text only"*.
+                 A coloured word is read one cell at a time; a tinted cell is read down the column,
+                 which is how a renter compares four offers on one term. This reverses the 2026-09-06
+                 ruling («if conflict just in red», the fill dropped for being too heavy) - the tint
+                 is the OS's own `*-bg` tone at 70%, a wash rather than the block that was removed,
+                 and «Didn't say» stays untinted so an absent answer never reads as a verdict. */
+              className={`${ROW} flex items-center gap-1.5 px-2.5 ${
+                a.against ? "bg-danger-soft/70" : a.met ? "bg-ok-soft/70" : ""
+              }`}
               title={a.text ?? undefined}
             >
               {/* -- The answer is READ, not cut (owner, 2026-09-05) ------------------------------
@@ -1136,13 +1172,21 @@ function TermColumn({
                   widening the column and pushing the money off the screen. */}
               <span
                 className={`line-clamp-2 break-words text-meta font-semibold leading-[1.3] ${
-                  a.against ? "text-danger" : a.met ? "text-ok" : a.text ? "text-navy" : "text-muted"
+                  a.against ? "text-danger" : a.met ? "text-ok" : a.text || doc ? "text-navy" : "text-muted"
                 }`}
               >
                 {/* ✗ before a requirement he did not meet: the mark is what stops «TÜV» in red and
                     «TÜV» in green being the same word twice. */}
                 {a.refused && <span aria-hidden="true">✗ </span>}
-                {a.text ?? t.workspace.didntSay}
+                {/* ── A FILE is an answer (owner, 2026-09-09) ────────────────────────────────────
+                    *"how come some have «didn't say» but have a document option to view"*. Because
+                    the two halves were read separately: the value came off the bid's term row, the
+                    eye off the bid's documents, so a supplier who uploaded his TÜV certificate but
+                    left the term itself blank was reported as having said NOTHING beside the paper
+                    that says it. The paper is the stronger claim of the two — this repo's own rule
+                    since 2026-09-06, *"a certificate and its file are one fact"* — so the cell
+                    names it and the eye opens it. */}
+                {a.text ?? (doc ? t.workspace.docAttached : t.workspace.didntSay)}
               </span>
               {doc && (
                 /* The eye opens the file itself, in a new tab, on the presigned URL the backend

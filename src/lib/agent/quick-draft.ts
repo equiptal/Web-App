@@ -80,9 +80,23 @@ function certsOf(raw: unknown): EquipmentItem["safetyCertsOverride"] {
   return codes.length ? (codes as EquipmentItem["safetyCertsOverride"]) : null;
 }
 
-function shell(items: EquipmentItem[]): AgentDraft {
+/**
+ * @param rfqId The row the agent wrote for this parse, when there is one.
+ *
+ * ⚠️ This was hardcoded `null`, and that single word took Tier 1 out of the learning loop
+ * entirely. `rfq-store.tsx` gates the correction POST on `if (s.draft.rfqId && editedFromDraft)`,
+ * so with no id a renter could fix the agent's answer and nothing was ever told: no
+ * `/rfq/:id/correct` row, no `rfq_corrections` audit, no input to `correctionMinerService`, no
+ * learned rule. Every edit on the fast lane was thrown away, silently, while the full path learned
+ * from the same correction.
+ *
+ * Tier 0 still passes nothing: the browser matched it, and its corpus row is posted
+ * fire-and-forget to `/rfq/ingest` without waiting for the id, so there is genuinely none to carry
+ * here. Correcting a Tier-0 line is a separate piece of work.
+ */
+function shell(items: EquipmentItem[], rfqId: string | null = null): AgentDraft {
   return {
-    rfqId: null,
+    rfqId,
     project: defaultProjectDetails(),
     items,
     preferences: defaultPreferences(),
@@ -171,7 +185,20 @@ export function quickItemsToDraft(
       ref,
       verdict,
       rawLabel: (r.input_equipment as string) ?? subtype ?? "",
-      rawSize: capacity,
+      /* ── ONLY the size the renter literally typed ────────────────────────────────────────────
+         This was `rawSize: capacity` — the agent's RESOLVED size — which is the one fallback the
+         full path forbids in as many words (`agent-adapters.ts:445-448`: *"NEVER fall back to
+         li.capacity … it belongs in MATCHED TO, not the raw input"*). The two lanes disagreed
+         about the same sentence, in the direction that misleads.
+
+         Type "22 ton" against a catalogue holding only "20 Ton" and the item is snapped. With
+         `capacity` here, "FROM YOUR RFQ" showed **20 Ton** as the renter's own words — a size they
+         never wrote, presented as the thing they wrote, with nothing marking the change.
+
+         The agent now emits `capacity_input_value` on every item for exactly this reason (its key
+         list calls the pair "NOT optional and NOT metadata"), so there is a real value to read.
+         null when they stated no size, which is the honest answer. */
+      rawSize: (r.capacity_input_value as string) ?? null,
       quantity: typeof r.quantity === "number" && r.quantity > 0 ? r.quantity : 1,
       /* ── EVERY answer the fast lane gives, not just the taxonomy ─────────────────────────────
 
@@ -224,10 +251,30 @@ export function quickItemsToDraft(
          The renter's report was exact: detected without a project, lost with one, because a project
          is what routes the line to this lane. */
       safetyCertsOverride: certsOf(r.safety_certifications),
+      /* ── The catch-all, and the only place some things can land at all ──────────────────────────
+
+         `additional_notes` is where the agent puts every per-item thing the renter stated that no
+         structured field can hold. Not a nice-to-have: the cert enum is TWO values (TUV, ARAMCO)
+         because each structured cert becomes a document demanded of every supplier who bids, so a
+         renter who types SASO, CE, ISO or SPSP-as-equipment has NOWHERE else to be heard. Same for
+         an attachment ("with a breaker"), a spec qualifier ("silent", "Tier-4") and a site
+         restriction ("narrow gate") — none has a field on this contract.
+
+         Before this, the fast lane dropped it and Tier 0 refused the line rather than lose it, so
+         "2 forklifts with saso" cost a model call and STILL arrived without the SASO. The full path
+         has read this since AC-53 (`agent-adapters.ts:482`); this lane simply never caught up. */
+      additionalNotes: (r.additional_notes as string) ?? "",
+      /* Crane/lifting only — `ItemRow` gates on `isCrane`, so a non-crane item carrying one is
+         invisible rather than wrong. Same mapping as the full path (A7). */
+      workType: (r.work_type as string) ?? undefined,
     } as EquipmentItem;
   });
 
-  return withCerts(text, shell(items.length ? items : [newManualItem("i1")]), quick);
+  return withCerts(
+    text,
+    shell(items.length ? items : [newManualItem("i1")], quick.rfq_id ?? null),
+    quick,
+  );
 }
 
 /**

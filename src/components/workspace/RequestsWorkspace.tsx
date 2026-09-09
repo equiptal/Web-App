@@ -31,6 +31,7 @@ import { ItemTier } from "@/components/workspace/ItemTier";
 import { BidCards } from "@/components/workspace/BidCards";
 import { CompareMatrix } from "@/components/workspace/CompareMatrix";
 import { AiRankPanel } from "@/components/workspace/AiRankPanel";
+import { BidSizeFilter } from "@/components/workspace/BidSizeFilter";
 import { RequestDetailsModal, type ShareLinkMeta } from "@/components/workspace/RequestDetailsModal";
 import { workspaceExportTotals } from "@/lib/contract/workspace-export";
 import { formatSar } from "@/lib/pricing/rental";
@@ -72,6 +73,16 @@ export function RequestsWorkspace() {
   const [wanted, setWanted] = useState<WorkspaceSelection>(EMPTY_SELECTION);
   const [tab, setTab] = useState<Tab>("cards");
   const [source, setSource] = useState<SourceFilter>("all");
+  /* ── Bids offering a LARGER machine (owner, 2026-09-08) ───────────────────────────────────────
+     The backend answers `exact` unless asked otherwise, and `exact` DROPS every bid whose machine
+     is bigger than the one the renter asked for. So this is not a filter over `bids`: it is part of
+     the request for them, and flipping it refetches. `largerHeld` is the envelope's own count,
+     taken before that filter runs, so it says how many such bids exist either way.
+
+     Held at the WORKSPACE, not per item: a renter who asked to see larger machines has answered a
+     question about what he will consider, not about one line of his RFQ. */
+  const [showLarger, setShowLarger] = useState(false);
+  const [largerHeld, setLargerHeld] = useState(0);
   const [reloads, setReloads] = useState(0);
   /* ── The open drawer is a STEP, so it lives in the URL (owner, 2026-09-07) ────────────────────
      *"Back must take the user back to the step he was in, not only the page screen."*
@@ -142,8 +153,9 @@ export function RequestsWorkspace() {
     let live = true;
     setBids([]);
     setSubmissionsByBid({});
+    setLargerHeld(0);
     Promise.all([
-      fetchBids(itemId).catch(() => ({ bids: [] })),
+      fetchBids(itemId, showLarger).catch(() => ({ bids: [], sizeCounts: undefined })),
       fetchRequestSubmissions(itemId).catch(() => ({ submissions: [] as Awaited<ReturnType<typeof fetchRequestSubmissions>>["submissions"] })),
     ]).then(([app, link]) => {
       if (!live) return;
@@ -153,6 +165,8 @@ export function RequestsWorkspace() {
         (sub.items.length ? sub.items : [undefined]).map((it) => ({ bid: { card: submissionToBidCard(sub, it), source: "offline" } as WorkspaceBid, sub })),
       );
       setBids([...app.bids.map((card): WorkspaceBid => ({ card, source: "app" })), ...offline.map((o) => o.bid)]);
+      // What the size filter is worth on this item, whichever way it is currently set.
+      setLargerHeld(app.sizeCounts?.larger ?? 0);
       setSubmissionsByBid(Object.fromEntries(offline.map((o) => [o.bid.card.id, o.sub])));
       // The same call already carries the public bid link's settings; the drawer's share sheet edits
       // them, so keep them rather than throwing them away with the rest of the envelope.
@@ -165,7 +179,7 @@ export function RequestsWorkspace() {
     return () => {
       live = false;
     };
-  }, [status, itemId]);
+  }, [status, itemId, showLarger]);
 
   // The code the list row lacked. One call, keyed on the item, dropped the moment the item changes so
   // a stale code can never sit over the wrong request.
@@ -549,9 +563,11 @@ export function RequestsWorkspace() {
             ))}
           </div>
         </div>
-        <div className={`mx-auto w-full ${PAGE_MAX} ${PAGE_X} mt-4 flex gap-5`}>
+        <div
+          className={`mx-auto grid w-full ${PAGE_MAX} ${PAGE_X} mt-4 grid-cols-[repeat(auto-fill,minmax(min(100%,320px),344px))] gap-5`}
+        >
           {Array.from({ length: 3 }, (_, i) => (
-            <Skeleton key={i} className="h-[420px] w-[344px] flex-none rounded-lg" />
+            <Skeleton key={i} className="h-[420px] rounded-lg" />
           ))}
         </div>
       </div>
@@ -596,7 +612,14 @@ export function RequestsWorkspace() {
     // this surface, and `fullBleed` gives it none to cancel. Every band below is `flex-none`; the one
     // that grows is the tab panel, and the only thing that scrolls is the list inside it — so the
     // rail and the strip cannot be pushed off the top by a long column of bids.
-    <div {...pin("requests-workspace")} className="flex h-full min-h-0 flex-col">
+    /* ── The page scrolls, not the box inside it (owner, 2026-09-08) ─────────────────────────
+       ~~Every band `flex-none`, the tab panel growing into what is left, and the bids scrolling
+       inside it.~~ That is what left a 100%-zoom screen with no vertical scrollbar at all and the
+       fourth bid behind a horizontal bar. This column is the scroller now: the rail, the tabs and
+       the cards all travel with it, which is what a renter means by scrolling the page. The shell is
+       still `fullBleed`, so this scroller is exactly the viewport under the header — the header and
+       the nav stay put, and there is only ever ONE bar on screen. */
+    <div {...pin("requests-workspace")} className="flex h-full min-h-0 flex-col overflow-y-auto">
       <RequestRail
         tiles={tiles}
         activeKey={resolved.groupId}
@@ -608,7 +631,7 @@ export function RequestsWorkspace() {
 
       {/* The same cap and the same gutter every page takes — so a renter moving from /create to
           /requests finds the content starting on the same line. */}
-      <div className={`mx-auto w-full ${PAGE_MAX} ${PAGE_X} mt-2 flex min-h-0 flex-1 flex-col pb-2`}>
+      <div className={`mx-auto w-full ${PAGE_MAX} ${PAGE_X} mt-2 flex flex-col pb-8`}>
         {/* ── The row above the panel (owner, 2026-08-27) ─────────────────────────────────────────
             Three things, and the tabs are the middle one so they sit under the eye rather than off
             at the leading edge.
@@ -670,7 +693,7 @@ export function RequestsWorkspace() {
               <button
                 type="button"
                 onClick={() => setBenched(new Set())}
-                className={btn("secondary", "lg", { className: "transition" })}
+                className={btn("secondary", "md", { className: "transition" })}
               >
                 <Icon name="done_all" size={14} /> {fmt(t.workspace.selectAll, { n: String(benched.size) })}
               </button>
@@ -678,11 +701,17 @@ export function RequestsWorkspace() {
             {/* One control, named for what THIS tab exports (owner, 2026-08-26): the cards issue the
                 quotation paper, the comparison issues the table. Both are the exports the app already
                 had; only which one the button reaches changes with the tab. */}
+            {/* ── The export is not the row's main act (owner, 2026-09-08) ─────────────────────
+                It stood at `control-lg`, 44px, the tallest control this design system has and the
+                same height as the tabs beside it, for a paper the renter takes once he is done
+                reading. `control-md` (34px) is what the context bar on the other end of this row
+                wears, so the trailing cluster now matches the leading one and the tabs are the only
+                44px thing on the line, which is right: they are what the row is FOR. */}
             <button
               type="button"
               disabled={shown.length === 0}
               onClick={() => (tab === "compare" ? printComparison() : void downloadQuotation())}
-              className={btn("secondary", "lg", { className: "whitespace-nowrap transition" })}
+              className={btn("secondary", "md", { className: "whitespace-nowrap transition" })}
             >
               {tab === "compare" ? t.workspace.exportComparison : t.workspace.downloadQuotation}
               {/* The count, only once a tick narrows it. Silent while the button means "all of
@@ -694,10 +723,13 @@ export function RequestsWorkspace() {
               )}{" "}
               <Icon name="download" size={14} />
             </button>
+            {/* The size filter, on the same line and at the same height. It narrows nothing already
+                on screen — it changes what the page ASKS the backend for (see `showLarger`). */}
+            <BidSizeFilter showLarger={showLarger} largerHeld={largerHeld} onChange={setShowLarger} />
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-sm rounded-tr-sm border border-border bg-surface">
+        <div className="flex flex-col overflow-hidden rounded-b-sm rounded-tr-sm border border-border bg-surface">
           {/* ── Source, above whichever pane is showing (owner's reference, 2026-08-25) ───────────
               It narrows both panes, so it belongs to neither — and it reads as a quiet row of words
               rather than a row of pills, because it is a filter over the table, not an action on it.
@@ -772,7 +804,9 @@ export function RequestsWorkspace() {
               `fullBleed` — pinned to the viewport by the same 2026-08-25 ruling — so there is no
               document scroll to hand the table to. Making the PAGE scroll means that page dropping
               `fullBleed`, which is the owner's call, not this component's. */}
-          <div className={`flex min-h-0 flex-1 flex-col ${tab === "compare" ? "overflow-y-auto" : "overflow-hidden"}`}>
+          {/* Neither tab scrolls itself any more: both render whole and the column above carries
+              them. The comparison keeps its own SIDEWAYS strip, which is a table's business. */}
+          <div className="flex flex-col">
           {tab === "cards" ? (
             <BidCards
               bids={shown}
@@ -785,6 +819,10 @@ export function RequestsWorkspace() {
               // supplier declined to price.
               mobByRentee={item?.mobByRentee ?? null}
               demobByRentee={item?.demobByRentee ?? null}
+              // So «no bids on this item» can say when that is only true of the size he asked for.
+              largerHeld={largerHeld}
+              showLarger={showLarger}
+              onShowLarger={() => setShowLarger(true)}
               onToggle={toggleBid}
             />
           ) : (

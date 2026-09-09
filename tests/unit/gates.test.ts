@@ -51,10 +51,20 @@ function makeDraft(items: EquipmentItem[], over: Partial<RfqDraft> = {}): RfqDra
 }
 
 /** A project that satisfies gateWhere. */
+/**
+ * A project with every REQUEST-WIDE answer given — the "everything but the equipment" baseline.
+ *
+ * The three party fields are set here because they are no longer seeded (2026-09-08): a fresh draft
+ * leaves «who delivers / who returns / who pays for the fuel» unanswered on purpose, so a helper
+ * that means "nothing is missing at request level" has to say so itself.
+ */
 function confirmedProject() {
   const p = defaultProjectDetails();
   p.location = { label: "King Khalid International Airport", lat: 24.9576, lng: 46.6988, confirmed: true };
   p.timing.rentalBasis = "monthly";
+  p.deliveryToSite = "me";
+  p.returnFromSite = "me";
+  p.fuelResponsibility = "me";
   return p;
 }
 
@@ -107,21 +117,64 @@ describe("itemAppGaps — the app's required set (MREQ-AC-09)", () => {
 });
 
 describe("itemWebGaps — year and certificate (MREQ-AC-54/55)", () => {
+  /* ── The gate reads the RESOLVED value (owner, 2026-09-09) ────────────────────────────────────
+     *"The certificate is shaking as required while it is selected, so whenever there is a value for
+     cert don't shake it, it is navy blue and filled and allow moving on."*
+
+     Both answers live at two levels — the item's own override, else the REQUEST-wide one — and the
+     card resolves them that way. This gate read the override alone, so a certificate set at request
+     level filled the pill and still counted as missing. Every case below therefore passes a project;
+     `bare()` is the request-wide silence these gates were written against, and `withCerts` /
+     `withYear` are the state that used to shake with an answer on screen. */
+  const bare = () => ({ touchedFields: [] as string[], project: defaultProjectDetails() });
+  const withRequestCerts = () => {
+    const p = defaultProjectDetails();
+    p.certificates.safety = ["tuv"];
+    return { touchedFields: [] as string[], project: p };
+  };
+  const withRequestYear = () => {
+    const p = defaultProjectDetails();
+    p.advanced.equipmentYear = "2018+";
+    return { touchedFields: [] as string[], project: p };
+  };
+
   it("accepts a value the RFQ named — that is already the renter's answer", () => {
     const item = makeItem({ equipmentYear: "2018+", safetyCertsOverride: ["tuv"] });
-    expect(itemWebGaps(item, { touchedFields: [] })).toEqual([]);
+    expect(itemWebGaps(item, bare())).toEqual([]);
   });
 
   it("blocks a value nobody supplied", () => {
     // Neither the RFQ nor the renter said anything: an empty cert list and a null year are the
     // form's silence, not an answer.
     const item = makeItem({ equipmentYear: null, safetyCertsOverride: [] });
-    expect(itemWebGaps(item, { touchedFields: [] }).map((g) => g.field)).toEqual(["equipment_year", "safety_certificates"]);
+    expect(itemWebGaps(item, bare()).map((g) => g.field)).toEqual(["equipment_year", "safety_certificates"]);
+  });
+
+  it("accepts a certificate set at REQUEST level, which is what the pill is showing", () => {
+    // The reported bug: the chip drew «TÜV», navy and filled, and shook as required.
+    const item = makeItem({ safetyCertsOverride: null, equipmentYear: "any" });
+    expect(itemWebGaps(item, withRequestCerts()).map((g) => g.field)).not.toContain("safety_certificates");
+  });
+
+  it("accepts a YEAR set at request level too — the same hole, one line apart", () => {
+    const item = makeItem({ equipmentYear: null, safetyCertsOverride: ["tuv"] });
+    expect(itemWebGaps(item, withRequestYear()).map((g) => g.field)).not.toContain("equipment_year");
+  });
+
+  it("still blocks when the item CLEARS the request-wide answer", () => {
+    /* An empty ARRAY on the item is «I have no certificate here», which is an answer only once the
+       control has been touched — and `null` means «follow the request». The two must not be
+       conflated, or clearing a cert on one machine would silently inherit the request's again. */
+    const item = makeItem({ safetyCertsOverride: [], equipmentYear: "any" });
+    expect(itemWebGaps(item, withRequestCerts()).map((g) => g.field)).toEqual(["safety_certificates"]);
   });
 
   it("is satisfied once each control is touched", () => {
     const item = makeItem();
-    const touched = { touchedFields: [itemFieldKey(item.id, "equipment_year"), itemFieldKey(item.id, "safety_certificates")] };
+    const touched = {
+      touchedFields: [itemFieldKey(item.id, "equipment_year"), itemFieldKey(item.id, "safety_certificates")],
+      project: defaultProjectDetails(),
+    };
     expect(itemWebGaps(item, touched)).toEqual([]);
   });
 
@@ -129,29 +182,39 @@ describe("itemWebGaps — year and certificate (MREQ-AC-54/55)", () => {
   // not a value, so an explicitly empty answer clears it exactly like a populated one.
   it("accepts 'any' and an empty certificate list as real answers", () => {
     const item = makeItem({ equipmentYear: "any", safetyCertsOverride: [] });
-    const touched = { touchedFields: [itemFieldKey(item.id, "equipment_year"), itemFieldKey(item.id, "safety_certificates")] };
+    const touched = {
+      touchedFields: [itemFieldKey(item.id, "equipment_year"), itemFieldKey(item.id, "safety_certificates")],
+      project: defaultProjectDetails(),
+    };
     expect(itemWebGaps(item, touched)).toEqual([]);
   });
 });
 
-describe("transportGaps — delivery and return (MREQ-AC-53)", () => {
-  it("passes with the seeded request-wide 'me', which is what the renter sees selected", () => {
-    const project = defaultProjectDetails(); // seeds both to "me"
-    expect(transportGaps([makeItem()], project)).toEqual([]);
+describe("transportGaps — delivery, return and who pays for the fuel (MREQ-AC-53)", () => {
+  /**
+   * ⚠️ These three start UNANSWERED since 2026-09-08. `defaultProjectDetails` used to seed «me» on
+   * all three, which turned the agent's silence into three priced commitments — the renter collects
+   * the machine, returns it, and buys the fuel — and made these very gates unreachable.
+   */
+  it("blocks a fresh draft on all three, because nobody has answered them", () => {
+    expect(transportGaps([makeItem()], defaultProjectDetails()).map((g) => g.reason)).toEqual([
+      "gate.deliveryMissing",
+      "gate.returnMissing",
+      "gate.fuelPartyMissing",
+    ]);
   });
 
-  it("blocks when the shared control is cleared and the item has no override", () => {
+  it("passes once the shared controls carry an answer", () => {
     const project = defaultProjectDetails();
-    project.deliveryToSite = null;
-    project.returnFromSite = null;
-    expect(transportGaps([makeItem()], project).map((g) => g.reason)).toEqual(["gate.deliveryMissing", "gate.returnMissing"]);
+    project.deliveryToSite = "me";
+    project.returnFromSite = "me";
+    project.fuelResponsibility = "me";
+    expect(transportGaps([makeItem()], project)).toEqual([]);
   });
 
   it("reads the per-item override ahead of the shared value, exactly as submit does", () => {
     const project = defaultProjectDetails();
-    project.deliveryToSite = null;
-    project.returnFromSite = null;
-    const item = makeItem({ deliveryOverride: "supplier", returnOverride: "supplier" });
+    const item = makeItem({ deliveryOverride: "supplier", returnOverride: "supplier", fuelResponsibilityOverride: "supplier" });
     expect(transportGaps([item], project)).toEqual([]);
   });
 });
@@ -240,10 +303,17 @@ describe("requiredGaps — the 'N things need you' count (MREQ-AC-12)", () => {
 describe("gateEquipment — one item's panel", () => {
   it("combines the app gates, the web gates and transport", () => {
     const item = makeItem();
-    const project = defaultProjectDetails();
+    // `confirmedProject` because TRANSPORT is part of what this gate combines, and the three party
+    // fields are unanswered on a fresh draft since 2026-09-08 — with `defaultProjectDetails` this
+    // case would pass for the wrong reason, blocked on transport rather than on the web gates.
+    const project = confirmedProject();
     expect(gateEquipment(item, project, { touchedFields: [] }).ok).toBe(false);
     const touched = { touchedFields: [itemFieldKey(item.id, "equipment_year"), itemFieldKey(item.id, "safety_certificates")] };
     expect(gateEquipment(item, project, touched).ok).toBe(true);
+
+    // And it really does read transport: clear one party and the same answered item is blocked again.
+    const noFuelParty = { ...project, fuelResponsibility: null };
+    expect(gateEquipment(item, noFuelParty, touched).reasons).toContain("gate.fuelPartyMissing");
   });
 });
 
@@ -259,5 +329,54 @@ describe("postableItems (specs#245-AC-33/34/43)", () => {
     const sourcing = makeItem({ id: "b", verdict: "no-match", sourcingRequested: true });
     expect(postableItems([makeItem({ id: "a" }), sourcing]).map((i) => i.id)).toEqual(["a"]);
     expect(itemBlocksAdvance(sourcing)).toBe(false);
+  });
+});
+
+/**
+ * The agent's SILENCE, end to end (owner, 2026-09-08).
+ *
+ * *"The agent now might send null values for many fields, so make sure web allows a non-selected
+ * option — no need to auto-select everything. Even if required, just show it in red with «Required»
+ * if the user tried to go next."*
+ *
+ * So: nothing is chosen on the renter's behalf, every unanswered required field raises its own gap,
+ * and the gap is what the canvas paints red. These pin the FIRST half — that the gaps exist and are
+ * addressed to the control that can satisfy them; `canvas-gating.test.tsx` pins the red mark itself.
+ */
+describe("a draft where the agent stated nothing", () => {
+  const silent = () =>
+    makeDraft([makeItem({ equipmentYear: null, safetyCertsOverride: [] })], {
+      project: defaultProjectDetails(),
+      touchedFields: [],
+    });
+
+  it("chooses nothing for the renter", () => {
+    const p = defaultProjectDetails();
+    expect(p.deliveryToSite).toBeNull();
+    expect(p.returnFromSite).toBeNull();
+    expect(p.fuelResponsibility).toBeNull();
+    // Rental basis and the site were already unanswered; the year is «any» only when asked for.
+    expect(p.timing.rentalBasis).toBeNull();
+    expect(p.location.confirmed).toBe(false);
+    expect(p.advanced.equipmentYear).toBeNull();
+  });
+
+  it("raises one gap per unanswered field, each addressed to its own control", () => {
+    const fields = requiredGaps(silent(), true).map((g) => g.field);
+    for (const f of ["delivery", "return", "fuel_responsibility", "equipment_year", "safety_certificates", "location", "rental_basis"]) {
+      expect(fields, `missing a gap for ${f}`).toContain(f);
+    }
+  });
+
+  it("clears each gap as its own answer arrives, and nothing else's", () => {
+    const draft = silent();
+    const only = (d: RfqDraft) => requiredGaps(d, true).map((g) => g.field);
+
+    expect(only(draft)).toContain("fuel_responsibility");
+    const answered = { ...draft, project: { ...draft.project, fuelResponsibility: "supplier" as const } };
+    expect(only(answered)).not.toContain("fuel_responsibility");
+    // The other two are untouched by that answer — no cascade, no guessing.
+    expect(only(answered)).toContain("delivery");
+    expect(only(answered)).toContain("return");
   });
 });

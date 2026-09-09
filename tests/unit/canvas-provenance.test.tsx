@@ -6,6 +6,12 @@ import { DRAFT_STORAGE_KEY } from "@/lib/store/rfq-store";
 import { itemGaps, transportGaps } from "@/lib/contract";
 import { confirmedProject, makeAgentDraft, makeItem, renderCanvas } from "../setup/canvas";
 
+/* The two overlay pills are addressed by their accessible NAME, and that name is the field’s noun —
+   «Certificate», «Minimum year». Their visible text is an INSTRUCTION while unanswered («Pick
+   certificate»), because a shouted noun on an empty control reads as a label for a value that is not
+   there (owner, 2026-09-08). Read by name, not by the words on the pill, so the copy can change
+   again without touching these. */
+
 /**
  * MREQ-TC-33/34/37/38 — the marks, the Arabic screen, resilience, and what survives a reload.
  *
@@ -16,9 +22,9 @@ import { confirmedProject, makeAgentDraft, makeItem, renderCanvas } from "../set
 
 /** Answer the minimum-year control through the UI, the way a renter would. */
 async function pickYear(handle: Awaited<ReturnType<typeof card>>) {
-  screen.getByRole("combobox", { name: "MINIMUM YEAR" }).click();
+  screen.getByRole("combobox", { name: "Minimum year" }).click();
   await Promise.resolve();
-  const listbox = screen.getByRole("listbox", { name: "MINIMUM YEAR" });
+  const listbox = screen.getByRole("listbox", { name: "Minimum year" });
   listbox.querySelectorAll<HTMLButtonElement>("[role=option]")[0].click();
   void handle;
 }
@@ -34,7 +40,10 @@ const card = (opts: Parameters<typeof renderCanvas>[1] = {}) =>
   );
 
 /** Controls ringed amber — the mark for "this was chosen for you", now the only one. */
-const ringed = (): number => document.querySelectorAll(".ring-warn\\/45").length;
+/* The provenance mark is one thin line in the BRAND orange, as production draws it round a
+   prefilled field. It was `ring-warn/45` with a tint and a 2px offset until 2026-09-08, when the
+   owner pointed at prod: `--warn` in this palette is a mustard, not an orange. */
+const ringed = (): number => document.querySelectorAll(".ring-brand").length;
 
 describe("provenance marks (MREQ-AC-57/58/59)", () => {
   /**
@@ -73,19 +82,28 @@ describe("provenance marks (MREQ-AC-57/58/59)", () => {
    * The four controls on the machine panel carry no visible label and no note — the prototype colours
    * the chip instead: amber while the renter has not answered, dark once they have. On a photo a
    * small amber caption would be unreadable, so the colour IS the mark there.
+   *
+   * Since 2026-09-08 there is a THIRD state on these two: answered by the AGENT rather than by the
+   * renter, which keeps the dark chip and adds the canvas’s provenance ring. `cert-year-pills.test.tsx`
+   * pins all three.
    */
   it("marks the panel overlays by colour rather than by a note", async () => {
     const handle = await card();
-    const year = screen.getByRole("combobox", { name: "MINIMUM YEAR" });
+    const year = screen.getByRole("combobox", { name: "Minimum year" });
     // The certificate is a multi-select now (owner, 2026-09-01), so it is a listbox opener rather
     // than a combobox — the field has always been an array everywhere else.
-    const cert = screen.getByRole("button", { name: "CERTIFICATE" });
-    expect(year.className).toContain("brand-press");
-    expect(cert.className).toContain("brand-press");
+    const cert = screen.getByRole("button", { name: "Certificate" });
+    /* `bg-brand`, not `brand-press`: the pressed shade (#bd5711) is nearly a brown and read as a
+       filled answer on an EMPTY control (owner, 2026-09-08). `toContain("bg-brand")` would also
+       match `bg-brand-press`, so the second line is what actually pins the change. */
+    expect(year.className).toContain("bg-brand");
+    expect(cert.className).toContain("bg-brand");
+    expect(year.className).not.toContain("brand-press");
+    expect(cert.className).not.toContain("brand-press");
 
     await handle.run(() => pickYear(handle));
 
-    expect(screen.getByRole("combobox", { name: "MINIMUM YEAR" }).className).toContain("navy-deep");
+    expect(screen.getByRole("combobox", { name: "Minimum year" }).className).toContain("navy-deep");
   });
 
   it("never blocks on its own (MREQ-AC-61)", async () => {
@@ -136,7 +154,7 @@ describe("Arabic (MREQ-AC-51)", () => {
 
     expect(screen.getByText("ما كتبته")).toBeTruthy();
     // The schedule is open, so equipment is collapsed to its strip — which is the label to assert.
-    expect(screen.getByText("الآلة والمشغّل")).toBeTruthy();
+    expect(screen.getByText("المعدّة والمشغّل")).toBeTruthy();
     expect(screen.getByText("مدة التشغيل")).toBeTruthy();
     // 155 charged days, in the digits the rest of the app uses — Latin, Arabic locale included
     // (owner, 2026-09-04). This asserted «١٥٥» and the ABSENCE of "155" until that ruling.
@@ -149,7 +167,7 @@ describe("Arabic (MREQ-AC-51)", () => {
       locale: "ar",
       draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
     });
-    for (const english of ["YOU WROTE", "The machine", "Where it goes", "When it runs"]) {
+    for (const english of ["YOU WROTE", "The equipment", "Where it goes", "When it runs"]) {
       expect(view.container.textContent).not.toContain(english);
     }
   });
@@ -163,7 +181,7 @@ describe("when the catalogue is unreachable (MREQ-AC-52)", () => {
       draft: makeAgentDraft({ items: [makeItem({ ref: { categoryId: null, subcategoryId: null, measurementId: null } })], project: confirmedProject() }),
     });
 
-    expect(screen.getByText("The machine")).toBeTruthy();
+    expect(screen.getByText("The equipment")).toBeTruthy();
     expect(screen.getByText("Where it goes")).toBeTruthy();
     /* ~~«N things need you».~~ Removed (owner, 2026-09-01): it counted gaps the cards below already
        mark one by one, in the place the renter has to act on them. The gap itself is what this pins

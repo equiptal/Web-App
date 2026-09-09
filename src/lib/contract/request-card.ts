@@ -150,6 +150,20 @@ export interface RequestCardCtx {
    * room — where the card names no type rather than naming the wrong one.
    */
   typeWord?: string | null;
+  /**
+   * **The supplier's own name** (owner, 2026-09-08: *"render the real company name, not «The
+   * company»"*).
+   *
+   * A `company`-scope card asks the FIRM for another machine, so it names no equipment and used to
+   * fall through to the literal «The company» — a label where the counterparty's name belongs, on a
+   * card sitting in that counterparty's own conversation. The surface knows the name (it is the
+   * chat's header and the bid's `supplierName`), so it hands it over rather than having this file
+   * invent a word for it.
+   *
+   * Absent → the old fallback, which is still the honest answer for a surface that has no name in
+   * hand.
+   */
+  companyName?: string | null;
 }
 
 /**
@@ -162,7 +176,9 @@ export interface RequestCardCtx {
  * different verdicts share is a tone that cannot be restyled for one of them later. It must never
  * take the green of `answered`.
  */
-export type RequestCardTone = "answered" | "refused" | "partial" | "waiting" | "unknown" | "draft";
+/** ~~`draft`.~~ Gone with the line it wore (owner, 2026-09-08): a draft's status row is absent, not
+ *  a sixth tone, and the buttons under the card are what say it has not been sent. */
+export type RequestCardTone = "answered" | "refused" | "partial" | "waiting" | "unknown";
 
 export interface RequestCardView {
   scope: RenteeRequestScope;
@@ -214,7 +230,9 @@ export function requestCardView(
     machine?.label?.trim() ||
     machine?.serial ||
     subject.serial ||
-    (subject.scope === "company" ? L("The company", "الشركة") : L("The equipment", "المعدّة"));
+    // The firm's own name on a company-scope card, and the generic word only when nobody handed one
+    // over (owner, 2026-09-08).
+    (subject.scope === "company" ? ctx.companyName?.trim() || L("The company", "الشركة") : L("The equipment", "المعدّة"));
 
   /* ── `alternative` asks for an ADDITION, and names the REQUEST's type (owner, 2026-08-11) ───────
      «طلب معدّة أخرى» / "Request for another machine" described a SWAP — a different unit instead of
@@ -359,9 +377,11 @@ export function requestCardView(
       default:
         // NEVER "he refused" — an unanswered ask is unanswered (RM3-AC-20's rule, on the card). And
         // never "waiting for his answer" on something he has not been sent.
-        return draft
-          ? { tone: "draft", label: L("Not sent yet — review it, then send", "لم يُرسل بعد — راجعه ثم أرسله") }
-          : { tone: "waiting", label: L("Waiting for his answer", "بانتظار ردّه") };
+        /* ~~A draft said «Not sent yet — review it, then send».~~ Removed (owner, 2026-09-08). The
+           card it sat on already has «Cancel» and «Send the request» under it, so the line described
+           the two buttons beneath it and cost the card a row and a dashed rule. A SENT card keeps its
+           waiting line, which is news rather than an instruction. */
+        return draft ? null : { tone: "waiting", label: L("Waiting for his answer", "بانتظار ردّه") };
     }
   })();
 

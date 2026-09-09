@@ -100,11 +100,21 @@ export function makeItem(over: Partial<EquipmentItem> = {}): EquipmentItem {
   };
 }
 
-/** A project with the site confirmed and a basis chosen — the "everything but equipment" baseline. */
+/**
+ * A project with the site confirmed and a basis chosen — the "everything but equipment" baseline.
+ *
+ * ⚠️ It also answers the three PARTY fields. They stopped being seeded on 2026-09-08 (the agent now
+ * returns null for anything the RFQ did not state, and «me» on all three was three commitments
+ * nobody made), so a helper that means "nothing is missing at request level" has to say so. A test
+ * about the party controls themselves passes `deliveryToSite: null` and so on through `over`.
+ */
 export function confirmedProject(over: Partial<ProjectDetails> = {}): ProjectDetails {
   const p = defaultProjectDetails();
   p.location = { label: "King Khalid International Airport", lat: 24.9576, lng: 46.6988, confirmed: true, source: "agent" };
   p.timing = { rentalBasis: "monthly", extendable: true, startDate: "2026-08-12", endDate: "2027-02-08", hoursPerDay: 10 };
+  p.deliveryToSite = "me";
+  p.returnFromSite = "me";
+  p.fuelResponsibility = "me";
   return { ...p, ...over };
 }
 

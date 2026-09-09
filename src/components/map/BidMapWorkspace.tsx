@@ -47,6 +47,12 @@ import { EquipmentList } from "@/components/map/EquipmentList";
 // the hover box on each marker. Two calls would be two answers waiting to differ (RM3-AC-19).
 import { equipmentCardModel } from "@/components/map/equipment-card-model";
 import { CompanyPanel, EquipmentDetail, type PanelRequestDraft } from "@/components/map/panel";
+import {
+  markYardExplained,
+  yardExplainedBefore,
+  YardExplainDialog,
+  type YardExplainState,
+} from "@/components/map/YardExplainDialog";
 import type { BidCard } from "@/lib/contract/bids";
 import { fetchBidCompanyDocuments, fetchBidFleet } from "@/lib/api/client";
 import { companyPanelSource, type CompanyDocsPayload } from "@/lib/contract/company-documents";
@@ -667,6 +673,27 @@ export function BidMapWorkspace({
     [askPending, panelDraftToWire],
   );
 
+  /* ── What a red distance means, and the ask behind it — owned HERE (owner, 2026-09-08) ─────────
+     ~~`EquipmentList` owned this state and rendered the layer.~~ The detail panel REPLACES the list
+     (`.bm-takeover`), so a layer owned by the list could not be reached from the detail's own yard
+     card, and the owner's ruling is that both open the same one: *"clicking it whether from the
+     details or from the fleet will open this"*.
+
+     The rule is unchanged: the FIRST press explains, every press after it asks straight away, and a
+     machine already asked about shows the question rather than offering to ask again. */
+  const [yardExplain, setYardExplain] = useState<YardExplainState | null>(null);
+  const onYardPress = useCallback(
+    (machine: FleetMachine, asked: boolean) => {
+      if (asked) { setYardExplain({ machine, asked: true }); return; }
+      if (!yardExplainedBefore()) { setYardExplain({ machine, asked: false }); return; }
+      // He has read it. Mark it again anyway — the flag is the only record, and a storage that came
+      // back empty once must not send him round the explanation on every later machine.
+      markYardExplained();
+      composeDraft(composeMachineRequest("availability", machine.equipmentId));
+    },
+    [composeDraft],
+  );
+
   /** The detail's machine, re-read from the CURRENT list on every render (AC-18) — nothing about a
    *  machine is held in this component's state except its id. A refetch that changes its availability
    *  changes the chip under the renter's eyes rather than leaving a stale copy open. */
@@ -943,6 +970,7 @@ export function BidMapWorkspace({
               }}
               onRequest={sendPanelRequest}
               askPending={panelAskPending}
+              onYardPress={onYardPress}
               initialTab={openedForDocuments ? "documents" : undefined}
             />
           </div>
@@ -1118,7 +1146,9 @@ export function BidMapWorkspace({
                   // the ONE seam every ask on this surface goes through — the shortfall, the card,
                   // the detail and both document surfaces — so there is exactly one place that stages
                   // an ask, one that creates the room, and one that reports a failure.
-                  onAskAvailability={(m) => composeDraft(composeMachineRequest("availability", m.equipmentId))}
+                  // The yard card's press. The LAYER it opens is this component's (see `onYardPress`),
+                  // because the detail panel opens the same one and replaces this list to do it.
+                  onYardPress={onYardPress}
                   // …and the same composer read for the other verb: a card whose «اطلب التأكيد» is
                   // already out shows it as asked instead of offering to ask again (owner, 2026-08-10).
                   askPending={(m) => askPending(composeMachineRequest("availability", m.equipmentId))}
@@ -1229,6 +1259,18 @@ export function BidMapWorkspace({
           // the fleet's machines the offer actually names, and therefore which have a detail.
           onOpenMachine={openMachineFromChat}
           canOpenMachine={canOpenMachineFromChat}
+        />
+      )}
+
+      {/* The yard layer, portalled to `<body>` from inside itself. Mounted HERE rather than in either
+          column, so the fleet card and the detail panel — which replaces that card — open the same
+          one. `request={bid}` is what makes the specimen show this machine's own distance. */}
+      {yardExplain && (
+        <YardExplainDialog
+          state={yardExplain}
+          request={bid ?? undefined}
+          onClose={() => setYardExplain(null)}
+          onAsk={(m) => composeDraft(composeMachineRequest("availability", m.equipmentId))}
         />
       )}
     </div>

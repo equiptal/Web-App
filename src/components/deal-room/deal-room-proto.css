@@ -284,7 +284,9 @@
    fallback `.chatcard` inside it is re-stated rather than left to centre itself. */
 /* The dock's ceiling (`.bm-chat-card`), and no margin — the thread's 8px gap is the rhythm now, so a
    margin here would spend it twice and park a card further from its neighbours than a bubble is. */
-.dlproto .thread .dl-rq-card { width: 86%; max-width: min(86%, 376px); margin: 0; }
+/* 520px on the request card's own wrapper — it is horizontal since 2026-09-08 and 376 was the
+   stacked card's width. The negotiation `.chatcard` beside it keeps its own 340px. */
+.dlproto .thread .dl-rq-card { width: 86%; max-width: min(86%, 520px); margin: 0; }
 .dlproto .thread .dl-rq-card.is-mine { align-self: flex-end; }
 .dlproto .thread .dl-rq-card.is-them { align-self: flex-start; }
 .dlproto .thread .dl-rq-card .bm-rq,
@@ -404,6 +406,12 @@
 .qp-htitle { min-width: 0; flex: 1; }
 .qp-htitle .t { font-size: 14px; font-weight: 800; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qp-htitle .s { font-size: 10.5px; font-weight: 600; color: var(--muted); margin-top: 2px; }
+/* The status a settled room carries into the sheet: cancelled, closed, or awaiting the supplier.
+   It sits under the room's own line because that is what it qualifies — this room, not this step —
+   and it is the first thing a renter who pressed «counter» on a dead room needs to read. */
+.qp-hnote { display: inline-flex; align-items: center; gap: 5px; margin-top: 5px; padding: 3px 9px 3px 6px; border-radius: 999px; font-size: 10.5px; font-weight: 800; background: var(--warn-soft); color: var(--warn-deep); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); }
+.qp-hnote.danger { background: var(--danger-soft); color: var(--danger-deep); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+.qp-hnote .material-icons-outlined { font-size: 14px; }
 .qp-htotal { flex: 0 0 auto; text-align: end; }
 .qp-htotal .k { font-size: 9.5px; font-weight: 700; color: var(--muted); }
 .qp-htotal .v { font-size: 16px; font-weight: 800; color: var(--navy); font-family: "IBM Plex Sans", monospace; direction: ltr; }

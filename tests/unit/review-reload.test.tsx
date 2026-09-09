@@ -57,7 +57,7 @@ describe("the review screen survives a reload", () => {
     });
 
     expect(screen.getByText("Ready to send")).toBeTruthy();
-    expect(screen.queryByText("The machine")).toBeNull();
+    expect(screen.queryByText("The equipment")).toBeNull();
   });
 });
 

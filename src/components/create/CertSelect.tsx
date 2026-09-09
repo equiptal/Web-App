@@ -30,12 +30,22 @@ export function CertSelect({
   values,
   touched,
   tone = "overlay",
+  preselected = false,
   onChange,
 }: {
   values: SafetyCertificate[];
   /** True once the renter has answered — an empty list then reads *No certificate*, not a placeholder. */
   touched: boolean;
   tone?: "overlay" | "brand";
+  /**
+   * The value was chosen FOR him — the agent read it off his RFQ, or a default supplied it.
+   *
+   * Draws the canvas's own provenance ring, the one every other prefilled field on this flow wears
+   * (owner, 2026-09-08: *"in case the cert or year is selected by agent will show another orange
+   * border around the box to indicate it is preselected, same indicator used in other request
+   * fields"*). Informational, never blocking: the ring says «check this», not «answer this».
+   */
+  preselected?: boolean;
   onChange: (next: SafetyCertificate[]) => void;
 }) {
   const t = useT();
@@ -74,19 +84,38 @@ export function CertSelect({
   const toggle = (k: SafetyCertificate) =>
     onChange(values.includes(k) ? values.filter((x) => x !== k) : [...values, k]);
 
+  /* ── Which orange, and why not the pressed one (owner, 2026-09-08) ───────────────────
+     *"Show them orange … in warning orange … and make its tone the same as the one in prod now."*
+
+     ~~`bg-brand-press`.~~ That is the pressed state of the button orange (`#bd5711`) — nearly a
+     brown on screen, and it read as a filled answer rather than as an unanswered field. `--brand`
+     is the palette's orange and the closest thing in it to the tone production serves
+     (`#f79009` there against `#f97316` here). See the note in `CLAUDE.md` if the exact production
+     hex is wanted: that is a palette change, not a component one. */
   const trigger =
     tone === "overlay"
       ? "bg-[color-mix(in_srgb,var(--navy-deep)_80%,transparent)] text-white"
-      : "bg-brand-press text-white";
+      : "bg-brand text-white";
 
   return (
-    <div ref={boxRef} className="relative">
+    <div
+      ref={boxRef}
+      className={cx(
+        "relative",
+        /* The provenance ring, exactly as `CanvasField` draws it — one mark for «chosen for you»
+           across the whole canvas. `ring-offset` is the navy photo here rather than `surface2`, so
+           the offset is transparent and the ring reads against whatever is behind the pill. */
+        preselected && "rounded-sm ring-1 ring-brand",
+      )}
+    >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={c.cert}
+        /* The field's NAME for a screen reader; the visible text is an instruction and reads badly
+           as a label ("Pick certificate, button"). */
+        aria-label={c.certName}
         className={cx(
           "flex w-full items-center gap-1.5 rounded-sm px-3 py-2 text-meta font-semibold",
           trigger,

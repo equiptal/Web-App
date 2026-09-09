@@ -13,7 +13,7 @@
  * be legible — a shake with nothing marked would be a refusal with no explanation anywhere.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Icon, Modal } from "@/components/ui";
@@ -21,9 +21,9 @@ import { MachineCard } from "@/components/create/MachineCard";
 import { OperatorRail } from "@/components/create/OperatorRail";
 import { WherePanel } from "@/components/create/WherePanel";
 import { WhenPanel } from "@/components/create/WhenPanel";
-import { CarryForwardModal } from "@/components/create/CarryForwardModal";
+import { EquipmentTabs } from "@/components/create/EquipmentTabs";
 import { PanelDot } from "@/components/create/Provenance";
-import { gateWhen, gateWhere, isCustomLine, itemGaps, requiredGaps, resolveRef, taxName, transportGaps } from "@/lib/contract";
+import { customName, gateWhen, gateWhere, isCustomLine, itemGaps, requiredGaps, resolveRef, taxName, transportGaps } from "@/lib/contract";
 import type { RequiredGap } from "@/lib/contract";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
@@ -95,6 +95,44 @@ export function Canvas() {
    * project, have a look, then press again*. Cleared the moment the renter opens anything himself.
    */
   const [prefilledNote, setPrefilledNote] = useState<"where" | "when" | null>(null);
+  /**
+   * ── The operator rail, never opened (owner, 2026-09-09) ────────────────────────────────────────
+   * *"If it is not open at all at least once and user try to move to next step the closed pannel
+   * will shake too."*
+   *
+   * The rail is the one panel on this canvas that can be walked past without a mark: it collapses to
+   * a 72px strip, nothing in it is required (`operatorNeeded` defaults to «no»), so no gap names it
+   * and the renter can finish a machine having never seen what it holds — and an operator is priced.
+   *
+   * Two pieces of state, and they are separate on purpose. `railOpen` is REPORTED by the rail (its
+   * `expanded` is local and opens off the item's own answer, so the canvas cannot derive it), and
+   * `railSeen` is the memory of it ever having been true. Per MACHINE, keyed by item id: item 2's
+   * rail is a different panel from item 1's, and being shown one is no answer about the other.
+   */
+  const [railOpen, setRailOpen] = useState(false);
+  const [railSeen, setRailSeen] = useState<Set<string>>(() => new Set());
+  const [shakingRail, setShakingRail] = useState(false);
+  /**
+   * ── The site and the schedule, locked once answered (owner, 2026-09-09) ───────────────────────
+   * *"20.1 and 19.1 will be locked once they are selected in any of an equipment."*
+   *
+   * `unlocked` is the «Change» having been pressed. It is NOT persisted and is deliberately per
+   * visit: the lock exists so the two request-wide panels are not edited by accident while the
+   * renter thinks he is answering one equipment, and a renter who has just pressed «Change» is not
+   * doing that. Leaving the canvas and coming back locks them again, answered.
+   */
+  const [unlocked, setUnlocked] = useState(false);
+  /**
+   * ── The equipment a tab's ✕ is about to remove (owner, 2026-09-09) ────────────────────────────
+   * *"In the equipment tabs must have x button to remove it."*
+   *
+   * It asks first, and this holds what it is asking about. Removing an equipment takes its answers
+   * with it — the machine, its year, its certificate, its operator, its transport — and nothing
+   * brings them back: `REMOVE_ITEM` is a one-way flag on the item and the card is gone from the
+   * strip the moment it is set. That is the same bar «Start over» and Back-to-intake clear, so it
+   * gets the same one-line question rather than a press that costs work on a mis-tap.
+   */
+  const [removing, setRemoving] = useState<{ id: string; label: string } | null>(null);
 
   /* Every press that opens a panel records it. Declared with the other hooks, above every
      early return: a hook placed after one runs in a different order on the render that takes
@@ -103,8 +141,23 @@ export function Canvas() {
     const open = state.activeSection;
     if (open) setSeen((prev) => (prev.has(open) ? prev : new Set(prev).add(open)));
   }, [state.activeSection]);
+  /* The rail reports its own open state; the canvas remembers that this MACHINE's rail was seen.
+     ⚠️ The machine's id is read through a REF, not a dependency: `itemId` is derived below the early
+     return that this hook has to sit above (`rules-of-hooks`), so naming it in the dependency array
+     would evaluate it before it exists. The ref is written during the render that derives it, which
+     is the same idiom `gapsRef` uses two hooks down and for the same reason. A stable identity also
+     matters here: this function is an effect dependency inside the rail, so a new one per render
+     would re-run that effect on every keystroke on the canvas. */
+  const itemIdRef = useRef<string | null>(null);
+  const onRailOpenState = useCallback((open: boolean) => {
+    setRailOpen(open);
+    const id = itemIdRef.current;
+    if (open && id) setRailSeen((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  }, []);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [carryTo, setCarryTo] = useState<{ index: number; isNew: boolean } | null>(null);
+  /* ~~`carryTo` — the item the carry-forward modal was about to move to.~~ Gone with the modal
+     (owner, 2026-09-09): a move that needs no confirmation needs no staging, so `advance` and
+     `addMachine` go straight to the item. */
   /** The last press before review: add another machine, or go on. See `advance`. */
   const [askAddMore, setAskAddMore] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -185,6 +238,9 @@ export function Canvas() {
   const live = draft.items.filter((i) => !i.removed);
   const index = Math.min(state.itemIndex, Math.max(0, live.length - 1));
   const item = live[index];
+  /** This machine's id, for the per-machine memories below (the rail's «was it ever open»). */
+  const itemId = item?.id ?? null;
+  itemIdRef.current = itemId;
   const isFirstItem = index === 0;
   const isLastItem = index >= live.length - 1;
 
@@ -205,6 +261,10 @@ export function Canvas() {
   const itemUnavailable = item ? item.verdict === "no-match" && !isCustomLine(item) : false;
   const equipmentDone = equipmentGaps.length === 0 && !itemUnavailable;
   const whenOk = gateWhen(draft.project, state.chargedDaysUnderstood).ok;
+  /* Locked when BOTH are answered and the renter has not asked to change them. Both, not either: a
+     strip that stated a confirmed site beside an empty schedule would be locking a panel that still
+     owes an answer, and the gates would then refuse a press with nothing on screen to fix. */
+  const locked = whereOk && whenOk && !unlocked;
 
   /**
    * Refuse a move, visibly.
@@ -219,6 +279,16 @@ export function Canvas() {
     setTried(true);
     setShakingNext(true);
     timers.current.push(setTimeout(() => setShakingNext(false), SHAKE_MS));
+  };
+
+  /** The rail's own refusal: one pass, then it is seen and the next press goes on. */
+  const shakeRail = () => {
+    setTried(true);
+    if (state.activeSection !== "equipment") actions.openSection("equipment");
+    equipmentRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    setShakingRail(true);
+    timers.current.push(setTimeout(() => setShakingRail(false), SHAKE_MS));
+    if (itemId) setRailSeen((prev) => new Set(prev).add(itemId));
   };
 
   const shakeNow = (panel: "equipment" | "where" | "when") => {
@@ -327,7 +397,16 @@ export function Canvas() {
       }
     }
     if (!isLastItem) {
-      setCarryTo({ index: index + 1, isNew: false });
+      /* «Next equipment» leaves THIS equipment, so the rail's own look is owed here too — the
+         owner's note is about moving to the next step, and on a multi-item request that is this
+         press. */
+      if (itemId && !railSeen.has(itemId) && !railOpen) {
+        shakeRail();
+        return;
+      }
+      // Straight there, with its panel open. No modal in between (owner, 2026-09-09).
+      actions.goItem(index + 1);
+      actions.openSection("equipment");
       return;
     }
     /* ── A panel the SITE filled, that the renter never opened ────────────────────────────────
@@ -367,6 +446,15 @@ export function Canvas() {
       shakeNow(first.panel);
       return;
     }
+    /* ── The rail, if it was never opened (owner, 2026-09-09) ─────────────────────────────────
+       Last, and only once everything else is answered: it is a LOOK, not a missing answer, so it
+       must never stand in front of a real gap or of another machine's. One pass — the shake marks it
+       seen — and the next press goes on, which is the same rule the unseen-panel pass above holds
+       to, for the same reason: a refusal the renter cannot clear is a dead end. */
+    if (itemId && !railSeen.has(itemId) && !railOpen) {
+      shakeRail();
+      return;
+    }
     /* Everything is answered, so the only thing left to decide is whether there is another machine.
        That is the one moment the question is worth asking, and it is where the standing
        «+ Add another machine» button used to live — see the note where it was removed. */
@@ -401,7 +489,13 @@ export function Canvas() {
       shakeNow("equipment");
       return;
     }
-    setCarryTo({ index: live.length, isNew: true });
+    /* Append, then land on it, with its equipment panel open — the modal used to stand between
+       those two acts and say what the screen now shows. `addItem` appends at the end, so the index
+       to travel to is the length BEFORE the append. */
+    const to = live.length;
+    actions.addItem();
+    actions.goItem(to);
+    actions.openSection("equipment");
   };
 
   /**
@@ -411,6 +505,28 @@ export function Canvas() {
    * operator comes with it. A strip that only said "The machine & operator" would make the renter
    * open it to find out whether they had already dealt with it.
    */
+  /**
+   * ── The request's equipment, for the tab strip (owner, 2026-09-09) ─────────────────────────────
+   * `type · size` per item, off the taxonomy — the same resolution `equipmentSummary` makes for the
+   * collapsed strip, so a tab and the panel it opens cannot name one equipment two ways. An
+   * off-catalogue line has no taxonomy pair and falls back to the renter's own words (`rawLabel`),
+   * then to «This equipment» rather than to an empty tab.
+   */
+  const equipmentTabs = live.map((it) => {
+    const { subcategory, measurement } = resolveRef(state.taxonomy, it.ref);
+    const label =
+      [taxName(subcategory, locale) || null, taxName(measurement, locale) || null].filter(Boolean).join(" · ") ||
+      (isCustomLine(it) ? customName(it) : null) ||
+      it.rawLabel ||
+      t.create.machine;
+    /* Per EQUIPMENT, not the request: `requiredGaps` answers for the whole draft, and a tab dotted
+       amber because the SITE is unset would mark every equipment as owing something. `itemGaps` plus
+       `transportGaps` for this one item is the same pair `equipmentGaps` uses for the panel in front
+       of the renter, asked of each item in turn. */
+    const own = [...itemGaps(it, draft), ...transportGaps([it], draft.project)];
+    return { id: it.id, label, complete: own.length === 0 };
+  });
+
   const equipmentSummary = (() => {
     if (!item) return "";
     const { subcategory, measurement } = resolveRef(state.taxonomy, item.ref);
@@ -470,6 +586,38 @@ export function Canvas() {
         </p>
       )}
 
+      {/* ── The request's equipment, as tabs (owner, 2026-09-09) ────────────────────────────────
+          *"If there is multi itme in the request i will show each equipment type with size here as
+          tabs below 16 inside the machine and operator … with + at first card and it adds an
+          equipment."*
+
+          It sits directly ON the equipment block, open or collapsed, so the strip and the panel read
+          as one object — the tabs' bottom border is the panel's top edge (`-mb-px`, the workspace's
+          own recipe). The + is withheld while THIS equipment still owes an answer: `addMachine`
+          would refuse the press anyway and shake, and a control that is going to refuse is better
+          absent than lying. */}
+      {item && (
+        <EquipmentTabs
+          tabs={equipmentTabs}
+          activeId={item.id}
+          onPick={(id) => {
+            const to = live.findIndex((it) => it.id === id);
+            if (to >= 0 && to !== index) actions.goItem(to);
+            // Arriving on an equipment means looking at it: open its panel rather than leaving the
+            // renter on whichever of the three was last open.
+            actions.openSection("equipment");
+          }}
+          onAdd={equipmentGaps.length === 0 ? addMachine : undefined}
+          /* Withheld on a request with ONE equipment: `gate.noItems` refuses a request with none, so
+             the press would lead nowhere but a refusal. */
+          onRemove={
+            equipmentTabs.length > 1
+              ? (id) => setRemoving({ id, label: equipmentTabs.find((tb) => tb.id === id)?.label ?? "" })
+              : undefined
+          }
+        />
+      )}
+
       {/* ---------------- Equipment ---------------- */}
       {/* ---------------- Equipment ----------------
           One panel at a time. `activeSection` already made Where and When mutually exclusive, but
@@ -480,7 +628,7 @@ export function Canvas() {
         (state.activeSection === "equipment" ? (
           <div ref={equipmentRef as React.Ref<HTMLDivElement>} className="mb-3.5 flex flex-col gap-4 lg:flex-row lg:items-stretch">
             <MachineCard item={item} gaps={equipmentGaps} shaking={shaking} tried={tried} onCollapse={() => collapse("equipment")} />
-            <OperatorRail item={item} />
+            <OperatorRail item={item} shaking={shakingRail} onOpenState={onRailOpenState} />
           </div>
         ) : (
           <button
@@ -543,9 +691,20 @@ export function Canvas() {
       )}
 
       {/* ---------------- Site and schedule ----------------
-          Request-wide, so from the second machine onwards they are shown as settled rather than
-          re-offered: editing them here would silently change the first machine's terms too. */}
-      {isFirstItem ? (
+          ── Locked the moment they are answered (owner, 2026-09-09) ─────────────────────────────
+          *"20.1 and 19.1 will be locked once they are selected in any of an equipment."*
+
+          ~~Editable on the first equipment, settled from the second onwards.~~ The rule was about
+          WHICH equipment the renter happened to be standing on, and these two panels belong to none
+          of them: one address and one schedule for the whole request. So they lock on the ANSWER
+          instead — the moment the site is confirmed and the basis chosen, the panels become the
+          green strip.
+
+          **With a «Change», at the owner's word.** A hard lock would trap a typo: a renter who set
+          the wrong end date on a one-equipment request would have no way back except Back to «Your
+          request» (which now asks first) and describing it again. The strip says the change reaches
+          the whole request, which was always true and used to be said by a modal. */}
+      {!locked ? (
         <>
           <div ref={whereRef}>
           <WherePanel
@@ -569,17 +728,36 @@ export function Canvas() {
           </div>
         </>
       ) : (
-        <div className="mb-3.5 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-sm border border-ok/40 bg-ok/[0.06] px-5 py-3.5">
-          <span className="flex items-center gap-2 text-body text-ok">
+        <div {...pin("locked-for-request")} className="mb-3.5 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-sm border border-ok/40 bg-ok/[0.06] px-5 py-3.5">
+          {/* Each half opens ITS OWN panel, not «the settings»: the renter presses the line he wants
+              to change, and the panel he lands on is the one that owns it. */}
+          <button
+            type="button"
+            onClick={() => { setUnlocked(true); openSection("where"); }}
+            className="flex items-center gap-2 text-start text-body text-ok hover:text-ok-deep"
+          >
             <Icon name="lock" size={14} />
             <span className="font-semibold">{t.create.where}</span> — {draft.project.location.label ?? "—"}
-          </span>
-          <span className="flex items-center gap-2 text-body text-ok">
+          </button>
+          <button
+            type="button"
+            onClick={() => { setUnlocked(true); openSection("when"); }}
+            className="flex items-center gap-2 text-start text-body text-ok hover:text-ok-deep"
+          >
             <Icon name="lock" size={14} />
             <span className="font-semibold">{t.create.when}</span> —{" "}
             {draft.project.timing.rentalBasis ? t.options.rentalBasis[draft.project.timing.rentalBasis] : "—"}
+          </button>
+          <span className="ms-auto flex items-center gap-3">
+            <span className="text-label text-ok/80">{t.create.lockedForRequest}</span>
+            <button
+              type="button"
+              onClick={() => { setUnlocked(true); openSection("where"); }}
+              className="inline-flex items-center gap-1 text-body font-semibold text-navy-mid underline decoration-ok/40 underline-offset-4 hover:text-navy"
+            >
+              <Icon name="edit" size={14} /> {t.create.changeForRequest}
+            </button>
           </span>
-          <span className="ms-auto text-label text-ok/80">{t.create.lockedForRequest}</span>
         </div>
       )}
 
@@ -626,6 +804,41 @@ export function Canvas() {
 
           Dismissing it is neither answer: the renter is returned to the canvas, not sent to review.
           A modal whose X means "yes, continue" is a modal that submits a request by being closed. */}
+      {/* ── «Remove this equipment from the request?» ────────────────────────────────────────────
+          One line and two buttons, the shape the leave-the-request confirm already uses: the title IS
+          the question, «Remove» is what the ✕ he pressed meant, and «Keep it» is the way out of a
+          mis-tap. Which equipment is named in the ✕'s own accessible label, so the dialog does not
+          have to repeat it. */}
+      <Modal open={removing != null} onClose={() => setRemoving(null)} title={t.create.removeEquipment.title}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button onClick={() => setRemoving(null)} className={btn("secondary", "md", { className: "transition" })}>
+            {t.create.removeEquipment.keep}
+          </button>
+          <button
+            onClick={() => {
+              const id = removing?.id;
+              setRemoving(null);
+              if (!id) return;
+              /* Where to land, worked out BEFORE the removal: `live` excludes removed items, so the
+                 list shrinks under the index. Removing one BEFORE the open card shifts it down by
+                 one; removing the open card itself keeps the index, which lands on the next
+                 equipment — or on the new last one when it was the last. */
+              const at = live.findIndex((it) => it.id === id);
+              const last = live.length - 2;
+              const to = at < index ? index - 1 : Math.min(index, last);
+              actions.removeItem(id);
+              actions.goItem(Math.max(0, to));
+              // A removal is a change of subject: open the equipment it lands on rather than leaving
+              // the renter on whichever panel happened to be open.
+              actions.openSection("equipment");
+            }}
+            className={btn("danger", "md", { className: "transition" })}
+          >
+            {t.create.removeEquipment.remove}
+          </button>
+        </div>
+      </Modal>
+
       <Modal open={askAddMore} onClose={() => setAskAddMore(false)} title={t.create.addMore.title}>
         <p className="mb-5 text-body leading-relaxed text-muted">{t.create.addMore.body}</p>
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -651,21 +864,15 @@ export function Canvas() {
         </div>
       </Modal>
 
-      <CarryForwardModal
-        open={carryTo != null}
-        itemNumber={(carryTo?.index ?? 0) + 1}
-        // A hand-added machine starts blank, so "its other details already match this one" would be
-        // untrue for it. Only a parsed item inherits.
-        copied={carryTo?.isNew === false}
-        onClose={() => setCarryTo(null)}
-        onContinue={() => {
-          if (!carryTo) return;
-          if (carryTo.isNew) actions.addItem();
-          actions.goItem(carryTo.index);
-          setCarryTo(null);
-        }}
-      />
+      {/* ~~`<CarryForwardModal>` — «Equipment #2», then two lines saying the site and schedule are
+          locked and the other details were copied.~~ **Removed** (owner, 2026-09-09: *"remove this
+          modal no need. make the add and the next … smoother without it"*).
 
+          It was written because two things happened at once and only one was reversible. Both halves
+          are now said on the SCREEN instead of in front of it: the site and the schedule sit in the
+          green locked strip with a «Change» beside them, and the copied details are the card the
+          renter lands on — visible, and editable, one press earlier than the modal used to be
+          dismissed. */}
       {/* Start over clears the saved draft, so it asks first. */}
       <Modal open={confirmReset} onClose={() => setConfirmReset(false)} title={t.draftPrompt.restartTitle}>
         <p className="mb-5 text-body leading-relaxed text-muted">{t.draftPrompt.restartConfirm}</p>

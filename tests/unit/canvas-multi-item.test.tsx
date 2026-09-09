@@ -26,42 +26,54 @@ const twoItems = () =>
     project: confirmedProject(),
   });
 
-describe("moving to the next machine (MREQ-AC-39)", () => {
-  it("raises the carry-forward modal rather than jumping", async () => {
+describe("moving to the next equipment (MREQ-AC-39)", () => {
+  /* ~~It raised the carry-forward modal: «Equipment #2», the site and schedule are locked, the other
+     details were copied, Continue / Edit this item first.~~ **Removed** (owner, 2026-09-09: *"remove
+     this modal no need. make the add and the next … smoother without it"*).
+
+     What the modal said is on the screen instead — the locked strip states the site and the
+     schedule, and the copied details ARE the card the renter lands on — so the press moves. The rule
+     it enforced is untouched and is what these cases still pin: the move refuses while THIS
+     equipment is unanswered (below, and in `canvas-gating`), and it lands with the equipment panel
+     open rather than wherever the renter last was. */
+  it("moves straight to equipment 2, with its panel open", async () => {
     const handle = await renderCanvas(<Canvas />, { draft: twoItems(), prepare: answered(["a0", "a1"]) });
 
     expect(screen.getByText(/Next equipment/)).toBeTruthy();
     await handle.run(() => screen.getByText(/Next equipment/).closest("button")!.click());
 
-    expect(screen.getByText("Equipment #2")).toBeTruthy();
-    expect(screen.getByText(/site and schedule already apply to your whole request/)).toBeTruthy();
-    expect(screen.getByText(/start out matching this equipment/)).toBeTruthy();
-    // Still on item 1 until the renter continues.
-    expect(handle.store().state.itemIndex).toBe(0);
-  });
-
-  it("lets the renter go back and edit this item first", async () => {
-    const handle = await renderCanvas(<Canvas />, { draft: twoItems(), prepare: answered(["a0", "a1"]) });
-    await handle.run(() => screen.getByText(/Next equipment/).closest("button")!.click());
-    await handle.run(() => screen.getByRole("button", { name: "Edit this item first" }).click());
-
-    expect(screen.queryByText("Equipment #2")).toBeNull();
-    expect(handle.store().state.itemIndex).toBe(0);
-  });
-
-  it("continues to item 2 and opens its equipment panel", async () => {
-    const handle = await renderCanvas(<Canvas />, { draft: twoItems(), prepare: answered(["a0", "a1"]) });
-    await handle.run(() => screen.getByText(/Next equipment/).closest("button")!.click());
-    await handle.run(() => screen.getByRole("button", { name: "Continue" }).click());
-
     expect(handle.store().state.itemIndex).toBe(1);
     expect(handle.store().state.activeSection).toBe("equipment");
     expect(screen.getByText("Equipment #2 of 2")).toBeTruthy();
+    // The modal, gone: neither its title nor either of its two sentences.
+    expect(screen.queryByText("Equipment #2")).toBeNull();
+    expect(screen.queryByText(/site and schedule already apply/)).toBeNull();
+  });
+
+  it("goes back through the tab strip, not through a dialog", async () => {
+    // The tabs are the new way BACK to an equipment already passed (owner, 2026-09-09).
+    const handle = await renderCanvas(<Canvas />, { draft: twoItems(), prepare: answered(["a0", "a1"]) });
+    await handle.run(() => screen.getByText(/Next equipment/).closest("button")!.click());
+    expect(handle.store().state.itemIndex).toBe(1);
+
+    const tabs = document.querySelectorAll('[data-pin="17.5"]');
+    expect(tabs.length).toBe(2);
+    await handle.run(() => (tabs[0] as HTMLElement).click());
+
+    expect(handle.store().state.itemIndex).toBe(0);
+    expect(handle.store().state.activeSection).toBe("equipment");
   });
 });
 
-describe("the site and schedule are locked from item 2 (MREQ-AC-40)", () => {
-  it("shows them as settled, not as editable panels", async () => {
+describe("the site and schedule lock once they are answered (MREQ-AC-40, widened 2026-09-09)", () => {
+  /* ~~Locked from equipment 2 onwards.~~ Widened on the owner's word: *"20.1 and 19.1 will be locked
+     once they are selected in any of an equipment"*. The old rule was about which equipment the
+     renter happened to be standing on, and these two panels belong to none of them — one address and
+     one schedule for the whole request — so they lock on the ANSWER instead.
+
+     With a way back, also his ruling: «Change for the request» reopens them, because a hard lock
+     would trap a typed date on a one-equipment request. */
+  it("shows them as settled rather than as editable panels", async () => {
     const handle = await renderCanvas(<Canvas />, {
       draft: twoItems(),
       prepare: (store) => {
@@ -71,9 +83,30 @@ describe("the site and schedule are locked from item 2 (MREQ-AC-40)", () => {
     });
 
     expect(screen.getByText("locked for the whole request")).toBeTruthy();
-    // The panel headers are gone — there is nothing to expand, so nothing can be changed here.
-    expect(screen.queryByRole("button", { name: /Where it goes/ })).toBeNull();
+    // The panel HEADERS are gone: there is nothing to expand by accident while answering equipment.
+    expect(screen.queryByRole("button", { name: /^Where it goes$/ })).toBeNull();
     expect(handle.store().state.itemIndex).toBe(1);
+  });
+
+  it("locks on the FIRST equipment too, the moment both are answered", async () => {
+    // The whole of what changed: a one-equipment request used to keep both panels open for editing.
+    await renderCanvas(<Canvas />, {
+      draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
+      prepare: answered(["a0"]),
+    });
+    expect(screen.getByText("locked for the whole request")).toBeTruthy();
+  });
+
+  it("«Change for the request» hands the panel back, so a wrong date is not a dead end", async () => {
+    const handle = await renderCanvas(<Canvas />, {
+      draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
+      prepare: answered(["a0"]),
+    });
+
+    await handle.run(() => screen.getByText(/Change for the request/).closest("button")!.click());
+
+    expect(screen.queryByText("locked for the whole request")).toBeNull();
+    expect(handle.store().state.activeSection).toBe("where");
   });
 
   it("returns to the previous item with its edits intact", async () => {
@@ -121,34 +154,71 @@ describe("the last item reviews instead of advancing", () => {
 /**
  * Adding a second machine, from the one place that offers it.
  *
- * ~~A standing «+ Add another machine» beside the CTA on every screen.~~ Removed (owner,
+ * ~~A standing «+ Add another equipment» beside the CTA on every screen.~~ Removed (owner,
  * 2026-09-01): it made two calls to action out of one moment and asked its question on items the
  * renter had not finished. It is now the secondary answer to the modal that a finished request
  * raises, which is the one point where it IS a question.
  */
-describe("adding a machine by hand", () => {
-  it("asks first, then appends and moves to it", async () => {
+describe("removing an equipment from its tab (owner, 2026-09-09)", () => {
+  /* *"In the equipment tabs must have x button to remove it, also the x is always visible."*
+     It asks first: the answers on that card go with it and `REMOVE_ITEM` is one-way. */
+  const remove = () => document.querySelectorAll('[data-pin="17.7"]');
+
+  it("asks, then removes, and lands on the equipment that took its place", async () => {
+    const handle = await renderCanvas(<Canvas />, { draft: twoItems(), prepare: answered(["a0", "a1"]) });
+
+    expect(remove().length).toBe(2);
+    await handle.run(() => (remove()[0] as HTMLElement).click());
+
+    // Nothing gone yet — the question is the whole of what the press did.
+    expect(handle.store().state.draft!.items.filter((i) => !i.removed).length).toBe(2);
+    expect(screen.getByText("Remove this equipment from the request?")).toBeTruthy();
+
+    await handle.run(() => screen.getByRole("button", { name: "Remove" }).click());
+
+    const live = handle.store().state.draft!.items.filter((i) => !i.removed);
+    expect(live.map((i) => i.id)).toEqual(["a1"]);
+    // The open card was the one removed, so the index lands on what is left rather than off the end.
+    expect(handle.store().state.itemIndex).toBe(0);
+    expect(handle.store().state.activeSection).toBe("equipment");
+  });
+
+  it("«Keep it» changes nothing", async () => {
+    const handle = await renderCanvas(<Canvas />, { draft: twoItems(), prepare: answered(["a0", "a1"]) });
+    await handle.run(() => (remove()[0] as HTMLElement).click());
+    await handle.run(() => screen.getByRole("button", { name: "Keep it" }).click());
+
+    expect(handle.store().state.draft!.items.filter((i) => !i.removed).length).toBe(2);
+    expect(handle.store().state.itemIndex).toBe(0);
+  });
+
+  it("offers no ✕ on the only equipment — a request with none cannot be sent", async () => {
+    await renderCanvas(<Canvas />, {
+      draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
+      prepare: answered(["a0"]),
+    });
+    expect(document.querySelector('[data-pin="17.7"]')).toBeNull();
+    // …and the tab itself is still there: one equipment is still the request's equipment.
+    expect(document.querySelectorAll('[data-pin="17.5"]').length).toBe(1);
+  });
+});
+
+describe("adding equipment by hand", () => {
+  it("appends and lands on it — from the finished-request prompt", async () => {
     const handle = await renderCanvas(<Canvas />, {
       draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
       prepare: answered(["a0"]),
     });
 
-    // Reached through the finished-request prompt, which is the only door to it now.
     await handle.run(() => screen.getByText(/Review & send/).closest("button")!.click());
-    await handle.run(() => screen.getByText(/Add another machine/).closest("button")!.click());
+    await handle.run(() => screen.getByText(/Add another equipment/).closest("button")!.click());
 
-    // The same modal as moving between parsed items — the site and schedule apply to this one too.
-    expect(screen.getByText("Equipment #2")).toBeTruthy();
-    expect(screen.getByText(/site and schedule already apply/)).toBeTruthy();
-    // But a hand-added machine starts blank, so it must NOT claim the details are inherited.
-    expect(screen.queryByText(/start out matching this equipment/)).toBeNull();
-    // Nothing added until the renter continues.
-    expect(handle.store().state.draft!.items.length).toBe(1);
-
-    await handle.run(() => screen.getByRole("button", { name: "Continue" }).click());
-
+    /* ~~It staged the add behind the carry-forward modal and only appended on «Continue».~~ The
+       modal is gone (owner, 2026-09-09), so the press appends, travels and opens the panel — the
+       three acts the dialog used to sit between. */
     expect(handle.store().state.draft!.items.length).toBe(2);
     expect(handle.store().state.itemIndex).toBe(1);
+    expect(handle.store().state.activeSection).toBe("equipment");
     /* ~~«N things need you».~~ Removed (owner, 2026-09-01): it counted gaps the cards below already
        mark one by one, in the place the renter has to act on them. The gap itself is what this pins
        now — the required dot the panel draws beside an unanswered field. */
@@ -156,20 +226,38 @@ describe("adding a machine by hand", () => {
     expect(document.querySelectorAll(".text-brand").length).toBeGreaterThan(0);
   });
 
-  it("will not add while this machine is unanswered", async () => {
+  it("adds from the tab strip's + as well, which is the same act", async () => {
+    // The owner's second door (2026-09-09): *"with + at first card and it adds an equipment"*. One
+    // implementation — `addMachine` — so the two cannot diverge on what adding means.
+    const handle = await renderCanvas(<Canvas />, {
+      draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
+      prepare: answered(["a0"]),
+    });
+
+    const add = document.querySelector('[data-pin="17.6"]') as HTMLElement;
+    expect(add).not.toBeNull();
+    await handle.run(() => add.click());
+
+    expect(handle.store().state.draft!.items.length).toBe(2);
+    expect(handle.store().state.itemIndex).toBe(1);
+    expect(document.querySelectorAll('[data-pin="17.5"]').length).toBe(2);
+  });
+
+  it("will not add while this equipment is unanswered — from either door", async () => {
     const handle = await renderCanvas(<Canvas />, {
       draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
       // Year and certificate deliberately left open.
     });
 
-    /* An unanswered machine never reaches the prompt at all, which is the stronger form of the same
-       rule: the old button sat there offering to add a second machine beside a first one that was
-       not finished. Now the press refuses on the gaps and the question is never put. */
+    /* An unanswered equipment never reaches the prompt at all, which is the stronger form of the
+       same rule: the old standing button offered to add a second one beside a first that was not
+       finished. Now the press refuses on the gaps and the question is never put. */
     await handle.run(() => screen.getByText(/Review & send/).closest("button")!.click());
-
-    expect(screen.queryByText(/Anything else on this job/)).toBeNull();
-    expect(screen.queryByText("Equipment #2")).toBeNull();
+    expect(screen.queryByText(/Anything else on this request/)).toBeNull();
     expect(handle.store().state.draft!.items.length).toBe(1);
+
+    // And the + is not even offered: a control that is going to refuse is better absent than lying.
+    expect(document.querySelector('[data-pin="17.6"]')).toBeNull();
   });
 });
 
@@ -196,9 +284,6 @@ describe("the bar for the next machine is this machine", () => {
     expect(handle.store().state.draft!.touchedFields).not.toContain("line_items[a1].equipment_year");
 
     await handle.run(() => screen.getByText(/Next equipment/).closest("button")!.click());
-    expect(screen.getByText("Equipment #2")).toBeTruthy();
-
-    await handle.run(() => screen.getByRole("button", { name: "Continue" }).click());
     expect(handle.store().state.itemIndex).toBe(1);
   });
 
@@ -226,7 +311,7 @@ describe("the bar for the next machine is this machine", () => {
     await handle.run(() => screen.getByText(/Next equipment/).closest("button")!.click());
 
     // No carry-forward prompt, no move: the same refusal «Review & send» gives, on the same panel.
-    expect(screen.queryByText(/Anything else on this job/)).toBeNull();
+    expect(screen.queryByText(/Anything else on this request/)).toBeNull();
     expect(handle.store().state.itemIndex).toBe(0);
     expect(handle.store().state.activeSection).toBe("when");
   });
@@ -242,13 +327,13 @@ describe("the bar for the next machine is this machine", () => {
     });
 
     await handle.run(() => screen.getByText(/Next equipment/).closest("button")!.click());
-    expect(screen.getByText("Equipment #2")).toBeTruthy();
+    // «It went through» is the travel itself now, not a dialog appearing (owner, 2026-09-09).
+    expect(handle.store().state.itemIndex).toBe(1);
   });
 
-  it("still refuses the next machine while THIS one is unanswered", async () => {
+  it("still refuses the next equipment while THIS one is unanswered", async () => {
     const handle = await renderCanvas(<Canvas />, { draft: twoItems() });
     await handle.run(() => screen.getByText(/Next equipment/).closest("button")!.click());
-    expect(screen.queryByText("Equipment #2")).toBeNull();
     expect(handle.store().state.itemIndex).toBe(0);
   });
 

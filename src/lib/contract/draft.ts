@@ -397,9 +397,22 @@ export function defaultProjectDetails(): ProjectDetails {
       equipmentYear: null,
     },
     certificates: { safety: [], safetyOther: "", other: [] },
-    deliveryToSite: "me",
-    returnFromSite: "me",
-    fuelResponsibility: "me",
+    /* ── UNANSWERED, not «me» (owner, 2026-09-08) ─────────────────────────────────────────────────
+     *
+     * ~~All three seeded to «me».~~ The agent now returns `null` for anything the RFQ did not state,
+     * and these three seeds turned that silence into a definite answer: the renter collects the
+     * machine, returns it, and pays for the fuel. Three priced commitments nobody made, and the gates
+     * that exist for them (`gate.deliveryMissing`, `gate.returnMissing`, `gate.fuelPartyMissing`)
+     * could never fire, because the fields were full from the first render.
+     *
+     * Null now, so the controls read empty, the panel dot stays amber, and a refused advance marks
+     * each one «* Required» in red — which is the renter answering rather than us guessing on his
+     * behalf. `applyProjectDefaults` still fills them from the renter's OWN site, which is his answer
+     * given once, and an agent line that stated a side still arrives with it.
+     */
+    deliveryToSite: null,
+    returnFromSite: null,
+    fuelResponsibility: null,
   };
 }
 

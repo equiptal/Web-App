@@ -71,8 +71,7 @@
  * a surface, not a decision.
  */
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { createPortal } from "react-dom";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 // Two numeral formatters, and the split is deliberate: `arabicIndicDigits` truncates, which is what a
 // COUNT wants, and `distanceDigits` keeps one decimal, which is what a measured distance wants.
 import { arabicIndicDigits, distanceDigits } from "@/lib/contract/bid-map";
@@ -82,33 +81,7 @@ import { equipmentCardModel, type EquipmentCardReadiness } from "@/components/ma
 import type { MatchRequest } from "@/components/map/panel/machine-panel-model";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { Photo } from "@/components/Photo";
-
-/**
- * **Has this renter had the red-distance explained to him yet?**
- *
- * Per browser, and deliberately unimportant: losing it costs one extra explanation on a control that
- * explains itself, so a throw — a private window, storage blocked, a browser that refuses the
- * accessor outright — reads as "not seen" and the layer opens again. Nothing about the ask depends
- * on it, and nothing is stored but the flag.
- */
-const YARD_EXPLAINED_KEY = "moeda.bidmap.yardExplained";
-
-function explainedBefore(): boolean {
-  try {
-    return window.localStorage.getItem(YARD_EXPLAINED_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function markExplained(): void {
-  try {
-    window.localStorage.setItem(YARD_EXPLAINED_KEY, "1");
-  } catch {
-    // A renter who cannot store the flag reads the explanation again next time. That is the whole
-    // cost, and it is smaller than any handling this could do.
-  }
-}
+import { pin } from "@/lib/uiPins";
 
 export interface EquipmentListProps {
   /**
@@ -144,9 +117,15 @@ export interface EquipmentListProps {
   onOpenDetail: (equipmentId: string) => void;
   /** Fly the map to this machine without opening its panel (app parity, 2026-08-15). */
   onFocusMachine: (equipmentId: string) => void;
-  /** «اطلب التأكيد» — V11 owns the composer and the send; this only says which machine was asked
-   *  about. Absent → the control renders disabled rather than claiming an ask was sent. */
-  onAskAvailability?: (machine: FleetMachine) => void;
+  /**
+   * **The distance was pressed on an unconfirmed machine.** The WORKSPACE decides what happens next —
+   * an explanation the first time, the ask itself after that, and on an already-asked machine the
+   * question he already put — because that layer is a modal over the whole surface and the detail
+   * panel (which replaces this list) has to be able to open the same one (owner, 2026-09-08).
+   *
+   * `asked` says whether his question is already with the supplier.
+   */
+  onYardPress: (machine: FleetMachine, asked: boolean) => void;
   /**
    * Whether this machine's availability ask is already with the lessor and unanswered — the owner's
    * "one ask, one card" rule (2026-08-10), asked of the workspace because only it can see the
@@ -177,7 +156,7 @@ export function EquipmentList({
   cueId,
   onOpenDetail,
   onFocusMachine,
-  onAskAvailability,
+  onYardPress,
   askPending,
   onToggleShowAll,
   scrollRef,
@@ -200,36 +179,6 @@ export function EquipmentList({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [filtersOpen]);
-
-  /* ── The distance chip's explanation, and the ask behind it (owner, 2026-08-28) ──────────────
-     A red distance says a thing the renter has no way to guess: this is where the machine stands
-     TODAY, and nobody has promised it will come from there or that it is free at all. The first
-     press explains that before it asks anything; every press after it asks straight away, because a
-     renter who has read the explanation is being taught something he has already learnt.
-
-     `asked` is the third state and it is not a tutorial: the question is already with the supplier,
-     so the layer shows what he asked and says it is waiting, rather than offering a second card that
-     the room's own guard would refuse anyway.
-
-     The seen-flag is per browser and deliberately unimportant: losing it costs one extra explanation
-     on a control that explains itself, so every read and write is wrapped and a throw means "not
-     seen". Nothing about the ask depends on it. */
-  const [yardExplain, setYardExplain] = useState<{ machine: FleetMachine; asked: boolean } | null>(null);
-  useEffect(() => {
-    if (!yardExplain) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setYardExplain(null); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [yardExplain]);
-
-  const onYardPress = useCallback(
-    (machine: FleetMachine, asked: boolean) => {
-      if (asked) { setYardExplain({ machine, asked: true }); return; }
-      if (!explainedBefore()) { setYardExplain({ machine, asked: false }); return; }
-      onAskAvailability?.(machine);
-    },
-    [onAskAvailability],
-  );
 
   // Bring the selected card into view when it is off-screen — which is the case when the selection was
   // made on the MAP (AC-15). Already-visible cards are left exactly where they are: scrolling a card
@@ -288,7 +237,7 @@ export function EquipmentList({
           The count renders whether or not anything is filtered, because «٨ من ٨» is the sentence that
           makes «٣ من ٨» readable later. */}
       {(view.groups.length > 0 || view.active.length > 0) && (
-        <div className="bm-eqf" role="group" aria-label={t.bidMap.eqFilterLabel}>
+        <div {...pin("equipment-filter")} className="bm-eqf" role="group" aria-label={t.bidMap.eqFilterLabel}>
           <div className="bm-eqf-top">
             <span className="bm-eqf-count">{countLine()}</span>
             {view.active.length > 0 && (
@@ -340,7 +289,7 @@ export function EquipmentList({
           company panel makes no ARIA claim at all; this one names itself because, unlike that panel,
           it has no heading of its own in the reading order above it. */}
       {filtersOpen && view.groups.length > 0 && (
-        <div className="bm-eqfp" role="dialog" aria-label={t.bidMap.eqFilterLabel}>
+        <div {...pin("equipment-filter-panel")} className="bm-eqfp" role="dialog" aria-label={t.bidMap.eqFilterLabel}>
           <div className="bm-eqfp-head">
             <span className="bm-eqfp-t">{t.bidMap.eqFilterLabel}</span>
             {/* An X, not a back chevron. The company panel goes BACK to what it covered; this one is
@@ -410,159 +359,6 @@ export function EquipmentList({
           </div>
         </div>
       )}
-
-      {/* ── What a red distance means, and the ask behind it (owner, 2026-08-28) ──────────────────
-          ~~`.bm-eqfp`'s idiom: a layer filling the equipment column.~~ Withdrawn by the owner on
-          2026-09-04 — «i want this to open as modal and very clear and simple just few lines and will
-          open over the chat panel on the left in the background so he can send the request directly».
-
-          So it is a MODAL over the whole surface now, not a panel inside one column. Two reasons, and
-          both are about the press it leads to: covering the column hid the very card the renter was
-          reading, and the ask it offers lands in the CHAT, which the column layer could not show him.
-          Centred on the veil, the chat sits behind it dimmed but legible, and «Ask the supplier» is a
-          thing he watches arrive where it goes.
-
-          `position: fixed`, so the panel it is rendered inside does not clip it.
-
-          Two states, one layer. The FIRST press on an unconfirmed distance explains what the colour
-          means and then offers the ask — because "not confirmed" is the one fact on this card a
-          renter cannot get from the card. Once he has read it, later presses go straight to the ask
-          and never come back here.
-
-          On a machine already asked about it says so and shows nothing to press: the question is in
-          the room, and a second «Ask» would post a duplicate card the backend's own guard refuses.
-
-          `role="dialog"` with a name, and `aria-modal` is now TRUE where it was false: a veil covers
-          the surface, so "everything else is hidden" is the claim the screen actually makes. */}
-      {yardExplain && (() => {
-        /* One model call for the whole layer: the machine's name, and the number the two specimens
-           below are drawn with. The specimen shows THIS machine's distance in both colours — an
-           invented figure would be a screenshot of a different machine. */
-        const explainCard = equipmentCardModel(yardExplain.machine, request);
-        const sampleKm = explainCard.km != null ? distanceDigits(explainCard.km, ar) : "—";
-        /* ── Out of the panel, into the document (owner, 2026-09-04) ────────────────────────────
-           The chat is `z-index: 31` and this column is `z-index: 24`, so ANY layer rendered inside
-           the panel paints under the conversation — including one that says «over the chat». A
-           portal to `<body>` is what puts the veil above both. That is also why the modal's rules in
-           `map-proto.css` carry no `.bidmap` ancestor: outside the surface's own subtree, they would
-           never match. */
-        return createPortal(
-        <div
-          className="bm-eqyx-veil"
-          onClick={(e) => {
-            // The veil closes; the card on it does not. Without the target check every press inside
-            // the dialog would bubble out here and shut it.
-            if (e.target === e.currentTarget) setYardExplain(null);
-          }}
-        >
-        <div className="bm-eqyx" role="dialog" aria-modal="true" aria-label={yardExplain.asked ? t.bidMap.eqYardAskedTitle : t.bidMap.eqYardExplainTitle}>
-          <div className="bm-eqyx-head">
-            <span className="bm-eqyx-t">{yardExplain.asked ? t.bidMap.eqYardAskedTitle : t.bidMap.eqYardExplainTitle}</span>
-            <button
-              type="button"
-              // Its own class, not `.bm-eqfp-x`: that rule is scoped to `.bidmap`, and this dialog
-              // is portalled out of it.
-              className="bm-eqyx-x"
-              aria-label={t.common.close}
-              title={t.common.close}
-              onClick={() => setYardExplain(null)}
-            >
-              <span className="material-icons-outlined">close</span>
-            </button>
-          </div>
-
-          <div className="bm-eqyx-body">
-            {/* The machine this is about, so a layer covering the surface still says which card it
-                came off. */}
-            <div className="bm-eqyx-eq">
-              <span className="bm-eqyx-name">{ar ? explainCard.title.ar : explainCard.title.en}</span>
-              {explainCard.km != null && (
-                <span className="bm-eqyx-km">
-                  <span dir="ltr">{distanceDigits(explainCard.km, ar)}</span> {t.bidMap.eqDistanceUnit}
-                </span>
-              )}
-            </div>
-
-            {yardExplain.asked ? (
-              <>
-                <p className="bm-eqyx-p">{t.bidMap.eqYardAskedBody}</p>
-                <div className="bm-eqyx-q">
-                  <span className="bm-eqyx-qh">{t.bidMap.eqYardAskedWhat}</span>
-                  {/* His own question, in the words the card put in the room — not a paraphrase of
-                      it. `eqAskConfirmWhy` is the ask's own sentence, which is what the request card
-                      carries. */}
-                  <span className="bm-eqyx-qt">{t.bidMap.eqAskConfirmWhy}</span>
-                </div>
-              </>
-            ) : (
-              <>
-                {/* ── The colour, shown rather than described ────────────────────────────────────
-                    Two specimens of the same distance, before and after he answers. The renter has
-                    the red one in front of him; putting the green one beside it is what makes
-                    «turns green» a thing he has seen rather than a promise in a paragraph. */}
-                <div className="bm-eqyx-demo" aria-hidden="true">
-                  {/* The specimens carry the mark where the CARD carries it — trailing — or the demo
-                      stops being a picture of the thing the renter is looking at. */}
-                  <span className="bm-eqyx-spec no">
-                    <span className="bm-eqyx-specn" dir="ltr">{sampleKm}</span>
-                    <span className="bm-eqyx-specu">{t.bidMap.eqDistanceUnit}</span>
-                    <span className="material-icons-outlined">help_outline</span>
-                  </span>
-                  <span className="bm-eqyx-arrow material-icons-outlined">arrow_forward</span>
-                  <span className="bm-eqyx-spec ok">
-                    <span className="bm-eqyx-specn" dir="ltr">{sampleKm}</span>
-                    <span className="bm-eqyx-specu">{t.bidMap.eqDistanceUnit}</span>
-                    <span className="material-icons-outlined">check_circle</span>
-                  </span>
-                </div>
-
-                {/* ── Three lines, not three paragraphs (owner, 2026-09-04) ──────────────────────
-                    ~~A numbered tutorial with a heading and a body per step.~~ Withdrawn. It was
-                    right about the ORDER and wrong about the length: this layer stands between the
-                    renter and the one press he came for, so it earns its place in the seconds it
-                    takes to read. One sentence each — what the number is, why it is red, what the
-                    press does — and the button is already under his eye. */}
-                <ul className="bm-eqyx-lines">
-                  {[t.bidMap.eqYardLine1, t.bidMap.eqYardLine2, t.bidMap.eqYardLine3].map((line) => (
-                    <li key={line} className="bm-eqyx-line">
-                      <span className="bm-eqyx-dot" aria-hidden="true" />
-                      <span>{line}</span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </div>
-
-          {/* The way on. Only the explanation has one: an asked machine's layer is a statement, and a
-              statement with a primary button under it invites the press it exists to prevent. */}
-          {!yardExplain.asked && (
-            <div className="bm-eqyx-foot">
-              <button type="button" className="bm-eqyx-later" onClick={() => setYardExplain(null)}>
-                {t.bidMap.eqYardExplainLater}
-              </button>
-              <button
-                type="button"
-                className="bm-eqyx-cta"
-                disabled={!onAskAvailability}
-                onClick={() => {
-                  // Marked BEFORE the ask, not after: the renter has read it either way, and a
-                  // failed send that also reset the flag would explain the same thing twice.
-                  markExplained();
-                  const m = yardExplain.machine;
-                  setYardExplain(null);
-                  onAskAvailability?.(m);
-                }}
-              >
-                {t.bidMap.eqYardExplainCta}
-              </button>
-            </div>
-          )}
-        </div>
-        </div>,
-        document.body,
-        );
-      })()}
 
       {/* The filtered empty state NAMES what emptied it and offers the way out. Plain «لا توجد نتائج»
           would read as "this lessor has nothing" — a claim about him rather than about the chips, and
@@ -703,6 +499,7 @@ function EquipmentCard({
 
   return (
     <li
+      {...pin("equipment-card")}
       className={`bm-eq${selected ? " on" : ""}${cue ? " cue" : ""}`}
       data-eq={machine.equipmentId}
       // The staggered arrival is the prototype's `0.05 + index·0.07s` — the list reads as being
@@ -750,6 +547,7 @@ function EquipmentCard({
             picture is the part of the card already about looking at the machine closely, so pressing
             it to see it closely is not a rule the renter has to learn. */}
         <span
+          {...pin("equipment-card-photo")}
           role="button"
           tabIndex={0}
           aria-label={`${t.bidMap.eqOpenFile} — ${title}`}
@@ -777,7 +575,7 @@ function EquipmentCard({
 
               «Details ›» is gone as a word. The icon is the file under a magnifier, which is what the
               control has always done — look inside this machine's file. */}
-          <div className="bm-eq-hd">
+          <div {...pin("equipment-card-head")} className="bm-eq-hd">
             {/* How complete the file is, on the LEADING edge (owner, 2026-08-31) — the first thing
                 read on the card's first line, and it sits beside the control that opens the papers
                 it counts. */}
@@ -831,12 +629,13 @@ function EquipmentCard({
               chip. AC-33 too — the ask's ink is still `askAvailability.colour`, carried on the rule
               under the prompt below. */}
           {yard === "ok" ? (
-            <span className="bm-eq-yard ok" title={t.bidMap.eqYardConfirmedWhy}>
+            <span {...pin("equipment-card-yard")} className="bm-eq-yard ok" title={t.bidMap.eqYardConfirmedWhy}>
               <span className="material-icons-outlined" aria-hidden="true">check_circle</span>
               <Distance km={km} ar={ar} t={t} />
             </span>
           ) : (
             <button
+              {...pin("equipment-card-yard")}
               type="button"
               className={`bm-eq-yard ${yard}`}
               title={yard === "asked" ? t.bidMap.askPendingWhy : t.bidMap.eqYardUnconfirmedWhy}

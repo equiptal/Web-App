@@ -21,7 +21,7 @@
  *
  * **Scope note (a decision, recorded):** the audit's "the chip's model exposes `{label}`" is
  * ambiguous between two chips on this surface — the availability STATUS chip (the pin's caption and
- * the panel's `mp-chip`) and the availability FILTER chip (§6.4a). Both are asserted, because the
+ * the panel's yard card, `mp-chip` until 2026-09-08) and the availability FILTER chip (§6.4a). Both are asserted, because the
  * safest reading of a negative AC is the wider one.
  *
  * **Not asserted (and deliberately so):** the panel's line renders `availability · distance · yard`,
@@ -171,9 +171,15 @@ describe("no chip renderer can reach `locationSource` at all (RM3-AC-30)", () =>
     expect(stripComments(canvas)).not.toContain("locationSource");
   });
 
-  it("the panel's chip is drawn from the availability state alone", () => {
+  it("the panel's yard card is drawn from the availability state alone", () => {
+    /* ~~The tinted chip on the far corner of the distance line.~~ Since 2026-09-08 the panel draws
+       the fleet card's own yard card instead (owner: *"just the red card of the distance and yard
+       with maybe small badge on the card saying not confirmed"*). The RULE is untouched and is what
+       this pins: the state it paints comes from `unitAvailability` and the reason is not reachable
+       from here at all. */
     const detail = src("src/components/map/panel/EquipmentDetail.tsx");
-    expect(detail).toContain('availability !== "absent"');
+    expect(detail).toContain('availability === "absent"');
+    expect(detail).toContain('availability === "confirmed"');
     expect(stripComments(detail)).not.toContain("locationSource");
   });
 

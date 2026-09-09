@@ -39,6 +39,9 @@ export function BidCards({
   startDate,
   mobByRentee = null,
   demobByRentee = null,
+  largerHeld = 0,
+  showLarger = false,
+  onShowLarger,
   onToggle,
 }: {
   bids: WorkspaceBid[];
@@ -58,40 +61,73 @@ export function BidCards({
    */
   mobByRentee?: boolean | null;
   demobByRentee?: boolean | null;
+  /**
+   * How many bids on this item offer a machine LARGER than the one asked for (`sizeCounts.larger`).
+   * They are dropped by the backend unless the list asks for them, so on an otherwise empty item
+   * this is the difference between «nobody answered» and «somebody answered with a bigger machine».
+   */
+  largerHeld?: number;
+  /** Whether those bids are already being asked for — if they are, this empty state is the truth. */
+  showLarger?: boolean;
+  onShowLarger?: () => void;
   onToggle: (bidId: string) => void;
 }) {
   const t = useT();
 
   if (bids.length === 0) {
+    /* ── «No bids» is a claim, and it can be false (owner, 2026-09-08) ────────────────────────
+       A supplier offering a bigger machine than the renter asked for is answered by dispatch and
+       then hidden here, so the renter gets a notification, opens the item and reads that nothing
+       arrived. The count says otherwise, and the button is the only route to the offer. Nothing is
+       said once the filter is already on: then the item really is empty. */
+    const held = showLarger ? 0 : largerHeld;
     return (
       <div className="grid min-h-[220px] place-items-center px-4 py-12 text-center">
         <div>
           <Icon name="inbox" size={30} className="text-muted" />
           <p className="mt-2 text-body font-semibold text-muted">{t.workspace.noBidsYet}</p>
+          {held > 0 && (
+            <div className="mt-3 inline-flex flex-wrap items-center justify-center gap-2 rounded-md border border-brand/40 bg-brand-soft px-3 py-2">
+              <span className="inline-flex items-center gap-1.5 text-meta font-semibold text-navy">
+                <Icon name="straighten" size={14} className="text-brand-deep" />
+                {fmt(held === 1 ? t.workspace.sizeLargerHeldOne : t.workspace.sizeLargerHeldMany, { n: String(held) })}
+              </span>
+              {onShowLarger && (
+                <button type="button" onClick={onShowLarger} className={btn("secondary", "sm", { className: "transition" })}>
+                  {held === 1 ? t.workspace.showLargerCtaOne : t.workspace.showLargerCtaMany}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
   return (
-    /* ── One height for every card: the tallest card's (owner, 2026-08-30) ───────────────────────
-       Three settings have been tried here, and only the third is right.
+    /* ── A ROW you travel sideways, and the COLUMN carries its height (owner, 2026-09-09) ────────
+       *"No, the bids card must be scrolled horizontally to show all of them, but I meant we might
+       need vertical scrolling to show the height of the card in some cases only."*
 
-         1. `h-full` + `items-stretch` + `max-h-full` on the card — every card took the PANE's
-            height, so a short bid held a column of empty white between its total and its button.
-         2. `items-start` — each card ended where its content did, so the «Counter this price»
-            buttons stepped down the row and no two lined up.
-         3. THIS. `items-stretch` with NO height on the row: a flex line's cross size is its tallest
-            item, so the row is as tall as the fullest card and every card stretches to exactly
-            that. Nothing is capped to the pane, so nothing scrolls inside a card, and no card is
-            taller than the most it could ever have to say.
+       ~~A wrapping `auto-fill` grid.~~ That was yesterday's answer to "no page scrolling is shown",
+       and it answered the wrong half: it fixed the missing VERTICAL scroll by taking the sideways
+       travel away. The bids are a rail — one card per supplier, read left to right, compared by
+       travelling — and that is the 2026-08-25 shape the owner has now restored.
 
-       The slack a shorter card now carries sits above its footer, because the footer is `mt-auto`.
-       That is the point: the buttons line up. A card whose neighbour says «Priced on 1 of the 3
-       units offered» and which has nothing of the kind to say is genuinely shorter, and the only
-       question is where its spare room goes — under the price, or under the button. Under the price
-       is the answer that keeps the row readable across. */
-    <div {...pin("workspace-bid-cards")} className="flex snap-x items-stretch gap-5 overflow-x-auto p-3">
+       What survives from yesterday is the part he actually reported: the workspace COLUMN scrolls
+       (`RequestsWorkspace`'s pinned root is `overflow-y-auto`, and neither tab pane clips), so a card
+       taller than the viewport is read by scrolling the page rather than by a bar inside a box. This
+       strip caps nothing and scrolls nothing downwards itself.
+
+       `items-stretch` keeps the 2026-08-30 ruling: every card takes the height of the tallest in the
+       row, so the «Counter this price» buttons line up and a shorter card's slack sits above its
+       footer. Both overflow axes are STATED — CSS computes the other from `visible` to `auto` the
+       moment one scrolls, and an unstated `overflow-y` is how this repo grew a phantom vertical bar
+       three times (the bid rail, the compare matrix, the suppliers table). */
+    <div
+      {...pin("workspace-bid-cards")}
+      className="flex items-stretch gap-5 overflow-x-auto overflow-y-clip p-3"
+    >
       {bids.map((b) => (
         <BidCardTile
           key={b.card.id}
@@ -307,7 +343,10 @@ function BidCardTile({
        does that job now, and says so. What is left here is a container: no click, no pointer, and
        the ring only when it IS checked. */
     <article {...pin("bid-card")}
-      className={`flex w-[344px] max-w-full flex-none snap-start flex-col overflow-hidden rounded-lg border bg-surface transition ${
+      /* 344px and `flex-none`: the card states its own width again (owner, 2026-09-09), because a
+         rail is made of cards that keep their size and a bid drawn at 700px is a different card.
+         `h-full` still takes the row's stretched height, which is what lines the footers up. */
+      className={`flex h-full w-[344px] flex-none flex-col overflow-hidden rounded-lg border bg-surface transition ${
         selected ? "border-brand" : "border-border"
       }`}
     >

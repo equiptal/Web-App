@@ -110,7 +110,29 @@ export interface ShareRequestPanelProps {
    * — the only case where nothing opened in another tab, and therefore the only case where a caller
    * should say so immediately rather than wait for the renter to come back.
    */
-  onShared?: (count: number, channel: string) => void;
+  /**
+   * A channel has been handed off.
+   *
+   * ── `handedOff` is the load-bearing part (owner, 2026-09-08) ─────────────────────────
+   * *"When I sent a request through Outlook and Moedatech it must show sent successfully with the
+   * post confirmation in the same modal, immediately."*
+   *
+   * It did not, and the reason is that a CONNECTED Outlook opens nothing at all: the message leaves
+   * from the server through Graph, the renter never leaves the page — and the caller was holding its
+   * confirmation back until the tab regained focus, which for that path never happens. So the
+   * outcome now says whether the browser actually went anywhere, and `mail` carries what the server
+   * did, so the confirmation can state the send rather than only the post.
+   */
+  onShared?: (
+    count: number,
+    channel: string,
+    outcome?: {
+      /** True when a tab, a pop-up or the device's own sheet took over. False when we sent it. */
+      handedOff: boolean;
+      /** Present only for a server-side send: what left, from where, and whether a copy was filed. */
+      mail?: { from: string; recipients: number; inSentFolder: boolean };
+    },
+  ) => void;
   /** Rows to start with ticked — the per-row share action picks one. */
   preselect?: string[];
   /** The renter's own firm, for the From line. */
@@ -309,6 +331,14 @@ export function ShareRequestPanel({
   const [connectNote, setConnectNote] = useState<"connected" | "denied" | "failed" | null>(null);
   /** The popup poll, held so an unmount mid-consent does not leave a timer running. */
   const connectTimer = useRef<number | null>(null);
+  /**
+   * How long the send waits for a consent the renter has not finished.
+   *
+   * MARK Long enough for a real sign-in — a password, a second factor, an account chooser on a
+   * tenant he has to pick from — and short enough that a renter who walked away is not left with a
+   * button that says «Posting…» over a request that is already live. Two minutes.
+   */
+  const CONNECT_WAIT_MS = 120_000;
 
   useEffect(() => setUuid(requestUuid), [requestUuid]);
   useEffect(() => setProvider(loadEmailProvider()), []);
@@ -396,7 +426,9 @@ export function ShareRequestPanel({
      * ⚠️ Same origin, deliberately: the backend checks `returnTo` against a host allow-list, and
      * the page closes itself by script, which a cross-origin document cannot be trusted to do.
      */
-    const url = await mailConnectUrl(`${window.location.origin}/mail-connected`);
+    /* 🔴 `await` inside `send`: a throw here rejects the whole send, and `busy` never clears. A
+       refusal is an answer, not an exception. */
+    const url = await mailConnectUrl(`${window.location.origin}/mail-connected`).catch(() => null);
     if (!url) {
       pre?.close();
       setConnecting(false);
@@ -422,23 +454,87 @@ export function ShareRequestPanel({
       return false;
     }
     /**
-     * ⚠️ **`window.closed` is the only signal there is.** The consent page is Microsoft's and the
-     * landing page is the backend's, so nothing inside the pop-up can talk to us. The status is
-     * re-read on close and IT decides: a renter who closed the window without deciding looks exactly
-     * like one who refused, and both mean "not connected".
+     * ⚠️ **Nothing inside the pop-up can talk to us.** The consent page is Microsoft's and the
+     * landing page is the backend's, so this watches from the outside: the window closing, and the
+     * connection status itself.
+     *
+     * 🔴 **~~`window.closed` was the only signal, and it hung the whole send~~** (owner,
+     * 2026-09-08: *"what if the user clicks Outlook and Send and didn't complete his connection with
+     * Outlook? It is showing like nothing happened, even the modal confirming the post didn't
+     * appear"*).
+     *
+     * A renter who ABANDONS the consent — leaves the window open on the account chooser and comes
+     * back to this tab, or lets it sit on a login that never finishes — never closes it. The
+     * interval polled forever, `await startConnect(...)` never returned, and everything after it
+     * never ran: no e-mail, no compose window, no «your request is posted» tick, and the Send button
+     * stuck on «Posting…». And the request was already live by then, so the one screen that could
+     * have told him said nothing at all.
+     *
+     * Three ways out now, and every one of them settles:
+     *
+     *  · **the window closes** — the status decides, as before;
+     *  · **the status says connected** — the callback has landed, so the consent is done whether or
+     *    not the little window has got round to closing itself. We close it and carry on;
+     *  · **the deadline passes** — he walked away. Answer «not connected», which sends him down the
+     *    compose-window path with everything on screen intact.
+     *
+     * ⚠️ The window is NOT closed on the deadline. He may still be typing a password into it, and
+     * shutting it under him would be worse than the wait. It closes itself when consent lands
+     * (`/mail-connected`), and until then it is his.
      */
+    const deadline = Date.now() + CONNECT_WAIT_MS;
     return new Promise<boolean>((resolve) => {
       if (connectTimer.current !== null) window.clearInterval(connectTimer.current);
-      connectTimer.current = window.setInterval(() => {
-        if (!win.closed) return;
+      /** Settle once, whichever of the three arrives first. */
+      const done = (connected: boolean, note: "connected" | "denied" | null) => {
         if (connectTimer.current !== null) window.clearInterval(connectTimer.current);
         connectTimer.current = null;
         setConnecting(false);
-        void mailConnectStatus().then((st) => {
-          setConnect(st);
-          setConnectNote(st.connected ? "connected" : "denied");
-          resolve(st.connected);
-        });
+        if (note) setConnectNote(note);
+        resolve(connected);
+      };
+      /* ⚠️ Guards the status read: the poll runs every 700 ms and the call takes longer than
+         that, so without it a slow answer would stack requests. */
+      let asking = false;
+      connectTimer.current = window.setInterval(() => {
+        if (win.closed) {
+          void mailConnectStatus()
+            .then((st) => {
+              setConnect(st);
+              done(st.connected, st.connected ? "connected" : "denied");
+            })
+            /* He closed it and we cannot tell what happened. «Not connected» is the answer that
+               keeps him moving; the compose window opens and the message still goes. */
+            .catch(() => done(false, "denied"));
+          return;
+        }
+        if (Date.now() > deadline) {
+          /* ⚠️ No note. «Denied» would be a claim about a decision he has not made — the window is
+             still open in front of him — and the panel's own status line already says the send fell
+             back to a compose window. */
+          done(false, null);
+          return;
+        }
+        if (asking) return;
+        asking = true;
+        void mailConnectStatus()
+          .then((st) => {
+            if (connectTimer.current === null) return;
+            if (!st.connected) return;
+            setConnect(st);
+            /* Consent landed. The window closes itself a moment later; close it now so the renter
+               is not left with a stray pop-up over the panel he is coming back to. */
+            try {
+              win.close();
+            } catch {
+              /* a browser may refuse; the page closes itself anyway */
+            }
+            done(true, "connected");
+          })
+          .catch(() => {})
+          .finally(() => {
+            asking = false;
+          });
       }, 700);
     });
   };
@@ -701,6 +797,22 @@ export function ShareRequestPanel({
    * who is picked may stop a request from being created.
    */
   const moedatechOnly = channel === "none";
+  /**
+   * 🔴 **Every machine here is off-catalogue, so the marketplace can reach nobody** (owner,
+   * 2026-09-08: *"for requests that have undefined taxonomy we will remove Moedatech from the
+   * confirmation, from the icons list in the share and from the confirmation question, and will
+   * tell the opposite since we will not have it available and no supplier"*).
+   *
+   * The rule this panel has been built on since 2026-09-02, *Moedatech is always a destination*, is
+   * true of every request except this one. A machine the catalogue cannot place is broadcast to
+   * nobody, so the locked chip, the button and the confirmation were all naming a marketplace that
+   * would never see it.
+   *
+   * ⚠️ Read off the CARD, so it is the same answer before and after the post: `draftForm` fills
+   * the model in `post` mode and the bid-form endpoint fills it in `share` mode. Until the card
+   * loads it is false, which is the ordinary case.
+   */
+  const offCatalogue = card?.model.offCatalogue === true;
   const canSend = !busy;
 
   /**
@@ -775,6 +887,12 @@ export function ShareRequestPanel({
 
     setBusy(true);
     setTooLong(false);
+    /* Did the browser LEAVE? A compose tab, a WhatsApp window or the device's share sheet all take
+       focus, and the confirmation waits for the renter to come back. A Graph send takes nothing, so
+       there is nothing to wait for — see `onShared`. */
+    let handedOff = false;
+    /** What the server sent, when it was the server that sent it. */
+    let mail: { from: string; recipients: number; inSentFolder: boolean } | undefined;
 
     // `post` mode mints the request first; a share that fails afterwards leaves a LIVE request, and
     // that is deliberate — the post is what the renter came here for, and rolling it back to tidy up
@@ -890,7 +1008,41 @@ export function ShareRequestPanel({
        */
       if (provider === "gmail") {
         consentWindow?.close();
-        reached += openCompose(id, message) ? reachable.length : 0;
+        const opened = openCompose(id, message);
+        if (opened) {
+          reached += reachable.length;
+          handedOff = true;
+        }
+      } else if (chosen.length > 0 && reachable.length === 0) {
+        /**
+         * 🔴 **Nobody picked has an e-mail address, so there is nothing to send and nothing to
+         * connect for.**
+         *
+         * ~~It fell through to the branch below and posted `renterSupplierIds: []`.~~ The endpoint's
+         * schema demands at least one id, so an empty list is a **400** — not a `sent: false` the
+         * fallback was written for. The branch read that as a failed send and answered by opening a
+         * compose window addressed to nobody, so the renter watched Outlook open and no mail leave.
+         *
+         * Confirmed against a real renter on 2026-09-09: the identical share worked the moment ONE
+         * supplier had an address added, because the array stopped being empty.
+         *
+         * ⚠️ **Stopping here is the honest outcome, not a silent skip.** The request is already
+         * posted, and «N have no e-mail» is on screen above the button before the press and stays
+         * there. Asking him to connect Outlook, or opening a compose window, would both be work in
+         * service of a send that cannot happen.
+         *
+         * 🔴 **`chosen.length > 0` is load-bearing and was missing in the first cut.** Ticking
+         * NOBODY is a different case with an opposite answer: the compose window must open so the
+         * renter addresses it himself (owner, 2026-09-02: *"users can share with this template in
+         * whatsapp or email without choosing from their suppliers fine"*). Guarding on
+         * `reachable.length === 0` alone swallowed that too, and the test written for it caught it.
+         *
+         * ⚠️ The blank pop-up is closed for the same reason the other early exits close it: it was
+         * opened as the first statement of the click to survive the pop-up blocker, so any path that
+         * does not use it has to clean it up or it is left stranded on `about:blank`.
+         */
+        consentWindow?.close();
+        setConfirming(false);
       } else {
       if (connect?.configured && !connect.connected) await startConnect(consentWindow);
 
@@ -924,6 +1076,8 @@ export function ShareRequestPanel({
 
       if (outcome.sent) {
         reached += outcome.recipients;
+        // Nothing opened and nothing to come back from: this is the path the owner's report is about.
+        mail = { from: outcome.from, recipients: outcome.recipients, inSentFolder: outcome.inSentFolder };
         /*
          * — the draft tab opened here —
          *
@@ -946,8 +1100,10 @@ export function ShareRequestPanel({
         const openedIt = openCompose(id, message);
         // Too long for a URL, and a truncated body loses its tail, which is where the link is. The
         // request is posted and the link is on screen; say so rather than sending half a message.
-        if (openedIt) reached += reachable.length;
-        else setTooLong(true);
+        if (openedIt) {
+          reached += reachable.length;
+          handedOff = true;
+        } else setTooLong(true);
       }
       }
     }
@@ -963,6 +1119,7 @@ export function ShareRequestPanel({
 
       const phone = (firstWithPhone?.phone ?? "").replace(/\D/g, "");
       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank", "noopener");
+      handedOff = true;
       if (firstWithPhone) reached += 1;
     }
     if (ch === "other") {
@@ -987,6 +1144,7 @@ export function ShareRequestPanel({
         .share?.({ title: subject, text: body, url })
         .then(() => true)
         .catch(() => false);
+      if (shared) handedOff = true;
       if (!shared) {
         /* Both flavours here, unlike Copy: *More* means "send this somewhere", so a paste into
            Gmail should arrive as the laid-out message with the card, and a paste into a chat as the
@@ -1010,7 +1168,7 @@ export function ShareRequestPanel({
     setHandedOff({ channel: ch, n: reached });
     if (ch !== "none") setSent((prev) => (prev.includes(ch) ? prev : [...prev, ch]));
     postedHere.current = false;
-    onShared?.(reached, ch);
+    onShared?.(reached, ch, { handedOff, mail });
     setBusy(false);
   };
 
@@ -1322,7 +1480,21 @@ export function ShareRequestPanel({
             {rows === null ? (
               <span className="text-meta text-muted">{c.loading}</span>
             ) : rows.length === 0 ? (
-              <span className="text-meta text-muted">{c.noSuppliers}</span>
+              /* ── An empty list is a dead end without this (owner, 2026-09-08) ──────────────────
+                 The «add» control lives in the SEARCH row, and that row is drawn only when there is
+                 something to search — so the renter with no suppliers read «No suppliers on your
+                 list yet» beside a "0 selected" count and had nothing to press. The one screen where
+                 he is choosing recipients is exactly where he notices the list is empty, so the same
+                 dialog My Suppliers uses is offered right here.
+
+                 Sharing still works without it: the link, WhatsApp and «More» never needed a list,
+                 and the sentence says what the list is FOR rather than what is missing. */
+              <span className="flex flex-col items-start gap-2.5 rounded-md border border-dashed border-border-strong px-3.5 py-4">
+                <span className="text-meta text-muted">{c.noSuppliersYet}</span>
+                <button type="button" onClick={() => setAddingSupplier(true)} className={btn("secondary", "sm")}>
+                  <Icon name="add" size={15} /> {t.suppliers.addSupplier}
+                </button>
+              </span>
             ) : (
               <div className="min-h-0 flex-1 overflow-auto rounded-md border border-border lg:max-h-none">
                 <ul>
@@ -1803,6 +1975,12 @@ export function ShareRequestPanel({
               What it does NOT take is the navy fill a chosen channel gets. Green is Moedatech's and
               navy is «you picked this»; keeping them apart is what lets a renter see, in one look,
               which parts of the row are his decision and which part is simply true. */}
+          {/* ⚠️ **Not drawn at all on an off-catalogue request** (owner, 2026-09-08). The chip
+              is a statement of fact, «this always happens», and on this one request it is not a
+              fact. A locked green mark naming a marketplace that cannot see the machine is the
+              worst of the three surfaces, because it cannot be pressed and so cannot be argued
+              with. */}
+          {!offCatalogue && (
           <span
             title={c.alwaysHint}
             className="inline-flex h-[34px] flex-none items-center gap-2 rounded-md border border-ok/30 bg-ok-soft px-3.5"
@@ -1813,8 +1991,9 @@ export function ShareRequestPanel({
             <img src="/moedatech-logo.svg" alt="Moedatech" className="h-3.5 w-auto brightness-0" />
             <Icon name="check_circle" size={15} className="text-ok-deep" />
           </span>
+          )}
 
-          <span aria-hidden className="h-7 w-px flex-none bg-border-strong" />
+          {!offCatalogue && <span aria-hidden className="h-7 w-px flex-none bg-border-strong" />}
 
           <Channel
             on={channel === "whatsapp"}
@@ -1894,7 +2073,7 @@ export function ShareRequestPanel({
           <button
             type="button"
             onClick={() => void send()}
-            disabled={!canSend}
+            disabled={!canSend || (offCatalogue && moedatechOnly && mode !== "post")}
             className={cx(btn("primary", "lg"), "ms-auto flex-none px-6")}
           >
             <Icon name="send" size={16} />
@@ -1903,9 +2082,18 @@ export function ShareRequestPanel({
               : sent.length
                 ? c.shareAgain
                 : moedatechOnly
-                  ? mode === "post"
-                    ? c.postMoedatechOnly
-                    : c.sendMoedatechOnly
+                  ? /* ⚠️ «Post to Moedatech» is the one promise this request cannot keep. In
+                       `post` mode the press still does something real, it creates the request and
+                       mints the link, so the button is named for that. In `share` mode the request
+                       already exists and no channel is picked, so the press has nothing left to do
+                       and the button says which decision is missing. */
+                    offCatalogue
+                    ? mode === "post"
+                      ? c.offCataloguePost
+                      : c.offCataloguePick
+                    : mode === "post"
+                      ? c.postMoedatechOnly
+                      : c.sendMoedatechOnly
                   : c.sendToSuppliers}
           </button>
         </div>
@@ -1921,12 +2109,19 @@ export function ShareRequestPanel({
             The Moedatech-only case keeps its line, because that one is NOT visible in the row: two
             unticked buttons look identical to a renter who has not realised Send still does
             something. */}
-        {moedatechOnly && (
+        {/* ⚠️ On an off-catalogue request this line is drawn whatever the channel, because it is
+            not a note about the channel row: it is the reason the link matters. */}
+        {offCatalogue ? (
+          <p className="flex items-start gap-1.5 text-meta font-semibold text-warn-deep">
+            <Icon name="error_outline" size={14} className="mt-px flex-none" />
+            {c.offCatalogueLine}
+          </p>
+        ) : moedatechOnly ? (
           <p className="flex items-center gap-1.5 text-meta font-semibold text-ok-deep">
             <Icon name="check_circle" size={14} className="flex-none" />
             {c.moedatechOnlyHint}
           </p>
-        )}
+        ) : null}
 
           {/* Said plainly: the alternative is a renter who believes four people were messaged.
               Nothing is said when NONE of them has a number (owner, 2026-09-03): the panel already
@@ -2178,13 +2373,21 @@ export function ShareRequestPanel({
           {/* One line per thing that is about to happen, each with its own mark, so he can count
               them rather than parse a sentence. */}
           <div className="grid gap-2.5">
-            {!uuid && (
+            {/* ⚠️ **The marketplace line is replaced, not dropped** (owner, 2026-09-08: *"will
+                tell the opposite"*). Saying nothing would leave a renter approving a send with no
+                idea that the e-mail in front of him is the only copy of this request anyone will
+                ever see. */}
+            {offCatalogue ? (
+              <span className="flex items-start gap-2.5 text-body text-navy">
+                <Icon name="error_outline" size={18} className="mt-px flex-none text-warn-deep" />
+                {c.offCatalogueLine}
+              </span>
+            ) : !uuid ? (
               <span className="flex items-start gap-2.5 text-body text-navy">
                 <Icon name="public" size={18} className="mt-px flex-none text-brand" />
                 {c.confirmPostLine}
               </span>
-            )}
-            {uuid && (
+            ) : (
               <span className="flex items-start gap-2.5 text-body text-muted">
                 <Icon name="check_circle" size={18} className="mt-px flex-none text-ok-deep" />
                 {c.confirmPostedAlready}
@@ -2196,8 +2399,12 @@ export function ShareRequestPanel({
             </span>
           </div>
 
-          {/* ⚠️ **The suppliers by NAME, every one of them.** A number is not something he can
-              check, and this is the last screen before his request reaches other firms. */}
+          {/* ⚠️ **The suppliers by ADDRESS, every one of them** (owner, 2026-09-09: *"he must
+              show the suppliers emails that he is sending to not the supplier or company name"*). A
+              number is not something he can check, and neither is a name: what leaves this screen is
+              an address, and «Al Faisal Rentals» does not say whether it is the branch mailbox or a
+              salesman's personal one. The name is the chip's `title`, so the firm is one hover away
+              without standing in for the thing being confirmed. */}
           {reachable.length > 0 && (
             <div className="rounded-md border border-border bg-surface2 p-3">
               <span className="text-label font-semibold uppercase tracking-wide text-muted">
@@ -2207,10 +2414,10 @@ export function ShareRequestPanel({
                 {reachable.map((x) => (
                   <span
                     key={x.id}
-                    title={x.email ?? undefined}
+                    title={x.name}
                     className="inline-flex h-[26px] max-w-full items-center rounded-full border border-border bg-surface px-3 text-meta text-navy"
                   >
-                    <span className="truncate">{x.name}</span>
+                    <span className="truncate">{x.email}</span>
                   </span>
                 ))}
               </div>

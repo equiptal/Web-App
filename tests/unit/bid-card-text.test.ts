@@ -24,6 +24,7 @@ const model = (over: Partial<BidCardModel> = {}): BidCardModel => ({
   closing: "Bidding closes 21 Aug 2026",
   accepting: true,
   cta: "Open the link to submit your bid →",
+  offCatalogue: false,
   ...over,
 });
 

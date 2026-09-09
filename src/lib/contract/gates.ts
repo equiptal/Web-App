@@ -150,7 +150,12 @@ export function itemAppGaps(item: EquipmentItem): RequiredGap[] {
  * agent-prefilled value would otherwise satisfy a gate the renter never looked at — which is the
  * whole thing these exist to prevent.
  */
-export function itemWebGaps(item: EquipmentItem, draft: Pick<RfqDraft, "touchedFields">): RequiredGap[] {
+export function itemWebGaps(
+  item: EquipmentItem,
+  /* `project` as well as `touchedFields` since 2026-09-09: both answers can live at REQUEST level,
+     and reading only the per-item override is what made a filled pill shake (see below). */
+  draft: Pick<RfqDraft, "touchedFields" | "project">,
+): RequiredGap[] {
   if (item.removed) return [];
   // An off-catalogue line is gated like any other: both answers are posted for it and both are shown
   // to the supplier on the bid form. A no-match line that cannot be named keeps its early return.
@@ -166,10 +171,25 @@ export function itemWebGaps(item: EquipmentItem, draft: Pick<RfqDraft, "touchedF
    * nobody supplied. The touch flag carries the case where the renter's answer IS "nothing": both
    * "No certificate" and "Any year" store as absent, and only `touchedFields` tells that apart from
    * never having been asked.
+   *
+   * ── It reads the RESOLVED value, not the per-item override (owner, 2026-09-09) ────────────────
+   * *"The certificate is shaking as required while it is selected, so whenever there is a value for
+   * cert don't shake it, it is navy blue and filled and allow moving on."*
+   *
+   * Both answers exist at two levels: the item's own override, else the REQUEST-wide one, and the
+   * card resolves them exactly that way (`useItemOverrides`: `item.safetyCertsOverride ??
+   * project.certificates.safety`, `item.equipmentYear ?? project.advanced.equipmentYear`). This gate
+   * read the override alone — so a certificate that came from the request level filled the pill,
+   * painted it navy, and still counted as missing: the chip shook, «* Required» appeared over a
+   * field with an answer in it, and «Review & send» refused with nothing on screen to fix.
+   *
+   * One resolution, two readers: the gate now asks the same question the pill answers.
    */
-  const yearAnswered = item.equipmentYear != null || isTouched(draft, itemFieldKey(item.id, "equipment_year"));
+  const resolvedYear = item.equipmentYear ?? draft.project.advanced.equipmentYear ?? null;
+  const resolvedCerts = item.safetyCertsOverride ?? draft.project.certificates.safety ?? [];
+  const yearAnswered = resolvedYear != null || isTouched(draft, itemFieldKey(item.id, "equipment_year"));
   const certAnswered =
-    (item.safetyCertsOverride ?? []).length > 0 || isTouched(draft, itemFieldKey(item.id, "safety_certificates"));
+    resolvedCerts.length > 0 || isTouched(draft, itemFieldKey(item.id, "safety_certificates"));
 
   if (!yearAnswered) at("equipment_year", "gate.yearMissing");
   if (!certAnswered) at("safety_certificates", "gate.certMissing");
@@ -177,7 +197,10 @@ export function itemWebGaps(item: EquipmentItem, draft: Pick<RfqDraft, "touchedF
 }
 
 /** Every unmet requirement on one item, app and web alike. */
-export function itemGaps(item: EquipmentItem, draft: Pick<RfqDraft, "touchedFields">): RequiredGap[] {
+export function itemGaps(
+  item: EquipmentItem,
+  draft: Pick<RfqDraft, "touchedFields" | "project">,
+): RequiredGap[] {
   return [...itemAppGaps(item), ...itemWebGaps(item, draft)];
 }
 
@@ -198,13 +221,31 @@ export function transportGaps(items: EquipmentItem[], project: ProjectDetails): 
     if ((item.returnOverride ?? project.returnFromSite) == null) {
       gaps.push({ panel: "equipment", itemId: item.id, field: "return", reason: "gate.returnMissing" });
     }
+    /**
+     * Who pays for the fuel, asked the same way as the two legs (2026-09-08).
+     *
+     * It had no gate because it could not be empty: the draft seeded «me». Now that the seeds are
+     * gone it can be, and `draftToCreateRequest` falls back to «me» when computing `dieselIncluded`
+     * — so without a gate an unanswered field would post as *the renter pays* in silence, which is
+     * the exact failure the seeds were removed to stop.
+     */
+    if ((item.fuelResponsibilityOverride ?? project.fuelResponsibility) == null) {
+      gaps.push({ panel: "equipment", itemId: item.id, field: "fuel_responsibility", reason: "gate.fuelPartyMissing" });
+    }
   }
   return gaps;
 }
 
 /** The equipment panel for ONE item — what the canvas gates on before opening *Where it goes*. */
-export function gateEquipment(item: EquipmentItem, project: ProjectDetails, draft: Pick<RfqDraft, "touchedFields">): GateResult {
-  const gaps = [...itemGaps(item, draft), ...transportGaps([item], project)];
+export function gateEquipment(
+  item: EquipmentItem,
+  project: ProjectDetails,
+  draft: Pick<RfqDraft, "touchedFields">,
+): GateResult {
+  /* `project` arrives as its own argument here and `itemGaps` now needs it on the draft shape (both
+     the year and the certificate can be answered at request level, 2026-09-09). It is the SAME
+     object either way — this caller has it and the draft it was taken from does too. */
+  const gaps = [...itemGaps(item, { ...draft, project }), ...transportGaps([item], project)];
   return { ok: gaps.length === 0, reasons: gaps.map((g) => g.reason) };
 }
 

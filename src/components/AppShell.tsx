@@ -665,7 +665,7 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
           {back && (
             // `flex` across the full width rather than `inline-flex`: the bar carries a trailing slot
             // now, and the control itself stays exactly where it was, first on the line.
-            <div {...pin("page-back")} className={cx(PAGE_BACK, fullBleed && `${PAGE_X} pt-4`)}>
+            <div {...pin("page-back")} className={cx(PAGE_BACK, fullBleed && `${PAGE_X} pt-2`)}>
               {(() => {
                 /* ── ONE control, one word, one place (owner, 2026-09-03) ───────────────────────
                    *"There are many variations of the back button on screens, and some have two. I

@@ -108,6 +108,7 @@ import {
   type RequestThreadCard,
 } from "@/lib/contract/request-card";
 import { useLocale, useT } from "@/lib/i18n";
+import { pin } from "@/lib/uiPins";
 import "@/components/deal-room/deal-room-proto.css";
 
 /** Refresh cadence for the REST unread + tab list. Deliberately slower than the deal room's 15s room
@@ -555,8 +556,12 @@ export function ChatDock({
       // The REQUEST's type, and only on the anchor tab: a sibling tab is a different item, and a card
       // there naming this item's type would name the wrong machine in words.
       typeWord: active?.bidId === bid.id ? typeWord : null,
+      /* The counterparty whose conversation this is — the ACTIVE tab's supplier, not the anchor's, so
+         a card in a sibling thread names the firm that thread belongs to (owner, 2026-09-08). It is
+         the same name the dock's header prints two rows above the card. */
+      companyName: activeRow?.supplierName ?? (active?.bidId === bid.id ? bid.supplierName : null),
     }),
-    [L, active?.bidId, bid.id, fleet, machineOf, fleetHas, repliesByRef, docLabel, onOpenMachine, canOpenMachine, typeWord],
+    [L, active?.bidId, activeRow?.supplierName, bid.id, bid.supplierName, fleet, machineOf, fleetHas, repliesByRef, docLabel, onOpenMachine, canOpenMachine, typeWord],
   );
 
   /* ── the arrival notice (004a §2.1) ──────────────────────────────────────────────────────────── */
@@ -824,7 +829,7 @@ export function ChatDock({
       )}
 
       {open && (
-        <section className={`bm-chat dlproto is-${place}`} aria-label={t.chatDock.title}>
+        <section {...pin("chat-dock")} className={`bm-chat dlproto is-${place}`} aria-label={t.chatDock.title}>
           {/* ── The identity band (`pChat`, prototype 05:17–24) ────────────────────────────────
               WHITE, with the counterparty's initials in a circle and his name in dark ink (owner,
               2026-08-11: *"the dock header is blue — make it white"*). It was `pChat`'s blue band
@@ -836,7 +841,7 @@ export function ChatDock({
               buttons and the call control. All three were excluded by name, so the band carries the
               identity and the two controls that are real — where the conversation sits, and closing
               it. */}
-          <header className="bm-chat-head">
+          <header {...pin("chat-dock-head")} className="bm-chat-head">
             <span className="bm-chat-av" aria-hidden="true">{initials}</span>
             {/* ── The name IS the link to the papers (owner, 2026-08-26) ────────────────────────
                 «Company details» was a kebab entry; it is now the band itself. The header already
@@ -1008,7 +1013,7 @@ export function ChatDock({
 
           {/* A tab per item — and NO strip at all when this counterparty holds one bid (RM3-AC-44). */}
           {tabs.length > 1 && (
-            <div className="bm-chat-tabs" role="tablist">
+            <div {...pin("chat-dock-tabs")} className="bm-chat-tabs" role="tablist">
               {tabs.map((tab) => (
                 <button
                   key={tab.bidId}
@@ -1027,7 +1032,7 @@ export function ChatDock({
             </div>
           )}
 
-          <div className="bm-chat-body">
+          <div {...pin("chat-dock-thread")} className="bm-chat-body">
             {!STREAM_API_KEY ? (
               <div className="bm-chat-note">{t.chatDock.unavailable}</div>
             ) : !active?.dealRoomId ? (
@@ -1197,7 +1202,7 @@ export function ChatDock({
               Nothing has been written at this point. «إلغاء» leaves no trace, and «أرسل الطلب» is
               what creates the room and posts the card. */}
           {draft && activeBidId === bid.id && (
-            <div className="bm-chat-draft">
+            <div {...pin("chat-dock-draft")} className="bm-chat-draft">
               <RequestCard
                 view={requestCardView(draftSubject(draft), cardCtx, { draft: true })}
                 draft
@@ -1224,7 +1229,7 @@ export function ChatDock({
 
               Every control goes inert while a send is in flight, the attach and the mic included: a
               second press during the room-creating first message would race the create. */}
-          <div className="bm-chat-compose">
+          <div {...pin("chat-dock-composer")} className="bm-chat-compose">
             {/* The recorder takes the WHOLE row while it is running (deal-room parity) — at this
                 width a timer, a cancel and a send cannot share the row with an input. */}
             {!voiceRecording && (

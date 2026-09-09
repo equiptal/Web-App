@@ -34,7 +34,7 @@
  * decision when the bids come back priced against it.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Icon, TextInput, Toggle } from "@/components/ui";
@@ -43,7 +43,23 @@ import { useProvenance } from "@/components/create/hooks";
 import { OPERATOR_CERTIFICATES, type EquipmentItem, type OperatorCertificate, type Party } from "@/lib/contract";
 import { pin } from "@/lib/uiPins";
 
-export function OperatorRail({ item }: { item: EquipmentItem }) {
+export interface OperatorRailProps {
+  item: EquipmentItem;
+  /**
+   * **A refusal that belongs to this rail** (owner, 2026-09-09: *"if it is not open at all at least
+   * once and user try to move to next step the closed pannel will shake too"*).
+   *
+   * The canvas cannot see whether the rail is showing — `expanded` is local, and it opens off the
+   * ITEM's own answer — so it cannot decide alone that this panel was never looked at. It asks
+   * instead: the rail reports whether it is open (`onOpenState`) and the canvas shakes it by setting
+   * this.
+   */
+  shaking?: boolean;
+  /** Whether the rail is showing right now, reported on every change of that state. */
+  onOpenState?: (open: boolean) => void;
+}
+
+export function OperatorRail({ item, shaking = false, onOpenState }: OperatorRailProps) {
   const t = useT();
   const { actions } = useRfq();
   const prov = useProvenance(item.id);
@@ -54,6 +70,11 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
   const on = item.operatorNeeded === "yes";
   /** Whether the panel is showing. Opens on the item's own answer, then the renter's to keep. */
   const [expanded, setExpanded] = useState(on);
+  /* Reported UP, because the refusal is the canvas's to raise and the state is this component's to
+     own. An effect rather than a call inside `setExpanded`: the rail also opens on mount for an item
+     that already says «with an operator», and the canvas has to know that too — a renter whose agent
+     answered the operator has seen it. */
+  useEffect(() => { onOpenState?.(expanded); }, [expanded, onOpenState]);
   const complete = !on || [op.fatFood, op.fatAccommodationTransport, op.nationality].every(Boolean);
 
   const setOp = (field: string, patch: Parameters<typeof actions.patchItemOperator>[1]) => {
@@ -70,9 +91,15 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
   if (!expanded) {
     return (
       <button
+        {...pin("operator-rail-closed")}
         type="button"
         onClick={() => setExpanded(true)}
-        className="flex w-[72px] flex-none flex-col items-center gap-3.5 self-stretch rounded-lg border-[1.5px] border-brand-light bg-brand-soft py-4 transition"
+        /* `shake-error` is the canvas's own refusal animation (`globals.css`), the same one the
+           machine card's fields and the two request-wide panels use — one gesture for «this panel
+           owes you a look», wherever it is raised. */
+        className={`flex w-[72px] flex-none flex-col items-center gap-3.5 self-stretch rounded-lg border-[1.5px] bg-brand-soft py-4 transition ${
+          shaking ? "shake-error border-brand" : "border-brand-light"
+        }`}
         aria-label={t.create.operator}
       >
         <span className="grid h-[34px] w-[34px] flex-none place-items-center rounded-full bg-brand text-white">

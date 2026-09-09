@@ -327,15 +327,20 @@ export function Intake() {
 
       {/* ── The way on ── */}
       <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
-        {hasDraft ? (
-          <Button variant="secondary" onClick={() => actions.resumeWizard()} className="me-auto">
-            <Icon name="arrow_back" size={16} className="rtl:scale-x-[-1]" /> {t.intake.backToReview}
-          </Button>
-        ) : (
-          /* A disabled Continue with nothing beside it is indistinguishable from a broken one, so
-             the only thing that can hold it says so. */
-          !canStart && <span className="text-meta text-muted">{t.intake.addSomething}</span>
-        )}
+        {/* ~~«Back to review», drawn on the left whenever a draft existed.~~ Removed (owner,
+            2026-09-09). It was a second Back on a screen that already has one, and the two disagreed:
+            the page's own control leaves the flow (`CreateBack`, `{ fallback: "/" }` on the intake),
+            while this one went forward into the drafted request. A renter who had just answered
+            «Leave» on the canvas's confirm met a button offering to undo that.
+
+            The draft is NOT stranded, and neither route needed this button:
+              · the browser's own Back resumes it (`rfq-store`'s `popstate` → `RESUME_WIZARD`);
+              · a returning visit raises the draft prompt, whose «Continue» resumes it;
+              · and «Re-analyse» right here rebuilds it from the words on screen.
+            `resumeWizard` therefore keeps its two callers and is not dead. */}
+        {/* A disabled Continue with nothing beside it is indistinguishable from a broken one, so
+            the only thing that can hold it says so. */}
+        {!canStart && <span className="me-auto text-meta text-muted">{t.intake.addSomething}</span>}
         <Button disabled={!canStart || state.busy} onClick={runAgent} className="px-6 py-3 text-body">
           {state.busy ? t.intake.reading : hasDraft ? t.intake.reAnalyze : t.intake.continueLabel}{" "}
           <Icon name={state.busy ? "hourglass_empty" : "arrow_forward"} size={17} className={state.busy ? "" : "rtl:scale-x-[-1]"} />

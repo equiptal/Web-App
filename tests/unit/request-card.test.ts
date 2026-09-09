@@ -277,14 +277,29 @@ describe("the draft card states what it is, and never what the supplier owes", (
     expect(view.ref).toBeNull();
   });
 
-  it("says «لم يُرسل بعد», never «بانتظار ردّه»", () => {
+  it("says NOTHING, and never «بانتظار ردّه»", () => {
+    /* ~~«لم يُرسل بعد — راجعه ثم أرسله».~~ Removed (owner, 2026-09-08): the card carries «Cancel» and
+       «Send the request» directly beneath, so the line described its own two buttons and cost the
+       card a row and a dashed rule.
+
+       The rule it was protecting is unchanged and is what this still pins: an unsent ask must never
+       claim the supplier owes an answer. */
     const view = requestCardView(draftSubject(draft), ctx({ machine: () => machine() }), { draft: true });
-    expect(view.status?.tone).toBe("draft");
-    expect(view.status?.label).toContain("لم يُرسل بعد");
+    expect(view.status).toBeNull();
     // The mutation: dropping the draft flag. The same subject then claims the supplier owes an
     // answer to a question he has never been sent.
     const sent = requestCardView(draftSubject(draft), ctx({ machine: () => machine() }));
     expect(sent.status?.label).toBe("بانتظار ردّه");
+  });
+
+  it("names the FIRM on a company-scope card when the surface knows it", () => {
+    // «The company» is a label where the counterparty's name belongs (owner, 2026-09-08). The
+    // surface hands the name down; the generic word survives only for a surface that has none.
+    const shortfall = composeShortfallRequest();
+    const named = requestCardView(draftSubject(shortfall), ctx({ machine: () => null, companyName: "شركة الغدير" }), { draft: true });
+    expect(named.title).toBe("شركة الغدير");
+    const anon = requestCardView(draftSubject(shortfall), ctx({ machine: () => null }), { draft: true });
+    expect(anon.title).toBe("الشركة");
   });
 
   it("still reports an already-satisfied machine — the most useful moment to find out", () => {

@@ -31,6 +31,26 @@ async function openDetails(handle: Awaited<ReturnType<typeof review>>) {
   await handle.run(() => screen.getByRole("button", { name: /View all details/i }).click());
 }
 
+describe("the screen lands at the top (owner, 2026-09-09)", () => {
+  it("scrolls the window to 0 on arrival, so Back and the heading are in view", async () => {
+    /* *"The review and summary screen must open at top so the back is shown at top when landing."*
+       The review REPLACES the canvas in place — same route, no navigation — so without this the
+       window keeps the canvas's scroll and a renter who pressed «Review & send» from the foot of a
+       long canvas arrives halfway down this screen, under the fold, with the Back control off
+       screen. It reads as a page that did not move. */
+    const scrollTo = vi.fn();
+    const original = window.scrollTo;
+    // jsdom's own `scrollTo` throws «not implemented», which is also why the component guards it.
+    Object.defineProperty(window, "scrollTo", { value: scrollTo, configurable: true, writable: true });
+    try {
+      await review();
+      expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "auto" });
+    } finally {
+      Object.defineProperty(window, "scrollTo", { value: original, configurable: true, writable: true });
+    }
+  });
+});
+
 describe("what suppliers will see (MREQ-AC-42)", () => {
   it("leads with one line: the place, the dates and the machine", async () => {
     /* The strip, which is now the page's own summary. The place is a LINK here — an address a

@@ -47,6 +47,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@/components/Icon";
+import { cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 
 export interface DropdownOption {
@@ -75,11 +76,13 @@ export function Dropdown({
   searchPlaceholder,
   label,
   tone = "field",
+  preselected = false,
   prefix,
   triggerClass,
   disabled = false,
   defaultOpen = false,
   onChange,
+  emptyAction,
 }: {
   value: string | null;
   options: DropdownOption[];
@@ -94,6 +97,38 @@ export function Dropdown({
    */
   label?: string;
   tone?: DropdownTone;
+  /**
+   * **What to offer when a SEARCH finds nothing** (owner, 2026-09-09).
+   *
+   * The list's empty state was a «—», which is honest and useless: the renter has typed a machine
+   * the catalogue does not carry and the control that told him so had nothing to do about it. This
+   * draws one row under it instead, carrying whatever he typed — the canvas uses it to turn the line
+   * off-catalogue and open the free-text name box seeded with his own words.
+   *
+   * Only while there IS a query. An empty list with an empty box means «there is nothing here to
+   * pick at all» — a taxonomy that failed to load, or a size list waiting on a type — and that is a
+   * different fault with a different answer.
+   */
+  emptyAction?: {
+    /**
+     * ONE general sentence, not a quote of what he typed (owner, 2026-09-09: *"make it general, add
+     * custom equipment type but show something that is not on moedatech etc"*).
+     *
+     * ~~«Add «wat» as equipment we do not carry yet».~~ Quoting the search text made the row read as
+     * a promise about that text, and a search FRAGMENT is not a machine's name — «wat» would have
+     * gone to suppliers as one. The row names the act; the box it opens takes the name.
+     */
+    label: string;
+    /** The typed text, still handed over: a caller may want it, and none does today. */
+    onPick: (query: string) => void;
+  };
+  /**
+   * The value came from the agent or a default, not from the renter.
+   *
+   * Draws the canvas’s provenance ring around the trigger. Informational: it says «check this», and
+   * never blocks — `CanvasField` uses the same mark for every other prefilled field on the flow.
+   */
+  preselected?: boolean;
   /**
    * A small constant prefix inside the trigger, e.g. «BASIS monthly» in a value strip.
    *
@@ -217,10 +252,25 @@ export function Dropdown({
           ? "text-inherit hover:text-brand"
         : tone === "overlay"
           ? "bg-[color-mix(in_srgb,var(--navy-deep)_80%,transparent)] px-3 py-2 text-meta font-semibold text-white rounded-sm"
-          : "bg-brand-press px-3 py-2 text-body font-semibold text-white rounded-sm");
+          /* «brand» is the UNANSWERED skin on the machine card’s photo overlay (the year pill), so it
+             takes the palette’s orange rather than its PRESSED shade — `brand-press` (#bd5711) is
+             nearly a brown and read as a filled answer (owner, 2026-09-08). `CertSelect` carries the
+             same pair of skins and the same note. */
+          : "bg-brand px-3 py-2 text-body font-semibold text-white rounded-sm");
 
   return (
-    <div {...pin("search-select")} ref={boxRef} className={`relative ${tone === "pill" ? "inline-flex" : ""}`}>
+    <div
+      {...pin("search-select")}
+      ref={boxRef}
+      className={cx(
+        "relative",
+        tone === "pill" && "inline-flex",
+        /* The provenance ring — «this was chosen for you», the same mark `CanvasField` puts around a
+           prefilled control (owner, 2026-09-08). Offset against whatever is behind, because on the
+           machine card this pill sits over the photo rather than on the panel. */
+        preselected && "rounded-sm ring-1 ring-brand",
+      )}
+    >
       <button
         type="button"
         disabled={disabled || options.length === 0}
@@ -295,7 +345,31 @@ export function Dropdown({
                 </span>
               </button>
             ))}
-            {filtered.length === 0 && <p className="px-3 py-3 text-body text-muted">—</p>}
+            {filtered.length === 0 && (
+              <>
+                <p className="px-3 pb-1 pt-3 text-body text-muted">—</p>
+                {/* The way out of a search that failed. `query.trim()`: see `emptyAction`. */}
+                {emptyAction && query.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const q = query.trim();
+                      setOpen(false);
+                      setQuery("");
+                      emptyAction.onPick(q);
+                    }}
+                    className="flex w-full items-start gap-2 border-t border-border px-3 py-2.5 text-start text-body font-semibold text-brand-deep transition hover:bg-brand-soft"
+                  >
+                    <Icon name="add" size={16} className="mt-[1px] flex-none" />
+                    {/* ~~A second, quieter line under it («Something Moedatech does not list yet»).~~
+                        Gone on the owner's word (2026-09-09): *"add a custom equipment type only"*.
+                        The row is one act and its own words say it; the note about what the state
+                        MEANS is already on the card, in orange, the moment the box opens. */}
+                    <span className="min-w-0">{emptyAction.label}</span>
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </div>,
         document.body,

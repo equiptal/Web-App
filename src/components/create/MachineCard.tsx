@@ -22,6 +22,7 @@ import { useState } from "react";
 import { fmt, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
+import { CUSTOM_EQUIPMENT_ENABLED } from "@/lib/flags";
 import { Button, Icon, Notice, TextArea, TextInput } from "@/components/ui";
 import { equipmentIcon } from "@/components/requests/EquipImg";
 import { CanvasField, ChoiceChips, ChoiceRow, PanelDot } from "@/components/create/Provenance";
@@ -32,6 +33,7 @@ import { pin } from "@/lib/uiPins";
 import {
   equipmentYears,
   isCustomLine,
+  isSystemChosen,
   isTouched,
   FUEL_TYPES,
   type EquipmentItem,
@@ -213,6 +215,15 @@ export function MachineCard({
                   values={overrides.safetyCerts}
                   touched={isTouched(state.draft!, prov.key("safety_certificates"))}
                   tone={gapFor("safety_certificates") ? "brand" : "overlay"}
+                  /* ── Three states, and the middle one was missing (owner, 2026-09-08) ────────
+                     Unanswered → orange, saying «Pick certificate». Answered by the RENTER → the plain
+                     overlay skin. Answered FOR him, by the agent reading his RFQ → the same overlay
+                     skin plus the canvas’s provenance ring, so he can see at a glance which of these
+                     answers are his own. Nothing here blocks: the gate is satisfied by a value from
+                     either hand, which is why an agent-filled cert no longer shakes. */
+                  preselected={isSystemChosen(
+                    prov.itemSource("safety_certificates", overrides.safetyCerts, "safetyCertsOverride", true),
+                  )}
                   onChange={(next) =>
                     set("safety_certificates", {
                       safetyCertsOverride: next,
@@ -290,8 +301,12 @@ export function MachineCard({
                 value={overrides.equipmentYear}
                 placeholder={t.create.machineCard.minYear}
                 searchPlaceholder={t.create.machineCard.minYear}
-                label={t.create.machineCard.minYear}
+                label={t.create.machineCard.minYearName}
                 tone={gapFor("equipment_year") ? "brand" : "overlay"}
+                /* The same three states as the certificate beside it — see the note there. */
+                preselected={isSystemChosen(
+                  prov.itemSource("equipment_year", overrides.equipmentYear, "equipmentYear", true),
+                )}
                 /* Every year from 2010 to now, newest first — the app's own list (`year_stepper.dart`),
                    and `SearchSelect` gives it the same search box the app's sheet has. A draft saved
                    with one of the old bands keeps rendering: the value is carried in so the field
@@ -357,6 +372,33 @@ export function MachineCard({
                   searchPlaceholder={t.create.machineCard.searchTypes}
                   label={t.create.machineCard.type}
                   options={tax.allSubtypes}
+                  /* ── A search that finds nothing is where off-catalogue BEGINS (owner, 2026-09-09) ──
+                     *"Maybe if he searched in the type and didnt find it we show for him something here
+                     that will open the field of custom type and the alert."*
+
+                     The canvas could only ARRIVE off-catalogue before this — the agent read a machine it
+                     could not place — so a renter who wanted to name one himself, or who had picked the
+                     wrong type and found the catalogue held nothing for him, had to go back to the intake
+                     and retype the whole request. The press turns THIS line off-catalogue, seeded with
+                     what he just typed, which opens the name box and the orange note below.
+
+                     Only offered while the feature is on: with `CUSTOM_EQUIPMENT_ENABLED` off,
+                     `isCustomLine` is false whatever the verdict says, so the row would clear the trio
+                     and open nothing. */
+                  emptyAction={
+                    CUSTOM_EQUIPMENT_ENABLED
+                      ? {
+                          label: t.create.machineCard.addCustomType,
+                          /* The name box opens EMPTY (owner, 2026-09-09, on making the row general).
+                             ~~It was seeded with the search text.~~ That only held while the row
+                             quoted it: a search fragment — «wat» — is not a machine's name, and
+                             seeding one would send it to suppliers as the answer. The box carries the
+                             star and the gate (`customEquipmentMissing`) asks for it, which is the
+                             same treatment every other required answer on this card gets. */
+                          onPick: () => actions.setItemOffCatalogue(item.id, ""),
+                        }
+                      : undefined
+                  }
                   onChange={(v) => {
                     // One pick, both ids: the parent category comes from the chosen subtype rather
                     // than being asked for separately.
@@ -402,12 +444,30 @@ export function MachineCard({
               {custom && (
                 <div className="border-t border-warn/30 pt-3 sm:col-span-3">
                   <CanvasField
+                    /* ── The note sits where the hint was (owner, 2026-09-08, second pass) ──────
+                       *"«This name is what your supplier will see on the bid form» — remove this and
+                       put the note in its place."*
+
+                       ~~The hint under the box, plus the notice pinned to the label and repeated
+                       under the field on a phone.~~ Three pieces of text around one input, two of
+                       them saying the same thing at two breakpoints, and the third explaining
+                       something the renter can see for himself the moment a supplier reads it.
+
+                       So: the label is the field’s name again, and the note is the single line under
+                       the box — the slot this field already had for a line of guidance, which is
+                       where a reader looks for one. One copy at every width, no duplication to keep
+                       in step. */
                     label={t.create.machineCard.customEquipment}
+                    star
                     missing={gapFor("custom_equipment")}
                     shake={shake("custom_equipment")}
                     required={owed("custom_equipment")}
-                    star
-                    hint={t.create.machineCard.customEquipmentHint}
+                    hint={
+                      <span className="flex items-start gap-1 text-warn">
+                        <Icon name="warning" size={13} className="mt-px flex-none" />
+                        {t.create.machineCard.notInCatalogueNote}
+                      </span>
+                    }
                   >
                     <TextInput
                       value={item.customEquipment ?? item.rawLabel ?? ""}
@@ -421,7 +481,9 @@ export function MachineCard({
             </div>
           )}
 
-          {notAvailable && <UnavailableCard item={item} label={item.rawLabel ?? tax.subtypeName ?? ""} />}
+          {/* The kill-switch row keeps its card: there the machine really is dropped, and that is a
+              refusal rather than a footnote. A NAMED off-catalogue row says its piece on the label. */}
+          {notAvailable && !custom && <UnavailableCard item={item} label={item.rawLabel ?? tax.subtypeName ?? ""} />}
 
           {/* Logistics, at the prototype's geometry: all three choices on ONE row — the two haulage
               legs inside a single box, fuel in its own — as a 2fr/1fr split, which lands the three
@@ -478,6 +540,12 @@ export function MachineCard({
             <div className="min-w-0 rounded-sm bg-surface2 p-3.5">
               <CanvasField
                 label={t.create.machineCard.fuelResponsibility}
+                /* Marked like the two legs beside it: it can be empty now that the draft no longer
+                   seeds «me», so it has to be able to say so. */
+                missing={gapFor("fuel_responsibility")}
+                shake={shake("fuel_responsibility")}
+                required={owed("fuel_responsibility")}
+                star
                 source={prov.itemSource("fuel_responsibility", overrides.fuelResponsibility, "fuelResponsibilityOverride", true)}
                 icon={
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-none" aria-hidden>

@@ -21,11 +21,16 @@ const api = vi.hoisted(() => ({
   totalPages: 1,
   total: 2,
   linked: [] as unknown[][],
+  /** Every directory call, so a test can say WHAT was asked for and not only that it was. */
+  calls: [] as unknown[][],
 }));
 
 vi.mock("@/lib/api/client", () => ({
-  searchSupplierDirectory: (_q: string, page = 1) =>
-    Promise.resolve({ rows: api.found, page, totalPages: api.totalPages, total: api.total }),
+  searchSupplierDirectory: (...args: unknown[]) => {
+    api.calls.push(args);
+    const page = typeof args[1] === "number" ? args[1] : 1;
+    return Promise.resolve({ rows: api.found, page, totalPages: api.totalPages, total: api.total });
+  },
   linkRenterSuppliers: (...args: unknown[]) => {
     api.linked.push(args);
     return Promise.resolve({ created: [{ supplierId: "9", id: "r1" }], skipped: [] });
@@ -35,6 +40,7 @@ vi.mock("@/lib/api/client", () => ({
 
 beforeEach(() => {
   api.linked = [];
+  api.calls = [];
   api.totalPages = 1;
   api.total = 2;
   api.found = [
@@ -82,7 +88,15 @@ describe("AddFromMoedatechDialog", () => {
     expect(boxes.every((b) => !b.disabled)).toBe(true);
   });
 
-  it("Given a supplier is ticked, When saved, Then the SUPPLIER id is linked, registered by default", async () => {
+  it("Given a supplier is ticked, When saved, Then it is linked and NOT marked a vendor", async () => {
+    /**
+     * 🔴 **Off by default** (owner, 2026-09-08: *"for add from Moedatech, same, doesn't auto-mark
+     * vendor for all, the default is unselected"*).
+     *
+     * ~~On.~~ «Registered vendor» is a claim about a procurement relationship, and picking a firm
+     * out of a directory of every account on the platform is not the moment it becomes true. Ticked
+     * for him, the flag ended up on everybody and stopped meaning anything.
+     */
     open();
     await listed();
 
@@ -90,10 +104,10 @@ describe("AddFromMoedatechDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: en.suppliers.dirAddN.replace("{n}", "1") }));
 
     await waitFor(() => expect(api.linked.length).toBe(1));
-    expect(api.linked[0][0]).toEqual([{ supplierId: "9", vendorRegistered: true }]);
+    expect(api.linked[0][0]).toEqual([{ supplierId: "9", vendorRegistered: false }]);
   });
 
-  it("Given the vendor flag is unticked on a row, Then that firm is added without it", async () => {
+  it("Given the vendor flag is ticked on a row, Then that firm is added WITH it", async () => {
     /**
      * It used to be forced on (owner, 2026-09-02 reversed it). Adding from Moedatech now behaves
      * exactly like adding a firm by hand, and the flag means the one thing it says: this is a firm I
@@ -114,7 +128,7 @@ describe("AddFromMoedatechDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: en.suppliers.dirAddN.replace("{n}", "1") }));
 
     await waitFor(() => expect(api.linked.length).toBe(1));
-    expect(api.linked[0][0]).toEqual([{ supplierId: "9", vendorRegistered: false }]);
+    expect(api.linked[0][0]).toEqual([{ supplierId: "9", vendorRegistered: true }]);
   });
 
   it("Given a row's vendor chip is pressed, Then it does not also pick or unpick the row", async () => {
@@ -126,19 +140,42 @@ describe("AddFromMoedatechDialog", () => {
     const boxes = screen.getAllByRole("checkbox") as HTMLInputElement[];
     fireEvent.click(boxes[1]);
 
+    // The row is untouched; the chip took its own press. ⚠️ Both start OFF now (2026-09-08).
     expect(boxes[0].checked).toBe(false);
-    expect(boxes[1].checked).toBe(false);
+    expect(boxes[1].checked).toBe(true);
   });
 
-  it("Given more than one page, Then it pages rather than scrolling 1,492 rows", async () => {
+  it("Given more than the first page, Then it offers ALL of them rather than a pager", async () => {
+    /**
+     * 🔴 **~~Prev / Next over seventy-five pages.~~** (owner, 2026-09-08: *"show first 20 with show
+     * all at the end that will show all suppliers we have, but in the same order we are
+     * following"*). A renter could not see how far in he was, could not get back to a firm he had
+     * passed, and the ordering meant nothing across a boundary he had to click through.
+     */
     api.totalPages = 75;
     api.total = 1492;
     open();
     await listed();
 
     expect(screen.getByText(en.suppliers.dirCount.replace("{shown}", "2").replace("{total}", "1492"))).toBeTruthy();
-    expect((screen.getByRole("button", { name: en.suppliers.prev }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole("button", { name: en.suppliers.next }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.getByRole("button", { name: en.suppliers.dirShowAll })).toBeTruthy();
+    /* ⚠️ «Prev» and «Next» are gone from the dictionary as well as from the screen: two spellings
+       of «how do I see more» is how the two came to disagree in the first place. */
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).not.toContain("Next");
+  });
+
+  it("Given «show all» is pressed, Then the whole directory is asked for in ONE call", async () => {
+    /* ⚠️ `limit = total`, not seventy-five requests. The alternative is the same bytes plus a
+       spinner that lies about being finished — and the sort is only a statement about the whole
+       directory once the whole directory is in hand. */
+    api.totalPages = 75;
+    api.total = 1492;
+    open();
+    await listed();
+
+    fireEvent.click(screen.getByRole("button", { name: en.suppliers.dirShowAll }));
+
+    await waitFor(() => expect(api.calls.some((a) => a[2] === 1492)).toBe(true));
   });
 
   it("Given every row, Then each carries its own vendor flag — not only the ticked ones", async () => {
@@ -176,6 +213,6 @@ describe("AddFromMoedatechDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: en.suppliers.dirAddN.replace("{n}", "1") }));
 
     await waitFor(() => expect(api.linked.length).toBe(1));
-    expect(api.linked[0][0]).toEqual([{ supplierId: "9", vendorRegistered: true }]);
+    expect(api.linked[0][0]).toEqual([{ supplierId: "9", vendorRegistered: false }]);
   });
 });

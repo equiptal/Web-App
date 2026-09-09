@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@/components/Dialog";
 import { useRfq } from "@/lib/store/rfq-store";
+import { filingFor, type ProjectSummary } from "@/lib/contract/project";
 import { useT } from "@/lib/i18n";
 import { Intake } from "@/components/screens/Intake";
 import { Processing } from "@/components/screens/Processing";
@@ -24,9 +27,39 @@ import { TRIAL_REQUESTS_ENABLED } from "@/lib/flags";
  * screen so the renter explicitly chooses to resume the draft or reset (web-app/002 draft UX).
  */
 export function CreateSurface() {
+  /**
+   * The site the request was filed under, drawn INSIDE the post tick.
+   *
+   * 🔴 **~~Two dialogs, queued.~~** (owner, 2026-09-08: *"we have now 2 competing modals, one for
+   * the post request success and one for the project... I don't know how to show the 2 modals
+   * without distracting or overwhelming him"*). They answer one question between them, *what just
+   * happened to my request?*, so they are one dialog: `ProjectFiled` does the write and hands the
+   * site up, `ShareOnPost` draws it under the tick.
+   *
+   * ⚠️ It can arrive AFTER the tick is already open — the filing is two round trips — so the block
+   * appears inside a dialog the renter is reading. That is the trade for one dialog instead of two,
+   * and it is the right way round: the tick answers the button he pressed, and the project is the
+   * consequence.
+   */
+  const [filed, setFiled] = useState<ProjectSummary | null>(null);
   const { state, actions } = useRfq();
   const t = useT();
   const router = useRouter();
+
+  /**
+   * Whether the request that was just posted actually went into a project.
+   *
+   * RED **Not `draft.projectId`** (owner, 2026-09-08: *"if he changed the location more than 100 m
+   * then a new project, if he kept it then filed under the existing one, and always a modal is
+   * shown"*). The draft keeps the site's id after the renter moves the pin off it; `filingFor` is
+   * what drops it AT THE WIRE, on `leftTheSite`. So a renter who started at Qiddiya and moved the
+   * pin to Riyadh posted a request belonging to nothing, and this dialog never mounted to say so or
+   * to give him the Riyadh project, because the draft still carried the Qiddiya id.
+   *
+   * Asking the same helper the submit asks means the dialog appears exactly when the request left
+   * unfiled, whatever the reason.
+   */
+  const filedUnder = state.draft ? filingFor(state.project, state.draft).projectId : undefined;
 
   const screen = (() => {
     switch (state.phase) {
@@ -128,7 +161,9 @@ export function CreateSurface() {
           back to the canvas carried a card advertising the PREVIOUS request's link into the request
           he was writing next. Pinning it to `confirmation` says what it always meant: this card
           belongs to the review it is posting, and to the moment just after. */}
-      {(state.readyToSend || (state.phase === "confirmation" && state.shareOnPost)) && <ShareOnPost />}
+      {(state.readyToSend || (state.phase === "confirmation" && state.shareOnPost)) && (
+        <ShareOnPost filed={filed} />
+      )}
 
       {/* ── Filing the request under a site, whichever screen won ─────────────────────────────
           🔴 **It used to live inside `Confirmation`, and the share card replaced that screen.**
@@ -141,12 +176,18 @@ export function CreateSurface() {
           rendering it costs nothing on the paths where it does not apply.
 
           ⚠️ Gated on `confirmation`, so it runs after a post and never during the review, and on
-          a PROJECTLESS draft — a renter who already filed this under a site is asked nothing. */}
-      {state.phase === "confirmation" && state.draft && !state.draft.projectId && (
+          a request that was posted UNFILED — a renter whose request went into a site is asked
+          nothing, because it is already where it belongs. */}
+      {state.phase === "confirmation" && state.draft && !filedUnder && (
         <ProjectFiled
           requestId={state.requestUuids[0] ?? null}
           project={state.draft.project}
           preferences={state.draft.preferences}
+          /* ── It draws nothing: the tick above says it (owner, 2026-09-08) ──────────────
+             ~~Its own dialog, queued behind the post tick with a `hold` flag.~~ One press, two
+             dialogs, and the second arrived after the renter believed he had finished. This one
+             files the request and reports the site; `ShareOnPost` says it. */
+          onFiled={setFiled}
         />
       )}
       {/* The shared dialog, not a scrim of its own (owner, 2026-08-28: one design for every modal).

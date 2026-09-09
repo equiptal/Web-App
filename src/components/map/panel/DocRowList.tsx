@@ -97,6 +97,7 @@ import {
   type PresenceStatus,
   type SelectionMode,
 } from "./machine-panel-model";
+import { pin } from "@/lib/uiPins";
 
 /** The status dot's look. `present`/`verified` green · `on_file` blue · **`missing` red**.
  *  ~~amber~~ — withdrawn 2026-08-09 with the rest of the amber family; `panel-proto.css` §missing
@@ -380,6 +381,7 @@ export function DocRowList({
         return (
           <div
             key={r.key}
+            {...pin("doc-row")}
             className={`mp-row${picked ? " picked" : ""}${framed ? " open" : ""}${r.dot === "missing" ? " missing" : ""}${dimmed ? " dim" : ""}`}
           >
             {tickable || dimmed ? (

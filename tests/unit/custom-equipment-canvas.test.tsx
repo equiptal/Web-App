@@ -43,7 +43,7 @@ describe("naming a machine the catalogue does not carry", () => {
       text: "floating crane barge for two weeks",
     });
 
-    const box = screen.getByPlaceholderText("Name the machine you need") as HTMLInputElement;
+    const box = screen.getByPlaceholderText("Name the equipment you need") as HTMLInputElement;
     expect(box.value).toBe("floating crane barge");
     /* The list is NOT taken away: a renter who can find his machine in it still can. And the name
        field sits in the SAME box as the list, under it, with the note after both (owner,
@@ -51,14 +51,22 @@ describe("naming a machine the catalogue does not carry", () => {
        saying why the first way came up empty. Two separate cards read as two unrelated asks. */
     expect(screen.getAllByText("TYPE").length).toBeGreaterThan(0);
     expect(screen.getAllByText("SIZE").length).toBeGreaterThan(0);
-    const order = ["TYPE", "Name the machine you need", "not available right now"].map((needle) =>
+    /* ── Where the notice lives, third time (owner, 2026-09-08) ───────────────────────
+       A block under the field → pinned to the label → and now the field’s own hint line, in place of
+       «this name is what your supplier will see», which the owner had removed: *"remove this and put
+       the note in its place"*. So: the list, then the box, then the note under it. */
+    const order = ["TYPE", "Name the equipment you need", "This equipment type is not available"].map((needle) =>
       document.body.innerHTML.indexOf(needle),
     );
     expect(order.every((i) => i >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    // And the row says what will happen to it, in the owner's own words (2026-09-06).
-    expect(screen.getByText(/This equipment type is not available right now/i)).toBeTruthy();
-    expect(screen.getByText(/share the link with your suppliers/i)).toBeTruthy();
+    /* And the row says what will happen to it, in the owner’s own words (2026-09-06).
+
+       ONE copy. It was two while the note was pinned to the label — a label row cannot wrap, so a
+       phone needed its own copy underneath. In the hint slot the note wraps like any other line of
+       guidance, and two copies to keep in step were two chances to drift. */
+    expect(screen.getAllByText(/This equipment type is not available/i)).toHaveLength(1);
+    expect(screen.getAllByText(/share the link with your suppliers/i)).toHaveLength(1);
     /* ~~«Message us», beside the sentence.~~ Removed the same day (owner). The note already tells
        the renter what to do — post it, share the link — and a control there sent him into another
        app in the middle of filling in a request. The sourcing ask survives only on the kill-switch
@@ -94,9 +102,9 @@ describe("naming a machine the catalogue does not carry", () => {
     });
     await renderCanvas(<Canvas />, { draft: makeAgentDraft({ items: [barge], project: confirmedProject() }) });
 
-    const box = screen.getByPlaceholderText("Name the machine you need") as HTMLInputElement;
+    const box = screen.getByPlaceholderText("Name the equipment you need") as HTMLInputElement;
     fireEvent.change(box, { target: { value: "split hopper barge" } });
-    expect((screen.getByPlaceholderText("Name the machine you need") as HTMLInputElement).value).toBe("split hopper barge");
+    expect((screen.getByPlaceholderText("Name the equipment you need") as HTMLInputElement).value).toBe("split hopper barge");
   }, 20_000);
 
   /**

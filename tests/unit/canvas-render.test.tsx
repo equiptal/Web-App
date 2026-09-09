@@ -17,7 +17,7 @@ describe("the canvas renders (MREQ-AC-01)", () => {
 
     expect(screen.getByText("YOU WROTE")).toBeTruthy();
     expect(screen.getByText(/30 ton digger with operator/)).toBeTruthy();
-    expect(screen.getByText("The machine")).toBeTruthy();
+    expect(screen.getByText("The equipment")).toBeTruthy();
     expect(screen.getByText("Where it goes")).toBeTruthy();
     expect(screen.getByText("When it runs")).toBeTruthy();
 

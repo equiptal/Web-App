@@ -206,7 +206,7 @@ describe("the primary button refuses with gaps (MREQ-AC-15)", () => {
        machine?" is a real question, so the press that used to go straight through now raises it —
        and going on is the modal's own primary. Nothing is committed by the press itself. */
     expect(handle.store().state.readyToSend).toBe(false);
-    expect(screen.getByText(/Anything else on this job/)).toBeTruthy();
+    expect(screen.getByText(/Anything else on this request/)).toBeTruthy();
 
     await handle.run(() => {
       screen.getAllByText(/Review & send/).at(-1)!.closest("button")!.click();
@@ -341,9 +341,12 @@ describe("the canvas is an accordion", () => {
 
     expect(handle.store().state.activeSection).toBe("where");
     expect(screen.queryByText("CATEGORY")).toBeNull();
-    // And it says what it holds, so the renter need not open it to check.
-    expect(screen.getByText("The machine & operator")).toBeTruthy();
-    expect(screen.getByText(/Crawler excavator/)).toBeTruthy();
+    // And it says what it holds, so the renter need not open it to check. Read out of the STRIP:
+    // the tab for this equipment (added 2026-09-09) names the same type and size, and `getByText`
+    // refuses two matches — which is correct, and not a duplicate to be removed.
+    expect(screen.getByText("The equipment & operator")).toBeTruthy();
+    const strip = screen.getByText("The equipment & operator").closest("button")!;
+    expect(strip.textContent).toMatch(/Crawler excavator/);
   });
 
   it("reopens from the strip, which closes whichever was open", async () => {
@@ -356,7 +359,7 @@ describe("the canvas is an accordion", () => {
     await handle.run(() => handle.store().actions.openSection("when"));
     expect(screen.queryByText("CATEGORY")).toBeNull();
 
-    await handle.run(() => screen.getByText("The machine & operator").closest("button")!.click());
+    await handle.run(() => screen.getByText("The equipment & operator").closest("button")!.click());
 
     expect(handle.store().state.activeSection).toBe("equipment");
     expect(screen.getByText("CATEGORY")).toBeTruthy();

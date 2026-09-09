@@ -285,6 +285,9 @@ export const en = {
       recipients: "Send to my suppliers",
       selected: "{n} selected",
       noSuppliers: "No suppliers on your list yet.",
+      /* The empty state's own sentence: what the list DOES, so the offer beside it reads as worth
+         taking. The bare «none yet» above is still used where there is no room for a control. */
+      noSuppliersYet: "Add the firms you rent from and you can send this request to them in one press",
       noEmail: "no e-mail",
       addEmail: "Add e-mail",
       addPhone: "Add phone",
@@ -308,6 +311,17 @@ export const en = {
       postMoedatechOnly: "Post to Moedatech",
       sendMoedatechOnly: "Send to Moedatech",
       moedatechOnlyHint: "This request goes to Moedatech only. Nothing else is sent.",
+      /* ── The opposite sentence, for a machine the catalogue cannot place ────────────────────
+         Owner, 2026-09-08: *"for requests that have undefined taxonomy we will remove Moedatech
+         from the confirmation, from the icons list in the share and from the confirmation question,
+         and will tell the opposite since we will not have it available and no supplier."*
+
+         Such a request reaches nobody by broadcast, so every surface that announces the marketplace
+         says this instead. It is not a warning about a failure: the request is saved and the link
+         works. It is the one fact that decides what he does next. */
+      offCatalogueLine: "This equipment is not in our catalogue yet, so no supplier on Moedatech can bid on it. Your link is the only way to reach one",
+      offCataloguePost: "Post the request",
+      offCataloguePick: "Pick a way to share",
       fixedByUs: "Request details",
       tplTitle: "Subject",
       tplAbove: "Your words above the request",
@@ -337,13 +351,23 @@ export const en = {
       openedWhatsApp: "WhatsApp opened with {name}. Send it there to finish.",
       openedOther: "Handed to your share sheet. Send it there to finish.",
       postedTitle: "Your request is posted",
-      postedLive: "It is live on Moedatech now.",
-      postedLiveOne: "It is live on Moedatech now, and shared with 1 supplier.",
-      postedLiveMany: "It is live on Moedatech now, and shared with {n} suppliers.",
-      postedNext: "You can still share it anytime with more suppliers.",
+      /* ── The tick says what happened, in its title (owner, 2026-09-08) ──────────────────────
+         *"The title is «your request is posted into Moedatech and shared from yara@outlook.co»,
+         then below it «sent from ... to 1 supplier, a copy is in your Sent folder in Outlook», then
+         below «you can still...»"*
+
+         The old shape said the post in the title, the post AGAIN in the line under it, the send in
+         a third line and the Sent folder in a fourth. Four lines for two facts. */
+      postedTitleFrom: "Your request is posted to Moedatech and shared from {from}",
+      /* No marketplace to name on an off-catalogue request: nothing there can bid on it. */
+      postedTitleFromOnly: "Your request is shared from {from}",
+      postedLive: "It is live on Moedatech now",
+      postedLiveOne: "It is live on Moedatech now, and shared with 1 supplier",
+      postedLiveMany: "It is live on Moedatech now, and shared with {n} suppliers",
+      postedNext: "You can still share it anytime with more suppliers",
       /* ── SUP-BE-23: the mail we send ourselves, from his own address ──────────────────────── */
-      mailSent: "Sent from {from} to {n} suppliers.",
-      mailSentOne: "Sent from {from} to 1 supplier.",
+      mailSent: "Sent from {from} to {n} suppliers",
+      mailSentOne: "Sent from {from} to 1 supplier",
       mailSkipped: "{n} of the ones you picked had no e-mail, so they were left out.",
       mailOpenInstead: "Open your e-mail",
       mailSetupTitle: "Send straight from {domain}, with no compose window",
@@ -392,6 +416,19 @@ export const en = {
         "Consent was not granted. Large organisations often need an administrator to approve it, so ask your IT if you did not refuse it yourself",
       mailConnectFailed: "Outlook could not be connected, so your e-mail opens instead",
       mailInSent: "A copy is in your Sent folder",
+      /* ── The reasons that used to pass in SILENCE (owner, 2026-09-08) ─────────────────────────
+         *"My account is sending to suppliers correctly, but my colleague's Outlook account doesn't
+         send anything."* Every reason below opened his compose window and said nothing about why —
+         so from his seat the press did nothing, while the same press worked for somebody else. Each
+         one names the fact that differs between two accounts. */
+      mailNoSender:
+        "Your Moedatech account has no e-mail address on it, so nothing can be sent from you. Add one in your profile, then try again",
+      mailNoRecipients:
+        "We could not find an address for any of the suppliers you picked. They may be on a colleague's list rather than yours, so your e-mail opens instead",
+      mailNotYours:
+        "Sending from your own address is not set up for this account yet. Your e-mail opens instead, which is what it does today",
+      mailDomainWaiting:
+        "Your domain {domain} is registered but not verified yet, so we cannot send as you until your IT adds the records. Your e-mail opens instead",
       mailPersonal:
         "Your address is a personal one, so Moedatech cannot send on its behalf. Your e-mail opens instead, which is what it does today.",
     },
@@ -435,7 +472,9 @@ export const en = {
     attachedFiles: "Attached files",
     emptyHint: "Paste text or attach at least one file to continue.",
     yourRequest: "Your request",
-    backToReview: "Back to review",
+    /* ~~`backToReview` — the intake's own second Back.~~ Deleted with the button (owner,
+       2026-09-09): the page's Back leaves the flow, the browser's Back and the draft prompt resume the
+       draft, and two controls disagreeing about which way «back» goes is what it cost. */
     reAnalyze: "Re-analyze",
     editReparseNote: "Editing your request re-runs the AI and refreshes your items.",
   },
@@ -800,7 +839,7 @@ export const en = {
     resolveLocationConflict: "Resolve the location conflict to continue.", // AC-47
     resolveItems: "Resolve the flagged equipment items to continue.", // AC-29
     // MREQ-AC-09 — the app's required set, named per control so the dot lands on what's empty.
-    noItems: "Add at least one machine to continue.",
+    noItems: "Add at least one equipment to continue.",
     categoryMissing: "Choose a category.",
     subtypeMissing: "Choose a type.",
     capacityMissing: "Choose a size.",
@@ -808,13 +847,14 @@ export const en = {
     quantityMissing: "Set how many you need.",
     deliveryMissing: "Say who delivers to site.",
     returnMissing: "Say who returns it from site.",
-    locationMissing: "Set where the machine goes.",
+    fuelPartyMissing: "Say who pays for the fuel.",
+    locationMissing: "Set where the equipment goes.",
     // MREQ-AC-54 — web-only gates, each satisfied by an explicit "nothing" answer.
     yearMissing: "Choose a minimum year, or Any year.",
     certMissing: "Choose a certificate, or No certificate.",
     // Off-catalogue: the name replaces the taxonomy trio as this line's required answer, so a blank
     // one blocks. A renter who won't name it removes the row.
-    customEquipmentMissing: "Name this machine, or remove it",
+    customEquipmentMissing: "Name this equipment, or remove it",
     confirmChargedDays: "Confirm how many days you'll be charged for.",
   },
   errors: {
@@ -1331,14 +1371,14 @@ export const en = {
     // Three steps, in the order they happen. It replaced two paragraphs that said the same true
     // things in prose (owner, 2026-08-31) — prose is where a renter looking at a red number stops
     // reading, and what he wants to know is where he is in a flow and what the end of it gets him.
-    /** ── The modal's three lines (owner, 2026-09-04: "very clear and simple just few lines") ──
-     *  One sentence each, in the order the renter's questions arrive: what the number is, why it is
-     *  red, what pressing the button does. They REPLACE `eqYardStep1T`…`eqYardStep3B`, the numbered
-     *  tutorial this layer used to carry: same three facts, one line apiece, on a modal that stands
-     *  between him and the press it exists to explain. */
-    eqYardLine1: "This is where the machine stands today, read off its file. It is not a delivery distance for your job.",
-    eqYardLine2: "Red means the supplier has not yet named the yard it would move from for your offer. Not refused.",
-    eqYardLine3: "Ask him and the question lands in your chat. When he answers, this turns green and the machine counts as confirmed.",
+    /** ── TWO lines, and the first one is the whole point (owner, 2026-09-08) ──────────────────
+     *  ~~Three lines: what the number is, why it is red, what the press does.~~ The first of them
+     *  described a distance nobody had asked about, and the owner cut it: *"remove the model year box
+     *  at top, just keep the red to green and below it one sentence clear"*. What is left is the fact
+     *  (the yard is not set, so the machine may not be available), the act (ask him to confirm it for
+     *  this offer), and what his answer does to the colour above. */
+    eqYardLine1: "The supplier has not set the yard this equipment would move from for your offer, so it might not be available. Ask him to confirm it is available for your offer",
+    eqYardLine2: "When he confirms availability by setting its yard, this turns green as confirmed",
     otherBids: "Other offers",
     eqYardExplainCta: "Ask the supplier",
     eqYardExplainLater: "Not now",
@@ -1645,6 +1685,18 @@ export const en = {
        where bids came from — and the renter has been reading it for weeks. Only the BID CARD's own
        line changed; see `sourceOfflineLong`. */
     sourceOffline: "Offline",
+    /* ── Larger-size bids (owner, 2026-09-08) ────────────────────────────────────────────────────
+       A bid offering a machine BIGGER than the one asked for is dropped by the backend unless the
+       list asks for it (`sizeMatch=exact_or_larger`), so the renter can be notified of a bid and
+       then find nothing here. The filter panel says how many are being held and lets him see them;
+       the empty state says the same thing where it matters most. */
+    filters: "Filters",
+    sizeLargerToggle: "Show bids with larger size",
+    sizeLargerHeldOne: "{n} bid offers a larger size",
+    sizeLargerHeldMany: "{n} bids offer a larger size",
+    sizeLargerNoneHeld: "Every bid here offers the size you asked for",
+    showLargerCtaOne: "Show it",
+    showLargerCtaMany: "Show them",
     // Empty states.
     emptyTitle: "No requests yet",
     emptyBody: "Create your first request to start getting supplier bids. You'll set up your account when you submit.",
@@ -1783,6 +1835,8 @@ export const en = {
     termNationality: "Nationality",
     // A term the supplier never answered. Said out loud, because a blank cell reads as "nothing to pay".
     didntSay: "Didn't say",
+    /** He never answered the term in words, but the paper that proves it is on the bid. */
+    docAttached: "Sent the document",
     rankWithAi: "Rank with AI",
     aiRanked: "AI ranked",
     // Under the three grand totals, so a figure is never read as a pre-tax one.
@@ -2142,6 +2196,10 @@ export const en = {
       nothingYet: "Nothing on this site yet. Add a work order for a machine already here, or post a request.",
     },
     chart: {
+      /* A machine whose name nothing could supply: no taxonomy pair on the request and no free text
+         either. Said rather than drawn blank (owner, 2026-09-08) — an empty name reads as a broken
+         row, and the renter cannot tell it from a machine we simply failed to load. */
+      unnamedItem: "Equipment (not named)",
       of: "of",
       pending: "pending",
       ownFleet: "Own fleet",
@@ -2256,7 +2314,26 @@ export const en = {
     needsYou: "{n} things need you",
     needsYouOne: "1 thing needs you",
     startOver: "Start over",
-    machine: "The machine",
+    machine: "The equipment",
+    /* ── The request's equipment, as tabs (owner, 2026-09-09) ──────────────────────────────────
+       A label for the strip and nothing else: each tab is DATA (the equipment's own type and size),
+       and the + carries `addAnother`, which this block already had. */
+    equipmentTabs: { label: "Equipment in this request" },
+    /* The way out of the lock on the site and the schedule (owner, 2026-09-09). It names the SCOPE,
+       because that is the whole reason those two panels lock: one address and one schedule for every
+       equipment on the request. */
+    changeForRequest: "Change for the request",
+    /* ── Taking one equipment off the request (owner, 2026-09-09) ──────────────────────────────
+       *"In the equipment tabs must have x button to remove it, also the x is always visible."*
+       `label` is the ✕'s accessible name and its tooltip, so a screen reader hears WHICH equipment
+       the press removes; the dialog is the one-line question, because the answers on that card go
+       with it and nothing brings them back. */
+    removeEquipment: {
+      label: "Remove {name}",
+      title: "Remove this equipment from the request?",
+      remove: "Remove",
+      keep: "Keep it",
+    },
     operator: "The operator",
     operatorRail: "OPERATOR",
     where: "Where it goes",
@@ -2273,7 +2350,7 @@ export const en = {
     change: "change",
     nextEquipment: "Next equipment",
     previousEquipment: "Previous equipment",
-    addAnother: "Add another machine",
+    addAnother: "Add another equipment",
     reviewAndSend: "Review & send",
     itemOfCount: "Equipment #{n} of {total}",
     provenance: {
@@ -2289,11 +2366,32 @@ export const en = {
       type: "TYPE",
       size: "SIZE",
       searchTypes: "Search types…",
+      /* ── The way out of a TYPE search that found nothing (owner, 2026-09-09) ────────────────────
+         *"Maybe if he searched in the type and didnt find it we show for him something here that will
+         open the field of custom type and the alert."*, then *"make it general, add custom equipment
+         type but show something that is not on moedatech etc"*.
+         ~~«Add «{q}» as equipment we do not carry yet».~~ Quoting the search text read as a promise
+         about that text, and a search FRAGMENT is not a machine's name. So: the act on the first
+         line, what it means on the second, and the name is asked for in the box this opens. */
+      /* One line, and only this one (owner, 2026-09-09: *"add a custom equipment type only"*). The
+         second line said what the state means, which the orange note on the card says once the box
+         is open. */
+      addCustomType: "Add a custom equipment type",
       searchSizes: "Search sizes…",
       fuel: "FUEL",
-      minYear: "MINIMUM YEAR",
+      /* ── An ask, not a heading (owner, 2026-09-08) ───────────────────────────────
+         *"If not set at all then show them orange with pick certificate and pick min year, in
+         warning orange and not capitalised."*
+
+         ~~«MINIMUM YEAR» / «CERTIFICATE».~~ Shouted, and a NOUN — which reads as a label for a value
+         that is already there, on a control whose whole point at that moment is that nothing is.
+         The words say what to do now, in the case the rest of the card is written in. */
+      minYear: "Pick min year",
       anyYear: "Any year",
-      cert: "CERTIFICATE",
+      cert: "Pick certificate",
+      /** The field's NAME, for a screen reader and for the sheet's own heading. */
+      certName: "Certificate",
+      minYearName: "Minimum year",
       noCert: "No certificate",
       certOther: "Name the certificate",
       quantity: "QUANTITY",
@@ -2317,12 +2415,11 @@ export const en = {
       // "Not available right now" is the same fact in the renter's terms, and "right now" is honest:
       // the type is being added, not refused.
       notInCatalogueNote:
-        "This equipment type is not available right now, but you can still post and share the link with your suppliers",
+        "This equipment type is not available, but you can still post and share the link with your suppliers",
       // The renter names the machine himself and the request goes out carrying his words. Prefilled
       // from what he wrote in the RFQ, so the ordinary case is a glance.
       customEquipment: "EQUIPMENT NAME",
-      customEquipmentPlaceholder: "Name the machine you need",
-      customEquipmentHint: "This name is what your supplier will see on the bid form",
+      customEquipmentPlaceholder: "Name the equipment you need",
       // Small and quiet: it is the way to get the machine into the catalogue, not the way out of the
       // request. Named for what it does, not for the app it opens (owner, 2026-09-06).
       unavailableWhatsapp: "Message us",
@@ -2361,9 +2458,14 @@ export const en = {
     },
     wherePanel: {
       unfiledShort: "different location: not in the project",
-      unfiledNote: "This is a different place from {project}, so this request will not be part of it. Move the pin back to file it there.",
+      /* ── It no longer ends nowhere (owner, 2026-09-08) ─────────────────────────────────────
+         ~~"...so this request will not be part of it. Move the pin back to file it there."~~ That
+         second sentence read as «otherwise it is filed under nothing», which was true until the
+         post began filing a moved request under a project of its own. Saying the outcome is the
+         point: he is not losing a project, he is starting a second one. */
+      unfiledNote: "This is a different place from {project}, so it gets a project of its own. Move the pin back to keep it in {project}",
       searchPlaceholder: "Search a place, or paste a Maps link / coordinates",
-      dragHint: "Drag the map, or drop a pin where the machine goes",
+      dragHint: "Drag the map, or drop a pin where the equipment goes",
       confirm: "This is the right spot",
       useMyLocation: "Use my location",
     },
@@ -2411,13 +2513,10 @@ export const en = {
       nudgeEnd: "Suppliers price lower when they know your duration. Add an end date to get better bids.",
       nudgeStart: "Suppliers price lower when they know your duration. Add a start date to get better bids.",
     },
-    carry: {
-      title: "Equipment #{n}",
-      locked: "The site and schedule already apply to your whole request, so this equipment uses the same ones automatically.",
-      copied: "Its other details, like delivery, food and certificates, start out matching this equipment, but you can change any of them.",
-      editFirst: "Edit this item first",
-      continue: "Continue",
-    },
+    /* ~~`carry` — the carry-forward modal's four strings («Equipment #{n}», what is locked, what is
+       copied, and its two buttons).~~ Deleted with the modal (owner, 2026-09-09). What they said is
+       on the screen now: the locked strip states the site and the schedule, and the copied details
+       are the card the renter lands on. */
     /* ── The last stop before review (owner, 2026-09-01) ───────────────────────────────
        The canvas had a standing «+ Add another machine» beside «Review & send», which asked the
        question on every screen of the flow and made two calls to action out of one moment. It asks
@@ -2428,9 +2527,19 @@ export const en = {
        The body says what carrying on costs him — nothing, the site and schedule already apply —
        because the reason people re-post a second request instead of adding an item is that they
        assume a second machine means starting again. */
+    /* ── Back, out of the drafted request (owner, 2026-09-09) ────────────────────────────────
+       *"Show short simple confirm modal asking do you want to leave this request? … just very simple
+       one line question."* So the TITLE is the question and there is no body: the two buttons say the
+       rest. «Leave» is the primary because it is what he pressed Back for; «Stay» is the way out of
+       having pressed it by accident. */
+    leaveRequest: {
+      title: "Leave this request and go back?",
+      leave: "Leave",
+      stay: "Stay",
+    },
     addMore: {
-      title: "Anything else on this job?",
-      body: "Your request is ready to review. If the job needs another machine, add it now. It uses the same site and schedule, so there is nothing to fill in twice.",
+      title: "Anything else on this request?",
+      body: "Your request is ready to review. If the request needs another equipment, add it now. It uses the same site and schedule, so there is nothing to fill in twice.",
     },
     ready: {
       viewAll: "View all details",
@@ -2452,7 +2561,7 @@ export const en = {
       subtitle: "This is exactly what suppliers will see. Terms and payment come after the bids arrive. Nothing else to fill in here.",
       where: "Where it goes",
       when: "When it runs",
-      machineAndOperator: "The machine & operator",
+      machineAndOperator: "The equipment & operator",
       preferences: "Preferences",
       equipment: "Equipment",
       billingDuration: "BILLING & DURATION",
@@ -2564,7 +2673,9 @@ export const en = {
     fCr: "CR number",
     removeRow: "Remove this row",
     markAll: "Mark them all as vendor registered",
-    markAllHint: "On by default: untick any row above to add that one as a contact only.",
+    /* Off by default now (owner, 2026-09-08), so the hint names the press that MARKS rather than
+       the press that undoes it. */
+    markAllHint: "Tick this to mark every row above as a vendor you have registered",
     /* «My» is the whole distinction from the button beside it (owner, 2026-09-03). Both add
        suppliers; one picks a firm off Moedatech, this one takes the renter's own contacts. */
     addSupplier: "Add my suppliers",
@@ -2588,8 +2699,6 @@ export const en = {
     groupDeleted: "Group deleted. The suppliers stay",
     groupFailed: "That did not save. Nothing changed.",
     close: "Close",
-    sharedOne: "Request shared with 1 supplier",
-    sharedMany: "Request shared with {n} suppliers",
     filtersTitle: "Filters",
     filtersSubtitle: "Narrow the list.",
     filterWhere: "Where they are",
@@ -2598,7 +2707,6 @@ export const en = {
     filterBidLink: "Bid through my link",
     clearAll: "Clear all",
     filters: "Filters",
-    shareARequest: "Share a request",
     offPlatform: "Off platform",
     hasStore: "Has a store",
     verifiedByMoedatech: "Verified by Moedatech",
@@ -2672,6 +2780,14 @@ export const en = {
     saveFailed: "That did not save. Nothing changed.",
     edit: "Edit",
     remove: "Remove",
+    removeAction: "Remove",
+    pickToRemove: "Tick the suppliers to remove from your list",
+    nSelectedToRemove: "{n} selected to remove",
+    removeConfirmOne: "Remove 1 supplier",
+    removeConfirmMany: "Remove {n} suppliers",
+    removedOne: "1 supplier removed from your list",
+    removedMany: "{n} suppliers removed from your list",
+    removedSome: "{n} removed, {failed} could not be",
     removeTitle: "Remove from my suppliers",
     removeBody: "This removes your link, your vendor flag and your groups. Their Moedatech account, their store and the bids they already sent you are untouched.",
     removed: "{name} removed",
@@ -2706,9 +2822,7 @@ export const en = {
     modeApp: "From Moedatech",
     appSearch: "Search by name",
     dirCount: "Showing {shown} of {total}",
-    dirPage: "{page} of {of}",
-    prev: "Previous",
-    next: "Next",
+    dirShowAll: "Show all",
     appEveryone: "Everyone with a Moedatech account. A firm without one goes under {tab}.",
     appOnlyStores: "Only suppliers with a store are listed here. Add anyone else under {tab}.",
     appNoSupplierId: "cannot be linked: this store does not name its company",
@@ -2724,7 +2838,7 @@ export const en = {
     appFailed: "That did not save. Nothing was added.",
     modeType: "Type them in",
     modeFile: "Upload a list",
-    importHint: "A CSV with a header row: company, contact, e-mail, phone.",
+    importHint: "Excel (.xlsx) or CSV, with a header row: company, contact, e-mail, phone.",
     previewImport: "Check the file first",
     planning: "Checking…",
     planLine: "{created} will be added · {merged} will merge into a supplier you already have · {rejected} refused",
@@ -2745,7 +2859,7 @@ export const en = {
     pastePlaceholder: "Company\tContact\tE-mail\tMobile\nZahid Tractor\tFaisal\tt@z.sa\t0551234567",
     pasteHint: "Select the rows in Excel, including the header row, and paste them here.",
     or: "or",
-    chooseCsv: "Choose a CSV file",
+    chooseCsv: "Choose a file",
     importUnreadable: "We could not read that. It needs a header row and at least one row under it.",
     importTooBig: "That file is over 2 MB. Split it and import the parts.",
     pastedRows: "Pasted rows",
@@ -2764,7 +2878,7 @@ export const en = {
     columnN: "Column {n}",
     preview: "Preview",
     skippedRows: "{n} rows will be skipped. They have no company name, or no email and no phone.",
-    markAllPreviewHint: "On by default: untick any row in the preview to import that one as a contact only.",
+    markAllPreviewHint: "Tick this to mark every row in the preview as a vendor you have registered",
     startOver: "Start over",
     importN: "Import {n} suppliers",
     importNone: "Import",
@@ -2779,7 +2893,13 @@ export const en = {
     suggestedOnApp: "on Moedatech",
     addToMySuppliers: "Add to my suppliers",
     dismiss: "Dismiss",
-    xlsxNotRead: "Excel files are not read directly. Open it, select the rows including the header, and paste them above, or save it as CSV.",
+    xlsxNotRead: "That format isn't read. Open it and save as .xlsx or CSV, then choose that file",
+    xlsxUnreadable: "That file couldn't be read as an Excel workbook. It may be renamed, or saved in another format",
+    phonesNormalized: "Phone numbers are shown as they will be saved (+966…)",
+    phoneTruncated: "One or more phone numbers were shortened by Excel when this file was saved as CSV (9.66503E+11 is 966,503,000,000, so the last digits are gone from the file). Type the number into the table below, or upload the .xlsx instead, where it is still complete",
+    rPhoneTruncated: "the phone was shortened by Excel",
+    rowShort: "Not added yet — {reason}",
+    rPhoneUnreadable: "the phone couldn't be read",
   },
 };
 

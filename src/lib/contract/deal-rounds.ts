@@ -320,8 +320,8 @@ export interface ReplyStanding {
 export const CHAT_TERM_LABELS: Record<string, [string, string]> = {
   PRICE: ["Price", "السعر"],
   fat: ["Operator FAT", "وقت الحضور المجاني"],
-  fat_food: ["Operator FAT — Food", "الإعاشة (F.A.T) — الطعام"],
-  fat_accommodation_transport: ["Operator FAT — Accommodation/Transport", "الإعاشة (F.A.T) — الإقامة/النقل"],
+  fat_food: ["Operator food", "طعام المشغّل"],
+  fat_accommodation_transport: ["Operator accommodation and transport", "إقامة ونقل المشغّل"],
   diesel_included: ["Fuel Responsibility", "مسؤولية الوقود"],
   breakdown_response_sla: ["Breakdown SLA", "اتفاقية مستوى الخدمة للأعطال"],
   maintenance_responsibility: ["Maintenance", "الصيانة"],

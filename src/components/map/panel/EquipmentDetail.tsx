@@ -26,18 +26,22 @@
  *     frame's state lives HERE because the frame does; the two tabs report the press. Pressing what is
  *     already framed is the way back to the photograph — the frame carries no X (owner, same UAT).
  *  2. **two underline tabs** — «Equipment» · its documents
- *  3. one line: distance · band — yard, with the availability chip on the opposite corner (and the
- *     unconfirmed explainer under it, which is the only thing that stops red reading as a refusal)
+ *  3. **the yard card** — the fleet list's own control (`.bm-eq-yard`), carrying the distance, the
+ *     yard and a small «not confirmed» badge, and opening the layer that explains the colour and
+ *     offers the ask (owner, 2026-09-08). ~~A 20px distance with a band word and an availability chip
+ *     on the far corner, over a titled paragraph saying red is not a refusal.~~
  *  4. **the match grid** — six cells scoring this machine against *this request*
- *  5. **a 76 px footer** carrying the two asks this surface raises, on the machine tab only
+ *  5. ~~a 76 px footer carrying two asks.~~ Removed (owner, 2026-09-08): the availability ask is the
+ *     yard card in 3, and «ask for another one» is the fleet list's own control one press behind this
+ *     panel. The documents tab keeps its own action bar.
  *
  * **It answers "does this machine fit my request", not "what is this machine."** There is no
  * specification dump here on purpose: a list of attributes hands the renter the judging, and the grid
  * exists to do the judging and show its working. Descriptive facts live on the card (V5).
  *
  * **Colour comes from `unitAvailability()` and nothing else** — never from the `yardConfirmed` boolean,
- * which supplier-side is just `yardId != null` and would turn every chip green (`bid-map.ts:64`,
- * AC-19). The chip here and the machine's pin must be the same fact.
+ * which supplier-side is just `yardId != null` and would turn every card green (`bid-map.ts:64`,
+ * AC-19). The yard card here and the machine's pin must be the same fact.
  */
 
 import { useCallback, useMemo, useState } from "react";
@@ -47,7 +51,6 @@ import { useDownloadBatch } from "./doc-download";
 import { EquipmentDocuments, type DocViewSubject } from "./EquipmentDocuments";
 import {
   arDigits,
-  distanceBandLabel,
   equipmentDocGroups,
   heroPhotoUrl,
   matchGrid,
@@ -118,6 +121,13 @@ export interface EquipmentDetailProps {
    */
   askPending?: (draft: PanelRequestDraft) => boolean;
   /**
+   * **The yard card was pressed** — the surface decides what happens next (owner, 2026-09-08:
+   * *"clicking it whether from the details or from the fleet will open this"*). It is the SAME
+   * handler `EquipmentList` is given, so the layer, the explain-once rule and the ask behind it are
+   * one thing rather than two spellings of it. `asked` says whether his question is already out.
+   */
+  onYardPress?: (machine: FleetMachine, asked: boolean) => void;
+  /**
    * Which tab the panel opens on. Defaults to the machine, which is what a renter who pressed a
    * card came to see. `"documents"` is for arriving from `View documents` in the requests workspace,
    * where the papers ARE the errand — landing on the machine would make him press one more time to
@@ -126,7 +136,7 @@ export interface EquipmentDetailProps {
   initialTab?: "machine" | "documents";
 }
 
-export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, askPending, initialTab }: EquipmentDetailProps) {
+export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, askPending, onYardPress, initialTab }: EquipmentDetailProps) {
   const [tab, setTab] = useState<"machine" | "documents">(initialTab ?? "machine");
 
   /* ── The frame's second subject (owner, 2026-08-11) ─────────────────────────────────────────────
@@ -185,30 +195,42 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
   const caption = [kind, size].filter(Boolean).join(" · ");
   const km = machine.distanceKm;
   const yard = machine.yardName || machine.yardCity;
-  const band = distanceBandLabel(km);
   const outOfCity = isOutOfCity(km);
   const heroName = title || kind || L("Equipment", "المعدّة");
 
   /* ── One ask, one card (owner, 2026-08-10) ──────────────────────────────────────────────────────
-     The two asks this footer raises, composed ONCE and used for both verbs: the object that would be
-     sent is the object the guard is asked about, so the control cannot be disabled for an ask it
-     would not have made, or stay live for one it already did.
+     The availability ask, composed ONCE and used for both verbs: the object that would be sent is
+     the object the guard is asked about, so the yard card cannot read «asked» for an ask it would
+     not have made, or stay unasked for one it already did.
+
+     ~~`alternativeAsk` beside it.~~ Gone with the footer that raised it (owner, 2026-09-08): «ask for
+     another one» lives on the fleet list, one press behind this panel.
 
      The copy is written inline through `L`, not pulled from the dictionary, because that is how this
      whole directory takes its words (see the file header) — a panel that reached for `useT` for one
      sentence would be the only one that did. */
   const availabilityAsk: PanelRequestDraft = { kind: "availability", equipmentId: machine.equipmentId };
-  const alternativeAsk: PanelRequestDraft = { kind: "alternative", equipmentId: machine.equipmentId };
   const availabilityPending = askPending?.(availabilityAsk) ?? false;
-  const alternativePending = askPending?.(alternativeAsk) ?? false;
   /** The disabled control says what it is waiting for rather than going quietly inert. «المورد» is
    *  this surface's word for the other party, matching the prototype — the owner's ruling of
    *  2026-08-10, which reversed an earlier one that had this surface saying «المؤجّر». */
-  const pendingLabel = L("Asked: awaiting his reply", "طُلب: بانتظار ردّه");
   const pendingWhy = L(
     "You've already asked this, and the supplier hasn't answered yet.",
     "سبق أن طلبت هذا، ولم يردّ المورد بعد.",
   );
+
+  /* The yard card's state as ONE word rather than three booleans read in four places — the fleet
+     card's own `yard` variable, so the two surfaces cannot end up with four states between them.
+     `null` is the machine whose availability is `absent` (an unidentified unit, AC-58): it gets the
+     card WITHOUT a skin, a badge or a press, because none of the three would be a fact about it. */
+  const yardState: "ok" | "asked" | "no" | null =
+    availability === "absent"
+      ? null
+      : availability === "confirmed"
+        ? "ok"
+        : availabilityPending
+          ? "asked"
+          : "no";
 
   // «تحميل» saves the photo through the same batch runner the document lists use, for the same reason
   // it exists: `<a download>` on a cross-origin presigned url is ignored by the browser and navigates
@@ -234,7 +256,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
       {/* `.doc` is the prototype's taller frame for a paper (268 px over its `var(--surface2)`) — a certificate
           at 196 px is a picture of a certificate. The `photo` / `paper` half decides how the file sits
           in it, and comes off the ROW'S GROUP rather than off its url; see `DocViewSubject.kind`. */}
-      <div className={`mp-viewer${framedDoc ? ` doc ${framedDoc.kind}` : ""}`}>
+      <div {...pin("equipment-detail-viewer")} className={`mp-viewer${framedDoc ? ` doc ${framedDoc.kind}` : ""}`}>
         {framed == null ? (
           /* The placeholder rather than the sentence (owner, 2026-09-02): the frame is 196px of
              photograph-shaped space, and what belongs in it when there is no photograph is the shape of
@@ -324,7 +346,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
         <div className="mp-cap">{framedDoc ? framedDoc.name : caption ? `${heroName} · ${caption}` : heroName}</div>
       </div>
 
-      <div className="mp-tabs" role="tablist">
+      <div {...pin("equipment-detail-tabs")} className="mp-tabs" role="tablist">
         <button type="button" role="tab" aria-selected={tab === "machine"} className={`mp-tab${tab === "machine" ? " on" : ""}`} onClick={() => setTab("machine")}>
           {/* ~~«The machine»~~ — **«Equipment»** (owner, UAT of 2026-08-11: *"for the machine tab call it
               Equipment"*). It is the word the rest of this surface already uses for the same object: the
@@ -343,70 +365,89 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
         </button>
       </div>
 
-      {/* The line and the explainer are FULL-BLEED — outside `.mp-body`'s inset — because the rule
-          that separates them from the grid is the panel's own hairline, and a border-top inside a
-          padded box stops short of both edges and reads as a stray line rather than a division. */}
+      {/* The yard card is FULL-BLEED — outside `.mp-body`'s inset — because the rule that separates it
+          from the grid is the panel's own hairline, and a border-top inside a padded box stops short
+          of both edges and reads as a stray line rather than a division. */}
       <div className="mp-scroll">
         {tab === "machine" ? (
           <>
-            {/* **The distance is the headline of this line, and the chip sits on the far corner**
-                (2026-08-09, the prototype's own typography). It used to be one wrapping muted
-                sentence with a filled chip leading it. Two things were wrong with that: a filled
-                chip is the loudest object on the panel and availability is not the first question
-                the line answers, and «١٢ كم من مشروعك» set at 11 px alongside the yard made the one
-                number the renter is actually comparing between machines the hardest thing to find.
+            {/* ── The yard card, the fleet card's own (owner, 2026-09-08) ─────────────────────
+                *"Show it red yard and distance similar to how it appears in the fleet cards, so no
+                need to «availability not confirmed» and no need for availability differentiation,
+                just the red card of the distance and yard with maybe a small badge on the card
+                saying not confirmed."*
 
-                Now: the kilometres at 20 px, the band word and the yard after them, and the chip
-                TINTED rather than filled on the opposite corner. It still states only that
-                availability is or is not confirmed — no reason, no cause, no location-source
-                (AC-30) — and "not confirmed" still reads as unanswered, never refused (AC-20).
+                ~~A 20px distance with a tinted availability chip on the far corner, and a paragraph
+                under it explaining that red is not a refusal.~~ Three objects for one fact: the
+                colour said it, the chip said it again in words, and the paragraph said it a third
+                time — on the one surface where the renter has already pressed the red card to get
+                here. What is left is the card the fleet list draws, with the distance and the yard on
+                it and a small «not confirmed» badge, and it opens the same layer that card opens.
 
-                It also moves INSIDE the machine tab. It was rendering above the tab strip, so a
-                line about where the machine is stood over the list of its papers. */}
-            <div className="mp-line">
-              <span className="mp-line-tx">
-                {km != null && (
+                The classes are `EquipmentList`'s, deliberately: the rules are shared in
+                `map-proto.css` so the two mounts cannot drift into two looks for one state. */}
+            <div {...pin("equipment-detail-yard")} className="mp-yardbox">
+              {(() => {
+                const inner = (
                   <>
-                    {/* ONE DECIMAL, never a whole kilometre (owner, 2026-08-11) — and through the
-                        SAME `distanceDigits` the card and the marker's chip use, so the three cannot
-                        state one machine's distance three ways. `arDigits` truncates, which is right
-                        for the document count above and would have turned 7.5 km into «٧» here. */}
-                    <span className="mp-km" dir="ltr">{distanceDigits(km, ar)}</span>
-                    <span className="mp-band">{band ? L(`km · ${band.en}`, `كم · ${band.ar}`) : L("km", "كم")}</span>
+                    {km != null ? (
+                      <span className="bm-eq-dist">
+                        {/* ONE DECIMAL, never a whole kilometre (owner, 2026-08-11) — and through the
+                            SAME `distanceDigits` the card and the marker's chip use, so the three
+                            cannot state one machine's distance three ways. */}
+                        <span className="bm-eq-km" dir="ltr">{distanceDigits(km, ar)}</span>
+                        {/* Word for word `t.bidMap.eqDistanceUnit`, which is what the fleet card prints.
+                            Written inline because this directory takes all of its copy through `L`
+                            (see the file header) — if either side is ever reworded, reword both. */}
+                        <span className="bm-eq-kmu">{L("km from your project", "كم من مشروعك")}</span>
+                      </span>
+                    ) : (
+                      <span className="bm-eq-kmu">{L("Distance not known", "المسافة غير معروفة")}</span>
+                    )}
+                    {/* The yard itself, which is what the colour is ABOUT. */}
+                    {yard && <span className="mp-yard">{yard}</span>}
+                    {/* The badge, and it says only that the availability is unanswered — no reason, no
+                        cause, no location-source (AC-30) — and «not confirmed» still reads as
+                        unanswered, never refused (AC-20). */}
+                    {yardState != null && yardState !== "ok" && (
+                      <span className="mp-yard-badge">
+                        {yardState === "asked" ? L("Asked", "طُلب") : L("Not confirmed", "غير مؤكّدة")}
+                      </span>
+                    )}
+                    {yardState != null && (
+                      <span className="material-icons-outlined" aria-hidden="true">
+                        {yardState === "ok" ? "check_circle" : yardState === "asked" ? "schedule" : "help_outline"}
+                      </span>
+                    )}
                   </>
-                )}
-                {yard && <span className="mp-yard">— {yard}</span>}
-                {/* Restored 2026-08-09. `isOutOfCity` was already the contract's (bid-map.ts) and
-                    this surface simply never drew it: presentation only, no filtering, no sorting,
-                    and it never contradicts the distance beside it. It is the fact that turns a
-                    delivery into a mobilisation the renter should be asking about. */}
-                {outOfCity && <span className="mp-outcity">{L("Outside the request's city", "خارج مدينة الطلب")}</span>}
-              </span>
-              {availability !== "absent" && (
-                <span className={`mp-chip ${availability}`}>
-                  <i />
-                  {availability === "confirmed"
-                    ? L("Availability confirmed", "التوفّر مؤكّد")
-                    : L("Availability not confirmed yet", "لم يؤكد توفرها بعد")}
-                </span>
-              )}
+                );
+                /* Green is settled and is not a control — there is nothing left to ask. Red is the
+                   question, and red with a clock is the question already put: it still opens, and
+                   shows him what he asked rather than offering to ask again. */
+                return yardState == null ? (
+                  <span className="bm-eq-yard">{inner}</span>
+                ) : yardState === "ok" ? (
+                  <span className="bm-eq-yard ok" title={L("The supplier named the yard this machine moves from, so this distance is confirmed for your offer.", "حدّد المورد الساحة التي تنتقل منها، فهذه المسافة مؤكّدة لعرضك.")}>
+                    {inner}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className={`bm-eq-yard ${yardState}`}
+                    disabled={!onYardPress}
+                    title={yardState === "asked" ? pendingWhy : L("Not confirmed for this offer: press to see what that means and to ask.", "غير مؤكّدة لهذا العرض: اضغط لتعرف ما معناه ولتسأل.")}
+                    onClick={() => onYardPress?.(machine, yardState === "asked")}
+                  >
+                    {inner}
+                  </button>
+                );
+              })()}
+              {/* Restored 2026-08-09. `isOutOfCity` was already the contract's (bid-map.ts) and this
+                  surface simply never drew it: presentation only, no filtering, no sorting, and it
+                  never contradicts the distance beside it. It is the fact that turns a delivery into a
+                  mobilisation the renter should be asking about. */}
+              {outOfCity && <div className="mp-outcity">{L("Outside the request's city", "خارج مدينة الطلب")}</div>}
             </div>
-
-            {/* A CONFIRMED machine needs no explanation — the chip is the whole statement. The
-                unanswered one does: red reads as rejection, and this sentence is the only thing on
-                the panel that says it is not (AC-20). «المورد», not the prototype's «المورد» —
-                this surface's word for the other party, as the equipment list already has it. */}
-            {availability === "unconfirmed" && (
-              <div className="mp-sect">
-                <div className="mp-sect-h">{L("Availability", "التوفّر")}</div>
-                <p className="mp-sect-n">
-                  {L(
-                    "The supplier has not named this machine's yard yet — an open question, not a refusal.",
-                    "لم يحدّد المورد ساحة هذه المعدّة بعد — سؤال معلّق، وليس رفضاً.",
-                  )}
-                </p>
-              </div>
-            )}
 
             <div className="mp-body">
               <div className="mp-h4">
@@ -424,7 +465,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
                   findings should not have to leave the findings to check one. Pressing the framed cell
                   again brings the machine's photograph back (`frame`). The subject it hands over is the
                   documents tab's own row, so the frame marks that row too if he crosses over. */}
-              <div className="mp-grid">
+              <div {...pin("equipment-detail-grid")} className="mp-grid">
                 {cells.map((c) => {
                   const ev = c.evidence;
                   const framedHere = ev != null && framedDoc?.key === ev.key;
@@ -486,43 +527,19 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
         )}
       </div>
 
-      {/* **The machine's own footer** — a 76 px bar over the panel's grey, two buttons side by side
-          (2026-08-09, the prototype's). It was two stacked full-width rows inside the scroll, each
-          with a `+` tile and a sub-line explaining itself.
+      {/* ── The footer is GONE (owner, 2026-09-08) ──────────────────────────────────────────────
+          *"Remove these 2: one is already in the fleet to add another one, and for availability let
+          it be like the fleet card as «?» on the yard card."*
 
-          ~~Stacked, not side by side: two buttons in a row read as "pick one", a list reads as "here
-          is what you can send".~~ Withdrawn. The reasoning holds for a list of five asks; for two it
-          bought a `+` tile and two lines of explanation for controls whose own labels already say
-          what they do, and it put the panel's actions wherever the renter happened to have scrolled
-          to. A footer is where an action bar goes, and it is where the documents tab's own already
-          is — two tabs of one panel were putting their actions in two different places.
+          ~~A 76px bar carrying «Ask him to confirm availability» and «Ask for different equipment».~~
+          Both asks are still reachable and neither was raised here twice by accident: the
+          availability ask is the yard card above, which is where the red the renter is asking about
+          actually is, and «ask for another one» is the dashed control that closes the fleet list one
+          press behind this panel. A bar that duplicated both put the panel's actions somewhere the
+          fact they act on is not.
 
-          It renders on the machine tab only: the documents tab has its own footer over the selection,
-          and this one steps aside rather than stacking two action bars. */}
-      {tab === "machine" && (
-        <div className="mp-foot">
-          {availability !== "confirmed" && (
-            <button
-              type="button"
-              className="mp-foot-b solid"
-              onClick={() => onRequest?.(availabilityAsk)}
-              disabled={!onRequest || availabilityPending}
-              title={availabilityPending ? pendingWhy : undefined}
-            >
-              {availabilityPending ? pendingLabel : L("Ask him to confirm availability", "اطلب تأكيد التوفّر")}
-            </button>
-          )}
-          <button
-            type="button"
-            className="mp-foot-b"
-            onClick={() => onRequest?.(alternativeAsk)}
-            disabled={!onRequest || alternativePending}
-            title={alternativePending ? pendingWhy : undefined}
-          >
-            {alternativePending ? pendingLabel : L("Ask for different equipment", "اطلب معدّة أخرى")}
-          </button>
-        </div>
-      )}
+          `availabilityAsk` / `alternativeAsk` and their pending readings went with it; the documents
+          tab keeps its own footer, which is the only action bar on this panel now. */}
     </div>
   );
 }

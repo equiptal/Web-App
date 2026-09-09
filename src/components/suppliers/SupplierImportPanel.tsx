@@ -7,13 +7,16 @@ import { fmt, useT } from "@/lib/i18n";
 import { addRenterSuppliersBulk, type BulkResult } from "@/lib/api/client";
 import {
   SHEET_MAX_ROWS,
+  contactable,
   guessField,
-  importable,
   mapRows,
   parseSheet,
+  type MappedRow,
   type SheetField,
   type SheetTable,
 } from "@/lib/contract/sheet-paste";
+import { normalizePhone, phoneE164, type PhoneProblem } from "@/lib/contract/phone-normalize";
+import { readXlsxSheet } from "@/lib/contract/xlsx-sheet";
 
 /**
  * SUP-T23 — importing a supplier list, INSIDE the add dialog rather than beside it.
@@ -67,7 +70,21 @@ import {
  * not arrive. Said on the screen, because the alternative is a renter who believes he has updated
  * forty suppliers and has not.
  *
- * ── Nothing in the file is lost ─────────────────────────────────────────────────────────────────
+ * ── Excel itself, and the numbers in it (owner, 2026-09-08) ────────────────────────
+ *
+ * *"Can't we add xlsx?"* and *"normalize the numbers"* — one change, because they are one problem.
+ *
+ * The import took CSV only, so a renter had to save his workbook as CSV first, and that step is what
+ * broke the phone column: Excel stores `966503372850` as a NUMBER, shows it as `9.66503E+11`, and
+ * writes the displayed text into the CSV. The digits are gone by the time we read the file, and the
+ * screen showed the mangled text without comment while the backend quietly stored NULL for it.
+ *
+ * So: `.xlsx` is read directly (`xlsx-sheet.ts`, no dependency — a zip and four XML tags), and every
+ * phone is normalised to E.164 IN THE PREVIEW (`phone-normalize.ts`), which means the renter reads
+ * the number that will actually be saved. A cell Excel already truncated says so and names the cure,
+ * because 9.66503×10¹¹ cannot be turned back into a phone number by anybody.
+ *
+ * ── Nothing in the file is lost ─────────────────────────────────────────────
  *
  * Four fields are ours. Every other column rides along under `extra` with its own header — payment
  * terms, account manager, whatever the firm keeps. A supplier list is somebody working document,
@@ -77,7 +94,8 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
   const t = useT();
   const c = t.suppliers;
 
-  const [text, setText] = useState("");
+  /** The sheet as READ — by the CSV parser or the workbook reader. Corrections live in `edits`. */
+  const [parsed, setParsed] = useState<SheetTable | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [mapping, setMapping] = useState<SheetField[]>([]);
   const [vendor, setVendor] = useState<boolean[]>([]);
@@ -90,8 +108,6 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
   /** Cell corrections, keyed `row:column`. This import only — the file on disk is never touched. */
   const [edits, setEdits] = useState<Record<string, string>>({});
 
-  const parsed: SheetTable | null = useMemo(() => parseSheet(text), [text]);
-
   /** The sheet as the renter has corrected it. Everything below reads this, never the raw parse. */
   const table: SheetTable | null = useMemo(() => {
     if (!parsed) return null;
@@ -102,15 +118,51 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
     };
   }, [parsed, edits]);
 
-  const rows = table ? mapRows(table, mapping) : [];
-  const ready = rows.filter(importable);
+  /** Which columns hold a phone. Recomputed with the mapping, since the renter can change it. */
+  const phoneCols = useMemo(() => mapping.flatMap((f, i) => (f === "phone" ? [i] : [])), [mapping]);
+
+  /**
+   * The sheet as it will be SAVED: every phone in E.164 (owner, 2026-09-08: *"normalize the
+   * numbers"*).
+   *
+   * Normalising for the eye and again for the wire would be two answers to one question, so there is
+   * one table and both the preview and the payload read it. A cell that cannot be normalised keeps
+   * the renter's own text — it is his to correct, and replacing it with an empty box would hide what
+   * the file said.
+   */
+  const view: SheetTable | null = useMemo(() => {
+    if (!table || phoneCols.length === 0) return table;
+    return {
+      ...table,
+      rows: table.rows.map((cells) =>
+        cells.map((v, i) => {
+          if (!phoneCols.includes(i)) return v;
+          const out = normalizePhone(v);
+          return out && "e164" in out ? out.e164 : v;
+        }),
+      ),
+    };
+  }, [table, phoneCols]);
+
+  const rows = view ? mapRows(view, mapping) : [];
+
+  /** The add rule, shared with the typed form — `contactable` in `sheet-paste.ts` says why. */
+  const ready0 = (r: MappedRow): boolean => contactable(r, (v) => phoneE164(v) != null);
+
+  const ready = rows.filter(ready0);
   const skipped = rows.length - ready.length;
+
+  /** What is wrong with a row's phone, if anything — a warning even on a row that has an e-mail. */
+  const phoneTrouble = (r: MappedRow): PhoneProblem | null => {
+    const out = normalizePhone(r.phone);
+    return out && "problem" in out ? out.problem : null;
+  };
 
   /** One payload, used for the preview and for the write — so the two cannot describe different rows. */
   const payload = () =>
     rows
       .map((r, i) => ({ r, v: vendor[i] !== false }))
-      .filter(({ r }) => importable(r))
+      .filter(({ r }) => ready0(r))
       .map(({ r, v }) => ({
         name: r.name.trim(),
         contactName: r.contactName.trim() || null,
@@ -162,7 +214,7 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
   const reset = () => {
     setPlan(null);
     setEdits({});
-    setText("");
+    setParsed(null);
     setFileName(null);
     setMapping([]);
     setVendor([]);
@@ -171,27 +223,53 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
   };
 
   const onFile = async (file: File) => {
-    /**
-     * An .xlsx is a ZIP container, not text — reading it as text produces binary noise and the parser
-     * would answer "we could not read that", which blames the renter for the file he actually has. So
-     * it is named, and answered with the one step that makes it work: save it as CSV.
-     */
-    if (/\.(xlsx|xls|xlsm|numbers|ods)$/i.test(file.name)) {
-      setError(c.xlsxNotRead);
-      return;
-    }
+    setError(null);
+    /* 2 MB, before anything is read: the cap is about the renter's file, not about our parser, and
+       telling him after a slow read would be telling him late. */
     if (file.size > 2 * 1024 * 1024) {
       setError(c.importTooBig);
       return;
     }
+
+    const name = file.name.toLowerCase();
+
+    /* ── A workbook is read as a workbook (owner, 2026-09-08) ────────────────────────
+       It used to be refused with "save it as CSV first", which is a chore AND a trap: the CSV is
+       where a 12-digit phone becomes `9.66503E+11`. `.xlsm` is the same OOXML container with macros
+       we never execute — we read four XML parts out of a zip. */
+    if (/\.(xlsx|xlsm)$/.test(name)) {
+      const out = await readXlsxSheet(await file.arrayBuffer());
+      if (typeof out === "string") {
+        setError(out === "not-a-workbook" ? c.xlsxUnreadable : c.importUnreadable);
+        return;
+      }
+      setParsed(out);
+      setEdits({});
+      setFileName(file.name);
+      setMapping(out.headers.map(guessField));
+      /* 🔴 **Off, like the typed form** (owner, 2026-09-08). A spreadsheet of contacts is not a
+       list of approved vendors, and a column of green ticks nobody set is the fastest way to make
+       the flag worthless. He marks the ones that are. */
+    setVendor(out.rows.map(() => false));
+      setPlan(null);
+      return;
+    }
+
+    /* `.xls` is OLE2 and `.numbers` / `.ods` are other containers entirely — three formats, one
+       sentence, and it names the two ways out rather than just saying no. */
+    if (/\.(xls|numbers|ods)$/.test(name)) {
+      setError(c.xlsxNotRead);
+      return;
+    }
+
     const raw = await file.text();
-    const parsed = parseSheet(raw);
-    setText(raw);
+    const table = parseSheet(raw);
+    setParsed(table);
     setEdits({});
     setFileName(file.name);
-    setError(parsed ? null : c.importUnreadable);
-    setMapping(parsed ? parsed.headers.map(guessField) : []);
-    setVendor(parsed ? parsed.rows.map(() => true) : []);
+    setError(table ? null : c.importUnreadable);
+    setMapping(table ? table.headers.map(guessField) : []);
+    setVendor(table ? table.rows.map(() => true) : []);
     setPlan(null);
   };
 
@@ -217,8 +295,14 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
   };
 
   /** Which half of the rule this row breaks — the renter's words, not the backend's code. */
-  const whySkipped = (r: (typeof rows)[number]): string =>
-    !r.name.trim() ? c.rMissingName : c.rMissingContact;
+  const whySkipped = (r: (typeof rows)[number]): string => {
+    if (!r.name.trim()) return c.rMissingName;
+    // A row whose phone was TYPED but could not be read is a different mistake from a row with no
+    // contact at all, and only one of the two is fixed by typing a number in.
+    const trouble = phoneTrouble(r);
+    if (trouble) return trouble === "truncated" ? c.rPhoneTruncated : c.rPhoneUnreadable;
+    return c.rMissingContact;
+  };
 
   const FIELDS: SheetField[] = ["name", "contactName", "email", "phone", "extra", "skip"];
   const fieldLabel: Record<SheetField, string> = {
@@ -243,7 +327,7 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
           <span className="text-meta text-muted">{c.importHint}</span>
           <input
             type="file"
-            accept=".csv,text/csv,text/plain"
+            accept=".xlsx,.xlsm,.csv,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             className="hidden"
             onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])}
           />
@@ -311,8 +395,8 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
               </tr>
             </thead>
             <tbody>
-              {table.rows.map((cells, r) => {
-                const ok = importable(rows[r]);
+              {(view ?? table).rows.map((cells, r) => {
+                const ok = ready0(rows[r]);
                 return (
                   <tr key={r} className={cx("border-b border-border last:border-b-0", !ok && "bg-danger-soft/40")}>
                     <td className="px-2.5 py-1.5 align-top">
@@ -354,11 +438,24 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
           </table>
         </div>
 
+        {/* The phones were rewritten on the way in, so the screen says so once rather than leaving the
+            renter to wonder why his sheet's `0503372850` now reads `+966503372850`. */}
+        {phoneCols.length > 0 && <span className="text-meta text-muted">{c.phonesNormalized}</span>}
+
+        {/* A phone the file lost. Its own line, not a rejection reason: the row may still be
+            importable on its e-mail, and the cure is the workbook rather than a correction here. */}
+        {rows.some((r) => phoneTrouble(r) === "truncated") && (
+          <div className="flex items-start gap-2 rounded-md bg-warn-soft px-3 py-2 text-meta text-warn-deep">
+            <Icon name="error_outline" size={14} className="mt-px flex-none" />
+            <span>{c.phoneTruncated}</span>
+          </div>
+        )}
+
         {/* Which rows, and which half of the rule each one breaks — not a count at the bottom. */}
         {skipped > 0 && (
           <div className="grid gap-1 rounded-md bg-danger-soft/50 px-3 py-2 text-meta text-danger-deep">
             {rows.map((r, i) =>
-              importable(r) ? null : (
+              ready0(r) ? null : (
                 <span key={i} className="flex items-start gap-2">
                   <Icon name="error_outline" size={14} className="mt-px flex-none" />
                   {fmt(c.planRejected, { row: i + 1, reason: whySkipped(r) })}
@@ -392,7 +489,7 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
               {table.headers.map((h, i) => (
                 <tr key={i} className="border-b border-border last:border-b-0">
                   <td className="py-1.5 pe-3 font-extrabold text-navy">{h || fmt(c.columnN, { n: i + 1 })}</td>
-                  <td className="py-1.5 pe-3 text-muted">{table.rows[0]?.[i] || "—"}</td>
+                  <td className="py-1.5 pe-3 text-muted">{(view ?? table).rows[0]?.[i] || "—"}</td>
                   <td className="py-1.5">
                     <select
                       value={mapping[i]}
@@ -420,7 +517,9 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
       <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-ok/40 bg-ok-soft px-3 py-2.5 text-meta text-ok-deep">
         <input
           type="checkbox"
-          checked={vendor.every((v) => v !== false)}
+          /* The master follows the rows: it is on only when every row is, and off is now the
+             state they all start in. */
+          checked={vendor.length > 0 && vendor.every((v) => v === true)}
           onChange={(e) => setVendor((v) => v.map(() => e.target.checked))}
           className="mt-0.5 h-4 w-4 flex-none accent-ok"
         />

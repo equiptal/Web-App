@@ -426,3 +426,74 @@ describe("a machine the catalogue cannot place, on the fast lane", () => {
     expect(d.items[0].verdict).toBe("needs-validation");
   });
 });
+
+/* ============================================================================================== *
+ * Everything the fast lane answers has to LAND — the no-data-loss half
+ * ============================================================================================== */
+//
+// Owner, 2026-09-08: *"make sure no data loss, we are processing all given input by user"*. The
+// agent emits the whole item contract now, presence-based. A field it answers and this reader drops
+// is loss that nothing downstream can recover, because the renter's words are gone by then.
+
+describe("the fast lane reader loses nothing the agent answered", () => {
+  const item = (extra: Record<string, unknown>) =>
+    ({
+      tier: 1 as const,
+      line_items: [
+        { input_equipment: "crawler excavator", subtype: "Crawler Excavator", capacity: "30 ton", quantity: 1, ...extra },
+      ],
+    }) as never;
+
+  /* ⚠️ The one that MISLEADS rather than merely drops. `rawSize` feeds "FROM YOUR RFQ", the view
+     that shows the renter their own words back. It used to be set from `capacity` — the agent's
+     RESOLVED size — which is the exact fallback the full path forbids in writing
+     (`agent-adapters.ts:445-448`). Type "22 ton" against a catalogue holding only "20 Ton" and the
+     item is snapped, so the renter was shown 20 Ton as the thing they typed, unmarked. */
+  it("shows the size the renter TYPED, never the snapped one", () => {
+    const d = quickItemsToDraft(
+      item({ capacity: "20 Ton", capacity_input_value: "22 ton", capacity_match: "snapped" }),
+      null,
+      "",
+    );
+    expect(d.items[0].rawSize, "their words, not the catalogue's").toBe("22 ton");
+  });
+
+  it("and says nothing rather than guessing when they stated no size", () => {
+    const d = quickItemsToDraft(item({ capacity: "30 ton" }), null, "");
+    expect(d.items[0].rawSize ?? null).toBeNull();
+  });
+
+  /* The catch-all. A cert outside the TUV/ARAMCO enum has no structured field anywhere on this
+     contract — the enum is two values because each one becomes a document demanded of every
+     supplier who bids — so `additional_notes` is the only place SASO, CE or ISO can be heard. */
+  it("keeps additional_notes, the only home an off-enum cert has", () => {
+    const d = quickItemsToDraft(item({ additional_notes: "SASO required, narrow gate access" }), null, "");
+    expect(d.items[0].additionalNotes).toBe("SASO required, narrow gate access");
+  });
+
+  it("keeps work_type for a crane line", () => {
+    const d = quickItemsToDraft(item({ work_type: "lifting steel beams" }), null, "");
+    expect(d.items[0].workType).toBe("lifting steel beams");
+  });
+
+  /* ⚠️ Without this the fast lane sits outside the learning loop entirely. `rfq-store` gates the
+     correction POST on `if (s.draft.rfqId && editedFromDraft)`, so a hardcoded null meant a renter
+     could fix the agent's answer and nothing was ever told: no `/rfq/:id/correct`, no audit row, no
+     input to the correction miner, no learned rule. Every Tier-1 edit was thrown away in silence
+     while the full path learned from the same correction. */
+  it("carries the rfq_id through, so a renter's correction can be recorded", () => {
+    const d = quickItemsToDraft(
+      { tier: 1, rfq_id: "3f0d1c9e-0000-4000-8000-000000000001", line_items: [{ subtype: "Crawler Excavator", quantity: 1 }] } as never,
+      null,
+      "",
+    );
+    expect(d.rfqId).toBe("3f0d1c9e-0000-4000-8000-000000000001");
+  });
+
+  it("and stays null for a Tier 0 match, which genuinely has none", () => {
+    // Tier 0 is matched in the browser and posted to /rfq/ingest fire-and-forget, so no id comes
+    // back to carry. Correcting a Tier-0 line is separate work, not something to fake here.
+    const d = quickItemsToDraft(item({}), null, "");
+    expect(d.rfqId ?? null).toBeNull();
+  });
+});

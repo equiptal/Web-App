@@ -20,6 +20,7 @@ const model: BidCardModel = {
   closing: "Bidding closes 21 Aug 2026",
   accepting: true,
   cta: "Submit your bid",
+  offCatalogue: false,
 };
 
 const URL_ = "https://web.moedatech.net/bid/abc";

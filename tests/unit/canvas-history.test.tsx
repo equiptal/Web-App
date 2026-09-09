@@ -62,7 +62,7 @@ describe("the history chain has three stops (MREQ-AC-06/07)", () => {
 
     expect(handle.store().state.phase).toBe("wizard");
     expect(handle.store().state.readyToSend).toBe(false);
-    expect(screen.getByText("The machine")).toBeTruthy();
+    expect(screen.getByText("The equipment")).toBeTruthy();
   });
 
   it("Forward from intake lands back on the canvas", async () => {
@@ -79,12 +79,12 @@ describe("the history chain has three stops (MREQ-AC-06/07)", () => {
 describe("the canvas is what the wizard phase now renders (MREQ-AC-01)", () => {
   it("shows the canvas, and the review screen once ready", async () => {
     const handle = await surface({ prepare: answered });
-    expect(screen.getByText("The machine")).toBeTruthy();
+    expect(screen.getByText("The equipment")).toBeTruthy();
     expect(screen.queryByText("Ready to send")).toBeNull();
 
     await handle.run(() => handle.store().actions.setReadyToSend(true));
     expect(screen.getByText("Ready to send")).toBeTruthy();
-    expect(screen.queryByText("The machine")).toBeNull();
+    expect(screen.queryByText("The equipment")).toBeNull();
   });
 });
 

@@ -72,6 +72,19 @@ export interface BidCardModel {
   accepting: boolean;
   /** The one line the image asks for: bid, or do not bother. */
   cta: string;
+  /**
+   * EVERY machine on this request is off-catalogue, so the marketplace can reach nobody for it.
+   *
+   * 🔴 **Not «one of them is».** A request with one catalogue machine and one custom line still
+   * goes out to every supplier who stocks the first, so muting Moedatech on it would be a lie in
+   * the other direction. It is the whole-request question, and only a whole-request answer earns
+   * the whole-request sentence.
+   *
+   * ⚠️ False on the two-string path, where there are no items to ask. That path is a card built
+   * from the preview endpoint's title and description alone, and «assume the ordinary case» is the
+   * safe default: at worst it names a marketplace that is genuinely open.
+   */
+  offCatalogue: boolean;
 }
 
 const COPY = {
@@ -328,6 +341,7 @@ export function bidCardModel(
       closing: d.status || null,
       accepting,
       cta: accepting ? t.cta : t.ctaClosed,
+      offCatalogue: false,
     };
   }
 
@@ -424,6 +438,7 @@ export function bidCardModel(
     ref: preview?.reference ?? bidCardDetails(copy, lang, accepting).ref,
     imageHeadline,
     cardTitle,
+    offCatalogue: items.every((i) => i.isUndefined === true),
     // A single-machine request already says the machine in the title; repeating it as a row below is
     // the same words twice in 14 vertical pixels. Its terms are all "shared" by definition, so they
     // sit in the request's own block.

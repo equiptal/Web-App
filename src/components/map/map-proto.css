@@ -1298,6 +1298,16 @@
    model each starting somewhere else.
 
    One start, one end, three lines. The figure reads first because it is first on its line. */
+/* ── ONE card, two mounts (owner, 2026-09-08) ─────────────────────────────────────────────────────
+   *"Clicking it whether from the details or from the fleet will open this."* The machine DETAIL draws
+   this same control now (`EquipmentDetail`, `.mp`), so every rule in this block names both mounts
+   rather than being copied into `panel-proto.css` — a second copy is how one state ends up with two
+   looks, and the state here is availability, which this surface is arranged to state exactly once.
+
+   The `.bm-eq` selector is written LAST in each list on purpose: `rentee-map-surface.test.ts` reads
+   these blocks by `indexOf(".bidmap .bm-eq .bm-eq-yard… {")`, so the anchor it looks for has to be the
+   line the brace sits on. */
+.bidmap .mp .bm-eq-yard,
 .bidmap .bm-eq .bm-eq-yard {
   display: flex;
   align-items: center;
@@ -1313,6 +1323,7 @@
 /* The mark trails the number (owner, 2026-09-04), so it is pushed to the chip's far edge rather than
    sitting a gap's width from the figure — a control at the end of a row reads as a control; one
    loitering beside the number reads as punctuation. */
+.bidmap .mp .bm-eq-yard .material-icons-outlined,
 .bidmap .bm-eq .bm-eq-yard .material-icons-outlined { flex-shrink: 0; font-size: 20px; line-height: 1; margin-inline-start: auto; }
 /* ── The state's tone is FIXED — selection may not touch it (owner, 2026-08-29) ──────────────
    *"When a card is selected dont let the selection color affect the red or green color, red or green
@@ -1328,6 +1339,7 @@
    Mixed into `var(--surface)` instead of into `transparent`: same colour on white, and now OPAQUE, so
    the ground under it cannot reach through. Every other channel of selection — the border, the fill,
    the accent bar, the file icon — is untouched and still says which card is chosen. */
+.bidmap .mp .bm-eq-yard.ok,
 .bidmap .bm-eq .bm-eq-yard.ok {
   color: var(--ok-deep);
   background: color-mix(in srgb, var(--ok-deep) 10%, var(--surface));
@@ -1335,6 +1347,8 @@
 }
 /* The unconfirmed and the asked states share a ground: the fact has not changed, only whether the
    renter has already acted on it. What separates them is the glyph and the prompt at the end. */
+.bidmap .mp .bm-eq-yard.no,
+.bidmap .mp .bm-eq-yard.asked,
 .bidmap .bm-eq .bm-eq-yard.no,
 .bidmap .bm-eq .bm-eq-yard.asked {
   pointer-events: auto;
@@ -1343,11 +1357,16 @@
   background: color-mix(in srgb, var(--danger-deep) 10%, var(--surface));
   border-color: color-mix(in srgb, var(--danger-deep) 30%, var(--surface));
 }
+.bidmap .mp .bm-eq-yard.no:hover,
+.bidmap .mp .bm-eq-yard.asked:hover,
 .bidmap .bm-eq .bm-eq-yard.no:hover,
 .bidmap .bm-eq .bm-eq-yard.asked:hover { background: color-mix(in srgb, var(--danger-deep) 16%, var(--surface)); }
+.bidmap .mp .bm-eq-yard.asked,
 .bidmap .bm-eq .bm-eq-yard.asked { color: var(--danger-press); }
+.bidmap .mp .bm-eq-yard:focus-visible,
 .bidmap .bm-eq .bm-eq-yard:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 
+.bidmap .mp .bm-eq-dist,
 .bidmap .bm-eq .bm-eq-dist { display: inline-flex; align-items: baseline; gap: 5px; min-width: 0; overflow: hidden; }
 /* The figure keeps the card's largest type: it is the fact the list is SORTED on. It takes the
    chip's ink rather than navy, because the colour is the whole point — the number and its
@@ -1359,7 +1378,9 @@
 
    The app's own face at 16/600 with `tabular-nums` keeps every digit on the same advance, which is
    the ONE thing monospace was actually buying here: a column of distances that does not jitter. */
+.bidmap .mp .bm-eq-km,
 .bidmap .bm-eq .bm-eq-km { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.1px; color: currentColor; }
+.bidmap .mp .bm-eq-kmu,
 .bidmap .bm-eq .bm-eq-kmu { font-size: 10.5px; font-weight: 600; opacity: 0.8; }
 
 /* The machine itself — the caption on the distance, not the headline. No serial and no capacity
@@ -1406,7 +1427,11 @@
   animation: bmYxVeil 0.14s ease;
 }
 .bm-eqyx {
-  width: min(400px, 100%);
+  /* 520px, not 400 (owner, 2026-09-08: *"make the card wider to fit the red and green in one
+     line"*). The two specimens plus the arrow between them measure ~330px in English and wrapped at
+     400 once the head's padding was taken off, which turned the one thing this layer SHOWS into two
+     stacked rows. */
+  width: min(520px, 100%);
   max-height: min(560px, calc(100dvh - 48px));
   display: flex;
   flex-direction: column;
@@ -1458,17 +1483,9 @@
 .bm-eqyx-x:hover { border-color: var(--border-strong); color: var(--navy); }
 /* Scrolls only if a long machine name and three lines outgrow 560px, which on a phone they can. */
 .bm-eqyx-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 14px; }
-.bm-eqyx-eq {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 10px 12px;
-  border-radius: var(--radius-md);
-  background: var(--surface2);
-  border: 1px solid var(--border-mid);
-}
-.bm-eqyx-name { font-size: 12.5px; font-weight: 800; color: var(--navy); }
-.bm-eqyx-km { font-size: 11px; font-weight: 700; color: var(--muted); }
+/* ~~`.bm-eqyx-eq` / `-name` / `-km` — the machine's name and distance in a box at the top.~~ Removed
+   with the markup (owner, 2026-09-08): the layer opens FROM that machine's card, one press earlier,
+   and the specimen below carries its distance. */
 .bm-eqyx-p { margin: 0; font-size: 12px; font-weight: 600; line-height: 1.85; color: var(--navy); }
 
 /* ── The tutorial (owner, 2026-08-31) ────────────────────────────────────────────────────────────
@@ -1479,6 +1496,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* NO wrap: the pair is the picture, and a red row above a green row is two states rather than one
+     becoming the other (owner, 2026-09-08). The card is 520px so it fits; below that the specimens
+     shrink their own padding rather than stacking. */
+  flex-wrap: nowrap;
   gap: 10px;
   padding: 14px 10px;
   border-radius: var(--radius-md);
@@ -1488,6 +1509,7 @@
 .bm-eqyx-spec {
   display: inline-flex;
   align-items: center;
+  min-width: 0;
   gap: 6px;
   padding: 7px 12px;
   border-radius: var(--radius-md);
@@ -1548,23 +1570,20 @@
   padding: 12px 14px;
   border-top: 1px solid var(--border);
 }
-.bm-eqyx-later {
-  flex-shrink: 0;
-  background: none;
-  border: 0;
-  padding: 8px 4px;
-  color: var(--muted);
-  font-size: 11.5px;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: inherit;
-}
-/* BLUE, never navy (RM3-AC-33): this is the one control on the layer the renter is supposed to
-   press, and beside a red explanation navy reads as disabled. */
+/* ~~`.bm-eqyx-later` — «Not now», beside the CTA.~~ Removed (owner, 2026-09-08): the head carries an
+   X, and a second dismissal is one more thing to read past on the way to the one control that acts. */
+/* ── ORANGE, the design system's own action colour (owner, 2026-09-08) ───────────────────────────
+   *"Make the ask button orange as our design system."*
+
+   ~~Blue, never navy (RM3-AC-33).~~ The half of AC-33 this reversal keeps is the half that matters:
+   the control is NOT navy, so beside a red explanation it cannot read as switched off. What the
+   owner has withdrawn is the blue — this is the primary act of a dialog, and every other primary
+   button in the product is `var(--brand)`. A layer that used the one blue nothing else here uses read
+   as borrowed from another product. */
 .bm-eqyx-cta {
   margin-inline-start: auto;
   flex: 1;
-  background: var(--action);
+  background: var(--brand);
   border: 0;
   border-radius: var(--radius-md);
   padding: 11px 14px;
@@ -1574,7 +1593,7 @@
   cursor: pointer;
   font-family: inherit;
 }
-.bm-eqyx-cta:hover:not(:disabled) { background: color-mix(in srgb, var(--action) 88%, var(--navy)); }
+.bm-eqyx-cta:hover:not(:disabled) { background: var(--brand-hover); }
 .bm-eqyx-cta:disabled { background: var(--disabled-bg); color: var(--disabled-fg); cursor: default; }
 
 
@@ -2160,7 +2179,12 @@
   flex-direction: column;
   justify-content: center;
   box-sizing: border-box;
-  min-height: 76px;
+  /* ── 58px, not 76 (owner, 2026-09-08: *"even this footer thinner"*) ────────────────────────────
+     The prototype's 76px matched the 64px header at the other end of a column that then had a lot
+     more furniture in it. What the bar holds now is one figure, one link and one or two acts on a
+     single line, so the extra 18px was padding around a row that already has its own. Still a
+     `min-height`, so the breakdown that opens INSIDE this slab still pushes it taller. */
+  min-height: 58px;
 
   /* DARK, the prototype's `var(--navy-deep) → var(--navy-deep)` — the one slab on this surface. Everything above is
      white cards on grey, and the bar that prices them must not read as one more card. The hairline
@@ -2168,7 +2192,7 @@
      of the column. */
   background: var(--navy-deep);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 12px 18px;
+  padding: 9px 18px;
   color: var(--surface);
 }
 
@@ -2182,13 +2206,15 @@
    own metrics: 24px, weight 700, `-0.8px` tracking, in the monospace it prints every figure in. */
 .bidmap .bm-foot-amt {
   font-family: ui-monospace, "IBM Plex Sans", monospace;
-  font-size: 24px;
+  /* 21px, down from the prototype's 24 — the slab lost 18px of height and the figure has to sit
+     inside it beside the acts (owner, 2026-09-08). It is still the largest thing on the bar. */
+  font-size: 21px;
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: -0.8px;
   color: var(--surface);
 }
-.bidmap .bm-foot-unit { font-size: 12px; font-weight: 700; color: rgba(255, 255, 255, 0.62); }
+.bidmap .bm-foot-unit { font-size: 11.5px; font-weight: 600; color: rgba(255, 255, 255, 0.62); }
 /* The SOURCE of the figure, never the state of the conversation. Its own line now — «عرض التفاصيل»
    was the only other thing on the row it used to share, so `.bm-foot-meta` went with that control. */
 /* The source line and the way into the arithmetic, on one line under the rate. */
@@ -2202,7 +2228,10 @@
   padding: 0;
   font: inherit;
   font-size: 10.5px;
-  font-weight: 700;
+  /* NOT BOLD (owner, 2026-09-08: *"not bold text on the show details and on the button of
+     counter"*). It is an underlined link into the arithmetic, sitting inches from two real acts;
+     bold gave it a control's weight beside them. */
+  font-weight: 500;
   color: rgba(255, 255, 255, 0.88);
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -2273,10 +2302,13 @@
   border-radius: var(--radius-md);
   /* Sized so the ENGLISH pair — «Counter this price» beside «Approve», the longer of the two — still
      shares one line with the hero rate inside the panel's 392px. Arabic has room to spare. */
-  padding: 11px 16px;
+  padding: 9px 14px;
   font: inherit;
   font-size: 12.5px;
-  font-weight: 800;
+  /* NOT BOLD, on the owner's word (2026-09-08). The pair is the loudest thing on the slab by
+     COLOUR — white on navy, and green when the deal is settled — and 800 on top of that made a
+     392px bar read as two shouted labels. */
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -2288,8 +2320,8 @@
   background: var(--ok);
   border-color: var(--ok);
   color: var(--surface);
-  font-weight: 800;
-  padding: 11px 16px;
+  font-weight: 600;
+  padding: 9px 14px;
 }
 .bidmap .bm-foot-cta.is-confirm:hover { background: var(--ok-deep, var(--ok-deep)); border-color: var(--ok-deep, var(--ok-deep)); }
 .bidmap .bm-foot-cta:disabled { opacity: 0.55; cursor: default; }
@@ -2680,6 +2712,10 @@
    rather than being a 436px panel — parked every card 14% in from the edge with white on both sides:
    the floating-in-the-middle the owner reported. Sided, capped, and the card fills its wrapper. */
 .bidmap .bm-chat-card { max-width: min(86%, 376px); width: 86%; }
+/* The request card is HORIZONTAL since 2026-09-08, so the wrapper that sides it gives it the room:
+   376px was the stacked card's width and would squeeze the two columns back into one. It applies to
+   `.bm-chat-card` holding a `.bm-rq` only — a negotiation `.chatcard` keeps its own width. */
+.bidmap .bm-chat-card:has(> .bm-rq) { max-width: min(92%, 520px); }
 .bidmap .bm-chat-card.is-mine { align-self: flex-end; }
 .bidmap .bm-chat-card.is-them { align-self: flex-start; }
 /* The card fills the wrapper that took the side. A width of its own here is a second opinion about
@@ -2768,12 +2804,14 @@
    the same ceiling, and nothing else: the `align-self: flex-end` that used to live here pinned every
    card to the outgoing edge whoever wrote it, which is precisely the reading the author-sided
    wrapper replaced (owner, 2026-08-11). Side is the wrapper's business now, in one place. */
-.bidmap .bm-chat-body > .bm-rq { width: 100%; max-width: min(86%, 376px); }
+/* 520px, up from 376 (owner, 2026-09-08). The card is a ROW now — counterparty on the leading edge,
+   the ask beside it — and 376px was the width of the stacked version. */
+.bidmap .bm-chat-body > .bm-rq { width: 100%; max-width: min(86%, 520px); }
 /* The draft sits between the stream and the composer, pinned, exactly where `rPendingCard` puts it —
    it must not scroll away with the conversation it is about to join. */
 .bidmap .bm-chat-draft { flex-shrink: 0; padding: 12px 18px; border-top: 1px solid var(--surface2); }
 /* The card itself keeps the stream's ceiling — pinned, but still one message's width. */
-.bidmap .bm-chat-draft .bm-rq { width: 100%; max-width: 376px; }
+.bidmap .bm-chat-draft .bm-rq { width: 100%; max-width: 520px; }
 
 /* Prototype keyframes — `design.md` §5 plus `design-v3.md` §7, verbatim. All disabled under
    `prefers-reduced-motion`. */
