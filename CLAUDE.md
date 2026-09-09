@@ -2,6 +2,29 @@
 
 ## Change log
 
+- **2026-09-09 - The bid cards travel sideways again, and the PAGE carries their height.**
+  Owner, correcting yesterday: *"no the bids card must be scrolled horizantally to show all of them
+  but i meant we might need vertical scrolling to show the height of the card in some cases only"*.
+  The 09-08 fix read «no page scrolling is shown» as «the cards must wrap» and answered the wrong
+  half: it got the vertical scroll by deleting the sideways travel, so four bids became four rows of
+  one card. The strip is a `flex … overflow-x-auto` rail again with each card back at
+  `w-[344px] flex-none`, and what survives from 09-08 is the part he was actually pointing at - the
+  workspace COLUMN is the one vertical scroller (`overflow-y-auto` on the pinned root, neither tab
+  pane clipping), so a card taller than the viewport is read by scrolling the page and never by a bar
+  inside the white card.
+  Files: `src/components/workspace/BidCards.tsx`,
+  `tests/unit/bid-cards-rail.test.ts` (renamed from `bid-cards-wrap.test.ts`, rewritten to the new
+  ruling with both rulings quoted in its head).
+  ⚠️ `items-stretch` is what keeps the 2026-08-30 ruling alive in a flex row: every card takes the
+  height of the tallest, so the «Counter this price» buttons still line up and a shorter card's slack
+  sits above its footer rather than under its button.
+  ⚠️ BOTH overflow axes are stated on the strip (`overflow-x-auto overflow-y-clip`). CSS computes the
+  unstated one from `visible` to `auto` the moment the other scrolls - the fourth time this repo has
+  met that, after the bid rail, the compare matrix and the suppliers table.
+  ⚠️ NOT re-introduced: a scroller on the tab pane. `overflow-hidden` there would cut a tall card off
+  with no way to see the rest, and `overflow-y-auto` would put the bar back inside the card, which is
+  what he reported on 09-08.
+
 - **2026-09-09 - The create flow says «equipment» and «request», its equipment are TABS, the site and schedule lock on the answer, and the carry-forward modal is gone.**
   Owner, four notes: *"90.2 use request not job and use equipment not machine anywhere in the create
   request not only this modal"*, *"if there is multi itme in the request i will show each equipment
@@ -105,7 +128,10 @@
   card's own width (one column on a phone), and the workspace COLUMN is the scroller
   (`overflow-y-auto` on the pinned root) with both tabs rendering whole.
   Files: `src/components/workspace/BidCards.tsx`, `src/components/workspace/RequestsWorkspace.tsx`,
-  `tests/unit/bid-cards-wrap.test.ts` (new).
+  `tests/unit/bid-cards-wrap.test.ts` (new; renamed `bid-cards-rail.test.ts` on 2026-09-09).
+  🔴 **HALF WITHDRAWN the next day** (see the 2026-09-09 entry at the top): the missing scroll he
+  reported was the VERTICAL one, and wrapping the cards took the sideways travel away to get it. The
+  grid is gone; the column's `overflow-y-auto` — the part he actually asked for — stays.
   Trap: the height ruling of 2026-08-30 survives, in grid's terms - a grid row stretches its items to
   the tallest of THAT ROW, so the «Counter this price» buttons still line up across each line and a
   short card's slack still sits above its footer. The card lost `w-[344px]` and `flex-none` with it:

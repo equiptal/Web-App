@@ -105,27 +105,28 @@ export function BidCards({
   }
 
   return (
-    /* ── The bids WRAP; they are not a row you travel sideways (owner, 2026-09-08) ───────────────
-       *"UI bug: when the browser is 100% or more the bid cards are not responsive, no page scrolling
-       is shown. Make the page scrollable, not the container of the cards."*
+    /* ── A ROW you travel sideways, and the COLUMN carries its height (owner, 2026-09-09) ────────
+       *"No, the bids card must be scrolled horizontally to show all of them, but I meant we might
+       need vertical scrolling to show the height of the card in some cases only."*
 
-       ~~`flex … overflow-x-auto`: one line of 344px cards with a scrollbar of its own under them.~~
-       At 100% zoom on a 1440 screen that put the fourth bid half off the edge and the way to it was
-       a bar at the foot of a container the renter had no reason to look at — while the page itself
-       did not scroll at all. Four bids became unreadable at exactly the size most people run.
+       ~~A wrapping `auto-fill` grid.~~ That was yesterday's answer to "no page scrolling is shown",
+       and it answered the wrong half: it fixed the missing VERTICAL scroll by taking the sideways
+       travel away. The bids are a rail — one card per supplier, read left to right, compared by
+       travelling — and that is the 2026-08-25 shape the owner has now restored.
 
-       `auto-fill` with a `min(100%, 320px)` floor: as many 344px columns as the width holds, wrapping
-       to the next line after that, and a single column on a phone rather than a track wider than the
-       screen. The cards keep their own width — this is not a stretch-to-fit grid, because a bid card
-       drawn at 700px is a different card.
+       What survives from yesterday is the part he actually reported: the workspace COLUMN scrolls
+       (`RequestsWorkspace`'s pinned root is `overflow-y-auto`, and neither tab pane clips), so a card
+       taller than the viewport is read by scrolling the page rather than by a bar inside a box. This
+       strip caps nothing and scrolls nothing downwards itself.
 
-       The 2026-08-30 height ruling survives, in the form grid gives it: a grid row's items stretch to
-       the tallest of that ROW, so the «Counter this price» buttons still line up across each line,
-       and a shorter card's slack still sits above its footer (`mt-auto`) rather than under its
-       button. Nothing is capped to the pane, so nothing scrolls inside a card. */
+       `items-stretch` keeps the 2026-08-30 ruling: every card takes the height of the tallest in the
+       row, so the «Counter this price» buttons line up and a shorter card's slack sits above its
+       footer. Both overflow axes are STATED — CSS computes the other from `visible` to `auto` the
+       moment one scrolls, and an unstated `overflow-y` is how this repo grew a phantom vertical bar
+       three times (the bid rail, the compare matrix, the suppliers table). */
     <div
       {...pin("workspace-bid-cards")}
-      className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,320px),344px))] items-stretch gap-5 p-3"
+      className="flex items-stretch gap-5 overflow-x-auto overflow-y-clip p-3"
     >
       {bids.map((b) => (
         <BidCardTile
@@ -342,9 +343,10 @@ function BidCardTile({
        does that job now, and says so. What is left here is a container: no click, no pointer, and
        the ring only when it IS checked. */
     <article {...pin("bid-card")}
-      /* No width and no `flex-none`: the GRID states the track (`auto-fill`, 344px), and a card
-         that also stated its own width would overflow the single column a phone gives it. */
-      className={`flex h-full flex-col overflow-hidden rounded-lg border bg-surface transition ${
+      /* 344px and `flex-none`: the card states its own width again (owner, 2026-09-09), because a
+         rail is made of cards that keep their size and a bid drawn at 700px is a different card.
+         `h-full` still takes the row's stretched height, which is what lines the footers up. */
+      className={`flex h-full w-[344px] flex-none flex-col overflow-hidden rounded-lg border bg-surface transition ${
         selected ? "border-brand" : "border-border"
       }`}
     >
