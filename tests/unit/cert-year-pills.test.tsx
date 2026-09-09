@@ -5,7 +5,7 @@ import { SearchSelect } from "@/components/create/SearchSelect";
 import { LocaleProvider } from "@/lib/i18n";
 import { en } from "@/lib/i18n/en";
 import { itemFieldKey, itemWebGaps } from "@/lib/contract/gates";
-import type { EquipmentItem, RfqDraft } from "@/lib/contract/draft";
+import { defaultProjectDetails, type EquipmentItem, type RfqDraft } from "@/lib/contract/draft";
 
 /**
  * **The certificate and the minimum year, in their three states** (owner, 2026-09-08).
@@ -127,7 +127,11 @@ describe("the minimum-year pill", () => {
  * there — and the answer for an agent-filled field has to be no.
  */
 describe("moving on", () => {
-  const draft = (touchedFields: string[] = []) => ({ touchedFields }) as unknown as RfqDraft;
+  /* A REQUEST with nothing answered at its level: the gate reads the resolved value now (the item's
+     override, else the request's), so a draft with no project would read `undefined.advanced`
+     (owner, 2026-09-09 — the fix for a filled certificate that shook). */
+  const draft = (touchedFields: string[] = []) =>
+    ({ touchedFields, project: defaultProjectDetails() }) as unknown as RfqDraft;
   const machine = (over: Partial<EquipmentItem>) =>
     ({
       id: "m1",

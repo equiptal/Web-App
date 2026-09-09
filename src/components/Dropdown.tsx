@@ -82,6 +82,7 @@ export function Dropdown({
   disabled = false,
   defaultOpen = false,
   onChange,
+  emptyAction,
 }: {
   value: string | null;
   options: DropdownOption[];
@@ -96,6 +97,31 @@ export function Dropdown({
    */
   label?: string;
   tone?: DropdownTone;
+  /**
+   * **What to offer when a SEARCH finds nothing** (owner, 2026-09-09).
+   *
+   * The list's empty state was a «—», which is honest and useless: the renter has typed a machine
+   * the catalogue does not carry and the control that told him so had nothing to do about it. This
+   * draws one row under it instead, carrying whatever he typed — the canvas uses it to turn the line
+   * off-catalogue and open the free-text name box seeded with his own words.
+   *
+   * Only while there IS a query. An empty list with an empty box means «there is nothing here to
+   * pick at all» — a taxonomy that failed to load, or a size list waiting on a type — and that is a
+   * different fault with a different answer.
+   */
+  emptyAction?: {
+    /**
+     * ONE general sentence, not a quote of what he typed (owner, 2026-09-09: *"make it general, add
+     * custom equipment type but show something that is not on moedatech etc"*).
+     *
+     * ~~«Add «wat» as equipment we do not carry yet».~~ Quoting the search text made the row read as
+     * a promise about that text, and a search FRAGMENT is not a machine's name — «wat» would have
+     * gone to suppliers as one. The row names the act; the box it opens takes the name.
+     */
+    label: string;
+    /** The typed text, still handed over: a caller may want it, and none does today. */
+    onPick: (query: string) => void;
+  };
   /**
    * The value came from the agent or a default, not from the renter.
    *
@@ -319,7 +345,31 @@ export function Dropdown({
                 </span>
               </button>
             ))}
-            {filtered.length === 0 && <p className="px-3 py-3 text-body text-muted">—</p>}
+            {filtered.length === 0 && (
+              <>
+                <p className="px-3 pb-1 pt-3 text-body text-muted">—</p>
+                {/* The way out of a search that failed. `query.trim()`: see `emptyAction`. */}
+                {emptyAction && query.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const q = query.trim();
+                      setOpen(false);
+                      setQuery("");
+                      emptyAction.onPick(q);
+                    }}
+                    className="flex w-full items-start gap-2 border-t border-border px-3 py-2.5 text-start text-body font-semibold text-brand-deep transition hover:bg-brand-soft"
+                  >
+                    <Icon name="add" size={16} className="mt-[1px] flex-none" />
+                    {/* ~~A second, quieter line under it («Something Moedatech does not list yet»).~~
+                        Gone on the owner's word (2026-09-09): *"add a custom equipment type only"*.
+                        The row is one act and its own words say it; the note about what the state
+                        MEANS is already on the card, in orange, the moment the box opens. */}
+                    <span className="min-w-0">{emptyAction.label}</span>
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </div>,
         document.body,

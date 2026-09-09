@@ -472,7 +472,9 @@ export const en = {
     attachedFiles: "Attached files",
     emptyHint: "Paste text or attach at least one file to continue.",
     yourRequest: "Your request",
-    backToReview: "Back to review",
+    /* ~~`backToReview` — the intake's own second Back.~~ Deleted with the button (owner,
+       2026-09-09): the page's Back leaves the flow, the browser's Back and the draft prompt resume the
+       draft, and two controls disagreeing about which way «back» goes is what it cost. */
     reAnalyze: "Re-analyze",
     editReparseNote: "Editing your request re-runs the AI and refreshes your items.",
   },
@@ -2351,6 +2353,17 @@ export const en = {
       type: "TYPE",
       size: "SIZE",
       searchTypes: "Search types…",
+      /* ── The way out of a TYPE search that found nothing (owner, 2026-09-09) ────────────────────
+         *"Maybe if he searched in the type and didnt find it we show for him something here that will
+         open the field of custom type and the alert."*, then *"make it general, add custom equipment
+         type but show something that is not on moedatech etc"*.
+         ~~«Add «{q}» as equipment we do not carry yet».~~ Quoting the search text read as a promise
+         about that text, and a search FRAGMENT is not a machine's name. So: the act on the first
+         line, what it means on the second, and the name is asked for in the box this opens. */
+      /* One line, and only this one (owner, 2026-09-09: *"add a custom equipment type only"*). The
+         second line said what the state means, which the orange note on the card says once the box
+         is open. */
+      addCustomType: "Add a custom equipment type",
       searchSizes: "Search sizes…",
       fuel: "FUEL",
       /* ── An ask, not a heading (owner, 2026-09-08) ───────────────────────────────

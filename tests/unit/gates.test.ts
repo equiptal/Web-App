@@ -117,21 +117,64 @@ describe("itemAppGaps — the app's required set (MREQ-AC-09)", () => {
 });
 
 describe("itemWebGaps — year and certificate (MREQ-AC-54/55)", () => {
+  /* ── The gate reads the RESOLVED value (owner, 2026-09-09) ────────────────────────────────────
+     *"The certificate is shaking as required while it is selected, so whenever there is a value for
+     cert don't shake it, it is navy blue and filled and allow moving on."*
+
+     Both answers live at two levels — the item's own override, else the REQUEST-wide one — and the
+     card resolves them that way. This gate read the override alone, so a certificate set at request
+     level filled the pill and still counted as missing. Every case below therefore passes a project;
+     `bare()` is the request-wide silence these gates were written against, and `withCerts` /
+     `withYear` are the state that used to shake with an answer on screen. */
+  const bare = () => ({ touchedFields: [] as string[], project: defaultProjectDetails() });
+  const withRequestCerts = () => {
+    const p = defaultProjectDetails();
+    p.certificates.safety = ["tuv"];
+    return { touchedFields: [] as string[], project: p };
+  };
+  const withRequestYear = () => {
+    const p = defaultProjectDetails();
+    p.advanced.equipmentYear = "2018+";
+    return { touchedFields: [] as string[], project: p };
+  };
+
   it("accepts a value the RFQ named — that is already the renter's answer", () => {
     const item = makeItem({ equipmentYear: "2018+", safetyCertsOverride: ["tuv"] });
-    expect(itemWebGaps(item, { touchedFields: [] })).toEqual([]);
+    expect(itemWebGaps(item, bare())).toEqual([]);
   });
 
   it("blocks a value nobody supplied", () => {
     // Neither the RFQ nor the renter said anything: an empty cert list and a null year are the
     // form's silence, not an answer.
     const item = makeItem({ equipmentYear: null, safetyCertsOverride: [] });
-    expect(itemWebGaps(item, { touchedFields: [] }).map((g) => g.field)).toEqual(["equipment_year", "safety_certificates"]);
+    expect(itemWebGaps(item, bare()).map((g) => g.field)).toEqual(["equipment_year", "safety_certificates"]);
+  });
+
+  it("accepts a certificate set at REQUEST level, which is what the pill is showing", () => {
+    // The reported bug: the chip drew «TÜV», navy and filled, and shook as required.
+    const item = makeItem({ safetyCertsOverride: null, equipmentYear: "any" });
+    expect(itemWebGaps(item, withRequestCerts()).map((g) => g.field)).not.toContain("safety_certificates");
+  });
+
+  it("accepts a YEAR set at request level too — the same hole, one line apart", () => {
+    const item = makeItem({ equipmentYear: null, safetyCertsOverride: ["tuv"] });
+    expect(itemWebGaps(item, withRequestYear()).map((g) => g.field)).not.toContain("equipment_year");
+  });
+
+  it("still blocks when the item CLEARS the request-wide answer", () => {
+    /* An empty ARRAY on the item is «I have no certificate here», which is an answer only once the
+       control has been touched — and `null` means «follow the request». The two must not be
+       conflated, or clearing a cert on one machine would silently inherit the request's again. */
+    const item = makeItem({ safetyCertsOverride: [], equipmentYear: "any" });
+    expect(itemWebGaps(item, withRequestCerts()).map((g) => g.field)).toEqual(["safety_certificates"]);
   });
 
   it("is satisfied once each control is touched", () => {
     const item = makeItem();
-    const touched = { touchedFields: [itemFieldKey(item.id, "equipment_year"), itemFieldKey(item.id, "safety_certificates")] };
+    const touched = {
+      touchedFields: [itemFieldKey(item.id, "equipment_year"), itemFieldKey(item.id, "safety_certificates")],
+      project: defaultProjectDetails(),
+    };
     expect(itemWebGaps(item, touched)).toEqual([]);
   });
 
@@ -139,7 +182,10 @@ describe("itemWebGaps — year and certificate (MREQ-AC-54/55)", () => {
   // not a value, so an explicitly empty answer clears it exactly like a populated one.
   it("accepts 'any' and an empty certificate list as real answers", () => {
     const item = makeItem({ equipmentYear: "any", safetyCertsOverride: [] });
-    const touched = { touchedFields: [itemFieldKey(item.id, "equipment_year"), itemFieldKey(item.id, "safety_certificates")] };
+    const touched = {
+      touchedFields: [itemFieldKey(item.id, "equipment_year"), itemFieldKey(item.id, "safety_certificates")],
+      project: defaultProjectDetails(),
+    };
     expect(itemWebGaps(item, touched)).toEqual([]);
   });
 });

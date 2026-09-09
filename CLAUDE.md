@@ -2,6 +2,87 @@
 
 ## Change log
 
+- **2026-09-09 - A TYPE search that finds nothing is where off-catalogue BEGINS.**
+  Owner: *"what if i want to add an equipment that is not in the taxonamy, like custom equipment type
+  but user didnt write it in the text, he wanted to add it or to edit his chosice of existing one,
+  there is no path for it if he isnt on the intake"*, then *"maybe if he searched in the type and
+  didnt find it we show for him something here that will open the field of custom type and the
+  alert"*.
+  The canvas could only ARRIVE off-catalogue: the agent read a machine it could not place and
+  `deriveVerdict` called it `no-match`. A renter who wanted to name one himself - or who had picked
+  the wrong type and then found the catalogue held nothing for him - had to go back to «Your request»
+  and retype the whole request.
+  Now the failure carries the way out. `Dropdown` takes an `emptyAction`, drawn UNDER the «—» when a
+  search matches nothing and only while there IS a query: **«Add a custom equipment type»**, one line
+  and nothing else (owner's third pass: *"add a custom equipment type only"* - the second line said
+  what the state MEANS, which the orange note on the card says the moment the box opens). The press
+  dispatches `SET_ITEM_OFF_CATALOGUE`, the exact mirror of `SET_ITEM_SUBCATEGORY`: the ids clear and
+  the verdict becomes `no-match`, so the card opens the EQUIPMENT NAME box with the orange «not in our
+  catalogue yet» note under it.
+  🔴 **The row is GENERAL and the box opens EMPTY** (owner, same day, second pass: *"make it general,
+  add custom equipment type but show something that is not on moedatech etc"*). ~~It quoted the search
+  text and seeded the name with it.~~ Quoting read as a promise about that text, and a search FRAGMENT
+  is not a machine's name - «wat» would have gone out to suppliers as the answer. The name is asked
+  for in the box, which carries the star like every other required answer on the card. The typed text
+  is still handed to `onPick`; nothing uses it today.
+  Files: `src/components/Dropdown.tsx` (`emptyAction`: `label`, `onPick`),
+  `src/lib/store/rfq-store.tsx` (`SET_ITEM_OFF_CATALOGUE`, `setItemOffCatalogue`),
+  `src/components/create/MachineCard.tsx`,
+  `src/lib/i18n/{en,ar}.ts` (`machineCard.addCustomType`),
+  `tests/unit/off-catalogue-from-type.test.tsx` (new, 7 cases).
+  ⚠️ **All THREE things that say «off-catalogue» move in the one branch** - the verdict, the ids
+  `isCustomLine` reads, and the typed name - which is the 2026-09-06 trap read backwards. The SIZE
+  goes with the type, because a size is a size OF something. A test drives the round trip both ways
+  and asserts the reverse is lossless.
+  ⚠️ The row is offered only while `CUSTOM_EQUIPMENT_ENABLED`. With the flag off `isCustomLine` is
+  false whatever the verdict says, so the press would clear the trio and open nothing.
+  ⚠️ **Only when he has typed something.** An empty list with an empty search box means «there is
+  nothing here to pick at all» - a taxonomy that failed to load, or a size list waiting on a type -
+  which is a different fault with a different answer. A case pins that, and another pins whitespace.
+  ⚠️ The reducer still ACCEPTS a name, and the canvas passes `""`. Keeping the parameter is what lets
+  a future caller (an edit modal, a work order) open the box already answered without a second action;
+  the canvas does not, for the fragment reason above.
+  ⚠️ Offered on TYPE only, not on CATEGORY or SIZE. The type is where the catalogue actually fails;
+  a category with nothing under it is a taxonomy fault, and a size list is empty until a type exists.
+
+- **2026-09-09 - A certificate answered at REQUEST level stops shaking: the gate reads what the pill shows.**
+  Owner: *"the certiticate is shaking as required while it is selected, so whenever there is a value
+  for cert dont shake it, it is navy blue and filled and allow moving on"*.
+  Both of these answers live at TWO levels - the item's own override, else the request-wide one - and
+  the card has always resolved them that way (`useItemOverrides`: `item.safetyCertsOverride ??
+  project.certificates.safety`). `itemWebGaps` read the OVERRIDE alone. So a certificate set at
+  request level (by the agent, or by a project template) filled the chip, painted it navy, and still
+  counted as missing: the chip shook, «* Required» appeared over a field with an answer in it, and
+  «Review & send» refused with nothing on screen to fix. One resolution, two readers now - the gate
+  asks the question the pill answers.
+  Files: `src/lib/contract/gates.ts` (`itemWebGaps`, `itemGaps`, `gateEquipment` take the draft's
+  `project` too), `tests/unit/gates.test.ts` (3 new cases), `tests/unit/cert-year-pills.test.tsx`.
+  ⚠️ **The YEAR had the identical hole, one line away, and is fixed in the same pass.** `equipmentYear`
+  resolves `item.equipmentYear ?? project.advanced.equipmentYear` on the card and was gated on the item
+  alone. Not asked for; left alone it would have been the next report, in the same words.
+  ⚠️ `null` and `[]` on the item still mean different things: `null` is «follow the request», `[]` is
+  «no certificate HERE» - which is an answer only once the control has been touched. Conflating them
+  would make clearing a cert on one machine silently inherit the request's again. A test pins it.
+  ⚠️ `gateEquipment` already took `project` as its own argument and now passes it through on the draft
+  shape (`{ ...draft, project }`). It is the same object either way; the two parameters are not two
+  sources.
+
+- **2026-09-09 - «Back to review» is gone from the intake: one Back per screen.**
+  Owner, on a screenshot of it: *"remove this"*. It was drawn on the intake whenever a draft existed,
+  and it was a SECOND back control on a screen that already has one - pointing the other way. The
+  page's own control leaves the flow there (`CreateBack`, `{ fallback: "/" }` on the intake); this one
+  went FORWARD into the drafted request, so a renter who had just answered «Leave» on the canvas's
+  confirm was met by a button offering to undo it.
+  The draft is not stranded: the browser's own Back resumes it (`rfq-store`'s `popstate` →
+  `RESUME_WIZARD`), a returning visit raises the draft prompt whose «Continue» resumes it, and
+  «Re-analyse» on the same screen rebuilds it from the words on it. `intake.backToReview` is deleted
+  in both locales.
+  Files: `src/components/screens/Intake.tsx`, `src/lib/i18n/{en,ar}.ts`.
+  ⚠️ `resumeWizard` is NOT dead - the store's own `popstate` handler is its other caller. Deleting it
+  would take the browser Back's resume with it.
+  ⚠️ «Add something to continue» keeps the row's leading edge (`me-auto`), which the removed button
+  used to hold: without it the hint sat against the Continue button rather than opposite it.
+
 - **2026-09-09 - The bid cards travel sideways again, and the PAGE carries their height.**
   Owner, correcting yesterday: *"no the bids card must be scrolled horizantally to show all of them
   but i meant we might need vertical scrolling to show the height of the card in some cases only"*.

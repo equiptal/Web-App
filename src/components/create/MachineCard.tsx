@@ -22,6 +22,7 @@ import { useState } from "react";
 import { fmt, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
+import { CUSTOM_EQUIPMENT_ENABLED } from "@/lib/flags";
 import { Button, Icon, Notice, TextArea, TextInput } from "@/components/ui";
 import { equipmentIcon } from "@/components/requests/EquipImg";
 import { CanvasField, ChoiceChips, ChoiceRow, PanelDot } from "@/components/create/Provenance";
@@ -371,6 +372,33 @@ export function MachineCard({
                   searchPlaceholder={t.create.machineCard.searchTypes}
                   label={t.create.machineCard.type}
                   options={tax.allSubtypes}
+                  /* ── A search that finds nothing is where off-catalogue BEGINS (owner, 2026-09-09) ──
+                     *"Maybe if he searched in the type and didnt find it we show for him something here
+                     that will open the field of custom type and the alert."*
+
+                     The canvas could only ARRIVE off-catalogue before this — the agent read a machine it
+                     could not place — so a renter who wanted to name one himself, or who had picked the
+                     wrong type and found the catalogue held nothing for him, had to go back to the intake
+                     and retype the whole request. The press turns THIS line off-catalogue, seeded with
+                     what he just typed, which opens the name box and the orange note below.
+
+                     Only offered while the feature is on: with `CUSTOM_EQUIPMENT_ENABLED` off,
+                     `isCustomLine` is false whatever the verdict says, so the row would clear the trio
+                     and open nothing. */
+                  emptyAction={
+                    CUSTOM_EQUIPMENT_ENABLED
+                      ? {
+                          label: t.create.machineCard.addCustomType,
+                          /* The name box opens EMPTY (owner, 2026-09-09, on making the row general).
+                             ~~It was seeded with the search text.~~ That only held while the row
+                             quoted it: a search fragment — «wat» — is not a machine's name, and
+                             seeding one would send it to suppliers as the answer. The box carries the
+                             star and the gate (`customEquipmentMissing`) asks for it, which is the
+                             same treatment every other required answer on this card gets. */
+                          onPick: () => actions.setItemOffCatalogue(item.id, ""),
+                        }
+                      : undefined
+                  }
                   onChange={(v) => {
                     // One pick, both ids: the parent category comes from the chosen subtype rather
                     // than being asked for separately.

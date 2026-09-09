@@ -288,6 +288,8 @@ type Action =
   | { t: "PATCH_ITEM_OPERATOR"; id: string; patch: Partial<OperatorDetails> }
   | { t: "SET_ITEM_CATEGORY"; id: string; categoryId: string }
   | { t: "SET_ITEM_SUBCATEGORY"; id: string; subcategoryId: string }
+  /** The renter searched the TYPE list, found nothing, and named the machine himself. */
+  | { t: "SET_ITEM_OFF_CATALOGUE"; id: string; name: string }
   | { t: "SET_ITEM_MEASUREMENT"; id: string; measurementId: string }
   | { t: "APPROVE_ITEM"; id: string }
   | { t: "APPROVE_SUGGESTION"; id: string }
@@ -789,6 +791,33 @@ export function reducer(state: RfqState, a: Action): RfqState {
           return next;
         }),
       );
+    /* ── The OTHER direction: the catalogue does not have it (owner, 2026-09-09) ─────────────────
+     * *"Maybe if he searched in the type and didnt find it we show for him something here that will
+     * open the field of custom type and the alert."*
+     *
+     * Until now the canvas could only ARRIVE off-catalogue — the agent read a machine it could not
+     * place (`deriveVerdict` → `no-match`) — and a renter who wanted to name one himself, or who had
+     * picked the wrong type and then found the catalogue had nothing for him, had no way in. His only
+     * route was back to the intake to retype the whole request.
+     *
+     * The exact mirror of `SET_ITEM_SUBCATEGORY` above, and all THREE things that say «off-catalogue»
+     * move together (the 2026-09-06 trap): the verdict, the ids `isCustomLine` reads, and the typed
+     * name. The size goes with the subtype, because a size is a size OF something.
+     *
+     * `name` is what he typed into the TYPE search — his own words, already written once, which is the
+     * same seeding rule `customName` follows for `rawLabel`. Empty is allowed: the gate
+     * (`customEquipmentMissing`) then asks for it in the box the card opens.
+     */
+    case "SET_ITEM_OFF_CATALOGUE":
+      return withDraft(state, (d) =>
+        mapItem(d, a.id, (i) => ({
+          ...i,
+          ref: { ...i.ref, categoryId: null, subcategoryId: null, measurementId: null },
+          verdict: "no-match" as const,
+          resolved: false,
+          customEquipment: a.name,
+        })),
+      );
     case "SET_ITEM_MEASUREMENT":
       return withDraft(state, (d) =>
         mapItem(d, a.id, (i) => {
@@ -1055,6 +1084,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
     patchItemOperator: (id: string, patch: Partial<OperatorDetails>) => dispatch({ t: "PATCH_ITEM_OPERATOR", id, patch }),
     setItemCategory: (id: string, categoryId: string) => dispatch({ t: "SET_ITEM_CATEGORY", id, categoryId }),
     setItemSubcategory: (id: string, subcategoryId: string) => dispatch({ t: "SET_ITEM_SUBCATEGORY", id, subcategoryId }),
+    setItemOffCatalogue: (id: string, name: string) => dispatch({ t: "SET_ITEM_OFF_CATALOGUE", id, name }),
     setItemMeasurement: (id: string, measurementId: string) => dispatch({ t: "SET_ITEM_MEASUREMENT", id, measurementId }),
     approveItem: (id: string) => dispatch({ t: "APPROVE_ITEM", id }),
     approveSuggestion: (id: string) => dispatch({ t: "APPROVE_SUGGESTION", id }),
