@@ -56,13 +56,22 @@ beforeEach(() => {
   api.assigned = [];
   api.created = 0;
   api.projects = [];
+  reported.length = 0;
 });
 afterEach(cleanup);
 
-const draw = (hold: boolean, where: ProjectDetails = project) =>
+/** Every site handed up through `onFiled`, in order. */
+const reported: Array<{ id: string }> = [];
+
+const draw = (_unused: boolean = false, where: ProjectDetails = project) =>
   render(
     <LocaleProvider initialLocale="en">
-      <ProjectFiled requestId="r-1" project={where} preferences={preferences} hold={hold} />
+      <ProjectFiled
+        requestId="r-1"
+        project={where}
+        preferences={preferences}
+        onFiled={(site) => reported.push(site)}
+      />
     </LocaleProvider>,
   );
 
@@ -81,42 +90,59 @@ const site = (id: string, label: string, lat: number | null = null, lng: number 
   version: 1,
 });
 
-describe("while the post is being announced", () => {
-  it("files the request anyway — the write never waits for a dialog", async () => {
-    draw(true);
+/**
+ * -- It files, and it draws nothing (owner, 2026-09-08) ------------------------------------------
+ *
+ * *"But we have now 2 competing modals, one for the post request success and one for the project...
+ * I don't know how to show the 2 modals without distracting or overwhelming him."*
+ *
+ * 🔴 ~~Its own dialog, queued behind the post tick with a `hold` flag.~~ One press, two dialogs,
+ * and the second arrived after the renter believed he had finished. The project is a block inside
+ * the tick now, so this component does the WRITE and reports the site; `ShareOnPost` says it.
+ */
+describe("the filer", () => {
+  it("files the request and reports the site it went into", async () => {
+    draw();
     await waitFor(() => expect(api.assigned).toHaveLength(1));
     expect(api.assigned[0][0]).toBe("r-1");
     expect(api.created).toBe(1);
+    expect(reported).toHaveLength(1);
+    expect(reported[0].id).toBe("p-1");
   });
 
-  it("draws nothing, so the tick keeps the screen", async () => {
-    const { container } = draw(true);
+  it("renders nothing at all, whatever else is on screen", async () => {
+    /**
+     * 🔴 **The write must not wait for a dialog**, which is why this stayed a mounted component
+     * rather than moving inside the tick. The filing happens on mount and the tick opens a moment
+     * later, when the share has been handed off — so a renter who closes the tab in between still
+     * has his request filed.
+     */
+    const { container } = draw();
     await waitFor(() => expect(api.assigned).toHaveLength(1));
-    expect(screen.queryByText(en.projects.offer.savedHeading)).toBeNull();
     expect(container.textContent).toBe("");
+    expect(screen.queryByText(en.projects.offer.savedHeading)).toBeNull();
+    expect(screen.queryByText(en.projects.offer.viewAction)).toBeNull();
   });
 
-  it("appears the moment the hold is lifted, without filing twice", async () => {
-    const { rerender } = draw(true);
+  it("files once, however often the parent re-renders", async () => {
+    // ⚠️ `onFiled` is read through a ref, so a parent passing an inline arrow cannot re-run the
+    // effect and file the same request a second time.
+    const { rerender } = draw();
     await waitFor(() => expect(api.assigned).toHaveLength(1));
 
     rerender(
       <LocaleProvider initialLocale="en">
-        <ProjectFiled requestId="r-1" project={project} preferences={preferences} hold={false} />
+        <ProjectFiled
+          requestId="r-1"
+          project={project}
+          preferences={preferences}
+          onFiled={(site) => reported.push(site)}
+        />
       </LocaleProvider>,
     );
-    expect(await screen.findByText(en.projects.offer.savedHeading)).toBeTruthy();
-    // The effect is keyed on the request and the address, neither of which `hold` touches.
     expect(api.assigned).toHaveLength(1);
     expect(api.created).toBe(1);
-  });
-});
-
-describe("with nothing else on screen", () => {
-  it("reports the filing straight away, as it always did", async () => {
-    draw(false);
-    expect(await screen.findByText(en.projects.offer.savedHeading)).toBeTruthy();
-    expect(api.assigned).toHaveLength(1);
+    expect(reported).toHaveLength(1);
   });
 });
 
@@ -172,61 +198,5 @@ describe("one project per PLACE, not per first line of an address", () => {
     await waitFor(() => expect(container.textContent).toBe(""));
     expect(api.created).toBe(0);
     expect(api.assigned).toHaveLength(0);
-  });
-});
-
-
-/**
- * -- What the dialog shows, and what it leaves out (owner, 2026-09-08) ---------------------------
- *
- * *"Show project title then site, then any values not set don't show it. And «view the project»
- * must be on the right not the left, and remove this «close», we already have an X."*
- */
-describe("the filed dialog", () => {
-  const o = en.projects.offer;
-
-  it("drops a row nobody answered, and keeps the two that always stand", async () => {
-    /**
-     * ⚠️ «Dates —» and «Payment terms —» took two of six lines to say nothing, and an em dash
-     * beside a label reads as a value that failed to load rather than as a question never asked.
-     */
-    const bare = {
-      location: { label: "Riyadh, Saudi Arabia", lat: null, lng: null },
-      timing: { startDate: null, endDate: null, rentalBasis: null, extendable: false },
-    } as unknown as ProjectDetails;
-
-    render(
-      <LocaleProvider initialLocale="en">
-        <ProjectFiled
-          requestId="r-1"
-          project={bare}
-          preferences={{ payment: { terms: null } } as unknown as Preferences}
-          hold={false}
-        />
-      </LocaleProvider>,
-    );
-
-    await waitFor(() => expect(screen.getByText(o.savedHeading)).toBeTruthy());
-    // The project and the site are what the dialog is announcing, so they always stand.
-    expect(screen.getByText(o.fieldName)).toBeTruthy();
-    expect(screen.getByText(o.fieldSite)).toBeTruthy();
-    // The three nobody answered are gone, dash and all.
-    expect(screen.queryByText(o.fieldDates)).toBeNull();
-    expect(screen.queryByText(o.fieldBasis)).toBeNull();
-    expect(screen.queryByText(o.fieldPayment)).toBeNull();
-    expect(screen.queryByText("—")).toBeNull();
-    /* ⚠️ «Extendable: No» STAYS. It is an answer, not a blank, and dropping it would tell a
-       renter the project holds nothing on the point when it holds a decision. */
-    expect(screen.getByText(o.fieldExtendable)).toBeTruthy();
-  });
-
-  it("offers one way out of itself, because the X is the other", async () => {
-    // ⚠️ The dialog already closes four ways and the X is one of them, in the corner where the eye
-    // looks for it. A «Close» link beside the action was a second exit competing with the one thing
-    // there is to do here.
-    draw(false);
-
-    await waitFor(() => expect(screen.getByText(o.viewAction)).toBeTruthy());
-    expect(screen.queryByText(en.common.close)).toBeNull();
   });
 });

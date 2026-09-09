@@ -66,15 +66,48 @@ const anchor = (over: Partial<DockAnchor> = {}): DockAnchor => ({
   ...over,
 });
 
+/** A sibling ITEM of the same RFQ: its own fanned-out request, its own machine. */
+const item = (bidId: string, requestId: string, subtype: string, size: string, over: Partial<InboxBid> = {}) =>
+  row({
+    bidId,
+    request: { ...row().request, id: requestId },
+    equipment: { subtype, subtypeAr: null, size, sizeAr: null },
+    ...over,
+  });
+
 describe("dockTabs — a tab per ITEM, for ONE counterparty (RM3-AC-43/44/45)", () => {
-  it("gives a tab to every bid this supplier holds in the RFQ group", () => {
+  it("gives a tab to every ITEM this supplier bid on in the RFQ group, named machine · size", () => {
     const tabs = dockTabs(anchor(), [
-      row({ bidId: "b1" }),
-      row({ bidId: "b2", equipmentType: { id: "t2", name: "Loader" } }),
-      row({ bidId: "b3", equipmentType: { id: "t3", name: "Crane" } }),
+      item("b1", "r1", "Crawler excavator", "20 ton"),
+      item("b2", "r2", "Wheel loader", "3 m³"),
+      item("b3", "r3", "Mobile crane", "50 ton"),
     ]);
     expect(tabs.map((t) => t.bidId)).toEqual(["b1", "b2", "b3"]);
-    expect(tabs.map((t) => t.label)).toEqual(["Excavator", "Loader", "Crane"]);
+    /* The SIZE is half the name (owner, 2026-09-08). Two lines of one subtype are the case the strip
+       exists for, and «Crawler Excavator» twice tells the renter nothing about which is which. */
+    expect(tabs.map((t) => t.label)).toEqual(["Crawler excavator · 20 ton", "Wheel loader · 3 m³", "Mobile crane · 50 ton"]);
+  });
+
+  /**
+   * ⚠️ The owner's report, 2026-09-08: *"how are 2 equipments shown in the chat while the request is
+   * one item?"* — a supplier holding two bids against the SAME item (a re-bid, or two colleagues of
+   * one firm, which this dock already treats as ONE counterparty) drew two identical tabs for one
+   * conversation. The item is the fanned-out request, so the request id is what a tab is keyed on.
+   */
+  it("gives ONE tab when the same supplier holds two bids on the SAME item", () => {
+    const tabs = dockTabs(anchor(), [
+      item("b1", "r1", "Crawler excavator", "20 ton", { unreadCount: 2 }),
+      item("b2", "r1", "Crawler excavator", "20 ton", { unreadCount: 3, supplierId: "u2", supplierName: "Omar" }),
+    ]);
+    expect(tabs).toHaveLength(1);
+    expect(tabs[0].bidId).toBe("b1"); // the anchor's own bid keeps the slot
+    // One conversation, so what arrived on either bid is one badge.
+    expect(tabs[0].unreadCount).toBe(5);
+  });
+
+  it("names a tab by its machine even where the projection carries no size", () => {
+    const tabs = dockTabs(anchor(), [item("b1", "r1", "Crawler excavator", "")]);
+    expect(tabs[0].label).toBe("Crawler excavator");
   });
 
   it("gives a single-bid supplier ONE tab, so the caller renders no strip (RM3-AC-44)", () => {
@@ -83,9 +116,10 @@ describe("dockTabs — a tab per ITEM, for ONE counterparty (RM3-AC-43/44/45)", 
 
   it("treats two MEMBERS of one firm as ONE counterparty (RM3-AC-45)", () => {
     // Same `supplierCompanyId`, different people — the backend already puts both in one channel.
+    // Different ITEMS, so two tabs: one firm, two machines.
     const tabs = dockTabs(anchor(), [
-      row({ bidId: "b1", supplierId: "u1", supplierName: "Ali" }),
-      row({ bidId: "b2", supplierId: "u2", supplierName: "Omar", equipmentType: { id: "t2", name: "Loader" } }),
+      item("b1", "r1", "Crawler excavator", "20 ton"),
+      item("b2", "r2", "Wheel loader", "3 m³", { supplierId: "u2", supplierName: "Omar" }),
     ]);
     expect(tabs.map((t) => t.bidId)).toEqual(["b1", "b2"]);
   });
@@ -104,19 +138,19 @@ describe("dockTabs — a tab per ITEM, for ONE counterparty (RM3-AC-43/44/45)", 
     // Paging, or a feed failure. A dock that could not open the conversation for the bid on screen
     // would be a worse failure than a one-tab strip.
     const tabs = dockTabs(anchor({ dealRoomId: "dr-1" }), []);
-    expect(tabs).toEqual([{ bidId: "b1", dealRoomId: "dr-1", label: "Excavator", unreadCount: 0, current: true }]);
+    expect(tabs).toEqual([{ itemKey: "b1", bidId: "b1", dealRoomId: "dr-1", label: "Excavator", unreadCount: 0, current: true }]);
   });
 
   it("carries each tab's own room — null means COMPOSE-ONLY, never a room to create on open", () => {
     const tabs = dockTabs(anchor(), [
-      row({ bidId: "b1", dealRoomId: "dr-1" }),
-      row({ bidId: "b2", dealRoomId: null, equipmentType: { id: "t2", name: "Loader" } }),
+      item("b1", "r1", "Crawler excavator", "20 ton", { dealRoomId: "dr-1" }),
+      item("b2", "r2", "Wheel loader", "3 m³", { dealRoomId: null }),
     ]);
     expect(tabs.map((t) => t.dealRoomId)).toEqual(["dr-1", null]);
   });
 
   it("marks exactly one tab current, so no other surface has to work out which bid is on screen", () => {
-    const tabs = dockTabs(anchor(), [row({ bidId: "b1" }), row({ bidId: "b2" })]);
+    const tabs = dockTabs(anchor(), [item("b1", "r1", "Crawler excavator", "20 ton"), item("b2", "r2", "Wheel loader", "3 m³")]);
     expect(tabs.filter((t) => t.current).map((t) => t.bidId)).toEqual(["b1"]);
   });
 
@@ -132,8 +166,8 @@ describe("dockTabs — a tab per ITEM, for ONE counterparty (RM3-AC-43/44/45)", 
 describe("dockUnreadTotal — the badge on the control (RM3-AC-46)", () => {
   it("sums every tab, so the closed dock states what the open one would show", () => {
     const tabs = dockTabs(anchor(), [
-      row({ bidId: "b1", unreadCount: 2 }),
-      row({ bidId: "b2", unreadCount: 3 }),
+      item("b1", "r1", "Crawler excavator", "20 ton", { unreadCount: 2 }),
+      item("b2", "r2", "Wheel loader", "3 m³", { unreadCount: 3 }),
     ]);
     expect(tabs.map((t) => t.unreadCount)).toEqual([2, 3]);
     expect(dockUnreadTotal(tabs)).toBe(5);
@@ -147,8 +181,8 @@ describe("dockUnreadTotal — the badge on the control (RM3-AC-46)", () => {
 describe("arrivalNotice — refresh-timed, and silent on what is being read (RM3-AC-62/63)", () => {
   const tabs = () =>
     dockTabs(anchor(), [
-      row({ bidId: "b1", unreadCount: 0 }),
-      row({ bidId: "b2", unreadCount: 1, equipmentType: { id: "t2", name: "Loader" } }),
+      item("b1", "r1", "Crawler excavator", "20 ton", { unreadCount: 0 }),
+      item("b2", "r2", "Wheel loader", "3 m³", { unreadCount: 1 }),
     ]);
 
   it("carries the request reference and the machine's serial, taken from the ASK", () => {
@@ -657,13 +691,15 @@ describe("one counterparty key across both projections (I1, AC-70)", () => {
   });
 
   /** The received-bids shape: the same firm, same nesting, no flat `supplierCompanyId` at all. */
-  const rawInboxRow = (id: string, memberId: string, name: string) => ({
+  /** One row of the received-bids feed. `requestId` is the ITEM: the fan-out gives each machine its
+   *  own request, and the dock keys a tab on it, so two siblings must not share one. */
+  const rawInboxRow = (id: string, memberId: string, name: string, requestId = `r-${id}`) => ({
     id,
     status: "PENDING",
     dealRoomId: `dr-${id}`,
     unreadCount: 0,
     supplier: { id: memberId, name: "Ali", company: { id: 77, name: "Al-Faris Rentals", isVerified: true } },
-    request: { id: "r1", requestGroupId: "g1", equipmentItems: [{ subtypeId: "t1", subtypeName: name }] },
+    request: { id: requestId, requestGroupId: "g1", equipmentItems: [{ subtypeId: "t1", subtypeName: name }] },
   });
 
   it("resolves the same key from a nested company id on both sides", () => {
@@ -843,8 +879,12 @@ describe("dockMessageView — nothing the deal room renders is invisible in the 
    ══════════════════════════════════════════════════════════════════════════════════════════════════ */
 
 describe("the dock's composer sends what the deal room sends, the way the deal room sends it", () => {
+  /* Found by the CLASS, not by the whole opening tag: the tag grew a `{...pin("chat-dock-composer")}`
+     on 2026-09-09 and the old marker — `<div className="bm-chat-compose">` — stopped matching, which
+     silently sliced an EMPTY region and turned three assertions below into vacuous passes (the
+     length check is what caught it). The class is the stable half. */
   const composerSrc = dockSrc.slice(
-    dockSrc.indexOf('<div className="bm-chat-compose">'),
+    dockSrc.indexOf('className="bm-chat-compose"'),
     dockSrc.indexOf("</section>"),
   );
   const dealRoomSrc = readFileSync(resolve(process.cwd(), "src/components/deal-room/DealRoom.tsx"), "utf8");
@@ -1005,8 +1045,8 @@ describe("an ask sent, the page reloaded — the control stays blocked", () => {
     expect(dockTabsWithKnownRooms(known, { anchorBidId: "b1", surfaceRoomId: "dr-stale" })[0].dealRoomId).toBe("dr-feed");
     // A sibling bid is a different room; the surface's id belongs to the anchor alone.
     const two = dockTabs(anchor({ dealRoomId: null }), [
-      row({ bidId: "b1", dealRoomId: null }),
-      row({ bidId: "b2", dealRoomId: null, equipmentType: { id: "t2", name: "Loader" } }),
+      item("b1", "r1", "Crawler excavator", "20 ton", { dealRoomId: null }),
+      item("b2", "r2", "Wheel loader", "3 m³", { dealRoomId: null }),
     ]);
     const merged = dockTabsWithKnownRooms(two, { anchorBidId: "b1", surfaceRoomId: "dr-1" });
     expect(merged.find((tb) => tb.bidId === "b1")?.dealRoomId).toBe("dr-1");

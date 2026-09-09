@@ -194,7 +194,7 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
           note under the overall total is the bid card's own sentence. Three surfaces, one reading. */}
       <div className="bm-foot-bar">
         <div className="bm-foot-figs">
-          <div className="bm-foot-rate">
+          <div {...pin("price-footer-rate")} className="bm-foot-rate">
             {/* The numeral run is LTR inside an RTL bar; the unit follows it in reading order, so in
                 Arabic «ر.س / يوم» lands to the left of the figure exactly as the app prints it. */}
             <span className="bm-foot-amt" dir="ltr">{money(totals.rate)}</span>
@@ -206,7 +206,8 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
           <div className="bm-foot-meta">
             <button
               type="button"
-              className="bm-foot-det"
+              {...pin("price-footer-details")}
+            className="bm-foot-det"
               onClick={() => setExpanded((v) => !v)}
               aria-expanded={expanded}
             >
@@ -227,18 +228,18 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
 
             Hidden rather than disabled, per the owner: a greyed Accept invites a press that cannot
             land, and the reason lives two screens away. Counter is the act that resolves the block. */}
-        <button type="button" className="bm-foot-cta" onClick={() => void handOff("counter")} disabled={busy}>
+        <button {...pin("price-footer-counter")} type="button" className="bm-foot-cta" onClick={() => void handOff("counter")} disabled={busy}>
           {t.priceFooter.counterPrice}
         </button>
         {canAccept && (
-          <button type="button" className="bm-foot-cta is-confirm" onClick={() => void handOff("accept")} disabled={busy}>
+          <button {...pin("price-footer-approve")} type="button" className="bm-foot-cta is-confirm" onClick={() => void handOff("accept")} disabled={busy}>
             {t.priceFooter.confirmPrice}
           </button>
         )}
       </div>
 
       {expanded && (
-        <div className="bm-foot-break" role="group" aria-label={t.priceFooter.showDetails}>
+        <div {...pin("price-footer-break")} className="bm-foot-break" role="group" aria-label={t.priceFooter.showDetails}>
           {multi && <div className="bm-foot-bhead">{t.priceFooter.perUnitHead}</div>}
           <Line
             label={t.priceFooter.rental}

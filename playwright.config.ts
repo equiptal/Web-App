@@ -16,8 +16,21 @@ import { defineConfig, devices } from "@playwright/test";
  * Point it elsewhere with `PW_BASE_URL=https://…`, which also suppresses the local server.
  */
 
-const baseURL = process.env.PW_BASE_URL ?? "http://localhost:3000";
-const external = Boolean(process.env.PW_BASE_URL);
+/* A BLANK `PW_BASE_URL` is not a base url. It used to be read with `??`, which only rejects
+   null/undefined — so an env that exported the name with an empty value (a shell profile, a CI step
+   that defaults it) gave every spec `baseURL: ""`, and `page.goto("/dev/preview")` resolved against
+   the working DIRECTORY and reported «File not found … Web-App\dev\preview». Trimmed and falsy-
+   checked, an empty value means "not set", which is what it reads as. */
+const configuredBaseURL = process.env.PW_BASE_URL?.trim() || null;
+/* ── `PW_PORT` — a server of OUR OWN, on a port nothing else is on ──────────────────────────────
+   `reuseExistingServer` is what makes the default run cheap: a dev server already up is used as is.
+   It is also a trap, and it fired on 2026-09-08 — something else was serving :3000 (a static file
+   server), Playwright reused it, and every spec navigated into a «File not found» page naming a
+   path on disk. Naming a port means the run OWNS it: nothing is reused, so the server behind the
+   pictures is this app and not whatever answered first. */
+const port = process.env.PW_PORT?.trim() || null;
+const baseURL = configuredBaseURL ?? `http://localhost:${port ?? "3000"}`;
+const external = configuredBaseURL != null;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -47,9 +60,16 @@ export default defineConfig({
   webServer: external
     ? undefined
     : {
-        command: "npm run dev",
+        /* `dev:preview` rather than `dev` on a named port: the `dev` script exports
+           `NODE_OPTIONS=--no-experimental-webstorage`, which a Node that HAS no web storage rejects
+           outright («not allowed in NODE_OPTIONS», exit 9) — so the shot lane could not boot a server
+           on the machine it was written on. The flag exists to keep Node ≥22's own `localStorage` off
+           the SERVER, and nothing the preview page renders reads storage while rendering: the yard
+           explainer touches it on a press, not on paint. */
+        command: port ? `npm run dev:preview -- --port ${port}` : "npm run dev",
         url: baseURL,
-        reuseExistingServer: true,
+        // A named port is ours (see `PW_PORT` above); the default port may be anybody's.
+        reuseExistingServer: port == null,
         // A cold Next dev boot compiles on first request; two minutes is the honest ceiling.
         timeout: 120_000,
         stdout: "ignore",

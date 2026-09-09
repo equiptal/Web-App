@@ -61,6 +61,25 @@ export function ReadyToSend() {
     if (error && isLimit) setShowLimit(true);
   }, [error, isLimit]);
 
+  /* ── It lands at the TOP (owner, 2026-09-09) ─────────────────────────────────────────────────
+     *"The review and summary screen must open at top so the back is shown at top when landing."*
+
+     The review replaces the canvas IN PLACE — same route, same page, no navigation — so the window
+     keeps whatever scroll the canvas had. A renter who pressed *Review & send* from the foot of a
+     long canvas arrived halfway down this screen, with the Back control and the heading above the
+     fold: it read as a page that had not moved.
+
+     `behavior: "auto"`, not smooth: this is the arrival, not a move the renter made, and animating
+     it looks like the page sliding out from under him. Guarded because a test renderer has no
+     `scrollTo`. */
+  useEffect(() => {
+    try {
+      window.scrollTo({ top: 0, behavior: "auto" });
+    } catch {
+      /* jsdom, or a browser that refuses the options form — the screen simply keeps its scroll. */
+    }
+  }, []);
+
   if (!draft) return null;
 
   const num = (n: number) => (ar ? arabicIndicDigits(n) : String(n));

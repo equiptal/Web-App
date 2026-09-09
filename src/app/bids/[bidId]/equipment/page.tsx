@@ -41,15 +41,30 @@ import { btn } from "@/lib/ds";
 export default function BidEquipmentPage({ params }: { params: Promise<{ bidId: string }> }) {
   const { bidId } = use(params);
   const t = useT();
+  /* ── Back lands on the REQUEST, not on the list of them (owner, 2026-09-08) ────────────────────
+     *"It must be back to the request they were on, not the general requests page — it must be on the
+     exact request."*
+
+     The trail already returns him to `/requests?r=…` when that is where he came from
+     (`back-nav.ts`), so what was wrong is the FALLBACK: every other way in — a notification, the
+     dashboard's bid rail, the inbox, a deep link — fell through to the bare `/requests`, which opens
+     whichever request the workspace picks by default. The bid knows its request, so the fallback can
+     name it: `?r=<requestId>` is the workspace's own parameter, the same one it writes when the
+     renter picks a request there.
+
+     Held HERE and not registered by the surface below, because `usePageBack` allows exactly one
+     registration: two of them and the parent's effect (which runs last) wins, which is the bug
+     `create-back` records. So the id travels up and the one control follows it. */
+  const [requestId, setRequestId] = useState<string | null>(null);
   return (
     // `fullBleed` — the map fills the shell below the header. Without it the surface renders inside
     // the standard `max-w-[1440px]` page gutter, which drew it as a card floating in the middle of a
     // desktop viewport with the map squeezed into what was left.
     <AppShell fullBleed title={t.bidMap.surfaceTitle}>
-      <PageBack fallback="/requests" />
+      <PageBack fallback={requestId ? `/requests?r=${encodeURIComponent(requestId)}` : "/requests"} />
       {/* Suspense boundary: the surface below reads `useSearchParams` for `?company=1`, which needs one. */}
       <Suspense fallback={null}>
-        <BidEquipmentGate bidId={decodeURIComponent(bidId)} />
+        <BidEquipmentGate bidId={decodeURIComponent(bidId)} onRequestId={setRequestId} />
       </Suspense>
     </AppShell>
   );
@@ -57,7 +72,7 @@ export default function BidEquipmentPage({ params }: { params: Promise<{ bidId: 
 
 /** Public web has no route gate, but one bid's equipment needs a session — so a signed-out visitor
  *  gets the auth modal opened in place, with a sign-in prompt behind it (the deal room's pattern). */
-function BidEquipmentGate({ bidId }: { bidId: string }) {
+function BidEquipmentGate({ bidId, onRequestId }: { bidId: string; onRequestId: (id: string | null) => void }) {
   const { status } = useSession();
   const { openAuth } = useAuthGate();
   const t = useT();
@@ -87,7 +102,7 @@ function BidEquipmentGate({ bidId }: { bidId: string }) {
   // exist; it simply lives somewhere else. Refusing on the id says so, and issues no request at all.
   if (isOffPlatformBidId(bidId)) return <OffPlatformState />;
 
-  return <BidEquipment bidId={bidId} />;
+  return <BidEquipment bidId={bidId} onRequestId={onRequestId} />;
 }
 
 /**
@@ -98,7 +113,7 @@ function BidEquipmentGate({ bidId }: { bidId: string }) {
  * a 15s staleness window so a burst of focus events (alt-tab, devtools, a modal closing) does not fire
  * a request each. Nothing here claims recency, and no copy on the surface implies live updating.
  */
-function BidEquipment({ bidId }: { bidId: string }) {
+function BidEquipment({ bidId, onRequestId }: { bidId: string; onRequestId: (id: string | null) => void }) {
   const t = useT();
   /** `?company=1` — see the note at the workspace below. Read once, as an INITIAL state rather than a
    *  live one: the renter closing the panel must not have it reopened by a URL that has not changed. */
@@ -182,6 +197,13 @@ function BidEquipment({ bidId }: { bidId: string }) {
     })();
     return () => { live = false; };
   }, [bidId, request?.id]);
+
+  /* The request this offer answers, handed to the page so Back can point at it (owner, 2026-09-08).
+     In an effect rather than during render: it sets state on an ancestor, and doing that while
+     rendering is a React error rather than a shortcut. */
+  useEffect(() => {
+    onRequestId(request?.id ?? null);
+  }, [request?.id, onRequestId]);
 
   // Focus — the renter comes back from the supplier's reply and expects to see it.
   useEffect(() => {

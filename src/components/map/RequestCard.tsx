@@ -24,6 +24,7 @@
  */
 
 import { equipmentIcon } from "@/components/requests/EquipImg";
+import { companyInitials } from "@/components/map/panel/machine-panel-model";
 import type { RequestCardView } from "@/lib/contract/request-card";
 /* The card's own chrome travels WITH it. These rules were `.bidmap`-scoped in `map-proto.css` until
    the owner put the same card in `/deal-room/[id]` (2026-08-11) — a surface that is not `.bidmap`,
@@ -93,21 +94,28 @@ export function RequestCard({
      fleet payload carries no taxonomy IMAGE url (`OfferedUnitDetail` has photos and nothing else),
      which is why the chain ends at the icon here rather than at a second picture.
 
-     `scope: "company"` is untouched: that card names a firm, not a machine, and its glyph is the
-     building it has always been. */
+     `scope: "company"` names a FIRM, not a machine, and since 2026-09-08 it wears the same mark
+     every other surface gives a counterparty: his initials in the green circle (see below). */
   const strip = (
     <>
       <span
+        {...pin("request-card-tile")}
         className={`bm-rq-tile${view.scope === "company" ? " is-co" : ""}${view.photoUrl ? " has-photo" : ""}`}
         aria-hidden="true"
       >
         {view.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={view.photoUrl} alt="" />
+        ) : view.scope === "company" ? (
+          /* ── The firm gets the app's own company mark (owner, 2026-09-08) ────────────────────────
+             *"Change the company icon to use the real company icons and colours used in other
+             places."* A gradient tile with a `apartment` glyph on it was this card's invention: every
+             other surface that names a counterparty — the chat dock's header, the company panel's
+             masthead, the inbox rows — draws his INITIALS in the green circle. So this does too, off
+             the same title the strip prints, which since 2026-09-08 is the firm's real name. */
+          <span className="bm-rq-initials">{companyInitials(view.title)}</span>
         ) : (
-          <span className="material-icons-outlined">
-            {view.scope === "company" ? "apartment" : equipmentIcon(view.title)}
-          </span>
+          <span className="material-icons-outlined">{equipmentIcon(view.title)}</span>
         )}
       </span>
       <span className="bm-rq-who">
@@ -145,6 +153,7 @@ export function RequestCard({
     <article {...pin("map-request-card")} className={`bm-rq${accent}${draft ? " is-draft" : ""}${cue ? " is-cued" : ""}`}>
       {view.openable && view.equipmentId && onOpenMachine ? (
         <button
+          {...pin("request-card-id")}
           type="button"
           className="bm-rq-id is-open"
           onClick={() => onOpenMachine(view.equipmentId as string)}
@@ -157,10 +166,10 @@ export function RequestCard({
           <span className="bm-rq-go material-icons-outlined" aria-hidden="true">chevron_right</span>
         </button>
       ) : (
-        <div className="bm-rq-id">{strip}</div>
+        <div {...pin("request-card-id")} className="bm-rq-id">{strip}</div>
       )}
 
-      <div className="bm-rq-body">
+      <div {...pin("request-card-body")} className="bm-rq-body">
         <div className="bm-rq-kind">{view.kindLabel}</div>
         {view.docChips.length > 0 ? (
           <div className="bm-rq-chips">
@@ -174,7 +183,7 @@ export function RequestCard({
         {/* The live answer — no stored status, re-read from the machine on every render. Absent
             entirely when this surface holds no fleet to read it off. */}
         {view.status && (
-          <div className={`bm-rq-state is-${view.status.tone}`}>
+          <div {...pin("request-card-state")} className={`bm-rq-state is-${view.status.tone}`}>
             <span className="bm-rq-dot" aria-hidden="true" />
             <span>{view.status.label}</span>
           </div>
@@ -183,7 +192,7 @@ export function RequestCard({
       </div>
 
       {draft && (
-        <div className="bm-rq-acts">
+        <div {...pin("request-card-acts")} className="bm-rq-acts">
           <button type="button" className="bm-rq-btn ghost" onClick={onCancel} disabled={busy}>
             {cancelLabel}
           </button>

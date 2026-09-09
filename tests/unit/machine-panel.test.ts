@@ -1901,7 +1901,7 @@ describe("the equipment tab is called Equipment, in both locales", () => {
     const code = stripComments(src("src/components/map/panel/EquipmentDetail.tsx"));
     expect(code).toContain('L("Equipment", "المعدّة")');
     // ~~«The machine»~~ — the owner's *"for the machine tab call it Equipment"*.
-    expect(code).not.toContain('"The machine"');
+    expect(code).not.toContain('"The equipment"');
   });
 });
 

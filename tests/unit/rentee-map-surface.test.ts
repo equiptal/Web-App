@@ -408,12 +408,20 @@ describe("the card carries three things, and the ask is the largest of them", ()
   });
 
   it("explains the red BEFORE it asks, once, and then never again", () => {
-    // The first press teaches, every press after it asks. Both halves matter: a tutorial that opened
-    // every time would stand between the renter and the one control he is meant to press.
-    expect(list).toMatch(/if \(!explainedBefore\(\)\) \{ setYardExplain\(\{ machine, asked: false \}\); return; \}/);
-    expect(list).toMatch(/onAskAvailability\?\.\(machine\)/);
+    /* The first press teaches, every press after it asks. Both halves matter: a tutorial that opened
+       every time would stand between the renter and the one control he is meant to press.
+
+       The RULE is unchanged; only its home is. It moved to `BidMapWorkspace` on 2026-09-08, because
+       the machine detail draws the same yard card and REPLACES this list to do it — a decision owned
+       by the list could not be reached from there at all. So the assertions read the workspace, and
+       the list is proved to hold no copy of the state machine. */
+    const surface = strip(read(WORKSPACE));
+    expect(surface).toMatch(/if \(!yardExplainedBefore\(\)\) \{ setYardExplain\(\{ machine, asked: false \}\); return; \}/);
+    expect(surface).toMatch(/composeDraft\(composeMachineRequest\("availability", machine\.equipmentId\)\)/);
     // …and an already-asked machine never reaches the ask at all: it opens the question he put.
-    expect(list).toMatch(/if \(asked\) \{ setYardExplain\(\{ machine, asked: true \}\); return; \}/);
+    expect(surface).toMatch(/if \(asked\) \{ setYardExplain\(\{ machine, asked: true \}\); return; \}/);
+    // One owner of the layer, so the two mounts cannot answer the same press differently.
+    expect(list).not.toContain("setYardExplain");
   });
 
   it("paints the distance with AVAILABILITY's red, not with the ask's blue", () => {
@@ -618,14 +626,18 @@ describe("the surface's stylesheet carries the same colour tokens the models do"
     expect(line).not.toContain(AVAILABILITY_COLOUR.unconfirmed);
   });
 
-  it("paints the ask's own control blue, never navy (RM3-AC-33)", () => {
-    // The card's prompt takes its ink from the model inline (asserted in the card block above), so the
-    // stylesheet's share of this rule is the layer's CTA — the one control the renter is meant to
-    // press once the red has been explained to him. Beside a red explanation, navy reads as disabled.
-    // Unscoped since 2026-09-05: the explainer is a MODAL portalled to `<body>`, so a `.bidmap`
-    // ancestor would never match it. Same control, same rule.
+  it("paints the ask's own control in the brand orange, and never navy (RM3-AC-33, half withdrawn)", () => {
+    /* The card's prompt takes its ink from the model inline (asserted in the card block above), so the
+       stylesheet's share of this rule is the layer's CTA — the one control the renter is meant to
+       press once the red has been explained to him.
+
+       ~~It must be `--action`, the blue.~~ Withdrawn by the owner on 2026-09-08: *"make the ask
+       button orange as our design system"*. The half of AC-33 that survives is the half the AC was
+       written to protect — the control is NOT navy, so beside a red explanation it cannot read as
+       switched off — and the brand orange is what every other primary button in the product is. */
     const cta = cssBlock(css, ".bm-eqyx-cta {");
-    expect(hex(cta)).toContain(hex(REQUEST_ACTION_COLOUR));
+    expect(hex(cta)).toContain("var(--brand)");
+    expect(hex(cta)).not.toContain(hex(REQUEST_ACTION_COLOUR));
     for (const navy of NAVY_TOKENS) expect(hex(cta)).not.toContain(navy);
   });
 

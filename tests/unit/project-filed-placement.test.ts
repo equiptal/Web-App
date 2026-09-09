@@ -61,9 +61,23 @@ describe("the auto-filer outlives the question of which screen won", () => {
     expect(filer).toBeGreaterThan(switchEnds);
   });
 
-  it("Given a draft already filed under a site, Then the filer is not drawn at all", () => {
-    // A renter who chose a project has been asked nothing and is asked nothing now.
-    expect(read(SURFACE)).toContain("!state.draft.projectId");
+  it("Given a request that was posted INTO a site, Then the filer is not drawn at all", () => {
+    /**
+     * 🔴 **The gate asks what was FILED, not what the draft carries** (owner, 2026-09-08: *"if he
+     * changed the location more than 100 m then a new project, if he kept it then filed under the
+     * existing one, and always a modal is shown"*).
+     *
+     * ~~`!state.draft.projectId`.~~ The draft keeps the site's id after the renter moves the pin off
+     * it; `filingFor` is what drops it AT THE WIRE, on `leftTheSite`. So a renter who started at one
+     * site and moved the pin 400 km posted a request belonging to nothing, and this dialog never
+     * mounted, because the draft still carried the id of the site he had left.
+     *
+     * Asking the same helper the submit asks is what makes the two agree.
+     */
+    const src = read(SURFACE);
+    expect(src).toContain("filingFor(state.project, state.draft).projectId");
+    expect(src).toContain("!filedUnder");
+    expect(src).not.toContain("!state.draft.projectId");
   });
 
   it("Given the review, Then it waits for the post — it is gated on `confirmation`", () => {

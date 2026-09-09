@@ -2,6 +2,253 @@
 
 ## Change log
 
+- **2026-09-09 - The create flow says «equipment» and «request», its equipment are TABS, the site and schedule lock on the answer, and the carry-forward modal is gone.**
+  Owner, four notes: *"90.2 use request not job and use equipment not machine anywhere in the create
+  request not only this modal"*, *"if there is multi itme in the request i will show each equipment
+  type with size here as tabs below 16 inside the machine and operator with same style as this, with
+  + at first card and it adds an equipment"*, *"20.1 and 19.1 will be locked once they are selected in
+  any of an equipment"*, and *"remove the modal that say equipment 2 once u click next equipmetn ...
+  remove this modal no need. make the add and the next whether from the new tabs style or exisying one
+  smoother without it"*.
+  (1) **The words.** «job» and «machine» swept out of everything the create flow reads - the `create`
+  block and the three `gate.*` strings it shows - in BOTH locales: «The equipment & operator», «Add
+  another equipment», «Anything else on this request?», «Add at least one equipment to continue», «Set
+  where the equipment goes», «Name this equipment». Arabic followed: «الآلة» → «المعدّة», «لهذا العمل»
+  → «لهذا الطلب». Deliberately NOT touched: `perJob` (a pricing basis), `end-of-job` (a schedule
+  option), `selectJobTitle` (a person's job title), and every surface outside the create flow.
+  (2) **`EquipmentTabs`** - one tab per equipment reading `type · size`, dotted green/amber by that
+  equipment's OWN gaps (`itemGaps` + `transportGaps` per item, never `requiredGaps`, which answers for
+  the whole draft and would mark every tab amber for one unset site), in the workspace's «Cards /
+  Compare» recipe (`control-lg`, `rounded-t-md`, `-mb-px` so the active tab eats the rule under it).
+  The **+ is first**, and it is withheld while THIS equipment owes an answer - the press would refuse
+  and shake, and a control that is going to refuse is better absent.
+  (3) **The lock moved from WHICH equipment to WHETHER answered.** `isFirstItem ? panels : strip`
+  became `!locked`, where `locked = whereOk && whenOk && !unlocked` - the two panels belong to no
+  single equipment, so they lock the moment both are answered. **«Change for the request»** and the
+  two lines themselves reopen them (owner's choice over a hard lock): a typo in a date on a
+  one-equipment request would otherwise have no way back but Back to «Your request».
+  (4) **`CarryForwardModal` is deleted**, with its four strings, its `carryTo` staging and pin 23
+  (retired, never renumbered). «Next equipment», the + and «Add another equipment» now append, travel
+  and open the panel in one press. What the modal said is on the screen instead: the locked strip
+  states the site and the schedule, and the copied details ARE the card the renter lands on.
+  Files: `src/components/create/EquipmentTabs.tsx` (new), `src/components/create/Canvas.tsx`,
+  `src/components/create/CarryForwardModal.tsx` (deleted), `src/lib/i18n/{en,ar}.ts`,
+  `src/lib/uiPins.ts` (17.4/17.5/17.6, 16.2; 23 retired), `scripts/ui-pins-doc.mjs`,
+  `tests/unit/canvas-multi-item.test.tsx` (rewritten around the modal's removal),
+  `tests/unit/{canvas-gating,canvas-history,canvas-no-match,canvas-provenance,canvas-render,custom-equipment-canvas,review-reload,project-apply,machine-panel,operator-rail-unseen,palette-drift}.test.*`.
+  ⚠️ **The tabs do NOT replace «Next equipment».** That control is still the way FORWARD and the one
+  that refuses on this equipment's gaps; the tabs are the way BACK to one already passed. Two routes,
+  one `addMachine` and one `goItem`, so they cannot diverge on what moving means.
+  ⚠️ `unlocked` is per VISIT and not persisted. The lock exists so the request-wide panels are not
+  edited by accident while the renter thinks he is answering one equipment; a renter who has just
+  pressed «Change» is not doing that, and leaving the canvas locks them again.
+  ⚠️ **`locked` needs BOTH answered, not either.** A strip stating a confirmed site beside an empty
+  schedule would lock a panel that still owes an answer, and the gates would then refuse a press with
+  nothing on screen to fix.
+  ⚠️ `palette-drift.test.ts` died with `ENOENT` on the deleted file: it sweeps `git ls-files`, which
+  reads the INDEX, so a working-tree deletion is still listed until it is staged. It skips what is not
+  on disk now, and the deletion is staged either way.
+  ⚠️ The full suite is green SERIALLY (3082). Run in parallel on this machine it produces 5s-timeout
+  failures in unrelated files (share panel, submission viewer) that pass alone - contention, not
+  breakage, and the canvas renders got heavier with the tab strip. `npx vitest run
+  --no-file-parallelism` is the honest gate here.
+
+- **2026-09-09 - The create flow: an unopened operator rail shakes, Back asks before it drops the request, and the review lands at the top.**
+  Owner, three notes: *"18. if it is not open at all at least once and user try to move to next step
+  the closed pannel will shake too"*, *"8. if clicked while user is on the request page and back
+  taking him to the intake again then show short simple confirm modal asking do you want to leave
+  this request? ... just very simple one line question"*, and *"the review and sumamry screen must
+  open at top so the back is shown at top when landing"*.
+  (1) **The operator rail is the one panel that could be walked past without a mark.** It collapses
+  to a 72px strip, `operatorNeeded` defaults to «no», so nothing in it is required and NO GAP names
+  it - a renter finishes a machine having never seen it, and the operator's food, accommodation,
+  nationality and certificate are all priced off that panel by the supplier. `advance` now holds one
+  pass on it, on BOTH ways out of a machine («Review & send» and «Next equipment»): the strip shakes
+  (`shake-error`, the canvas's own refusal), the press does not go through, and the next press does.
+  The rail's `expanded` is local and opens off the item's own answer, so it REPORTS its state
+  (`onOpenState`) and the canvas remembers it per machine (`railSeen`, keyed by item id).
+  (2) **Back on the canvas asks.** That press replaces the whole drafted request with the typing box,
+  which is the only step of the chain worth a question: the title IS the question and there is no
+  body, with «Leave» primary and «Stay» beside it. `review → canvas` and `intake → out` are untouched.
+  (3) **The review screen scrolls to 0 on mount.** It replaces the canvas IN PLACE - same route, no
+  navigation - so it inherited the canvas's scroll and a renter who pressed the button at the foot of
+  a long canvas arrived under the fold with the Back control off screen.
+  Files: `src/components/create/{OperatorRail,Canvas,CreateBack,ReadyToSend}.tsx`,
+  `src/lib/i18n/{en,ar}.ts` (`create.leaveRequest`), `src/lib/uiPins.ts` (18.4, 16.1, and 21 relabelled),
+  `tests/unit/operator-rail-unseen.test.tsx` (new, 4 cases),
+  `tests/unit/{create-back,ready-to-send,chat-dock}.test.*`.
+  ⚠️ **An item whose agent already asked for an operator never shakes**, because the rail opens on
+  mount for it and is therefore seen. That is also why every other canvas suite is untouched: the
+  shared fixture (`makeItem`) sets `operatorNeeded: "yes"`.
+  ⚠️ The rail's pass runs LAST in `advance`, after every gap and after the unseen where/when pass. It
+  is a look, not a missing answer, and putting it in front of a real gap would answer the wrong
+  question first. The shake marks it seen, so it can never become a dead end.
+  ⚠️ `onRailOpenState` reads the machine's id through a REF, not a dependency: it must sit above the
+  `if (!draft) return null` early return (`rules-of-hooks`) and `itemId` is derived below it. A stable
+  identity also matters - the rail uses it as an effect dependency.
+  ⚠️ **The BROWSER's own Back still walks canvas → intake with no question.** It moves the store's
+  history chain rather than pressing this control, and intercepting it needs a history entry of its
+  own; the in-app control is what the owner named. Say so rather than implying both are guarded.
+  ⚠️ `chat-dock.test.ts` sliced the composer's source from the literal `<div className="bm-chat-compose">`,
+  which stopped matching the moment that tag took a pin - and an empty slice made three assertions
+  VACUOUS rather than failing. It matches on the class now. Any source-slicing test is one prop away
+  from the same hole.
+
+- **2026-09-08 - The bid cards wrap, and the PAGE scrolls instead of the box they sit in.**
+  Owner: *"UI bug: when the browser is 100% or more the bid cards are not responsive, no page
+  scrolling is shown. Make the page scrollable, not the container of the cards."* The cards were one
+  flex line of fixed 344px tiles in `overflow-x-auto`, and every band above them was `flex-none` with
+  the tab panel taking what was left - the 2026-08-25 ruling (*"i dont want scroll inside the cards
+  even"*, bids as a row you travel sideways). At 100% zoom on a 1440 screen that hung the fourth bid
+  off the edge behind a scrollbar at the foot of a container, while the page itself had no scrollbar
+  at all. Now: `grid-cols-[repeat(auto-fill,minmax(min(100%,320px),344px))]` so the bids wrap at the
+  card's own width (one column on a phone), and the workspace COLUMN is the scroller
+  (`overflow-y-auto` on the pinned root) with both tabs rendering whole.
+  Files: `src/components/workspace/BidCards.tsx`, `src/components/workspace/RequestsWorkspace.tsx`,
+  `tests/unit/bid-cards-wrap.test.ts` (new).
+  Trap: the height ruling of 2026-08-30 survives, in grid's terms - a grid row stretches its items to
+  the tallest of THAT ROW, so the «Counter this price» buttons still line up across each line and a
+  short card's slack still sits above its footer. The card lost `w-[344px]` and `flex-none` with it:
+  a card stating its own width overflows the single column a phone gives it.
+  ⚠️ This REVERSES 2026-08-25 for the cards tab. The shell keeps `fullBleed`, so the scroller is the
+  viewport under the header rather than the document - the nav and the header stay put, and there is
+  one bar on screen instead of two. The comparison tab lost its own `overflow-y-auto` in the same
+  move and keeps only its sideways strip.
+  ⚠️ Verified by typecheck, lint and the unit suite (3061 passing) plus a source guard. NOT yet seen
+  rendered: `/requests` needs a signed-in renter with bids, which is a deployed build.
+
+- **2026-09-08 - The yard card is the same object in the list and in the detail, and the layer behind it is one.**
+  Owner, over five screenshots: *"show it red yard and distance similar to how it appears in the fleets
+  cards so no need to avaialbility not confirmed and no need for avaialibity differentiation just the
+  red card of the distance and yard with maybe small badge on the card saying not confirmed"*, then
+  *"remove these 2, one is already in the fleet to add another one and for availibity let it like the
+  fleet card as ? on the yard card that we will add also clicking it whether from the detaisl or from
+  the feet will open this"*, then on the modal *"remove the model year box at top just keep the red to
+  green and below it one sentance clear ... remove not now from the modal, make the ask button orange
+  as our design system ... make the card wider to fit the red and green in one line"*.
+  (1) **The detail said one fact three times.** A 20px distance, a tinted «Availability not confirmed
+  yet» chip on the far corner, and a titled paragraph under it explaining that red is not a refusal -
+  on the surface the renter reaches BY pressing the red card. It now draws `EquipmentList`'s own
+  `.bm-eq-yard`: distance, yard, a small «Not confirmed» badge, the `?` / clock / tick, and the press.
+  The rules are SHARED in `map-proto.css` (`.bidmap .mp .bm-eq-yard, .bidmap .bm-eq .bm-eq-yard`), not
+  copied - one state may not have two looks. `.mp-line`, `.mp-km`, `.mp-band`, `.mp-chip` and the
+  `.mp-sect` family are gone with the markup.
+  (2) **The layer moved UP to the workspace.** The detail is a takeover (`.bm-takeover` replaces the
+  column, list included), so a modal owned by `EquipmentList` could not be opened from the detail at
+  all. `YardExplainDialog` is its own component now, `BidMapWorkspace` owns `yardExplain` and the
+  explain-once rule, and both mounts call the same `onYardPress`.
+  (3) **The detail's 76px footer is deleted.** «Ask him to confirm availability» is the yard card, and
+  «Ask for different equipment» is the fleet list's dashed control one press behind the panel.
+  (4) The modal: the machine box went (the press it came from named that machine), the specimens are
+  `nowrap` in a 520px card, three lines became two (the fact and the act, then what his answer does to
+  the colour), «Not now» went (the head has an X) and the CTA is `var(--brand)`.
+  (5) **Back lands on the request, not on the list of them.** `/bids/[bidId]/equipment` fell through to
+  a bare `/requests` for every entry that is not the workspace itself; the fallback is
+  `/requests?r=<requestId>` now, held by the PAGE (one `usePageBack` registration, the `create-back`
+  trap) and fed by the bid's own request.
+  (6) Thinner, and unbolded where the owner named it: `PAGE_BACK` (`mb-2`/`gap-3`, `pt-2` full-bleed),
+  the documents footer (76 -> 56px, weight 600), the price footer (min-height 76 -> 58px, «Show
+  details» 700 -> 500, both acts 800 -> 600, the rate 24 -> 21px).
+  (7) The request card is HORIZONTAL: the identity strip is the leading column (`border-inline-end`,
+  wrapping back to a stack under a 430px CONTAINER query, not a viewport one), the firm wears its
+  initials on `var(--ok)` like every other counterparty mark, `ctx.companyName` prints the real name
+  instead of «The company», «Not sent yet - review it, then send» is deleted, and nothing but the
+  title is bold. Hosts widened 376 -> 520px in the dock and the deal room.
+  Files: `src/components/map/YardExplainDialog.tsx` (new), `src/components/map/EquipmentList.tsx`,
+  `src/components/map/BidMapWorkspace.tsx`, `src/components/map/panel/EquipmentDetail.tsx`,
+  `src/components/map/panel/panel-proto.css`, `src/components/map/map-proto.css`,
+  `src/components/map/{RequestCard.tsx,request-card.css,ChatDock.tsx}`,
+  `src/components/deal-room/deal-room-proto.css`, `src/lib/contract/request-card.ts`,
+  `src/lib/ds.ts`, `src/components/AppShell.tsx`, `src/app/bids/[bidId]/equipment/page.tsx`,
+  `src/lib/i18n/{en,ar}.ts`, `tests/unit/{yard-card,request-card-render}.test.tsx` (new, 8 cases),
+  `tests/unit/{rentee-map-surface,availability-chip,request-card,page-back}.test.*`.
+  🔴 **RM3-AC-33 is HALF withdrawn, deliberately.** The ask's CTA is no longer blue (`--action`); it is
+  the brand orange. The half that survives is the half the AC protects - it is not navy, so beside a
+  red explanation it cannot read as switched off - and `rentee-map-surface.test.ts` now pins the orange
+  and still forbids every navy token.
+  ⚠️ The shared yard rules name `.bm-eq` LAST in each selector list on purpose:
+  `rentee-map-surface.test.ts` reads those blocks by `indexOf(".bidmap .bm-eq .bm-eq-yard… {")`, so the
+  anchor has to be the line the brace sits on.
+  ⚠️ `RequestCardTone` lost `"draft"` and `.bm-rq-state.is-draft` went with it. A draft's status is
+  ABSENT now, not a sixth tone; the rule it protected (an unsent ask must never say the supplier owes
+  an answer) is still pinned, against `status === null`.
+  ⚠️ `distanceBandLabel` has **no caller** and is kept with a note at its head: it is the only
+  definition of «قريب / متوسط / بعيد» and its thresholds are the prototype's. Delete it with its four
+  tests if the band never returns.
+  ⚠️ **The equipment images on the map are still white where the taxonomy asset is a `.jpg`** (13 of
+  the seeded 44, e.g. `vacuum-robot.jpg`). Measured: the `.png` assets carry real alpha, the `.jpg`
+  ones cannot, and CSS cannot key it out - Leaflet's `translate3d` isolates the marker, so a blend mode
+  never reaches the tiles. The owner set this aside for now; the fix is either transparent PNGs in
+  `moedatech-eu-storage/default/equipment-taxonomy` (which fixes the app too) or proxying the image
+  through our own origin and keying it on a canvas (S3 CORS does not allow the beta origin, which is
+  why a plain client fetch is not enough).
+
+- **2026-09-08 - «Counter» always opens the 3-styles sheet, and a chat tab is per ITEM, with its size.**
+  Two owner reports on the deal room. (1) *"This view must be retired ... the counter offer must
+  always show the 3 styles sheet, and if the deal room is cancelled show that note in the sheet's
+  header"*: `flowGate.counter` was `live`, so `?act=counter` on a CANCELLED, CLOSED or AWAITING room
+  fell through and dropped the renter on the retired room view - masthead, price hero, two lines
+  saying it was cancelled - which is the screen retired on 2026-09-07, reached through the one link
+  that is meant to open the sheet. Counter now opens the sheet at every status; a settled room draws
+  a `qp-hnote` under the room's line in the sheet header (cancelled · agreed and closed · awaiting the
+  supplier), and sends nothing: `editable` is false, `canSubmit` is false, the accept shortcut is
+  withheld and the final button reads «Closed». (2) *"how are 2 equipments shown in the chat while the
+  request is one item"*: `dockTabs` pushed a tab per BID, so a supplier holding two bids on the same
+  item - a re-bid, or two colleagues of one firm, which this dock already treats as ONE counterparty -
+  drew two identical «Crawler Excavator» tabs for one conversation. A tab is keyed on the ITEM (the
+  fanned-out request id) now, the anchor's bid keeps the slot, and the unread counts add up.
+  Files: `src/components/deal-room/DealRoom.tsx`, `src/components/deal-room/deal-room-proto.css`,
+  `src/lib/contract/chat-dock.ts`, `tests/unit/chat-dock.test.ts`.
+  Also: a tab is named «subtype · size» (`equipment.subtype` / `equipment.size`), because the case the
+  strip exists for is two lines of ONE subtype, and the subtype alone cannot tell them apart.
+  Trap: the dock's own fixtures gave every sibling `request.id: "r1"` and differed only by
+  `equipmentType.name` - a shape the fan-out never produces (one item IS one request). They carry
+  distinct request ids now, and a new case pins the reported bug: two bids, one request, one tab.
+
+- **2026-09-08 - My Suppliers: one picking mode for two jobs, and «vendor» stops being ticked for him.**
+  Four owner notes on one screen.
+  (1) **Stored phones are normalised on the way OUT, not only on the way in** (*"some numbers in
+  Excel still show weird values, not normalized"*). The import preview normalises what it POSTS,
+  which fixed everything sent after it and nothing already stored: `phone` on an `own` row is what
+  the renter typed, so `0503372850`, `966503372850` and `+966 50-337-2850` all printed verbatim in a
+  column he scans down. The cell now runs `phoneE164` - the same parser the preview uses - and falls
+  back to the raw text when it cannot read it, because an unparseable phone is still the only thing
+  he has.
+  (2) **«Share a request» is gone from this screen**, and «Remove» takes its place. Removing rows is
+  the same act as grouping them, so it enters the SAME picking mode: `picking: boolean` became
+  `pickFor: "group" | "remove" | null`. While picking, a press ANYWHERE on the row selects it (a
+  14px checkbox in a 44px row was six small aims for six suppliers, and the row's own click opened
+  the profile over the list he was picking from). The dark bar moved from ABOVE the table to
+  `sticky bottom-0` under it, at `text-body font-extrabold`, and the header tick now says «All»
+  beside it.
+  (3, 4) **The vendor flag starts OFF everywhere** - typed, imported and picked off Moedatech
+  (*"any add supplier, whether by hand or Excel, doesn't default to vendor registered, but he will
+  mark it"*). It is a claim about a procurement relationship, and adding a contact is not the moment
+  it becomes true; ticked for him it ended up on everybody and stopped meaning anything. The two
+  hints were reworded to name the press that ⚠️S rather than the press that undoes it.
+  Also in (4): the directory's **Prev / Next pager became «Show all»**. Seventy-five pages is a
+  filing cabinet, not a picker, and the ordering meant nothing across a boundary he had to click
+  through. One request with `limit = total`, sorted by the same rule.
+  Files: `src/components/suppliers/{SuppliersPage,AddSuppliersDialog,SupplierImportPanel,AddFromMoedatechDialog}.tsx`,
+  `src/lib/api/client.ts`, `src/lib/i18n/{en,ar}.ts`,
+  `tests/unit/suppliers-remove-and-pick.test.tsx` (new, 10 cases),
+  `tests/unit/add-from-moedatech.test.tsx`.
+  🔴 **BACKEND, still owed: the equipment count.** *"Show the verified ones on Moedatech with the
+  highest number of equipment"* cannot be answered here and was already raised on 2026-09-03
+  (`docs/supplier-directory-ranking.md`). `/agents/suppliers` answers
+  `{ id, name, company_name, city, is_verified, has_store }` and nothing about equipment, so there
+  is nothing to sort on. `DirectorySupplier.equipmentCount` is READ and sorted on now (verified →
+  equipment count → store), so the ordering starts working the day the field arrives with no second
+  web change. Until then that clause compares 0 with 0.
+  ⚠️ `removeRenterSupplier` is called through `Promise.allSettled`, not `Promise.all`: the latter
+  rejects on the first failure and throws away what the others answered, so a batch where one row
+  404s would say «that did not save» about nine removals that did.
+  ⚠️ The removal takes a confirmation naming every row. A delete has no undo, and what it removes
+  is the renter's LINK - their account, their store and the bids they already sent stay.
+  ⚠️ Dead keys swept with the controls they belonged to: `shareARequest`, `sharedOne`,
+  `sharedMany`, `dirPage`, `prev`, `next`. `ShareRequestModal` itself is untouched and still mounted
+  by every request surface.
+
 - **2026-09-08 - The catalogue note takes the hint's place, and «chosen for you» is ORANGE.**
   Owner: *"«This name is what your supplier will see on the bid form» — remove this and put the note
   in its place"*, and *"for the auto selected color use like this token — it lives in prod"* with a

@@ -812,6 +812,13 @@ export function heroPhotoUrl(machine: Pick<FleetMachine, "photoKeys">): string |
 }
 
 /**
+ * ⚠️ **NO CALLER since 2026-09-08.** The band word («قريب» / «متوسط» / «بعيد») was the second half of
+ * the machine detail's distance line, and that line is now the fleet card's yard card, which states
+ * the distance and the availability and nothing else (owner: *"similar to how it appears in the fleet
+ * cards"*). Kept rather than deleted because it is the only definition of this vocabulary and its
+ * thresholds are the prototype's own, tested below; delete it with its tests if the band never comes
+ * back.
+ *
  * **«قريب · متوسط · بعيد»** — the word the detail's availability line puts after the kilometres.
  *
  * The prototype's own helper and its own thresholds (`distBand`, decoded line 340): ≤ 30 km near,

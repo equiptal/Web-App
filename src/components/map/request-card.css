@@ -47,6 +47,22 @@
   border: 1.5px solid var(--rq-edge);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  /* ── HORIZONTAL (owner, 2026-09-08: *"the card is tall, I want it more horizontal"*) ────────────
+     ~~Three stacked blocks: the identity strip, the ask, then the two buttons.~~ On a dock that fills
+     the surface beside the panel, that spent 200px of height on two short lines and left the width
+     empty. The strip is a COLUMN of the card now — the counterparty and what the ask is about on the
+     leading edge, the ask itself beside it — so the card is wider than it is tall and a thread of
+     three of them can be read without scrolling.
+
+     `wrap` is the phone: below ~360px of card the strip takes its own line back rather than
+     squeezing the ask into 90px. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  /* A CONTAINER, so the wrap below is decided by the card's own width and not by the viewport's: this
+     card lives in a dock that can be 300px wide on a 1600px screen, and a media query would have
+     kept two columns exactly where they do not fit. */
+  container-type: inline-size;
 }
 
 /* ── The card wears its state (app parity: `rentee_request_card.dart`) ────────────────────────────
@@ -101,17 +117,30 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  width: 100%;
-  padding: 9px 11px;
+  /* The leading COLUMN, not a banner across the top. `flex-basis` rather than a fixed width so it
+     gives way on a narrow card, and `border-inline-end` so the divider mirrors with the script. */
+  flex: 1 1 168px;
+  min-width: 168px;
+  max-width: 240px;
+  padding: 10px 11px;
   /* LIGHT GREY on a white card (owner, 2026-09-05) — the two tones the card is now made of, and the
      band is the grey one so the machine it names is told apart from the ask below it.
      ~~`rgba(255,255,255,0.55)`~~: translucent white was how a band stayed visible on a card whose
      fill moved with its state. Nothing moves now, so the band can state its own colour. */
   background: var(--surface2);
   border: 0;
-  border-bottom: 1px solid var(--rq-rule);
+  border-inline-end: 1px solid var(--rq-rule);
   font: inherit;
   text-align: start;
+}
+/* Wrapped — a card too narrow for two columns — and the divider goes back under the strip, where the
+   stack needs it. */
+@container (max-width: 430px) {
+  .bm-rq-id {
+    max-width: none;
+    border-inline-end: 0;
+    border-bottom: 1px solid var(--rq-rule);
+  }
 }
 /* Pressable, and it says so before it is pressed — the affordance the owner asked for. A card with no
    machine (`scope: "company"`) never gets this class and stays a plain strip. */
@@ -145,7 +174,13 @@
    the title is read. A company card names no equipment, so there is no picture to show instead. */
 /* Two blues, dark into bright — the prototype ran var(--navy-mid) into var(--action), and the direction is the
    point: the tile lifts toward the light rather than sinking. */
-.bm-rq-tile.is-co { background: linear-gradient(135deg, var(--navy-mid), var(--action)); border-color: transparent; color: var(--surface); }
+/* ── The firm's mark is the app's, not this card's (owner, 2026-09-08) ───────────────────────────
+   ~~Two blues, dark into bright — the prototype's second gradient.~~ Withdrawn: *"change the company
+   icon to use the real company icons and colours used in other places"*. Everywhere else a
+   counterparty is drawn — the chat dock's header (`.bm-chat-av`), the company panel's masthead — it
+   is his initials on `var(--ok)`, so this is that, at this card's own 40px. */
+.bm-rq-tile.is-co { background: var(--ok); border-color: transparent; color: var(--surface); border-radius: 50%; }
+.bm-rq-initials { font-size: 13px; font-weight: 800; letter-spacing: 0.02em; }
 .bm-rq-tile img { width: 100%; height: 100%; object-fit: cover; }
 .bm-rq-tile .material-icons-outlined { font-size: 22px; }
 .bm-rq-who { flex: 1; min-width: 0; display: block; }
@@ -175,17 +210,19 @@
 .bm-rq-ref { flex-shrink: 0; font-size: 8px; font-weight: 600; color: var(--muted-light); letter-spacing: 0.02em; }
 .bm-rq-go { flex-shrink: 0; font-size: 16px; color: var(--border-strong); }
 [dir="rtl"] .bm-rq-go { transform: scaleX(-1); }
-.bm-rq-body { padding: 10px 11px; }
+.bm-rq-body { flex: 1 1 200px; min-width: 0; padding: 10px 12px; }
 /* The ask's NAME, in the card's own colour and at the size the app sets (12/900).
    ~~10px, weight 800, fixed blue.~~ Two problems: it sat below the chips beneath it in the reading
    order, and a fixed blue said nothing once the card had moved to green or red. The accent is what
    separates the ask's name from the ask's SENTENCE directly under it — rendered in one colour the
    two ran together as a single dark paragraph. */
-.bm-rq-kind { font-size: 12px; font-weight: 900; color: var(--rq-accent); margin-bottom: 3px; }
+/* The ask's NAME — the card's title, and the ONE heavy line on it (owner, 2026-09-08: *"make the
+   text not bold except the title"*). */
+.bm-rq-kind { font-size: 12px; font-weight: 800; color: var(--rq-accent); margin-bottom: 3px; }
 .bm-rq-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 7px; }
 .bm-rq-chip {
   font-size: 9.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--navy);
   /* Grey, for the same reason the strip is: translucent white on a white card is no chip at all. */
   background: var(--surface2);
@@ -198,7 +235,10 @@
    card after the machine's name.
    ~~11.5px at weight 600.~~ That set the instruction lighter than the chips beneath it, so the eye
    landed on «TÜV certificate» and had to climb back up to learn what to do with it. */
-.bm-rq-ask { font-size: 12px; font-weight: 800; color: var(--navy); line-height: 1.45; margin: 0 0 7px; }
+/* ~~Navy and heavy, the weightiest line on the card after the machine's name.~~ Normal weight
+   (owner, 2026-09-08): the title above it is the heavy line, and two bold blocks in a 60px body read
+   as one. The sentence is still navy, which is what separates it from the chips. */
+.bm-rq-ask { font-size: 12px; font-weight: 500; color: var(--navy); line-height: 1.5; margin: 0 0 7px; }
 /* The live status row. Dashed divider above it, because the verdict is not part of the ask — it is
    what the ask reads as RIGHT NOW, and it changes under a card that never moves. */
 .bm-rq-state {
@@ -208,7 +248,7 @@
   padding-top: 8px;
   border-top: 1px dashed var(--surface3);
   font-size: 10.5px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--muted);
 }
 .bm-rq-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: currentcolor; }
@@ -221,17 +261,20 @@
    refusal he did not make. Its own amber rather than `is-refused`'s — one step deeper — so the two
    verdicts can be told apart at a glance and either can be restyled without moving the other. */
 .bm-rq-state.is-partial { color: var(--brand-deep); }
-.bm-rq-state.is-draft { color: var(--action); }
+/* ~~`.bm-rq-state.is-draft`.~~ Gone with «Not sent yet — review it, then send» (owner, 2026-09-08):
+   a draft's row is absent now, because the two buttons under the card already say it is unsent. */
 /* Every card in a conversation carries its time (AC-16), including this one. Quiet and at the
    trailing edge — the card's subject is the ask, not the minute it was made in. */
-.bm-rq-at { margin-top: 7px; text-align: end; font-size: 9px; font-weight: 700; color: var(--muted); }
-.bm-rq-acts { display: flex; gap: 8px; padding: 0 11px 11px; }
+.bm-rq-at { margin-top: 7px; text-align: end; font-size: 9px; font-weight: 500; color: var(--muted); }
+/* The draft's two buttons: a row of their own at the FOOT of the whole card (it is the one thing
+   that spans both columns), which is why `flex-basis: 100%`. */
+.bm-rq-acts { flex: 0 0 100%; display: flex; gap: 8px; padding: 0 12px 11px; }
 .bm-rq-btn {
   border-radius: var(--radius-md);
-  padding: 9px;
+  padding: 8px;
   font: inherit;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
 }
 .bm-rq-btn:disabled { opacity: 0.55; cursor: default; }

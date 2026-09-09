@@ -154,7 +154,7 @@ describe("Arabic (MREQ-AC-51)", () => {
 
     expect(screen.getByText("ما كتبته")).toBeTruthy();
     // The schedule is open, so equipment is collapsed to its strip — which is the label to assert.
-    expect(screen.getByText("الآلة والمشغّل")).toBeTruthy();
+    expect(screen.getByText("المعدّة والمشغّل")).toBeTruthy();
     expect(screen.getByText("مدة التشغيل")).toBeTruthy();
     // 155 charged days, in the digits the rest of the app uses — Latin, Arabic locale included
     // (owner, 2026-09-04). This asserted «١٥٥» and the ABSENCE of "155" until that ruling.
@@ -167,7 +167,7 @@ describe("Arabic (MREQ-AC-51)", () => {
       locale: "ar",
       draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
     });
-    for (const english of ["YOU WROTE", "The machine", "Where it goes", "When it runs"]) {
+    for (const english of ["YOU WROTE", "The equipment", "Where it goes", "When it runs"]) {
       expect(view.container.textContent).not.toContain(english);
     }
   });
@@ -181,7 +181,7 @@ describe("when the catalogue is unreachable (MREQ-AC-52)", () => {
       draft: makeAgentDraft({ items: [makeItem({ ref: { categoryId: null, subcategoryId: null, measurementId: null } })], project: confirmedProject() }),
     });
 
-    expect(screen.getByText("The machine")).toBeTruthy();
+    expect(screen.getByText("The equipment")).toBeTruthy();
     expect(screen.getByText("Where it goes")).toBeTruthy();
     /* ~~«N things need you».~~ Removed (owner, 2026-09-01): it counted gaps the cards below already
        mark one by one, in the place the renter has to act on them. The gap itself is what this pins

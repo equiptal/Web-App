@@ -57,7 +57,16 @@ import { SupplierImportPanel } from "./SupplierImportPanel";
  */
 type Row = { name: string; contactName: string; email: string; phone: string; vendor: boolean };
 
-const blank = (): Row => ({ name: "", contactName: "", email: "", phone: "", vendor: true });
+/**
+ * 🔴 **Vendor starts OFF** (owner, 2026-09-08: *"any add supplier, whether by hand or Excel,
+ * doesn't default to vendor registered, but he will mark it"*).
+ *
+ * ~~`vendor: true`.~~ «Registered vendor» is a claim about a relationship the renter has with that
+ * firm — a contract, an approval, a procurement record — and adding a contact is not the moment it
+ * becomes true. Ticked for him, every row he typed in a hurry carried a claim he never made, and
+ * the flag stopped meaning anything the moment it was on everybody.
+ */
+const blank = (): Row => ({ name: "", contactName: "", email: "", phone: "", vendor: false });
 
 /**
  * A row is real once it names a firm AND carries a way to reach it — `contactable`, the same rule
@@ -290,7 +299,16 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
               </button>
 
               {/* The flag is per row above; this only sets them all at once. */}
-              <label className="inline-flex h-[30px] cursor-pointer items-center gap-2 rounded-md border border-ok/40 bg-ok-soft px-3 text-meta font-extrabold text-ok-deep">
+              {/* ⚠️ Green only when it is ON. With the flag off by default (2026-09-08) a
+                  permanently green band over an unticked box reads as a state nobody set. */}
+              <label
+                className={cx(
+                  "inline-flex h-[30px] cursor-pointer items-center gap-2 rounded-md border px-3 text-meta font-extrabold",
+                  rows.every((r) => r.vendor)
+                    ? "border-ok/40 bg-ok-soft text-ok-deep"
+                    : "border-border-strong bg-surface text-muted",
+                )}
+              >
                 <input
                   type="checkbox"
                   checked={rows.every((r) => r.vendor)}

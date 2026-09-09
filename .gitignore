@@ -48,3 +48,9 @@ next-env.d.ts
 
 # Editor/agent backups — never tracked. One was swept in by a `git add -A` on 2026-08-31.
 *.bak
+
+# UI screenshots from `npm run ui:shots` — evidence for a change report, never committed
+.artifacts/
+
+# The screenshot lane's own build dir — it must not contend with `.next` (see next.config.ts)
+.next-preview/

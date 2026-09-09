@@ -1671,6 +1671,17 @@ export interface DirectorySupplier {
   city: string | null;
   verified: boolean;
   hasStore: boolean;
+  /**
+   * How many machines the firm lists.
+   *
+   * RED **Null on every row today, and that is the backend gap, not a bug here** (owner,
+   * 2026-09-08: *"show the verified ones on Moedatech with the highest number of equipment"*, the
+   * same ask as 2026-09-03). `/agents/suppliers` answers
+   * `{ id, name, company_name, city, is_verified, has_store }` and nothing about equipment, so there
+   * is nothing to sort on. The field is read here so the ordering below starts working the day it
+   * arrives, with no second web change. See `docs/supplier-directory-ranking.md`.
+   */
+  equipmentCount: number | null;
 }
 
 /** One page of the directory, with what the pager needs to know. */
@@ -1680,6 +1691,10 @@ export interface DirectoryPage {
   totalPages: number;
   total: number;
 }
+
+
+/** A count off the wire, or null when the field is absent — never 0, which would be a claim. */
+const count = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
 /**
  * Browse or search every supplier who holds an account.
@@ -1744,6 +1759,8 @@ export async function searchSupplierDirectory(q: string, page = 1, limit = 20): 
           city: typeof o.city === "string" ? o.city.trim() || null : null,
           // `is_verified` and `has_store` arrive as 0/1 from a raw query, not as booleans.
           verified: bool(o.isVerified ?? o.is_verified),
+      /* Every spelling the backend might reasonably pick, so the field lands whichever it sends. */
+      equipmentCount: count(o.equipmentCount ?? o.equipment_count ?? o.listingCount ?? o.listing_count),
           hasStore: bool(o.hasStore ?? o.has_store),
         },
       ];
@@ -1763,8 +1780,21 @@ export async function searchSupplierDirectory(q: string, page = 1, limit = 20): 
      * Ranking the directory itself is the backend's to do; see the note in
      * `docs/supplier-directory-ranking.md`. Until it does, this is an honest local tidy of
      * one page and is deliberately not dressed up as a recommendation.
+     *
+     * ⚠️ **Asked again on 2026-09-08**, and answered the same way: the equipment count is now READ
+     * (`equipmentCount`) and sorted on, so nothing here needs changing when the backend adds it. And
+     * *Show all* in the dialog fetches the whole directory in one call, which is what makes this
+     * sort a statement about all of it rather than about twenty rows.
      */
-    rows.sort((a, b) => Number(b.verified) - Number(a.verified) || Number(b.hasStore) - Number(a.hasStore));
+    rows.sort(
+      (a, b) =>
+        Number(b.verified) - Number(a.verified) ||
+        /* ⚠️ Inert until the backend sends a count: every row is null, so this compares 0 with 0
+           and the next rule decides. It is written now so the ordering the owner asked for starts
+           working the day the field arrives. */
+        (b.equipmentCount ?? 0) - (a.equipmentCount ?? 0) ||
+        Number(b.hasStore) - Number(a.hasStore),
+    );
 
     return {
       rows,

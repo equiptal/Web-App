@@ -70,11 +70,30 @@ export function AddFromMoedatechDialog({
 
   const [q, setQ] = useState("");
   const [page, setPage] = useState<DirectoryPage | null>(null);
-  const [pageNo, setPageNo] = useState(1);
+  /**
+   * Twenty, then all of them (owner, 2026-09-08: *"show first 20 with show all at the end that will
+   * show all suppliers we have, but in the same order we are following"*).
+   *
+   * RED **~~A pager.~~** Seventy-five pages of Prev / Next is a filing cabinet, not a picker: the
+   * renter cannot see how far in he is, cannot go back to a firm he passed, and the ORDER means
+   * nothing across a boundary he has to click through. One press loads the lot, sorted by the same
+   * rule, and the scroller inside the box carries it.
+   *
+   * MARK It is one request with `limit = total`, not seventy-five. The list is a directory read, and
+   * the alternative — paging in the background — is the same bytes plus a spinner that lies about
+   * being finished.
+   */
+  const [all, setAll] = useState(false);
   const [picked, setPicked] = useState<Record<string, boolean>>({});
-  /* Per row, because a batch always has an exception — the firm being tried out, the one inherited
-     from a previous site. On by default: someone picking a firm off the directory is usually picking
-     one he works with. */
+  /**
+   * Per row, because a batch always has an exception — the firm being tried out, the one inherited
+   * from a previous site.
+   *
+   * 🔴 **Off by default** (owner, 2026-09-08: *"for add from Moedatech, same, doesn't auto-mark
+   * vendor for all, the default is unselected"*). ~~On.~~ Picking a firm out of a directory of
+   * every account on the platform says even less about a procurement relationship than typing one
+   * in does.
+   */
   const [vendor, setVendor] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,15 +107,22 @@ export function AddFromMoedatechDialog({
     const mine = ++seq.current;
     // Debounced for typing; a page press is the same path and 250ms is imperceptible on a click.
     const id = setTimeout(async () => {
-      const found = await searchSupplierDirectory(q.trim(), pageNo);
-      if (mine === seq.current) setPage(found);
+      const first = await searchSupplierDirectory(q.trim(), 1);
+      if (mine !== seq.current) return;
+      /* ⚠️ The first page is drawn either way, so the box fills while the whole list is fetched
+         rather than sitting empty behind a spinner. */
+      setPage(first);
+      if (!all || first.total <= first.rows.length) return;
+      const everyone = await searchSupplierDirectory(q.trim(), 1, first.total);
+      if (mine === seq.current) setPage(everyone);
     }, 250);
     return () => clearTimeout(id);
-  }, [open, q, pageNo]);
+  }, [open, q, all]);
 
-  // A new search starts at the beginning; staying on page 7 of the old query shows nothing.
+  /* A new search is a new question: it comes back to the first twenty, and «show all» is his to
+     press again on the answer he is now looking at. */
   useEffect(() => {
-    setPageNo(1);
+    setAll(false);
   }, [q]);
 
   const rows = page?.rows ?? null;
@@ -109,7 +135,7 @@ export function AddFromMoedatechDialog({
     setError(null);
     try {
       const result = await linkRenterSuppliers(
-        chosen.map((s) => ({ supplierId: s.supplierId, vendorRegistered: vendor[s.supplierId] !== false })),
+        chosen.map((s) => ({ supplierId: s.supplierId, vendorRegistered: vendor[s.supplierId] === true })),
       );
       const created = result?.created?.length ?? chosen.length;
       const skipped = result?.skipped?.length ?? 0;
@@ -193,14 +219,14 @@ export function AddFromMoedatechDialog({
                   <label
                     className={cx(
                       "inline-flex h-[26px] flex-none cursor-pointer items-center gap-1.5 rounded-md border px-2 text-label font-extrabold",
-                      vendor[s.supplierId] !== false
+                      vendor[s.supplierId] === true
                         ? "border-ok bg-ok-soft text-ok-deep"
                         : "border-dashed border-border-strong bg-surface text-muted",
                     )}
                   >
                     <input
                       type="checkbox"
-                      checked={vendor[s.supplierId] !== false}
+                      checked={vendor[s.supplierId] === true}
                       onChange={(e) => setVendor((v) => ({ ...v, [s.supplierId]: e.target.checked }))}
                       className="h-3 w-3 accent-ok"
                     />
@@ -214,31 +240,19 @@ export function AddFromMoedatechDialog({
         )}
       </div>
 
-      {/* ── The pager ────────────────────────────────────────────────────────────────────────────
-          1,492 accounts is not a list to scroll. Twenty a page, and the count is stated so a renter
-          searching a common word knows whether to narrow it rather than paging through ninety. */}
-      {page && page.totalPages > 1 && (
+      {/* ── Twenty, then all of them ─────────────────────────────────────────────────────────
+          The count is stated either way, so a renter searching a common word can see whether to
+          narrow it rather than pressing into fifteen hundred rows. */}
+      {page && page.total > (rows?.length ?? 0) && (
         <div className="flex items-center gap-2 text-meta text-muted">
           <span>{fmt(c.dirCount, { shown: rows?.length ?? 0, total: page.total })}</span>
-          <span className="ms-auto flex items-center gap-1.5">
-            <button
-              type="button"
-              disabled={pageNo <= 1}
-              onClick={() => setPageNo((n) => Math.max(1, n - 1))}
-              className="rounded-sm border border-border px-2.5 py-1 font-semibold text-navy transition hover:border-brand disabled:bg-disabled-bg disabled:text-disabled-fg"
-            >
-              {c.prev}
-            </button>
-            <span className="tabular-nums">{fmt(c.dirPage, { page: page.page, of: page.totalPages })}</span>
-            <button
-              type="button"
-              disabled={pageNo >= page.totalPages}
-              onClick={() => setPageNo((n) => n + 1)}
-              className="rounded-sm border border-border px-2.5 py-1 font-semibold text-navy transition hover:border-brand disabled:bg-disabled-bg disabled:text-disabled-fg"
-            >
-              {c.next}
-            </button>
-          </span>
+          <button
+            type="button"
+            onClick={() => setAll(true)}
+            className="ms-auto rounded-sm border border-border px-2.5 py-1 font-semibold text-navy transition hover:border-brand"
+          >
+            {c.dirShowAll}
+          </button>
         </div>
       )}
 

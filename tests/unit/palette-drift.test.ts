@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { resolve } from "node:path";
 
@@ -85,7 +85,12 @@ describe("no component names a colour either", () => {
       .toString()
       .split(String.fromCharCode(10))
       .map((f) => f.trim())
-      .filter((f) => f && !EXEMPT.includes(f));
+      .filter((f) => f && !EXEMPT.includes(f))
+      /* `git ls-files` reads the INDEX, so a file deleted in the working tree is still listed until
+         the deletion is staged — and this sweep then dies on `ENOENT` instead of reporting a colour
+         (it did, on 2026-09-09, when `CarryForwardModal.tsx` was removed). Skipping what is not on
+         disk keeps the failure about the palette; the deletion is staged either way. */
+      .filter((f) => existsSync(resolve(ROOT, f)));
     const offenders: string[] = [];
     for (const f of files) {
       const src = read(f)

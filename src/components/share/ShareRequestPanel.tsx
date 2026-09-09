@@ -331,6 +331,14 @@ export function ShareRequestPanel({
   const [connectNote, setConnectNote] = useState<"connected" | "denied" | "failed" | null>(null);
   /** The popup poll, held so an unmount mid-consent does not leave a timer running. */
   const connectTimer = useRef<number | null>(null);
+  /**
+   * How long the send waits for a consent the renter has not finished.
+   *
+   * MARK Long enough for a real sign-in — a password, a second factor, an account chooser on a
+   * tenant he has to pick from — and short enough that a renter who walked away is not left with a
+   * button that says «Posting…» over a request that is already live. Two minutes.
+   */
+  const CONNECT_WAIT_MS = 120_000;
 
   useEffect(() => setUuid(requestUuid), [requestUuid]);
   useEffect(() => setProvider(loadEmailProvider()), []);
@@ -418,7 +426,9 @@ export function ShareRequestPanel({
      * ⚠️ Same origin, deliberately: the backend checks `returnTo` against a host allow-list, and
      * the page closes itself by script, which a cross-origin document cannot be trusted to do.
      */
-    const url = await mailConnectUrl(`${window.location.origin}/mail-connected`);
+    /* 🔴 `await` inside `send`: a throw here rejects the whole send, and `busy` never clears. A
+       refusal is an answer, not an exception. */
+    const url = await mailConnectUrl(`${window.location.origin}/mail-connected`).catch(() => null);
     if (!url) {
       pre?.close();
       setConnecting(false);
@@ -444,23 +454,87 @@ export function ShareRequestPanel({
       return false;
     }
     /**
-     * ⚠️ **`window.closed` is the only signal there is.** The consent page is Microsoft's and the
-     * landing page is the backend's, so nothing inside the pop-up can talk to us. The status is
-     * re-read on close and IT decides: a renter who closed the window without deciding looks exactly
-     * like one who refused, and both mean "not connected".
+     * ⚠️ **Nothing inside the pop-up can talk to us.** The consent page is Microsoft's and the
+     * landing page is the backend's, so this watches from the outside: the window closing, and the
+     * connection status itself.
+     *
+     * 🔴 **~~`window.closed` was the only signal, and it hung the whole send~~** (owner,
+     * 2026-09-08: *"what if the user clicks Outlook and Send and didn't complete his connection with
+     * Outlook? It is showing like nothing happened, even the modal confirming the post didn't
+     * appear"*).
+     *
+     * A renter who ABANDONS the consent — leaves the window open on the account chooser and comes
+     * back to this tab, or lets it sit on a login that never finishes — never closes it. The
+     * interval polled forever, `await startConnect(...)` never returned, and everything after it
+     * never ran: no e-mail, no compose window, no «your request is posted» tick, and the Send button
+     * stuck on «Posting…». And the request was already live by then, so the one screen that could
+     * have told him said nothing at all.
+     *
+     * Three ways out now, and every one of them settles:
+     *
+     *  · **the window closes** — the status decides, as before;
+     *  · **the status says connected** — the callback has landed, so the consent is done whether or
+     *    not the little window has got round to closing itself. We close it and carry on;
+     *  · **the deadline passes** — he walked away. Answer «not connected», which sends him down the
+     *    compose-window path with everything on screen intact.
+     *
+     * ⚠️ The window is NOT closed on the deadline. He may still be typing a password into it, and
+     * shutting it under him would be worse than the wait. It closes itself when consent lands
+     * (`/mail-connected`), and until then it is his.
      */
+    const deadline = Date.now() + CONNECT_WAIT_MS;
     return new Promise<boolean>((resolve) => {
       if (connectTimer.current !== null) window.clearInterval(connectTimer.current);
-      connectTimer.current = window.setInterval(() => {
-        if (!win.closed) return;
+      /** Settle once, whichever of the three arrives first. */
+      const done = (connected: boolean, note: "connected" | "denied" | null) => {
         if (connectTimer.current !== null) window.clearInterval(connectTimer.current);
         connectTimer.current = null;
         setConnecting(false);
-        void mailConnectStatus().then((st) => {
-          setConnect(st);
-          setConnectNote(st.connected ? "connected" : "denied");
-          resolve(st.connected);
-        });
+        if (note) setConnectNote(note);
+        resolve(connected);
+      };
+      /* ⚠️ Guards the status read: the poll runs every 700 ms and the call takes longer than
+         that, so without it a slow answer would stack requests. */
+      let asking = false;
+      connectTimer.current = window.setInterval(() => {
+        if (win.closed) {
+          void mailConnectStatus()
+            .then((st) => {
+              setConnect(st);
+              done(st.connected, st.connected ? "connected" : "denied");
+            })
+            /* He closed it and we cannot tell what happened. «Not connected» is the answer that
+               keeps him moving; the compose window opens and the message still goes. */
+            .catch(() => done(false, "denied"));
+          return;
+        }
+        if (Date.now() > deadline) {
+          /* ⚠️ No note. «Denied» would be a claim about a decision he has not made — the window is
+             still open in front of him — and the panel's own status line already says the send fell
+             back to a compose window. */
+          done(false, null);
+          return;
+        }
+        if (asking) return;
+        asking = true;
+        void mailConnectStatus()
+          .then((st) => {
+            if (connectTimer.current === null) return;
+            if (!st.connected) return;
+            setConnect(st);
+            /* Consent landed. The window closes itself a moment later; close it now so the renter
+               is not left with a stray pop-up over the panel he is coming back to. */
+            try {
+              win.close();
+            } catch {
+              /* a browser may refuse; the page closes itself anyway */
+            }
+            done(true, "connected");
+          })
+          .catch(() => {})
+          .finally(() => {
+            asking = false;
+          });
       }, 700);
     });
   };

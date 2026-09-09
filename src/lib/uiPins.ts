@@ -114,8 +114,8 @@ export const PIN_REGISTRY = {
   /* ── 10–14  home ──────────────────────────────────────────────────────────────────────────── */
   "home-hub": { n: "10", label: "Home", file: "src/components/home/HomeHub.tsx" },
   "browse-page": { n: "10.5", label: "Browse — banner + supplier directory", file: "src/components/stores/BrowsePage.tsx" },
-  "home-hero": { n: "10.1", label: "Home — hero band", file: "src/components/home/HomeHub.tsx" },
-  "home-hero-actions": { n: "10.2", label: "Home — hero action column", file: "src/components/home/HomeHub.tsx" },
+  "home-hero": { n: "10.1", label: "Home — hero band", file: "src/components/home/CtaBanner.tsx" },
+  "home-hero-actions": { n: "10.2", label: "Home — hero action column", file: "src/components/home/CtaBanner.tsx" },
   "home-requests": { n: "10.4", label: "Home — requests + bids rail", file: "src/components/home/HomeRequests.tsx" },
   "home-bubble": { n: "10.7", label: "Home — notification bubble", file: "src/components/home/HomeNotificationBubble.tsx" },
   "suppliers-list": { n: "10.6", label: "My Suppliers — the list", file: "src/components/suppliers/SuppliersPage.tsx" },
@@ -132,14 +132,25 @@ export const PIN_REGISTRY = {
   "operator-rail-head": { n: "18.1", label: "Operator rail — head row", file: "src/components/create/OperatorRail.tsx" },
   "operator-rail-options": { n: "18.2", label: "Operator rail — options grid", file: "src/components/create/OperatorRail.tsx" },
   "operator-rail-note": { n: "18.3", label: "Operator rail — note block", file: "src/components/create/OperatorRail.tsx" },
+  "operator-rail-closed": { n: "18.4", label: "Operator rail — closed strip (72px)", file: "src/components/create/OperatorRail.tsx" },
+  "equipment-tabs": { n: "17.4", label: "Equipment tabs — the strip", file: "src/components/create/EquipmentTabs.tsx" },
+  "equipment-tab": { n: "17.5", label: "Equipment tabs — one equipment", file: "src/components/create/EquipmentTabs.tsx" },
+  "equipment-tabs-add": { n: "17.6", label: "Equipment tabs — the + that adds one", file: "src/components/create/EquipmentTabs.tsx" },
+  "locked-for-request": { n: "16.2", label: "Create — site + schedule locked strip (with «Change»)", file: "src/components/create/Canvas.tsx" },
   "when-panel": { n: "19", label: "When panel (dates)", file: "src/components/create/WhenPanel.tsx" },
   "when-panel-head": { n: "19.1", label: "When panel — head button", file: "src/components/create/WhenPanel.tsx" },
   "when-panel-body": { n: "19.2", label: "When panel — open body", file: "src/components/create/WhenPanel.tsx" },
   "where-panel": { n: "20", label: "Where panel (site)", file: "src/components/create/WherePanel.tsx" },
   "where-panel-head": { n: "20.1", label: "Where panel — head button", file: "src/components/create/WherePanel.tsx" },
   "where-panel-body": { n: "20.2", label: "Where panel — open body", file: "src/components/create/WherePanel.tsx" },
-  "ready-to-send": { n: "21", label: "Ready-to-send bar", file: "src/components/create/ReadyToSend.tsx" },
-  "carry-forward-modal": { n: "23", label: "Carry-forward modal", file: "src/components/create/CarryForwardModal.tsx" },
+  "ready-to-send": { n: "21", label: "Create — review & send screen", file: "src/components/create/ReadyToSend.tsx" },
+  /* ~~23 «Carry-forward modal».~~ Deleted with the component (owner, 2026-09-09: *"remove this modal
+     no need"*). The number is retired and left unused, per this file's own rule — old notes and
+     screenshots refer to it. */
+  /* The create canvas is 16 and its parts are 16.x; this modal belongs to the FLOW rather than to a
+     panel, and 15–24 has no free surface number left (the block's own rule: never renumber). It is
+     raised by Back (8) from the canvas. */
+  "create-leave-confirm": { n: "16.1", label: "Create — «leave this request?» confirm", file: "src/components/create/CreateBack.tsx" },
   "create-processing": { n: "24", label: "Create — processing screen", file: "src/components/screens/Processing.tsx" },
   "create-confirmation": { n: "22", label: "Create — confirmation screen", file: "src/components/screens/Confirmation.tsx" },
 
@@ -171,12 +182,50 @@ export const PIN_REGISTRY = {
   "bidmap-canvas": { n: "45.1", label: "Bid map — canvas side", file: "src/components/map/BidMapWorkspace.tsx" },
   "bidmap-panel": { n: "45.2", label: "Bid map — side panel", file: "src/components/map/BidMapWorkspace.tsx" },
   "map-canvas": { n: "46", label: "Map canvas", file: "src/components/map/MapCanvas.tsx" },
+  "map-pin": { n: "46.1", label: "Map — one machine's marker", file: "src/components/map/MapCanvas.tsx" },
+  /* The fleet list's own card, and the parts a restyle actually lands on. `EquipmentList`'s root is a
+     fragment and cannot carry a pin (see the note at the top), so the CARD is the surface. */
+  "equipment-card": { n: "47", label: "Fleet card (equipment list)", file: "src/components/map/EquipmentList.tsx" },
+  "equipment-card-photo": { n: "47.1", label: "Fleet card — photo cell", file: "src/components/map/EquipmentList.tsx" },
+  "equipment-card-head": { n: "47.2", label: "Fleet card — readiness + file icon", file: "src/components/map/EquipmentList.tsx" },
+  "equipment-card-yard": { n: "47.3", label: "Fleet card — yard card (distance + availability)", file: "src/components/map/EquipmentList.tsx" },
+  "equipment-filter": { n: "47.5", label: "Fleet list — filter bar", file: "src/components/map/EquipmentList.tsx" },
+  "equipment-filter-panel": { n: "47.6", label: "Fleet list — filter panel", file: "src/components/map/EquipmentList.tsx" },
   "price-footer": { n: "48", label: "Price footer", file: "src/components/map/PriceFooter.tsx" },
+  "price-footer-rate": { n: "48.1", label: "Price footer — the rate", file: "src/components/map/PriceFooter.tsx" },
+  "price-footer-details": { n: "48.2", label: "Price footer — «Show details» link", file: "src/components/map/PriceFooter.tsx" },
+  "price-footer-counter": { n: "48.3", label: "Price footer — «Counter this price»", file: "src/components/map/PriceFooter.tsx" },
+  "price-footer-approve": { n: "48.5", label: "Price footer — «Approve» (only when nothing is left to settle)", file: "src/components/map/PriceFooter.tsx" },
+  "price-footer-break": { n: "48.4", label: "Price footer — the breakdown", file: "src/components/map/PriceFooter.tsx" },
   "map-request-card": { n: "49", label: "Map request card", file: "src/components/map/RequestCard.tsx" },
+  "request-card-id": { n: "49.1", label: "Request card — identity strip (firm / machine)", file: "src/components/map/RequestCard.tsx" },
+  "request-card-tile": { n: "49.2", label: "Request card — photo or company mark", file: "src/components/map/RequestCard.tsx" },
+  "request-card-body": { n: "49.3", label: "Request card — the ask", file: "src/components/map/RequestCard.tsx" },
+  "request-card-state": { n: "49.4", label: "Request card — status row", file: "src/components/map/RequestCard.tsx" },
+  "request-card-acts": { n: "49.5", label: "Request card — draft's Cancel / Send", file: "src/components/map/RequestCard.tsx" },
+  "yard-explain": { n: "50", label: "Yard explainer modal (red distance)", file: "src/components/map/YardExplainDialog.tsx" },
+  "yard-explain-demo": { n: "50.1", label: "Yard explainer — red → green specimens", file: "src/components/map/YardExplainDialog.tsx" },
+  "yard-explain-lines": { n: "50.2", label: "Yard explainer — the two lines", file: "src/components/map/YardExplainDialog.tsx" },
+  "yard-explain-cta": { n: "50.3", label: "Yard explainer — «Ask the supplier»", file: "src/components/map/YardExplainDialog.tsx" },
   "company-panel": { n: "51", label: "Supplier panel", file: "src/components/map/panel/CompanyPanel.tsx" },
   "equipment-detail": { n: "52", label: "Equipment detail panel", file: "src/components/map/panel/EquipmentDetail.tsx" },
+  "equipment-detail-viewer": { n: "52.1", label: "Equipment detail — the viewer (photo / paper)", file: "src/components/map/panel/EquipmentDetail.tsx" },
+  "equipment-detail-tabs": { n: "52.2", label: "Equipment detail — tab strip", file: "src/components/map/panel/EquipmentDetail.tsx" },
+  "equipment-detail-yard": { n: "52.3", label: "Equipment detail — yard card", file: "src/components/map/panel/EquipmentDetail.tsx" },
+  "equipment-detail-grid": { n: "52.4", label: "Equipment detail — match grid", file: "src/components/map/panel/EquipmentDetail.tsx" },
+  "equipment-documents": { n: "53", label: "Equipment documents tab", file: "src/components/map/panel/EquipmentDocuments.tsx" },
+  "equipment-documents-foot": { n: "53.1", label: "Documents tab — Download / Ask footer", file: "src/components/map/panel/EquipmentDocuments.tsx" },
+  "doc-row": { n: "53.2", label: "Document row", file: "src/components/map/panel/DocRowList.tsx" },
   "deal-room": { n: "55", label: "Deal room", file: "src/components/deal-room/DealRoom.tsx" },
   "chat-card": { n: "56", label: "Chat card", file: "src/components/deal-room/ChatCard.tsx" },
+  /* `ChatDock`'s root is a fragment; the DRAWER is the surface, and its four parts are what a note
+     about "the chat" almost always means. */
+  "chat-dock": { n: "57", label: "Chat drawer (map)", file: "src/components/map/ChatDock.tsx" },
+  "chat-dock-head": { n: "57.1", label: "Chat drawer — identity + phase + kebab", file: "src/components/map/ChatDock.tsx" },
+  "chat-dock-tabs": { n: "57.2", label: "Chat drawer — supplier tabs", file: "src/components/map/ChatDock.tsx" },
+  "chat-dock-thread": { n: "57.3", label: "Chat drawer — the thread", file: "src/components/map/ChatDock.tsx" },
+  "chat-dock-composer": { n: "57.4", label: "Chat drawer — composer", file: "src/components/map/ChatDock.tsx" },
+  "chat-dock-draft": { n: "57.5", label: "Chat drawer — staged request card", file: "src/components/map/ChatDock.tsx" },
 
   /* ── 60–69  inbox, stores ─────────────────────────────────────────────────────────────────── */
   "inbox-view": { n: "60", label: "Inbox", file: "src/components/inbox/InboxView.tsx" },
@@ -203,7 +252,7 @@ export const PIN_REGISTRY = {
   "dialog": { n: "90", label: "Dialog", file: "src/components/Dialog.tsx" },
   "dialog-panel": { n: "90.1", label: "Dialog — panel", file: "src/components/Dialog.tsx" },
   "dialog-header": { n: "90.2", label: "Dialog — header row", file: "src/components/Dialog.tsx" },
-  "search-select": { n: "92", label: "Search select", file: "src/components/create/SearchSelect.tsx" },
+  "search-select": { n: "92", label: "Search select", file: "src/components/Dropdown.tsx" },
 } as const satisfies Record<string, PinEntry>;
 
 export type PinId = keyof typeof PIN_REGISTRY;

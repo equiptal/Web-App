@@ -10,6 +10,8 @@ import { useSession } from "@/lib/session";
 import { AccountModal } from "@/components/onboarding/AccountModal";
 import { draftBidForm } from "@/lib/draftBidForm";
 import { ShareRequestPanel } from "@/components/share/ShareRequestPanel";
+import { projectTitle, shortSite, type ProjectSummary } from "@/lib/contract/project";
+import { useRouter } from "next/navigation";
 
 /**
  * *Share this request* — the card under the summary on **Ready to send**.
@@ -33,10 +35,29 @@ import { ShareRequestPanel } from "@/components/share/ShareRequestPanel";
  * this is rendered by `CreateSurface`, which owns the switch and survives it — the flip happens
  * behind the card and the renter sees one continuous act.
  */
-export function ShareOnPost({ onAnnouncing }: { onAnnouncing?: (owed: boolean) => void } = {}) {
+/**
+ * How long the tick waits for a hand-off that may never have happened.
+ *
+ * ⚠️ Longer than any browser takes to raise a window it agreed to open, and short enough that a
+ * renter staring at a card which did nothing is not left there. Two and a half seconds.
+ */
+const TELL_ANYWAY_MS = 2_500;
+
+export function ShareOnPost({
+  /**
+   * The site this request was filed under, if it was.
+   *
+   * 🔴 **The project's whole dialog is this block** (owner, 2026-09-08). `ProjectFiled` still does
+   * the write, outside and on mount; what it used to draw is two lines here. Null when the request
+   * went into a site the renter had already chosen, or when the filing failed, and in both cases
+   * nothing is drawn: the first needs no telling, and the second is silent by design.
+   */
+  filed = null,
+}: { filed?: ProjectSummary | null } = {}) {
   const t = useT();
   const c = t.intake.postShare;
   const { state, actions } = useRfq();
+  const router = useRouter();
   const { tier } = useSession();
   const [showAccount, setShowAccount] = useState(false);
   /**
@@ -75,26 +96,9 @@ export function ShareOnPost({ onAnnouncing }: { onAnnouncing?: (owed: boolean) =
   /** What the server sent, when it sent it: the confirmation states the e-mail as well as the post. */
   const [mail, setMail] = useState<{ from: string; recipients: number; inSentFolder: boolean } | null>(null);
   const announced = useRef(false);
-  /**
-   * ── The two dialogs are a QUEUE, not a pile (owner, 2026-09-08) ─────────────────────
-   *
-   * *"I want the same post-to-Moedatech modal to show the e-mail too, so they are together, then the
-   * project modal after them."*
-   *
-   * `ProjectFiled` files the request under a site and reports it in a dialog of its own, and both
-   * mount on the same phase flip — so two dialogs raced for the screen and the renter met whichever
-   * won. These two states let the page order them: the post is announced first, with the send in it,
-   * and the project follows once he has read it.
-   *
-   * `owed` runs from the moment OUR post mints a request until the tick has been dismissed, which is
-   * deliberately wider than the dialog itself: the send happens a tick after the post, and a project
-   * dialog opening in that gap would be in front of a tick that had not appeared yet.
-   */
-  const [minted, setMinted] = useState(false);
-  const [toldHim, setToldHim] = useState(false);
-  useEffect(() => {
-    onAnnouncing?.(minted && !toldHim);
-  }, [minted, toldHim, onAnnouncing]);
+  /* ⚠️ ~~`minted` / `toldHim` / `onAnnouncing`.~~ They existed to queue the project dialog
+     behind this one (2026-09-08, earlier the same day). There is no second dialog to queue any
+     more: the project is a block inside this one, so the whole mechanism went with it. */
   /** The request cap has a dialog of its own on the review above; this banner leaves it to it. */
   const isLimit = state.errorDetail?.backendCode === "E8009";
   /** The renter's own firm, for the From line. Read once, and a failure just leaves it unnamed. */
@@ -111,9 +115,26 @@ export function ShareOnPost({ onAnnouncing }: { onAnnouncing?: (owed: boolean) =
        this one (a second monitor, a small pop-up) fires only `focus`. */
     document.addEventListener("visibilitychange", tell);
     window.addEventListener("focus", tell);
+    /**
+     * 🔴 **And a floor under both, because the hand-off can be a lie** (owner, 2026-09-08: *"it is
+     * showing like nothing happened, even the modal confirming the post didn't appear"*).
+     *
+     * `openEmailCompose` opens the compose window with `noopener`, and a window opened that way
+     * returns NO handle — so a pop-up the browser silently blocked is indistinguishable from one
+     * that opened, and the panel reports a hand-off either way. Nothing then took focus, this tab
+     * never lost visibility, and neither event ever fired: the renter was left on the share card
+     * with a live request and no tick at all.
+     *
+     * ⚠️ This is not a race with the compose tab. `tell` still refuses while this tab is HIDDEN,
+     * and a compose window that really opened takes focus long before the grace is up — so the only
+     * case this catches is the one where nothing opened. If he did leave, the listeners above still
+     * hold the tick until he comes back.
+     */
+    const floor = window.setTimeout(tell, TELL_ANYWAY_MS);
     return () => {
       document.removeEventListener("visibilitychange", tell);
       window.removeEventListener("focus", tell);
+      window.clearTimeout(floor);
     };
   }, [waitingToTell]);
 
@@ -177,8 +198,6 @@ export function ShareOnPost({ onAnnouncing }: { onAnnouncing?: (owed: boolean) =
     // Keeps this card mounted once the phase flips to confirmation, and keeps the REVIEW on screen
     // behind it rather than the confirmation page — see `CreateSurface`.
     actions.setShareOnPost(true);
-    // From here the tick is owed, so nothing else may take the screen until it has been read.
-    setMinted(true);
     return uuid;
   };
 
@@ -272,7 +291,6 @@ export function ShareOnPost({ onAnnouncing }: { onAnnouncing?: (owed: boolean) =
         open={posted}
         onClose={() => {
           setPosted(false);
-          setToldHim(true);
         }}
         size="sm"
       >
@@ -304,20 +322,17 @@ export function ShareOnPost({ onAnnouncing }: { onAnnouncing?: (owed: boolean) =
               {reached === 0 ? c.postedLive : reached === 1 ? c.postedLiveOne : fmt(c.postedLiveMany, { n: reached })}
             </p>
           )}
-          {/* ── The e-mail, said here too (owner, 2026-09-08) ────────────────────────────
-              A server-side send is the one channel with no window of its own to prove it happened,
-              so the line above — which counts suppliers — is not enough: he asked for *sent
-              successfully*, with the address it left from. Drawn only for that path, because a
-              compose window is its own evidence. */}
-          {mail && (
-            <p className="mt-2 flex flex-wrap items-center justify-center gap-1.5 text-meta font-semibold text-ok-deep">
-              <Icon name="mark_email_read" size={15} className="flex-none" />
-              {/* ⚠️ One sentence, not two lines. The Sent-folder copy is a clause of the send, and
-                  on its own line it read as a second thing that had happened. */}
-              {fmt(mail.recipients === 1 ? c.mailSentOne : c.mailSent, { from: mail.from, n: mail.recipients })}
-              {mail.inSentFolder ? `, ${c.mailCopyInSent}` : ""}
-            </p>
-          )}
+          {/* ── Two lines, not five (owner, 2026-09-08: *"reduce the text, remove the «sent
+              to» etc, just keep the title"*) ─────────────────────────────────────────────────
+
+              ~~A tick, a title, «It is live on Moedatech now and shared with 1 supplier», «Sent
+              from … to 1 supplier», «A copy is in your Sent folder», then the next step.~~ Five
+              lines for two facts, and the title above already states both: the request is posted
+              and it went from his own address. What was left was the same news in smaller type.
+
+              ⚠️ The Sent-folder copy is not lost, only moved to where it can be checked: the
+              status line under the share button, which is on screen behind this. */}
+
           {/* ⚠️ **The opposite sentence** (owner, 2026-09-08). This request reaches nobody by
               broadcast, so the one thing he must not walk away believing is that suppliers on
               Moedatech are looking at it. */}
@@ -327,18 +342,54 @@ export function ShareOnPost({ onAnnouncing }: { onAnnouncing?: (owed: boolean) =
               {c.offCatalogueLine}
             </p>
           )}
+
+          {/* ⚠️ **The project, as a block rather than a second dialog** (owner, 2026-09-08).
+              Filing is a consequence of the post, so it belongs under the sentence that announces
+              the post. It appears when the write lands, which may be a moment after this opens. */}
+          {filed && (
+            <div className="mt-4 flex w-full items-center gap-2.5 rounded-md border border-brand/40 bg-brand-soft px-3 py-2.5 text-start">
+              <Icon name="folder_open" size={17} className="flex-none text-brand" />
+              <span className="min-w-0 flex-1">
+                <b className="block truncate text-body font-semibold text-navy">
+                  {fmt(t.projects.offer.filedTitle, { site: projectTitle(filed) })}
+                </b>
+                <span className="block truncate text-meta text-muted">
+                  {t.projects.offer.fieldSite} · {shortSite(filed.location.label ?? "")}
+                </span>
+              </span>
+            </div>
+          )}
+
           {/* The link is already on the card behind this, so the dialog does not offer it again — it
               says the one thing he does not know yet and gets out of the way. */}
           <p className="mt-3 text-meta text-muted">{c.postedNext}</p>
           {/* Full width and last, as the reference has it: there is one thing to do here, so it
-              takes the whole row rather than hiding on a trailing edge. */}
+              takes the whole row rather than hiding on a trailing edge.
+
+              ⚠️ With a project there are two, and «View the project» is the SECONDARY one: it
+              leaves this screen, and the renter is midway through choosing channels. Keep sharing
+              stays the press that returns him to what he was doing. */}
+          {filed && (
+            <button
+              type="button"
+              onClick={() => {
+                setPosted(false);
+                  /* `?site=` selects THIS project on the board rather than whichever was touched
+                   last. */
+                router.push(`/?site=${encodeURIComponent(filed.id)}`);
+              }}
+              className={cx(btn("secondary", "lg", { full: true }), "mt-6")}
+            >
+              <Icon name="open_in_new" size={15} />
+              {t.projects.offer.viewAction}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
               setPosted(false);
-              setToldHim(true);
             }}
-            className={cx(btn("primary", "lg", { full: true }), "mt-6")}
+            className={cx(btn("primary", "lg", { full: true }), filed ? "mt-2" : "mt-6")}
           >
             {c.postedKeepSharing}
           </button>

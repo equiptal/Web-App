@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "manual:shots": "playwright test tests/e2e/manual-shots.spec.ts --project=en",
+    "ui:pins": "node scripts/ui-pins-doc.mjs",
+    "ui:shots": "PW_PORT=3100 playwright test tests/e2e/ui-shots.spec.ts",
+    "dev:preview": "NEXT_DIST_DIR=.next-preview next dev",
     "dev": "NODE_OPTIONS=--no-experimental-webstorage next dev",
     "build": "NODE_OPTIONS=--no-experimental-webstorage next build",
     "start": "NODE_OPTIONS=--no-experimental-webstorage next start",

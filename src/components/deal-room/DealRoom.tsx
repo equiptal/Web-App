@@ -714,13 +714,18 @@ export function DealRoom({ id, onTitle, initialFlow }: {
      he did not ask. Negotiating is available whenever the deal is live, which is the app's own rule and
      what the price bar's comment already claims: *"Negotiate is always available."*
 
-     `live` is still a real gate and the one that matters: a CLOSED, ABANDONED or AWAITING room has
-     nothing to counter — in an awaiting room the renter has accepted and the bar offers Withdraw — so
-     the link falls through and he lands on the room, under the strip that says why.
+     ~~`live` is still a real gate.~~ **Counter opens the sheet at EVERY status** (owner, 2026-09-08:
+     *"the counter offer must always show the 3 styles sheet, and if the deal room is cancelled show
+     that note in the sheet's header"*). It used to fall through on a CLOSED, ABANDONED or AWAITING
+     room, which dropped the renter onto the retired room view — a masthead, a price hero and two
+     lines saying it was cancelled: the very screen that was retired on 2026-09-07, reachable again
+     through the one link that is supposed to open the sheet. The sheet now opens read-only and says
+     so in its own header, which is both the answer to «what happened here» and the negotiation
+     history he came to read.
 
      ACCEPT keeps `showAct && canAccept` untouched. Accepting is settling, and its gate is the room's
      own comparison of terms, price and units; nothing here loosens it. */
-  flowGate.current = { counter: live, accept: showAct && canAccept };
+  flowGate.current = { counter: true, accept: showAct && canAccept };
 
   return (
     <div {...pin("deal-room")} className="dlproto" dir={ar ? "rtl" : "ltr"}>
@@ -1281,7 +1286,25 @@ function CounterFlow({
   }) => void;
   onAccept: (contractType: string) => void;
 }) {
-  const editable = mode === "counter";
+  /**
+   * A settled room still opens the sheet, read-only, and says why in its header (owner, 2026-09-08).
+   *
+   * The renter arriving from «counter this price» on a cancelled or closed room is not asking to
+   * negotiate — he cannot — he is asking what happened, and the answer is the negotiation itself:
+   * the three steps hold the price, the terms and the round-by-round log. Dropping him on the
+   * retired room view instead answered nothing and showed him a screen the product retired.
+   */
+  const settledNote =
+    room.status === "ABANDONED"
+      ? L("This deal room has been cancelled", "تم إلغاء غرفة الصفقة هذه")
+      : room.status === "CLOSED"
+        ? L("This deal is agreed and closed", "تم الاتفاق على هذه الصفقة وإغلاقها")
+        : room.status === "AWAITING_SUPPLIER_CONFIRMATION"
+          ? L("Waiting for the supplier to confirm", "بانتظار تأكيد المورد")
+          : null;
+  /** Nothing can be sent from a settled room, whichever mode opened the sheet. */
+  const settled = settledNote != null;
+  const editable = mode === "counter" && !settled;
   // Reconstructed negotiation history (app parity) — the LIVE position is read off this, not just the
   // room columns, so a supplier's unit counter is RECEIVED here (app resolveLivePosition). Also drives
   // the round number, the "Supplier: N units" references, and the supplier-total on the compare card.
@@ -1426,7 +1449,8 @@ function CounterFlow({
 
   // Pages reordered to spec §6: 0 = السعر (price), 1 = الشروط (terms), 2 = المراجعة (review).
   const canNext = page === 0 ? (editable ? rateValid : true) : page === 1 ? unresolvedCount === 0 : true;
-  const canSubmit = editable ? rateValid : ack;
+  // A settled room is read all the way through and sends nothing at the end of it.
+  const canSubmit = settled ? false : editable ? rateValid : ack;
   const allMatched = unresolvedCount === 0;
   const doSubmit = () =>
     editable
@@ -1639,6 +1663,13 @@ function CounterFlow({
             <div className="qp-htitle">
               <div className="t">{sheetTitle}</div>
               <div className="s">{L("Negotiation room", "غرفة التفاوض")}{roomCode ? ` · ${roomCode}` : ""} · {L(`Round ${roundNo}`, `الجولة ${roundNo}`)}</div>
+              {/* The status the renter arrived into, in the sheet's own header — see `settledNote`. */}
+              {settledNote && (
+                <div className={`qp-hnote${room.status === "ABANDONED" ? " danger" : ""}`}>
+                  <span className="material-icons-outlined">{room.status === "ABANDONED" ? "cancel" : room.status === "CLOSED" ? "verified" : "schedule"}</span>
+                  {settledNote}
+                </div>
+              )}
             </div>
             <div className="qp-htotal"><div className="k">{L("Your offer", "إجمالي عرضك")}</div><div className="v">{nf(total)} {sar}</div></div>
             <button className="qp-x" onClick={() => !busy && onClose()} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
@@ -1910,11 +1941,11 @@ function CounterFlow({
           <button type="button" className="qp-log" onClick={() => setLogOpen(true)}><span className="material-icons-outlined" style={{ fontSize: 16 }}>history</span>{L("Log", "السجل")}</button>
           <div className="spacer" />
           <div className="qp-foot-main">
-            {!editable && allMatched && page < 2 && <button className="qp-fbtn accept" onClick={() => setPage(2)}>✓ {L("Accept offer", "قبول العرض")}</button>}
+            {!editable && !settled && allMatched && page < 2 && <button className="qp-fbtn accept" onClick={() => setPage(2)}>✓ {L("Accept offer", "قبول العرض")}</button>}
             {page < 2 ? (
               <button className="qp-fbtn primary" disabled={!canNext} onClick={() => setPage((p) => (p + 1) as 0 | 1 | 2)}>{page === 0 ? L("Next: Terms", "التالي: الشروط") : L("Review & send", "مراجعة وإرسال")}<span className="qp-cch">‹</span></button>
             ) : (
-              <button className={`qp-fbtn ${editable ? "primary" : "accept"}`} disabled={busy || !canSubmit} onClick={doSubmit}>{busy ? L("Sending…", "جارٍ الإرسال…") : editable ? L("Send reply", "إرسال الرد") : L("Accept offer", "قبول العرض")}<span className="qp-cch">‹</span></button>
+              <button className={`qp-fbtn ${editable ? "primary" : "accept"}`} disabled={busy || !canSubmit} onClick={doSubmit}>{busy ? L("Sending…", "جارٍ الإرسال…") : settled ? L("Closed", "مغلقة") : editable ? L("Send reply", "إرسال الرد") : L("Accept offer", "قبول العرض")}<span className="qp-cch">‹</span></button>
             )}
             <button className="qp-fbtn back" disabled={busy} onClick={() => (page > 0 ? setPage((p) => (p - 1) as 0 | 1 | 2) : onClose())}>{page > 0 ? L("Back", "رجوع") : L("Close", "إغلاق")}<span className="qp-cch">›</span></button>
           </div>

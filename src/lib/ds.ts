@@ -311,8 +311,14 @@ export const PAGE_Y = "py-6 sm:py-7";
  * own leading edge, it reads as belonging to what it leaves.
  *
  * `AppShell` renders this itself for any page that registered a handler, so no page positions it.
+ *
+ * **Thinner since 2026-09-08** (owner, on the bid map's own header: *"the back arrow and its header
+ * must be thinner"*). ~~`mb-4` and a `gap-4`.~~ It is a row carrying one plain word — and, where a
+ * page fills the bar's trailing slot, a strip of chips — so 16px under it and 16px inside it was a
+ * band of empty space above every screen's first row. `mb-2` / `gap-3` on every page, because there
+ * is one back control and it is the same one everywhere.
  */
-export const PAGE_BACK = "mb-4 flex w-full items-center gap-4";
+export const PAGE_BACK = "mb-2 flex w-full items-center gap-3";
 
 /**
  * A row of buttons.

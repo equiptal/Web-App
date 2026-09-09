@@ -2,12 +2,20 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/ui";
+import { Dialog } from "@/components/Dialog";
 import { fmt, useT } from "@/lib/i18n";
 import { btn, cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 import { VendorMark } from "@/components/VendorMark";
 import { MoedatechBadge } from "@/components/MoedatechBadge";
-import { ApiError, deleteSupplierGroup, listRenterSuppliers, renameSupplierGroup, updateRenterSupplier } from "@/lib/api/client";
+import {
+  ApiError,
+  deleteSupplierGroup,
+  listRenterSuppliers,
+  removeRenterSupplier,
+  renameSupplierGroup,
+  updateRenterSupplier,
+} from "@/lib/api/client";
 import { AddSuppliersDialog } from "./AddSuppliersDialog";
 import { AddFromMoedatechDialog } from "./AddFromMoedatechDialog";
 import { DeleteGroupDialog, GroupsMenu, NameGroupDialog, RenameGroupDialog } from "./SupplierGroups";
@@ -16,7 +24,6 @@ import { SupplierBidsDialog } from "./SupplierBidsDialog";
 import { EditSupplierDialog } from "./EditSupplierDialog";
 import { InviteSupplierDialog } from "./InviteSupplierDialog";
 import { SuggestedBand } from "./SuggestedBand";
-import { ShareRequestModal } from "@/components/share/ShareRequestModal";
 import {
   activeFilterCount,
   NO_FILTERS,
@@ -25,6 +32,7 @@ import {
   type SupplierFilterState,
 } from "./SupplierFilters";
 import { hasUnseenBid, loadSeen, markSeen } from "@/lib/supplierSeen";
+import { phoneE164 } from "@/lib/contract/phone-normalize";
 import {
   bidCount,
   canBeEmailed,
@@ -79,8 +87,21 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
      when it is done. */
   const [menuOpen, setMenuOpen] = useState(false);
   const [groupFilter, setGroupFilter] = useState("");
-  const [picking, setPicking] = useState(false);
+  /**
+   * What the ticks are FOR, or null when there are none.
+   *
+   * ⚠️ ~~A boolean.~~ Removing rows is the same act as grouping them — pick, then do one thing —
+   * and giving it a selection mode of its own would put two different columns of checkboxes on one
+   * table. The mode decides what the footer says and which button it carries; everything else about
+   * picking is shared.
+   */
+  const [pickFor, setPickFor] = useState<"group" | "remove" | null>(null);
+  const picking = pickFor !== null;
   const [picked, setPicked] = useState<Record<string, boolean>>({});
+  /** True while the removals are in flight, so the button cannot be pressed twice. */
+  const [removing, setRemoving] = useState(false);
+  /** The last step before rows go. A delete is not something a stray click may do. */
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const [naming, setNaming] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -94,8 +115,6 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
   /* The finer cuts, behind one button — the everyday split stays on the two pills beside it. */
   const [filters, setFilters] = useState<SupplierFilterState>(NO_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  /** Whom a share is being composed for. Empty means «whoever is picked in the dialog». */
-  const [sharingWith, setSharingWith] = useState<RenterSupplier[] | null>(null);
   /* When THIS person last opened each row. Local by design — see `supplierSeen.ts`. */
   const [seen, setSeen] = useState<Record<string, string>>({});
 
@@ -162,6 +181,34 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
     }
   };
 
+  /**
+   * Take the picked rows off the renter's list.
+   *
+   * 🔴 **A write per row, and a partial failure is REPORTED rather than hidden.** `Promise.all`
+   * rejects on the first failure and throws away what the others answered, so a batch where one row
+   * 404s would say «that did not save» about nine removals that did. `allSettled` counts them.
+   *
+   * ⚠️ It removes the renter's LINK, not the supplier. Their account, their store and the bids
+   * they already sent stay exactly where they are, which is what the confirmation says.
+   */
+  const doRemove = async () => {
+    const gone = pickedRows;
+    if (!gone.length || removing) return;
+    setRemoving(true);
+    const results = await Promise.allSettled(gone.map((s) => removeRenterSupplier(s.id)));
+    const failed = results.filter((r) => r.status === "rejected").length;
+    setRemoving(false);
+    setConfirmRemove(false);
+    setPickFor(null);
+    setPicked({});
+    setToast(
+      failed === 0
+        ? fmt(gone.length === 1 ? c.removedOne : c.removedMany, { n: gone.length })
+        : fmt(c.removedSome, { n: gone.length - failed, failed }),
+    );
+    load();
+  };
+
   /** Assigning a group is a write per row: a label lives on the supplier, not in a table of its own. */
   const saveGroup = async (name: string) => {
     const members = pickedRows;
@@ -174,7 +221,7 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
       setToast(c.groupFailed);
     }
     setNaming(false);
-    setPicking(false);
+    setPickFor(null);
     setPicked({});
     load();
   };
@@ -289,26 +336,32 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
           <Pill on={pill === "vendor"} onClick={() => setPill("vendor")} label={c.registeredVendors} n={vendors} mark />
 
           <span className="ms-auto flex items-center gap-2">
-            {/* ── Share a request, from HERE as well as from the request ──────────────────────────
-                Both doors exist in the prototype on purpose, and its own note says why: *"pick the
-                suppliers first, or pick the request first. Both write the same record, so either way
-                it lands under «What you sent them» and on the request itself."*
+            {/*
+              * — «Share a request» lived here —
+              *
+              * Removed (owner, 2026-09-08). It opened the whole share panel from a screen about
+              * PEOPLE, so a renter mid-way through tidying his list met a request picker, a channel
+              * row and a message preview. The door from the request itself is the one that matches
+              * what he is thinking about, and it is unchanged.
+              *
+              * 🔴 `ShareRequestModal` is untouched and still mounted by every request surface. This
+              * removes a second entrance, not the feature.
+              */}
 
-                A renter on this screen is thinking about people; a renter on a request is thinking
-                about a job. Making him navigate to the other one first is making him translate.
-
-                It sits WITH the groups menu and the filters (owner, 2026-09-02). Everything on the
-                trailing side acts on the list in front of him: narrow it, group it, send it a
-                request. The search box and the two count pills on the leading side describe what he
-                is looking at. Alone in the middle, this was the one control belonging to neither. */}
+            {/* ⚠️ Remove enters the SAME picking mode the groups menu does, because it is the same
+                act: choose rows, then do one thing to them. Two selection idioms on one table is how
+                a renter ends up ticking boxes for a job he is not doing. */}
             <button
               type="button"
-              onClick={() => setSharingWith([])}
+              onClick={() => {
+                setPicked({});
+                setPickFor("remove");
+              }}
               disabled={!rows?.length}
               className={cx(btn("secondary", "sm"), "flex-none")}
             >
-              <Icon name="share" size={14} />
-              {c.shareARequest}
+              <Icon name="delete_outline" size={14} />
+              {c.removeAction}
             </button>
 
             <GroupsMenu
@@ -332,7 +385,7 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
               onCreate={() => {
                 setMenuOpen(false);
                 setPicked({});
-                setPicking(true);
+                setPickFor("group");
               }}
             />
 
@@ -354,34 +407,6 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
           </span>
         </div>
 
-        {/* Only while a group is being made. Pick, then name — a group with no members does not exist. */}
-        {picking && (
-          <div className="flex flex-wrap items-center gap-2.5 bg-navy px-3 py-2.5 text-meta font-extrabold text-surface">
-            <Icon name="label" size={15} />
-            <span>{pickedRows.length ? fmt(c.nSelectedFor, { n: pickedRows.length }) : c.pickMembers}</span>
-            <span className="ms-auto flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setPicking(false);
-                  setPicked({});
-                }}
-                className="text-surface/75 transition hover:text-surface"
-              >
-                {t.common.cancel}
-              </button>
-              <button
-                type="button"
-                disabled={!pickedRows.length}
-                onClick={() => setNaming(true)}
-                className={btn("primary", "sm")}
-              >
-                {c.nameGroup}
-              </button>
-            </span>
-          </div>
-        )}
-
         {rows === null ? (
           <p className="p-8 text-center text-meta text-muted">{c.loading}</p>
         ) : visible.length === 0 ? (
@@ -402,20 +427,26 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
             <thead>
               <tr>
                 {picking && (
-                  <th className="w-[34px] border-b border-border bg-surface2 px-3 py-2">
-                    <input
-                      type="checkbox"
-                      aria-label={c.pickMembers}
-                      checked={visible.length > 0 && visible.every((s) => picked[s.id])}
-                      onChange={(e) =>
-                        setPicked((p) => {
-                          const next = { ...p };
-                          visible.forEach((s) => (e.target.checked ? (next[s.id] = true) : delete next[s.id]));
-                          return next;
-                        })
-                      }
-                      className="h-3.5 w-3.5 accent-brand"
-                    />
+                  /* ⚠️ **The word, beside the box** (owner, 2026-09-08: *"make the top select all
+                     clear, like add text «all» beside the tick box"*). A lone checkbox in a header
+                     row is the one control on this table whose job cannot be guessed: it sits where
+                     a column heading goes, so it reads as a heading rather than as a switch. */
+                  <th className="w-[60px] border-b border-border bg-surface2 px-3 py-2">
+                    <label className="flex cursor-pointer items-center gap-1.5 text-label font-extrabold uppercase tracking-wide text-muted">
+                      <input
+                        type="checkbox"
+                        checked={visible.length > 0 && visible.every((s) => picked[s.id])}
+                        onChange={(e) =>
+                          setPicked((p) => {
+                            const next = { ...p };
+                            visible.forEach((s) => (e.target.checked ? (next[s.id] = true) : delete next[s.id]));
+                            return next;
+                          })
+                        }
+                        className="h-3.5 w-3.5 flex-none accent-brand"
+                      />
+                      {c.all}
+                    </label>
                   </th>
                 )}
                 {[c.colSupplier, c.colVendor, c.colPhone, c.colEmail, c.colGroups, c.colBids, ""].map((h, hi) => (
@@ -462,6 +493,61 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
           </table>
           </div>
         )}
+
+        {/* ── The selection bar, under the rows it counts (owner, 2026-09-08) ──────────────────
+            *"Make the header as footer of the table and make the font bold here."*
+
+            MARK **It was above the table**, between the toolbar and the column headings, so a renter
+            scrolling a long list lost the count and both buttons the moment he started picking —
+            and the rows he was ticking pushed the one control that finishes the job off the top of
+            the screen. It is `sticky bottom-0` now: it stays with him down the list, over the rows
+            rather than beside them, which is where every table in this product puts a bulk action.
+
+            MARK It is drawn OUTSIDE the horizontal scroller. Inside it, the bar would scroll
+            sideways with the columns and take Cancel off the screen on a phone. */}
+        {picking && (
+          <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-2.5 bg-navy px-3 py-3 text-body font-extrabold text-surface">
+            <Icon name={pickFor === "remove" ? "delete_outline" : "label"} size={16} className="flex-none" />
+            <span>
+              {pickedRows.length
+                ? fmt(pickFor === "remove" ? c.nSelectedToRemove : c.nSelectedFor, { n: pickedRows.length })
+                : pickFor === "remove"
+                  ? c.pickToRemove
+                  : c.pickMembers}
+            </span>
+            <span className="ms-auto flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPickFor(null);
+                  setPicked({});
+                }}
+                className="text-surface/75 transition hover:text-surface"
+              >
+                {t.common.cancel}
+              </button>
+              {pickFor === "remove" ? (
+                <button
+                  type="button"
+                  disabled={!pickedRows.length || removing}
+                  onClick={() => setConfirmRemove(true)}
+                  className={btn("danger", "sm")}
+                >
+                  {c.removeAction}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!pickedRows.length}
+                  onClick={() => setNaming(true)}
+                  className={btn("primary", "sm")}
+                >
+                  {c.nameGroup}
+                </button>
+              )}
+            </span>
+          </div>
+        )}
       </div>
 
       <AddFromMoedatechDialog
@@ -494,19 +580,6 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
         onChange={setFilters}
         onClearGroup={() => setGroupFilter("")}
         onClose={() => setFiltersOpen(false)}
-      />
-
-      {/* The same panel the review screen carries, in the shell this screen needs (owner,
-          2026-09-02: *"on any share option for a request it will open for them modal in the same
-          style"*). Nothing about the share lives here, so this door cannot drift from that one. */}
-      <ShareRequestModal
-        open={sharingWith !== null}
-        preselect={(sharingWith ?? []).map((s) => s.id)}
-        onClose={() => setSharingWith(null)}
-        onShared={(n) => {
-          setToast(n === 1 ? c.sharedOne : fmt(c.sharedMany, { n }));
-          load();
-        }}
       />
 
       <EditSupplierDialog
@@ -543,6 +616,41 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
       />
 
       <NameGroupDialog open={naming} members={pickedRows} onClose={() => setNaming(false)} onSave={saveGroup} />
+
+      {/* 🔴 **A delete gets a confirmation, always.** The rows are gone from his list on this press
+          and there is no undo, so the count and the consequence are stated once more before it
+          runs — and the consequence is the narrow one: his link goes, their account does not. */}
+      <Dialog
+        open={confirmRemove}
+        onClose={() => setConfirmRemove(false)}
+        title={c.removeTitle}
+        footer={
+          <div className="flex w-full items-center justify-end gap-2">
+            <button type="button" onClick={() => setConfirmRemove(false)} className={btn("secondary", "md")}>
+              {t.common.cancel}
+            </button>
+            <button type="button" disabled={removing} onClick={() => void doRemove()} className={btn("danger", "md")}>
+              <Icon name="delete_outline" size={15} />
+              {fmt(pickedRows.length === 1 ? c.removeConfirmOne : c.removeConfirmMany, { n: pickedRows.length })}
+            </button>
+          </div>
+        }
+      >
+        <div className="grid gap-3">
+          <p className="text-body leading-relaxed text-muted-dark">{c.removeBody}</p>
+          {/* ⚠️ Named, not counted. This is the last screen before they go. */}
+          <div className="flex flex-wrap gap-1.5">
+            {pickedRows.map((x) => (
+              <span
+                key={x.id}
+                className="inline-flex h-[26px] max-w-full items-center rounded-full border border-border bg-surface2 px-3 text-meta text-navy"
+              >
+                <span className="truncate">{x.name}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      </Dialog>
       {renaming !== null && (
         <RenameGroupDialog
           open
@@ -650,6 +758,15 @@ function Row({
       onClick={(e) => {
         // Anything interactive keeps its own click: the vendor toggle, the checkbox, the bid count.
         if ((e.target as HTMLElement).closest("button, input, a, select")) return;
+        /* ⚠️ **The whole row picks, not the 14px box** (owner, 2026-09-08: *"make the selection
+           smooth on row select, not exact tick place"*). A checkbox is a 14px target in a 44px row,
+           so ticking six suppliers was six small aims; and the row's own click did something ELSE
+           entirely, opening the profile over the list he was picking from. While picking, the row
+           IS the checkbox. */
+        if (picking) {
+          onPick(!picked);
+          return;
+        }
         onOpen();
       }}
       className={cx(
@@ -658,6 +775,9 @@ function Row({
       )}
     >
       {picking && (
+        /* ⚠️ It stays, and it is now a MIRROR of the row's state as well as a target of its own:
+            it is what tells a renter at a glance which rows are in, and screen readers have nothing
+            else to read the selection from. */
         <td className="px-3 py-2.5">
           <input
             type="checkbox"
@@ -734,9 +854,20 @@ function Row({
           «add» is a real button now rather than a styled span, and it opens the same edit form the
           pen does. Groups and bids get the dash alone: neither is a thing the renter fills in here. */}
       <td className="px-3 py-2.5 text-meta">
+        {/* 🔴 **Normalised on the way OUT, not only on the way in** (owner, 2026-09-08: *"some
+            numbers in Excel still show weird values, not normalized"*).
+
+            The import preview normalises what it is about to post, and that fixed everything sent
+            AFTER it. It did nothing for what is already stored: `phone` on an `own` row is what the
+            renter typed, so a row imported before that landed still comes back as `05 0337 2850`,
+            `966503372850` or `+966 50-337-2850` and the cell printed it verbatim. Three spellings of
+            one number, in a column a renter scans down.
+
+            `phoneE164` is the same parser the preview uses. A number it cannot read is drawn exactly
+            as it arrived, because a phone we cannot parse is still the only thing he has. */}
         {s.phone ? (
           <span className="block font-semibold text-navy" dir="ltr">
-            {s.phone}
+            {phoneE164(s.phone) ?? s.phone}
           </span>
         ) : (
           <MissingContact onAdd={onEdit} label={c.add} />

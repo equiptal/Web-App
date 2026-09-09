@@ -89,16 +89,54 @@ describe("the review screen steps back to the canvas", () => {
     expect(nav.pushed).toEqual([]);
   });
 
-  it("then steps from the canvas back to «Your request»", async () => {
+  it("ASKS before stepping from the canvas back to «Your request»", async () => {
+    /* ~~It stepped straight back.~~ Withdrawn (owner, 2026-09-09): *"if clicked while user is on the
+       request page and back taking him to the intake again then show short simple confirm modal
+       asking do you want to leave this request?"*. That press replaces the whole drafted request
+       with the typing box, so it is the one step of the chain that earns a question. */
     draw();
     await toCanvas();
 
     fireEvent.click(back()!);
 
+    // Nothing has moved yet — the question is the whole of what the press did.
+    expect(store.state.phase).toBe("wizard");
+    expect(screen.getByText("Leave this request and go back?")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Leave" }));
+
     expect(store.state.phase).toBe("intake");
     expect(nav.pushed).toEqual([]);
     // The draft is not thrown away by stepping back — it is the same request.
     expect(store.state.draft).toBeTruthy();
+  });
+
+  it("«Stay» leaves him exactly where he was", async () => {
+    // The mutation this catches: a confirm whose second button also navigates, which would make the
+    // question decorative.
+    draw();
+    await toCanvas();
+
+    fireEvent.click(back()!);
+    fireEvent.click(screen.getByRole("button", { name: "Stay" }));
+
+    expect(store.state.phase).toBe("wizard");
+    expect(store.state.readyToSend).toBe(false);
+    expect(nav.pushed).toEqual([]);
+    expect(store.state.draft).toBeTruthy();
+  });
+
+  it("does NOT ask on the review step — that press keeps the draft whole", async () => {
+    // The confirm guards ONE step. Asking on every step would put a dialog between the renter and
+    // the panel he was going back to look at.
+    draw();
+    await toCanvas();
+    await run(() => store.actions.setReadyToSend(true));
+
+    fireEvent.click(back()!);
+
+    expect(screen.queryByText("Leave this request and go back?")).toBeNull();
+    expect(store.state.readyToSend).toBe(false);
   });
 
   it("only leaves the page at the bottom of the chain, and leaves for where he came FROM", async () => {

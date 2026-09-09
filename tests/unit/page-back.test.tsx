@@ -71,9 +71,12 @@ describe("the back control sits on the page, under the bar", () => {
     expect(cls).toContain("border-border");
   });
 
-  it("leaves 16px between itself and the page's first row", () => {
+  it("leaves 8px between itself and the page's first row", () => {
+    /* ~~16px (`mb-4`).~~ Halved on the owner's word (2026-09-08): *"the back arrow and its header must
+       be thinner"*. The bar holds one plain word and, on some pages, a strip of chips beside it; the
+       old rhythm read as a band of empty space above every first row. */
     render(<Shell back={() => {}} />);
-    expect(screen.getByRole("button", { name: "Back" }).parentElement?.className).toContain("mb-4");
+    expect(screen.getByRole("button", { name: "Back" }).parentElement?.className).toContain("mb-2");
   });
 });
 

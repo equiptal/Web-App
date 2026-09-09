@@ -2489,3 +2489,110 @@ describe("an off-catalogue request says the opposite", () => {
     expect(screen.queryByText(c.sendMoedatechOnly)).toBeNull();
   });
 });
+
+
+/**
+ * -- An unfinished consent (owner, 2026-09-08) --------------------------------------------------
+ *
+ * *"What if the user clicks Outlook and Send and didn't complete his connection with Outlook? It is
+ * showing like nothing happened, even the modal confirming the post didn't appear."*
+ *
+ * 🔴 The consent poll watched ONE thing, `window.closed`. A renter who leaves the account chooser
+ * open and comes back to this tab never closes it, so the promise never settled: the send stopped
+ * dead after the post, the tick never fired, and the button sat on «Posting…» over a request that
+ * was already live.
+ */
+describe("a consent the renter never finishes", () => {
+  const shared = vi.fn();
+
+  /** A pop-up that stays OPEN, which is the whole point of these. */
+  const stuckPopup = () => {
+    const win = { closed: false, location: { href: "" }, close: vi.fn() } as unknown as Window & { close: ReturnType<typeof vi.fn> };
+    opened.mockReturnValue(win);
+    return win;
+  };
+
+  const pressSendConnecting = async () => {
+    shared.mockReset();
+    api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
+    api.connectUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?x=1";
+    api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
+
+    draw({ draftForm: DRAFT, onShared: shared });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    await waitFor(() => expect(confirmButton()).toBeTruthy());
+    fireEvent.click(confirmButton()!);
+  };
+
+  it("Given consent lands while the window is still open, Then the send carries on", async () => {
+    /**
+     * ⚠️ The status is the second signal, and it is the one that is actually true: the callback
+     * has reached the backend, so the connection exists whether or not the little window has got
+     * round to closing itself.
+     */
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const win = stuckPopup();
+      await pressSendConnecting();
+      await waitFor(() => expect(win.location.href).toContain("login.microsoftonline.com"));
+
+      // Microsoft answers; the backend flips. The window is still open on screen.
+      api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
+      api.mail = { sent: true, from: "b@x.sa", via: "graph", recipients: 1, messageId: null, inSentFolder: true, skipped: 0 };
+
+      await vi.advanceTimersByTimeAsync(1500);
+      await waitFor(() => expect(api.mailCalls).toHaveLength(1));
+      // ⚠️ And we shut the stray pop-up ourselves rather than leaving it over the panel.
+      expect(win.close).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("Given he walks away, Then the send finishes anyway rather than waiting forever", async () => {
+    /**
+     * 🔴 **This is the report.** The request is posted by the time the consent starts, so a poll
+     * that never settles leaves a live request and a screen that says nothing at all. After the
+     * deadline the answer is «not connected», which is the answer that keeps him moving: the send
+     * falls through to the compose window and the tick fires.
+     */
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const win = stuckPopup();
+      await pressSendConnecting();
+      await waitFor(() => expect(win.location.href).toContain("login.microsoftonline.com"));
+
+      // Nothing happens. He never signs in, and he never closes it.
+      await vi.advanceTimersByTimeAsync(121_000);
+
+      await waitFor(() => expect(api.mailCalls).toHaveLength(1));
+      await waitFor(() => expect(shared).toHaveBeenCalled());
+      // ⚠️ The window is NOT closed under him: he may still be typing a password into it.
+      expect(win.close).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("Given the authorize call fails, Then the send still finishes", async () => {
+    // ⚠️ It is awaited inside `send`, so a throw there rejected the whole send and `busy` never
+    // cleared. A refusal is an answer, not an exception.
+    shared.mockReset();
+    api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
+    api.connectUrl = null;
+    api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
+
+    draw({ draftForm: DRAFT, onShared: shared });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    await waitFor(() => expect(confirmButton()).toBeTruthy());
+    fireEvent.click(confirmButton()!);
+
+    await waitFor(() => expect(shared).toHaveBeenCalled());
+    // The button is pressable again, not stuck on «Posting…».
+    expect(screen.queryByText(c.posting)).toBeNull();
+  });
+});

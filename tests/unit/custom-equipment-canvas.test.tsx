@@ -43,7 +43,7 @@ describe("naming a machine the catalogue does not carry", () => {
       text: "floating crane barge for two weeks",
     });
 
-    const box = screen.getByPlaceholderText("Name the machine you need") as HTMLInputElement;
+    const box = screen.getByPlaceholderText("Name the equipment you need") as HTMLInputElement;
     expect(box.value).toBe("floating crane barge");
     /* The list is NOT taken away: a renter who can find his machine in it still can. And the name
        field sits in the SAME box as the list, under it, with the note after both (owner,
@@ -55,7 +55,7 @@ describe("naming a machine the catalogue does not carry", () => {
        A block under the field → pinned to the label → and now the field’s own hint line, in place of
        «this name is what your supplier will see», which the owner had removed: *"remove this and put
        the note in its place"*. So: the list, then the box, then the note under it. */
-    const order = ["TYPE", "Name the machine you need", "This equipment type is not available"].map((needle) =>
+    const order = ["TYPE", "Name the equipment you need", "This equipment type is not available"].map((needle) =>
       document.body.innerHTML.indexOf(needle),
     );
     expect(order.every((i) => i >= 0)).toBe(true);
@@ -102,9 +102,9 @@ describe("naming a machine the catalogue does not carry", () => {
     });
     await renderCanvas(<Canvas />, { draft: makeAgentDraft({ items: [barge], project: confirmedProject() }) });
 
-    const box = screen.getByPlaceholderText("Name the machine you need") as HTMLInputElement;
+    const box = screen.getByPlaceholderText("Name the equipment you need") as HTMLInputElement;
     fireEvent.change(box, { target: { value: "split hopper barge" } });
-    expect((screen.getByPlaceholderText("Name the machine you need") as HTMLInputElement).value).toBe("split hopper barge");
+    expect((screen.getByPlaceholderText("Name the equipment you need") as HTMLInputElement).value).toBe("split hopper barge");
   }, 20_000);
 
   /**

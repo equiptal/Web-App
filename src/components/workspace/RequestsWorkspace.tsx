@@ -563,9 +563,11 @@ export function RequestsWorkspace() {
             ))}
           </div>
         </div>
-        <div className={`mx-auto w-full ${PAGE_MAX} ${PAGE_X} mt-4 flex gap-5`}>
+        <div
+          className={`mx-auto grid w-full ${PAGE_MAX} ${PAGE_X} mt-4 grid-cols-[repeat(auto-fill,minmax(min(100%,320px),344px))] gap-5`}
+        >
           {Array.from({ length: 3 }, (_, i) => (
-            <Skeleton key={i} className="h-[420px] w-[344px] flex-none rounded-lg" />
+            <Skeleton key={i} className="h-[420px] rounded-lg" />
           ))}
         </div>
       </div>
@@ -610,7 +612,14 @@ export function RequestsWorkspace() {
     // this surface, and `fullBleed` gives it none to cancel. Every band below is `flex-none`; the one
     // that grows is the tab panel, and the only thing that scrolls is the list inside it — so the
     // rail and the strip cannot be pushed off the top by a long column of bids.
-    <div {...pin("requests-workspace")} className="flex h-full min-h-0 flex-col">
+    /* ── The page scrolls, not the box inside it (owner, 2026-09-08) ─────────────────────────
+       ~~Every band `flex-none`, the tab panel growing into what is left, and the bids scrolling
+       inside it.~~ That is what left a 100%-zoom screen with no vertical scrollbar at all and the
+       fourth bid behind a horizontal bar. This column is the scroller now: the rail, the tabs and
+       the cards all travel with it, which is what a renter means by scrolling the page. The shell is
+       still `fullBleed`, so this scroller is exactly the viewport under the header — the header and
+       the nav stay put, and there is only ever ONE bar on screen. */
+    <div {...pin("requests-workspace")} className="flex h-full min-h-0 flex-col overflow-y-auto">
       <RequestRail
         tiles={tiles}
         activeKey={resolved.groupId}
@@ -622,7 +631,7 @@ export function RequestsWorkspace() {
 
       {/* The same cap and the same gutter every page takes — so a renter moving from /create to
           /requests finds the content starting on the same line. */}
-      <div className={`mx-auto w-full ${PAGE_MAX} ${PAGE_X} mt-2 flex min-h-0 flex-1 flex-col pb-2`}>
+      <div className={`mx-auto w-full ${PAGE_MAX} ${PAGE_X} mt-2 flex flex-col pb-8`}>
         {/* ── The row above the panel (owner, 2026-08-27) ─────────────────────────────────────────
             Three things, and the tabs are the middle one so they sit under the eye rather than off
             at the leading edge.
@@ -720,7 +729,7 @@ export function RequestsWorkspace() {
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-sm rounded-tr-sm border border-border bg-surface">
+        <div className="flex flex-col overflow-hidden rounded-b-sm rounded-tr-sm border border-border bg-surface">
           {/* ── Source, above whichever pane is showing (owner's reference, 2026-08-25) ───────────
               It narrows both panes, so it belongs to neither — and it reads as a quiet row of words
               rather than a row of pills, because it is a filter over the table, not an action on it.
@@ -795,7 +804,9 @@ export function RequestsWorkspace() {
               `fullBleed` — pinned to the viewport by the same 2026-08-25 ruling — so there is no
               document scroll to hand the table to. Making the PAGE scroll means that page dropping
               `fullBleed`, which is the owner's call, not this component's. */}
-          <div className={`flex min-h-0 flex-1 flex-col ${tab === "compare" ? "overflow-y-auto" : "overflow-hidden"}`}>
+          {/* Neither tab scrolls itself any more: both render whole and the column above carries
+              them. The comparison keeps its own SIDEWAYS strip, which is a table's business. */}
+          <div className="flex flex-col">
           {tab === "cards" ? (
             <BidCards
               bids={shown}

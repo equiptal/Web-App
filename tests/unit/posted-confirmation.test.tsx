@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { LocaleProvider } from "@/lib/i18n";
 import { en } from "@/lib/i18n/en";
+import type { ProjectSummary } from "@/lib/contract/project";
 
 /**
  * **The confirmation appears when there is nothing to come back from** (owner, 2026-09-08: *"when I
@@ -66,10 +67,18 @@ afterEach(cleanup);
  */
 const titleFrom = (from: string) => c.postedTitleFrom.replace("{from}", from);
 
-const draw = () =>
+/** A site the request was filed under, as `ProjectFiled` hands it up. */
+const SITE = {
+  id: "p-1",
+  title: "RGRA",
+  location: { label: "RGRA, Riyadh", lat: null, lng: null },
+  version: 1,
+} as unknown as ProjectSummary;
+
+const draw = (filed: ProjectSummary | null = null) =>
   render(
     <LocaleProvider initialLocale="en">
-      <ShareOnPost />
+      <ShareOnPost filed={filed} />
     </LocaleProvider>,
   );
 
@@ -92,27 +101,31 @@ describe("a send the server performed", () => {
       handedOff: false,
       mail: { from: "bandar@moedatech.net", recipients: 2, inSentFolder: true },
     });
-    /* ⚠️ **The title says it, and the line under it says it again with the count** (owner,
-       2026-09-08). Both carry the address on purpose: the title answers *did it go?* and the line
-       answers *to how many?* */
+    /**
+     * 🔴 **The title is the whole statement** (owner, 2026-09-08: *"reduce the text, remove the
+     * «sent to» etc, just keep the title"*).
+     *
+     * ~~A title, «It is live on Moedatech now and shared with 1 supplier», «Sent from … to 1
+     * supplier», «A copy is in your Sent folder».~~ Four lines for two facts, both of which the
+     * title already carries: it is posted, and it went from his own address.
+     */
     expect(await screen.findByText(titleFrom("bandar@moedatech.net"))).toBeTruthy();
-    // A server send has no window of its own to prove it happened, so the copy in Sent is stated —
-    // as a CLAUSE of the send line now, not as a line of its own.
     const sent = c.mailSent.replace("{from}", "bandar@moedatech.net").replace("{n}", "2");
-    expect(screen.getByText(new RegExp(`${sent}, ${c.mailCopyInSent}`))).toBeTruthy();
+    expect(screen.queryByText(new RegExp(sent))).toBeNull();
+    // ⚠️ The Sent-folder copy is not lost, only moved: the status line under the share button,
+    // which is on screen behind this dialog, still says it.
+    expect(screen.queryByText(new RegExp(c.mailInSent))).toBeNull();
   });
 
-  it("still counts the suppliers it reached", async () => {
+  it("says nothing under the title but the next step", async () => {
     draw();
     await waitFor(() => expect(screen.getByTestId("panel")).toBeTruthy());
     hoisted.fire!(1, "email", { handedOff: false, mail: { from: "b@m.net", recipients: 1, inSentFolder: false } });
-    /* ⚠️ **Counted in the send line, not in a line of its own** (owner, 2026-09-08). «It is live
-       on Moedatech now, and shared with 1 supplier» said the post a second time and the send a
-       second time, in a dialog whose title had already said both. */
-    expect(await screen.findByText(c.mailSentOne.replace("{from}", "b@m.net"))).toBeTruthy();
+    /* ⚠️ **The count survives only where it is the ONLY thing said** — a channel we did not send
+       through. With a server send the title states the address and the count is not worth a line of
+       its own; with WhatsApp there is no title to carry it. */
+    expect(await screen.findByText(titleFrom("b@m.net"))).toBeTruthy();
     expect(screen.queryByText(c.postedLiveOne)).toBeNull();
-    // And no Sent-folder clause on a send that filed no copy.
-    expect(screen.queryByText(new RegExp(c.mailCopyInSent))).toBeNull();
   });
 });
 
@@ -131,6 +144,65 @@ describe("a channel that took the browser away", () => {
     expect(await screen.findByText(c.postedTitle)).toBeTruthy();
     // Nothing to claim about an e-mail we did not send.
     expect(screen.queryByText(new RegExp(c.mailInSent))).toBeNull();
+  });
+
+  it("Given the window was BLOCKED, Then it announces anyway rather than waiting forever", async () => {
+    /**
+     * 🔴 **A hand-off can be a lie** (owner, 2026-09-08: *"it is showing like nothing happened,
+     * even the modal confirming the post didn't appear"*).
+     *
+     * `openEmailCompose` opens the compose window with `noopener`, which returns NO handle — so a
+     * pop-up the browser silently blocked is indistinguishable from one that opened, and the panel
+     * reports `handedOff: true` either way. Nothing took focus, this tab never lost visibility, and
+     * neither `focus` nor `visibilitychange` ever fired: a live request and no tick.
+     */
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      draw();
+      await waitFor(() => expect(screen.getByTestId("panel")).toBeTruthy());
+      hoisted.fire!(1, "email", { handedOff: true });
+      /* ⚠️ The wait is an EFFECT, so let it mount before the clock is moved — otherwise the test
+         advances past a timer that has not been set yet and proves nothing. */
+      await act(async () => {});
+      expect(screen.queryByText(c.postedTitle)).toBeNull();
+
+      // No event, ever. The tab was visible the whole time, because nothing opened.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3_000);
+      });
+      expect(screen.getByText(c.postedTitle)).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("Given the window DID open, Then the floor does not fire under it", async () => {
+    /**
+     * ⚠️ Not a race with the compose tab. The announcement still refuses while this tab is
+     * HIDDEN, and a window that really opened takes focus long before the grace is up — so the only
+     * case the floor catches is the one where nothing opened.
+     */
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const hidden = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    try {
+      draw();
+      await waitFor(() => expect(screen.getByTestId("panel")).toBeTruthy());
+      hoisted.fire!(1, "email", { handedOff: true });
+      await act(async () => {});
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3_000);
+      });
+      // He is still in the compose tab. The tick waits for him, as it always did.
+      expect(screen.queryByText(c.postedTitle)).toBeNull();
+
+      hidden.mockReturnValue("visible");
+      fireEvent(window, new Event("focus"));
+      expect(await screen.findByText(c.postedTitle)).toBeTruthy();
+    } finally {
+      hidden.mockRestore();
+      vi.useRealTimers();
+    }
   });
 
   it("Moedatech alone still announces immediately", async () => {
@@ -158,59 +230,57 @@ describe("a channel that took the browser away", () => {
   });
 });
 
-/* ── The queue the page reads (owner, 2026-09-08) ────────────────────────────────── */
-
 /**
- * *"I want the same post-to-Moedatech modal to show the e-mail too, so they are together, then the
- * project modal after them."*
+ * -- The project, inside the tick (owner, 2026-09-08) -------------------------------------------
  *
- * `ProjectFiled` mounts on the same phase flip as this card, so the two dialogs raced. `CreateSurface`
- * now holds the project one back while `onAnnouncing` is true — and what these pin is the SIGNAL,
- * since the signal is what decides the order.
+ * *"But we have now 2 competing modals... I don't know how to show the 2 modals without distracting
+ * or overwhelming him."*
+ *
+ * 🔴 ~~`ProjectFiled` drew a dialog of its own, queued behind this one with a `hold` flag.~~ One
+ * press, two dialogs, and the second arrived after the renter believed he had finished. The filing
+ * is a CONSEQUENCE of the post, so it sits under the sentence that announces the post.
  */
-describe("what the page is told about the queue", () => {
-  it("claims the screen from the post until the tick has been read", async () => {
-    const owed: boolean[] = [];
-    render(
-      <LocaleProvider initialLocale="en">
-        <ShareOnPost onAnnouncing={(v) => owed.push(v)} />
-      </LocaleProvider>,
-    );
+describe("the project the request was filed under", () => {
+  const o = en.projects.offer;
+
+  it("names the site inside the tick, with the way to open it", async () => {
+    draw(SITE);
     await waitFor(() => expect(screen.getByTestId("panel")).toBeTruthy());
-    // Before anything is posted there is nothing to wait for: the project dialog is free to open.
-    expect(owed.at(-1)).toBe(false);
-
-    // The post mints the request. The send lands a tick later, so the claim must start HERE — a
-    // project dialog opening in that gap would be in front of a tick that has not appeared yet.
-    await act(async () => {
-      await hoisted.post!();
-    });
-    expect(owed.at(-1)).toBe(true);
-
     hoisted.fire!(1, "email", { handedOff: false, mail: { from: "b@m.net", recipients: 1, inSentFolder: true } });
-    await screen.findByText(titleFrom("b@m.net"));
-    // Still ours: he is reading it.
-    expect(owed.at(-1)).toBe(true);
 
-    fireEvent.click(screen.getByText(c.postedKeepSharing));
-    await waitFor(() => expect(owed.at(-1)).toBe(false));
+    await screen.findByText(titleFrom("b@m.net"));
+    expect(screen.getByText(o.filedTitle.replace("{site}", "RGRA"))).toBeTruthy();
+    expect(screen.getByText(o.viewAction)).toBeTruthy();
   });
 
-  it("releases the screen when the tick is dismissed by its close, not only by its button", async () => {
-    const owed: boolean[] = [];
-    render(
-      <LocaleProvider initialLocale="en">
-        <ShareOnPost onAnnouncing={(v) => owed.push(v)} />
-      </LocaleProvider>,
-    );
+  it("says nothing about a project when there is none", async () => {
+    // ⚠️ A request the renter had already filed himself, or a filing that failed. Both are silent
+    // by design: the first needs no telling, and the second is a convenience nobody can act on.
+    draw(null);
     await waitFor(() => expect(screen.getByTestId("panel")).toBeTruthy());
-    await act(async () => {
-      await hoisted.post!();
-    });
+    hoisted.fire!(0, "none", { handedOff: false });
+
+    await screen.findByText(c.postedTitle);
+    expect(screen.queryByText(o.viewAction)).toBeNull();
+  });
+
+  it("appears when the write lands, even after the tick is already open", async () => {
+    /**
+     * ⚠️ The filing is two round trips and the tick opens as soon as the share is handed off, so
+     * the block arrives INTO a dialog he is reading. That is the trade for one dialog instead of
+     * two, and it is the right way round: the tick answers the button he pressed.
+     */
+    const { rerender } = draw(null);
+    await waitFor(() => expect(screen.getByTestId("panel")).toBeTruthy());
     hoisted.fire!(0, "none", { handedOff: false });
     await screen.findByText(c.postedTitle);
+    expect(screen.queryByText(o.viewAction)).toBeNull();
 
-    fireEvent.keyDown(document, { key: "Escape" });
-    await waitFor(() => expect(owed.at(-1)).toBe(false));
+    rerender(
+      <LocaleProvider initialLocale="en">
+        <ShareOnPost filed={SITE} />
+      </LocaleProvider>,
+    );
+    expect(await screen.findByText(o.viewAction)).toBeTruthy();
   });
 });

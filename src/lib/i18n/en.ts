@@ -837,7 +837,7 @@ export const en = {
     resolveLocationConflict: "Resolve the location conflict to continue.", // AC-47
     resolveItems: "Resolve the flagged equipment items to continue.", // AC-29
     // MREQ-AC-09 — the app's required set, named per control so the dot lands on what's empty.
-    noItems: "Add at least one machine to continue.",
+    noItems: "Add at least one equipment to continue.",
     categoryMissing: "Choose a category.",
     subtypeMissing: "Choose a type.",
     capacityMissing: "Choose a size.",
@@ -846,13 +846,13 @@ export const en = {
     deliveryMissing: "Say who delivers to site.",
     returnMissing: "Say who returns it from site.",
     fuelPartyMissing: "Say who pays for the fuel.",
-    locationMissing: "Set where the machine goes.",
+    locationMissing: "Set where the equipment goes.",
     // MREQ-AC-54 — web-only gates, each satisfied by an explicit "nothing" answer.
     yearMissing: "Choose a minimum year, or Any year.",
     certMissing: "Choose a certificate, or No certificate.",
     // Off-catalogue: the name replaces the taxonomy trio as this line's required answer, so a blank
     // one blocks. A renter who won't name it removes the row.
-    customEquipmentMissing: "Name this machine, or remove it",
+    customEquipmentMissing: "Name this equipment, or remove it",
     confirmChargedDays: "Confirm how many days you'll be charged for.",
   },
   errors: {
@@ -1369,14 +1369,14 @@ export const en = {
     // Three steps, in the order they happen. It replaced two paragraphs that said the same true
     // things in prose (owner, 2026-08-31) — prose is where a renter looking at a red number stops
     // reading, and what he wants to know is where he is in a flow and what the end of it gets him.
-    /** ── The modal's three lines (owner, 2026-09-04: "very clear and simple just few lines") ──
-     *  One sentence each, in the order the renter's questions arrive: what the number is, why it is
-     *  red, what pressing the button does. They REPLACE `eqYardStep1T`…`eqYardStep3B`, the numbered
-     *  tutorial this layer used to carry: same three facts, one line apiece, on a modal that stands
-     *  between him and the press it exists to explain. */
-    eqYardLine1: "This is where the machine stands today, read off its file. It is not a delivery distance for your job.",
-    eqYardLine2: "Red means the supplier has not yet named the yard it would move from for your offer. Not refused.",
-    eqYardLine3: "Ask him and the question lands in your chat. When he answers, this turns green and the machine counts as confirmed.",
+    /** ── TWO lines, and the first one is the whole point (owner, 2026-09-08) ──────────────────
+     *  ~~Three lines: what the number is, why it is red, what the press does.~~ The first of them
+     *  described a distance nobody had asked about, and the owner cut it: *"remove the model year box
+     *  at top, just keep the red to green and below it one sentence clear"*. What is left is the fact
+     *  (the yard is not set, so the machine may not be available), the act (ask him to confirm it for
+     *  this offer), and what his answer does to the colour above. */
+    eqYardLine1: "The supplier has not set the yard this equipment would move from for your offer, so it might not be available. Ask him to confirm it is available for your offer",
+    eqYardLine2: "When he confirms availability by setting its yard, this turns green as confirmed",
     otherBids: "Other offers",
     eqYardExplainCta: "Ask the supplier",
     eqYardExplainLater: "Not now",
@@ -2310,7 +2310,15 @@ export const en = {
     needsYou: "{n} things need you",
     needsYouOne: "1 thing needs you",
     startOver: "Start over",
-    machine: "The machine",
+    machine: "The equipment",
+    /* ── The request's equipment, as tabs (owner, 2026-09-09) ──────────────────────────────────
+       A label for the strip and nothing else: each tab is DATA (the equipment's own type and size),
+       and the + carries `addAnother`, which this block already had. */
+    equipmentTabs: { label: "Equipment in this request" },
+    /* The way out of the lock on the site and the schedule (owner, 2026-09-09). It names the SCOPE,
+       because that is the whole reason those two panels lock: one address and one schedule for every
+       equipment on the request. */
+    changeForRequest: "Change for the request",
     operator: "The operator",
     operatorRail: "OPERATOR",
     where: "Where it goes",
@@ -2327,7 +2335,7 @@ export const en = {
     change: "change",
     nextEquipment: "Next equipment",
     previousEquipment: "Previous equipment",
-    addAnother: "Add another machine",
+    addAnother: "Add another equipment",
     reviewAndSend: "Review & send",
     itemOfCount: "Equipment #{n} of {total}",
     provenance: {
@@ -2385,7 +2393,7 @@ export const en = {
       // The renter names the machine himself and the request goes out carrying his words. Prefilled
       // from what he wrote in the RFQ, so the ordinary case is a glance.
       customEquipment: "EQUIPMENT NAME",
-      customEquipmentPlaceholder: "Name the machine you need",
+      customEquipmentPlaceholder: "Name the equipment you need",
       // Small and quiet: it is the way to get the machine into the catalogue, not the way out of the
       // request. Named for what it does, not for the app it opens (owner, 2026-09-06).
       unavailableWhatsapp: "Message us",
@@ -2431,7 +2439,7 @@ export const en = {
          point: he is not losing a project, he is starting a second one. */
       unfiledNote: "This is a different place from {project}, so it gets a project of its own. Move the pin back to keep it in {project}",
       searchPlaceholder: "Search a place, or paste a Maps link / coordinates",
-      dragHint: "Drag the map, or drop a pin where the machine goes",
+      dragHint: "Drag the map, or drop a pin where the equipment goes",
       confirm: "This is the right spot",
       useMyLocation: "Use my location",
     },
@@ -2479,13 +2487,10 @@ export const en = {
       nudgeEnd: "Suppliers price lower when they know your duration. Add an end date to get better bids.",
       nudgeStart: "Suppliers price lower when they know your duration. Add a start date to get better bids.",
     },
-    carry: {
-      title: "Equipment #{n}",
-      locked: "The site and schedule already apply to your whole request, so this equipment uses the same ones automatically.",
-      copied: "Its other details, like delivery, food and certificates, start out matching this equipment, but you can change any of them.",
-      editFirst: "Edit this item first",
-      continue: "Continue",
-    },
+    /* ~~`carry` — the carry-forward modal's four strings («Equipment #{n}», what is locked, what is
+       copied, and its two buttons).~~ Deleted with the modal (owner, 2026-09-09). What they said is
+       on the screen now: the locked strip states the site and the schedule, and the copied details
+       are the card the renter lands on. */
     /* ── The last stop before review (owner, 2026-09-01) ───────────────────────────────
        The canvas had a standing «+ Add another machine» beside «Review & send», which asked the
        question on every screen of the flow and made two calls to action out of one moment. It asks
@@ -2496,9 +2501,19 @@ export const en = {
        The body says what carrying on costs him — nothing, the site and schedule already apply —
        because the reason people re-post a second request instead of adding an item is that they
        assume a second machine means starting again. */
+    /* ── Back, out of the drafted request (owner, 2026-09-09) ────────────────────────────────
+       *"Show short simple confirm modal asking do you want to leave this request? … just very simple
+       one line question."* So the TITLE is the question and there is no body: the two buttons say the
+       rest. «Leave» is the primary because it is what he pressed Back for; «Stay» is the way out of
+       having pressed it by accident. */
+    leaveRequest: {
+      title: "Leave this request and go back?",
+      leave: "Leave",
+      stay: "Stay",
+    },
     addMore: {
-      title: "Anything else on this job?",
-      body: "Your request is ready to review. If the job needs another machine, add it now. It uses the same site and schedule, so there is nothing to fill in twice.",
+      title: "Anything else on this request?",
+      body: "Your request is ready to review. If the request needs another equipment, add it now. It uses the same site and schedule, so there is nothing to fill in twice.",
     },
     ready: {
       viewAll: "View all details",
@@ -2520,7 +2535,7 @@ export const en = {
       subtitle: "This is exactly what suppliers will see. Terms and payment come after the bids arrive. Nothing else to fill in here.",
       where: "Where it goes",
       when: "When it runs",
-      machineAndOperator: "The machine & operator",
+      machineAndOperator: "The equipment & operator",
       preferences: "Preferences",
       equipment: "Equipment",
       billingDuration: "BILLING & DURATION",
@@ -2658,8 +2673,6 @@ export const en = {
     groupDeleted: "Group deleted. The suppliers stay",
     groupFailed: "That did not save. Nothing changed.",
     close: "Close",
-    sharedOne: "Request shared with 1 supplier",
-    sharedMany: "Request shared with {n} suppliers",
     filtersTitle: "Filters",
     filtersSubtitle: "Narrow the list.",
     filterWhere: "Where they are",
@@ -2668,7 +2681,6 @@ export const en = {
     filterBidLink: "Bid through my link",
     clearAll: "Clear all",
     filters: "Filters",
-    shareARequest: "Share a request",
     offPlatform: "Off platform",
     hasStore: "Has a store",
     verifiedByMoedatech: "Verified by Moedatech",
@@ -2785,9 +2797,6 @@ export const en = {
     appSearch: "Search by name",
     dirCount: "Showing {shown} of {total}",
     dirShowAll: "Show all",
-    dirPage: "{page} of {of}",
-    prev: "Previous",
-    next: "Next",
     appEveryone: "Everyone with a Moedatech account. A firm without one goes under {tab}.",
     appOnlyStores: "Only suppliers with a store are listed here. Add anyone else under {tab}.",
     appNoSupplierId: "cannot be linked: this store does not name its company",

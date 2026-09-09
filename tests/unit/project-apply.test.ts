@@ -169,7 +169,7 @@ describe("a location from the project arrives confirmed", () => {
      *
      * Confirmation is a statement about a pin. A project typed as an address and never pinned fills
      * the label and leaves `lat`/`lng` empty; claiming it confirmed put «Location confirmed» beside
-     * «drop a pin where the machine goes» and dead-ended the flow, because `gateWhere` refuses on
+     * «drop a pin where the equipment goes» and dead-ended the flow, because `gateWhere` refuses on
      * `locationMissing` before it ever reads the flag. This is that case, kept honest.
      */
     const { draft, agentOrigin } = draftWith();

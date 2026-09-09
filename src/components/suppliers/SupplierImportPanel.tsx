@@ -247,7 +247,10 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
       setEdits({});
       setFileName(file.name);
       setMapping(out.headers.map(guessField));
-      setVendor(out.rows.map(() => true));
+      /* 🔴 **Off, like the typed form** (owner, 2026-09-08). A spreadsheet of contacts is not a
+       list of approved vendors, and a column of green ticks nobody set is the fastest way to make
+       the flag worthless. He marks the ones that are. */
+    setVendor(out.rows.map(() => false));
       setPlan(null);
       return;
     }
@@ -514,7 +517,9 @@ export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string
       <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-ok/40 bg-ok-soft px-3 py-2.5 text-meta text-ok-deep">
         <input
           type="checkbox"
-          checked={vendor.every((v) => v !== false)}
+          /* The master follows the rows: it is on only when every row is, and off is now the
+             state they all start in. */
+          checked={vendor.length > 0 && vendor.every((v) => v === true)}
           onChange={(e) => setVendor((v) => v.map(() => e.target.checked))}
           className="mt-0.5 h-4 w-4 flex-none accent-ok"
         />

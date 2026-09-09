@@ -46,7 +46,7 @@ import { equipmentIcon } from "@/components/requests/EquipImg";
 // which is the shape the dependency should have — the map has no business knowing how a card is made.
 import type { EquipmentCardModel } from "@/components/map/equipment-card-model";
 import { useLocale, useT } from "@/lib/i18n";
-import { pin } from "@/lib/uiPins";
+import { PIN_REGISTRY, pin } from "@/lib/uiPins";
 
 export interface SitePoint {
   lat: number;
@@ -712,7 +712,10 @@ function machineIcon(
       // state-DEPENDENT in the way the colours are: they are one fixed treatment, switched on, and
       // the stylesheet is where a fixed treatment belongs (and where it can be swept for the
       // availability colours it must not contain).
-      `<div class="bm-pin${selected ? " is-on" : ""}" dir="rtl" style="direction:rtl;width:${box.w}px;padding-top:${box.h - PIN_H}px">` +
+      // `data-pin` written by hand rather than through `pin()`: a `divIcon` is an HTML STRING, so
+      // there is no element to spread props onto. The number comes from the registry either way, so
+      // the overlay finds the marker like every other surface.
+      `<div data-pin="${PIN_REGISTRY["map-pin"].n}" class="bm-pin${selected ? " is-on" : ""}" dir="rtl" style="direction:rtl;width:${box.w}px;padding-top:${box.h - PIN_H}px">` +
       // The zoom LENS. A wrapper rather than a scale on the stage itself, because `.bm-pin.is-on
       // .bm-pin-stage` already owns that transform for the selection emphasis and a second one would
       // have replaced it — a selected machine would have stopped being bigger the moment it was zoomed

@@ -105,24 +105,28 @@ export function BidCards({
   }
 
   return (
-    /* ── One height for every card: the tallest card's (owner, 2026-08-30) ───────────────────────
-       Three settings have been tried here, and only the third is right.
+    /* ── The bids WRAP; they are not a row you travel sideways (owner, 2026-09-08) ───────────────
+       *"UI bug: when the browser is 100% or more the bid cards are not responsive, no page scrolling
+       is shown. Make the page scrollable, not the container of the cards."*
 
-         1. `h-full` + `items-stretch` + `max-h-full` on the card — every card took the PANE's
-            height, so a short bid held a column of empty white between its total and its button.
-         2. `items-start` — each card ended where its content did, so the «Counter this price»
-            buttons stepped down the row and no two lined up.
-         3. THIS. `items-stretch` with NO height on the row: a flex line's cross size is its tallest
-            item, so the row is as tall as the fullest card and every card stretches to exactly
-            that. Nothing is capped to the pane, so nothing scrolls inside a card, and no card is
-            taller than the most it could ever have to say.
+       ~~`flex … overflow-x-auto`: one line of 344px cards with a scrollbar of its own under them.~~
+       At 100% zoom on a 1440 screen that put the fourth bid half off the edge and the way to it was
+       a bar at the foot of a container the renter had no reason to look at — while the page itself
+       did not scroll at all. Four bids became unreadable at exactly the size most people run.
 
-       The slack a shorter card now carries sits above its footer, because the footer is `mt-auto`.
-       That is the point: the buttons line up. A card whose neighbour says «Priced on 1 of the 3
-       units offered» and which has nothing of the kind to say is genuinely shorter, and the only
-       question is where its spare room goes — under the price, or under the button. Under the price
-       is the answer that keeps the row readable across. */
-    <div {...pin("workspace-bid-cards")} className="flex snap-x items-stretch gap-5 overflow-x-auto p-3">
+       `auto-fill` with a `min(100%, 320px)` floor: as many 344px columns as the width holds, wrapping
+       to the next line after that, and a single column on a phone rather than a track wider than the
+       screen. The cards keep their own width — this is not a stretch-to-fit grid, because a bid card
+       drawn at 700px is a different card.
+
+       The 2026-08-30 height ruling survives, in the form grid gives it: a grid row's items stretch to
+       the tallest of that ROW, so the «Counter this price» buttons still line up across each line,
+       and a shorter card's slack still sits above its footer (`mt-auto`) rather than under its
+       button. Nothing is capped to the pane, so nothing scrolls inside a card. */
+    <div
+      {...pin("workspace-bid-cards")}
+      className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,320px),344px))] items-stretch gap-5 p-3"
+    >
       {bids.map((b) => (
         <BidCardTile
           key={b.card.id}
@@ -338,7 +342,9 @@ function BidCardTile({
        does that job now, and says so. What is left here is a container: no click, no pointer, and
        the ring only when it IS checked. */
     <article {...pin("bid-card")}
-      className={`flex w-[344px] max-w-full flex-none snap-start flex-col overflow-hidden rounded-lg border bg-surface transition ${
+      /* No width and no `flex-none`: the GRID states the track (`auto-fill`, 344px), and a card
+         that also stated its own width would overflow the single column a phone gives it. */
+      className={`flex h-full flex-col overflow-hidden rounded-lg border bg-surface transition ${
         selected ? "border-brand" : "border-border"
       }`}
     >
