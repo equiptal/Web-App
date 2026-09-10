@@ -4,7 +4,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useT, useLocale } from "@/lib/i18n";
 import { Dropdown } from "@/components/Dropdown";
 import { Icon } from "@/components/ui";
-import { updateProfile } from "@/lib/api/profile-client";
+import { completeProfile, updateProfile } from "@/lib/api/profile-client";
+import { useSession } from "@/lib/session";
 import type { RenterProfile } from "@/lib/contract/onboarding";
 import { pin } from "@/lib/uiPins";
 
@@ -53,6 +54,9 @@ export function EditProfileForm({
   const p = t.profile;
   const { locale } = useLocale();
   const ar = locale === "ar";
+  const { tier, refresh } = useSession();
+  // A guest has no stored profile yet, so this form IS his first save, not an edit.
+  const isFirstSave = tier === "guest";
 
   const [firstName, setFirstName] = useState(profile.firstName ?? "");
   const [lastName, setLastName] = useState(profile.lastName ?? "");
@@ -111,7 +115,11 @@ export function EditProfileForm({
     setFe({});
     setErr(null);
     setBusy(true);
-    const r = await updateProfile({
+    // ⚠️ Guest goes to `completeProfile`, NOT `updateProfile`. `PUT /profile/me` is gated on
+    // `requireTier(basic)`, so sending a guest's first save there 403s him with "complete your
+    // profile" — the thing he was doing. Same fields either way; only the endpoint differs.
+    const save = isFirstSave ? completeProfile : updateProfile;
+    const r = await save({
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       city: city.trim(),
@@ -120,6 +128,12 @@ export function EditProfileForm({
       whatsapp: whatsapp.trim() || undefined,
       companyName: companyName.trim() || undefined,
     });
+    if (r.ok && isFirstSave) {
+      // guest→basic. The BFF already re-stamped the mt_user cookie; without this the page keeps the
+      // stale tier, so the badge still reads «Guest» and every basic-only action stays blocked over a
+      // profile that is now complete. Same step OnboardingForm takes after its own submit.
+      await refresh();
+    }
     setBusy(false);
     if (!r.ok) {
       setErr(r.code === "offline" ? p.offline : ar && r.messageAr ? r.messageAr : p.saveError);

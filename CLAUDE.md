@@ -2,6 +2,34 @@
 
 ## Change log
 
+- **2026-09-10 - A GUEST could not save his own profile: the form posted to the basic-only endpoint,
+  so the server answered "complete your profile" to the request that was completing it.**
+  Owner sent a prod screenshot of `+966566493886` (user 3581) stuck on that error with the زائر badge
+  still showing. Files: `src/components/profile/EditProfileForm.tsx`, `src/lib/api/profile-client.ts`.
+  ⚠️ 🔴 **There are TWO backend endpoints and they are not interchangeable.** `PUT /profile/me`
+  (`/api/me/profile`) is an EDIT and is gated on `requireTier(basic)`; `PUT /users/me/profile`
+  (`/api/profile/complete`) is the guest→basic transition and has no tier gate. `EditProfileForm`
+  always used the first, and `ProfileView.tsx:237` renders that form for every signed-in user with no
+  tier condition - so a guest was shown a form he was not allowed to submit. The 403 is `E8007`
+  TIER_INSUFFICIENT, whose Arabic text is «مستوى حسابك لا يسمح بهذا الإجراء. يرجى إكمال ملفك الشخصي»,
+  which reads as a validation complaint about the form and is not: it is about his tier.
+  ⚠️ **The payloads are IDENTICAL** (firstName, lastName, city, jobTitle, email?, whatsapp?,
+  companyName?), so this is an endpoint swap, not a form change. Nothing about the fields moved.
+  ⚠️ 🔴 **The refresh is half the fix, not a nicety.** `/api/profile/complete` re-reads `/users/me`
+  and re-stamps the `mt_user` cookie, but the client still has to call `session.refresh()` or the
+  page keeps the stale tier: badge still «Guest», every basic-only action still blocked, over a
+  profile that just saved successfully. `OnboardingForm.tsx` already did this after its own submit;
+  the profile tab did not. Landing only the endpoint swap would look fixed and still be broken.
+  ⚠️ **The backend split is deliberate - do NOT "simplify" it by dropping the gate on
+  `PUT /profile/me`.** Mobile honours the same two paths (`profile_bloc.dart:66` completeProfile,
+  `:180` updateProfile), so loosening the gate is a contract change reaching the app for no gain.
+  ⚠️ **The can't-clear guards do not fire for a guest** (`profile.email` etc. are empty, so there is
+  nothing to protect), which is why the first save needs no special-casing beyond the endpoint.
+  Verified: `npm run typecheck` clean. 🔴 **Tests NOT run** - a guard hook refuses `npm test` in this
+  environment - and 🔴 **not exercised in a browser against a real guest account.** The endpoint,
+  its method and its payload were read off `src/app/api/profile/complete/route.ts` and the backend's
+  `completeProfileSchema`, not observed.
+
 - **2026-09-09 - «Didn't say» was OURS, not the supplier's: a bid's own declarations are now the term's value.**
   Owner: *"how can someone not say? it must say yes or no in the form, even in bid he must choose"*.
   He is right about the form and the blank was on our side. The bid form makes every T3 term a
