@@ -76,30 +76,70 @@ function DirectRequestGate() {
     year: Number(params.get("year")) || null,
   };
   const { direct, draft, text } = state;
-  const seeded = useRef(false);
+  /**
+   * WHICH machine this URL is for. The seed is keyed on it, not on the supplier and not on "have I
+   * run once", which is what broke the flow twice over (owner, 2026-09-10: *"we have an issue in
+   * direct request, why does it take him to the intake UI"*).
+   *
+   * ~~`if (direct?.supplierId === supplierId) return;` and `if (draft) return;`~~ Both were written to
+   * stop the gate re-dispatching on every render, and both stopped the SEED as well:
+   *
+   *  · **The second press on the same supplier landed on INTAKE, with an empty box.** `state.direct`
+   *    already named that supplier, so the effect returned before it seeded — and the `prefill`
+   *    fallback sits after the same return, so the renter got a blank intake with a direct ribbon
+   *    over it. Reproduced against staging: press a store's machine, «Start over», press another of
+   *    that store's machines → «How would you like to create your request?».
+   *  · **A press with a draft already open showed the WRONG machine.** The URL said 500 ton
+   *    (`capId=183d…`) and the canvas kept the 220 ton from the press before it. Silently: nothing
+   *    on screen said the machine he had just tapped was not the one he was pricing.
+   *
+   * So the guard is now the machine itself. Re-renders and reloads carry the same key and seed
+   * nothing; a different machine seeds, replacing what was there — which is app parity
+   * (`rfq-store`'s own note: the mobile flow refuses to restore a stored draft into a direct
+   * request) and the only reading of the press that can be right: he tapped THAT machine.
+   */
+  const wanted = canSeedDirect(equipment)
+    ? [equipment.categoryId, equipment.subtypeId, equipment.capacityId].join("/")
+    : null;
+  /** The machine the draft is already built around, in the same shape. */
+  const inDraft = (() => {
+    const live = (draft?.items ?? []).filter((i) => !i.removed);
+    if (live.length !== 1) return null;
+    const ref = live[0].ref;
+    return ref.categoryId && ref.subcategoryId && ref.measurementId
+      ? [ref.categoryId, ref.subcategoryId, ref.measurementId].join("/")
+      : null;
+  })();
+  /** What the last seed answered — the key, so a second machine is not mistaken for a re-render. */
+  const seeded = useRef<string | null>(null);
 
   useEffect(() => {
-    const same = (direct?.supplierId ?? null) === (supplierId ?? null);
-    if (same) return;
-    actions.setDirect(supplierId ? { supplierId, supplierName, storeId } : null);
-    if (!supplierId || draft || seeded.current) return;
-    if (canSeedDirect(equipment)) {
-      // The machine is known, so the flow starts where the renter's own answers begin. Guarded on
-      // `!draft` above: a renter who came back to a request in progress keeps it.
-      seeded.current = true;
+    // The recipient, whenever the URL names a different one. Kept separate from the seed below: a
+    // renter can arrive for a new machine at a supplier the store already names.
+    if ((direct?.supplierId ?? null) !== (supplierId ?? null)) {
+      actions.setDirect(supplierId ? { supplierId, supplierName, storeId } : null);
+    }
+    if (!supplierId) return;
+
+    if (wanted) {
+      // Already the machine on screen, or already seeded from this very URL: nothing to do. This is
+      // what makes the effect idempotent under re-render, and it is why the key is the guard.
+      if (wanted === inDraft || wanted === seeded.current) return;
+      seeded.current = wanted;
       actions.seedDraft(directRequestDraft(equipment));
       return;
     }
-    // No usable triple: the prefill seeds an EMPTY box only, and only once — a renter who has
-    // already typed owns what he wrote, and a re-render must not push his words back to the
-    // machine's name.
-    if (prefill && !text.trim()) {
-      seeded.current = true;
+
+    /* No usable triple (an older payload, a half-filled row): the words in the box, the renter's to
+       edit. Seeded ONCE and only into an EMPTY box — a renter who has already typed owns what he
+       wrote, and a re-render must not push his words back to the machine's name. */
+    if (prefill && !text.trim() && seeded.current !== prefill) {
+      seeded.current = prefill;
       actions.setText(prefill);
     }
     // `actions` is rebuilt each render but only wraps dispatch; depending on it would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supplierId, supplierName, storeId, prefill, direct, draft, text]);
+  }, [supplierId, supplierName, storeId, prefill, wanted, inDraft, direct, text]);
 
   return null;
 }

@@ -46,7 +46,7 @@ export const ar: Dictionary = {
     suppliers: "الموردون",
     profile: "الملف الشخصي",
     requests: "الطلبات",
-    beta: "تجريبي",
+    beta: "نسخة خاصة",
     compare: "مقارنة العروض",
     dashboard: "الصفحة الرئيسية",
     browse: "تصفّح",
@@ -1922,6 +1922,7 @@ export const ar: Dictionary = {
       label: "المشروع",
       ended: "منتهي",
       all: "كل المشاريع",
+      fewer: "عرض أقل",
     },
     pills: {
       startFrom: "ابدأ من",

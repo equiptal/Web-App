@@ -76,3 +76,44 @@ describe("where the renter lands", () => {
     expect(after.agentOrigin?.items[0].ref.subcategoryId).toBe("sub-crawler");
   });
 });
+
+/**
+ * ── A SECOND direct press must answer the machine that was pressed (owner, 2026-09-10) ───────────
+ * *"we have an issue in direct request, why does it take him to the intake UI"*.
+ *
+ * Two faults, both in guards written to stop the create page's effect re-dispatching on every
+ * render, and both reproduced in a browser against staging before this was changed:
+ *
+ *  · The gate returned when `state.direct` already named the URL's supplier, so the second machine
+ *    from one store seeded NOTHING — and the `prefill` fallback sits after the same return, so the
+ *    renter met an empty intake with a direct ribbon over it.
+ *  · The gate returned when a draft existed, so a press with one open kept the OLD machine: the URL
+ *    said 500 ton and the canvas said 220.
+ *
+ * The store side of that is here: seeding a second machine must REPLACE the item, not append to it
+ * and not be refused. The page's own guard (the machine's own key) is what decides when to call it.
+ */
+describe("a second machine from the same store", () => {
+  const SECOND = { ...LISTING, capacityId: "cap-50", label: "Crawler excavator 50 ton" };
+
+  it("replaces the machine on the draft rather than adding to it", () => {
+    const first = reducer(initialState, { t: "PROCESS_SUCCESS", draft: directRequestDraft(LISTING) });
+    expect(first.draft?.items).toHaveLength(1);
+    expect(first.draft?.items[0].ref.measurementId).toBe("cap-30");
+
+    const second = reducer(first, { t: "PROCESS_SUCCESS", draft: directRequestDraft(SECOND) });
+    // ONE machine, and it is the one he just pressed. A renter pricing a 50 ton crane must never be
+    // shown the 30 ton one he looked at a minute ago.
+    expect(second.draft?.items).toHaveLength(1);
+    expect(second.draft?.items[0].ref.measurementId).toBe("cap-50");
+    expect(second.draft?.items[0].rawLabel).toBe("Crawler excavator 50 ton");
+  });
+
+  it("keeps the recipient across the swap — both presses are that store's", () => {
+    const withDirect = reducer(initialState, { t: "SET_DIRECT", direct: { supplierId: "474", supplierName: "Arabian Cranes Co.", storeId: "st-1" } });
+    const seeded = reducer(withDirect, { t: "PROCESS_SUCCESS", draft: directRequestDraft(SECOND) });
+    expect(seeded.direct?.supplierId).toBe("474");
+    // And the canvas is where he lands: a seeded direct request never sits on the intake screen.
+    expect(seeded.phase).toBe("wizard");
+  });
+});

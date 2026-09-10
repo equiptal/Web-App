@@ -50,8 +50,10 @@ export const en = {
        2026-09-04): the row is three words now, one per place, and the renter's own requests are what
        he goes there to read. */
     requests: "Requests",
-    /* The product's own state, beside the wordmark. Not a page label. */
-    beta: "Beta",
+    /* The product's own state, beside the wordmark. Not a page label. The KEY stays `beta` (the
+       mark's slot, and what the `header-beta` pin names); only the words changed, because "Beta"
+       told a renter he was being tested on. */
+    beta: "VIP access",
     compare: "Compare bids",
     dashboard: "Dashboard",
     browse: "Browse",
@@ -2280,6 +2282,8 @@ export const en = {
       label: "Project",
       ended: "ended",
       all: "All projects",
+      /** The way back to two rows once «All projects» has opened the rest. */
+      fewer: "Show fewer",
     },
     pills: {
       startFrom: "start from",
