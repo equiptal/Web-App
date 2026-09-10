@@ -2,6 +2,77 @@
 
 ## Change log
 
+- **2026-09-10 - The company panel drops its initials tile and its boxed blue arrow, and a paper the machine DOES hold stops painting its alternatives red.**
+  Owner, on a screenshot of the company documents panel: *"for ui put small arrow to open, not this
+  bold blue one folded in a card, make it only a small arrow"*, *"use the verified badge style and
+  icon used in other surfaces"*, *"remove this capital icon"*, and earlier the same day *"if at least
+  one document from proof of ownership or the front image at least, then don't show missing proof and
+  missing images as red"*.
+  (1) **`.mp-doc` is a bare arrow.** It was a 30px outlined tile with a tinted fill on a row that
+  already carries a bordered card, a framed thumbnail and a checkbox: boxed beside the paper's own
+  thumbnail it read as a second document rather than as the way to open the first. The 30px HIT AREA
+  stays (a 14px glyph is not a target on a phone); the border, the fill and the weight go.
+  (2) **The verified chip is the product's badge.** The hand-drawn stroked check became
+  `Icon name="verified"`, the rosette the profile block, the Moedatech picker and the request-details
+  chips all draw, and the chip took those chips' colours: `--ok` on `--ok-soft` inside a hairline of
+  `--ok` at 30%, where it had been white-on-45% and read as a sticker on the navy header.
+  (3) **`.mp-initials` is deleted**, markup and CSS. «AC» in front of «Al-Faisal Contracting Est.»
+  abbreviated the name standing beside it, on the one header whose job is to say whose papers these
+  are.
+  (4) **The FRONT shot alone answers the photos key.** `REQUIRED_PHOTO_SLOTS` and
+  `computeUnitReadiness`'s `photosPresent` both dropped `plate`, so a machine photographed from the
+  front no longer reads red on the bid card and «Missing plate / serial» on the map.
+  (5) **An ownership row whose sibling is on file is not a gap.** The four proof rows are ways of
+  answering ONE question - `attentionCount` has counted them as one since 2026-08-12 - but each row
+  still painted itself, so a machine proven by an istimara drew three red rows saying «missing».
+  `DocRow.answeredElsewhere` marks the empty siblings and `DocRowList` withholds the red skin.
+  Files: `src/components/map/panel/{CompanyPanel.tsx,DocRowList.tsx,EquipmentDocuments.tsx,machine-panel-model.ts,panel-proto.css}`,
+  `src/lib/contract/bid-readiness.ts`, `tests/unit/machine-panel.test.ts` (11 cases rewritten).
+  ⚠️ **`answeredElsewhere` changes the PAINT and nothing else.** The row keeps `status: "missing"`
+  and `requestable: true`, so «select all missing» still reaches it and a renter who wants the customs
+  card as well as the istimara can still ask for it. Making the row not-required instead was the first
+  cut and it was wrong twice over: a held paper's status flipped to `on_file`, and the absent siblings
+  would have stopped rendering, against the 2026-08-12 rule that a renter cannot choose a proof the
+  surface has hidden.
+  ⚠️ **An absent OPTIONAL photo slot is not a row**, which is why the plate shot simply disappears
+  from the group rather than going grey - the same rule the meter and the side shots have always
+  followed. It is also why `machine-panel.test.ts`'s selection block had to swap its pair round: the
+  front shot is now the only photo row that can read `missing`.
+  ⚠️ `companyInitials` is NOT dead - `RequestCard` draws the counterparty's mark from it. `.bm-verified`
+  (the map's light twin of the chip) keeps its own values: it sits on white, where `--ok-soft` is
+  already the ground.
+
+- **2026-09-10 - The map panel's shortfall alert is withdrawn: it contradicted the pill above it.**
+  Owner, on a panel reading «2 Crawler Excavators 20 ton registered» · «2 in this offer» with
+  «1 in this offer with no registered equipment» under them: *"from where this note is shown"*, then
+  *"but he has 2 registered so remove it"*.
+  🔴 **Two counts, one word.** Both say «registered» and neither means the other:
+    · the PILL is `counts.owned` = `fleet.length` - every machine the lessor holds for this request;
+    · the ALERT is `counts.claimed` = `offered − registered`, where `registered` counts ONLY fleet
+      rows carrying `inBid === true`, the ones committed to THIS bid.
+  Two owned, two offered, one flagged `inBid` therefore printed «1 unbacked» directly under a pill
+  saying he has two. Read together they contradict each other; read apart, each is true. The alert
+  is the half that goes, because it is the one whose number the renter cannot check.
+  Files: `src/components/map/BidMapWorkspace.tsx`, `tests/unit/rentee-map-surface.test.ts`
+  (the RM3-AC-05 block rewritten to the removal, 3 cases, break-checked).
+  🔴 **This does NOT fix `inBid`, and the alert was not necessarily wrong.** Either the lessor really
+  attached one machine of the two, or the projection under-reports `in_bid`. That is a BACKEND
+  question and it is still open - worth asking, because the same flag drives the map's own list
+  (`listedMachines` filters `inBid === true`), so an under-reported flag hides pins too, silently.
+  ⚠️ **The ASK survives.** «Ask him to add it» and the list-foot's «Ask for different equipment» were
+  always ONE ask (`composeShortfallRequest`, an `alternative` naming no machine), so the route is one
+  press behind the list and nothing is stranded. `shortfallPending` still reads at the list foot,
+  which is how the test proves it.
+  ⚠️ **The MODEL is untouched** - `shortfallAlert`, `countCase`, `SHORTFALL_COLOUR`, and
+  `bid-map.test.ts` with them. RM3-AC-05/06 are a contract this app shares with the mobile app, and
+  the model is what a corrected `inBid` would light up again. Only the render went.
+  ⚠️ `unitCountLabel` and the `shortfallAlert` import went with the render rather than being left
+  unused; `SHORTFALL_COLOUR` stays, because `rentee-map-surface.test.ts` still binds the stylesheet's
+  `.bm-short` orange to it and that rule is still in `map-proto.css`.
+  ⚠️ This is the SECOND «units with no machine behind them» line removed in two days - the bid card's
+  `countClaimed` went on 2026-09-10 as well. Same underlying fact, two surfaces, two separate owner
+  calls. Nothing now states it in words anywhere; `unitCounts` still computes it.
+
 - **2026-09-10 - The pin overlay is off on staging (temporarily), and the bid card drops the «no named machine» note.**
   Two owner notes.
   (1) *"can u remove the pins toggle from staging just temporarily just hide it"*. The two staging

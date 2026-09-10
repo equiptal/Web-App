@@ -577,23 +577,39 @@ describe("the landing cue is finite (RM3-AC-35)", () => {
    visual check; what is assertable — and what a "condense it" instruction actually endangers — is that
    nothing was condensed by being deleted. */
 
-describe("the shortfall survived the condensing whole (RM3-AC-05)", () => {
-  const alert = region(read(WORKSPACE), "{shortfall && (", "</button>");
+describe("the shortfall alert is WITHDRAWN from the panel (owner, 2026-09-10)", () => {
+  /**
+   * *"but he has 2 registered so remove it"* — on a panel whose first pill read «2 Crawler
+   * Excavators 20 ton registered» while the alert under it said «1 in this offer with no registered
+   * equipment». Both used the word «registered» for different counts: the pill is `counts.owned`
+   * (the fleet), the alert is `offered − registered` where `registered` counts only rows flagged
+   * `inBid`. Read together they contradict; read apart, each is true.
+   *
+   * ~~«the shortfall survived the condensing whole (RM3-AC-05)»~~, which pinned the alert's copy,
+   * its ask and its gate. What replaces it pins the removal AND the two things that had to survive
+   * it — otherwise "remove the alert" and "remove the ask with it" look identical from here.
+   */
+  const src = strip(read(WORKSPACE));
 
-  it("still states the DIFFERENCE, and still carries the ask", () => {
-    // `shortfall.claimed` is the difference; `counts.offered` is the sentence's one plausible wrong
-    // number, and it is not reachable from this model at all.
-    expect(alert).toMatch(/shortfall\.claimed/);
-    expect(alert).not.toMatch(/counts\.offered/);
-    expect(alert).toMatch(/composeShortfallRequest\(\)/);
-    expect(alert).toMatch(/t\.bidMap\.shortfallAction/);
-    // …and the reason the control is inert, when it is, is still a sentence rather than a state on a
-    // button — the line most at risk from a change made to save vertical space.
-    expect(alert).toMatch(/shortfallPending && <div className="bm-short-s">/);
+  it("draws no shortfall alert", () => {
+    expect(src).not.toMatch(/\{shortfall && \(/);
+    expect(src).not.toMatch(/bm-short-t/);
+    expect(src).not.toMatch(/t\.bidMap\.shortfall/);
   });
 
-  it("is still gated on `short` alone, so its ABSENCE still means nothing is claimed", () => {
-    expect(strip(read(WORKSPACE))).toMatch(/const shortfall = counts \? shortfallAlert\(counts\) : null/);
+  it("keeps the ASK, which was never the alert's alone", () => {
+    // «Ask him to add it» and the list-foot's «Ask for different equipment» are ONE ask — an
+    // `alternative` naming no machine — so removing the alert must not take the route with it.
+    expect(src).toMatch(/composeShortfallRequest\(\)/);
+    expect(src).toMatch(/shortfallPending/);
+  });
+
+  it("leaves the MODEL alone, so a corrected `inBid` can light it again", () => {
+    // RM3-AC-05/06 are a contract shared with the mobile app. The panel stopped rendering it; the
+    // rule that decides it is untouched, and `bid-map.test.ts` still holds it.
+    const model = read("src/lib/contract/bid-map.ts");
+    expect(model).toMatch(/export function shortfallAlert/);
+    expect(model).toMatch(/countCase\(counts\) !== "short"/);
   });
 });
 

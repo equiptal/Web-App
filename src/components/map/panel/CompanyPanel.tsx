@@ -76,7 +76,6 @@ import {
   arDigits,
   attentionCount,
   companyDocRows,
-  companyInitials,
   docDownloadBatch,
   docRowMode,
   docRowSelectable,
@@ -87,6 +86,7 @@ import {
   type DocDownloadTarget,
 } from "./machine-panel-model";
 import "./panel-proto.css";
+import { Icon } from "@/components/Icon";
 import { pin } from "@/lib/uiPins";
 
 /* ───────────────────── what the batch acts on — pure, so it is testable ───────────────────── */
@@ -147,7 +147,6 @@ export interface CompanyPanelProps {
 export function CompanyPanel({ companyName, verified, docs, ar, L, onBack }: CompanyPanelProps) {
   const rows = useMemo(() => companyDocRows({ verified, docs }), [verified, docs]);
   const attention = attentionCount(rows);
-  const initials = companyInitials(companyName);
 
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set<string>());
 
@@ -207,28 +206,23 @@ export function CompanyPanel({ companyName, verified, docs, ar, L, onBack }: Com
         <button type="button" className="mp-back" onClick={onBack} aria-label={L("Back", "رجوع")} title={L("Back", "رجوع")}>
           <span aria-hidden="true">{ar ? "›" : "‹"}</span>
         </button>
-        {/* Decoration on a header whose next element is the name itself, so it is hidden rather than
-            read out twice. Absent when the name yields no letter — an empty tile is furniture. */}
-        {initials && <span className="mp-initials" aria-hidden="true">{initials}</span>}
+        {/* ~~A 40px tile carrying the firm's initials.~~ Removed (owner, 2026-09-10: *"remove this
+            capital icon"*). It was decoration in front of the name it abbreviated, on the one header
+            whose whole job is to say whose papers these are — «AC» beside «Al-Faisal Contracting
+            Est.» told the reader nothing the next element did not say in full. `companyInitials` is
+            NOT dead: `RequestCard` draws the counterparty's mark from it. */}
         <span className="mp-coname">{companyName}</span>
         {verified && (
           <span className="mp-vchip">
-            {/* The stroked check every other surface draws (owner, 2026-08-19) — the map panel's
-                header, both chats, and this. A typed «✓» sat at whatever weight the running font gave
-                it, which on IBM Plex Sans Arabic is not the 2.6 stroke the others carry. */}
-            <svg
-              width="11"
-              height="11"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M20 6L9 17l-5-5" />
-            </svg>
+            {/* ── The product's OWN verified badge (owner, 2026-09-10) ────────────────────────────
+                *"use the verified badge style and icon used in other surfaces"*.
+
+                ~~A hand-drawn stroked check~~ (2026-08-19, when this surface was a prototype with a
+                palette of its own). Everywhere else the fact is stated with the material `verified`
+                rosette — the profile's own block, the Moedatech picker, the request details chips —
+                so the map panel was the last place drawing its own tick. The chip's colours follow
+                in `panel-proto.css`: `--ok` on `--ok-soft`, the shape those chips carry. */}
+            <Icon name="verified" size={13} />
             {L("Verified company", "شركة موثّقة")}
           </span>
         )}

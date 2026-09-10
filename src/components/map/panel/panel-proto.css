@@ -724,23 +724,32 @@ span.mp-rowopen { cursor: default; }
 
    What IS documented survives untouched: the narrowing to view-only, with the per-row download glyph
    withdrawn in favour of the batch (AC-69, 2026-08-08). */
+/* **A small arrow, and nothing around it** (owner, 2026-09-10: *"put a small arrow to open, not this
+   bold blue one folded in a card, make it only a small arrow"*).
+
+   ~~A 30px outlined tile with a tinted fill.~~ On a row that already carries a bordered card, a
+   thumbnail with its own frame and a checkbox, a fourth box turned the one act on the row into the
+   loudest object in it — and boxed beside the paper's own thumbnail it read as a second document
+   rather than as a way to open the first. The glyph keeps its 30px HIT AREA (a 14px arrow is not a
+   target on a phone) and loses the border, the fill and the weight. */
 .mp-doc {
   width: 30px;
   height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid color-mix(in srgb, var(--navy-deep) 22%, transparent);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--navy-deep) 7%, transparent);
-  color: var(--navy);
+  border: 0;
+  background: none;
+  color: var(--navy-mid);
   font-family: inherit;
-  font-size: 14px;
-  font-weight: 800;
+  font-size: 15px;
+  font-weight: 600;
   line-height: 1;
   cursor: pointer;
   text-decoration: none;
+  transition: color 0.15s ease;
 }
+.mp-doc:hover { color: var(--navy); }
 
 /* ═══════════════════════════ actions ═══════════════════════════ */
 
@@ -880,18 +889,10 @@ span.mp-rowopen { cursor: default; }
 }
 /* The firm's letters — `40 × 40`, r11, a lift off the slab rather than a colour of its own. Absent
    from ours entirely, and it is what makes the header read as a subject and not a title bar. */
-.mp-initials {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.13);
-  font-size: 13px;
-  font-weight: 800;
-}
+/* ~~`.mp-initials`~~ — the header's 40px initials tile, removed with its markup (owner,
+   2026-09-10). Deleted rather than left: nothing renders it, and a rule for a class no component
+   carries is the kind of thing the next reader restores by accident. `.bm-rq-initials` in
+   `map-proto.css` is a DIFFERENT mark, on the request card, and stays. */
 .mp-coname {
   flex: 1;
   /* ── The name asks for its own WIDTH, and the chip is what yields ────────────────────────────────
@@ -942,14 +943,24 @@ span.mp-rowopen { cursor: default; }
      *"verification is a fact about the company, not a property of the surface it sits on."* This
      block already said it wanted to "say it identically on both" and then drew it at `4px 10px`
      against the light chip's `2px 8px` — two sizes for one fact. Both now carry the prototype's. */
-  gap: 5px;
+  /* **The product's own verified chip** (owner, 2026-09-10: *"use the verified badge style and icon
+     used in other surfaces"*). Everywhere else the fact is `--ok` ink on `--ok-soft` inside a
+     hairline of `--ok` at 30% — the request-details chips, the suppliers picker — and this drew
+     white-on-45% instead, which on the navy header read as a sticker rather than as the same badge
+     the renter meets on every other surface. The material `verified` rosette replaced the
+     hand-drawn tick in `CompanyPanel`; these are its colours.
+
+     ⚠️ `.bm-verified` (map-proto.css) is the LIGHT twin of this chip and its note asks for the two
+     to stay one definition in three colours. It sits on white, where `--ok-soft` is already the
+     ground, so it keeps its own values — the shape, the icon and the ink are what match. */
+  gap: 4px;
   border-radius: 999px;
-  padding: 2px 9px;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid color-mix(in srgb, var(--ok) 45%, transparent);
+  padding: 2px 8px;
+  background: var(--ok-soft);
+  border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent);
   color: var(--ok);
-  font-size: 10px;
-  font-weight: 800;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 /* ═══════════════════ the firm's rows carry a verdict, the machine's do not ═══════════════════ */

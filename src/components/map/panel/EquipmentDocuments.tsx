@@ -255,6 +255,8 @@ export function EquipmentDocuments({
             downloadUrl: r.downloadUrl,
             files: r.files,
             mode: docRowMode(r),
+            // An ownership alternative whose sibling is on the file: shown, askable, not red.
+            answeredElsewhere: r.answeredElsewhere,
             selectable: docRowSelectable(r, mode),
           }))}
           selected={selected}
