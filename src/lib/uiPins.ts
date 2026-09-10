@@ -77,8 +77,15 @@
  * the Amplify console: one build behaves correctly on every host it is served from.
  */
 const PIN_HOSTS = [
-  "webstaging.moedatech.net",
-  "staging.dgdtg4fmrwwfn.amplifyapp.com",
+  /* ── HIDDEN ON STAGING, TEMPORARILY (owner, 2026-09-10: *"can u remove the pins toggle from
+     staging just temporarily just hide it"*) ────────────────────────────────────────────────────
+     Uncomment both to bring it back. Nothing else changed: the overlay, its shortcut and the whole
+     registry are intact, and localhost keeps them, so this is one edit to undo and no behaviour to
+     rebuild.
+     ⚠️ `uiPinsAllowed` also gates `/dev/preview`, so that page answers "not here" on staging for as
+     long as these two lines are commented out. */
+  // "webstaging.moedatech.net",
+  // "staging.dgdtg4fmrwwfn.amplifyapp.com",
   "localhost",
   "127.0.0.1",
 ];

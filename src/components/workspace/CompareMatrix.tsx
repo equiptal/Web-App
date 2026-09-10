@@ -199,6 +199,61 @@ const ROW = "h-[52px] flex-none box-border border-b border-border";
  */
 const HEAD = "h-[48px] flex-none box-border border-b border-border";
 
+/** One term column: the canonical group, every wire key that folds onto it, and its two labels. */
+export interface TermColumnSpec { group: string; keys: string[]; labelEn: string; labelAr: string; asked: boolean }
+
+/**
+ * The term columns a set of bids earns — **the one derivation**, shared by the table on screen and
+ * by the printed comparison sheet (`compare-sheet.ts`).
+ *
+ * It was inline in the component until 2026-09-09, when the export began drawing the same terms:
+ * a sheet that decides its own columns is a sheet that prints a term the screen dropped, or drops
+ * one the screen shows, and nothing fails when it does.
+ */
+export function buildTermColumns(rows: WorkspaceBid[], ar: boolean): TermColumnSpec[] {
+    const byGroup = new Map<string, { group: string; keys: string[]; labelEn: string; labelAr: string; asked: boolean }>();
+    for (const b of rows) {
+      // `supplier` is deliberately absent: CR and VAT are company details (see TERM_HIDDEN).
+      for (const r of [...(b.card.negotiableTerms ?? []), ...b.card.terms.contract, ...b.card.terms.equipment]) {
+        if (TERM_HIDDEN.has(r.key)) continue;
+        if (!saysSomething(r)) continue;
+        const group = TERM_CANON[r.key] ?? r.key;
+        if (TERM_HIDDEN.has(group)) continue;
+        /* ── A column must have something to SAY (owner, 2026-09-07) ───────────────────────
+           *"If something is not set by the request and doesn't have at least one value across the
+           suppliers' bids, don't show it — meaningless to show all «doesn't say»."*
+
+           `saysSomething` above only drops a row that is grey AND bare, which let a term through on
+           a state alone: «Maintenance» was `matched` with no value anywhere, so the table drew a
+           column of «Didn't say» about a question nobody had asked in words.
+
+           A term the REQUEST set and nobody answered still draws, as a column of «Didn't say» - that
+           is the renter's own question going unanswered, which is exactly what he is here to see. */
+        const sides = termSides(r, ar);
+        const at = byGroup.get(group);
+        if (at) {
+          if (!at.keys.includes(r.key)) at.keys.push(r.key);
+          at.asked = at.asked || sides.asked != null;
+        } else {
+          byGroup.set(group, {
+            group,
+            keys: [r.key],
+            labelEn: r.labelEn,
+            labelAr: r.labelAr,
+            asked: sides.asked != null,
+          });
+        }
+      }
+    }
+    const known = (g: string) => { const i = TERM_ORDER.indexOf(g); return i === -1 ? Number.MAX_SAFE_INTEGER : i; };
+    /* The known reading order, then anything new alphabetically. The «renter's first» key that used
+       to lead this sort is gone with the volunteered columns it separated — every column is his. */
+    return [...byGroup.values()]
+      // The request did not ask it, so there is nothing here to compare against. It does not draw.
+      .filter((c) => c.asked)
+      .sort((a, b) => known(a.group) - known(b.group) || a.labelEn.localeCompare(b.labelEn));
+}
+
 export function CompareMatrix({
   bids,
   durationDays,
@@ -448,49 +503,7 @@ export function CompareMatrix({
    * A term is the renter's when any bid carries his side of it — `renteeValue`, or the «Renter: X»
    * half of the detail line, which is how an off-platform submission carries it (`termRow`).
    */
-  const termCols = useMemo(() => {
-    const byGroup = new Map<string, { group: string; keys: string[]; labelEn: string; labelAr: string; asked: boolean }>();
-    for (const b of rows) {
-      // `supplier` is deliberately absent: CR and VAT are company details (see TERM_HIDDEN).
-      for (const r of [...(b.card.negotiableTerms ?? []), ...b.card.terms.contract, ...b.card.terms.equipment]) {
-        if (TERM_HIDDEN.has(r.key)) continue;
-        if (!saysSomething(r)) continue;
-        const group = TERM_CANON[r.key] ?? r.key;
-        if (TERM_HIDDEN.has(group)) continue;
-        /* ── A column must have something to SAY (owner, 2026-09-07) ───────────────────────
-           *"If something is not set by the request and doesn't have at least one value across the
-           suppliers' bids, don't show it — meaningless to show all «doesn't say»."*
-
-           `saysSomething` above only drops a row that is grey AND bare, which let a term through on
-           a state alone: «Maintenance» was `matched` with no value anywhere, so the table drew a
-           column of «Didn't say» about a question nobody had asked in words.
-
-           A term the REQUEST set and nobody answered still draws, as a column of «Didn't say» - that
-           is the renter's own question going unanswered, which is exactly what he is here to see. */
-        const sides = termSides(r, ar);
-        const at = byGroup.get(group);
-        if (at) {
-          if (!at.keys.includes(r.key)) at.keys.push(r.key);
-          at.asked = at.asked || sides.asked != null;
-        } else {
-          byGroup.set(group, {
-            group,
-            keys: [r.key],
-            labelEn: r.labelEn,
-            labelAr: r.labelAr,
-            asked: sides.asked != null,
-          });
-        }
-      }
-    }
-    const known = (g: string) => { const i = TERM_ORDER.indexOf(g); return i === -1 ? Number.MAX_SAFE_INTEGER : i; };
-    /* The known reading order, then anything new alphabetically. The «renter's first» key that used
-       to lead this sort is gone with the volunteered columns it separated — every column is his. */
-    return [...byGroup.values()]
-      // The request did not ask it, so there is nothing here to compare against. It does not draw.
-      .filter((c) => c.asked)
-      .sort((a, b) => known(a.group) - known(b.group) || a.labelEn.localeCompare(b.labelEn));
-  }, [rows, ar]);
+  const termCols = useMemo(() => buildTermColumns(rows, ar), [rows, ar]);
 
   const lowRate = useMemo(() => cheapest(rows, (b) => b.card.price), [rows]);
   const lowFirst = useMemo(() => cheapest(rows, (b) => totals.get(b.card.id)?.firstCycle.total ?? null), [rows, totals]);
@@ -688,12 +701,16 @@ export function CompareMatrix({
           genuinely needs to overhang the strip — the breakdown — is drawn in a portal instead. */}
       <div {...pin("matrix-scroller")} className="flex items-stretch overflow-x-auto overflow-y-clip">
         {/* ── The suppliers, on the inline-start edge ── */}
-        {/* 220px, and the name WRAPS (owner, 2026-09-07: *"the supplier names on the left must show
-            the name fully"*). At 185px with `truncate`, «Al Faisal Heavy Equipment Est.» read as «Al
-            Faisal Heavy…» — the column identifies who each row belongs to, and a name cut off has
-            lost the only job it has. The rows keep their 52px, so nothing else on the table moves:
-            two lines of 11px fit inside it. */}
-        <div {...pin("matrix-supplier-col")} className="w-[220px] flex-none border-e border-border">
+        {/* ── ONE row per name, and the column widened to hold it (owner, 2026-09-09) ────────────
+            *"make the supplier name in 1 row"*. It wrapped to two lines at 220px, which answered an
+            earlier note of his — *"the supplier names on the left must show the name fully"*
+            (2026-09-07, after 185px + `truncate` cut «Al Faisal Heavy Equipment Est.» to «Al Faisal
+            Heavy…»). Both rulings are alive: the name is `truncate` on one line again AND the column
+            is 280px, which fits «Nesma Heavy Equipment Co.» whole beside the avatar and the ✕. A
+            name longer than that truncates with the whole of it on `title`, which is the honest
+            answer to a column that cannot grow forever.
+            The rows keep their 52px, so nothing else on the table moves. */}
+        <div {...pin("matrix-supplier-col")} className="w-[280px] flex-none border-e border-border">
           <div className="box-border flex h-[96px] flex-col justify-end gap-1.5 border-b border-border bg-surface2/60 px-3 pb-2">
             {/* «Supplier», and nothing after it: the «pick one» that stood here was an instruction
                 for a choice this table no longer asks for (owner, 2026-09-04). */}
@@ -741,17 +758,25 @@ export function CompareMatrix({
                   {initials(b.card.supplierName)}
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="line-clamp-2 break-words text-meta font-extrabold leading-[1.25] text-navy" title={b.card.supplierName}>
+                  <span className="truncate text-meta font-extrabold leading-[1.25] text-navy" title={b.card.supplierName}>
                     {b.card.supplierName}
                   </span>
                   <span className={`truncate text-label font-semibold leading-none ${recommended ? "text-ok" : "text-muted"}`}>
+                    {/* ── The line under the name says WHERE the offer came from (owner, 2026-09-09) ──
+                        *"call it via app instead of waiting reply etc"*. ~~«Awaiting reply» /
+                        «In negotiation».~~ Both are facts about the CONVERSATION, and this column
+                        is the row's identity: on a table of six they said six different things
+                        about the same kind of offer, while the one distinction that changes how a
+                        renter reads a row — did this come through Moedatech, or through my own
+                        shared link — was said only on the offline half. It is the SOURCE now, in
+                        the same two words the SOURCE filter above the table uses (`sourceApp` /
+                        `offlineInvite`), so the row and the tab cannot drift apart.
+                        The agent's ★ still wins the slot: it is a recommendation, not a source. */}
                     {recommended
                       ? `★ ${t.workspace.recommended}`
                       : b.source === "offline"
                         ? t.workspace.offlineInvite
-                        : b.card.dealRoomId
-                          ? t.workspace.inNegotiation
-                          : t.workspace.awaitingReply}
+                        : t.workspace.sourceApp}
                   </span>
                 </span>
                 <button
@@ -790,21 +815,26 @@ export function CompareMatrix({
              ~~Two bands, «Terms you set» and «They offered on their own», each sized to its own
              column count.~~ Gone. The terms are one set of facts about one offer, and the split
              asked the reader to hold a distinction that changes nothing he does: he reads the
-             answer, and the colour says whether it meets what he wanted. The terms he set still come
-             FIRST — `termCols` sorts them that way — so the ORDER carries what the heading used to
-             announce.
+             answer, and the colour says whether it meets what he wanted. Since 2026-09-09 every
+             column IS one he set, so there is no longer a second half for a heading to announce.
 
              Open, this group is the widest thing on the row and the money is folded to rails beside
              it, because a term column sharing the width with six money columns truncates every
              answer in it. */
-          /* ── The strip is as WIDE as its columns, never squeezed under the rail beside it ──────
-               (owner, 2026-09-09: *"fix the overlay"*). It was `flex-[9_1_0] min-w-0`, so with
-               eight terms open the columns — each carrying its own `minWidth` — overflowed this box
-               and drew straight through the «Equipment» rail on its trailing edge: a head read
-               «OPERATOR» with the rest of the word behind the rail, and two columns reappeared on
-               the far side of it. It is `flex-none` now and the table scrolls sideways instead,
-               which is what the scroller around it is for. */
-          <div className="flex flex-none flex-col border-s border-border">
+          /* ── The strip GROWS into spare width and never shrinks below its columns ─────────────
+               Two owner notes, one line of CSS. *"fix the overlay"* (2026-09-09): it was
+               `flex-[9_1_0] min-w-0`, so with eight terms open the box shrank below its content
+               while each column kept its own `minWidth` — the columns overflowed and drew straight
+               through the «Equipment» rail on the trailing edge, a head reading «OPERATOR» with the
+               rest behind the rail and two columns reappearing on its far side. That was answered
+               with `flex-none`, which fixed the overlap and left the opposite fault: with FEW terms
+               the table stopped short of its own container and the orange rail floated in the middle
+               of the card with white after it — *"fix the equipment orange stripe place"*.
+
+               `flex-[1_0_auto]` is both answers at once: grow into spare width, NEVER shrink below
+               the columns. Wide enough for the terms, the rail sits flush on the table's trailing
+               edge; too narrow, the columns hold their width and the scroller carries them. */
+          <div className="flex min-w-min flex-[1_0_auto] flex-col border-s border-border">
             <div className={`${HEAD} flex items-center gap-1.5 bg-surface2/60 px-3`}>
               <span className="min-w-0 text-label font-extrabold uppercase leading-tight tracking-wide text-navy-mid">
                 {t.workspace.groupTerms}
@@ -1083,7 +1113,7 @@ function oppositeParty(asked: string | null, t: Dict): string | null {
 }
 
 /** The paper that proves this term for one bid, if the bid carries one. */
-function docForTerm(group: string, docs: DealRoomDocument[]): DealRoomDocument | null {
+export function docForTerm(group: string, docs: DealRoomDocument[]): DealRoomDocument | null {
   const wants = TERM_DOC_TYPES[group];
   if (!wants) return null;
   return docs.find((d) => !!d.url && wants(d.type)) ?? null;
@@ -1120,7 +1150,10 @@ function TermColumn({
   const merged = answers.length > 1 && first.text != null && answers.every((a) => a.text === first.text && !a.against);
 
   return (
-    <div className="flex flex-none flex-col border-e border-border last:border-e-0" style={{ width: TERM_MIN_PX }}>
+    /* `flex-1` with a floor, never a fixed width: the columns SHARE whatever spare width the strip
+       grew into, so the table reaches its own trailing edge with no white gap before the «Equipment»
+       rail, and `minWidth` is what stops them shrinking under the answers when there are many. */
+    <div className="flex flex-1 flex-col border-e border-border last:border-e-0" style={{ minWidth: TERM_MIN_PX }}>
       {/* ── The term, and nothing else (owner, 2026-09-06) ────────────────────────────────────
           *"No need to mention what the rentee asked — just red or green."*
 
@@ -1238,7 +1271,7 @@ function TermColumn({
  *
  * The state itself is never printed. It is the colour: a conflict is red, everything else is not.
  */
-function readTerm(
+export function readTerm(
   row: TermRow | null,
   key: string,
   ar: boolean,

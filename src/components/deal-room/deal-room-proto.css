@@ -25,9 +25,9 @@
   flex-direction: column;
   min-height: calc(100vh - 140px);
   color: var(--navy);
-  font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  font-family: var(--font-sans);
 }
-.dlproto .mono { font-family: "IBM Plex Sans", monospace; }
+.dlproto .mono { font-family: var(--font-mono); }
 .dlproto .material-icons-outlined { font-family: "Material Icons Outlined"; line-height: 1; }
 .dlproto .btn { border: 1px solid var(--border); background: var(--surface1); border-radius: var(--r-md); padding: 12px 18px; font: inherit; font-weight: 800; font-size: 13.5px; color: var(--navy); display: inline-flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer; }
 .dlproto .btn.green { background: var(--success); border-color: var(--success); color: var(--surface); }
@@ -87,7 +87,7 @@
 .dlproto .pb-src .dot { width: 8px; height: 8px; border-radius: 50%; background: color-mix(in srgb, var(--action) 45%, white); }
 .dlproto .pb-src.done .dot { background: var(--tick-up); } .dlproto .pb-src.wait .dot { background: var(--warn-amber); }
 .dlproto .pb-hero { display: flex; align-items: baseline; gap: 8px; }
-.dlproto .pb-hero .n { font-family: "IBM Plex Sans", monospace; font-size: 52px; font-weight: 800; letter-spacing: -1.5px; line-height: 1; color: var(--surface); }
+.dlproto .pb-hero .n { font-family: var(--font-mono); font-size: 52px; font-weight: 800; letter-spacing: -1.5px; line-height: 1; color: var(--surface); }
 .dlproto .pb-hero .u { font-size: 17px; font-weight: 600; color: rgba(255, 255, 255, 0.68); }
 .dlproto .pb-tools { display: inline-flex; align-items: center; gap: 12px; margin-top: 2px; }
 .dlproto .pb-seg { display: inline-flex; background: rgba(255, 255, 255, 0.1); border-radius: var(--radius-sm); padding: 2px; }
@@ -101,7 +101,7 @@
 .dlproto .pb-breakdown { position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); z-index: 20; width: min(460px, calc(100vw - 40px)); background: var(--navy-deep); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: var(--radius-lg); padding: 16px 20px; }
 .dlproto .pb-brow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 6px 0; }
 .dlproto .pb-brow .l { font-size: 13.5px; font-weight: 600; color: rgba(255, 255, 255, 0.82); }
-.dlproto .pb-brow .v { font-family: "IBM Plex Sans", monospace; font-size: 15px; font-weight: 800; color: var(--surface); }
+.dlproto .pb-brow .v { font-family: var(--font-mono); font-size: 15px; font-weight: 800; color: var(--surface); }
 .dlproto .pb-brow .v.ex { color: rgba(255, 255, 255, 0.4); font-family: inherit; font-weight: 700; }
 .dlproto .pb-brow.tot { border-top: 1px solid rgba(255, 255, 255, 0.2); margin-top: 4px; padding-top: 10px; }
 .dlproto .pb-brow.tot .l { font-weight: 800; color: var(--surface); } .dlproto .pb-brow.tot .v { font-size: 17px; color: color-mix(in srgb, var(--action) 45%, white); }
@@ -181,7 +181,7 @@
 .dlproto .cc-k { font-size: 11.5px; font-weight: 700; color: var(--muted); }
 .dlproto .cc-v { font-size: 13px; font-weight: 800; color: var(--navy); text-align: end; }
 /* A numeric run marked `dir=ltr` must not inherit the RTL bubble's alignment. */
-.dlproto .chatcard .cc-v[dir="ltr"] { font-family: "IBM Plex Sans", monospace; }
+.dlproto .chatcard .cc-v[dir="ltr"] { font-family: var(--font-mono); }
 /* old → new. The glyph itself comes from the component (`←` in Arabic), so nothing here assumes LTR. */
 .dlproto .cc-trans { margin-top: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; font-weight: 700; }
 .dlproto .cc-old { color: var(--muted); text-decoration: line-through; }
@@ -397,7 +397,7 @@
 .qp-scrim { position: fixed; inset: 0; z-index: 60; background: color-mix(in srgb, var(--navy-deep) 50%, transparent); display: flex; align-items: center; justify-content: center; padding: clamp(10px,3%,28px); }
 .qp-scrim .material-icons-outlined { font-family: "Material Icons Outlined"; line-height: 1; }
 .qp-sheet {--rentee: var(--action); --action:var(--brand); --success:var(--ok); --success-bg:var(--ok-soft);--danger-bg:var(--danger-soft); --warning:var(--warn);--line:var(--surface3);--paper-2:var(--surface);
-  display: flex; flex-direction: column; width: 100%; max-width: 860px; max-height: 94vh; background: var(--surface); border-radius: var(--radius-lg); overflow: hidden; font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; color: var(--navy); animation: dpModal .22s ease; }
+  display: flex; flex-direction: column; width: 100%; max-width: 860px; max-height: 94vh; background: var(--surface); border-radius: var(--radius-lg); overflow: hidden; font-family: var(--font-sans); color: var(--navy); animation: dpModal .22s ease; }
 @keyframes dpModal { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: none; } }
 
 /* header — two rows */
@@ -414,7 +414,7 @@
 .qp-hnote .material-icons-outlined { font-size: 14px; }
 .qp-htotal { flex: 0 0 auto; text-align: end; }
 .qp-htotal .k { font-size: 9.5px; font-weight: 700; color: var(--muted); }
-.qp-htotal .v { font-size: 16px; font-weight: 800; color: var(--navy); font-family: "IBM Plex Sans", monospace; direction: ltr; }
+.qp-htotal .v { font-size: 16px; font-weight: 800; color: var(--navy); font-family: var(--font-mono); direction: ltr; }
 .qp-x { flex: 0 0 auto; display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); border-radius: 50%; cursor: pointer; }
 .qp-x .material-icons-outlined { font-size: 18px; }
 /* stepper */
@@ -463,7 +463,7 @@
 .qp-table td { border-bottom: 1px solid var(--line); padding: 11px 10px; font-size: 12.5px; vertical-align: middle; }
 .qp-table .lbl { font-weight: 800; color: var(--navy); }
 .qp-table .sub { font-size: 10.5px; font-weight: 600; color: var(--muted); margin-top: 2px; }
-.qp-table .tot { font-family: "IBM Plex Sans", monospace; font-weight: 800; color: var(--navy); direction: ltr; }
+.qp-table .tot { font-family: var(--font-mono); font-weight: 800; color: var(--navy); direction: ltr; }
 .qp-table tr.ex td { background: var(--paper-2); }
 .qp-pricebox { display: inline-flex; align-items: center; gap: 3px; background: var(--success-bg); border: 1.5px solid color-mix(in srgb, var(--ok) 50%, transparent); border-radius: var(--radius-sm); padding: 3px 9px; }
 .qp-pricebox .ic { font-size: 14px; color: var(--success); }
@@ -488,7 +488,7 @@
 /* totals + words + payment cards */
 .qp-totals { margin-top: 16px; border-top: 1.5px solid var(--border); padding-top: 10px; }
 .qp-trow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 13px; }
-.qp-trow .l { color: var(--navy-mid); font-weight: 600; } .qp-trow .v { font-family: "IBM Plex Sans", monospace; font-weight: 700; direction: ltr; }
+.qp-trow .l { color: var(--navy-mid); font-weight: 600; } .qp-trow .v { font-family: var(--font-mono); font-weight: 700; direction: ltr; }
 /* The fixed-divisor note trailing a money figure ("· 26 working days/month") — the same muted, smaller
    treatment `.qp-table .sub` gives it in the price table, so the two papers state it identically. */
 .qp-trow .v .sub { font-family: inherit; font-size: 10.5px; font-weight: 600; color: var(--muted); }
@@ -510,7 +510,7 @@
 .qp-compare .duo { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .qp-compare .side { text-align: center; flex: 1; }
 .qp-compare .side .k { font-size: 10.5px; font-weight: 700; color: rgba(255,255,255,.7); }
-.qp-compare .side .v { font-size: 27px; font-weight: 800; font-family: "IBM Plex Sans", monospace; direction: ltr; margin-top: 2px; line-height: 1; }
+.qp-compare .side .v { font-size: 27px; font-weight: 800; font-family: var(--font-mono); direction: ltr; margin-top: 2px; line-height: 1; }
 .qp-compare .side.sup .v { color: var(--warn-amber); } .qp-compare .side.me .v { color: color-mix(in srgb, var(--action) 45%, white); }
 .qp-compare .conv { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 .qp-compare .conv .track { flex: 1; height: 3px; border-radius: var(--radius-sm); background: rgba(255,255,255,.18); }
@@ -522,7 +522,7 @@
 .qp-cmp-tbl { width: 100%; border-collapse: collapse; margin-top: 10px; color: var(--surface); }
 .qp-cmp-tbl th { font-size: 9.5px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; color: rgba(255,255,255,.6); padding: 4px 8px; text-align: end; border-bottom: 1px solid rgba(255,255,255,.16); }
 .qp-cmp-tbl th:first-child { text-align: start; }
-.qp-cmp-tbl td { font-size: 12px; font-weight: 700; font-family: "IBM Plex Sans", monospace; direction: ltr; padding: 6px 8px; text-align: end; border-bottom: 1px solid rgba(255,255,255,.08); }
+.qp-cmp-tbl td { font-size: 12px; font-weight: 700; font-family: var(--font-mono); direction: ltr; padding: 6px 8px; text-align: end; border-bottom: 1px solid rgba(255,255,255,.08); }
 .qp-cmp-tbl td.ln { text-align: start; font-family: inherit; color: rgba(255,255,255,.9); }
 .qp-cmp-tbl td .u { font-size: 9.5px; font-weight: 700; color: rgba(255,255,255,.55); }
 .qp-cmp-tbl td.na { color: rgba(255,255,255,.45); font-weight: 700; }
@@ -725,7 +725,7 @@
 .dlproto .qp-round-role { font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 999px; background: var(--surface2); color: var(--navy-mid); }
 .dlproto .qp-round-role.supplier { background: var(--success-bg); color: var(--supplier); }
 .dlproto .qp-round-role.rentee { background: color-mix(in srgb, var(--action) 8%, white); color: var(--rentee); }
-.dlproto .qp-round-tot { font-family: "IBM Plex Sans", monospace; font-size: 14px; font-weight: 800; color: var(--navy); }
+.dlproto .qp-round-tot { font-family: var(--font-mono); font-size: 14px; font-weight: 800; color: var(--navy); }
 .dlproto .qp-round-d { margin-top: 5px; font-size: 12px; font-weight: 600; color: var(--navy-mid); display: flex; flex-wrap: wrap; gap: 4px 12px; }
 .dlproto .qp-round-t { margin-top: 4px; font-size: 10.5px; font-weight: 600; color: var(--muted); }
 

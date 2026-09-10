@@ -29,7 +29,7 @@
 .rproto .basket .bk-ic { color: var(--action); }
 .rproto .basket .bk-t { font-size: 13px; font-weight: 800; }
 .rproto .basket .bk-s { font-size: 11.5px; color: var(--navy-mid); font-weight: 600; margin-top: 2px; }
-.rproto .basket .bk-v { margin-inline-start: auto; font-family: "IBM Plex Sans", monospace; font-size: 19px; font-weight: 800; color: var(--action); }
+.rproto .basket .bk-v { margin-inline-start: auto; font-family: var(--font-mono); font-size: 19px; font-weight: 800; color: var(--action); }
 
 /* item tabs */
 .rproto .item-tabs { margin: 4px 0 14px; }
@@ -38,7 +38,7 @@
 .rproto .itab:hover { border-color: var(--navy-mid); }
 .rproto .itab.on { background: var(--navy); border-color: var(--navy); color: var(--surface); }
 .rproto .itab .material-icons-outlined { font-size: 16px; }
-.rproto .itab .ct { display: inline-flex; align-items: center; justify-content: center; min-width: 19px; height: 19px; padding: 0 6px; border-radius: var(--r-full); background: var(--surface2); color: var(--navy-mid); font-family: "IBM Plex Sans", monospace; font-size: 11px; font-weight: 800; }
+.rproto .itab .ct { display: inline-flex; align-items: center; justify-content: center; min-width: 19px; height: 19px; padding: 0 6px; border-radius: var(--r-full); background: var(--surface2); color: var(--navy-mid); font-family: var(--font-mono); font-size: 11px; font-weight: 800; }
 .rproto .itab.on .ct { background: rgba(255,255,255,0.22); color: var(--surface); }
 
 /* per-item comparison */

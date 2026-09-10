@@ -788,3 +788,91 @@ describe("a term cell carries its verdict as a tint, not only as ink", () => {
     expect(screen.getByText("Didn't say")).toBeTruthy();
   });
 });
+
+/**
+ * ── The supplier column, 2026-09-09 ─────────────────────────────────────────────────────────────
+ * *"make the supplier name in 1 row and call it via app instead of waiting reply etc"*.
+ */
+describe("the supplier column names the firm on one line, and says where the offer came from", () => {
+  const two = () => [
+    wb(bc({ id: "b1", supplierName: "Nesma Heavy Equipment Co.", terms: { equipment: [], contract: [term("payment_terms", "Payment", "net_30", { renteeValue: "net_30" })], supplier: [] } }), "app"),
+    wb(bc({ id: "link-s1", supplierName: "Al Jazira Equipment Rental", terms: { equipment: [], contract: [term("payment_terms", "Payment", "net_60", { renteeValue: "net_30" })], supplier: [] } }), "offline"),
+  ];
+
+  it("draws the name on ONE line, with the whole of it on `title`", () => {
+    const { container } = two() && draw(two());
+    const name = Array.from(container.querySelectorAll("span")).find((s) => s.textContent === "Nesma Heavy Equipment Co.")!;
+    expect(name.className).toContain("truncate");
+    // It wrapped to two lines until now; a clamp and a single line cannot both be true.
+    expect(name.className).not.toContain("line-clamp-2");
+    expect(name.getAttribute("title")).toBe("Nesma Heavy Equipment Co.");
+  });
+
+  it("widens the column so a real firm name still reads whole on that one line", () => {
+    // The 2026-09-07 ruling — *"the supplier names on the left must show the name fully"* — is the
+    // reason this is 280px and not a narrower column with an ellipsis in it.
+    const { container } = draw(two());
+    expect((container.querySelector('[data-pin="30.2"]') as HTMLElement).className).toContain("w-[280px]");
+  });
+
+  it("says «Via app» and «Offline · invite ↗», never the state of the conversation", () => {
+    draw(two());
+    expect(screen.getByText("Via app")).toBeTruthy();
+    expect(screen.getByText(/Offline · invite/)).toBeTruthy();
+    // Both were facts about the chat, not about the row: an app bid said one or the other depending
+    // on whether a deal room happened to be open.
+    expect(screen.queryByText("Awaiting reply")).toBeNull();
+    expect(screen.queryByText("In negotiation")).toBeNull();
+  });
+
+  it("keeps the agent's ★ in that slot — a recommendation is not a source", () => {
+    const rows = two();
+    render(
+      <LocaleProvider>
+        <CompareMatrix
+          bids={rows} durationDays={null} startDate={null} mobByRentee={null} demobByRentee={null}
+          submissions={{}} benched={new Set()} onBench={() => {}} ranking={{ bidId: "b1", note: null }}
+        />
+      </LocaleProvider>,
+    );
+    expect(screen.getByText(/★/)).toBeTruthy();
+    // The other row still names its source.
+    expect(screen.getByText(/Offline · invite/)).toBeTruthy();
+  });
+});
+
+/**
+ * ── The terms strip reaches the «Equipment» rail (owner, 2026-09-09: *"fix the equipment orange
+ * stripe place"*) ───────────────────────────────────────────────────────────────────────────────
+ * `flex-none` (the 09-09 overlay fix) stopped the columns overflowing the strip and left the
+ * opposite fault: with few terms the table ended short of its container and the orange rail floated
+ * mid-card with white after it. `flex-[1_0_auto]` grows into the spare width and never shrinks.
+ *
+ * ⚠️ These pin the DECLARATION. jsdom does not lay flexbox out, so neither the overlap nor the gap
+ * can be measured here — only that the rules which decide them are the ones intended.
+ */
+describe("the terms strip grows into spare width and never shrinks under its columns", () => {
+  const stripOf = (c: HTMLElement) =>
+    (Array.from(c.querySelectorAll("div")).find((d) => d.className.includes("flex-[1_0_auto]")) as HTMLElement);
+
+  it("grows, never shrinks, and holds a floor of its own", () => {
+    const { container } = draw();
+    openTerms();
+    const strip = stripOf(container);
+    expect(strip).toBeTruthy();
+    // Grow 1 / shrink 0 / basis auto — the shrink is the half that stops the overlay.
+    expect(strip.className).toContain("flex-[1_0_auto]");
+    expect(strip.className).toContain("min-w-min");
+  });
+
+  it("lets the COLUMNS share that spare width, so no gap opens before the rail", () => {
+    const { container } = draw();
+    openTerms();
+    const col = Array.from(stripOf(container).querySelectorAll("div"))
+      .find((d) => d.style.minWidth && d.className.includes("flex-1")) as HTMLElement;
+    expect(col).toBeTruthy();
+    // A fixed `width` here is what left the white gap; a floor plus grow is what closes it.
+    expect(col.style.width).toBe("");
+    expect(col.style.minWidth).toBe("132px");
+  });
+});

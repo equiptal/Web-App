@@ -2,6 +2,151 @@
 
 ## Change log
 
+- **2026-09-10 - The pin overlay is off on staging (temporarily), and the bid card drops the «no named machine» note.**
+  Two owner notes.
+  (1) *"can u remove the pins toggle from staging just temporarily just hide it"*. The two staging
+  hosts are COMMENTED OUT of `PIN_HOSTS` rather than deleted, with the quote beside them, so bringing
+  it back is uncommenting two lines. `localhost` and `127.0.0.1` keep the overlay, so nothing about
+  developing locally changes, and the registry, the shortcut and `?pins=1` are all untouched.
+  ⚠️ `uiPinsAllowed` also gates **`/dev/preview`**, so that page answers «not here» on staging for as
+  long as this stands. Said out loud because it is a second surface going dark for a one-line edit
+  aimed at the first.
+  (2) *"«1 من هذه الوحدات بلا معدّة مسمّاة: أُدرجت 1 معدّة.» remove this note from the bid card"*.
+  It fired on `claimedUnits > 0` - units offered with no named machine behind them - which is the
+  ORDINARY shape of an off-platform bid, so it printed in orange on most cards and told the renter
+  nothing he acts on there.
+  Files: `src/lib/uiPins.ts`, `docs/ui-pins.md`, `src/components/workspace/BidCards.tsx`,
+  `src/lib/i18n/{en,ar}.ts` (`workspace.countClaimed` deleted).
+  ⚠️ **Only the NOTE went.** `unitCountNotes` still computes `hasClaimedNote`, `claimedUnits` and
+  `machinesNamed`, and `bid-card-rules.test.ts` still pins them: it is the app's own rule, and the
+  equipment map is where a unit with no machine behind it actually matters.
+  ⚠️ The box's condition moved from `!countNotes.isEmpty` to `hasPricedNote`. Left as it was, a bid
+  carrying ONLY the claimed note would have drawn an empty bordered strip under the total.
+  ⚠️ The comment above the two surviving strings described the removed line in both locales and was
+  rewritten. A comment stating a premise that is no longer true is worse than none.
+  ⚠️ `docs/ui-pins.md` is GENERATED outside its `pins:start/end` block too - a hand-edit to the prose
+  makes `ui-pins.test.ts` fail as «stale» until `node scripts/ui-pins-doc.mjs` is re-run, which then
+  keeps the edit. Re-run it after touching that file.
+  ⚠️ That same test was ALREADY failing before this change, on a clean tree: the committed docs are
+  CRLF on disk here and the generator writes LF. Verified by stashing. Re-running the generator
+  settles it and produces no content diff.
+
+- **2026-09-10 - The Latin face is INTER at last, and a guard now stops the type drifting the way the colour once did.**
+  Owner, on `docs/design-tokens.md`: *"is the font style and size in this md applied to web in all
+  screens?"*, then *"apply it, and make sure to register it as part of the web design system so any
+  further changes will follow and use it"*.
+  🔴 **It was not applied, and had not been since the file landed.** The token file named Inter on
+  2026-09-04, `layout.tsx` began DOWNLOADING it that day, and `globals.css` bound
+  `--font-sans: var(--font-inter), …` — but **nothing read `--font-sans`**. Its only other mention in
+  `src/` was inside a comment. `body` went on declaring `"Segoe UI", system-ui, -apple-system,
+  Roboto, sans-serif`, and a declaration on `body` beats anything preflight puts on `html`, so for
+  six days the app paid for the webfont on every load and rendered in the system face anyway - the
+  worst of the two options it was choosing between. The ARABIC half was wired correctly the same day
+  (`:lang(ar) body` → Almarai), which is why only English screens drifted and nobody saw it.
+  (1) `body` is `font-family: var(--font-sans)`. **This repaints every Latin screen.**
+  (2) **37 stray `font-family` declarations swept** out of five prototype stylesheets and the public
+  bid form's style blob: `"Segoe UI", …` → `var(--font-sans)`, `"IBM Plex Sans Arabic", …` →
+  `var(--font-arabic)`, `"IBM Plex Sans", monospace` → `var(--font-mono)` (a TEXT face, the token
+  file's own decision - figures align on `tabular-nums`, not on a monospaced face), and raw
+  `ui-monospace, monospace` → `var(--font-mono-data)`. `font-family: inherit` is left alone: it
+  inherits the body's face, which is now the token's.
+  (3) **Registered**: `DESIGN.md` gains a «The faces» table above the size scale, the linter table
+  gains a row, and `tests/unit/font-drift.test.ts` (new, 5 cases) fails on any `font-family` in
+  `src/` that is not one of the four tokens.
+  Files: `src/app/globals.css`, `src/components/bid/bidFormStyles.ts`,
+  `src/components/{map/map-proto,map/panel/panel-proto,map/request-card,deal-room/deal-room-proto,requests/requests-proto,compare/compare-proto}.css`,
+  `DESIGN.md`, `tests/unit/font-drift.test.ts`.
+  ⚠️ **The md defines NO sizes.** It is titled «Colors & Fonts» and holds three families with their
+  weights plus ~113 colours - no scale, no line-heights. The six-step `--text-*` scale is this app's
+  own and predates it, which `DESIGN.md` now says out loud so the next reader does not go looking.
+  ⚠️ **Five files are exempt, and must stay exempt**: the quotation, the printed comparison, and the
+  three cards pasted into Gmail / Outlook / Word. They render where this app's `:root` does not
+  exist, so `var(--font-sans)` resolves to nothing there and a `next/font` face is not available at
+  all. The guard requires each to name a real system STACK rather than one family, and adding a
+  sixth means adding it to that list with a reason.
+  ⚠️ **Oswald (`--font-hero`) is the one face this app loads that the token file does not name.**
+  Left as it is - it is the CTA banner headline and the owner chose it - but it is a deviation, and
+  `DESIGN.md` says so rather than leaving it to be discovered.
+  ⚠️ Verified: typecheck, lint, and the five design guards green (240) - `font-drift`,
+  `palette-drift`, `ds-colors`, `rentee-map-surface`, `equipment-card`. The new guard was
+  break-checked both ways (body reverted to Segoe UI, and a Comic Sans rule added to a prototype
+  stylesheet); each went red. **NOT seen rendered**: the repaint has not been looked at in a browser,
+  and Inter and Segoe UI have different metrics - the places to check first are the ones with fixed
+  widths, the compare matrix's 132px term columns and the map's numeric chips.
+
+- **2026-09-09 - The exported comparison is the WHOLE table: two money bands, every term, the verdicts in colour, and the brand at the top.**
+  Owner: *"i wanna the export template for compare table to be as full table with all but grouped by
+  section price or terms but showing moedatech logo at top and showing green and red too"*.
+  ~~Four columns - supplier, rate, transport, grand total.~~ A renter who had spent the afternoon
+  reading eight term columns exported a sheet with none of them on it, and the verdicts he was
+  choosing BY (this one meets the certificate, that one refuses it) printed nowhere at all.
+  `src/lib/export/compare-sheet.ts` draws the screen's own shape: a two-deck head (the band
+  «PER CYCLE / GRAND TOTAL / TERMS», then the columns under it, the supplier cell spanning both), a
+  row per bid naming its source, the money with the cheapest marked, and every term cell in the
+  green or the red the screen paints it, with the ✗ on a refusal.
+  🔴 **ONE derivation, two renderers.** The sheet calls `buildTermColumns` and `readTerm` - the
+  matrix's own, extracted to module scope and exported for this - and the money is the same
+  `computeCycleTotals` call with the same inputs. A sheet that decides its own columns prints a term
+  the screen dropped, and NOTHING fails when it does; it just quietly disagrees with the screen it
+  claims to be a copy of.
+  Files: `src/lib/export/compare-sheet.ts` (new), `src/components/workspace/RequestsWorkspace.tsx`
+  (`printComparison` rewritten), `src/components/workspace/CompareMatrix.tsx` (`buildTermColumns`
+  extracted; it and `readTerm` / `docForTerm` exported), `src/lib/i18n/{en,ar}.ts`
+  (`workspace.exportLegend`), `tests/unit/compare-sheet.test.ts` (new, 9 cases).
+  ⚠️ **The old sheet was never branded, and could not have been.** It wrote `color:var(--navy)` and
+  `border:1px solid var(--border)` into `window.open("", "_blank")` - a document that inherits no
+  stylesheet from this app - so every one of those resolved to nothing and it printed in the
+  browser's defaults. The sheet carries `DS_ROOT_CSS` in its own `<head>` now, which is what the
+  QUOTATION has always done for the same reason. A test asserts `:root{` and the two soft tones are
+  in the output.
+  ⚠️ The logo URL is ABSOLUTE (`${window.location.origin}/moedatech-logo.svg`). A relative path in an
+  `about:blank` document resolves to nothing and prints a broken image where the brand should be.
+  ⚠️ A leg the RENTER moves prints as «Didn't say», never as 0 SAR - on paper a zero reads as free
+  delivery. Same rule as the matrix's `onRentee` column.
+  ⚠️ The ✗ is drawn as well as the colour, because a sheet gets photocopied and the colour is the
+  first thing to go.
+  ⚠️ `workspaceExportTotals` is no longer imported by the workspace. It is still used by the CARDS
+  export payload; do not delete it on the strength of this one call site going away.
+  ⚠️ Verified: typecheck, lint, 9 new cases plus `compare-matrix`, `palette-drift` and `ds-colors`
+  green (178). NOT seen as a picture: the sheet was rendered to HTML and served locally, but the
+  browser tool timed out on every screenshot attempt, so the LAYOUT (column widths on A4 landscape
+  with eight terms, and the print colours) has not been looked at. That is the next thing to check.
+
+- **2026-09-09 - The comparison's supplier column is one line and names the SOURCE, and the terms strip reaches the orange rail.**
+  Owner, three notes on one screenshot: *"make the supplier name in 1 row"*, *"call it via app instead
+  of waiting reply etc"*, *"fix the equipment orange stripe place"*.
+  (1) **One line, and the column widened to hold it.** The name was `line-clamp-2 break-words` in a
+  220px column, so «Nesma Heavy Equipment Co.» took two rows of a 52px cell. It is `truncate` again
+  and the column is 280px, which fits a real firm name whole beside the 28px avatar and the ✕ - both
+  rulings stay alive, because the wrap was itself an answer (2026-09-07: *"the supplier names on the
+  left must show the name fully"*, after 185px + `truncate` cut «Al Faisal Heavy Equipment Est.»).
+  Anything longer truncates with the whole of it on `title`.
+  (2) **The line under the name says where the offer CAME FROM.** ~~«Awaiting reply» / «In
+  negotiation».~~ Both are facts about the conversation, and this column is the row's identity: on a
+  table of six they said different things about the same kind of offer, while the one distinction
+  that changes how a renter reads a row - through Moedatech, or through his own shared link - was
+  stated only on the offline half. It reuses `sourceApp` / `offlineInvite`, the SAME two words the
+  SOURCE filter above the table uses, so the row and the tab cannot drift. No new string.
+  (3) **`flex-[1_0_auto] min-w-min` on the terms strip**, and its columns are `flex-1` with a
+  `minWidth` floor instead of a fixed `width`. Earlier the same day the strip was `flex-[9_1_0]
+  min-w-0`, so it shrank below its content while each column kept its floor: the columns overflowed
+  and drew through the «Equipment» rail. That was answered with `flex-none`, which fixed the overlap
+  and produced the opposite fault - with few terms the table ended short of its container and the
+  orange rail floated mid-card with white after it. Grow, never shrink, is both answers at once.
+  Files: `src/components/workspace/CompareMatrix.tsx`,
+  `tests/unit/compare-matrix.test.tsx` (5 cases, 51 passing).
+  ⚠️ The agent's ★ still wins that slot over the source. A recommendation is not a provenance, and
+  the row can only say one thing on one line.
+  ⚠️ **«In negotiation» is no longer said ON THIS TABLE.** An open deal room is still visible on the
+  bid card and in the deal room itself; the comparison is for choosing between offers, not for
+  tracking where each conversation stands. Say so rather than assuming nobody misses it.
+  ⚠️ The two strip cases pin the DECLARATION, not the render: jsdom lays out no flexbox, so neither
+  the overlap nor the gap can be measured in a unit test - only that the rules deciding them are the
+  intended ones. Both faults were found on a screenshot and need one.
+  ⚠️ Verified: typecheck, lint, 51 passing, and all five new cases break-checked (each source change
+  reverted in turn, each went red). NOT seen rendered - `/requests` needs a signed-in renter with
+  bids on a deployed build, so the third item especially wants a look.
+
 - **2026-09-09 - «Didn't say» was OURS, not the supplier's: a bid's own declarations are now the term's value.**
   Owner: *"how can someone not say? it must say yes or no in the form, even in bid he must choose"*.
   He is right about the form and the blank was on our side. The bid form makes every T3 term a

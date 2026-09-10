@@ -32,9 +32,9 @@
   max-width: 1440px;
   margin: 0 auto;
   color: var(--navy);
-  font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  font-family: var(--font-sans);
 }
-.rproto .mono { font-family: "IBM Plex Sans", monospace; }
+.rproto .mono { font-family: var(--font-mono); }
 
 /* buttons */
 .rproto .btn { border: 1px solid var(--border); background: var(--surface1); border-radius: var(--r-md); padding: 11px 18px; font: inherit; font-weight: 700; font-size: 13.5px; color: var(--navy); display: inline-flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer; transition: filter 0.12s, background 0.12s; }
@@ -47,7 +47,7 @@
 /* segments + chips */
 .rproto .seg-tabs { display: flex; gap: 10px; margin-bottom: 18px; }
 .rproto .seg { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid var(--border); background: var(--surface1); border-radius: var(--r-md); padding: 10px 24px; cursor: pointer; min-width: 130px; }
-.rproto .seg .c { font-family: "IBM Plex Sans", monospace; font-size: 20px; font-weight: 700; }
+.rproto .seg .c { font-family: var(--font-mono); font-size: 20px; font-weight: 700; }
 .rproto .seg .l { font-size: 12.5px; font-weight: 700; color: var(--muted); }
 .rproto .seg.on { background: var(--action); border-color: var(--action); }
 .rproto .seg.on .c, .rproto .seg.on .l { color: var(--surface); }
@@ -99,7 +99,7 @@
 .rproto .infostrip .ic + .ic::before { content: ""; position: absolute; inset-block: 14px; inset-inline-start: 0; width: 1px; background: rgba(255, 255, 255, 0.12); }
 .rproto .infostrip .lab { font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255, 255, 255, 0.55); }
 .rproto .infostrip .val { font-size: 14px; font-weight: 800; margin-top: 5px; }
-.rproto .infostrip .val.mono { font-family: "IBM Plex Sans", monospace; }
+.rproto .infostrip .val.mono { font-family: var(--font-mono); }
 @media (max-width: 900px) { .rproto .infostrip { grid-template-columns: 1fr 1fr; } .rproto .infostrip .ic:nth-child(3)::before { display: none; } }
 .rproto .dsec { margin-bottom: 18px; }
 .rproto .dsec-h { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--navy-mid); margin: 0 2px 11px; }
@@ -131,7 +131,7 @@
 .rproto .req-chips { display: flex; gap: 9px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 16px; }
 .rproto .req-chip { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; border: 1.5px solid var(--border); background: var(--surface1); border-radius: var(--r-full); padding: 8px 14px; font-size: 12.5px; font-weight: 700; color: var(--navy-mid); cursor: pointer; }
 .rproto .req-chip.on { background: var(--navy); border-color: var(--navy); color: var(--surface); }
-.rproto .req-chip .ct { display: inline-flex; align-items: center; justify-content: center; min-width: 19px; height: 19px; padding: 0 6px; border-radius: var(--r-full); background: var(--surface2); color: var(--navy-mid); font-family: "IBM Plex Sans", monospace; font-size: 11px; font-weight: 800; }
+.rproto .req-chip .ct { display: inline-flex; align-items: center; justify-content: center; min-width: 19px; height: 19px; padding: 0 6px; border-radius: var(--r-full); background: var(--surface2); color: var(--navy-mid); font-family: var(--font-mono); font-size: 11px; font-weight: 800; }
 .rproto .req-chip.on .ct { background: rgba(255,255,255,0.22); color: var(--surface); }
 .rproto .req-chip .asap-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--danger); flex: 0 0 auto; }
 
@@ -147,7 +147,7 @@
 .rproto .gctx .gx-track .rt-lbl { font-size: 11.5px; font-weight: 800; color: var(--surface); }
 .rproto .gctx .gx-track .rt-stat { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: rgba(255, 255, 255, 0.7); }
 .rproto .gctx .gx-track .rt-stat .material-icons-outlined { font-size: 15px; color: rgba(255, 255, 255, 0.7); }
-.rproto .gctx .gx-track .rt-stat b { font-family: "IBM Plex Sans", monospace; font-size: 16px; font-weight: 800; color: var(--surface); }
+.rproto .gctx .gx-track .rt-stat b { font-family: var(--font-mono); font-size: 16px; font-weight: 800; color: var(--surface); }
 .rproto .gctx .gx-track .rt-stat.sub b { color: var(--warn-amber); }
 .rproto .gctx .gx-track .rt-copy { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 11.5px; font-weight: 700; color: var(--surface); background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: var(--r-sm); padding: 6px 12px; cursor: pointer; }
 .rproto .gctx .gx-track .rt-copy .material-icons-outlined { font-size: 14px; }
@@ -184,7 +184,7 @@
 .rproto .fftile .ff-meta { min-width: 0; }
 .rproto .fftile .ff-nm { font-size: 13px; font-weight: 800; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rproto .fftile .ff-fr { font-size: 11.5px; color: var(--muted); font-weight: 600; margin-top: 1px; }
-.rproto .fftile .ff-fr b { font-family: "IBM Plex Sans", monospace; color: var(--navy); font-weight: 800; }
+.rproto .fftile .ff-fr b { font-family: var(--font-mono); color: var(--navy); font-weight: 800; }
 .rproto .fftile .ff-bar { height: 8px; border-radius: var(--r-full); background: var(--surface3); overflow: hidden; margin-top: 11px; }
 .rproto .fftile .ff-fill { height: 100%; border-radius: var(--r-full); transition: width .3s; }
 .rproto .fftile.low .ff-fill { background: var(--danger); }
@@ -310,7 +310,7 @@
 .rproto .bucket .bl { font-size: 12px; font-weight: 700; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rproto .donut { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; flex: 0 0 auto; }
 .rproto .donut::before { content: ""; position: absolute; inset: 4px; background: var(--surface1); border-radius: 50%; }
-.rproto .donut span { position: relative; font-family: "IBM Plex Sans", monospace; font-size: 11px; font-weight: 700; color: var(--navy); }
+.rproto .donut span { position: relative; font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--navy); }
 /* Per-class term status chips on the bid card (Equipment / Project / Supplier) — colored by the worst
    issue in the class, with a "settled / total" fraction so the renter sees how far each class is. */
 .rproto .term-classes { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; justify-content: flex-end; min-width: 0; }
@@ -375,17 +375,17 @@
 .rproto .price-row { border-top: 1px solid var(--border); }
 .rproto .price-collapsed { display: flex; align-items: center; padding: 12px 14px; cursor: pointer; }
 .rproto .price-collapsed .pl { font-size: 13px; font-weight: 800; color: var(--navy); }
-.rproto .price-collapsed .pr { margin-inline-start: auto; display: flex; align-items: center; gap: 6px; font-family: "IBM Plex Sans", monospace; font-size: 17px; font-weight: 700; color: var(--action); }
+.rproto .price-collapsed .pr { margin-inline-start: auto; display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 17px; font-weight: 700; color: var(--action); }
 .rproto .price-collapsed .pr .chev { font-family: "Material Icons Outlined"; font-size: 18px; color: var(--muted); transition: 0.2s; }
 .rproto .price-row.open .price-collapsed .pr .chev { transform: rotate(180deg); }
 .rproto .price-body { padding: 2px 14px 14px; }
 .rproto .prow { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; font-size: 13px; border-bottom: 1px solid var(--line); }
 .rproto .prow:last-child { border-bottom: 0; }
 .rproto .prow .pl2 { color: var(--navy-mid); font-weight: 600; }
-.rproto .prow .pv { font-family: "IBM Plex Sans", monospace; font-weight: 700; }
+.rproto .prow .pv { font-family: var(--font-mono); font-weight: 700; }
 .rproto .grandcard { border: 1.5px solid color-mix(in srgb, var(--brand) 40%, transparent); background: var(--action-dim); border-radius: var(--r-md); padding: 11px 13px; margin-top: 10px; display: flex; align-items: center; }
 .rproto .grandcard .gl { font-size: 13px; font-weight: 800; color: var(--navy); }
-.rproto .grandcard .gv { margin-inline-start: auto; font-family: "IBM Plex Sans", monospace; font-size: 16px; font-weight: 800; color: var(--action); }
+.rproto .grandcard .gv { margin-inline-start: auto; font-family: var(--font-mono); font-size: 16px; font-weight: 800; color: var(--action); }
 /* The fixed-divisor assumption under the collapsed rate label ("6 working days/week"). Own line, so
    it reads as a caption rather than part of the label. */
 .rproto .price-collapsed .pl { display: flex; flex-direction: column; gap: 2px; }
@@ -446,7 +446,7 @@
 .rproto .slb-left { min-width: 0; }
 .rproto .slb-lbl { font-size: 12px; font-weight: 800; color: var(--navy-mid); }
 .rproto .slb-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
-.rproto .slb-total { font-family: "IBM Plex Sans", monospace; font-size: 16px; font-weight: 800; color: var(--action); white-space: nowrap; }
+.rproto .slb-total { font-family: var(--font-mono); font-size: 16px; font-weight: 800; color: var(--action); white-space: nowrap; }
 .rproto .slb-foot-meta { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
 .rproto .slb-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: var(--navy-mid); background: var(--surface2); border: 1px solid var(--border); border-radius: 100px; padding: 5px 11px; }
 .rproto .slb-chip .material-icons-outlined { font-size: 13px; color: var(--muted); }
@@ -475,7 +475,7 @@
 .rproto .rd-track .rt-lbl { font-size: 12px; font-weight: 800; color: var(--surface); }
 .rproto .rd-track .rt-stat { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: rgba(255, 255, 255, 0.72); }
 .rproto .rd-track .rt-stat .material-icons-outlined { font-size: 15px; color: rgba(255, 255, 255, 0.72); }
-.rproto .rd-track .rt-stat b { font-family: "IBM Plex Sans", monospace; font-size: 16px; font-weight: 800; color: var(--surface); }
+.rproto .rd-track .rt-stat b { font-family: var(--font-mono); font-size: 16px; font-weight: 800; color: var(--surface); }
 .rproto .rd-track .rt-stat.sub b { color: var(--warn-amber); }
 .rproto .rd-track .rt-copy { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 700; color: var(--surface); background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: var(--r-sm); padding: 7px 13px; cursor: pointer; }
 .rproto .rd-track .rt-copy .material-icons-outlined { font-size: 14px; }

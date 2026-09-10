@@ -8,7 +8,9 @@ The number every surface answers to on staging. Three ways in:
 - `Ctrl+Shift+U`
 - `?pins=1` on any URL — and `?pins=0` to switch it off again
 
-If none of those show anything, the host is not on the list in `uiPinsAllowed()`: `webstaging.moedatech.net`, `staging.dgdtg4fmrwwfn.amplifyapp.com`, localhost and `127.0.0.1` only — beta and production are deliberately absent. The console says `[ui-pins] ready` where it is live.
+⚠️ **The two staging hosts are commented out of `PIN_HOSTS` right now** (owner, 2026-09-10: *"can u remove the pins toggle from staging just temporarily just hide it"*), so the overlay answers on **localhost and `127.0.0.1` only**, and `/dev/preview` says "not here" on staging too. Uncomment the two lines in `src/lib/uiPins.ts` to bring it back — nothing else was changed.
+
+If none of those show anything, the host is not on the list in `uiPinsAllowed()` — beta and production are deliberately absent, and staging is out temporarily. The console says `[ui-pins] ready` where it is live.
 
 Three levels, and the panel switches between them.
 

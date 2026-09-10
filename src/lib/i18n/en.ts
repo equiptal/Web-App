@@ -1672,6 +1672,9 @@ export const en = {
     // The one download beside the tabs, named for what the tab it stands over exports.
     downloadQuotation: "Download quotation",
     exportComparison: "Export comparison",
+    /** Under the printed comparison. The sheet may be read in black and white, so the two colours
+     *  are named rather than left to speak for themselves. */
+    exportLegend: "Green meets what you asked for, red goes against it, and ✗ marks a requirement the supplier would not meet",
     // Puts every benched bid back on the comparison — and therefore back in the export, which covers
     // what the comparison covers. Named with its count so the renter knows what he is bringing back.
     selectAll: "Select all ({n} off)",
@@ -1776,14 +1779,13 @@ export const en = {
        a second supplier. Kept as it was (owner, 2026-09-06: *"offline invite keep it"*). */
     offlineInvite: "Offline · invite ↗",
     notBuiltYet: "Not available yet.",
-    // ── When a bid's three counts disagree (`unit-count-notes`) ──────────────────────────────────
-    // Said only where they genuinely diverge. `priced` is what the money was built on, `offered` is
-    // what the bid claims, and `named` is how many distinct machines are actually behind it — a
-    // supplier may commit to more units than he holds machines for, and the padding is invisible
-    // without this line.
+    // ── When a bid's PRICED and OFFERED counts disagree (`unit-count-notes`) ─────────────────────
+    // Said only where they genuinely diverge: `priced` is what the money was built on, `offered` is
+    // what the bid claims. ~~A third line named how many machines were actually behind it.~~ Removed
+    // from the bid card on 2026-09-10 (owner) — it fired on the ordinary shape of an off-platform
+    // bid. `unitCountNotes` still computes that count for the equipment map.
     countPricedAbove: "Priced on {priced} units, though the offer lists {offered}.",
     countPricedBelow: "Priced on {priced} of the {offered} units offered.",
-    countClaimed: "{n} of these units name no machine: {named} machines were listed.",
     // ── The comparison matrix ──
     // "Pick one" focuses the row — it drives the strip above. It never awards; that is the deal room.
     supplierPickOne: "Supplier · pick one",

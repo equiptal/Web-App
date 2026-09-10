@@ -5,8 +5,8 @@
  */
 export const BID_FORM_CSS = `
 .bidpage{--action:var(--brand);--action-dim:var(--brand-soft);--rentee:var(--info);--success:var(--ok);--success-bg:var(--ok-soft);--danger-bg:var(--danger-soft);--surface1:var(--surface);--line:var(--surface3);--r-md:10px;--r-lg:14px;--r-full:100px;
-  min-height:100vh;background:var(--surface2);color:var(--navy);font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
-.bidpage.rtl{font-family:"IBM Plex Sans Arabic","Segoe UI",system-ui,sans-serif}
+  min-height:100vh;background:var(--surface2);color:var(--navy);font-family:var(--font-sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+.bidpage.rtl{font-family:var(--font-arabic)}
 .bidpage *{box-sizing:border-box}
 .bidpage .material-icons-outlined{font-family:'Material Icons Outlined';line-height:1}
 .pubbar{background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
@@ -65,7 +65,7 @@ export const BID_FORM_CSS = `
 .cd-label .material-icons-outlined{font-size:17px}
 .cd-boxes{display:flex;align-items:center;justify-content:center;gap:10px}
 .cd-box{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);border-radius:var(--r-md);padding:10px 0;width:74px}
-.cd-box b{display:block;font-family:"IBM Plex Sans",monospace;font-size:28px;font-weight:700;line-height:1}
+.cd-box b{display:block;font-family:var(--font-mono);font-size:28px;font-weight:700;line-height:1}
 .cd-box span{font-size:10.5px;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;margin-top:5px;display:block}
 .cd-sep{font-size:24px;color:rgba(255,255,255,.4)}
 .cd-deadline{margin-top:13px;font-size:12.5px;color:rgba(255,255,255,.72);font-weight:600}
@@ -191,16 +191,16 @@ export const BID_FORM_CSS = `
 .ptbl-in{width:120px;text-align:end;border:1px solid var(--border);border-radius: var(--radius-sm);height:36px;padding:0 9px;font:inherit;font-size:13.5px;font-weight:700;color:var(--navy);background:var(--surface);outline:0}
 .ptbl-in:focus{border-color:var(--brand);outline: 3px solid color-mix(in srgb, var(--brand) 12%, transparent); outline-offset: 0}
 .ptbl-in.invalid{border-color:var(--danger);background:var(--danger-bg)}
-.ptbl-ro{display:inline-block;min-width:90px;text-align:end;font-family:"IBM Plex Sans",monospace;font-weight:700;color:var(--navy)}
-.ptbl .tot{font-family:"IBM Plex Sans",monospace;font-weight:700}
+.ptbl-ro{display:inline-block;min-width:90px;text-align:end;font-family:var(--font-mono);font-weight:700;color:var(--navy)}
+.ptbl .tot{font-family:var(--font-mono);font-weight:700}
 .itot{margin-top:10px;display:flex;justify-content:flex-end;gap:24px;flex-wrap:wrap}
 .itot .r{font-size:12.5px;color:var(--muted);font-weight:600}
-.itot .r b{font-family:"IBM Plex Sans",monospace;color:var(--navy);margin-inline-start:6px}
+.itot .r b{font-family:var(--font-mono);color:var(--navy);margin-inline-start:6px}
 .itot .r.t{font-size:14px;font-weight:800;color:var(--navy)}
 .itot .r.t b{color:var(--brand);font-size:16px}
 .grand{display:flex;align-items:center;justify-content:space-between;background:var(--action-dim);border:1px solid color-mix(in srgb, var(--brand) 30%, transparent);border-radius:var(--r-md);padding:18px 20px;margin:0 0 16px}
 .grand .gk{font-size:14px;font-weight:800}
-.grand .gv{font-family:"IBM Plex Sans",monospace;font-size:24px;font-weight:800;color:var(--brand)}
+.grand .gv{font-family:var(--font-mono);font-size:24px;font-weight:800;color:var(--brand)}
 .notes-field{margin-top:14px}
 .notes-field label{display:block;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
 .notes-field textarea{width:100%;min-height:64px;border:1px solid var(--border);border-radius:var(--r-md);padding:11px 13px;font:inherit;font-size:14px;color:var(--navy);outline:0;resize:vertical}
@@ -257,7 +257,7 @@ export const BID_FORM_CSS = `
 .state .sic .material-icons-outlined{font-size:44px}
 .state h2{margin:0 0 9px;font-size:21px;font-weight:800}
 .state p{margin:0 auto;max-width:42ch;font-size:14px;color:var(--muted)}
-.state .recap{display:inline-flex;align-items:center;gap:8px;margin-top:18px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-full);padding:8px 16px;font-size:13px;font-weight:700;font-family:"IBM Plex Sans",monospace}
+.state .recap{display:inline-flex;align-items:center;gap:8px;margin-top:18px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-full);padding:8px 16px;font-size:13px;font-weight:700;font-family:var(--font-mono)}
 .state .recap .material-icons-outlined{font-size:16px;color:var(--muted)}
 .state-actions{margin-top:22px}
 .state-actions .btn{font-size:14px;padding:11px 20px}

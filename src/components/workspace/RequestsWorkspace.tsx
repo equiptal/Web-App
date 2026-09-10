@@ -33,7 +33,8 @@ import { CompareMatrix } from "@/components/workspace/CompareMatrix";
 import { AiRankPanel } from "@/components/workspace/AiRankPanel";
 import { BidSizeFilter } from "@/components/workspace/BidSizeFilter";
 import { RequestDetailsModal, type ShareLinkMeta } from "@/components/workspace/RequestDetailsModal";
-import { workspaceExportTotals } from "@/lib/contract/workspace-export";
+import { computeCycleTotals } from "@/lib/contract/cycle-totals";
+import { buildCompareSheet, type SheetMoneyCol } from "@/lib/export/compare-sheet";
 import { formatSar } from "@/lib/pricing/rental";
 import { buildBidQuotationDoc, quotationSupplierInitials, quotationSupplierKey } from "@/lib/quotation/bid-quotation";
 import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
@@ -491,36 +492,103 @@ export function RequestsWorkspace() {
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
   }, [ar, item, shown, checkedBids, fetchedCode, tier]);
 
+  /**
+   * ── The comparison, on paper (owner, 2026-09-09) ──────────────────────────────────────────────
+   * *"i wanna the export template for compare table to be as full table with all but grouped by
+   * section price or terms but showing moedatech logo at top and showing green and red too"*.
+   *
+   * ~~Four columns: supplier, rate, transport, grand total.~~ A renter who had spent the afternoon
+   * reading eight term columns exported a sheet with none of them on it, and the verdicts he was
+   * choosing BY - this one meets the certificate, that one refuses it - printed nowhere.
+   *
+   * The money is resolved HERE, from the same `computeCycleTotals` the matrix renders from and with
+   * the same inputs, so a figure on the sheet is the figure on the screen. The terms and their
+   * colours are the matrix's own `buildTermColumns` / `readTerm`, called inside the builder.
+   */
   const printComparison = useCallback(() => {
     if (typeof window === "undefined" || !item || shown.length === 0) return;
-    const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch] as string);
-    const totals = workspaceExportTotals({ bids: shown, durationDays: item.durationDays, startDate: item.startDate });
     const title = item.item ? (ar ? item.item.nameAr || item.item.name : item.item.name) : item.displayId;
-    const rows = shown
-      .map((b) => {
-        const tot = totals[b.card.id];
-        const cell = (m: { value: number; stated: boolean } | undefined) =>
-          m?.stated ? formatSar(m.value) : `<span class="q">${esc(t.workspace.didntSay)}</span>`;
-        return `<tr><td>${esc(b.card.supplierName)}</td><td>${cell(tot?.rental)}</td><td>${cell(tot?.mobDemob)}</td><td><b>${cell(tot?.grandTotal)}</b></td></tr>`;
-      })
-      .join("");
+    const subtitle = [
+      group?.locationLabel,
+      group?.groupRef ?? item.displayId,
+      item.durationDays ? t.workspace.overDays.replace("{n}", String(item.durationDays)) : null,
+      new Date().toLocaleDateString(ar ? "ar" : "en-GB"),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+    const totals = new Map(
+      shown.map((b) => [
+        b.card.id,
+        computeCycleTotals({
+          rate: b.card.price,
+          priceUnit: b.card.priceUnit,
+          mob: { amount: b.card.mobPrice, units: b.card.mobUnits, excluded: b.card.mobExcluded },
+          demob: { amount: b.card.demobPrice, units: b.card.demobUnits, excluded: b.card.demobExcluded },
+          durationDays: item.durationDays,
+          startDate: item.startDate,
+          units: b.card.unitsOffered > 0 ? b.card.unitsOffered : b.card.numberOfUnits,
+        }),
+      ]),
+    );
+    /** The cheapest stated figure on a column, or null when fewer than two bids state one. */
+    const low = (pick: (b: WorkspaceBid) => number | null | undefined): string | null => {
+      const stated = shown.map((b) => ({ id: b.card.id, v: pick(b) })).filter((x): x is { id: string; v: number } => x.v != null);
+      if (stated.length < 2) return null;
+      return stated.reduce((a, c) => (c.v < a.v ? c : a)).id;
+    };
+    const money = (v: number | null | undefined) => (v == null ? null : formatSar(v));
+
+    const perCycle: SheetMoneyCol[] = [
+      { label: t.workspace.colRate, cell: (b) => money(b.card.price), win: low((b) => b.card.price) },
+      // A leg the RENTER moves was never quoted, so it prints as unstated rather than as 0 SAR,
+      // which on a sheet reads as free delivery (the same rule the matrix's `onRentee` applies).
+      { label: t.priceFooter.mobilisation, cell: (b) => (b.card.mobExcluded ? null : money(b.card.mobPrice)) },
+      { label: t.priceFooter.demobilisation, cell: (b) => (b.card.demobExcluded ? null : money(b.card.demobPrice)) },
+    ];
+    const grandTotal: SheetMoneyCol[] = [
+      {
+        label: t.workspace.deliveredCost,
+        sub: t.workspace.deliveredCostOneCycle,
+        cell: (b) => money(totals.get(b.card.id)?.firstCycle.total),
+        win: low((b) => totals.get(b.card.id)?.firstCycle.total),
+      },
+      {
+        label: t.workspace.runningRate,
+        sub: t.workspace.runningRateSub,
+        cell: (b) => money(totals.get(b.card.id)?.everyCycleAfter?.total),
+        win: low((b) => totals.get(b.card.id)?.everyCycleAfter?.total),
+      },
+      ...(item.durationDays
+        ? [{
+            label: t.workspace.deliveredCost,
+            sub: t.workspace.overDays.replace("{n}", String(item.durationDays)),
+            cell: (b: WorkspaceBid) => money(totals.get(b.card.id)?.duration?.total),
+            win: low((b) => totals.get(b.card.id)?.duration?.total),
+          }]
+        : []),
+    ];
+
+    const html = buildCompareSheet({
+      bids: shown,
+      ar,
+      t,
+      L: (en, arr) => (ar ? arr : en),
+      title,
+      subtitle,
+      // ABSOLUTE. The sheet is written into `about:blank`, where a relative path resolves to nothing
+      // and the header would print with a broken image where the brand should be.
+      logoUrl: `${window.location.origin}/moedatech-logo.svg`,
+      perCycle,
+      grandTotal,
+    });
+
     const w = window.open("", "_blank");
     if (!w) {
       setToast(t.workspace.exportPopupBlocked);
       return;
     }
-    w.document.write(
-      `<!doctype html><html dir="${ar ? "rtl" : "ltr"}"><head><meta charset="utf-8"><title>${esc(title)}</title>` +
-        `<style>body{font:14px system-ui,sans-serif;padding:28px;color:var(--navy)}h1{font-size:18px;margin:0 0 2px}` +
-        `p{margin:0 0 18px;color:var(--muted);font-size:12px}table{border-collapse:collapse;width:100%}` +
-        `th,td{border:1px solid var(--border);padding:8px 10px;text-align:${ar ? "right" : "left"};font-size:12.5px}` +
-        `th{background:var(--background);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px}.q{color:var(--muted-light)}</style></head><body>` +
-        `<h1>${esc(title)}</h1><p>${esc(group?.locationLabel ?? "")} · ${esc(group?.groupRef ?? item.displayId)}` +
-        (item.durationDays ? ` · ${esc(t.workspace.overDays.replace("{n}", String(item.durationDays)))}` : "") +
-        `</p><table><thead><tr><th>${esc(t.workspace.supplierPickOne)}</th><th>${esc(t.workspace.colRate)}</th>` +
-        `<th>${esc(t.workspace.transportOnce)}</th><th>${esc(t.workspace.grandTotalInclVat)}</th></tr></thead>` +
-        `<tbody>${rows}</tbody></table></body></html>`,
-    );
+    w.document.write(html);
     w.document.close();
     w.focus();
     w.print();

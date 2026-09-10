@@ -473,7 +473,19 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  /* ── The Latin face is INTER, and this rule is what makes it so (owner, 2026-09-10) ─────────
+     *"apply it, and make sure to register it as part of the web design system so any further
+     changes will follow and use it"*.
+
+     ~~`"Segoe UI", system-ui, -apple-system, Roboto, sans-serif`.~~ The token file named Inter on
+     2026-09-04 and `layout.tsx` began downloading it that day — but NOTHING ever read
+     `--font-sans`: this rule went on declaring the system stack, and a declaration on `body` beats
+     anything preflight puts on `html`. So the app paid for the webfont on every load and rendered
+     in Segoe UI anyway, which is the worst of the two choices it was picking between. The Arabic
+     half was applied correctly the same day, which is why only the English screens drifted.
+     ⚠️ This repaints EVERY Latin screen. It is the change the token file has been asking for since
+     it landed; `tests/unit/font-drift.test.ts` is what stops it drifting back. */
+  font-family: var(--font-sans);
   font-size: var(--text-body);
   /* ── So a band can reach the window's edge (owner, 2026-08-30) ─────────────────────────
      The home CTA is full-bleed: it escapes the page's 1440px cap and its gutter with the standard
