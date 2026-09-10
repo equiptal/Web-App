@@ -407,11 +407,11 @@ export function ShareRequestPanel({
    * and the renter gets *"Outlook could not be connected"* instead of an account chooser (owner,
    * 2026-09-06, with a screenshot of exactly that).
    *
-   * So `send` opens a BLANK pop-up in the same tick as the press and hands it here, and this
-   * navigates it once the URL exists. An empty window a renter can see opening is also the honest
-   * signal that something is happening while the post is in flight.
+   * ~~So `send` opened a BLANK pop-up in the same tick as the press and handed it here.~~ That
+   * whole dance is gone with the press it served (owner, 2026-09-10): connecting is its own button
+   * now, so the activation is still live when this runs and the consent URL is opened directly.
    */
-  const startConnect = async (pre?: Window | null): Promise<boolean> => {
+  const startConnect = async (): Promise<boolean> => {
     if (connecting) return false;
     setConnecting(true);
     setConnectNote(null);
@@ -430,23 +430,21 @@ export function ShareRequestPanel({
        refusal is an answer, not an exception. */
     const url = await mailConnectUrl(`${window.location.origin}/mail-connected`).catch(() => null);
     if (!url) {
-      pre?.close();
       setConnecting(false);
       setConnectNote("failed");
       return false;
     }
-    let win: Window | null = pre ?? null;
-    if (win) win.location.href = url;
-    // No window was pre-opened, so this is a real button press and the activation is still live.
-    else win = window.open(url, "moeda-mail-connect", "width=520,height=700");
+    /* ⚠️ One `await` before this, and the browser still counts the press: a single fetch is inside
+       the activation window every engine allows. It was the POST plus this call, from inside Send,
+       that spent it. */
+    const win = window.open(url, "moeda-mail-connect", "width=520,height=700");
     /**
      * 🔴 **Blocked: leave the button, do NOT redirect.**
      *
-     * ~~It used to take the whole tab to Microsoft.~~ That is survivable from a button press, and it
-     * is not survivable from inside Send: by then the request is POSTED, and the draft, the picks
-     * and the wording live in memory that a navigation throws away. He would come back to a live
-     * request and an empty panel. Falling through to the compose window costs him a paste; a
-     * redirect costs him the screen.
+     * ~~It used to take the whole tab to Microsoft.~~ The draft, the picks and the wording live in
+     * memory that a navigation throws away, and in `post` mode the request has not been created
+     * yet — so a redirect from this screen costs him everything he has typed. The button says it
+     * failed and stays where it is; Send still works, through the compose window.
      */
     if (!win) {
       setConnecting(false);
@@ -869,21 +867,22 @@ export function ShareRequestPanel({
       return;
     }
 
-    /**
-     * 🔴 **Opened here, before anything is awaited, or the browser blocks it.**
+    /*
+     * — The blank consent pop-up lived here —
      *
-     * This is the first statement of the click. Everything below it awaits, and a pop-up opened
-     * after an await is a pop-up the browser refuses — which is why the renter was being shown
-     * *"Outlook could not be connected"* rather than Microsoft's account chooser.
+     * 🔴 **Connecting Outlook is its OWN act now** (owner, 2026-09-10: *"users are confused when
+     * their request is sent with the Outlook at same click, so i want to separate the connect as a
+     * separate action from the create, so the create is done to Outlook once it is connected"*).
      *
-     * ⚠️ Outlook only, and only when there is something to connect to. Gmail's compose URL carries
-     * `bcc`, so its own window already shows the recipients and a Microsoft consent there would be a
-     * detour to solve a problem he does not have.
+     * ~~One press did three things: post the request, open Microsoft's consent, then send through
+     * whatever came back.~~ A renter pressing Send met an account chooser he had not asked for, over
+     * a request that was already live, and could not tell which of the three had happened when it
+     * closed. The consent is a button on the channel row now, pressed before Send and answering one
+     * question; `send` does the post and the mail, and nothing else.
+     *
+     * This also retires the pop-up-blocker dance the window existed for: `startConnect` is only ever
+     * reached from a real press, so the activation is live and it opens the consent URL directly.
      */
-    const consentWindow =
-      ch === "email" && provider === "outlook" && connect?.configured && !connect.connected
-        ? window.open("", "moeda-mail-connect", "width=520,height=700")
-        : null;
 
     setBusy(true);
     setTooLong(false);
@@ -903,8 +902,7 @@ export function ShareRequestPanel({
       if (id) postedHere.current = true;
     }
     if (!id) {
-      // Nothing was posted, so there is nothing to consent for. Do not leave a blank window open.
-      consentWindow?.close();
+      // Nothing was posted, so there is nothing to send. The review above says what went wrong.
       setBusy(false);
       return;
     }
@@ -1007,7 +1005,6 @@ export function ShareRequestPanel({
        * separate buttons, and it needs no connection, no consent and no confirm step.
        */
       if (provider === "gmail") {
-        consentWindow?.close();
         const opened = openCompose(id, message);
         if (opened) {
           reached += reachable.length;
@@ -1041,10 +1038,15 @@ export function ShareRequestPanel({
          * opened as the first statement of the click to survive the pop-up blocker, so any path that
          * does not use it has to clean it up or it is left stranded on `about:blank`.
          */
-        consentWindow?.close();
         setConfirming(false);
       } else {
-      if (connect?.configured && !connect.connected) await startConnect(consentWindow);
+      /*
+       * — `startConnect` was awaited here —
+       *
+       * 🔴 Gone with the pop-up above (2026-09-10). An unconnected Outlook falls straight through
+       * to the compose window, which is what this path has always done when the server could not
+       * send — the difference is that it no longer takes a detour through Microsoft first.
+       */
 
       const body = {
         subject,

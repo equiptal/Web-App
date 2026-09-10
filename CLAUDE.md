@@ -2,6 +2,42 @@
 
 ## Change log
 
+- **2026-09-10 - The Arabic brand has ONE spelling, «معداتك», and the guard now catches all three ways it broke.**
+  Owner, on «انضم إلى مؤجّرتك»: *"make sure all moedatech word in english is معداتك in arabic, fix it
+  and add it to localization or whatever"*.
+  Three faults, and only the first was the one he could see:
+  (1) **TRANSLATED.** `guestWall.join` read «انضم إلى مؤجّرتك» - «join your LESSOR». The brand was
+  translated instead of written. One string.
+  (2) 🔴 **DIACRITISED, 32 times.** «مُعِدّاتك» across the dictionary and `inviteCardHtml.ts`. Same six
+  letters, so it passes a glance - but the vowels change the word (مُعِدّات reads «preparers», not
+  «equipment»), and **a search for «معداتك» does not find it**, which is why the 2026-09-08 sweep for
+  «مويداتك» walked straight past every one of them.
+  (3) **The LATIN name inside Arabic copy.** Two WhatsApp bodies opened «مرحبًا Moedatech».
+  And one string had simply DROPPED the brand: `suppliers.couldNotReadBody` lost the whole clause
+  about matching a supplier to a Moedatech account, so the Arabic reader was told the value was kept
+  and never told what it costs him.
+  **Registered**, which is the half that lasts: `tests/unit/brand-spelling.test.ts` grew from one rule
+  to six. Beside the existing «مويداتك» check it now forbids the translated form, forbids ANY
+  diacritic inside the brand's six letters, and - the rule he actually asked for - walks `en` and `ar`
+  IN STEP and fails when an English string names Moedatech and its Arabic twin does not, or when
+  Arabic copy carries the Latin name.
+  Files: `src/lib/i18n/ar.ts` (32 strings), `src/lib/inviteCardHtml.ts`,
+  `tests/unit/brand-spelling.test.ts`.
+  ⚠️ **«المؤجّر» is NOT swept.** It is the ordinary word for the supplier and is correct in dozens of
+  strings; the rule is narrowed to the possessive shape «مؤجّرتك» that stands where the brand belongs.
+  A blanket sweep here would have renamed the supplier throughout the product.
+  ⚠️ The Latin name stays in KEY NAMES - `onMoedatech`, `verifiedByMoedatech`, `postMoedatechOnly`,
+  `sendMoedatechOnly` - which no reader sees. The parity rule reads VALUES only.
+  ⚠️ **The decoded prototypes under `docs/implementation-plans/**\/prototype*` are exempt**, by path,
+  with the reason in the file: they are a captured copy of somebody else's build, and correcting them
+  would make the reference disagree with the artefact it records. Our own plan documents are not
+  exempt and were fixed on 2026-09-08.
+  ⚠️ Verified: typecheck, lint, 14 passing across `brand-spelling`, `auth-i18n` and `source-wording`.
+  All four new rules break-checked by re-introducing one fault each; each went red.
+  🔴 **Outside this repo, STILL WRONG and now two faults**: `Moedatech-App`'s
+  `app_ar.arb` / `app_localizations_ar.dart` carried «مويداتك» (raised 2026-09-08, still open) and
+  have never been checked for the diacritised spelling. The same guard would port.
+
 - **2026-09-10 - A direct request from a store answers the machine that was PRESSED, and stops landing on the intake.**
   Owner: *"we have an issue in direct request, why does it take him to the intake UI"*. Reproduced in
   a browser against staging (local build, demo renter, Arabian Cranes Co.), which is what separated
