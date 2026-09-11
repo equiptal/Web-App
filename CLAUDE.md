@@ -2,6 +2,58 @@
 
 ## Change log
 
+- **2026-09-12 - Connecting Outlook is its own act, and the confirmation names every destination it reaches.**
+  Owner: *"users are confused when their request is sent with the Outlook at same click, so i want to
+  separate the connect as a separate action from the create, so the create is done to Outlook once it
+  is connected"*, then *"if they didn't connect the Outlook the confirmation will be on Moedatech
+  only"*, *"in case it is already connected also confirm to send to both with a small option to
+  disconnect Outlook"*, and *"make the confirmation modals clear and dominant... even when sent, the
+  successful modal must be clear"*.
+  (1) **Send no longer connects.** One press used to post the request, open a blank pop-up (to beat
+  the pop-up blocker), aim it at Microsoft, wait for it to close, re-read the status and then send.
+  Five acts, none announced, and when the window shut the renter could not tell which had happened.
+  The consent is a button on the channel row now, drawn the moment Outlook is picked and not
+  connected. `send` does the post and the mail, and nothing else.
+  (2) **Not connected means Moedatech only.** The endpoint is not called at all, and no compose
+  window opens. `emailWillGo` is the single reading of *will a message actually leave?* - Gmail
+  always (its own window IS the send), Outlook only when connected and not skipped.
+  (3) **The confirmation states DESTINATIONS, not sentences.** `xl`, one bordered block per place the
+  request is about to reach, each drawn only when it will really receive it: Moedatech, then Outlook
+  or Gmail, with the addresses inside the mail block. The not-connected case draws the Outlook block
+  greyed, saying nothing is e-mailed, with the Connect button inside it.
+  (4) **«Don't send by Outlook this time»** greys the mail block and switches the button to «Post to
+  Moedatech». `skipEmail` is cleared on every open of the dialog.
+  (5) **The tick mirrors it**: `md`, a short title again, and the same rows ticked back.
+  Files: `src/components/share/ShareRequestPanel.tsx`, `src/components/create/ShareOnPost.tsx`,
+  `src/lib/i18n/{en,ar}.ts`, `tests/unit/{share-request-panel,posted-confirmation}.test.tsx`.
+  🔴 **The SES path is REMOVED from the product** (owner: *"we will not communicate with the IT of
+  company, so remove this scenario, it will be from the Outlook connection"*). Our server could also
+  send as the renter's own domain once somebody with DNS access proved we may; the panel carried a
+  records table and a «your IT adds these once» line. Nobody was going to do it. The panel no longer
+  draws any of it, and `DOMAIN_NOT_VERIFIED` / `PERSONAL_DOMAIN` / `NO_SENDER_ADDRESS` read as
+  ordinary refusals. They are also unreachable now, because the web only calls that endpoint with a
+  connected mailbox and `shareEmail.ts` reaches all three on its SES branch only.
+  🔴 **A dropped token left the panel believing it was connected.** `connect` is read once on
+  mount, so when Microsoft revokes consent the backend answers `RECONNECT_REQUI🔴`, forgets the
+  token, and this screen went on saying «Sending from ...» over a refusal with no Reconnect offer -
+  that offer is gated on `!connected`. The status is re-read on that reason now. Found while
+  rewriting the tests, not reported.
+  ⚠️ **The compose window is a PRESS, never an outcome.** Nothing opens by itself on any Outlook
+  path. «Open your e-mail» and «Copy addresses» are staged and offered under the status line,
+  including on the Moedatech-only path, so a renter who wants to write by hand still can.
+  ⚠️ **This reverses the placement of 2026-09-05**, which moved the connect offer OFF the tick
+  because it *"put a paragraph about Microsoft consent in front of a renter who had not asked to send
+  anything yet"*. The half of that ruling that survives is the paragraph: this is one line and a
+  button. What replaced it was worse, which is the report above.
+  ⚠️ **`mailConnectedNow` lost «press Send again».** True only while connecting happened inside
+  Send.
+  🔴 **Scripting trap, hit TWICE in one session and once ON THE REMOTE.** These edits are applied by
+  Python scripts that expand a `🔴` placeholder into the 🔴 marker. `🔴` is a substring of
+  `RECONNECT_REQUI🔴`, `🔴IRECT`, `OFFE🔴` and `DECLA🔴`, so the expansion silently corrupted
+  each of them - including a string COMPARISON (`outcome.reason === "RECONNECT_REQUI🔴"`) that
+  typechecked and could never match. `🔴IRECT` was corrupted inside a comment in commit `0597a6d8`
+  and is on `origin/beta` now. Use a placeholder that cannot appear in code.
+
 - **2026-09-10 - The Arabic brand has ONE spelling, «معداتك», and the guard now catches all three ways it broke.**
   Owner, on «انضم إلى مؤجّرتك»: *"make sure all moedatech word in english is معداتك in arabic, fix it
   and add it to localization or whatever"*.
@@ -37,6 +89,221 @@
   🔴 **Outside this repo, STILL WRONG and now two faults**: `Moedatech-App`'s
   `app_ar.arb` / `app_localizations_ar.dart` carried «مويداتك» (raised 2026-09-08, still open) and
   have never been checked for the diacritised spelling. The same guard would port.
+- **2026-09-10 - The company panel drops its initials tile and its boxed blue arrow, and a paper the machine DOES hold stops painting its alternatives red.**
+  Owner, on a screenshot of the company documents panel: *"for ui put small arrow to open, not this
+  bold blue one folded in a card, make it only a small arrow"*, *"use the verified badge style and
+  icon used in other surfaces"*, *"remove this capital icon"*, and earlier the same day *"if at least
+  one document from proof of ownership or the front image at least, then don't show missing proof and
+  missing images as red"*.
+  (1) **`.mp-doc` is a bare arrow.** It was a 30px outlined tile with a tinted fill on a row that
+  already carries a bordered card, a framed thumbnail and a checkbox: boxed beside the paper's own
+  thumbnail it read as a second document rather than as the way to open the first. The 30px HIT AREA
+  stays (a 14px glyph is not a target on a phone); the border, the fill and the weight go.
+  (2) **The verified chip is the product's badge.** The hand-drawn stroked check became
+  `Icon name="verified"`, the rosette the profile block, the Moedatech picker and the request-details
+  chips all draw, and the chip took those chips' colours: `--ok` on `--ok-soft` inside a hairline of
+  `--ok` at 30%, where it had been white-on-45% and read as a sticker on the navy header.
+  (3) **`.mp-initials` is deleted**, markup and CSS. «AC» in front of «Al-Faisal Contracting Est.»
+  abbreviated the name standing beside it, on the one header whose job is to say whose papers these
+  are.
+  (4) **The FRONT shot alone answers the photos key.** `REQUIRED_PHOTO_SLOTS` and
+  `computeUnitReadiness`'s `photosPresent` both dropped `plate`, so a machine photographed from the
+  front no longer reads red on the bid card and «Missing plate / serial» on the map.
+  (5) **An ownership row whose sibling is on file is not a gap.** The four proof rows are ways of
+  answering ONE question - `attentionCount` has counted them as one since 2026-08-12 - but each row
+  still painted itself, so a machine proven by an istimara drew three red rows saying «missing».
+  `DocRow.answeredElsewhere` marks the empty siblings and `DocRowList` withholds the red skin.
+  Files: `src/components/map/panel/{CompanyPanel.tsx,DocRowList.tsx,EquipmentDocuments.tsx,machine-panel-model.ts,panel-proto.css}`,
+  `src/lib/contract/bid-readiness.ts`, `tests/unit/machine-panel.test.ts` (11 cases rewritten).
+  ⚠️ **`answeredElsewhere` changes the PAINT and nothing else.** The row keeps `status: "missing"`
+  and `requestable: true`, so «select all missing» still reaches it and a renter who wants the customs
+  card as well as the istimara can still ask for it. Making the row not-required instead was the first
+  cut and it was wrong twice over: a held paper's status flipped to `on_file`, and the absent siblings
+  would have stopped rendering, against the 2026-08-12 rule that a renter cannot choose a proof the
+  surface has hidden.
+  ⚠️ **An absent OPTIONAL photo slot is not a row**, which is why the plate shot simply disappears
+  from the group rather than going grey - the same rule the meter and the side shots have always
+  followed. It is also why `machine-panel.test.ts`'s selection block had to swap its pair round: the
+  front shot is now the only photo row that can read `missing`.
+  ⚠️ `companyInitials` is NOT dead - `RequestCard` draws the counterparty's mark from it. `.bm-verified`
+  (the map's light twin of the chip) keeps its own values: it sits on white, where `--ok-soft` is
+  already the ground.
+
+- **2026-09-10 - The map panel's shortfall alert is withdrawn: it contradicted the pill above it.**
+  Owner, on a panel reading «2 Crawler Excavators 20 ton registered» · «2 in this offer» with
+  «1 in this offer with no registered equipment» under them: *"from where this note is shown"*, then
+  *"but he has 2 registered so remove it"*.
+  🔴 **Two counts, one word.** Both say «registered» and neither means the other:
+    · the PILL is `counts.owned` = `fleet.length` - every machine the lessor holds for this request;
+    · the ALERT is `counts.claimed` = `offered − registered`, where `registered` counts ONLY fleet
+      rows carrying `inBid === true`, the ones committed to THIS bid.
+  Two owned, two offered, one flagged `inBid` therefore printed «1 unbacked» directly under a pill
+  saying he has two. Read together they contradict each other; read apart, each is true. The alert
+  is the half that goes, because it is the one whose number the renter cannot check.
+  Files: `src/components/map/BidMapWorkspace.tsx`, `tests/unit/rentee-map-surface.test.ts`
+  (the RM3-AC-05 block rewritten to the removal, 3 cases, break-checked).
+  🔴 **This does NOT fix `inBid`, and the alert was not necessarily wrong.** Either the lessor really
+  attached one machine of the two, or the projection under-reports `in_bid`. That is a BACKEND
+  question and it is still open - worth asking, because the same flag drives the map's own list
+  (`listedMachines` filters `inBid === true`), so an under-reported flag hides pins too, silently.
+  ⚠️ **The ASK survives.** «Ask him to add it» and the list-foot's «Ask for different equipment» were
+  always ONE ask (`composeShortfallRequest`, an `alternative` naming no machine), so the route is one
+  press behind the list and nothing is stranded. `shortfallPending` still reads at the list foot,
+  which is how the test proves it.
+  ⚠️ **The MODEL is untouched** - `shortfallAlert`, `countCase`, `SHORTFALL_COLOUR`, and
+  `bid-map.test.ts` with them. RM3-AC-05/06 are a contract this app shares with the mobile app, and
+  the model is what a corrected `inBid` would light up again. Only the render went.
+  ⚠️ `unitCountLabel` and the `shortfallAlert` import went with the render rather than being left
+  unused; `SHORTFALL_COLOUR` stays, because `rentee-map-surface.test.ts` still binds the stylesheet's
+  `.bm-short` orange to it and that rule is still in `map-proto.css`.
+  ⚠️ This is the SECOND «units with no machine behind them» line removed in two days - the bid card's
+  `countClaimed` went on 2026-09-10 as well. Same underlying fact, two surfaces, two separate owner
+  calls. Nothing now states it in words anywhere; `unitCounts` still computes it.
+
+- **2026-09-10 - The pin overlay is off on staging (temporarily), and the bid card drops the «no named machine» note.**
+  Two owner notes.
+  (1) *"can u remove the pins toggle from staging just temporarily just hide it"*. The two staging
+  hosts are COMMENTED OUT of `PIN_HOSTS` rather than deleted, with the quote beside them, so bringing
+  it back is uncommenting two lines. `localhost` and `127.0.0.1` keep the overlay, so nothing about
+  developing locally changes, and the registry, the shortcut and `?pins=1` are all untouched.
+  ⚠️ `uiPinsAllowed` also gates **`/dev/preview`**, so that page answers «not here» on staging for as
+  long as this stands. Said out loud because it is a second surface going dark for a one-line edit
+  aimed at the first.
+  (2) *"«1 من هذه الوحدات بلا معدّة مسمّاة: أُدرجت 1 معدّة.» remove this note from the bid card"*.
+  It fired on `claimedUnits > 0` - units offered with no named machine behind them - which is the
+  ORDINARY shape of an off-platform bid, so it printed in orange on most cards and told the renter
+  nothing he acts on there.
+  Files: `src/lib/uiPins.ts`, `docs/ui-pins.md`, `src/components/workspace/BidCards.tsx`,
+  `src/lib/i18n/{en,ar}.ts` (`workspace.countClaimed` deleted).
+  ⚠️ **Only the NOTE went.** `unitCountNotes` still computes `hasClaimedNote`, `claimedUnits` and
+  `machinesNamed`, and `bid-card-rules.test.ts` still pins them: it is the app's own rule, and the
+  equipment map is where a unit with no machine behind it actually matters.
+  ⚠️ The box's condition moved from `!countNotes.isEmpty` to `hasPricedNote`. Left as it was, a bid
+  carrying ONLY the claimed note would have drawn an empty bordered strip under the total.
+  ⚠️ The comment above the two surviving strings described the removed line in both locales and was
+  rewritten. A comment stating a premise that is no longer true is worse than none.
+  ⚠️ `docs/ui-pins.md` is GENERATED outside its `pins:start/end` block too - a hand-edit to the prose
+  makes `ui-pins.test.ts` fail as «stale» until `node scripts/ui-pins-doc.mjs` is re-run, which then
+  keeps the edit. Re-run it after touching that file.
+  ⚠️ That same test was ALREADY failing before this change, on a clean tree: the committed docs are
+  CRLF on disk here and the generator writes LF. Verified by stashing. Re-running the generator
+  settles it and produces no content diff.
+
+- **2026-09-10 - The Latin face is INTER at last, and a guard now stops the type drifting the way the colour once did.**
+  Owner, on `docs/design-tokens.md`: *"is the font style and size in this md applied to web in all
+  screens?"*, then *"apply it, and make sure to register it as part of the web design system so any
+  further changes will follow and use it"*.
+  🔴 **It was not applied, and had not been since the file landed.** The token file named Inter on
+  2026-09-04, `layout.tsx` began DOWNLOADING it that day, and `globals.css` bound
+  `--font-sans: var(--font-inter), …` — but **nothing read `--font-sans`**. Its only other mention in
+  `src/` was inside a comment. `body` went on declaring `"Segoe UI", system-ui, -apple-system,
+  Roboto, sans-serif`, and a declaration on `body` beats anything preflight puts on `html`, so for
+  six days the app paid for the webfont on every load and rendered in the system face anyway - the
+  worst of the two options it was choosing between. The ARABIC half was wired correctly the same day
+  (`:lang(ar) body` → Almarai), which is why only English screens drifted and nobody saw it.
+  (1) `body` is `font-family: var(--font-sans)`. **This repaints every Latin screen.**
+  (2) **37 stray `font-family` declarations swept** out of five prototype stylesheets and the public
+  bid form's style blob: `"Segoe UI", …` → `var(--font-sans)`, `"IBM Plex Sans Arabic", …` →
+  `var(--font-arabic)`, `"IBM Plex Sans", monospace` → `var(--font-mono)` (a TEXT face, the token
+  file's own decision - figures align on `tabular-nums`, not on a monospaced face), and raw
+  `ui-monospace, monospace` → `var(--font-mono-data)`. `font-family: inherit` is left alone: it
+  inherits the body's face, which is now the token's.
+  (3) **Registered**: `DESIGN.md` gains a «The faces» table above the size scale, the linter table
+  gains a row, and `tests/unit/font-drift.test.ts` (new, 5 cases) fails on any `font-family` in
+  `src/` that is not one of the four tokens.
+  Files: `src/app/globals.css`, `src/components/bid/bidFormStyles.ts`,
+  `src/components/{map/map-proto,map/panel/panel-proto,map/request-card,deal-room/deal-room-proto,requests/requests-proto,compare/compare-proto}.css`,
+  `DESIGN.md`, `tests/unit/font-drift.test.ts`.
+  ⚠️ **The md defines NO sizes.** It is titled «Colors & Fonts» and holds three families with their
+  weights plus ~113 colours - no scale, no line-heights. The six-step `--text-*` scale is this app's
+  own and predates it, which `DESIGN.md` now says out loud so the next reader does not go looking.
+  ⚠️ **Five files are exempt, and must stay exempt**: the quotation, the printed comparison, and the
+  three cards pasted into Gmail / Outlook / Word. They render where this app's `:root` does not
+  exist, so `var(--font-sans)` resolves to nothing there and a `next/font` face is not available at
+  all. The guard requires each to name a real system STACK rather than one family, and adding a
+  sixth means adding it to that list with a reason.
+  ⚠️ **Oswald (`--font-hero`) is the one face this app loads that the token file does not name.**
+  Left as it is - it is the CTA banner headline and the owner chose it - but it is a deviation, and
+  `DESIGN.md` says so rather than leaving it to be discovered.
+  ⚠️ Verified: typecheck, lint, and the five design guards green (240) - `font-drift`,
+  `palette-drift`, `ds-colors`, `rentee-map-surface`, `equipment-card`. The new guard was
+  break-checked both ways (body reverted to Segoe UI, and a Comic Sans rule added to a prototype
+  stylesheet); each went red. **NOT seen rendered**: the repaint has not been looked at in a browser,
+  and Inter and Segoe UI have different metrics - the places to check first are the ones with fixed
+  widths, the compare matrix's 132px term columns and the map's numeric chips.
+
+- **2026-09-09 - The exported comparison is the WHOLE table: two money bands, every term, the verdicts in colour, and the brand at the top.**
+  Owner: *"i wanna the export template for compare table to be as full table with all but grouped by
+  section price or terms but showing moedatech logo at top and showing green and red too"*.
+  ~~Four columns - supplier, rate, transport, grand total.~~ A renter who had spent the afternoon
+  reading eight term columns exported a sheet with none of them on it, and the verdicts he was
+  choosing BY (this one meets the certificate, that one refuses it) printed nowhere at all.
+  `src/lib/export/compare-sheet.ts` draws the screen's own shape: a two-deck head (the band
+  «PER CYCLE / GRAND TOTAL / TERMS», then the columns under it, the supplier cell spanning both), a
+  row per bid naming its source, the money with the cheapest marked, and every term cell in the
+  green or the red the screen paints it, with the ✗ on a refusal.
+  🔴 **ONE derivation, two renderers.** The sheet calls `buildTermColumns` and `readTerm` - the
+  matrix's own, extracted to module scope and exported for this - and the money is the same
+  `computeCycleTotals` call with the same inputs. A sheet that decides its own columns prints a term
+  the screen dropped, and NOTHING fails when it does; it just quietly disagrees with the screen it
+  claims to be a copy of.
+  Files: `src/lib/export/compare-sheet.ts` (new), `src/components/workspace/RequestsWorkspace.tsx`
+  (`printComparison` rewritten), `src/components/workspace/CompareMatrix.tsx` (`buildTermColumns`
+  extracted; it and `readTerm` / `docForTerm` exported), `src/lib/i18n/{en,ar}.ts`
+  (`workspace.exportLegend`), `tests/unit/compare-sheet.test.ts` (new, 9 cases).
+  ⚠️ **The old sheet was never branded, and could not have been.** It wrote `color:var(--navy)` and
+  `border:1px solid var(--border)` into `window.open("", "_blank")` - a document that inherits no
+  stylesheet from this app - so every one of those resolved to nothing and it printed in the
+  browser's defaults. The sheet carries `DS_ROOT_CSS` in its own `<head>` now, which is what the
+  QUOTATION has always done for the same reason. A test asserts `:root{` and the two soft tones are
+  in the output.
+  ⚠️ The logo URL is ABSOLUTE (`${window.location.origin}/moedatech-logo.svg`). A relative path in an
+  `about:blank` document resolves to nothing and prints a broken image where the brand should be.
+  ⚠️ A leg the RENTER moves prints as «Didn't say», never as 0 SAR - on paper a zero reads as free
+  delivery. Same rule as the matrix's `onRentee` column.
+  ⚠️ The ✗ is drawn as well as the colour, because a sheet gets photocopied and the colour is the
+  first thing to go.
+  ⚠️ `workspaceExportTotals` is no longer imported by the workspace. It is still used by the CARDS
+  export payload; do not delete it on the strength of this one call site going away.
+  ⚠️ Verified: typecheck, lint, 9 new cases plus `compare-matrix`, `palette-drift` and `ds-colors`
+  green (178). NOT seen as a picture: the sheet was rendered to HTML and served locally, but the
+  browser tool timed out on every screenshot attempt, so the LAYOUT (column widths on A4 landscape
+  with eight terms, and the print colours) has not been looked at. That is the next thing to check.
+
+- **2026-09-09 - The comparison's supplier column is one line and names the SOURCE, and the terms strip reaches the orange rail.**
+  Owner, three notes on one screenshot: *"make the supplier name in 1 row"*, *"call it via app instead
+  of waiting reply etc"*, *"fix the equipment orange stripe place"*.
+  (1) **One line, and the column widened to hold it.** The name was `line-clamp-2 break-words` in a
+  220px column, so «Nesma Heavy Equipment Co.» took two rows of a 52px cell. It is `truncate` again
+  and the column is 280px, which fits a real firm name whole beside the 28px avatar and the ✕ - both
+  rulings stay alive, because the wrap was itself an answer (2026-09-07: *"the supplier names on the
+  left must show the name fully"*, after 185px + `truncate` cut «Al Faisal Heavy Equipment Est.»).
+  Anything longer truncates with the whole of it on `title`.
+  (2) **The line under the name says where the offer CAME FROM.** ~~«Awaiting reply» / «In
+  negotiation».~~ Both are facts about the conversation, and this column is the row's identity: on a
+  table of six they said different things about the same kind of offer, while the one distinction
+  that changes how a renter reads a row - through Moedatech, or through his own shared link - was
+  stated only on the offline half. It reuses `sourceApp` / `offlineInvite`, the SAME two words the
+  SOURCE filter above the table uses, so the row and the tab cannot drift. No new string.
+  (3) **`flex-[1_0_auto] min-w-min` on the terms strip**, and its columns are `flex-1` with a
+  `minWidth` floor instead of a fixed `width`. Earlier the same day the strip was `flex-[9_1_0]
+  min-w-0`, so it shrank below its content while each column kept its floor: the columns overflowed
+  and drew through the «Equipment» rail. That was answered with `flex-none`, which fixed the overlap
+  and produced the opposite fault - with few terms the table ended short of its container and the
+  orange rail floated mid-card with white after it. Grow, never shrink, is both answers at once.
+  Files: `src/components/workspace/CompareMatrix.tsx`,
+  `tests/unit/compare-matrix.test.tsx` (5 cases, 51 passing).
+  ⚠️ The agent's ★ still wins that slot over the source. A recommendation is not a provenance, and
+  the row can only say one thing on one line.
+  ⚠️ **«In negotiation» is no longer said ON THIS TABLE.** An open deal room is still visible on the
+  bid card and in the deal room itself; the comparison is for choosing between offers, not for
+  tracking where each conversation stands. Say so rather than assuming nobody misses it.
+  ⚠️ The two strip cases pin the DECLARATION, not the render: jsdom lays out no flexbox, so neither
+  the overlap nor the gap can be measured in a unit test - only that the rules deciding them are the
+  intended ones. Both faults were found on a screenshot and need one.
+  ⚠️ Verified: typecheck, lint, 51 passing, and all five new cases break-checked (each source change
+  reverted in turn, each went red). NOT seen rendered - `/requests` needs a signed-in renter with
+  bids on a deployed build, so the third item especially wants a look.
 
 - **2026-09-10 - A direct request from a store answers the machine that was PRESSED, and stops landing on the intake.**
   Owner: *"we have an issue in direct request, why does it take him to the intake UI"*. Reproduced in

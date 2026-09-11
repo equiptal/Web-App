@@ -194,7 +194,7 @@
   white-space: nowrap;
 }
 .bm-rq-serial, .bm-rq-ref {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono-data);
   font-weight: 700;
   color: var(--muted);
   text-align: start;

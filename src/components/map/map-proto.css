@@ -387,7 +387,7 @@
 }
 /* The numeral keeps the card's face: one column of distances, one shape to scan, whether the reader
    is on the map or in the list. */
-.bm-pin .bm-pin-chip [dir="ltr"] { font-family: ui-monospace, monospace; letter-spacing: -0.3px; }
+.bm-pin .bm-pin-chip [dir="ltr"] { font-family: var(--font-mono-data); letter-spacing: -0.3px; }
 /* «خارج المدينة» rides the label now that the route has no chip of its own. On a filled
    availability pill it cannot be amber ink — nothing would read — so it is a white-on-white capsule
    at low alpha: legible over either fill, and unmistakably not part of the number. */
@@ -509,7 +509,7 @@
    run still reads left to right. Same face and same weight the card's distance wears, and now the
    same ink: it inherits the row's availability colour rather than reverting to navy. */
 .bm-pin .bm-pinfo-km [dir="ltr"] {
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono-data);
   font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.4px;
@@ -1526,7 +1526,7 @@
   background: color-mix(in srgb, var(--ok-deep) 10%, var(--surface));
   border-color: color-mix(in srgb, var(--ok) 34%, var(--surface));
 }
-.bm-eqyx-specn { font-family: ui-monospace, monospace; font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+.bm-eqyx-specn { font-family: var(--font-mono-data); font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
 .bm-eqyx-specu { font-size: 9.5px; font-weight: 700; opacity: 0.85; }
 .bm-eqyx-arrow { color: var(--muted); font-size: 18px; }
 [dir="rtl"] .bm-eqyx-arrow { transform: scaleX(-1); }
@@ -2205,7 +2205,7 @@
 /* Hero size — the one number on this surface a renter is actually deciding about. The prototype's
    own metrics: 24px, weight 700, `-0.8px` tracking, in the monospace it prints every figure in. */
 .bidmap .bm-foot-amt {
-  font-family: ui-monospace, "IBM Plex Sans", monospace;
+  font-family: var(--font-mono-data);
   /* 21px, down from the prototype's 24 — the slab lost 18px of height and the figure has to sit
      inside it beside the acts (owner, 2026-09-08). It is still the largest thing on the bar. */
   font-size: 21px;
@@ -2264,7 +2264,7 @@
   font-size: 12.5px;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.94);
-  font-family: ui-monospace, "IBM Plex Sans", monospace;
+  font-family: var(--font-mono-data);
   white-space: nowrap;
 }
 /* «ر.س» rides with every figure — quieter than the digits, because the reader is comparing amounts
@@ -2483,7 +2483,7 @@
   font-size: 9.5px;
   font-weight: 800;
   color: var(--muted);
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono-data);
 }
 .bidmap .bm-dock-notice-x {
   flex-shrink: 0;
@@ -3017,5 +3017,5 @@
   white-space: nowrap;
 }
 /* The short code is the thing a renter with three conversations open actually scans for. */
-.bidmap .bm-chat-req-code { flex-shrink: 0; font-family: ui-monospace, monospace; font-size: 10.5px; font-weight: 700; color: var(--muted); }
+.bidmap .bm-chat-req-code { flex-shrink: 0; font-family: var(--font-mono-data); font-size: 10.5px; font-weight: 700; color: var(--muted); }
 .bidmap .bm-chat-req-s { flex-shrink: 0; margin-inline-start: auto; font-size: 10.5px; font-weight: 700; color: var(--muted); white-space: nowrap; }

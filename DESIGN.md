@@ -158,7 +158,40 @@ inside its own four-colour glyph, the mobile app's cream, and two one-offs.
 
 ## Type
 
-Six sizes. There is no seventh for UI.
+### The faces
+
+Three, and `docs/design-tokens.md` is where they are decided — the same file the
+palette comes from. **You do not name a typeface in a component.**
+
+| Token | Face | For |
+|---|---|---|
+| `var(--font-sans)` | **Inter**, Almarai behind it | everything, via `body` |
+| `var(--font-arabic)` | **Almarai**, Inter behind it | applied to `body` under `:lang(ar)` |
+| `var(--font-mono)` | Inter | a numeric run that wants tabular figures, **not** a monospace look |
+| `var(--font-mono-data)` | **JetBrains Mono** | data codes only — `REQ-00337`, a model number |
+
+`--font-mono` resolving to a TEXT face is deliberate, and it is the token file's
+own decision: figures line up because Inter carries `tabular-nums`, not because
+the face is monospaced. True monospace is the explicit opt-in, `.keep-mono`.
+
+`--font-hero` (Oswald) is the CTA banner headline and nothing else. It is the one
+face this app loads that the token file does not name.
+
+**Every screen inherits.** `body` resolves `var(--font-sans)`, so a new component
+gets the right face by writing nothing at all. `tests/unit/font-drift.test.ts`
+fails on a `font-family` anywhere in `src/` that is not one of these tokens.
+
+⚠️ **The exception, and the only one:** a surface that renders where this app's
+`:root` does not exist — the quotation, the printed comparison, and the cards
+pasted into Gmail or Outlook. `var(--font-sans)` there resolves to nothing, and
+`next/font` faces do not exist outside this app's `<body>`. Those five files are
+named in the guard and must state a real system STACK, never one family. Adding a
+sixth means adding it there with a reason beside it.
+
+### The sizes
+
+Six. There is no seventh for UI. These are **this app's own scale**, not the token
+file's — that file defines faces and colours and no sizes at all.
 
 | Token | Size | For |
 |---|---|---|
@@ -451,6 +484,7 @@ off.
 | `hover:brightness-*`, `hover:opacity-*`, `hover:-translate-*` | a hover colour |
 | `disabled:opacity-*` | the disabled colours |
 | `font-medium`, `font-bold`, `font-black` | the three weights |
+| a `font-family` naming a typeface | `var(--font-sans)`, `--font-arabic`, `--font-mono`, `--font-mono-data` |
 
 ---
 

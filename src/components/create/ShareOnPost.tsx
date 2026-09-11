@@ -43,6 +43,19 @@ import { useRouter } from "next/navigation";
  */
 const TELL_ANYWAY_MS = 2_500;
 
+/** One place the request reached, ticked. The mirror of the confirmation's own blocks. */
+function Landed({ title, detail }: { title: string; detail: string }) {
+  return (
+    <span className="flex items-start gap-2.5 rounded-md border border-ok/40 bg-ok-soft px-3 py-2.5">
+      <Icon name="check_circle" size={17} className="mt-px flex-none text-ok-deep" />
+      <span className="min-w-0 flex-1">
+        <b className="block text-meta font-extrabold text-navy">{title}</b>
+        <span className="block text-meta leading-relaxed text-muted-dark">{detail}</span>
+      </span>
+    </span>
+  );
+}
+
 export function ShareOnPost({
   /**
    * The site this request was filed under, if it was.
@@ -292,7 +305,7 @@ export function ShareOnPost({
         onClose={() => {
           setPosted(false);
         }}
-        size="sm"
+        size="md"
       >
         <div className="flex flex-col items-center px-2 pb-1 pt-4 text-center">
           <SuccessTick />
@@ -306,42 +319,52 @@ export function ShareOnPost({
 
               ⚠️ No `capitalize`: the title now carries an e-mail address, and the class title-cases
               every word in it. */}
-          <h2 className="mt-5 text-title font-extrabold text-navy">
-            {mail
-              ? fmt(offCatalogue ? c.postedTitleFromOnly : c.postedTitleFrom, { from: mail.from })
-              : c.postedTitle}
-          </h2>
-          {/* ⚠️ It only claims a share when one HAPPENED (owner, 2026-09-03: *"removed shared with
-              your supplier if he didnt share it"*). A renter who posted to Moedatech alone being
-              told his suppliers were told is the panel lying about the one thing he pressed.
+          {/* ⚠️ **The title is SHORT again, and the destinations are blocks** (owner, 2026-09-10:
+              *"even when sent, the successful modal must be clear"*).
 
-              ⚠️ Drawn only when the server did NOT send. With a send, the title says the post and
-              the line below says the send, and this sentence would be the third telling. */}
-          {!mail && !offCatalogue && (
-            <p className="mt-2 text-body leading-relaxed text-muted-dark">
-              {reached === 0 ? c.postedLive : reached === 1 ? c.postedLiveOne : fmt(c.postedLiveMany, { n: reached })}
-            </p>
-          )}
-          {/* ── Two lines, not five (owner, 2026-09-08: *"reduce the text, remove the «sent
-              to» etc, just keep the title"*) ─────────────────────────────────────────────────
+              ~~«Your request is posted to Moedatech and shared from yara@outlook.com» in one 17px
+              title.~~ That packed two facts into a sentence that wrapped to three lines and was read
+              once. The blocks under it are the SAME two rows he approved in the confirmation a
+              moment earlier, ticked — so the screen that asks and the screen that reports are the
+              same shape, and he can check them off rather than re-read them.
 
-              ~~A tick, a title, «It is live on Moedatech now and shared with 1 supplier», «Sent
-              from … to 1 supplier», «A copy is in your Sent folder», then the next step.~~ Five
-              lines for two facts, and the title above already states both: the request is posted
-              and it went from his own address. What was left was the same news in smaller type.
+              This keeps the half of 2026-09-08 that still holds (*"reduce the text, just keep the
+              title"*): there is no paragraph here, and the title says one thing. */}
+          <h2 className="mt-5 text-title font-extrabold capitalize text-navy">{c.postedTitle}</h2>
 
-              ⚠️ The Sent-folder copy is not lost, only moved to where it can be checked: the
-              status line under the share button, which is on screen behind this. */}
+          <div className="mt-4 grid w-full gap-2 text-start">
+            {/* Moedatech, unless this request can reach nobody there. */}
+            {offCatalogue ? (
+              <span className="flex items-start gap-2.5 rounded-md border border-warn/40 bg-warn-soft px-3 py-2.5">
+                <Icon name="error_outline" size={17} className="mt-px flex-none text-warn-deep" />
+                <span className="text-meta font-semibold leading-relaxed text-navy">{c.offCatalogueLine}</span>
+              </span>
+            ) : (
+              <Landed title={c.destMoedatech} detail={c.postedLive} />
+            )}
 
-          {/* ⚠️ **The opposite sentence** (owner, 2026-09-08). This request reaches nobody by
-              broadcast, so the one thing he must not walk away believing is that suppliers on
-              Moedatech are looking at it. */}
-          {offCatalogue && (
-            <p className="mt-2 flex items-start gap-1.5 text-meta font-semibold text-warn-deep">
-              <Icon name="error_outline" size={15} className="mt-px flex-none" />
-              {c.offCatalogueLine}
-            </p>
-          )}
+            {/* ⚠️ The mail, and only when the server really sent one. A channel that merely opened
+                a window has no report to make here: the renter watched it happen. */}
+            {mail && (
+              <Landed
+                title={c.destOutlook}
+                detail={
+                  fmt(mail.recipients === 1 ? c.mailSentOne : c.mailSent, {
+                    from: mail.from,
+                    n: mail.recipients,
+                  }) + (mail.inSentFolder ? `, ${c.mailInSent}` : "")
+                }
+              />
+            )}
+
+            {/* ⚠️ A channel we did not send through: say the count, because nothing else does. */}
+            {!mail && !offCatalogue && reached > 0 && (
+              <Landed
+                title={c.destShared}
+                detail={reached === 1 ? c.postedLiveOne : fmt(c.postedLiveMany, { n: reached })}
+              />
+            )}
+          </div>
 
           {/* ⚠️ **The project, as a block rather than a second dialog** (owner, 2026-09-08).
               Filing is a consequence of the post, so it belongs under the sentence that announces

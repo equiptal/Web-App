@@ -63,8 +63,6 @@ import {
   isPlottable,
   LANDING_CUE_MS,
   requestTypeWord,
-  shortfallAlert,
-  unitCountLabel,
   unitCounts,
 } from "@/lib/contract/bid-map";
 import {
@@ -767,9 +765,6 @@ export function BidMapWorkspace({
      footer prices on what was agreed, these pills describe what was offered (RM3-AC-65/67). */
   const counts = bid && fleet ? unitCounts(bid, fleet) : null;
   const kase = counts ? countCase(counts) : null;
-  /** V4's alert, or null. It carries the DIFFERENCE and not the offered total (RM3-AC-05), and its
-   *  own orange (RM3-AC-06) — both decided in the model, so neither is re-derived at the render. */
-  const shortfall = counts ? shortfallAlert(counts) : null;
 
   // NO "does the offer match" derivation here, deliberately (owner, 2026-08-11). Whether Accept is
   // available is the DEAL ROOM's rule — `termsMatched && priceMatches && unitsMatch`
@@ -1047,55 +1042,29 @@ export function BidMapWorkspace({
               </div>
             )}
 
-            {/* ── V4 · the shortfall alert ───────────────────────────────────────────────────────
-                Renders on `short` and on nothing else, so its absence reliably means nothing is
-                claimed (RM3-AC-05). ORANGE, never red: on this surface red means availability only,
-                and a shortfall is an incomplete offer, not an unavailable machine (RM3-AC-06). It
-                states the DIFFERENCE — not the offered total — and the consequence: those units are
-                not on the map.
+            {/* ── V4 · the shortfall alert is WITHDRAWN (owner, 2026-09-10) ─────────────────────
+                On a panel whose first pill read «2 Crawler Excavators 20 ton registered» beside «2 in
+                this offer», it still said «1 in this offer with no registered equipment». Owner:
+                *"but he has 2 registered so remove it"*.
 
-                ONE SENTENCE AND A BUTTON, as the prototype draws it (decoded 3775–3784). The glyph,
-                the bold heading and the grey paragraph that were here until 2026-08-11 made a
-                three-part notice out of a fact that fits on one line, and the paragraph only
-                unpacked the consequence the sentence already carries. */}
-            {shortfall && (
-              <div className="bm-short" role="status">
-                <div className="bm-short-body">
-                  <div className="bm-short-t">
-                    {/* `shortfall.claimed` — the DIFFERENCE. `counts.offered` is the sentence's one
-                        plausible wrong number and is not reachable from this model at all. */}
-                    {fmt(t.bidMap.shortfall, { n: ar ? unitCountLabel(shortfall.claimed) : `${shortfall.claimed}` })}
-                  </div>
-                  {/* The reason the control beside this is inert, IN WORDS. A disabled button whose
-                      label merely changed to «تم الطلب» leaves the renter guessing whether the ask
-                      failed or the surface is broken; the rule is that his question is already with
-                      the lessor, and that is a sentence, not a state on a button. */}
-                  {shortfallPending && <div className="bm-short-s">{t.bidMap.askPendingWhy}</div>}
-                </div>
-                <button
-                  type="button"
-                  className="bm-short-act"
-                  // The composer is the whole of this action's contract: an `alternative` card with a
-                  // NULL `equipmentId` — there is no machine to name — which the backend pairs with
-                  // `scope: "company"`. `add_to_offer` is retired and rejected server-side, and is
-                  // unreachable from here by construction (RM3-AC-07).
-                  //
-                  // This control COMPOSES; it does not send. The draft card lands in the chat and
-                  // «أرسل الطلب» is what writes — which is also what creates the deal room when the
-                  // bid has none (004a §4.5), so opening the surface and pressing this both still
-                  // leave the supplier's offered count unfrozen.
-                  //
-                  // Routed through the ONE seam like every other ask, so the acknowledgement that
-                  // used to be this control's own `shortfallSent` flag is now the thing all four
-                  // asks share: a card in the room means the question is out.
-                  onClick={() => composeDraft(composeShortfallRequest())}
-                  disabled={sender.busy || shortfallPending}
-                  title={shortfallPending ? t.bidMap.askPendingWhy : undefined}
-                >
-                  {sender.busy ? t.bidMap.shortfallSending : shortfallPending ? t.bidMap.shortfallSent : t.bidMap.shortfallAction}
-                </button>
-              </div>
-            )}
+                🔴 **The two numbers count different things, and both use the word «registered».**
+                  · the PILL is `counts.owned` — `fleet.length`, every machine the lessor holds for
+                    this request;
+                  · the ALERT is `counts.claimed` — `offered − registered`, where `registered` counts
+                    only fleet rows carrying `inBid === true`, the ones committed to THIS bid.
+                So 2 owned, 2 offered, 1 flagged `inBid` produced a «1 unbacked» line under a pill
+                saying he has two. Read together they contradict each other; read apart, each is true.
+
+                ⚠️ **The alert is not necessarily WRONG, and this does not fix `inBid`.** Either the
+                lessor really attached one machine of the two, or the projection under-reports
+                `in_bid` — that is a backend question, and it is still open. What is removed is the
+                sentence that stated the gap in words the panel beside it contradicts.
+                ⚠️ The ASK survives. «Ask him to add it» and the list-foot's «Ask for different
+                equipment» were always ONE ask (`composeShortfallRequest`, an `alternative` naming no
+                machine), so the route to it is one press behind the list and nothing is stranded.
+                ⚠️ `shortfallAlert`, `SHORTFALL_COLOUR` and `countCase` are untouched, with their
+                tests: RM3-AC-05/06 are a contract this app shares with the mobile app, and the model
+                is what a corrected `inBid` would light up again. */}
 
             {/* ── A failed ask is stated; the RULE is not a failure (owner, 2026-08-11) ──────────
                 Two different things went through one red `role="alert"` box, and the owner saw the

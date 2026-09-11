@@ -318,17 +318,17 @@ describe("attachments — grey by decision, never red", () => {
 // follows the documents group. Before that, a machine carrying both mandatory shots and no meter photo
 // read "nothing outstanding" in the documents tab and red "2 of 4 uploaded" here, on one screen.
 describe("equipment photos — the fraction, over the slots the lessor is actually held to", () => {
-  it("greens on the two REQUIRED slots, whether or not the optional two were uploaded", () => {
-    const both = cellsBy(machine({ photos: [{ slot: "front" }, { slot: "serial" }] }), {}).photos;
-    expect(both.state).toBe("green");
-    // The count, in shape 1 — the cell the owner pointed at when he asked for a cell to open its
-    // evidence: *"clicking on any document field here, like '2 of 2 unit photos'"*.
-    expect(both.en).toBe("2 of 2 — on the unit's file");
-    expect(both.ar).toBe("2 من 2 — موجودة في ملف الوحدة");
+  it("greens on the FRONT shot alone, whatever else was uploaded", () => {
+    /* Owner, 2026-09-10: *"the front image at least … then don't show missing images as red"*. The
+       plate shot is still shown when it exists and still askable; it no longer fails the machine. */
+    const front = cellsBy(machine({ photos: [{ slot: "front" }] }), {}).photos;
+    expect(front.state).toBe("green");
+    expect(front.en).toBe("1 of 1 — on the unit's file");
+    expect(front.ar).toBe("1 من 1 — موجودة في ملف الوحدة");
     // All four reads the same: the optional shots are not a higher score, they are simply optional.
     const all = cellsBy(machine({ photos: ALL_FOUR }), {}).photos;
     expect(all.state).toBe("green");
-    expect(all.en).toBe("2 of 2 — on the unit's file");
+    expect(all.en).toBe("1 of 1 — on the unit's file");
   });
 
   it("does not fail a machine for a shot nobody requires", () => {
@@ -341,18 +341,20 @@ describe("equipment photos — the fraction, over the slots the lessor is actual
   // a red cell left the renter to work out which of the two shots was the missing one by opening the
   // other tab; the slot's own name is the answer, and it is the same `PHOTO_LABEL` that heads the row
   // over there. The fraction is what green states.
-  it("reds when a REQUIRED shot is missing, and NAMES the shot", () => {
-    const c = cellsBy(machine({ photos: [{ slot: "front" }, { slot: "equipment" }] }), {}).photos;
+  it("does NOT red a machine that has everything but the front shot", () => {
+    // The plate and the side are optional now, so their presence is what the group states — a cell
+    // that failed on them would be the surface disagreeing with its own documents tab again.
+    const c = cellsBy(machine({ photos: [{ slot: "serial" }, { slot: "equipment" }] }), {}).photos;
     expect(c.state).toBe("red");
-    expect(c.en).toBe("Missing Plate / serial");
-    expect(c.ar).toBe("مفقود: اللوحة والرقم التسلسلي");
+    expect(c.en).toBe("Missing Front");
+    expect(c.ar).toBe("مفقود: أمامية");
   });
 
-  it("reds at none, and names both rather than omitting the cell", () => {
+  it("reds at none, and names the front shot rather than omitting the cell", () => {
     const c = cellsBy(machine({ photos: [] }), {}).photos;
     expect(c.state).toBe("red");
-    expect(c.en).toBe("Missing Front · Plate / serial");
-    expect(c.ar).toBe("مفقود: أمامية · اللوحة والرقم التسلسلي");
+    expect(c.en).toBe("Missing Front");
+    expect(c.ar).toBe("مفقود: أمامية");
   });
 
   it("folds the wire's slot vocabulary onto the four the renter is shown", () => {
@@ -486,10 +488,10 @@ describe("only a green cell opens its evidence", () => {
   });
 
   it("gives a RED cell none — a finding about an absence has nothing to open", () => {
-    // Front is on the file and the plate shot is not, so this cell is red WITH a real photo behind it:
-    // the case where opening "the first file of the family" would show evidence for a sentence the cell
-    // did not write.
-    const c = cellsOf(machine({ photos: [{ slot: "front" }] }), {}).photos;
+    // The plate and side shots are on the file and the FRONT one is not, so this cell is red WITH a
+    // real photo behind it: the case where opening "the first file of the family" would show evidence
+    // for a sentence the cell did not write.
+    const c = cellsOf(machine({ photos: [{ slot: "serial" }, { slot: "equipment" }] }), {}).photos;
     expect(c.state).toBe("red");
     expect(c.evidence).toBeNull();
     // Same for a half-held certificate cell: TÜV is on the file, the finding is about the SPSP.
@@ -643,7 +645,9 @@ describe("equipmentDocGroups — the groups, and each one's own attention count 
 
   it("counts ROWS NEEDING ACTION, never totals", () => {
     const g = groupBy(machine({ photos: [{ slot: "front" }], docs: [{ type: "tuv" }] }), asking(["tuv"], "spsp"));
-    expect(g.photos.attention).toBe(1); // the plate shot, and nothing else — meter and side are not required
+    // ~~1, for the plate shot.~~ The front shot is the only required one since 2026-09-10, and it is
+    // on the file, so this group is answered — the plate row is shown, not outstanding.
+    expect(g.photos.attention).toBe(0);
     expect(paperAttention(g)).toBe(1); // ownership; the asked-for TÜV is on the file
     // The asked-for operator SPSP is missing and is counted NOWHERE here — it is the match grid's
     // operator cell that reports it, which is the whole of the 2026-08-11 ruling.
@@ -724,7 +728,10 @@ describe("equipmentDocGroups — the groups, and each one's own attention count 
   it("gives every row a download link when it holds a file, and none when it does not", () => {
     const g = groupBy(machine({ photos: [{ slot: "front" }] }), NO_ASKS);
     expect(g.photos.rows[0].downloadUrl).toBe("https://x/front");
-    expect(g.photos.rows[1].downloadUrl).toBeNull();
+    // The plate shot is optional since 2026-09-10, so an absent one is not a row to link. A paper
+    // that IS required and absent still carries the null link.
+    const ownership = papers(groupBy(machine({ docs: [] }), NO_ASKS));
+    expect(ownership[0].downloadUrl).toBeNull();
   });
 });
 
@@ -831,11 +838,13 @@ describe("a document already on the file is never requestable", () => {
   });
 
   it("holds for photos too — an uploaded shot is not a shot to ask for", () => {
-    const g = groupBy(machine({ photos: [{ slot: "front" }] }), NO_ASKS);
+    const g = groupBy(machine({ photos: [{ slot: "front" }, { slot: "serial" }] }), NO_ASKS);
     const front = g.photos.rows.find((r) => r.key === "photo:front")!;
     const plate = g.photos.rows.find((r) => r.key === "photo:plate")!;
+    // Both on the file: the front one because it is required, the plate because it was uploaded —
+    // an optional shot that exists reads `on_file`, and neither is a shot to ask for.
     expect([front.status, front.requestable]).toEqual(["present", false]);
-    expect([plate.status, plate.requestable]).toEqual(["missing", true]);
+    expect([plate.status, plate.requestable]).toEqual(["on_file", false]);
   });
 
   /* A test here asserted that the operator's certificates follow this rule too — a missing one being
@@ -955,13 +964,12 @@ describe("the operator's documents leave this tab entirely", () => {
 });
 
 describe("photos follow the same rule as the papers", () => {
-  it("front and plate are required of every lessor — absent, they are red and counted", () => {
+  it("the FRONT shot is required of every lessor — absent, it is red and counted", () => {
+    /* Owner, 2026-09-10. ~~front + plate~~: the plate shot joined the meter and the side as a shot
+       nobody is held to, so an absent one is not a row and not a gap. */
     const g = groupBy(machine({ photos: [] }), NO_ASKS);
-    expect(g.photos.rows.map((r) => [r.key, r.status])).toEqual([
-      ["photo:front", "missing"],
-      ["photo:plate", "missing"],
-    ]);
-    expect(g.photos.attention).toBe(2);
+    expect(g.photos.rows.map((r) => [r.key, r.status])).toEqual([["photo:front", "missing"]]);
+    expect(g.photos.attention).toBe(1);
   });
 
   it("meter and side are required nowhere — absent, they are NOT rows", () => {
@@ -1180,9 +1188,10 @@ describe("what the operator's cell inherits from the scorer", () => {
       machine({ photos: [{ slot: "front" }], docs: [{ type: "istimara" }, { type: "operator_tuv" }] }),
       asking(["tuv"], "tuv, spsp"),
     );
-    // `EquipmentDetail` sums `g.attention`. The plate photo and the missing TÜV are the whole badge; the
-    // missing operator SPSP is the grid's to report and is counted nowhere here.
-    expect(groups.reduce((n, g) => n + g.attention, 0)).toBe(2);
+    /* `EquipmentDetail` sums `g.attention`. ~~The plate photo and the missing TÜV.~~ Since
+       2026-09-10 the plate shot is optional and the front one is on the file, so the missing TÜV is
+       the whole badge; the missing operator SPSP is the grid's to report and is counted nowhere. */
+    expect(groups.reduce((n, g) => n + g.attention, 0)).toBe(1);
     expect(groups.every((g) => typeof g.attention === "number")).toBe(true);
   });
 });
@@ -1292,13 +1301,18 @@ describe("every document family on this surface is openable (RM3-AC-69)", () => 
         "Missing",
         "on the unit's file · not requested",
       ]).toContain(row.statusLine.en);
-      // The row's whole shape, so a verify badge or an expiry cannot arrive by accident. `anyOfGroup`
-      // joined it on 2026-08-12 and is present ONLY on the four ownership rows — it says which rows are
-      // alternatives to one another, which is a fact about counting, not about verification.
+      /* The row's whole shape, so a verify badge or an expiry cannot arrive by accident. `anyOfGroup`
+         joined it on 2026-08-12 and is present ONLY on the four ownership rows — it says which rows
+         are alternatives to one another, which is a fact about counting, not about verification.
+         `answeredElsewhere` joined on 2026-09-10 and is narrower still: an ownership row that is
+         EMPTY while a sibling is on the file. Both are facts about the group, never about a paper's
+         verification. */
       const shape = ["docTypes", "downloadUrl", "files", "key", "label", "requestable", "status", "statusLine", "thumbUrl"];
-      expect(Object.keys(row).sort()).toEqual(
-        row.key.startsWith("doc:ownership:") ? ["anyOfGroup", ...shape].sort() : shape,
-      );
+      const own = row.key.startsWith("doc:ownership:");
+      const expected = own
+        ? [...(row.status === "missing" ? ["answeredElsewhere"] : []), "anyOfGroup", ...shape].sort()
+        : shape;
+      expect(Object.keys(row).sort()).toEqual(expected);
     }
   });
 });
@@ -1321,14 +1335,18 @@ describe("every document family on this surface is openable (RM3-AC-69)", () => 
  */
 describe("selection is a MODE, inferred from the first tick", () => {
   /** front photo held · plate photo missing · ownership held · TÜV asked for and missing. */
+  /* ⚠️ **The held photo is the PLATE and the missing one is the FRONT**, since 2026-09-10. Only the
+     front shot is required, so it is the only photo row that can read `missing`; an optional slot is
+     a row exactly when it was uploaded. The pair this block needs is therefore the other way round
+     from the one it was written with. */
   const mixed = () =>
     equipmentDocGroups(
-      machine({ photos: [{ slot: "front" }], docs: [{ type: "istimara" }] }),
+      machine({ photos: [{ slot: "serial" }], docs: [{ type: "istimara" }] }),
       asking(["tuv"]),
     ).flatMap((g) => g.rows);
 
-  const HELD_PHOTO = "photo:front";
-  const MISSING_PHOTO = "photo:plate";
+  const MISSING_PHOTO = "photo:front";
+  const HELD_PHOTO = "photo:plate";
   const HELD_PAPER = "doc:ownership:istimara";
   const MISSING_PAPER = "doc:equipment_cert:tuv";
   /**
@@ -1374,8 +1392,8 @@ describe("selection is a MODE, inferred from the first tick", () => {
     const rows = mixed();
     expect(selectionModeOf(rows, new Set())).toBeNull();
     expect(selectableKeys(rows, null)).toEqual([
-      HELD_PHOTO,
       MISSING_PHOTO,
+      HELD_PHOTO,
       HELD_PAPER,
       ...UNHELD_OWNERSHIP,
       MISSING_PAPER,
@@ -1445,7 +1463,7 @@ describe("selection is a MODE, inferred from the first tick", () => {
     const rows = mixed();
 
     const saving = new Set([HELD_PHOTO, HELD_PAPER]);
-    expect(docDownloadBatch(rows, saving).map((t) => t.url)).toEqual(["https://x/front", "https://x/istimara"]);
+    expect(docDownloadBatch(rows, saving).map((t) => t.url)).toEqual(["https://x/serial", "https://x/istimara"]);
     expect(batchDocumentRequest("eq-1", rows, saving)).toBeNull();
 
     const asking_ = new Set([MISSING_PHOTO, MISSING_PAPER]);
@@ -1494,7 +1512,7 @@ describe("selection is a MODE, inferred from the first tick", () => {
     // Every row ticked at once — a state the UI refuses, which is exactly why the model is asked.
     const draft = docDraft(rows, new Set(rows.map((r) => r.key)));
     expect(draft.labels.map((l) => l.en)).toEqual([
-      "Plate / serial",
+      "Front",
       // The three ownership papers this machine does not hold. Each names itself — the point of the
       // 2026-08-12 split — so an ask raised over all of them says customs card, sale contract and SASO
       // registration rather than three copies of "istimara".

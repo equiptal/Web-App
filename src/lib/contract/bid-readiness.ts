@@ -325,9 +325,20 @@ export function computeUnitReadiness(
     return { code: kind, ...operatorCertLabel(kind), present, url: present ? docTypeUrl.get(kind) ?? null : null };
   });
 
+  /**
+   * ── The FRONT shot alone answers the photos key (owner, 2026-09-10) ─────────────────────────────
+   * *"if at least one document from proof of ownership or the front image at least, then don't show
+   * missing proof and missing images as red"*.
+   *
+   * ~~`front && serial`~~ — the app's `kMandatoryPhotoSlots` pair. A machine photographed from the
+   * front, with its papers on file and no separate plate shot, read RED on the renter's readiness
+   * card and «Missing plate / serial» on the map's grid: a supplier who had shown the renter the
+   * machine was marked as having shown him nothing. The plate photo is still SHOWN when it is
+   * uploaded (`photos` below carries every slot) and it is still what the plate row of the documents
+   * tab asks for; it just no longer fails the machine on its own.
+   */
   const front = unit.photoKeys.some((p) => /front/i.test(p.slot));
-  const serial = unit.photoKeys.some((p) => /serial|plate/i.test(p.slot));
-  const photosPresent = front && serial;
+  const photosPresent = front;
 
   // The app's `hasPoo`: `docTypes.any(kPooDocTypes.contains)` — ANY one ownership paper resolves the
   // key. Computed on every caller (see {@link UnitReadiness.ownershipPresent}); only whether it is

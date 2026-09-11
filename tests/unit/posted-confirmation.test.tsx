@@ -65,7 +65,17 @@ afterEach(cleanup);
  * ⚠️ It is one of THREE titles: with a server send it names the mailbox, on an off-catalogue
  * request it names no marketplace, and with no send at all it is the bare line.
  */
-const titleFrom = (from: string) => c.postedTitleFrom.replace("{from}", from);
+/**
+ * 🔴 **~~The title carried the address.~~** (owner, 2026-09-10: *"even when sent, the successful
+ * modal must be clear"*). One 17px sentence held both facts and wrapped to three lines. The title
+ * says one thing now, and the destinations are ticked blocks under it, the same two rows he approved
+ * in the confirmation a moment earlier.
+ */
+const titleFrom = (_from: string) => c.postedTitle;
+
+/** The Outlook row of the tick, with the address and the count it really sent to. */
+const sentLine = (from: string, n: number) =>
+  (n === 1 ? c.mailSentOne : c.mailSent).replace("{from}", from).replace("{n}", String(n));
 
 /** A site the request was filed under, as `ProjectFiled` hands it up. */
 const SITE = {
@@ -102,19 +112,20 @@ describe("a send the server performed", () => {
       mail: { from: "bandar@moedatech.net", recipients: 2, inSentFolder: true },
     });
     /**
-     * 🔴 **The title is the whole statement** (owner, 2026-09-08: *"reduce the text, remove the
-     * «sent to» etc, just keep the title"*).
+     * 🔴 **The title says ONE thing; the destinations are blocks** (owner, 2026-09-10: *"even when
+     * sent, the successful modal must be clear"*).
      *
-     * ~~A title, «It is live on Moedatech now and shared with 1 supplier», «Sent from … to 1
-     * supplier», «A copy is in your Sent folder».~~ Four lines for two facts, both of which the
-     * title already carries: it is posted, and it went from his own address.
+     * This keeps the half of 2026-09-08 that still holds (*"reduce the text, just keep the title"*):
+     * there is no paragraph, and the title does not wrap. What it drops is the trick of packing the
+     * post AND the send into one 17px sentence, which was read once and skimmed after that.
      */
-    expect(await screen.findByText(titleFrom("bandar@moedatech.net"))).toBeTruthy();
-    const sent = c.mailSent.replace("{from}", "bandar@moedatech.net").replace("{n}", "2");
-    expect(screen.queryByText(new RegExp(sent))).toBeNull();
-    // ⚠️ The Sent-folder copy is not lost, only moved: the status line under the share button,
-    // which is on screen behind this dialog, still says it.
-    expect(screen.queryByText(new RegExp(c.mailInSent))).toBeNull();
+    expect(await screen.findByText(c.postedTitle)).toBeTruthy();
+    // The two places it reached, each as its own ticked row.
+    expect(screen.getByText(c.destMoedatech)).toBeTruthy();
+    expect(screen.getByText(c.destOutlook)).toBeTruthy();
+    // ⚠️ The address and the count ride the Outlook row, with the Sent-folder copy as a clause.
+    expect(screen.getByText(new RegExp(sentLine("bandar@moedatech.net", 2)))).toBeTruthy();
+    expect(screen.getByText(new RegExp(c.mailInSent))).toBeTruthy();
   });
 
   it("says nothing under the title but the next step", async () => {

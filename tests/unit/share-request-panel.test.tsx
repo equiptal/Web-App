@@ -53,6 +53,11 @@ vi.mock("@/lib/api/client", () => ({
   setBidDeadline: () => Promise.resolve(),
   shareRequestEmail: (...args: unknown[]) => {
     api.mailCalls.push(args);
+    /* ⚠️ The backend FORGETS the token when it answers this reason, so the stub does too: a test
+       that flipped the status afterwards would race the panel's own re-read. */
+    if (api.mail.sent === false && api.mail.reason === "RECONNECT_REQUIRED") {
+      api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
+    }
     return Promise.resolve(api.mail);
   },
   mailConnectStatus: () => Promise.resolve(api.connect),
@@ -134,13 +139,13 @@ const arShare = ar.intake.postShare;
 /**
  * The confirm button inside the dialog, whichever of its two labels it is wearing.
  *
- * ⚠️ It says «Post and send» before the request exists and «Send» afterwards, because those are
- * two different promises. Read from inside `role="dialog"` so it can never match the panel's own
- * Send button.
+ * ⚠️ **THREE labels, not two** (2026-09-12). «Post and send» when both halves happen, «Post to
+ * Moedatech» when Outlook is not connected and no mail will leave, «Send» when the request is
+ * already live. Read from inside `role="dialog"` so it can never match the panel's own Send button.
  */
 const confirmButton = () =>
-  Array.from(document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')).find(
-    (b) => (b.textContent ?? "").includes(c.confirmDoBoth) || (b.textContent ?? "").includes(c.confirmDoSend),
+  Array.from(document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')).find((b) =>
+    [c.confirmDoBoth, c.confirmDoSend, c.confirmDoPost].some((w) => (b.textContent ?? "").includes(w)),
   ) ?? null;
 
 /**
@@ -150,6 +155,21 @@ const confirmButton = () =>
  * a test that presses once and expects a send is describing the old flow. Every case that is not
  * about the dialog itself goes through here. The other channels open no dialog and are unaffected.
  */
+/**
+ * Outlook, connected.
+ *
+ * 🔴 **Since 2026-09-12 this is what makes e-mail a destination at all.** An unconnected Outlook
+ * sends nothing and opens nothing: the request goes to Moedatech and the confirmation says so. Every
+ * case below that is about a MAIL therefore has to connect first, and the ones that are about the
+ * Moedatech-only path deliberately do not.
+ */
+const connected = (email = "bandar@zahid.sa") => {
+  api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: email, connectedAt: null };
+};
+
+/** Press the offer that is drawn once a send could not put the message on the wire. */
+const openItYourself = () => fireEvent.click(screen.getByText(c.mailOpenInstead).closest("button")!);
+
 const pressSend = () => {
   fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
   const yes = confirmButton();
@@ -208,10 +228,18 @@ describe("how it goes", () => {
   });
 
   it("Given e-mail, Then the recipients are the ticked suppliers", async () => {
+    /**
+     * 🔴 **The compose window is now a PRESS, never an outcome** (owner, 2026-09-10). The send
+     * itself opens nothing; «Open your e-mail» is offered afterwards and this is what it builds.
+     */
     draw();
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
     pressSend();
+
+    await waitFor(() => expect(screen.queryByText(c.mailOpenInstead)).toBeTruthy());
+    expect(opened).not.toHaveBeenCalled();
+    openItYourself();
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
     const url = new URL(opened.mock.calls[0][0] as string);
@@ -239,6 +267,9 @@ describe("how it goes", () => {
     await screen.findByText("Al Faisal Rentals");
     fireEvent.click(screen.getByText(c.outlook));
     pressSend();
+
+    await waitFor(() => expect(screen.queryByText(c.mailOpenInstead)).toBeTruthy());
+    openItYourself();
 
     await waitFor(() => expect(opened).toHaveBeenCalled());
     const q = new URL(opened.mock.calls[0][0] as string).searchParams;
@@ -414,6 +445,10 @@ describe("how it goes", () => {
     fireEvent.click(screen.getByText(c.outlook));
     pressSend();
 
+    /* ⚠️ The window is a press now, and it still records nothing: opening a mail client has never
+       been evidence that a message left it. */
+    await waitFor(() => expect(screen.queryByText(c.mailOpenInstead)).toBeTruthy());
+    openItYourself();
     await waitFor(() => expect(opened).toHaveBeenCalled());
     expect(api.shares).toHaveLength(0);
   });
@@ -704,6 +739,8 @@ describe("what rides the clipboard on an e-mail send", () => {
     fireEvent.click(screen.getByText(c.outlook));
     pressSend();
 
+    await waitFor(() => expect(screen.queryByText(c.mailOpenInstead)).toBeTruthy());
+    openItYourself();
     await waitFor(() => expect(opened).toHaveBeenCalled());
     // The send itself left the clipboard alone.
     expect(writeText).not.toHaveBeenCalled();
@@ -723,6 +760,8 @@ describe("what rides the clipboard on an e-mail send", () => {
     fireEvent.click(screen.getByText(c.outlook));
     pressSend();
 
+    await waitFor(() => expect(screen.queryByText(c.mailOpenInstead)).toBeTruthy());
+    openItYourself();
     await waitFor(() => expect(opened).toHaveBeenCalled());
     const body = new URL(String(opened.mock.calls[0][0])).searchParams.get("body")!;
     expect(body).toContain("Crawler Excavator");
@@ -819,7 +858,9 @@ describe("the panel narrates nothing after a send (owner, 2026-09-03)", () => {
     fireEvent.click(screen.getByText(c.outlook));
     pressSend();
 
-    await waitFor(() => expect(opened).toHaveBeenCalled());
+    /* ⚠️ The press posts to Moedatech and opens nothing, so «no narration» is now a statement
+       about a screen where nothing happened but the post. */
+    await waitFor(() => expect(api.mailCalls).toHaveLength(0));
     expect(screen.queryByText(/on the clipboard/i)).toBeNull();
     expect(screen.queryByText(/opened with/i)).toBeNull();
     expect(screen.queryByText(/Pick another channel/i)).toBeNull();
@@ -983,85 +1024,83 @@ describe("what they receive", () => {
  * the card in it and his suppliers in blind copy.
  */
 describe("the mail we send ourselves", () => {
+  /**
+   * 🔴 **It only happens with a CONNECTED mailbox now** (owner, 2026-09-10). Every case here used
+   * to reach the endpoint with nothing connected at all, because the backend would then try to send
+   * as the renter's own domain. That route is gone from the product.
+   */
   const sendByEmail = async () => {
+    connected();
     draw();
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
     pressSend();
   };
 
-  it("Given a verified domain, Then NO compose window opens and the send is stated", async () => {
+  it("Given the server sent it, Then NO window opens and the send is stated", async () => {
     /**
-     * ⚠️ This is the one outcome on this panel the renter cannot see for himself. Every other press
-     * puts a window in front of him; this one puts nothing, so silence would read as a dead button.
+     * ⚠️ This is the one outcome on this panel the renter cannot see for himself. Every other
+     * press puts a window in front of him; this one puts nothing, so silence would read as a dead
+     * button.
      */
-    api.mail = { sent: true, from: "bandar@shibhaljazira.com", via: "ses", recipients: 1, messageId: "0100-abc", inSentFolder: false, skipped: 0 };
+    api.mail = { sent: true, from: "bandar@shibhaljazira.com", via: "graph", recipients: 1, messageId: "0100-abc", inSentFolder: true, skipped: 0 };
     await sendByEmail();
 
     await waitFor(() => expect(screen.getByText(/bandar@shibhaljazira\.com/)).toBeTruthy());
     expect(opened).not.toHaveBeenCalled();
+    // ⚠️ And no offer to do it by hand: the message went, so there is nothing left to do.
+    expect(screen.queryByText(c.mailOpenInstead)).toBeNull();
   });
 
   it("Given WE sent it, Then no DECLARED share is recorded on top of it", async () => {
     /**
-     * ⚠️ The backend writes that row itself, stamped with the SES message id — a send it can prove.
-     * Recording a second one here would file a claim that the renter declared the same send from
-     * his own client, which is a different fact and not a true one.
+     * ⚠️ The backend writes that row itself, stamped with the mail server's own id, which is a
+     * send it can prove. Recording a second one here would file a claim that the renter declared the
+     * same send from his own client, which is a different fact and not a true one.
      */
-    api.mail = { sent: true, from: "b@x.sa", via: "ses", recipients: 1, messageId: "m", inSentFolder: false, skipped: 0 };
+    api.mail = { sent: true, from: "b@x.sa", via: "graph", recipients: 1, messageId: "m", inSentFolder: true, skipped: 0 };
     await sendByEmail();
 
     await waitFor(() => expect(api.mailCalls).toHaveLength(1));
     expect(api.shares).toHaveLength(0);
   });
 
-  it("Given it could not send, Then the compose window opens exactly as before", async () => {
-    // Nothing regresses for a renter whose IT has not added the records: this is today's behaviour,
-    // chosen by a FIELD in the answer rather than by catching an error.
-    api.mail = { sent: false, reason: "DOMAIN_NOT_VERIFIED", from: "b@x.sa", domain: "x.sa", dns: [] };
+  it("Given it could not send, Then the window is OFFERED and never opened", async () => {
+    /**
+     * 🔴 **~~«the compose window opens exactly as before»~~** (owner, 2026-09-10). It opened by
+     * itself whenever the server refused, and that is the ambush he reported: he asked for a request
+     * to be posted and a mail client took the screen. The offer is drawn, the press is his.
+     */
+    api.mail = { sent: false, reason: "SEND_REJECTED", from: "b@x.sa", domain: null, dns: [], connectPath: null };
     await sendByEmail();
 
+    await waitFor(() => expect(screen.getByText(c.mailOpenInstead)).toBeTruthy());
+    expect(opened).not.toHaveBeenCalled();
+
+    openItYourself();
     await waitFor(() => expect(opened).toHaveBeenCalled());
-    // ⚠️ Nothing recorded: the window opening is not a send.
+    // ⚠️ Nothing recorded: a window opening is not a send, whoever opened it.
     expect(api.shares).toHaveLength(0);
   });
 
-  it("Given an unverified domain, Then the records his IT adds are on screen", async () => {
-    api.mail = {
-      sent: false,
-      reason: "DOMAIN_NOT_VERIFIED",
-      from: "bandar@shibhaljazira.com",
-      domain: "shibhaljazira.com",
-      dns: [{ type: "CNAME", name: "abc._domainkey.shibhaljazira.com", value: "abc.dkim.amazonses.com" }],
-    };
-    await sendByEmail();
+  /*
+   * — «Given an unverified domain, Then the records his IT adds are on screen» —
+   * — «Given a personal address, Then it says so and offers NO records to chase» —
+   *
+   * 🔴 Both retired with the scenario they described (owner, 2026-09-12: *"we will not communicate
+   * with the IT of company, so remove this scenario, it will be from the Outlook connection"*). They
+   * covered the SES route, where our server sends as the renter's own domain once somebody with
+   * access to that domain's DNS has proved we may. Nobody was ever going to do that, and the panel
+   * was asking a renter to go and find the person who runs his company's website.
+   *
+   * ⚠️ `DOMAIN_NOT_VERIFIED` and `PERSONAL_DOMAIN` can still ARRIVE from the backend. They read as
+   * ordinary refusals now, which the case above pins.
+   */
 
-    await waitFor(() => expect(screen.getByText("abc._domainkey.shibhaljazira.com")).toBeTruthy());
-    expect(screen.getByText("abc.dkim.amazonses.com")).toBeTruthy();
-    // ⚠️ Framed as an improvement, never as a failure: his message HAS already gone to his own
-    // compose window, and telling him otherwise sends him chasing IT mid-share.
-    expect(opened).toHaveBeenCalled();
-  });
-
-  it("Given a personal address, Then it says so and offers NO records to chase", async () => {
+  it("Given the send was refused, Then he can open his e-mail himself", async () => {
     /**
-     * ⚠️ Nobody can add a DNS record to `gmail.com`. Showing this renter a list to forward to IT
-     * would be an errand with no end, so the refusal is its own reason and its own sentence.
-     */
-    api.mail = { sent: false, reason: "PERSONAL_DOMAIN", from: "bandar@gmail.com", domain: "gmail.com", dns: [] };
-    await sendByEmail();
-
-    await waitFor(() => expect(screen.getByText(c.mailPersonal)).toBeTruthy());
-    expect(screen.queryByText(c.mailSetupCopy)).toBeNull();
-    expect(opened).toHaveBeenCalled();
-  });
-
-  it("Given the fallback ran, Then he can open his e-mail again himself", async () => {
-    /**
-     * ⚠️ `window.open` needs a live user gesture and this one fires AFTER an await on the mail API.
-     * Safari can refuse it, and `noopener` makes `window.open` return null by spec — so a refusal
-     * cannot be detected. The button is therefore always offered rather than only when something
-     * looks wrong.
+     * ⚠️ `window.open` needs a live user gesture, and `noopener` makes it return null by spec, so
+     * a browser's refusal cannot be detected. That is why this is a button and not an outcome.
      */
     api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [] };
     await sendByEmail();
@@ -1179,36 +1218,53 @@ describe("connecting Outlook", () => {
     expect(screen.queryByText(c.mailConnect)).toBeNull();
   });
 
-  it("Given he only TICKED e-mail, Then nothing about Microsoft is on screen yet", async () => {
+  it("Given he TICKS Outlook, Then the offer is there BEFORE he presses anything", async () => {
     /**
-     * ⚠️ Owner, 2026-09-05: *"this isnt here, when i click email and send to suppliers then it
-     * will ask to connect just the normal flow."* Offered on the tick, it put a paragraph about
-     * consent in front of a renter who had not asked to send anything, above the button he was
-     * reaching for.
+     * 🔴 **This reverses 2026-09-05, and the reason it was moved is the reason it comes back.**
+     *
+     * It was taken off the tick because it *"put a paragraph about Microsoft consent in front of a
+     * renter who had not asked to send anything yet"*. What replaced it was worse: the consent moved
+     * INSIDE Send, so one press posted his request and opened an account chooser he never asked for
+     * (owner, 2026-09-10: *"users are confused when their request is sent with the Outlook at same
+     * click"*).
+     *
+     * ⚠️ The half of that ruling that still holds is the PARAGRAPH. This is a line and a button.
      */
     api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
     await pickEmail();
 
-    await waitFor(() => expect(screen.getByText(c.outlook)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(c.mailConnect)).toBeTruthy());
+    // Nothing has been pressed, nothing posted, nothing sent.
+    expect(api.mailCalls).toHaveLength(0);
+    expect(opened).not.toHaveBeenCalled();
+  });
+
+  it("Given he has NOT ticked Outlook, Then the offer is not drawn", async () => {
+    // ⚠️ It belongs to the channel it configures. On WhatsApp it would be a question about a
+    // transport he is not using.
+    api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
+    draw();
+    await screen.findByText("Al Faisal Rentals");
+    fireEvent.click(screen.getByText(c.whatsapp));
+
+    await waitFor(() => expect(screen.getByText(c.whatsapp)).toBeTruthy());
     expect(screen.queryByText(c.mailConnect)).toBeNull();
   });
 
-  it("Given the send was refused, Then the offer appears — at the moment it answers a question", async () => {
+  it("Given Send with Outlook NOT connected, Then nothing is e-mailed and nothing opens", async () => {
+    /**
+     * 🔴 **The whole point of the change** (owner, 2026-09-10: *"if they didn't connect the Outlook
+     * the confirmation will be on Moedatech only"*). The endpoint is not even called: there is no
+     * mailbox to send through, and asking it anyway is what used to end in a compose window nobody
+     * asked for.
+     */
     api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
-    api.mail = {
-      sent: false,
-      reason: "NOT_CONNECTED",
-      from: "bandar@zahid.sa",
-      domain: "zahid.sa",
-      dns: [],
-      connectPath: "/agents/mail-connect/authorize",
-    };
     await pickEmail();
     pressSend();
 
-    await waitFor(() => expect(screen.getByText(c.mailConnect)).toBeTruthy());
-    // And the share still went out the old way while he decides.
-    expect(opened).toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText(c.mailOpenInstead)).toBeTruthy());
+    expect(api.mailCalls).toHaveLength(0);
+    expect(opened).not.toHaveBeenCalled();
   });
 
   it("Given he is connected, Then it says which address, and offers to disconnect", async () => {
@@ -1220,22 +1276,26 @@ describe("connecting Outlook", () => {
     await waitFor(() => expect(api.disconnected).toBe(1));
   });
 
-  it("Given the token was dropped, Then the button says RECONNECT rather than connect", async () => {
-    api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
+  it("Given the token was dropped mid-send, Then the button says RECONNECT rather than connect", async () => {
+    /**
+     * ⚠️ He WAS connected when he pressed, so the send really was attempted; the token had been
+     * revoked at Microsoft's end. «Connect» would read as though he had never done it.
+     */
+    connected();
     api.mail = {
       sent: false,
       reason: "RECONNECT_REQUIRED",
       from: "bandar@zahid.sa",
-      domain: "zahid.sa",
+      domain: null,
       dns: [],
       connectPath: "/agents/mail-connect/authorize",
     };
     await pickEmail();
     pressSend();
-
+    /* ⚠️ The stub drops the token exactly as the backend does, and the panel re-reads the
+       status rather than going on believing it is connected. Without that re-read the offer cannot
+       be drawn at all, because it is gated on «not connected». */
     await waitFor(() => expect(screen.getByText(c.mailReconnect)).toBeTruthy());
-    // And the share still went out the old way while he sorts it out.
-    expect(opened).toHaveBeenCalled();
   });
 
   it("Given Graph sent it, Then it says the copy is in his Sent folder", async () => {
@@ -1243,6 +1303,7 @@ describe("connecting Outlook", () => {
      * ⚠️ Only on the Graph path. SES sends AS him without touching his mailbox, so there is no copy
      * there, and saying otherwise sends him looking for something that does not exist.
      */
+    connected();
     api.mail = { sent: true, from: "bandar@zahid.sa", via: "graph", recipients: 2, messageId: null, inSentFolder: true, skipped: 0 };
     await pickEmail();
     pressSend();
@@ -1254,6 +1315,7 @@ describe("connecting Outlook", () => {
   });
 
   it("Given SES sent it, Then it does NOT claim a Sent folder copy", async () => {
+    connected();
     api.mail = { sent: true, from: "bandar@zahid.sa", via: "ses", recipients: 2, messageId: "0100-x", inSentFolder: false, skipped: 0 };
     await pickEmail();
     pressSend();
@@ -1264,6 +1326,7 @@ describe("connecting Outlook", () => {
 
   it("Given some picks had no address, Then the left-out are counted rather than hidden", async () => {
     // A count that quietly omits them is how a renter comes to believe eight people were written to.
+    connected();
     api.mail = { sent: true, from: "b@x.sa", via: "graph", recipients: 1, messageId: null, inSentFolder: true, skipped: 2 };
     await pickEmail();
     pressSend();
@@ -1490,7 +1553,9 @@ describe("the clipboard has one writer at a time", () => {
     fireEvent.click(screen.getByText(c.outlook));
     pressSend();
 
-    await waitFor(() => expect(opened).toHaveBeenCalled());
+    /* ⚠️ The press posts and opens nothing, so this now asserts the stronger thing: the clipboard
+       is untouched by a send that did not even reach a mail client. */
+    await waitFor(() => expect(screen.queryByText(c.mailOpenInstead)).toBeTruthy());
     expect(write).not.toHaveBeenCalled();
     expect(writeText).not.toHaveBeenCalled();
   });
@@ -1531,6 +1596,7 @@ describe("the clipboard has one writer at a time", () => {
      * what he was supposed to do with it.
      */
     clip();
+    connected("b@x.sa");
     api.mail = { sent: true, from: "b@x.sa", via: "graph", recipients: 1, messageId: null, inSentFolder: true, skipped: 0 };
 
     draw({ draftForm: DRAFT });
@@ -1713,40 +1779,59 @@ describe("a wording per channel", () => {
  * a paragraph explaining the first one. The request is posted by the time the consent is needed, so
  * it is not a detour, it is the next step of the thing he pressed.
  */
-describe("Send opens the connector itself", () => {
-  /**
-   * A pop-up that is already closed, so the poll resolves on its first tick.
-   *
-   * 🔴 It carries a `location`, because the consent URL is no longer passed to `window.open`. The
-   * window is opened BLANK inside the click and aimed afterwards: opened after the two awaits that
-   * `send` needs (the post, then the authorize call) the browser refuses it outright, which is what
-   * put *"Outlook could not be connected"* on screen instead of an account chooser.
-   */
+describe("Send never connects", () => {
+  /** A pop-up that is already closed, so the consent poll resolves on its first tick. */
   const popup = () => {
     const win = { closed: true, location: { href: "" }, close: () => {} } as unknown as Window;
     opened.mockReturnValue(win);
     return win;
   };
 
-  it("Given he is not connected, Then pressing Send opens the consent, then sends", async () => {
-    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
-    api.connectUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?x=1";
-    api.mail = { sent: true, from: "b@x.sa", via: "graph", recipients: 1, messageId: null, inSentFolder: false, skipped: 0, draftUrl: null };
-
-    // Not connected at the moment of the press; connected by the time the pop-up closes.
+  it("Given he is not connected, Then Send opens NO consent and e-mails nothing", async () => {
+    /**
+     * 🔴 **~~«pressing Send opens the consent, then sends»~~** (owner, 2026-09-10: *"users are
+     * confused when their request is sent with the Outlook at same click, so i want to separate the
+     * connect as a separate action from the create"*).
+     *
+     * That one press posted the request, opened a blank pop-up to beat the pop-up blocker, aimed it
+     * at Microsoft, waited for it to close, re-read the status and then sent — five acts, none of
+     * them announced, and the renter could not tell which had happened when the window shut.
+     * Connecting is a button of its own now, and it is pressed before Send or not at all.
+     */
     api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
-    const win = popup();
+    api.connectUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?x=1";
+    popup();
 
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
     pressSend();
 
-    // 🔴 The window is opened BLANK, in the same tick as the click, or the browser blocks it.
+    await waitFor(() => expect(screen.getByText(c.mailOpenInstead)).toBeTruthy());
+    // No pop-up of any kind, blank or otherwise, and no mail.
+    expect(opened).not.toHaveBeenCalled();
+    expect(api.mailCalls).toHaveLength(0);
+  });
+
+  it("Given the CONNECT button, Then the consent URL is opened directly", async () => {
+    /**
+     * 🔴 **No blank window any more.** It existed because `send` had to open a pop-up before two
+     * awaits had finished, and a browser refuses that. From a button there is one `await` before the
+     * open, which every engine still counts as the same press.
+     */
+    api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
+    api.connectUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?x=1";
+    popup();
+
+    draw({ draftForm: DRAFT });
+    await screen.findByText("Al Faisal Rentals");
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click((await screen.findByText(c.mailConnect)).closest("button")!);
+
     await waitFor(() => expect(opened).toHaveBeenCalled());
-    expect(String(opened.mock.calls[0][0])).toBe("");
-    // And it is aimed at Microsoft once the authorize call has answered.
-    await waitFor(() => expect(win.location.href).toContain("login.microsoftonline.com"));
+    expect(String(opened.mock.calls[0][0])).toContain("login.microsoftonline.com");
+    // Nothing was posted and nothing was sent: connecting is not sharing.
+    expect(api.mailCalls).toHaveLength(0);
   });
 
   it("Given the FIRST press, Then NOTHING happens — not the post, not the mail", async () => {
@@ -1893,19 +1978,19 @@ describe("Send opens the connector itself", () => {
     expect(opened).not.toHaveBeenCalled();
   });
 
-  it("Given this stage cannot connect, Then Send does NOT try, and the window opens as before", async () => {
-    // ⚠️ `configured: false` means no Azure app registration. A consent pop-up there is a dead end.
+  it("Given this stage cannot connect, Then no offer is drawn at all", async () => {
+    // ⚠️ `configured: false` means no Azure app registration. A Connect button there is a dead
+    // end: `authorize` answers `NOT_CONFIGURED` and there is no consent screen to reach.
     api.connect = { configured: false, connected: false, provider: null, accountEmail: null, connectedAt: null };
     api.connectUrl = null;
-    api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
 
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(c.outlook));
-    pressSend();
 
-    await waitFor(() => expect(opened).toHaveBeenCalled());
-    expect(String(opened.mock.calls[0][0])).not.toContain("login.microsoftonline.com");
+    await waitFor(() => expect(screen.getByText(c.outlook)).toBeTruthy());
+    expect(screen.queryByText(c.mailConnect)).toBeNull();
+    expect(opened).not.toHaveBeenCalled();
   });
 
   it("Given GMAIL, Then no window is pre-opened at all", async () => {
@@ -1924,10 +2009,12 @@ describe("Send opens the connector itself", () => {
     expect(String(opened.mock.calls[0][0])).toContain("mail.google.com");
   });
 
-  it("Given the POST fails, Then the blank window is closed rather than left open", async () => {
+  it("Given the POST fails, Then nothing is opened and nothing is left stranded", async () => {
     /**
-     * 🔴 It is opened before the post, because it has to be. A post that then fails would leave an
-     * empty pop-up sitting on his screen with nothing in it and no way to know what it was for.
+     * 🔴 **~~«the blank window is closed rather than left open»~~.** There is no blank window to
+     * close: it was opened before the post only so it could survive the pop-up blocker, and that
+     * whole trick retired with the consent that needed it. A failed post now opens nothing at all,
+     * which is a shorter way to keep the same promise.
      */
     api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
     const closed = vi.fn();
@@ -1942,7 +2029,9 @@ describe("Send opens the connector itself", () => {
     fireEvent.click(screen.getByText(c.outlook));
     pressSend();
 
-    await waitFor(() => expect(closed).toHaveBeenCalled());
+    await waitFor(() => expect(api.mailCalls).toHaveLength(0));
+    expect(opened).not.toHaveBeenCalled();
+    expect(closed).not.toHaveBeenCalled();
   });
 });
 
@@ -2028,21 +2117,25 @@ describe("the To line", () => {
     api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: email, connectedAt: null };
   };
 
+  /**
+   * 🔴 **The compose window is a PRESS now** (owner, 2026-09-10), so this presses it. Nothing about
+   * the To line changed: what changed is who opens the window. Gmail still opens its own as the
+   * send itself, and for Outlook this is «Open your e-mail» under the status line.
+   *
+   * ⚠️ No blank pop-up to skip any more, so the first `open` IS the compose URL.
+   */
   const send = async (channel: string) => {
     api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
     draw({ draftForm: DRAFT });
     fireEvent.click(await screen.findByText("Al Faisal Rentals"));
     fireEvent.click(screen.getByText(channel));
     pressSend();
+    if (channel !== c.gmail) {
+      await waitFor(() => expect(screen.queryByText(c.mailOpenInstead)).toBeTruthy());
+      openItYourself();
+    }
     await waitFor(() => expect(opened).toHaveBeenCalled());
-    /**
-     * ⚠️ Skip the BLANK window and the consent screen. An unconnected Outlook opens an empty
-     * pop-up as the first statement of the click — it has to, or the browser refuses it — so
-     * `calls[0]` is `""` on that path and only the compose URL is the one under test.
-     */
-    const url = opened.mock.calls
-      .map((x) => String(x[0]))
-      .find((u) => u.startsWith("http") && !u.includes("login.microsoftonline.com"));
+    const url = opened.mock.calls.map((x) => String(x[0])).find((u) => u.startsWith("http"));
     return new URL(url ?? "https://example.invalid/");
   };
 
@@ -2258,8 +2351,9 @@ describe("the confirm dialog", () => {
     await toConfirm();
     // Twice: the row in the list, and the chip in the dialog.
     expect(screen.getAllByText("Al Faisal Rentals").length).toBeGreaterThan(1);
-    // And the mailbox that will send it, by name.
-    expect(screen.getByText(c.confirmMailLine.replace("{from}", "bandar@zahid.sa"))).toBeTruthy();
+    /* ⚠️ The mailbox that will send it, in the Outlook block's own detail line. The dialog states
+       DESTINATIONS now rather than two sentences, so the address rides the block it belongs to. */
+    expect(screen.getByText(c.destOutlookBodyOne.replace("{from}", "bandar@zahid.sa"))).toBeTruthy();
   });
 
   it("Given a supplier with no address, Then the dialog names him too", async () => {
@@ -2403,15 +2497,21 @@ describe("the outcome handed back to the caller", () => {
     expect(opened).not.toHaveBeenCalled();
   });
 
-  it("says the browser DID leave when a compose window opened instead", async () => {
-    // The unsendable case: the panel falls back to his own webmail, which takes focus.
-    api.mail = { sent: false, reason: "DOMAIN_NOT_VERIFIED", from: "b@najd.sa", domain: "najd.sa", dns: [], connectPath: null };
+  it("says the browser did NOT leave when the send was merely refused", async () => {
+    /**
+     * 🔴 **~~«the browser DID leave when a compose window opened instead»~~** (owner, 2026-09-10).
+     * It opened that window itself, so it really had handed the screen over. Nothing opens by itself
+     * now — the offer waits under the status line — so the browser is still here, and saying
+     * otherwise would hold the «your request is posted» tick back for a return that never happens.
+     */
+    connected("b@najd.sa");
+    api.mail = { sent: false, reason: "SEND_REJECTED", from: "b@najd.sa", domain: null, dns: [], connectPath: null };
     draw({ onShared: shared });
     await sendByEmail();
 
     await waitFor(() => expect(shared).toHaveBeenCalled());
     const [, , outcome] = shared.mock.calls[0];
-    expect(outcome).toMatchObject({ handedOff: true });
+    expect(outcome).toMatchObject({ handedOff: false });
     expect(outcome.mail).toBeUndefined();
   });
 
@@ -2533,21 +2633,24 @@ describe("a consent the renter never finishes", () => {
     return win;
   };
 
-  const pressSendConnecting = async () => {
+  /**
+   * 🔴 **The consent is reached from the BUTTON now, never from Send** (owner, 2026-09-10), so
+   * these describe a press that can no longer block a share. The hang itself still matters: a poll
+   * that never settles leaves the button reading «Waiting for Outlook» for ever, and the renter
+   * cannot tell a slow sign-in from a dead one.
+   */
+  const pressConnect = async () => {
     shared.mockReset();
     api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
     api.connectUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?x=1";
-    api.mail = { sent: false, reason: "UNAVAILABLE", from: null, domain: null, dns: [], connectPath: null };
 
     draw({ draftForm: DRAFT, onShared: shared });
-    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    await screen.findByText("Al Faisal Rentals");
     fireEvent.click(screen.getByText(c.outlook));
-    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
-    await waitFor(() => expect(confirmButton()).toBeTruthy());
-    fireEvent.click(confirmButton()!);
+    fireEvent.click((await screen.findByText(c.mailConnect)).closest("button")!);
   };
 
-  it("Given consent lands while the window is still open, Then the send carries on", async () => {
+  it("Given consent lands while the window is still open, Then the connection is taken", async () => {
     /**
      * ⚠️ The status is the second signal, and it is the one that is actually true: the callback
      * has reached the backend, so the connection exists whether or not the little window has got
@@ -2556,15 +2659,17 @@ describe("a consent the renter never finishes", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       const win = stuckPopup();
-      await pressSendConnecting();
-      await waitFor(() => expect(win.location.href).toContain("login.microsoftonline.com"));
+      await pressConnect();
+      await waitFor(() => expect(opened).toHaveBeenCalled());
+      expect(String(opened.mock.calls[0][0])).toContain("login.microsoftonline.com");
 
       // Microsoft answers; the backend flips. The window is still open on screen.
       api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "b@x.sa", connectedAt: null };
-      api.mail = { sent: true, from: "b@x.sa", via: "graph", recipients: 1, messageId: null, inSentFolder: true, skipped: 0 };
 
       await vi.advanceTimersByTimeAsync(1500);
-      await waitFor(() => expect(api.mailCalls).toHaveLength(1));
+      // ⚠️ The status is the second signal and the one that is actually true: the callback has
+      // reached the backend, so the connection exists whether or not the window has closed itself.
+      await waitFor(() => expect(screen.getAllByText(/b@x\.sa/).length).toBeGreaterThan(0));
       // ⚠️ And we shut the stray pop-up ourselves rather than leaving it over the panel.
       expect(win.close).toHaveBeenCalled();
     } finally {
@@ -2582,14 +2687,16 @@ describe("a consent the renter never finishes", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       const win = stuckPopup();
-      await pressSendConnecting();
-      await waitFor(() => expect(win.location.href).toContain("login.microsoftonline.com"));
+      await pressConnect();
+      await waitFor(() => expect(opened).toHaveBeenCalled());
 
       // Nothing happens. He never signs in, and he never closes it.
       await vi.advanceTimersByTimeAsync(121_000);
 
-      await waitFor(() => expect(api.mailCalls).toHaveLength(1));
-      await waitFor(() => expect(shared).toHaveBeenCalled());
+      /* 🔴 **The button comes back** rather than reading «Waiting for Outlook» for ever. It is no
+         longer holding a send open behind it, but a control that never finishes is still a control
+         a renter cannot use. */
+      await waitFor(() => expect(screen.getByText(c.mailConnect)).toBeTruthy());
       // ⚠️ The window is NOT closed under him: he may still be typing a password into it.
       expect(win.close).not.toHaveBeenCalled();
     } finally {
@@ -2597,7 +2704,7 @@ describe("a consent the renter never finishes", () => {
     }
   });
 
-  it("Given the authorize call fails, Then the send still finishes", async () => {
+  it("Given the authorize call fails, Then the button reports it and stays put", async () => {
     // ⚠️ It is awaited inside `send`, so a throw there rejected the whole send and `busy` never
     // cleared. A refusal is an answer, not an exception.
     shared.mockReset();

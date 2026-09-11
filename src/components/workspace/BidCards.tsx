@@ -592,24 +592,22 @@ function BidCardTile({
               footnote to that multiplication — «priced on 2 of the 4 units offered» is why the row
               above says · 2 units — and a note sitting outside the box read as a remark about the
               card rather than about the figure it qualifies. */}
-          {!countNotes.isEmpty && (
+          {/* ── The CLAIMED note is gone from this card (owner, 2026-09-10) ───────────────────────
+              *"«1 من هذه الوحدات بلا معدّة مسمّاة: أُدرجت 1 معدّة.» remove this note from the bid
+              card"*. It fired on `claimedUnits > 0` — units offered without a named machine behind
+              them — which is the ORDINARY shape of an off-platform bid, so it printed in orange on
+              most cards and said nothing the renter acts on there.
+              ⚠️ Only the note is removed. `unitCountNotes` still computes `hasClaimedNote`,
+              `claimedUnits` and `machinesNamed`, with its tests: it is the app's own rule, and the
+              equipment map is where a unit with no machine behind it actually matters. */}
+          {countNotes.hasPricedNote && (
             <div className="flex flex-col gap-1 border-t border-border/70 pt-2.5 text-label font-semibold leading-snug text-muted">
-              {countNotes.hasPricedNote && (
-                <span>
-                  {fmt(
-                    countNotes.relation === "above" ? t.workspace.countPricedAbove : t.workspace.countPricedBelow,
-                    { priced: String(countNotes.priced), offered: String(countNotes.offered) },
-                  )}
-                </span>
-              )}
-              {countNotes.hasClaimedNote && (
-                <span className="text-brand">
-                  {fmt(t.workspace.countClaimed, {
-                    n: String(countNotes.claimedUnits),
-                    named: String(countNotes.machinesNamed),
-                  })}
-                </span>
-              )}
+              <span>
+                {fmt(
+                  countNotes.relation === "above" ? t.workspace.countPricedAbove : t.workspace.countPricedBelow,
+                  { priced: String(countNotes.priced), offered: String(countNotes.offered) },
+                )}
+              </span>
             </div>
           )}
         </div>

@@ -955,6 +955,18 @@ export interface DocRow {
    * papers, and a second route to the same answer is how the two numbers start to disagree.
    */
   anyOfGroup?: string;
+  /**
+   * **This row is absent, and its question is already answered** (owner, 2026-09-10: *"if at least
+   * one document from proof of ownership … then don't show missing proof as red"*).
+   *
+   * Set on the empty siblings of a satisfied {@link DocRow.anyOfGroup}. The row keeps `status:
+   * "missing"` and stays askable — a renter who wants the customs card as well as the istimara can
+   * still ask for it, and the batch's «select all missing» still reaches it — but it is drawn
+   * NEUTRAL rather than red: a proof that is one of four alternatives is not a gap once another of
+   * the four is on the file, which is the rule {@link attentionCount} has counted by since
+   * 2026-08-12. Only the paint was still judging each row alone.
+   */
+  answeredElsewhere?: boolean;
 }
 
 /** The one `anyOfGroup` this surface has. Named rather than inlined so the row builder and
@@ -1219,7 +1231,19 @@ const PHOTO_LABEL: Record<PhotoSlot, Bilingual> = {
  * nowhere, so they follow the not-required rule: shown when uploaded, and absent they are simply not a
  * row. This repo's `computeUnitReadiness` derives `photosPresent` from the same two slots.
  */
-const REQUIRED_PHOTO_SLOTS = new Set<PhotoSlot>(["front", "plate"]);
+/**
+ * ⚠️ **The FRONT shot alone, since 2026-09-10** (owner: *"if at least one document from proof of
+ * ownership or the front image at least, then don't show missing proof and missing images as red"*).
+ *
+ * ~~`["front", "plate"]`~~, the app's `kMandatoryPhotoSlots`. A machine photographed from the front
+ * read RED here and «Missing plate / serial» in the cell, which is the surface telling a renter that
+ * a supplier who HAS shown him the machine has shown him nothing. The plate row still exists in the
+ * documents tab and can still be asked for; it is no longer what fails the machine.
+ *
+ * ⚠️ `computeUnitReadiness` (`bid-readiness.ts`) derives `photosPresent` from the same rule, and the
+ * two must move together: they are read side by side on the bid card and on this panel.
+ */
+const REQUIRED_PHOTO_SLOTS = new Set<PhotoSlot>(["front"]);
 
 /**
  * The rows' status lines — **the app's two phrases, and a tail it has no word for**.
@@ -1397,8 +1421,9 @@ function certRow(args: {
   required: boolean;
   askType: string;
   anyOfGroup?: string;
+  answeredElsewhere?: boolean;
 }): DocRow {
-  const { key, label, held, required, askType, anyOfGroup } = args;
+  const { key, label, held, required, askType, anyOfGroup, answeredElsewhere } = args;
   const files = filesOf(held);
   const status: PresenceStatus = held.length === 0 ? "missing" : required ? "present" : "on_file";
   return {
@@ -1413,6 +1438,8 @@ function certRow(args: {
     // You can only ask for what is not there — held or unrequired, there is nothing to chase.
     requestable: status === "missing",
     ...(anyOfGroup ? { anyOfGroup } : {}),
+    // Only ever true on an ABSENT row: a held paper says so itself.
+    ...(answeredElsewhere && status === "missing" ? { answeredElsewhere: true } : {}),
   };
 }
 
@@ -1575,6 +1602,8 @@ export function equipmentDocGroups(machine: FleetMachine, request: MatchRequest)
       // `saso_registration` are active catalogue rows).
       askType: code,
       anyOfGroup: OWNERSHIP_ANY_OF,
+      // One paper answers the group; the rest are alternatives, not gaps (owner, 2026-09-10).
+      answeredElsewhere: ownershipHeld.length > 0,
     }),
   );
 
