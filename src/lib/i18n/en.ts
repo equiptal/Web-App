@@ -370,14 +370,6 @@ export const en = {
       mailSentOne: "Sent from {from} to 1 supplier",
       mailSkipped: "{n} of the ones you picked had no e-mail, so they were left out.",
       mailOpenInstead: "Open your e-mail",
-      mailSetupTitle: "Send straight from {domain}, with no compose window",
-      mailSetupWhat:
-        "Your e-mail opened as usual, so nothing is held up. To have Moedatech send it for you next time, from your own address, your IT adds these records to {domain} once.",
-      mailSetupHost: "Name",
-      mailSetupValue: "Value",
-      mailSetupCopy: "Copy the records",
-      mailSetupCopied: "Records copied",
-      mailSetupWait: "Records take up to a day to take effect. Nothing changes for you until they do.",
       /* ── SUP-BE-23, the Graph path: the renter connects his own Outlook once ──────────────── */
       copyAddresses: "Copy addresses",
       copyAddressesDone: "Addresses copied",
@@ -389,6 +381,30 @@ export const en = {
       envBcc: "Bcc",
       envNoRecipients: "Nobody yet, tick a supplier",
       envSkipped: "{names} has no e-mail on file, so they are left out",
+      /* ── The confirmation names its destinations (owner, 2026-09-10) ──────────────────────
+         *"Allow users to connect Outlook, then ask them if they want to send, clearly. It is a
+         confirmation on Outlook and Moedatech, and if they didn't connect the Outlook the
+         confirmation will be on Moedatech only."*
+
+         Three titles, because the press makes one of three different promises. */
+      confirmBothTitle: "Post this request and e-mail it?",
+      confirmSubBoth: "It reaches both of these places",
+      confirmSubPost: "It reaches one place",
+      confirmDoPost: "Post to Moedatech",
+      destMoedatech: "Moedatech",
+      destShared: "Shared",
+      destOutlook: "Outlook",
+      destGmail: "Gmail",
+      destNoMarket: "Not on the marketplace",
+      destOutlookBody: "Sent from {from} to {n} suppliers, each in blind copy",
+      destOutlookBodyOne: "Sent from {from} to 1 supplier, in blind copy",
+      destGmailBody: "Your Gmail opens with the message and your suppliers in blind copy, ready for you to send",
+      destSkipOutlook: "Don't send by Outlook this time",
+      destOutlookSkipped: "Outlook, skipped this time",
+      destOutlookSkippedBody: "Nothing is e-mailed. Your Outlook stays connected for your next request",
+      destSendItAfterAll: "Send it by Outlook after all",
+      destOutlookOff: "Outlook is not connected",
+      destOutlookOffBody: "Nothing is e-mailed. Connect Outlook and your requests go out from your own address, with your suppliers in blind copy",
       confirmPostTitle: "Post this request and e-mail it?",
       confirmSendTitle: "E-mail this request?",
       confirmPostLine: "Your request goes live on Moedatech, where every supplier there can bid on it",
@@ -406,31 +422,30 @@ export const en = {
       confirmNo: "Cancel",
       mailConnect: "Connect Outlook",
       mailReconnect: "Reconnect Outlook",
+      /* Shown BEFORE any send now (2026-09-10), so it says what connecting buys rather than what
+         has just gone wrong. */
       mailConnectWhy:
-        "Connect Outlook once and Moedatech sends this from your own address, with the card in the message and your suppliers in blind copy. No compose window, and a copy lands in your Sent folder",
+        "Connect Outlook once and your requests go out from your own address, with your suppliers in blind copy and a copy in your Sent folder",
       mailConnecting: "Waiting for Outlook",
       mailConnected: "Sending from {email}",
       mailDisconnect: "Disconnect",
-      mailConnectedNow: "Outlook connected. Press Send again to use it",
+      /* «Again» was true only while connecting happened inside Send. It is its own press now. */
+      mailConnectedNow: "Outlook connected. Your requests can go out from it",
       mailConnectDenied:
-        "Consent was not granted. Large organisations often need an administrator to approve it, so ask your IT if you did not refuse it yourself",
-      mailConnectFailed: "Outlook could not be connected, so your e-mail opens instead",
+        "Consent was not granted, so nothing is e-mailed. Large organisations often need an administrator to approve it, so ask your IT if you did not refuse it yourself",
+      mailConnectFailed: "Outlook could not be connected, so nothing is e-mailed. Your request still posts to Moedatech",
       mailInSent: "A copy is in your Sent folder",
       /* ── The reasons that used to pass in SILENCE (owner, 2026-09-08) ─────────────────────────
          *"My account is sending to suppliers correctly, but my colleague's Outlook account doesn't
          send anything."* Every reason below opened his compose window and said nothing about why —
          so from his seat the press did nothing, while the same press worked for somebody else. Each
          one names the fact that differs between two accounts. */
-      mailNoSender:
-        "Your Moedatech account has no e-mail address on it, so nothing can be sent from you. Add one in your profile, then try again",
       mailNoRecipients:
         "We could not find an address for any of the suppliers you picked. They may be on a colleague's list rather than yours, so your e-mail opens instead",
       mailNotYours:
         "Sending from your own address is not set up for this account yet. Your e-mail opens instead, which is what it does today",
       mailDomainWaiting:
         "Your domain {domain} is registered but not verified yet, so we cannot send as you until your IT adds the records. Your e-mail opens instead",
-      mailPersonal:
-        "Your address is a personal one, so Moedatech cannot send on its behalf. Your e-mail opens instead, which is what it does today.",
     },
     reading: "Reading",
     heading: "How would you like to create your request?",

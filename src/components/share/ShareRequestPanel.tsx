@@ -290,7 +290,6 @@ export function ShareRequestPanel({
    * beats a share that silently did not open.
    */
   const [reopen, setReopen] = useState<Compose | null>(null);
-  const [dnsCopied, setDnsCopied] = useState(false);
   const [copiedPart, setCopiedPart] = useState<"subject" | "body" | null>(null);
   /*
    * — `myEmail`, the address off his Moedatech profile, lived here —
@@ -327,6 +326,19 @@ export function ShareRequestPanel({
    * `!connected` alone.
    */
   const [connect, setConnect] = useState<MailConnectStatus | null>(null);
+  /**
+   * He pressed «Don't send by Outlook» in the confirmation.
+   *
+   * 🔴 **This once, and the connection is untouched** (owner, 2026-09-11, choosing it over a
+   * permanent disconnect: *"option 1"*). A small link inside a send dialog that signed him out of
+   * his mail account would only show itself on the NEXT request, when the e-mail had quietly stopped
+   * being offered. Disconnecting for good is still one press away, on the «Sending from …» line
+   * where it has always been, and that one says what it does.
+   *
+   * ⚠️ Cleared every time the dialog opens, so it can never carry into a request he did not press
+   * it on.
+   */
+  const [skipEmail, setSkipEmail] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [connectNote, setConnectNote] = useState<"connected" | "denied" | "failed" | null>(null);
   /** The popup poll, held so an unmount mid-consent does not leave a timer running. */
@@ -366,7 +378,7 @@ export function ShareRequestPanel({
    * Coming back from Microsoft.
    *
    * The backend appends one word to the URL it was given: `connected`, `denied`, `unavailable` or
-   * `error`. This is the 🔴IRECT path, taken when the pop-up was blocked; the pop-up path resolves
+   * `error`. This is the REDIRECT path, taken when the pop-up was blocked; the pop-up path resolves
    * in `startConnect` instead. Both end in the same place, which is why the word is read here rather
    * than only in one of them.
    *
@@ -407,9 +419,9 @@ export function ShareRequestPanel({
    * and the renter gets *"Outlook could not be connected"* instead of an account chooser (owner,
    * 2026-09-06, with a screenshot of exactly that).
    *
-   * So `send` opens a BLANK pop-up in the same tick as the press and hands it here, and this
-   * navigates it once the URL exists. An empty window a renter can see opening is also the honest
-   * signal that something is happening while the post is in flight.
+   * ~~So `send` opened a BLANK pop-up in the same tick as the press and handed it here.~~ That whole
+   * dance retires with the press it served (owner, 2026-09-10): connecting is its own button now, so
+   * the activation is still live here and the consent URL is opened directly.
    */
   const startConnect = async (pre?: Window | null): Promise<boolean> => {
     if (connecting) return false;
@@ -435,18 +447,16 @@ export function ShareRequestPanel({
       setConnectNote("failed");
       return false;
     }
-    let win: Window | null = pre ?? null;
-    if (win) win.location.href = url;
-    // No window was pre-opened, so this is a real button press and the activation is still live.
-    else win = window.open(url, "moeda-mail-connect", "width=520,height=700");
+    /* ⚠️ ONE `await` stands before this, and every engine still counts the press through a single
+       fetch. It was the POST plus this call, from inside Send, that spent the activation. */
+    const win = window.open(url, "moeda-mail-connect", "width=520,height=700");
     /**
      * 🔴 **Blocked: leave the button, do NOT redirect.**
      *
-     * ~~It used to take the whole tab to Microsoft.~~ That is survivable from a button press, and it
-     * is not survivable from inside Send: by then the request is POSTED, and the draft, the picks
-     * and the wording live in memory that a navigation throws away. He would come back to a live
-     * request and an empty panel. Falling through to the compose window costs him a paste; a
-     * redirect costs him the screen.
+     * ~~It used to take the whole tab to Microsoft.~~ The draft, the picks and the wording live in
+     * memory that a navigation throws away, and in `post` mode the request has not been created yet,
+     * so a redirect from this screen costs him everything he has typed. The button reports the
+     * failure and stays where it is.
      */
     if (!win) {
       setConnecting(false);
@@ -621,6 +631,35 @@ export function ShareRequestPanel({
    * account will send.
    */
   const sendingFrom = connect?.connected && provider === "outlook" ? connect.accountEmail : null;
+
+  /**
+   * Whether pressing Send will put a message on the wire, asked once and read everywhere.
+   *
+   * 🔴 **Outlook sends only when it is CONNECTED** (owner, 2026-09-10). Picking the Outlook chip is
+   * a statement of intent; the connection is what makes it a destination. Before this, an
+   * unconnected Outlook fell through to a compose window nobody asked for, which is the surprise
+   * this whole change is about.
+   *
+   * ⚠️ Gmail is not «connected» and never will be: its compose URL carries `bcc`, so its own
+   * window IS the send, and it needs no account of ours. It is a destination whenever it is picked.
+   */
+  /**
+   * The confirmation names what is about to happen, in its title and on its button.
+   *
+   * RED Three readings, and each one is a different promise (owner, 2026-09-10). Posting AND
+   * e-mailing; posting alone, because Outlook is not connected or he asked us to skip it; or
+   * e-mailing alone, because the request is already live and he is reaching a second supplier.
+   *
+   * MARK Read from `emailWillGo`, never from the CHIP. Picking Outlook is a statement of intent and
+   * the connection is what makes it a destination, so a title read off the chip would promise a mail
+   * that is not going to leave.
+   */
+  const emailWillGo =
+    channel === "email" && (provider === "gmail" || (!!connect?.connected && !skipEmail));
+
+  const confirmTitle = uuid ? c.confirmSendTitle : emailWillGo ? c.confirmBothTitle : c.confirmPostTitle;
+  const confirmSub = emailWillGo || uuid ? c.confirmSubBoth : c.confirmSubPost;
+  const confirmAction = uuid ? c.confirmDoSend : emailWillGo ? c.confirmDoBoth : c.confirmDoPost;
 
   /**
    * 🔴 **No guess when we do not know which mailbox sends** (owner, 2026-09-07: *"if gmail or still
@@ -865,6 +904,9 @@ export function ShareRequestPanel({
      * consent window can be opened there — which is the only moment a browser allows it.
      */
     if (ch === "email" && !confirmed) {
+      /* ⚠️ Cleared on every open, so «don't send by Outlook» can never carry into a request he
+         did not press it on. */
+      setSkipEmail(false);
       setConfirming(true);
       return;
     }
@@ -872,19 +914,19 @@ export function ShareRequestPanel({
     /**
      * 🔴 **Opened here, before anything is awaited, or the browser blocks it.**
      *
-     * This is the first statement of the click. Everything below it awaits, and a pop-up opened
-     * after an await is a pop-up the browser refuses — which is why the renter was being shown
-     * *"Outlook could not be connected"* rather than Microsoft's account chooser.
+     * 🔴 **Connecting Outlook is its OWN act** (owner, 2026-09-10: *"users are confused when their
+     * request is sent with the Outlook at same click, so i want to separate the connect as a
+     * separate action from the create, so the create is done to Outlook once it is connected"*).
      *
-     * ⚠️ Outlook only, and only when there is something to connect to. Gmail's compose URL carries
-     * `bcc`, so its own window already shows the recipients and a Microsoft consent there would be a
-     * detour to solve a problem he does not have.
+     * ~~One press did three things: post the request, open Microsoft's consent, then send through
+     * whatever came back.~~ A renter pressing Send met an account chooser he had not asked for, over
+     * a request that was already live, and could not tell which of the three had happened when it
+     * closed. Connecting is a button of its own now; `send` does the post and the mail, and nothing
+     * else.
+     *
+     * This also retires the pop-up-blocker dance the window existed for: `startConnect` is only ever
+     * reached from a real press, so the activation is live and it opens the consent URL directly.
      */
-    const consentWindow =
-      ch === "email" && provider === "outlook" && connect?.configured && !connect.connected
-        ? window.open("", "moeda-mail-connect", "width=520,height=700")
-        : null;
-
     setBusy(true);
     setTooLong(false);
     /* Did the browser LEAVE? A compose tab, a WhatsApp window or the device's share sheet all take
@@ -903,8 +945,7 @@ export function ShareRequestPanel({
       if (id) postedHere.current = true;
     }
     if (!id) {
-      // Nothing was posted, so there is nothing to consent for. Do not leave a blank window open.
-      consentWindow?.close();
+      // Nothing was posted, so there is nothing to send. The review above says what went wrong.
       setBusy(false);
       return;
     }
@@ -1007,7 +1048,6 @@ export function ShareRequestPanel({
        * separate buttons, and it needs no connection, no consent and no confirm step.
        */
       if (provider === "gmail") {
-        consentWindow?.close();
         const opened = openCompose(id, message);
         if (opened) {
           reached += reachable.length;
@@ -1037,15 +1077,28 @@ export function ShareRequestPanel({
          * whatsapp or email without choosing from their suppliers fine"*). Guarding on
          * `reachable.length === 0` alone swallowed that too, and the test written for it caught it.
          *
-         * ⚠️ The blank pop-up is closed for the same reason the other early exits close it: it was
-         * opened as the first statement of the click to survive the pop-up blocker, so any path that
-         * does not use it has to clean it up or it is left stranded on `about:blank`.
          */
-        consentWindow?.close();
+        setConfirming(false);
+      } else if (!emailWillGo) {
+        /**
+         * 🔴 **Moedatech only, and nothing else happens** (owner, 2026-09-10). Two ways to land
+         * here, and they read the same to the renter because the confirmation said so before the
+         * press: **Outlook is not connected**, or he pressed «Don\'t send by Outlook» in the
+         * confirmation.
+         *
+         * ~~It called the endpoint anyway, was refused, and opened his Outlook compose window.~~
+         * That window was the surprise the owner reported: he asked for a request to be posted and
+         * a mail client took the screen. The request is posted, the link is on the card behind this,
+         * and the confirmation promised exactly that.
+         *
+         * ⚠️ **The manual way out is STAGED, not taken.** «Open your e-mail» and «Copy addresses»
+         * appear under the button afterwards, so a renter who wants to write to his suppliers by
+         * hand still can. Nothing opens unless he presses it, which is the whole difference between
+         * an offer and the ambush this change removes.
+         */
+        stageCompose(message);
         setConfirming(false);
       } else {
-      if (connect?.configured && !connect.connected) await startConnect(consentWindow);
-
       const body = {
         subject,
         html: card
@@ -1074,6 +1127,20 @@ export function ShareRequestPanel({
          admits it, so it is refused here rather than assumed away. */
       setMailer(outcome.sent === false && outcome.reason === "PREVIEW" ? null : outcome);
 
+      /**
+       * 🔴 **A dropped token leaves the panel believing it is still connected** (found while
+       * rewriting the tests, 2026-09-12). `connect` is read once on mount; when Microsoft revokes
+       * consent the backend answers `RECONNECT_REQUIRED` and forgets the token, and this screen went
+       * on saying «Sending from bandar@zahid.sa» over a refusal, with no Reconnect offer anywhere,
+       * because that offer is drawn on `!connect.connected`.
+       *
+       * ⚠️ Re-read, never guessed: the status endpoint is the one thing that knows, and writing
+       * `connected: false` from here would be this panel inventing a fact about an account.
+       */
+      if (outcome.sent === false && outcome.reason === "RECONNECT_REQUIRED") {
+        await mailConnectStatus().then(setConnect).catch(() => {});
+      }
+
       if (outcome.sent) {
         reached += outcome.recipients;
         // Nothing opened and nothing to come back from: this is the path the owner's report is about.
@@ -1097,13 +1164,16 @@ export function ShareRequestPanel({
          * ⚠️ Empty when we could not read his address, which is exactly today's behaviour. A
          * missing `To` is worse than a filled one and better than a wrong one.
          */
-        const openedIt = openCompose(id, message);
-        // Too long for a URL, and a truncated body loses its tail, which is where the link is. The
-        // request is posted and the link is on screen; say so rather than sending half a message.
-        if (openedIt) {
-          reached += reachable.length;
-          handedOff = true;
-        } else setTooLong(true);
+        /**
+         * 🔴 **It is OFFERED, not opened** (owner, 2026-09-10). The confirmation named one route
+         * and the server could not take it, so a compose window opening by itself now would be the
+         * same surprise in a different place. `stageCompose` fills the «Open your Outlook instead»
+         * button that already sits under the status line, and the renter decides.
+         *
+         * ⚠️ Nothing is counted as reached and nothing is handed off: no message left, and the
+         * tick must not say one did.
+         */
+        stageCompose(message);
       }
       }
     }
@@ -1179,7 +1249,13 @@ export function ShareRequestPanel({
    * normal route, since its compose URL carries `bcc`; **Outlook** falls back to it when the server
    * could not send. Written twice they would drift, and the second copy is the one nobody tests.
    */
-  const openCompose = (id: string, message: string): boolean => {
+  /**
+   * Everything a compose window needs, put where the «Open it instead» button can reach it.
+   *
+   * 🔴 Split out of `openCompose` on 2026-09-10, because a failed server send must OFFER the window
+   * rather than take the screen with it. Staging fills the button; opening is a press.
+   */
+  const stageCompose = (message: string): Compose => {
     const args: Compose = {
       /* ⚠️ The connected mailbox where there is one: it is the address the message leaves from,
          so it is the address a copy should come back to. */
@@ -1193,7 +1269,11 @@ export function ShareRequestPanel({
     /* ⚠️ The paste is Outlook's problem alone: its deeplink discards `bcc` without a word, and
        Gmail's carries it. */
     setPasteAddresses(provider === "outlook" ? reachable.map((x) => x.email as string) : []);
-    const opened = openEmailCompose(args);
+    return args;
+  };
+
+  const openCompose = (id: string, message: string): boolean => {
+    const opened = openEmailCompose(stageCompose(message));
     if (!opened) setTooLong(true);
     return opened;
   };
@@ -2169,27 +2249,32 @@ export function ShareRequestPanel({
             </span>
           )}
 
-          {/* ── Connect Outlook (SUP-BE-23, the Graph path) ────────────────────────────────────
-              ⚠️ **Only after a send has actually been refused** (owner, 2026-09-05: *"this isnt
-              here, when i click email and send to suppliers then it will ask to connect just the
-              normal flow"*).
+          {/* ── Connect Outlook, as an act of its own (SUP-BE-23, the Graph path) ─────────────
+              🔴 **Offered the moment Outlook is picked, and no longer inside Send** (owner,
+              2026-09-10: *"i want to separate the connect as a separate action from the create, so
+              the create is done to Outlook once it is connected"*).
 
-              ~~Also offered the moment he ticked E-mail.~~ That put a paragraph about Microsoft
-              consent in front of a renter who had not asked to send anything yet, sitting above the
-              button he was reaching for. The offer belongs at the moment it answers a question he
-              actually has: he pressed Send, a compose window opened instead, and this is why.
+              This REVERSES the placement of 2026-09-05, and the reason it was moved is the reason
+              it comes back. It was taken out of «the moment he ticked E-mail» because it *"put a
+              paragraph about Microsoft consent in front of a renter who had not asked to send
+              anything yet"* — and what replaced it was worse: the consent moved INSIDE Send, so
+              pressing one button posted his request and opened an account chooser he had not asked
+              for. The half of that ruling that still holds is the paragraph, so this is a line and a
+              button, drawn only for the channel it belongs to.
 
-              ⚠️ **`connectPath`, never the reason, decides it.** Listing reasons in the web means
-              a redeploy the day the backend adds one, and a stage with no app registration would get
-              a button that leads nowhere. */}
-          {connect?.configured && !connect.connected && mailer?.sent === false && mailer.connectPath && (
-            <div className="mt-1 rounded-md border border-border bg-surface2 p-3">
-              <p className="text-meta text-navy-mid">{c.mailConnectWhy}</p>
+              ⚠️ **`configured`, not `connectPath`.** The old condition read a field off a REFUSED
+              send, which is the only thing it could read before the press; the status endpoint
+              answers the same question before it, and a stage with no app registration still answers
+              `configured: false` and draws nothing. */}
+          {channel === "email" && provider === "outlook" && connect?.configured && !connect.connected && (
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-border bg-surface2 px-3 py-2.5">
+              <Icon name="link" size={16} className="flex-none text-muted" />
+              <span className="min-w-0 flex-1 text-meta text-navy-mid">{c.mailConnectWhy}</span>
               <button
                 type="button"
                 onClick={() => void startConnect()}
                 disabled={connecting}
-                className={cx(btn("secondary", "sm"), "mt-2")}
+                className={cx(btn("secondary", "sm"), "flex-none")}
               >
                 <Icon name={connecting ? "hourglass_top" : "link"} size={15} />
                 {connecting
@@ -2239,78 +2324,41 @@ export function ShareRequestPanel({
             </span>
           )}
 
-          {/* A personal address can never be sent on behalf of — nobody can add a DNS record to
-              `gmail.com`. Said once, plainly, instead of a setup panel he could never finish. */}
-          {mailer?.sent === false && mailer.reason === "PERSONAL_DOMAIN" && (
-            <span className="text-meta text-muted">{c.mailPersonal}</span>
-          )}
+          {/*
+            * — The mail-domain setup panel lived here —
+            *
+            * A «Your IT adds these records to {domain} once» table, its three DKIM rows, a Copy
+            * button, and two lines above it. Plus «your address is a personal one, so Moedatech
+            * cannot send on its behalf».
+            *
+            * 🔴 **Removed** (owner, 2026-09-12: *"we will not communicate with the IT of company,
+            * so remove this scenario, it will be from the Outlook connection"*). It served the SES
+            * path, where our own server sends as the renter's domain once somebody with access to
+            * that domain's DNS has proved we may. Nobody was ever going to do that: a renter cannot
+            * do it himself, and the panel was asking him to go and find the person who runs his
+            * company's website.
+            *
+            * ⚠️ **The backend can still ANSWER those reasons**, and nothing here breaks if it
+            * does: `DOMAIN_NOT_VERIFIED`, `PERSONAL_DOMAIN` and `NO_SENDER_ADDRESS` now read as
+            * ordinary refusals, and the panel says the send did not go and offers the connection.
+            * They are also unreachable in practice now, because the web only calls that endpoint
+            * with a connected mailbox, and `shareEmail.ts` reaches all three only on the SES branch.
+            */}
 
-          {/* The compose window was opened after an `await`, which Safari may refuse — and
-              `noopener` makes the refusal undetectable. One press to try again, always offered. */}
-          {mailer?.sent === false && reopen && (
+          {/* ── Open his own mail client, as a PRESS ───────────────────────────────────────────
+              🔴 It was ~~opened automatically~~ whenever the server could not send, and the
+              renter had not asked for it (owner, 2026-09-10). Nothing opens by itself now, so this
+              is the only way a compose window is ever reached, and reaching it is his decision.
+
+              ⚠️ Gated on `reopen`, not on a refusal: the Moedatech-only path stages it without
+              calling the endpoint at all, so there is no `mailer` to read. `!mailer?.sent` keeps it
+              off the screen after a send that really went out. */}
+          {reopen && !mailer?.sent && (
             <button type="button" onClick={() => openEmailCompose(reopen)} className={cx(btn("link"), "text-meta")}>
               {c.mailOpenInstead}
             </button>
           )}
 
-          {/* ── The records IT adds, once, per company ──────────────────────────────────────────
-              Shown only when adding them would actually change something: a verified domain has
-              nothing to add, and a personal one has nothing that would ever help.
-
-              ⚠️ Framed as an improvement, not a failure. His message has ALREADY gone to his own
-              compose window by the time he reads this — nothing is blocked, and telling him
-              otherwise would send him chasing his IT before he finishes the share he is in. */}
-          {mailer?.sent === false && mailer.reason === "DOMAIN_NOT_VERIFIED" && mailer.dns.length > 0 && (
-            <div className="mt-1 rounded-md border border-border bg-surface2 p-3">
-              <p className="text-body font-semibold text-navy">{fmt(c.mailSetupTitle, { domain: mailer.domain ?? "" })}</p>
-              <p className="mt-1 text-meta text-navy-mid">{fmt(c.mailSetupWhat, { domain: mailer.domain ?? "" })}</p>
-
-              {/* A table, because IT copies it field by field into a DNS panel that asks for exactly
-                  these three columns. `break-all` so a 60-character DKIM host wraps instead of
-                  pushing the panel sideways. */}
-              <div className="mt-2 overflow-x-auto">
-                <table className="w-full border-collapse text-meta">
-                  <thead>
-                    <tr className="text-start text-muted">
-                      <th className="py-1 pe-3 text-start font-semibold">{c.mailSetupHost}</th>
-                      <th className="py-1 pe-3 text-start font-semibold">{c.mailSetupValue}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mailer.dns.map((r) => (
-                      <tr key={`${r.type}-${r.name}`} className="border-t border-border align-top">
-                        <td className="py-1 pe-3 font-mono break-all text-navy">
-                          <span className="me-1.5 rounded-sm bg-surface3 px-1 text-muted">{r.type}</span>
-                          {r.name}
-                        </td>
-                        <td className="py-1 pe-3 font-mono break-all text-navy-mid">{r.value}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="mt-2 flex items-center gap-3">
-                <button
-                  type="button"
-                  className={btn("secondary", "sm")}
-                  onClick={() => {
-                    /* Tab-separated, one record per line: that is what a DNS panel's bulk-import
-                       box and a spreadsheet both take, and what survives a paste into an e-mail
-                       to IT. */
-                    const text = mailer.dns.map((r) => `${r.type}\t${r.name}\t${r.value}`).join("\n");
-                    void navigator.clipboard?.writeText(text).catch(() => {});
-                    setDnsCopied(true);
-                    setTimeout(() => setDnsCopied(false), 2400);
-                  }}
-                >
-                  <Icon name={dnsCopied ? "check" : "content_paste"} size={15} />
-                  {dnsCopied ? c.mailSetupCopied : c.mailSetupCopy}
-                </button>
-                <span className="text-meta text-muted">{c.mailSetupWait}</span>
-              </div>
-            </div>
-          )}
           {/* What actually happened, not a blanket «shared». A send that reached nobody by e-mail
               still POSTED, and saying «shared with 0 suppliers» would read as a failure when the
               request is live on Moedatech and waiting. */}
@@ -2343,11 +2391,28 @@ export function ShareRequestPanel({
           request as well as e-mailing it, a later one only e-mails, because it is already live. A
           renter sharing with a second supplier must not be asked to approve a post that happened
           yesterday. */}
+      {/* ── The last step, and it names every destination it is about to reach ───────────────
+          Owner, 2026-09-07: *"the confirmation must be clear and big so user can really confirm
+          that his requests will be sent to these suppliers through outlook and on moedatech"*, and
+          2026-09-10: *"make the confirmation modals clear and dominant, as users must see"*.
+
+          🔴 **Nothing has happened when this opens.** The request is not posted and no mail has
+          left, so Cancel really does call the whole thing off.
+
+          🔴 **It states the DESTINATIONS, not a sentence about them** (2026-09-10). ~~Two lines of
+          prose, one of which guessed: «It is e-mailed from your own account» was printed before we
+          knew whether he would ever connect.~~ Each place the request is about to reach is its own
+          block now, with its own mark and its own detail, and a block is drawn only when that place
+          is really going to receive it. What he approves and what happens are the same list.
+
+          ⚠️ The title and the button follow the same reading: both halves, the post alone, or the
+          mail alone when the request is already live. */}
       <Dialog
         open={confirming}
         onClose={cancelSend}
-        size="lg"
-        title={uuid ? c.confirmSendTitle : c.confirmPostTitle}
+        size="xl"
+        title={confirmTitle}
+        subtitle={confirmSub}
         footer={
           <div className="flex w-full items-center justify-end gap-2">
             <button type="button" onClick={cancelSend} className={btn("secondary", "lg")}>
@@ -2357,75 +2422,121 @@ export function ShareRequestPanel({
               type="button"
               onClick={() => {
                 setConfirming(false);
-                /* ⚠️ Sent from THIS press, so the browser still counts the click and the blank
-                   consent window can be opened inside `send`. */
+                /* ⚠️ Sent from THIS press, so a channel that opens a window of its own still has a
+                   live user activation to open it with. */
                 void send(undefined, true);
               }}
               className={cx(btn("primary", "lg"), "px-6")}
             >
               <Icon name="send" size={16} />
-              {uuid ? c.confirmDoSend : c.confirmDoBoth}
+              {confirmAction}
             </button>
           </div>
         }
       >
-        <div className="grid gap-4">
-          {/* One line per thing that is about to happen, each with its own mark, so he can count
-              them rather than parse a sentence. */}
-          <div className="grid gap-2.5">
-            {/* ⚠️ **The marketplace line is replaced, not dropped** (owner, 2026-09-08: *"will
-                tell the opposite"*). Saying nothing would leave a renter approving a send with no
-                idea that the e-mail in front of him is the only copy of this request anyone will
-                ever see. */}
-            {offCatalogue ? (
-              <span className="flex items-start gap-2.5 text-body text-navy">
-                <Icon name="error_outline" size={18} className="mt-px flex-none text-warn-deep" />
-                {c.offCatalogueLine}
-              </span>
-            ) : !uuid ? (
-              <span className="flex items-start gap-2.5 text-body text-navy">
-                <Icon name="public" size={18} className="mt-px flex-none text-brand" />
-                {c.confirmPostLine}
-              </span>
-            ) : (
-              <span className="flex items-start gap-2.5 text-body text-muted">
-                <Icon name="check_circle" size={18} className="mt-px flex-none text-ok-deep" />
-                {c.confirmPostedAlready}
-              </span>
-            )}
-            <span className="flex items-start gap-2.5 text-body text-navy">
-              <Icon name={provider === "gmail" ? "alternate_email" : "mail"} size={18} className="mt-px flex-none text-brand" />
-              {sendingFrom ? fmt(c.confirmMailLine, { from: sendingFrom }) : c.confirmMailLineAnon}
-            </span>
-          </div>
+        <div className="grid gap-3">
+          {/* ── Moedatech ──────────────────────────────────────────────────────────────────────
+              ⚠️ **Replaced, never dropped, on an off-catalogue request** (owner, 2026-09-08: *"will
+              tell the opposite"*). Saying nothing would leave a renter approving a send with no idea
+              that the e-mail in front of him is the only copy anyone will ever see. */}
+          {offCatalogue ? (
+            <Destination
+              icon="error_outline"
+              tone="warn"
+              title={c.destNoMarket}
+              detail={c.offCatalogueLine}
+            />
+          ) : (
+            <Destination
+              icon="public"
+              tone={uuid ? "done" : "on"}
+              title={c.destMoedatech}
+              detail={uuid ? c.confirmPostedAlready : c.confirmPostLine}
+            />
+          )}
 
-          {/* ⚠️ **The suppliers by ADDRESS, every one of them** (owner, 2026-09-09: *"he must
-              show the suppliers emails that he is sending to not the supplier or company name"*). A
-              number is not something he can check, and neither is a name: what leaves this screen is
-              an address, and «Al Faisal Rentals» does not say whether it is the branch mailbox or a
-              salesman's personal one. The name is the chip's `title`, so the firm is one hover away
-              without standing in for the thing being confirmed. */}
-          {reachable.length > 0 && (
-            <div className="rounded-md border border-border bg-surface2 p-3">
-              <span className="text-label font-semibold uppercase tracking-wide text-muted">
-                {c.envBcc} · {reachable.length}
-              </span>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {reachable.map((x) => (
-                  <span
-                    key={x.id}
-                    title={x.name}
-                    className="inline-flex h-[26px] max-w-full items-center rounded-full border border-border bg-surface px-3 text-meta text-navy"
-                  >
-                    <span className="truncate">{x.email}</span>
-                  </span>
-                ))}
-              </div>
-            </div>
+          {/* ── The mail, drawn only when one is actually going to leave ───────────────────────
+              🔴 **This is the change the owner asked for** (2026-09-10: *"if they didn't connect
+              the Outlook the confirmation will be on Moedatech only"*). An unconnected Outlook is
+              not a destination: nothing is sent through it and nothing opens. The block below says
+              so plainly and offers the one press that changes it. */}
+          {channel === "email" && emailWillGo && (
+            <Destination
+              icon={provider === "gmail" ? "alternate_email" : "mail"}
+              tone="on"
+              title={provider === "gmail" ? c.destGmail : c.destOutlook}
+              detail={
+                provider === "gmail"
+                  ? c.destGmailBody
+                  : fmt(reachable.length === 1 ? c.destOutlookBodyOne : c.destOutlookBody, {
+                      from: sendingFrom ?? "",
+                      n: reachable.length,
+                    })
+              }
+            >
+              {/* The addresses, because an address is the thing that leaves and a name is not. */}
+              {reachable.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {reachable.map((x) => (
+                    <span
+                      key={x.id}
+                      title={x.name}
+                      className="inline-flex h-[26px] max-w-full items-center rounded-full border border-border bg-surface px-3 text-meta text-navy"
+                    >
+                      <span className="truncate">{x.email}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* ⚠️ **This once, and the connection is untouched** (owner, 2026-09-11). A renter
+                  who wants this one request on Moedatech alone says so here; disconnecting for good
+                  is the link on the «Sending from …» line, which says what it does. */}
+              {provider === "outlook" && (
+                <button
+                  type="button"
+                  onClick={() => setSkipEmail(true)}
+                  className={cx(btn("link"), "mt-2 text-meta")}
+                >
+                  {c.destSkipOutlook}
+                </button>
+              )}
+            </Destination>
+          )}
+
+          {/* Outlook is picked and cannot send: say which press changes that, and say it HERE,
+              where he is asking the question. */}
+          {channel === "email" && provider === "outlook" && !emailWillGo && (
+            <Destination
+              icon="link_off"
+              tone="off"
+              title={skipEmail ? c.destOutlookSkipped : c.destOutlookOff}
+              detail={skipEmail ? c.destOutlookSkippedBody : c.destOutlookOffBody}
+            >
+              {skipEmail ? (
+                <button
+                  type="button"
+                  onClick={() => setSkipEmail(false)}
+                  className={cx(btn("link"), "mt-2 text-meta")}
+                >
+                  {c.destSendItAfterAll}
+                </button>
+              ) : connect?.configured ? (
+                <button
+                  type="button"
+                  onClick={() => void startConnect()}
+                  disabled={connecting}
+                  className={cx(btn("secondary", "sm"), "mt-2")}
+                >
+                  <Icon name={connecting ? "hourglass_top" : "link"} size={15} />
+                  {connecting ? c.mailConnecting : c.mailConnect}
+                </button>
+              ) : null}
+            </Destination>
           )}
 
           {/* ⚠️ The ones being left out, named. It is the last moment he can add an address. */}
-          {skippedNames.length > 0 && (
+          {emailWillGo && skippedNames.length > 0 && (
             <span className="flex items-start gap-2 text-meta font-semibold text-warn-deep">
               <Icon name="error_outline" size={15} className="mt-px flex-none" />
               {fmt(c.envSkipped, { names: skippedNames.join(", ") })}
@@ -2442,6 +2553,52 @@ export function ShareRequestPanel({
           listRenterSuppliers().then(setRows).catch(() => {});
         }}
       />
+    </div>
+  );
+}
+
+/**
+ * One place the request is about to reach, drawn as a block rather than a line.
+ *
+ * RED **A destination a renter can COUNT** (owner, 2026-09-10: *"make the confirmation modals clear
+ * and dominant, as users must see"*). ~~Two sentences with a glyph in front of each.~~ A sentence is
+ * read once and skimmed the second time; blocks are counted, and counting is the act this dialog
+ * exists for: he is answering *where does this go?*, and the answer is one block or two.
+ *
+ * MARK `off` is drawn in the same frame, deliberately. A place that is NOT receiving the request is
+ * still an answer to his question, and hiding it is how a renter comes back asking why no e-mail
+ * arrived.
+ */
+function Destination({
+  icon,
+  tone,
+  title,
+  detail,
+  children,
+}: {
+  icon: string;
+  tone: "on" | "off" | "done" | "warn";
+  title: string;
+  detail: string;
+  children?: ReactNode;
+}) {
+  const skin =
+    tone === "on"
+      ? { box: "border-brand/40 bg-brand-soft", mark: "text-brand" }
+      : tone === "done"
+        ? { box: "border-ok/40 bg-ok-soft", mark: "text-ok-deep" }
+        : tone === "warn"
+          ? { box: "border-warn/40 bg-warn-soft", mark: "text-warn-deep" }
+          : { box: "border-border bg-surface2", mark: "text-muted" };
+
+  return (
+    <div className={cx("flex items-start gap-3 rounded-md border p-3.5", skin.box)}>
+      <Icon name={icon} size={20} className={cx("mt-px flex-none", skin.mark)} />
+      <span className="min-w-0 flex-1">
+        <b className="block text-body font-extrabold text-navy">{title}</b>
+        <span className="mt-0.5 block text-meta leading-relaxed text-muted-dark">{detail}</span>
+        {children}
+      </span>
     </div>
   );
 }

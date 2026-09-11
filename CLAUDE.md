@@ -2,6 +2,93 @@
 
 ## Change log
 
+- **2026-09-12 - Connecting Outlook is its own act, and the confirmation names every destination it reaches.**
+  Owner: *"users are confused when their request is sent with the Outlook at same click, so i want to
+  separate the connect as a separate action from the create, so the create is done to Outlook once it
+  is connected"*, then *"if they didn't connect the Outlook the confirmation will be on Moedatech
+  only"*, *"in case it is already connected also confirm to send to both with a small option to
+  disconnect Outlook"*, and *"make the confirmation modals clear and dominant... even when sent, the
+  successful modal must be clear"*.
+  (1) **Send no longer connects.** One press used to post the request, open a blank pop-up (to beat
+  the pop-up blocker), aim it at Microsoft, wait for it to close, re-read the status and then send.
+  Five acts, none announced, and when the window shut the renter could not tell which had happened.
+  The consent is a button on the channel row now, drawn the moment Outlook is picked and not
+  connected. `send` does the post and the mail, and nothing else.
+  (2) **Not connected means Moedatech only.** The endpoint is not called at all, and no compose
+  window opens. `emailWillGo` is the single reading of *will a message actually leave?* - Gmail
+  always (its own window IS the send), Outlook only when connected and not skipped.
+  (3) **The confirmation states DESTINATIONS, not sentences.** `xl`, one bordered block per place the
+  request is about to reach, each drawn only when it will really receive it: Moedatech, then Outlook
+  or Gmail, with the addresses inside the mail block. The not-connected case draws the Outlook block
+  greyed, saying nothing is e-mailed, with the Connect button inside it.
+  (4) **«Don't send by Outlook this time»** greys the mail block and switches the button to «Post to
+  Moedatech». `skipEmail` is cleared on every open of the dialog.
+  (5) **The tick mirrors it**: `md`, a short title again, and the same rows ticked back.
+  Files: `src/components/share/ShareRequestPanel.tsx`, `src/components/create/ShareOnPost.tsx`,
+  `src/lib/i18n/{en,ar}.ts`, `tests/unit/{share-request-panel,posted-confirmation}.test.tsx`.
+  🔴 **The SES path is REMOVED from the product** (owner: *"we will not communicate with the IT of
+  company, so remove this scenario, it will be from the Outlook connection"*). Our server could also
+  send as the renter's own domain once somebody with DNS access proved we may; the panel carried a
+  records table and a «your IT adds these once» line. Nobody was going to do it. The panel no longer
+  draws any of it, and `DOMAIN_NOT_VERIFIED` / `PERSONAL_DOMAIN` / `NO_SENDER_ADDRESS` read as
+  ordinary refusals. They are also unreachable now, because the web only calls that endpoint with a
+  connected mailbox and `shareEmail.ts` reaches all three on its SES branch only.
+  🔴 **A dropped token left the panel believing it was connected.** `connect` is read once on
+  mount, so when Microsoft revokes consent the backend answers `RECONNECT_REQUI🔴`, forgets the
+  token, and this screen went on saying «Sending from ...» over a refusal with no Reconnect offer -
+  that offer is gated on `!connected`. The status is re-read on that reason now. Found while
+  rewriting the tests, not reported.
+  ⚠️ **The compose window is a PRESS, never an outcome.** Nothing opens by itself on any Outlook
+  path. «Open your e-mail» and «Copy addresses» are staged and offered under the status line,
+  including on the Moedatech-only path, so a renter who wants to write by hand still can.
+  ⚠️ **This reverses the placement of 2026-09-05**, which moved the connect offer OFF the tick
+  because it *"put a paragraph about Microsoft consent in front of a renter who had not asked to send
+  anything yet"*. The half of that ruling that survives is the paragraph: this is one line and a
+  button. What replaced it was worse, which is the report above.
+  ⚠️ **`mailConnectedNow` lost «press Send again».** True only while connecting happened inside
+  Send.
+  🔴 **Scripting trap, hit TWICE in one session and once ON THE REMOTE.** These edits are applied by
+  Python scripts that expand a `🔴` placeholder into the 🔴 marker. `🔴` is a substring of
+  `RECONNECT_REQUI🔴`, `🔴IRECT`, `OFFE🔴` and `DECLA🔴`, so the expansion silently corrupted
+  each of them - including a string COMPARISON (`outcome.reason === "RECONNECT_REQUI🔴"`) that
+  typechecked and could never match. `🔴IRECT` was corrupted inside a comment in commit `0597a6d8`
+  and is on `origin/beta` now. Use a placeholder that cannot appear in code.
+
+- **2026-09-10 - The Arabic brand has ONE spelling, «معداتك», and the guard now catches all three ways it broke.**
+  Owner, on «انضم إلى مؤجّرتك»: *"make sure all moedatech word in english is معداتك in arabic, fix it
+  and add it to localization or whatever"*.
+  Three faults, and only the first was the one he could see:
+  (1) **TRANSLATED.** `guestWall.join` read «انضم إلى مؤجّرتك» - «join your LESSOR». The brand was
+  translated instead of written. One string.
+  (2) 🔴 **DIACRITISED, 32 times.** «مُعِدّاتك» across the dictionary and `inviteCardHtml.ts`. Same six
+  letters, so it passes a glance - but the vowels change the word (مُعِدّات reads «preparers», not
+  «equipment»), and **a search for «معداتك» does not find it**, which is why the 2026-09-08 sweep for
+  «مويداتك» walked straight past every one of them.
+  (3) **The LATIN name inside Arabic copy.** Two WhatsApp bodies opened «مرحبًا Moedatech».
+  And one string had simply DROPPED the brand: `suppliers.couldNotReadBody` lost the whole clause
+  about matching a supplier to a Moedatech account, so the Arabic reader was told the value was kept
+  and never told what it costs him.
+  **Registered**, which is the half that lasts: `tests/unit/brand-spelling.test.ts` grew from one rule
+  to six. Beside the existing «مويداتك» check it now forbids the translated form, forbids ANY
+  diacritic inside the brand's six letters, and - the rule he actually asked for - walks `en` and `ar`
+  IN STEP and fails when an English string names Moedatech and its Arabic twin does not, or when
+  Arabic copy carries the Latin name.
+  Files: `src/lib/i18n/ar.ts` (32 strings), `src/lib/inviteCardHtml.ts`,
+  `tests/unit/brand-spelling.test.ts`.
+  ⚠️ **«المؤجّر» is NOT swept.** It is the ordinary word for the supplier and is correct in dozens of
+  strings; the rule is narrowed to the possessive shape «مؤجّرتك» that stands where the brand belongs.
+  A blanket sweep here would have renamed the supplier throughout the product.
+  ⚠️ The Latin name stays in KEY NAMES - `onMoedatech`, `verifiedByMoedatech`, `postMoedatechOnly`,
+  `sendMoedatechOnly` - which no reader sees. The parity rule reads VALUES only.
+  ⚠️ **The decoded prototypes under `docs/implementation-plans/**\/prototype*` are exempt**, by path,
+  with the reason in the file: they are a captured copy of somebody else's build, and correcting them
+  would make the reference disagree with the artefact it records. Our own plan documents are not
+  exempt and were fixed on 2026-09-08.
+  ⚠️ Verified: typecheck, lint, 14 passing across `brand-spelling`, `auth-i18n` and `source-wording`.
+  All four new rules break-checked by re-introducing one fault each; each went red.
+  🔴 **Outside this repo, STILL WRONG and now two faults**: `Moedatech-App`'s
+  `app_ar.arb` / `app_localizations_ar.dart` carried «مويداتك» (raised 2026-09-08, still open) and
+  have never been checked for the diacritised spelling. The same guard would port.
 - **2026-09-10 - The company panel drops its initials tile and its boxed blue arrow, and a paper the machine DOES hold stops painting its alternatives red.**
   Owner, on a screenshot of the company documents panel: *"for ui put small arrow to open, not this
   bold blue one folded in a card, make it only a small arrow"*, *"use the verified badge style and
