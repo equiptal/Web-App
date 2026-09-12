@@ -2,6 +2,36 @@
 
 ## Change log
 
+- **2026-09-12 - The request rail is a band OF the screen, not a card ON it.**
+  Owner, on a screenshot of it: *"can we make this header fit the whole screen no margin so like it
+  is part of the screen not a card"*.
+  The grey strip carried the page's 1440 cap, its gutter, a radius and an all-round border, so it
+  drew a slab floating over the page with a margin on every side.
+  🔴 **This REVERSES half of 2026-08-30** (*"make the bar same width and margin as the requests parent
+  card so all aligned"*), and which half matters:
+  · GONE - the card: `max-w-[1440px]`, `mx-auto`, the outer gutter, `rounded-lg`, and `border` on all
+    four sides. The ground reaches both window edges now.
+  · KEPT - the ALIGNMENT, which is what that ruling was actually protecting. `PAGE_X` moved INSIDE
+    the band, so the «New» circle still starts on the same vertical as the panel below it.
+  The pre-08-30 fault was a full-bleed ground whose CONTENT sat somewhere else entirely; this is not
+  that, and the test says so in as many words.
+  Files: `src/components/workspace/RequestRail.tsx`,
+  `tests/unit/request-rail-bleed.test.ts` (new, 5 cases).
+  ⚠️ **`border-b` is what stops it becoming a grey area with no edge.** A card was edged on four
+  sides; a band of chrome needs one line, where the page begins. Removing it too would leave the
+  strip and the page dissolving into each other.
+  ⚠️ Three nested elements became two. The middle wrapper existed ONLY to cap and gutter the card, so
+  leaving it in place would have put the outer margin back one layer down - which is why a case pins
+  that nothing above the band carries a `max-w`.
+  ⚠️ The ground tone is untouched (`bg-surface3/60`) and so is the 96px height, whose arithmetic the
+  component works out in a comment above this block. Only the SHAPE changed; a new tone here would be
+  a second decision nobody asked for.
+  ⚠️ Verified: typecheck, lint, 50 cases across `request-rail-bleed`, `request-rail-fit` and
+  `workspace`, and break-checked by putting `rounded-lg border` back - two cases went red.
+  🔴 **NOT seen rendered.** `/requests` draws the GuestWall without a signed-in renter, so the rail
+  does not mount at all locally - confirmed by looking for it in the DOM and finding nothing. The
+  shape is pinned against the SOURCE only, and it wants one look on a deployed build.
+
 - **2026-09-12 - A dialog opened over a dialog draws a ground of its own, so it reads as a layer.**
   Owner, on a shot of *Add suppliers* standing over *Share for bids*: *"fix the ui, how can i open 2
   modals above each other?"*

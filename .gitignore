@@ -55,6 +55,7 @@ next-env.d.ts
 # The screenshot lane's own build dir — it must not contend with `.next` (see next.config.ts)
 .next-preview/
 
-# Typecheck/build probe dirs written by ad-hoc `next build` runs — never committed
-.next-probe/
-.next-probe2/
+# Typecheck/build probe dirs written by ad-hoc `next build` runs — never committed.
+# A GLOB, not a list: `.next-probe3/` was created on 2026-09-12 and the two named rules above it
+# did not cover it, so a whole build tree sat untracked in `git status` waiting for a `git add -A`.
+.next-probe*/

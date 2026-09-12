@@ -88,20 +88,25 @@ export function RequestRail({
   // put both of them 2px low. Change any line above and every figure here moves with it; that is
   // the point of writing the sum down.
   return (
-    /* ── The band is a card, not a full-bleed strip (owner, 2026-08-30) ──────────────────────────
-       *"Make the bar same width and margin as the requests parent card so all aligned."*
+    /* ── The band is the SCREEN's, not a card on it (owner, 2026-09-12) ──────────────────────────
+       *"can we make this header fit the whole screen no margin so like it is part of the screen not
+       a card"*.
 
-       It used to reach the window on both sides while the tiles inside it sat on the page column, so
-       the grey ground and the content it carried disagreed about where the page begins — the rail
-       read as chrome bolted above the page rather than as the page's first block. Now the surface
-       takes the same cap, the same gutter and the same radius as the panel below it, and the two
-       edges line up down the whole screen.
+       🔴 **This reverses 2026-08-30** (*"make the bar same width and margin as the requests parent
+       card so all aligned"*), and only half of it. What that ruling was really about is the
+       ALIGNMENT, and that survives: the ground now reaches both window edges — no cap, no outer
+       gutter, no radius, no border — while the tiles inside it keep the page's own gutter, so the
+       «New» circle still starts on the same vertical as the panel below. What goes is the card:
+       a bordered, rounded slab floating over the page read as a thing ON the screen rather than a
+       band OF it.
 
-       Still three elements, because they are three jobs: the row's place in the column, the page's
-       own cap and gutter, and the card itself. */
+       ⚠️ The bottom hairline is what stops it becoming a grey area with no edge. A band of chrome
+       needs a line where the page begins; a card had a border on all four sides to do that job.
+
+       Two elements now, not three: the row's place in the column, and the band itself carrying the
+       gutter its content sits on. */
     <div {...pin("request-rail")} className="flex-none">
-    <div className={`mx-auto w-full max-w-[1440px] ${PAGE_X} pt-2`}>
-    <div className="flex h-[96px] select-none items-center gap-4 overflow-hidden rounded-lg border border-border bg-surface3/60 px-4">
+    <div className={`flex h-[96px] select-none items-center gap-4 overflow-hidden border-b border-border bg-surface3/60 ${PAGE_X}`}>
       <Link {...pin("rail-create-tile")} href="/create" className="group flex flex-none flex-col items-center gap-1">
         {/* The same hairline the real circles wear now, dashed — a 2px dash beside 1px solids read
             as a different control rather than an empty slot in the same set. */}
@@ -394,7 +399,6 @@ export function RequestRail({
       >
         <Icon name="chevron_right" size={16} className="rtl:scale-x-[-1]" />
       </button>
-    </div>
     </div>
     </div>
   );
