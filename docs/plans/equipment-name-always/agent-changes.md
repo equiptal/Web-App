@@ -1,7 +1,7 @@
 # Agent changes — matching a HIDDEN node, and saying so
 
 **For:** whoever writes the tickets in `Normalization-Agent` (Mansour).
-**Depends on:** `backend-changes.md` **B2**. Do not ship this first — see the warning at the end.
+**Depends on:** `app-backend-changes.md` **B2** (which resolves visibility at read — no migration). Do not ship this first — see the warning at the end.
 
 ---
 

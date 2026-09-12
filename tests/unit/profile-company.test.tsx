@@ -82,28 +82,37 @@ const draw = () =>
   );
 
 describe("the organization, on the profile", () => {
-  it("offers the join form under the renter's own details when he has no firm", async () => {
+  it("asks the company question ONCE, in one card, with both answers in it", async () => {
+    /**
+     * 🔴 **The banner is gone** (owner, 2026-09-12: *"why ui is trash here, keep the create as part
+     * of the company but show it nice and without ui bugs"*), which reverses the move made earlier
+     * the same day (*"make one CTA for the verify"*).
+     *
+     * What that ruling protected SURVIVES — there is still exactly one place to press. What it
+     * produced did not: a full-width slab whose own sentence pointed three hundred pixels down at
+     * the card owning the other half of the same errand, and which was a `<button>` carrying a fake
+     * CTA `<span>` styled as a second button.
+     *
+     * So: one card, headed by the QUESTION rather than by one of its two answers, holding «create»
+     * above «join» in the app's own order.
+     */
     draw();
-    // The no-company state, on this page: verify to create your own, or join with a code.
-    expect(await find(en.company.createOwnTitle)).toBeTruthy();
-    expect(screen.getByText(en.company.joinTitle)).toBeTruthy();
+    const head = await find(en.company.noneTitle);
+    expect(head).toBeTruthy();
+    expect(screen.getByText(en.company.createOwnCta)).toBeTruthy();
+    // ⚠️ «Join a company» is no longer a HEADING here: it labelled a card that only joined, and the
+    // card now asks the wider question. The join route is the invite-code field and its button.
+    expect(screen.queryByText(en.company.joinTitle)).toBeNull();
+    expect(screen.getByText(en.company.enterCode)).toBeTruthy();
+    expect(screen.getByText(en.company.joinButton)).toBeTruthy();
+
+    // ⚠️ The old slab's head is not drawn anywhere any more. Seeing it would mean two cards again.
+    expect(screen.queryByText(en.company.createOwnTitle)).toBeNull();
 
     const profile = screen.getByText(en.profile.profileSection);
-    // The JOIN form is below the personal details, where the company block has always been.
-    const join = screen.getByText(en.company.joinTitle);
+    // The card is BELOW the personal details, where the company block has always been.
     // eslint-disable-next-line no-bitwise
-    expect(profile.compareDocumentPosition(join) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-
-    /**
-     * 🔴 **The verify CTA is ABOVE them now** (owner, 2026-09-12: *"make one CTA for the verify"*).
-     * There were two, a thin banner up here and this card down there, saying the same thing in two
-     * shapes a screen apart. The card's content won and took the banner's position, because that
-     * position was being held for a reason: the one errand on the page that should not have to be
-     * found.
-     */
-    const cta = screen.getByText(en.company.createOwnTitle);
-    // eslint-disable-next-line no-bitwise
-    expect(profile.compareDocumentPosition(cta) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    expect(profile.compareDocumentPosition(head) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("Given a firm, Then the verify CTA is not drawn at all", async () => {
@@ -112,7 +121,8 @@ describe("the organization, on the profile", () => {
     api.company = member();
     draw();
     await find("Moedatech Contracting");
-    expect(screen.queryByText(en.company.createOwnTitle)).toBeNull();
+    expect(screen.queryByText(en.company.createOwnCta)).toBeNull();
+    expect(screen.queryByText(en.company.noneTitle)).toBeNull();
   });
 
   it("names the firm and the renter's role in it, without a second masthead", async () => {
@@ -155,7 +165,7 @@ describe("the organization, on the profile", () => {
     // Then it is the only thing anyone has said about his company, so it stands.
     api.company = null;
     draw();
-    await find(en.company.createOwnTitle);
+    await find(en.company.noneTitle);
     expect(screen.getByText("Yesr Test")).toBeTruthy();
   });
 

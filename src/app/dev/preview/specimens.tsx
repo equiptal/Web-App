@@ -22,6 +22,10 @@
  * `docs/ui-change-playbooks.md` names the specimen beside each surface.
  */
 
+import { NoCompanyCard } from "@/components/company/CompanyHub";
+import { GuestWall, GuestDashboardPreview, GuestRequestsPreview } from "@/components/common/GuestWall";
+import { ProcessingView } from "@/components/screens/Processing";
+import { Mansour } from "@/components/Mansour";
 import { RequestCard } from "@/components/map/RequestCard";
 import { PriceFooter } from "@/components/map/PriceFooter";
 import { EquipmentDetail } from "@/components/map/panel/EquipmentDetail";
@@ -145,6 +149,116 @@ export const SPECIMENS: Specimen[] = [
           cancelLabel="Cancel"
           confirmLabel="Send the request"
         />
+      </div>
+    ),
+  },
+  {
+    /* The no-company state of the profile's company block: create your own, or join one. Both
+       routes in ONE card (owner, 2026-09-12) — the pair used to be a full-width banner up the page
+       and this card down it. */
+    id: "company-none",
+    pin: "—",
+    label: "Company — neither created nor joined",
+    render: () => (
+      <div style={{ width: 520 }}>
+        <NoCompanyCard busy={false} onCreate={() => {}} onJoin={() => {}} onError={() => {}} onAttempt={() => {}} />
+      </div>
+    ),
+  },
+  {
+    /* The same card with NO create route — what a renter sees where the page cannot offer to make
+       him one, and the shape this card had before both routes met in it. */
+    id: "company-join-only",
+    pin: "—",
+    label: "Company — join only",
+    render: () => (
+      <div style={{ width: 520 }}>
+        <NoCompanyCard busy={false} onJoin={() => {}} onError={() => {}} onAttempt={() => {}} />
+      </div>
+    ),
+  },
+  {
+    /* What a signed-out visitor meets on `/requests`. The point of the picture is the BACKDROP: the
+       card in front of it has never been in doubt, and the owner's report on 2026-09-12 was that the
+       page behind the glass read as blank. */
+    id: "guest-wall-requests",
+    pin: "—",
+    label: "Guest wall — requests",
+    render: () => (
+      <div style={{ width: 1100 }} className="px-6 py-4">
+        <GuestWall
+          title={L("Your requests", "طلباتك")}
+          body={L("Every request you send, and the offers that come back.", "كل طلب ترسله، والعروض التي تعود إليك")}
+          preview={<GuestRequestsPreview />}
+        />
+      </div>
+    ),
+  },
+  {
+    /* The same wall on the dashboard, whose backdrop was enriched in the same pass and under the
+       same rule: furniture, never content. */
+    id: "guest-wall-dashboard",
+    pin: "—",
+    label: "Guest wall — dashboard",
+    render: () => (
+      <div style={{ width: 1100 }} className="px-6 py-4">
+        <GuestWall
+          title={L("Your dashboard", "لوحتك")}
+          body={L("Your requests, the offers on them, your sites and your suppliers.", "طلباتك والعروض عليها ومواقعك ومورّدوك")}
+          preview={<GuestDashboardPreview />}
+        />
+      </div>
+    ),
+  },
+  {
+    /* The agent at work, before it has matched anything. The screen lives for about four seconds
+       inside a flow that needs a session, a project and a live agent, so it could not be looked at
+       while it was being changed - which is what these two exist for. */
+    id: "processing-reading",
+    pin: "24",
+    label: "Processing — reading",
+    render: () => <ProcessingView imageUrl={null} title={L("Reading your request", "نقرأ طلبك")} caption={null} />,
+  },
+  {
+    /* The same screen once the answer has landed: the catalogue's own picture of the machine the
+       agent matched, and its catalogue name. The URL is a REAL taxonomy object (Crawler Excavator,
+       the one node of 413 that carries a photograph today). */
+    id: "processing-matched",
+    pin: "24",
+    label: "Processing — matched",
+    render: () => (
+      <ProcessingView
+        imageUrl="https://moedatech-eu-storage.s3.eu-central-1.amazonaws.com/default/taxonomy-equipment-images/1788187483685-taxonomy-equipment-9eadefb3-d967-4d6e-9d8a-32e6af50f243-9f0b0bb1-9744-4de2-b632-aef5a948ab0e.jpeg"
+        title={L("Crawler excavator 20 ton", "حفارة زاحفة 20 طن")}
+        caption={L("Matched from our catalogue", "مطابَق من كتالوجنا")}
+      />
+    ),
+  },
+  {
+    /* The agent himself, at the three sizes this app uses him at and in each of his states. He is
+       ANIMATED - the idle gaze, the blink, the sway - so a still picture of this specimen proves
+       only that he draws; watching it is what proves he is alive. */
+    id: "mansour",
+    pin: "—",
+    label: "Mansour — the agent",
+    render: () => (
+      <div className="flex items-end gap-8 p-6">
+        <span className="flex flex-col items-center gap-2">
+          <Mansour size={56} state="live" />
+          <span className="text-label text-muted">56 · live</span>
+        </span>
+        <span className="flex flex-col items-center gap-2">
+          <Mansour size={38} state="waiting" />
+          <span className="text-label text-muted">38 · waiting</span>
+        </span>
+        <span className="flex flex-col items-center gap-2">
+          <Mansour size={34} />
+          <span className="text-label text-muted">34 · idle</span>
+        </span>
+        <span className="flex flex-col items-center gap-2">
+          <Mansour size={26} state="aiming" />
+          <span className="text-label text-muted">26 · aiming</span>
+        </span>
       </div>
     ),
   },

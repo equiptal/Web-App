@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { screen } from "@testing-library/react";
 import { Canvas } from "@/components/create/Canvas";
@@ -186,9 +188,58 @@ describe("when the catalogue is unreachable (MREQ-AC-52)", () => {
     expect(screen.getByText("Where it goes")).toBeTruthy();
     /* ~~«N things need you».~~ Removed (owner, 2026-09-01): it counted gaps the cards below already
        mark one by one, in the place the renter has to act on them. The gap itself is what this pins
-       now — the required dot the panel draws beside an unanswered field. */
-    expect(document.querySelectorAll(".text-brand").length).toBeGreaterThan(0);
+       now — the required dot the panel draws beside an unanswered field.
+       ⚠️ It reads the DOT's own glyph, not a colour class. It used to count `.text-brand`, which
+       stopped existing when the two orange label states were unified onto `brand-deep`
+       (owner, 2026-09-12) — and worse, the class it would have moved to is worn by a
+       chosen-FOR-you label as well, so the assertion would have passed with no dot on screen. */
+    const dots = [...document.querySelectorAll("span")].filter((s) => s.textContent === "●");
+    expect(dots.length).toBeGreaterThan(0);
     expect(handle.store().state.draft).toBeTruthy();
+  });
+});
+
+/**
+ * ── ONE orange, for both of the label's orange states (owner, 2026-09-12) ───────────────────────
+ * *"Use unified font colour for missing fields: some have dark orange like return and site and some
+ * have orange like size, so unify."*
+ *
+ * `missing` drew `text-brand` (#f97316) and a chosen-FOR-you label drew `text-brand-deep`
+ * (#c2570f) — two oranges on one card, and the brighter one broke this file's own stated rule, that
+ * orange TEXT on a light ground must be the deep one to pass AA while `brand` is a FILL.
+ *
+ * These read the SOURCE, because jsdom resolves no custom property and the fault was a shade.
+ */
+describe("the two orange label states wear one ink", () => {
+  const src = readFileSync(resolve(process.cwd(), "src/components/create/Provenance.tsx"), "utf8");
+
+  it("spells the missing label and the chosen-for-you label the same", () => {
+    expect(src).toContain('missing || isSystemChosen(source) ? "text-brand-deep"');
+  });
+
+  it("uses no bare `text-brand` in the marks themselves — it is a fill colour", () => {
+    /* The DOT and the field, comments stripped: a `~~text-brand~~` inside the note recording why it
+       went would otherwise fail its own rule.
+       ⚠️ `CheckFromProject` is deliberately OUTSIDE this slice and keeps `text-brand`: it is a
+       16px icon glyph sitting on `bg-brand-soft`, not 11px type on the card's own ground, and it is
+       the one mark on this surface the owner did not name. */
+    const marks = src.slice(src.indexOf("export function RequiredDot")).replace(/\/\*[\s\S]*?\*\//g, "");
+    // `text-brand-deep` must not satisfy this, hence the word boundary.
+    expect(/text-brand(?![\w-])/.test(marks)).toBe(false);
+  });
+
+  it("keeps the DOT on the same ink as the label it follows", () => {
+    const dot = src.slice(src.indexOf("export function RequiredDot"), src.indexOf("export function CanvasField"));
+    expect(dot).toContain("text-brand-deep");
+  });
+
+  it("still tells the two states apart — by the dot and the ring, not by the shade", () => {
+    // The ● is drawn for `missing` alone; the ring round the control for `isSystemChosen` alone. So
+    // nothing was lost by merging the inks: what a renter reads the state OFF is still per-state.
+    expect(src).toContain("<RequiredDot show={missing} />");
+    const ring = src.slice(src.indexOf("The amber highlight wraps the CONTROL"));
+    expect(ring).toContain("isSystemChosen(source)");
+    expect(ring).toContain("ring-1 ring-brand");
   });
 });
 

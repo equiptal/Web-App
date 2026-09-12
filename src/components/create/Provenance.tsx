@@ -60,7 +60,10 @@ export function CheckFromProject() {
 export function RequiredDot({ show }: { show: boolean }) {
   if (!show) return null;
   return (
-    <span aria-hidden className="text-label leading-none text-brand">
+    /* `brand-deep`, the same orange its label wears (owner, 2026-09-12: *"use unified font colour
+       for missing fields"*). It was `brand`, so the dot and the word it follows were two different
+       oranges an inch apart. */
+    <span aria-hidden className="text-label leading-none text-brand-deep">
       ●
     </span>
   );
@@ -130,9 +133,20 @@ export function CanvasField({
 
            `brand-deep` rather than `brand`: orange TEXT on a light ground has to be #c2570f to pass
            AA, and the brand orange is a FILL colour — the rule the token file states and
-           `palette-drift` enforces. */
+           `palette-drift` enforces.
+
+           ── ONE orange for both orange states (owner, 2026-09-12) ──────────────────────────────
+           *"use unified font colour for missing fields, some have dark orange like return and site
+           and some have orange like size, so unify"*.
+           ~~`missing` drew `text-brand` (#f97316) while a chosen-for-you label drew `brand-deep`
+           (#c2570f).~~ Two oranges a hand's width apart on one card, and the brighter of the two was
+           the one breaking this file's own AA rule — it is a FILL colour being used as 11px text.
+           🔴 The two STATES are still told apart, just not by the label's colour: the ● is drawn for
+           `missing` alone and the ring round the box for `isSystemChosen` alone. Nothing is lost by
+           spelling them in one ink; what was lost before was the reader's ability to tell a shade
+           from a state. */
         className={`mb-2 flex items-center gap-1.5 text-label font-semibold uppercase leading-tight tracking-[0.05em] ${
-          required ? "text-danger" : missing ? "text-brand" : isSystemChosen(source) ? "text-brand-deep" : "text-muted"
+          required ? "text-danger" : missing || isSystemChosen(source) ? "text-brand-deep" : "text-muted"
         }`}
       >
         {icon}

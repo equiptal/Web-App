@@ -8,6 +8,21 @@ rule, the gate and the reducer are live-safe; the one piece that touches the wir
 
 ---
 
+## Backend status — each claim below checked against `Moedatech-App`, 2026-09-12
+
+| | | |
+| --- | --- | --- |
+| **B1** QR flag | **BUILT on `main`, not committed, not deployed** | one open question, at the end of B1 |
+| **B2** hidden is undefined | **not started** — the spec below is the whole of it | no migration; code only |
+| **B3** bid-form label | 🔴 **ALREADY CORRECT — no change needed** | the section below is stale |
+| **B4** hidden line keeps its name | **CONFIRMED by reading** | both resolvers look up by id, unfiltered |
+| **B5a** chart selects the name | 🔴 **ALREADY DONE**, and wider than asked | the section below is stale |
+| **B5b** PATCH with ids + name | **accepted** — verified by direct invocation, 2026-09-06 | never run against a deployed stage |
+
+So what is actually left is **B2**, plus deploying B1.
+
+---
+
 ## The two rules, in one place
 
 ```
@@ -55,10 +70,48 @@ const hasCustomEquipment = reqs.some((r) =>
 - **Keep the field NAME.** The OS needs no change and no deploy, and its test pins the exact
   expression (`app-handoff.test.ts:96`). A rename couples two deploys for no gain; do it later, in
   both repos, if the name bothers us.
-- `PREVIEW_SELECT` (`:333`) must then select what the predicate reads — `subtypeId`, and
-  `subtypeHidden` if B2 takes the column route.
+- `PREVIEW_SELECT` (`:333`) must then select what the predicate reads — `subtypeId`, plus whatever
+  B2's helper needs to judge it (see B2: the visibility is read from the catalogue, not from the row,
+  so this query also has to have the hidden set in hand).
 - ⚠️ The response is `Cache-Control: public, max-age=300` and the OS revalidates at 300s, so whichever
   answer is wrong outlives its deploy by five minutes. Not a bug to chase.
+
+### Built 2026-09-12 — `agents-equipment`, uncommitted, not deployed
+
+`apps/backend-agents/src/handlers/agents/bid-form/getBidFormPreview.ts`, three parts that ship
+together:
+
+1. the predicate above, replacing `!!i.customEquipmentName?.trim()`;
+2. **`subtypeId: true` in `PREVIEW_SELECT`** — it was NOT selected (only `categoryId`,
+   `customEquipmentName`, `numberOfUnits`). Without it the predicate reads `undefined` on every line
+   and suppresses the handoff on **every** request: the same outage, inverted;
+3. the field's comment, which documented the dead premise — *"every off-catalogue line necessarily
+   carries a name, so this set strictly CONTAINS the off-catalogue set"* — and would otherwise argue
+   the next reader straight back into the bug.
+
+Verified: `typecheck:ratchet` on `backend-agents`, 0 pre-existing errors, no file got worse. Not run
+against a stage.
+
+⚠️ **This call site will stop compiling when B2 lands, on purpose.** B2 changes the predicate's
+signature to take the hidden set, and this is one of the call sites that must then load it — which is
+precisely the mechanism B2 chose over a sibling helper.
+
+### ⚠️ Open, parked by the owner: `some` or `every`, for a multi-item link
+
+The predicate is `some` — one undefined line hides the handoff for the whole link. That is inherited
+from the old test, not a decision.
+
+The fan-out makes the other reading defensible: a multi-item submission becomes **one single-item
+request per line** sharing a group id, so an undefined line is its own request — undispatched,
+invisible on every supplier surface — while the ordinary ones are perfectly biddable in the app. On
+that reading only `every` (nothing in the link is biddable) should hide the QR.
+
+**What settles it is what the QR opens** — the group token, or one request id. If the app resolves
+the group and renders only the biddable requests, `every` is right; if it can land on the undefined
+request, `some` is protecting a dead end. That is in the OS repo, which was not read.
+
+⚠️ Either way the FORM is unaffected: `getBidForm` flattens every item across the group, so the
+supplier always sees all of them, each labelled. This flag controls the app handoff only.
 
 ---
 
@@ -77,57 +130,103 @@ For the owner's case 3 the create must **accept and record** it instead:
    name and see its picture.
 3. Everything that asks *«can this reach a supplier»* must now answer no for it.
 
-### The decision this needs first — a column, or a read?
+### The route — DECIDED: resolve at read. No migration.
 
-`request_equipment_items` has **no Prisma relation** to `equipment_taxonomy` (plain string ids), and
-four feed queries filter in SQL on *«this line has a usable taxonomy»*:
+`request_equipment_items` has **no Prisma relation** to `equipment_taxonomy` (plain string ids), so
+the predicate cannot see `visibility` by itself. Two ways to give it that fact, and the owner chose
+the first (2026-09-12, answering *«why migration?»*):
 
-```
-request.repository.ts:537, 709, 753 · partner/openRequests.ts:130
-    equipmentItems: { some: { subtypeId: { not: UNDEFINED_TAXONOMY_ID } } }
-```
-
-| | **A · denormalised column** `subtype_hidden` | **B · resolve at read** |
+| | **RESOLVE AT READ — chosen** | **STAMPED COLUMN — rejected** |
 | --- | --- | --- |
-| Feed SQL | `{ subtypeId: { not: '' }, subtypeHidden: false }` | fetch the hidden subtype ids first (small, cacheable), then `subtypeId: { notIn: hidden }` |
-| JS call sites | unchanged — the flag is on the row | ~8 sites across three packages must load visibility, and **a miss is invisible**: the feed hides the line while the bid gate still accepts it |
-| Meaning | «this request was made under a hidden node» — a fact about the REQUEST, permanent | «this request's node is hidden right now» — a fact about the CATALOGUE, retroactive |
-| Hiding a node later | old requests keep behaving as they did | old requests silently leave the feeds and stop accepting bids, including ones mid-negotiation |
-| Cost | one additive column + backfill + migration-before-code ordering | no migration |
+| Schema | nothing | `subtype_hidden` on `request_equipment_items` |
+| Migration | **none** | additive column + backfill, migration before code |
+| Feed SQL | fetch the hidden ids first, then `subtypeId: { notIn: hidden }` | `subtypeHidden: false` |
+| JS call sites | ~8 across three packages must be handed the hidden set | unchanged, the flag is on the row |
+| Meaning | «this line's node is hidden **right now**» — a fact about the catalogue | «this request was made under a hidden node» — a fact about the request, permanent |
+| Hiding a node later | old requests leave the feeds and stop accepting bids **at once** | old requests keep behaving as they did |
+| Rollback | revert the code; there is no data to unwind | revert the code, then decide what to do with a column full of answers |
+
+**What the choice accepts, said plainly:** hiding a node is **retroactive**. Hide *Light tower 9 m* on
+Friday and every request already made on it — including one with an open deal room and a supplier
+waiting — leaves the feeds and stops accepting bids on Friday. That is the behaviour, not a bug to be
+reported later. If ops need a node hidden *for new requests only*, this route cannot give them that,
+and the answer then is the column.
 
 **Rejected third option:** store a hidden line as off-catalogue outright (empty ids + his words). No
 migration and no new concept, but the renter then loses the catalogue's name and picture, which is the
 one thing hidden lines are meant to keep.
 
-**Written, not committed, in the `Moedatech-App` working tree** (option A, so it can be read or
-discarded): the migration `20260912100000_request_item_subtype_hidden`, the `subtypeHidden` field on
-`RequestEquipmentItem`, the three copies of `isUndefinedEquipment`, `assertRequestable` no longer
-refusing hidden, and `createRequest` marking the line. **Nothing is committed there and the feed
-WHERE clauses were NOT touched** — that half waits on this decision.
+### How to build it so a missed call site cannot ship
 
-### What must be true once it lands
+🔴 **The hazard of this route is a call site nobody changed, and it is silent**: the feed hides the
+line while the bid gate goes on accepting bids for it. Two rules make that impossible rather than
+unlikely.
+
+1. **ONE loader, one set.** A single `hiddenSubtypeIds(): Promise<Set<string>>` over
+   `equipment_taxonomy WHERE visibility = 'HIDDEN'`. Small, and the only definition of the fact.
+   Never a second query that filters on `visibility` by hand.
+2. **Change the predicate's SIGNATURE, do not add a sibling.**
+
+   ```ts
+   // three copies of undefined-equipment.ts
+   isUndefinedEquipment(item, hidden: ReadonlySet<string>): boolean
+       => !item.subtypeId || hidden.has(item.subtypeId)
+   ```
+
+   The second parameter is what makes the compiler name every call site the day this lands. A new
+   `isUndefinedOrHidden()` beside the old one compiles everywhere and leaves the misses to a reader —
+   which is exactly how the feed and the gate come to disagree.
+
+**Caching:** the set is small and changes when ops hide a node, so a TTL is tempting. ⚠️ **Not on the
+CREATE path.** Dispatch happens once, at create, and a stale set there notifies precisely the
+suppliers the hiding was meant to protect — for the length of the TTL, with no second chance. Read it
+fresh in `createRequest`; cache it for the feeds if they need it.
+
+**Empty set:** guard it explicitly (`hidden.size ? { notIn: [...hidden] } : {}`) rather than relying on
+what Prisma does with `notIn: []`. One query shape that behaves differently when nothing is hidden is
+not worth the line it saves.
+
+### The sites
+
+**SQL — the four feed filters** (`«this line has a usable taxonomy»`):
+
+```
+request.repository.ts:537, 709, 753 · partner/openRequests.ts:130
+    equipmentItems: { some: { subtypeId: { not: UNDEFINED_TAXONOMY_ID } } }
+                                      → plus notIn the hidden set
+```
+
+**JS — everything that reads the predicate**, each of which must now load the set first:
 
 - **Dispatch**: `createRequest.ts:788` already skips an undefined item, broadcast and DIRECT alike.
-  Nothing new once the predicate is right.
-- **Bid gate**: `bid-eligibility.service.ts:349`, `bid.service.ts:485`, `partner/market.ts:164` all
-  read the same helper. Nothing new.
-- **Feeds**: the four WHERE clauses above.
+  Nothing new once the predicate is right — but this is the one that must not read a cache.
+- **Bid gate**: `bid-eligibility.service.ts:349`, `bid.service.ts:485`, `partner/market.ts:164`.
+- **B1's preview**: `getBidFormPreview.ts:435`.
 - **`matchedSupplierCount` stays 0**, meaning «never dispatched», as for any undefined line.
+
+**Nothing is written in `Moedatech-App`.** A column-route draft existed in that working tree while the
+decision was open and was reverted when it closed; the tree is clean on `main`. This section is the
+whole of the specification.
 
 ---
 
-## B3 · The bid form's label must stop branching on `isUndefined`
+## B3 · The bid form's label — 🔴 ALREADY CORRECT, nothing to change
 
-`getBidForm.ts:145` builds the item label as `isUndefined ? customEquipmentName : taxonomy`. The
-moment hidden counts as undefined, that prints the renter's words for a hidden line — the opposite of
-the ruling. It becomes:
+**This section was written against an assumption and the assumption was wrong.** It said
+`getBidForm.ts:145` builds the label as `isUndefined ? customEquipmentName : taxonomy`. It does not,
+and never has since the field was introduced. `getBidForm.ts:148` reads:
 
+```ts
+label:   tax?.name   ?? i.customEquipmentName ?? null,
+labelAr: tax?.nameAr ?? i.customEquipmentName ?? null,
 ```
-label = taxonomyName ?? customEquipmentName
-```
 
-Same order every other surface uses, supplier-facing included. `isUndefined` stays in the payload: it
-is the behaviour flag, and the web reads it for what a line can DO, never for what it is called.
+— the exact order the ruling asks for. `isUndefined` is computed one line above and used only as the
+payload's behaviour flag, never for the label.
+
+So a hidden line will label itself from the catalogue the day B2 lands, with no change here. What is
+owed is the **test**, not the code: *the bid form labels a hidden line with the catalogue's name, and
+an off-catalogue line with the renter's words.*
 
 ---
 
@@ -138,19 +237,32 @@ they do for any other line — **provided nothing starts blanking them because t
 Worth an explicit test: the renter's whole reason for case 3 is that the machine still looks like part
 of the system.
 
-`resolveTaxonomyMap` looks nodes up by id with no visibility filter, so this should already hold.
-Confirm rather than assume.
+**Confirmed 2026-09-12 by reading, as asked.** Both name resolvers look a node up by id with **no
+`visibility` and no `isActive` filter**:
+
+- `request.repository.ts:1161` — `enrichEquipmentItemsWithTaxonomy`, which every renter-facing read
+  goes through (list, detail, deal room, bids, outcome survey);
+- `taxonomy.service.ts:315` — `resolveTaxonomyMap`.
+
+So a hidden line keeps its `subtypeName`, `capacityName` and image key for free. Nothing in the
+projections branches on `isUndefined`, so there is nothing to stop blanking them. Still worth the
+explicit test — this is the renter's whole reason for case 3, and it would break silently.
 
 ---
 
-## B5 · Two older items, still open, now more visible
+## B5 · Two older items — 🔴 BOTH ALREADY CLOSED
 
-- **The chart projection does not select `customEquipmentName`** (raised 2026-09-08). `getChart.ts:156`
-  labels a request's item from its taxonomy pair alone, so an off-catalogue line draws a blank name;
-  the work-order branch beside it already falls back to `rawLabel`. The web fills the gap client-side
-  and prints a placeholder when it cannot.
-- **`PATCH /rentees/me/requests/{id}` accepting an item with ids AND `customEquipmentName`** has never
-  been verified (raised 2026-09-06). The web's edit modal now offers the name on any line.
+- **The chart projection.** Said not to select `customEquipmentName` (raised 2026-09-08). **It does**,
+  and it does more than was asked: `getChart.ts` selects the field and labels each item through a
+  three-step chain — `subtype (+ size) → category → the renter's typed name` — so it also covers the
+  HALF-PLACED line (a category with no subtype), which the ticket did not mention. The web's
+  client-side fallback and its placeholder are now belt-and-braces rather than the only cover.
+- **`PATCH /rentees/me/requests/{id}` with ids AND `customEquipmentName`.** **Accepted.**
+  `hasValidEquipmentIdentity` returns true on three ids regardless of the name, and
+  `buildItemCreateData` stores the name alongside them, so the line round-trips and behaves as
+  ordinary. ⚠️ Verified by **direct invocation of the validator and `editRequest` with prisma
+  stubbed** on 2026-09-06 — **never against a deployed stage**, so the contract is proven in code and
+  unproven over the wire.
 
 ---
 
@@ -161,8 +273,11 @@ Confirm rather than assume.
 2. **B2 before the AGENT's `includeHidden`.** Until the predicate knows about hidden, a hidden id on a
    request reads as an ordinary line and **dispatches to exactly the suppliers the flag exists to
    protect**. See `agent-changes.md`.
-3. If B2 takes the column route: **migration before code**, as always here.
-4. B3, B4, B5 can follow. They make case 3 read correctly; they do not make it unsafe.
+3. **No migration anywhere in this feature.** B2 resolves at read, so B2 is a code deploy and a
+   revert is a code revert.
+4. ~~B3, B4, B5 can follow.~~ **All three are already true in the code** — B3 and B5 were written
+   against assumptions that turned out to be wrong, B4 was confirmed by reading. What they leave
+   behind is tests, not deploys. See the status table at the top.
 
 ---
 
@@ -178,3 +293,8 @@ Confirm rather than assume.
 - A renter projection of a hidden line still carries `subtypeName`, `capacityName` and the image key.
 - A create with three ids **and** `customEquipmentName` stores both, and the line behaves as ordinary
   (this is what the web will start sending once B1 lands).
+- **Hiding a node acts on a request that already exists**: create on a public node, confirm it is in
+  the feed and bid-able, hide the node, and confirm the same request is out of the feed and refused by
+  the gate with no write to it. That is the chosen route's defining behaviour, so it is the case that
+  proves the route landed rather than half-landed.
+- The hidden set being **empty** leaves every feed query answering exactly what it answers today.

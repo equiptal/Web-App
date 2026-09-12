@@ -1,145 +1,115 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog } from "@/components/Dialog";
-import { useT, useLocale, fmt } from "@/lib/i18n";
+import { useT, useLocale } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Button, Icon } from "@/components/ui";
+import { Mansour } from "@/components/Mansour";
 import type { EquipmentItem } from "@/lib/contract/draft";
+import { resolveRef } from "@/lib/contract/taxonomy";
+import { publicTaxonomyUrl } from "@/lib/contract/requests";
 import { pin } from "@/lib/uiPins";
 
 /**
- * The agent at work (owner, 2026-08-26 — the Processing prototype).
+ * The agent at work: one ring, one picture, one line.
  *
- * ── What is real here, and what cannot be ───────────────────────────────────────────────────────
- * `processRfq` is ONE request. The server answers once, with everything; there is no stream, so
- * there is no progress to report while it is in flight. Pretending otherwise — a bar that creeps to
- * 90% on a timer — is the thing this screen used to do, and it lies in the renter's favour right up
- * until it stalls.
+ * ── What the owner asked for (2026-09-12) ───────────────────────────────────────────────────────
+ * *"make it very simple processing icon that is aligned with our design system and no need for
+ * steps and many complicated text he is doing, i want something simple and the taxonomy he is
+ * thinking of and processing so images of taxonomy in our db will be shown in processing according
+ * to what the agent is matching"*.
  *
- * So the four stages are split honestly:
+ * ~~A four-stage rail, a four-line activity feed, a percentage pill, a progress bar and a counts
+ * line.~~ Five devices narrating one request that the server answers in one shot. They are gone.
+ * What is left is the thing the renter is actually waiting to learn: WHICH MACHINE the agent
+ * decided he meant, shown as the catalogue's own picture of it with its catalogue name under it.
  *
- *   SCAN, EXTRACT   paced, and they say what was SENT — the document is being read, the details are
- *                   being pulled. Neither claims a finding, because none has arrived.
- *   MATCH           begins the moment the draft lands, and every line after it is REAL: each item's
- *                   own label and quantity, then the canonical name the agent matched it to. This is
- *                   the equipment the renter is about to see on the canvas, named the same way.
- *   ANALYZE         the last beat before the canvas opens.
+ * ── The two states, and why only one of them names anything ─────────────────────────────────────
+ *  · IN FLIGHT - the glyph, and «Reading your request». Nothing is named and no picture is shown,
+ *    because nothing has been matched yet. The old screen filled this gap with paced lines about
+ *    scanning and extracting; they were true about what was SENT and read as findings.
+ *  · MATCHED - each item the agent returned, in the order the canvas will list them: its taxonomy
+ *    picture, its name. This is the reveal, and the wait is what pays for it.
  *
- * The reveal is also what the wait is FOR. The old screen sat on a flat 1,400ms pause after the
- * response so the counts could be read; that time now shows what was actually found, item by item.
+ * 🔴 **The picture is `equipmentImageUrl`, and the catalogue has almost none of them.** Measured
+ * against the live agents taxonomy on 2026-09-12: 413 nodes, **one** carrying
+ * `equipment_image_url`, and no other image field on that payload at all. So today this screen
+ * draws the glyph for nearly every machine, and the pictures arrive with no further web change as
+ * the admin panel fills that column. The drawings on the requests rail come from the REQUEST
+ * projection (`subtypeImageUrl` / `categoryImageUrl`), which does not exist before the request does
+ * and therefore cannot be read here.
  *
- * `agentNames` is the source for «matched to» — the contract marks it display-only for exactly this,
- * and it carries Arabic. Ids are never shown; they are not what a renter recognises.
+ * ⚠️ **Nothing is invented to fill the wait.** Cycling catalogue pictures while the request is in
+ * flight was considered and refused: a picture on this screen means «this is what the agent matched
+ * you to», and showing machines it has not chosen would make the one honest use of the slot
+ * unreadable.
  */
 
-type Feed = { id: number; text: string };
-
-/** How long each revealed item holds the feed. Fast enough not to delay the canvas, slow enough to read. */
-const CHECK_MS = 320;
-const MATCH_MS = 560;
+/** How long each matched machine holds the screen. Long enough to read, short enough not to delay. */
+const REVEAL_MS = 620;
+/** The last beat after the final machine, before the canvas replaces this. */
+const HANDOVER_MS = 420;
 
 export function Processing() {
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
   const { state, actions } = useRfq();
-  const { busy, error, draft, errorDetail } = state;
+  const { busy, error, draft, errorDetail, taxonomy } = state;
 
-  const stages = [
-    { label: t.processing.stageScan, title: t.processing.stage1, icon: "radio_button_checked" },
-    { label: t.processing.stageExtract, title: t.processing.stage2, icon: "edit_note" },
-    { label: t.processing.stageMatch, title: t.processing.stage3, icon: "swap_horiz" },
-    { label: t.processing.stageAnalyze, title: t.processing.stage4, icon: "target" },
-  ];
-
-  const [step, setStep] = useState(0);
-  const [revealed, setRevealed] = useState(0);
-  const [matched, setMatched] = useState(0);
-  const [feed, setFeed] = useState<Feed[]>([]);
-  const feedId = useRef(0);
-  const push = (text: string) => setFeed((f) => [...f, { id: ++feedId.current, text }].slice(-4));
-
-  /** The items the agent actually returned, in the order the canvas will list them. */
+  /** The items the agent returned, in the order the canvas will list them. */
   const items: EquipmentItem[] = useMemo(
     () => (draft ? draft.items.filter((i) => !i.removed) : []),
     [draft],
   );
 
-  /** One item, named as the renter will see it named. */
-  const itemLabel = (it: EquipmentItem) => {
-    const name =
-      it.rawLabel ||
-      (ar ? it.agentNames?.subtypeAr || it.agentNames?.subtype : it.agentNames?.subtype) ||
-      (ar ? it.agentNames?.categoryAr || it.agentNames?.category : it.agentNames?.category) ||
-      "—";
-    const size = it.rawSize ? ` · ${it.rawSize}` : "";
-    const qty = it.quantity > 1 ? ` × ${it.quantity}` : "";
-    return `${name}${size}${qty}`;
-  };
-
-  /** What the agent resolved it to. Falls back to the item's own name rather than inventing one. */
-  const matchLabel = (it: EquipmentItem) => {
-    const a = it.agentNames;
-    if (!a) return itemLabel(it);
-    const sub = ar ? a.subtypeAr || a.subtype : a.subtype;
-    const cap = ar ? a.capacityAr || a.capacity : a.capacity;
-    return [sub, cap].filter(Boolean).join(" ") || itemLabel(it);
-  };
-
-  // ── Stages 0 and 1: paced, while the one request is in flight. ──
-  useEffect(() => {
-    if (!busy) return;
-    setStep(0);
-    setRevealed(0);
-    setMatched(0);
-    setFeed([]);
-    push(t.processing.feedReading);
-    const a = setTimeout(() => {
-      push(fmt(t.processing.feedRead, { n: "1" }));
-      setStep(1);
-    }, 1100);
-    const b = setTimeout(() => {
-      push(t.processing.feedExtracted);
-      setStep(2);
-    }, 2300);
-    return () => {
-      clearTimeout(a);
-      clearTimeout(b);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [busy]);
+  /** Which machine is on screen. -1 while the request is still in flight. */
+  const [at, setAt] = useState(-1);
+  const [broken, setBroken] = useState<string | null>(null);
 
   const done = !busy && !!draft && !error;
 
-  // ── Stage 2: the real items, one at a time. ──
+  useEffect(() => {
+    if (busy) setAt(-1);
+  }, [busy]);
+
+  // One machine at a time, then the canvas. Nothing here is paced against a clock while the request
+  // is in flight - the reveal starts when the answer does.
   useEffect(() => {
     if (!done) return;
-    if (step < 2) setStep(2);
-    if (revealed < items.length && matched === revealed) {
-      const id = setTimeout(() => {
-        push(fmt(t.processing.feedChecking, { item: itemLabel(items[revealed]) }));
-        setRevealed((n) => n + 1);
-      }, CHECK_MS);
+    if (at + 1 < items.length) {
+      const id = setTimeout(() => setAt((n) => n + 1), at < 0 ? 0 : REVEAL_MS);
       return () => clearTimeout(id);
     }
-    if (matched < revealed) {
-      const id = setTimeout(() => {
-        const it = items[matched];
-        push(fmt(t.processing.feedMatched, { item: itemLabel(it), match: matchLabel(it) }));
-        setMatched((n) => n + 1);
-      }, MATCH_MS);
-      return () => clearTimeout(id);
-    }
-    // Everything named — one last beat, then the canvas.
-    const id = setTimeout(() => {
-      push(t.processing.feedAllMatched);
-      setStep(3);
-      setTimeout(() => actions.enterWizard(), 700);
-    }, 400);
+    const id = setTimeout(() => actions.enterWizard(), HANDOVER_MS);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [done, revealed, matched, items.length]);
+  }, [done, at, items.length]);
+
+  const item: EquipmentItem | null = at >= 0 ? items[at] ?? null : null;
+
+  /**
+   * The catalogue's picture of this machine: the subtype's, else its category's.
+   *
+   * Read off the taxonomy the browser already holds for the dropdowns, so this costs no request.
+   * An off-catalogue line has no ref at all and resolves to nothing, which is correct - the
+   * catalogue has no picture of a machine it does not carry.
+   */
+  const picture = useMemo(() => {
+    if (!item) return null;
+    const { category, subcategory } = resolveRef(taxonomy, item.ref);
+    return publicTaxonomyUrl(subcategory?.equipmentImageUrl ?? category?.equipmentImageUrl ?? null);
+  }, [item, taxonomy]);
+
+  /** What the agent resolved this line to, named as the canvas will name it. */
+  const name = useMemo(() => {
+    if (!item) return "";
+    const a = item.agentNames;
+    const sub = a ? (ar ? a.subtypeAr || a.subtype : a.subtype) : "";
+    const cap = a ? (ar ? a.capacityAr || a.capacity : a.capacity) : "";
+    return [sub, cap].filter(Boolean).join(" ") || item.rawLabel || t.processing.oneMachine;
+  }, [item, ar, t]);
 
   /* ----------------------------- Error (AC-09 / AC-10) — clear modal ----------------------------- */
   if (error) {
@@ -180,121 +150,108 @@ export function Processing() {
     );
   }
 
-  /**
-   * The bar is anchored to what has actually happened, not to a clock: 12% on send, 30% once the
-   * request has been described, then 45→80% across the real items as they are named, and 92% while
-   * the canvas is built. It never reaches 100 before the canvas does.
-   */
-  const pct =
-    step === 0 ? 12 : step === 1 ? 30 : step === 2 ? Math.round(45 + (items.length ? (revealed + matched) / (items.length * 2) : 0) * 35) : 92;
+  return <ProcessingView imageUrl={picture && broken !== picture ? picture : null} title={item ? name : t.processing.reading} caption={item ? t.processing.matched : null} onImageError={() => setBroken(picture)} />;
+}
 
+/**
+ * What the screen actually draws, with the state taken out of it.
+ *
+ * Split from {@link Processing} so `dev/preview` can photograph both of its states: the screen is
+ * on its feet for about four seconds inside a flow that needs a session, a project and a live
+ * agent, which is not a thing anyone can look at while changing it. This is the real component -
+ * `Processing` renders this and nothing else.
+ */
+export function ProcessingView({
+  imageUrl,
+  title,
+  caption,
+  onImageError,
+}: {
+  /** The catalogue's picture of the machine on screen, or null for the glyph. */
+  imageUrl: string | null;
+  /** One line: what is happening, or - once there is an answer - the machine. */
+  title: string;
+  /** Drawn only under a machine's name, to mark it as a finding rather than a label. */
+  caption: string | null;
+  onImageError?: () => void;
+}) {
   return (
-    <div {...pin("create-processing")} className="flex min-h-[70vh] items-center justify-center">
-      <div className="w-full max-w-[520px] rounded-lg border border-border bg-surface p-7 text-center">
-        {/* ── The agent's mark, and the fact that it is live (owner's reference, 2026-08-26) ───────
-            A 64px amber tile ABOVE its own label rather than a 30px chip beside it. This is the one
-            moment in the flow where the renter is waiting on something he cannot see, so the thing
-            he is waiting on is drawn at a size that admits it.
+    <div {...pin("create-processing")} className="flex min-h-[70vh] flex-col items-center justify-center gap-5 px-4 text-center">
+      {/* ── The ring, and what is inside it ────────────────────────────────────────────────────────
+          ONE moving thing on the screen. A 2px ring of `brand` at a fifth strength with a solid
+          quarter turning through it: the design system's own orange, no gradient, no glow, no
+          second tile. It never reports a POSITION, because there is none to report - the server
+          answers this request in one shot, which is what the bar and the percentage pill were
+          pretending otherwise about.
 
-            The live dot moves from beside the label onto the tile's own corner, where it reads as
-            "this is running" rather than as a bullet before a word. It is still the only thing on the
-            card that moves without a reason — it is the reason — and the white ring is what keeps it
-            legible against the amber it overlaps. */}
-        <div className="mb-4 flex justify-center">
-          <span className="relative grid h-16 w-16 place-items-center rounded-lg bg-gradient-to-br from-brand-light to-brand text-white">
-            <Icon name="auto_awesome" size={30} />
-            <span className="absolute -bottom-1 -end-1 h-4 w-4 rounded-full border-2 border-surface bg-ok motion-safe:animate-pulse" />
+          The picture sits INSIDE the ring rather than beside it, so the machine is the subject and
+          the spinner is its frame, and it takes `object-cover`.
+
+          🔴 **`object-contain` was tried here first and looked at.** These are PHOTOGRAPHS -
+          `equipment_image_url`, 1408x768 on the one node that has one, 1.83:1 - so contain drew a
+          76x41 band across the middle of a round hole with empty crescents above and below, the
+          machine tiny in a circle that is mostly nothing. That is the same fault the requests rail
+          measured on 2026-08-31 and answered the same way: a photograph reaches its own edges, so
+          it wants the crop. The rail's OTHER rule, the 1.34 scale, belongs to the taxonomy DRAWINGS
+          and is not copied - no drawing can reach this screen (see the note at the top). */}
+      <span className="relative grid h-[104px] w-[104px] flex-none place-items-center">
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 rounded-full border-[3px] border-brand/15 border-t-brand motion-safe:animate-spin"
+          style={{ animationDuration: "1.1s" }}
+        />
+        <span className="grid h-[84px] w-[84px] place-items-center overflow-hidden rounded-full bg-surface2">
+          {imageUrl ? (
+            /* ── A URL that fails falls back to the glyph ──────────────────────────────────────
+               A plain `<img>`, the same as the requests rail and for the same two reasons. The
+               taxonomy's equipment objects are NOT public-read on staging, so a well-formed URL
+               answers 403 and `onError` is the only signal a client gets; and `next/image` would
+               need this S3 host in `next.config.ts`'s `remotePatterns`, which it is not - it throws
+               at render rather than degrading, which is the opposite of what this slot needs. */
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={imageUrl}
+              alt=""
+              draggable={false}
+              onError={onImageError}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            /* ── MANSOUR is what is waited on, so he is what is drawn (owner, 2026-09-13) ──────
+               *"use this mansour kit that represent the agent, use it in the processing"*.
+
+               ~~A `precision_manufacturing` glyph.~~ A generic machine icon on the one screen whose
+               subject is the AGENT: it said «equipment» where the honest word was «him». He is at
+               56px inside the 84px well, `is-live` - the kit's working state, a small bob - so the
+               ring turning around him and his own bob are the two halves of one idea.
+
+               ⚠️ There is no artwork FALLBACK problem here: he is drawn, not fetched, and the
+               stylesheet stops every one of his animations under `prefers-reduced-motion`. */
+            <Mansour size={56} state="live" />
+          )}
+        </span>
+
+        {/* ── Once there is a picture, he keeps the corner ──────────────────────────────────────
+            The machine becomes the subject and he becomes the one who found it: a 30px mark on the
+            trailing-bottom edge, on the app's own ground so he reads as standing ON the tile rather
+            than inside it. `is-live` stays, because he still is.
+
+            This is where the old screen's green «it is running» dot sat, and it is doing that job
+            with something that also says WHO. */}
+        {imageUrl && (
+          <span className="absolute -bottom-0.5 -end-0.5 grid h-[34px] w-[34px] place-items-center rounded-full border border-border bg-surface">
+            <Mansour size={26} state="live" />
           </span>
-        </div>
-        <div className="mb-2 text-label font-extrabold uppercase tracking-[.06em] text-ok">{t.processing.agentWorking}</div>
-
-        <h2 className="text-display font-extrabold tracking-tight text-navy">
-          {stages[Math.min(step, 3)].title}
-          <span className="motion-safe:animate-pulse">…</span>
-        </h2>
-        <p className="mb-5 mt-1 text-body text-muted">{t.processing.sub}</p>
-
-        {/* The four stages, with the rule between them filling as each is passed. */}
-        <div className="mx-auto mb-5 flex max-w-[400px] items-start">
-          {stages.map((s, i) => {
-            const isDone = i < step;
-            const active = i === step;
-            return (
-              <div key={s.label} className="flex flex-1 items-center">
-                <div className="flex flex-col items-center gap-2">
-                  <span
-                    className={`grid h-9 w-9 flex-none place-items-center rounded-full ${
-                      isDone
-                        ? "bg-ok text-white"
-                        : active
-                          ? "bg-brand text-white motion-safe:animate-pulse"
-                          : "bg-surface2 text-muted"
-                    }`}
-                  >
-                    <Icon name={isDone ? "check" : s.icon} size={17} />
-                  </span>
-                  {/* The step in hand is the only one in navy: green is behind you, grey is ahead. */}
-                  <span
-                    className={`whitespace-nowrap text-meta ${
-                      isDone ? "font-semibold text-ok" : active ? "font-extrabold text-navy" : "font-semibold text-muted"
-                    }`}
-                  >
-                    {s.label}
-                  </span>
-                </div>
-                {i < stages.length - 1 && (
-                  <span className={`mt-[-18px] h-0.5 flex-1 ${i < step ? "bg-ok" : "bg-border"}`} />
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* ── What the agent has said so far (owner's reference, 2026-08-26) ──────────────────────
-            Four lines: enough to follow, short enough not to scroll.
-
-            Each line carries a BADGE rather than a 6px dot — a green tick for a line that finished,
-            a filled amber disc for the one still running. A dot that small could only be read by its
-            colour, which asked a renter to know that amber means "working" before he had been told
-            it once; a tick says finished in any palette. */}
-        <div className="min-h-[110px] rounded-md border border-border bg-surface2/40 px-4 py-3.5">
-          <div className="mb-2.5 text-label font-extrabold uppercase tracking-[.03em] text-muted">{t.processing.liveActivity}</div>
-          <div className="flex flex-col items-stretch gap-2">
-            {feed.map((entry, i) => {
-              const running = i === feed.length - 1;
-              return (
-                <div key={entry.id} className="flex items-center gap-2.5 text-start">
-                  <span
-                    className={`grid h-5 w-5 flex-none place-items-center rounded-full ${
-                      running ? "bg-brand motion-safe:animate-pulse" : "bg-ok text-white"
-                    }`}
-                  >
-                    {!running && <Icon name="check" size={13} />}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-body text-navy-mid">{entry.text}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Thicker, and the figure in a pill of its own — the reference's, and it earns the weight:
-            this is the only number on the screen and it was set in the same grey as the caption. */}
-        <div className="mt-5 flex items-center gap-3">
-          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-surface3">
-            <div className="h-full rounded-full bg-brand transition-[width] duration-500" style={{ width: `${pct}%` }} />
-          </div>
-          <span className="flex-none rounded-full bg-brand-soft px-2 py-0.5 text-meta font-extrabold text-brand">{pct}%</span>
-        </div>
-
-        {/* The counts the canvas will open on, once there are any. */}
-        {done && draft && (
-          <p className="mt-3 text-meta font-semibold text-muted">
-            {fmt(t.processing.summaryItems, { count: draft.summary.totalItems })}
-            {draft.summary.needsValidation > 0 && ` · ${fmt(t.processing.summaryNeedCheck, { count: draft.summary.needsValidation })}`}
-            {draft.summary.notAvailable > 0 && ` · ${fmt(t.processing.summaryNotAvailable, { count: draft.summary.notAvailable })}`}
-          </p>
         )}
+      </span>
+
+      {/* One line. While the request is in flight it says what is happening; from the moment the
+          answer lands it says the MACHINE, which is the only thing here worth reading. The caption
+          under it is what makes the name a FINDING rather than a label - without it a machine name
+          alone on a loading screen reads as the thing being waited for. */}
+      <div className="flex min-h-[52px] max-w-[420px] flex-col items-center gap-1">
+        <p className="text-subhead font-extrabold tracking-tight text-navy">{title}</p>
+        {caption && <p className="text-meta font-semibold text-muted">{caption}</p>}
       </div>
     </div>
   );

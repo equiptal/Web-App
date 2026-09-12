@@ -17,7 +17,6 @@ import { EditProfileForm } from "./EditProfileForm";
 import { ChangePhoneModal } from "./ChangePhoneModal";
 import { DeleteAccountModal } from "./DeleteAccountModal";
 import { openSupportMessenger } from "@/components/support/IntercomWidget";
-import { btn } from "@/lib/ds";
 import { SkeletonFields, SkeletonRows, SkeletonSection } from "@/components/Skeleton";
 import { pin } from "@/lib/uiPins";
 
@@ -57,7 +56,6 @@ export function ProfileView() {
    * `!firmName` would answer NO while the question was still open — so a renter who already has a
    * company would see «Add your own company» flash above his own firm on every visit.
    */
-  const [hasCompany, setHasCompany] = useState<boolean | null>(null);
   const [langBusy, setLangBusy] = useState(false);
 
   useEffect(() => {
@@ -171,44 +169,23 @@ export function ProfileView() {
         </p>
       )}
 
-      {/* ── ONE verify CTA on this page (owner, 2026-09-12) ──────────────────────────────────
-          *"Fix the UI issues here and make one CTA for the verify."*
+      {/* ── The banner is GONE; the company card asks the question (owner, 2026-09-12) ──────────
+          *"why ui is trash here, keep the create as part of the company but show it nice and without
+          ui bugs"*.
 
-          🔴 **There were two, and they said the same thing twice.** This thin banner —
-          «Basic Rentee · Get Verified», an arrow, and nothing else across the full width — and
-          `CreateOwnCompanyCard` in the company block below it, which carried the icon, the sentence
-          and the button. A renter reading down the page met the same errand twice in two shapes and
-          could not tell whether they were two different things.
-
-          The card won and moved up here, because this is the position the banner was holding for a
-          reason: the one thing on the page that should not have to be found. The block below draws
-          nothing now.
-
-          ⚠️ `normal-case` on the text, and that is the bug in the screenshot. `btn()` carries
-          `capitalize` for its LABELS, which is right for a word and wrong for a card: it turned the
-          body into «Verify Your Company To Become A Trusted Renter». */}
-      {/* ⚠️ **No company is the gate, not the TIER.** The card this replaces said so in its own
-          doc — *"shown unconditionally in the no-company state: a renter who was already verified
-          would have a company, since verification creates it"* — and gating on `tier === "basic"`
-          silently narrowed it, which a test caught. */}
-      {!loading && hasCompany === false && verification !== "pending" && verification !== "verified" && (
-        <button
-          onClick={() => setVerifyOpen(true)}
-          className={btn("secondary", "lg", { full: true, className: "mt-4 flex items-center gap-3.5 text-start normal-case transition" })}
-        >
-          <span className="grid h-11 w-11 flex-none place-items-center rounded-sm bg-brand text-brand-fg">
-            <Icon name="verified" size={22} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-subhead font-extrabold text-navy">{t.company.createOwnTitle}</span>
-            <span className="mt-0.5 block text-meta leading-relaxed text-muted">{t.company.createOwnDesc}</span>
-          </span>
-          <span className="inline-flex flex-none items-center gap-1 rounded-sm bg-brand px-3 py-2 text-meta font-semibold text-brand-fg">
-            {t.company.createOwnCta}
-            <Icon name="arrow_forward" size={15} className="rtl:scale-x-[-1]" />
-          </span>
-        </button>
-      )}
+          🔴 **Three faults, and the first two were real bugs, not taste.**
+          (1) A `<button>` with a fake CTA `<span>` inside it, styled as a second button. Two
+              affordances for one press: the whole slab was the control and the orange pill only
+              looked like one.
+          (2) The company topic in TWO places. This slab said *"…or join an existing company with an
+              invite code below"* and pointed three hundred pixels down at the card that owns the
+              other half, so the reader met one errand twice and had to reconcile them himself.
+          (3) A full-width band above a two-column grid, which is the shape the page uses for the
+              masthead alone.
+          The create route now sits inside the company card, where the join route already lives —
+          see `CompanyHub`'s `NoCompanyCard`. This REVERSES the move made earlier the same day
+          (*"make one CTA for the verify"*); what that ruling protected survives, because there is
+          still exactly one place to press. */}
 
       {/* ⚠️ The form, over the page he is already on. It was a route until 2026-09-12 — see
           `VerifyModal` for why it stopped being one. */}
@@ -309,9 +286,16 @@ export function ProfileView() {
             <div className="mt-5">
               <CompanyHub
                 embedded
+                /* The form is a dialog over THIS page, so the page owns it and the card asks for
+                   it. Withheld once he is verified or waiting on it: verification creates the
+                   company, so offering to create a second one would be a press with nowhere to go. */
+                onCreateCompany={
+                  verification !== "pending" && verification !== "verified"
+                    ? () => setVerifyOpen(true)
+                    : undefined
+                }
                 onCompany={(co) => {
                   setFirmName(co?.name ?? null);
-                  setHasCompany(!!co);
                 }}
               />
             </div>

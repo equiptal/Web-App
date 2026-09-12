@@ -199,6 +199,18 @@ export interface RfqState {
    */
   projectTypedLine: string | null;
   /**
+   * True while the agent is WRITING that line into the box, a character at a time.
+   *
+   * It exists so the intake can draw Mansour over the box while it happens (owner, 2026-09-13:
+   * *"make it like this mansour is writing it"*) - the typewriter lives in `ProjectChips`, on the
+   * box's floor, and the perch belongs on the box itself, which is a different component. Two
+   * components, one fact, so it is state rather than a prop threaded through the screen.
+   *
+   * ⚠️ NOT persisted and not restored: it describes something happening right now, and a reload
+   * mid-write must not come back with a man standing on an empty box.
+   */
+  agentTyping: boolean;
+  /**
    * Which pills the renter changed on this request. They render as changed, and the fields they
    * cover read `renter` rather than `project` once the draft exists — once someone has answered a
    * question, it stops being the site's answer.
@@ -255,6 +267,7 @@ export const initialState: RfqState = {
   project: null,
   projectDirty: [],
   projectTypedLine: null,
+  agentTyping: false,
   workOrderGroupId: null,
   templateTerms: null,
   processingSince: null,
@@ -308,6 +321,7 @@ type Action =
   | { t: "SET_DIRECT"; direct: DirectTarget | null }
   | { t: "SELECT_PROJECT"; project: ProjectSummary }
   | { t: "PROJECT_TYPED"; line: string | null }
+  | { t: "AGENT_TYPING"; on: boolean }
   | { t: "CLEAR_PROJECT" }
   | { t: "PATCH_PROJECT_DEFAULTS"; patch: Partial<TimingHours>; keys: string[] }
   | { t: "PATCH_PROJECT_TERMS"; paymentTerms: PaymentTerm | null }
@@ -475,6 +489,8 @@ export function reducer(state: RfqState, a: Action): RfqState {
       };
     case "PROJECT_TYPED":
       return { ...state, projectTypedLine: a.line };
+    case "AGENT_TYPING":
+      return { ...state, agentTyping: a.on };
     case "CLEAR_PROJECT":
       // The template goes with the site. It was a thing INSIDE that project, so leaving its terms
       // behind would carry values from a site the renter just removed, with nothing on screen
@@ -997,6 +1013,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
     resumeDirect: (saved: Partial<RfqState>) => dispatch({ t: "RESUME_DIRECT", saved }),
     /** Mark (or unmark) the line a template typed, so the box can colour it. */
     markProjectTyped: (line: string | null) => dispatch({ t: "PROJECT_TYPED", line }),
+    setAgentTyping: (on: boolean) => dispatch({ t: "AGENT_TYPING", on }),
     addFiles: (files: { name: string; type: string; data?: string }[]) => dispatch({ t: "ADD_FILES", files }),
     removeFile: (index: number) => dispatch({ t: "REMOVE_FILE", index }),
     setSimulateError: (value: boolean) => dispatch({ t: "SET_SIMULATE_ERROR", value }),

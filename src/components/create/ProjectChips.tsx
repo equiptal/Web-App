@@ -228,6 +228,16 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
    * 14ms a character: about 70 a second, faster than anyone types and slow enough to be seen
    * arriving. A twenty-character machine name is under a third of a second, so nobody waits for it.
    *
+   * ── And MANSOUR is the one writing it ───────────────────────────────────────────────────────────
+   *
+   * Owner, 2026-09-13: *"use it here for typing when u select a project and it auto fills the
+   * equipment name, make it like this mansour is writing it"*. The words already arrived as typing;
+   * what was missing was WHO. `agentTyping` is raised for the length of the run and the intake draws
+   * him on the box while it is up - the same agent the processing screen shows, doing the same job
+   * one screen earlier.
+   *
+   * ⚠️ Lowered in a `finally`, so a throw mid-write cannot leave him standing there forever.
+   *
    * ── It stays interruptible ──────────────────────────────────────────────────────────────────────
    *
    * Each frame appends to the SNAPSHOT taken before it started, never to the live value, so a renter
@@ -238,14 +248,23 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
   async function typeInto(before: string, line: string) {
     const base = before ? `${before}
 ` : "";
-    for (let i = 1; i <= line.length; i++) {
-      actions.setText(base + line.slice(0, i));
-      // eslint-disable-next-line no-await-in-loop -- a typewriter is sequential by definition
-      await new Promise((r) => setTimeout(r, 14));
+    actions.setAgentTyping(true);
+    try {
+      for (let i = 1; i <= line.length; i++) {
+        actions.setText(base + line.slice(0, i));
+        // A typewriter is sequential by definition; this await is the point of the loop.
+        await new Promise((r) => setTimeout(r, 14));
+      }
+      // Marked AFTER the last character, so the colour arrives with the finished word rather than
+      // chasing the caret across the screen.
+      actions.markProjectTyped(line);
+      /* He stays a beat after the last character, reading it back. Cutting him at the same frame as
+         the final letter reads as a flicker rather than as somebody finishing a sentence - and a
+         short name («Grader», six characters, 84ms) would otherwise never be seen at all. */
+      await new Promise((r) => setTimeout(r, 900));
+    } finally {
+      actions.setAgentTyping(false);
     }
-    // Marked AFTER the last character, so the colour arrives with the finished word rather than
-    // chasing the caret across the screen.
-    actions.markProjectTyped(line);
   }
 
   async function applyTemplate(itemId: string) {

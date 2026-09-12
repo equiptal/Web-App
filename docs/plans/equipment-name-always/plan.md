@@ -471,7 +471,9 @@ deploys, and neither failure is visible from the repo that caused it.
 - **B1** — re-derive `hasCustomEquipment` from the undefined predicate instead of the name test
   (one function, no new column, no OS deploy). Unlocks the web.
 - **B2** — `isUndefinedEquipment` gains the HIDDEN test, so dispatch skips a hidden line the way it
-  skips a nameless one. Unlocks the agent.
+  skips a nameless one. Unlocks the agent. **No migration**: the visibility is read from the catalogue
+  at the moment it is asked, so hiding a node acts on requests that already exist (owner's call,
+  2026-09-12 — see `app-backend-changes.md` B2).
 
 Everything else backend (projections keeping the hidden node's names and image, the bid-form label
 order) can follow at leisure — those make case 3 read correctly, they do not make it unsafe.

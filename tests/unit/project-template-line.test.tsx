@@ -21,9 +21,17 @@ import type { TemplateOption } from "@/lib/contract/project-apply";
 
 const rows = vi.hoisted(() => ({ value: [] as ProjectSummary[] }));
 const tpls = vi.hoisted(() => ({ value: [] as TemplateOption[] }));
+/**
+ * ⚠️ **This mock must carry EVERY action `ProjectChips` calls.** `applyTemplate` ends in a bare
+ * `catch {}` - a template that fails to apply leaves the renter where he was, deliberately - so a
+ * missing function here is not a `TypeError` in the report: the whole template silently does
+ * nothing and two unrelated cases fail with «0 calls». That is exactly what `setAgentTyping` did
+ * when it landed on 2026-09-13.
+ */
 const store = vi.hoisted(() => ({
   setText: vi.fn(),
   markProjectTyped: vi.fn(),
+  setAgentTyping: vi.fn(),
   useTemplate: vi.fn(),
   selectProject: vi.fn(),
   clearProject: vi.fn(),
@@ -71,6 +79,7 @@ beforeEach(() => {
   rows.value = [site()];
   store.setText.mockClear();
   store.markProjectTyped.mockClear();
+  store.setAgentTyping.mockClear();
   store.useTemplate.mockClear();
   Object.defineProperty(HTMLElement.prototype, "offsetHeight", { configurable: true, get: () => 26 });
   Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, get: () => 26 });
@@ -116,5 +125,27 @@ describe("a template whose machine has no name", () => {
     draw();
     await pickTemplate("Tower crane");
     await waitFor(() => expect(store.markProjectTyped).toHaveBeenCalledWith("Tower crane"));
+  });
+
+  it("says the AGENT is writing it, and stops saying so", async () => {
+    /**
+     * Owner, 2026-09-13: *"make it like this mansour is writing it"*. The words already arrived as
+     * typing (2026-08-31); what was missing was WHO. The intake draws him on the box for exactly
+     * the length of this flag - see `mansour.test.tsx`.
+     */
+    tpls.value = [tpl("Tower crane")];
+    draw();
+    await pickTemplate("Tower crane");
+    await waitFor(() => expect(store.setAgentTyping).toHaveBeenCalledWith(true));
+    await waitFor(() => expect(store.setAgentTyping).toHaveBeenCalledWith(false), { timeout: 3000 });
+  });
+
+  it("does NOT raise him for a template with no machine to write", async () => {
+    // Nothing is typed, so nobody is typing. He would appear over a box he never touched.
+    tpls.value = [tpl(null)];
+    draw();
+    await pickTemplate("JTR060995");
+    await waitFor(() => expect(store.useTemplate).toHaveBeenCalled());
+    expect(store.setAgentTyping).not.toHaveBeenCalled();
   });
 });

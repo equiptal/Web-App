@@ -14,7 +14,7 @@
 /coverage
 
 # next.js
-/.next/
+# (`.next/` itself is covered by the `.next*/` rule at the foot of this file.)
 /out/
 
 # production
@@ -52,10 +52,15 @@ next-env.d.ts
 # UI screenshots from `npm run ui:shots` — evidence for a change report, never committed
 .artifacts/
 
-# The screenshot lane's own build dir — it must not contend with `.next` (see next.config.ts)
-.next-preview/
-
-# Typecheck/build probe dirs written by ad-hoc `next build` runs — never committed.
-# A GLOB, not a list: `.next-probe3/` was created on 2026-09-12 and the two named rules above it
-# did not cover it, so a whole build tree sat untracked in `git status` waiting for a `git add -A`.
-.next-probe*/
+# EVERY Next build directory, whatever it is called — never committed.
+#
+# One rule, not a list of names. This started as `/.next/`, then `.next-preview/` was added for the
+# screenshot lane (it must not contend with `.next`, see next.config.ts), then `.next-probe/` and
+# `.next-probe2/` for ad-hoc `next build` typecheck runs, then `.next-probe*/` on 2026-09-12 when a
+# third one slipped through — and within the day `.next-guestwall/` and `.next-gw2/` were created
+# and matched none of them. Each new name is a full build tree sitting untracked in `git status`
+# waiting for somebody's `git add -A`.
+#
+# The trailing slash matters: it matches DIRECTORIES only, so `next-env.d.ts` (ignored above, no
+# leading dot) and any future `.next-something.json` file are unaffected.
+.next*/

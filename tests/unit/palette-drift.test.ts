@@ -76,9 +76,59 @@ describe("no component names a colour either", () => {
     "src/app/globals.css", // the palette itself
     "src/lib/ds-colors.ts", // the palette, mirrored as literals for the three surfaces with no stylesheet
     "src/components/dev/UiPins.tsx", // a staging-only developer instrument, deliberately anti-palette
+    /**
+     * 🔴 **Outlook's and Gmail's own compose chrome** (owner, 2026-09-06: *"use exactly as outlook
+     * ui, same colors same icons same background same text etc"*). Twenty-two Microsoft and Google
+     * values imitating a window the renter can no longer open. The file's own header already says
+     * they must never reach `ds-colors.ts` or `globals.css`, and it carries an `eslint-disable` for
+     * the same reason.
+     *
+     * ⚠️ Exempt as a FILE rather than by value, unlike `BRANDS`: this is a whole foreign palette,
+     * not a mark. Twenty-two greys in an allowlist would start matching our own by coincidence.
+     *
+     * ⚠️ It surfaced on 2026-09-12, when the sweep below started working again — see the note on
+     * the match. It was never a new violation; it was simply never looked at.
+     */
+    "src/components/share/mail-chrome.tsx",
+    /**
+     * **Mansour, the agent** (owner, 2026-09-13). Four colours: #9AA3AE gear, #6B737E gear edge,
+     * #6E7075 body, #f3efea eyes. They are the `Mansour Kit`'s, copied byte for byte from the rig
+     * that runs on moedatech.net, and they are deliberately outside this palette - the kit's own
+     * README says he is *"grey on purpose so he sits on any brand colour"*.
+     *
+     * ⚠️ Exempt as a FILE, like the compose chrome and unlike `BRANDS`: he is a DRAWING, and the
+     * four values only mean anything together. Tokenising any of them would make this app's agent a
+     * different character from the one on the marketing site, and nothing else would say so.
+     */
+    "src/components/Mansour.tsx",
   ];
-  /** Third-party marks. Someone else's brand is not one of our states. */
-  const BRANDS = new Set(["#25d366", "#ffcd00"]);
+  /**
+   * Third-party marks. Someone else's brand is not one of our states.
+   *
+   * ⚠️ The five after WhatsApp's green and the Google Play yellow are GMAIL's envelope, drawn as
+   * inline SVG in `src/components/ChannelMark.tsx` (2026-09-12). Allowed BY VALUE rather than by
+   * exempting that file, so a house colour smuggled into it still fails: the rule is «this exact
+   * brand may paint itself», not «this file may paint anything».
+   */
+  const BRANDS = new Set(["#25d366", "#ffcd00", "#4285f4", "#34a853", "#fbbc04", "#ea4335", "#c5221f"]);
+
+  /**
+   * Black, which on these five lines is not a colour the app PAINTS.
+   *
+   * ⚠️ All five surfaced on 2026-09-12 when the sweep below started working again, and each is
+   * black for a reason the palette has nothing to say about:
+   *  · `AuthBrand` (×2) — inside a `mask-image` gradient, where the value is an ALPHA channel:
+   *    `#000` there means «fully masked» and never renders as a colour at all.
+   *  · `AuthPanel` — the last stop of a scrim ramp whose other four stops are `rgba(0,0,0,…)`,
+   *    which this regex does not catch either. A dimming ramp is not a surface.
+   *  · `bidFormStyles` — the Google Play badge, black by Google's own brand rules. Same category
+   *    as the `#ffcd00` Play mark already above.
+   *
+   * 🔴 This is NOT a licence for black on a surface of ours. `--navy-deep` is the darkest ground
+   * this app paints; a `#000` background on one of our own cards should be caught, and would be,
+   * because it would not be one of these two spellings inside a mask, a ramp or a foreign badge.
+   */
+  const NOT_PAINT = new Set(["#000", "#000000"]);
 
   it("paints only in tokens", () => {
     const files = execSync('git ls-files "src/**/*.ts" "src/**/*.tsx" "src/**/*.css"', { cwd: ROOT })
@@ -96,8 +146,27 @@ describe("no component names a colour either", () => {
       const src = read(f)
         .replace(/\/\*[\s\S]*?\*\//g, "")
         .replace(/^\s*\/\/.*$/gm, "");
-      for (const h of src.match(/#[0-9a-fA-F]{3,8}/g) ?? []) {
-        if (!BRANDS.has(h.toLowerCase())) offenders.push(`${f}: ${h}`);
+      /**
+       * 🔴 **This regex was DEAD, and took the whole case with it.** It read
+       * `/#[0-9a-fA-F]{3,8}<BS>/g` — a literal BACKSPACE character where `\b` was meant — committed
+       * in `5a428e61` and never noticed, because a regex that matches nothing makes every file
+       * clean. From that commit until 2026-09-12 this case passed on ANY colour in ANY component,
+       * so every «palette-drift green» recorded in the change log over that window is vacuous for
+       * COMPONENTS. The stylesheet sweep above is a separate matcher and was always live.
+       *
+       * ⚠️ Repairing it surfaced six pre-existing hits and not one was drift: `mail-chrome.tsx`
+       * (exempt above) and the five blacks in `NOT_PAINT`. That is the argument for the repair
+       * rather than against it — the rule was right, it simply was not running.
+       *
+       * ⚠️ Same class as the `RED` → 🔴 corruption this repo already records: an escape written by
+       * a script through a layer that interpreted it. Two more survive in the tree and are NOT
+       * fixed here — `RequestDetailsModal.tsx:191` (a `\b` in a title-caser, so it title-cases
+       * nothing) and `rentee-map-surface.test.ts:597` (a `\b` in a `.not.toMatch`, so that
+       * assertion can never fail). Both reported to the owner on 2026-09-12.
+       */
+      for (const h of src.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []) {
+        const v = h.toLowerCase();
+        if (!BRANDS.has(v) && !NOT_PAINT.has(v)) offenders.push(`${f}: ${h}`);
       }
     }
     expect(offenders).toEqual([]);

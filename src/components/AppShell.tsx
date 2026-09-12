@@ -534,7 +534,13 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
                   settings page, and a second nudge up here would repeat the mistake the menu was
                   already making. Flagged for the owner rather than quietly kept. */}
             {status === "authed" && (
-              <div ref={accountBox} className="relative flex-none">
+              /* ⚠️ **`flex`, and that is the whole of the reported fault** (owner, 2026-09-12:
+                 *"what is this ugly ui"*). This wrapper was `relative flex-none` and nothing else —
+                 a BLOCK — so the avatar and the «Verify» press beside it were two block-level
+                 children and stacked: the pill dropped onto a second line under the circle and the
+                 52px bar cut it in half. The comment two blocks down already promised «it sits
+                 BESIDE the avatar»; the box it sits in never agreed. */
+              <div ref={accountBox} className="relative flex flex-none items-center gap-2">
               <button {...pin("header-avatar")}
                 type="button"
                 onClick={() => setAccountOpen((v) => !v)}
@@ -584,7 +590,16 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
                   type="button"
                   onClick={() => setVerifyOpen(true)}
                   aria-label={t.shell.verifyNudge}
-                  className="flex-none rounded-full bg-brand px-2 py-0.5 text-label font-semibold uppercase tracking-[0.05em] text-white transition hover:bg-brand-press"
+                  /* ── Quiet enough to sit beside a face, loud enough to be the thing to press ──
+                     ~~`uppercase tracking-[0.05em]`~~ on a solid brand ground: SHOUTED at 11px, on a
+                     navy bar where every other mark is white at reduced strength, and it read as an
+                     alert rather than as an offer. Sentence case at the same size and weight says
+                     the same word without raising its voice.
+
+                     ⚠️ The brand FILL stays. This is an action, not a note — the outlined-white
+                     treatment belongs to the marks beside the wordmark, which state a fact and are
+                     not pressed. `h-[22px]` keeps it off the bar's own edges beside a 34px circle. */
+                  className="flex h-[22px] flex-none items-center rounded-full bg-brand px-2.5 text-label font-semibold text-white transition hover:bg-brand-press"
                 >
                   {t.shell.verifyNudge}
                 </button>

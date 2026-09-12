@@ -18,7 +18,7 @@
  * platform cannot resolve becomes a document demanded of every supplier who bids.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { fmt, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
@@ -105,6 +105,32 @@ export function MachineCard({
   /** Set when that URL fails to load, so the panel falls back to the glyph. Keyed off the URL so
    *  changing the subtype clears a previous failure rather than inheriting it. */
   const [brokenPhoto, setBrokenPhoto] = useState<string | null>(null);
+  /**
+   * Presses on «Select from our list», used as a REMOUNT KEY for the TYPE control.
+   *
+   * `Dropdown.defaultOpen` is read once, at mount, so that a list the renter asked for can then be
+   * closed and stay closed — its own note says a caller wanting it open again remounts it with a
+   * `key`. This counter is that key: each press remounts the control with the list already open.
+   * Zero means «never asked», which is every ordinary render, so nothing opens by itself.
+   */
+  const [openTypeAt, setOpenTypeAt] = useState(0);
+
+  /**
+   * The «point at what just changed» pulse, after the renter takes the line off-catalogue.
+   *
+   * Owner, 2026-09-13: *"clicking it will highlight with animation … the equipment [name] with the
+   * note below it"*. The press changes three things at once — the taxonomy empties, the name box
+   * gains its star, and a warning note appears — and all of it happens ABOVE the row he pressed, so
+   * without this the card rearranges itself behind his eyes.
+   * Cleared on a timer rather than on animation end: `animationend` never fires under
+   * `prefers-reduced-motion`, where the rule draws a standing outline and no animation at all.
+   */
+  const [pulseName, setPulseName] = useState(false);
+  useEffect(() => {
+    if (!pulseName) return;
+    const id = setTimeout(() => setPulseName(false), 1500);
+    return () => clearTimeout(id);
+  }, [pulseName]);
   const photoBroken = brokenPhoto !== null && brokenPhoto === photo;
   const overrides = useItemOverrides(item, state.draft!.project);
   const attachments = useItemAttachments(item);
@@ -373,7 +399,9 @@ export function MachineCard({
                   What it holds, in order: what he typed, else the words his RFQ used, else the
                   taxonomy he picked (flow B — a line added by hand fills itself from the pick rather
                   than asking him to retype what he just chose). */}
-              <div className="sm:col-span-3">
+              {/* The pulse wraps the FIELD, so it encloses the name box and the note under it —
+                  which is the pair the press creates. */}
+              <div className={`sm:col-span-3 ${pulseName ? "attn-pulse" : ""}`}>
                 <CanvasField
                   label={t.create.machineCard.customEquipment}
                   star={custom}
@@ -382,7 +410,18 @@ export function MachineCard({
                   required={owed("custom_equipment")}
                   hint={
                     custom ? (
-                      <span className="flex items-start gap-1 text-warn">
+                      /* ── The app's own warning ink, not the fill (owner, 2026-09-12) ──────────
+                         *"the box that appears when no taxonomy has a weird colour, it is not yellow
+                         and not orange, use colours in our design system and used in other places for
+                         warning"*.
+                         🔴 `text-warn` is #b98a1d, and `globals.css` says in as many words that
+                         `--warn` is a FILL and `--warn-deep` (#8a6412) is the one that may carry
+                         text. At 2.97:1 on this pale ground the sentence came out khaki — neither
+                         yellow nor orange, which is exactly what he read.
+                         The box itself was already right: `border-warn/40 bg-warn-soft` IS
+                         `NOTICE_TONE.warn`, the recipe every other warning in the app wears. Only the
+                         ink was off it, so the line now finishes that same recipe. */
+                      <span className="flex items-start gap-1 text-warn-deep">
                         <Icon name="warning" size={13} className="mt-px flex-none" />
                         {t.create.machineCard.notInCatalogueNote}
                       </span>
@@ -407,6 +446,8 @@ export function MachineCard({
                 source={prov.itemSource("subtype", item.ref.subcategoryId)}
               >
                 <SearchSelect
+                  key={`type-${openTypeAt}`}
+                  defaultOpen={openTypeAt > 0}
                   value={item.ref.subcategoryId}
                   placeholder={t.create.machineCard.type}
                   searchPlaceholder={t.create.machineCard.searchTypes}
@@ -451,22 +492,46 @@ export function MachineCard({
                 />
               </CanvasField>
 
-              {/* ── The way out of a match that is not his machine (owner, 2026-09-12) ──────────
-                  The third column, where CATEGORY used to sit. It says what it does and it does it
-                  in one press: the taxonomy clears, the line is off-catalogue, and the orange note
-                  appears under the name box to explain the state he has just chosen.
+              {/* ── One row, and it offers whichever door the renter is NOT standing in ─────────
+                  On a matched line it is the way OUT of the catalogue: one press clears the taxonomy,
+                  the line goes off-catalogue, and the warning note appears under the name box to
+                  explain the state he has just chosen.
+                  On an off-catalogue line it is the way BACK IN (owner, 2026-09-13: *"if it is
+                  clicked then in its place, with no taxonomy selected, we will write «select from
+                  our list»"*) — and it OPENS the TYPE list rather than merely naming it, because the
+                  lists are still on screen above and a row that only points at them is a caption.
 
-                  Offered only while there IS a taxonomy to reject, and never on a line started from
-                  a supplier's listing — a DIRECT request is taxonomy only (owner, same day), and an
-                  off-catalogue one reaches nobody at all, the named supplier included. */}
-              {!custom && CUSTOM_EQUIPMENT_ENABLED && !listingLocked && item.ref.subcategoryId && (
-                <div className="flex items-end">
+                  ── It is a ROW, not the third column (owner, 2026-09-13) ───────────────────────
+                  🔴 His first shape for this was the freed CATEGORY column, and four wordings died
+                  in it: *"make the sentence fit in one line"*, then *"both sentences not clear"*,
+                  then *"must be clear"*. The column is ~160px of text. Every string short enough to
+                  fit it was too short to say what the press does — the width was choosing the words,
+                  and it kept choosing badly.
+                  Full width under the two lists, so the sentence is the owner's own and whole. TYPE
+                  and SIZE keep the widths they had; the space beside them is simply space.
+                  ⚠️ `sm:whitespace-nowrap`, not `whitespace-nowrap`: one line where he is looking,
+                  and a wrap on a phone, where the grid is one column and truncating a sentence would
+                  be worse than two lines of it.
+
+                  ⚠️ Withheld on a line started from a supplier's listing — a DIRECT request is
+                  taxonomy only (owner, 2026-09-12), and an off-catalogue one reaches nobody at all,
+                  the named supplier included. And withheld on a line with no type picked yet: there
+                  is no catalogue answer to reject, and the name box is already open to him. */}
+              {CUSTOM_EQUIPMENT_ENABLED && !listingLocked && (custom || item.ref.subcategoryId) && (
+                <div className="sm:col-span-3">
                   <button
                     type="button"
-                    onClick={() => actions.setItemOffCatalogue(item.id, item.customEquipment ?? item.rawLabel ?? "")}
-                    className="w-full rounded-sm border border-dashed border-border-strong px-3 py-2 text-start text-label leading-snug text-muted-dark transition hover:border-warn hover:text-warn"
+                    onClick={() => {
+                      if (custom) {
+                        setOpenTypeAt((n) => n + 1);
+                        return;
+                      }
+                      actions.setItemOffCatalogue(item.id, item.customEquipment ?? item.rawLabel ?? "");
+                      setPulseName(true);
+                    }}
+                    className="w-full overflow-hidden text-ellipsis rounded-sm border border-dashed border-border-strong px-3 py-2 text-start text-label leading-snug text-muted-dark transition hover:border-warn hover:text-warn-deep sm:whitespace-nowrap"
                   >
-                    {t.create.machineCard.useMyOwnName}
+                    {custom ? t.create.machineCard.selectFromList : t.create.machineCard.useMyOwnName}
                   </button>
                 </div>
               )}

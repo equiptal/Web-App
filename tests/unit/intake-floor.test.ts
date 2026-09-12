@@ -79,3 +79,59 @@ describe("the sites are named on the same row", () => {
     expect(intake).toContain('className="ms-auto flex flex-none items-center gap-2"');
   });
 });
+
+/**
+ * ── The controls are a CHIP tall, and they ride the last row (owner, 2026-09-12) ────────────────
+ *
+ * *"make the buttons on the same size of the project pills … also consider if many projects exist,
+ * how the ui will be? the buttons must be on the last row always"*.
+ *
+ * **26px, measured rather than chosen.** A chip is `px-3 py-1 text-label` inside a hairline:
+ * 16.5px line box (11px × the body's 1.5) + 8px padding + 1.6px border = 26.1px — and the same in
+ * Arabic, because that line box is a RATIO of the font size and not of the face. Verified in a
+ * browser at both locales before the number was written down. The circles had been 40px, half again
+ * as tall as the row they sit on.
+ *
+ * 🔴 **The cost is on the record: 26px is under the house's 44px target**, the same fault logged
+ * against a dozen icon-only controls on 2026-09-08. «The same size as the pills» is what was asked
+ * for, and the alternative is the 40px circle beside a 26px chip that was reported.
+ */
+describe("the floor's controls match the pills", () => {
+  const controls = intake.slice(intake.indexOf('className="ms-auto'));
+
+  it("Given either control, Then it is 26px square — the chip's own height", () => {
+    const sized = controls.match(/h-\[26px\] w-\[26px\]/g) ?? [];
+    expect(sized).toHaveLength(2);
+  });
+
+  it("Given the 40px circles, Then neither survives", () => {
+    expect(controls).not.toMatch(/h-10 w-10/);
+  });
+
+  it("Given a 26px box, Then the glyph inside it is small enough to fit", () => {
+    // A 20px icon in a 26px circle leaves 3px a side and reads as a glyph in a collar.
+    expect(controls).not.toMatch(/size=\{20\}/);
+    expect(controls).toMatch(/size=\{15\}/);
+  });
+
+  it("Given many sites, Then the wrapper keeps the controls on the LAST row", () => {
+    /**
+     * `items-end` is the whole mechanism, and it is what makes this hold as the strip grows: the
+     * chips wrap inside their own `flex-1` group, the group gets taller, and the two controls stay
+     * pinned to its bottom edge instead of climbing back beside the first row.
+     *
+     * Checked with twelve sites patched into the live DOM: three rows of chips, both controls on
+     * the third, their bottom edge level with the group's to the pixel.
+     */
+    const row = intake.slice(intake.indexOf("<div className=\"flex flex-wrap items-end"));
+    expect(row.slice(0, 120)).toContain("items-end");
+    // `flex-none` beside a `min-w-0 flex-1` group is what stops them being pushed to a row of their
+    // own while there is still width for them.
+    expect(intake).toContain('className="flex min-w-0 flex-1 flex-wrap items-center');
+  });
+
+  it("Given the sentence, Then it offers A project rather than claiming one is HIS", () => {
+    expect(en.projects.chips.pick).toBe("Select a project");
+    expect(en.projects.chips.pick).not.toMatch(/your/i);
+  });
+});

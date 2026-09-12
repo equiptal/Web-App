@@ -582,14 +582,38 @@ export function Canvas() {
 
   return (
     <div {...pin("create-canvas")}>
-      {/* ---------------- The renter's own words, and what's left ---------------- */}
-      <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-warn/45 bg-warn/[0.07] px-5 py-3.5">
+      {/* ── The renter's own words, and what's left ────────────────────────────────────
+          🔴 **Withheld on a DIRECT request that has no words** (owner, 2026-09-13, on a shot of it
+          reading a bare em dash: *"remove the below one when direct request as no input"*).
+
+          A direct request is seeded from the machine he PRESSED in a store, not from anything he
+          typed, so `state.text` is empty and this card drew «YOU WROTE» over a dash. The one thing
+          it exists for — letting him check what we read against what he wrote — has no content on
+          that path, and «Edit», which walks back to the typing box, has nothing to edit.
+
+          ⚠️ **`Start over` goes with it on that path**, and it is the canvas's only one. Not
+          replaced: Back still walks the flow out, the ✕ on a direct tab is a trip to the store, and
+          `state.direct` is dropped the moment he presses a different machine. Said out loud because
+          it is a control disappearing, not just a decoration.
+
+          ⚠️ The test is the WORDS, not the mode: a direct request that did arrive with a prefilled
+          sentence still shows it, because then there is something to check.
+
+          ⚠️ **The tone is the direct ribbon's** (owner, same message: *"use the above color in the
+          intake card below in case of broadcast"*). It was `--warn`, which this palette serves as a
+          MUSTARD (#b98a1d) rather than an orange — the same mismatch the canvas's provenance ring
+          was corrected for on 2026-09-08. One orange on this screen now, whatever sits above it. */}
+      {!(state.direct && !state.text?.trim()) && (
+      <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-brand/35 bg-brand-soft px-5 py-3.5">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="grid h-[30px] w-[30px] flex-none place-items-center rounded-sm bg-warn/15 text-warn">
+          <span className="grid h-[30px] w-[30px] flex-none place-items-center rounded-sm bg-brand/15 text-brand-deep">
             <Icon name="chat_bubble" size={15} />
           </span>
           <div className="min-w-0">
-            <div className="text-label font-semibold uppercase tracking-[0.05em] text-warn">{t.create.youWrote}</div>
+            {/* ⚠️ `brand-deep` (#c2570f) and never `brand`: orange TEXT on a light ground has to be
+                the dark one to pass AA, and the brand orange is a FILL. The ring and the tile above
+                keep `brand`, because those are borders and fills. Same ruling as 2026-09-08. */}
+            <div className="text-label font-semibold uppercase tracking-[0.05em] text-brand-deep">{t.create.youWrote}</div>
             {/* ⚠️ Not `truncate`. This is the renter's OWN sentence, and the whole reason it sits at
                 the top of the canvas is so he can check what we read against what he wrote. One line
                 with the rest clipped showed him the half he already remembered and hid the half the
@@ -602,7 +626,7 @@ export function Canvas() {
         <div className="flex flex-none items-center gap-3.5">
           <button
             onClick={() => window.history.back()}
-            className="text-body font-semibold text-warn underline decoration-warn/40 underline-offset-2 hover:decoration-warn"
+            className="text-body font-semibold text-brand-deep underline decoration-brand/40 underline-offset-2 hover:decoration-brand"
           >
             {t.common.edit}
           </button>
@@ -618,6 +642,7 @@ export function Canvas() {
               he could not do anything with, sitting beside the two controls he could. */}
         </div>
       </div>
+      )}
 
       {/* Which machine, when there is more than one. */}
       {live.length > 1 && (

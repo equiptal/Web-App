@@ -1002,7 +1002,21 @@ describe("what they receive", () => {
      * of these, not two.
      */
     expect(screen.getByText(c.linkMasked)).toBeTruthy();
-    expect(screen.getByLabelText(c.copy).closest("button")!.hasAttribute("disabled")).toBe(true);
+
+    /**
+     * 🔴 **Copy is PRESSABLE with no link, and says why** (owner, 2026-09-12: *"clicking it will
+     * open small clear popup saying post the request first so the link is generated"*).
+     *
+     * ~~`disabled` until the post.~~ A dead grey button beside a dead grey field, with nothing on
+     * the screen saying what either was waiting for: the renter reads it as broken, not as
+     * not-yet. The refusal now answers itself.
+     */
+    const copy = screen.getByLabelText(c.copy).closest("button")!;
+    expect(copy.hasAttribute("disabled")).toBe(false);
+
+    fireEvent.click(copy);
+    expect(await screen.findByText(c.linkLockedTitle)).toBeTruthy();
+    expect(screen.getByText(c.linkLockedBody)).toBeTruthy();
   });
 
   it("Given no equipment yet, Then it says so rather than drawing an empty card", async () => {
