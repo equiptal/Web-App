@@ -10,7 +10,7 @@ import { useSession } from "@/lib/session";
 import { AccountModal } from "@/components/onboarding/AccountModal";
 import { draftBidForm } from "@/lib/draftBidForm";
 import { ShareRequestPanel } from "@/components/share/ShareRequestPanel";
-import { SubmitError } from "./SubmitError";
+import { SubmitError } from "@/components/create/SubmitError";
 import { projectTitle, shortSite, type ProjectSummary } from "@/lib/contract/project";
 import { useRouter } from "next/navigation";
 
