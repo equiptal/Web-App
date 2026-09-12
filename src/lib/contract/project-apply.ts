@@ -35,6 +35,10 @@ import type { RfqDraft, EquipmentItem, ProjectDetails } from "./draft";
 import { defaultProjectDetails } from "./draft";
 import type { MachineTerms } from "./work-order";
 import type { ProjectDefaults } from "./project";
+// The ONE reader of the equipment-year ask. `maxEquipmentAge` is the deprecated alias the web
+// posts under and the backend never sends back, so reading it alone answers null on every live
+// request — see its own note in `bids.ts` for the three earlier times that happened.
+import { requestedMinYear } from "./bids";
 
 /**
  * The untouched snapshot of what the agent returned — the same shape the store already keeps for the
@@ -208,8 +212,15 @@ export interface TemplateOption {
    * a machine, because terms are a machine's.
    */
   itemId: string;
-  /** This machine's name, as the chart draws it: category, subtype and size in one string. */
-  machine: string;
+  /**
+   * This machine's name, as the chart draws it: category, subtype and size in one string.
+   *
+   * **Nullable, and every reader must say so.** An off-catalogue line reaches the chart with no
+   * label (see `ChartItem.label`), and this used to be typed `string` — so `ProjectChips`
+   * interpolated it and wrote «12 × null» into the renter's own request box, where it went on to the
+   * agent as if he had typed it.
+   */
+  machine: string | null;
   /** How many of it, so the text written into the box says so. */
   quantity: number;
   /** The source's OWN period, when it had one. Copied with the terms; null means it inherited. */
@@ -244,6 +255,8 @@ export function machineTermsOfRequestItem(item: {
   nightShiftRequired?: boolean | null;
   fatRequired?: boolean | null;
   fuelTypePreference?: string | null;
+  /** The LIVE field. Read with the alias below through `requestedMinYear`, never either alone. */
+  minimumEquipmentYear?: number | null;
   maxEquipmentAge?: number | null;
   mobilizationByRentee?: boolean | null;
   demobilizationByRentee?: boolean | null;
@@ -263,7 +276,10 @@ export function machineTermsOfRequestItem(item: {
       fatAccommodationTransport: null,
     } as MachineTerms["operator"],
     fuelType: (item.fuelTypePreference ?? null) as MachineTerms["fuelType"],
-    equipmentYear: (item.maxEquipmentAge != null ? String(item.maxEquipmentAge) : null) as MachineTerms["equipmentYear"],
+    equipmentYear: (() => {
+      const y = requestedMinYear(item as unknown as Record<string, unknown>);
+      return (y != null ? String(y) : null) as MachineTerms["equipmentYear"];
+    })(),
     deliveryOverride: party(item.mobilizationByRentee) as MachineTerms["deliveryOverride"],
     returnOverride: party(item.demobilizationByRentee) as MachineTerms["returnOverride"],
     fuelResponsibilityOverride: (item.dieselIncluded == null ? null : item.dieselIncluded ? "supplier" : "me") as MachineTerms["fuelResponsibilityOverride"],

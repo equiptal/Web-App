@@ -4,6 +4,7 @@ import { Canvas } from "@/components/create/Canvas";
 import { MachineCard } from "@/components/create/MachineCard";
 import { DRAFT_STORAGE_KEY } from "@/lib/store/rfq-store";
 import { itemGaps, transportGaps } from "@/lib/contract";
+import { EMPTY_REF } from "@/lib/contract/taxonomy";
 import { confirmedProject, makeAgentDraft, makeItem, renderCanvas } from "../setup/canvas";
 
 /* The two overlay pills are addressed by their accessible NAME, and that name is the field’s noun —
@@ -188,5 +189,71 @@ describe("when the catalogue is unreachable (MREQ-AC-52)", () => {
        now — the required dot the panel draws beside an unanswered field. */
     expect(document.querySelectorAll(".text-brand").length).toBeGreaterThan(0);
     expect(handle.store().state.draft).toBeTruthy();
+  });
+});
+
+/**
+ * ── «Required» costs the label as little as it can (owner, 2026-09-12) ──────────────────────────
+ * *"fix the ui when required appear to not change the size of card box and dont affect the text
+ * wrapping, put the required text small"*.
+ *
+ * The word was a flex SIBLING of the label at the label's own metrics - 11px, uppercase, extrabold,
+ * with the row's 0.05em tracking - and it carried a star of its own. Three faults from that one
+ * line: it took its width off the label, so «FUEL RESPONSIBILITY» wrapped to two lines and its panel
+ * grew taller than the two beside it; with no `nowrap` the string «* Required» split at its own
+ * space, stranding the star at the end of the first line with «REQUIRED» beneath it; and at that
+ * weight it read as a second title rather than as a note on the first.
+ */
+describe("the required marker, on a labelled field", () => {
+  const markOf = (root: HTMLElement) =>
+    Array.from(root.querySelectorAll("span")).find((el) => el.textContent?.trim() === "Required") ?? null;
+
+  it("is small and quiet: sentence case, no tracking, and not the label's weight", async () => {
+    const handle = await renderCanvas(<Canvas />, {
+      draft: makeAgentDraft({ items: [makeItem({ ref: EMPTY_REF })], project: confirmedProject() }),
+    });
+    await handle.run(() => {
+      screen.getByText(/Review & send/).closest("button")!.click();
+    });
+
+    const mark = markOf(handle.view.container);
+    expect(mark, "a refused field must say the word").toBeTruthy();
+    // The row is `uppercase … tracking-[0.05em]`; the marker opts out of both, which is most of the
+    // width it gave back.
+    expect(mark!.className).toContain("normal-case");
+    expect(mark!.className).toContain("tracking-normal");
+    expect(mark!.className).toContain("font-semibold");
+    expect(mark!.className).not.toContain("font-extrabold");
+  });
+
+  it("never breaks in half, and never takes the label's width as a rigid item", async () => {
+    const handle = await renderCanvas(<Canvas />, {
+      draft: makeAgentDraft({ items: [makeItem({ ref: EMPTY_REF })], project: confirmedProject() }),
+    });
+    await handle.run(() => {
+      screen.getByText(/Review & send/).closest("button")!.click();
+    });
+
+    const mark = markOf(handle.view.container)!;
+    // «* Required» split at its own space and left the star on the line above.
+    expect(mark.className).toContain("whitespace-nowrap");
+    // INLINE with the label's text, not a sibling of it: it flows with the words rather than
+    // competing with them for the row's width.
+    expect(mark.parentElement?.textContent).toMatch(/Required$/);
+    expect(mark.parentElement?.className).toContain("min-w-0");
+  });
+
+  it("carries no star of its own — the label has one, in both states", async () => {
+    const handle = await renderCanvas(<Canvas />, {
+      draft: makeAgentDraft({ items: [makeItem({ ref: EMPTY_REF })], project: confirmedProject() }),
+    });
+    await handle.run(() => {
+      screen.getByText(/Review & send/).closest("button")!.click();
+    });
+
+    expect(markOf(handle.view.container)!.textContent).toBe("Required");
+    // The standing star survives the refusal rather than being replaced by it, so the label's width
+    // is the same before and after — which is the whole point of the change.
+    expect(screen.getAllByText("*").length).toBeGreaterThan(0);
   });
 });

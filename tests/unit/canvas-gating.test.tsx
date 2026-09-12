@@ -135,6 +135,24 @@ describe("accepting the charged days closes the schedule (MREQ-AC-05)", () => {
   });
 });
 
+/**
+ * Every way the canvas says «this is owed», counted together.
+ *
+ * There are TWO markers by design, and they are not the same shape:
+ *  · a CHIP on the photograph draws one opaque strip, «MINIMUM YEAR * Required» (`OverlayRequired`);
+ *  · a labelled FIELD draws the star on its own label and the bare word beside it, small - the word
+ *    stopped carrying a star of its own on 2026-09-12, because that star broke across the line and
+ *    pushed «FUEL RESPONSIBILITY» onto two lines with it.
+ *
+ * Reading only the literal «* Required» would therefore pass on a chip while a field said nothing,
+ * and - worse - every `queryByText("* Required")).toBeNull()` below would become VACUOUS for a
+ * field. So both spellings are counted, in one place.
+ */
+const requiredMarks = () => screen.queryAllByText((_t, el) => {
+  const text = el?.textContent?.trim();
+  return text === "Required" || text === "* Required";
+}).length;
+
 describe("the primary button refuses with gaps (MREQ-AC-15)", () => {
   /* ~~Owner, 2026-08-26: it is DISABLED while anything is owed rather than live-then-shaking. A
      button that looks ready and then refuses teaches the renter that the page is broken.~~
@@ -160,8 +178,8 @@ describe("the primary button refuses with gaps (MREQ-AC-15)", () => {
     await handle.run(() => button.click());
 
     expect(handle.store().state.readyToSend).toBe(false);
-    // The mark is on the field, and it is the same word wherever a field is owed.
-    expect(screen.getAllByText("* Required").length).toBeGreaterThan(0);
+    // The mark is on the field, whichever of the two shapes that field wears.
+    expect(requiredMarks()).toBeGreaterThan(0);
   });
 
   /**
@@ -185,7 +203,7 @@ describe("the primary button refuses with gaps (MREQ-AC-15)", () => {
     expect(handle.store().state.readyToSend).toBe(false);
     expect(shaken(handle.view.container)).toBeGreaterThan(0);
     // Neither the word nor the standing star: the request did not ask for either field.
-    expect(screen.queryByText("* Required")).toBeNull();
+    expect(requiredMarks()).toBe(0);
   });
 
   it("advances to the review screen when nothing is left", async () => {
@@ -238,7 +256,7 @@ describe("a refusal opens the panel that owes the answer", () => {
     });
 
     expect(handle.store().state.activeSection).toBe("when");
-    expect(screen.getAllByText("* Required").length).toBeGreaterThan(0);
+    expect(requiredMarks()).toBeGreaterThan(0);
   });
 
   it("marks FUEL, which is one of the app's own gates and had no mark at all", async () => {
@@ -258,7 +276,7 @@ describe("a refusal opens the panel that owes the answer", () => {
     expect(handle.store().state.activeSection).toBe("equipment");
     // The chip has no visible label of its own, so the mark brings the field's NAME with it.
     expect(screen.getAllByText("FUEL").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("* Required").length).toBeGreaterThan(0);
+    expect(requiredMarks()).toBeGreaterThan(0);
   });
 });
 
@@ -277,7 +295,7 @@ describe("what a required field says before the first refusal", () => {
 
     // TYPE, SIZE, DELIVERY TO SITE and RETURN FROM SITE, each starred on its own label.
     expect(screen.getAllByText("*").length).toBeGreaterThanOrEqual(4);
-    expect(screen.queryByText("* Required")).toBeNull();
+    expect(requiredMarks()).toBe(0);
   });
 });
 

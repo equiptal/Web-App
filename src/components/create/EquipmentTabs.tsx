@@ -49,6 +49,7 @@ export function EquipmentTabs({
   onPick,
   onAdd,
   onRemove,
+  removeLabel,
 }: {
   tabs: readonly EquipmentTab[];
   activeId: string | null;
@@ -65,6 +66,15 @@ export function EquipmentTabs({
    * one, because where to land afterwards is a fact about the canvas's own selection.
    */
   onRemove?: (id: string) => void;
+  /**
+   * What the ✕ DOES, when it is not a removal.
+   *
+   * On a direct request the only tab's ✕ takes the renter back to the supplier's store to pick a
+   * different machine (app parity, Epic 008 AC-04) — the line is swapped, not dropped. «Remove» on
+   * it would describe neither the press nor what comes back, and it is the only text a screen reader
+   * gets for this control.
+   */
+  removeLabel?: string;
 }) {
   const t = useT();
   return (
@@ -125,8 +135,8 @@ export function EquipmentTabs({
                 {...pin("equipment-tab-remove")}
                 type="button"
                 onClick={() => onRemove(tab.id)}
-                aria-label={fmt(t.create.removeEquipment.label, { name: tab.label })}
-                title={fmt(t.create.removeEquipment.label, { name: tab.label })}
+                aria-label={fmt(removeLabel ?? t.create.removeEquipment.label, { name: tab.label })}
+                title={fmt(removeLabel ?? t.create.removeEquipment.label, { name: tab.label })}
                 className={cx(
                   "absolute start-0 top-1/2 z-[3] ms-1.5 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full transition",
                   on ? "text-muted hover:bg-danger-soft hover:text-danger" : "text-muted/70 hover:bg-danger-soft hover:text-danger",

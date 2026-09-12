@@ -2267,7 +2267,11 @@ export function ShareRequestPanel({
               `configured: false` and draws nothing. */}
           {channel === "email" && provider === "outlook" && connect?.configured && !connect.connected && (
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-border bg-surface2 px-3 py-2.5">
-              <Icon name="link" size={16} className="flex-none text-muted" />
+              {/* ⚠️ Outlook's own mark, not a chain link (owner, 2026-09-12). The renter is being
+                  asked to connect ONE named thing, and the logo says which before the sentence
+                  does. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/outlook-logo.webp" alt="Outlook" className="h-4 w-4 flex-none object-contain" />
               <span className="min-w-0 flex-1 text-meta text-navy-mid">{c.mailConnectWhy}</span>
               <button
                 type="button"
@@ -2448,6 +2452,7 @@ export function ShareRequestPanel({
           ) : (
             <Destination
               icon="public"
+              logo={{ src: "/moedatech-logo.svg", alt: "Moedatech", className: "h-4 w-auto brightness-0" }}
               tone={uuid ? "done" : "on"}
               title={c.destMoedatech}
               detail={uuid ? c.confirmPostedAlready : c.confirmPostLine}
@@ -2462,6 +2467,11 @@ export function ShareRequestPanel({
           {channel === "email" && emailWillGo && (
             <Destination
               icon={provider === "gmail" ? "alternate_email" : "mail"}
+              logo={
+                provider === "outlook"
+                  ? { src: "/outlook-logo.webp", alt: "Outlook", className: "h-5 w-5 object-contain" }
+                  : undefined
+              }
               tone="on"
               title={provider === "gmail" ? c.destGmail : c.destOutlook}
               detail={
@@ -2508,6 +2518,7 @@ export function ShareRequestPanel({
           {channel === "email" && provider === "outlook" && !emailWillGo && (
             <Destination
               icon="link_off"
+              logo={{ src: "/outlook-logo.webp", alt: "Outlook", className: "h-5 w-5 object-contain" }}
               tone="off"
               title={skipEmail ? c.destOutlookSkipped : c.destOutlookOff}
               detail={skipEmail ? c.destOutlookSkippedBody : c.destOutlookOffBody}
@@ -2570,12 +2581,25 @@ export function ShareRequestPanel({
  */
 function Destination({
   icon,
+  logo,
   tone,
   title,
   detail,
   children,
 }: {
   icon: string;
+  /**
+   * The real mark of the place this block names (owner, 2026-09-12).
+   *
+   * ⚠️ A glyph says «mail»; a logo says WHICH mail. This dialog is the last screen before a
+   * request leaves for other firms, and the renter is checking WHERE it goes, so the two
+   * destinations wear the marks he already knows rather than two house icons that differ only in
+   * their shape.
+   *
+   * Falls back to `icon` when absent, which is what the off-catalogue block still uses: there is no
+   * logo for «nowhere».
+   */
+  logo?: { src: string; alt: string; className: string };
   tone: "on" | "off" | "done" | "warn";
   title: string;
   detail: string;
@@ -2592,7 +2616,20 @@ function Destination({
 
   return (
     <div className={cx("flex items-start gap-3 rounded-md border p-3.5", skin.box)}>
-      <Icon name={icon} size={20} className={cx("mt-px flex-none", skin.mark)} />
+      {logo ? (
+        /* ⚠️ Each mark carries its OWN sizing, because a wordmark and a square badge cannot share
+           one box: Moedatech's is a wide lockup drawn to a height, Outlook's is a square drawn to
+           both. `brightness-0` on the lockup is the same treatment the locked Moedatech chip in the
+           channel row already uses on a soft tint, so the two agree. */
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={logo.src}
+          alt={logo.alt}
+          className={cx("mt-px flex-none", logo.className, tone === "off" && "opacity-45 grayscale")}
+        />
+      ) : (
+        <Icon name={icon} size={20} className={cx("mt-px flex-none", skin.mark)} />
+      )}
       <span className="min-w-0 flex-1">
         <b className="block text-body font-extrabold text-navy">{title}</b>
         <span className="mt-0.5 block text-meta leading-relaxed text-muted-dark">{detail}</span>

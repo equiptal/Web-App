@@ -257,10 +257,23 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
       const terms = await fetchTemplateTerms(chosen.id, option);
       actions.useTemplate(terms, option.kind === "work_order" ? option.id : null, option.when);
 
-      const line = `${option.quantity > 1 ? `${option.quantity} × ` : ""}${option.machine}`.trim();
-      if (line) {
-        const before = state.text.trimEnd();
-        await typeInto(before, line);
+      /* ── A template with no NAME copies its terms and writes nothing (owner, 2026-09-12) ───────
+         *"why the equipment name doesn't appear here, why showing null"* — on a chip that had typed
+         «12 × null» into the request box, twice.
+
+         `option.machine` is `ChartItem.label`, which is genuinely absent for an off-catalogue line:
+         the chart's projection names a request's item from its taxonomy pair alone, and that pair is
+         empty. It was TYPED `string`, so nothing objected, and `${null}` in the template literal
+         produced the four characters «null» — which `trim()` then reported as a perfectly good line
+         and the typewriter wrote into the renter's own words, where it went on to the agent as if he
+         had asked for a machine called null.
+
+         The terms still apply: they are what a template is FOR, and they are keyed on the item, not
+         on its name. Only the sentence is withheld, because there is no name to put in it. */
+      const name = option.machine?.trim();
+      if (name) {
+        const line = `${option.quantity > 1 ? `${option.quantity} × ` : ""}${name}`;
+        await typeInto(state.text.trimEnd(), line);
       }
     } catch {
       // Nothing is applied and nothing is said. A template is a shortcut; failing to take one leaves

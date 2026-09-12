@@ -297,6 +297,11 @@ const finite = (v: number | null | undefined): number | null => (typeof v === "n
  * Two rules it enforces so no caller has to:
  *  - **Never a half-resolved point** (AC-06). One missing side voids both and downgrades the level to
  *    `none` — a point at `(lat, 0)` is somewhere in the Gulf of Guinea, which is worse than no point.
+ *  - **`(0, 0)` is not a place** (owner, 2026-09-12). The rule above was written for a MISSING side
+ *    and guarded `null` only, so a yard row carrying zero for both arrived here as a perfectly good
+ *    coordinate: the machine was plotted in the Atlantic and the card printed «5720.8 km from your
+ *    project», which is the distance from Riyadh to Null Island to within a rounding step. A renter
+ *    read that as a real yard 5,700 km away rather than as a yard nobody has located.
  *  - **`unidentified` keeps its level** even though it has no coordinates. Collapsing it into `none`
  *    would tell the renter a machine exists whose location is unknown, when no machine exists at all.
  */
@@ -307,6 +312,11 @@ export function resolveUnitLocation(unit: Pick<OfferedUnitDetail, "lat" | "lng" 
   const lat = finite(unit.lat);
   const lng = finite(unit.lng);
   if (lat == null || lng == null) return { lat: null, lng: null, distanceKm: null, locationSource: "none" };
+  /* Null Island is the sentinel an unset yard arrives as, never a yard. The DISTANCE goes with it:
+     the backend computed that figure from these coordinates, so it is exactly as wrong as they are.
+     Exact zeros only — 0.0001° is 11 m off the equator and is a real if unlikely point, and widening
+     this to a tolerance would start discarding places instead of sentinels. */
+  if (lat === 0 && lng === 0) return { lat: null, lng: null, distanceKm: null, locationSource: "none" };
 
   return { lat, lng, distanceKm: finite(unit.distanceKm), locationSource: source };
 }

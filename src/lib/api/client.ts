@@ -41,10 +41,26 @@ export class ApiError extends Error {
   status?: number;
   /** The real upstream backend HTTP status (e.g. agents-backend), distinct from our relay's status. */
   backendStatus?: number;
+  /**
+   * The envelope's `details`, untouched.
+   *
+   * ⚠️ On a `VALIDATION_ERROR` this is zod's `flatten()` — `{ formErrors, fieldErrors }` — which is
+   * the only thing that names the field the backend refused. Carried as `unknown` because other
+   * codes put other shapes here (an export's `{ fallback }`, for one), and narrowing it at the door
+   * would silently drop those.
+   */
+  details?: unknown;
   constructor(
     kind: ApiErrorKind,
     message?: string,
-    extra?: { detail?: string; messageAr?: string; backendCode?: string; status?: number; backendStatus?: number },
+    extra?: {
+      detail?: string;
+      messageAr?: string;
+      backendCode?: string;
+      status?: number;
+      backendStatus?: number;
+      details?: unknown;
+    },
   ) {
     super(message ?? kind);
     this.kind = kind;
@@ -54,6 +70,7 @@ export class ApiError extends Error {
     this.backendCode = extra?.backendCode;
     this.status = extra?.status;
     this.backendStatus = extra?.backendStatus;
+    this.details = extra?.details;
   }
 }
 
@@ -77,11 +94,33 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   }
   if (!res.ok) {
     let code: ApiErrorKind = "unknown";
-    let extra: { detail?: string; messageAr?: string; backendCode?: string; status?: number; backendStatus?: number } = { status: res.status };
+    let extra: {
+      detail?: string;
+      messageAr?: string;
+      backendCode?: string;
+      status?: number;
+      backendStatus?: number;
+      details?: unknown;
+    } = { status: res.status };
     try {
-      const data = (await res.json()) as { code?: ApiErrorKind; detail?: string; messageAr?: string; backendCode?: string; backendStatus?: number };
+      const data = (await res.json()) as {
+        code?: ApiErrorKind;
+        detail?: string;
+        messageAr?: string;
+        backendCode?: string;
+        backendStatus?: number;
+        details?: unknown;
+      };
       if (data.code === "empty" || data.code === "network") code = data.code;
-      extra = { ...extra, detail: data.detail, messageAr: data.messageAr, backendCode: data.backendCode, backendStatus: data.backendStatus };
+      extra = {
+        ...extra,
+        detail: data.detail,
+        messageAr: data.messageAr,
+        backendCode: data.backendCode,
+        backendStatus: data.backendStatus,
+        // ⚠️ Which field the backend refused. See `ApiError.details`.
+        details: data.details,
+      };
     } catch {
       /* ignore */
     }
@@ -1234,7 +1273,7 @@ export async function listTemplates(projectId: string): Promise<TemplateOption[]
       kind: g.kind,
       ref: g.title?.trim() || g.ref,
       itemId: it.id,
-      machine: it.label,
+      machine: it.label ?? null,
       quantity: it.quantity,
       when: g.when,
     })),

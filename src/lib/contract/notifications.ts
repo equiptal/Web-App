@@ -109,6 +109,22 @@ export function isBubbleWorthy(n: NotificationItem): boolean {
  * The workspace takes `?r=<requestId>` and resolves the group and the item from it
  * (`RequestsWorkspace.tsx`), so that is the shape every request-scoped link uses now.
  *
+ * ── Audited again 2026-09-12, against every `type:` the three backends emit ──────────────────────
+ *
+ * Owner: *"make sure all notifications are wired to their exact place."* Three were not, and all
+ * three carried the id they needed:
+ *
+ *  · `request.closed_owner` — the renter's OWN request closing. `roleContext: 'rentee'`, and the
+ *    backend comments the id as being there *"so the renter's tap opens THEIR request"*.
+ *  · `request.closed_unfilled` — the same event told to a supplier who bid on it.
+ *  · `bid.quotation_viewed` / `bid.quotation_downloaded` — a supplier's own live-status pill.
+ *
+ * 🔴 **Three more look like gaps and are NOT notifications.** `bid_withdrawn`, `deal_closed` and
+ * `request_summary` are Stream CHAT system-message metadata (`postSystemMessage(..., { type })`) and
+ * never reach the bell; `referral_reward` is a COUPON type. Adding cases for them would be four dead
+ * branches that a reader would later trust. The underscore is the tell: every real notification type
+ * in this product is dotted.
+ *
  * **Half the old map was for the wrong audience.** `request.broadcast`, `request.direct`,
  * `bid.accepted`, `RFQ_CLOSED_FOMO`, `verification.*` and `equipment.*` are all emitted with
  * `roleContext: 'supplier'` — a renter never receives one. They are kept, deliberately: the same
@@ -168,13 +184,27 @@ export function notificationHref(n: NotificationItem): string | null {
     case "deal.acceptance_withdrawn":
       return room ?? "/inbox";
 
+    /* The renter's own request closed, by him or for want of a bid. Both carry `requestId`, and the
+       backend's own comment on the first says why: *"The renter's tap opens THEIR request, so the id
+       has to be here."* It arrived, and this file dropped it on the floor. */
+    case "request.closed_owner":
+      return request;
+
     /* ── Supplier-side rows, kept for a dual-role account ─────────────────────────────────────── */
     case "request.broadcast":
     case "request.direct":
     case "request.details_changed":
     case "request.fully_covered":
+    case "request.closed_unfilled":
     case "bid.accepted":
       return request;
+
+    /* The renter opened or downloaded his quotation. `roleContext: 'supplier'`, and it carries BOTH
+       ids — the bid is the one that matters, because a supplier holding several bids on one request
+       needs the one that was read. */
+    case "bid.quotation_viewed":
+    case "bid.quotation_downloaded":
+      return chat ?? request;
     case "RFQ_CLOSED_FOMO":
       return "/browse";
 

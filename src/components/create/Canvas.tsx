@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Icon, Modal } from "@/components/ui";
@@ -27,6 +28,7 @@ import { customName, gateWhen, gateWhere, isCustomLine, itemGaps, requiredGaps, 
 import type { RequiredGap } from "@/lib/contract";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { saveDirectStash, type DirectStashIntent } from "@/lib/agent/direct-stash";
 
 /**
  * A gap's reason, in the renter's words.
@@ -133,6 +135,44 @@ export function Canvas() {
    * gets the same one-line question rather than a press that costs work on a mis-tap.
    */
   const [removing, setRemoving] = useState<{ id: string; label: string } | null>(null);
+
+  /**
+   * ── In a DIRECT request the equipment comes from the store, so changing it is a trip there ─────
+   *
+   * App parity, Epic 008 AC-02 / AC-04: *"in direct mode the only-tab × redirects to the supplier's
+   * store and the new selection becomes the single tab on return"*, and the + does the same with
+   * intent `append`. The machine on a direct request came off one supplier's listing; picking a
+   * different one HERE would address a request to a firm that may not carry it, which is why the
+   * app hides the type and size controls in this mode too.
+   *
+   * The draft is stashed first, because `/create` deliberately refuses to rehydrate a stored draft
+   * into a direct request (the 2026-09-10 fix) — without this, the site, the dates and every other
+   * machine would be gone on the way back. `direct-stash.ts` carries the whole slice.
+   */
+  const router = useRouter();
+  const direct = state.direct;
+  const storeErrand = direct?.storeId
+    ? (intent: DirectStashIntent) => {
+        saveDirectStash({
+          intent,
+          supplierId: direct.supplierId,
+          snapshot: {
+            phase: state.phase,
+            activeSection: state.activeSection,
+            readyToSend: state.readyToSend,
+            itemIndex: state.itemIndex,
+            draft: state.draft,
+            text: state.text,
+            multiLocationDismissed: state.multiLocationDismissed,
+            seq: state.seq,
+            agentOrigin: state.agentOrigin,
+            isTrial: state.isTrial,
+            direct: state.direct,
+          },
+        });
+        router.push(`/stores/${encodeURIComponent(direct.storeId!)}`);
+      }
+    : null;
 
   /* Every press that opens a panel records it. Declared with the other hooks, above every
      early return: a hook placed after one runs in a different order on the render that takes
@@ -607,13 +647,33 @@ export function Canvas() {
             // renter on whichever of the three was last open.
             actions.openSection("equipment");
           }}
-          onAdd={equipmentGaps.length === 0 ? addMachine : undefined}
+          /* In a direct request the + is an errand to the supplier's store, not a blank card here
+             (AC-02). It still refuses while THIS equipment owes an answer — leaving for the store
+             would strand a half-answered machine in the stash. */
+          onAdd={
+            equipmentGaps.length > 0
+              ? undefined
+              : storeErrand
+                ? () => storeErrand("append")
+                : addMachine
+          }
           /* Withheld on a request with ONE equipment: `gate.noItems` refuses a request with none, so
-             the press would lead nowhere but a refusal. */
+             the press would lead nowhere but a refusal.
+
+             ⚠️ Except in a DIRECT request, where the ✕ on the ONLY tab is the one way to change the
+             machine (AC-04) — it swaps rather than removes, so it never leads to an empty request.
+             It asks nothing: the errand leaves the draft whole and the new pick replaces the line on
+             return, so there is no answer to lose and nothing to confirm. With two or more equipment
+             a ✕ is an ordinary remove in either mode, which is what the app does too — the errand is
+             the answer to «I want a DIFFERENT machine», not to «I want one fewer». */
+          /* Only when the ✕ is the store errand — with two or more equipment it removes, and says so. */
+          removeLabel={equipmentTabs.length === 1 && storeErrand ? t.create.changeEquipment : undefined}
           onRemove={
             equipmentTabs.length > 1
               ? (id) => setRemoving({ id, label: equipmentTabs.find((tb) => tb.id === id)?.label ?? "" })
-              : undefined
+              : storeErrand
+                ? () => storeErrand("single")
+                : undefined
           }
         />
       )}

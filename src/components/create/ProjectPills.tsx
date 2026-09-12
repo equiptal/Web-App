@@ -491,6 +491,55 @@ export function ProjectPills() {
           onChange={(v) => actions.patchTerms({ fuelResponsibilityOverride: v }, ["preferences.fuel"])}
         />
 
+        {/* ── REQUIRED to send, so they are drawn whether or not anything set them ─────────────
+            Owner, 2026-09-12: *"keep it unless term is required in request to be sent"*.
+
+            The model year and the safety certificate are the two terms `itemWebGaps` refuses a send
+            without (`gate.yearMissing` / `gate.certMissing`), and both resolve at REQUEST level as
+            well as per machine (`item.equipmentYear ?? project.advanced.equipmentYear`). Hiding
+            either until it held a value took the control off the strip exactly when the renter
+            needed it, and «Review & send» then refused with nothing on this row to fix.
+
+            They sit OUTSIDE the `terms` group with the three party terms for the same reason those
+            moved out on 2026-09-01: a renter who picked a site and no template has no `terms` object
+            at all, and `PATCH_TEMPLATE_TERMS` starts a blank set for exactly this case. Every
+            OPTIONAL term keeps `shown()` and stays hidden until it has an answer. */}
+
+        {/* The same list the machine card offers, and «any» is a real answer rather than an empty
+            one: it says the renter will take any year, which is what suppliers price against. */}
+        <PillSelect<string>
+          label={t.projects.pills.year}
+          value={terms?.equipmentYear ?? null}
+          options={equipmentYears()}
+          optionLabel={(v) => (v === "any" ? t.create.machineCard.anyYear : v)}
+          changed={dirty("preferences.equipment_year")}
+          missing={!terms?.equipmentYear}
+          onRemove={() => actions.patchTerms({ equipmentYear: null }, ["preferences.equipment_year"])}
+          onChange={(v) => actions.patchTerms({ equipmentYear: v }, ["preferences.equipment_year"])}
+        />
+
+        {/* One choice, not a multi-select: the machine card asks it exactly this way — no
+            certificate, TÜV, Aramco, Other — and two shapes for one question is how the two surfaces
+            drift. «Other» keeps its free-text box in *More details*, which is the one thing a pill
+            genuinely cannot hold. */}
+        <PillSelect<string>
+          label={t.projects.pills.certs}
+          value={terms?.safetyCertsOverride?.[0] ?? (terms?.safetyCertsOverride ? NO_CERT : null)}
+          options={[NO_CERT, ...SAFETY_CERTIFICATES]}
+          optionLabel={(v) => (v === NO_CERT ? t.create.machineCard.noCert : t.options.safetyCert[v as SafetyCertificate] ?? v)}
+          changed={dirty("preferences.certs")}
+          missing={!terms?.safetyCertsOverride}
+          onRemove={() => actions.patchTerms({ safetyCertsOverride: null }, ["preferences.certs"])}
+          onChange={(v) =>
+            actions.patchTerms(
+              {
+                safetyCertsOverride: (v == null ? null : v === NO_CERT ? [] : [v as SafetyCertificate]),
+              },
+              ["preferences.certs"],
+            )
+          }
+        />
+
         {terms && (
           <>
             {/* ~~The fuel it burns, beside who buys it.~~ Removed (owner, 2026-09-03: *"remove
@@ -528,18 +577,6 @@ export function ProjectPills() {
                 The same list the machine card offers, and «any» is a real answer rather than an
                 empty one: it says the renter will take any year, which is what suppliers price
                 against. */}
-            {shown(terms.equipmentYear) && (
-            <PillSelect<string>
-              label={t.projects.pills.year}
-              value={terms.equipmentYear ?? null}
-              options={equipmentYears()}
-              optionLabel={(v) => (v === "any" ? t.create.machineCard.anyYear : v)}
-              changed={dirty("preferences.equipment_year")}
-              onRemove={() => actions.patchTerms({ equipmentYear: null }, ["preferences.equipment_year"])}
-              onChange={(v) => actions.patchTerms({ equipmentYear: v }, ["preferences.equipment_year"])}
-            />
-            )}
-
             {/* ── The operator's own terms ───────────────────────────────────────────────────────
                 Food, accommodation and transport, the night shift, the nationality rule and the
                 operator's certificate all travel in `MachineTerms.operator`, and a work order copied
@@ -642,38 +679,6 @@ export function ProjectPills() {
                 />
                 )}
               </>
-            )}
-
-            {/* ── The certificate is EDITABLE, and shown whether or not it is set ──────────────
-                ~~Certificates report rather than edit: the set lives in *More details*.~~ Two faults
-                in one pill (owner, 2026-08-31: *"this is read only and cant be edited"*).
-
-                It could not be changed — every other term on this row can, so one that only reports
-                reads as a bug rather than as a pointer to somewhere else. And it appeared ONLY when
-                a certificate was already set, so a renter who wanted to ADD one had nothing to press
-                and no reason to think this row was where it lived.
-
-                One choice, not a multi-select: the machine card asks it exactly this way — no
-                certificate, TÜV, Aramco, Other — and two shapes for one question is how the two
-                surfaces drift. «Other» keeps its free-text box in *More details*, which is the one
-                thing a pill genuinely cannot hold. */}
-            {shown(terms.safetyCertsOverride?.[0]) && (
-            <PillSelect<string>
-              label={t.projects.pills.certs}
-              value={terms.safetyCertsOverride?.[0] ?? (terms.safetyCertsOverride ? NO_CERT : null)}
-              options={[NO_CERT, ...SAFETY_CERTIFICATES]}
-              optionLabel={(v) => (v === NO_CERT ? t.create.machineCard.noCert : t.options.safetyCert[v as SafetyCertificate] ?? v)}
-              changed={dirty("preferences.certs")}
-              onRemove={() => actions.patchTerms({ safetyCertsOverride: null }, ["preferences.certs"])}
-              onChange={(v) =>
-                actions.patchTerms(
-                  {
-                    safetyCertsOverride: (v == null ? null : v === NO_CERT ? [] : [v as SafetyCertificate]),
-                  },
-                  ["preferences.certs"],
-                )
-              }
-            />
             )}
           </>
         )}

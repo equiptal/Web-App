@@ -2,6 +2,239 @@
 
 ## Change log
 
+- **2026-09-12 - A DIRECT request's machine is the LISTING's: the taxonomy is locked, and changing it is a trip to that supplier's store and back.**
+  Owner: *"in direct request he cant change the taxonamy right? it is filled from equipment he
+  selected so if he want to change will be bacl to store"*, then *"match the app"*. He was describing
+  the APP; the web had no direct-mode branch at all - `MachineCard`, `Canvas` and `EquipmentTabs`
+  contained the word «direct» exactly zero times.
+  (1) **The lock (Epic 008 AC-01).** TYPE and SIZE are `disabled` when `state.direct` is set, and the
+  off-catalogue escape (`emptyAction`, «Add a custom equipment type») is withheld with them. The app
+  hides its size-edit badge and its «need a different type» section for the reason its own comment
+  gives: *"direct-mode rentees are tied to one supplier; offering siblings under the same parent
+  category could route them to a subcategory the supplier doesn't carry"*. Before this a renter could
+  turn the 35-ton excavator he tapped into a forklift while the orange ribbon above went on promising
+  the request went to that firm alone.
+  (2) **The errand (AC-02 / AC-04).** The ✕ on the ONLY tab and the + both stash the draft and push
+  `/stores/{storeId}`; the machine picked there comes back as that line (`single`) or beside it
+  (`append`). On a direct request the ✕ is drawn on the only tab, which it never is on a broadcast -
+  it swaps rather than removes, so it cannot leave a request with no equipment - and it says «Change
+  {name}, at the store» rather than «Remove».
+  (3) **`direct-stash.ts`** (new) holds the whole restorable slice in `sessionStorage`, keyed to the
+  supplier and good for 30 minutes. `RESUME_DIRECT` puts it back.
+  Files: `src/lib/agent/direct-stash.ts` (new), `src/lib/agent/direct-draft.ts`
+  (`directRequestItem` split out), `src/lib/store/rfq-store.tsx` (`RESUME_DIRECT`, `resumeDirect`),
+  `src/app/create/page.tsx`, `src/components/create/{Canvas,MachineCard,EquipmentTabs}.tsx`,
+  `src/lib/i18n/{en,ar}.ts` (`create.changeEquipment`),
+  `tests/unit/direct-store-errand.test.ts` (new, 6 cases),
+  `tests/unit/direct-taxonomy-lock.test.tsx` (new, 4 cases).
+  🔴 **The stash exists because `/create` REFUSES to rehydrate into a direct request.** That is the
+  2026-09-10 fix and it must stay: the stored INTAKE phase was overwriting the machine the renter had
+  just pressed. Without a stash the store round trip would therefore drop the site, the dates and
+  every other machine, which is worse than the problem it solves.
+  ⚠️ **`RESUME_DIRECT` is not `HYDRATE` and not `PROCESS_SUCCESS`,** and each for its own reason.
+  `HYDRATE` raises the continue/start-over prompt, which here would ask the renter about his own last
+  two presses. `PROCESS_SUCCESS` re-applies the project's defaults and the template's terms over the
+  whole draft and RESETS `touchedFields` - and «no certificate» is stored as absent, so the gate would
+  ask again for a certificate he had already declined.
+  ⚠️ **`SET_DIRECT` drops the draft when the target changes**, deliberately (*"the draft in hand
+  belongs to the other request"*). Coming back from the errand the supplier is the SAME, so nothing is
+  dropped; on a cold return the store is empty anyway and `RESUME_DIRECT` follows in the same effect.
+  A test fixture that names the supplier after the draft has landed sees an empty canvas, which is why
+  `direct-taxonomy-lock.test.tsx` puts the draft straight back.
+  ⚠️ With TWO or more equipment the ✕ is an ordinary remove in either mode. The errand answers «I want
+  a DIFFERENT machine», not «I want one fewer».
+  ⚠️ An appended line takes a `d…` id, so it can never collide with `ADD_ITEM`'s `m{seq}` or the first
+  line's `i1`.
+  ⚠️ **A RELOAD of a direct request still keeps only the machine.** That is the rehydrate guard, not
+  this change: the stash covers the errand and nothing else. If the reload case ever needs answering,
+  it needs its own decision, not a wider stash.
+  ⚠️ Verified: typecheck, lint, 81 cases across the eight suites that touch the direct flow and the
+  machine card. Both halves break-checked (the lock forced false, the ✕ made an ordinary remove); each
+  went red. NOT seen rendered as a round trip - that needs a signed-in renter, a real store and a
+  deployed build, so the store press and the return are pinned by tests only.
+
+- **2026-09-12 - A template's YEAR came back empty because it was read off the field the backend never sends, and the two terms a request cannot go out without now draw empty.**
+  Owner: *"the year is not stored or shown from the request why? all terms of request must be shown as
+  pills in the request intake"*, then *"keep it unless term is required in request to be sent also
+  dont mention fuel type"*.
+  (1) **The read.** `machineTermsOfRequestItem` set `equipmentYear` from `item.maxEquipmentAge`
+  alone. That is the DEPRECATED alias the web POSTS under and the backend coalesces on write
+  (`minimumEquipmentYear ?? maxEquipmentAge`); it is never sent BACK. So a past request used as a
+  project template carried `equipmentYear: null` every time, and the strip's year pill - guarded on
+  having a value - drew nothing. It reads `requestedMinYear` now, which is the one reader that exists
+  for exactly this.
+  (2) **The strip.** The model year and the equipment certificate are the two terms `itemWebGaps`
+  refuses a send without (`gate.yearMissing` / `gate.certMissing`). Both were drawn only when
+  already answered, and both sat INSIDE the `{terms && …}` group - so a renter who picked a site and
+  no template had neither control on screen while «Review & send» refused over them. They moved out
+  beside delivery / return / fuel responsibility, which left that group on 2026-09-01 for the same
+  reason, and they draw empty and `missing` when nobody has answered.
+  Files: `src/lib/contract/project-apply.ts`, `src/components/create/ProjectPills.tsx`,
+  `tests/unit/project-apply.test.ts` (3 cases), `tests/unit/project-pills-visibility.test.tsx`
+  (rewritten to the new rule, 5 cases).
+  ⚠️ **The YEAR changed sides; the RULE did not.** 2026-09-02 named the year as an example of an
+  optional term that must stay hidden until filled, and it was one then. It became required on
+  2026-09-09, when the cert/year gate learned to read the request-level answer. The test head quotes
+  both rulings; if the gate is ever lifted, both pills go back to `shown()`.
+  ⚠️ **FOURTH reader of that field pair.** `requestedMinYear`'s own note in `bids.ts` lists the
+  other three (`mapBid` 2026-08-10, `itemDetailRows` 2026-09-01, the terms modal). Anything that
+  wants a request's year goes through it; reading either field alone is the bug, both times.
+  ⚠️ **No fuel-type pill**, at the owner's word in the same message. It was deliberately removed on
+  2026-09-03 (*"it is always prefilled by us in the system"*) and the comment recording that stays.
+  ⚠️ A WORK-ORDER template was never affected: `listWorkOrders` returns terms from the stored
+  `WireTerms.year`, a different path.
+  ⚠️ Verified: typecheck, lint, and 63 cases across the five touched suites. The year fix was
+  break-checked (the reader reverted to the alias, the new case went red). NOT seen rendered - the
+  strip needs a signed-in renter with a project, so the pills are pinned by the component test
+  rather than by a picture.
+
+- **2026-09-12 - The ocean machine, finished without the backend: the sentinel dies at the parser, and an unplaceable yard stops naming itself.**
+  Owner: *"if i didnt fix backend cant it be fixed?"* and *"i want u to test case of yard is also
+  unspecified but shown as outside the requests city and shown as equipment swimming on the ocean"*.
+  Yes - and the earlier guard was only a third of it.
+  🔴 **`resolveUnitLocation` is called by `isPlottable` and almost nothing else.** The fleet CARD, the
+  equipment DETAIL, the distance SORT and the distance BANDS all read `m.distanceKm` and `m.lat`
+  STRAIGHT off the row. So guarding `(0, 0)` inside that function took the machine off the map and
+  left «5720.8 km from your project» printed on the card beside it - one fact with two answers, which
+  is the exact shape every disagreement on this surface has arrived in. The sentinel is voided in
+  `mapFleet` now, so a `FleetMachine` cannot carry it and no consumer has to remember the rule.
+  Three lies came out of that one pair of zeros, and each is pinned: the MAP drew a pin in the Gulf
+  of Guinea; the CARD printed a confident distance; and `isOutOfCity` was TRUE, so the panel also
+  said the yard is outside the request's city - an inference stacked on the bad number, and the worst
+  of the three, because it reads as something somebody established rather than as arithmetic on a
+  placeholder.
+  **The yard NAME was the last backend dependency, and it is closed.** `EquipmentDetail` printed
+  `machine.yardName` verbatim, which is why «Unspecified yard» - the backend's own placeholder row -
+  reached the screen. The web cannot tell a placeholder name from a real one, but it can tell that
+  this yard resolved to nothing at all, and a yard nothing can place has nothing to say about where
+  the machine is. The name is withheld and the cell says «Location not specified» alone.
+  Files: `src/lib/contract/fleet.ts`, `src/components/map/panel/EquipmentDetail.tsx`,
+  `tests/unit/fleet.test.ts` (7 cases), `docs/todo.json`.
+  🔴 **Only the SENTINEL is voided, never `resolveUnitLocation` wholesale.** The first cut spread the
+  whole resolved object at the parser, and that function voids the DISTANCE whenever there are no
+  coordinates - right for a pin, wrong for the card, because the platform can know how far a yard is
+  without publishing where it is. `yard-card.test.tsx` has fixed a machine at 12.4 km with no point
+  since it was written, and the wholesale spread silently blanked it. Two of its cases caught that.
+  ⚠️ For the same reason «placeable» on the detail is **a point OR a distance**, not a point alone.
+  ⚠️ **An unrecognised `locationSource` still parses to `undefined`** and must. `reportedLocationSource`
+  applies the documented default at read time; writing a level in the parser would put a second
+  default where nobody would look for it. The first cut broke that too - the spread always wrote one -
+  and `fleet.test.ts`'s own case caught it.
+  ⚠️ Distance-without-a-point is UNTOUCHED, and so is a genuinely distant machine: 870 km still plots
+  and still reads out-of-city. Far is not the same as unplaced, and two cases say so.
+  ⚠️ Verified: typecheck, lint, **401 passing across the eight map/fleet suites**, and the parser void
+  break-checked by deleting the line - three cases went red. NOT seen rendered.
+
+- **2026-09-12 - A yard at `(0, 0)` is no yard: the machine leaves the map and the card says so.**
+  Owner, on the «unspecified yard» todo: *"some equipment might not have yard at all, how is this
+  handled"*, then *"can we solve it without backend? like if no yard then show no equipment in map
+  and show unspecified location"*. Yes - the whole fix is in the web.
+  🔴 **The sentinel was being read as a place.** A yard row with no coordinates arrives carrying ZERO
+  for both, and `resolveUnitLocation`'s half-point rule guarded `null` only - its own comment already
+  said *"a point at `(lat, 0)` is somewhere in the Gulf of Guinea, which is worse than no point"*,
+  and then tested for absence rather than for zero. So the point passed through as valid: the machine
+  was PLOTTED in the Atlantic, and its card printed «5720.8 km from your project». That figure is the
+  great-circle distance from Riyadh to Null Island - 5720.2 km computed, which is what identified the
+  mechanism. The renter read a real yard 5,700 km away where the truth is a yard nobody has located.
+  Now `(0, 0)` resolves to `locationSource: "none"`, and everything the app already does for that
+  state follows with no further change: **no pin** (`isPlottable` false), **no distance**, and the
+  machine **stays in the fleet list** red and unconfirmed - it exists, it is simply not placed.
+  The cell's words moved with the meaning: ~~«Distance not known»~~ → **«Location not specified»** /
+  «الموقع غير محدّد». `km` is null only when there is no resolvable location at all, so saying
+  «distance» invited the reading that the yard is known and the arithmetic failed.
+  Files: `src/lib/contract/bid-map.ts`, `src/lib/i18n/{en,ar}.ts` (`bidMap.eqNoDistance`),
+  `src/components/map/panel/EquipmentDetail.tsx`, `tests/unit/bid-map.test.ts` (5 cases),
+  `docs/todo.json` (the item annotated, not ticked).
+  ⚠️ **EXACT zeros only.** `0.0001°` is 11 m off the equator and is a real if unlikely point; widening
+  this to a tolerance would start discarding places instead of sentinels. A case pins that a zero on
+  ONE side survives - the equator and the prime meridian are places.
+  ⚠️ **The DISTANCE goes with the point.** The backend computed 5720.8 from those coordinates, so it
+  is exactly as wrong as they are; keeping it would print a confident figure beside «Location not
+  specified», which is the two halves of the bug disagreeing on one card.
+  ⚠️ `none`, never `absent`. `absent` means there is no machine at all and `listedMachines` drops it
+  off the fleet list entirely - this machine has photos, papers and a readiness score, and the renter
+  needs to see it in order to ask where it is.
+  🔴 **Backend, still owed, and this only hides it**: the projection should send NULL coordinates
+  rather than `(0, 0)`, and should not name a placeholder yard «Unspecified yard» - `EquipmentDetail`
+  prints `machine.yardName` verbatim, so that phrase in the owner's screenshot is DATA, not a string
+  in this repo (grepped: it appears nowhere in `src/`). The web can decline to believe the
+  coordinates; it cannot know that a yard NAME is a placeholder.
+  ⚠️ Verified: typecheck, lint, 282 passing across the five map suites, and the guard break-checked by
+  deleting the line - three cases went red. NOT seen rendered.
+
+- **2026-09-12 - «12 × null» stops being typed into the renter's own request.**
+  Owner, on the intake with a site chip picked: *"still why the equipment name doesnt appear here why
+  showing null"*.
+  🔴 **It was not a label. It was the REQUEST TEXT.** Picking a template types its machine into the
+  box as if the renter had written it, and that text is what goes to the agent - so the request said
+  «12 × null», twice, and would have been read as a machine by that name.
+  The chain, and the lie at the end of it: the chart's projection names a REQUEST's item from its
+  taxonomy pair alone, so an off-catalogue line has no label; `chartItemName` can only fill it when
+  the row carries a typed name, which that branch still does not select (raised 2026-09-08, OPEN);
+  so `label` is null. `ChartRow` had always handled that - «Equipment (not named)» - and **nothing
+  else knew it was possible**, because `ChartItem.label` was typed `string` and the
+  `as unknown as ChartGroup` cast in `fetchChart` laundered the null straight past the compiler.
+  `listTemplates` copied it into `TemplateOption.machine`; `ProjectChips` interpolated it; `${null}`
+  is the four characters «null»; and `.trim()` reported them as a perfectly good line.
+  **The type is honest now** (`label: string | null`), and the compiler named all three readers that
+  had been getting away with it:
+   · `listTemplates` → `machine: string | null`;
+   · `ProjectsSurface`'s work-order form → an unnamed machine edits as an EMPTY name, so the renter
+     types his own rather than saving a placeholder as the name;
+   · `siteLevelAward` → says «Equipment (not named)» rather than drawing an empty subtitle.
+  And `applyTemplate` builds its line from a real name or writes nothing at all.
+  Files: `src/lib/contract/award.ts`, `src/lib/contract/project-apply.ts`, `src/lib/api/client.ts`,
+  `src/components/create/ProjectChips.tsx`, `src/components/projects/ProjectsSurface.tsx`,
+  `tests/unit/project-template-line.test.tsx` (new, 4 cases), `tests/unit/chart-item-name.test.ts`
+  (3 new cases).
+  ⚠️ **The TERMS still apply when the name is missing.** They are what a template is FOR and they are
+  keyed on the item, not on its name; only the sentence is withheld. Skipping the whole template
+  would have taken the renter's shortcut away over a display fault.
+  ⚠️ The PICKER read correctly all along - it labels a row `tpl.machine || tpl.ref`, so an unnamed
+  machine falls back to the request's code there. That is why the dropdown in his screenshot looked
+  right while the line it typed did not, and why the test picks a row by whichever label the case
+  produces.
+  🔴 **BACKEND, still owed and now costing more than a blank row**: `getChart.ts` must select
+  `customEquipmentName` on the `equipmentItems` request branch and label it
+  `taxonomy → customEquipmentName → null`, the way the work-order branch already reads. Until it
+  does, these machines have NO name to show anywhere - the web can only decline to invent one.
+  ⚠️ Verified: typecheck, lint, 57 passing across the five project/canvas suites, and the typed-line
+  pin break-checked by restoring the old interpolation - it went red.
+
+- **2026-09-12 - «Required» stops resizing the field it marks.**
+  Owner, on a shot of «FUEL RESPONSIBILITY» broken over two lines with a stranded red star above the
+  word: *"fix the ui when required appear to not change the size of card box and dont affect the text
+  wrapping, put the required text small"*.
+  Three faults out of one line in `CanvasField`. The marker was a flex SIBLING of the label at the
+  label's OWN metrics - 11px, uppercase, extrabold, inheriting the row's `tracking-[0.05em]` - and
+  the string it drew was `requiredMark`, «* Required», star included.
+  (1) **It took its width off the label.** A rigid flex item beside a label that has to fit: the
+  label wrapped, the panel grew a second line, and the fuel box stood taller than the delivery and
+  return boxes next to it.
+  (2) **It split in half.** No `whitespace-nowrap`, so «* Required» broke at its own space and left
+  the star at the end of one line with «REQUIRED» under it - which is the star the screenshot shows
+  floating above the word.
+  (3) **It read as a second title**, being the same size and weight as the field's name.
+  Now: INLINE with the label's text, so it flows with the words instead of competing with them;
+  `normal-case` + `tracking-normal` + `font-semibold`, which is roughly half the width it was; and
+  `whitespace-nowrap` so it can never break again. It draws `create.requiredWord` («Required» /
+  «مطلوب»), a new bare key - `requiredMark` keeps its star for the photo chips, which are one opaque
+  strip and were never the problem.
+  Files: `src/components/create/Provenance.tsx`, `src/lib/i18n/{en,ar}.ts` (`create.requiredWord`),
+  `tests/unit/canvas-provenance.test.tsx` (3 new cases), `tests/unit/canvas-gating.test.tsx`.
+  ⚠️ **The standing star is no longer SUPPRESSED when the word appears.** It used to be - the word
+  carried a star of its own - and that is exactly the star that broke across the line. One star, on
+  the label, in both states, so the label's width does not change when a field is refused. That
+  reverses half of the 2026-09-03 note *"the word replaces the star rather than joining it"*: the
+  word still replaces the DOT, but no longer the star.
+  ⚠️ **There are now TWO required markers with different shapes**, and a test reading only the literal
+  «* Required» would pass on a photo chip while a field said nothing - and every
+  `queryByText("* Required")).toBeNull()` in `canvas-gating` would have gone VACUOUS for a field.
+  One `requiredMarks()` helper counts both spellings, in one place.
+  ⚠️ Verified: typecheck, lint, 88 passing across the five canvas suites, and the field-level pin
+  break-checked by deleting the marker - it went red. NOT seen rendered: the wrap this fixes is a
+  measured layout fact and jsdom lays out nothing, so the fuel panel wants one look.
+
 - **2026-09-12 - Connecting Outlook is its own act, and the confirmation names every destination it reaches.**
   Owner: *"users are confused when their request is sent with the Outlook at same click, so i want to
   separate the connect as a separate action from the create, so the create is done to Outlook once it

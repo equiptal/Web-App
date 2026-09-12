@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { mapFleet, type FleetMachine } from "@/lib/contract/fleet";
-import { isPlottable, unitAvailability } from "@/lib/contract/bid-map";
+import { isOutOfCity, isPlottable, unitAvailability } from "@/lib/contract/bid-map";
 import { canonicalCertCode, computeBidReadiness, computeUnitReadiness, readinessInputsFor } from "@/lib/contract/bid-readiness";
 import { mapBidList, type BidCard } from "@/lib/contract/bids";
 
@@ -671,5 +671,92 @@ describe("SASO — registration vs. certificate (owner's ruling, 2026-08-09)", (
     expect(canonicalCertCode("SASO Registration")).toBe("saso_registration");
     expect(canonicalCertCode("saso")).toBe("saso");
     expect(canonicalCertCode("saso_technical_inspection")).toBe("saso");
+  });
+});
+
+/**
+ * ── The machine swimming in the ocean (owner, 2026-09-12) ───────────────────────────────────────
+ *
+ * *"i want u to test case of yard is also unspecified but shown as outside the requests city and
+ * shown as equipment swimming on the ocean in the map"*.
+ *
+ * The reported card: **«5720.8 km from your project»**, a red «Unspecified yard…» beside it, and a
+ * pin in the Atlantic. The cause is a yard row with no coordinates arriving as `lat: 0, lng: 0`, and
+ * 5720.8 km is the great-circle distance from Riyadh to Null Island — 5720.2 km computed, which is
+ * what identified it.
+ *
+ * Three separate lies came out of that one sentinel, and each is pinned below:
+ *   · the MAP drew a pin in the Gulf of Guinea;
+ *   · the CARD printed a confident distance for a machine nobody has located;
+ *   · `isOutOfCity` was true, so the panel also said the yard is outside the request's city — an
+ *     inference stacked on the bad number, and the most misleading of the three, because it reads as
+ *     a fact somebody established rather than as arithmetic on a placeholder.
+ */
+describe("a yard that is not a place", () => {
+  const oceanic = () =>
+    mapFleet([
+      row({
+        equipmentId: "eq-ocean",
+        // Exactly what the backend sends for a yard nobody filled in.
+        yardName: "Unspecified yard",
+        lat: 0,
+        lng: 0,
+        // Computed server-side FROM those coordinates, so it is as wrong as they are.
+        distanceKm: 5720.8,
+        locationSource: "listing_yard",
+        inBid: true,
+      }),
+    ])[0];
+
+  it("keeps the machine OFF the map", () => {
+    expect(isPlottable(oceanic())).toBe(false);
+  });
+
+  it("carries NO position at all once parsed — the card reads the row, not the rule", () => {
+    /* The guard began life in `resolveUnitLocation`, which only `isPlottable` called: the machine
+       left the map and «5720.8 km» stayed on the card beside it. Resolving in `mapFleet` is what
+       makes the row itself honest. */
+    const m = oceanic();
+    expect(m.lat).toBeNull();
+    expect(m.lng).toBeNull();
+    expect(m.distanceKm).toBeNull();
+    expect(m.locationSource).toBe("none");
+  });
+
+  it("is NOT called out-of-city, because there is no distance to judge", () => {
+    // `isOutOfCity` is documented as never true for an unknown distance. It was true here only
+    // because the sentinel supplied one.
+    expect(isOutOfCity(oceanic().distanceKm)).toBe(false);
+    // …and it is still true for a machine that really is far away.
+    expect(isOutOfCity(120)).toBe(true);
+  });
+
+  it("stays IN the fleet list, unconfirmed — it exists, it is simply not placed", () => {
+    // `none`, never `absent`: absent means no machine at all and `listedMachines` drops it, taking
+    // its photos, papers and readiness score with it.
+    expect(unitAvailability(oceanic())).toBe("unconfirmed");
+  });
+
+  it("does not drag the sort: an unplaced machine ranks past every real distance", () => {
+    const [near, ocean] = mapFleet([
+      row({ equipmentId: "eq-near", lat: 24.7, lng: 46.7, distanceKm: 12, inBid: true }),
+      row({ equipmentId: "eq-ocean", lat: 0, lng: 0, distanceKm: 5720.8, inBid: true }),
+    ]);
+    expect(near.distanceKm).toBe(12);
+    // Previously 5720.8 — a real number, so it sorted as merely "far" rather than as unknown.
+    expect(ocean.distanceKm).toBeNull();
+  });
+
+  it("leaves a genuinely distant machine alone — far is not the same as unplaced", () => {
+    const m = mapFleet([row({ equipmentId: "eq-far", lat: 21.48, lng: 39.19, distanceKm: 870, inBid: true })])[0];
+    expect(m.distanceKm).toBe(870);
+    expect(isPlottable(m)).toBe(true);
+    expect(isOutOfCity(m.distanceKm)).toBe(true);
+  });
+
+  it("leaves the equator and the prime meridian alone — one zero is a place", () => {
+    const onEquator = mapFleet([row({ equipmentId: "eq-eq", lat: 0, lng: 46.7, distanceKm: 40, inBid: true })])[0];
+    expect(onEquator.lat).toBe(0);
+    expect(isPlottable(onEquator)).toBe(true);
   });
 });

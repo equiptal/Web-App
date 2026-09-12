@@ -130,7 +130,14 @@ export interface RfqState {
   busy: boolean;
   error: ApiErrorKind | null;
   /** The real backend reason behind a submit failure, surfaced in the UI for diagnosis. */
-  errorDetail: { detail?: string; backendCode?: string; backendStatus?: number; status?: number } | null;
+  /** ⚠️ `details` carries the backend's field errors on a 422 — see `contract/submit-error.ts`. */
+  errorDetail: {
+    detail?: string;
+    backendCode?: string;
+    backendStatus?: number;
+    status?: number;
+    details?: unknown;
+  } | null;
   requestId: string | null;
   /** Every short code from the fan-out (one per equipment item); requestId is the first. */
   requestIds: string[];
@@ -313,6 +320,7 @@ type Action =
   | { t: "SUBMIT_SUCCESS"; requestId: string; requestIds: string[]; requestUuids: string[]; trialExpiresAt?: string | null }
   | { t: "SUBMIT_ERROR"; kind: ApiErrorKind; detail?: RfqState["errorDetail"] }
   | { t: "HYDRATE"; saved: Partial<RfqState> }
+  | { t: "RESUME_DIRECT"; saved: Partial<RfqState> }
   | { t: "RESET" };
 
 interface DeepPrefPatch {
@@ -938,6 +946,21 @@ export function reducer(state: RfqState, a: Action): RfqState {
       // `_withGlobalEquipmentDefaults` is reachable from `_onDraftLoaded`/`_onStashRestored`).
       return { ...state, ...a.saved, taxonomy: state.taxonomy, draftPrompt: true };
     }
+    /**
+     * Come back from the supplier's store with the draft he left here (app parity, Epic 008).
+     *
+     * Like `HYDRATE` in every way but the PROMPT. A reload is ambiguous — «is this still the request
+     * you meant?» — so that one raises continue/start-over. This is not: he pressed the ✕ or the +
+     * thirty seconds ago, went to pick a machine, and picked one. Asking him whether he meant to
+     * resume the request he never left would be a question about his own last two presses.
+     *
+     * Not `PROCESS_SUCCESS` either, which is the OTHER door into a direct draft. That one is for a
+     * draft nobody has answered yet: it re-applies the project's defaults and the template's terms
+     * over the whole thing and resets `touchedFields`, which here would forget which answers were
+     * HIS — and «no certificate» is stored as absent, so the gate would ask for it again.
+     */
+    case "RESUME_DIRECT":
+      return { ...state, ...a.saved, taxonomy: state.taxonomy };
     default:
       return state;
   }
@@ -965,6 +988,8 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
      * would drift from this one within a month. See `direct-draft.ts` for what the store fills.
      */
     seedDraft: (draft: AgentDraft) => dispatch({ t: "PROCESS_SUCCESS", draft }),
+    /** Restore the draft stashed for a trip to the supplier's store — see `RESUME_DIRECT`. */
+    resumeDirect: (saved: Partial<RfqState>) => dispatch({ t: "RESUME_DIRECT", saved }),
     /** Mark (or unmark) the line a template typed, so the box can colour it. */
     markProjectTyped: (line: string | null) => dispatch({ t: "PROJECT_TYPED", line }),
     addFiles: (files: { name: string; type: string; data?: string }[]) => dispatch({ t: "ADD_FILES", files }),
@@ -1052,7 +1077,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
         if (e instanceof ApiError && e.kind === "guest_limit") { dispatch({ t: "GUEST_LIMIT" }); return; }
         const detail =
           e instanceof ApiError
-            ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status }
+            ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status, details: e.details }
             : null;
         dispatch({ t: "PROCESS_ERROR", kind: e instanceof ApiError ? e.kind : "unknown", detail });
       }
@@ -1181,7 +1206,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
       } catch (e) {
         const detail =
           e instanceof ApiError
-            ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status }
+            ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status, details: e.details }
             : null;
         dispatch({ t: "SUBMIT_ERROR", kind: e instanceof ApiError ? e.kind : "unknown", detail });
         return null;

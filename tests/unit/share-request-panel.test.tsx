@@ -2812,3 +2812,51 @@ describe("nobody picked has an e-mail address", () => {
     expect(api.mailCalls[0][1]).toEqual(["1"]);
   });
 });
+
+
+/**
+ * -- The two destinations wear their own marks (owner, 2026-09-12) -------------------------------
+ *
+ * *"use this logo in the Outlook connection note, and use the Moedatech logo in the confirmation
+ * modal to send."*
+ *
+ * ⚠️ A glyph says «mail»; a logo says WHICH mail. This dialog is the last screen before a request
+ * leaves for other firms, and what the renter is checking is WHERE it goes.
+ */
+describe("the destinations wear their real marks", () => {
+  const marksIn = (root: Element) =>
+    Array.from(root.querySelectorAll("img")).map((i) => i.getAttribute("src"));
+
+  const toConfirm = async (channel: string) => {
+    connected();
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(channel));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    await waitFor(() => expect(confirmButton()).toBeTruthy());
+    return document.querySelector('[role="dialog"]')!;
+  };
+
+  it("Given the confirmation, Then Moedatech and Outlook are named by their logos", async () => {
+    const dialog = await toConfirm(c.outlook);
+    expect(marksIn(dialog)).toContain("/moedatech-logo.svg");
+    expect(marksIn(dialog)).toContain("/outlook-logo.webp");
+  });
+
+  it("Given GMAIL, Then the Outlook mark is not drawn", async () => {
+    // ⚠️ It is the mark of one named client, not a picture of «e-mail».
+    const dialog = await toConfirm(c.gmail);
+    expect(marksIn(dialog)).toContain("/moedatech-logo.svg");
+    expect(marksIn(dialog)).not.toContain("/outlook-logo.webp");
+  });
+
+  it("Given the connect offer on the panel, Then it carries the Outlook mark", async () => {
+    api.connect = { configured: true, connected: false, provider: "microsoft", accountEmail: null, connectedAt: null };
+    draw({ draftForm: DRAFT });
+    await screen.findByText("Al Faisal Rentals");
+    fireEvent.click(screen.getByText(c.outlook));
+
+    const offer = (await screen.findByText(c.mailConnect)).closest("div")!;
+    expect(offer.querySelector('img[src="/outlook-logo.webp"]')).toBeTruthy();
+  });
+});

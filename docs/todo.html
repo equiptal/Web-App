@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>To-do</title>
+<style>
+  :root{
+    --ink:#22384e; --ink-deep:#1c2738; --brand:#f97316; --brand-dark:#c2570f;
+    --page:#f4f4f4; --card:#fff; --hair:#e4e4e4; --border:#d0d0d0; --press:#e8e8e8;
+    --text:#22384e; --text-2:#444f57; --muted:#59646e; --faint:#8a95a0;
+    --p1:#c02626; --p1-bg:#fbeeee; --p1-br:#e8c1c1;
+    --p2:#c2570f; --p2-bg:#fdf0e6; --p2-br:#f0cfae;
+    --p3:#8a6412; --p3-bg:#f7edd8; --p3-br:#e0c583;
+    --p0:#59646e; --p0-bg:#eceae3; --p0-br:#dcdcdc;
+    --ok:#1d7a45; --ok-bg:#e2efe7; --ok-br:#c3dfcd;
+    --web:#3b556e; --web-bg:#e7ebee; --web-br:#ccd4db;
+    --app:#6d4fc4; --app-bg:#eee9fa; --app-br:#d8cff2;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--text);
+       font:400 14px/1.5 Inter,"Segoe UI",system-ui,sans-serif}
+  button{font:inherit;cursor:pointer}
+
+  header{position:sticky;top:0;z-index:5;background:var(--ink-deep);color:#c8d4e4;padding:14px 20px}
+  .head-row{max-width:1040px;margin:0 auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  h1{margin:0;font-size:16px;font-weight:600;color:#fff}
+  .meta{font-size:12px;color:#8698b0}
+  .meta b{color:var(--brand);font-weight:600}
+  .state{margin-inline-start:auto;font-size:11.5px;color:#8698b0;min-width:74px;text-align:end}
+  .state.on{color:#38b06a}
+  .state.bad{color:#ff6b5e}
+  .add{max-width:1040px;margin:10px auto 0;display:flex;gap:8px}
+  .add input{flex:1;min-width:0;padding:8px 11px;border:1px solid #2f4257;border-radius:5px;
+             background:#16222f;color:#fff;font:inherit}
+  .add input::placeholder{color:#6d7f95}
+  .add button{padding:8px 15px;border:0;border-radius:5px;background:var(--brand);color:#fff;font-weight:600}
+  .add button:hover{background:var(--brand-dark)}
+
+  main{max-width:1040px;margin:0 auto;padding:20px 16px 70px}
+  .band{margin-bottom:24px}
+  .band h2{display:flex;align-items:center;gap:9px;margin:0 0 10px;padding:0 0 7px;
+           font-size:12.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;
+           border-bottom:2px solid}
+  .band h2 em{font-style:normal;text-transform:none;letter-spacing:0;font-weight:400;font-size:12px;color:var(--muted)}
+  .band h2 .count{margin-inline-start:auto;font-size:12px;font-weight:400;color:var(--muted)}
+
+  .item{display:grid;grid-template-columns:20px 1fr auto;gap:11px;align-items:start;
+        background:var(--card);border:1px solid var(--hair);border-radius:6px;padding:11px 13px;margin-bottom:8px}
+  .item:hover{border-color:var(--border)}
+  .item.drag{opacity:.4}
+  .item.over{border-color:var(--brand)}
+
+  .tick{width:18px;height:18px;margin-top:1px;padding:0;border:1.5px solid var(--border);border-radius:3px;
+        background:#fff;color:var(--ok);font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center}
+  .tick:hover{border-color:var(--ok)}
+  .body{min-width:0;display:flex;flex-direction:column;gap:7px}
+  .text{outline:0;overflow-wrap:anywhere;border-radius:3px;padding:1px 2px;margin:-1px -2px}
+  .text:focus{background:#fffbf6;box-shadow:0 0 0 1px var(--brand)}
+  .done .text{color:var(--muted);text-decoration:line-through}
+  .row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .pill{border:1px solid;border-radius:10px;padding:1px 9px;font-size:11px;font-weight:600;
+        background:#fafafa;border-color:var(--hair);color:var(--faint)}
+  .pill.off:hover{border-color:var(--border);color:var(--muted)}
+  .rin{width:42px;padding:2px 5px;border:1px solid var(--hair);border-radius:4px;background:#fafafa;
+       font:600 11px/1.5 inherit;color:var(--faint);text-align:center;text-transform:uppercase}
+  .rin::placeholder{color:#b3bcc4;font-weight:400}
+  .rin:focus{outline:0;border-color:var(--brand);background:#fffbf6;color:var(--text)}
+  .rin.p1{color:var(--p1);background:var(--p1-bg);border-color:var(--p1-br)}
+  .rin.p2{color:var(--p2);background:var(--p2-bg);border-color:var(--p2-br)}
+  .rin.p3{color:var(--p3);background:var(--p3-bg);border-color:var(--p3-br)}
+  .rin.pn{color:var(--ink);background:var(--p0-bg);border-color:var(--p0-br)}
+  .lb[data-l="web"].on{color:var(--web);background:var(--web-bg);border-color:var(--web-br)}
+  .lb[data-l="app"].on{color:var(--app);background:var(--app-bg);border-color:var(--app-br)}
+  .lb[data-l="test"].on{color:var(--ok);background:var(--ok-bg);border-color:var(--ok-br)}
+  .sep{width:1px;height:15px;background:var(--hair);margin:0 3px}
+  .tags{position:relative;display:inline-flex;align-items:center;gap:5px}
+  .chosen{display:inline-flex;gap:5px;flex-wrap:wrap}
+  .tagbtn{border:1px dashed var(--border);border-radius:10px;background:#fff;color:var(--faint);
+          font-size:11px;font-weight:600;padding:1px 8px;line-height:1.5}
+  .tagbtn:hover{color:var(--text-2);border-color:var(--text-2)}
+  .menu{position:absolute;inset-block-start:calc(100% + 5px);inset-inline-start:0;z-index:4;
+        background:#fff;border:1px solid var(--border);border-radius:6px;padding:6px;min-width:120px;
+        box-shadow:0 6px 18px rgba(28,39,56,.15);display:flex;flex-direction:column;gap:3px}
+  .menu[hidden]{display:none}
+  .opt{display:flex;align-items:center;gap:8px;padding:2px 4px;border-radius:4px;cursor:pointer}
+  .opt:hover{background:#f7f7f7}
+  .opt input{accent-color:var(--brand);margin:0;cursor:pointer}
+
+  textarea.notes{width:100%;min-height:26px;resize:vertical;border:0;border-inline-start:2px solid var(--hair);
+       border-radius:0;padding:2px 0 2px 9px;font:inherit;font-size:12.5px;color:var(--text-2);background:none;outline:0}
+  textarea.notes:focus{border-inline-start-color:var(--brand)}
+  textarea.notes::placeholder{color:var(--faint)}
+  .shots{display:flex;gap:7px;flex-wrap:wrap}
+  .shot{position:relative;border:1px solid var(--hair);border-radius:5px;overflow:hidden;line-height:0}
+  .shot img{display:block;max-height:150px;max-width:100%}
+  .shot button{position:absolute;inset-block-start:3px;inset-inline-end:3px;width:19px;height:19px;padding:0;
+               border:0;border-radius:3px;background:rgba(28,39,56,.82);color:#fff;font-size:12px;line-height:19px}
+  .acts{display:flex;gap:3px;align-items:center}
+  .acts button{width:24px;height:24px;padding:0;border:1px solid var(--hair);border-radius:4px;
+               background:#fff;color:var(--faint);font-size:12px;line-height:1}
+  .acts button:hover{color:var(--text);border-color:var(--border)}
+  .acts .kill:hover{color:var(--p1);border-color:var(--p1-br);background:var(--p1-bg)}
+  .grip{cursor:grab;color:var(--faint);padding:0 2px;user-select:none}
+
+  footer{max-width:1040px;margin:0 auto;padding:0 16px 40px;font-size:12px;color:var(--muted)}
+  footer code{background:var(--press);border-radius:3px;padding:1px 5px}
+  .warn{max-width:1040px;margin:18px auto;padding:12px 14px;border:1px solid var(--p1-br);
+        background:var(--p1-bg);color:var(--p1);border-radius:6px;font-size:13px}
+  .empty{color:var(--muted);font-size:13px;padding:2px 0 6px}
+  /* Phone. Bigger targets, because a thumb is not a mouse pointer. */
+  @media (max-width:620px){
+    body{font-size:15px}
+    header{padding:12px 14px}
+    main{padding:16px 12px 70px}
+    .item{grid-template-columns:26px 1fr;gap:10px;padding:12px}
+    .acts{grid-column:1/-1;justify-content:flex-end;gap:6px;margin-top:2px}
+    .acts button{width:34px;height:34px;font-size:14px}
+    .tick{width:24px;height:24px;font-size:15px}
+    .rin{width:52px;padding:5px 6px;font-size:12px}
+    .pill{padding:3px 10px;font-size:12px}
+    .tagbtn{padding:3px 10px;font-size:12px}
+    .opt{padding:6px 6px}
+    .opt input{width:18px;height:18px}
+    .add input,.add button{padding:11px 13px}
+    textarea.notes{font-size:13.5px;min-height:30px}
+    .shot img{max-height:210px}
+    .grip{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="head-row">
+    <h1>To-do</h1>
+    <div class="meta"><b id="nOpen">0 open</b> · <span id="nDone">0 done</span></div>
+    <div class="state" id="state"></div>
+  </div>
+  <form class="add" id="addForm" autocomplete="off">
+    <input id="addText" placeholder="Add a task, then Enter">
+    <button type="submit">Add</button>
+  </form>
+</header>
+
+<main id="board"></main>
+
+<footer>
+  Everything here saves itself to <code>docs/todo.json</code>. Drag a picture onto a task to attach it.
+  Type a priority in the box beside a task, P1 is the most urgent. Drag the handle to reorder.
+  <code>/todo</code> in Claude Code reads the same file.
+</footer>
+
+<script>
+const LABELS = ["web", "app", "test"];
+// He types the rank himself, so the bands are whatever he has used. P1 is the most urgent.
+const SAY = { P1: "urgent", P2: "soon", P3: "later" };
+const rankSay = (r) => SAY[r] ?? "";
+const rankColour = (r) => (r === "P1" ? "var(--p1)" : r === "P2" ? "var(--p2)"
+  : r === "P3" ? "var(--p3)" : r ? "var(--ink)" : "var(--p0)");
+const rankClass = (r) => (r === "P1" ? "p1" : r === "P2" ? "p2" : r === "P3" ? "p3" : r ? "pn" : "");
+const readRank = (typed) => {
+  const m = /([1-9])/.exec(String(typed));
+  return m ? "P" + m[1] : null;
+};
+
+function closeMenus() {
+  for (const m of document.querySelectorAll(".menu")) m.hidden = true;
+}
+document.addEventListener("click", closeMenus);
+
+let list = { items: [] };
+let timer = null;
+let dragId = null;
+
+const $ = (sel) => document.querySelector(sel);
+const state = $("#state");
+
+function say(text, cls) {
+  state.textContent = text;
+  state.className = "state" + (cls ? " " + cls : "");
+}
+
+async function load() {
+  try {
+    const res = await fetch("/api/todo");
+    if (!res.ok) throw new Error(res.status);
+    list = await res.json();
+    if (!Array.isArray(list.items)) list.items = [];
+    render();
+  } catch (err) {
+    $("#board").innerHTML =
+      '<div class="warn">The board is not running. Start it with <b>node scripts/todo-server.mjs</b>' +
+      ' and open <b>http://127.0.0.1:8099/</b>. Opening this file straight from disk cannot save anything.</div>';
+  }
+}
+
+function save() {
+  clearTimeout(timer);
+  say("saving…");
+  timer = setTimeout(async () => {
+    try {
+      const res = await fetch("/api/todo", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ items: list.items }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      say("saved", "on");
+      setTimeout(() => { if (state.textContent === "saved") say(""); }, 1400);
+    } catch (err) {
+      say("not saved", "bad");
+      console.error(err);
+    }
+  }, 350);
+}
+
+function counts() {
+  const open = list.items.filter((i) => !i.done).length;
+  $("#nOpen").textContent = open + " open";
+  $("#nDone").textContent = (list.items.length - open) + " done";
+}
+
+function render() {
+  const board = $("#board");
+  board.textContent = "";
+  const open = list.items.filter((i) => !i.done);
+  const done = list.items.filter((i) => i.done);
+
+  const used = [...new Set(open.map((i) => i.rank).filter(Boolean))]
+    .sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
+  for (const r of used) {
+    board.append(band([r, rankSay(r), rankColour(r)], open.filter((i) => i.rank === r), ""));
+  }
+  board.append(band(["Not ranked", "type a P beside a task", "var(--p0)"],
+    open.filter((i) => !i.rank), "Nothing unranked"));
+  if (done.length) board.append(band(["Done", "", "var(--ok)"], done, ""));
+  counts();
+}
+
+function band([title, say_, colour], items, emptyText) {
+  const sec = document.createElement("section");
+  sec.className = "band";
+  const h = document.createElement("h2");
+  h.style.borderColor = colour;
+  h.innerHTML = `<span style="color:${colour}">${title}</span>` +
+    (say_ ? ` <em>${say_}</em>` : "") + `<span class="count">${items.length}</span>`;
+  sec.append(h);
+  if (!items.length) {
+    const p = document.createElement("div");
+    p.className = "empty";
+    p.textContent = emptyText;
+    sec.append(p);
+  }
+  for (const item of items) sec.append(row(item));
+  return sec;
+}
+
+function row(item) {
+  const el = document.createElement("div");
+  el.className = "item" + (item.done ? " done" : "");
+  el.dataset.id = item.id;
+
+  const tick = document.createElement("button");
+  tick.className = "tick";
+  tick.title = item.done ? "Put it back" : "Tick it off";
+  tick.innerHTML = item.done ? "&#10003;" : "";
+  tick.onclick = () => {
+    item.done = !item.done;
+    item.doneAt = item.done ? new Date().toISOString().slice(0, 10) : null;
+    save(); render();
+  };
+
+  const body = document.createElement("div");
+  body.className = "body";
+
+  const text = document.createElement("div");
+  text.className = "text";
+  text.contentEditable = "true";
+  text.spellcheck = false;
+  text.textContent = item.text;
+  text.onblur = () => {
+    const next = text.textContent.trim();
+    if (next !== item.text) { item.text = next; save(); }
+  };
+  text.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); text.blur(); } };
+
+  const row1 = document.createElement("div");
+  row1.className = "row";
+
+  // The rank is TYPED, the way he wrote it in the markdown: P1, or just 1. Empty means unranked.
+  const rin = document.createElement("input");
+  rin.className = "rin " + rankClass(item.rank);
+  rin.value = item.rank ?? "";
+  rin.placeholder = "P_";
+  rin.maxLength = 2;
+  rin.title = "Type your priority. P1 is the most urgent, empty is unranked";
+  const commit = () => {
+    const next = readRank(rin.value);
+    if (next === item.rank) { rin.value = item.rank ?? ""; return; }
+    item.rank = next;
+    save(); render();
+  };
+  rin.onchange = commit;
+  rin.onblur = commit;
+  rin.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); rin.blur(); } };
+  row1.append(rin);
+
+  const sep = document.createElement("span");
+  sep.className = "sep";
+  row1.append(sep);
+  // Labels: only the chosen ones are drawn. The control opens a small multi-select.
+  const tags = document.createElement("span");
+  tags.className = "tags";
+  const chosen = document.createElement("span");
+  chosen.className = "chosen";
+  const tagBtn = document.createElement("button");
+  tagBtn.className = "tagbtn";
+  const menu = document.createElement("span");
+  menu.className = "menu";
+  menu.hidden = true;
+  menu.onclick = (e) => e.stopPropagation();
+
+  const paintTags = () => {
+    chosen.textContent = "";
+    for (const l of item.labels) {
+      const c = document.createElement("span");
+      c.className = "pill lb on";
+      c.dataset.l = l;
+      c.textContent = l;
+      chosen.append(c);
+    }
+    tagBtn.innerHTML = item.labels.length ? "&#9662;" : "+ label";
+    tagBtn.title = item.labels.length ? "Change the labels" : "Give it a label";
+    for (const opt of menu.children) opt.firstChild.checked = item.labels.includes(opt.dataset.l);
+  };
+
+  for (const l of LABELS) {
+    const opt = document.createElement("label");
+    opt.className = "opt";
+    opt.dataset.l = l;
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    const name = document.createElement("span");
+    name.className = "pill lb on";
+    name.dataset.l = l;
+    name.textContent = l;
+    box.onchange = () => {
+      const next = box.checked ? [...item.labels, l] : item.labels.filter((x) => x !== l);
+      item.labels = LABELS.filter((x) => next.includes(x));
+      paintTags(); save();
+    };
+    opt.append(box, name);
+    menu.append(opt);
+  }
+
+  tagBtn.onclick = (e) => {
+    e.stopPropagation();
+    const wasShut = menu.hidden;
+    closeMenus();
+    menu.hidden = !wasShut;
+  };
+
+  paintTags();
+  tags.append(chosen, tagBtn, menu);
+  row1.append(tags);
+
+  const notes = document.createElement("textarea");
+  notes.className = "notes";
+  notes.placeholder = "notes";
+  notes.value = item.notes || "";
+  notes.rows = Math.max(1, (item.notes || "").split("\n").length);
+  notes.oninput = () => { item.notes = notes.value; save(); };
+
+  body.append(text, row1, notes);
+
+  if (item.images.length) {
+    const shots = document.createElement("div");
+    shots.className = "shots";
+    for (const src of item.images) {
+      const wrap = document.createElement("span");
+      wrap.className = "shot";
+      const a = document.createElement("a");
+      a.href = src; a.target = "_blank";
+      const img = document.createElement("img");
+      img.src = src; img.alt = "";
+      a.append(img);
+      const kill = document.createElement("button");
+      kill.textContent = "×";
+      kill.title = "Take this picture off the task";
+      kill.onclick = () => { item.images = item.images.filter((s) => s !== src); save(); render(); };
+      wrap.append(a, kill);
+      shots.append(wrap);
+    }
+    body.append(shots);
+  }
+
+  const acts = document.createElement("div");
+  acts.className = "acts";
+  const grip = document.createElement("span");
+  grip.className = "grip";
+  grip.textContent = "⠿";
+  grip.title = "Drag to reorder";
+  grip.draggable = true;
+  grip.ondragstart = (e) => { dragId = item.id; el.classList.add("drag"); e.dataTransfer.effectAllowed = "move"; };
+  grip.ondragend = () => { dragId = null; el.classList.remove("drag"); };
+
+  const up = document.createElement("button");
+  up.innerHTML = "&#8593;"; up.title = "Move up";
+  up.onclick = () => move(item.id, -1);
+  const down = document.createElement("button");
+  down.innerHTML = "&#8595;"; down.title = "Move down";
+  down.onclick = () => move(item.id, 1);
+  const kill = document.createElement("button");
+  kill.className = "kill";
+  kill.innerHTML = "&#10005;"; kill.title = "Delete the task";
+  kill.onclick = () => {
+    if (!confirm("Delete this task?\n\n" + item.text)) return;
+    list.items = list.items.filter((i) => i.id !== item.id);
+    save(); render();
+  };
+  acts.append(grip, up, down, kill);
+
+  el.ondragover = (e) => { if (dragId && dragId !== item.id) { e.preventDefault(); el.classList.add("over"); } };
+  el.ondragleave = () => el.classList.remove("over");
+  el.ondrop = (e) => {
+    e.preventDefault();
+    el.classList.remove("over");
+    if (!dragId || dragId === item.id) return;
+    const from = list.items.findIndex((i) => i.id === dragId);
+    const moving = list.items[from];
+    if (!moving) return;
+    list.items.splice(from, 1);
+    const to = list.items.findIndex((i) => i.id === item.id);
+    moving.rank = item.rank;
+    moving.done = item.done;
+    list.items.splice(to, 0, moving);
+    save(); render();
+  };
+
+  el.ondragenter = (e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); };
+  el.addEventListener("drop", async (e) => {
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    e.preventDefault();
+    say("uploading…");
+    const res = await fetch("/api/image?name=" + encodeURIComponent(file.name), {
+      method: "POST",
+      headers: { "content-type": file.type },
+      body: file,
+    });
+    if (!res.ok) return say("not saved", "bad");
+    const { path } = await res.json();
+    item.images.push(path);
+    save(); render();
+  });
+
+  el.append(tick, body, acts);
+  return el;
+}
+
+function move(id, by) {
+  const i = list.items.findIndex((it) => it.id === id);
+  const j = i + by;
+  if (i < 0 || j < 0 || j >= list.items.length) return;
+  const a = list.items[i];
+  const b = list.items[j];
+  a.rank = b.rank;
+  a.done = b.done;
+  list.items[i] = b;
+  list.items[j] = a;
+  save(); render();
+}
+
+$("#addForm").onsubmit = (e) => {
+  e.preventDefault();
+  const input = $("#addText");
+  const text = input.value.trim();
+  if (!text) return;
+  list.items.push({
+    id: "t" + Math.random().toString(36).slice(2, 9),
+    text, rank: null, labels: [], notes: "", images: [], done: false, doneAt: null,
+  });
+  input.value = "";
+  save(); render();
+};
+
+load();
+</script>
+</body>
+</html>

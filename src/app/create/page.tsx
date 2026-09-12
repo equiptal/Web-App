@@ -7,7 +7,8 @@ import { RfqProvider, useRfq } from "@/lib/store/rfq-store";
 import { CreateSurface } from "@/components/CreateSurface";
 import { CreateBack } from "@/components/create/CreateBack";
 import { StartYourRequestModal, type StartRequestChoice } from "@/components/home/StartYourRequestModal";
-import { canSeedDirect, directRequestDraft, type DirectPrefill } from "@/lib/agent/direct-draft";
+import { canSeedDirect, directRequestDraft, directRequestItem, type DirectPrefill } from "@/lib/agent/direct-draft";
+import { consumeDirectStash } from "@/lib/agent/direct-stash";
 import { TRIAL_REQUESTS_ENABLED } from "@/lib/flags";
 import { useStartRequestGate } from "@/lib/access/start-request-gate";
 import { useT } from "@/lib/i18n";
@@ -126,6 +127,39 @@ function DirectRequestGate() {
       // what makes the effect idempotent under re-render, and it is why the key is the guard.
       if (wanted === inDraft || wanted === seeded.current) return;
       seeded.current = wanted;
+
+      /* ── Back from the store on an errand, so MERGE rather than start over (app parity, AC-02/04) ──
+         A direct request cannot pick its equipment on this page — the machine comes off a listing —
+         so «change this one» and «add another» are both a trip to the supplier's store and back.
+         `direct-stash.ts` holds what he had answered, because the rehydrate guard above deliberately
+         refuses to restore a stored draft into a direct request and would otherwise drop all of it.
+
+         `single` replaces the line he pressed the ✕ on; `append` adds the new one beside the ones he
+         already has. Reading the stash CLEARS it, so this can only happen once per errand. */
+      const stash = consumeDirectStash(supplierId);
+      const stashed = stash?.snapshot.draft;
+      if (stash && stashed) {
+        const live = stashed.items.filter((it) => !it.removed);
+        /* `d…` ids, so an appended line can never collide with `ADD_ITEM`'s `m{seq}` or with the
+           first line's `i1`. */
+        const items =
+          stash.intent === "append"
+            ? [...live, directRequestItem(equipment, `d${live.length + 1}`)]
+            : [directRequestItem(equipment, live[0]?.id ?? "i1")];
+        actions.resumeDirect({
+          ...stash.snapshot,
+          draft: { ...stashed, items },
+          phase: "wizard",
+          activeSection: "equipment",
+          // Land ON the machine he just picked: the last one either way, since `single` leaves one.
+          itemIndex: items.length - 1,
+          // He is back on the canvas answering for a new machine, not on the review he may have
+          // reached before the errand.
+          readyToSend: false,
+        });
+        return;
+      }
+
       actions.seedDraft(directRequestDraft(equipment));
       return;
     }

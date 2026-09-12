@@ -392,7 +392,10 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
           ...blankMachine(),
           id: it.id,
           offCatalogue: true,
-          rawLabel: it.label,
+          // An unnamed machine edits as an EMPTY name, never as the string "null": the form's field
+          // is what the renter types his own name into, and seeding it with a placeholder would
+          // save that placeholder as the machine's name on the next submit.
+          rawLabel: it.label ?? "",
           quantity: it.quantity,
           terms: termsOf(it.id),
           lines: it.awards.length
@@ -733,8 +736,9 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
     return {
       id: SITE_DOCUMENT,
       supplierId: null,
-      // The machine's name, because the dialog's subtitle would otherwise read a supplier nobody named.
-      supplierName: item.label,
+      // The machine's name, because the dialog's subtitle would otherwise read a supplier nobody
+      // named. An unnamed machine says so in words rather than printing an empty subtitle.
+      supplierName: item.label ?? t.projects.chart.unnamedItem,
       units: item.quantity,
       mobilizationAmount: null,
       demobilizationAmount: null,

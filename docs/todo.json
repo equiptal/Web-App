@@ -1,0 +1,266 @@
+{
+  "updated": "2026-09-11T17:06:10.870Z",
+  "items": [
+    {
+      "id": "tden3ryq",
+      "text": "this is a major issue we have to change the UI for unspecific yards to just say unspecficied no lcoation and fix ui of map in general",
+      "rank": null,
+      "labels": [
+        "web"
+      ],
+      "notes": "Fixed web-only 2026-09-12, no backend needed. Yard rows with no coordinates arrive as lat/lng (0,0); 5720.8 km is Riyadh to Null Island (5720.2 computed). mapFleet now voids the sentinel, so: no pin, no distance, not called out-of-city, machine stays in the list red/unconfirmed, cell reads 'Location not specified', and the placeholder yard NAME is withheld rather than printed. Backend would still be tidier (send null, drop the 'Unspecified yard' row) but is no longer required.",
+      "images": [
+        "todo-images/unspecified-yard-card.jpeg"
+      ],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "tnkq6gn1",
+      "text": "Clicking on the bid doesn't take me directly where to the request",
+      "rank": null,
+      "labels": [
+        "web"
+      ],
+      "notes": "",
+      "images": [
+        "todo-images/bid-notification-does-not-open-request.jpeg"
+      ],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "tq4dh80v",
+      "text": "i logged in from fadwas laptop in another device and i was still connected + still managed to send from her email ( keep in mind ) test if it is sent from connection or from the registered email",
+      "rank": null,
+      "labels": [
+        "web",
+        "test"
+      ],
+      "notes": "",
+      "images": [],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "ty83ol0z",
+      "text": "price on offline form doesnt support arabic and test if email exist in the form",
+      "rank": null,
+      "labels": [
+        "web",
+        "test"
+      ],
+      "notes": "",
+      "images": [],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "tv9np4fh",
+      "text": "Preselected terms don't show up after no certificate and minimum year specifically from the project",
+      "rank": null,
+      "labels": [
+        "web"
+      ],
+      "notes": "",
+      "images": [],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "t3hzplw4",
+      "text": "outlook and request sharing seperation",
+      "rank": "P1",
+      "labels": [
+        "app"
+      ],
+      "notes": "",
+      "images": [],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "t4wy40zs",
+      "text": "fix ui in summary and review, copy link will open a note that it's generated later same with more and dominant the expiry cta",
+      "rank": null,
+      "labels": [
+        "web"
+      ],
+      "notes": "",
+      "images": [],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "t8bw1cwo",
+      "text": "fix review and summary panel screenshot case",
+      "rank": null,
+      "labels": [
+        "web"
+      ],
+      "notes": "",
+      "images": [],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "tmp4vkoe",
+      "text": "undefined and hidden taxonamy request",
+      "rank": "P2",
+      "labels": [
+        "web"
+      ],
+      "notes": "",
+      "images": [],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "tr4tbb35",
+      "text": "Check scenario of uploading multiple equipment with 1 offline and 1 online. Will system handle it smoothly on back end + will the email content sent show two different bid links ? If 5 different equipment 5 different bid links",
+      "rank": "P3",
+      "labels": [
+        "web",
+        "test"
+      ],
+      "notes": "",
+      "images": [],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "tn1znklv",
+      "text": "test direct request",
+      "rank": null,
+      "labels": [
+        "web",
+        "test"
+      ],
+      "notes": "",
+      "images": [],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "tvc6dmxh",
+      "text": "shaking operator and remove x from units",
+      "rank": null,
+      "labels": [
+        "web"
+      ],
+      "notes": "",
+      "images": [],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "tj3xy6jm",
+      "text": "If possible let's make it so it shows the city in the location of site project",
+      "rank": null,
+      "labels": [
+        "web"
+      ],
+      "notes": "",
+      "images": [],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "tecrofau",
+      "text": "test closed requests and notifications in app",
+      "rank": null,
+      "labels": [
+        "app",
+        "test"
+      ],
+      "notes": "",
+      "images": [],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "tauj3l1n",
+      "text": "test account 101 and check demo account",
+      "rank": null,
+      "labels": [
+        "test"
+      ],
+      "notes": "",
+      "images": [],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "tcxcmayc",
+      "text": "test taxonamy images",
+      "rank": null,
+      "labels": [
+        "test"
+      ],
+      "notes": "",
+      "images": [],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "tnhi28do",
+      "text": "google verification",
+      "rank": null,
+      "labels": [
+        "web"
+      ],
+      "notes": "",
+      "images": [],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "tw14ayzp",
+      "text": "deep link md file",
+      "rank": null,
+      "labels": [
+        "web"
+      ],
+      "notes": "",
+      "images": [],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "thcc097f",
+      "text": "onboarding videos",
+      "rank": null,
+      "labels": [
+        "web"
+      ],
+      "notes": "",
+      "images": [],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "tpt7j36c",
+      "text": "using mansour design",
+      "rank": null,
+      "labels": [
+        "web"
+      ],
+      "notes": "",
+      "images": [],
+      "done": false,
+      "doneAt": null
+    },
+    {
+      "id": "tjdwr7id",
+      "text": "compliance dashboard",
+      "rank": null,
+      "labels": [
+        "web"
+      ],
+      "notes": "",
+      "images": [],
+      "done": false,
+      "doneAt": null
+    }
+  ]
+}

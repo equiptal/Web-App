@@ -274,3 +274,35 @@ export function sourceCounts(bids: WorkspaceBid[]): Record<SourceFilter, number>
     offline: bids.filter((b) => b.source === "offline").length,
   };
 }
+
+/**
+ * Is the request named in the URL a NEW instruction, or this screen's own echo?
+ *
+ * 🔴 **The workspace read its entry parameters once per mount, and that was the bug** (owner's
+ * list: «Clicking on the bid doesn't take me directly where to the request», screenshot of the
+ * notification bell).
+ *
+ * A renter opening the bell is usually already on `/requests`. `router.push("/requests?r=<id>")` is
+ * a client-side navigation to the same route, so the component never remounts and a `read once`
+ * guard returns before it looks at `r`. The URL changed and the screen did not.
+ *
+ * ⚠️ **Reading it EVERY time is the opposite bug**, and the reason the once-only guard existed:
+ * the workspace `replaceState`s `?r=` whenever the renter picks a request, so a reader that trusted
+ * every change would drag him back to the notification's request each time he chose another.
+ *
+ * So it is decided by VALUE, not by a count of mounts. A request that is neither the one we last
+ * acted on nor the one already open can only have come from outside — the bell, the dashboard, a
+ * link a colleague pasted.
+ *
+ * @param incoming what `?r=` says now
+ * @param applied  the last `r` this screen acted on
+ * @param open     the item on screen, which is what the screen itself writes into `?r=`
+ */
+export function isNewEntryRequest(
+  incoming: string | null | undefined,
+  applied: string | null | undefined,
+  open: string | null | undefined,
+): boolean {
+  if (!incoming) return false;
+  return incoming !== applied && incoming !== open;
+}

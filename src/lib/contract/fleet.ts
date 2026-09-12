@@ -78,8 +78,23 @@ export function mapFleet(raw: unknown): FleetMachine[] {
     if (seen.has(unit.equipmentId)) continue;
     seen.add(unit.equipmentId);
     const serial = o.serialNumber ?? o.serial_number ?? o.serial;
+    /* ── The SENTINEL is voided here, once, for every surface (owner, 2026-09-12) ────────────────
+       `(0, 0)` is what a yard row with no coordinates arrives as, and `resolveUnitLocation` refuses
+       it — but that rule was called by `isPlottable` and by almost nothing else: the fleet CARD, the
+       equipment DETAIL, the distance SORT and the distance BANDS all read `m.distanceKm` and
+       `m.lat` straight off the row. Guarding it there alone took the machine off the MAP and left
+       «5720.8 km from your project» printed on the card beside it — one fact, two answers.
+
+       ⚠️ **Only the sentinel**, not `resolveUnitLocation` wholesale. That function answers *what is
+       this machine's POSITION*, and it voids the distance whenever there are no coordinates — which
+       is right for a pin and wrong for the card, because the platform can know how far a yard is
+       without publishing where it is. `yard-card.test.tsx` has always fixed a machine at 12.4 km with
+       no point at all; spreading the whole resolved object silently blanked it. The distance dies
+       here only because it was computed FROM the sentinel, so it is exactly as wrong. */
+    const nullIsland = unit.lat === 0 && unit.lng === 0;
     out.push({
       ...unit,
+      ...(nullIsland ? { lat: null, lng: null, distanceKm: null, locationSource: "none" as const } : {}),
       serialNumber: serial == null || serial === "" ? null : String(serial),
       inBid: (o.inBid ?? o.in_bid) === true,
       yardConfirmed: (o.yardConfirmed ?? o.yard_confirmed) === true,

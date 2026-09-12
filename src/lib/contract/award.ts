@@ -242,7 +242,18 @@ export function awardsFor(book: AwardBook, kind: AwardParentKind, parentId: stri
 /** One machine line, with however many awards are under it. */
 export interface ChartItem {
   id: string;
-  label: string;
+  /**
+   * The machine's name, and it can genuinely be ABSENT (owner, 2026-09-12: *"why the equipment name
+   * doesn't appear here, why showing null"*).
+   *
+   * ~~`string`.~~ That was a lie the cast in `fetchChart` laundered. The backend's chart projection
+   * labels a REQUEST's item from its taxonomy pair alone, so an off-catalogue line arrives with no
+   * label at all, and `chartItemName` can only fill it when the row carries a typed name to fall
+   * back on — which the request branch still does not select (raised 2026-09-08, open). `ChartRow`
+   * had always handled the null; nothing else knew it was possible, and `listTemplates` copied it
+   * into a template whose line was then written into the renter's request box as «12 × null».
+   */
+  label: string | null;
   labelAr: string | null;
   quantity: number;
   /**

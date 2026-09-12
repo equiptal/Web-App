@@ -884,6 +884,27 @@ export const en = {
     unavailableTitle: "The AI assistant is unavailable",
     unavailableBody: "It couldn't process your request right now. Your input is saved. Try again shortly.",
     switchManual: "Switch to Manual",
+    /* ── Said to the RENTER, not to the log (owner, 2026-09-12) ─────────────────────────────
+       *"can we make the error messages clear to the user and user friendly and clearly have the
+       reason, not like this by numbers"*, after meeting «INTERNAL_ERROR · 500».
+
+       One sentence per SIDE the fault is on, because that is what decides his next move. See
+       `contract/submit-error.ts` for why this reads the status rather than the backend's code. */
+    submit: {
+      oursTitle: "Something went wrong on our side",
+      oursBody: "Your request was not sent, and nothing you typed is lost. Try again in a moment",
+      yoursTitle: "Your request could not be accepted",
+      yoursBody: "Something in it was refused. Check the details above and try again",
+      authTitle: "Your account cannot do this yet",
+      authBody: "Sign in again, or complete your profile, then try once more",
+      offlineTitle: "We could not reach Moedatech",
+      offlineBody: "Check your connection. Your request is saved here and nothing was sent",
+      unknownTitle: "That did not go through",
+      unknownBody: "Your request was not sent, and nothing you typed is lost. Try again",
+      /** For support, never the headline. A press, so it cannot take the clipboard by surprise. */
+      copyRef: "Copy error details",
+      copiedRef: "Details copied",
+    },
   },
   options: {
     rentalBasis: { daily: "Daily", weekly: "Weekly", monthly: "Monthly" },
@@ -1378,7 +1399,12 @@ export const en = {
     // for), and "No certificates requested" explained an absence nobody had asked about. No readers
     // are left, so the key went with them.
     eqDistanceUnit: "km from your project",
-    eqNoDistance: "Distance not known",
+    /* ~~«Distance not known».~~ The condition is stricter than that and always was: `km` is null
+       only when the machine has NO resolvable location, so the distance is not the thing missing -
+       the place is (owner, 2026-09-12: *"if no yard then show no equipment in map and show
+       unspecified location"*). Saying «distance» invited the reading that the yard is known and the
+       arithmetic failed. */
+    eqNoDistance: "Location not specified",
     // ── The distance chip, and the tutorial behind it (owner, 2026-08-28) ──────────────────
     // The card's dominant fact is now the distance, painted with the availability it is only as good
     // as. A red distance is not a bad distance — it is a distance nobody has promised — and that is
@@ -2355,12 +2381,19 @@ export const en = {
       remove: "Remove",
       keep: "Keep it",
     },
+    /* A DIRECT request's ✕ swaps the machine rather than removing it: it goes back to the supplier's
+       store, because that listing is where the equipment came from. «Remove» would be a lie about
+       both what it does and what comes back. */
+    changeEquipment: "Change {name}, at the store",
     operator: "The operator",
     operatorRail: "OPERATOR",
     where: "Where it goes",
     when: "When it runs",
     nextPanel: "Next: {panel}",
     requiredMark: "* Required",
+    /** The same demand for a field whose LABEL already carries the star: the word alone, so the
+     *  marker costs the label as little width as possible (owner, 2026-09-12). */
+    requiredWord: "Required",
     /* Said in a panel the SITE filled and the renter has never opened, so the panel that opens on
        «Review & send» states why it opened. See `prefilledNote` in `Canvas`. */
     checkFromProject: "Filled in from your project. Have a look, then press Review & send again.",

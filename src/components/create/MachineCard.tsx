@@ -84,6 +84,21 @@ export function MachineCard({
 }) {
   const t = useT();
   const { state, actions } = useRfq();
+  /**
+   * ── A DIRECT request's machine is the LISTING's, not the renter's to re-pick (app parity, AC-01) ──
+   *
+   * *"in direct request he cant change the taxonamy right? it is filled from equipment he selected
+   * so if he want to change will be back to store"* (owner, 2026-09-12) — and yes, that is what the
+   * app does. `equipment_step.dart` hides the size-edit badge when `isDirect` (*"the measurement is
+   * locked from the listing prefill"*) and hides the «need a different type» section outright,
+   * because *"direct-mode rentees are tied to one supplier; offering siblings under the same parent
+   * category could route them to a subcategory the supplier doesn't carry"*.
+   *
+   * So the type and the size are read-only here and the way to change them is the ✕ on the
+   * equipment tab, which takes him back to that supplier's store (`Canvas`, `direct-stash.ts`).
+   * The category was always derived and never picked.
+   */
+  const listingLocked = !!state.direct;
   const tax = useItemTaxonomy(item, state.taxonomy);
   /** The subtype's photograph, else the category's. Null on most rows — the glyph covers that. */
   const photo = tax.subcategory?.equipmentImageUrl ?? tax.category?.equipmentImageUrl ?? null;
@@ -371,6 +386,7 @@ export function MachineCard({
                   placeholder={t.create.machineCard.type}
                   searchPlaceholder={t.create.machineCard.searchTypes}
                   label={t.create.machineCard.type}
+                  disabled={listingLocked}
                   options={tax.allSubtypes}
                   /* ── A search that finds nothing is where off-catalogue BEGINS (owner, 2026-09-09) ──
                      *"Maybe if he searched in the type and didnt find it we show for him something here
@@ -385,8 +401,11 @@ export function MachineCard({
                      Only offered while the feature is on: with `CUSTOM_EQUIPMENT_ENABLED` off,
                      `isCustomLine` is false whatever the verdict says, so the row would clear the trio
                      and open nothing. */
+                  /* Never offered on a direct request: naming a machine the catalogue cannot place
+                     would address a request to ONE supplier for a listing he does not have. The
+                     dropdown is disabled there anyway, so this is the belt to that brace. */
                   emptyAction={
-                    CUSTOM_EQUIPMENT_ENABLED
+                    CUSTOM_EQUIPMENT_ENABLED && !listingLocked
                       ? {
                           label: t.create.machineCard.addCustomType,
                           /* The name box opens EMPTY (owner, 2026-09-09, on making the row general).
@@ -424,7 +443,7 @@ export function MachineCard({
                   placeholder={t.create.machineCard.size}
                   searchPlaceholder={t.create.machineCard.searchSizes}
                   label={t.create.machineCard.size}
-                  disabled={!item.ref.subcategoryId}
+                  disabled={listingLocked || !item.ref.subcategoryId}
                   options={tax.sizes}
                   onChange={(v) => {
                     prov.touch("capacity");

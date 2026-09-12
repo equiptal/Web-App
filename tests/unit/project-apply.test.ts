@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyProjectDefaults, applyMachineTerms, machineTermsOf } from "@/lib/contract/project-apply";
+import { applyProjectDefaults, applyMachineTerms, machineTermsOf, machineTermsOfRequestItem } from "@/lib/contract/project-apply";
 import { fieldSource, isSystemChosen } from "@/lib/contract/provenance";
 import { defaultProjectDetails, defaultPreferences, newManualItem } from "@/lib/contract/draft";
 import { defaultProjectDefaults } from "@/lib/contract/project";
@@ -408,5 +408,35 @@ describe("who wins when the project and the text disagree", () => {
 
     const { draft: next } = applyMachineTerms(draft, aramcoTemplate, { project: base.project, items: draft.items });
     expect(next.items[0].safetyCertsOverride).toEqual([]);
+  });
+});
+
+
+/**
+ * ── A past request used as a template brings its YEAR (owner, 2026-09-12) ───────────────────────
+ *
+ * *"the year is not stored or shown from the request"*.
+ *
+ * `machineTermsOfRequestItem` read `maxEquipmentAge` alone. That is the DEPRECATED alias the web
+ * posts under and the backend never sends back — the live wire answers `minimumEquipmentYear` — so
+ * the template's year came back null on every real request, and the strip's year pill, guarded on a
+ * value, drew nothing.
+ *
+ * This is the FOURTH reader to make that mistake; `requestedMinYear` exists so there is one. Its own
+ * note lists the other three.
+ */
+describe("the year a request was asked with", () => {
+  it("Given the live field, Then the template carries it", () => {
+    expect(machineTermsOfRequestItem({ minimumEquipmentYear: 2020 }).equipmentYear).toBe("2020");
+  });
+
+  it("Given only the deprecated alias, Then it is still read", () => {
+    // Not removable: it is the only thing that reads a request submitted by an older app build.
+    expect(machineTermsOfRequestItem({ maxEquipmentAge: 2018 }).equipmentYear).toBe("2018");
+  });
+
+  it("Given the request asked for no year, Then the term says nothing", () => {
+    // Null means «say nothing» to the merge, never «any year» — a template must not invent an answer.
+    expect(machineTermsOfRequestItem({}).equipmentYear).toBeNull();
   });
 });
