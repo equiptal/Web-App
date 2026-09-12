@@ -75,6 +75,19 @@ export function useItemTaxonomy(item: EquipmentItem, taxonomy: Taxonomy) {
       subtypeName: taxName(subcategory, locale),
       sizeName: taxName(measurement, locale),
       /**
+       * The pick, written out — «Crawler excavator 20 ton» — for the EQUIPMENT NAME box to fall back
+       * on (owner, 2026-09-12).
+       *
+       * A line added by hand has no words of the renter's own behind it, and asking him to type the
+       * name of the thing he has just chosen from two lists is the annoyance he asked to be rid of.
+       * So the box follows the pick until he edits it; the moment he types, `customEquipment` holds
+       * his answer and this stops being consulted.
+       *
+       * Null while nothing is picked, so the box is genuinely empty on a fresh line rather than
+       * holding half a name.
+       */
+      pickedName: [taxName(subcategory, locale), taxName(measurement, locale)].filter(Boolean).join(" ") || null,
+      /**
        * Part 1 parity with `equipment_step.dart` `_isCraneSelected`: the optional free-text work type
        * is a crane-only field, gated on the subtype's ENGLISH name so the check doesn't depend on the
        * viewer's locale.

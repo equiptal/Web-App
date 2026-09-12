@@ -194,7 +194,20 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
   const size = (ar ? machine.measurementNameAr : machine.measurementName) || machine.measurementName;
   const caption = [kind, size].filter(Boolean).join(" · ");
   const km = machine.distanceKm;
-  const yard = machine.yardName || machine.yardCity;
+  /* ── A yard we cannot place does not get to name itself (owner, 2026-09-12) ──────────────────────
+     *"can we solve it without backend?"* — this is the half that needed answering. `yardName` is
+     printed VERBATIM, so the «Unspecified yard» in his screenshot is the backend's own row: a
+     placeholder, with `(0, 0)` for coordinates, reading on the card as though somebody had named the
+     place. The web cannot tell a placeholder NAME from a real one — but it can tell that this yard
+     resolved to no position at all, and a yard that cannot be placed has nothing to say about where
+     the machine is. So the name is withheld and the cell says «Location not specified» on its own.
+
+     ⚠️ «Placed» is deliberately **a point OR a distance**, not a point alone. The platform can know
+     how far a yard is without publishing where it is, and `yard-card.test.tsx` has always fixed a
+     machine at 12.4 km with no coordinates — gating on the point alone blanked that yard's name too.
+     A yard nothing can place in EITHER sense is the one that has nothing to say. */
+  const anchored = machine.lat != null || machine.distanceKm != null;
+  const yard = anchored ? machine.yardName || machine.yardCity : null;
   const outOfCity = isOutOfCity(km);
   const heroName = title || kind || L("Equipment", "المعدّة");
 
@@ -402,7 +415,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
                         <span className="bm-eq-kmu">{L("km from your project", "كم من مشروعك")}</span>
                       </span>
                     ) : (
-                      <span className="bm-eq-kmu">{L("Distance not known", "المسافة غير معروفة")}</span>
+                      <span className="bm-eq-kmu">{L("Location not specified", "الموقع غير محدّد")}</span>
                     )}
                     {/* The yard itself, which is what the colour is ABOUT. */}
                     {yard && <span className="mp-yard">{yard}</span>}

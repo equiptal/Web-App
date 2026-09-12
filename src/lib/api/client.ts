@@ -41,10 +41,26 @@ export class ApiError extends Error {
   status?: number;
   /** The real upstream backend HTTP status (e.g. agents-backend), distinct from our relay's status. */
   backendStatus?: number;
+  /**
+   * The envelope's `details`, untouched.
+   *
+   * ⚠️ On a `VALIDATION_ERROR` this is zod's `flatten()` — `{ formErrors, fieldErrors }` — which is
+   * the only thing that names the field the backend refused. Carried as `unknown` because other
+   * codes put other shapes here (an export's `{ fallback }`, for one), and narrowing it at the door
+   * would silently drop those.
+   */
+  details?: unknown;
   constructor(
     kind: ApiErrorKind,
     message?: string,
-    extra?: { detail?: string; messageAr?: string; backendCode?: string; status?: number; backendStatus?: number },
+    extra?: {
+      detail?: string;
+      messageAr?: string;
+      backendCode?: string;
+      status?: number;
+      backendStatus?: number;
+      details?: unknown;
+    },
   ) {
     super(message ?? kind);
     this.kind = kind;
@@ -54,6 +70,7 @@ export class ApiError extends Error {
     this.backendCode = extra?.backendCode;
     this.status = extra?.status;
     this.backendStatus = extra?.backendStatus;
+    this.details = extra?.details;
   }
 }
 
@@ -77,11 +94,33 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   }
   if (!res.ok) {
     let code: ApiErrorKind = "unknown";
-    let extra: { detail?: string; messageAr?: string; backendCode?: string; status?: number; backendStatus?: number } = { status: res.status };
+    let extra: {
+      detail?: string;
+      messageAr?: string;
+      backendCode?: string;
+      status?: number;
+      backendStatus?: number;
+      details?: unknown;
+    } = { status: res.status };
     try {
-      const data = (await res.json()) as { code?: ApiErrorKind; detail?: string; messageAr?: string; backendCode?: string; backendStatus?: number };
+      const data = (await res.json()) as {
+        code?: ApiErrorKind;
+        detail?: string;
+        messageAr?: string;
+        backendCode?: string;
+        backendStatus?: number;
+        details?: unknown;
+      };
       if (data.code === "empty" || data.code === "network") code = data.code;
-      extra = { ...extra, detail: data.detail, messageAr: data.messageAr, backendCode: data.backendCode, backendStatus: data.backendStatus };
+      extra = {
+        ...extra,
+        detail: data.detail,
+        messageAr: data.messageAr,
+        backendCode: data.backendCode,
+        backendStatus: data.backendStatus,
+        // ⚠️ Which field the backend refused. See `ApiError.details`.
+        details: data.details,
+      };
     } catch {
       /* ignore */
     }
@@ -815,7 +854,7 @@ async function projectFetch<T>(url: string, init: ProjectFetchInit = {}): Promis
       error?: { code?: string; message?: string; messageAr?: string; details?: unknown };
     };
     code = body.code ?? body.error?.code;
-    details = body.details;
+    details = body.details ?? body.error?.details;
     detail = body.detail ?? body.message ?? body.error?.message;
     messageAr = body.messageAr ?? body.error?.messageAr;
   } catch {
@@ -840,10 +879,9 @@ async function projectFetch<T>(url: string, init: ProjectFetchInit = {}): Promis
   throw new ApiError(res.status >= 500 ? "network" : "unknown", `HTTP ${res.status}`, {
     status: res.status,
     backendCode: code,
-    /* ⚠️ `details` is NOT passed here on this branch: `ApiError`'s `extra` has no such field yet.
-       Adding it is a separate change — the dialog below reads only the sentence and the code. */
     detail,
     messageAr,
+    details,
   });
 }
 
@@ -1257,7 +1295,7 @@ export async function listTemplates(projectId: string): Promise<TemplateOption[]
       kind: g.kind,
       ref: g.title?.trim() || g.ref,
       itemId: it.id,
-      machine: it.label,
+      machine: it.label ?? null,
       quantity: it.quantity,
       when: g.when,
     })),
@@ -2105,9 +2143,22 @@ export interface MailConnectStatus {
   connectedAt: string | null;
 }
 
-/** Never throws: a status we cannot reach is the same as nothing to offer. */
-export async function mailConnectStatus(): Promise<MailConnectStatus> {
-  const none: MailConnectStatus = { configured: false, connected: false, provider: null, accountEmail: null, connectedAt: null };
+/**
+ * The renter's mailbox connection, or `null` when we could not find out.
+ *
+ * 🔴 **`null` is NOT «not connected»** (owner, 2026-09-12: *"outlook is connected but the success
+ * modal is not shown and i didn't find it sent from my outlook"*).
+ *
+ * ~~Every failure answered a fabricated `connected: false`.~~ The panel asks this ONCE on mount and
+ * never again, so a single blip — a cold Lambda, a dropped request — turned a working connection off
+ * for the whole page: `emailWillGo` went false, the send took the «not connected» branch, the
+ * endpoint was never called, and nothing reached the supplier or his Sent folder. Nothing said so,
+ * because from the panel's side nothing had gone wrong.
+ *
+ * A caller that genuinely wants «nothing to offer» can read null that way. A caller about to SEND
+ * must ask again instead of acting on a guess.
+ */
+export async function mailConnectStatus(): Promise<MailConnectStatus | null> {
   try {
     const raw = await projectFetch<Record<string, unknown>>("/api/mail-connect/status");
     return {
@@ -2118,7 +2169,7 @@ export async function mailConnectStatus(): Promise<MailConnectStatus> {
       connectedAt: typeof raw?.connectedAt === "string" ? raw.connectedAt : null,
     };
   } catch {
-    return none;
+    return null;
   }
 }
 

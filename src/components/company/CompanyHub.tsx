@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { VerifiedMark } from "@/components/VerifiedMark";
 import { Dialog } from "@/components/Dialog";
 import { MastheadPill, PageMasthead, RowList, Section } from "@/components/PageSection";
-import { useRouter } from "next/navigation";
 import { useT, useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
@@ -53,10 +52,17 @@ import { pin } from "@/lib/uiPins";
 export function CompanyHub({
   embedded = false,
   onCompany,
+  onCreateCompany,
 }: {
   embedded?: boolean;
   /** Reports the firm (or its absence) to the page around it — the profile prints one name, not two. */
   onCompany?: (company: MyCompany | null) => void;
+  /**
+   * Open the verification form — the OTHER way to have a company, and the one that makes one for
+   * him. Owned by the page (the form is a dialog over it), offered here because this card is where
+   * the question «do you have a company?» is actually asked.
+   */
+  onCreateCompany?: () => void;
 } = {}) {
   const t = useT();
   const c = t.company;
@@ -181,11 +187,21 @@ export function CompanyHub({
         </div>
       ) : !company ? (
         <div className="flex flex-col gap-4">
-          {/* App parity (companyCreateOwn* keys): the two ways to have a company, in the app's
-              order — create your own by verifying, ABOVE joining someone else's. */}
-          <CreateOwnCompanyCard />
-          <JoinForm
+          {/* ── ONE card, both routes (owner, 2026-09-12: *"keep the create as part of the company
+              but show it nice and without ui bugs"*) ──────────────────────────────────────────────
+
+              🔴 **This brings «create» back INTO the company block**, reversing the move made
+              earlier the same day (*"make one CTA for the verify"*, which sent this card's content
+              up to a full-width banner on the profile). What that ruling was really about survives:
+              there is still exactly ONE place to press. It is here, beside the other way to have a
+              company, rather than in a slab three hundred pixels above a card that answered half
+              the same question and had to point down at it.
+
+              App parity keeps the order: create your own by verifying, ABOVE joining someone
+              else's. */}
+          <NoCompanyCard
             busy={busy}
+            onCreate={onCreateCompany}
             onJoin={(code, name) => setConfirm(joinSpec(code, name))}
             onError={setError}
             onAttempt={() => setError(null)}
@@ -307,46 +323,21 @@ export function CompanyHub({
 
 // ── State 1: no company → create your own, or join by code ───────────────────
 
-/**
- * "Add your own company" — the other route to having one, and the one the app offers first
- * (`companyCreateOwnTitle/Desc/Cta`). A company is only ever minted by the verification form, so
- * this is a link to `/verify`, not an action of its own.
- *
- * Shown unconditionally in the no-company state: a renter who was already verified would have a
- * company (verification creates it), so reaching this state means verifying is still available to
- * them — whether they've never submitted, or submitted and were rejected.
- */
-function CreateOwnCompanyCard() {
-  const t = useT();
-  const c = t.company;
-  const router = useRouter();
-  return (
-    <button
-      onClick={() => router.push("/verify")}
-      className={btn("secondary", "md", { full: true, className: "flex text-start transition" })}
-    >
-      <span className="grid h-11 w-11 flex-none place-items-center rounded-sm bg-brand text-brand-fg">
-        <Icon name="verified" size={22} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-subhead font-extrabold text-navy">{c.createOwnTitle}</p>
-        <p className="mt-0.5 text-meta leading-relaxed text-muted">{c.createOwnDesc}</p>
-      </div>
-      <span className="inline-flex flex-none items-center gap-1 rounded-sm bg-brand px-3 py-2 text-meta font-semibold text-brand-fg">
-        {c.createOwnCta}
-        <Icon name="arrow_forward" size={15} className="rtl:scale-x-[-1]" />
-      </span>
-    </button>
-  );
-}
 
-function JoinForm({
+/**
+ * Exported for `dev/preview` ONLY, which photographs it: the profile is behind a session and behind
+ * a backend, so this card had no way to be looked at before it shipped. Nothing else imports it.
+ */
+export function NoCompanyCard({
   busy,
+  onCreate,
   onJoin,
   onError,
   onAttempt,
 }: {
   busy: boolean;
+  /** Absent → the create route is not drawn, and the card is the join form it has always been. */
+  onCreate?: () => void;
   /** Called with the code AND the firm's name, once `validate-code` confirmed both. */
   onJoin: (code: string, companyName: string) => void;
   onError: (message: string) => void;
@@ -380,15 +371,34 @@ function JoinForm({
 
   return (
     <div className="rounded-sm border border-border bg-surface p-6">
-      <div className="flex items-center gap-3">
+      {/* ⚠️ `items-start`, not `items-center`: the body wraps to two lines at this column's width,
+          and centring on the taller block floats the 44px tile off the title it belongs to. */}
+      <div className="flex items-start gap-3">
         <span className="grid h-11 w-11 flex-none place-items-center rounded-sm bg-brand-soft text-brand">
           <Icon name="business_center" size={22} />
         </span>
-        <div>
-          <h2 className="text-subhead font-extrabold text-navy">{c.joinTitle}</h2>
-          <p className="mt-0.5 text-meta leading-relaxed text-muted">{c.noCompany}</p>
+        <div className="min-w-0">
+          {/* The head names the QUESTION, not one of its two answers. «Join a company» over a card
+              that also creates one is the confusion this change removes. */}
+          <h2 className="text-subhead font-extrabold text-navy">{onCreate ? c.noneTitle : c.joinTitle}</h2>
+          <p className="mt-0.5 text-meta leading-relaxed text-muted">{onCreate ? c.noneBody : c.noCompany}</p>
         </div>
       </div>
+
+      {/* ── The first route: verify, and a company is made for him ──────────────────────────────
+          ⚠️ A real BUTTON with a plain label, and nothing nested inside it. The banner this
+          replaces was a `<button>` carrying a fake CTA `<span>` styled as a second button: two
+          affordances for one press, which is what read as broken in the screenshot. */}
+      {onCreate && (
+        <button
+          type="button"
+          onClick={onCreate}
+          className={btn("primary", "lg", { full: true, className: "mt-5 flex items-center justify-center gap-1.5 transition" })}
+        >
+          <Icon name="verified" size={16} />
+          {c.createOwnCta}
+        </button>
+      )}
 
       <form
         className="mt-5"
@@ -411,10 +421,13 @@ function JoinForm({
           dir="ltr"
           className="mt-1.5 w-full rounded-sm border border-border bg-surface px-3.5 py-2.5 text-body font-semibold tracking-[1px] text-navy outline-none transition focus:border-brand"
         />
+        {/* ⚠️ SECONDARY once «create» is on the card: two full-width brand buttons in one block
+            would put the same weight on both routes and let neither read as the one to press. With
+            no create route it is the card's only act and stays primary. */}
         <button
           type="submit"
           disabled={busy || checking || !code.trim()}
-          className={btn("primary", "lg", { full: true, className: "mt-4 transition" })}
+          className={btn(onCreate ? "secondary" : "primary", "lg", { full: true, className: "mt-4 transition" })}
         >
           {checking ? "…" : c.joinButton}
         </button>

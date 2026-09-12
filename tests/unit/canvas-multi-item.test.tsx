@@ -222,8 +222,9 @@ describe("adding equipment by hand", () => {
     /* ~~«N things need you».~~ Removed (owner, 2026-09-01): it counted gaps the cards below already
        mark one by one, in the place the renter has to act on them. The gap itself is what this pins
        now — the required dot the panel draws beside an unanswered field. */
-    // A fresh item has no taxonomy yet, so it blocks — and the panel marks where.
-    expect(document.querySelectorAll(".text-brand").length).toBeGreaterThan(0);
+    // A fresh item has no taxonomy yet, so it blocks — and the panel marks where. The DOT's glyph,
+    // not a colour class: the missing-label orange merged with the chosen-for-you one on 2026-09-12.
+    expect([...document.querySelectorAll("span")].filter((s) => s.textContent === "●").length).toBeGreaterThan(0);
   });
 
   it("adds from the tab strip's + as well, which is the same act", async () => {

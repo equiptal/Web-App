@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { ProjectChips } from "@/components/create/ProjectChips";
+import { Mansour } from "@/components/Mansour";
 import { ProjectPills } from "@/components/create/ProjectPills";
 import { warmAgentCache } from "@/lib/api/client";
 import { useSession } from "@/lib/session";
-import { Button, Icon } from "@/components/ui";
+import { Icon } from "@/components/ui";
 import { AccountModal } from "@/components/onboarding/AccountModal";
 import { bumpAgentUse, guestLimitReached } from "@/lib/access/agent-quota";
 import { pin } from "@/lib/uiPins";
@@ -276,6 +277,30 @@ export function Intake() {
                own, not text, so transparency does not reach it. */
             className={`${FIELD_TEXT} relative w-full flex-1 resize-none border-0 bg-transparent text-transparent caret-navy outline-none placeholder:text-muted/70 focus-visible:outline-none`}
           />
+
+          {/* ── Mansour, while he is the one writing (owner, 2026-09-13) ───────────────────────
+              *"use it here for typing when u select a project and it auto fills the equipment name,
+              make it like this mansour is writing it"*.
+
+              Picking a template has typed its machine into this box, a character at a time, since
+              2026-08-31 - *"I want it shown as typed, like someone is really typing this item"*.
+              That answered HOW and left WHO unsaid, so the line still arrived from nowhere. He
+              stands on the box for the length of the run, `is-live`, and goes.
+
+              ⚠️ **A PERCH, not a caret.** The kit's own note says he leaves the box and watches
+              from a fixed spot on its rim while somebody else's words go in, *"a FIXED spot, not a
+              moving one: his original complaint was that he drifted while you typed"*. Being the
+              caret needs a measured x for every character, and this field is a mirrored textarea
+              whose glyphs are transparent - there is no element to measure against. The trailing
+              corner is a spot he never leaves.
+
+              ⚠️ `pointer-events-none`: he sits over a field the renter may be typing in, and a
+              decoration that swallows a click on the text is worse than no decoration. */}
+          {state.agentTyping && (
+            <span className="pointer-events-none absolute end-3 top-2.5 z-10">
+              <Mansour size={34} state="live" />
+            </span>
+          )}
         </div>
 
         {/* ── The floor: the renter's sites, and the way to hand us a file ─────────────────────
@@ -288,16 +313,75 @@ export function Intake() {
             Upload keeps the row but not the lead. It is the other way in for the renter who has a
             document rather than a sentence, and it belongs at the end of the row for the same reason
             it stopped being the only thing on it. */}
-        <div className="flex flex-wrap items-center gap-2.5 px-5 pb-4 pt-1">
-          <ProjectChips />
-          <button
-            type="button"
-            onClick={() => fileInput.current?.click()}
-            className="ms-auto flex flex-none items-center gap-1.5 rounded-sm border border-border bg-surface px-3 py-1.5 text-body font-semibold text-navy-mid transition hover:border-brand hover:text-brand"
-          >
-            <Icon name="upload" size={15} className="flex-none" />
-            {t.intake.uploadRfq}
-          </button>
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-3 px-5 pb-4 pt-1">
+          {/* ⚠️ **The sentence, then his sites** (owner, 2026-09-12: *"on the left on same row the
+              project pills with sentence «select your project» beside them"*). A bare row of place
+              names is furniture; named, it is a question with an answer already in reach. */}
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="flex-none text-meta font-semibold text-muted">{t.projects.chips.pick}</span>
+            <ProjectChips />
+          </div>
+
+          {/* ⚠️ **Two round controls, and they are the whole floor now** (owner, 2026-09-12:
+              *"remove the continue button, remove upload... instead i want a circle icon for + which
+              will be for upload and beside it a circle arrow to send"*).
+
+              ~~«Upload RFQ» here, and a «Continue» button in a row of its own below.~~ Two rows for
+              two presses, one of them a full-width word for the act every renter is already
+              reaching for. The + hands us a file and the arrow sends: both are what they do, and
+              neither needs a label to say it. */}
+          {/* ── The two controls are a CHIP tall, and they ride the LAST row ────────────────────
+              Owner, 2026-09-12: *"make the buttons on the same size of the project pills … also
+              consider if many projects exist, how the ui will be? the buttons must be on the last
+              row always"*.
+
+              **26px, measured rather than guessed.** A chip is `px-3 py-1 text-label` inside a
+              hairline: 16.5px line box (11px × the body's 1.5) + 8px of padding + 1.6px of border =
+              **26.1px**, and it comes to the same in Arabic because the line box is a RATIO of the
+              font size, not of the face. Checked in the browser at both locales before touching
+              this. The circles were 40px, half again as tall as the row they sit on.
+
+              **The last row is `items-end` on the wrapper above**, which is what makes this hold as
+              the site strip grows: the chips wrap inside their own `flex-1` group, the group gets
+              taller, and these two stay pinned to its bottom edge. They never climb back beside the
+              first row, and they are never pushed onto a row of their own while there is width for
+              them — `flex-none` beside a `min-w-0 flex-1` group is what guarantees that.
+
+              🔴 **The cost, stated: 26px is a small target.** The house guideline is 44, and this
+              row now has two controls well under it — the same fault already logged against a dozen
+              icon-only controls on 2026-09-08. It is what «the same size as the pills» means, and it
+              is his call; the alternative is a 40px circle beside a 26px chip, which is what he is
+              reporting. */}
+          <span className="ms-auto flex flex-none items-center gap-2">
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              aria-label={t.intake.uploadRfq}
+              title={t.intake.uploadRfq}
+              className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full border border-border bg-surface text-navy-mid transition hover:border-brand hover:text-brand"
+            >
+              <Icon name="add" size={15} />
+            </button>
+
+            {/* ⚠️ **What holds it back is on the button itself.** The old Continue had a sentence
+                beside it, because a disabled button with nothing near it reads as broken. A round
+                control has no room for one, so the reason is its `title`: "add something" while it
+                is empty, and what the press will do once it is not. */}
+            <button
+              type="button"
+              disabled={!canStart || state.busy}
+              onClick={runAgent}
+              aria-label={canStart ? (hasDraft ? t.intake.reAnalyze : t.intake.continueLabel) : t.intake.addSomething}
+              title={canStart ? (hasDraft ? t.intake.reAnalyze : t.intake.continueLabel) : t.intake.addSomething}
+              className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full bg-brand text-brand-fg transition hover:bg-brand-press disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
+            >
+              <Icon
+                name={state.busy ? "hourglass_empty" : "arrow_forward"}
+                size={15}
+                className={state.busy ? "" : "rtl:scale-x-[-1]"}
+              />
+            </button>
+          </span>
         </div>
 
         <input ref={fileInput} type="file" multiple accept={ACCEPT_ATTR} className="hidden" onChange={(e) => onFiles(e.target.files)} />
@@ -325,27 +409,18 @@ export function Intake() {
       </div>
 
 
-      {/* ── The way on ── */}
-      <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
-        {/* ~~«Back to review», drawn on the left whenever a draft existed.~~ Removed (owner,
-            2026-09-09). It was a second Back on a screen that already has one, and the two disagreed:
-            the page's own control leaves the flow (`CreateBack`, `{ fallback: "/" }` on the intake),
-            while this one went forward into the drafted request. A renter who had just answered
-            «Leave» on the canvas's confirm met a button offering to undo that.
-
-            The draft is NOT stranded, and neither route needed this button:
-              · the browser's own Back resumes it (`rfq-store`'s `popstate` → `RESUME_WIZARD`);
-              · a returning visit raises the draft prompt, whose «Continue» resumes it;
-              · and «Re-analyse» right here rebuilds it from the words on screen.
-            `resumeWizard` therefore keeps its two callers and is not dead. */}
-        {/* A disabled Continue with nothing beside it is indistinguishable from a broken one, so
-            the only thing that can hold it says so. */}
-        {!canStart && <span className="me-auto text-meta text-muted">{t.intake.addSomething}</span>}
-        <Button disabled={!canStart || state.busy} onClick={runAgent} className="px-6 py-3 text-body">
-          {state.busy ? t.intake.reading : hasDraft ? t.intake.reAnalyze : t.intake.continueLabel}{" "}
-          <Icon name={state.busy ? "hourglass_empty" : "arrow_forward"} size={17} className={state.busy ? "" : "rtl:scale-x-[-1]"} />
-        </Button>
-      </div>
+      {/*
+        * — «The way on» lived here —
+        *
+        * A row of its own holding «Continue», with «Add a description or a file» opposite it, and
+        * before 2026-09-09 a «Back to review» beside that.
+        *
+        * 🔴 **Removed** (owner, 2026-09-12). It is one press, and it now sits on the floor of the
+        * box beside the file button, where the renter's hand already is. The sentence that had to
+        * stand next to a disabled Continue is the arrow's `title` instead: a round control cannot
+        * carry a sentence, and a tooltip says the same thing to the renter who hovers and to the
+        * screen reader either way.
+        */}
 
       {/* Guest hit the free agent-run limit → create an account, then continue processing. */}
       <AccountModal open={showAccount} onClose={() => setShowAccount(false)} onCreated={() => { setShowAccount(false); void actions.process(); }} title={t.guest.trialTitle} subtitle={t.guest.trialSub} />

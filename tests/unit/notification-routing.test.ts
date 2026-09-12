@@ -146,3 +146,59 @@ describe("the home bubble raises only what the owner picked (2026-09-05)", () =>
     }
   });
 });
+
+/**
+ * -- Audited against every type the backends emit (owner, 2026-09-12) ----------------------------
+ *
+ * *"Make sure all notifications are wired to their exact place."*
+ */
+describe("the rows that were falling through", () => {
+  const n = (type: string, data: Record<string, unknown> = {}) =>
+    ({ id: "n", type, title: "", body: "", roleContext: "rentee", isRead: false, createdAt: "", data }) as NotificationItem;
+
+  it("Given HIS request closed, Then it opens that request", () => {
+    /**
+     * 🔴 `request.closed_owner` is `roleContext: 'rentee'` and the backend comments the id as
+     * being there *"so the renter's tap opens THEIR request"*. It arrived carrying `requestId` and
+     * this mapper returned null, so the row was inert.
+     */
+    expect(notificationHref(n("request.closed_owner", { requestId: "req-1" }))).toBe("/requests?r=req-1");
+  });
+
+  it("Given a request he bid on closed unfilled, Then it opens that request too", () => {
+    // ⚠️ Supplier-side, kept for a dual-role account like the rest of that block.
+    expect(notificationHref(n("request.closed_unfilled", { requestId: "req-2" }))).toBe("/requests?r=req-2");
+  });
+
+  it("Given his quotation was read, Then it opens the BID, not the request", () => {
+    // ⚠️ A supplier can hold several bids on one request, so the bid is the one that was read.
+    expect(notificationHref(n("bid.quotation_viewed", { bidId: "b-9", requestId: "req-3" }))).toBe(
+      "/bids/b-9/equipment?chat=1",
+    );
+    expect(notificationHref(n("bid.quotation_downloaded", { bidId: "b-9" }))).toBe("/bids/b-9/equipment?chat=1");
+  });
+
+  it("Given a chat system-message type, Then it is NOT treated as a notification", () => {
+    /**
+     * 🔴 `bid_withdrawn`, `deal_closed` and `request_summary` are Stream CHAT metadata
+     * (`postSystemMessage(..., { type })`) and never reach the bell; `referral_reward` is a COUPON
+     * type. Wiring them would be four dead branches a later reader would trust. The underscore is
+     * the tell: every real notification type in this product is dotted.
+     */
+    for (const t of ["bid_withdrawn", "deal_closed", "request_summary", "referral_reward"]) {
+      expect(notificationHref(n(t, { requestId: "req-4", dealRoomId: "d-1" }))).toBeNull();
+    }
+  });
+
+  it("Given the off-platform bid, Then it opens the request it was made on", () => {
+    /**
+     * 🔴 The row in the owner's screenshot. It is sent as `bid.received` with
+     * `data: { requestId, submissionId }`, so the MAP was already right — the fault was that the
+     * workspace ignored the arriving `?r=` when it was already mounted. Pinned here so the mapping
+     * half can never regress underneath that fix.
+     */
+    expect(notificationHref(n("bid.received", { requestId: "req-5", submissionId: "s-1" }))).toBe(
+      "/requests?r=req-5",
+    );
+  });
+});

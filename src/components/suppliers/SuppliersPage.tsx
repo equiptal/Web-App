@@ -864,10 +864,21 @@ function Row({
             one number, in a column a renter scans down.
 
             `phoneE164` is the same parser the preview uses. A number it cannot read is drawn exactly
-            as it arrived, because a phone we cannot parse is still the only thing he has. */}
+            as it arrived, because a phone we cannot parse is still the only thing he has.
+
+            ── `dir` rides a BDI, never the block (owner, 2026-09-12) ───────────────────────────
+            *"the order is different in columns"* — in Arabic the «الجوال» and «البريد» headers sat
+            against the right edge of their columns while the values sat against the left, so two of
+            the six columns read as shifted out of line.
+
+            `dir="ltr"` was on the BLOCK. `text-align: start` resolves against the element's OWN
+            direction, so an ltr block inside an rtl table starts on the LEFT while its `text-start`
+            header starts on the RIGHT. The direction is still needed — a `+966…` number must not be
+            reordered by the Arabic around it — so it moves to a `<bdi>`, the element for exactly
+            this: it isolates the run's direction and leaves the block's alignment to the page. */}
         {s.phone ? (
-          <span className="block font-semibold text-navy" dir="ltr">
-            {phoneE164(s.phone) ?? s.phone}
+          <span className="block font-semibold text-navy">
+            <bdi dir="ltr">{phoneE164(s.phone) ?? s.phone}</bdi>
           </span>
         ) : (
           <MissingContact onAdd={onEdit} label={c.add} />
@@ -877,8 +888,9 @@ function Row({
 
       <td className="px-3 py-2.5 text-meta">
         {canBeEmailed(s) ? (
-          <span className="block font-semibold text-navy" dir="ltr">
-            {s.email}
+          /* The same bidi isolation as the phone above, for the same reason. */
+          <span className="block font-semibold text-navy">
+            <bdi dir="ltr">{s.email}</bdi>
           </span>
         ) : (
           <MissingContact onAdd={onEdit} label={c.add} />

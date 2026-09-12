@@ -637,6 +637,32 @@ body {
   }
 }
 
+/* The renter has just asked to name the machine himself, so the card POINTS at what changed: the
+   name box and the note that appeared under it (owner, 2026-09-13). A pulse and never a shake —
+   `shake-error` is this canvas's word for a REFUSAL, and nothing was refused here; the line simply
+   moved to a state he chose. Two beats, so it reads as deliberate rather than as a flicker.
+   Reduced motion keeps the outline, which is the part carrying the meaning — the same trade the
+   shake makes above. */
+@keyframes attn-glow {
+  0%   { outline-color: transparent; }
+  22%  { outline-color: var(--warn); }
+  50%  { outline-color: transparent; }
+  72%  { outline-color: var(--warn); }
+  100% { outline-color: transparent; }
+}
+.attn-pulse {
+  animation: attn-glow 1.4s ease-in-out;
+  outline: 2px solid transparent;
+  outline-offset: 3px;
+  border-radius: var(--radius-md);
+}
+@media (prefers-reduced-motion: reduce) {
+  .attn-pulse {
+    animation: none;
+    outline-color: var(--warn);
+  }
+}
+
 /* ---- The success tick (owner, 2026-09-03) ----
    A confirmation that a request went out is the one moment in the flow worth marking: the renter has
    just pressed the button he came to press, and everything else on the screen is the work he did to

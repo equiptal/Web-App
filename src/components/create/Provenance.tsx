@@ -60,7 +60,10 @@ export function CheckFromProject() {
 export function RequiredDot({ show }: { show: boolean }) {
   if (!show) return null;
   return (
-    <span aria-hidden className="text-label leading-none text-brand">
+    /* `brand-deep`, the same orange its label wears (owner, 2026-09-12: *"use unified font colour
+       for missing fields"*). It was `brand`, so the dot and the word it follows were two different
+       oranges an inch apart. */
+    <span aria-hidden className="text-label leading-none text-brand-deep">
       ●
     </span>
   );
@@ -130,25 +133,55 @@ export function CanvasField({
 
            `brand-deep` rather than `brand`: orange TEXT on a light ground has to be #c2570f to pass
            AA, and the brand orange is a FILL colour — the rule the token file states and
-           `palette-drift` enforces. */
+           `palette-drift` enforces.
+
+           ── ONE orange for both orange states (owner, 2026-09-12) ──────────────────────────────
+           *"use unified font colour for missing fields, some have dark orange like return and site
+           and some have orange like size, so unify"*.
+           ~~`missing` drew `text-brand` (#f97316) while a chosen-for-you label drew `brand-deep`
+           (#c2570f).~~ Two oranges a hand's width apart on one card, and the brighter of the two was
+           the one breaking this file's own AA rule — it is a FILL colour being used as 11px text.
+           🔴 The two STATES are still told apart, just not by the label's colour: the ● is drawn for
+           `missing` alone and the ring round the box for `isSystemChosen` alone. Nothing is lost by
+           spelling them in one ink; what was lost before was the reader's ability to tell a shade
+           from a state. */
         className={`mb-2 flex items-center gap-1.5 text-label font-semibold uppercase leading-tight tracking-[0.05em] ${
-          required ? "text-danger" : missing ? "text-brand" : isSystemChosen(source) ? "text-brand-deep" : "text-muted"
+          required ? "text-danger" : missing || isSystemChosen(source) ? "text-brand-deep" : "text-muted"
         }`}
       >
         {icon}
-        <span>
+        {/* ── The demand rides INSIDE the label, and costs it as little as possible ──────────────
+            (owner, 2026-09-12: *"fix the ui when required appear to not change the size of card box
+            and dont affect the text wrapping, put the required text small"*.)
+
+            ~~The word was a flex SIBLING of the label, at the label's own size: 11px, uppercase,
+            extrabold, with the row's 0.05em tracking on it.~~ Three faults from one line. It was a
+            rigid item, so it took its width off the label and pushed «FUEL RESPONSIBILITY» onto two
+            lines, which made that panel taller than the two beside it. It had no `nowrap`, so the
+            string «* Required» split at its own space and left the star stranded at the end of the
+            first line with «REQUIRED» under it. And at the label's weight it read as a second title
+            rather than as a note on the first.
+
+            It is INLINE with the label text now, so it flows with the words instead of competing
+            with them, `normal-case` at `font-semibold` with the tracking cleared — which is roughly
+            half the width it was — and `whitespace-nowrap` so it can never break in half again. */}
+        <span className="min-w-0">
           {label}
           {/* The star rides the LABEL, not the row: «TYPE *» is one thing to read, while a star a
-              gap away from the word it qualifies reads as a footnote to the whole field. */}
-          {star && !required && <span className="ms-0.5 font-extrabold text-danger">*</span>}
+              gap away from the word it qualifies reads as a footnote to the whole field.
+              It is drawn whenever the field is starred, `required` included — it used to be
+              SUPPRESSED then, because the word carried a star of its own; that star is what broke
+              across the line. One star, in one place, in both states. */}
+          {star && <span className="ms-0.5 font-extrabold text-danger">*</span>}
+          {required && (
+            <span className="ms-1 whitespace-nowrap font-semibold normal-case tracking-normal text-danger">
+              {t.create.requiredWord}
+            </span>
+          )}
         </span>
         {optional && <span className="font-normal normal-case tracking-normal text-muted/70">{t.create.machineCard.notesOptional}</span>}
-        {/* The word, not just the dot — see `shake`. */}
-        {required ? (
-          <span className="font-extrabold text-danger">{t.create.requiredMark}</span>
-        ) : (
-          <RequiredDot show={missing} />
-        )}
+        {/* The dot is the UNTRIED state of the same fact, and never shows beside the word. */}
+        {!required && <RequiredDot show={missing} />}
       </div>
       {/**
         * The amber highlight wraps the CONTROL, not the whole field.

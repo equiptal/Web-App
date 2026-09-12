@@ -80,6 +80,28 @@ const SIZE: Record<DialogSize, string> = {
 const SCRIM = "fixed inset-0 z-[60] bg-black/55 backdrop-blur-[3px]";
 
 /**
+ * The scrim a NESTED dialog draws, which is a wash rather than a curtain.
+ *
+ * 🔴 **It was transparent, and that is the bug** (owner, 2026-09-12, on a shot of *Add suppliers*
+ * standing over *Share for bids*: *"fix the ui, how can i open 2 modals above each other?"*). The
+ * second dialog had no ground of its own and no elevation the app can spend (this design system has
+ * no shadows), so the first one's header, rows and buttons went on reading at full strength above
+ * and below it. It looked like a panel pasted into the middle of the page, not like a layer over it.
+ *
+ * ⚠️ **Light on purpose, and no second blur.** `black/55` under `black/25` composites to about
+ * 66%, a visible step down from 55% and still short of the ~70% mud that made two scrims unreadable
+ * the first time (see {@link openDialogs}). A second `backdrop-blur` would soften the dialog
+ * underneath as well as the page, which is more than a wash needs to do and costs a repaint of the
+ * whole viewport on every keystroke in the nested form.
+ *
+ * ⚠️ **The z-index stays at 60.** A nested dialog is a DESCENDANT of the one that opened it, so
+ * later in the document wins at the same level, and `Dropdown` portals its list at `z-[70]` on the
+ * stated promise of sitting above this shell. Raising this would put the nested dialog over its own
+ * dropdowns.
+ */
+const NESTED_SCRIM = "fixed inset-0 z-[60] bg-black/25";
+
+/**
  * How many dialogs are open, so a NESTED one does not dim the page twice.
  *
  * The share sheet opens from the request modal (owner, 2026-08-31: *"why does the share open like
@@ -215,7 +237,7 @@ export function Dialog({
 
   return (
     <div {...pin("dialog")}
-      className={`${nested ? "fixed inset-0 z-[60]" : SCRIM} flex items-end justify-center p-0 sm:items-center sm:p-4`}
+      className={`${nested ? NESTED_SCRIM : SCRIM} flex items-end justify-center p-0 sm:items-center sm:p-4`}
       onClick={onClose}
       role="dialog"
       aria-modal="true"

@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { VerifiedMark } from "@/components/VerifiedMark";
+import { VerifyModal } from "@/components/onboarding/VerifyModal";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
@@ -170,6 +171,8 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
   const { tier, status, signOut, refresh: refreshSession } = useSession();
   /** The account menu: Profile, and the only door out of the app. */
   const [accountOpen, setAccountOpen] = useState(false);
+  /** The verification form, opened by the header nudge — see the note on that button. */
+  const [verifyOpen, setVerifyOpen] = useState(false);
   const accountBox = useRef<HTMLDivElement>(null);
 
   /* Dismissed the way every popover in this app is: a press outside it, or Escape. Also closed on
@@ -531,7 +534,13 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
                   settings page, and a second nudge up here would repeat the mistake the menu was
                   already making. Flagged for the owner rather than quietly kept. */}
             {status === "authed" && (
-              <div ref={accountBox} className="relative flex-none">
+              /* ⚠️ **`flex`, and that is the whole of the reported fault** (owner, 2026-09-12:
+                 *"what is this ugly ui"*). This wrapper was `relative flex-none` and nothing else —
+                 a BLOCK — so the avatar and the «Verify» press beside it were two block-level
+                 children and stacked: the pill dropped onto a second line under the circle and the
+                 52px bar cut it in half. The comment two blocks down already promised «it sits
+                 BESIDE the avatar»; the box it sits in never agreed. */
+              <div ref={accountBox} className="relative flex flex-none items-center gap-2">
               <button {...pin("header-avatar")}
                 type="button"
                 onClick={() => setAccountOpen((v) => !v)}
@@ -563,12 +572,38 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
                   </span>
                 ) : null}
                 </span>
-                {tier !== "verified" && (
-                  <span className="rounded-full bg-brand px-2 py-0.5 text-label font-semibold uppercase tracking-[0.05em] text-white">
-                    {t.shell.verifyNudge}
-                  </span>
-                )}
               </button>
+
+              {/* 🔴 **«Verify» is its own press, and it opens the FORM** (owner, 2026-09-12: *"when
+                  a user clicks verify from the header of the web beside the profile, take him
+                  directly to the form, not to the profile"*).
+                  ~~Inside the avatar button.~~ One control wearing two promises: the word said
+                  «verify» and the press opened the account menu, from which the renter still had to
+                  find the profile and then find the nudge on it. Three steps to reach a form the
+                  word had already offered him.
+
+                  ⚠️ It sits BESIDE the avatar, not on it: the house scale starts at 11px, and 11px
+                  of «Verify» is wider than the 34px circle. Two buttons now, which is what they
+                  always were — the avatar opens the menu, this opens the form. */}
+              {tier !== "verified" && (
+                <button
+                  type="button"
+                  onClick={() => setVerifyOpen(true)}
+                  aria-label={t.shell.verifyNudge}
+                  /* ── Quiet enough to sit beside a face, loud enough to be the thing to press ──
+                     ~~`uppercase tracking-[0.05em]`~~ on a solid brand ground: SHOUTED at 11px, on a
+                     navy bar where every other mark is white at reduced strength, and it read as an
+                     alert rather than as an offer. Sentence case at the same size and weight says
+                     the same word without raising its voice.
+
+                     ⚠️ The brand FILL stays. This is an action, not a note — the outlined-white
+                     treatment belongs to the marks beside the wordmark, which state a fact and are
+                     not pressed. `h-[22px]` keeps it off the bar's own edges beside a 34px circle. */
+                  className="flex h-[22px] flex-none items-center rounded-full bg-brand px-2.5 text-label font-semibold text-white transition hover:bg-brand-press"
+                >
+                  {t.shell.verifyNudge}
+                </button>
+              )}
 
               {/* Two entries, and each is the only way to reach what it names. On a dark bar the
                   popover keeps its own light ground — the same treatment the nav sheet gets — because
@@ -704,6 +739,10 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
           {children}
         </main>
       </div>
+
+      {/* ⚠️ Mounted at the SHELL, so the form opens over whatever the renter was reading and
+          closing it puts him back there. That is the whole reason it stopped being a page. */}
+      <VerifyModal open={verifyOpen} onClose={() => setVerifyOpen(false)} />
 
     </div>
     </BackAsideContext.Provider>

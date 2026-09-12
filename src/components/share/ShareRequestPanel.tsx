@@ -24,6 +24,7 @@ import {
 import { canBeEmailed, groupsWithCounts, isOnMoedatech } from "@/lib/contract/renter-suppliers";
 import { GroupsMenu } from "@/components/suppliers/SupplierGroups";
 import { AddSuppliersDialog } from "@/components/suppliers/AddSuppliersDialog";
+import { ChannelMark, type ChannelName } from "@/components/ChannelMark";
 import { MAIL_UI, MailField, MailChips, type MailPerson } from "@/components/share/mail-chrome";
 import type { BidFormData } from "@/lib/contract/link-bids";
 import { bidCardHtml } from "@/lib/bidCardHtml";
@@ -247,6 +248,14 @@ export function ShareRequestPanel({
   const [group, setGroup] = useState("");
   const [groupMenu, setGroupMenu] = useState(false);
   const [expiry, setExpiry] = useState("");
+  /**
+   * He pressed Copy before there was anything to copy — see the note on that button.
+   *
+   * ⚠️ A DIALOG rather than a tooltip: the answer is a fact about his REQUEST (it has not been
+   * posted), not a label for the control, and a tooltip never appears at all on a touch screen,
+   * which is where this press is most likely to be a surprise.
+   */
+  const [linkLocked, setLinkLocked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uuid, setUuid] = useState<string | null>(requestUuid);
   /**
@@ -509,8 +518,10 @@ export function ShareRequestPanel({
         if (win.closed) {
           void mailConnectStatus()
             .then((st) => {
-              setConnect(st);
-              done(st.connected, st.connected ? "connected" : "denied");
+              /* ⚠️ `null` is «we could not find out», not «not connected» — so it does not overwrite
+                 what the panel already knows, and it is read as denied only for this one answer. */
+              if (st) setConnect(st);
+              done(st?.connected === true, st?.connected ? "connected" : "denied");
             })
             /* He closed it and we cannot tell what happened. «Not connected» is the answer that
                keeps him moving; the compose window opens and the message still goes. */
@@ -529,7 +540,7 @@ export function ShareRequestPanel({
         void mailConnectStatus()
           .then((st) => {
             if (connectTimer.current === null) return;
-            if (!st.connected) return;
+            if (!st?.connected) return;
             setConnect(st);
             /* Consent landed. The window closes itself a moment later; close it now so the renter
                is not left with a stray pop-up over the panel he is coming back to. */
@@ -1046,6 +1057,28 @@ export function ShareRequestPanel({
        * suppliers already in it and he presses Send there. That is the whole reason the two are
        * separate buttons, and it needs no connection, no consent and no confirm step.
        */
+      /**
+       * ── ASK AGAIN before deciding he is not connected (owner, 2026-09-12) ────────────────────
+       *
+       * *"outlook is connected but the success modal that it is sent not shown and i didnt find it
+       * sent from my outlook"*.
+       *
+       * The connection is read ONCE, on mount, and `mailConnectStatus` used to answer a fabricated
+       * `connected: false` for every failure — so one dropped request turned a working connection
+       * off for the whole page. `emailWillGo` then went false, the send took the «not connected»
+       * branch, the endpoint was never called, and nothing reached the supplier or the Sent folder.
+       * Nothing said so, because from here nothing had gone wrong.
+       *
+       * ⚠️ Only when the panel believes it is NOT connected, so a connected renter pays no extra
+       * round trip. `null` still means unknown, and a second unknown leaves today's behaviour.
+       */
+      let live = connect;
+      if (provider === "outlook" && !skipEmail && !live?.connected) {
+        live = (await mailConnectStatus()) ?? live;
+        if (live !== connect) setConnect(live);
+      }
+      const willSend = provider === "gmail" || (!!live?.connected && !skipEmail);
+
       if (provider === "gmail") {
         const opened = openCompose(id, message);
         if (opened) {
@@ -1078,7 +1111,7 @@ export function ShareRequestPanel({
          *
          */
         setConfirming(false);
-      } else if (!emailWillGo) {
+      } else if (!willSend) {
         /**
          * 🔴 **Moedatech only, and nothing else happens** (owner, 2026-09-10). Two ways to land
          * here, and they read the same to the renter because the confirmation said so before the
@@ -1369,90 +1402,114 @@ export function ShareRequestPanel({
         <div className="flex flex-wrap items-center gap-2">
           {/* The heading rides this row — see `heading`. */}
           {heading}
-          {/* The expiry sits beside the link because it is a property OF the link, not of the
-              request — and it is named, because a bare date box beside a URL could be anything. */}
+
+          {/* ── The LINK, on the leading edge, with its copy inside it (owner, 2026-09-12) ──────
+              *"the link placeholder field must be smaller without this «Your shareable link is
+              generated the moment you post your request», and the copy button is part of the link
+              placeholder so just copy icon inside the placeholder"*.
+
+              🔴 **Three things stood on this row and the least useful was the widest.** The field
+              carried the masked link AND a full sentence about when the real one arrives, so the
+              placeholder grew to hold a line of prose; the copy sat OUTSIDE it as a bordered 34px
+              button, which read as a fourth control rather than as part of the field it acts on;
+              and the expiry — the one control on the row a renter actually sets before he posts —
+              was a grey chip squeezed against the leading edge.
+
+              Now the field is capped and holds the link and one icon, and the sentence is gone.
+              ⚠️ The sentence is not merely moved: the DIALOG behind the icon says the same thing
+              at the moment he asks for it, which is the only moment it answers a question he has. */}
+          <span
+            className={cx(
+              "flex h-[38px] min-w-0 flex-1 items-center gap-2 rounded-md border ps-3 pe-1",
+              /* ⚠️ **Capped.** Left to grow it took every pixel the expiry was not using, which is
+                 how a masked stub ended up the widest object on the row. A real bid URL fits inside
+                 380px; anything longer truncates, which it always did. */
+              "sm:max-w-[380px]",
+              uuid ? "border-border bg-surface" : "border-dashed border-border-strong bg-surface2",
+            )}
+          >
+            {!uuid && <Icon name="lock" size={13} className="flex-none text-muted-light" />}
+            {/* The shape of the link that is coming: host, path, a stub, stars. */}
+            <span
+              dir={uuid ? "ltr" : undefined}
+              className={cx(
+                "block min-w-0 flex-1 truncate font-mono text-meta",
+                uuid ? "text-navy" : "text-muted-light",
+              )}
+            >
+              {uuid ? shareUrl.replace(/^https?:\/\//, "") : maskedLink}
+            </span>
+            {/* ⚠️ **Inside the field, and never disabled.** It was `disabled={!uuid}` and outside,
+                so before the post it was a dead grey button beside a dead grey field and the screen
+                said nothing about why. A control that refuses must say what it is waiting for, so
+                this one is always pressable and answers in a dialog when there is nothing to copy. */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!uuid) {
+                  setLinkLocked(true);
+                  return;
+                }
+                /**
+                 * The link, and only the link (owner, 2026-09-02: *"copy link must only copy the
+                 * linkl not the message"*).
+                 *
+                 * ~~It briefly copied the whole message in two flavours.~~ That made the one control
+                 * a renter reaches for when he needs a URL — a CRM field, a WhatsApp Business
+                 * template, a purchase order — hand him four paragraphs instead. The template still
+                 * travels: every app that unfurls a link draws the card from the URL itself, which is
+                 * what `/bid/[token]/og` is for. Where a renter wants the words as well, that is what
+                 * *More* does.
+                 */
+                void navigator.clipboard?.writeText(shareUrl).catch(() => {});
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1600);
+              }}
+              title={c.copy}
+              aria-label={c.copy}
+              className={cx(
+                "grid h-[30px] w-[30px] flex-none place-items-center rounded-sm transition",
+                /* ⚠️ A 30px HIT AREA round a 15px glyph. The same ruling as the machine panel's
+                   document arrow on 2026-09-10: a 15px glyph is not a target on a phone, and the box
+                   that makes it one carries no border of its own inside a field that has one. */
+                uuid ? "text-navy-mid hover:bg-surface2 hover:text-navy" : "text-muted hover:bg-surface3 hover:text-navy",
+              )}
+            >
+              {/* ⚠️ **A glyph, with no word** (owner, 2026-09-05). It sits inside the link field
+                  and copies the link: the field IS the label, and «Copy» beside it named the object
+                  twice while taking room from the URL, which is the half a person actually reads. */}
+              <Icon name={copied ? "check" : "content_copy"} size={15} />
+            </button>
+          </span>
+
+          {/* ── The EXPIRY leads the row now, on the trailing edge (owner, 2026-09-12) ───────────
+              *"so now the expiry date is more dominant, make it the main cta in this row and
+              actually make it on the right and the link copy placeholder on the left"*.
+
+              It is the only thing on this row a renter DECIDES. The link is minted for him and the
+              copy acts on it; the date is his own deadline for the whole share, and it was dressed
+              as the quietest object there — grey label, grey glyph, hairline border.
+
+              ⚠️ **Brand tone, not a filled button.** The panel already has one filled primary, the
+              Send on the channel row, and a second would put two competing presses on one card. This
+              is dominant WITHIN its row — brand ground, brand edge, the label in `brand-deep` — and
+              still reads as a field, which it is.
+
+              ⚠️ `ms-auto`, never `ml-auto`: this screen mirrors, so «the right» is the edge the
+              renter reads TOWARDS, which is the left in Arabic. */}
           {showExpiry && (
-            <span className="flex h-[34px] items-center gap-2 rounded-md border border-border px-2.5">
-              <Icon name="event" size={14} className="flex-none text-muted" />
-              <span className="whitespace-nowrap text-label font-semibold uppercase tracking-[0.05em] text-muted">{c.expiry}</span>
+            <span className="ms-auto flex h-[38px] flex-none items-center gap-2 rounded-md border border-brand/45 bg-brand-soft px-3">
+              <Icon name="event" size={15} className="flex-none text-brand-deep" />
+              <span className="whitespace-nowrap text-label font-extrabold uppercase tracking-[0.05em] text-brand-deep">{c.expiry}</span>
               <input
                 type="date"
                 value={expiry}
                 onChange={(e) => setExpiry(e.target.value)}
                 aria-label={c.expiry}
-                className="w-[124px] bg-transparent text-meta text-navy outline-none"
+                className="w-[124px] bg-transparent text-meta font-semibold text-navy outline-none"
               />
             </span>
           )}
-          {/* Locked until it exists (owner, 2026-09-02: *"users cant copy or view the link before
-              sharing or posting it because it is not created yet"*). Drawn as a padlocked, dashed
-              field rather than hidden: the renter needs to know a link is coming and that this is
-              where it will be, or Copy looks broken rather than not-yet. */}
-          <span
-            className={cx(
-              "flex min-w-0 flex-1 items-center gap-2 rounded-md border px-3 py-2",
-              uuid ? "border-border bg-surface" : "border-dashed border-border-strong bg-surface2",
-            )}
-          >
-            {!uuid && <Icon name="lock" size={13} className="flex-none text-muted-light" />}
-            {/* The shape of the link that is coming: host, path, a stub, stars. It says WHAT the
-                link will be, and the sentence beside it says WHEN it arrives. */}
-            <span
-              dir={uuid ? "ltr" : undefined}
-              className={cx(
-                "block min-w-0 truncate text-meta",
-                // Both variants shrink. `flex-none` on the masked one meant the stub host stuck 48px
-                // out of a phone-width card, the one element still overflowing after the grid fix.
-                uuid ? "flex-1 font-mono text-navy" : "flex-1 font-mono text-muted-light",
-              )}
-            >
-              {uuid ? shareUrl.replace(/^https?:\/\//, "") : maskedLink}
-            </span>
-            {/* ── The sentence lives IN the field, beside the locked value (owner, 2026-09-03) ───
-                *"This must be in the placeholder of the link beside the locked value."*
-
-                ~~A line of its own under the row.~~ It is not a fact about the screen, it is what
-                this ONE field is waiting for, which is what a placeholder is; and under the row it
-                cost a line that the card needed back above the fold. It disappears the moment the
-                link exists, exactly as a placeholder should, because by then the field holds the
-                answer instead.
-
-                Hidden below `sm`: on a narrow panel the masked link and a sentence cannot share a
-                line, and the value is the half that must stay. */}
-            {!uuid && (
-              <span className="hidden min-w-0 flex-1 truncate text-meta text-muted-light sm:block">
-                {c.linkHint}
-              </span>
-            )}
-          </span>
-          <button
-            type="button"
-            disabled={!uuid}
-            onClick={() => {
-              /**
-               * The link, and only the link (owner, 2026-09-02: *"copy link must only copy the
-               * linkl not the message"*).
-               *
-               * ~~It briefly copied the whole message in two flavours.~~ That made the one control
-               * a renter reaches for when he needs a URL — a CRM field, a WhatsApp Business
-               * template, a purchase order — hand him four paragraphs instead. The template still
-               * travels: every app that unfurls a link draws the card from the URL itself, which is
-               * what `/bid/[token]/og` is for. Where a renter wants the words as well, that is what
-               * *More* does.
-               */
-              void navigator.clipboard?.writeText(shareUrl).catch(() => {});
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1600);
-            }}
-            title={c.copy}
-            aria-label={c.copy}
-            className={cx(btn("secondary", "md", { icon: true }), "flex-none")}
-          >
-            {/* ⚠️ **A glyph, with no word** (owner, 2026-09-05). It sits against the link field and
-                copies the link: the field IS the label, and «Copy» beside it named the object twice
-                while taking room from the URL, which is the half a person actually reads. */}
-            <Icon name={copied ? "check" : "content_copy"} size={15} />
-          </button>
           {/*
             * — «Preview form» lived here —
             *
@@ -2078,6 +2135,7 @@ export function ShareRequestPanel({
             on={channel === "whatsapp"}
             onClick={() => setChannel((v) => (v === "whatsapp" ? "none" : "whatsapp"))}
             icon="chat"
+            mark="whatsapp"
             label={c.whatsapp}
             done={sent.includes("whatsapp")}
           />
@@ -2106,6 +2164,7 @@ export function ShareRequestPanel({
               setChannel((v) => (v === "email" && provider === "outlook" ? "none" : "email"));
             }}
             icon="mail"
+            mark="outlook"
             label={c.outlook}
             done={sent.includes("email") && provider === "outlook"}
           />
@@ -2117,6 +2176,7 @@ export function ShareRequestPanel({
               setChannel((v) => (v === "email" && provider === "gmail" ? "none" : "email"));
             }}
             icon="alternate_email"
+            mark="gmail"
             label={c.gmail}
             done={sent.includes("email")}
           />
@@ -2248,6 +2308,55 @@ export function ShareRequestPanel({
             </span>
           )}
 
+          {/* ── A send that did NOT happen says so (owner, 2026-09-12) ────────────────────────────
+              *"outlook is connected but the success modal that it is sent not shown and i didnt find
+              it sent from my outlook"*.
+
+              Only the SUCCESS was ever reported here. Every refusal — `NO_RECIPIENTS`,
+              `SEND_REJECTED`, `RECONNECT_REQUIRED`, the SES domain ones — changed a button's label at
+              most, so «nothing sent» and «nothing pressed» looked identical on screen and the renter
+              was left checking his Sent folder to find out.
+
+              ⚠️ `PREVIEW` cannot reach here: `setMailer` already refuses it, which is why the type
+              does not admit it either. No second guard — a dead comparison reads as a live rule.
+              ⚠️ The reason is NOT translated. It is the part that makes a screenshot of this line
+              diagnostic, which is how the next report arrives already answered. */}
+          {mailer?.sent === false && (
+            <span className="flex items-start gap-1.5 text-meta font-semibold text-danger-deep">
+              <Icon name="error_outline" size={14} className="mt-px flex-none" />
+              <span>
+                {/* ── ONE refusal the renter can clear himself, so it names the REMEDY ───────────
+                    `NO_SENDER_ADDRESS` means his Moedatech profile carries no e-mail. `resolveSender`
+                    reads `users.email`, and this product registers people by PHONE, so a great many
+                    accounts have none — and the generic sentence would send him to a compose window
+                    over something one field would fix. Owner, 2026-09-12: *"it is because the user
+                    doesnt have email in his profile but once i added it worked"*.
+
+                    ⚠️ It should be unreachable on a CONNECTED mailbox — Graph sends from the mailbox
+                    he consented with and that guard was narrowed to the SES path on 2026-09-09
+                    (`629db61f`). It is drawn for both paths anyway: the deployed Lambda is older
+                    than that commit until somebody redeploys it, and the sentence is true either
+                    way. */}
+                {mailer.reason === "NO_SENDER_ADDRESS" ? c.mailNoSender : c.mailNotSent} ({mailer.reason})
+                {mailer.reason === "NO_SENDER_ADDRESS" && (
+                  /* A new tab, never a navigation: the request is posted but the panel still holds
+                     his picks, his message and the link, and leaving would drop all of it. */
+                  <>
+                    {" "}
+                    <a
+                      href="/profile"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline decoration-danger-deep/40 underline-offset-2 hover:decoration-danger-deep"
+                    >
+                      {c.mailNoSenderAction}
+                    </a>
+                  </>
+                )}
+              </span>
+            </span>
+          )}
+
           {/* ── Connect Outlook, as an act of its own (SUP-BE-23, the Graph path) ─────────────
               🔴 **Offered the moment Outlook is picked, and no longer inside Send** (owner,
               2026-09-10: *"i want to separate the connect as a separate action from the create, so
@@ -2267,7 +2376,13 @@ export function ShareRequestPanel({
               `configured: false` and draws nothing. */}
           {channel === "email" && provider === "outlook" && connect?.configured && !connect.connected && (
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-border bg-surface2 px-3 py-2.5">
-              <Icon name="link" size={16} className="flex-none text-muted" />
+              {/* ⚠️ Outlook's own mark, not a chain link (owner, 2026-09-12). The renter is being
+                  asked to connect ONE named thing, and the logo says which before the sentence
+                  does. */}
+              {/* ⚠️ No `eslint-disable` here any more: the `<img>` this used to be moved into
+                  `ChannelMark`, and the directive moved with it. A disable left standing over a tag
+                  that no longer exists reads as a rule this line is still breaking. */}
+              <ChannelMark name="outlook" size={16} />
               <span className="min-w-0 flex-1 text-meta text-navy-mid">{c.mailConnectWhy}</span>
               <button
                 type="button"
@@ -2448,6 +2563,7 @@ export function ShareRequestPanel({
           ) : (
             <Destination
               icon="public"
+              logo={{ src: "/moedatech-logo.svg", alt: "Moedatech", className: "h-4 w-auto brightness-0" }}
               tone={uuid ? "done" : "on"}
               title={c.destMoedatech}
               detail={uuid ? c.confirmPostedAlready : c.confirmPostLine}
@@ -2462,6 +2578,10 @@ export function ShareRequestPanel({
           {channel === "email" && emailWillGo && (
             <Destination
               icon={provider === "gmail" ? "alternate_email" : "mail"}
+              /* ⚠️ Gmail used to fall through to the grey envelope here while Outlook wore its
+                 logo, so the one dialog that exists to say WHERE the request goes drew one
+                 destination by name and the other by category. */
+              mark={provider === "gmail" ? "gmail" : "outlook"}
               tone="on"
               title={provider === "gmail" ? c.destGmail : c.destOutlook}
               detail={
@@ -2508,6 +2628,7 @@ export function ShareRequestPanel({
           {channel === "email" && provider === "outlook" && !emailWillGo && (
             <Destination
               icon="link_off"
+              mark="outlook"
               tone="off"
               title={skipEmail ? c.destOutlookSkipped : c.destOutlookOff}
               detail={skipEmail ? c.destOutlookSkippedBody : c.destOutlookOffBody}
@@ -2544,6 +2665,22 @@ export function ShareRequestPanel({
         </div>
       </Dialog>
 
+      {/* ── Why Copy did nothing, said at the moment he presses it ───────────────────────
+          ⚠️ `sm`, one line, and NO second button: the X and the backdrop both close it, and an
+          «OK» under a sentence that only reports a fact invites the reading that pressing it does
+          something. Nothing here is a decision.
+          ⚠️ It cannot open once a link exists — the press copies instead — so there is no state
+          where this dialog stands in front of a field that would have worked. */}
+      <Dialog
+        open={linkLocked}
+        onClose={() => setLinkLocked(false)}
+        size="sm"
+        icon={<Icon name="lock" size={20} className="text-brand" />}
+        title={c.linkLockedTitle}
+      >
+        <p className="text-body leading-relaxed text-muted-dark">{c.linkLockedBody}</p>
+      </Dialog>
+
       <AddSuppliersDialog
         open={addingSupplier}
         onClose={() => setAddingSupplier(false)}
@@ -2570,12 +2707,36 @@ export function ShareRequestPanel({
  */
 function Destination({
   icon,
+  logo,
+  mark,
   tone,
   title,
   detail,
   children,
 }: {
   icon: string;
+  /**
+   * The real mark of the place this block names (owner, 2026-09-12).
+   *
+   * ⚠️ A glyph says «mail»; a logo says WHICH mail. This dialog is the last screen before a
+   * request leaves for other firms, and the renter is checking WHERE it goes, so the two
+   * destinations wear the marks he already knows rather than two house icons that differ only in
+   * their shape.
+   *
+   * Falls back to `icon` when absent, which is what the off-catalogue block still uses: there is no
+   * logo for «nowhere».
+   */
+  logo?: { src: string; alt: string; className: string };
+  /**
+   * A SEND CHANNEL’s mark, where the block names one (owner, 2026-09-12).
+   *
+   * ⚠️ Separate from `logo` rather than folded into it, because they are two different objects:
+   * `logo` is a raster or a wordmark with its own geometry (Moedatech’s is a wide lockup drawn to
+   * a height), and this is one of three known channels drawn to a square by `ChannelMark`. One
+   * prop taking both would have to carry the sizing anyway, which is what it was already doing at
+   * every call site.
+   */
+  mark?: ChannelName;
   tone: "on" | "off" | "done" | "warn";
   title: string;
   detail: string;
@@ -2592,7 +2753,25 @@ function Destination({
 
   return (
     <div className={cx("flex items-start gap-3 rounded-md border p-3.5", skin.box)}>
-      <Icon name={icon} size={20} className={cx("mt-px flex-none", skin.mark)} />
+      {mark ? (
+        /* ⚠️ Full colour, and NOT greyed on the `off` tone — unlike the lockup below. The off
+           block says «nothing is e-mailed through here», and a greyed-out Outlook mark would read
+           as «Outlook is broken» rather than as a destination this send does not reach. */
+        <ChannelMark name={mark} size={20} className="mt-px" />
+      ) : logo ? (
+        /* ⚠️ Each mark carries its OWN sizing, because a wordmark and a square badge cannot share
+           one box: Moedatech's is a wide lockup drawn to a height, Outlook's is a square drawn to
+           both. `brightness-0` on the lockup is the same treatment the locked Moedatech chip in the
+           channel row already uses on a soft tint, so the two agree. */
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={logo.src}
+          alt={logo.alt}
+          className={cx("mt-px flex-none", logo.className, tone === "off" && "opacity-45 grayscale")}
+        />
+      ) : (
+        <Icon name={icon} size={20} className={cx("mt-px flex-none", skin.mark)} />
+      )}
       <span className="min-w-0 flex-1">
         <b className="block text-body font-extrabold text-navy">{title}</b>
         <span className="mt-0.5 block text-meta leading-relaxed text-muted-dark">{detail}</span>
@@ -2872,12 +3051,25 @@ function Channel({
   on,
   onClick,
   icon,
+  mark,
   label,
   done,
 }: {
   on: boolean;
   onClick: () => void;
   icon: string;
+  /**
+   * The channel's real brand mark, where it has one (owner, 2026-09-12).
+   *
+   * 🔴 **Two of these chips drew the same picture.** Outlook took `mail` and Gmail
+   * `alternate_email`: both are grey envelopes, so the only thing telling a renter which button
+   * sends through which account was the word beside it — on the one row where the whole decision
+   * is WHICH account. WhatsApp had `chat`, which is every chat app there is.
+   *
+   * ⚠️ `icon` stays and is still the fallback: «More» is the operating system’s own share
+   * sheet and has no brand of its own, so it keeps its glyph.
+   */
+  mark?: ChannelName;
   label: string;
   done?: boolean;
 }) {
@@ -2895,7 +3087,10 @@ function Channel({
         on ? "border-navy bg-navy text-surface" : "border-border bg-surface text-navy-mid hover:border-navy",
       )}
     >
-      <Icon name={icon} size={15} className={on ? "text-surface" : "text-muted"} />
+      {/* ⚠️ **The mark keeps its own colours on the navy chip.** Everything else in here inverts
+          when the chip is picked; a brand mark that recolours is not that brand’s mark, and the
+          colour is most of how a person recognises it at 15px. */}
+      {mark ? <ChannelMark name={mark} size={15} /> : <Icon name={icon} size={15} className={on ? "text-surface" : "text-muted"} />}
       {label}
       {done && <Icon name="check" size={13} className={on ? "text-surface/80" : "text-ok-deep"} />}
     </button>

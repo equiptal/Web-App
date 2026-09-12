@@ -51,11 +51,11 @@ describe("naming a machine the catalogue does not carry", () => {
        saying why the first way came up empty. Two separate cards read as two unrelated asks. */
     expect(screen.getAllByText("TYPE").length).toBeGreaterThan(0);
     expect(screen.getAllByText("SIZE").length).toBeGreaterThan(0);
-    /* ── Where the notice lives, third time (owner, 2026-09-08) ───────────────────────
-       A block under the field → pinned to the label → and now the field’s own hint line, in place of
-       «this name is what your supplier will see», which the owner had removed: *"remove this and put
-       the note in its place"*. So: the list, then the box, then the note under it. */
-    const order = ["TYPE", "Name the equipment you need", "This equipment type is not available"].map((needle) =>
+    /* ── The NAME leads the box (owner, 2026-09-12) ────────────────────────────────────
+       It stopped being a field that appears when the catalogue fails and became «what the renter
+       calls this machine», on every line — so it sits ABOVE the two lists, with the note as its own
+       hint. Reads: the box, its note, then TYPE and SIZE under them. */
+    const order = ["Name the equipment you need", "does not go to Moedatech suppliers", "TYPE"].map((needle) =>
       document.body.innerHTML.indexOf(needle),
     );
     expect(order.every((i) => i >= 0)).toBe(true);
@@ -65,8 +65,13 @@ describe("naming a machine the catalogue does not carry", () => {
        ONE copy. It was two while the note was pinned to the label — a label row cannot wrap, so a
        phone needed its own copy underneath. In the hint slot the note wraps like any other line of
        guidance, and two copies to keep in step were two chances to drift. */
-    expect(screen.getAllByText(/This equipment type is not available/i)).toHaveLength(1);
-    expect(screen.getAllByText(/share the link with your suppliers/i)).toHaveLength(1);
+    expect(screen.getAllByText(/does not go to Moedatech suppliers/i)).toHaveLength(1);
+    expect(screen.getAllByText(/share it with your suppliers offline/i)).toHaveLength(1);
+    /* ── It must NOT claim the catalogue lacks the machine (owner, 2026-09-12) ──────────────────
+       *"it is not the case always that this equipment is not available, like what the note says"*.
+       Since the renter can take a line off-catalogue himself, the type he rejected is often sitting
+       in the list directly above this sentence. The note states what FOLLOWS, not what we stock. */
+    expect(document.body.innerHTML).not.toContain("is not available");
     /* ~~«Message us», beside the sentence.~~ Removed the same day (owner). The note already tells
        the renter what to do — post it, share the link — and a control there sent him into another
        app in the middle of filling in a request. The sourcing ask survives only on the kill-switch
@@ -147,5 +152,69 @@ describe("naming a machine the catalogue does not carry", () => {
     // And it is a real line again: it posts, and it asks for the size like any other.
     expect(gates.postableItems([item]).map((i) => i.id)).toEqual(["nm1"]);
     expect(gates.itemAppGaps(item).map((g) => g.field)).toEqual(["capacity"]);
+  });
+});
+
+/**
+ * ── The row offers the door the renter is NOT standing in (owner, 2026-09-13) ────────────────────
+ * *"if it is clicked then in its place, with no taxonomy selected, we will write «select from our
+ * list»"*.
+ *
+ * One control, two labels. On a matched line it takes the taxonomy off; on an off-catalogue line it
+ * is the way back into the catalogue — and it OPENS the type list, because the lists are still on
+ * screen above it and a row that merely points at them is a caption.
+ */
+describe("the way back into the catalogue", () => {
+  it("replaces the «send it with your own name» offer once the line is off-catalogue", async () => {
+    const { Canvas, confirmedProject, makeAgentDraft, makeItem, renderCanvas } = await withFlag();
+    const barge = makeItem({
+      id: "nm1",
+      rawLabel: "floating crane barge",
+      rawSize: null,
+      ref: { categoryId: null, subcategoryId: null, measurementId: null },
+      verdict: "no-match",
+      resolved: false,
+    });
+    await renderCanvas(<Canvas />, { draft: makeAgentDraft({ items: [barge], project: confirmedProject() }) });
+
+    expect(screen.getByRole("button", { name: /Select from our list/i })).toBeTruthy();
+    // The two never stand together: one line cannot be offered both doors at once.
+    expect(screen.queryByRole("button", { name: /Send it with your custom equipment name/i })).toBeNull();
+  }, 20_000);
+
+  it("points at what the press changed — the name box and its new note pulse together", async () => {
+    const { Canvas, confirmedProject, makeAgentDraft, makeItem, renderCanvas, TAXONOMY } = await withFlag();
+    // A MATCHED line: it is the one that still carries the way out of the catalogue.
+    const matched = makeItem({ id: "m1" });
+    await renderCanvas(<Canvas />, { draft: makeAgentDraft({ items: [matched], project: confirmedProject() }) });
+    expect(TAXONOMY).toBeTruthy();
+
+    expect(document.querySelector(".attn-pulse")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Send it with your custom equipment name/i }));
+
+    /* The press empties the taxonomy, stars the name box and raises the note — three changes, all of
+       them ABOVE the row he pressed. The pulse wraps the FIELD, so what is outlined is the name box
+       together with the note under it, which is the pair the press created. */
+    const pulsed = document.querySelector(".attn-pulse");
+    expect(pulsed).toBeTruthy();
+    expect(pulsed!.textContent).toContain("does not go to Moedatech suppliers");
+  }, 20_000);
+
+  it("is the SAME control, so it cannot drift into two rows", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
+    const src = readFileSync(resolve(process.cwd(), "src/components/create/MachineCard.tsx"), "utf8");
+    expect(src).toContain("custom ? t.create.machineCard.selectFromList : t.create.machineCard.useMyOwnName");
+    /* The press opens the list by REMOUNTING the control with `defaultOpen`, which is what that
+       prop's own note prescribes — it is read once at mount, so a caller wanting it open again
+       remounts with a `key`. Without the key the counter would change and nothing would open. */
+    expect(src).toContain("key={`type-${openTypeAt}`}");
+    expect(src).toContain("defaultOpen={openTypeAt > 0}");
+    /* The pulse is cleared on a TIMER, and deliberately not on the animation ending: that event
+       never fires under `prefers-reduced-motion`, where the rule draws a standing outline and no
+       animation at all, so the outline would stay on the card for the rest of the session.
+       ⚠️ The card DOES use `onAnimationEnd` elsewhere — that is the shake's own reset — which is why
+       this reads the pulse's own line rather than sweeping the file for the word. */
+    expect(src).toContain("setTimeout(() => setPulseName(false), 1500)");
   });
 });

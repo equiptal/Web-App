@@ -160,6 +160,48 @@ describe("resolveUnitLocation — position, kept separate from commitment", () =
     expect(resolveUnitLocation(located("bid_yard", { distanceKm: Number.NaN })).distanceKm).toBeNull();
   });
 
+  /**
+   * ── `(0, 0)` is a sentinel, not a yard (owner, 2026-09-12) ────────────────────────────────────
+   * *"can we solve it without backend? like if no yard then show no equipment in map and show
+   * unspecified location"*.
+   *
+   * A yard row with no coordinates arrives carrying ZERO for both, and the half-point rule above
+   * guarded `null` only — so the point passed straight through as valid. The machine was plotted in
+   * the Atlantic and its card printed «5720.8 km from your project», which is the great-circle
+   * distance from Riyadh to Null Island to within a rounding step (5720.2 km, computed). The renter
+   * read a real yard 5,700 km away where the truth is a yard nobody has located.
+   */
+  it("treats (0, 0) as NO location, not as a point in the Gulf of Guinea", () => {
+    expect(resolveUnitLocation(unit({ locationSource: "listing_yard", lat: 0, lng: 0, distanceKm: 5720.8 }))).toEqual({
+      lat: null,
+      lng: null,
+      distanceKm: null,
+      locationSource: "none",
+    });
+  });
+
+  it("drops the DISTANCE with the point, because the backend computed it FROM that point", () => {
+    // Keeping it would print «5720.8 km» beside «Location not specified», which is the two halves of
+    // the bug disagreeing on one card.
+    expect(resolveUnitLocation(unit({ locationSource: "bid_yard", lat: 0, lng: 0, distanceKm: 5720.8 })).distanceKm).toBeNull();
+  });
+
+  it("keeps a real point that merely has a zero on ONE side", () => {
+    // The equator and the prime meridian are places. Only BOTH zeros are the sentinel.
+    expect(resolveUnitLocation(unit({ locationSource: "unit_yard", lat: 0, lng: 46.7, distanceKm: 9 })).lat).toBe(0);
+    expect(resolveUnitLocation(unit({ locationSource: "unit_yard", lat: 24.7, lng: 0, distanceKm: 9 })).lng).toBe(0);
+  });
+
+  it("keeps it OFF the map, which is what the renter asked for", () => {
+    expect(isPlottable(unit({ locationSource: "listing_yard", lat: 0, lng: 0 }))).toBe(false);
+  });
+
+  it("leaves the machine in the LIST, red and unconfirmed — it exists, it is simply not placed", () => {
+    // `none` is «a registered machine whose every location level is null», which is exactly this.
+    // Never `absent`: that means no machine at all, and would drop it off the fleet list entirely.
+    expect(unitAvailability({ locationSource: resolveUnitLocation(unit({ locationSource: "listing_yard", lat: 0, lng: 0 })).locationSource })).toBe("unconfirmed");
+  });
+
   it("excludes unlocatable units from the pin set (RM3-AC-22 — was cited as RMAP-AC-19)", () => {
     expect(isPlottable(located("bid_pin"))).toBe(true);
     expect(isPlottable(unit({ locationSource: "none" }))).toBe(false);

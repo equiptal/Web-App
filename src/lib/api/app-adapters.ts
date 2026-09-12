@@ -1,5 +1,6 @@
 import type { Taxonomy } from "@/lib/contract";
 import { postableItems, normalizeSafetyCert, customName, isCustomLine } from "@/lib/contract";
+import { EQUIPMENT_NAME_ON_EVERY_LINE } from "@/lib/flags";
 import type { EquipmentItem } from "@/lib/contract";
 import type { RfqRequestPayload } from "@/lib/contract";
 import type { TaxonomyNode, CreateRequestPayload, CreateRequestItem } from "@/lib/contract/app";
@@ -265,6 +266,19 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
        * triple is refused by design.
        */
       const custom = isCustomLine(i) ? customName(i) : "";
+      /**
+       * His own words BESIDE the taxonomy, once the switch is thrown (owner, 2026-09-12).
+       *
+       * The two are separate columns on the backend and `isUndefined` is derived from the subtype
+       * alone, so a line carrying both dispatches, matches and reads back as any ordinary line, with
+       * his words stored as our reference. `hasValidEquipmentIdentity` asks only that ONE of them is
+       * present, which is also the rule the canvas gates on.
+       *
+       * ⚠️ Held behind `EQUIPMENT_NAME_ON_EVERY_LINE` until backend-agents ships B1 — see the flag.
+       * ⚠️ `undefined`, never `""`: the field is `min(1)` on the backend, so an empty box must omit
+       *    the key rather than 422 a line that is otherwise perfectly valid.
+       */
+      const ownWords = EQUIPMENT_NAME_ON_EVERY_LINE ? (i.customEquipment ?? i.rawLabel ?? "").trim().slice(0, 120) : "";
       return {
         ...(custom
           ? { customEquipmentName: custom.slice(0, 120) }
@@ -272,6 +286,7 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
               categoryId: i.ref.categoryId as string,
               subtypeId: i.ref.subcategoryId as string,
               capacityId: i.ref.measurementId as string,
+              ...(ownWords ? { customEquipmentName: ownWords } : {}),
             }),
         // Per-item attachments: admin-defined ids + free-text customs (trimmed, de-duped, blanks dropped).
         attachmentIds: i.attachmentIds ?? [],

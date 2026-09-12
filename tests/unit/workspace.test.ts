@@ -4,6 +4,7 @@ import {
   documentsTargetUnit,
   filterBySource,
   isClosedGroup,
+  isNewEntryRequest,
   isClosedRequest,
   railTiles,
   requestActions,
@@ -304,5 +305,47 @@ describe("filterBySource / sourceCounts", () => {
 
   it("counts each position", () => {
     expect(sourceCounts(bids)).toEqual({ all: 3, app: 2, offline: 1 });
+  });
+});
+
+/**
+ * -- Arriving on a request while already standing on the workspace ------------------------------
+ *
+ * Owner's list: «Clicking on the bid doesn't take me directly where to the request», with a
+ * screenshot of the notification bell.
+ */
+describe("isNewEntryRequest", () => {
+  it("Given a request neither applied nor open, Then it is an instruction", () => {
+    /**
+     * 🔴 **The reported bug.** He is on `/requests` reading req-1, opens the bell, clicks a bid on
+     * req-9. The push is a client-side navigation to the SAME route, so nothing remounts and a
+     * read-once guard never looks at `r`. By value it is plainly new.
+     */
+    expect(isNewEntryRequest("req-9", null, "req-1")).toBe(true);
+    expect(isNewEntryRequest("req-9", "req-2", "req-1")).toBe(true);
+  });
+
+  it("Given the screen's OWN echo, Then it is not", () => {
+    /**
+     * 🔴 This is why the once-only guard existed, and it still has to hold: the workspace
+     * `replaceState`s `?r=` every time the renter picks a request. A reader that trusted every
+     * change would drag him back to the notification's request each time he chose another.
+     */
+    expect(isNewEntryRequest("req-1", "req-9", "req-1")).toBe(false);
+  });
+
+  it("Given the same instruction twice, Then it is applied once", () => {
+    // ⚠️ A failed lookup still records itself as applied, so a request that is not in his list
+    // cannot re-fire the effect on every render.
+    expect(isNewEntryRequest("req-9", "req-9", "req-1")).toBe(false);
+  });
+
+  it("Given no request in the URL, Then there is nothing to act on", () => {
+    for (const v of [null, undefined, ""]) expect(isNewEntryRequest(v, "req-1", "req-2")).toBe(false);
+  });
+
+  it("Given a first arrival with nothing open yet, Then it is an instruction", () => {
+    // The cold-entry case the guard was written for, which must keep working.
+    expect(isNewEntryRequest("req-9", null, null)).toBe(true);
   });
 });

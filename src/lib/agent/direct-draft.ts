@@ -77,11 +77,19 @@ export function canSeedDirect(p: DirectPrefill | null | undefined): boolean {
  * `verdict: "confident"` and `resolved: true`, because there is nothing to validate: these ids came
  * off the row the renter chose, not out of a model. The canvas still asks him for the year and the
  * certificate (MREQ-AC-54, its own gates) and for the dates and the site.
+ *
+ * ── The ITEM is separate, because a direct request can gain a second one ────────────────────────
+ *
+ * `directRequestItem` is the same machine as one line, for the case where the renter went BACK to
+ * the store to add or swap one (`direct-stash.ts`). Then the rest of the draft — his site, his
+ * dates, the equipment he had already answered for — is the stash's, not a fresh set of defaults,
+ * and only this line comes off the listing. `id` defaults to the first line's, so the whole-draft
+ * case below is unchanged; an append passes the store's own next id.
  */
-export function directRequestDraft(p: DirectPrefill): AgentDraft {
-  const base = newManualItem("i1");
+export function directRequestItem(p: DirectPrefill, id = "i1"): EquipmentItem {
+  const base = newManualItem(id);
   const fuel = p.fuel ? FUEL_IN[p.fuel.trim().toUpperCase()] : undefined;
-  const item: EquipmentItem = {
+  return {
     ...base,
     ref: {
       categoryId: p.categoryId,
@@ -95,6 +103,10 @@ export function directRequestDraft(p: DirectPrefill): AgentDraft {
     equipmentYear: yearOf(p.year),
     attachmentIds: p.attachmentIds ?? [],
   };
+}
+
+export function directRequestDraft(p: DirectPrefill): AgentDraft {
+  const item = directRequestItem(p);
 
   return {
     rfqId: null,

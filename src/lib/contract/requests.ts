@@ -396,28 +396,36 @@ export function publicTaxonomyUrl(value: string | null | undefined): string | nu
 /**
  * Best-effort item display name from the enriched taxonomy names (EN or AR).
  *
- * An off-catalogue line has no taxonomy at all, so it reads the renter's own words instead — the
- * same words in both locales, because he typed one language and we do not invent the other.
+ * **Taxonomy first, always** (owner, 2026-09-12): *"if null taxonomy then read from the user words,
+ * otherwise use taxonomy even if hidden"*. His own words appear in exactly one situation — the line
+ * carries no taxonomy name at all — and then in both locales, because he typed one language and we
+ * do not invent the other.
  */
 export function itemName(it: RequestItem, ar: boolean): string {
-  const custom = customEquipmentLabel(it);
-  if (custom) return custom;
   const parts = ar
     ? [it.subtypeNameAr ?? it.subtypeName, it.capacityNameAr ?? it.capacityName]
     : [it.subtypeName, it.capacityName];
-  return parts.filter(Boolean).join(" · ") || (ar ? it.categoryNameAr ?? "" : it.categoryName ?? "") || "—";
+  const taxonomy = parts.filter(Boolean).join(" · ") || (ar ? it.categoryNameAr ?? "" : it.categoryName ?? "");
+  return taxonomy || customEquipmentLabel(it) || "—";
 }
 
 /**
- * The renter's name for an off-catalogue line, or "" for an ordinary one — the one place the
- * `isUndefined` branch is written, so no surface has to remember it.
+ * The renter's own words for this line, or "" when the line has none.
+ *
+ * 🔴 ~~Gated on `isUndefined`.~~ Reversed 2026-09-12, with the meaning of the field itself: a name is
+ * «what the renter calls this machine» and is carried on ordinary lines too, while `isUndefined` is
+ * about BEHAVIOUR (no dispatch, no deal room, no QR) and says nothing about what to draw. A reader
+ * that branched on it would show his words for a HIDDEN line, which has a catalogue name and must
+ * read by it.
+ *
+ * So the display rule lives in the CALLER's order — taxonomy, then this — and this answers one
+ * question: what did he call it?
  *
  * Accepts the loose shape every projection shares (the inbox, the deal room and the chat dock each
  * carry their own item type) rather than only {@link RequestItem}.
  */
 export function customEquipmentLabel(it: { isUndefined?: boolean | null; customEquipmentName?: string | null } | null | undefined): string {
-  if (!it?.isUndefined) return "";
-  return (it.customEquipmentName ?? "").trim();
+  return (it?.customEquipmentName ?? "").trim();
 }
 
 /** Pull the list array out of whatever envelope the backend uses. */

@@ -228,6 +228,16 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
    * 14ms a character: about 70 a second, faster than anyone types and slow enough to be seen
    * arriving. A twenty-character machine name is under a third of a second, so nobody waits for it.
    *
+   * ── And MANSOUR is the one writing it ───────────────────────────────────────────────────────────
+   *
+   * Owner, 2026-09-13: *"use it here for typing when u select a project and it auto fills the
+   * equipment name, make it like this mansour is writing it"*. The words already arrived as typing;
+   * what was missing was WHO. `agentTyping` is raised for the length of the run and the intake draws
+   * him on the box while it is up - the same agent the processing screen shows, doing the same job
+   * one screen earlier.
+   *
+   * ⚠️ Lowered in a `finally`, so a throw mid-write cannot leave him standing there forever.
+   *
    * ── It stays interruptible ──────────────────────────────────────────────────────────────────────
    *
    * Each frame appends to the SNAPSHOT taken before it started, never to the live value, so a renter
@@ -238,14 +248,23 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
   async function typeInto(before: string, line: string) {
     const base = before ? `${before}
 ` : "";
-    for (let i = 1; i <= line.length; i++) {
-      actions.setText(base + line.slice(0, i));
-      // eslint-disable-next-line no-await-in-loop -- a typewriter is sequential by definition
-      await new Promise((r) => setTimeout(r, 14));
+    actions.setAgentTyping(true);
+    try {
+      for (let i = 1; i <= line.length; i++) {
+        actions.setText(base + line.slice(0, i));
+        // A typewriter is sequential by definition; this await is the point of the loop.
+        await new Promise((r) => setTimeout(r, 14));
+      }
+      // Marked AFTER the last character, so the colour arrives with the finished word rather than
+      // chasing the caret across the screen.
+      actions.markProjectTyped(line);
+      /* He stays a beat after the last character, reading it back. Cutting him at the same frame as
+         the final letter reads as a flicker rather than as somebody finishing a sentence - and a
+         short name («Grader», six characters, 84ms) would otherwise never be seen at all. */
+      await new Promise((r) => setTimeout(r, 900));
+    } finally {
+      actions.setAgentTyping(false);
     }
-    // Marked AFTER the last character, so the colour arrives with the finished word rather than
-    // chasing the caret across the screen.
-    actions.markProjectTyped(line);
   }
 
   async function applyTemplate(itemId: string) {
@@ -257,10 +276,23 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
       const terms = await fetchTemplateTerms(chosen.id, option);
       actions.useTemplate(terms, option.kind === "work_order" ? option.id : null, option.when);
 
-      const line = `${option.quantity > 1 ? `${option.quantity} × ` : ""}${option.machine}`.trim();
-      if (line) {
-        const before = state.text.trimEnd();
-        await typeInto(before, line);
+      /* ── A template with no NAME copies its terms and writes nothing (owner, 2026-09-12) ───────
+         *"why the equipment name doesn't appear here, why showing null"* — on a chip that had typed
+         «12 × null» into the request box, twice.
+
+         `option.machine` is `ChartItem.label`, which is genuinely absent for an off-catalogue line:
+         the chart's projection names a request's item from its taxonomy pair alone, and that pair is
+         empty. It was TYPED `string`, so nothing objected, and `${null}` in the template literal
+         produced the four characters «null» — which `trim()` then reported as a perfectly good line
+         and the typewriter wrote into the renter's own words, where it went on to the agent as if he
+         had asked for a machine called null.
+
+         The terms still apply: they are what a template is FOR, and they are keyed on the item, not
+         on its name. Only the sentence is withheld, because there is no name to put in it. */
+      const name = option.machine?.trim();
+      if (name) {
+        const line = `${option.quantity > 1 ? `${option.quantity} × ` : ""}${name}`;
+        await typeInto(state.text.trimEnd(), line);
       }
     } catch {
       // Nothing is applied and nothing is said. A template is a shortcut; failing to take one leaves

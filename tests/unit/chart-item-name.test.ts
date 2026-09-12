@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { fetchChart } from "@/lib/api/client";
+import { fetchChart, listTemplates } from "@/lib/api/client";
 
 /**
  * **A machine the catalogue cannot name still has a name** (owner, 2026-09-08: *"some request items
@@ -95,5 +95,46 @@ describe("naming a chart item", () => {
   it("survives a payload with no groups at all", async () => {
     serve({ project: { id: "p-1", locationLabel: "Riyadh", version: 1 }, version: 1 });
     expect((await fetchChart("p-1")).groups).toEqual([]);
+  });
+});
+
+/**
+ * ── «12 × null», typed into the renter's own request (owner, 2026-09-12) ────────────────────────
+ * *"still why the equipment name doesn't appear here, why showing null"*.
+ *
+ * When NOTHING can name the machine — no taxonomy pair and no free-text column either, which is the
+ * request branch of the projection as it stands — `chartItemName` returns null, and `ChartRow` has
+ * always said «Equipment (not named)» for it. Nothing else knew the null was possible, because
+ * `ChartItem.label` was typed `string` and the cast in `fetchChart` laundered it: `listTemplates`
+ * copied it into `TemplateOption.machine`, and `ProjectChips` interpolated that into a line it TYPED
+ * into the request box. `${null}` is the four characters «null», and `trim()` reports them as a
+ * perfectly good line — so the renter's own words reached the agent reading «12 × null».
+ */
+describe("a machine nothing can name", () => {
+  it("comes back as NULL rather than as a name, so every reader has to decide", async () => {
+    serve(payload([{ id: "r-1", label: null, labelAr: null, quantity: 12, awards: [] }]));
+    const item = await firstItem();
+    expect(item.label).toBeNull();
+    expect(item.labelAr).toBeNull();
+    // Never the STRING. This is the value that reached the request box.
+    expect(item.label as unknown as string).not.toBe("null");
+  });
+
+  it("reaches a template as null, never as the word", async () => {
+    serve(payload([{ id: "r-1", label: null, labelAr: null, quantity: 12, awards: [] }]));
+    const [tpl] = await listTemplates("p-1");
+    expect(tpl.machine).toBeNull();
+    // What `ProjectChips` used to build out of it, and must never build again.
+    expect(`${tpl.quantity} × ${tpl.machine}`).toBe("12 × null");
+  });
+
+  it("still carries the rest of the template, because terms are keyed on the item and not its name", async () => {
+    serve(payload([{ id: "r-1", label: null, quantity: 12, awards: [] }]));
+    const [tpl] = await listTemplates("p-1");
+    expect(tpl.itemId).toBe("r-1");
+    expect(tpl.quantity).toBe(12);
+    // The picker falls back to the request's ref, which is why the DROPDOWN read correctly all along
+    // while the typed line did not.
+    expect(tpl.ref).toBe("JTR080920");
   });
 });

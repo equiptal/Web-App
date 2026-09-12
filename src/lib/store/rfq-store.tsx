@@ -130,7 +130,14 @@ export interface RfqState {
   busy: boolean;
   error: ApiErrorKind | null;
   /** The real backend reason behind a submit failure, surfaced in the UI for diagnosis. */
-  errorDetail: { detail?: string; backendCode?: string; backendStatus?: number; status?: number } | null;
+  /** ⚠️ `details` carries the backend's field errors on a 422 — see `contract/submit-error.ts`. */
+  errorDetail: {
+    detail?: string;
+    backendCode?: string;
+    backendStatus?: number;
+    status?: number;
+    details?: unknown;
+  } | null;
   requestId: string | null;
   /** Every short code from the fan-out (one per equipment item); requestId is the first. */
   requestIds: string[];
@@ -192,6 +199,18 @@ export interface RfqState {
    */
   projectTypedLine: string | null;
   /**
+   * True while the agent is WRITING that line into the box, a character at a time.
+   *
+   * It exists so the intake can draw Mansour over the box while it happens (owner, 2026-09-13:
+   * *"make it like this mansour is writing it"*) - the typewriter lives in `ProjectChips`, on the
+   * box's floor, and the perch belongs on the box itself, which is a different component. Two
+   * components, one fact, so it is state rather than a prop threaded through the screen.
+   *
+   * ⚠️ NOT persisted and not restored: it describes something happening right now, and a reload
+   * mid-write must not come back with a man standing on an empty box.
+   */
+  agentTyping: boolean;
+  /**
    * Which pills the renter changed on this request. They render as changed, and the fields they
    * cover read `renter` rather than `project` once the draft exists — once someone has answered a
    * question, it stops being the site's answer.
@@ -248,6 +267,7 @@ export const initialState: RfqState = {
   project: null,
   projectDirty: [],
   projectTypedLine: null,
+  agentTyping: false,
   workOrderGroupId: null,
   templateTerms: null,
   processingSince: null,
@@ -301,6 +321,7 @@ type Action =
   | { t: "SET_DIRECT"; direct: DirectTarget | null }
   | { t: "SELECT_PROJECT"; project: ProjectSummary }
   | { t: "PROJECT_TYPED"; line: string | null }
+  | { t: "AGENT_TYPING"; on: boolean }
   | { t: "CLEAR_PROJECT" }
   | { t: "PATCH_PROJECT_DEFAULTS"; patch: Partial<TimingHours>; keys: string[] }
   | { t: "PATCH_PROJECT_TERMS"; paymentTerms: PaymentTerm | null }
@@ -313,6 +334,7 @@ type Action =
   | { t: "SUBMIT_SUCCESS"; requestId: string; requestIds: string[]; requestUuids: string[]; trialExpiresAt?: string | null }
   | { t: "SUBMIT_ERROR"; kind: ApiErrorKind; detail?: RfqState["errorDetail"] }
   | { t: "HYDRATE"; saved: Partial<RfqState> }
+  | { t: "RESUME_DIRECT"; saved: Partial<RfqState> }
   | { t: "RESET" };
 
 interface DeepPrefPatch {
@@ -467,6 +489,8 @@ export function reducer(state: RfqState, a: Action): RfqState {
       };
     case "PROJECT_TYPED":
       return { ...state, projectTypedLine: a.line };
+    case "AGENT_TYPING":
+      return { ...state, agentTyping: a.on };
     case "CLEAR_PROJECT":
       // The template goes with the site. It was a thing INSIDE that project, so leaving its terms
       // behind would carry values from a site the renter just removed, with nothing on screen
@@ -763,11 +787,13 @@ export function reducer(state: RfqState, a: Action): RfqState {
             ref: { ...i.ref, subcategoryId: a.subcategoryId, measurementId: null },
             operatorNeeded,
             resolved: false,
-            /* ── A picked subtype ENDS the off-catalogue state, verdict and all ──────────────────
+            /* ── A picked subtype ENDS the off-catalogue state — but NOT his words ───────────────
              *
-             * The renter found his machine in the list, so the name he typed for it goes with the
-             * state it belonged to: leaving it would post a line carrying both a subtype and free
-             * text, and the ids win, so the text would ride along unread.
+             * 🔴 ~~The name is cleared with the state it belonged to.~~ Reversed 2026-09-12, when the
+             * field stopped meaning «off-catalogue» and started meaning «what the renter calls this
+             * machine». Picking a type does not make his words untrue: he typed «water tanker», the
+             * agent missed, he found «Water truck» himself, and both are true. The taxonomy wins for
+             * READING; his words are kept and sent as our reference.
              *
              * ⚠️ And the VERDICT has to move with it. It did not, and the row vanished under the
              * renter's own hand (owner, 2026-09-06: *"when i try to click a subtype from existing
@@ -778,7 +804,6 @@ export function reducer(state: RfqState, a: Action): RfqState {
              * line whose machine is known and whose size is not, which is exactly what he now has.
              */
             verdict: i.verdict === "no-match" ? ("needs-validation" as const) : i.verdict,
-            customEquipment: null,
           };
           // No cert seeding here either. This used to "rescue" an uncertified line by stamping the
           // category default once the subcategory refined the lifting test (`_onEquipmentVariantPicked`)
@@ -804,9 +829,13 @@ export function reducer(state: RfqState, a: Action): RfqState {
      * move together (the 2026-09-06 trap): the verdict, the ids `isCustomLine` reads, and the typed
      * name. The size goes with the subtype, because a size is a size OF something.
      *
-     * `name` is what he typed into the TYPE search — his own words, already written once, which is the
-     * same seeding rule `customName` follows for `rawLabel`. Empty is allowed: the gate
-     * (`customEquipmentMissing`) then asks for it in the box the card opens.
+     * `name` is whatever the card already held for him — what he typed in the box, else the words his
+     * RFQ used. Empty is allowed: the gate (`customEquipmentMissing`) then asks for it, in a box that
+     * is on the card either way since 2026-09-12.
+     *
+     * ⚠️ It never SEEDS from a taxonomy name. The card's box falls back to the pick for display, but
+     * writing that into state here would make «Water truck 20,000 L» his answer for a machine he has
+     * just said is not the one he meant.
      */
     case "SET_ITEM_OFF_CATALOGUE":
       return withDraft(state, (d) =>
@@ -938,6 +967,21 @@ export function reducer(state: RfqState, a: Action): RfqState {
       // `_withGlobalEquipmentDefaults` is reachable from `_onDraftLoaded`/`_onStashRestored`).
       return { ...state, ...a.saved, taxonomy: state.taxonomy, draftPrompt: true };
     }
+    /**
+     * Come back from the supplier's store with the draft he left here (app parity, Epic 008).
+     *
+     * Like `HYDRATE` in every way but the PROMPT. A reload is ambiguous — «is this still the request
+     * you meant?» — so that one raises continue/start-over. This is not: he pressed the ✕ or the +
+     * thirty seconds ago, went to pick a machine, and picked one. Asking him whether he meant to
+     * resume the request he never left would be a question about his own last two presses.
+     *
+     * Not `PROCESS_SUCCESS` either, which is the OTHER door into a direct draft. That one is for a
+     * draft nobody has answered yet: it re-applies the project's defaults and the template's terms
+     * over the whole thing and resets `touchedFields`, which here would forget which answers were
+     * HIS — and «no certificate» is stored as absent, so the gate would ask for it again.
+     */
+    case "RESUME_DIRECT":
+      return { ...state, ...a.saved, taxonomy: state.taxonomy };
     default:
       return state;
   }
@@ -965,8 +1009,11 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
      * would drift from this one within a month. See `direct-draft.ts` for what the store fills.
      */
     seedDraft: (draft: AgentDraft) => dispatch({ t: "PROCESS_SUCCESS", draft }),
+    /** Restore the draft stashed for a trip to the supplier's store — see `RESUME_DIRECT`. */
+    resumeDirect: (saved: Partial<RfqState>) => dispatch({ t: "RESUME_DIRECT", saved }),
     /** Mark (or unmark) the line a template typed, so the box can colour it. */
     markProjectTyped: (line: string | null) => dispatch({ t: "PROJECT_TYPED", line }),
+    setAgentTyping: (on: boolean) => dispatch({ t: "AGENT_TYPING", on }),
     addFiles: (files: { name: string; type: string; data?: string }[]) => dispatch({ t: "ADD_FILES", files }),
     removeFile: (index: number) => dispatch({ t: "REMOVE_FILE", index }),
     setSimulateError: (value: boolean) => dispatch({ t: "SET_SIMULATE_ERROR", value }),
@@ -1052,7 +1099,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
         if (e instanceof ApiError && e.kind === "guest_limit") { dispatch({ t: "GUEST_LIMIT" }); return; }
         const detail =
           e instanceof ApiError
-            ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status }
+            ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status, details: e.details }
             : null;
         dispatch({ t: "PROCESS_ERROR", kind: e instanceof ApiError ? e.kind : "unknown", detail });
       }
@@ -1181,7 +1228,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
       } catch (e) {
         const detail =
           e instanceof ApiError
-            ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status }
+            ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status, details: e.details }
             : null;
         dispatch({ t: "SUBMIT_ERROR", kind: e instanceof ApiError ? e.kind : "unknown", detail });
         return null;

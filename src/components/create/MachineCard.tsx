@@ -18,7 +18,7 @@
  * platform cannot resolve becomes a document demanded of every supplier who bids.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { fmt, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
@@ -84,12 +84,53 @@ export function MachineCard({
 }) {
   const t = useT();
   const { state, actions } = useRfq();
+  /**
+   * ── A DIRECT request's machine is the LISTING's, not the renter's to re-pick (app parity, AC-01) ──
+   *
+   * *"in direct request he cant change the taxonamy right? it is filled from equipment he selected
+   * so if he want to change will be back to store"* (owner, 2026-09-12) — and yes, that is what the
+   * app does. `equipment_step.dart` hides the size-edit badge when `isDirect` (*"the measurement is
+   * locked from the listing prefill"*) and hides the «need a different type» section outright,
+   * because *"direct-mode rentees are tied to one supplier; offering siblings under the same parent
+   * category could route them to a subcategory the supplier doesn't carry"*.
+   *
+   * So the type and the size are read-only here and the way to change them is the ✕ on the
+   * equipment tab, which takes him back to that supplier's store (`Canvas`, `direct-stash.ts`).
+   * The category was always derived and never picked.
+   */
+  const listingLocked = !!state.direct;
   const tax = useItemTaxonomy(item, state.taxonomy);
   /** The subtype's photograph, else the category's. Null on most rows — the glyph covers that. */
   const photo = tax.subcategory?.equipmentImageUrl ?? tax.category?.equipmentImageUrl ?? null;
   /** Set when that URL fails to load, so the panel falls back to the glyph. Keyed off the URL so
    *  changing the subtype clears a previous failure rather than inheriting it. */
   const [brokenPhoto, setBrokenPhoto] = useState<string | null>(null);
+  /**
+   * Presses on «Select from our list», used as a REMOUNT KEY for the TYPE control.
+   *
+   * `Dropdown.defaultOpen` is read once, at mount, so that a list the renter asked for can then be
+   * closed and stay closed — its own note says a caller wanting it open again remounts it with a
+   * `key`. This counter is that key: each press remounts the control with the list already open.
+   * Zero means «never asked», which is every ordinary render, so nothing opens by itself.
+   */
+  const [openTypeAt, setOpenTypeAt] = useState(0);
+
+  /**
+   * The «point at what just changed» pulse, after the renter takes the line off-catalogue.
+   *
+   * Owner, 2026-09-13: *"clicking it will highlight with animation … the equipment [name] with the
+   * note below it"*. The press changes three things at once — the taxonomy empties, the name box
+   * gains its star, and a warning note appears — and all of it happens ABOVE the row he pressed, so
+   * without this the card rearranges itself behind his eyes.
+   * Cleared on a timer rather than on animation end: `animationend` never fires under
+   * `prefers-reduced-motion`, where the rule draws a standing outline and no animation at all.
+   */
+  const [pulseName, setPulseName] = useState(false);
+  useEffect(() => {
+    if (!pulseName) return;
+    const id = setTimeout(() => setPulseName(false), 1500);
+    return () => clearTimeout(id);
+  }, [pulseName]);
   const photoBroken = brokenPhoto !== null && brokenPhoto === photo;
   const overrides = useItemOverrides(item, state.draft!.project);
   const attachments = useItemAttachments(item);
@@ -338,7 +379,7 @@ export function MachineCard({
                away from him. Never starred there: nothing in the catalogue can satisfy it, and a star
                would say the renter owes an answer he cannot give. */
             <div
-              className={`grid gap-2.5 rounded-sm p-3.5 sm:grid-cols-[minmax(132px,1fr)_minmax(150px,1.5fr)_minmax(104px,0.9fr)] ${
+              className={`grid gap-2.5 rounded-sm p-3.5 sm:grid-cols-[minmax(150px,1.5fr)_minmax(104px,0.9fr)_minmax(132px,1fr)] ${
                 /* The house WARNING tone, the same `--warn` family the note wears (owner,
                    2026-09-06). It was `danger-soft` for a day and read as an error: nothing has gone
                    wrong here, the machine is simply not in the list, so the box and the note must be
@@ -346,18 +387,56 @@ export function MachineCard({
                 custom ? "border border-warn/40 bg-warn-soft" : "bg-surface2"
               }`}
             >
-              {/* Derived, never picked. The renter chooses a TYPE and the category follows from it —
-                  so this shows the taxonomy's `tag` (its canonical grouping, e.g. "Earthmoving") as a
-                  read-only box, exactly as the prototype does. No chevron, because there is nothing
-                  here to open. */}
-              <CanvasField
-                label={t.create.machineCard.category}
-                source={prov.itemSource("category", item.ref.categoryId, "ref")}
-              >
-                <div className="truncate rounded-sm border border-border bg-surface px-3 py-2.5 text-body text-navy">
-                  {tax.tagName || "—"}
-                </div>
-              </CanvasField>
+              {/* ── The renter's OWN words, first and always (owner, 2026-09-12) ────────────────
+                  ~~Shown only on a line the catalogue could not place.~~ The field stopped meaning
+                  «the name of a machine we do not carry» and started meaning «what the renter calls
+                  this machine», so it is the first thing on the card whatever the taxonomy says.
+
+                  It is NOT required while a type is set: with a taxonomy on the line the name is a
+                  note to us, and one of the two is all the backend asks for. Without one it is the
+                  line's only answer, and it carries the star.
+
+                  What it holds, in order: what he typed, else the words his RFQ used, else the
+                  taxonomy he picked (flow B — a line added by hand fills itself from the pick rather
+                  than asking him to retype what he just chose). */}
+              {/* The pulse wraps the FIELD, so it encloses the name box and the note under it —
+                  which is the pair the press creates. */}
+              <div className={`sm:col-span-3 ${pulseName ? "attn-pulse" : ""}`}>
+                <CanvasField
+                  label={t.create.machineCard.customEquipment}
+                  star={custom}
+                  missing={gapFor("custom_equipment")}
+                  shake={shake("custom_equipment")}
+                  required={owed("custom_equipment")}
+                  hint={
+                    custom ? (
+                      /* ── The app's own warning ink, not the fill (owner, 2026-09-12) ──────────
+                         *"the box that appears when no taxonomy has a weird colour, it is not yellow
+                         and not orange, use colours in our design system and used in other places for
+                         warning"*.
+                         🔴 `text-warn` is #b98a1d, and `globals.css` says in as many words that
+                         `--warn` is a FILL and `--warn-deep` (#8a6412) is the one that may carry
+                         text. At 2.97:1 on this pale ground the sentence came out khaki — neither
+                         yellow nor orange, which is exactly what he read.
+                         The box itself was already right: `border-warn/40 bg-warn-soft` IS
+                         `NOTICE_TONE.warn`, the recipe every other warning in the app wears. Only the
+                         ink was off it, so the line now finishes that same recipe. */
+                      <span className="flex items-start gap-1 text-warn-deep">
+                        <Icon name="warning" size={13} className="mt-px flex-none" />
+                        {t.create.machineCard.notInCatalogueNote}
+                      </span>
+                    ) : undefined
+                  }
+                >
+                  <TextInput
+                    value={item.customEquipment ?? item.rawLabel ?? tax.pickedName ?? ""}
+                    maxLength={120}
+                    placeholder={t.create.machineCard.customEquipmentPlaceholder}
+                    onChange={(e) => set("custom_equipment", { customEquipment: e.target.value })}
+                  />
+                </CanvasField>
+              </div>
+
               <CanvasField
                 label={t.create.machineCard.type}
                 missing={gapFor("subtype") || gapFor("category")}
@@ -367,38 +446,18 @@ export function MachineCard({
                 source={prov.itemSource("subtype", item.ref.subcategoryId)}
               >
                 <SearchSelect
+                  key={`type-${openTypeAt}`}
+                  defaultOpen={openTypeAt > 0}
                   value={item.ref.subcategoryId}
                   placeholder={t.create.machineCard.type}
                   searchPlaceholder={t.create.machineCard.searchTypes}
                   label={t.create.machineCard.type}
+                  disabled={listingLocked}
                   options={tax.allSubtypes}
-                  /* ── A search that finds nothing is where off-catalogue BEGINS (owner, 2026-09-09) ──
-                     *"Maybe if he searched in the type and didnt find it we show for him something here
-                     that will open the field of custom type and the alert."*
-
-                     The canvas could only ARRIVE off-catalogue before this — the agent read a machine it
-                     could not place — so a renter who wanted to name one himself, or who had picked the
-                     wrong type and found the catalogue held nothing for him, had to go back to the intake
-                     and retype the whole request. The press turns THIS line off-catalogue, seeded with
-                     what he just typed, which opens the name box and the orange note below.
-
-                     Only offered while the feature is on: with `CUSTOM_EQUIPMENT_ENABLED` off,
-                     `isCustomLine` is false whatever the verdict says, so the row would clear the trio
-                     and open nothing. */
-                  emptyAction={
-                    CUSTOM_EQUIPMENT_ENABLED
-                      ? {
-                          label: t.create.machineCard.addCustomType,
-                          /* The name box opens EMPTY (owner, 2026-09-09, on making the row general).
-                             ~~It was seeded with the search text.~~ That only held while the row
-                             quoted it: a search fragment — «wat» — is not a machine's name, and
-                             seeding one would send it to suppliers as the answer. The box carries the
-                             star and the gate (`customEquipmentMissing`) asks for it, which is the
-                             same treatment every other required answer on this card gets. */
-                          onPick: () => actions.setItemOffCatalogue(item.id, ""),
-                        }
-                      : undefined
-                  }
+                  /* 🔴 ~~«Add a custom equipment type», offered when a search found nothing
+                     (2026-09-09).~~ REMOVED 2026-09-12: it opened a box that did not exist yet, and
+                     the box is on the card at all times now — the row was a second door into a room
+                     the renter is already standing in. */
                   onChange={(v) => {
                     // One pick, both ids: the parent category comes from the chosen subtype rather
                     // than being asked for separately.
@@ -424,7 +483,7 @@ export function MachineCard({
                   placeholder={t.create.machineCard.size}
                   searchPlaceholder={t.create.machineCard.searchSizes}
                   label={t.create.machineCard.size}
-                  disabled={!item.ref.subcategoryId}
+                  disabled={listingLocked || !item.ref.subcategoryId}
                   options={tax.sizes}
                   onChange={(v) => {
                     prov.touch("capacity");
@@ -433,49 +492,47 @@ export function MachineCard({
                 />
               </CanvasField>
 
-              {/* ── The renter's own name for a machine the catalogue cannot place ──────────────
-                  Inside the same box as the list, across all three columns, under a hairline: the
-                  list and the name answer one question, and the renter reads down from «not in
-                  there» to «then call it this».
+              {/* ── One row, and it offers whichever door the renter is NOT standing in ─────────
+                  On a matched line it is the way OUT of the catalogue: one press clears the taxonomy,
+                  the line goes off-catalogue, and the warning note appears under the name box to
+                  explain the state he has just chosen.
+                  On an off-catalogue line it is the way BACK IN (owner, 2026-09-13: *"if it is
+                  clicked then in its place, with no taxonomy selected, we will write «select from
+                  our list»"*) — and it OPENS the TYPE list rather than merely naming it, because the
+                  lists are still on screen above and a row that only points at them is a caption.
 
-                  Prefilled from what he wrote in the RFQ, and never written into state until he
-                  types: a name nobody looked at must not reach a supplier. It is this row's required
-                  answer in place of the trio, so it carries the star and the shake. */}
-              {custom && (
-                <div className="border-t border-warn/30 pt-3 sm:col-span-3">
-                  <CanvasField
-                    /* ── The note sits where the hint was (owner, 2026-09-08, second pass) ──────
-                       *"«This name is what your supplier will see on the bid form» — remove this and
-                       put the note in its place."*
+                  ── It is a ROW, not the third column (owner, 2026-09-13) ───────────────────────
+                  🔴 His first shape for this was the freed CATEGORY column, and four wordings died
+                  in it: *"make the sentence fit in one line"*, then *"both sentences not clear"*,
+                  then *"must be clear"*. The column is ~160px of text. Every string short enough to
+                  fit it was too short to say what the press does — the width was choosing the words,
+                  and it kept choosing badly.
+                  Full width under the two lists, so the sentence is the owner's own and whole. TYPE
+                  and SIZE keep the widths they had; the space beside them is simply space.
+                  ⚠️ `sm:whitespace-nowrap`, not `whitespace-nowrap`: one line where he is looking,
+                  and a wrap on a phone, where the grid is one column and truncating a sentence would
+                  be worse than two lines of it.
 
-                       ~~The hint under the box, plus the notice pinned to the label and repeated
-                       under the field on a phone.~~ Three pieces of text around one input, two of
-                       them saying the same thing at two breakpoints, and the third explaining
-                       something the renter can see for himself the moment a supplier reads it.
-
-                       So: the label is the field’s name again, and the note is the single line under
-                       the box — the slot this field already had for a line of guidance, which is
-                       where a reader looks for one. One copy at every width, no duplication to keep
-                       in step. */
-                    label={t.create.machineCard.customEquipment}
-                    star
-                    missing={gapFor("custom_equipment")}
-                    shake={shake("custom_equipment")}
-                    required={owed("custom_equipment")}
-                    hint={
-                      <span className="flex items-start gap-1 text-warn">
-                        <Icon name="warning" size={13} className="mt-px flex-none" />
-                        {t.create.machineCard.notInCatalogueNote}
-                      </span>
-                    }
+                  ⚠️ Withheld on a line started from a supplier's listing — a DIRECT request is
+                  taxonomy only (owner, 2026-09-12), and an off-catalogue one reaches nobody at all,
+                  the named supplier included. And withheld on a line with no type picked yet: there
+                  is no catalogue answer to reject, and the name box is already open to him. */}
+              {CUSTOM_EQUIPMENT_ENABLED && !listingLocked && (custom || item.ref.subcategoryId) && (
+                <div className="sm:col-span-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (custom) {
+                        setOpenTypeAt((n) => n + 1);
+                        return;
+                      }
+                      actions.setItemOffCatalogue(item.id, item.customEquipment ?? item.rawLabel ?? "");
+                      setPulseName(true);
+                    }}
+                    className="w-full overflow-hidden text-ellipsis rounded-sm border border-dashed border-border-strong px-3 py-2 text-start text-label leading-snug text-muted-dark transition hover:border-warn hover:text-warn-deep sm:whitespace-nowrap"
                   >
-                    <TextInput
-                      value={item.customEquipment ?? item.rawLabel ?? ""}
-                      maxLength={120}
-                      placeholder={t.create.machineCard.customEquipmentPlaceholder}
-                      onChange={(e) => set("custom_equipment", { customEquipment: e.target.value })}
-                    />
-                  </CanvasField>
+                    {custom ? t.create.machineCard.selectFromList : t.create.machineCard.useMyOwnName}
+                  </button>
                 </div>
               )}
             </div>

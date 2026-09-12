@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
@@ -16,6 +16,7 @@ import {
   EMPTY_SELECTION,
   filterBySource,
   railTiles,
+  isNewEntryRequest,
   resolveSelection,
   selectedGroup,
   selectedItem,
@@ -138,6 +139,9 @@ export function RequestsWorkspace() {
   }, [status, reloads]);
 
   const resolved = useMemo(() => resolveSelection(groups ?? [], bids, wanted), [groups, bids, wanted]);
+  /** What is open RIGHT NOW, for the entry reader — see `appliedR`. A ref, not state: it is read
+   *  inside an effect to tell an arrival from an echo, and reading it must not schedule a render. */
+  const resolvedItemId = useRef<string | null>(null);
   const group = useMemo(() => selectedGroup(groups ?? [], resolved), [groups, resolved]);
   const item = useMemo(() => selectedItem(groups ?? [], resolved), [groups, resolved]);
 
@@ -223,8 +227,35 @@ export function RequestsWorkspace() {
      time he picked another. */
   const params = useSearchParams();
   const [entered, setEntered] = useState(false);
+  /**
+   * The last `r` this screen ACTED ON, so a second instruction can be told from its own echo.
+   *
+   * 🔴 **Read once per mount was the bug** (owner's list, «Clicking on the bid doesn't take me
+   * directly where to the request», with a screenshot of the notification bell).
+   *
+   * ~~`if (entered) return;`~~ The renter is usually ALREADY on `/requests` when he opens the bell —
+   * that is where the screenshot was taken — and `router.push("/requests?r=<id>")` is a client-side
+   * navigation to the same route, so nothing remounts and `entered` is already true. The effect
+   * returned before reading `r`: the URL changed, the screen did not, and every bid notification
+   * looked dead.
+   *
+   * ⚠️ The «read once» rule was right about the thing it was written for, and the comment below
+   * still states it: the effect must not drag him back to a request every time he picks another. But
+   * the effect cannot tell a NEW instruction from its own echo by counting mounts, because the
+   * writer effect below `replaceState`s `?r=` on every selection. It can tell them apart by VALUE,
+   * which is what this ref is: apply an `r` that is neither the one we last applied nor the one
+   * already on screen.
+   */
+  const appliedR = useRef<string | null>(null);
   useEffect(() => {
-    if (entered || !groups?.length) return;
+    if (!groups?.length) return;
+
+    /**
+     * A request named in the URL that is neither what we last opened nor what is open now is a
+     * fresh instruction — from the bell, the dashboard, or a link a colleague pasted.
+     */
+    const incoming = params?.get("r") ?? null;
+    if (entered && !isNewEntryRequest(incoming, appliedR.current, resolvedItemId.current)) return;
     setEntered(true);
     /**
      * ── `r` opens ONE request without knowing its group (owner, 2026-09-03) ────────────────────
@@ -240,8 +271,15 @@ export function RequestsWorkspace() {
      */
     const r = params?.get("r");
     if (r) {
+      appliedR.current = r;
       const owner = groups.find((x) => x.items.some((it) => it.id === r));
       if (owner) setWanted({ groupId: owner.id, itemId: r, bidId: null });
+      /**
+       * ⚠️ **A miss is SILENT, and that is deliberate.** The id can name a request this renter no
+       * longer has in the list — cancelled, or filtered out — and the honest answer there is the
+       * list he does have rather than an error about a row he cannot see. It is recorded as applied
+       * either way, so a failed lookup cannot re-fire on every render.
+       */
     }
 
     const g = params?.get("g");
@@ -290,6 +328,9 @@ export function RequestsWorkspace() {
     const before = url.search;
     if (resolved.itemId) url.searchParams.set("r", resolved.itemId);
     else url.searchParams.delete("r");
+    /* ⚠️ What this screen wrote is not an instruction to itself. The reader above compares against
+       it, so its own `replaceState` can never be mistaken for a renter arriving on a link. */
+    resolvedItemId.current = resolved.itemId ?? null;
     if (tab !== "cards") url.searchParams.set("tab", tab);
     else url.searchParams.delete("tab");
     // The entry instructions are consumed on arrival; leaving them in the URL would re-open the

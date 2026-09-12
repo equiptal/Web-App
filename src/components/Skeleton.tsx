@@ -23,7 +23,14 @@ import { CARD } from "@/components/PageSection";
  * reader announcing eight empty boxes is worse than silence.
  */
 export function Skeleton({ className }: { className?: string }) {
-  return <span aria-hidden="true" className={cx("block rounded-sm bg-surface2 motion-safe:animate-pulse", className)} />;
+  /**
+   * ⚠️ **The default radius is WITHHELD when the caller names one** (2026-09-12). Tailwind emits
+   * `.rounded-sm` AFTER `.rounded-full` in its stylesheet, and both are one class of specificity, so
+   * the base always won and `<Skeleton className="rounded-full">` drew a SQUARE — everywhere in the
+   * product, silently. Class ORDER in the attribute decides nothing; only the sheet's order does.
+   */
+  const radius = /(^|\s)rounded(-|\s|$)/.test(className ?? "") ? null : "rounded-sm";
+  return <span aria-hidden="true" className={cx("block bg-surface2 motion-safe:animate-pulse", radius, className)} />;
 }
 
 /**

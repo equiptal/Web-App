@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Icon, Modal } from "@/components/ui";
@@ -27,6 +28,7 @@ import { customName, gateWhen, gateWhere, isCustomLine, itemGaps, requiredGaps, 
 import type { RequiredGap } from "@/lib/contract";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { saveDirectStash, type DirectStashIntent } from "@/lib/agent/direct-stash";
 
 /**
  * A gap's reason, in the renter's words.
@@ -133,6 +135,44 @@ export function Canvas() {
    * gets the same one-line question rather than a press that costs work on a mis-tap.
    */
   const [removing, setRemoving] = useState<{ id: string; label: string } | null>(null);
+
+  /**
+   * ── In a DIRECT request the equipment comes from the store, so changing it is a trip there ─────
+   *
+   * App parity, Epic 008 AC-02 / AC-04: *"in direct mode the only-tab × redirects to the supplier's
+   * store and the new selection becomes the single tab on return"*, and the + does the same with
+   * intent `append`. The machine on a direct request came off one supplier's listing; picking a
+   * different one HERE would address a request to a firm that may not carry it, which is why the
+   * app hides the type and size controls in this mode too.
+   *
+   * The draft is stashed first, because `/create` deliberately refuses to rehydrate a stored draft
+   * into a direct request (the 2026-09-10 fix) — without this, the site, the dates and every other
+   * machine would be gone on the way back. `direct-stash.ts` carries the whole slice.
+   */
+  const router = useRouter();
+  const direct = state.direct;
+  const storeErrand = direct?.storeId
+    ? (intent: DirectStashIntent) => {
+        saveDirectStash({
+          intent,
+          supplierId: direct.supplierId,
+          snapshot: {
+            phase: state.phase,
+            activeSection: state.activeSection,
+            readyToSend: state.readyToSend,
+            itemIndex: state.itemIndex,
+            draft: state.draft,
+            text: state.text,
+            multiLocationDismissed: state.multiLocationDismissed,
+            seq: state.seq,
+            agentOrigin: state.agentOrigin,
+            isTrial: state.isTrial,
+            direct: state.direct,
+          },
+        });
+        router.push(`/stores/${encodeURIComponent(direct.storeId!)}`);
+      }
+    : null;
 
   /* Every press that opens a panel records it. Declared with the other hooks, above every
      early return: a hook placed after one runs in a different order on the render that takes
@@ -542,14 +582,38 @@ export function Canvas() {
 
   return (
     <div {...pin("create-canvas")}>
-      {/* ---------------- The renter's own words, and what's left ---------------- */}
-      <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-warn/45 bg-warn/[0.07] px-5 py-3.5">
+      {/* ── The renter's own words, and what's left ────────────────────────────────────
+          🔴 **Withheld on a DIRECT request that has no words** (owner, 2026-09-13, on a shot of it
+          reading a bare em dash: *"remove the below one when direct request as no input"*).
+
+          A direct request is seeded from the machine he PRESSED in a store, not from anything he
+          typed, so `state.text` is empty and this card drew «YOU WROTE» over a dash. The one thing
+          it exists for — letting him check what we read against what he wrote — has no content on
+          that path, and «Edit», which walks back to the typing box, has nothing to edit.
+
+          ⚠️ **`Start over` goes with it on that path**, and it is the canvas's only one. Not
+          replaced: Back still walks the flow out, the ✕ on a direct tab is a trip to the store, and
+          `state.direct` is dropped the moment he presses a different machine. Said out loud because
+          it is a control disappearing, not just a decoration.
+
+          ⚠️ The test is the WORDS, not the mode: a direct request that did arrive with a prefilled
+          sentence still shows it, because then there is something to check.
+
+          ⚠️ **The tone is the direct ribbon's** (owner, same message: *"use the above color in the
+          intake card below in case of broadcast"*). It was `--warn`, which this palette serves as a
+          MUSTARD (#b98a1d) rather than an orange — the same mismatch the canvas's provenance ring
+          was corrected for on 2026-09-08. One orange on this screen now, whatever sits above it. */}
+      {!(state.direct && !state.text?.trim()) && (
+      <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-brand/35 bg-brand-soft px-5 py-3.5">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="grid h-[30px] w-[30px] flex-none place-items-center rounded-sm bg-warn/15 text-warn">
+          <span className="grid h-[30px] w-[30px] flex-none place-items-center rounded-sm bg-brand/15 text-brand-deep">
             <Icon name="chat_bubble" size={15} />
           </span>
           <div className="min-w-0">
-            <div className="text-label font-semibold uppercase tracking-[0.05em] text-warn">{t.create.youWrote}</div>
+            {/* ⚠️ `brand-deep` (#c2570f) and never `brand`: orange TEXT on a light ground has to be
+                the dark one to pass AA, and the brand orange is a FILL. The ring and the tile above
+                keep `brand`, because those are borders and fills. Same ruling as 2026-09-08. */}
+            <div className="text-label font-semibold uppercase tracking-[0.05em] text-brand-deep">{t.create.youWrote}</div>
             {/* ⚠️ Not `truncate`. This is the renter's OWN sentence, and the whole reason it sits at
                 the top of the canvas is so he can check what we read against what he wrote. One line
                 with the rest clipped showed him the half he already remembered and hid the half the
@@ -562,7 +626,7 @@ export function Canvas() {
         <div className="flex flex-none items-center gap-3.5">
           <button
             onClick={() => window.history.back()}
-            className="text-body font-semibold text-warn underline decoration-warn/40 underline-offset-2 hover:decoration-warn"
+            className="text-body font-semibold text-brand-deep underline decoration-brand/40 underline-offset-2 hover:decoration-brand"
           >
             {t.common.edit}
           </button>
@@ -578,6 +642,7 @@ export function Canvas() {
               he could not do anything with, sitting beside the two controls he could. */}
         </div>
       </div>
+      )}
 
       {/* Which machine, when there is more than one. */}
       {live.length > 1 && (
@@ -607,13 +672,33 @@ export function Canvas() {
             // renter on whichever of the three was last open.
             actions.openSection("equipment");
           }}
-          onAdd={equipmentGaps.length === 0 ? addMachine : undefined}
+          /* In a direct request the + is an errand to the supplier's store, not a blank card here
+             (AC-02). It still refuses while THIS equipment owes an answer — leaving for the store
+             would strand a half-answered machine in the stash. */
+          onAdd={
+            equipmentGaps.length > 0
+              ? undefined
+              : storeErrand
+                ? () => storeErrand("append")
+                : addMachine
+          }
           /* Withheld on a request with ONE equipment: `gate.noItems` refuses a request with none, so
-             the press would lead nowhere but a refusal. */
+             the press would lead nowhere but a refusal.
+
+             ⚠️ Except in a DIRECT request, where the ✕ on the ONLY tab is the one way to change the
+             machine (AC-04) — it swaps rather than removes, so it never leads to an empty request.
+             It asks nothing: the errand leaves the draft whole and the new pick replaces the line on
+             return, so there is no answer to lose and nothing to confirm. With two or more equipment
+             a ✕ is an ordinary remove in either mode, which is what the app does too — the errand is
+             the answer to «I want a DIFFERENT machine», not to «I want one fewer». */
+          /* Only when the ✕ is the store errand — with two or more equipment it removes, and says so. */
+          removeLabel={equipmentTabs.length === 1 && storeErrand ? t.create.changeEquipment : undefined}
           onRemove={
             equipmentTabs.length > 1
               ? (id) => setRemoving({ id, label: equipmentTabs.find((tb) => tb.id === id)?.label ?? "" })
-              : undefined
+              : storeErrand
+                ? () => storeErrand("single")
+                : undefined
           }
         />
       )}

@@ -76,7 +76,24 @@ export async function POST(req: Request) {
       // Surface the real backend status + message instead of an opaque 503.
       if (err instanceof AgentsBackendError) {
         return NextResponse.json(
-          { code: "submit_failed", detail: err.message, backendCode: err.code, backendStatus: err.status },
+          {
+            code: "submit_failed",
+            detail: err.message,
+            backendCode: err.code,
+            backendStatus: err.status,
+            /**
+             * ⚠️ **Which FIELD the backend refused** (owner, 2026-09-12: *"can it be specific, like
+             * if a field is missing"*).
+             *
+             * ~~Dropped here.~~ A `VALIDATION_ERROR` carries `parsed.error.flatten()`, so the backend
+             * has always said exactly which key it could not accept and this route threw it away,
+             * leaving the renter with the word «Validation Error» and no field.
+             *
+             * ⚠️ Forwarded RAW, as the backend's own key names. Turning them into sentences is the
+             * client's job, where the dictionary lives.
+             */
+            details: err.details ?? null,
+          },
           { status: 502 },
         );
       }

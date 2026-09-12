@@ -82,15 +82,47 @@ const draw = () =>
   );
 
 describe("the organization, on the profile", () => {
-  it("offers the join form under the renter's own details when he has no firm", async () => {
+  it("asks the company question ONCE, in one card, with both answers in it", async () => {
+    /**
+     * 🔴 **The banner is gone** (owner, 2026-09-12: *"why ui is trash here, keep the create as part
+     * of the company but show it nice and without ui bugs"*), which reverses the move made earlier
+     * the same day (*"make one CTA for the verify"*).
+     *
+     * What that ruling protected SURVIVES — there is still exactly one place to press. What it
+     * produced did not: a full-width slab whose own sentence pointed three hundred pixels down at
+     * the card owning the other half of the same errand, and which was a `<button>` carrying a fake
+     * CTA `<span>` styled as a second button.
+     *
+     * So: one card, headed by the QUESTION rather than by one of its two answers, holding «create»
+     * above «join» in the app's own order.
+     */
     draw();
-    // The hub's no-company state, on this page: create your own, or join with a code.
-    expect(await find(en.company.createOwnTitle)).toBeTruthy();
-    expect(screen.getByText(en.company.joinTitle)).toBeTruthy();
-    // And it really is BELOW the personal details, not above them.
+    const head = await find(en.company.noneTitle);
+    expect(head).toBeTruthy();
+    expect(screen.getByText(en.company.createOwnCta)).toBeTruthy();
+    // ⚠️ «Join a company» is no longer a HEADING here: it labelled a card that only joined, and the
+    // card now asks the wider question. The join route is the invite-code field and its button.
+    expect(screen.queryByText(en.company.joinTitle)).toBeNull();
+    expect(screen.getByText(en.company.enterCode)).toBeTruthy();
+    expect(screen.getByText(en.company.joinButton)).toBeTruthy();
+
+    // ⚠️ The old slab's head is not drawn anywhere any more. Seeing it would mean two cards again.
+    expect(screen.queryByText(en.company.createOwnTitle)).toBeNull();
+
     const profile = screen.getByText(en.profile.profileSection);
-    const firm = screen.getByText(en.company.createOwnTitle);
-    expect(profile.compareDocumentPosition(firm) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The card is BELOW the personal details, where the company block has always been.
+    // eslint-disable-next-line no-bitwise
+    expect(profile.compareDocumentPosition(head) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("Given a firm, Then the verify CTA is not drawn at all", async () => {
+    // ⚠️ No company is the gate, not the tier: verification is what CREATES a company, so an
+    // account that has one has nothing left to ask for here.
+    api.company = member();
+    draw();
+    await find("Moedatech Contracting");
+    expect(screen.queryByText(en.company.createOwnCta)).toBeNull();
+    expect(screen.queryByText(en.company.noneTitle)).toBeNull();
   });
 
   it("names the firm and the renter's role in it, without a second masthead", async () => {
@@ -133,7 +165,7 @@ describe("the organization, on the profile", () => {
     // Then it is the only thing anyone has said about his company, so it stands.
     api.company = null;
     draw();
-    await find(en.company.createOwnTitle);
+    await find(en.company.noneTitle);
     expect(screen.getByText("Yesr Test")).toBeTruthy();
   });
 

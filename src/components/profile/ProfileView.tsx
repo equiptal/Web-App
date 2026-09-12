@@ -12,11 +12,11 @@ import type { RenterProfile, VerificationStatus } from "@/lib/contract/onboardin
 import { updateLanguage } from "@/lib/api/profile-client";
 import { Field, FieldGrid, MastheadPill, PageMasthead, Row, RowList, Section } from "@/components/PageSection";
 import { CompanyHub } from "@/components/company/CompanyHub";
+import { VerifyModal } from "@/components/onboarding/VerifyModal";
 import { EditProfileForm } from "./EditProfileForm";
 import { ChangePhoneModal } from "./ChangePhoneModal";
 import { DeleteAccountModal } from "./DeleteAccountModal";
 import { openSupportMessenger } from "@/components/support/IntercomWidget";
-import { btn } from "@/lib/ds";
 import { SkeletonFields, SkeletonRows, SkeletonSection } from "@/components/Skeleton";
 import { pin } from "@/lib/uiPins";
 
@@ -48,6 +48,14 @@ export function ProfileView() {
   const [savedToast, setSavedToast] = useState(false);
   /** The firm this account belongs to, reported up by the block below — see the Company field. */
   const [firmName, setFirmName] = useState<string | null>(null);
+  const [verifyOpen, setVerifyOpen] = useState(false);
+  /**
+   * Whether this account belongs to a firm. `null` until the block below has looked.
+   *
+   * 🔴 **Three states, not two.** The verify CTA is drawn when the answer is NO, and a bare
+   * `!firmName` would answer NO while the question was still open — so a renter who already has a
+   * company would see «Add your own company» flash above his own firm on every visit.
+   */
   const [langBusy, setLangBusy] = useState(false);
 
   useEffect(() => {
@@ -161,23 +169,27 @@ export function ProfileView() {
         </p>
       )}
 
-      {/* Tier banner — basic renter → verify (verified shows the company card verified state below). */}
-      {!loading && tier === "basic" && verification !== "pending" && verification !== "verified" && (
-        <button
-          // → /verify, which is where a company is actually minted. It pointed at `/company`, and
-          // that page is gone (owner, 2026-09-04): the firm is a block on THIS page now, so the old
-          // target would have been a nudge to scroll. `CreateOwnCompanyCard`, in that block, sends
-          // him to the same form, so the two nudges still agree.
-          onClick={() => router.push("/verify")}
-          className={btn("secondary", "lg", { full: true, className: "mt-4 flex justify-between text-start transition" })}
-        >
-          <div>
-            <p className="text-body font-semibold text-navy">{t.shell.tierBasic} · {t.home.nudgeBasicTitle}</p>
-            <p className="text-meta text-muted">{t.home.nudgeBasicBody}</p>
-          </div>
-          <Icon name="arrow_forward" size={18} className="flex-none text-brand rtl:scale-x-[-1]" />
-        </button>
-      )}
+      {/* ── The banner is GONE; the company card asks the question (owner, 2026-09-12) ──────────
+          *"why ui is trash here, keep the create as part of the company but show it nice and without
+          ui bugs"*.
+
+          🔴 **Three faults, and the first two were real bugs, not taste.**
+          (1) A `<button>` with a fake CTA `<span>` inside it, styled as a second button. Two
+              affordances for one press: the whole slab was the control and the orange pill only
+              looked like one.
+          (2) The company topic in TWO places. This slab said *"…or join an existing company with an
+              invite code below"* and pointed three hundred pixels down at the card that owns the
+              other half, so the reader met one errand twice and had to reconcile them himself.
+          (3) A full-width band above a two-column grid, which is the shape the page uses for the
+              masthead alone.
+          The create route now sits inside the company card, where the join route already lives —
+          see `CompanyHub`'s `NoCompanyCard`. This REVERSES the move made earlier the same day
+          (*"make one CTA for the verify"*); what that ruling protected survives, because there is
+          still exactly one place to press. */}
+
+      {/* ⚠️ The form, over the page he is already on. It was a route until 2026-09-12 — see
+          `VerifyModal` for why it stopped being one. */}
+      <VerifyModal open={verifyOpen} onClose={() => setVerifyOpen(false)} />
 
 
       {/* ── Two columns: who you are, and how the account behaves (owner, 2026-08-30) ─────────
@@ -272,7 +284,20 @@ export function ProfileView() {
               (its own padding, its own `dir`, the firm's masthead) — see `CompanyHub`. */}
           {!loading && (
             <div className="mt-5">
-              <CompanyHub embedded onCompany={(co) => setFirmName(co?.name ?? null)} />
+              <CompanyHub
+                embedded
+                /* The form is a dialog over THIS page, so the page owns it and the card asks for
+                   it. Withheld once he is verified or waiting on it: verification creates the
+                   company, so offering to create a second one would be a press with nowhere to go. */
+                onCreateCompany={
+                  verification !== "pending" && verification !== "verified"
+                    ? () => setVerifyOpen(true)
+                    : undefined
+                }
+                onCompany={(co) => {
+                  setFirmName(co?.name ?? null);
+                }}
+              />
             </div>
           )}
 

@@ -295,7 +295,8 @@ export const ar: Dictionary = {
       shareAgainHint: "اختر قناة أخرى فوق ثم اضغط مرّة أخرى. الرابط نفسه لا يتغير.",
       nowPasteAddresses: "مورّدوك في الحافظة. اضغط Ctrl+V في حقل Bcc في أوتلوك.",
       nowPasteCard: "البطاقة في الحافظة. اضغط Ctrl+V في آخر الرسالة.",
-      linkHint: "يُنشَأ رابط المشاركة لحظة نشر طلبك.",
+      linkLockedTitle: "انشر الطلب أولاً",
+      linkLockedBody: "يُنشَأ الرابط لحظة النشر، وبعدها يمكنك نسخه ومشاركته أينما أردت",
       noPhone: "لا يوجد هاتف",
       vendorShort: "مورّد معتمد",
       skippingPhone: "{n} ممّن اخترتهم بلا هاتف.",
@@ -366,6 +367,9 @@ export const ar: Dictionary = {
         "لم تُمنح الموافقة. غالبًا ما تحتاج المؤسسات الكبيرة إلى موافقة مسؤول، فاسأل قسم تقنية المعلومات إن لم ترفضها بنفسك",
       mailConnectFailed: "تعذّر ربط أوتلوك، لذلك لن يُرسَل بريد. ومع ذلك يُنشَر طلبك على معداتك",
       mailInSent: "توجد نسخة في مجلد المُرسَل",
+      mailNotSent: "لم تُرسل الرسالة. طلبك منشور، ويمكنك إرساله بنفسك من «افتح بريدك» بالأسفل",
+      mailNoSender: "لا يوجد بريد إلكتروني في ملفك الشخصي، فلا مكان تُرسل منه الرسالة. أضِف بريدًا في ملفك ثم أعد الإرسال",
+      mailNoSenderAction: "افتح ملفك الشخصي",
       mailNoRecipients:
         "لم نجد بريداً لأي من الموردين المختارين. قد يكونون في قائمة زميل لا قائمتك، لذا يُفتح بريدك بدلاً من ذلك",
       mailNotYours:
@@ -421,28 +425,9 @@ export const ar: Dictionary = {
     restartConfirm: "سيؤدي هذا إلى مسح طلبك الحالي وبدء طلب جديد.",
   },
   processing: {
-    title: "نقرأ طلب عرض الأسعار…",
-    note: "ستظهر تفاصيل المشروع والعناصر أثناء تحليلها.",
-    sub: "عادةً يستغرق بضع ثوانٍ: انتظر قليلًا.",
-    stage1: "قراءة مستندك/نصك",
-    stage2: "استخراج تفاصيل مشروعك",
-    stage3: "مطابقة معداتك بما نوفّره",
-    stage4: "تحضير طلبك",
-    summaryItems: "تم العثور على {count} عنصر",
-    summaryNeedCheck: "{count} بحاجة إلى مراجعة سريعة",
-    summaryNotAvailable: "{count} غير متوفر",
-    agentWorking: "الوكيل يعمل",
-    liveActivity: "النشاط المباشر",
-    feedReading: "جارٍ قراءة المستند/النص…",
-    feedRead: "تم العثور على نص مقروء: {n} كتلة طلب",
-    feedExtracted: "تم استخراج الموقع والمدة والكميات",
-    feedChecking: "جارٍ فحص: {item}",
-    feedMatched: "{item} ← مطابق لـ {match}",
-    feedAllMatched: "تمت مطابقة جميع المعدات: جارٍ تجهيز طلبك",
-    stageScan: "المسح",
-    stageExtract: "الاستخراج",
-    stageMatch: "المطابقة",
-    stageAnalyze: "التحليل",
+    reading: "نقرأ طلبك",
+    matched: "مطابَق من كتالوجنا",
+    oneMachine: "معدّتك",
   },
   step1: {
     title: "تفاصيل المشروع",
@@ -670,6 +655,8 @@ export const ar: Dictionary = {
     myCompanySubtitle: "انضم إلى شركة أو أدِر فريقك",
     details: "التفاصيل",
     share: "مشاركة",
+    noneTitle: "شركتك",
+    noneBody: "لست عضوًا في أي شركة بعد. أنشئ شركتك، أو انضم إلى شركة برمز دعوة.",
     joinTitle: "الانضمام إلى شركة",
     noCompany: "لست عضوًا في أي شركة بعد. أدخل رمز دعوة من مالك الشركة للانضمام إليها.",
     enterCode: "رمز الدعوة",
@@ -765,6 +752,20 @@ export const ar: Dictionary = {
     unavailableTitle: "المساعد الذكي غير متاح",
     unavailableBody: "تعذّر عليه معالجة طلبك الآن. تم حفظ مدخلاتك: حاول بعد قليل.",
     switchManual: "الانتقال إلى اليدوي",
+    submit: {
+      oursTitle: "حدث خطأ من جانبنا",
+      oursBody: "لم يُرسَل طلبك، ولم يضع شيء مما كتبته. أعد المحاولة بعد لحظات",
+      yoursTitle: "تعذّر قبول طلبك",
+      yoursBody: "رُفض شيء فيه. راجع التفاصيل أعلاه ثم أعد المحاولة",
+      authTitle: "حسابك لا يسمح بهذا بعد",
+      authBody: "سجّل الدخول مرة أخرى، أو أكمل ملفك الشخصي، ثم أعد المحاولة",
+      offlineTitle: "تعذّر الوصول إلى معداتك",
+      offlineBody: "تحقّق من اتصالك. طلبك محفوظ هنا ولم يُرسَل شيء",
+      unknownTitle: "لم يتم ذلك",
+      unknownBody: "لم يُرسَل طلبك، ولم يضع شيء مما كتبته. أعد المحاولة",
+      copyRef: "انسخ تفاصيل الخطأ",
+      copiedRef: "تم نسخ التفاصيل",
+    },
   },
   options: {
     rentalBasis: { daily: "يومي", weekly: "أسبوعي", monthly: "شهري" },
@@ -1173,7 +1174,7 @@ export const ar: Dictionary = {
     // حُذف `eqNoCerts` (المالك، 2026-08-19): المعدّة التي لم يُطلب لها أيّ شهادة لا يُكتب لها شيء —
     // لا في صفّ البطاقة الرابع ولا في صندوق المؤشّر على الخريطة. لم يبقَ له قارئ.
     eqDistanceUnit: "كم من مشروعك",
-    eqNoDistance: "المسافة غير معروفة",
+    eqNoDistance: "الموقع غير محدّد",
     // ── شارة المسافة والشرح خلفها (المالك، 2026-08-28) ─────────────────────────
     // المسافة الحمراء ليست مسافة سيئة، بل مسافة لم يعد بها أحد — وهذه الجملة هي ما تشرحه أول ضغطة.
     eqYardExplainTitle: "كيف تعمل هذه المسافة",
@@ -1926,6 +1927,7 @@ export const ar: Dictionary = {
     chips: {
       label: "المشروع",
       ended: "منتهي",
+      pick: "اختر مشروعاً",
       all: "كل المشاريع",
       fewer: "عرض أقل",
     },
@@ -1971,12 +1973,14 @@ export const ar: Dictionary = {
       remove: "حذف",
       keep: "الإبقاء عليها",
     },
+    changeEquipment: "تغيير {name} من المتجر",
     operator: "المشغّل",
     operatorRail: "المشغّل",
     where: "وجهة المعدّة",
     when: "مدة التشغيل",
     nextPanel: "التالي: {panel}",
     requiredMark: "* مطلوب",
+    requiredWord: "مطلوب",
     checkFromProject: "مُعبّأ من مشروعك. راجعه، ثم اضغط «مراجعة وإرسال» مرة أخرى.",
     nextOnly: "التالي",
     missingTitle: "قبل الإرسال، ينقص:",
@@ -1999,6 +2003,8 @@ export const ar: Dictionary = {
       type: "النوع",
       size: "الحجم",
       searchTypes: "ابحث في الأنواع…",
+      useMyOwnName: "لا يطابق ما تريد؟ أرسلها باسم المعدة المخصّص أعلاه",
+      selectFromList: "اختر من قائمتنا",
       addCustomType: "أضف نوع معدّة مخصّصاً",
       searchSizes: "ابحث في الأحجام…",
       fuel: "الوقود",
@@ -2013,7 +2019,9 @@ export const ar: Dictionary = {
       logistics: "الخدمات اللوجستية",
       delivery: "التوصيل إلى الموقع",
       returnFromSite: "الإعادة من الموقع",
-      fuelResponsibility: "مسؤولية الوقود",
+      // «الوقود على» + «المورد / أنا» — the product's own vocabulary for a party term, and shorter
+      // than «مسؤولية الوقود» for the same reason the English was shortened.
+      fuelResponsibility: "الوقود على",
       attachment: "الملحق",
       workType: "نوع العمل",
       workTypePlaceholder: "ماذا سترفع؟",
@@ -2021,9 +2029,10 @@ export const ar: Dictionary = {
       notesOptional: "(اختياري)",
       notesPlaceholder: "أي شيء آخر ينبغي أن يعرفه المورّد…",
       unavailableTitle: "{equipment} غير متوفرة لدى المورّدين حالياً.",
-      // خارج الكتالوج: ثلاث حقائق قبل الإرسال، ثم المستأجر يسمّي المعدة بنفسه.
+      // خارج الكتالوج: النتيجة أولاً — لا مورّد لدينا مطابق لمعدّة يسمّيها المستأجر بنفسه، فلا نرسلها
+      // إلى أحد، ثم الطريق الذي يبقى له. لا ادّعاء عن الكتالوج: قد يكون النوع موجوداً وقد رفضه هو.
       notInCatalogueNote:
-        "هذا النوع من المعدات غير متاح حاليًا، لكن يمكنك نشر الطلب ومشاركة الرابط مع مورّديك",
+        "هذه لا تذهب إلى مورّدي معداتك، لكن يمكنك نشر الطلب ومشاركته مع مورّديك خارج التطبيق",
       customEquipment: "اسم المعدة",
       customEquipmentPlaceholder: "اكتب اسم المعدة التي تحتاجها",
       unavailableWhatsapp: "راسلنا",
@@ -2160,7 +2169,10 @@ export const ar: Dictionary = {
     all: "الكل",
     registeredVendors: "المورّدون المعتمدون",
     colSupplier: "المورّد",
-    colVendor: "اعتماد المورّد",
+    /* «اعتماد المورّد» read as an approval somebody grants — the owner could not tell what the
+       column was for (2026-09-12). The English is «Vendor registration», and this is his own
+       wording for it: the renter's own record that he has registered this firm as a vendor. */
+    colVendor: "تسجيل المورّد",
     colPhone: "الجوال",
     colEmail: "البريد",
     colContact: "الاتصال",

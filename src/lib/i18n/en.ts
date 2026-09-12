@@ -343,7 +343,14 @@ export const en = {
       shareAgainHint: "Pick another channel above and press again. The link stays the same.",
       nowPasteAddresses: "Your suppliers are on the clipboard. Press Ctrl+V in Outlook’s Bcc field.",
       nowPasteCard: "The card is on the clipboard. Press Ctrl+V at the end of the message.",
-      linkHint: "Your shareable link is generated the moment you post your request.",
+      /* ── The locked link, answered on the PRESS (owner, 2026-09-12) ────────────────────
+         *"clicking it will open small clear popup saying post the request first so the link is
+         generated and u can share the link"*.
+         ~~`linkHint`, a sentence that sat inside the field at all times.~~ It was a line of prose in
+         a placeholder, so the field had to be wide enough to hold it, and it answered a question
+         before the renter had asked it. */
+      linkLockedTitle: "Post the request first",
+      linkLockedBody: "The link is created the moment you post. After that you can copy it and share it anywhere you like",
       noPhone: "no phone",
       vendorShort: "Vendor",
       skippingPhone: "{n} of the ones you picked have no phone.",
@@ -437,6 +444,15 @@ export const en = {
         "Consent was not granted, so nothing is e-mailed. Large organisations often need an administrator to approve it, so ask your IT if you did not refuse it yourself",
       mailConnectFailed: "Outlook could not be connected, so nothing is e-mailed. Your request still posts to Moedatech",
       mailInSent: "A copy is in your Sent folder",
+      /* Said out loud, because a send that did not happen used to say NOTHING: the success line was
+         the only outcome this panel reported, and every refusal changed a button label at most. The
+         reason rides in the parentheses untranslated, so a screenshot of this line is diagnostic. */
+      mailNotSent: "The e-mail did not go out. Your request is posted; use «Open your e-mail» below to send it yourself",
+      /* The ONE refusal the renter can clear himself, so it names the remedy instead of the fault.
+         `resolveSender` reads `users.email`, and Moedatech registers people by PHONE — so a great
+         many accounts have none, and a renter whose profile is blank is refused with no idea why. */
+      mailNoSender: "Your profile has no e-mail address, so the message has nowhere to come from. Add one, then send again",
+      mailNoSenderAction: "Open your profile",
       /* ── The reasons that used to pass in SILENCE (owner, 2026-09-08) ─────────────────────────
          *"My account is sending to suppliers correctly, but my colleague's Outlook account doesn't
          send anything."* Every reason below opened his compose window and said nothing about why —
@@ -503,32 +519,14 @@ export const en = {
     restartTitle: "Start over?",
     restartConfirm: "This clears your current request and starts a new one.",
   },
+  // Three strings for the whole screen (owner, 2026-09-12: *"no need for steps and many complicated
+  // text"*). The stage rail, the activity feed and the counts line are gone, and their eighteen
+  // strings with them - a key nobody reads is the next agent's invitation to draw it again.
   processing: {
-    title: "Reading your RFQ…",
-    note: "Project details and items will appear as they're parsed.",
-    sub: "This usually takes a few seconds. Hang tight.",
-    stage1: "Reading your document/text",
-    stage2: "Extracting your project details",
-    stage3: "Matching your equipment to what we provide",
-    stage4: "Preparing your request",
-    // AC-56 e.g. "24 items found · 3 need a quick check · 2 not available"
-    summaryItems: "{count} items found",
-    summaryNeedCheck: "{count} need a quick check",
-    summaryNotAvailable: "{count} not available",
-    // The live feed. The first two lines are said while the request is still in flight, so they
-    // report what was SENT rather than what was found; everything after names real extracted items.
-    agentWorking: "AGENT WORKING",
-    liveActivity: "LIVE ACTIVITY",
-    feedReading: "Reading your document/text…",
-    feedRead: "Found readable text: {n} request block",
-    feedExtracted: "Extracted site, duration and quantities",
-    feedChecking: "Checking: {item}",
-    feedMatched: "{item} → matched to {match}",
-    feedAllMatched: "All equipment matched: preparing your request",
-    stageScan: "Scan",
-    stageExtract: "Extract",
-    stageMatch: "Match",
-    stageAnalyze: "Analyze",
+    reading: "Reading your request",
+    matched: "Matched from our catalogue",
+    // The fallback name for a line the agent placed nowhere and the renter never titled.
+    oneMachine: "Your equipment",
   },
   step1: {
     title: "Project details",
@@ -770,6 +768,13 @@ export const en = {
     details: "Details",
     share: "Share",
     // No company yet → join by code.
+    /* ── ONE card owns the company question, and it asks it once (owner, 2026-09-12) ────────────
+       The page used to put «Add your own company» in a full-width slab at the top and «Join a
+       company» in a card three hundred pixels below it, so a renter with no company met the same
+       errand twice, in two shapes, and the slab's own sentence had to point downwards at the other
+       half. These two are the card's head; `joinTitle` now labels only the invite-code half. */
+    noneTitle: "Your company",
+    noneBody: "You're not part of a company yet. Create your own, or join one with an invite code.",
     joinTitle: "Join a company",
     noCompany: "You're not part of a company yet. Enter an invite code from a company owner to join.",
     enterCode: "Invite code",
@@ -884,6 +889,27 @@ export const en = {
     unavailableTitle: "The AI assistant is unavailable",
     unavailableBody: "It couldn't process your request right now. Your input is saved. Try again shortly.",
     switchManual: "Switch to Manual",
+    /* ── Said to the RENTER, not to the log (owner, 2026-09-12) ─────────────────────────────
+       *"can we make the error messages clear to the user and user friendly and clearly have the
+       reason, not like this by numbers"*, after meeting «INTERNAL_ERROR · 500».
+
+       One sentence per SIDE the fault is on, because that is what decides his next move. See
+       `contract/submit-error.ts` for why this reads the status rather than the backend's code. */
+    submit: {
+      oursTitle: "Something went wrong on our side",
+      oursBody: "Your request was not sent, and nothing you typed is lost. Try again in a moment",
+      yoursTitle: "Your request could not be accepted",
+      yoursBody: "Something in it was refused. Check the details above and try again",
+      authTitle: "Your account cannot do this yet",
+      authBody: "Sign in again, or complete your profile, then try once more",
+      offlineTitle: "We could not reach Moedatech",
+      offlineBody: "Check your connection. Your request is saved here and nothing was sent",
+      unknownTitle: "That did not go through",
+      unknownBody: "Your request was not sent, and nothing you typed is lost. Try again",
+      /** For support, never the headline. A press, so it cannot take the clipboard by surprise. */
+      copyRef: "Copy error details",
+      copiedRef: "Details copied",
+    },
   },
   options: {
     rentalBasis: { daily: "Daily", weekly: "Weekly", monthly: "Monthly" },
@@ -1378,7 +1404,12 @@ export const en = {
     // for), and "No certificates requested" explained an absence nobody had asked about. No readers
     // are left, so the key went with them.
     eqDistanceUnit: "km from your project",
-    eqNoDistance: "Distance not known",
+    /* ~~«Distance not known».~~ The condition is stricter than that and always was: `km` is null
+       only when the machine has NO resolvable location, so the distance is not the thing missing -
+       the place is (owner, 2026-09-12: *"if no yard then show no equipment in map and show
+       unspecified location"*). Saying «distance» invited the reading that the yard is known and the
+       arithmetic failed. */
+    eqNoDistance: "Location not specified",
     // ── The distance chip, and the tutorial behind it (owner, 2026-08-28) ──────────────────
     // The card's dominant fact is now the distance, painted with the availability it is only as good
     // as. A red distance is not a bad distance — it is a distance nobody has promised — and that is
@@ -2298,6 +2329,11 @@ export const en = {
     chips: {
       label: "Project",
       ended: "ended",
+      /** Beside the pills on the intake floor (owner, 2026-09-12): a row of place names is
+       *  furniture until something names the question it answers. */
+      /* «a», not «your» (owner, 2026-09-12). The row is a CHOICE among his sites, and the
+         possessive claimed one of them was already his answer. */
+      pick: "Select a project",
       all: "All projects",
       /** The way back to two rows once «All projects» has opened the rest. */
       fewer: "Show fewer",
@@ -2355,12 +2391,19 @@ export const en = {
       remove: "Remove",
       keep: "Keep it",
     },
+    /* A DIRECT request's ✕ swaps the machine rather than removing it: it goes back to the supplier's
+       store, because that listing is where the equipment came from. «Remove» would be a lie about
+       both what it does and what comes back. */
+    changeEquipment: "Change {name}, at the store",
     operator: "The operator",
     operatorRail: "OPERATOR",
     where: "Where it goes",
     when: "When it runs",
     nextPanel: "Next: {panel}",
     requiredMark: "* Required",
+    /** The same demand for a field whose LABEL already carries the star: the word alone, so the
+     *  marker costs the label as little width as possible (owner, 2026-09-12). */
+    requiredWord: "Required",
     /* Said in a panel the SITE filled and the renter has never opened, so the panel that opens on
        «Review & send» states why it opened. See `prefilledNote` in `Canvas`. */
     checkFromProject: "Filled in from your project. Have a look, then press Review & send again.",
@@ -2397,6 +2440,28 @@ export const en = {
       /* One line, and only this one (owner, 2026-09-09: *"add a custom equipment type only"*). The
          second line said what the state means, which the orange note on the card says once the box
          is open. */
+      /* ── The way out of a match that is not his machine (owner, 2026-09-12, settled 09-13) ────
+         Five wordings. The first four died of the SLOT, not of the words:
+         ~~«Doesn't match what I want? Use my own name of equipment»~~ — three lines, and «what I
+         want» asked about his PREFERENCE, so a renter who merely liked his own wording had every
+         reason to press it and lose every supplier we would have reached.
+         ~~«My machine is not listed»~~ — a statement: when to press, never what pressing does.
+         ~~«Name it myself»~~ — an act with no object, on a card whose name box is already filled.
+         ~~«Send it with the name above»~~ — points at the box at last, and still reads as a shrug:
+         *"must be clear"*.
+         🔴 The column was choosing the words. ~160px of text cannot hold a sentence that both names
+         the CONDITION and the ACT, so every candidate dropped one of the two. The control moved to
+         its own full-width row instead, and the string below is the owner's own sentence, whole
+         (*"doesnt match what you want? send it with your custom equipment name above"*).
+         ⚠️ «custom equipment name» is deliberately the FIELD's own vocabulary rather than plain
+         English: it names the box the press points at, which is the whole of what the sentence has
+         to do now that the pulse draws the eye there. */
+      useMyOwnName: "Doesn't match what you want? Send it with your custom equipment name above",
+      /* The same row, on a line that has already gone off-catalogue (owner, 2026-09-13): *"if it is
+         clicked then in its place, with no taxonomy selected, we will write «select from our list»"*.
+         His words. It OPENS the type list, rather than just naming it — the lists are still on screen
+         above this row, so a line that only points at them would be a caption, not a control. */
+      selectFromList: "Select from our list",
       addCustomType: "Add a custom equipment type",
       searchSizes: "Search sizes…",
       fuel: "FUEL",
@@ -2419,7 +2484,17 @@ export const en = {
       logistics: "LOGISTICS",
       delivery: "DELIVERY TO SITE",
       returnFromSite: "RETURN FROM SITE",
-      fuelResponsibility: "FUEL RESPONSIBILITY",
+      /* ── «FUEL PAID BY», because «FUEL RESPONSIBILITY» did not fit (owner, 2026-09-12) ─────────
+         Measured, not guessed: the fuel box gives its label 119px and «FUEL RESPONSIBILITY *» needs
+         133px on one line, so it wrapped to two at FULL desktop width while the two haulage legs
+         beside it stayed on one. It is the longest of the three strings in the narrowest of the
+         three slots — the row is `2fr_1fr`, and fuel also pays a whole box's 28px padding alone
+         where the two legs share one box's between them.
+         Shortened rather than re-gridded: `RETURN FROM SITE` has only 4px of its own to spare, so
+         taking room from that column would move the wrap rather than remove it.
+         ⚠️ NOT plain «FUEL»: the same card already labels the fuel TYPE control «FUEL», over the
+         photo. Two different questions under one word on one card is worse than a wrap. */
+      fuelResponsibility: "FUEL PAID BY",
       attachment: "ATTACHMENT",
       workType: "WORK TYPE",
       workTypePlaceholder: "What will it lift?",
@@ -2427,16 +2502,30 @@ export const en = {
       notesOptional: "(optional)",
       notesPlaceholder: "Anything else the supplier should know…",
       unavailableTitle: "{equipment} isn't available from suppliers right now.",
-      // ── Off-catalogue (CUSTOM_EQUIPMENT_ENABLED) ────────────────────────────────────────────
-      // The owner's own wording (2026-09-06). It says the two things that decide what the renter does
-      // next: the type is not available right now, and the request still goes out under his own link.
-      //
-      // ~~"Not in our catalogue: no supplier is sent it, but you can post and share the link with
-      // your own."~~ It led with OUR filing system and spent half its width on the dispatch rule.
-      // "Not available right now" is the same fact in the renter's terms, and "right now" is honest:
-      // the type is being added, not refused.
+      /* ── Off-catalogue (CUSTOM_EQUIPMENT_ENABLED) ───────────────────────────────────────────
+         ~~«This equipment type is not available, but you can still post and share the link with your
+         suppliers».~~ Owner, 2026-09-12: *"it is not the case always that this equipment is not
+         available, like what the note says"* — and the note has to be *"clear"* that the request
+         will not reach our suppliers.
+         🔴 The sentence made a claim about OUR CATALOGUE, and since the renter can now take a line
+         off-catalogue himself, that claim is false half the time: the type he rejected is sitting in
+         the list above the note. And the half he actually needed — nobody is sent this — was left to
+         be inferred from «you can still share the link», which reads as an extra, not as the only
+         route there is.
+         So the note states the CONSEQUENCE, which is true however the line got here.
+         ~~«No Moedatech supplier is matched to a machine you name yourself, so we will not send this
+         equipment to anyone…».~~ Right facts, unreadable: 180 characters whose first clause described
+         our MATCHING rather than his outcome. ~~«Moedatech suppliers will not see this equipment.
+         Only the suppliers you send the link to can price it».~~ Shorter, and still ours rather than
+         his. The wording below is the OWNER'S OWN, taken as given.
+         ⚠️ «This one», never «this request». One line of a five-line request can be off-catalogue
+         while the other four go out to everybody who stocks them.
+         ⚠️ «offline» carries a SECOND meaning in this dictionary — «you appear to be offline», the
+         lost connection, four strings of it. It is deliberate here: it is also the word the source
+         filter and the comparison have shown him for weeks («Offline · invite»), so it is the
+         product's own name for a supplier reached outside Moedatech. */
       notInCatalogueNote:
-        "This equipment type is not available, but you can still post and share the link with your suppliers",
+        "This one does not go to Moedatech suppliers, but you can still post the request and share it with your suppliers offline",
       // The renter names the machine himself and the request goes out carrying his words. Prefilled
       // from what he wrote in the RFQ, so the ordinary case is a glance.
       customEquipment: "EQUIPMENT NAME",
