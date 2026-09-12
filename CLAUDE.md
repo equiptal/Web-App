@@ -2,6 +2,52 @@
 
 ## Change log
 
+- **2026-09-12 - «Add a supplier» says what the SERVER said, instead of «try again» for five different failures.**
+  Owner, forwarding a beta user (+966 53 586 9745) stuck on «لم يُحفظ. صفوفك ما زالت هنا: حاول مرة
+  أخرى» while the same act worked from his own account.
+  `AddSuppliersDialog`'s save ended in a bare `catch {}` that printed one sentence for every non-2xx.
+  FIVE different failures reach it and the screen could not tell them apart: the relay's **401** (no
+  session id), the handler's **404** («المستخدم غير موجود» - the user row is not in the tenant that
+  Lambda reads), a **422** from the schema, a **500** from the unguarded `createMany`, and a dropped
+  connection. A day went into guessing between them from source, and the one screen that had been
+  TOLD the answer had thrown it away.
+  (1) `projectFetch` now carries the backend's own `message` / `messageAr` into `ApiError`, which has
+  always had fields for them. **Both envelopes**, because two reach it: the agents relay forwards
+  `{ success:false, error:{ code, message, messageAr } }` verbatim, while this app's own routes answer
+  a flat `{ code, detail, messageAr }`.
+  (2) The dialog prints that sentence in the reader's language, with **`CODE · HTTP n` beside it**.
+  That suffix is not prose and is deliberately untranslated: it is the part that makes a screenshot
+  of this dialog diagnostic.
+  Files: `src/lib/api/client.ts` (`projectFetch`),
+  `src/components/suppliers/AddSuppliersDialog.tsx`,
+  `tests/unit/add-suppliers-error.test.tsx` (new, 5 cases).
+  ⚠️ **No new dialog and no new control.** It is the same red line in the footer row
+  (`AddSuppliersDialog.tsx:213`), in the same place the generic sentence used it, with the rows and
+  the renter's typing untouched behind it.
+  ⚠️ **A per-row refusal is untouched.** The endpoint answers 200 with `rejected[]`, and
+  `refusalLine` still names each row and its reason. Only a THROWN request reaches the new branch.
+  ⚠️ A body with no reason at all (a dropped connection, an unreadable upstream) still falls back to
+  `addFailed`, which is the sentence that tells the renter his typing is safe. A case pins it.
+  ⚠️ **`details` is NOT carried on this branch.** `ApiError`'s `extra` has no such field here; it
+  gains one on staging. The sentence and the code are what the dialog reads, so nothing on screen
+  depends on it - but a future reader porting this back should not be surprised by the difference.
+  ⚠️ `LocaleProvider` overrides `initialLocale` on mount, so the Arabic case sets
+  `localStorage["moedatech.locale"]` the way `tests/setup/canvas.tsx` does. `initialLocale` alone
+  silently renders English and the assertion passes for the wrong reason.
+  🔴 **This does not fix the user's problem; it makes the next report carry its own diagnosis.**
+  Still unknown which of the five he hit - the response body was never captured and the database was
+  behind a permission block.
+  🔴 **BACKEND, two tickets, neither touched (different repo):**
+  · `bulkRenterSuppliers.ts:233` - `prisma.renterSupplier.createMany` has NO try/catch, so one
+  constraint failure falls to the outer catch and 500s a partial-success endpoint, losing every good
+  row. That file's own header says this must never happen.
+  · `apps/backend/serverless.yml:272` declares
+  `TENANT_ID: ${env:TENANT_ID, ssm:/moedatech/${stage}/tenant/id, 'default'}`, while
+  `apps/backend-agents/serverless.yml` declares **no `TENANT_ID` at all** - so the service that
+  CREATES users can be stamped from SSM while the service that WRITES suppliers is pinned to
+  `'default'` by omission. Verify the SSM value before acting: if it is `default`, this is harmless
+  today and only a latent trap.
+
 - **2026-09-12 - Connecting Outlook is its own act, and the confirmation names every destination it reaches.**
   Owner: *"users are confused when their request is sent with the Outlook at same click, so i want to
   separate the connect as a separate action from the create, so the create is done to Outlook once it
