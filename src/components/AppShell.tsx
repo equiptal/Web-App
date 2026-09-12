@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { VerifiedMark } from "@/components/VerifiedMark";
+import { VerifyModal } from "@/components/onboarding/VerifyModal";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
@@ -170,6 +171,8 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
   const { tier, status, signOut, refresh: refreshSession } = useSession();
   /** The account menu: Profile, and the only door out of the app. */
   const [accountOpen, setAccountOpen] = useState(false);
+  /** The verification form, opened by the header nudge — see the note on that button. */
+  const [verifyOpen, setVerifyOpen] = useState(false);
   const accountBox = useRef<HTMLDivElement>(null);
 
   /* Dismissed the way every popover in this app is: a press outside it, or Escape. Also closed on
@@ -563,12 +566,29 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
                   </span>
                 ) : null}
                 </span>
-                {tier !== "verified" && (
-                  <span className="rounded-full bg-brand px-2 py-0.5 text-label font-semibold uppercase tracking-[0.05em] text-white">
-                    {t.shell.verifyNudge}
-                  </span>
-                )}
               </button>
+
+              {/* 🔴 **«Verify» is its own press, and it opens the FORM** (owner, 2026-09-12: *"when
+                  a user clicks verify from the header of the web beside the profile, take him
+                  directly to the form, not to the profile"*).
+                  ~~Inside the avatar button.~~ One control wearing two promises: the word said
+                  «verify» and the press opened the account menu, from which the renter still had to
+                  find the profile and then find the nudge on it. Three steps to reach a form the
+                  word had already offered him.
+
+                  ⚠️ It sits BESIDE the avatar, not on it: the house scale starts at 11px, and 11px
+                  of «Verify» is wider than the 34px circle. Two buttons now, which is what they
+                  always were — the avatar opens the menu, this opens the form. */}
+              {tier !== "verified" && (
+                <button
+                  type="button"
+                  onClick={() => setVerifyOpen(true)}
+                  aria-label={t.shell.verifyNudge}
+                  className="flex-none rounded-full bg-brand px-2 py-0.5 text-label font-semibold uppercase tracking-[0.05em] text-white transition hover:bg-brand-press"
+                >
+                  {t.shell.verifyNudge}
+                </button>
+              )}
 
               {/* Two entries, and each is the only way to reach what it names. On a dark bar the
                   popover keeps its own light ground — the same treatment the nav sheet gets — because
@@ -704,6 +724,10 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
           {children}
         </main>
       </div>
+
+      {/* ⚠️ Mounted at the SHELL, so the form opens over whatever the renter was reading and
+          closing it puts him back there. That is the whole reason it stopped being a page. */}
+      <VerifyModal open={verifyOpen} onClose={() => setVerifyOpen(false)} />
 
     </div>
     </BackAsideContext.Provider>

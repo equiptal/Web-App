@@ -12,6 +12,7 @@ import type { RenterProfile, VerificationStatus } from "@/lib/contract/onboardin
 import { updateLanguage } from "@/lib/api/profile-client";
 import { Field, FieldGrid, MastheadPill, PageMasthead, Row, RowList, Section } from "@/components/PageSection";
 import { CompanyHub } from "@/components/company/CompanyHub";
+import { VerifyModal } from "@/components/onboarding/VerifyModal";
 import { EditProfileForm } from "./EditProfileForm";
 import { ChangePhoneModal } from "./ChangePhoneModal";
 import { DeleteAccountModal } from "./DeleteAccountModal";
@@ -48,6 +49,15 @@ export function ProfileView() {
   const [savedToast, setSavedToast] = useState(false);
   /** The firm this account belongs to, reported up by the block below — see the Company field. */
   const [firmName, setFirmName] = useState<string | null>(null);
+  const [verifyOpen, setVerifyOpen] = useState(false);
+  /**
+   * Whether this account belongs to a firm. `null` until the block below has looked.
+   *
+   * 🔴 **Three states, not two.** The verify CTA is drawn when the answer is NO, and a bare
+   * `!firmName` would answer NO while the question was still open — so a renter who already has a
+   * company would see «Add your own company» flash above his own firm on every visit.
+   */
+  const [hasCompany, setHasCompany] = useState<boolean | null>(null);
   const [langBusy, setLangBusy] = useState(false);
 
   useEffect(() => {
@@ -161,23 +171,48 @@ export function ProfileView() {
         </p>
       )}
 
-      {/* Tier banner — basic renter → verify (verified shows the company card verified state below). */}
-      {!loading && tier === "basic" && verification !== "pending" && verification !== "verified" && (
+      {/* ── ONE verify CTA on this page (owner, 2026-09-12) ──────────────────────────────────
+          *"Fix the UI issues here and make one CTA for the verify."*
+
+          🔴 **There were two, and they said the same thing twice.** This thin banner —
+          «Basic Rentee · Get Verified», an arrow, and nothing else across the full width — and
+          `CreateOwnCompanyCard` in the company block below it, which carried the icon, the sentence
+          and the button. A renter reading down the page met the same errand twice in two shapes and
+          could not tell whether they were two different things.
+
+          The card won and moved up here, because this is the position the banner was holding for a
+          reason: the one thing on the page that should not have to be found. The block below draws
+          nothing now.
+
+          ⚠️ `normal-case` on the text, and that is the bug in the screenshot. `btn()` carries
+          `capitalize` for its LABELS, which is right for a word and wrong for a card: it turned the
+          body into «Verify Your Company To Become A Trusted Renter». */}
+      {/* ⚠️ **No company is the gate, not the TIER.** The card this replaces said so in its own
+          doc — *"shown unconditionally in the no-company state: a renter who was already verified
+          would have a company, since verification creates it"* — and gating on `tier === "basic"`
+          silently narrowed it, which a test caught. */}
+      {!loading && hasCompany === false && verification !== "pending" && verification !== "verified" && (
         <button
-          // → /verify, which is where a company is actually minted. It pointed at `/company`, and
-          // that page is gone (owner, 2026-09-04): the firm is a block on THIS page now, so the old
-          // target would have been a nudge to scroll. `CreateOwnCompanyCard`, in that block, sends
-          // him to the same form, so the two nudges still agree.
-          onClick={() => router.push("/verify")}
-          className={btn("secondary", "lg", { full: true, className: "mt-4 flex justify-between text-start transition" })}
+          onClick={() => setVerifyOpen(true)}
+          className={btn("secondary", "lg", { full: true, className: "mt-4 flex items-center gap-3.5 text-start normal-case transition" })}
         >
-          <div>
-            <p className="text-body font-semibold text-navy">{t.shell.tierBasic} · {t.home.nudgeBasicTitle}</p>
-            <p className="text-meta text-muted">{t.home.nudgeBasicBody}</p>
-          </div>
-          <Icon name="arrow_forward" size={18} className="flex-none text-brand rtl:scale-x-[-1]" />
+          <span className="grid h-11 w-11 flex-none place-items-center rounded-sm bg-brand text-brand-fg">
+            <Icon name="verified" size={22} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-subhead font-extrabold text-navy">{t.company.createOwnTitle}</span>
+            <span className="mt-0.5 block text-meta leading-relaxed text-muted">{t.company.createOwnDesc}</span>
+          </span>
+          <span className="inline-flex flex-none items-center gap-1 rounded-sm bg-brand px-3 py-2 text-meta font-semibold text-brand-fg">
+            {t.company.createOwnCta}
+            <Icon name="arrow_forward" size={15} className="rtl:scale-x-[-1]" />
+          </span>
         </button>
       )}
+
+      {/* ⚠️ The form, over the page he is already on. It was a route until 2026-09-12 — see
+          `VerifyModal` for why it stopped being one. */}
+      <VerifyModal open={verifyOpen} onClose={() => setVerifyOpen(false)} />
 
 
       {/* ── Two columns: who you are, and how the account behaves (owner, 2026-08-30) ─────────
@@ -272,7 +307,13 @@ export function ProfileView() {
               (its own padding, its own `dir`, the firm's masthead) — see `CompanyHub`. */}
           {!loading && (
             <div className="mt-5">
-              <CompanyHub embedded onCompany={(co) => setFirmName(co?.name ?? null)} />
+              <CompanyHub
+                embedded
+                onCompany={(co) => {
+                  setFirmName(co?.name ?? null);
+                  setHasCompany(!!co);
+                }}
+              />
             </div>
           )}
 

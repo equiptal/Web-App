@@ -84,13 +84,35 @@ const draw = () =>
 describe("the organization, on the profile", () => {
   it("offers the join form under the renter's own details when he has no firm", async () => {
     draw();
-    // The hub's no-company state, on this page: create your own, or join with a code.
+    // The no-company state, on this page: verify to create your own, or join with a code.
     expect(await find(en.company.createOwnTitle)).toBeTruthy();
     expect(screen.getByText(en.company.joinTitle)).toBeTruthy();
-    // And it really is BELOW the personal details, not above them.
+
     const profile = screen.getByText(en.profile.profileSection);
-    const firm = screen.getByText(en.company.createOwnTitle);
-    expect(profile.compareDocumentPosition(firm) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The JOIN form is below the personal details, where the company block has always been.
+    const join = screen.getByText(en.company.joinTitle);
+    // eslint-disable-next-line no-bitwise
+    expect(profile.compareDocumentPosition(join) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    /**
+     * 🔴 **The verify CTA is ABOVE them now** (owner, 2026-09-12: *"make one CTA for the verify"*).
+     * There were two, a thin banner up here and this card down there, saying the same thing in two
+     * shapes a screen apart. The card's content won and took the banner's position, because that
+     * position was being held for a reason: the one errand on the page that should not have to be
+     * found.
+     */
+    const cta = screen.getByText(en.company.createOwnTitle);
+    // eslint-disable-next-line no-bitwise
+    expect(profile.compareDocumentPosition(cta) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+  });
+
+  it("Given a firm, Then the verify CTA is not drawn at all", async () => {
+    // ⚠️ No company is the gate, not the tier: verification is what CREATES a company, so an
+    // account that has one has nothing left to ask for here.
+    api.company = member();
+    draw();
+    await find("Moedatech Contracting");
+    expect(screen.queryByText(en.company.createOwnTitle)).toBeNull();
   });
 
   it("names the firm and the renter's role in it, without a second masthead", async () => {

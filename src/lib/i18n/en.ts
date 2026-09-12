@@ -437,6 +437,15 @@ export const en = {
         "Consent was not granted, so nothing is e-mailed. Large organisations often need an administrator to approve it, so ask your IT if you did not refuse it yourself",
       mailConnectFailed: "Outlook could not be connected, so nothing is e-mailed. Your request still posts to Moedatech",
       mailInSent: "A copy is in your Sent folder",
+      /* Said out loud, because a send that did not happen used to say NOTHING: the success line was
+         the only outcome this panel reported, and every refusal changed a button label at most. The
+         reason rides in the parentheses untranslated, so a screenshot of this line is diagnostic. */
+      mailNotSent: "The e-mail did not go out. Your request is posted; use «Open your e-mail» below to send it yourself",
+      /* The ONE refusal the renter can clear himself, so it names the remedy instead of the fault.
+         `resolveSender` reads `users.email`, and Moedatech registers people by PHONE — so a great
+         many accounts have none, and a renter whose profile is blank is refused with no idea why. */
+      mailNoSender: "Your profile has no e-mail address, so the message has nowhere to come from. Add one, then send again",
+      mailNoSenderAction: "Open your profile",
       /* ── The reasons that used to pass in SILENCE (owner, 2026-09-08) ─────────────────────────
          *"My account is sending to suppliers correctly, but my colleague's Outlook account doesn't
          send anything."* Every reason below opened his compose window and said nothing about why —

@@ -2143,9 +2143,22 @@ export interface MailConnectStatus {
   connectedAt: string | null;
 }
 
-/** Never throws: a status we cannot reach is the same as nothing to offer. */
-export async function mailConnectStatus(): Promise<MailConnectStatus> {
-  const none: MailConnectStatus = { configured: false, connected: false, provider: null, accountEmail: null, connectedAt: null };
+/**
+ * The renter's mailbox connection, or `null` when we could not find out.
+ *
+ * 🔴 **`null` is NOT «not connected»** (owner, 2026-09-12: *"outlook is connected but the success
+ * modal is not shown and i didn't find it sent from my outlook"*).
+ *
+ * ~~Every failure answered a fabricated `connected: false`.~~ The panel asks this ONCE on mount and
+ * never again, so a single blip — a cold Lambda, a dropped request — turned a working connection off
+ * for the whole page: `emailWillGo` went false, the send took the «not connected» branch, the
+ * endpoint was never called, and nothing reached the supplier or his Sent folder. Nothing said so,
+ * because from the panel's side nothing had gone wrong.
+ *
+ * A caller that genuinely wants «nothing to offer» can read null that way. A caller about to SEND
+ * must ask again instead of acting on a guess.
+ */
+export async function mailConnectStatus(): Promise<MailConnectStatus | null> {
   try {
     const raw = await projectFetch<Record<string, unknown>>("/api/mail-connect/status");
     return {
@@ -2156,7 +2169,7 @@ export async function mailConnectStatus(): Promise<MailConnectStatus> {
       connectedAt: typeof raw?.connectedAt === "string" ? raw.connectedAt : null,
     };
   } catch {
-    return none;
+    return null;
   }
 }
 

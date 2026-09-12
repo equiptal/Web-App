@@ -2,6 +2,109 @@
 
 ## Change log
 
+- **2026-09-12 - A dialog opened over a dialog draws a ground of its own, so it reads as a layer.**
+  Owner, on a shot of *Add suppliers* standing over *Share for bids*: *"fix the ui, how can i open 2
+  modals above each other?"*
+  🔴 **The nested layer was `fixed inset-0 z-[60]` and nothing else**, a transparent click-catcher.
+  This design system spends no shadows, so with no tone behind it the second panel had nothing
+  separating it from the first: the share panel's header, its supplier rows and its buttons went on
+  reading at full strength above and below the new dialog, which is why it looked like an inline
+  block pasted into the page rather than something on top of it.
+  It takes `bg-black/25` now. Under the first scrim's `black/55` that composites to about 66%, a
+  visible step down from 55% and short of the ~70% mud the nesting rule was written to avoid in the
+  first place (two `navy/45` scrims, 2026-08-31, which made the dialog underneath unreadable).
+  Files: `src/components/Dialog.tsx` (`NESTED_SCRIM`),
+  `tests/unit/nested-dialog-scrim.test.tsx` (new, 4 cases).
+  ⚠️ **The STACK itself is deliberate and untouched.** `ShareRequestPanel` opens the add dialog
+  over the share panel rather than replacing it, because the list reloads on success and the firm he
+  has just typed in arrives with the picks he had already made still ticked. Only the layering was
+  broken.
+  ⚠️ **No second blur, and the z-index stays at 60.** A `backdrop-blur` here would soften the
+  dialog underneath as well as the page and repaint the viewport on every keystroke in the nested
+  form. And `Dropdown` portals its list at `z-[70]` on the stated promise of clearing this shell, so
+  raising the nested dialog would put it over its own dropdowns; being a DESCENDANT of the dialog
+  that opened it is what already paints it on top.
+  🔴 **Two dialogs opened in the SAME commit still decide it backwards**, and this does not fix
+  that: a child's effect runs before its parent's, so the inner one increments the counter first and
+  reads itself as the first dialog. Unreachable today (a nested dialog is always opened by a later
+  press), and left alone rather than guessed at.
+  ⚠️ Verified: typecheck, lint, 170 passing across `nested-dialog-scrim`, `share-request-panel`,
+  `add-suppliers-error`, `suppliers-remove-and-pick`, `posted-confirmation` and `palette-drift`, and
+  the scrim break-checked by stripping the tone again - two cases went red. NOT seen rendered: the
+  tone is a measured fact and jsdom composites nothing, so the pair wants one look.
+  ⚠️ Reported and NOT changed: the same screenshot shows Title Case on «Share For Bids», «Add
+  Suppliers», «Upload A Sheet Instead» and «Send To Moedatech». That is `TITLE_CASE` on the dialog
+  heading and `capitalize` inside `btn()`, both deliberate and product-wide - a separate decision,
+  not a fault in this dialog.
+
+- **2026-09-12 - The missing profile e-mail names its own remedy, and every send gets its own tick.**
+  Owner, having found the cause himself: *"it is because the user doesnt have email in his profile
+  but once i added it worked"*, and *"the other issue that no success modal for sending to outlook
+  only shown on first post"*, then *"i want to fix both"*.
+  (1) **`NO_SENDER_ADDRESS` is the ONE refusal the renter can clear himself**, so it stops printing
+  the generic «it did not go out» and says what to do: «Your profile has no e-mail address … Add one,
+  then send again», with «Open your profile» beside it as a NEW TAB. `resolveSender` reads
+  `users.email`, and this product registers people by PHONE, so a blank profile is the ordinary case -
+  and the generic sentence sent him to a compose window over something one field fixes.
+  (2) **The tick re-arms on dismissal.** `announced` was a ref set on the first `onShared` and never
+  cleared, so «Keep sharing» - whose whole purpose is to send him back to reach another supplier -
+  led to a send that said nothing at all.
+  Files: `src/components/share/ShareRequestPanel.tsx`, `src/components/create/ShareOnPost.tsx`
+  (`closeTick`), `src/lib/i18n/{en,ar}.ts` (`postShare.mailNoSender`, `mailNoSenderAction`),
+  `tests/unit/share-request-panel.test.tsx` (1 case), `tests/unit/posted-confirmation.test.tsx`
+  (the 2026-09-10 case rewritten, 1 new).
+  🔴 **This OVERTURNS «a second channel is not a second request» (2026-09-10)**, and the evidence is
+  that the case it protected cannot occur: `ShareRequestPanel` calls `onShared` from exactly ONE
+  place, at the end of `send()`, after every channel that press touched. A second call is a second
+  PRESS. What the rule actually suppressed was the report of the next send. The half that survives is
+  pinned by its own case: two calls with no dismissal in between still announce once.
+  ⚠️ **`NO_SENDER_ADDRESS` should be unreachable on a CONNECTED mailbox.** That guard was narrowed to
+  the SES path on 2026-09-09 (`629db61f`, agents backend) because it was refusing connected renters
+  over a field the Graph path never reads. The line is drawn for both paths anyway: **the deployed
+  Lambda is older than that commit**, which is why the owner hit it at all, and the sentence is true
+  either way.
+  🔴 **BACKEND, owed: redeploy `agents-partners`.** Nothing to change in the source - `629db61f` is on
+  `main` and has been since 2026-09-09. Until it ships, a connected renter with no profile e-mail is
+  refused, and now at least he is told why.
+  ⚠️ The English drops the brand («Your profile», not «Your Moedatech profile»): `brand-spelling`
+  walks the two dictionaries IN STEP and fails when an English string names the brand and its Arabic
+  twin does not. Adding «معداتك» to the Arabic would have worked equally; the shorter sentence is
+  better copy and the profile is unambiguous inside this product.
+  ⚠️ The profile link is `target="_blank"`. The request is posted by then, but the panel still holds
+  his picks, his message and the link, and a navigation would drop all of it.
+  ⚠️ Verified: typecheck, lint, 159 cases across the five touched suites. Both fixes break-checked
+  (the re-arm removed, the remedy sentence forced back to the generic one); each went red.
+
+- **2026-09-12 - A connected Outlook stopped being switched off by one dropped request, and a send that did not happen now SAYS so.**
+  Owner: *"outlook is connected but the success modal that it is sent not shown and i didnt find it
+  sent from my outlook"*. Two faults behind that one sentence, and either alone produces it.
+  (1) **`mailConnectStatus` invented a disconnection.** It answered a fabricated
+  `{ connected: false }` for EVERY failure, and `ShareRequestPanel` asks it once, on mount, and never
+  again. So one blip - a cold Lambda, a dropped request - turned a working connection off for the
+  whole page: `emailWillGo` went false, the send took the «not connected» branch, `share-email` was
+  never called, and nothing reached the supplier or his Sent folder. It returns `null` now, which
+  means «we could not find out», and the send RE-READS it before deciding - only when the panel
+  believes it is not connected, so a connected renter pays no extra round trip.
+  (2) **Only the SUCCESS was ever reported.** «Sent from X to N suppliers» was the single outcome
+  this panel stated; every refusal (`NO_RECIPIENTS`, `SEND_REJECTED`, `RECONNECT_REQUIRED`, the three
+  SES domain ones) changed a button's LABEL at most. So «nothing sent» and «nothing pressed» looked
+  identical and the renter had to open his Sent folder to find out. A `sent: false` now draws a red
+  line naming what happened, with the reason code beside it.
+  Files: `src/lib/api/client.ts` (`mailConnectStatus` → `MailConnectStatus | null`),
+  `src/components/share/ShareRequestPanel.tsx`, `src/lib/i18n/{en,ar}.ts` (`postShare.mailNotSent`),
+  `tests/unit/share-request-panel.test.tsx` (2 cases, 130 passing).
+  ⚠️ **The reason code is NOT translated**, same ruling as the add-supplier dialog earlier today: it
+  is the part that makes a screenshot of the line diagnostic.
+  ⚠️ The consent POLL also learned the difference: a `null` mid-poll no longer overwrites what the
+  panel already knows, and counts as denied only for that one answer.
+  ⚠️ `PREVIEW` cannot reach the new line - `setMailer` already refuses it, so the type does not admit
+  it and there is no second guard. A dead comparison reads as a live rule.
+  ⚠️ `emailWillGo` still drives the CONFIRM dialog's wording; the send now decides on `willSend`,
+  which is the same expression over the re-read status. They agree except in the window this fixes.
+  🔴 **NOT reproduced against a live mailbox.** Both halves are pinned by tests and break-checked
+  (the re-read forced off, the line's condition inverted); neither was seen against real Graph. If
+  the owner's case was in fact a refusal rather than a lost status, the new line is what will name it.
+
 - **2026-09-12 - The intake's floor is his sites and two round controls; «Continue» and the labelled upload are gone.**
   Owner, on a screenshot of the intake: *"remove the continue button, remove upload, remove this «Add
   a description or a file». Instead I want a circle icon for + which will be for upload and beside it

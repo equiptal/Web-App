@@ -39,7 +39,7 @@ const api = vi.hoisted(() => ({
     provider: string | null;
     accountEmail: string | null;
     connectedAt: string | null;
-  },
+  } | null,
   connectUrl: null as string | null,
   disconnected: 0,
 }));
@@ -2858,5 +2858,81 @@ describe("the destinations wear their real marks", () => {
 
     const offer = (await screen.findByText(c.mailConnect)).closest("div")!;
     expect(offer.querySelector('img[src="/outlook-logo.webp"]')).toBeTruthy();
+  });
+});
+
+/**
+ * ── A send that did not happen must SAY so, and a dropped status must not turn Outlook off ──────
+ *
+ * Owner, 2026-09-12: *"outlook is connected but the success modal that it is sent not shown and i
+ * didnt find it sent from my outlook"*.
+ *
+ * Two faults behind that one sentence. `mailConnectStatus` answered a fabricated `connected: false`
+ * for every failure, and the panel asks it ONCE on mount — so a single dropped request turned a
+ * working connection off for the whole page, the send took the «not connected» branch, and the
+ * endpoint was never called. And only the SUCCESS was ever reported here: every refusal changed a
+ * button label at most, so «nothing sent» and «nothing pressed» looked identical.
+ */
+describe("when the e-mail does not leave", () => {
+  it("Given a refusal, Then the panel says it did not go out, with the reason", async () => {
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
+    api.mail = { sent: false, reason: "SEND_REJECTED", from: "bandar@zahid.sa", via: "graph", domain: null, dns: [], connectPath: null };
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    fireEvent.click(confirmButton()!);
+
+    await waitFor(() => expect(screen.getByText(new RegExp(c.mailNotSent.slice(0, 24)))).toBeTruthy());
+    // Untranslated on purpose: this is what makes a screenshot of the line diagnostic.
+    await waitFor(() => expect(screen.getByText(/SEND_REJECTED/)).toBeTruthy());
+  });
+
+  it("Given the status read FAILED on mount, Then the send asks again instead of giving up", async () => {
+    /**
+     * `null` is «we could not find out», not «not connected». Before this the panel would have
+     * skipped the endpoint entirely and staged a compose window, with nothing on screen to say that
+     * a connected mailbox had been ignored.
+     */
+    api.connect = null;
+    api.mail = { sent: true, from: "bandar@zahid.sa", via: "graph", recipients: 1, messageId: null, inSentFolder: true, skipped: 0 };
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    // The re-read at send time finds the connection the mount read missed.
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    fireEvent.click(confirmButton()!);
+
+    await waitFor(() => expect(api.mailCalls).toHaveLength(1));
+  });
+});
+
+describe("the one refusal the renter can clear himself", () => {
+  it("Given NO_SENDER_ADDRESS, Then it names the remedy and offers his profile", async () => {
+    /**
+     * Owner, 2026-09-12: *"it is because the user doesnt have email in his profile but once i added
+     * it worked"*. `resolveSender` reads `users.email`, and this product registers people by PHONE,
+     * so a blank profile is common — and the generic sentence would send him to a compose window
+     * over something one field would fix.
+     */
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
+    api.mail = { sent: false, reason: "NO_SENDER_ADDRESS", from: null, via: null, domain: null, dns: [], connectPath: null };
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    fireEvent.click(confirmButton()!);
+
+    await waitFor(() => expect(screen.getByText(new RegExp(c.mailNoSender.slice(0, 30)))).toBeTruthy());
+    const link = screen.getByText(c.mailNoSenderAction).closest("a")!;
+    expect(link.getAttribute("href")).toBe("/profile");
+    // A new tab, never a navigation: the panel still holds his picks, his message and the link.
+    expect(link.getAttribute("target")).toBe("_blank");
+    // The generic sentence is NOT used for this one.
+    expect(screen.queryByText(new RegExp(c.mailNotSent.slice(0, 30)))).toBeNull();
   });
 });

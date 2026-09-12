@@ -509,8 +509,10 @@ export function ShareRequestPanel({
         if (win.closed) {
           void mailConnectStatus()
             .then((st) => {
-              setConnect(st);
-              done(st.connected, st.connected ? "connected" : "denied");
+              /* ⚠️ `null` is «we could not find out», not «not connected» — so it does not overwrite
+                 what the panel already knows, and it is read as denied only for this one answer. */
+              if (st) setConnect(st);
+              done(st?.connected === true, st?.connected ? "connected" : "denied");
             })
             /* He closed it and we cannot tell what happened. «Not connected» is the answer that
                keeps him moving; the compose window opens and the message still goes. */
@@ -529,7 +531,7 @@ export function ShareRequestPanel({
         void mailConnectStatus()
           .then((st) => {
             if (connectTimer.current === null) return;
-            if (!st.connected) return;
+            if (!st?.connected) return;
             setConnect(st);
             /* Consent landed. The window closes itself a moment later; close it now so the renter
                is not left with a stray pop-up over the panel he is coming back to. */
@@ -1046,6 +1048,28 @@ export function ShareRequestPanel({
        * suppliers already in it and he presses Send there. That is the whole reason the two are
        * separate buttons, and it needs no connection, no consent and no confirm step.
        */
+      /**
+       * ── ASK AGAIN before deciding he is not connected (owner, 2026-09-12) ────────────────────
+       *
+       * *"outlook is connected but the success modal that it is sent not shown and i didnt find it
+       * sent from my outlook"*.
+       *
+       * The connection is read ONCE, on mount, and `mailConnectStatus` used to answer a fabricated
+       * `connected: false` for every failure — so one dropped request turned a working connection
+       * off for the whole page. `emailWillGo` then went false, the send took the «not connected»
+       * branch, the endpoint was never called, and nothing reached the supplier or the Sent folder.
+       * Nothing said so, because from here nothing had gone wrong.
+       *
+       * ⚠️ Only when the panel believes it is NOT connected, so a connected renter pays no extra
+       * round trip. `null` still means unknown, and a second unknown leaves today's behaviour.
+       */
+      let live = connect;
+      if (provider === "outlook" && !skipEmail && !live?.connected) {
+        live = (await mailConnectStatus()) ?? live;
+        if (live !== connect) setConnect(live);
+      }
+      const willSend = provider === "gmail" || (!!live?.connected && !skipEmail);
+
       if (provider === "gmail") {
         const opened = openCompose(id, message);
         if (opened) {
@@ -1078,7 +1102,7 @@ export function ShareRequestPanel({
          *
          */
         setConfirming(false);
-      } else if (!emailWillGo) {
+      } else if (!willSend) {
         /**
          * 🔴 **Moedatech only, and nothing else happens** (owner, 2026-09-10). Two ways to land
          * here, and they read the same to the renter because the confirmation said so before the
@@ -2244,6 +2268,55 @@ export function ShareRequestPanel({
                     mailbox. On the SES path we send AS him without touching it, so there is no copy
                     in his Sent folder and saying otherwise would send him looking for one. */}
                 {mailer.inSentFolder && ` ${c.mailInSent}`}
+              </span>
+            </span>
+          )}
+
+          {/* ── A send that did NOT happen says so (owner, 2026-09-12) ────────────────────────────
+              *"outlook is connected but the success modal that it is sent not shown and i didnt find
+              it sent from my outlook"*.
+
+              Only the SUCCESS was ever reported here. Every refusal — `NO_RECIPIENTS`,
+              `SEND_REJECTED`, `RECONNECT_REQUIRED`, the SES domain ones — changed a button's label at
+              most, so «nothing sent» and «nothing pressed» looked identical on screen and the renter
+              was left checking his Sent folder to find out.
+
+              ⚠️ `PREVIEW` cannot reach here: `setMailer` already refuses it, which is why the type
+              does not admit it either. No second guard — a dead comparison reads as a live rule.
+              ⚠️ The reason is NOT translated. It is the part that makes a screenshot of this line
+              diagnostic, which is how the next report arrives already answered. */}
+          {mailer?.sent === false && (
+            <span className="flex items-start gap-1.5 text-meta font-semibold text-danger-deep">
+              <Icon name="error_outline" size={14} className="mt-px flex-none" />
+              <span>
+                {/* ── ONE refusal the renter can clear himself, so it names the REMEDY ───────────
+                    `NO_SENDER_ADDRESS` means his Moedatech profile carries no e-mail. `resolveSender`
+                    reads `users.email`, and this product registers people by PHONE, so a great many
+                    accounts have none — and the generic sentence would send him to a compose window
+                    over something one field would fix. Owner, 2026-09-12: *"it is because the user
+                    doesnt have email in his profile but once i added it worked"*.
+
+                    ⚠️ It should be unreachable on a CONNECTED mailbox — Graph sends from the mailbox
+                    he consented with and that guard was narrowed to the SES path on 2026-09-09
+                    (`629db61f`). It is drawn for both paths anyway: the deployed Lambda is older
+                    than that commit until somebody redeploys it, and the sentence is true either
+                    way. */}
+                {mailer.reason === "NO_SENDER_ADDRESS" ? c.mailNoSender : c.mailNotSent} ({mailer.reason})
+                {mailer.reason === "NO_SENDER_ADDRESS" && (
+                  /* A new tab, never a navigation: the request is posted but the panel still holds
+                     his picks, his message and the link, and leaving would drop all of it. */
+                  <>
+                    {" "}
+                    <a
+                      href="/profile"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline decoration-danger-deep/40 underline-offset-2 hover:decoration-danger-deep"
+                    >
+                      {c.mailNoSenderAction}
+                    </a>
+                  </>
+                )}
               </span>
             </span>
           )}

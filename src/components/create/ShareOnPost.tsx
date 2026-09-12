@@ -109,6 +109,24 @@ export function ShareOnPost({
   const [reached, setReached] = useState(0);
   /** What the server sent, when it sent it: the confirmation states the e-mail as well as the post. */
   const [mail, setMail] = useState<{ from: string; recipients: number; inSentFolder: boolean } | null>(null);
+  /**
+   * ── Guards ONE send against two announcements, not the SECOND send against any ─────────────────
+   *
+   * Owner, 2026-09-12: *"no success modal for sending to outlook only shown on first post"*.
+   *
+   * ~~Set on the first `onShared` and never cleared.~~ The tick's own «Keep sharing» exists to send
+   * the renter back to the panel to reach another supplier, and every send after that was silent:
+   * the mail left, the count rose, and the screen said nothing about the one outcome he cannot see
+   * for himself.
+   *
+   * 🔴 **This overturns the 2026-09-10 ruling «a second channel is not a second request»**, and the
+   * evidence is that the case it protected cannot occur: `ShareRequestPanel` calls `onShared` from
+   * exactly ONE place, at the end of `send()`, after every channel that press touched. So a second
+   * call is a second PRESS, never a second channel of the same press. What that rule actually
+   * suppressed was the announcement of the next send.
+   *
+   * The original job survives: two calls without a dismissal in between still announce once.
+   */
   const announced = useRef(false);
   /* ⚠️ ~~`minted` / `toldHim` / `onAnnouncing`.~~ They existed to queue the project dialog
      behind this one (2026-09-08, earlier the same day). There is no second dialog to queue any
@@ -117,6 +135,11 @@ export function ShareOnPost({
   const isLimit = state.errorDetail?.backendCode === "E8009";
   /** The renter's own firm, for the From line. Read once, and a failure just leaves it unnamed. */
   const [renterName, setRenterName] = useState<string | null>(null);
+  /** Dismiss the tick AND re-arm the announcement, so the next send is reported like the first. */
+  const closeTick = () => {
+    setPosted(false);
+    announced.current = false;
+  };
 
   useEffect(() => {
     if (!waitingToTell) return;
@@ -288,9 +311,7 @@ export function ShareOnPost({
           The message is unchanged, and so is the rule under it. */}
       <Dialog
         open={posted}
-        onClose={() => {
-          setPosted(false);
-        }}
+        onClose={closeTick}
         size="md"
       >
         <div className="flex flex-col items-center px-2 pb-1 pt-4 text-center">
@@ -382,7 +403,7 @@ export function ShareOnPost({
             <button
               type="button"
               onClick={() => {
-                setPosted(false);
+                closeTick();
                   /* `?site=` selects THIS project on the board rather than whichever was touched
                    last. */
                 router.push(`/?site=${encodeURIComponent(filed.id)}`);
@@ -395,9 +416,7 @@ export function ShareOnPost({
           )}
           <button
             type="button"
-            onClick={() => {
-              setPosted(false);
-            }}
+            onClick={closeTick}
             className={cx(btn("primary", "lg", { full: true }), filed ? "mt-2" : "mt-6")}
           >
             {c.postedKeepSharing}

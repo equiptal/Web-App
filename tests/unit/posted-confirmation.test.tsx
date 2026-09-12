@@ -225,7 +225,32 @@ describe("a channel that took the browser away", () => {
     expect(screen.getByText(c.postedLive)).toBeTruthy();
   });
 
-  it("announces once — a second channel is not a second request", async () => {
+  it("announces ONE send once, however many channels it touched", async () => {
+    /**
+     * The half of the 2026-09-10 rule that survives. Two calls with no dismissal in between must
+     * open the tick once - it is the same press being reported twice.
+     */
+    draw();
+    await waitFor(() => expect(screen.getByTestId("panel")).toBeTruthy());
+    hoisted.fire!(1, "email", { handedOff: false, mail: { from: "b@m.net", recipients: 1, inSentFolder: true } });
+    await screen.findByText(titleFrom("b@m.net"));
+
+    hoisted.fire!(9, "whatsapp", { handedOff: true });
+    await act(async () => {});
+    // Still the first send's figures: the second call was refused, as before.
+    expect(screen.getByText(titleFrom("b@m.net"))).toBeTruthy();
+  });
+
+  it("Given the tick was dismissed, Then the NEXT send is announced too", async () => {
+    /**
+     * 🔴 **This overturns «a second channel is not a second request»** (owner, 2026-09-12: *"no
+     * success modal for sending to outlook only shown on first post"*).
+     *
+     * The case that rule protected cannot occur. `ShareRequestPanel` calls `onShared` from exactly
+     * ONE place, at the end of `send()`, after every channel that press touched - so a second call
+     * is a second PRESS, not a second channel. «Keep sharing» exists to send the renter back to
+     * reach another supplier, and what the rule actually suppressed was the report of that send.
+     */
     draw();
     await waitFor(() => expect(screen.getByTestId("panel")).toBeTruthy());
     hoisted.fire!(1, "email", { handedOff: false, mail: { from: "b@m.net", recipients: 1, inSentFolder: true } });
@@ -233,11 +258,8 @@ describe("a channel that took the browser away", () => {
     fireEvent.click(screen.getByText(c.postedKeepSharing));
     await waitFor(() => expect(screen.queryByText(titleFrom("b@m.net"))).toBeNull());
 
-    hoisted.fire!(1, "whatsapp", { handedOff: true });
-    await act(async () => {});
-    fireEvent(window, new Event("focus"));
-    // Still gone: the panel reports a second channel inline, not with the big tick again.
-    await waitFor(() => expect(screen.queryByText(c.postedTitle)).toBeNull());
+    hoisted.fire!(1, "email", { handedOff: false, mail: { from: "b@m.net", recipients: 1, inSentFolder: true } });
+    expect(await screen.findByText(titleFrom("b@m.net"))).toBeTruthy();
   });
 });
 

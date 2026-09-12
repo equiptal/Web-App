@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { VerifiedMark } from "@/components/VerifiedMark";
 import { Dialog } from "@/components/Dialog";
 import { MastheadPill, PageMasthead, RowList, Section } from "@/components/PageSection";
-import { useRouter } from "next/navigation";
 import { useT, useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
@@ -183,7 +182,17 @@ export function CompanyHub({
         <div className="flex flex-col gap-4">
           {/* App parity (companyCreateOwn* keys): the two ways to have a company, in the app's
               order — create your own by verifying, ABOVE joining someone else's. */}
-          <CreateOwnCompanyCard />
+          {/*
+            * — `CreateOwnCompanyCard` was drawn here —
+            *
+            * 🔴 **Removed** (owner, 2026-09-12: *"make one CTA for the verify"*). It said the same
+            * thing as the banner at the top of the profile, in a different shape, a screen apart.
+            * The card's CONTENT won and moved up there; this block keeps «Join a company», which is
+            * the other, genuinely different errand.
+            *
+            * ⚠️ The component is DELETED, not commented out. Its markup lives in the profile
+            * banner now, so keeping a second copy here would be the drift this change removes.
+            */}
           <JoinForm
             busy={busy}
             onJoin={(code, name) => setConfirm(joinSpec(code, name))}
@@ -307,38 +316,6 @@ export function CompanyHub({
 
 // ── State 1: no company → create your own, or join by code ───────────────────
 
-/**
- * "Add your own company" — the other route to having one, and the one the app offers first
- * (`companyCreateOwnTitle/Desc/Cta`). A company is only ever minted by the verification form, so
- * this is a link to `/verify`, not an action of its own.
- *
- * Shown unconditionally in the no-company state: a renter who was already verified would have a
- * company (verification creates it), so reaching this state means verifying is still available to
- * them — whether they've never submitted, or submitted and were rejected.
- */
-function CreateOwnCompanyCard() {
-  const t = useT();
-  const c = t.company;
-  const router = useRouter();
-  return (
-    <button
-      onClick={() => router.push("/verify")}
-      className={btn("secondary", "md", { full: true, className: "flex text-start transition" })}
-    >
-      <span className="grid h-11 w-11 flex-none place-items-center rounded-sm bg-brand text-brand-fg">
-        <Icon name="verified" size={22} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-subhead font-extrabold text-navy">{c.createOwnTitle}</p>
-        <p className="mt-0.5 text-meta leading-relaxed text-muted">{c.createOwnDesc}</p>
-      </div>
-      <span className="inline-flex flex-none items-center gap-1 rounded-sm bg-brand px-3 py-2 text-meta font-semibold text-brand-fg">
-        {c.createOwnCta}
-        <Icon name="arrow_forward" size={15} className="rtl:scale-x-[-1]" />
-      </span>
-    </button>
-  );
-}
 
 function JoinForm({
   busy,
