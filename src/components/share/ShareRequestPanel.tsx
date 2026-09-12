@@ -423,7 +423,7 @@ export function ShareRequestPanel({
    * dance retires with the press it served (owner, 2026-09-10): connecting is its own button now, so
    * the activation is still live here and the consent URL is opened directly.
    */
-  const startConnect = async (pre?: Window | null): Promise<boolean> => {
+  const startConnect = async (): Promise<boolean> => {
     if (connecting) return false;
     setConnecting(true);
     setConnectNote(null);
@@ -442,7 +442,6 @@ export function ShareRequestPanel({
        refusal is an answer, not an exception. */
     const url = await mailConnectUrl(`${window.location.origin}/mail-connected`).catch(() => null);
     if (!url) {
-      pre?.close();
       setConnecting(false);
       setConnectNote("failed");
       return false;
@@ -911,8 +910,8 @@ export function ShareRequestPanel({
       return;
     }
 
-    /**
-     * 🔴 **Opened here, before anything is awaited, or the browser blocks it.**
+    /*
+     * — The blank consent pop-up lived here —
      *
      * 🔴 **Connecting Outlook is its OWN act** (owner, 2026-09-10: *"users are confused when their
      * request is sent with the Outlook at same click, so i want to separate the connect as a

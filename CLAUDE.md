@@ -305,6 +305,101 @@
   reverted in turn, each went red). NOT seen rendered - `/requests` needs a signed-in renter with
   bids on a deployed build, so the third item especially wants a look.
 
+- **2026-09-10 - A direct request from a store answers the machine that was PRESSED, and stops landing on the intake.**
+  Owner: *"we have an issue in direct request, why does it take him to the intake UI"*. Reproduced in
+  a browser against staging (local build, demo renter, Arabian Cranes Co.), which is what separated
+  the two faults hiding behind one symptom. Both were guards written to stop `DirectRequestGate`
+  re-dispatching on every render, and both stopped the SEED as well.
+  (1) **The second press on the same supplier landed on the INTAKE, with an empty box.** The effect
+  began `if (direct?.supplierId === supplierId) return;` — and after the first press `state.direct`
+  already named that supplier, so the seed never ran. The `prefill` fallback sits after the same
+  return, so the box was not even filled with the machine's name: «How would you like to create your
+  request?» under a ribbon reading «This request goes to Arabian Cranes Co. only».
+  (2) **A press with a draft open kept the OLD machine.** `if (!supplierId || draft || seeded.current)
+  return;` — the URL said `capId=183d…` (500 ton) and the canvas showed the 220 ton from the press
+  before it, silently.
+  (3) **`HYDRATE` overwrote the seed.** A child's effect runs before its parent's, so the page seeded
+  and the store's restore effect replaced it a tick later — with the stored draft, or with the stored
+  INTAKE phase. `RfqState.direct`'s own comment has always claimed the opposite (*"a direct run also
+  starts from a CLEAN draft: the mobile flow refuses to restore a stored draft into a direct
+  request"*); now the code obeys it and skips the restore while the URL carries `supplierId`.
+  The guard is the MACHINE now: the URL's `cat/sub/cap` triple against the one already on the draft.
+  A re-render or reload carries the same key and seeds nothing; a different machine seeds and
+  replaces, which is the only reading of the press that can be right.
+  Files: `src/app/create/page.tsx` (`DirectRequestGate`), `src/lib/store/rfq-store.tsx` (the restore
+  effect), `tests/unit/direct-from-store.test.ts` (2 cases).
+  ⚠️ **Verified in the browser, not only in tests**: press 220 ton → canvas 220 ton; «Start over» →
+  press 500 ton → canvas 500 ton (was the intake); with that draft open, press 100 ton → canvas 100
+  ton (was 500). The reducer cases pin the store half; jsdom cannot exercise `useSearchParams` plus
+  the provider's effect ordering, which is where these bugs actually lived.
+  ⚠️ **The stored draft is LEFT in storage** when a direct request skips the restore, so an abandoned
+  direct press does not destroy a broadcast in progress. It is not protected from the persist effect
+  once the direct request is edited — one key holds one draft — so that promise is only good until he
+  answers something.
+  ⚠️ **Found and NOT fixed**: a bare `/create` does not restore a stored draft at all — no canvas, no
+  «Continue your request?» prompt, on a hard reload with the owner's id matching and the row intact
+  in `localStorage`. Confirmed pre-existing by disabling the new guard and reproducing it unchanged.
+  It needs its own pass; the cause is not diagnosed and is not guessed at here.
+
+- **2026-09-10 - «All projects» was a dead button, and the site strip caps itself at TWO ROWS now.**
+  Owner, on a screenshot of the intake: *"it has more projects and when I click All it doesn't open
+  them, I want the projects to be shown 2 rows max then All will open them below it as other rows"*.
+  Two faults in one control.
+  (1) **The press did nothing.** The chip called `onBrowseAll`, which is an OPTIONAL prop, and
+  `Intake` renders `<ProjectChips />` with no handler - so on the first screen a renter meets, «All
+  projects (5)» was a control whose `onClick` was `undefined`. Nothing threw and nothing moved.
+  (2) **`VISIBLE = 6` was a guess at how many chips fit.** At the card's own width six wrapped onto
+  two rows and the seventh onto a third, so the cap that existed to hold the strip to a couple of
+  rows let it grow anyway.
+  Now the cap is the SHAPE it was always described as: every site renders, the strip is clamped to
+  two rows of whatever a chip actually measures (`ResizeObserver` on the strip, `offsetHeight` of the
+  first chip × 2 + the 8px `gap-2`), and the toggle - drawn only when there IS more - unclamps it in
+  place and becomes «Show fewer». The rest arrive as further rows under the two.
+  Files: `src/components/create/ProjectChips.tsx`, `src/lib/i18n/{en,ar}.ts`
+  (`projects.chips.fewer`), `tests/unit/project-chips-rows.test.tsx` (new, 4 cases).
+  ⚠️ **The height is MEASURED, never a constant.** A chip is `py-1 text-label` and what that comes to
+  depends on the face the locale loads - Almarai's line box is not the Latin one - so a pixel
+  constant would clamp two rows in English and one and a half in Arabic.
+  ⚠️ **Unmeasured renders UNCLAMPED.** `twoRowsPx` starts null, and a browser with no
+  `ResizeObserver` keeps it null: showing every site is a smaller fault than hiding some of them with
+  no way to reach them, which is the bug this entry is about.
+  ⚠️ `overflow-hidden` is applied ONLY while clamped. Expanded it would cut off the chosen site's
+  template dropdown, which draws outside the strip's box.
+  ⚠️ `onBrowseAll` is KEPT and still wins when a caller passes one - a surface that wants a full
+  picker can have it - so the in-place expansion is the default rather than a second thing to wire.
+  ⚠️ **jsdom has no layout**, so the clamp itself is not asserted: the new suite stubs
+  `offsetHeight` / `scrollHeight` and `ResizeObserver` to get the component past its measurement, and
+  pins what was broken - every site rendering, the toggle appearing, and the press opening the rest
+  rather than calling nothing.
+
+- **2026-09-10 - A GUEST could not save his own profile: the form posted to the basic-only endpoint,
+  so the server answered "complete your profile" to the request that was completing it.**
+  Owner sent a prod screenshot of `+966566493886` (user 3581) stuck on that error with the زائر badge
+  still showing. Files: `src/components/profile/EditProfileForm.tsx`, `src/lib/api/profile-client.ts`.
+  ⚠️ 🔴 **There are TWO backend endpoints and they are not interchangeable.** `PUT /profile/me`
+  (`/api/me/profile`) is an EDIT and is gated on `requireTier(basic)`; `PUT /users/me/profile`
+  (`/api/profile/complete`) is the guest→basic transition and has no tier gate. `EditProfileForm`
+  always used the first, and `ProfileView.tsx:237` renders that form for every signed-in user with no
+  tier condition - so a guest was shown a form he was not allowed to submit. The 403 is `E8007`
+  TIER_INSUFFICIENT, whose Arabic text is «مستوى حسابك لا يسمح بهذا الإجراء. يرجى إكمال ملفك الشخصي»,
+  which reads as a validation complaint about the form and is not: it is about his tier.
+  ⚠️ **The payloads are IDENTICAL** (firstName, lastName, city, jobTitle, email?, whatsapp?,
+  companyName?), so this is an endpoint swap, not a form change. Nothing about the fields moved.
+  ⚠️ 🔴 **The refresh is half the fix, not a nicety.** `/api/profile/complete` re-reads `/users/me`
+  and re-stamps the `mt_user` cookie, but the client still has to call `session.refresh()` or the
+  page keeps the stale tier: badge still «Guest», every basic-only action still blocked, over a
+  profile that just saved successfully. `OnboardingForm.tsx` already did this after its own submit;
+  the profile tab did not. Landing only the endpoint swap would look fixed and still be broken.
+  ⚠️ **The backend split is deliberate - do NOT "simplify" it by dropping the gate on
+  `PUT /profile/me`.** Mobile honours the same two paths (`profile_bloc.dart:66` completeProfile,
+  `:180` updateProfile), so loosening the gate is a contract change reaching the app for no gain.
+  ⚠️ **The can't-clear guards do not fire for a guest** (`profile.email` etc. are empty, so there is
+  nothing to protect), which is why the first save needs no special-casing beyond the endpoint.
+  Verified: `npm run typecheck` clean. 🔴 **Tests NOT run** - a guard hook refuses `npm test` in this
+  environment - and 🔴 **not exercised in a browser against a real guest account.** The endpoint,
+  its method and its payload were read off `src/app/api/profile/complete/route.ts` and the backend's
+  `completeProfileSchema`, not observed.
+
 - **2026-09-09 - «Didn't say» was OURS, not the supplier's: a bid's own declarations are now the term's value.**
   Owner: *"how can someone not say? it must say yes or no in the form, even in bid he must choose"*.
   He is right about the form and the blank was on our side. The bid form makes every T3 term a

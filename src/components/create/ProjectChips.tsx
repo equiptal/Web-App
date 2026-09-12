@@ -49,12 +49,30 @@ import { projectTitle, projectEnded, endedLast, type ProjectSummary } from "@/li
 import { Icon } from "@/components/ui";
 import { Dropdown } from "@/components/Dropdown";
 
-/** Six, then a way to reach the rest. Enough to cover a renter's live jobs without becoming a list. */
-const VISIBLE = 6;
+/**
+ * ── TWO ROWS, then the rest on demand (owner, 2026-09-10) ───────────────────────────────────────
+ * *"I want the projects to be shown 2 rows max, then All will open them below it as other rows"*.
+ *
+ * ~~`VISIBLE = 6`, and a chip that called `onBrowseAll`.~~ Two faults in one control. The count was
+ * a guess at how many chips fit — at this card's width six wrapped onto two rows and the seventh
+ * onto a third, so the row it was meant to cap grew anyway — and **the press did nothing at all**:
+ * `onBrowseAll` is optional and the intake renders `<ProjectChips />` with no handler, so «All
+ * projects (5)» was a dead button on the one screen a renter meets first.
+ *
+ * The cap is now the SHAPE it was always described as: the strip is clamped to two rows of whatever
+ * height a chip actually is at this font and language, and «All projects» unclamps it in place. The
+ * rest arrive as further rows under the two, which is what he asked for, and no chip is unreachable.
+ */
+const ROWS_COLLAPSED = 2;
+/** `gap-2` on the strip — 0.5rem. Read once here so the clamp and the layout cannot drift apart. */
+const ROW_GAP_PX = 8;
 
 const today = () => new Date().toISOString().slice(0, 10);
 
 export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
+  /* ⚠️ `onBrowseAll` is KEPT and still honoured when a caller passes one — a surface that wants a
+     full picker rather than more rows can have it — but the intake passes none, which is why the
+     expansion below is the default behaviour rather than a second thing to wire up. */
   const t = useT();
   const { user } = useSession();
   const { state, actions } = useRfq();
@@ -66,6 +84,21 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
      and not which row inside it, so the select needs its own memory or it would spring back to
      "pick one" the moment the terms landed. */
   const [picked, setPicked] = useState<string | null>(null);
+  /** Is the strip showing every site, or the first two rows of them? */
+  const [expanded, setExpanded] = useState(false);
+  /**
+   * The height of two rows, measured rather than assumed.
+   *
+   * A chip is `py-1 text-label`, and what that comes to depends on the font the locale loads — Almarai
+   * has a different line box from the Latin face, so a pixel constant would clamp two rows in English
+   * and one and a half in Arabic. `null` means "not measured yet", and an unmeasured strip renders
+   * unclamped: showing every site for one frame is a smaller fault than hiding some of them forever
+   * on a browser with no `ResizeObserver`.
+   */
+  const [twoRowsPx, setTwoRowsPx] = useState<number | null>(null);
+  /** Whether there is anything BEYOND those two rows — the toggle is drawn only when there is. */
+  const [overflows, setOverflows] = useState(false);
+  const strip = useRef<HTMLDivElement | null>(null);
 
   /* `actions` is rebuilt on every render of the store's provider. Listing it as a dependency would
      re-run the fetch on each of those renders; leaving it out silently would age. Held in a ref, the
@@ -123,6 +156,31 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
   }, [chosenId]);
 
   /**
+   * Measure a chip, and ask whether the strip needs more than two rows of them.
+   *
+   * Re-runs on every resize of the strip itself (the card is fluid, and the sidebar-less phone layout
+   * fits two chips where the desktop fits six), and whenever the chips change — a picked site moves
+   * out of the list and into the pill, which can be the difference between two rows and three.
+   */
+  useEffect(() => {
+    const el = strip.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => {
+      const first = el.firstElementChild as HTMLElement | null;
+      const rowH = first?.offsetHeight ?? 0;
+      if (!rowH) return;
+      const cap = rowH * ROWS_COLLAPSED + ROW_GAP_PX * (ROWS_COLLAPSED - 1);
+      setTwoRowsPx(cap);
+      // A 1px tolerance: sub-pixel line boxes otherwise report a two-row strip as overflowing.
+      setOverflows(el.scrollHeight > cap + 1);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
+
+  /**
    * One thing filed at this site applies ITSELF (owner, 2026-09-01).
    *
    * A dropdown with a single row is a question with one answer: the renter opens it, reads the only
@@ -146,8 +204,6 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
   /* The chosen one leads and is not repeated among the rest. Six of the others, which is enough to
      cover a renter's live jobs without becoming a list. */
   const ordered = endedLast(projects, today()).filter((p) => p.id !== chosen?.id);
-  const shown = ordered.slice(0, VISIBLE);
-  const rest = ordered.length - shown.length;
 
   /**
    * Copy how this renter HIRES at this site — never what they are hiring.
@@ -214,10 +270,23 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
     }
   }
 
+  const clamped = !expanded && twoRowsPx != null;
+
   return (
     /* INSIDE the box now, on the floor row (owner, 2026-09-01) — the site is what fills half the
-       request, so it belongs in the thing the request is written in rather than under it. */
-    <div className="flex min-w-0 flex-wrap items-center gap-2">
+       request, so it belongs in the thing the request is written in rather than under it.
+
+       The strip and its toggle stack, so «All projects» sits UNDER the two rows it opens rather than
+       inside them: a control that moves as the thing it controls grows is a control the renter has to
+       find twice. */
+    <div className="flex min-w-0 flex-col items-start gap-2">
+      <div
+        ref={strip}
+        /* `overflow-hidden` only while clamped — expanded it must not cut a dropdown open on the
+           chosen site's pill, which draws outside the strip's box. */
+        className={`flex min-w-0 flex-wrap items-center gap-2${clamped ? " overflow-hidden" : ""}`}
+        style={clamped ? { maxHeight: twoRowsPx } : undefined}
+      >
       {/* ~~«Pick a site, and half of this fills itself in», in an amber chip at the head of the
           row.~~ Removed (owner, 2026-09-02). It was written to give the row a reason to be pressed,
           and it sat in the row it was advertising: an amber pill among the site pills, the same size
@@ -282,7 +351,7 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
         </span>
       )}
 
-      {shown.map((p) => {
+      {ordered.map((p) => {
         const ended = projectEnded(p, today());
         return (
           <button
@@ -302,13 +371,18 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
         );
       })}
 
-      {rest > 0 && (
+      </div>
+
+      {/* Drawn only when there IS more than two rows of sites — and it opens them here, in place.
+          A caller that passed `onBrowseAll` gets its own surface instead; the intake passes none. */}
+      {(overflows || expanded) && (
         <button
           type="button"
-          onClick={onBrowseAll}
+          onClick={() => (onBrowseAll ? onBrowseAll() : setExpanded((v) => !v))}
+          aria-expanded={onBrowseAll ? undefined : expanded}
           className="rounded-full border border-dashed border-border px-3 py-1 text-label font-semibold text-muted transition hover:border-brand hover:text-brand"
         >
-          {t.projects.chips.all} ({rest})
+          {expanded && !onBrowseAll ? t.projects.chips.fewer : `${t.projects.chips.all} (${ordered.length})`}
         </button>
       )}
     </div>

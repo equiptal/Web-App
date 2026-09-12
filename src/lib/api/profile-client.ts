@@ -56,6 +56,19 @@ export function updateProfile(payload: ProfileUpdatePayload) {
   return send<{ user?: { tier?: string }; message?: string }>("/api/me/profile", "PUT", payload);
 }
 
+/**
+ * The SAME fields, on the endpoint a guest is allowed to use.
+ *
+ * ⚠️ `updateProfile` above is `PUT /profile/me`, which the backend gates on `requireTier(basic)` —
+ * so a guest saving his profile for the first time gets 403 E8007 «your account tier does not allow
+ * this action, please complete your profile», about the very request that was completing it. The
+ * guest→basic transition is a different endpoint (`PUT /users/me/profile`, no tier gate), which this
+ * BFF route proxies. Pick by tier at the call site; the payloads are identical.
+ */
+export function completeProfile(payload: ProfileUpdatePayload) {
+  return send<{ user?: { tier?: string } }>("/api/profile/complete", "POST", payload);
+}
+
 export function requestPhoneChange(newPhone: string) {
   return send<{ message?: string }>("/api/me/profile/change-phone", "POST", { newPhone });
 }

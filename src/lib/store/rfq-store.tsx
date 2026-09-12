@@ -1226,6 +1226,25 @@ export function RfqProvider({ children }: { children: ReactNode }) {
         window.history.replaceState(null, "", window.location.pathname);
         return;
       }
+      /**
+        * ── A DIRECT request never rehydrates a stored draft (owner, 2026-09-10) ─────────────────
+        * *"we have an issue in direct request, why does it take him to the intake UI"*.
+        *
+        * This is the rule `RfqState.direct` has always DESCRIBED — *"a direct run also starts from a
+        * CLEAN draft: the mobile flow refuses to restore a stored draft into a direct request"* — and
+        * the code did not obey it. `HYDRATE` runs from the provider, and a child's effect runs before
+        * its parent's, so the create page's seed landed first and this overwrote it a tick later:
+        * the URL named the 100-ton crane the renter had just tapped and the canvas showed the 500-ton
+        * one from the press before, or the stored INTAKE phase, which is the screen he reported.
+        * Reproduced against staging on a local build, then fixed here and re-verified.
+        *
+        * ⚠️ The stored draft is left in storage rather than dropped, so a renter who abandons the
+        * direct request still has his broadcast. It is NOT protected from the persist effect below
+        * once he starts answering the direct one — the same key holds one draft — so the promise in
+        * that comment is only true until this request is edited.
+        */
+      if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("supplierId")) return;
+
       const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
       if (!raw) return;
       const saved = JSON.parse(raw) as Partial<RfqState> & { userId?: number | null };
