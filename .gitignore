@@ -54,3 +54,7 @@ next-env.d.ts
 
 # The screenshot lane's own build dir — it must not contend with `.next` (see next.config.ts)
 .next-preview/
+
+# Typecheck/build probe dirs written by ad-hoc `next build` runs — never committed
+.next-probe/
+.next-probe2/

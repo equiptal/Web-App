@@ -169,13 +169,12 @@ export function itemDetailRows(it: RequestItem, ar: boolean, L: Pick): Row[] {
   ]);
 }
 
-/** The machine's own name, as the enriched taxonomy can give it — or, off-catalogue, as the renter
- *  wrote it (same words in both locales). */
+/** The machine's own name: the enriched taxonomy whenever the line has one, else the renter's own
+ *  words (same words in both locales). Taxonomy first — owner, 2026-09-12. */
 export function itemDisplayName(it: RequestItem, ar: boolean): string {
-  const custom = customEquipmentLabel(it);
-  if (custom) return custom;
   const parts = ar
     ? [it.subtypeNameAr ?? it.subtypeName, it.capacityNameAr ?? it.capacityName]
     : [it.subtypeName, it.capacityName];
-  return parts.filter(Boolean).join(" · ") || (ar ? it.categoryNameAr ?? "" : it.categoryName ?? "") || "—";
+  const taxonomy = parts.filter(Boolean).join(" · ") || (ar ? it.categoryNameAr ?? "" : it.categoryName ?? "");
+  return taxonomy || customEquipmentLabel(it) || "—";
 }

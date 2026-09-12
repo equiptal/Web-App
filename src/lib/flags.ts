@@ -71,3 +71,18 @@ export const HELP_MANUAL_ENABLED = process.env.NEXT_PUBLIC_HELP_MANUAL === "1";
  * link cannot create a trial), and `isTrial` is never sent.
  */
 export const TRIAL_REQUESTS_ENABLED: boolean = false;
+
+/**
+ * EQUIPMENT_NAME_ON_EVERY_LINE — send the renter's own words beside the taxonomy, not instead of it.
+ *
+ * OFF until `backend-agents` ships **B1**, and this is not caution, it is a measured consequence:
+ * `getBidFormPreview` computes `hasCustomEquipment` as *any line carries a name*, and the Supplier OS
+ * suppresses its ENTIRE app handoff on that flag — the QR dialog and «Go To App». The moment every
+ * line carries a name, that flag is true for every request in the product and every bid link loses
+ * its QR. B1 re-derives the flag from the undefined predicate instead; this switch is thrown after it.
+ *
+ * With it off, the payload keeps today's shape — ids OR a name — and every other part of this change
+ * (the card, the reading rule, the gate) is already live and safe, because none of them touches the
+ * wire.
+ */
+export const EQUIPMENT_NAME_ON_EVERY_LINE = process.env.NEXT_PUBLIC_EQUIPMENT_NAME_EVERY_LINE === "1";

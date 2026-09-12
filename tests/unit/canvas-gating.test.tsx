@@ -352,13 +352,14 @@ describe("the canvas is an accordion", () => {
       draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
       prepare: complete,
     });
-    // Equipment starts open: its controls are on screen.
-    expect(screen.getByText("CATEGORY")).toBeTruthy();
+    /* Equipment starts open: its controls are on screen. Read by TYPE since 2026-09-12 — CATEGORY was
+       removed from the card, and TYPE is the first control the panel owns. */
+    expect(screen.getByText("TYPE")).toBeTruthy();
 
     await handle.run(() => screen.getByText("Where it goes").closest("button")!.click());
 
     expect(handle.store().state.activeSection).toBe("where");
-    expect(screen.queryByText("CATEGORY")).toBeNull();
+    expect(screen.queryByText("TYPE")).toBeNull();
     // And it says what it holds, so the renter need not open it to check. Read out of the STRIP:
     // the tab for this equipment (added 2026-09-09) names the same type and size, and `getByText`
     // refuses two matches — which is correct, and not a duplicate to be removed.
@@ -375,12 +376,12 @@ describe("the canvas is an accordion", () => {
     // Opened in its own step: batching it with setChargedDaysUnderstood lets the auto-return effect
     // (accepting the figure sends you back to equipment) fire and undo it.
     await handle.run(() => handle.store().actions.openSection("when"));
-    expect(screen.queryByText("CATEGORY")).toBeNull();
+    expect(screen.queryByText("TYPE")).toBeNull();
 
     await handle.run(() => screen.getByText("The equipment & operator").closest("button")!.click());
 
     expect(handle.store().state.activeSection).toBe("equipment");
-    expect(screen.getByText("CATEGORY")).toBeTruthy();
+    expect(screen.getByText("TYPE")).toBeTruthy();
   });
 
   // A refusal shakes the blocking fields, which cannot happen while they are unmounted.
@@ -389,11 +390,11 @@ describe("the canvas is an accordion", () => {
       draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
       prepare: (store) => store.actions.openSection("when"),
     });
-    expect(screen.queryByText("CATEGORY")).toBeNull();
+    expect(screen.queryByText("TYPE")).toBeNull();
 
     await handle.run(() => screen.getByText("Where it goes").closest("button")!.click());
 
     expect(handle.store().state.activeSection).toBe("equipment");
-    expect(screen.getByText("CATEGORY")).toBeTruthy();
+    expect(screen.getByText("TYPE")).toBeTruthy();
   });
 });

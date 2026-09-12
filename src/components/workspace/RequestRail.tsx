@@ -241,11 +241,27 @@ export function RequestRail({
                            one enlarges the margin rather than the machine. What changed is that the
                            two are now distinguishable — `imageIsPhoto` is set where the payload gave
                            an equipment photograph — so each takes the fit it needs instead of one
-                           rule being wrong for half the catalogue. */
+                           rule being wrong for half the catalogue.
+
+                           ── The DRAWING fills its circle too (owner, 2026-09-12) ─────────────────
+                           *"make sure all photos fit well in the circle, as some have squared edges
+                           and some fit well."* Measured on staging: the taxonomy drawings are WIDE —
+                           `spider-crane.png` is 1024×559, 1.83:1, the same shape as the photographs —
+                           so `contain` inside a 52px box drew them 52×28, a letterbox with its own
+                           straight top and bottom edge showing through a round hole. That edge is the
+                           «squared» one; the photographs beside them, on `cover`, filled properly.
+                           `p-1` made it worse by shrinking the box first.
+
+                           The padding is gone and the drawing is scaled to cover the circle's
+                           diameter — 1.34 ≈ 52 ÷ 28, the exact factor that turns that letterbox into
+                           a filled round tile. It is NOT switched to `object-cover`: tried on the
+                           live rail and the crop cut the machine into an unreadable jumble, which is
+                           what the note above predicted. `contain` keeps the whole machine and the
+                           scale gives it the circle. */
                         className={
                           tile.imageIsPhoto
                             ? "h-[52px] w-[52px] rounded-full object-cover"
-                            : "h-[52px] w-[52px] object-contain p-1"
+                            : "h-[52px] w-[52px] scale-[1.34] object-contain"
                         }
                       />
                     ) : (

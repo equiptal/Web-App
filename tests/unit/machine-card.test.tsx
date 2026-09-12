@@ -193,8 +193,6 @@ describe("taxonomy — one pick, category derived (MREQ-AC-20/21)", () => {
     await card();
     expect(screen.getByText("Crawler excavator")).toBeTruthy();
     expect(screen.getByText("30 ton")).toBeTruthy();
-    // CATEGORY renders the taxonomy's `tag`, which is what the prototype shows there.
-    expect(screen.getByText("Earthmoving")).toBeTruthy();
   });
 
   // The renter picks a TYPE and nothing else, so the list spans every category rather than being
@@ -204,21 +202,28 @@ describe("taxonomy — one pick, category derived (MREQ-AC-20/21)", () => {
     expect(await optionsOf(handle, "TYPE")).toEqual(["Crawler excavator", "Wheel loader", "Mobile crane"]);
   });
 
-  it("offers no category control at all — it is derived", async () => {
+  /**
+   * 🔴 ~~CATEGORY is a read-only box showing the taxonomy's tag.~~ REMOVED from the card 2026-09-12
+   * (owner): the renter picks a TYPE and the category follows from it, so the box restated a fact the
+   * TYPE beside it already carried — and the freed column now holds «Doesn't match what I want?».
+   * The id is still derived and still sent; only the display went.
+   */
+  it("offers no category control at all — and no longer shows the tag either", async () => {
     await card();
-    expect(screen.getByText("CATEGORY")).toBeTruthy();
+    expect(screen.queryByText("CATEGORY")).toBeNull();
+    expect(screen.queryByText("Earthmoving")).toBeNull();
     expect(screen.queryByRole("combobox", { name: "CATEGORY" })).toBeNull();
   });
 
-  it("sets BOTH ids from one pick, and re-tags the category", async () => {
+  it("sets BOTH ids from one pick — the category is derived, and no longer drawn", async () => {
     const handle = await card();
     await pick(handle, "TYPE", "Mobile crane");
 
     const ref = handle.store().state.draft!.items[0].ref;
     expect(ref.subcategoryId).toBe("sub-mobile-crane");
     expect(ref.categoryId).toBe("cat-lifting");
-    // The derived category follows, shown as that branch's tag.
-    expect(screen.getByText("Lifting, Cranes & Aerial")).toBeTruthy();
+    // The category still FOLLOWS the pick; since 2026-09-12 it is simply not shown on the card.
+    expect(screen.queryByText("Lifting, Cranes & Aerial")).toBeNull();
     expect(handle.store().state.draft!.touchedFields).toContain("line_items[a0].subtype");
   });
 
@@ -282,7 +287,13 @@ describe("logistics — the prototype's labels and options (MREQ-AC-62/63)", () 
     await card();
     expect(screen.getByText("DELIVERY TO SITE")).toBeTruthy();
     expect(screen.getByText("RETURN FROM SITE")).toBeTruthy();
-    expect(screen.getByText("FUEL RESPONSIBILITY")).toBeTruthy();
+    /**
+     * ~~«FUEL RESPONSIBILITY».~~ Shortened to «FUEL PAID BY» (owner, 2026-09-12, on a screenshot of
+     * it wrapping): measured in the browser, the fuel box gives its label 119px and the old string
+     * needed 133px, so it drew on two lines at full desktop width while the two legs beside it
+     * stayed on one. Not «FUEL» alone — this card already labels the fuel TYPE control that.
+     */
+    expect(screen.getByText("FUEL PAID BY")).toBeTruthy();
     // Three choices, each Supplier then Me — never the other way round.
     expect(screen.getAllByRole("button", { name: "Supplier" }).length).toBe(3);
     expect(screen.getAllByRole("button", { name: "Me" }).length).toBe(3);
@@ -291,7 +302,7 @@ describe("logistics — the prototype's labels and options (MREQ-AC-62/63)", () 
   // `PARTIES` is ["me","supplier"], so mapping it in array order silently reversed every pair.
   it("puts Supplier before Me in every pair", async () => {
     await card();
-    for (const label of ["DELIVERY TO SITE", "RETURN FROM SITE", "FUEL RESPONSIBILITY"]) {
+    for (const label of ["DELIVERY TO SITE", "RETURN FROM SITE", "FUEL PAID BY"]) {
       const field = screen.getByText(label).closest("div")!.parentElement!;
       const names = within(field)
         .getAllByRole("button")
@@ -305,7 +316,7 @@ describe("logistics — the prototype's labels and options (MREQ-AC-62/63)", () 
     const { view } = await card();
     const row = view.container.querySelector('[class*="2fr_1fr"]');
     expect(row).toBeTruthy();
-    for (const label of ["DELIVERY TO SITE", "RETURN FROM SITE", "FUEL RESPONSIBILITY"]) {
+    for (const label of ["DELIVERY TO SITE", "RETURN FROM SITE", "FUEL PAID BY"]) {
       expect(row!.contains(screen.getByText(label))).toBe(true);
     }
   });

@@ -1940,6 +1940,7 @@ export const ar: Dictionary = {
     chips: {
       label: "المشروع",
       ended: "منتهي",
+      pick: "اختر مشروعك",
       all: "كل المشاريع",
       fewer: "عرض أقل",
     },
@@ -2015,6 +2016,7 @@ export const ar: Dictionary = {
       type: "النوع",
       size: "الحجم",
       searchTypes: "ابحث في الأنواع…",
+      useMyOwnName: "لا يطابق ما أريد؟ استخدم اسم معدتي",
       addCustomType: "أضف نوع معدّة مخصّصاً",
       searchSizes: "ابحث في الأحجام…",
       fuel: "الوقود",
@@ -2029,7 +2031,9 @@ export const ar: Dictionary = {
       logistics: "الخدمات اللوجستية",
       delivery: "التوصيل إلى الموقع",
       returnFromSite: "الإعادة من الموقع",
-      fuelResponsibility: "مسؤولية الوقود",
+      // «الوقود على» + «المورد / أنا» — the product's own vocabulary for a party term, and shorter
+      // than «مسؤولية الوقود» for the same reason the English was shortened.
+      fuelResponsibility: "الوقود على",
       attachment: "الملحق",
       workType: "نوع العمل",
       workTypePlaceholder: "ماذا سترفع؟",
@@ -2176,7 +2180,10 @@ export const ar: Dictionary = {
     all: "الكل",
     registeredVendors: "المورّدون المعتمدون",
     colSupplier: "المورّد",
-    colVendor: "اعتماد المورّد",
+    /* «اعتماد المورّد» read as an approval somebody grants — the owner could not tell what the
+       column was for (2026-09-12). The English is «Vendor registration», and this is his own
+       wording for it: the renter's own record that he has registered this firm as a vendor. */
+    colVendor: "تسجيل المورّد",
     colPhone: "الجوال",
     colEmail: "البريد",
     colContact: "الاتصال",

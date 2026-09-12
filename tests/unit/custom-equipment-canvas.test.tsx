@@ -51,11 +51,11 @@ describe("naming a machine the catalogue does not carry", () => {
        saying why the first way came up empty. Two separate cards read as two unrelated asks. */
     expect(screen.getAllByText("TYPE").length).toBeGreaterThan(0);
     expect(screen.getAllByText("SIZE").length).toBeGreaterThan(0);
-    /* ── Where the notice lives, third time (owner, 2026-09-08) ───────────────────────
-       A block under the field → pinned to the label → and now the field’s own hint line, in place of
-       «this name is what your supplier will see», which the owner had removed: *"remove this and put
-       the note in its place"*. So: the list, then the box, then the note under it. */
-    const order = ["TYPE", "Name the equipment you need", "This equipment type is not available"].map((needle) =>
+    /* ── The NAME leads the box (owner, 2026-09-12) ────────────────────────────────────
+       It stopped being a field that appears when the catalogue fails and became «what the renter
+       calls this machine», on every line — so it sits ABOVE the two lists, with the note as its own
+       hint. Reads: the box, its note, then TYPE and SIZE under them. */
+    const order = ["Name the equipment you need", "This equipment type is not available", "TYPE"].map((needle) =>
       document.body.innerHTML.indexOf(needle),
     );
     expect(order.every((i) => i >= 0)).toBe(true);

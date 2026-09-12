@@ -62,9 +62,10 @@ function mapRow(raw: Record<string, unknown>): InboxBid {
   const eq = (raw.equipment ?? {}) as Record<string, unknown>;
   const items = Array.isArray(req.equipmentItems) ? (req.equipmentItems as Record<string, unknown>[]) : [];
   const item0 = items[0] ?? {};
-  // Off-catalogue: the request's line has no taxonomy at all, so the renter's own words are the only
-  // name it has — in both locales, since he typed one language.
-  const custom = item0.isUndefined === true ? s(item0.customEquipmentName) : null;
+  /* His own words, read ONLY when the line carries no taxonomy name (owner, 2026-09-12) — in both
+     locales, since he typed one language. Not keyed on `isUndefined`: a hidden line is undefined and
+     still has a catalogue name, and the name is what a row is read by. */
+  const custom = s(item0.subtypeName) || s(item0.categoryName) ? null : s(item0.customEquipmentName);
   const equipmentName =
     [s(eq.manufacturer), s(eq.modelName)].filter(Boolean).join(" ") ||
     custom ||

@@ -2,6 +2,184 @@
 
 ## Change log
 
+- **2026-09-12 - The intake's floor is his sites and two round controls; «Continue» and the labelled upload are gone.**
+  Owner, on a screenshot of the intake: *"remove the continue button, remove upload, remove this «Add
+  a description or a file». Instead I want a circle icon for + which will be for upload and beside it
+  a circle arrow to send, all on the right; and on the left on the same row the project pills with the
+  sentence «select your project» beside them."*
+  ~~Two rows for two presses~~: the box's floor carried «Upload RFQ» opposite the site chips, and
+  under it a row of its own holding a full-width «Continue» with «Add a description or a file» at the
+  far end of it. One row now: the chips are led by `projects.chips.pick` («Select your project» /
+  «اختر مشروعك»), and a 40px `+` and a 40px brand arrow sit against the trailing edge.
+  ⚠️ **The sentence that used to stand beside Continue is the arrow's `title` and `aria-label`.** A
+  disabled button with nothing near it reads as broken, and a round control has no room for a line of
+  text - so the reason is on the control itself: `intake.addSomething` while the box is empty, and
+  «Continue» / «Re-analyse» once it is not. Both attributes are set, so the hovering renter and the
+  screen reader are told the same thing.
+  ⚠️ `intake.reading` is no longer READ - the busy state is the hourglass glyph alone, with the label
+  frozen at whatever the press would have said. Left in the dictionary rather than swept.
+  ⚠️ The arrow keeps `rtl:scale-x-[-1]`, and only while it is an arrow: the hourglass must not mirror.
+  Files: `src/components/screens/Intake.tsx`, `src/lib/i18n/{en,ar}.ts` (`projects.chips.pick`),
+  `tests/unit/intake-floor.test.ts` (new).
+  ⚠️ The cases read the SOURCE, not a render: `Intake` pulls the rfq store, the session, the project
+  list and a file input, and what is under test is a layout ruling - which controls exist and where.
+  ⚠️ Verified: typecheck, lint, and the full suite serially (3242 passing; the one failure is
+  `ui-pins.test.ts`, pre-existing CRLF staleness confirmed on a clean tree on 2026-09-10). NOT seen
+  rendered, and NOT break-checked.
+
+- **2026-09-12 - «Add a supplier» says what the SERVER said, instead of «try again» for five different failures.**
+  Owner, forwarding a beta user (+966 53 586 9745) stuck on «لم يُحفظ. صفوفك ما زالت هنا: حاول مرة
+  أخرى» while the same act worked from his own account.
+  `AddSuppliersDialog`'s save ended in a bare `catch {}` that printed one sentence for every non-2xx.
+  FIVE different failures reach it and the screen could not tell them apart: the relay's **401** (no
+  session id), the handler's **404** («المستخدم غير موجود» - the user row is not in the tenant that
+  Lambda reads), a **422** from the schema, a **500** from the unguarded `createMany`, and a dropped
+  connection. A day went into guessing between them from source, and the one screen that had been
+  TOLD the answer had thrown it away.
+  (1) `projectFetch` now carries the backend's own `message` / `messageAr` / `details` into
+  `ApiError`, which has always had fields for them. **Both envelopes**, because two reach it: the
+  agents relay forwards `{ success:false, error:{ code, message, messageAr, details } }` verbatim,
+  while this app's own routes answer a flat `{ code, detail, messageAr }`.
+  (2) The dialog prints that sentence in the reader's language, with **`CODE · HTTP n` beside it**.
+  That suffix is not prose and is deliberately untranslated: it is the part that makes a screenshot
+  of this dialog diagnostic.
+  Files: `src/lib/api/client.ts` (`projectFetch`),
+  `src/components/suppliers/AddSuppliersDialog.tsx`,
+  `tests/unit/add-suppliers-error.test.tsx` (new, 5 cases).
+  ⚠️ **A per-row refusal is untouched.** The endpoint answers 200 with `rejected[]`, and
+  `refusalLine` still names each row and its reason. Only a THROWN request reaches the new branch.
+  ⚠️ A body with no reason at all (a dropped connection, an unreadable upstream) still falls back to
+  `addFailed`, which is the sentence that tells the renter his typing is safe. A case pins it.
+  ⚠️ `projectFetch` is SHARED - every project, work-order, award and renter-supplier call throws
+  through it. The change only ADDS fields to the error; nothing reads them yet but this dialog.
+  ⚠️ `LocaleProvider` overrides `initialLocale` on mount, so the Arabic case sets
+  `localStorage["moedatech.locale"]` the way `tests/setup/canvas.tsx` does. `initialLocale` alone
+  silently renders English and the assertion passes for the wrong reason.
+  🔴 **This does not fix the user's problem; it makes the next report carry its own diagnosis.**
+  Still unknown which of the five he hit - the response body was never captured and the database is
+  behind a permission block here.
+  🔴 **BACKEND, two tickets, neither touched (different repo):**
+  · `bulkRenterSuppliers.ts:233` - `prisma.renterSupplier.createMany` has NO try/catch, so one
+  constraint failure falls to the outer catch and 500s a partial-success endpoint, losing every good
+  row. That file's own header says this must never happen.
+  · `apps/backend/serverless.yml:272` declares
+  `TENANT_ID: ${env:TENANT_ID, ssm:/moedatech/${stage}/tenant/id, 'default'}`, while
+  `apps/backend-agents/serverless.yml` declares **no `TENANT_ID` at all** - so the service that
+  CREATES users can be stamped from SSM while the service that WRITES suppliers is pinned to
+  `'default'` by omission, and every agents handler that filters on tenant would refuse those
+  accounts. Verify the SSM value before acting: if it is `default`, this is harmless today.
+
+- **2026-09-12 - The suppliers table lines up in Arabic, and the vendor column says what it is.**
+  Owner, on the RTL table: *"fix this ui, the order is different in columns + vendor registered is
+  not clear in arabic تسجيل المُورِّد or like this"*.
+  (1) **One attribute in the wrong place, two columns out of line.** «الجوال» and «البريد» sat
+  against the RIGHT edge of their columns while their values sat against the LEFT. Both cells put
+  `dir="ltr"` on the BLOCK, and `text-align: start` resolves against the element's OWN direction - so
+  an ltr block inside an rtl table starts on the left while its `text-start` header starts on the
+  right. The direction is genuinely needed: a `+966…` number must not be reordered by the Arabic
+  around it. It moves to a `<bdi>`, which is the element for exactly this - it isolates the run's
+  direction and leaves the block's alignment to the page.
+  (2) **«اعتماد المورّد» → «تسجيل المورّد».** «اعتماد» reads as an approval somebody grants, and he
+  could not tell what the column was for. The English has always been «Vendor registration»: the
+  RENTER's own record that he has registered this firm, which is what the tick on the row sets. His
+  own wording, taken as given.
+  Files: `src/components/suppliers/SuppliersPage.tsx`, `src/lib/i18n/ar.ts`,
+  `tests/unit/suppliers-rtl-columns.test.ts` (new, 6 cases).
+  ⚠️ **Deleting the `dir` would "fix" the alignment and break the number** - `+966535869745` in an
+  RTL run without isolation can render with the `+` adrift. A case pins that the direction survives.
+  ⚠️ The other four columns were never misaligned: they carry Arabic or a dash, so they inherit the
+  table's direction and land on the same edge as their headers. Only the two ltr runs drifted, which
+  is why it read as «the order is different» rather than as a broken table.
+  ⚠️ `vendorShort` («مورّد معتمد»), `registeredVendors` and the toast strings are NOT changed - he
+  named the COLUMN. If «معتمد» is wrong there too it is a second pass, and one worth asking about
+  rather than assuming.
+  ⚠️ jsdom resolves no bidi and no `text-align: start`, so the cases read the SOURCE: the alignment
+  is a rendered fact they cannot measure, and what they pin is the rule that decides it.
+  ⚠️ Verified: typecheck, lint, 6 new cases plus the suppliers suite (10 passing), and the alignment
+  pin break-checked by putting `dir` back on the block - two cases went red. The suite's one
+  unhandled error is PRE-EXISTING (confirmed against a stashed tree on 2026-09-09).
+
+- **2026-09-12 - Every request tile fills its circle: the taxonomy drawing stops being a letterbox.**
+  Owner: *"make sure all photos fit well in the circle as some have squared edges and some fit well"*.
+  **Measured on staging before touching anything**, and the measurement is what settled it. The rail
+  draws THREE kinds of tile, and two of them are the same SHAPE while taking different fits:
+   · a photograph - `.jpeg`, 1408×768, **ratio 1.83** - on `object-cover`: scaled to 95px wide inside
+     the 52px circle, sides cropped, machine filling the mask. This is the one that «fits well».
+   · a taxonomy drawing - `spider-crane.png`, 1024×559, **ratio 1.83, the same shape** - on
+     `object-contain p-1`: drawn **52×28**, a letterbox whose own straight top and bottom edge shows
+     through a round hole. THAT is the «squared edge», and `p-1` shrank the box before `contain` even
+     had its say.
+   · no artwork - the `precision_manufacturing` icon (5 of 39 tiles on his account). A different
+     state, deliberately left alone.
+  The padding is gone and the drawing takes `scale-[1.34]` - 52 ÷ 28, the exact factor that turns
+  that letterbox into a filled round tile.
+  🔴 **`object-cover` for the drawings was TRIED on the live rail and rejected.** Injected it, looked
+  at it: the crop cut the machine into an unreadable jumble, exactly as the component's own 2026-08-31
+  note predicted («cropping one enlarges the margin rather than the machine»). `contain` keeps the
+  whole machine; the scale gives it the circle. Both candidates are recorded in the test so the next
+  reader does not re-run the experiment.
+  Files: `src/components/workspace/RequestRail.tsx`, `tests/unit/request-rail-fit.test.ts` (new, 4).
+  ⚠️ Scaling PAST the box is only safe because the parent is `overflow-hidden rounded-full`; without
+  that clip the drawing would spill over the tile's border and its own count badge. A case pins it.
+  ⚠️ jsdom lays out no images, so the cases read the SOURCE. The fit is a rendered fact and the live
+  rail is what judged it - what is assertable here is that the two rules are the ones that test chose.
+  ⚠️ Verified: typecheck, lint, 50 passing across `request-rail-fit`, `workspace` and `request-label`,
+  and the fit pin break-checked by restoring `object-contain p-1` - two cases went red.
+  ⚠️ The suite crashed once with «Worker exited unexpectedly» - the machine was low on memory, not a
+  code fault. `--no-file-parallelism` is the honest gate on this machine, as on 2026-09-09.
+
+- **2026-09-12 - The renter's own words ride EVERY line, the card leads with them, and CATEGORY is gone.**
+  Owner, on the create flow: *"i want the custom type field to be always at top... it is now the user
+  input of the equipment name not only the ones that don't exist in our taxonomy"*, *"for the
+  category-type-size i wanna have them type-size only"*, *"if taxonomy is sent then always read the
+  taxonomy, if null then the custom"*, *"no custom type is required, it can be null, but one of the
+  custom field or the taxonomy must be sent"*, and *"hidden or free text, both are undefined"*.
+  **The field changed MEANING**, which is what makes the rest follow: it was «the name of a machine we
+  do not carry» and is now «what the renter calls this machine». So it is the first thing on the card
+  on every line, starred only when there is no taxonomy behind it, and it reads:
+  what he typed → the words his RFQ used → the pick itself («Crawler excavator 20 ton»), so a line
+  added BY HAND fills its own name instead of asking him to retype what he just chose from two lists.
+  Two rules, and they are different questions:
+  · **READ** — the taxonomy whenever the line has one, HIDDEN included; his words only when it has
+    none. Six readers moved: `requests.itemName`, `request-fields.itemDisplayName`, `inbox`,
+    `sibling-tabs`, `bid-map.requestTypeWord`, `BidMapWorkspace`, and `deal-room` (which read the name
+    FIRST - harmless while the two could never coexist, and wrong from the day they can).
+  · **SEND** — whatever the line holds; the backend asks only that ONE of them is present
+    (`hasValidEquipmentIdentity`) and stores them in separate columns.
+  CATEGORY left the card (it is derived from the TYPE and still sent), and its column now holds
+  «Doesn't match what I want? Use my own name of equipment» - one press clears the taxonomy, turns the
+  line off-catalogue and raises the orange note under the name box.
+  Files: `src/components/create/MachineCard.tsx`, `src/components/create/hooks.ts` (`pickedName`),
+  `src/lib/store/rfq-store.tsx`, `src/lib/contract/{requests,request-fields,inbox,sibling-tabs,bid-map,deal-room,gates}.ts`,
+  `src/components/map/BidMapWorkspace.tsx`, `src/lib/api/app-adapters.ts`, `src/lib/flags.ts`,
+  `src/lib/i18n/{en,ar}.ts`, `tests/unit/equipment-name-every-line.test.ts` (new, 10 cases),
+  `tests/unit/{off-catalogue-from-type,custom-equipment-canvas,machine-card,canvas-gating}.test.*`.
+  Plan: `docs/plans/equipment-name-always/plan.md`.
+  Trap: **`isUndefined` is about BEHAVIOUR, never about display.** A hidden line is undefined - no
+  dispatch, no deal room, no QR - and still has a catalogue name the renter must read it by. Every
+  reader keyed on that flag printed his words for such a line; they ask «is there a taxonomy name»
+  now, which is also the owner's rule verbatim.
+  Trap: 🔴 **picking a type no longer clears the name** (reversing 2026-09-06's «all three move
+  together»). His words are not made untrue by a match; the taxonomy simply wins for reading.
+  🔴 **«Add a custom equipment type» in the TYPE search is REMOVED** (added 2026-09-09). It opened a
+  box that only existed on an off-catalogue line; the box is on the card at all times now, so the row
+  was a second door into a room he is already standing in.
+  ⚠️ **The WIRE half is held behind `NEXT_PUBLIC_EQUIPMENT_NAME_EVERY_LINE` (default OFF)** and must
+  not be thrown before backend-agents ships B1. `getBidFormPreview.hasCustomEquipment` is «any line
+  carries a name», and the Supplier OS suppresses its ENTIRE app handoff on it - so the day every line
+  carries a name, every bid link in the product loses its QR and «Go To App», for 300s longer than the
+  rollback. Everything else here is live and safe because none of it touches the wire.
+  ⚠️ **Backend, owed, in this order**: (B1) re-derive `hasCustomEquipment` from the undefined
+  predicate; (B2) `isUndefinedEquipment` gains the HIDDEN test so dispatch skips a hidden line the way
+  it skips a nameless one - until B2, a hidden id on a request notifies exactly the suppliers the flag
+  exists to protect, so the AGENT's `includeHidden` must not ship first either; then the projections
+  keeping a hidden node's names and image, and `getBidForm`'s label becoming
+  `taxonomyName ?? customEquipmentName`.
+  ⚠️ Found while planning, NOT fixed: `browseEquipment` filters HIDDEN only when a category filter is
+  supplied, so an admin-created listing under a hidden node is browsable and its store press can put a
+  hidden subtype on a request today. Suppliers cannot self-list there (both pickers read the
+  renter-visible tree), so it needs RelayPanel to have made one.
+
 - **2026-09-12 - A DIRECT request's machine is the LISTING's: the taxonomy is locked, and changing it is a trip to that supplier's store and back.**
   Owner: *"in direct request he cant change the taxonamy right? it is filled from equipment he
   selected so if he want to change will be bacl to store"*, then *"match the app"*. He was describing

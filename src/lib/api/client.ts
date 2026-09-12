@@ -834,10 +834,29 @@ async function projectFetch<T>(url: string, init: ProjectFetchInit = {}): Promis
 
   let code: string | undefined;
   let details: unknown;
+  /**
+   * The backend's own words, kept rather than dropped.
+   *
+   * ⚠️ Both envelopes, because two of them reach here. The agents relay forwards the upstream body
+   * verbatim — `{ success: false, error: { code, message, messageAr, details } }` — while this app's
+   * own routes answer a flat `{ code, detail, messageAr }`. Reading only the flat one is how a
+   * refusal that HAD a reason arrived as a bare status: «المستخدم غير موجود» became «try again».
+   */
+  let detail: string | undefined;
+  let messageAr: string | undefined;
   try {
-    const body = (await res.json()) as { code?: string; error?: { code?: string }; details?: unknown };
+    const body = (await res.json()) as {
+      code?: string;
+      detail?: string;
+      message?: string;
+      messageAr?: string;
+      details?: unknown;
+      error?: { code?: string; message?: string; messageAr?: string; details?: unknown };
+    };
     code = body.code ?? body.error?.code;
-    details = body.details;
+    details = body.details ?? body.error?.details;
+    detail = body.detail ?? body.message ?? body.error?.message;
+    messageAr = body.messageAr ?? body.error?.messageAr;
   } catch {
     /* non-JSON body */
   }
@@ -860,6 +879,9 @@ async function projectFetch<T>(url: string, init: ProjectFetchInit = {}): Promis
   throw new ApiError(res.status >= 500 ? "network" : "unknown", `HTTP ${res.status}`, {
     status: res.status,
     backendCode: code,
+    detail,
+    messageAr,
+    details,
   });
 }
 

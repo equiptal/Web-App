@@ -46,7 +46,12 @@ export function isCustomLine(item: EquipmentItem): boolean {
 }
 
 /**
- * The name an off-catalogue line goes out under, trimmed. Empty string when there is none, which is
+ * The name an off-catalogue line goes out under, trimmed.
+ *
+ * ⚠️ Since 2026-09-12 EVERY line may carry a name — it is «what the renter calls this machine», not
+ * «the name of a machine we do not carry». This helper still answers only the off-catalogue question:
+ * is there a name to post a line that has no taxonomy? What a line SENDS is `app-adapters`' business,
+ * and what a screen READS is `equipmentName`'s: taxonomy first, his words when there is none. Empty string when there is none, which is
  * what blocks the line and keeps it out of the post.
  *
  * `rawLabel` is the seed, not a second answer: it is the renter's OWN words as they appeared in his

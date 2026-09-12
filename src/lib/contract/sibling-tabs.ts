@@ -83,11 +83,11 @@ export function siblingTabLabel(request: SiblingRequestLike, requestId: string):
   const first = items[0];
   if (first) {
     const join = (type: unknown, capacity: unknown) => [txt(type), txt(capacity)].filter(Boolean).join(" · ");
-    // Off-catalogue: the renter's own words, in both locales, since the taxonomy has no name to give.
-    // Read inline rather than through `customEquipmentLabel` — this file imports nothing on purpose.
-    const custom = first.isUndefined === true ? txt(first.customEquipmentName) : "";
-    const en = custom || join(first.subtypeName ?? first.categoryName, first.capacityName);
-    const ar = custom || join(first.subtypeNameAr ?? first.categoryNameAr, first.capacityNameAr);
+    /* Taxonomy first; his own words only when there is none, in both locales (owner, 2026-09-12).
+       Read inline rather than through `customEquipmentLabel` — this file imports nothing on purpose. */
+    const custom = txt(first.customEquipmentName);
+    const en = join(first.subtypeName ?? first.categoryName, first.capacityName) || custom;
+    const ar = join(first.subtypeNameAr ?? first.categoryNameAr, first.capacityNameAr) || custom;
     // One locale missing is not a reason to fall back to a reference code — the other locale's name
     // still says which machine this is.
     if (en || ar) return { en: en || ar, ar: ar || en };

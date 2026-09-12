@@ -7,7 +7,7 @@ import { ProjectChips } from "@/components/create/ProjectChips";
 import { ProjectPills } from "@/components/create/ProjectPills";
 import { warmAgentCache } from "@/lib/api/client";
 import { useSession } from "@/lib/session";
-import { Button, Icon } from "@/components/ui";
+import { Icon } from "@/components/ui";
 import { AccountModal } from "@/components/onboarding/AccountModal";
 import { bumpAgentUse, guestLimitReached } from "@/lib/access/agent-quota";
 import { pin } from "@/lib/uiPins";
@@ -288,16 +288,53 @@ export function Intake() {
             Upload keeps the row but not the lead. It is the other way in for the renter who has a
             document rather than a sentence, and it belongs at the end of the row for the same reason
             it stopped being the only thing on it. */}
-        <div className="flex flex-wrap items-center gap-2.5 px-5 pb-4 pt-1">
-          <ProjectChips />
-          <button
-            type="button"
-            onClick={() => fileInput.current?.click()}
-            className="ms-auto flex flex-none items-center gap-1.5 rounded-sm border border-border bg-surface px-3 py-1.5 text-body font-semibold text-navy-mid transition hover:border-brand hover:text-brand"
-          >
-            <Icon name="upload" size={15} className="flex-none" />
-            {t.intake.uploadRfq}
-          </button>
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-3 px-5 pb-4 pt-1">
+          {/* ⚠️ **The sentence, then his sites** (owner, 2026-09-12: *"on the left on same row the
+              project pills with sentence «select your project» beside them"*). A bare row of place
+              names is furniture; named, it is a question with an answer already in reach. */}
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="flex-none text-meta font-semibold text-muted">{t.projects.chips.pick}</span>
+            <ProjectChips />
+          </div>
+
+          {/* ⚠️ **Two round controls, and they are the whole floor now** (owner, 2026-09-12:
+              *"remove the continue button, remove upload... instead i want a circle icon for + which
+              will be for upload and beside it a circle arrow to send"*).
+
+              ~~«Upload RFQ» here, and a «Continue» button in a row of its own below.~~ Two rows for
+              two presses, one of them a full-width word for the act every renter is already
+              reaching for. The + hands us a file and the arrow sends: both are what they do, and
+              neither needs a label to say it. */}
+          <span className="ms-auto flex flex-none items-center gap-2">
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              aria-label={t.intake.uploadRfq}
+              title={t.intake.uploadRfq}
+              className="grid h-10 w-10 flex-none place-items-center rounded-full border border-border bg-surface text-navy-mid transition hover:border-brand hover:text-brand"
+            >
+              <Icon name="add" size={20} />
+            </button>
+
+            {/* ⚠️ **What holds it back is on the button itself.** The old Continue had a sentence
+                beside it, because a disabled button with nothing near it reads as broken. A round
+                control has no room for one, so the reason is its `title`: "add something" while it
+                is empty, and what the press will do once it is not. */}
+            <button
+              type="button"
+              disabled={!canStart || state.busy}
+              onClick={runAgent}
+              aria-label={canStart ? (hasDraft ? t.intake.reAnalyze : t.intake.continueLabel) : t.intake.addSomething}
+              title={canStart ? (hasDraft ? t.intake.reAnalyze : t.intake.continueLabel) : t.intake.addSomething}
+              className="grid h-10 w-10 flex-none place-items-center rounded-full bg-brand text-brand-fg transition hover:bg-brand-press disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
+            >
+              <Icon
+                name={state.busy ? "hourglass_empty" : "arrow_forward"}
+                size={20}
+                className={state.busy ? "" : "rtl:scale-x-[-1]"}
+              />
+            </button>
+          </span>
         </div>
 
         <input ref={fileInput} type="file" multiple accept={ACCEPT_ATTR} className="hidden" onChange={(e) => onFiles(e.target.files)} />
@@ -325,27 +362,18 @@ export function Intake() {
       </div>
 
 
-      {/* ── The way on ── */}
-      <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
-        {/* ~~«Back to review», drawn on the left whenever a draft existed.~~ Removed (owner,
-            2026-09-09). It was a second Back on a screen that already has one, and the two disagreed:
-            the page's own control leaves the flow (`CreateBack`, `{ fallback: "/" }` on the intake),
-            while this one went forward into the drafted request. A renter who had just answered
-            «Leave» on the canvas's confirm met a button offering to undo that.
-
-            The draft is NOT stranded, and neither route needed this button:
-              · the browser's own Back resumes it (`rfq-store`'s `popstate` → `RESUME_WIZARD`);
-              · a returning visit raises the draft prompt, whose «Continue» resumes it;
-              · and «Re-analyse» right here rebuilds it from the words on screen.
-            `resumeWizard` therefore keeps its two callers and is not dead. */}
-        {/* A disabled Continue with nothing beside it is indistinguishable from a broken one, so
-            the only thing that can hold it says so. */}
-        {!canStart && <span className="me-auto text-meta text-muted">{t.intake.addSomething}</span>}
-        <Button disabled={!canStart || state.busy} onClick={runAgent} className="px-6 py-3 text-body">
-          {state.busy ? t.intake.reading : hasDraft ? t.intake.reAnalyze : t.intake.continueLabel}{" "}
-          <Icon name={state.busy ? "hourglass_empty" : "arrow_forward"} size={17} className={state.busy ? "" : "rtl:scale-x-[-1]"} />
-        </Button>
-      </div>
+      {/*
+        * — «The way on» lived here —
+        *
+        * A row of its own holding «Continue», with «Add a description or a file» opposite it, and
+        * before 2026-09-09 a «Back to review» beside that.
+        *
+        * 🔴 **Removed** (owner, 2026-09-12). It is one press, and it now sits on the floor of the
+        * box beside the file button, where the renter's hand already is. The sentence that had to
+        * stand next to a disabled Continue is the arrow's `title` instead: a round control cannot
+        * carry a sentence, and a tooltip says the same thing to the renter who hovers and to the
+        * screen reader either way.
+        */}
 
       {/* Guest hit the free agent-run limit → create an account, then continue processing. */}
       <AccountModal open={showAccount} onClose={() => setShowAccount(false)} onCreated={() => { setShowAccount(false); void actions.process(); }} title={t.guest.trialTitle} subtitle={t.guest.trialSub} />

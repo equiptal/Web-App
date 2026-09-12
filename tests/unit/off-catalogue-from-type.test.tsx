@@ -69,17 +69,21 @@ describe("the reducer's off-catalogue transition", () => {
     expect(customName(item)).toBe("water jetting unit");
   });
 
-  it("is reversible: picking a real type ends the off-catalogue state and drops the name", () => {
+  it("is reversible: picking a real type ends the off-catalogue STATE and KEEPS his words", () => {
     /* The 2026-09-06 bug in the other direction — a pick that cleared `isCustomLine` while leaving
        `verdict: "no-match"` made the row vanish. The two transitions have to be exact mirrors, or a
-       renter who changes his mind twice ends up in a state neither of them describes. */
+       renter who changes his mind twice ends up in a state neither of them describes.
+
+       🔴 ~~and drops the name.~~ Reversed 2026-09-12: the field is «what the renter calls this
+       machine», so a type does not make his words untrue. The taxonomy wins for READING; his words
+       are kept and sent beside it. */
     const off = run(stateWith(), { t: "SET_ITEM_OFF_CATALOGUE", id: "a0", name: "water jetting unit" });
     const back = run(off, { t: "SET_ITEM_SUBCATEGORY", id: "a0", subcategoryId: "sub-crawler" });
     const item = back.draft!.items[0];
 
     expect(item.ref.subcategoryId).toBe("sub-crawler");
     expect(item.verdict).toBe("needs-validation");
-    expect(item.customEquipment).toBeNull();
+    expect(item.customEquipment).toBe("water jetting unit");
     expect(isCustomLine(item)).toBe(false);
   });
 
@@ -191,12 +195,19 @@ describe("the card offers it whatever the TYPE control already holds", () => {
   /** The TYPE control's own props, from its `value` line to the end of its `onChange`. */
   const typeControl = src.slice(src.indexOf("value={item.ref.subcategoryId}"), src.indexOf("actions.setItemSubcategory"));
 
-  it("passes `emptyAction` on the TYPE control, gated ONLY by the feature flag", () => {
-    expect(typeControl).toContain("emptyAction=");
-    expect(typeControl).toContain("CUSTOM_EQUIPMENT_ENABLED");
-    // The mutation this catches: withholding the row once a type is chosen, which would take away
-    // the half of the owner's ask that is about EDITING a wrong choice.
-    expect(typeControl).not.toMatch(/emptyAction=\{[^}]*subcategoryId\s*[?&]/);
+  /**
+   * 🔴 ~~«Add a custom equipment type», offered when a TYPE search found nothing (2026-09-09).~~
+   * REMOVED 2026-09-12 (owner): *"no need for add a custom type because the field is always open"*.
+   * The row existed to open a box that only appeared on an off-catalogue line; the box is on the card
+   * at all times now, so the row was a second door into a room he is already standing in.
+   *
+   * The DOOR it opened is still there and still tested: `SET_ITEM_OFF_CATALOGUE` above, reached from
+   * «Doesn't match what I want? Use my own name of equipment» in the column CATEGORY used to hold.
+   */
+  it("offers no empty-state row on the TYPE control any more", () => {
+    expect(typeControl).not.toContain("emptyAction=");
+    expect(src).toContain("useMyOwnName");
+    expect(src).toContain("setItemOffCatalogue");
   });
 
   it("keeps it off the SIZE control, which is empty for a different reason", () => {

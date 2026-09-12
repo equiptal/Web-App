@@ -4,12 +4,12 @@ import { useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 import { btn, cx } from "@/lib/ds";
-import { fmt, useT } from "@/lib/i18n";
+import { fmt, useLocale, useT } from "@/lib/i18n";
 import type { Dictionary } from "@/lib/i18n/en";
 import { contactable } from "@/lib/contract/sheet-paste";
 import { normalizePhone, phoneE164 } from "@/lib/contract/phone-normalize";
 import { VendorMark } from "@/components/VendorMark";
-import { addRenterSuppliersBulk, type NewRenterSupplier } from "@/lib/api/client";
+import { addRenterSuppliersBulk, ApiError, type NewRenterSupplier } from "@/lib/api/client";
 import { SupplierImportPanel } from "./SupplierImportPanel";
 
 /**
@@ -110,6 +110,7 @@ const GRID =
 
 export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; onClose: () => void; onAdded: (msg?: string) => void }) {
   const t = useT();
+  const { locale } = useLocale();
   const c = t.suppliers;
   /** One way, and back. `file` is reached from the rows and returns to them on cancel. */
   const [mode, setMode] = useState<"type" | "file">("type");
@@ -172,9 +173,26 @@ export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; 
             : fmt(c.addedMany, { n: created }),
       );
       close();
-    } catch {
+    } catch (e) {
+      /**
+       * ── SAY WHAT THE SERVER SAID (owner, 2026-09-12) ────────────────────────────────────────
+       *
+       * ~~`catch {}` → `c.addFailed`.~~ A renter on beta hit this and the screenshot could not tell
+       * us which of five different failures it was: the relay's 401 (no session), the handler's 404
+       * («المستخدم غير موجود» — his user row is not in the tenant that Lambda reads), a 422 from the
+       * schema, a 500 from the unguarded `createMany`, or a dropped connection. Every one of them
+       * printed «لم يُحفظ… حاول مرة أخرى», and the one screen that had been TOLD the answer threw it
+       * away. A day was spent guessing at it from source.
+       *
+       * The backend answers `message` + `messageAr` on every refusal and `projectFetch` now carries
+       * both. The `code · HTTP n` suffix is deliberate and is NOT prose: it is the part that makes a
+       * screenshot of this dialog diagnostic, which is how the report arrives next time.
+       */
+      const err = e instanceof ApiError ? e : null;
+      const said = (locale === "ar" ? err?.messageAr : err?.detail) ?? err?.detail ?? err?.messageAr;
+      const tag = [err?.backendCode, err?.status ? `HTTP ${err.status}` : null].filter(Boolean).join(" · ");
       // Never close on failure: the renter's typing is the only copy of it.
-      setError(c.addFailed);
+      setError([said || c.addFailed, tag ? `(${tag})` : null].filter(Boolean).join(" "));
       setSaving(false);
     }
   };

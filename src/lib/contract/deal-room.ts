@@ -544,9 +544,13 @@ export function mapDealRoom(raw: unknown): DealRoomView {
   const details: DealItemDetails = {
     // Equipment name = subtype (matches the request/bid cards); capacity = size. Fall back to the older
     // keys, then to the accepted bid's equipment (make + model) since getDealRoom omits taxonomy names.
-    // `customEquipmentName` comes first: off-catalogue, it is the only name the line has, and every
-    // taxonomy key beside it is null. It reads in both locales, so the Arabic label takes it too.
-    equipmentLabel: s(pick("customEquipmentName", "subtypeName", "label", "equipmentName", "name", "subcategoryName", "categoryName")) ?? bidEqLabel,
+    /* 🔴 ~~`customEquipmentName` first.~~ Reversed 2026-09-12: the TAXONOMY is read whenever the line
+       has one, and the renter's own words only when it has none (owner: *"if null taxonomy then read
+       from the user words, otherwise use taxonomy even if hidden"*).
+       It was harmless while the two could never appear together — a line had ids or a name. From the
+       day every line carries a name, this order would print «water tanker» in the deal room of a
+       request that went out as «Water truck · 20,000 L». */
+    equipmentLabel: s(pick("subtypeName", "label", "equipmentName", "name", "subcategoryName", "categoryName", "customEquipmentName")) ?? bidEqLabel,
     equipmentLabelAr: s(pick("subtypeNameAr", "customEquipmentName")),
     equipmentSize: s(pick("capacityName", "size", "capacity")),
     equipmentSizeAr: s(pick("capacityNameAr")),

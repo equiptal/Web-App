@@ -771,11 +771,13 @@ export function reducer(state: RfqState, a: Action): RfqState {
             ref: { ...i.ref, subcategoryId: a.subcategoryId, measurementId: null },
             operatorNeeded,
             resolved: false,
-            /* ── A picked subtype ENDS the off-catalogue state, verdict and all ──────────────────
+            /* ── A picked subtype ENDS the off-catalogue state — but NOT his words ───────────────
              *
-             * The renter found his machine in the list, so the name he typed for it goes with the
-             * state it belonged to: leaving it would post a line carrying both a subtype and free
-             * text, and the ids win, so the text would ride along unread.
+             * 🔴 ~~The name is cleared with the state it belonged to.~~ Reversed 2026-09-12, when the
+             * field stopped meaning «off-catalogue» and started meaning «what the renter calls this
+             * machine». Picking a type does not make his words untrue: he typed «water tanker», the
+             * agent missed, he found «Water truck» himself, and both are true. The taxonomy wins for
+             * READING; his words are kept and sent as our reference.
              *
              * ⚠️ And the VERDICT has to move with it. It did not, and the row vanished under the
              * renter's own hand (owner, 2026-09-06: *"when i try to click a subtype from existing
@@ -786,7 +788,6 @@ export function reducer(state: RfqState, a: Action): RfqState {
              * line whose machine is known and whose size is not, which is exactly what he now has.
              */
             verdict: i.verdict === "no-match" ? ("needs-validation" as const) : i.verdict,
-            customEquipment: null,
           };
           // No cert seeding here either. This used to "rescue" an uncertified line by stamping the
           // category default once the subcategory refined the lifting test (`_onEquipmentVariantPicked`)
@@ -812,9 +813,13 @@ export function reducer(state: RfqState, a: Action): RfqState {
      * move together (the 2026-09-06 trap): the verdict, the ids `isCustomLine` reads, and the typed
      * name. The size goes with the subtype, because a size is a size OF something.
      *
-     * `name` is what he typed into the TYPE search — his own words, already written once, which is the
-     * same seeding rule `customName` follows for `rawLabel`. Empty is allowed: the gate
-     * (`customEquipmentMissing`) then asks for it in the box the card opens.
+     * `name` is whatever the card already held for him — what he typed in the box, else the words his
+     * RFQ used. Empty is allowed: the gate (`customEquipmentMissing`) then asks for it, in a box that
+     * is on the card either way since 2026-09-12.
+     *
+     * ⚠️ It never SEEDS from a taxonomy name. The card's box falls back to the pick for display, but
+     * writing that into state here would make «Water truck 20,000 L» his answer for a machine he has
+     * just said is not the one he meant.
      */
     case "SET_ITEM_OFF_CATALOGUE":
       return withDraft(state, (d) =>

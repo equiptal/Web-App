@@ -2324,6 +2324,9 @@ export const en = {
     chips: {
       label: "Project",
       ended: "ended",
+      /** Beside the pills on the intake floor (owner, 2026-09-12): a row of place names is
+       *  furniture until something names the question it answers. */
+      pick: "Select your project",
       all: "All projects",
       /** The way back to two rows once «All projects» has opened the rest. */
       fewer: "Show fewer",
@@ -2430,6 +2433,10 @@ export const en = {
       /* One line, and only this one (owner, 2026-09-09: *"add a custom equipment type only"*). The
          second line said what the state means, which the orange note on the card says once the box
          is open. */
+      /* The way out of a match that is not his machine (owner, 2026-09-12): «make it doesn't match
+         what I want? use my own name of equipment and then the notes will be shown». Two lines at the
+         width of the column CATEGORY used to hold. */
+      useMyOwnName: "Doesn't match what I want? Use my own name of equipment",
       addCustomType: "Add a custom equipment type",
       searchSizes: "Search sizes…",
       fuel: "FUEL",
@@ -2452,7 +2459,17 @@ export const en = {
       logistics: "LOGISTICS",
       delivery: "DELIVERY TO SITE",
       returnFromSite: "RETURN FROM SITE",
-      fuelResponsibility: "FUEL RESPONSIBILITY",
+      /* ── «FUEL PAID BY», because «FUEL RESPONSIBILITY» did not fit (owner, 2026-09-12) ─────────
+         Measured, not guessed: the fuel box gives its label 119px and «FUEL RESPONSIBILITY *» needs
+         133px on one line, so it wrapped to two at FULL desktop width while the two haulage legs
+         beside it stayed on one. It is the longest of the three strings in the narrowest of the
+         three slots — the row is `2fr_1fr`, and fuel also pays a whole box's 28px padding alone
+         where the two legs share one box's between them.
+         Shortened rather than re-gridded: `RETURN FROM SITE` has only 4px of its own to spare, so
+         taking room from that column would move the wrap rather than remove it.
+         ⚠️ NOT plain «FUEL»: the same card already labels the fuel TYPE control «FUEL», over the
+         photo. Two different questions under one word on one card is worse than a wrap. */
+      fuelResponsibility: "FUEL PAID BY",
       attachment: "ATTACHMENT",
       workType: "WORK TYPE",
       workTypePlaceholder: "What will it lift?",

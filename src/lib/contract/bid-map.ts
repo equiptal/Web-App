@@ -681,13 +681,17 @@ export interface RequestTypeSource {
  */
 export function requestTypeWord(item: RequestTypeSource | null | undefined, n: number): { en: string; ar: string } {
   const join = (head: string | null, capacity: string | null) => [head, capacity].filter(Boolean).join(" ").trim();
-  // Off-catalogue: his words, unchanged, in both locales. `englishTypePlural` is skipped on purpose —
-  // it inflects a known head noun, and inflecting free text produces "floating crane barges" from
-  // "floating crane barge" only by luck.
-  const custom = item?.isUndefined ? (item.customEquipmentName ?? "").trim() : "";
-  if (custom) return { en: custom, ar: custom };
   const enSubtype = item?.subtypeName ?? item?.subtypeNameAr ?? null;
   const arSubtype = item?.subtypeNameAr ?? item?.subtypeName ?? null;
+  /* No taxonomy on the line: his words, unchanged, in both locales. `englishTypePlural` is skipped on
+     purpose — it inflects a known head noun, and inflecting free text produces "floating crane barges"
+     from "floating crane barge" only by luck.
+     ⚠️ Taxonomy FIRST since 2026-09-12, and no longer gated on `isUndefined`: a hidden line is
+     undefined AND has a catalogue name, and it must read by that name. */
+  if (!enSubtype && !arSubtype) {
+    const custom = (item?.customEquipmentName ?? "").trim();
+    if (custom) return { en: custom, ar: custom };
+  }
   return {
     en: join(englishTypePlural(enSubtype, n), item?.capacityName ?? item?.capacityNameAr ?? null),
     ar: join(arSubtype, item?.capacityNameAr ?? item?.capacityName ?? null),
