@@ -59,11 +59,16 @@ import { Dropdown } from "@/components/Dropdown";
  * `onBrowseAll` is optional and the intake renders `<ProjectChips />` with no handler, so «All
  * projects (5)» was a dead button on the one screen a renter meets first.
  *
- * The cap is now the SHAPE it was always described as: the strip is clamped to two rows of whatever
+ * The cap is now the SHAPE it was always described as: the strip is clamped to N rows of whatever
  * height a chip actually is at this font and language, and «All projects» unclamps it in place. The
- * rest arrive as further rows under the two, which is what he asked for, and no chip is unreachable.
+ * rest arrive as further rows under them, which is what he asked for, and no chip is unreachable.
+ *
+ * 🔴 **THREE rows, not two** (owner, 2026-09-13: *"the max number of pills used without white
+ * space, and then if the number of projects is more it will grow to 3 rows max using all the
+ * space"*). Two rows on a renter with fifteen sites left most of them behind a press while the
+ * floor of the box sat empty underneath.
  */
-const ROWS_COLLAPSED = 2;
+const ROWS_COLLAPSED = 3;
 /** `gap-2` on the strip — 0.5rem. Read once here so the clamp and the layout cannot drift apart. */
 const ROW_GAP_PX = 8;
 
@@ -329,21 +334,31 @@ export function ProjectChips({
        The strip and its toggle stack, so «All projects» sits UNDER the two rows it opens rather than
        inside them: a control that moves as the thing it controls grows is a control the renter has to
        find twice. */
-    /* ⚠️ The lead sits BESIDE the stack, not above it, which is the shape the owner approved on
-       2026-09-12 - and it is outside the measured strip on purpose: `twoRowsPx` is read off the
-       first CHIP's height, and a sentence in that flow would be the thing measured instead. */
-    <div className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-      {lead}
-      {/* ⚠️ `flex-1`, so the strip takes the rest of the line after the lead rather than sizing to
-          its own contents - which is what leaves a row short of the card’s edge. */}
-      <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
+    /* 🔴 **ONE wrapping strip, not a strip with a control under it** (owner, 2026-09-13: *"the ui
+       is trash here ... the max number of pills used without white space"*). «All projects» used to
+       stack BELOW, in a row of its own, which is what put a line with one chip on it between the
+       sites and the floor controls - and pushed those controls down to a fourth line with white
+       space to their left. It is the last item in the same flow now, so it follows the final pill
+       and the row fills.
+       ⚠️ What that costs, and why it is worth it: the 2026-09-10 note said the toggle stacks so it
+       does not move as the strip grows. It does move now. The white space it was avoiding was worse,
+       and it is always the LAST thing in the flow, so it is where the sites end rather than where a
+       row happens to break. */
+    <div className="contents">
       <div
         ref={strip}
         /* `overflow-hidden` only while clamped — expanded it must not cut a dropdown open on the
            chosen site's pill, which draws outside the strip's box. */
-        className={`flex min-w-0 flex-wrap items-center gap-2${clamped ? " overflow-hidden" : ""}`}
+        className={`flex min-w-0 flex-1 flex-wrap items-center gap-2${clamped ? " overflow-hidden" : ""}`}
         style={clamped ? { maxHeight: twoRowsPx } : undefined}
       >
+      {/* ⚠️ The lead sits INSIDE the wrapping flow, first (owner, 2026-09-13, two instructions that
+          had to be kept together: *"«اختر مشروعاً» is only shown when user have projects"*, which is
+          why this slot belongs to the component that knows whether there are any, and *"the max
+          number of pills used without white space"*, which is why everything is one flow.
+          🔴 It was dropped when these two passes were merged — one had the slot, the other had the
+          flow — and a rebase that took either side whole lost the other. */}
+      {lead}
       {/* ~~«Pick a site, and half of this fills itself in», in an amber chip at the head of the
           row.~~ Removed (owner, 2026-09-02). It was written to give the row a reason to be pressed,
           and it sat in the row it was advertising: an amber pill among the site pills, the same size
@@ -428,10 +443,9 @@ export function ProjectChips({
         );
       })}
 
-      </div>
-
-      {/* Drawn only when there IS more than two rows of sites — and it opens them here, in place.
-          A caller that passed `onBrowseAll` gets its own surface instead; the intake passes none. */}
+      {/* Drawn only when there IS more than three rows of sites — and it opens them here, in place.
+          A caller that passed `onBrowseAll` gets its own surface instead; the intake passes none.
+          ⚠️ INSIDE the strip, as its last item — see the note on the wrapper. */}
       {(overflows || expanded) && (
         <button
           type="button"
