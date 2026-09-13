@@ -55,7 +55,7 @@ describe("naming a machine the catalogue does not carry", () => {
        It stopped being a field that appears when the catalogue fails and became «what the renter
        calls this machine», on every line — so it sits ABOVE the two lists, with the note as its own
        hint. Reads: the box, its note, then TYPE and SIZE under them. */
-    const order = ["Name the equipment you need", "does not go to Moedatech suppliers", "TYPE"].map((needle) =>
+    const order = ["Name the equipment you need", "reach Moedatech suppliers", "TYPE"].map((needle) =>
       document.body.innerHTML.indexOf(needle),
     );
     expect(order.every((i) => i >= 0)).toBe(true);
@@ -65,8 +65,11 @@ describe("naming a machine the catalogue does not carry", () => {
        ONE copy. It was two while the note was pinned to the label — a label row cannot wrap, so a
        phone needed its own copy underneath. In the hint slot the note wraps like any other line of
        guidance, and two copies to keep in step were two chances to drift. */
-    expect(screen.getAllByText(/does not go to Moedatech suppliers/i)).toHaveLength(1);
-    expect(screen.getAllByText(/share it with your suppliers offline/i)).toHaveLength(1);
+    expect(screen.getAllByText(/reach Moedatech suppliers/i)).toHaveLength(1);
+    /* ⚠️ Both halves still in ONE sentence, and it stays short - but it WRAPS rather than clipping
+       (owner, 2026-09-13, an hour after asking for one line: *"the note beside the equipment name is
+       wrapped so make it 2 lines fine"*). Clipping a warning is the one thing it must never do. */
+    expect(screen.getAllByText(/Share the link yourself/i)).toHaveLength(1);
     /* ── It must NOT claim the catalogue lacks the machine (owner, 2026-09-12) ──────────────────
        *"it is not the case always that this equipment is not available, like what the note says"*.
        Since the renter can take a line off-catalogue himself, the type he rejected is often sitting
@@ -179,7 +182,7 @@ describe("the way back into the catalogue", () => {
 
     expect(screen.getByRole("button", { name: /Select from our list/i })).toBeTruthy();
     // The two never stand together: one line cannot be offered both doors at once.
-    expect(screen.queryByRole("button", { name: /Send it with your custom equipment name/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Use your custom name/i })).toBeNull();
   }, 20_000);
 
   it("points at what the press changed — the name box and its new note pulse together", async () => {
@@ -190,21 +193,29 @@ describe("the way back into the catalogue", () => {
     expect(TAXONOMY).toBeTruthy();
 
     expect(document.querySelector(".attn-pulse")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /Send it with your custom equipment name/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Use your custom name/i }));
 
-    /* The press empties the taxonomy, stars the name box and raises the note — three changes, all of
-       them ABOVE the row he pressed. The pulse wraps the FIELD, so what is outlined is the name box
-       together with the note under it, which is the pair the press created. */
+    /* The press empties the taxonomy, stars the name box and raises the note. The pulse wraps the
+       ROW, so what is outlined is the name box together with the note beside it — the pair the press
+       created. The control itself now sits in the row BELOW, under the two lists it emptied
+       (owner, 2026-09-13). */
     const pulsed = document.querySelector(".attn-pulse");
     expect(pulsed).toBeTruthy();
-    expect(pulsed!.textContent).toContain("does not go to Moedatech suppliers");
+    expect(pulsed!.textContent).toContain("reach Moedatech suppliers");
   }, 20_000);
 
   it("is the SAME control, so it cannot drift into two rows", async () => {
     const { readFileSync } = await import("node:fs");
     const { resolve } = await import("node:path");
     const src = readFileSync(resolve(process.cwd(), "src/components/create/MachineCard.tsx"), "utf8");
-    expect(src).toContain("custom ? t.create.machineCard.selectFromList : t.create.machineCard.useMyOwnName");
+    /* 🔴 **One control again** (owner, 2026-09-13: *"i want this note inlined with the size-type
+       row"*). They were split apart earlier the same day — the way OUT beside the NAME box, the way
+       BACK under the LISTS — and both are about the two lists, so both belong under them. One cell,
+       one skin, a ternary for the label and another for the press. */
+    expect(src).toContain("const ESCAPE_ROW =");
+    expect(src.match(/className={ESCAPE_ROW}/g)?.length).toBe(1);
+    expect(src).toContain("t.create.machineCard.selectFromList");
+    expect(src).toContain("t.create.machineCard.useMyOwnName");
     /* The press opens the list by REMOUNTING the control with `defaultOpen`, which is what that
        prop's own note prescribes — it is read once at mount, so a caller wanting it open again
        remounts with a `key`. Without the key the counter would change and nothing would open. */

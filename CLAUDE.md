@@ -2,6 +2,467 @@
 
 ## Change log
 
+- **2026-09-13 - The off-catalogue note may take two lines, the offer takes the owner's own words, and TYPE's placeholder matches SIZE's.**
+  Owner, an hour after asking for one line: *"the note beside the equipment name is wrapped so make
+  it 2 lines fine, and for the notes on the type-size make «not in our list? use your custom name»,
+  and for the placeholder of the type dropdown make it «select type» same as «select size»"*.
+  (1) 🔴 **`sm:truncate` is GONE from the note, reversing this morning's one-line rule.** Clipping is
+  the one thing a warning must never do, and that was the price of the rule; he looked at it wrapped
+  and took the wrap. The sentence stays short - two lines is the ceiling now, not the target - and
+  the glyph moved back to `items-start` so it sits on the first line rather than against the middle
+  of a two-line block.
+  (2) **«Not in our list? Use your custom name»**, his wording, replacing «Not listed? Use your own
+  name». «custom name» is the NAME BOX's own vocabulary, which is what the press fills.
+  (3) **«Select equipment type from our list» → «Select type».** The two boxes sit side by side and
+  said different kinds of thing: a four-word instruction naming the catalogue, beside two words.
+  «from our list» is the escape row's job now, one cell along.
+  Files: `src/components/create/MachineCard.tsx`, `src/lib/i18n/{en,ar}.ts`,
+  `tests/unit/custom-equipment-canvas.test.tsx`.
+  ⚠️ Measured at `text-label`: the new offer is **186px** English, 182px Arabic. Its column is
+  ~297px of text room at the card's ordinary width, and ~189px just above the `sm` breakpoint - so
+  it fits everywhere by measurement, and by 3px at the narrowest. It is a button with `leading-snug`
+  and no `nowrap`, so the worst case there is two lines, not an overflow.
+  ⚠️ **A corrupted comment beside `sizePlaceholder` was repaired in passing** - `26a0Fe0f` and a run
+  of raw code points where a ⚠️ and an Arabic quotation should have been. Same class of scripting
+  accident as the `RED` note of 2026-09-12. Said out loud because it is not part of the asked-for
+  change; an unreadable comment is worse than none.
+  ⚠️ Verified: typecheck, lint (0 errors), 74 passing across the five card suites. NOT seen
+  rendered: the canvas needs a session (a guest hits «You've reached your limit» on this backend),
+  so the widths are measured in the page rather than looked at in the card.
+
+- **2026-09-13 - The off-catalogue offer moves under the two lists it is about, and both of its sentences are cut to fit one line.**
+  Owner, on the dashed row: *"i want this note inlined with the size-type row so make it shorter, use
+  same meaning but shorter, even for the notes above ... i want it to fit in one line not wrapped so
+  make sure use shorter sentences to fit"*.
+  (1) **ONE control again, in row two.** The two offers were split apart earlier the same day - the
+  way OUT beside the NAME box it fills, the way BACK under the LISTS it opens - and both are about
+  the same two lists, so both now live in the third column beneath TYPE and SIZE. One cell, one
+  skin, a ternary for the label and another for the press.
+  (2) **Both sentences cut, and MEASURED rather than guessed** at `text-label`, which is what the
+  card draws them in:
+   · «Doesn't match what you want? Send it with your custom equipment name above» **391px → 152px**
+     («Not listed? Use your own name»). Its column is `minmax(200px, …)` less the button's 24px of
+     padding, so it clears even at the column's floor.
+   · «This one does not go to Moedatech suppliers, but you can still post the request and share it
+     with your suppliers offline» **573px → 317px** («This one won't reach Moedatech suppliers.
+     Share the link yourself»). It spans columns two and three, ~340px at the 640px breakpoint and
+     ~490px at the card's ordinary width.
+  Arabic came out narrower on both (153px and 213px), as it usually does here.
+  Files: `src/components/create/MachineCard.tsx`, `src/lib/i18n/{en,ar}.ts`
+  (`machineCard.useMyOwnName`, `notInCatalogueNote`),
+  `tests/unit/custom-equipment-canvas.test.tsx` (3 cases rewritten).
+  ⚠️ **The note is `sm:truncate`, so its LENGTH is now a layout constraint** - a longer sentence
+  does not wrap, it disappears. Both dictionaries carry a note saying so. Below `sm` the class is
+  absent and it wraps, because no sentence of this kind fits one line on a phone and forcing it
+  would push the card sideways.
+  ⚠️ **On a MATCHED line row one's second cell is now EMPTY.** That is the cost of the move and it
+  is the owner's call: the offer belongs beside the two lists that failed him, not beside the box it
+  fills.
+  🔴 **This REVERSES «one control, two homes» from earlier today**, which had just reversed «one
+  control with a ternary label». What survives across all three is the rule underneath: one SKIN, in
+  one constant, so the two labels can never drift into two different-looking rows. The test that
+  pinned two `ESCAPE_ROW` call sites now pins one.
+  ⚠️ Verified: typecheck, lint (0 errors), 63 passing across the four card suites, and the full
+  suite serially (3371 passing). The two failures are both KNOWN and neither is from this change:
+  `ui-pins` (pre-existing CRLF staleness) and `share-request-email`'s `recipientEmails`, which is
+  uncommitted work that exists nowhere in `HEAD`.
+  🔴 **NOT seen rendered.** The canvas needs a session - a guest hits «You've reached your limit» on
+  this backend - so the two strings were measured in the page rather than looked at in the card, and
+  the measurement ran against the SYSTEM font stack because the local page had not applied Inter.
+  Inter is a little wider, so the English note's ~20px of headroom at the narrowest `sm` layout may
+  not be there; `sm:truncate` is what catches it. The card wants one look on a deployed build.
+
+- **2026-09-13 - The site strip uses the whole card: the two round controls stop reserving width on every row.**
+  Owner, on a screenshot of the intake floor: *"more project pill can fit in the row so make the max
+  per row"*.
+  🔴 **The chips were wrapping as if the card were 110px narrower than it is.** The strip sat in a
+  `flex-1` group with the `+` and the arrow beside it, so those two held their own width on EVERY
+  line of the wrap - and they only ever occupy ONE. His first row ended with about 200px of white
+  after it and the next chip had gone to a second line that did not need to exist.
+  `basis-full` on the group sends the controls to a line of their own and gives the strip the card.
+  Files: `src/components/screens/Intake.tsx`, `src/components/create/ProjectChips.tsx`,
+  `tests/unit/intake-floor.test.ts` (the «controls on the last row» case reversed).
+  🔴 **This REVERSES a ruling from earlier the same day** - *"the wrapper keeps the controls on the
+  LAST row"*, which had been checked against twelve sites in the live DOM. It was not wrong about
+  what it measured; it was answering a different question. The cost of the reversal, stated: the
+  floor is one row taller than it was.
+  ⚠️ **`items-end` STAYS.** It is still what keeps the controls level with the bottom of whatever
+  sits above them, and it is the half of that mechanism which was never the problem.
+  ⚠️ The strip inside `ProjectChips` took `flex-1` in the same pass, so it fills the line after the
+  lead rather than sizing to its own contents - which is the same fault one level down.
+  ⚠️ **NOT changed: the chip LABELS.** He also said they look *"clipped or i dont know but
+  stripped"*. They are `projectTitle` - the renter's own title, else `shortSite(location.label)`,
+  which is the text before the first comma with runs of 4+ digits removed (a postcode rule). The
+  names in his shot are Google PLUS CODES («PMGJ+PH», «RHOA», «RGRA»), which is what the geocoder
+  returned for sites he never titled, not something this strip cut. Worth a look at the data before
+  changing a shared helper that six surfaces read.
+  ⚠️ Verified: typecheck, lint, 54 passing across the five touched suites, and the width
+  break-checked (the group returned to `flex-1`) - two cases went red. NOT seen rendered.
+
+- **2026-09-13 - Mansour asks the question from the front of it, and the line under it stops wrapping.**
+  Owner, on the intake: *"put mansour before the question and make the text below as one line dont
+  wrap it"*.
+  (1) ~~A 52px rig on its own line above the heading.~~ There he was a mark floating over a page.
+  He is INSIDE the `<h1>` now at 44px, still `is-waiting` - the kit's own «waiting for the user»
+  lean-in - so the pair centres as one object and he reads as the one asking rather than as
+  decoration over it. `flex-wrap` on the heading so the question can drop under him on a phone, and
+  `flex-none` on him so he never squeezes when it does.
+  ⚠️ **Arabic needs no branch.** «Before» is the LEADING edge, and a flex row reverses under
+  `dir="rtl"` on its own: he lands on the right of «كيف تريد إنشاء طلبك؟» with no mirror rule.
+  Verified in the browser in both directions.
+  (2) **The sentence is one line, and its LENGTH is now a layout constraint.** The cap was
+  `max-w-[640px]`, which broke it in two and hung «fill themselves in.» alone under the middle of the
+  page. The cap is gone - and the copy was SHORTENED, because at 880px the old 120-character
+  sentence could not be made to fit without shrinking the type, which is a worse answer to «don't
+  wrap it». Both dictionaries carry a note saying so.
+  ⚠️ `sm:whitespace-nowrap`, never bare. Below 640px no sentence of this kind fits on one line, and
+  forcing it would push the whole DOCUMENT wider than the phone - the fault audited out of three
+  surfaces on 2026-09-08. One line where there is room; wrapped where there is not.
+  ⚠️ The trailing full stop went with the rewrite, which is the house rule for UI strings and which
+  the old sentence had been breaking.
+  Files: `src/components/screens/Intake.tsx`, `src/lib/i18n/{en,ar}.ts` (`intake.subheading`),
+  `tests/unit/mansour.test.tsx` (1 case).
+  ⚠️ Verified: typecheck, lint (0 errors), 38 passing across the intake/brand/wording suites, the
+  placement break-checked (the rig and the nowrap both removed - the new case went red), and **SEEN
+  RENDERED in both locales**: he sits before the question and the line holds at one row.
+  🔴 NOT seen at phone width: the resize did not take on this browser, so the `sm:` fallback is the
+  standard guard rather than an observed one.
+
+- **2026-09-13 - `NO_SENDER_ADDRESS` can only reach this panel through a FAILED MAILBOX, so the connection is re-read and both routes out are on screen.**
+  Owner, meeting that sentence a second time: *"didnt we fix this???"*
+  **We fixed the wording, never the cause, and the cause is not the profile.** Traced end to end
+  before touching anything:
+   · `ShareRequestPanel` calls `share-email` from ONE place, and only when `willSend` - which needs
+     `live.connected`. Gmail returns through its own branch and never reaches it. Not-connected
+     takes the Moedatech-only branch and does not call it at all.
+   · So the backend answering at all means `accessTokenFor(userId)` returned `ok: false`, and the
+     handler then falls into its SES branch, where the check is the profile e-mail.
+   · `accessTokenFor` already knows WHICH failure it was - `NOT_CONFIGURED`, `NOT_CONNECTED` or
+     `RECONNECT_REQUIRED`, the last set after Microsoft rejects the refresh and the stored token is
+     deleted - and `shareEmail.ts` throws that reason away.
+  🔴 **BACKEND, the real fix, one branch:** in
+  `apps/backend-agents/src/handlers/agents/requests/shareEmail.ts`, report `access.reason` when
+  `access.ok === false` and it is `RECONNECT_REQUIRED`, BEFORE the `NO_SENDER_ADDRESS` guard. A
+  renter whose consent has just lapsed is currently told to add an e-mail address, which cannot help
+  him: Graph sends from the mailbox he consented with and reads no profile e-mail at all.
+  🔴 **BACKEND, still owed since 2026-09-12: redeploy `agents-partners`.** `629db61f` (2026-09-09,
+  on `main`) is what narrowed the guard to the SES path.
+  **Web half, and it is deliberately not a guess.** Which remedy is the true one depends on WHICH
+  Lambda is deployed, and this screen cannot know: on the build the owner tested on 2026-09-12,
+  adding the address really did work, because the old guard ran before the token check. So both
+  routes are offered and neither is claimed - the sentence keeps the one-field fix and its profile
+  link, and `send` now RE-READS the connection on `NO_SENDER_ADDRESS` as well as on
+  `RECONNECT_REQUIRED`, which is what makes the Reconnect offer appear when the token is the cause.
+  The bracketed reason code is what tells us which it was on the next screenshot.
+  Files: `src/components/share/ShareRequestPanel.tsx`,
+  `tests/unit/share-request-panel.test.tsx` (1 new case; the stub counts status reads).
+  ⚠️ **The narrower cut was written and rejected.** Withholding the profile remedy whenever the
+  panel believes it is connected is right against the CURRENT source and wrong against a stale
+  Lambda - it would have taken away the one remedy that has actually been observed to work, on the
+  strength of a deploy nobody has confirmed.
+  ⚠️ The Reconnect offer is gated on `!connect.connected`, which is why the re-read is the whole
+  mechanism: without it the panel goes on believing a connection the server has already dropped.
+  ⚠️ Verified: typecheck, lint, 132 passing in the panel suite, and the re-read break-checked by
+  narrowing it back to `RECONNECT_REQUIRED` alone - the new case went red. NOT reproduced against a
+  live mailbox: it needs a connected renter whose consent has lapsed.
+
+- **2026-09-13 - The envelope names the MAILBOX, the body can be copied before the post, «تنزيل» for both files, and Mansour asks the question on the intake.**
+  Owner, on the Arabic envelope preview: *"why i cant copy the body? also why it shows the supplier
+  name in the bcc it must be the email, and for export call it تنزيل, + can u use mansour icon
+  more in the chat intake somewhere, i want it to be attractive"*.
+  (1) 🔴 **The Bcc chip shows the ADDRESS**, reversing *"the NAME leads, the address is the
+  tooltip"*. That rule was borrowed from what a mail client draws for a header the renter WROTE;
+  this one is addressed FOR him off his own supplier list, and the question he is answering is not
+  «who is this» but «is that the right mailbox». «Al Faisal Rentals» cannot tell him whether the
+  message goes to the branch address or to a salesman's, and a mistyped address in his own list is
+  invisible behind the label he gave it. The name is the `title`, one hover away, and the initial
+  disc still carries its first letter.
+  ⚠️ **The confirmation dialog took this exact decision on 2026-09-09 and the two had quietly
+  disagreed ever since** - that entry claimed *"the envelope preview already draws the address with
+  the name beside it"*. It did not; it drew the name alone. One surface, one rule, at last.
+  (2) 🔴 **The body copy is no longer LOCKED before the post**, reversing 2026-09-07. The rule was
+  that the message ends with a URL that does not exist yet - true, and it answered a question nobody
+  had asked: a greyed button beside a message he can read says «no» and never «not yet, and here is
+  why». The caveat moved onto the control (`copyBodyPending` on `title`), and the clipboard gets
+  exactly what is on screen: the message without a link, because there is no link.
+  ⚠️ **Before the post it writes the PLAIN flavour only.** The rich one wraps the card in
+  `<a href="…">`, and an empty href resolves to whatever page the message is pasted into - a card
+  that looks like a link and goes nowhere is worse than no card.
+  (3) **«تصدير المقارنة» → «تنزيل المقارنة».** Both presses on that row produce a FILE the renter
+  keeps and the other already said تنزيل; one word for one act. English is untouched - «Export
+  comparison» and «Download quotation» are both ordinary there.
+  (4) **Mansour asks the question.** A 52px rig above the intake's heading, `is-waiting` - the kit's
+  own state for this moment, *"waiting for the user"*. The heading IS his question, so he is not
+  decoration beside it. Above and centred rather than to one side, so he holds the same axis as the
+  heading and the box.
+  Files: `src/components/share/mail-chrome.tsx`, `src/components/share/ShareRequestPanel.tsx`
+  (`CopyBit` gained `title`), `src/components/screens/Intake.tsx`, `src/lib/i18n/{en,ar}.ts`
+  (`postShare.copyBodyPending`; `workspace.exportComparison` reworded),
+  `tests/unit/share-request-panel.test.tsx` (4 cases rewritten to the two reversals).
+  ⚠️ **«نسخة مخفية» is CORRECT and was left alone**, checked against Microsoft's own Arabic
+  documentation rather than assumed: their Outlook-for-Windows page is titled *«إظهار حقل نسخة
+  مخفية (نسخة كربونية عمياء)»*. «من» / «إلى» / «الموضوع» match their field names too.
+  ⚠️ The chip is `dir="ltr"` unconditionally now. An address is always an ltr run whatever the page
+  is: a domain reordered by the Arabic around it is a different address.
+  ⚠️ One rewritten case was passing for the WRONG reason - «they are NAMED, every one of them»
+  counted the firm's name twice, once in the supplier list and once in the envelope chip behind the
+  dialog. With the envelope on addresses the name appears once, and the case now asks what it meant.
+  🔴 **THREE tests are red in the full suite and NONE of them is from this change.**
+  `share-request-email` and two `share-request-panel` cases fail on a `recipientEmails` field that
+  exists in the working tree (`src/lib/api/client.ts`, `ShareRequestPanel.tsx`) and **nowhere in
+  `HEAD`** - uncommitted work whose tests were never updated. It was green in two full runs earlier
+  tonight and red in the third, and `client.ts` has a modification time inside this session that no
+  edit of mine accounts for: **something outside this session is writing to this tree.** Reported
+  rather than fixed - it is somebody's half-finished change and mending it silently would hide it.
+  ⚠️ Verified: typecheck, lint (0 errors), and 75 passing across the six suites this work owns.
+  **SEEN RENDERED**: the intake with Mansour over the heading. NOT seen rendered: the envelope chips
+  and the copy control, which need a draft and a picked supplier.
+
+- **2026-09-13 - «Copy addresses» moves onto the Bcc row, and the tick names the suppliers it reached.**
+  Owner, on the control floating over the preview heading: *"what this copy? make it copy emails on
+  the bcc field, not here"*, and *"in the success message when a request is posted and sent to email,
+  show to who it was sent, like their emails; if so much addresses then show first 5"*.
+  (1) **The copy sits on the field it copies.** It was a toolbar button beside «the message they
+  receive», with nothing saying which addresses it meant - which is exactly the question he asked. On
+  the Bcc row it needs no explaining, and it is the rule the subject and the body have followed since
+  2026-09-07 (*"one on the title as copy title and one on the body as copy body"*). `MailField`
+  already had the `action` slot; this is the third thing in it.
+  🔴 **It is still drawn ONLY when there is something to paste**, and the first cut got that
+  wrong: offering it on every Bcc row with an address in it is refused by two pinned cases («Given
+  nothing was sent yet», «Given WE sent it - the message carried them»). A server-side send puts the
+  recipients on the message; a paste offered there says the send needs one. The control exists for
+  one fault only - Outlook's deeplink drops `bcc` silently, so the window it opened was addressed to
+  nobody.
+  (2) **The tick says WHICH suppliers, five of them, then a count.** The line said «sent from X to 4
+  suppliers» and nothing answered «which» - and a mistyped address in the renter's own supplier list
+  is invisible behind a number, on the last screen that could have shown it to him.
+  ⚠️ **The ADDRESS, never the firm's name**, the same ruling the send confirmation took on
+  2026-09-09: a name cannot tell him whether this went to the branch mailbox or to one salesman's
+  personal one. Each chip is `dir="ltr"`, or an address inside an Arabic block reorders.
+  🔴 **Whose list is it?** The backend DERIVES the recipients off the renter's supplier rows, so
+  our own `reachable` is what we ASKED for, not what went out. The server's list wins whenever it
+  gives one (`bcc` / `recipientEmails` on the sent response, neither of which the parser read
+  before); ours is the fallback **only when `skipped === 0`**, where the two sets are the same size
+  and naming ours cannot name somebody the server dropped. With a skip and no list, the tick says the
+  count alone, exactly as it did.
+  Files: `src/lib/api/client.ts` (`recipientEmails` on the sent result),
+  `src/components/share/ShareRequestPanel.tsx`, `src/components/create/ShareOnPost.tsx`,
+  `src/lib/i18n/{en,ar}.ts` (`postShare.mailSentTo`),
+  `tests/unit/posted-confirmation.test.tsx` (3 new cases), `tests/unit/share-request-panel.test.tsx`.
+  ⚠️ **Both readers of the new field are defensive on purpose** (`outcome.recipientEmails?.length`,
+  `mail.emails?.length`) although the parser always fills it. Both run AFTER the request is posted:
+  a throw in `send` loses the share on a request that is already live, and a throw in the tick hides
+  the only confirmation the renter gets for a send that really happened. An unrecognised shape must
+  degrade to «we were not told», never to an exception - and the stubs in both suites are the proof
+  that partial payloads reach these lines.
+  ⚠️ Verified: typecheck, lint, 146 passing across the two share suites. NOT seen rendered.
+
+- **2026-09-13 - The processing screen shows the CATALOGUE: the drawings were on the other taxonomy endpoint all along.**
+  Owner, on a shot of a lone spinner over «نقرأ طلبك»: *"didnt we say it must show equipment he is
+  trying to map, the ui is so dull"*.
+  🔴 **My own diagnosis the day before was wrong, and this is the correction.** I reported that
+  *"the catalogue has ONE picture"* and built the screen around a glyph because of it. True of the
+  field I looked at; false about the product. There are TWO taxonomy endpoints and only one carries
+  artwork, and I had measured the wrong one:
+   · `/api/taxonomy` - the AGENTS service, what the create flow's dropdowns are built from. One
+     image field, `equipment_image_url`, a PHOTOGRAPH, on **1 row of 413**.
+   · `/api/stores/taxonomy` - the APP backend's tree, behind the browse filters since web-app/004.
+     `imageUrl` / `imageKey`, the flat DRAWING, on **92 of 412**.
+  **The ids are the same in both**, which is what makes it work and was worth checking rather than
+  assuming: all 37 agent categories and all 58 agent subtypes resolve in the app tree, and every one
+  of those 58 ends with a drawing - 55 of their own, 3 inherited from a category. The drawings the
+  requests rail has always shown come from that same tree by way of the REQUEST projection, which is
+  the clue I walked past.
+  So: **READING** flicks through the catalogue, a drawing every 380ms, with NOTHING named; the
+  moment the answer lands the reel stops and each matched machine gets its own drawing, its name and
+  «Matched from our catalogue». The ring went 104px → 144px and the type a step up, because the
+  screen holds three things and a viewport of air.
+  Files: `src/lib/contract/taxonomy-icons.ts` (new), `src/components/screens/Processing.tsx`,
+  `src/app/dev/preview/specimens.tsx` (`processing-no-art` added; the other two re-pointed at real
+  catalogue icons), `tests/unit/taxonomy-icons.test.ts` (new, 9 cases),
+  `tests/unit/{processing-screen,mansour,project-template-line}.test.*`.
+  ⚠️ **The reel is NEVER captioned, and that is the whole licence for it.** A picture on this screen
+  means «this is what the agent matched you to»; unnamed and moving, a reel reads as the catalogue
+  being searched, which is what is happening. On 2026-09-12 I refused to show anything during the
+  wait for exactly that risk - the answer was not «show nothing», it was «show them without a name».
+  🔴 **The FIT changed sides, twice, and both were looked at in a browser.** `object-cover` was
+  right while the slot held a photograph (1.83:1; contain drew a band across a round hole). It is a
+  DRAWING now, carrying its own transparent margin, so cropping enlarges the margin rather than the
+  machine - the requests rail's note of 2026-08-31. Plain `contain` then filled under half the
+  circle and the tile read as empty, so it is `contain` PLUS `scale-[1.25]`, which is the same
+  answer the rail reached. Safe only because the disc is `overflow-hidden rounded-full`; a case
+  pins that.
+  ⚠️ **A second request, deliberately.** The store already holds the agents taxonomy, and it is not
+  the one with the pictures. `/api/stores/taxonomy` is what the browse filters fetch, it is cheap,
+  and its public twin serves the same ids - which this flow needs, because a guest can run the whole
+  of it. A failure is swallowed: no drawings, Mansour holds the ring, and the request the renter is
+  waiting on is untouched.
+  ⚠️ Mansour is the FALLBACK now rather than the default - an off-catalogue line, or a tree that
+  failed to load. He keeps the corner mark whenever the ring holds a machine.
+  ⚠️ `key={imageUrl}` on the `<img>`: without it the browser keeps the old pixels until the next
+  decode and the reel stutters instead of flicking.
+  🔴 **A test leak, fixed properly rather than retried.** `project-template-line`'s new case read
+  `not.toHaveBeenCalled()` on `setAgentTyping`, and the typewriter holds that flag for 900ms after
+  its last character - so an earlier case's `finally` lands past this file's `mockClear` and the
+  blunt assertion failed on the leak rather than on the rule. It asserts the RAISE now
+  (`not.toHaveBeenCalledWith(true)`).
+  ⚠️ Verified: typecheck, lint, the full suite serially (3359 passing; the one failure is
+  `ui-pins.test.ts`, pre-existing CRLF staleness). Both new rulings break-checked (the fit forced
+  back to cover, the category fallback deleted); two cases went red. **SEEN RENDERED**: all three
+  specimens, and the coverage numbers above measured against the two live services rather than
+  reasoned about.
+  🔴 **The reel itself was NOT seen moving in the real flow** - the screen is up for a few seconds
+  behind a session and a live agent, and the browser tool times out inside that window. The
+  specimens show one frame each.
+
+- **2026-09-13 - The comparison's equipment rail opens on a bid the map can draw, and each band wears its own light tone.**
+  Owner, on the compare table: *"the orange equipment must take to the map if at least one bid is in
+  app, and in the map it will show other bids anyway"*, and *"can u make a light color for each
+  section like the orange, maybe light blue for terms and light grey for prices as it is now"*.
+  (1) 🔴 **The door pointed at rows that cannot open.** `equipmentTarget` was `rows[0]`, whatever
+  it was, and `/bids/{id}/equipment` reads a supplier's REGISTERED machines, their papers and the
+  yard he confirmed - none of which an off-platform submission has. That is what
+  `mayOpenEquipmentSurface` has existed to say since the surface shipped, and this rail never asked
+  it. On a request whose top row came in through the renter's own shared link - the ordinary case,
+  and the one in his screenshot - the orange rail led nowhere. The target is now the first OPENABLE
+  row, with the agent's recommendation winning only if it is one.
+  (2) **One tone per section.** Three of the four bands were the same grey, so the only thing telling
+  a rate from a certificate was the heading over it. `BAND` holds the two skins: money keeps its grey
+  (the table's default reading), terms take the slate, and equipment keeps its orange.
+  Files: `src/components/workspace/CompareMatrix.tsx`,
+  `tests/unit/compare-matrix.test.tsx` (7 new cases, 57 passing).
+  ⚠️ **`info`, never `action`.** This palette has no true blue by design - `--info` is a slate in
+  the ink family - and `--action` (#1a7ec8) is reserved for the bid map's ask by RM3-AC-33, pinned by
+  `palette-drift` and guarded by `rentee-map-surface`. Spreading it to a terms band would give one
+  colour two meanings in one product. The printed comparison has used `--info` for this same band
+  since it was written, so the two renderers agree.
+  ⚠️ **The terms band keeps its tone OPEN as well as folded.** A colour that shows only while the
+  section is shut means something in the half the renter reads least.
+  ⚠️ **Landing on any in-app bid is enough**, which is the owner's own reasoning: the map carries
+  every other offer on the request in its header, so the row it opens on is a starting point rather
+  than a choice made for him.
+  ⚠️ Verified: typecheck, lint, 277 passing across the six touched suites, and both halves
+  break-checked (the door returned to `rows[0]`, the terms tone returned to grey) - two cases went
+  red. NOT seen rendered.
+
+- **2026-09-13 - The operator rail OPENS when it refuses, and it only refuses «Next equipment».**
+  Owner: *"can u let the operator open and shake when user try to click next without opening, not
+  from the review and send but from the next of the equipment"*.
+  (1) **It opens.** ~~The closed 72px strip shook and stayed shut.~~ That asked the renter to work
+  out that the shaking thing was a button and then press it - on the one panel the whole pass exists
+  because he has never pressed it. Opening it IS the look being demanded, so the refusal performs it
+  and the shake says which panel just moved. `shaking` turns into `setExpanded(true)` inside the
+  rail, and the shake class moved onto the OPEN panel as well.
+  (2) **«Review & send» no longer holds.** 2026-09-09 put the pass on both ways out of a machine;
+  what that missed is where each press LEAVES the renter. «Next equipment» keeps him on this canvas,
+  so opening the rail puts the panel in front of him and the next press carries on. «Review & send»
+  is the last press of the whole request, and refusing it to open a panel nothing is MISSING from
+  reads as a broken button rather than as an invitation.
+  Files: `src/components/create/OperatorRail.tsx`, `src/components/create/Canvas.tsx`,
+  `tests/unit/operator-rail-unseen.test.tsx` (two cases rewritten to the new rulings).
+  🔴 **The cost, stated: a ONE-equipment request no longer forces the rail open at all.** Such a
+  request has no «Next equipment», so that renter can finish having never seen the panel - the exact
+  hole 2026-09-09 was written to close, re-opened for the single-item case at the owner's word. The
+  operator's food, accommodation, nationality and certificate are all priced off it by the supplier.
+  A case pins that hole deliberately, so the next reader meets it as a decision and not a regression.
+  ⚠️ **The rail still owns `expanded`.** The canvas raises `shaking`; the rail turns that into a
+  state change. A `forceOpen` prop would have been a second source of truth for one fact, and the
+  canvas cannot derive the rail's state anyway - which is why `onOpenState` exists.
+  ⚠️ **No `else` on that effect.** It must not CLOSE when the shake ends, or the panel would snap
+  shut under a renter who has started reading it.
+  ⚠️ The shake had to move to the open panel: it lived only on the closed strip, and that is the
+  one element that stops existing the moment the refusal opens the rail - so the gesture would have
+  fired on a node being unmounted.
+  ⚠️ Verified: typecheck, lint, 96 passing across the nine canvas suites, and the opening
+  break-checked (the effect forced off) - one case went red. NOT seen rendered.
+
+- **2026-09-13 - Signing in and creating the account are ONE act: the second modal cannot be walked away from, and leaving it signs you out.**
+  Owner: *"after the sign up or login modal it must open the create account for new users directly
+  right? like a user cant be guest after login"*, then *"make the login and create account as one
+  step but 2 modals, cant be done as 1 step only, check the prod main and align the logic"*.
+  🔴 **A user COULD be a guest after login.** `guest` is a real backend state - `getUserTier`
+  (`Moedatech-App/apps/backend/src/services/profile.service.ts:163`) returns it until `firstName &&
+  lastName && city && jobTitle` ALL exist - and Modal 2 was an ordinary dismissible dialog with a ✕,
+  a scrim and Escape. Verify a code, press any of the three, and the renter holds a session, a phone
+  and nothing else: every tier-gated action refuses him and his badge reads «زائر». That is the
+  account forwarded on 2026-09-10 (`+966566493886`), stuck on «مستوى حسابك لا يسمح بهذا الإجراء».
+  Now the profile step is COMMITTED: `Dialog` gained `dismissible`, `AccountFlow` reports which
+  phase it is on, and while the form is up the dialog has no way out of its own. The way out lives
+  in the form and is named for what it does - «Leave and sign out» / «المغادرة وتسجيل الخروج» - a
+  quiet underlined line under the act, never a second button beside it.
+  ⚠️ **It really signs out, and that is the half that stops the guest.** A phone-first renter
+  already holds a session by the time that form is on screen; closing without the sign-out is
+  exactly what stranded people. An email-first one has no account at all - only the onboarding token
+  `AuthGate` keeps for the «Finish your signup» banner - so the call is harmless there.
+  🔴 **`origin/main` was checked first, as asked, and it is the SAME CODE.** `afterVerified` reads
+  the authoritative tier off `/api/me` and routes anything below basic to `setPhase("profile")`,
+  line for line, on both; the entire main↔beta difference in this flow is the design-system pass
+  (`btn()`, `Dialog`, the tokens, the navy panel) plus the dropped `companyName` field, and beta is
+  AHEAD of main there with no main-only commits. **Prod has the identical hole**, so «align with
+  main» would have changed nothing. The routing was never the fault - being able to leave was.
+  Files: `src/components/Dialog.tsx` (`dismissible`), `src/components/onboarding/AccountModal.tsx`,
+  `src/components/onboarding/OnboardingForm.tsx` (`onAbandon`), `src/lib/i18n/{en,ar}.ts`
+  (`onboarding.leave`), `src/app/dev/preview/specimens.tsx` (`onboarding-form`),
+  `tests/unit/onboarding-gate.test.tsx` (new, 9 cases).
+  ⚠️ **`dismissible={false}` is for this one dialog and must stay that way.** Every layer in this app
+  has a way out; a dialog without one is a trap. It is allowed here only because leaving is not
+  «close the dialog» but «abandon a signup», a different act with a different consequence, and the
+  body carries it explicitly. A case pins that `AccountModal` is the only caller.
+  ⚠️ The focus TRAP is untouched - `useDialogKeys` still runs and only its Escape half is neutered.
+  An undismissable dialog needs the trap more than an ordinary one, not less.
+  ⚠️ The keep/switch question is deliberately NOT committed: that account is already complete and
+  both its buttons are answers, so there is nothing to trap anybody into.
+  🔴 **This does nothing for the guests who already exist**, and there are some in production. A
+  returning guest who presses «Sign in» does resume at Modal 2 (`hasGuestSession`) and now cannot
+  leave it without finishing or signing out, which covers him the moment he comes back - but nothing
+  goes looking for him. The «Finish your signup» banner is still email-first only
+  (`persistOnboarding` is called from one place, the `needsSignup` branch of `CodeEntry`); extending
+  it to phone-first guests is the backstop, and it is NOT done here.
+  ⚠️ Verified: typecheck, lint, the full suite serially (3345 passing; the one failure is
+  `ui-pins.test.ts`, pre-existing CRLF staleness). Break-checked both halves (the gate removed, the
+  sign-out removed); two cases went red. **SEEN RENDERED** through the new `onboarding-form`
+  specimen.
+  🔴 **NOT reproduced end to end.** Neither the old fault nor the fix was exercised against a real
+  OTP: this machine cannot receive one. The routing, the tier rule and the three exits were read off
+  the source and the backend's own `getUserTier`, and the gate is pinned by tests and a picture.
+
+- **2026-09-13 - The guest wall centres on the SCREEN, and its page reaches the fold.**
+  Owner, on a shot of `/requests` signed out: *"the background and popup not centered, make it like
+  the dashboard center, also for both can u show more from the background like read dashboard and
+  read requests but blurr"*.
+  (1) **The centring was a HEIGHT fault.** The card layer is `absolute inset-0`, so it centres inside
+  the wall's own box - and that box was sized by the preview alone. On requests the parent is a
+  `flex-1` column the height of the viewport while the preview is about 570px, so the card landed
+  near the top with half a screen of white under it. The dashboard only looked right because its
+  preview happens to be about as tall as its page. The root takes `h-full` plus a
+  `min-h-[calc(100dvh-8rem)]` floor, and the backdrop floats (`absolute inset-0 overflow-hidden`) so
+  it can no longer decide the height - and so a backdrop longer than the fold does not grow the page
+  a scrollbar for something nobody can read or reach.
+  (2) **Both previews reach the fold.** Requests gains the comparison strip under the bid cards (a
+  supplier column and six term cells over five rows); the dashboard gains its supplier TABLE (a head
+  row of five column stubs, then six rows with a mark, two runs and a pill).
+  Files: `src/components/common/GuestWall.tsx`,
+  `tests/unit/guest-wall-backdrop.test.tsx` (6 new cases, 16 passing).
+  🔴 **The 2026-09-06 ruling STANDS and this does not reverse it**: the backdrop is the page's own
+  SKELETON and never invented data, because *"rendering plausible-looking rows of somebody's business
+  behind a blur would be inventing a dashboard he does not have"*. What is added is FURNITURE - more
+  bands, more rows, more cells - and a case asserts both previews render no text at all.
+  ⚠️ **The blur stays at 3px and the opacity at 92%.** «Show more» was answered with more PAGE, not
+  with a sharper one: raising either would start making a placeholder look like data, which is the
+  fault the tone was tuned against on 2026-09-12.
+  ⚠️ **`h-full` and the floor are both needed.** `h-full` takes the height where a parent offers
+  one (requests, inside its flex column) and resolves to `auto` where none does (the dashboard, in
+  ordinary page flow) - and with the backdrop now absolute, the floor is the only thing giving that
+  page height. The old flat `min-h-[420px]` is shorter than the fold, which is the same fault again.
+  ⚠️ **A comment claimed a mechanism nobody wrote.** It said *"`sticky` inside the absolute layer
+  keeps it in the middle of the VIEWPORT"*; there is no `sticky` in the file and there never was,
+  which is most of why this went unnoticed. Kept struck through as the record, with a case reading
+  the CODE rather than the prose.
+  ⚠️ Verified: typecheck, lint, 156 passing across the five touched suites, and both halves
+  break-checked (the flat floor restored, the backdrop put back in flow) - two cases went red each
+  time. NOT seen rendered: the centring is a measured fact and jsdom lays out nothing, so both walls
+  want one look signed out.
+
 - **2026-09-13 - MANSOUR is in the product: he is what the processing screen shows, and he is the one writing the template's machine into the box.**
   Owner, handing over `Mansour Kit`: *"can u use this mansour kit that represent the agent, use it
   in the processing and use it here for typing when u select a project and it auto fills the
@@ -206,25 +667,98 @@
   connection, in four strings. Kept deliberately: it is also the word the source filter and the
   comparison have shown him for weeks («Offline · invite»), so it is the product's own name for a
   supplier reached outside Moedatech.
-    (4) **The off-catalogue box was khaki, and the box was never the problem.** Owner: *"it is not
-  yellow and not orange, use colours in our design system and used in other places for warning"*.
-  🔴 The hint's ink was `text-warn` = #b98a1d, and `globals.css` says in as many words that `--warn`
-  is a **FILL** and `--warn-deep` (#8a6412) is the one that may carry TEXT. At 2.97:1 on that pale
-  ground the sentence came out neither yellow nor orange. The BOX was already correct -
-  `border-warn/40 bg-warn-soft` IS `NOTICE_TONE.warn`, the recipe every other warning in the app
-  wears - so only the ink was off it. Same fault, same day, as the label in (1): a fill colour used
-  as type.
-  ⚠️ **Reported, NOT fixed - three more of the same** on this flow: `Canvas.tsx:592/605` («YOU
-  WROTE» and its link), `WherePanel.tsx:186` and `WhenPanel.tsx:147/207` all set `text-warn` on
-  words. They are the identical violation and they want one sweep, not four edits smuggled into a
-  copy change.
-    Files: `src/components/create/Provenance.tsx`, `src/components/create/MachineCard.tsx`,
-  `src/lib/i18n/{en,ar}.ts`, `tests/unit/canvas-provenance.test.tsx` (4 new cases),
-  `tests/unit/{canvas-multi-item,custom-equipment-canvas}.test.tsx`.
+    (4) **The off-catalogue box wears the OPERATOR RAIL's light orange**, and its sentence the ink that
+  goes with it. Owner: *"it is not yellow and not orange, use colours in our design system and used in
+  other places for warning"*, then *"can we use another colour? we might use the same operator light
+  orange colour"*.
+  🔴 Two faults, one after the other. The hint's ink was `text-warn` = #b98a1d, and
+  `globals.css` says in as many words that `--warn` is a **FILL** and `--warn-deep` (#8a6412) is the
+  one that may carry TEXT — at 2.97:1 on that pale ground the sentence came out khaki. Moving it to
+  `warn-deep` fixed the contrast and left the real problem: `bg-warn-soft` (#f7edd8) is a sandy cream,
+  and against the orange this card now speaks everywhere else (the labels, the dot, the pulse) it read
+  as a third colour nobody chose. ~~`border-warn/40 bg-warn-soft`~~ → `border-brand-light
+  bg-brand-soft`, which is the COLLAPSED OPERATOR RAIL's own pair, one panel to the right of this box,
+  with `text-brand-deep` on the sentence and `--brand` on the pulse.
+  ⚠️ **It was never DRIFT** - the old pair is exactly `NOTICE_TONE.warn`, the recipe every other
+  warning in the app wears. It is a deliberate departure on one box, because this card carries four
+  orange marks of its own and a fifth colour beside them reads as a mistake. `UnavailableCard`'s copy
+  of the note moved with it (`tone="warn"` → `tone="brand"`), so the two cannot disagree.
+  ⚠️ **Reported, NOT fixed - three more `text-warn`-on-words** on this flow: `Canvas.tsx`
+  («YOU WROTE» and its link), `WherePanel` and `WhenPanel`. The identical violation, and they want one
+  sweep rather than four edits smuggled into a copy change.
+  (5) **The box is TWO rows, and nothing in it is wide and useless** (owner, 2026-09-13: *"i want the
+  equipment [name] to be in the same row as the note below it because the field is so wide and
+  useless, and for the type-size also must be on the same row as the note below, so totally 2 rows
+  here"*).
+  ~~Name (full width) · note · TYPE + SIZE · the offer.~~ Four rows, and the name box alone took the
+  card's whole width to hold «Spider Lift». Now: **row one** is the name beside the sentence that
+  state owes — the warning note off-catalogue, the way OUT of the catalogue when matched; **row two**
+  is the two lists and, off-catalogue, the way back in.
+  ⚠️ **The offer changed HOME, not identity.** Each label now sits beside the thing it acts on: the
+  way out next to the NAME box it points at, «Select from our list» next to the LISTS it opens. They
+  share one `ESCAPE_ROW` constant, so the skins cannot drift; the test that used to pin one ternary
+  now pins two uses of that constant.
+  ⚠️ Row one repeats `TRIO_COLS` rather than splitting 1fr/2fr of its own, so the name box lines up
+  EXACTLY with TYPE beneath it. A ratio of its own is off by the gap, which shows as a step down the
+  left edge of the box.
+  ⚠️ This also retires the one-line problem that cost four wordings: the long sentence now has two
+  thirds of the card's width in row one, so it fits on one line without being shortened again.
+  (6) **An empty TYPE or SIZE asks for an answer instead of repeating its own label** (owner,
+  2026-09-13: *"here if no selected show «select equipment type from our list» and «select size»,
+  this exact wording"*). The placeholder was the label again — «TYPE» over a box reading «Type» —
+  and a noun repeated under itself says nothing twice. His wording, taken as given; the card's other
+  empty controls have asked since 2026-09-08 («Pick min year», «Pick certificate») and these two were
+  the last that did not.
+  ⚠️ The trigger `truncate`s, so a placeholder wider than its column is CUT with an ellipsis rather
+  than overflowing. «Select equipment type from our list» is ~35 characters in a ~236px column: it
+  should just fit, and it has not been seen rendered.
+  ⚠️ **Two near-identical sentences now stand on an off-catalogue line** — this placeholder and the
+  dashed «Select from our list» row added hours earlier, two lines apart. Reported, NOT removed: he
+  asked for that row by name. It may now be redundant, since the TYPE control says the same thing and
+  is the same single press.
+  (7) 🔴 **Hidden taxonomy in the renter's dropdown: built, and held OFF.** Owner, on a TYPE search
+  for a hidden machine returning «—»: *"why is the hidden taxonomy not shown in the dropdown? it must
+  be matched from the agent and must appear in the dropdown anyway"*.
+  The web's catalogue is `GET /agents/taxonomy?tenant=default`, and that endpoint excludes HIDDEN
+  unless the caller says `includeHidden=true` — so the dropdown has never held one. The flag is the
+  whole of the web change and it is now wired, behind `TAXONOMY_INCLUDE_HIDDEN` in `src/lib/flags.ts`.
+  **It must not be turned on before the app backend's B2.** `assertRequestable`
+  (`taxonomy-normalization.service.ts:176`) REFUSES a hidden subtype at create, so a renter who picked
+  one out of the list would fill in the whole card and be 422'd at «Review & send» with nothing on
+  screen he could fix — worse than not offering it. The AGENT's own `includeHidden` (built,
+  uncommitted, `Normalization-Agent`) is blocked on the same B2, for the same reason.
+  ⚠️ A CODE toggle, not a `NEXT_PUBLIC_*` env var, on the `TRIAL_REQUESTS_ENABLED` precedent: it is
+  a product decision that lands in one deploy, not a per-environment setting.
+  (8) **THREE tints, three meanings, on the card and on the share surfaces alike** (owner,
+  2026-09-13, on the share panel beside the posted tick: *"can u unify the colours and their
+  meanings"*).
+  🔴 They had drifted into five: a cream `warn` block for the off-catalogue caution, a peach
+  `brand` block for a destination that WOULD receive the request, a green one for a destination that
+  HAD, a peach one again for the project it was filed under, and grey for a destination that would
+  not. Two of those peaches meant different things, and the cream said what the create card had just
+  started saying in orange.
+  · **ORANGE** `bg-brand-soft border-brand-light text-brand-deep` — «pay attention», this will not
+  work the way you expect. One per screen, ideally.
+  · **GREEN** `bg-ok-soft border-ok/40 text-ok-deep` — «it happened». Never a promise about the
+  future.
+  · **GREY** `bg-surface2` · `border-border` or `border-border-strong` — a plain statement with no
+  verdict: a destination listed, a project named.
+  ⚠️ **`on` and `off` are both GREY**, deliberately. One is «this will receive it» and the other
+  «this will not», and neither is a verdict on the request; they are told apart by the border's
+  weight, the greyed mark and the words, which is where that difference actually lives. Painting
+  «will receive it» green would promise a send that has not happened.
+  ⚠️ The PROJECT block lost its peach for the same reason: on a dialog that can show both at once
+  it was competing with the caution for the one colour that means «pay attention».
+  Files: `src/components/create/Provenance.tsx`, `src/components/create/MachineCard.tsx`,
+  `src/app/globals.css` (`.attn-pulse`), `src/lib/flags.ts`, `src/app/api/taxonomy/route.ts`,
+  `src/components/share/ShareRequestPanel.tsx` (`DestinationBlock`),
+  `src/components/create/ShareOnPost.tsx`, `src/lib/i18n/{en,ar}.ts`,
+  `tests/unit/canvas-provenance.test.tsx` (4 new cases), `tests/unit/custom-equipment-canvas.test.tsx`
+  (3 new cases), `tests/unit/canvas-multi-item.test.tsx`.
   ⚠️ **Two suites counted `.text-brand` to prove the required dot was drawn**, and that class stopped
   existing. They read the ●'s own glyph now - moving them to `.text-brand-deep` would have made them
   VACUOUS, because a chosen-for-you label wears that class with no dot on screen.
-  ⚠️ Verified: typecheck, lint, 113 passing across the nine canvas / copy suites, and the unified ink
+  ⚠️ Verified: typecheck, lint, 126 passing across the ten canvas / copy suites, and the unified ink
   break-checked by restoring the old ternary - two cases went red. **NOT seen rendered**: the one-line
   fit is arithmetic and the tone is a measured value, and jsdom lays out and composites nothing, so
   the row wants one look.

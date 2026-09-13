@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { screen, within } from "@testing-library/react";
 import { MachineCard } from "@/components/create/MachineCard";
@@ -399,5 +400,35 @@ describe("the option list opens where it can be read", () => {
     const handle = await card();
     const listbox = await open(handle, "Minimum year");
     expect(topOf(listbox)).toBe(58);
+  });
+});
+
+describe("the photograph shows the machine, not a crop of it", () => {
+  /**
+   * 🔴 Owner, 2026-09-13, on a card showing three wheels and nothing else: *"can u choose the
+   * right zoom and size of the images here"*.
+   *
+   * The panel is `min-h-[450px]` and stretches to the column beside it - taller than it is wide -
+   * while a taxonomy photograph is 1408x768, ratio 1.83. `object-cover` scales to the HEIGHT and
+   * throws away more than half the width, which on a flatbed is the half with the machine on it.
+   *
+   * ⚠️ **The same measurement the request rail made on 2026-09-12**, and it came out the same
+   * way: *"the crop cut the machine into an unreadable jumble"*. Recorded in both places so the
+   * next reader does not re-run the experiment.
+   */
+  const SRC = readFileSync("src/components/create/MachineCard.tsx", "utf8");
+  const code = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  it("Given the panel photo, Then it is contained rather than cropped", () => {
+    expect(code).toContain("object-contain");
+    expect(code).not.toContain("object-cover");
+  });
+
+  it("Given `contain`, Then the box keeps its full size", () => {
+    // ⚠️ `p-*` shrinks the box BEFORE `contain` measures it, which is what made the rail’s
+    // drawings letterbox at half size - the rail’s own note records that trap.
+    const img = code.slice(code.indexOf("object-contain") - 200, code.indexOf("object-contain") + 40);
+    expect(img).toContain("absolute inset-0 h-full w-full");
+    expect(img).not.toMatch(/\bp-\d/);
   });
 });

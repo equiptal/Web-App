@@ -1997,6 +1997,16 @@ export type ShareEmailResult =
       messageId: string | null;
       /** True only on the Graph path: the message is in the renter's own Sent folder. */
       inSentFolder: boolean;
+      /**
+       * The addresses it actually went to, when the backend names them.
+       *
+       * ⚠️ **Often EMPTY, and that is not a failure.** The recipients are derived server-side off
+       * the renter's supplier rows (see the note below), so this is whatever that answer chose to
+       * echo back — `[]` when it echoes nothing. A caller that wants to NAME the recipients has to
+       * decide for itself what to do with an empty list; it must never print the count as though
+       * these were the addresses.
+       */
+      recipientEmails: string[];
       /*
        * — `draftUrl` lived here —
        *
@@ -2089,6 +2099,13 @@ export async function shareRequestEmail(
         messageId: typeof raw.messageId === "string" ? raw.messageId : null,
         inSentFolder: raw.inSentFolder === true,
         recipients: typeof raw.recipients === "number" ? raw.recipients : renterSupplierIds.length,
+        /* Both spellings, because the PREVIEW branch below already answers `bcc` and a sent
+           response may name the same list under either key. Absent on both → an empty array, which
+           the caller reads as «we were not told». */
+        recipientEmails: (() => {
+          const v = Array.isArray(raw.bcc) ? raw.bcc : Array.isArray(raw.recipientEmails) ? raw.recipientEmails : [];
+          return v.filter((x: unknown): x is string => typeof x === "string");
+        })(),
         skipped: typeof raw.skipped === "number" ? raw.skipped : 0,
       };
     }

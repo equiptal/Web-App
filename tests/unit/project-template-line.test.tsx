@@ -146,6 +146,13 @@ describe("a template whose machine has no name", () => {
     draw();
     await pickTemplate("JTR060995");
     await waitFor(() => expect(store.useTemplate).toHaveBeenCalled());
-    expect(store.setAgentTyping).not.toHaveBeenCalled();
+    /**
+     * ⚠️ `not.toHaveBeenCalledWith(true)`, never `not.toHaveBeenCalled()`. The typewriter holds the
+     * flag for 900ms AFTER its last character so he is seen reading the line back, and that beat
+     * outlives the test that started it: an earlier case's `finally` lands here, past this file's
+     * `mockClear`, and the blunt assertion failed on a leak rather than on the rule. What this case
+     * is about is the RAISE.
+     */
+    expect(store.setAgentTyping).not.toHaveBeenCalledWith(true);
   });
 });

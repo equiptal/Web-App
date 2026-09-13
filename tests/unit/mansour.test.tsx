@@ -100,21 +100,39 @@ describe("his three states, and his size", () => {
 });
 
 describe("where he is used", () => {
-  it("the processing screen draws HIM, not a machine glyph", () => {
+  it("the processing screen falls back to HIM, never to a machine glyph", () => {
     /**
      * ~~`precision_manufacturing`.~~ A generic equipment icon on the one screen whose subject is the
      * AGENT: it said «equipment» where the honest word was «him».
+     *
+     * ⚠️ He is the FALLBACK now, not the default: since 2026-09-13 the ring holds the catalogue's
+     * own drawing of a real machine, and he takes it only when there is no drawing to hold — an
+     * off-catalogue line, or a taxonomy that failed to load.
      */
-    expect(PROCESSING).toMatch(/<Mansour size=\{56\} state="live" \/>/);
+    expect(PROCESSING).toMatch(/<Mansour size=\{72\} state="live" \/>/);
     // ⚠️ The ELEMENT, not the word: the note above that line still names the glyph it replaced, so
     // a bare search would fail on the file's own explanation of itself.
     expect(PROCESSING).not.toMatch(/<Icon name="precision_manufacturing"/);
   });
 
-  it("and keeps the corner once a machine has a picture", () => {
-    // The machine becomes the subject and he becomes the one who found it — the slot the old
-    // screen's «it is running» dot used to hold, now saying WHO as well as whether.
-    expect(PROCESSING).toMatch(/<Mansour size=\{26\} state="live" \/>/);
+  it("and keeps the corner whenever the ring holds a machine", () => {
+    // The machine is the subject and he is the one who found it — the slot the old screen's «it is
+    // running» dot used to hold, now saying WHO as well as whether.
+    expect(PROCESSING).toMatch(/<Mansour size=\{30\} state="live" \/>/);
+  });
+
+  it("the intake seats him BEFORE the question, on the heading's own line", () => {
+    /**
+     * Owner, 2026-09-13: *"put mansour before the question"*. ~~On his own line above it~~, where he
+     * was a mark floating over a page rather than the one asking. He is inside the `<h1>` now, so
+     * the pair centres as one object and mirrors in Arabic for free - «before» is the leading edge,
+     * which is the right in an RTL page.
+     */
+    const at = INTAKE.indexOf("t.intake.heading");
+    const h1 = INTAKE.slice(INTAKE.lastIndexOf("<h1", at), at);
+    expect(h1).toMatch(/<Mansour size=\{44\} state="waiting"/);
+    // `flex-none` so he never squeezes when the question wraps on a phone.
+    expect(h1).toMatch(/flex-none/);
   });
 
   it("the intake perches him on the box while the template is being written", () => {

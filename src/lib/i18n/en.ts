@@ -275,7 +275,13 @@ export const en = {
       fromLine: "From: {name}",
       fromYou: "you",
       coach: "Share with your supplier to bid",
-      expiry: "Expiry date of your link",
+      /* ⚠️ It says what the date DOES, not what it is called (owner, 2026-09-13: *"make the text
+         as «set the deadline of your link so supplier cant bid after it»"*). «Expiry date of your
+         link» named a field; nothing on the screen said that leaving it empty means the link never
+         closes, or that setting it stops a supplier bidding. `expiryName` keeps the short noun for
+         the `aria-label`, because a screen reader wants the field, not the reason. */
+      expiry: "Set your link’s deadline, so nobody can bid after it",
+      expiryName: "Expiry date of your link",
       title: "Share this request",
       linkLabel: "Your shareable link",
       linkMasked: "Generated the moment you post",
@@ -377,6 +383,12 @@ export const en = {
       /* ── SUP-BE-23: the mail we send ourselves, from his own address ──────────────────────── */
       mailSent: "Sent from {from} to {n} suppliers",
       mailSentOne: "Sent from {from} to 1 supplier",
+      /* ── WHO it went to, on the tick (owner, 2026-09-13) ──────────────────────────
+         *"in the success message when a request is posted and sent to email, show to who it was
+         sent, like their emails, if so much addresses then show first 5"*.
+         The count answered «how many» and nothing answered «which» — and a mistyped address in his
+         own supplier list is invisible behind a number. Five, then this. */
+      mailSentTo: "+{n} more",
       mailSkipped: "{n} of the ones you picked had no e-mail, so they were left out.",
       mailOpenInstead: "Open your e-mail",
       /* ── SUP-BE-23, the Graph path: the renter connects his own Outlook once ──────────────── */
@@ -427,7 +439,9 @@ export const en = {
       confirmDoBoth: "Post and send",
       confirmDoSend: "Send",
       copyTitleBtn: "Copy subject",
-      copyBodyBtn: "Copy body",
+      // Said on the control itself while there is no request yet, now that the press is live.
+    copyBodyPending: "The link is added once you post the request",
+    copyBodyBtn: "Copy body",
       confirmNo: "Cancel",
       mailConnect: "Connect Outlook",
       mailReconnect: "Reconnect Outlook",
@@ -467,7 +481,11 @@ export const en = {
     },
     reading: "Reading",
     heading: "How would you like to create your request?",
-    subheading: "Describe your request, or upload an existing RFQ document. If it belongs to a project, its defaults fill themselves in.",
+    // ⚠️ ONE LINE (owner, 2026-09-13: *"make the text below as one line dont wrap it"*). It is
+    // `whitespace-nowrap` from `sm` up, so its LENGTH is now a layout constraint rather than a free
+    // choice: the old sentence was 120 characters and could not fit this column at any width the app
+    // has. Keep anything replacing it about this long, and look at it.
+    subheading: "Describe your request, or upload an RFQ. A project fills in its own defaults",
     optUploadTitle: "Write / Upload RFQ",
     optUploadDesc: "Write your request or upload a file. Your AI assistant fills the form automatically.",
     recommended: "Recommended",
@@ -1010,6 +1028,12 @@ export const en = {
     },
   },
   onboarding: {
+    /* ⚠️ **RECONSTRUCTED, 2026-09-13.** The Arabic twin («المغادرة وتسجيل الخروج») and the call
+       site (`OnboardingForm`’s `onAbandon` control) survived; this English string did not, because
+       a `git checkout --` in a SHARED worktree threw away another session’s uncommitted edit to
+       this file. Reworded from the Arabic and the usage, not recovered. Correct it if it is not
+       what was written. */
+    leave: "Leave and sign out",
     step1: "Create account",
     step2: "Verify company",
     later: "later",
@@ -2429,6 +2453,15 @@ export const en = {
       category: "CATEGORY",
       type: "TYPE",
       size: "SIZE",
+      /* ⚠️ The two read as a PAIR (owner, 2026-09-13: *"for the placeholder of the type dropdown
+         make it «select type», same as «select size»"*). They sit side by side in the same row and
+         said different kinds of thing - one a four-word instruction naming the catalogue, the other
+         two words. «from our list» is also the escape row's job now, one cell along.
+         ⚠️ The comment that stood here was CORRUPTED - `26a0Fe0f` and a run of raw code points where
+         the ⚠️ and the Arabic should have been, the same class of scripting accident the 2026-09-12
+         `RED` note records. Repaired rather than left: an unreadable comment is worse than none. */
+      typePlaceholder: "Select type",
+      sizePlaceholder: "Select size",
       searchTypes: "Search types…",
       /* ── The way out of a TYPE search that found nothing (owner, 2026-09-09) ────────────────────
          *"Maybe if he searched in the type and didnt find it we show for him something here that will
@@ -2456,7 +2489,12 @@ export const en = {
          ⚠️ «custom equipment name» is deliberately the FIELD's own vocabulary rather than plain
          English: it names the box the press points at, which is the whole of what the sentence has
          to do now that the pulse draws the eye there. */
-      useMyOwnName: "Doesn't match what you want? Send it with your custom equipment name above",
+      /* ⚠️ SHORT, because it moved (owner, 2026-09-13: *"i want this note inlined with the size-type
+         row ... make sure use shorter sentences to fit"*). It sits in a ~200px grid column under the
+         two lists now, not on a full-width row of its own, so the sentence that named both the
+         CONDITION and the ACT no longer has the room for either at length. Five words: what is wrong,
+         and what to press. Keep any replacement this short and LOOK at it in the card. */
+      useMyOwnName: "Not in our list? Use your custom name",
       /* The same row, on a line that has already gone off-catalogue (owner, 2026-09-13): *"if it is
          clicked then in its place, with no taxonomy selected, we will write «select from our list»"*.
          His words. It OPENS the type list, rather than just naming it — the lists are still on screen
@@ -2524,8 +2562,10 @@ export const en = {
          lost connection, four strings of it. It is deliberate here: it is also the word the source
          filter and the comparison have shown him for weeks («Offline · invite»), so it is the
          product's own name for a supplier reached outside Moedatech. */
-      notInCatalogueNote:
-        "This one does not go to Moedatech suppliers, but you can still post the request and share it with your suppliers offline",
+      /* ⚠️ ONE LINE, and therefore short (owner, 2026-09-13). It is `sm:truncate` in a two-column
+         cell now, so a longer sentence does not wrap - it disappears. Both facts survive: it reaches
+         no Moedatech supplier, and the link is still his to send. */
+      notInCatalogueNote: "This one won't reach Moedatech suppliers. Share the link yourself",
       // The renter names the machine himself and the request goes out carrying his words. Prefilled
       // from what he wrote in the RFQ, so the ordinary case is a glance.
       customEquipment: "EQUIPMENT NAME",
@@ -2783,7 +2823,7 @@ export const en = {
     fCr: "CR number",
     removeRow: "Remove this row",
     markAll: "Mark them all as vendor registered",
-    /* Off by default now (owner, 2026-09-08), so the hint names the press that MARKS rather than
+    /* Off by default now (owner, 2026-09-08), so the hint names the press that ⚠️S rather than
        the press that undoes it. */
     markAllHint: "Tick this to mark every row above as a vendor you have registered",
     /* «My» is the whole distinction from the button beside it (owner, 2026-09-03). Both add

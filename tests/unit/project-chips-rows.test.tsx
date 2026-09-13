@@ -129,3 +129,40 @@ describe("the intake's site strip", () => {
     expect(screen.queryByText(en.projects.chips.fewer)).toBeNull();
   });
 });
+
+describe("the sentence beside the pills", () => {
+  /**
+   * 🔴 Owner, 2026-09-13, on «اختر مشروعاً»: *"this is only shown when user have projects"*.
+   *
+   * It was a `<span>` in `Intake`, drawn unconditionally, while this component returns `null` for a
+   * renter with no sites - so the first screen a renter meets asked a question with no answers
+   * anywhere near it. The `lead` slot puts both behind the same guard.
+   */
+  it("Given sites, Then the lead is drawn ahead of the strip", async () => {
+    rows.value = [site(1), site(2)];
+    render(
+      <LocaleProvider>
+        <ProjectChips lead={<span>PICK A PROJECT</span>} />
+      </LocaleProvider>,
+    );
+    const lead = await screen.findByText("PICK A PROJECT");
+    const chip = await screen.findByText("Site 1");
+    expect(lead).toBeTruthy();
+    // ⚠️ Before them in the DOM, which is what puts it before them on the row.
+    // eslint-disable-next-line no-bitwise
+    expect(lead.compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("Given NO sites, Then the lead is not drawn either", async () => {
+    // 🔴 The whole point: no answers, so no question.
+    rows.value = [];
+    render(
+      <LocaleProvider>
+        <ProjectChips lead={<span>PICK A PROJECT</span>} />
+      </LocaleProvider>,
+    );
+    // ⚠️ The component returns `null` synchronously for an empty list, so there is nothing to
+    // wait for: a `findBy*` here would pass by timing out on the thing it is meant to assert.
+    expect(screen.queryByText("PICK A PROJECT")).toBeNull();
+  });
+});

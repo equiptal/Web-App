@@ -86,3 +86,24 @@ export const TRIAL_REQUESTS_ENABLED: boolean = false;
  * wire.
  */
 export const EQUIPMENT_NAME_ON_EVERY_LINE = process.env.NEXT_PUBLIC_EQUIPMENT_NAME_EVERY_LINE === "1";
+
+/**
+ * Does the renter's own catalogue include HIDDEN nodes?
+ *
+ * Owner, 2026-09-13, on a TYPE search that found nothing: *"why is the hidden taxonomy not shown in
+ * the dropdown? it must be matched from the agent and must appear in the dropdown anyway"*.
+ *
+ * 🔴 **ON at the owner's word**, asked three times, with the cost stated each time and accepted.
+ * The cost, restated so nobody flips it back by accident: `assertRequestable`
+ * (`taxonomy-normalization.service.ts:176`) still REFUSES a hidden subtype at create, so a renter
+ * who picks one out of this list fills in the whole card and is 422'd on «Review & send», with
+ * nothing on screen he can fix. The app backend's B2 is what makes the create accept it and the
+ * dispatch skip it — `docs/plans/equipment-name-always/app-backend-changes.md`.
+ *
+ * ⚠️ The endpoint's half is verified, not assumed: `getTaxonomy.ts:52-57` reads
+ * `?includeHidden=true` and drops its `visibility: { not: 'HIDDEN' }` filter when it is set.
+ *
+ * A code toggle rather than a `NEXT_PUBLIC_*` env var, on the `TRIAL_REQUESTS_ENABLED` precedent: it
+ * is a product decision that lands in one deploy, not a per-environment setting.
+ */
+export const TAXONOMY_INCLUDE_HIDDEN = true;

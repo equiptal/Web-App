@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Icon, SuccessTick } from "@/components/ui";
 import { Dialog } from "@/components/Dialog";
 import { btn, cx } from "@/lib/ds";
@@ -44,14 +44,18 @@ import { useRouter } from "next/navigation";
  */
 const TELL_ANYWAY_MS = 2_500;
 
+/** How many addresses the tick names before it starts counting instead (owner, 2026-09-13). */
+const NAMED_RECIPIENTS = 5;
+
 /** One place the request reached, ticked. The mirror of the confirmation's own blocks. */
-function Landed({ title, detail }: { title: string; detail: string }) {
+function Landed({ title, detail, children }: { title: string; detail: string; children?: ReactNode }) {
   return (
     <span className="flex items-start gap-2.5 rounded-md border border-ok/40 bg-ok-soft px-3 py-2.5">
       <Icon name="check_circle" size={17} className="mt-px flex-none text-ok-deep" />
       <span className="min-w-0 flex-1">
         <b className="block text-meta font-extrabold text-navy">{title}</b>
         <span className="block text-meta leading-relaxed text-muted-dark">{detail}</span>
+        {children}
       </span>
     </span>
   );
@@ -108,7 +112,14 @@ export function ShareOnPost({
   /** How many suppliers that first send actually reached — 0 when he posted to Moedatech alone. */
   const [reached, setReached] = useState(0);
   /** What the server sent, when it sent it: the confirmation states the e-mail as well as the post. */
-  const [mail, setMail] = useState<{ from: string; recipients: number; inSentFolder: boolean } | null>(null);
+  /**
+   * ⚠️ `emails` is OPTIONAL here while the panel always sends it.
+   *
+   * This dialog opens over a request that is already live, so a `TypeError` reading a field a
+   * partial payload happens not to carry would hide the one confirmation the renter gets — for a
+   * send that really happened. Read it as «what we were told, if anything».
+   */
+  const [mail, setMail] = useState<{ from: string; recipients: number; inSentFolder: boolean; emails?: string[] } | null>(null);
   /**
    * ── Guards ONE send against two announcements, not the SECOND send against any ─────────────────
    *
@@ -342,8 +353,12 @@ export function ShareOnPost({
           <div className="mt-4 grid w-full gap-2 text-start">
             {/* Moedatech, unless this request can reach nobody there. */}
             {offCatalogue ? (
-              <span className="flex items-start gap-2.5 rounded-md border border-warn/40 bg-warn-soft px-3 py-2.5">
-                <Icon name="error_outline" size={17} className="mt-px flex-none text-warn-deep" />
+              /* ORANGE is this product's «pay attention» — the create card's off-catalogue box and
+                 the share panel's block wear the same three tokens (owner, 2026-09-13: *"can u unify
+                 the colours and their meanings"*). It was `warn`, a sandy cream, which said the same
+                 thing in a fourth colour. */
+              <span className="flex items-start gap-2.5 rounded-md border border-brand-light bg-brand-soft px-3 py-2.5">
+                <Icon name="error_outline" size={17} className="mt-px flex-none text-brand-deep" />
                 <span className="text-meta font-semibold leading-relaxed text-navy">{c.offCatalogueLine}</span>
               </span>
             ) : (
@@ -361,7 +376,38 @@ export function ShareOnPost({
                     n: mail.recipients,
                   }) + (mail.inSentFolder ? `, ${c.mailInSent}` : "")
                 }
-              />
+              >
+                {/* ── WHICH suppliers, not just how many (owner, 2026-09-13) ────────────────
+                    *"show to who it was sent, like their emails, if so much addresses then show
+                    first 5"*. The line above says how many; a mistyped address in his own supplier
+                    list is invisible behind a number, and this is the last screen that can show it
+                    to him.
+                    ⚠️ The ADDRESS, never the firm's name — the same ruling the confirmation took on
+                    2026-09-09: the name cannot tell him whether this went to the branch mailbox or
+                    to one salesman's personal one.
+                    ⚠️ `dir="ltr"` on each chip: an address inside an Arabic block reorders without
+                    it, and `@` can end up adrift.
+                    ⚠️ Drawn only when we KNOW them. The recipients are derived server-side, so an
+                    empty list means we were not told, and the count above still stands alone. */}
+                {(mail.emails?.length ?? 0) > 0 && (
+                  <span className="mt-1.5 flex flex-wrap gap-1">
+                    {(mail.emails ?? []).slice(0, NAMED_RECIPIENTS).map((address) => (
+                      <span
+                        key={address}
+                        dir="ltr"
+                        className="max-w-full truncate rounded-full border border-ok/30 bg-surface px-2 py-0.5 text-label text-navy-mid"
+                      >
+                        {address}
+                      </span>
+                    ))}
+                    {(mail.emails?.length ?? 0) > NAMED_RECIPIENTS && (
+                      <span className="px-1 py-0.5 text-label text-muted">
+                        {fmt(c.mailSentTo, { n: (mail.emails?.length ?? 0) - NAMED_RECIPIENTS })}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </Landed>
             )}
 
             {/* ⚠️ A channel we did not send through: say the count, because nothing else does. */}
@@ -377,8 +423,11 @@ export function ShareOnPost({
               Filing is a consequence of the post, so it belongs under the sentence that announces
               the post. It appears when the write lands, which may be a moment after this opens. */}
           {filed && (
-            <div className="mt-4 flex w-full items-center gap-2.5 rounded-md border border-brand/40 bg-brand-soft px-3 py-2.5 text-start">
-              <Icon name="folder_open" size={17} className="flex-none text-brand" />
+            /* GREY, not orange: the project is a plain statement of where this request was filed,
+               with no verdict in it. In peach it competed with the caution above it for the one
+               colour that means «pay attention», on a dialog that can show both at once. */
+            <div className="mt-4 flex w-full items-center gap-2.5 rounded-md border border-border bg-surface2 px-3 py-2.5 text-start">
+              <Icon name="folder_open" size={17} className="flex-none text-muted-dark" />
               <span className="min-w-0 flex-1">
                 <b className="block truncate text-body font-semibold text-navy">
                   {fmt(t.projects.offer.filedTitle, { site: projectTitle(filed) })}

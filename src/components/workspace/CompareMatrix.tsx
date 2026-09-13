@@ -12,7 +12,7 @@ import { partyToken, termValueLabel } from "@/lib/contract/labels";
 import { termSides, type TermRow } from "@/lib/contract/bids";
 import type { DealRoomDocument } from "@/lib/contract/deal-room";
 import { submissionToBidDocuments, type LinkBidSubmission } from "@/lib/contract/link-bids";
-import { isOffPlatformBidId } from "@/lib/contract/bid-equipment-access";
+import { isOffPlatformBidId, mayOpenEquipmentSurface } from "@/lib/contract/bid-equipment-access";
 import { fetchBidDocuments } from "@/lib/api/client";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
@@ -540,7 +540,23 @@ export function CompareMatrix({
    * The recommendation wins the door when there is one: an agent that has ranked these bids has said
    * something about where to start, and a silent first-row default would ignore it.
    */
-  const equipmentTarget = (ranking ? rows.find((b) => b.card.id === ranking.bidId) : null) ?? rows[0] ?? null;
+  /**
+   * 🔴 **The door has to open on an IN-APP bid** (owner, 2026-09-13: *"the orange equipment must
+   * take to the map if at least one bid is in app, and in the map it will show other bids anyway"*).
+   *
+   * ~~`rows[0]`, whatever it was.~~ `/bids/{id}/equipment` reads a supplier’s registered machines,
+   * their papers and the yard he confirmed - and an OFF-PLATFORM submission has none of that, which
+   * is what `mayOpenEquipmentSurface` exists to say. On a request whose top row came in through the
+   * renter’s shared link - the ordinary case, and the one in his screenshot - the rail pointed at a
+   * surface that cannot be built.
+   *
+   * ⚠️ The recommendation still wins the door, but only if it is openable; otherwise the first
+   * row that IS. And the map carries every other offer in its header, so landing on one of them is a
+   * starting point rather than a choice made for the renter - which is why any in-app bid will do.
+   */
+  const openable = rows.filter((b) => mayOpenEquipmentSurface(b.card));
+  const equipmentTarget =
+    (ranking ? openable.find((b) => b.card.id === ranking.bidId) : null) ?? openable[0] ?? null;
   const openEquipment = () => {
     if (!equipmentTarget) return;
     router.push(`/bids/${encodeURIComponent(equipmentTarget.card.id)}/equipment`);
@@ -805,7 +821,7 @@ export function CompareMatrix({
 
         {/* ── The terms, in one block ── */}
         {shut.has("terms") ? (
-          <GroupRail label={t.workspace.groupTerms} hint={t.workspace.openTerms} onClick={() => toggleGroup("terms")} glyph="square" />
+          <GroupRail label={t.workspace.groupTerms} hint={t.workspace.openTerms} onClick={() => toggleGroup("terms")} glyph="square" tone="terms" />
         ) : (
           /* ── ONE heading, and the columns under it (owner, 2026-09-06) ──────────────────────────
              *"What is this «they offered on their own»? What does it mean?"* — asked twice, which is
@@ -835,8 +851,10 @@ export function CompareMatrix({
                the columns. Wide enough for the terms, the rail sits flush on the table's trailing
                edge; too narrow, the columns hold their width and the scroller carries them. */
           <div className="flex min-w-min flex-[1_0_auto] flex-col border-s border-border">
-            <div className={`${HEAD} flex items-center gap-1.5 bg-surface2/60 px-3`}>
-              <span className="min-w-0 text-label font-extrabold uppercase leading-tight tracking-wide text-navy-mid">
+            {/* ⚠️ The band keeps its tone OPEN as well as folded, or the colour would only mean
+                something while the section is shut - which is the half the renter reads least. */}
+            <div className={`${HEAD} flex items-center gap-1.5 ${BAND.terms.head} px-3`}>
+              <span className={`min-w-0 text-label font-extrabold uppercase leading-tight tracking-wide ${BAND.terms.ink}`}>
                 {t.workspace.groupTerms}
               </span>
               <FoldButton onClick={() => toggleGroup("terms")} hint={t.workspace.hideGroup} />
@@ -1345,16 +1363,38 @@ function humanTerm(raw: string | null, key: string, t: Dict, L: LFn): string | n
  * the one coloured rail on the row is the one that leaves the page. The glyph is the group's own mark
  * so two folded rails are told apart at a glance without reading them sideways.
  */
+/**
+ * The tone a band wears, folded or open.
+ *
+ * 🔴 **One colour per section** (owner, 2026-09-13: *"can u make a light color for each section
+ * like the orange, maybe light blue for terms and light grey for prices as it is now"*). The table
+ * is four bands of different KINDS - money, money, terms, equipment - and three of them were the
+ * same grey, so the only thing separating a rate from a certificate was the heading above it.
+ *
+ * ⚠️ **`info`, not `action`.** This palette has no true blue by design: `--info` is a slate that
+ * sits in the ink family, and `--action` (#1a7ec8) is reserved for the bid map’s ask by RM3-AC-33 -
+ * `palette-drift.test.ts` pins that and `rentee-map-surface.test.ts` forbids anything else wearing
+ * it. `--info-soft` is the palette’s own light informational ground, and the printed comparison has
+ * used `--info` for this exact band since it was written.
+ */
+const BAND = {
+  /* Money keeps the grey it has: it is the table’s default reading and the one the eye starts on. */
+  money: { rail: "border-border bg-surface2/70 hover:bg-surface3", head: "bg-surface2/60", ink: "text-navy-mid", dot: "bg-muted/60 group-hover:bg-navy-mid" },
+  terms: { rail: "border-info/25 bg-info-soft hover:bg-info/15", head: "bg-info-soft", ink: "text-info", dot: "bg-info/50 group-hover:bg-info" },
+} as const;
+
 function GroupRail({
   label,
   hint,
   onClick,
   glyph,
+  tone = "money",
 }: {
   label: string;
   hint: string;
   onClick: () => void;
   glyph: "dot" | "square";
+  tone?: keyof typeof BAND;
 }) {
   return (
     <button
@@ -1362,11 +1402,11 @@ function GroupRail({
       onClick={onClick}
       title={hint}
       aria-label={hint}
-      className="group flex w-11 flex-none flex-col items-center justify-center gap-2.5 overflow-hidden border-s border-border bg-surface2/70 transition hover:bg-surface3"
+      className={`group flex w-11 flex-none flex-col items-center justify-center gap-2.5 overflow-hidden border-s transition ${BAND[tone].rail}`}
     >
       <span
         aria-hidden="true"
-        className={`h-1.5 w-1.5 flex-none bg-muted/60 transition group-hover:bg-navy-mid ${glyph === "dot" ? "rounded-full" : "rounded-sm"}`}
+        className={`h-1.5 w-1.5 flex-none transition ${BAND[tone].dot} ${glyph === "dot" ? "rounded-full" : "rounded-sm"}`}
       />
       <span className="rotate-180 truncate text-label font-extrabold uppercase tracking-wide text-navy-mid [writing-mode:vertical-rl]">
         {label}

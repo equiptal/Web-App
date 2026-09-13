@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { TAXONOMY } from "@/lib/taxonomy/fixture";
 import { useRealApp } from "@/lib/config/env";
+import { TAXONOMY_INCLUDE_HIDDEN } from "@/lib/flags";
 import { agentsGet } from "@/lib/api/agents-backend";
 import { nodesToTree } from "@/lib/api/app-adapters";
 import type { TaxonomyNode, TaxonomyResponse } from "@/lib/contract/app";
@@ -19,7 +20,13 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   if (useRealApp) {
     try {
-      const data = await agentsGet<TaxonomyResponse | TaxonomyNode[]>("/agents/taxonomy?tenant=default");
+      /* `includeHidden` is the endpoint's own flag and it already returns `visibility` on every
+         node; without it the catalogue excludes HIDDEN, which is why a renter searching TYPE for a
+         hidden machine gets «—» (owner, 2026-09-13). 🔴 Held at false until the backend's B2 — the
+         create REFUSES a hidden subtype today, so offering one here buys a 422 at the end of the
+         card. See `TAXONOMY_INCLUDE_HIDDEN`. */
+      const query = TAXONOMY_INCLUDE_HIDDEN ? "?tenant=default&includeHidden=true" : "?tenant=default";
+      const data = await agentsGet<TaxonomyResponse | TaxonomyNode[]>(`/agents/taxonomy${query}`);
       const nodes = Array.isArray(data) ? data : data.nodes;
       return NextResponse.json(nodesToTree(nodes), { status: 200 });
     } catch (err) {

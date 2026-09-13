@@ -39,7 +39,7 @@
  * hiding instead: a site you stop using stops being picked, and drops off the six.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { useRfq } from "@/lib/store/rfq-store";
@@ -69,7 +69,25 @@ const ROW_GAP_PX = 8;
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
+export function ProjectChips({
+  onBrowseAll,
+  lead,
+}: {
+  onBrowseAll?: () => void;
+  /**
+   * The sentence that names what the pills are for, drawn beside them.
+   *
+   * BIG **It belongs to THIS component because this is the one that knows whether there are any**
+   * (owner, 2026-09-13: *"«اختر مشروعاً» - this is only shown when user have projects"*). It used to
+   * be a `<span>` in `Intake`, rendered unconditionally, while the strip beside it returns `null`
+   * for a renter with no sites - so a renter who has never filed one read a question with no answers
+   * anywhere near it, on the first screen he meets.
+   *
+   * MARK A slot rather than a string: the caller owns the wording and the type scale it is drawn at,
+   * and the intake is not the only surface that may want the strip.
+   */
+  lead?: ReactNode;
+}) {
   /* ⚠️ `onBrowseAll` is KEPT and still honoured when a caller passes one — a surface that wants a
      full picker rather than more rows can have it — but the intake passes none, which is why the
      expansion below is the default behaviour rather than a second thing to wire up. */
@@ -311,7 +329,14 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
        The strip and its toggle stack, so «All projects» sits UNDER the two rows it opens rather than
        inside them: a control that moves as the thing it controls grows is a control the renter has to
        find twice. */
-    <div className="flex min-w-0 flex-col items-start gap-2">
+    /* ⚠️ The lead sits BESIDE the stack, not above it, which is the shape the owner approved on
+       2026-09-12 - and it is outside the measured strip on purpose: `twoRowsPx` is read off the
+       first CHIP's height, and a sentence in that flow would be the thing measured instead. */
+    <div className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+      {lead}
+      {/* ⚠️ `flex-1`, so the strip takes the rest of the line after the lead rather than sizing to
+          its own contents - which is what leaves a row short of the card’s edge. */}
+      <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
       <div
         ref={strip}
         /* `overflow-hidden` only while clamped — expanded it must not cut a dropdown open on the
@@ -417,6 +442,7 @@ export function ProjectChips({ onBrowseAll }: { onBrowseAll?: () => void }) {
           {expanded && !onBrowseAll ? t.projects.chips.fewer : `${t.projects.chips.all} (${ordered.length})`}
         </button>
       )}
+      </div>
     </div>
   );
 }

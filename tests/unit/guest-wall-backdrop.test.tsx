@@ -116,3 +116,72 @@ describe("it is still a skeleton, which is the 2026-09-06 ruling", () => {
     for (const leaf of leaves) expect(leaf.className).toMatch(/animate-pulse/);
   });
 });
+
+describe("the card sits in the middle of the SCREEN, not of the preview", () => {
+  /**
+   * 🔴 Owner, 2026-09-13: *"the background and popup not centered, make it like the dashboard
+   * center"*. The card layer is `absolute inset-0`, so it centres inside the wall's own box - and
+   * that box was sized by the preview alone. On `/requests` the parent is a `flex-1` column the
+   * height of the viewport while the preview is about 570px, so the card landed near the top with
+   * half a screen of white beneath it.
+   */
+  it("takes the height its parent offers, and has a viewport floor of its own", () => {
+    const root = SRC.slice(SRC.indexOf('{...pin("guest-wall")}'), SRC.indexOf('aria-hidden="true"'));
+    // ⚠️ BOTH, and neither alone is enough: `h-full` is inert in ordinary page flow (the
+    // dashboard), and the floor is what gives the box height there now the backdrop is absolute.
+    expect(root).toMatch(/h-full/);
+    expect(root).toMatch(/min-h-\[calc\(100dvh-8rem\)\]/);
+    // ~~`min-h-[420px]`.~~ A flat floor shorter than the fold is the fault above, by another route.
+    expect(root).not.toMatch(/min-h-\[420px\]/);
+  });
+
+  it("floats the backdrop, so the preview cannot decide the wall's height", () => {
+    // ⚠️ In flow it would ALSO grow the page a scrollbar for a backdrop nobody can read or reach.
+    expect(glass).toMatch(/absolute inset-0/);
+    expect(glass).toMatch(/overflow-hidden/);
+  });
+
+  it("no longer claims a `sticky` that was never written", () => {
+    /**
+     * ⚠️ The old note said *"`sticky` inside the absolute layer keeps it in the middle of the
+     * VIEWPORT"* - a mechanism nobody implemented, which is most of why the card sat high for a
+     * week. The phrase survives STRUCK THROUGH, as the record of what was believed, so this reads
+     * the code rather than the prose: there is no `sticky` class in the file.
+     */
+    expect(SRC).toMatch(/~~«`sticky`/);
+    expect(SRC.replace(/\/\*[\s\S]*?\*\//g, "")).not.toMatch(/\bsticky\b/);
+  });
+});
+
+describe("each backdrop reaches the fold", () => {
+  /**
+   * Owner, 2026-09-13: *"show more from the background, like read dashboard and read requests, but
+   * blurred"*. Both previews stopped short, so the lower half of a tall screen was plain white and
+   * the shape stopped arguing half way down.
+   *
+   * 🔴 **Still no invented content.** The 2026-09-06 ruling stands: what is added is FURNITURE -
+   * more bands, more rows, more cells - and not one of them carries a name, a price or a date.
+   */
+  it("the requests page carries its comparison strip under the bid cards", () => {
+    const el = render(<GuestRequestsPreview />).container;
+    // ⚠️ Read by CLASS through a filter, never `querySelector`: an arbitrary-value Tailwind class
+    // needs its brackets escaped for CSS, and getting that wrong THROWS rather than missing, which
+    // reads as a real failure. Same rule the rail case above follows.
+    const cells = [...el.querySelectorAll("*")].filter((x) => x.className.toString().includes("w-[104px]"));
+    // Six term cells a row is the real strip's shape, over five supplier rows.
+    expect(cells.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it("the dashboard carries its supplier table under the cards", () => {
+    const el = render(<GuestDashboardPreview />).container;
+    // A head row of five column stubs, then rows with a mark, two runs and a pill.
+    expect(el.querySelectorAll(".rounded-full").length).toBeGreaterThanOrEqual(6);
+  });
+
+  it("neither preview writes a word", () => {
+    // ⚠️ The rule that makes all of this honest, re-asserted over the new bands.
+    for (const el of [render(<GuestRequestsPreview />).container, render(<GuestDashboardPreview />).container]) {
+      expect((el.textContent ?? "").trim()).toBe("");
+    }
+  });
+});
