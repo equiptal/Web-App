@@ -58,13 +58,24 @@ describe("the two round controls replaced two rows", () => {
 });
 
 describe("the sites are named on the same row", () => {
-  it("Given the strip, Then the sentence sits beside the pills", () => {
+  it("Given the strip, Then the sentence is handed TO the pills, not drawn beside them", () => {
+    /**
+     * 🔴 **Only when there are projects** (owner, 2026-09-13: *"«اختر مشروعاً» - this is only shown
+     * when user have projects"*). ~~A `<span>` in this file, next to `<ProjectChips />`.~~ That
+     * component returns `null` for a renter with no sites, and for a guest, so the question was
+     * asked unconditionally beside nothing at all - on the first screen a renter meets.
+     *
+     * ⚠️ The sentence still renders FIRST; what moved is who decides. `ProjectChips` draws `lead`
+     * ahead of its own strip, behind the same guard, so the question and its answers cannot part.
+     */
     expect(intake).toContain("t.projects.chips.pick");
-    const sentence = intake.indexOf("t.projects.chips.pick");
-    const pills = intake.indexOf("<ProjectChips />");
-    // 🔴 Beside them, and BEFORE them: it is the question the pills answer.
-    expect(sentence).toBeGreaterThan(-1);
-    expect(pills).toBeGreaterThan(sentence);
+    // Handed in as the `lead`, so the old bare `<ProjectChips />` is gone from this file.
+    expect(intake).toContain("lead={");
+    expect(intake).not.toContain("<ProjectChips />");
+    const chips = intake.indexOf("<ProjectChips");
+    const sentence = intake.indexOf("t.projects.chips.pick", chips);
+    // It is INSIDE the tag now, which is what makes it conditional.
+    expect(sentence).toBeGreaterThan(chips);
   });
 
   it("Given both locales, Then the sentence exists in each", () => {

@@ -75,6 +75,24 @@ export function OperatorRail({ item, shaking = false, onOpenState }: OperatorRai
      that already says «with an operator», and the canvas has to know that too — a renter whose agent
      answered the operator has seen it. */
   useEffect(() => { onOpenState?.(expanded); }, [expanded, onOpenState]);
+  /**
+   * BIG **A refusal OPENS it, it does not only rattle the door** (owner, 2026-09-13: *"can u let the
+   * operator open and shake when user try to click next without opening"*).
+   *
+   * ~~The closed 72px strip shook and stayed shut.~~ That asked the renter to work out that the
+   * shaking thing was a button and press it - on the one panel the whole pass exists because he has
+   * never pressed it. Opening it IS the look being demanded, so the refusal performs it and the
+   * shake says which panel just moved.
+   *
+   * MARK The rail still owns `expanded`; the canvas raises `shaking` and this turns it into a state
+   * change. A `forceOpen` prop would have been a second source of truth for the same fact.
+   *
+   * MARK No `else`: it must not CLOSE when the shake ends, or the panel would snap shut under a
+   * renter who has started reading it.
+   */
+  useEffect(() => {
+    if (shaking) setExpanded(true);
+  }, [shaking]);
   const complete = !on || [op.fatFood, op.fatAccommodationTransport, op.nationality].every(Boolean);
 
   const setOp = (field: string, patch: Parameters<typeof actions.patchItemOperator>[1]) => {
@@ -114,7 +132,16 @@ export function OperatorRail({ item, shaking = false, onOpenState }: OperatorRai
   }
 
   return (
-    <div {...pin("operator-rail")} className="flex w-full flex-none flex-col gap-4 self-stretch rounded-sm border border-border bg-surface p-3.5 lg:min-h-[530px] lg:w-[380px]">
+    /* MARK The shake is on the OPEN panel as well now. It used to live only on the closed strip,
+       which is the one element that stops existing the moment the refusal opens the rail - so
+       without this the gesture would fire on a node being unmounted and the renter would see the
+       panel appear with nothing drawing his eye to it. */
+    <div
+      {...pin("operator-rail")}
+      className={`flex w-full flex-none flex-col gap-4 self-stretch rounded-sm border bg-surface p-3.5 lg:min-h-[530px] lg:w-[380px] ${
+        shaking ? "shake-error border-brand" : "border-border"
+      }`}
+    >
       <div {...pin("operator-rail-head")} className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-2">
           <PanelDot complete={complete} />

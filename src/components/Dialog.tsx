@@ -190,6 +190,9 @@ function useDialogKeys(open: boolean, onClose: () => void, panel: React.RefObjec
   }, [open, panel]);
 }
 
+/** A stable no-op, so `useDialogKeys`'s ref does not churn on every render. */
+const NOOP = () => {};
+
 export function Dialog({
   open,
   onClose,
@@ -203,6 +206,7 @@ export function Dialog({
   flushHeader = false,
   padded = true,
   tone = "default",
+  dismissible = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -218,9 +222,26 @@ export function Dialog({
   padded?: boolean;
   /** `dark` puts the same shell on navy — see {@link PANEL}. The floating close follows it. */
   tone?: DialogTone;
+  /**
+   * `false` takes away all THREE ways out — the scrim, the corner close and Escape — so the body
+   * inside is the only thing that can end this dialog.
+   *
+   * ⚠️ **Almost nothing may use this.** A dialog a reader cannot dismiss is a trap, and the rule
+   * this app has kept is that every layer has a way out. It exists for ONE case (owner, 2026-09-13):
+   * the half-finished signup, where the renter has verified a code and the account behind it is not
+   * yet an account. Leaving THERE is not «close the dialog», it is «abandon the signup» — a
+   * different act with a different consequence, and the body has to offer it explicitly.
+   *
+   * So: only pass `false` where the body itself carries the way out. `AccountModal` is the only
+   * caller, and `onboarding-gate.test.tsx` pins that it does.
+   */
+  dismissible?: boolean;
 }) {
   const panel = useRef<HTMLDivElement>(null);
-  useDialogKeys(open, onClose, panel);
+  /* Escape is one of the three exits, so it goes with the other two. The hook still runs - it owns
+     the focus trap and the focus handback, which an undismissable dialog needs MORE than an ordinary
+     one, not less. */
+  useDialogKeys(open, dismissible ? onClose : NOOP, panel);
 
   /** True when another dialog was already open when this one mounted — see {@link openDialogs}. */
   const [nested, setNested] = useState(false);
@@ -238,7 +259,7 @@ export function Dialog({
   return (
     <div {...pin("dialog")}
       className={`${nested ? NESTED_SCRIM : SCRIM} flex items-end justify-center p-0 sm:items-center sm:p-4`}
-      onClick={onClose}
+      onClick={dismissible ? onClose : undefined}
       role="dialog"
       aria-modal="true"
       /* Print hooks. A caller that wants to print only its own dialog needs to name the scrim and the
@@ -262,7 +283,7 @@ export function Dialog({
       >
         {/* A dialog whose body supplies its own headings still needs a way out, so the close floats
             in the corner rather than being dropped along with the header. */}
-        {!title && !icon && (
+        {!title && !icon && dismissible && (
           <div className="absolute end-1.5 top-1.5 z-10">
             <DialogClose onClose={onClose} tone={tone === "dark" ? "onDark" : "default"} />
           </div>
@@ -275,7 +296,7 @@ export function Dialog({
               {title && <h2 className={cx("text-title font-extrabold leading-tight tracking-[-.2px] text-navy", TITLE_CASE)}>{title}</h2>}
               {subtitle && <p className="mt-0.5 text-meta leading-snug text-muted">{subtitle}</p>}
             </div>
-            <DialogClose onClose={onClose} />
+            {dismissible && <DialogClose onClose={onClose} />}
           </div>
         )}
 

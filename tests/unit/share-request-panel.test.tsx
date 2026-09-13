@@ -42,6 +42,8 @@ const api = vi.hoisted(() => ({
   } | null,
   connectUrl: null as string | null,
   disconnected: 0,
+  /** How many times the panel has ASKED for the connection state. The re-read is a behaviour. */
+  connectCalls: 0,
 }));
 
 vi.mock("@/lib/api/client", () => ({
@@ -60,7 +62,10 @@ vi.mock("@/lib/api/client", () => ({
     }
     return Promise.resolve(api.mail);
   },
-  mailConnectStatus: () => Promise.resolve(api.connect),
+  mailConnectStatus: () => {
+    api.connectCalls += 1;
+    return Promise.resolve(api.connect);
+  },
   mailConnectUrl: () => Promise.resolve(api.connectUrl),
   mailDisconnect: () => {
     api.disconnected += 1;
@@ -113,6 +118,7 @@ beforeEach(() => {
   api.connect = { configured: false, connected: false, provider: null, accountEmail: null, connectedAt: null };
   api.connectUrl = null;
   api.disconnected = 0;
+  api.connectCalls = 0;
   api.rows = [
     { id: "1", name: "Al Faisal Rentals", email: "ops@alfaisal.sa", phone: "+966501112233", verified: true },
     // No address: he is in the list, he is pickable, and he is honestly named as skipped.
@@ -1498,11 +1504,16 @@ describe("copy subject, copy body", () => {
     expect(write).not.toHaveBeenCalled();
   });
 
-  it("Given no link yet, Then the BODY is locked and the SUBJECT is not", async () => {
+  it("Given no link yet, Then BOTH copies are live and the body says the link is coming", async () => {
     /**
-     * ⚠️ The message ends with a URL that does not exist before the post, so copying the body
-     * early hands him a message with a hole where the link goes. The subject has no link in it: it
-     * names the machine, and that is true before anything is published.
+     * 🔴 **This REVERSES «the body is locked before the post» (2026-09-07).** Owner, 2026-09-13:
+     * *"why i cant copy the body?"* - which is the whole argument: a greyed button beside a message
+     * he can read says «no» and never «not yet, and here is why». They are his own words, and they
+     * are his before anything is published.
+     *
+     * What survives is the caveat, moved onto the control: while there is no request the button
+     * carries `copyBodyPending` on its `title`, and the clipboard gets exactly what is on screen -
+     * the message without a link, because there is no link.
      */
     render(
       <LocaleProvider>
@@ -1512,7 +1523,9 @@ describe("copy subject, copy body", () => {
     await screen.findByText("Al Faisal Rentals");
     fireEvent.click(screen.getByText(c.outlook));
 
-    expect(screen.getAllByText(c.copyBodyBtn)[0].closest("button")!.hasAttribute("disabled")).toBe(true);
+    const body = screen.getAllByText(c.copyBodyBtn)[0].closest("button")!;
+    expect(body.hasAttribute("disabled")).toBe(false);
+    expect(body.getAttribute("title")).toBe(c.copyBodyPending);
     expect(screen.getAllByText(c.copyTitleBtn)[0].closest("button")!.hasAttribute("disabled")).toBe(false);
   });
 
@@ -2248,17 +2261,17 @@ describe("the envelope reads like a message header", () => {
     await preview();
 
     /**
-     * ⚠️ **The chip shows the NAME**, like both clients do: he knows «Al Faisal Rentals», he does
-     * not necessarily know `ops@alfaisal.sa` belongs to them. An address with no name behind it
-     * stands alone, because a chip with nothing readable on it is worse than a raw address.
+     * 🔴 **The chip shows the ADDRESS** (owner, 2026-09-13: *"why it shows the supplier name in the
+     * bcc, it must be the email"*), reversing «the name leads» - which was borrowed from what a mail
+     * client draws for a header the renter WROTE. This one is addressed for him off his own supplier
+     * list, and the question here is not «who is this» but «is that the right mailbox».
      */
-    expect(screen.getAllByText("Al Faisal Rentals").length).toBeGreaterThan(1);
-    expect(screen.getAllByText("Zahid Tractor").length).toBeGreaterThan(1);
+    // `getAllByText`: the supplier LIST behind the preview prints the address on its own row too.
+    expect(screen.getAllByText("ops@alfaisal.sa").length).toBeGreaterThan(1);
+    expect(screen.getAllByText("bids@zahid.sa").length).toBeGreaterThan(1);
     // Two separate elements, never one run-on line.
     expect(screen.queryByText("ops@alfaisal.sa, bids@zahid.sa")).toBeNull();
-    /* ⚠️ The chip carries the NAME and keeps the address on its `title`, which is what both
-       clients do: he knows «Al Faisal Rentals», he does not necessarily know `ops@alfaisal.sa`
-       belongs to them. */
+    // The name is one hover away, so nothing is lost - only the order of the two.
     expect(document.querySelector('[title="Zahid Tractor · bids@zahid.sa"]')).toBeTruthy();
   });
 
@@ -2305,7 +2318,9 @@ describe("the envelope reads like a message header", () => {
     fireEvent.click(screen.getByText(c.outlook));
 
     // The Bcc chip carries his supplier's NAME, so it appears twice: the row, and the chip.
-    await waitFor(() => expect(screen.getAllByText("Al Faisal Rentals").length).toBeGreaterThan(1));
+    /* The ticked row is in Bcc before any preview exists - by its ADDRESS, the same as after
+       (owner, 2026-09-13). Its NAME appears once, on the supplier row it was ticked from. */
+    await waitFor(() => expect(screen.getAllByText("ops@alfaisal.sa").length).toBeGreaterThan(1));
     await waitFor(() => expect(screen.getByText(c.envTo)).toBeTruthy());
     // ⚠️ And From leads, because it is the field this whole feature exists to control.
     expect(screen.getByText(c.envFrom)).toBeTruthy();
@@ -2357,14 +2372,19 @@ describe("the confirm dialog", () => {
     await waitFor(() => expect(confirmButton()).toBeNull());
   });
 
-  it("Given the suppliers, Then they are NAMED, every one of them", async () => {
+  it("Given the suppliers, Then each is there by ADDRESS, one per chip", async () => {
     /**
      * 🔴 A number is not something he can check, and this is the last screen before his request
-     * reaches other firms.
+     * reaches other firms. The chips have carried the address since 2026-09-09 - «Al Faisal
+     * Rentals» cannot tell him whether the mail goes to the branch mailbox or to a salesman's.
+     *
+     * ⚠️ This used to count the NAME twice - once in the supplier list, once in the envelope chip
+     * behind the dialog - which made it pass for the wrong reason. The envelope says the address
+     * now too, so the name appears once and the assertion asks the question it meant to.
      */
     await toConfirm();
-    // Twice: the row in the list, and the chip in the dialog.
-    expect(screen.getAllByText("Al Faisal Rentals").length).toBeGreaterThan(1);
+    expect(screen.getByText("Al Faisal Rentals")).toBeTruthy();
+    expect(screen.getAllByText("ops@alfaisal.sa").length).toBeGreaterThan(0);
     /* ⚠️ The mailbox that will send it, in the Outlook block's own detail line. The dialog states
        DESTINATIONS now rather than two sentences, so the address rides the block it belongs to. */
     expect(screen.getByText(c.destOutlookBodyOne.replace("{from}", "bandar@zahid.sa"))).toBeTruthy();
@@ -2425,7 +2445,11 @@ describe("what the caller is told", () => {
     await waitFor(() =>
       expect(shared).toHaveBeenCalledWith(1, "email", {
         handedOff: false,
-        mail: { from: "bandar@zahid.sa", recipients: 1, inSentFolder: true },
+        /* `emails` arrived on 2026-09-13, so the tick can say WHICH suppliers it reached rather
+           than only how many. The backend names them when it can; this stub does not, and nothing
+           was skipped, so the panel falls back to the addresses it picked — which is the one case
+           where our list and the server's cannot differ. */
+        mail: { from: "bandar@zahid.sa", recipients: 1, inSentFolder: true, emails: ["ops@alfaisal.sa"] },
       }),
     );
     expect(shared).toHaveBeenCalledTimes(1);
@@ -2948,5 +2972,30 @@ describe("the one refusal the renter can clear himself", () => {
     expect(link.getAttribute("target")).toBe("_blank");
     // The generic sentence is NOT used for this one.
     expect(screen.queryByText(new RegExp(c.mailNotSent.slice(0, 30)))).toBeNull();
+  });
+
+  it("Given NO_SENDER_ADDRESS, Then the CONNECTION is re-read, because it is the other candidate", async () => {
+    /**
+     * 🔴 Owner, 2026-09-13, on that sentence a second time: *"didnt we fix this???"*
+     *
+     * This panel only calls the endpoint when it believes Outlook is connected - Gmail returns
+     * through its own branch and never reaches it - so the backend answering `NO_SENDER_ADDRESS`
+     * means `accessTokenFor` failed and it fell through to the SES branch. Which remedy is the real
+     * one then depends on which Lambda is deployed, and this screen cannot know: the profile link
+     * stays (it demonstrably worked on the build tested on 2026-09-12), and the status is re-read so
+     * the Reconnect route appears when the token is the cause.
+     */
+    api.connect = { configured: true, connected: true, provider: "microsoft", accountEmail: "bandar@zahid.sa", connectedAt: null };
+    api.mail = { sent: false, reason: "NO_SENDER_ADDRESS", from: null, via: null, domain: null, dns: [], connectPath: null };
+
+    draw({ draftForm: DRAFT });
+    fireEvent.click(await screen.findByText("Al Faisal Rentals"));
+    fireEvent.click(screen.getByText(c.outlook));
+    // The mount read is one call; the send must produce ANOTHER once the refusal lands.
+    const before = api.connectCalls;
+    fireEvent.click(screen.getByText(c.sendToSuppliers).closest("button")!);
+    fireEvent.click(confirmButton()!);
+
+    await waitFor(() => expect(api.connectCalls).toBeGreaterThan(before));
   });
 });

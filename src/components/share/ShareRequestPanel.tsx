@@ -131,7 +131,7 @@ export interface ShareRequestPanelProps {
       /** True when a tab, a pop-up or the device's own sheet took over. False when we sent it. */
       handedOff: boolean;
       /** Present only for a server-side send: what left, from where, and whether a copy was filed. */
-      mail?: { from: string; recipients: number; inSentFolder: boolean };
+      mail?: { from: string; recipients: number; inSentFolder: boolean; emails: string[] };
     },
   ) => void;
   /** Rows to start with ticked — the per-row share action picks one. */
@@ -746,9 +746,16 @@ export function ShareRequestPanel({
    * message"*). Copy link answers *give me the URL*; these answer *give me what you were going to
    * send*. Folding them together is what made Copy ambiguous the first time.
    *
-   * ⚠️ The body is locked until the request is posted, the same rule as the link itself: the
-   * message ends with a URL that does not exist yet. The SUBJECT is not, because it names the
-   * machine and is true before anything is published.
+   * 🔴 **The body is no longer LOCKED before the post** (owner, 2026-09-13: *"why i cant copy the
+   * body?"*). It was, on the rule that the message ends with a URL that does not exist yet - and
+   * that rule answered a question nobody had asked: a greyed button beside a message he can read
+   * says only «no», never «not yet, and here is why». He is copying his own words, which are his
+   * before anything is published.
+   *
+   * What survives is the WARNING, moved onto the control where he meets it: while there is no
+   * request the button carries `copyBodyPending` on `title`, and what lands on the clipboard is
+   * exactly what is on screen - the message without a link, because there is no link. The preview
+   * already says so in its own words (`linkPending`), so the clipboard and the screen agree.
    */
   const copySubject = async () => {
     await navigator.clipboard?.writeText(subject).catch(() => {});
@@ -757,18 +764,25 @@ export function ShareRequestPanel({
   };
 
   const copyBody = async () => {
-    if (!uuid || !card) return;
-    const url = bidShareUrl(uuid);
-    /* ⚠️ Both flavours, as before: the receiving app chooses. Gmail and Outlook keep the HTML and
-       draw the card; a chat takes the words. */
-    await copyShareMessage(
-      renderShareMessage(card.model, url, { template, renterName, lang }),
-      shareMessageHtml(card.model, url, card.imageUrl || `${window.location.origin}/bid/${uuid}/og?lang=${lang}`, {
-        template,
-        renterName,
-        lang,
-      }),
-    ).catch(() => {});
+    if (!card) return;
+    /* No request yet means no link. The empty string is what the renderers already treat as «no
+       link»: `renderShareMessage` filters that block out and `shareMessageHtml` draws no link line. */
+    const url = uuid ? bidShareUrl(uuid) : "";
+    /* ⚠️ Both flavours once the request exists: the receiving app chooses. Gmail and Outlook keep
+       the HTML and draw the card; a chat takes the words.
+
+       ⚠️ **Before the post, the PLAIN flavour only.** The rich one wraps the whole card in
+       `<a href="…">`, and an empty href resolves to whatever page the message is pasted into - a
+       card that looks like a link and goes nowhere is worse than no card. His words are what he
+       asked for, and they are all that exists yet. */
+    const html = uuid
+      ? shareMessageHtml(card.model, url, card.imageUrl || `${window.location.origin}/bid/${uuid}/og?lang=${lang}`, {
+          template,
+          renterName,
+          lang,
+        })
+      : "";
+    await copyShareMessage(renderShareMessage(card.model, url, { template, renterName, lang }), html).catch(() => {});
     setCopiedPart("body");
     setTimeout(() => setCopiedPart(null), 2400);
   };
@@ -944,7 +958,7 @@ export function ShareRequestPanel({
        there is nothing to wait for — see `onShared`. */
     let handedOff = false;
     /** What the server sent, when it was the server that sent it. */
-    let mail: { from: string; recipients: number; inSentFolder: boolean } | undefined;
+    let mail: { from: string; recipients: number; inSentFolder: boolean; emails: string[] } | undefined;
 
     // `post` mode mints the request first; a share that fails afterwards leaves a LIVE request, and
     // that is deliberate — the post is what the renter came here for, and rolling it back to tidy up
@@ -1169,14 +1183,50 @@ export function ShareRequestPanel({
        * ⚠️ Re-read, never guessed: the status endpoint is the one thing that knows, and writing
        * `connected: false` from here would be this panel inventing a fact about an account.
        */
-      if (outcome.sent === false && outcome.reason === "RECONNECT_REQUIRED") {
+      /**
+       * 🔴 **`NO_SENDER_ADDRESS` is re-read too, and it is the same fault wearing another name**
+       * (owner, 2026-09-13: *"didnt we fix this???"*, on that sentence again).
+       *
+       * This endpoint is only CALLED when the panel believes the mailbox is connected - `willSend`
+       * above requires it - so the backend reaching its SES branch at all means `accessTokenFor`
+       * failed. That branch then refuses on the profile e-mail, which is a true statement about a
+       * path he was never on: Graph sends from the mailbox he consented with and reads no profile
+       * e-mail at all. Adding one would change nothing.
+       */
+      if (
+        outcome.sent === false &&
+        (outcome.reason === "RECONNECT_REQUIRED" ||
+          outcome.reason === "NOT_CONNECTED" ||
+          outcome.reason === "NO_SENDER_ADDRESS")
+      ) {
         await mailConnectStatus().then(setConnect).catch(() => {});
       }
 
       if (outcome.sent) {
         reached += outcome.recipients;
         // Nothing opened and nothing to come back from: this is the path the owner's report is about.
-        mail = { from: outcome.from, recipients: outcome.recipients, inSentFolder: outcome.inSentFolder };
+        /* ── WHO it went to, for the tick (owner, 2026-09-13) ──────────────────────────
+           *"in the success message when a request is posted and sent to email, show to who it was
+           sent, like their emails"*.
+           🔴 The backend's list wins whenever it gives one, because the recipients are DERIVED
+           there off the renter's supplier rows — our own `reachable` is what we asked for, not what
+           went out. It is used as the fallback only when nothing was skipped: then the two sets are
+           the same size and naming ours cannot name somebody the server dropped. With a skip and no
+           list from the backend the tick says the COUNT alone, as it did before. */
+        mail = {
+          from: outcome.from,
+          recipients: outcome.recipients,
+          inSentFolder: outcome.inSentFolder,
+          /* `?.` although the parser always fills it: this runs AFTER the request is posted, and a
+             throw here loses the share on a request that is already live. A response shape we do not
+             recognise must degrade to «we were not told», never to an exception. */
+          emails:
+            (outcome.recipientEmails?.length ?? 0) > 0
+              ? outcome.recipientEmails
+              : outcome.skipped === 0
+                ? reachable.map((x) => x.email as string)
+                : [],
+        };
         /*
          * — the draft tab opened here —
          *
@@ -1399,6 +1449,16 @@ export function ShareRequestPanel({
       {/* ── The link ──────────────────────────────────────────────────────────────────────────── */}
       {showLink && (
       <div className="grid grid-cols-[minmax(0,1fr)] gap-2">
+        {/* BIG **The same grid as the two columns below** (owner, 2026-09-13: *"make it wider and on
+            the beginning of the preview card below it"*). ~~A flex row with the expiry pushed to the
+            far end by `ms-auto`.~~ That put the deadline wherever the link happened to stop, which is
+            nowhere in particular: on a wide card it floated in the middle of the band with nothing
+            under it, and it lined up with no edge on the screen.
+            Sharing the template means the expiry starts on exactly the same vertical as the preview
+            card beneath it, at every width and in both directions, with nothing to keep in step by
+            hand. Below `lg` there is one column and the two simply stack, which is the same thing
+            that happens to the cards. */}
+        <div className="grid grid-cols-[minmax(0,1fr)] items-center gap-x-6 gap-y-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
         <div className="flex flex-wrap items-center gap-2">
           {/* The heading rides this row — see `heading`. */}
           {heading}
@@ -1420,11 +1480,21 @@ export function ShareRequestPanel({
               at the moment he asks for it, which is the only moment it answers a question he has. */}
           <span
             className={cx(
-              "flex h-[38px] min-w-0 flex-1 items-center gap-2 rounded-md border ps-3 pe-1",
-              /* ⚠️ **Capped.** Left to grow it took every pixel the expiry was not using, which is
-                 how a masked stub ended up the widest object on the row. A real bid URL fits inside
-                 380px; anything longer truncates, which it always did. */
-              "sm:max-w-[380px]",
+              "flex h-[38px] min-w-0 items-center gap-2 rounded-md border ps-3 pe-1",
+              /* 🔴 **The width of the card beneath it** (owner, 2026-09-13: *"make its width fit
+                 the «send to my suppliers» card below it"*).
+
+                 ~~`flex-1` with an `sm:max-w-[380px]` cap.~~ The cap was answering the previous
+                 fault - a masked stub that grew into every pixel the expiry was not using - and it
+                 over-corrected: the field then ended wherever 380px ran out, which lines up with
+                 nothing on the screen. `basis-full` gives it its own line inside this grid cell and
+                 `w-full` fills it, so its two edges are the supplier card’s two edges, at every
+                 width and in both directions.
+
+                 ⚠️ It shares the cell with the panel’s HEADING, which is why `basis-full` and not
+                 just `w-full`: on the surfaces that pass one, the field takes the line under it
+                 rather than whatever the heading leaves. */
+              "w-full basis-full",
               uuid ? "border-border bg-surface" : "border-dashed border-border-strong bg-surface2",
             )}
           >
@@ -1482,34 +1552,6 @@ export function ShareRequestPanel({
             </button>
           </span>
 
-          {/* ── The EXPIRY leads the row now, on the trailing edge (owner, 2026-09-12) ───────────
-              *"so now the expiry date is more dominant, make it the main cta in this row and
-              actually make it on the right and the link copy placeholder on the left"*.
-
-              It is the only thing on this row a renter DECIDES. The link is minted for him and the
-              copy acts on it; the date is his own deadline for the whole share, and it was dressed
-              as the quietest object there — grey label, grey glyph, hairline border.
-
-              ⚠️ **Brand tone, not a filled button.** The panel already has one filled primary, the
-              Send on the channel row, and a second would put two competing presses on one card. This
-              is dominant WITHIN its row — brand ground, brand edge, the label in `brand-deep` — and
-              still reads as a field, which it is.
-
-              ⚠️ `ms-auto`, never `ml-auto`: this screen mirrors, so «the right» is the edge the
-              renter reads TOWARDS, which is the left in Arabic. */}
-          {showExpiry && (
-            <span className="ms-auto flex h-[38px] flex-none items-center gap-2 rounded-md border border-brand/45 bg-brand-soft px-3">
-              <Icon name="event" size={15} className="flex-none text-brand-deep" />
-              <span className="whitespace-nowrap text-label font-extrabold uppercase tracking-[0.05em] text-brand-deep">{c.expiry}</span>
-              <input
-                type="date"
-                value={expiry}
-                onChange={(e) => setExpiry(e.target.value)}
-                aria-label={c.expiry}
-                className="w-[124px] bg-transparent text-meta font-semibold text-navy outline-none"
-              />
-            </span>
-          )}
           {/*
             * — «Preview form» lived here —
             *
@@ -1518,6 +1560,39 @@ export function ShareRequestPanel({
             * form, and once it was locked until the post it was a disabled button on the row a
             * renter reads for his LINK. The preview that matters is the one on this screen.
             */}
+        </div>
+
+        {/* ── The deadline, over the card it is about ─────────────────────────────────────
+            It is the only thing on this band a renter DECIDES - the link is minted for him and the
+            copy acts on it - so it keeps the brand tone it took on 2026-09-12.
+
+            ⚠️ **Brand tone, not a filled button.** The panel already has one filled primary, the
+            Send on the channel row, and a second would put two competing presses on one card. This
+            is dominant within its band and still reads as a field, which is what it is.
+
+            ⚠️ **No `ms-auto` any more.** The grid places it; pushing it as well would fight the
+            column it is supposed to line up with. `w-full` is the «wider»: it now takes the whole
+            preview column rather than shrinking to its own contents, which is also what makes room
+            for the sentence. */}
+        {showExpiry && (
+          <label className="flex h-[38px] w-full items-center gap-2 rounded-md border border-brand/45 bg-brand-soft px-3">
+            <Icon name="event" size={15} className="flex-none text-brand-deep" />
+            {/* ⚠️ `normal-case`, and no `uppercase`: it is a SENTENCE now. Shouted, a line this
+                long stops being readable, and the type scale's label step is for one or two words. */}
+            <span className="min-w-0 flex-1 truncate text-meta font-semibold normal-case text-brand-deep">
+              {c.expiry}
+            </span>
+            {/* ⚠️ The `aria-label` is the short NOUN (`expiryName`), never the sentence: a screen
+                reader wants to be told which field this is, and the reason is the visible half. */}
+            <input
+              type="date"
+              value={expiry}
+              onChange={(e) => setExpiry(e.target.value)}
+              aria-label={c.expiryName}
+              className="w-[124px] flex-none bg-transparent text-meta font-semibold text-navy outline-none"
+            />
+          </label>
+        )}
         </div>
       </div>
       )}
@@ -1855,25 +1930,6 @@ export function ShareRequestPanel({
             </span>
             <span className="ms-auto" />
 
-            {/* ⚠️ **The one paste Outlook genuinely cannot do without**, and only when it is
-                real: its deeplink discards `bcc`, so the window opened addressed to nobody. Drawn
-                only after a fallback actually happened, because a server-side send carries the
-                recipients on the message and has nothing to paste. */}
-            {pasteAddresses.length > 0 && (
-              <button
-                type="button"
-                title={c.copyAddressesHint}
-                className={cx(btn("secondary", "sm"), "flex-none")}
-                onClick={() => {
-                  void navigator.clipboard?.writeText(pasteAddresses.join("; ")).catch(() => {});
-                  setAddrCopied(true);
-                  setTimeout(() => setAddrCopied(false), 2400);
-                }}
-              >
-                <Icon name={addrCopied ? "check" : "contact_mail"} size={14} />
-                {addrCopied ? c.copyAddressesDone : c.copyAddresses}
-              </button>
-            )}
           </span>
 
 
@@ -1937,7 +1993,39 @@ export function ShareRequestPanel({
                       where it goes — to him — without inventing which of his mailboxes. */}
                   <MailChips people={envelopeTo} empty={c.envYourMail} skin={skin} />
                 </MailField>
-                <MailField label={c.envBcc} skin={skin}>
+                {/* ── The copy sits ON the Bcc row (owner, 2026-09-13) ────────────────────
+                    *"what this copy? make it copy emails on the bcc field, not here"*.
+                    🔴 It was a toolbar button over the PREVIEW heading, beside «the message they
+                    receive» — nothing said which addresses it meant, which is exactly what he asked.
+                    On the field it copies, it needs no explaining, and it is the rule the subject and
+                    the body already follow (2026-09-07: *"one on the title as copy title and one on
+                    the body as copy body"*).
+                    🔴 **Only when there is something to paste, and that is not a detail.** The
+                    first cut drew it on every Bcc row with an address in it, which two pinned cases
+                    refuse (`share-request-panel`: «Given nothing was sent yet», «Given WE sent it —
+                    the message carried them»). A server-side send puts the recipients on the
+                    message; offering a paste there says the send needs one, which is worse than
+                    saying nothing. It exists for exactly one fault: Outlook's deeplink drops `bcc`
+                    silently, so the window it opened was addressed to nobody. */}
+                <MailField
+                  label={c.envBcc}
+                  skin={skin}
+                  action={
+                    pasteAddresses.length > 0 ? (
+                      <CopyBit
+                        label={addrCopied ? c.copyAddressesDone : c.copyAddresses}
+                        done={addrCopied}
+                        title={c.copyAddressesHint}
+                        disabled={false}
+                        onClick={() => {
+                          void navigator.clipboard?.writeText(pasteAddresses.join("; ")).catch(() => {});
+                          setAddrCopied(true);
+                          setTimeout(() => setAddrCopied(false), 2400);
+                        }}
+                      />
+                    ) : undefined
+                  }
+                >
                   <MailChips people={envelopeBcc} empty={c.envNoRecipients} skin={skin} />
                 </MailField>
                 <MailField
@@ -1999,7 +2087,8 @@ export function ShareRequestPanel({
                     label={copiedPart === "body" ? c.copied : c.copyBodyBtn}
                     done={copiedPart === "body"}
                     onClick={() => void copyBody()}
-                    disabled={!uuid || !card}
+                    disabled={!card}
+                    title={!uuid ? c.copyBodyPending : undefined}
                   />
                 </div>
                 <Message
@@ -2029,7 +2118,8 @@ export function ShareRequestPanel({
                   label={copiedPart === "body" ? c.copied : c.copyBodyBtn}
                   done={copiedPart === "body"}
                   onClick={() => void copyBody()}
-                  disabled={!uuid || !card}
+                  disabled={!card}
+                  title={!uuid ? c.copyBodyPending : undefined}
                 />
                 <PreviewTools lang={lang} setLang={setLang} />
               </div>
@@ -2321,7 +2411,9 @@ export function ShareRequestPanel({
               does not admit it either. No second guard — a dead comparison reads as a live rule.
               ⚠️ The reason is NOT translated. It is the part that makes a screenshot of this line
               diagnostic, which is how the next report arrives already answered. */}
-          {mailer?.sent === false && (
+          {mailer?.sent === false && (() => {
+            const noSender = mailer.reason === "NO_SENDER_ADDRESS";
+            return (
             <span className="flex items-start gap-1.5 text-meta font-semibold text-danger-deep">
               <Icon name="error_outline" size={14} className="mt-px flex-none" />
               <span>
@@ -2332,13 +2424,21 @@ export function ShareRequestPanel({
                     over something one field would fix. Owner, 2026-09-12: *"it is because the user
                     doesnt have email in his profile but once i added it worked"*.
 
-                    ⚠️ It should be unreachable on a CONNECTED mailbox — Graph sends from the mailbox
-                    he consented with and that guard was narrowed to the SES path on 2026-09-09
-                    (`629db61f`). It is drawn for both paths anyway: the deployed Lambda is older
-                    than that commit until somebody redeploys it, and the sentence is true either
-                    way. */}
-                {mailer.reason === "NO_SENDER_ADDRESS" ? c.mailNoSender : c.mailNotSent} ({mailer.reason})
-                {mailer.reason === "NO_SENDER_ADDRESS" && (
+                    🔴 **The MAILBOX is offered beside it now** (owner, 2026-09-13: *"didnt we fix
+                    this???"*, on this sentence again). This panel only calls that endpoint when it
+                    believes Outlook is connected - Gmail returns through its own branch and never
+                    reaches it - so the backend answering at all means `accessTokenFor` failed and it
+                    fell through to the SES branch, where the profile e-mail is what it checks.
+                    Whether the remedy is the profile or the connection therefore depends on WHICH
+                    Lambda is deployed, and this screen cannot know: on the build the owner tested on
+                    2026-09-12 adding the address really did work, because the old guard ran before
+                    the token check.
+                    So both routes are on screen and neither is guessed at: the sentence keeps the
+                    one-field fix, and `send` now re-reads the connection on this reason, which is
+                    what makes the Reconnect offer below appear when the token is the real cause. The
+                    bracketed code is what tells us which it was. */}
+                {noSender ? c.mailNoSender : c.mailNotSent} ({mailer.reason})
+                {noSender && (
                   /* A new tab, never a navigation: the request is posted but the panel still holds
                      his picks, his message and the link, and leaving would drop all of it. */
                   <>
@@ -2355,7 +2455,8 @@ export function ShareRequestPanel({
                 )}
               </span>
             </span>
-          )}
+            );
+          })()}
 
           {/* ── Connect Outlook, as an act of its own (SUP-BE-23, the Graph path) ─────────────
               🔴 **Offered the moment Outlook is picked, and no longer inside Send** (owner,
@@ -2742,13 +2843,33 @@ function Destination({
   detail: string;
   children?: ReactNode;
 }) {
+  /* ══ THREE tones, three meanings, and the same three on the card (owner, 2026-09-13) ════════
+     *"can u unify the colours and their meanings"*, on the share panel beside the posted tick.
+     🔴 They had drifted into FIVE: a cream `warn` block for the off-catalogue caution, a peach
+     `brand` block for a destination that would receive it, a green one for a destination that had,
+     a peach one again for the project it was filed under, and grey for a destination that would
+     not. Two of those peaches meant different things, and the cream meant the same thing the create
+     card had just started saying in orange.
+
+       ORANGE  bg-brand-soft / border-brand-light / text-brand-deep
+               «pay attention» — this will not work the way you expect. One per screen, ideally.
+       GREEN   bg-ok-soft / border-ok/40 / text-ok-deep
+               «it happened». Never a promise about the future; the tick is the only place it is
+               earned.
+       GREY    bg-surface2 / border-border · border-border-strong
+               a plain statement with no verdict: a destination listed, a project named.
+
+     `on` and `off` are both GREY on purpose — one is «this will receive it», the other «this will
+     not», and neither is a verdict on the request. They are told apart by the border's weight, by
+     the greyed mark below, and by the words, which is where that difference actually lives. Painting
+     «will receive it» green would promise a send that has not happened. */
   const skin =
-    tone === "on"
-      ? { box: "border-brand/40 bg-brand-soft", mark: "text-brand" }
+    tone === "warn"
+      ? { box: "border-brand-light bg-brand-soft", mark: "text-brand-deep" }
       : tone === "done"
         ? { box: "border-ok/40 bg-ok-soft", mark: "text-ok-deep" }
-        : tone === "warn"
-          ? { box: "border-warn/40 bg-warn-soft", mark: "text-warn-deep" }
+        : tone === "on"
+          ? { box: "border-border-strong bg-surface2", mark: "text-muted-dark" }
           : { box: "border-border bg-surface2", mark: "text-muted" };
 
   return (
@@ -2936,12 +3057,16 @@ function PreviewTools({ lang, setLang }: { lang: "en" | "ar"; setLang: (v: "en" 
 }
 
 /** One small copy control, drawn on the thing it copies. */
-function CopyBit({ label, done, onClick, disabled }: { label: string; done: boolean; onClick: () => void; disabled: boolean }) {
+function CopyBit({ label, done, onClick, disabled, title }: { label: string; done: boolean; onClick: () => void; disabled: boolean; title?: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      /* The one place the «no link yet» caveat is said now that the control is live. A `title` and
+         not a line of copy: it belongs to the button, and the preview beside it already says the
+         same thing in the message itself. */
+      title={title}
       className={cx(
         "inline-flex h-[22px] flex-none items-center gap-1 rounded-sm border border-border bg-surface px-2 text-label transition-colors",
         disabled ? "text-muted-light" : "text-navy-mid hover:text-navy",

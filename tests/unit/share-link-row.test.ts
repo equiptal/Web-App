@@ -74,8 +74,24 @@ describe("the link field", () => {
     expect("linkHint" in ar.intake.postShare).toBe(false);
   });
 
-  it("Given the field, Then it is capped rather than free to grow", () => {
-    expect(panel).toContain("sm:max-w-[380px]");
+  it("Given the field, Then it is as wide as the supplier card beneath it", () => {
+    /**
+     * 🔴 Owner, 2026-09-13: *"this placeholder, also make its width fit the «send to my
+     * suppliers» card below it"*.
+     *
+     * ~~`flex-1` with an `sm:max-w-[380px]` cap.~~ The cap answered the fault before it - a masked
+     * stub growing into every pixel the expiry was not using - and over-corrected: the field then
+     * ended wherever 380px ran out, which lines up with nothing on the screen.
+     *
+     * ⚠️ Asserted against the COMMENT-STRIPPED source. The old class is quoted in the note that
+     * explains its removal, so a test reading the raw file would pass on the prose - which this one
+     * did, for one commit, until it was caught.
+     */
+    expect(code).toContain("w-full basis-full");
+    expect(code).not.toContain("max-w-[380px]");
+    // `basis-full` and not merely `w-full`: the cell also holds the panel’s heading on the
+    // surfaces that pass one, and the field must take the line under it rather than the remainder.
+    expect(code).toContain("basis-full");
   });
 
   it("Given both locales, Then the dialog's two lines exist in each", () => {
@@ -92,7 +108,7 @@ describe("the link field", () => {
 });
 
 describe("the expiry leads the row", () => {
-  it("Given the row, Then the expiry is drawn AFTER the link and pushed to the trailing edge", () => {
+  it("Given the row, Then the expiry is drawn AFTER the link, as the grid’s second cell", () => {
     const link = panel.indexOf("{!uuid && <Icon name=\"lock\"");
     const expiry = panel.indexOf("{showExpiry && (");
     expect(link).toBeGreaterThan(-1);
@@ -109,9 +125,21 @@ describe("the expiry leads the row", () => {
     expect(block).toContain("bg-brand-soft");
     expect(block).toContain("border-brand/45");
     expect(block).toContain("text-brand-deep");
-    // ⚠️ `ms-auto`, never `ml-auto`: this screen mirrors, so «the right» is the trailing edge.
-    expect(block).toContain("ms-auto");
+    /**
+     * 🔴 **No `ms-auto` any more** (owner, 2026-09-13: *"make it wider and on the beginning of the
+     * preview card below it"*). Pushing it to the far end put the deadline wherever the link
+     * happened to stop, which is nowhere in particular and lined up with no edge on the screen. The
+     * row shares the GRID of the two columns beneath it now, so this cell starts on exactly the
+     * same vertical as the preview card - at every width, in both directions, with nothing kept in
+     * step by hand.
+     */
+    expect(block).not.toContain("ms-auto");
     expect(block).not.toContain("ml-auto");
+    // ⚠️ `w-full` is the «wider»: the cell, not the control’s own contents.
+    expect(block).toContain("w-full");
+    const row = panel.slice(panel.indexOf("{showLink && ("), panel.indexOf("{showExpiry && ("));
+    // The same template the two columns below it use — that is what does the aligning.
+    expect(row).toContain("lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]");
   });
 });
 
@@ -139,5 +167,28 @@ describe("the three channels wear their own marks", () => {
     // One component, so the three cannot drift apart again through three call sites.
     expect(panel).not.toContain("/outlook-logo.webp");
     expect(mark).toContain("/outlook-logo.webp");
+  });
+});
+
+describe("the deadline says what it DOES", () => {
+  it("Given the label, Then it is a sentence about bidding, not a field name", () => {
+    /**
+     * 🔴 Owner, 2026-09-13: *"make the text as «set the deadline of your link so supplier cant bid
+     * after it» or something like this"*. «Expiry date of your link» named a field and said nothing
+     * about what leaving it empty means, or what setting it stops.
+     */
+    for (const d of [en, ar]) {
+      expect(d.intake.postShare.expiry.length).toBeGreaterThan(24);
+      // ⚠️ No trailing full stop, the house rule for every string a renter reads.
+      expect(d.intake.postShare.expiry.endsWith(".")).toBe(false);
+    }
+    expect(en.intake.postShare.expiry.toLowerCase()).toContain("bid");
+  });
+
+  it("Given a screen reader, Then it still hears the FIELD, not the reason", () => {
+    // ⚠️ `aria-label` keeps the short noun. A date input announced as a whole sentence tells the
+    // listener why it exists and never what it is.
+    expect(panel).toContain("aria-label={c.expiryName}");
+    for (const d of [en, ar]) expect(d.intake.postShare.expiryName).toBeTruthy();
   });
 });

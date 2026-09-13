@@ -68,6 +68,14 @@ function OverlayRequired({ title, word }: { title: string; word?: boolean }) {
   );
 }
 
+/** The trio box's columns, shared by the box and by its first row so the two line up exactly. */
+const TRIO_COLS = "sm:grid-cols-[minmax(150px,1.3fr)_minmax(104px,0.85fr)_minmax(200px,1.35fr)]";
+
+/** The dashed offer that changes the line's kind — one skin, wherever of the two rows it sits in. */
+const ESCAPE_ROW =
+  "w-full rounded-sm border border-dashed border-border-strong px-3 py-2 text-start text-label " +
+  "leading-snug text-muted-dark transition hover:border-brand hover:text-brand-deep";
+
 export function MachineCard({
   item,
   gaps,
@@ -125,6 +133,13 @@ export function MachineCard({
    * Cleared on a timer rather than on animation end: `animationend` never fires under
    * `prefers-reduced-motion`, where the rule draws a standing outline and no animation at all.
    */
+  /** Offered only while there IS a catalogue answer to reject, and never on a direct line. */
+  const offerOffCatalogue = CUSTOM_EQUIPMENT_ENABLED && !listingLocked && !!item.ref.subcategoryId;
+  const goOffCatalogue = () => {
+    actions.setItemOffCatalogue(item.id, item.customEquipment ?? item.rawLabel ?? "");
+    setPulseName(true);
+  };
+
   const [pulseName, setPulseName] = useState(false);
   useEffect(() => {
     if (!pulseName) return;
@@ -214,10 +229,25 @@ export function MachineCard({
                  card, so the card read as mostly empty; and the name under it repeated the TYPE and
                  SIZE the selects state in full in the very next column.
 
-                 `absolute inset-0` with `object-cover`: it fills the panel corner to corner. The
-                 four chips already float on the corners, so they were drawn for a photograph
-                 underneath them rather than beside it. */
-              className="absolute inset-0 h-full w-full object-cover"
+                 `absolute inset-0`: the BOX fills the panel corner to corner. The four chips already
+                 float on the corners, so they were drawn for a photograph underneath them rather
+                 than beside it.
+
+                 🔴 **`contain`, not `cover`** (owner, 2026-09-13: *"choose the right zoom and size
+                 of the images here"*, on a card showing three wheels and nothing else). The panel is
+                 `min-h-[450px]` and stretches to the column beside it - about 660x610 in his shot,
+                 so taller than it is wide - while a taxonomy photograph is 1408x768, ratio 1.83.
+                 `cover` scales to the HEIGHT and throws away more than half the width, which on a
+                 flatbed is the half with the machine on it.
+
+                 ⚠️ **This is the same measurement the request rail made on 2026-09-12** and it
+                 came out the same way: *"the crop cut the machine into an unreadable jumble"*.
+                 `contain` keeps the whole machine; the grey band above and below is the panel’s own
+                 ground, which the glyph state already shows.
+
+                 ⚠️ No padding. `p-*` shrinks the box BEFORE `contain` measures it, which is what
+                 made the rail’s drawings letterbox at half size - the rail’s own note records it. */
+              className="absolute inset-0 h-full w-full object-contain"
             />
           ) : (
             /* No photograph: the glyph keeps its centred box and its caption. Here the name is not a
@@ -379,54 +409,50 @@ export function MachineCard({
                away from him. Never starred there: nothing in the catalogue can satisfy it, and a star
                would say the renter owes an answer he cannot give. */
             <div
-              className={`grid gap-2.5 rounded-sm p-3.5 sm:grid-cols-[minmax(150px,1.5fr)_minmax(104px,0.9fr)_minmax(132px,1fr)] ${
-                /* The house WARNING tone, the same `--warn` family the note wears (owner,
-                   2026-09-06). It was `danger-soft` for a day and read as an error: nothing has gone
-                   wrong here, the machine is simply not in the list, so the box and the note must be
-                   the same colour or the row tells the renter two different stories. */
-                custom ? "border border-warn/40 bg-warn-soft" : "bg-surface2"
+              className={`grid gap-2.5 rounded-sm p-3.5 ${TRIO_COLS} ${
+                /* ── The operator rail's light orange, not the mustard (owner, 2026-09-13) ───────
+                   *"can we use another colour? it is not nice and i don't think it matches our
+                   design system, we might use the same operator light orange colour"*.
+                   ~~`border-warn/40 bg-warn-soft`.~~ That IS `NOTICE_TONE.warn`, so it was not drift
+                   — but `--warn-soft` is #f7edd8, a sandy cream, and against the orange this card
+                   now speaks everywhere else (the labels, the dot, the pulse) it read as a third
+                   colour nobody chose. This pair is the COLLAPSED OPERATOR RAIL's own, one panel to
+                   the right of this box: `bg-brand-soft` inside `border-brand-light`. */
+                custom ? "border border-brand-light bg-brand-soft" : "bg-surface2"
               }`}
             >
-              {/* ── The renter's OWN words, first and always (owner, 2026-09-12) ────────────────
-                  ~~Shown only on a line the catalogue could not place.~~ The field stopped meaning
-                  «the name of a machine we do not carry» and started meaning «what the renter calls
-                  this machine», so it is the first thing on the card whatever the taxonomy says.
+              {/* ── TWO rows, and nothing wide and useless (owner, 2026-09-13) ──────────────
+                  *"i want the equipment [name] to be in the same row as the note below it, because
+                  the field is so wide and useless, and for the type-size also must be on the same row
+                  as the note below, so totally 2 rows here"*.
+                  ~~Name (full width) · note · TYPE + SIZE · the offer.~~ Four rows for four things,
+                  and the name box alone ate the card's whole width to hold «Spider Lift».
+                  Row ONE is the name and the sentence this state owes: the warning note when the line
+                  is off-catalogue, and the way OUT of the catalogue when it is not. Row TWO is the
+                  two lists and, off-catalogue, the way back in.
+                  ⚠️ The inner grid repeats `TRIO_COLS` rather than splitting 1fr/2fr of its own, so
+                  the name box lines up EXACTLY with TYPE beneath it. A different ratio here is off by
+                  the gap, which shows as a step down the left edge of the box.
+                  ⚠️ `sm:items-end` levels the sentence with the INPUT, not with the label above it. */}
+              <div className={`grid gap-2.5 sm:col-span-3 sm:items-end ${TRIO_COLS} ${pulseName ? "attn-pulse" : ""}`}>
+                {/* ── The renter's OWN words, first and always (owner, 2026-09-12) ──────────────
+                    ~~Shown only on a line the catalogue could not place.~~ The field stopped meaning
+                    «the name of a machine we do not carry» and started meaning «what the renter calls
+                    this machine», so it is the first thing on the card whatever the taxonomy says.
 
-                  It is NOT required while a type is set: with a taxonomy on the line the name is a
-                  note to us, and one of the two is all the backend asks for. Without one it is the
-                  line's only answer, and it carries the star.
+                    It is NOT required while a type is set: with a taxonomy on the line the name is a
+                    note to us, and one of the two is all the backend asks for. Without one it is the
+                    line's only answer, and it carries the star.
 
-                  What it holds, in order: what he typed, else the words his RFQ used, else the
-                  taxonomy he picked (flow B — a line added by hand fills itself from the pick rather
-                  than asking him to retype what he just chose). */}
-              {/* The pulse wraps the FIELD, so it encloses the name box and the note under it —
-                  which is the pair the press creates. */}
-              <div className={`sm:col-span-3 ${pulseName ? "attn-pulse" : ""}`}>
+                    What it holds, in order: what he typed, else the words his RFQ used, else the
+                    taxonomy he picked (flow B — a line added by hand fills itself from the pick
+                    rather than asking him to retype what he just chose). */}
                 <CanvasField
                   label={t.create.machineCard.customEquipment}
                   star={custom}
                   missing={gapFor("custom_equipment")}
                   shake={shake("custom_equipment")}
                   required={owed("custom_equipment")}
-                  hint={
-                    custom ? (
-                      /* ── The app's own warning ink, not the fill (owner, 2026-09-12) ──────────
-                         *"the box that appears when no taxonomy has a weird colour, it is not yellow
-                         and not orange, use colours in our design system and used in other places for
-                         warning"*.
-                         🔴 `text-warn` is #b98a1d, and `globals.css` says in as many words that
-                         `--warn` is a FILL and `--warn-deep` (#8a6412) is the one that may carry
-                         text. At 2.97:1 on this pale ground the sentence came out khaki — neither
-                         yellow nor orange, which is exactly what he read.
-                         The box itself was already right: `border-warn/40 bg-warn-soft` IS
-                         `NOTICE_TONE.warn`, the recipe every other warning in the app wears. Only the
-                         ink was off it, so the line now finishes that same recipe. */
-                      <span className="flex items-start gap-1 text-warn-deep">
-                        <Icon name="warning" size={13} className="mt-px flex-none" />
-                        {t.create.machineCard.notInCatalogueNote}
-                      </span>
-                    ) : undefined
-                  }
                 >
                   <TextInput
                     value={item.customEquipment ?? item.rawLabel ?? tax.pickedName ?? ""}
@@ -435,6 +461,26 @@ export function MachineCard({
                     onChange={(e) => set("custom_equipment", { customEquipment: e.target.value })}
                   />
                 </CanvasField>
+
+                <div className="sm:col-span-2">
+                  {custom ? (
+                    /* ── The note, in the card's own orange (owner, 2026-09-12/13) ────────────
+                       It was `text-warn` (#b98a1d), which `globals.css` states is a FILL — at 2.97:1
+                       on a pale ground the sentence came out khaki, which is what he read as «not
+                       yellow and not orange». `brand-deep` is the ink this card now uses for every
+                       orange word on it, and it is the AA-safe half of the brand pair. */
+                    <p className="flex items-start gap-1 text-label leading-snug text-brand-deep">
+                      <Icon name="warning" size={13} className="mt-px flex-none" />
+                      {t.create.machineCard.notInCatalogueNote}
+                    </p>
+                  ) : (
+                    offerOffCatalogue && (
+                      <button type="button" onClick={goOffCatalogue} className={ESCAPE_ROW}>
+                        {t.create.machineCard.useMyOwnName}
+                      </button>
+                    )
+                  )}
+                </div>
               </div>
 
               <CanvasField
@@ -449,7 +495,7 @@ export function MachineCard({
                   key={`type-${openTypeAt}`}
                   defaultOpen={openTypeAt > 0}
                   value={item.ref.subcategoryId}
-                  placeholder={t.create.machineCard.type}
+                  placeholder={t.create.machineCard.typePlaceholder}
                   searchPlaceholder={t.create.machineCard.searchTypes}
                   label={t.create.machineCard.type}
                   disabled={listingLocked}
@@ -480,7 +526,7 @@ export function MachineCard({
               >
                 <SearchSelect
                   value={item.ref.measurementId}
-                  placeholder={t.create.machineCard.size}
+                  placeholder={t.create.machineCard.sizePlaceholder}
                   searchPlaceholder={t.create.machineCard.searchSizes}
                   label={t.create.machineCard.size}
                   disabled={listingLocked || !item.ref.subcategoryId}
@@ -492,46 +538,22 @@ export function MachineCard({
                 />
               </CanvasField>
 
-              {/* ── One row, and it offers whichever door the renter is NOT standing in ─────────
-                  On a matched line it is the way OUT of the catalogue: one press clears the taxonomy,
-                  the line goes off-catalogue, and the warning note appears under the name box to
-                  explain the state he has just chosen.
-                  On an off-catalogue line it is the way BACK IN (owner, 2026-09-13: *"if it is
-                  clicked then in its place, with no taxonomy selected, we will write «select from
-                  our list»"*) — and it OPENS the TYPE list rather than merely naming it, because the
-                  lists are still on screen above and a row that only points at them is a caption.
-
-                  ── It is a ROW, not the third column (owner, 2026-09-13) ───────────────────────
-                  🔴 His first shape for this was the freed CATEGORY column, and four wordings died
-                  in it: *"make the sentence fit in one line"*, then *"both sentences not clear"*,
-                  then *"must be clear"*. The column is ~160px of text. Every string short enough to
-                  fit it was too short to say what the press does — the width was choosing the words,
-                  and it kept choosing badly.
-                  Full width under the two lists, so the sentence is the owner's own and whole. TYPE
-                  and SIZE keep the widths they had; the space beside them is simply space.
-                  ⚠️ `sm:whitespace-nowrap`, not `whitespace-nowrap`: one line where he is looking,
-                  and a wrap on a phone, where the grid is one column and truncating a sentence would
-                  be worse than two lines of it.
-
+              {/* ── The way BACK into the catalogue, beside the lists it opens ──────────────
+                  Owner, 2026-09-13: *"if it is clicked then in its place, with no taxonomy selected,
+                  we will write «select from our list»"*, and *"the type-size must be on the same row
+                  as the note below"* — so it sits in row TWO, level with TYPE and SIZE, which is what
+                  it acts on. On a matched line this cell is empty and the offer is up in row one,
+                  beside the name box IT points at. One control, two labels, two homes, each next to
+                  the thing it changes.
+                  It OPENS the type list rather than naming it: the lists are on screen already, so a
+                  row that only pointed at them would be a caption.
                   ⚠️ Withheld on a line started from a supplier's listing — a DIRECT request is
                   taxonomy only (owner, 2026-09-12), and an off-catalogue one reaches nobody at all,
-                  the named supplier included. And withheld on a line with no type picked yet: there
-                  is no catalogue answer to reject, and the name box is already open to him. */}
-              {CUSTOM_EQUIPMENT_ENABLED && !listingLocked && (custom || item.ref.subcategoryId) && (
-                <div className="sm:col-span-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (custom) {
-                        setOpenTypeAt((n) => n + 1);
-                        return;
-                      }
-                      actions.setItemOffCatalogue(item.id, item.customEquipment ?? item.rawLabel ?? "");
-                      setPulseName(true);
-                    }}
-                    className="w-full overflow-hidden text-ellipsis rounded-sm border border-dashed border-border-strong px-3 py-2 text-start text-label leading-snug text-muted-dark transition hover:border-warn hover:text-warn-deep sm:whitespace-nowrap"
-                  >
-                    {custom ? t.create.machineCard.selectFromList : t.create.machineCard.useMyOwnName}
+                  the named supplier included. */}
+              {custom && CUSTOM_EQUIPMENT_ENABLED && !listingLocked && (
+                <div className="flex items-end">
+                  <button type="button" onClick={() => setOpenTypeAt((n) => n + 1)} className={ESCAPE_ROW}>
+                    {t.create.machineCard.selectFromList}
                   </button>
                 </div>
               )}
@@ -705,7 +727,7 @@ function UnavailableCard({ item, label }: { item: EquipmentItem; label: string }
      row below, where the machine really is dropped and there is nothing else to press. */
   if (custom) {
     return (
-      <Notice tone="warn" icon="warning">
+      <Notice tone="brand" icon="warning">
         <span className="block leading-snug">{t.create.machineCard.notInCatalogueNote}</span>
       </Notice>
     );

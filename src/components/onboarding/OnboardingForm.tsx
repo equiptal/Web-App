@@ -58,6 +58,7 @@ export function OnboardingForm({
   showEmail = true,
   phoneVerify,
   onSignIn,
+  onAbandon,
 }: {
   next: string;
   /** When provided, called after the account is created instead of navigating (e.g. modal flow). */
@@ -82,6 +83,16 @@ export function OnboardingForm({
   /** Case 1: if the typed phone already has an account, we show "sign in instead" — clicking it calls
    *  this to drop back to Modal 1 (phone sign-in). */
   onSignIn?: () => void;
+  /**
+   * Abandon the signup outright - drawn only when the caller supplies it.
+   *
+   * ⚠️ It is NOT «close». This form is the second half of one act (owner, 2026-09-13: *"make the
+   * login and create account as one step but 2 modals"*), and the dialog around it cannot be
+   * dismissed while it is on screen; so the renter who genuinely wants to stop needs a control that
+   * says what stopping DOES. `AccountModal` signs him out on the way, because a phone-first signup
+   * already has a session by now and closing without that is what left people as guests.
+   */
+  onAbandon?: () => void;
 }) {
   const t = useT();
   const o = t.onboarding;
@@ -435,6 +446,22 @@ export function OnboardingForm({
           {busy ? o.submitting : o.submit}
           {!busy && <Icon name="arrow_forward" size={18} className="rtl:scale-x-[-1]" />}
         </button>
+
+        {/* ── The way out, named for what it does ────────────────────────────────────────────────
+            A quiet text link under the act, not a second button beside it: finishing is the thing
+            to do here and the two must not read as a pair of equal choices. It says «sign out»
+            rather than «cancel» because that is what it performs - the code is already verified and
+            the session already exists. */}
+        {onAbandon && (
+          <button
+            type="button"
+            onClick={onAbandon}
+            disabled={busy}
+            className="mx-auto mt-3 block text-meta font-semibold text-muted underline transition hover:text-navy disabled:text-disabled-fg disabled:no-underline"
+          >
+            {o.leave}
+          </button>
+        )}
       </div>
     </form>
   );

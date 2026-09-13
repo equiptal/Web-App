@@ -48,7 +48,21 @@ export function GuestWall({
   const t = useT();
   const { openAuth } = useAuthGate();
   return (
-    <div {...pin("guest-wall")} className="relative min-h-[420px]">
+    /* 🔴 **The height is the centring fault** (owner, 2026-09-13: *"the background and popup not
+       centered, make it like the dashboard center"*).
+
+       The card layer is `absolute inset-0`, so it centres inside THIS box — and this box used to be
+       sized by the preview alone. On the requests page the parent is a `flex-1` column the height of
+       the viewport while the preview is about 570px, so the card landed near the top with half a
+       screen of white under it. The dashboard only looked right because its preview happens to be
+       about as tall as the page.
+
+       ⚠️ **Both halves are needed, and neither alone is enough.** `h-full` takes the height where a
+       parent offers one (requests, inside its flex column); it resolves to `auto` where none does
+       (the dashboard, in ordinary page flow), which is why the `min-h` is a viewport calc rather
+       than the old flat 420px — with the backdrop now absolute, nothing else gives this box height
+       on that page. `8rem` is the nav plus the page's own padding. */
+    <div {...pin("guest-wall")} className="relative h-full min-h-[calc(100dvh-8rem)]">
       {/* ⚠️ **The glass was opaque enough to erase the page** (owner, 2026-09-12: *"show the
           background state too, it is totally blank"*). A skeleton is already pale — `surface3` on
           `surface2` — and 60% of it under a blur came out as four grey ghosts on an empty screen,
@@ -64,13 +78,22 @@ export function GuestWall({
           (#e8e8e8) is still unmistakably a placeholder and is a shape you can see.
           It is a variant rather than 30 edited `Skeleton` calls: the tone belongs to the BACKDROP,
           not to the previews, which are ordinary skeletons anywhere else they are drawn. */}
-      <div aria-hidden="true" className="pointer-events-none select-none blur-[3px] saturate-[0.85] opacity-[0.92] [&_.bg-surface2]:bg-surface3">
+      {/* ⚠️ **Clipped, not ended.** Each preview is longer than most viewports now (see the note
+          on each), and in flow it would grow the page a scrollbar for a backdrop nobody can read or
+          reach. Absolute and clipped, it is cut off at the fold, which is what a page behind glass
+          actually looks like. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 select-none overflow-hidden blur-[3px] saturate-[0.85] opacity-[0.92] [&_.bg-surface2]:bg-surface3"
+      >
         {preview}
       </div>
 
       {/* Centred over the page, not pinned to its top: the card is the subject and the surface is
-          the backdrop, so it sits where the eye already is. `sticky` inside the absolute layer keeps
-          it in the middle of the VIEWPORT on a tall page, which is what the OS does. */}
+          the backdrop, so it sits where the eye already is.
+          ⚠️ ~~«`sticky` inside the absolute layer keeps it in the middle of the VIEWPORT».~~ There
+          is no `sticky` here and there never was - the comment described a mechanism nobody wrote,
+          which is why the card sat high on the requests page. The height on the root does it. */}
       <div className="absolute inset-0 grid place-items-center p-4">
         <div className={cx(CARD, "w-full max-w-[380px] overflow-hidden")}>
           <p className="border-b border-border bg-surface2 px-4 py-2.5 text-meta font-semibold text-muted-dark">
@@ -156,6 +179,35 @@ export function GuestDashboardPreview() {
           </div>
         ))}
       </div>
+
+      {/* ⚠️ **The page keeps going** (owner, 2026-09-13: *"show more from the background, like read
+          dashboard and read requests, but blurred"*). The dashboard's own last band is the supplier
+          TABLE, and the preview stopped above it — so on a tall screen the argument ran out before
+          the fold did. Its head, its column rules and its rows, and nothing written in them. */}
+      <div className={cx(CARD, "overflow-hidden")}>
+        <div className="flex items-center gap-3 border-b border-border px-3.5 py-3">
+          <Skeleton className="h-3.5 w-32" />
+          <Skeleton className="ms-auto h-8 w-28 rounded-sm" />
+          <Skeleton className="h-8 w-24 rounded-sm" />
+        </div>
+        <div className="flex items-center gap-4 border-b border-border bg-surface2 px-3.5 py-2">
+          {/* ⚠️ Widths as CLASSES, not a `style`: `Skeleton` takes `className` and nothing else, on
+              purpose — a component that accepts arbitrary inline style is how a raw colour gets past
+              the palette guard. Five different ones so the head reads as columns rather than a rule. */}
+          {["w-28", "w-24", "w-32", "w-20", "w-16"].map((w, c) => (
+            <Skeleton key={c} className={cx("h-2.5 flex-none", w)} />
+          ))}
+        </div>
+        {Array.from({ length: 6 }, (_, r) => (
+          <div key={r} className="flex items-center gap-4 border-b border-border px-3.5 py-3 last:border-b-0">
+            <Skeleton className="size-7 flex-none rounded-full" />
+            <Skeleton className="h-3 w-28 flex-none" />
+            <Skeleton className="h-2.5 w-36 flex-none" />
+            <Skeleton className="h-2.5 w-24 flex-none" />
+            <Skeleton className="ms-auto h-5 w-16 flex-none rounded-full" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -233,6 +285,37 @@ export function GuestRequestsPreview() {
               <Skeleton className="size-4 flex-none rounded-sm" />
               <Skeleton className="h-3 w-24" />
             </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ⚠️ **The page keeps going** (owner, 2026-09-13: *"show more from the background, like read
+          dashboard and read requests, but blurred"*). The preview used to end under the bid rail, so
+          on anything taller than a laptop the lower half of the wall was plain white and the shape
+          stopped arguing about half way down. The real workspace carries the comparison strip under
+          the cards; this is its furniture, and it is what fills the fold.
+
+          ⚠️ Still NO invented content — no name, no price, no date. The 2026-09-06 ruling stands:
+          a guest has no requests, and plausible-looking rows would be a business he does not have.
+          What is added is more FURNITURE, which is the one thing a blur can say honestly. */}
+      <div className={cx(CARD, "mt-1 overflow-hidden")}>
+        <div className="flex items-center gap-3 border-b border-border px-3.5 py-2.5">
+          <Skeleton className="h-3 w-32" />
+          <Skeleton className="ms-auto h-3 w-20" />
+        </div>
+        {/* The comparison's own shape: a supplier column, then a strip of term cells per row. */}
+        {Array.from({ length: 5 }, (_, r) => (
+          <div key={r} className="flex items-center gap-3 border-b border-border px-3.5 py-3 last:border-b-0">
+            <span className="flex w-[180px] flex-none items-center gap-2.5">
+              <Skeleton className="size-7 flex-none rounded-full" />
+              <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-2.5 w-16" />
+              </span>
+            </span>
+            {Array.from({ length: 6 }, (_, c) => (
+              <Skeleton key={c} className="h-6 w-[104px] flex-none rounded-sm" />
+            ))}
           </div>
         ))}
       </div>

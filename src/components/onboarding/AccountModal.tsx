@@ -38,6 +38,31 @@ export function AccountModal({ open, onClose, onCreated, title, subtitle, postHe
   const { locale } = useLocale();
   /** Which ground this open is drawing on — the flow tells the shell, so the two cannot disagree. */
   const [dark, setDark] = useState(true);
+  /**
+   * True once the code has been verified and the account behind it is NOT yet an account.
+   *
+   * ── Sign in and create the account are ONE act (owner, 2026-09-13) ──────────────────────────────
+   * *"make the login and create account as one step but 2 modals, can't be done as 1 step only"*,
+   * after: *"a user can't be guest after login"*.
+   *
+   * 🔴 **They could be.** `guest` is a real backend state - `getUserTier` returns it until
+   * `firstName && lastName && city && jobTitle` all exist - and Modal 2 was an ordinary dismissible
+   * dialog. Verify a code, press the ✕, and the renter is signed in as a guest with a session, a
+   * phone and nothing else: every tier-gated action refuses him and the badge says «زائر». That is
+   * exactly the account the owner forwarded on 2026-09-10 (`+966566493886`), stuck on «مستوى حسابك
+   * لا يسمح بهذا الإجراء» over a profile form he was not allowed to submit.
+   *
+   * 🔴 **And `origin/main` is no better** - checked before building, because the owner asked to
+   * *"check the prod main and align the logic"*. The routing is the same line for line there; the
+   * whole main↔beta difference in this flow is the design-system pass (`btn()`, `Dialog`, tokens,
+   * the navy panel) plus the dropped `companyName` field. Prod has the identical hole, so aligning
+   * to it would have changed nothing.
+   *
+   * The second modal is therefore not dismissible. The way OUT is still there and is now an explicit
+   * act with its own name - «Leave and sign out» inside the form - because leaving here is abandoning
+   * a signup, not closing a dialog.
+   */
+  const [committed, setCommitted] = useState(false);
   if (!open) return null;
   return (
     // No header of its own: the flow inside titles each of its four phases, and a second title above
@@ -49,10 +74,10 @@ export function AccountModal({ open, onClose, onCreated, title, subtitle, postHe
     // stay on `--surface`, because they are ordinary forms and a dark ground would make the app's one
     // long form the only dark one in it. `AccountFlow` reports which it is drawing, so the shell and
     // the step cannot disagree about the ground under them.
-    <Dialog open onClose={onClose} size="xl" padded={false} tone={dark ? "dark" : "default"}>
+    <Dialog open onClose={onClose} size="xl" padded={false} tone={dark ? "dark" : "default"} dismissible={!committed}>
       <div {...pin("auth-gate")} dir={locale === "ar" ? "rtl" : "ltr"}>
         {/* Fresh mount each open → the flow always starts at the right step for the current session. */}
-        <AccountFlow onCreated={onCreated} title={title} subtitle={subtitle} postHeadline={postHeadline} postSubhead={postSubhead} resumeToken={resumeToken} onNeedsSignup={onNeedsSignup} onGround={setDark} />
+        <AccountFlow onCreated={onCreated} onAbandon={onClose} title={title} subtitle={subtitle} postHeadline={postHeadline} postSubhead={postSubhead} resumeToken={resumeToken} onNeedsSignup={onNeedsSignup} onGround={setDark} onCommitted={setCommitted} />
       </div>
     </Dialog>
   );
@@ -60,9 +85,9 @@ export function AccountModal({ open, onClose, onCreated, title, subtitle, postHe
 
 type Phase = "entry" | "code" | "profile" | "emailChoice";
 
-function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, resumeToken, onNeedsSignup, onGround }: { onCreated: () => void; title?: string; subtitle?: string; postHeadline?: string; postSubhead?: string; resumeToken?: string; onNeedsSignup?: (token: string, email: string | null) => void; onGround?: (dark: boolean) => void }) {
+function AccountFlow({ onCreated, onAbandon, title, subtitle, postHeadline, postSubhead, resumeToken, onNeedsSignup, onGround, onCommitted }: { onCreated: () => void; onAbandon: () => void; title?: string; subtitle?: string; postHeadline?: string; postSubhead?: string; resumeToken?: string; onNeedsSignup?: (token: string, email: string | null) => void; onGround?: (dark: boolean) => void; onCommitted?: (on: boolean) => void }) {
   const t = useT();
-  const { status, user, signIn, refresh } = useSession();
+  const { status, user, signIn, signOut, refresh } = useSession();
   // A guest-tier session with a phone is a phone-first user who verified but never finished the profile
   // → resume at Modal 2 (Case 2, email required). Already basic/verified → nothing to fill → continue.
   const hasGuestSession = status === "authed" && !!user?.phone && user?.tier === "guest";
@@ -95,6 +120,29 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
   useEffect(() => {
     onGround?.(phase === "entry" || phase === "code");
   }, [phase, onGround]);
+
+  /* The profile step is the committed one: past it there is a verified code and no account. The
+     keep/switch question is NOT - that account is already complete, and its two buttons are both
+     answers, so there is nothing to trap anybody into. */
+  useEffect(() => {
+    onCommitted?.(phase === "profile");
+  }, [phase, onCommitted]);
+
+  /**
+   * Leave the half-finished signup.
+   *
+   * ⚠️ **It SIGNS OUT, and that is the point.** A phone-first renter already has a session by the
+   * time this form is on screen: closing without it is what left people signed in as guests. An
+   * email-first one has no account at all - only the onboarding token, which `AuthGate` keeps so the
+   * «Finish your signup» banner can resume him - so there is nothing to sign out of and the call is
+   * harmless either way.
+   */
+  const abandon = async () => {
+    if (status === "authed") {
+      try { await signOut(); } catch { /* the close still has to happen */ }
+    }
+    onAbandon();
+  };
 
   // Post-verify routing (existing session set): confirm the AUTHORITATIVE tier from /api/me (verify's
   // tier can be thin for a returning account), then continue / keep-switch / register.
@@ -254,6 +302,7 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
       requireEmail={!emailFirst}
       phoneVerify={emailFirst ? { onboardingToken } : undefined}
       onSignIn={() => { setOnboardingToken(""); setCodeEmail(null); setCodePhone(null); setEntryMode("phone"); setPhase("entry"); }}
+      onAbandon={() => void abandon()}
       onDone={onCreated}
       headline={postHeadline ?? t.guest.postTitle}
       subhead={postSubhead ?? t.guest.postBody}

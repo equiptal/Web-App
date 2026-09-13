@@ -29,25 +29,30 @@ const glyph = (c: HTMLElement) => c.querySelector(".material-icons-outlined");
 /** The agent himself — see `mansour.test.tsx` for the rig's own rules. */
 const mansour = (c: HTMLElement) => c.querySelector(".v4m-man");
 
-describe("in flight, it names nothing", () => {
-  it("draws MANSOUR and the one line, and no picture", () => {
+describe("in flight, it shows the catalogue and names nothing", () => {
+  it("draws a real drawing, and the one line", () => {
     /**
-     * Nothing has been matched, so there is nothing to show a picture OF. The old screen filled
-     * this gap with paced lines about scanning and extracting, which read as findings.
-     *
-     * ~~A `precision_manufacturing` glyph.~~ A generic equipment icon on the one screen whose
-     * subject is the AGENT (owner, 2026-09-13).
+     * Owner, 2026-09-13, on a shot of a lone spinner: *"didnt we say it must show equipment he is
+     * trying to map, the ui is so dull"*. The catalogue is flicked through while the agent reads.
      */
+    const c = render(<ProcessingView imageUrl="https://x/spider-crane.png" title={en.processing.reading} caption={null} />).container;
+    expect(img(c)?.getAttribute("src")).toBe("https://x/spider-crane.png");
+    expect(c.textContent).toContain(en.processing.reading);
+  });
+
+  it("has NO caption, which is the whole licence for showing them", () => {
+    // A picture here means «this is what the agent matched you to». Unnamed and moving, a reel of
+    // them reads as the catalogue being searched; captioned, it would claim matches not yet made.
+    const c = render(<ProcessingView imageUrl="https://x/spider-crane.png" title={en.processing.reading} caption={null} />).container;
+    expect(c.textContent).not.toContain(en.processing.matched);
+  });
+
+  it("with no drawing at all, the AGENT holds the ring — never an empty disc, never a glyph", () => {
+    // An off-catalogue line, or a taxonomy that failed to load.
     const c = render(<ProcessingView imageUrl={null} title={en.processing.reading} caption={null} />).container;
     expect(img(c)).toBeNull();
     expect(mansour(c)).toBeTruthy();
     expect(glyph(c)).toBeNull();
-    expect(c.textContent).toContain(en.processing.reading);
-  });
-
-  it("has no caption, so the line cannot read as a match", () => {
-    const c = render(<ProcessingView imageUrl={null} title={en.processing.reading} caption={null} />).container;
-    expect(c.textContent).not.toContain(en.processing.matched);
   });
 });
 
@@ -65,15 +70,30 @@ describe("matched, it shows the catalogue's own picture", () => {
     expect(mansour(c)).toBeTruthy();
   });
 
-  it("CROPS it, because these are photographs", () => {
+  it("FITS it and scales it past the box, because these are drawings", () => {
     /**
-     * 🔴 `object-contain` was tried and looked at: `equipment_image_url` is 1.83:1, so contain drew
-     * a 76x41 band across a round hole with empty crescents above and below. A photograph reaches
-     * its own edges and wants the crop — the requests rail measured the same thing on 2026-08-31.
+     * 🔴 Two fits were tried here, in this order, and both were looked at.
+     *
+     * `object-cover` was right while the slot held a PHOTOGRAPH (`equipment_image_url`, 1.83:1) —
+     * contain drew a band across a round hole. That slot is gone: the drawings come from
+     * `/api/stores/taxonomy` now, and a drawing carries its own transparent margin, so cropping one
+     * enlarges the margin rather than the machine (the requests rail's note, 2026-08-31).
+     *
+     * Plain `contain` then filled under half the circle and the tile read as empty, which is the
+     * report this answers — so it is contain PLUS a scale, exactly as the rail settled it.
      */
     const el = draw();
-    expect(img(el)?.className).toMatch(/object-cover/);
-    expect(img(el)?.className).not.toMatch(/object-contain/);
+    expect(img(el)?.className).toMatch(/object-contain/);
+    expect(img(el)?.className).toMatch(/scale-\[1\.25\]/);
+    expect(img(el)?.className).not.toMatch(/object-cover/);
+  });
+
+  it("the scale is only safe because the disc CLIPS", () => {
+    // Without `overflow-hidden rounded-full` on the parent the drawing would spill over the ring and
+    // over Mansour's corner mark.
+    const el = draw();
+    expect(img(el)?.parentElement?.className).toMatch(/overflow-hidden/);
+    expect(img(el)?.parentElement?.className).toMatch(/rounded-full/);
   });
 
   it("names the machine, and says where the name came from", () => {
@@ -84,6 +104,19 @@ describe("matched, it shows the catalogue's own picture", () => {
 });
 
 describe("the furniture is gone, not merely hidden", () => {
+  it("the drawings are read off the APP taxonomy, not the agents one", () => {
+    /**
+     * 🔴 The first cut read `equipmentImageUrl` off `/api/taxonomy` — 1 row of 413 has one — and drew
+     * a glyph because of it, which is the empty screen the owner photographed. The artwork was one
+     * endpoint away, and the ids are the same in both trees.
+     */
+    expect(SRC).toMatch(/\/api\/stores\/taxonomy/);
+    expect(SRC).toMatch(/iconForRef\(icons, item\.ref\)/);
+    // ⚠️ The CALL, not the word: the note at the head of that file still names the field it stopped
+    // reading, so a bare search would fail on the file's own explanation of itself.
+    expect(SRC).not.toMatch(/\.equipmentImageUrl/);
+  });
+
   it("no stage rail, no feed, no bar, no percentage", () => {
     // Each of these was a separate device saying the same nothing. A source test rather than a
     // render one: what must not come back is the MARKUP, in either state.

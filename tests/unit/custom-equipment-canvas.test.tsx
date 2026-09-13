@@ -204,7 +204,14 @@ describe("the way back into the catalogue", () => {
     const { readFileSync } = await import("node:fs");
     const { resolve } = await import("node:path");
     const src = readFileSync(resolve(process.cwd(), "src/components/create/MachineCard.tsx"), "utf8");
-    expect(src).toContain("custom ? t.create.machineCard.selectFromList : t.create.machineCard.useMyOwnName");
+    /* ~~One control with a ternary label.~~ The two offers moved apart on 2026-09-13, each beside
+       the thing it changes: the way OUT sits in row one next to the NAME box it points at, the way
+       BACK sits in row two next to the LISTS it opens. What still may not drift is their SKIN, so
+       the two share one constant rather than two copies of a class string. */
+    expect(src).toContain("const ESCAPE_ROW =");
+    expect(src.match(/className={ESCAPE_ROW}/g)?.length).toBe(2);
+    expect(src).toContain("t.create.machineCard.selectFromList");
+    expect(src).toContain("t.create.machineCard.useMyOwnName");
     /* The press opens the list by REMOUNTING the control with `defaultOpen`, which is what that
        prop's own note prescribes — it is read once at mount, so a caller wanting it open again
        remounts with a `key`. Without the key the counter would change and nothing would open. */

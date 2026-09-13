@@ -26,6 +26,7 @@ import { NoCompanyCard } from "@/components/company/CompanyHub";
 import { GuestWall, GuestDashboardPreview, GuestRequestsPreview } from "@/components/common/GuestWall";
 import { ProcessingView } from "@/components/screens/Processing";
 import { Mansour } from "@/components/Mansour";
+import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
 import { RequestCard } from "@/components/map/RequestCard";
 import { PriceFooter } from "@/components/map/PriceFooter";
 import { EquipmentDetail } from "@/components/map/panel/EquipmentDetail";
@@ -211,25 +212,33 @@ export const SPECIMENS: Specimen[] = [
     ),
   },
   {
-    /* The agent at work, before it has matched anything. The screen lives for about four seconds
-       inside a flow that needs a session, a project and a live agent, so it could not be looked at
-       while it was being changed - which is what these two exist for. */
+    /* The agent at work, before it has matched anything: the catalogue is flicked through, a drawing
+       every 380ms, with NOTHING named - naming one would claim a match that has not been made. The
+       screen lives for a few seconds inside a flow that needs a session, a project and a live agent,
+       so it could not be looked at while it was being changed, which is what these exist for. */
     id: "processing-reading",
     pin: "24",
     label: "Processing — reading",
-    render: () => <ProcessingView imageUrl={null} title={L("Reading your request", "نقرأ طلبك")} caption={null} />,
+    render: () => (
+      <ProcessingView
+        imageUrl="https://moedatech-eu-storage.s3.eu-central-1.amazonaws.com/default/equipment-taxonomy/spider-crane.png"
+        title={L("Reading your request", "نقرأ طلبك")}
+        caption={null}
+      />
+    ),
   },
   {
-    /* The same screen once the answer has landed: the catalogue's own picture of the machine the
-       agent matched, and its catalogue name. The URL is a REAL taxonomy object (Crawler Excavator,
-       the one node of 413 that carries a photograph today). */
+    /* The same screen once the answer has landed: the catalogue's own DRAWING of the machine the
+       agent matched, and its catalogue name. The URL is a real taxonomy icon off
+       `/api/stores/taxonomy`, which is where these come from - see `taxonomy-icons.ts` for why it is
+       that tree and not the agents one. */
     id: "processing-matched",
     pin: "24",
     label: "Processing — matched",
     render: () => (
       <ProcessingView
-        imageUrl="https://moedatech-eu-storage.s3.eu-central-1.amazonaws.com/default/taxonomy-equipment-images/1788187483685-taxonomy-equipment-9eadefb3-d967-4d6e-9d8a-32e6af50f243-9f0b0bb1-9744-4de2-b632-aef5a948ab0e.jpeg"
-        title={L("Crawler excavator 20 ton", "حفارة زاحفة 20 طن")}
+        imageUrl="https://moedatech-eu-storage.s3.eu-central-1.amazonaws.com/default/equipment-taxonomy/scissor-lift.png"
+        title={L("Scissor lift 12 m", "منصة مقصية 12 م")}
         caption={L("Matched from our catalogue", "مطابَق من كتالوجنا")}
       />
     ),
@@ -261,6 +270,29 @@ export const SPECIMENS: Specimen[] = [
         </span>
       </div>
     ),
+  },
+  {
+    /* Modal 2 - the create-account form, in the shape a PHONE-first new user meets it: e-mail
+       required, phone already verified, and the way out named for what it does. The dialog around
+       it cannot be dismissed while this is on screen (owner, 2026-09-13), so this control is the
+       only exit and has to be findable without competing with the act. */
+    id: "onboarding-form",
+    pin: "—",
+    label: "Create account — modal 2",
+    render: () => (
+      <div style={{ width: 620 }}>
+        <OnboardingForm next="/create" showEmail requireEmail onAbandon={() => {}} onSignIn={() => {}} onDone={() => {}} />
+      </div>
+    ),
+  },
+  {
+    /* The third state, and the one nothing else covers: an OFF-CATALOGUE line, or a tree that failed
+       to load. There is no drawing of a machine the catalogue does not carry, so the agent holds the
+       ring rather than an empty grey disc. */
+    id: "processing-no-art",
+    pin: "24",
+    label: "Processing — no drawing",
+    render: () => <ProcessingView imageUrl={null} title={L("Reading your request", "نقرأ طلبك")} caption={null} />,
   },
   {
     id: "price-footer",

@@ -645,9 +645,9 @@ body {
    shake makes above. */
 @keyframes attn-glow {
   0%   { outline-color: transparent; }
-  22%  { outline-color: var(--warn); }
+  22%  { outline-color: var(--brand); }
   50%  { outline-color: transparent; }
-  72%  { outline-color: var(--warn); }
+  72%  { outline-color: var(--brand); }
   100% { outline-color: transparent; }
 }
 .attn-pulse {
@@ -659,7 +659,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .attn-pulse {
     animation: none;
-    outline-color: var(--warn);
+    outline-color: var(--brand);
   }
 }
 

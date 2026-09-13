@@ -20,7 +20,7 @@ import type { ProjectSummary } from "@/lib/contract/project";
  * `share-request-panel.test.tsx`.
  */
 
-type Outcome = { handedOff: boolean; mail?: { from: string; recipients: number; inSentFolder: boolean } };
+type Outcome = { handedOff: boolean; mail?: { from: string; recipients: number; inSentFolder: boolean; emails?: string[] } };
 
 const hoisted = vi.hoisted(() => ({
   fire: null as null | ((n: number, ch: string, o?: Outcome) => void),
@@ -315,5 +315,51 @@ describe("the project the request was filed under", () => {
       </LocaleProvider>,
     );
     expect(await screen.findByText(o.viewAction)).toBeTruthy();
+  });
+});
+
+/**
+ * ── WHO it went to, not only how many (owner, 2026-09-13) ────────────────────────────────────────
+ * *"in the success message when a request is posted and sent to email, show to who it was sent,
+ * like their emails, if so much addresses then show first 5"*.
+ *
+ * The count answered «how many» and nothing answered «which» — and a mistyped address in his own
+ * supplier list is invisible behind a number. This is the last screen that can show it to him.
+ */
+describe("the addresses on the tick", () => {
+  it("names them, as ADDRESSES rather than firms", async () => {
+    draw();
+    await waitFor(() => expect(screen.getByTestId("panel")).toBeTruthy());
+    hoisted.fire!(2, "email", {
+      handedOff: false,
+      mail: { from: "bandar@zahid.sa", recipients: 2, inSentFolder: true, emails: ["ops@alfaisal.sa", "sales@nesma.sa"] },
+    });
+    await screen.findByText(titleFrom("bandar@zahid.sa"));
+    expect(screen.getByText("ops@alfaisal.sa")).toBeTruthy();
+    expect(screen.getByText("sales@nesma.sa")).toBeTruthy();
+  });
+
+  it("names five and counts the rest", async () => {
+    const emails = ["a@x.sa", "b@x.sa", "c@x.sa", "d@x.sa", "e@x.sa", "f@x.sa", "g@x.sa"];
+    draw();
+    await waitFor(() => expect(screen.getByTestId("panel")).toBeTruthy());
+    hoisted.fire!(7, "email", { handedOff: false, mail: { from: "b@x.sa", recipients: 7, inSentFolder: true, emails } });
+    await screen.findByText(titleFrom("b@x.sa"));
+
+    emails.slice(0, 5).forEach((address) => expect(screen.getByText(address)).toBeTruthy());
+    // The sixth and seventh are counted, never drawn: a tick is a confirmation, not a mailing list.
+    expect(screen.queryByText("f@x.sa")).toBeNull();
+    expect(screen.getByText("+2 more")).toBeTruthy();
+  });
+
+  it("says the count alone when the send named nobody", async () => {
+    // The recipients are derived server-side, so an empty list means «we were not told» — and a
+    // tick that invented names would be worse than one that gives a number.
+    draw();
+    await waitFor(() => expect(screen.getByTestId("panel")).toBeTruthy());
+    hoisted.fire!(3, "email", { handedOff: false, mail: { from: "b@x.sa", recipients: 3, inSentFolder: true, emails: [] } });
+    await screen.findByText(titleFrom("b@x.sa"));
+    // The FROM address is in the title and the sentence; no chip names a recipient.
+    expect(screen.queryByText("a@x.sa")).toBeNull();
   });
 });

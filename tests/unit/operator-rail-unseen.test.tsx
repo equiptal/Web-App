@@ -48,24 +48,32 @@ const twoNoOperator = () =>
   });
 
 const strip = () => document.querySelector('[data-pin="18.4"]');
+/** The rail once it is OPEN — a different element from the closed strip, and the one that shakes now. */
+const panel = () => document.querySelector('[data-pin="18"]') ?? document.querySelector('[data-pin="18.1"]');
 const press = (name: RegExp) => screen.getByText(name).closest("button")!;
 
 describe("the operator rail, never opened", () => {
-  it("shakes the closed strip instead of going to review, then lets the next press through", async () => {
+  it("does NOT hold «Review & send» any more, even unopened", async () => {
+    /**
+     * 🔴 **Withdrawn from this press** (owner, 2026-09-13: *"let the operator open and shake when
+     * user try to click next without opening, not from the review and send but from the next of the
+     * equipment"*). It stays on «Next equipment» — see the case below.
+     *
+     * 2026-09-09 put the pass on BOTH ways out of a machine. What that missed is where each press
+     * LEAVES the renter: «Next equipment» keeps him on this canvas, so opening the rail puts the
+     * panel in front of him; «Review & send» is the last press of the request, and refusing it to
+     * open a panel nothing is missing from reads as a broken button.
+     *
+     * 🔴 **The cost, and it is real:** a ONE-equipment request has no «Next equipment», so nothing
+     * forces the rail open on it at all. This case is that hole, pinned deliberately so the next
+     * reader meets it as a decision rather than as a regression.
+     */
     const handle = await renderCanvas(<Canvas />, { draft: noOperator(), prepare: answered(["a0"]) });
 
-    // Nothing is missing: this is a look, not a gap.
     expect(strip()).not.toBeNull();
     expect(strip()!.className).not.toContain("shake-error");
 
-    await handle.run(() => press(/Review & send/).click());
-
-    // Refused, and the refusal is the shake on the strip itself.
-    expect(strip()!.className).toContain("shake-error");
-    expect(handle.store().state.readyToSend).toBe(false);
-
-    // ONE pass. The renter has now been shown it, so the second press goes on — the last question
-    // before review is «anything else on this job?», which is what «done» looks like here.
+    // Straight through on the FIRST press: the last question before review is «anything else?».
     await handle.run(() => press(/Review & send/).click());
     expect(screen.getByText("Anything else on this request?")).toBeTruthy();
   });
@@ -82,14 +90,24 @@ describe("the operator rail, never opened", () => {
     expect(screen.getByText("Anything else on this request?")).toBeTruthy();
   });
 
-  it("holds on «Next equipment» too, which is the other way out of a machine", async () => {
+  it("holds «Next equipment», and OPENS the rail rather than only rattling it", async () => {
+    /**
+     * 🔴 **It opens now** (owner, 2026-09-13: *"can u let the operator open and shake"*). ~~The
+     * closed 72px strip shook and stayed shut.~~ That asked the renter to work out that the shaking
+     * thing was a button and press it — on the one panel the whole pass exists because he has never
+     * pressed it. Opening it IS the look being demanded.
+     */
     const handle = await renderCanvas(<Canvas />, { draft: twoNoOperator(), prepare: answered(["a0", "a1"]) });
+
+    expect(strip()).not.toBeNull();
 
     await handle.run(() => press(/Next equipment/).click());
     // Refused: the travel is what «it went through» looks like since the carry-forward modal went
     // (2026-09-09), so the item index is the assertion.
     expect(handle.store().state.itemIndex).toBe(0);
-    expect(strip()!.className).toContain("shake-error");
+    // ⚠️ The closed strip is GONE, because the refusal opened the panel it belongs to.
+    expect(strip()).toBeNull();
+    expect(panel()).not.toBeNull();
 
     await handle.run(() => press(/Next equipment/).click());
     expect(handle.store().state.itemIndex).toBe(1);

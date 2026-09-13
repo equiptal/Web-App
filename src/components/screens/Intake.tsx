@@ -203,6 +203,19 @@ export function Intake() {
 
   return (
     <div {...pin("create-intake")} className="mx-auto w-full max-w-[880px]">
+      {/* ── He asks the question (owner, 2026-09-13: *"use mansour icon more in the chat intake
+          somewhere, i want it to be attractive"*) ─────────────────────────────────────────────────
+          The screen was a heading, a line and a big empty box - correct and characterless. He stands
+          over the heading at 52px, `is-waiting`, which is the kit's own state for exactly this
+          moment: a slow lean-in, *"waiting for the user"*. The heading IS his question, so he is not
+          decoration beside it - he is who is asking.
+
+          Above rather than beside: centred over a centred heading he holds the axis the box below
+          also sits on, where a mark to one side would set up a second edge for the eye to find. */}
+      <div className="mb-3 flex justify-center">
+        <Mansour size={52} state="waiting" />
+      </div>
+
       {/* Centred, because the box below it is the only thing on this screen and a left-aligned
           heading over a full-width card points at nothing. */}
       <h1 className="text-center text-display font-extrabold leading-tight tracking-[-.02em] text-navy">{t.intake.heading}</h1>
@@ -317,9 +330,16 @@ export function Intake() {
           {/* ⚠️ **The sentence, then his sites** (owner, 2026-09-12: *"on the left on same row the
               project pills with sentence «select your project» beside them"*). A bare row of place
               names is furniture; named, it is a question with an answer already in reach. */}
+          {/* 🔴 **It is the CHIPS that draw the sentence now** (owner, 2026-09-13: *"«اختر مشروعاً» -
+              this is only shown when user have projects"*). ~~A `<span>` here, beside the strip.~~
+              `ProjectChips` returns `null` for a renter with no sites - and for a guest - so the
+              question was asked unconditionally next to nothing at all, on the first screen a renter
+              meets. Passing it IN means the one thing that knows whether there are any sites is the
+              one that decides whether to ask about them; they can no longer disagree. */}
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
-            <span className="flex-none text-meta font-semibold text-muted">{t.projects.chips.pick}</span>
-            <ProjectChips />
+            <ProjectChips
+              lead={<span className="flex-none text-meta font-semibold text-muted">{t.projects.chips.pick}</span>}
+            />
           </div>
 
           {/* ⚠️ **Two round controls, and they are the whole floor now** (owner, 2026-09-12:

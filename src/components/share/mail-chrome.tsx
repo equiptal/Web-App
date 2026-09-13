@@ -98,12 +98,21 @@ export interface MailPerson {
 }
 
 /**
- * ⚠️ **The NAME leads, the address is the tooltip** — which is what both clients do, and it is
- * the difference between a header a renter can check and a row of strings he has to decode. He
- * knows «Al Faisal Rentals»; he does not necessarily know `ops@alfaisal.sa` belongs to them.
+ * 🔴 **The ADDRESS leads, the name is the tooltip** (owner, 2026-09-13: *"why it shows the supplier
+ * name in the bcc, it must be the email"*).
  *
- * The address stands alone when we have no name for it, because a chip with nothing readable on it
- * is worse than a raw address.
+ * ~~The name led, because that is what both clients draw.~~ They draw it for a header the renter
+ * WROTE; this one was addressed for him off his own supplier list, and the question he is answering
+ * here is not «who is this» but «is that the right mailbox». «Al Faisal Rentals» cannot tell him
+ * whether the message is going to the branch address or to a salesman's personal one, and a
+ * mistyped address in his own list is invisible behind the label he gave it.
+ *
+ * ⚠️ This is the SAME ruling the confirmation dialog took on 2026-09-09, for the same reason, and
+ * the two had quietly disagreed ever since: that change moved the confirm chips to addresses and a
+ * note here claimed the envelope already did. It did not.
+ *
+ * The name is not lost - it is the `title`, one hover away, and the initial disc still carries its
+ * first letter so the chip reads as a person rather than as a string.
  */
 export function MailChips({ people, empty, skin }: { people: MailPerson[]; empty: string | null; skin: MailSkin }) {
   return (
@@ -116,7 +125,9 @@ export function MailChips({ people, empty, skin }: { people: MailPerson[]; empty
                makes a chip read as a PERSON rather than as a tag. */
             <span
               key={who.address}
-              dir={who.name ? undefined : "ltr"}
+              /* An address is always an ltr run, whatever the page is - a `+`-style local part or a
+                 domain reordered by the Arabic around it is a different address. */
+              dir="ltr"
               title={who.name ? `${who.name} · ${who.address}` : who.address}
               className="inline-flex h-[24px] max-w-full items-center gap-1.5 rounded-full ps-0.5 pe-2.5 text-[12px]"
               style={{ background: skin.chipGround, color: skin.chipText, border: `1px solid ${skin.chipBorder}` }}
@@ -128,7 +139,7 @@ export function MailChips({ people, empty, skin }: { people: MailPerson[]; empty
               >
                 {((who.name || who.address).trim()[0] || "?").toUpperCase()}
               </span>
-              <span className="truncate">{who.name || who.address}</span>
+              <span className="truncate">{who.address}</span>
             </span>
           ))
         )}

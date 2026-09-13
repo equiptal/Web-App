@@ -275,7 +275,13 @@ export const en = {
       fromLine: "From: {name}",
       fromYou: "you",
       coach: "Share with your supplier to bid",
-      expiry: "Expiry date of your link",
+      /* ⚠️ It says what the date DOES, not what it is called (owner, 2026-09-13: *"make the text
+         as «set the deadline of your link so supplier cant bid after it»"*). «Expiry date of your
+         link» named a field; nothing on the screen said that leaving it empty means the link never
+         closes, or that setting it stops a supplier bidding. `expiryName` keeps the short noun for
+         the `aria-label`, because a screen reader wants the field, not the reason. */
+      expiry: "Set your link’s deadline, so nobody can bid after it",
+      expiryName: "Expiry date of your link",
       title: "Share this request",
       linkLabel: "Your shareable link",
       linkMasked: "Generated the moment you post",
@@ -377,6 +383,12 @@ export const en = {
       /* ── SUP-BE-23: the mail we send ourselves, from his own address ──────────────────────── */
       mailSent: "Sent from {from} to {n} suppliers",
       mailSentOne: "Sent from {from} to 1 supplier",
+      /* ── WHO it went to, on the tick (owner, 2026-09-13) ──────────────────────────
+         *"in the success message when a request is posted and sent to email, show to who it was
+         sent, like their emails, if so much addresses then show first 5"*.
+         The count answered «how many» and nothing answered «which» — and a mistyped address in his
+         own supplier list is invisible behind a number. Five, then this. */
+      mailSentTo: "+{n} more",
       mailSkipped: "{n} of the ones you picked had no e-mail, so they were left out.",
       mailOpenInstead: "Open your e-mail",
       /* ── SUP-BE-23, the Graph path: the renter connects his own Outlook once ──────────────── */
@@ -427,7 +439,9 @@ export const en = {
       confirmDoBoth: "Post and send",
       confirmDoSend: "Send",
       copyTitleBtn: "Copy subject",
-      copyBodyBtn: "Copy body",
+      // Said on the control itself while there is no request yet, now that the press is live.
+    copyBodyPending: "The link is added once you post the request",
+    copyBodyBtn: "Copy body",
       confirmNo: "Cancel",
       mailConnect: "Connect Outlook",
       mailReconnect: "Reconnect Outlook",
@@ -1010,6 +1024,12 @@ export const en = {
     },
   },
   onboarding: {
+    /* ⚠️ **RECONSTRUCTED, 2026-09-13.** The Arabic twin («المغادرة وتسجيل الخروج») and the call
+       site (`OnboardingForm`’s `onAbandon` control) survived; this English string did not, because
+       a `git checkout --` in a SHARED worktree threw away another session’s uncommitted edit to
+       this file. Reworded from the Arabic and the usage, not recovered. Correct it if it is not
+       what was written. */
+    leave: "Leave and sign out",
     step1: "Create account",
     step2: "Verify company",
     later: "later",
@@ -2429,6 +2449,11 @@ export const en = {
       category: "CATEGORY",
       type: "TYPE",
       size: "SIZE",
+      /* ⚠️ RECONSTRUCTED in the same accident as `onboarding.leave` above — see that note. From
+         the Arabic «اختر نوع المعدة من قائمتنا» and the `Dropdown` it is the placeholder for. */
+      typePlaceholder: "Select equipment type from our list",
+      /* 26a0Fe0f RECONSTRUCTED in the same accident - see `onboarding.leave`. Arabic: 00ab0627062e062a0631 06270644062d062c064500bb. */
+      sizePlaceholder: "Select size",
       searchTypes: "Search types…",
       /* ── The way out of a TYPE search that found nothing (owner, 2026-09-09) ────────────────────
          *"Maybe if he searched in the type and didnt find it we show for him something here that will
@@ -2783,7 +2808,7 @@ export const en = {
     fCr: "CR number",
     removeRow: "Remove this row",
     markAll: "Mark them all as vendor registered",
-    /* Off by default now (owner, 2026-09-08), so the hint names the press that MARKS rather than
+    /* Off by default now (owner, 2026-09-08), so the hint names the press that ⚠️S rather than
        the press that undoes it. */
     markAllHint: "Tick this to mark every row above as a vendor you have registered",
     /* «My» is the whole distinction from the button beside it (owner, 2026-09-03). Both add

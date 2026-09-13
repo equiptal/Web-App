@@ -486,15 +486,25 @@ export function Canvas() {
       shakeNow(first.panel);
       return;
     }
-    /* ── The rail, if it was never opened (owner, 2026-09-09) ─────────────────────────────────
-       Last, and only once everything else is answered: it is a LOOK, not a missing answer, so it
-       must never stand in front of a real gap or of another machine's. One pass — the shake marks it
-       seen — and the next press goes on, which is the same rule the unseen-panel pass above holds
-       to, for the same reason: a refusal the renter cannot clear is a dead end. */
-    if (itemId && !railSeen.has(itemId) && !railOpen) {
-      shakeRail();
-      return;
-    }
+    /*
+     * — The rail’s unseen pass used to stand here too —
+     *
+     * 🔴 **Removed from «Review & send»** (owner, 2026-09-13: *"let the operator open and shake
+     * when user try to click next without opening, not from the review and send but from the next
+     * of the equipment"*). It stays on «Next equipment», above.
+     *
+     * The 2026-09-09 ruling put it on BOTH ways out of a machine. What that missed is where the two
+     * presses LEAVE the renter: «Next equipment» keeps him on this canvas, so opening the rail puts
+     * the panel he skipped in front of him and the next press carries on. «Review & send» is the
+     * last press of the whole request, and refusing it in order to open a panel nothing is missing
+     * from reads as a fault in the button rather than as an invitation.
+     *
+     * 🔴 **The cost, stated: on a ONE-equipment request nothing forces the rail open any more.**
+     * Such a request has no «Next equipment», so that renter can finish having never seen the
+     * panel — the exact hole 2026-09-09 was written to close, re-opened for the single-item case at
+     * the owner’s word. The operator’s food, accommodation, nationality and certificate are all
+     * priced off it.
+     */
     /* Everything is answered, so the only thing left to decide is whether there is another machine.
        That is the one moment the question is worth asking, and it is where the standing
        «+ Add another machine» button used to live — see the note where it was removed. */

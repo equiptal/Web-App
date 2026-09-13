@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { CompareMatrix } from "@/components/workspace/CompareMatrix";
@@ -874,5 +875,73 @@ describe("the terms strip grows into spare width and never shrinks under its col
     // A fixed `width` here is what left the white gap; a floor plus grow is what closes it.
     expect(col.style.width).toBe("");
     expect(col.style.minWidth).toBe("132px");
+  });
+});
+
+describe("the equipment rail is a door the map can actually open", () => {
+  /**
+   * 🔴 Owner, 2026-09-13: *"the orange equipment must take to the map if at least one bid is in
+   * app, and in the map it will show other bids anyway"*.
+   *
+   * `/bids/{id}/equipment` reads a supplier’s registered machines, their papers and the yard he
+   * confirmed. An OFF-PLATFORM submission has none of that - which is exactly what
+   * `mayOpenEquipmentSurface` says - and the rail used to point at `rows[0]` whatever it was. On a
+   * request whose top row came in through the renter’s shared link, the ordinary case and the one
+   * in his screenshot, the press led to a surface that cannot be built.
+   */
+  const SRC = readFileSync("src/components/workspace/CompareMatrix.tsx", "utf8");
+
+  it("Given the target, Then it is chosen from the OPENABLE rows only", () => {
+    expect(SRC).toContain("mayOpenEquipmentSurface");
+    expect(SRC).toContain("const openable = rows.filter((b) => mayOpenEquipmentSurface(b.card));");
+    // ⚠️ ~~`?? rows[0]`.~~ The fallback is what made an off-platform row the door.
+    expect(SRC).toContain("?? openable[0] ?? null");
+    expect(SRC).not.toContain("?? rows[0] ?? null");
+  });
+
+  it("Given a recommendation on an UNOPENABLE bid, Then it does not win the door", () => {
+    // ⚠️ The agent’s pick is looked up inside `openable`, not inside every row: a ranked
+    // off-platform bid must not take the door back.
+    expect(SRC).toContain("openable.find((b) => b.card.id === ranking.bidId)");
+  });
+
+  it("Given no in-app bid at all, Then the rail is disabled rather than lying", () => {
+    // The button already guards on the target; what changed is what the target MEANS.
+    expect(SRC).toContain("disabled={!equipmentTarget}");
+  });
+});
+
+describe("one light tone per section", () => {
+  /**
+   * Owner, 2026-09-13: *"can u make a light color for each section like the orange, maybe light
+   * blue for terms and light grey for prices as it is now"*. Three of the four bands were the same
+   * grey, so the only thing separating a rate from a certificate was the heading above it.
+   */
+  const SRC = readFileSync("src/components/workspace/CompareMatrix.tsx", "utf8");
+
+  it("Given the bands, Then terms is the slate and money keeps its grey", () => {
+    expect(SRC).toContain("bg-info-soft");
+    expect(SRC).toContain('tone="terms"');
+    // Money is untouched: it is the table’s default reading and the one the eye starts on.
+    expect(SRC).toContain("bg-surface2/70");
+  });
+
+  it("Given the terms band OPEN, Then it keeps its tone", () => {
+    // ⚠️ A colour that only shows while the section is SHUT means something in the half the
+    // renter reads least.
+    expect(SRC).toContain("${BAND.terms.head}");
+    expect(SRC).toContain("${BAND.terms.ink}");
+  });
+
+  it("Given the blue, Then it is `info` and never the map’s `action`", () => {
+    /**
+     * 🔴 This palette has no true blue by design: `--info` is a slate in the ink family, and
+     * `--action` (#1a7ec8) is reserved for the bid map’s ask by RM3-AC-33 - `palette-drift` pins
+     * that value and `rentee-map-surface` forbids anything else wearing it. Spreading it to a terms
+     * band would give one colour two meanings in one product.
+     */
+    const band = SRC.slice(SRC.indexOf("const BAND = {"), SRC.indexOf("} as const;"));
+    expect(band).toContain("info");
+    expect(band).not.toContain("action");
   });
 });
