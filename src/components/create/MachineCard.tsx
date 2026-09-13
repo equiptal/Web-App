@@ -475,12 +475,17 @@ export function MachineCard({
                        on a pale ground the sentence came out khaki, which is what he read as «not
                        yellow and not orange». `brand-deep` is the ink this card now uses for every
                        orange word on it, and it is the AA-safe half of the brand pair.
-                       ⚠️ ONE LINE from `sm` up (owner, 2026-09-13), which is why the sentence was
-                       shortened rather than the type: `min-w-0` + `truncate` so a locale whose
-                       wording runs longer clips instead of pushing the card sideways. */
-                    <p className="flex items-center gap-1 text-label leading-snug text-brand-deep">
-                      <Icon name="warning" size={13} className="flex-none" />
-                      <span className="min-w-0 sm:truncate">{t.create.machineCard.notInCatalogueNote}</span>
+                       🔴 **It WRAPS, and two lines are fine** (owner, 2026-09-13, an hour after
+                       asking for one: *"the note beside the equipment name is wrapped so make it 2
+                       lines fine"*). ~~`sm:truncate`.~~ Clipping a warning is the one thing this
+                       sentence must never do, and it was the price of the one-line rule; he looked
+                       at it wrapped and took the wrap instead. The sentence stays SHORT anyway - two
+                       lines is the ceiling here, not the target.
+                       ⚠️ `items-start` so the glyph sits on the FIRST line rather than floating
+                       against the middle of a two-line block. */
+                    <p className="flex items-start gap-1 text-label leading-snug text-brand-deep">
+                      <Icon name="warning" size={13} className="mt-px flex-none" />
+                      <span className="min-w-0">{t.create.machineCard.notInCatalogueNote}</span>
                     </p>
                   )}
                 </div>

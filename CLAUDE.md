@@ -2,6 +2,34 @@
 
 ## Change log
 
+- **2026-09-13 - The off-catalogue note may take two lines, the offer takes the owner's own words, and TYPE's placeholder matches SIZE's.**
+  Owner, an hour after asking for one line: *"the note beside the equipment name is wrapped so make
+  it 2 lines fine, and for the notes on the type-size make «not in our list? use your custom name»,
+  and for the placeholder of the type dropdown make it «select type» same as «select size»"*.
+  (1) 🔴 **`sm:truncate` is GONE from the note, reversing this morning's one-line rule.** Clipping is
+  the one thing a warning must never do, and that was the price of the rule; he looked at it wrapped
+  and took the wrap. The sentence stays short - two lines is the ceiling now, not the target - and
+  the glyph moved back to `items-start` so it sits on the first line rather than against the middle
+  of a two-line block.
+  (2) **«Not in our list? Use your custom name»**, his wording, replacing «Not listed? Use your own
+  name». «custom name» is the NAME BOX's own vocabulary, which is what the press fills.
+  (3) **«Select equipment type from our list» → «Select type».** The two boxes sit side by side and
+  said different kinds of thing: a four-word instruction naming the catalogue, beside two words.
+  «from our list» is the escape row's job now, one cell along.
+  Files: `src/components/create/MachineCard.tsx`, `src/lib/i18n/{en,ar}.ts`,
+  `tests/unit/custom-equipment-canvas.test.tsx`.
+  ⚠️ Measured at `text-label`: the new offer is **186px** English, 182px Arabic. Its column is
+  ~297px of text room at the card's ordinary width, and ~189px just above the `sm` breakpoint - so
+  it fits everywhere by measurement, and by 3px at the narrowest. It is a button with `leading-snug`
+  and no `nowrap`, so the worst case there is two lines, not an overflow.
+  ⚠️ **A corrupted comment beside `sizePlaceholder` was repaired in passing** - `26a0Fe0f` and a run
+  of raw code points where a ⚠️ and an Arabic quotation should have been. Same class of scripting
+  accident as the `RED` note of 2026-09-12. Said out loud because it is not part of the asked-for
+  change; an unreadable comment is worse than none.
+  ⚠️ Verified: typecheck, lint (0 errors), 74 passing across the five card suites. NOT seen
+  rendered: the canvas needs a session (a guest hits «You've reached your limit» on this backend),
+  so the widths are measured in the page rather than looked at in the card.
+
 - **2026-09-13 - The off-catalogue offer moves under the two lists it is about, and both of its sentences are cut to fit one line.**
   Owner, on the dashed row: *"i want this note inlined with the size-type row so make it shorter, use
   same meaning but shorter, even for the notes above ... i want it to fit in one line not wrapped so

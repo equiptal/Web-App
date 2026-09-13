@@ -2453,10 +2453,14 @@ export const en = {
       category: "CATEGORY",
       type: "TYPE",
       size: "SIZE",
-      /* ⚠️ RECONSTRUCTED in the same accident as `onboarding.leave` above — see that note. From
-         the Arabic «اختر نوع المعدة من قائمتنا» and the `Dropdown` it is the placeholder for. */
-      typePlaceholder: "Select equipment type from our list",
-      /* 26a0Fe0f RECONSTRUCTED in the same accident - see `onboarding.leave`. Arabic: 00ab0627062e062a0631 06270644062d062c064500bb. */
+      /* ⚠️ The two read as a PAIR (owner, 2026-09-13: *"for the placeholder of the type dropdown
+         make it «select type», same as «select size»"*). They sit side by side in the same row and
+         said different kinds of thing - one a four-word instruction naming the catalogue, the other
+         two words. «from our list» is also the escape row's job now, one cell along.
+         ⚠️ The comment that stood here was CORRUPTED - `26a0Fe0f` and a run of raw code points where
+         the ⚠️ and the Arabic should have been, the same class of scripting accident the 2026-09-12
+         `RED` note records. Repaired rather than left: an unreadable comment is worse than none. */
+      typePlaceholder: "Select type",
       sizePlaceholder: "Select size",
       searchTypes: "Search types…",
       /* ── The way out of a TYPE search that found nothing (owner, 2026-09-09) ────────────────────
@@ -2490,7 +2494,7 @@ export const en = {
          two lists now, not on a full-width row of its own, so the sentence that named both the
          CONDITION and the ACT no longer has the room for either at length. Five words: what is wrong,
          and what to press. Keep any replacement this short and LOOK at it in the card. */
-      useMyOwnName: "Not listed? Use your own name",
+      useMyOwnName: "Not in our list? Use your custom name",
       /* The same row, on a line that has already gone off-catalogue (owner, 2026-09-13): *"if it is
          clicked then in its place, with no taxonomy selected, we will write «select from our list»"*.
          His words. It OPENS the type list, rather than just naming it — the lists are still on screen

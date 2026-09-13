@@ -66,9 +66,9 @@ describe("naming a machine the catalogue does not carry", () => {
        phone needed its own copy underneath. In the hint slot the note wraps like any other line of
        guidance, and two copies to keep in step were two chances to drift. */
     expect(screen.getAllByText(/reach Moedatech suppliers/i)).toHaveLength(1);
-    /* ⚠️ Both halves still in ONE sentence, and the sentence is short because it may not wrap now
-       (owner, 2026-09-13: *"make sure use shorter sentences to fit"*) — it is `sm:truncate` in a
-       two-column cell, so a longer one would not wrap, it would disappear. */
+    /* ⚠️ Both halves still in ONE sentence, and it stays short - but it WRAPS rather than clipping
+       (owner, 2026-09-13, an hour after asking for one line: *"the note beside the equipment name is
+       wrapped so make it 2 lines fine"*). Clipping a warning is the one thing it must never do. */
     expect(screen.getAllByText(/Share the link yourself/i)).toHaveLength(1);
     /* ── It must NOT claim the catalogue lacks the machine (owner, 2026-09-12) ──────────────────
        *"it is not the case always that this equipment is not available, like what the note says"*.
@@ -182,7 +182,7 @@ describe("the way back into the catalogue", () => {
 
     expect(screen.getByRole("button", { name: /Select from our list/i })).toBeTruthy();
     // The two never stand together: one line cannot be offered both doors at once.
-    expect(screen.queryByRole("button", { name: /Use your own name/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Use your custom name/i })).toBeNull();
   }, 20_000);
 
   it("points at what the press changed — the name box and its new note pulse together", async () => {
@@ -193,7 +193,7 @@ describe("the way back into the catalogue", () => {
     expect(TAXONOMY).toBeTruthy();
 
     expect(document.querySelector(".attn-pulse")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /Use your own name/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Use your custom name/i }));
 
     /* The press empties the taxonomy, stars the name box and raises the note. The pulse wraps the
        ROW, so what is outlined is the name box together with the note beside it — the pair the press
