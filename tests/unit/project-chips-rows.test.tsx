@@ -153,6 +153,33 @@ describe("the sentence beside the pills", () => {
     expect(lead.compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("Given sites, Then the lead is INSIDE the measured strip, not a row of its own", async () => {
+    /**
+     * 🔴 This is the case the pair above could not catch, and the one a rebase actually broke.
+     *
+     * Two passes landed the same day: one added the `lead` slot, the other made the strip a single
+     * wrapping flow so «All projects» follows the last pill instead of sitting on a line of its own
+     * (*"the max number of pills used without white space"*). Merging them by taking either side
+     * whole put the lead back OUTSIDE the strip — which still draws it, still draws it first, and
+     * still passes both cases above, while returning the layout to the white-space fault.
+     *
+     * So the assertion is CONTAINMENT: the sentence and the pills share the one element whose
+     * height is measured for the row clamp. If they do not, the lead is on its own line again.
+     */
+    rows.value = [site(1), site(2)];
+    render(
+      <LocaleProvider>
+        <ProjectChips lead={<span>PICK A PROJECT</span>} />
+      </LocaleProvider>,
+    );
+    const lead = await screen.findByText("PICK A PROJECT");
+    const chip = await screen.findByText("Site 1");
+    // The strip is the flex-wrap box both sit in; `closest` walks up from each and must meet there.
+    const strip = chip.closest(".flex-wrap");
+    expect(strip).toBeTruthy();
+    expect(strip!.contains(lead)).toBe(true);
+  });
+
   it("Given NO sites, Then the lead is not drawn either", async () => {
     // 🔴 The whole point: no answers, so no question.
     rows.value = [];
