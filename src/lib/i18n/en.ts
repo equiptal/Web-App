@@ -481,7 +481,11 @@ export const en = {
     },
     reading: "Reading",
     heading: "How would you like to create your request?",
-    subheading: "Describe your request, or upload an existing RFQ document. If it belongs to a project, its defaults fill themselves in.",
+    // ⚠️ ONE LINE (owner, 2026-09-13: *"make the text below as one line dont wrap it"*). It is
+    // `whitespace-nowrap` from `sm` up, so its LENGTH is now a layout constraint rather than a free
+    // choice: the old sentence was 120 characters and could not fit this column at any width the app
+    // has. Keep anything replacing it about this long, and look at it.
+    subheading: "Describe your request, or upload an RFQ. A project fills in its own defaults",
     optUploadTitle: "Write / Upload RFQ",
     optUploadDesc: "Write your request or upload a file. Your AI assistant fills the form automatically.",
     recommended: "Recommended",
@@ -2481,7 +2485,12 @@ export const en = {
          ⚠️ «custom equipment name» is deliberately the FIELD's own vocabulary rather than plain
          English: it names the box the press points at, which is the whole of what the sentence has
          to do now that the pulse draws the eye there. */
-      useMyOwnName: "Doesn't match what you want? Send it with your custom equipment name above",
+      /* ⚠️ SHORT, because it moved (owner, 2026-09-13: *"i want this note inlined with the size-type
+         row ... make sure use shorter sentences to fit"*). It sits in a ~200px grid column under the
+         two lists now, not on a full-width row of its own, so the sentence that named both the
+         CONDITION and the ACT no longer has the room for either at length. Five words: what is wrong,
+         and what to press. Keep any replacement this short and LOOK at it in the card. */
+      useMyOwnName: "Not listed? Use your own name",
       /* The same row, on a line that has already gone off-catalogue (owner, 2026-09-13): *"if it is
          clicked then in its place, with no taxonomy selected, we will write «select from our list»"*.
          His words. It OPENS the type list, rather than just naming it — the lists are still on screen
@@ -2549,8 +2558,10 @@ export const en = {
          lost connection, four strings of it. It is deliberate here: it is also the word the source
          filter and the comparison have shown him for weeks («Offline · invite»), so it is the
          product's own name for a supplier reached outside Moedatech. */
-      notInCatalogueNote:
-        "This one does not go to Moedatech suppliers, but you can still post the request and share it with your suppliers offline",
+      /* ⚠️ ONE LINE, and therefore short (owner, 2026-09-13). It is `sm:truncate` in a two-column
+         cell now, so a longer sentence does not wrap - it disappears. Both facts survive: it reaches
+         no Moedatech supplier, and the link is still his to send. */
+      notInCatalogueNote: "This one won't reach Moedatech suppliers. Share the link yourself",
       // The renter names the machine himself and the request goes out carrying his words. Prefilled
       // from what he wrote in the RFQ, so the ordinary case is a glance.
       customEquipment: "EQUIPMENT NAME",

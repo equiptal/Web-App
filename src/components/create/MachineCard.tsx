@@ -462,23 +462,26 @@ export function MachineCard({
                   />
                 </CanvasField>
 
+                {/* ── The note, and ONLY the note (owner, 2026-09-13) ──────────────────────────
+                    *"i want this note inlined with the size-type row"* — so the dashed offer moved
+                    down to sit under the lists it acts on, and this cell keeps the sentence alone.
+                    ⚠️ On a MATCHED line there is nothing to say here and the cell is empty. That is
+                    the cost of the move and it is his call: the offer belongs beside the two lists
+                    that failed him, not beside the box it fills. */}
                 <div className="sm:col-span-2">
-                  {custom ? (
+                  {custom && (
                     /* ── The note, in the card's own orange (owner, 2026-09-12/13) ────────────
                        It was `text-warn` (#b98a1d), which `globals.css` states is a FILL — at 2.97:1
                        on a pale ground the sentence came out khaki, which is what he read as «not
                        yellow and not orange». `brand-deep` is the ink this card now uses for every
-                       orange word on it, and it is the AA-safe half of the brand pair. */
-                    <p className="flex items-start gap-1 text-label leading-snug text-brand-deep">
-                      <Icon name="warning" size={13} className="mt-px flex-none" />
-                      {t.create.machineCard.notInCatalogueNote}
+                       orange word on it, and it is the AA-safe half of the brand pair.
+                       ⚠️ ONE LINE from `sm` up (owner, 2026-09-13), which is why the sentence was
+                       shortened rather than the type: `min-w-0` + `truncate` so a locale whose
+                       wording runs longer clips instead of pushing the card sideways. */
+                    <p className="flex items-center gap-1 text-label leading-snug text-brand-deep">
+                      <Icon name="warning" size={13} className="flex-none" />
+                      <span className="min-w-0 sm:truncate">{t.create.machineCard.notInCatalogueNote}</span>
                     </p>
-                  ) : (
-                    offerOffCatalogue && (
-                      <button type="button" onClick={goOffCatalogue} className={ESCAPE_ROW}>
-                        {t.create.machineCard.useMyOwnName}
-                      </button>
-                    )
                   )}
                 </div>
               </div>
@@ -550,10 +553,22 @@ export function MachineCard({
                   ⚠️ Withheld on a line started from a supplier's listing — a DIRECT request is
                   taxonomy only (owner, 2026-09-12), and an off-catalogue one reaches nobody at all,
                   the named supplier included. */}
-              {custom && CUSTOM_EQUIPMENT_ENABLED && !listingLocked && (
+              {/* ── The offer, under the two lists it is about (owner, 2026-09-13) ─────────────
+                  *"i want this note inlined with the size-type row"*. Both labels live in this one
+                  cell now: off-catalogue it offers the way BACK to the lists, and on a matched line
+                  it offers the way OUT of them. One control, two labels, one home — under TYPE and
+                  SIZE, which are the two boxes either press is about.
+                  ⚠️ Withheld on a line started from a supplier's listing — a DIRECT request is
+                  taxonomy only (owner, 2026-09-12), and an off-catalogue one reaches nobody at all,
+                  the named supplier included. */}
+              {CUSTOM_EQUIPMENT_ENABLED && !listingLocked && (custom || offerOffCatalogue) && (
                 <div className="flex items-end">
-                  <button type="button" onClick={() => setOpenTypeAt((n) => n + 1)} className={ESCAPE_ROW}>
-                    {t.create.machineCard.selectFromList}
+                  <button
+                    type="button"
+                    onClick={custom ? () => setOpenTypeAt((n) => n + 1) : goOffCatalogue}
+                    className={ESCAPE_ROW}
+                  >
+                    {custom ? t.create.machineCard.selectFromList : t.create.machineCard.useMyOwnName}
                   </button>
                 </div>
               )}

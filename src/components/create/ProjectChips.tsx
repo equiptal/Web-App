@@ -332,9 +332,11 @@ export function ProjectChips({
     /* ⚠️ The lead sits BESIDE the stack, not above it, which is the shape the owner approved on
        2026-09-12 - and it is outside the measured strip on purpose: `twoRowsPx` is read off the
        first CHIP's height, and a sentence in that flow would be the thing measured instead. */
-    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+    <div className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
       {lead}
-      <div className="flex min-w-0 flex-col items-start gap-2">
+      {/* ⚠️ `flex-1`, so the strip takes the rest of the line after the lead rather than sizing to
+          its own contents - which is what leaves a row short of the card’s edge. */}
+      <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
       <div
         ref={strip}
         /* `overflow-hidden` only while clamped — expanded it must not cut a dropdown open on the

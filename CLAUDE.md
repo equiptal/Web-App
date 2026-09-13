@@ -2,6 +2,104 @@
 
 ## Change log
 
+- **2026-09-13 - The off-catalogue offer moves under the two lists it is about, and both of its sentences are cut to fit one line.**
+  Owner, on the dashed row: *"i want this note inlined with the size-type row so make it shorter, use
+  same meaning but shorter, even for the notes above ... i want it to fit in one line not wrapped so
+  make sure use shorter sentences to fit"*.
+  (1) **ONE control again, in row two.** The two offers were split apart earlier the same day - the
+  way OUT beside the NAME box it fills, the way BACK under the LISTS it opens - and both are about
+  the same two lists, so both now live in the third column beneath TYPE and SIZE. One cell, one
+  skin, a ternary for the label and another for the press.
+  (2) **Both sentences cut, and MEASURED rather than guessed** at `text-label`, which is what the
+  card draws them in:
+   · «Doesn't match what you want? Send it with your custom equipment name above» **391px → 152px**
+     («Not listed? Use your own name»). Its column is `minmax(200px, …)` less the button's 24px of
+     padding, so it clears even at the column's floor.
+   · «This one does not go to Moedatech suppliers, but you can still post the request and share it
+     with your suppliers offline» **573px → 317px** («This one won't reach Moedatech suppliers.
+     Share the link yourself»). It spans columns two and three, ~340px at the 640px breakpoint and
+     ~490px at the card's ordinary width.
+  Arabic came out narrower on both (153px and 213px), as it usually does here.
+  Files: `src/components/create/MachineCard.tsx`, `src/lib/i18n/{en,ar}.ts`
+  (`machineCard.useMyOwnName`, `notInCatalogueNote`),
+  `tests/unit/custom-equipment-canvas.test.tsx` (3 cases rewritten).
+  ⚠️ **The note is `sm:truncate`, so its LENGTH is now a layout constraint** - a longer sentence
+  does not wrap, it disappears. Both dictionaries carry a note saying so. Below `sm` the class is
+  absent and it wraps, because no sentence of this kind fits one line on a phone and forcing it
+  would push the card sideways.
+  ⚠️ **On a MATCHED line row one's second cell is now EMPTY.** That is the cost of the move and it
+  is the owner's call: the offer belongs beside the two lists that failed him, not beside the box it
+  fills.
+  🔴 **This REVERSES «one control, two homes» from earlier today**, which had just reversed «one
+  control with a ternary label». What survives across all three is the rule underneath: one SKIN, in
+  one constant, so the two labels can never drift into two different-looking rows. The test that
+  pinned two `ESCAPE_ROW` call sites now pins one.
+  ⚠️ Verified: typecheck, lint (0 errors), 63 passing across the four card suites, and the full
+  suite serially (3371 passing). The two failures are both KNOWN and neither is from this change:
+  `ui-pins` (pre-existing CRLF staleness) and `share-request-email`'s `recipientEmails`, which is
+  uncommitted work that exists nowhere in `HEAD`.
+  🔴 **NOT seen rendered.** The canvas needs a session - a guest hits «You've reached your limit» on
+  this backend - so the two strings were measured in the page rather than looked at in the card, and
+  the measurement ran against the SYSTEM font stack because the local page had not applied Inter.
+  Inter is a little wider, so the English note's ~20px of headroom at the narrowest `sm` layout may
+  not be there; `sm:truncate` is what catches it. The card wants one look on a deployed build.
+
+- **2026-09-13 - The site strip uses the whole card: the two round controls stop reserving width on every row.**
+  Owner, on a screenshot of the intake floor: *"more project pill can fit in the row so make the max
+  per row"*.
+  🔴 **The chips were wrapping as if the card were 110px narrower than it is.** The strip sat in a
+  `flex-1` group with the `+` and the arrow beside it, so those two held their own width on EVERY
+  line of the wrap - and they only ever occupy ONE. His first row ended with about 200px of white
+  after it and the next chip had gone to a second line that did not need to exist.
+  `basis-full` on the group sends the controls to a line of their own and gives the strip the card.
+  Files: `src/components/screens/Intake.tsx`, `src/components/create/ProjectChips.tsx`,
+  `tests/unit/intake-floor.test.ts` (the «controls on the last row» case reversed).
+  🔴 **This REVERSES a ruling from earlier the same day** - *"the wrapper keeps the controls on the
+  LAST row"*, which had been checked against twelve sites in the live DOM. It was not wrong about
+  what it measured; it was answering a different question. The cost of the reversal, stated: the
+  floor is one row taller than it was.
+  ⚠️ **`items-end` STAYS.** It is still what keeps the controls level with the bottom of whatever
+  sits above them, and it is the half of that mechanism which was never the problem.
+  ⚠️ The strip inside `ProjectChips` took `flex-1` in the same pass, so it fills the line after the
+  lead rather than sizing to its own contents - which is the same fault one level down.
+  ⚠️ **NOT changed: the chip LABELS.** He also said they look *"clipped or i dont know but
+  stripped"*. They are `projectTitle` - the renter's own title, else `shortSite(location.label)`,
+  which is the text before the first comma with runs of 4+ digits removed (a postcode rule). The
+  names in his shot are Google PLUS CODES («PMGJ+PH», «RHOA», «RGRA»), which is what the geocoder
+  returned for sites he never titled, not something this strip cut. Worth a look at the data before
+  changing a shared helper that six surfaces read.
+  ⚠️ Verified: typecheck, lint, 54 passing across the five touched suites, and the width
+  break-checked (the group returned to `flex-1`) - two cases went red. NOT seen rendered.
+
+- **2026-09-13 - Mansour asks the question from the front of it, and the line under it stops wrapping.**
+  Owner, on the intake: *"put mansour before the question and make the text below as one line dont
+  wrap it"*.
+  (1) ~~A 52px rig on its own line above the heading.~~ There he was a mark floating over a page.
+  He is INSIDE the `<h1>` now at 44px, still `is-waiting` - the kit's own «waiting for the user»
+  lean-in - so the pair centres as one object and he reads as the one asking rather than as
+  decoration over it. `flex-wrap` on the heading so the question can drop under him on a phone, and
+  `flex-none` on him so he never squeezes when it does.
+  ⚠️ **Arabic needs no branch.** «Before» is the LEADING edge, and a flex row reverses under
+  `dir="rtl"` on its own: he lands on the right of «كيف تريد إنشاء طلبك؟» with no mirror rule.
+  Verified in the browser in both directions.
+  (2) **The sentence is one line, and its LENGTH is now a layout constraint.** The cap was
+  `max-w-[640px]`, which broke it in two and hung «fill themselves in.» alone under the middle of the
+  page. The cap is gone - and the copy was SHORTENED, because at 880px the old 120-character
+  sentence could not be made to fit without shrinking the type, which is a worse answer to «don't
+  wrap it». Both dictionaries carry a note saying so.
+  ⚠️ `sm:whitespace-nowrap`, never bare. Below 640px no sentence of this kind fits on one line, and
+  forcing it would push the whole DOCUMENT wider than the phone - the fault audited out of three
+  surfaces on 2026-09-08. One line where there is room; wrapped where there is not.
+  ⚠️ The trailing full stop went with the rewrite, which is the house rule for UI strings and which
+  the old sentence had been breaking.
+  Files: `src/components/screens/Intake.tsx`, `src/lib/i18n/{en,ar}.ts` (`intake.subheading`),
+  `tests/unit/mansour.test.tsx` (1 case).
+  ⚠️ Verified: typecheck, lint (0 errors), 38 passing across the intake/brand/wording suites, the
+  placement break-checked (the rig and the nowrap both removed - the new case went red), and **SEEN
+  RENDERED in both locales**: he sits before the question and the line holds at one row.
+  🔴 NOT seen at phone width: the resize did not take on this browser, so the `sm:` fallback is the
+  standard guard rather than an observed one.
+
 - **2026-09-13 - `NO_SENDER_ADDRESS` can only reach this panel through a FAILED MAILBOX, so the connection is re-read and both routes out are on screen.**
   Owner, meeting that sentence a second time: *"didnt we fix this???"*
   **We fixed the wording, never the cause, and the cause is not the profile.** Traced end to end

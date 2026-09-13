@@ -121,6 +121,20 @@ describe("where he is used", () => {
     expect(PROCESSING).toMatch(/<Mansour size=\{30\} state="live" \/>/);
   });
 
+  it("the intake seats him BEFORE the question, on the heading's own line", () => {
+    /**
+     * Owner, 2026-09-13: *"put mansour before the question"*. ~~On his own line above it~~, where he
+     * was a mark floating over a page rather than the one asking. He is inside the `<h1>` now, so
+     * the pair centres as one object and mirrors in Arabic for free - «before» is the leading edge,
+     * which is the right in an RTL page.
+     */
+    const at = INTAKE.indexOf("t.intake.heading");
+    const h1 = INTAKE.slice(INTAKE.lastIndexOf("<h1", at), at);
+    expect(h1).toMatch(/<Mansour size=\{44\} state="waiting"/);
+    // `flex-none` so he never squeezes when the question wraps on a phone.
+    expect(h1).toMatch(/flex-none/);
+  });
+
   it("the intake perches him on the box while the template is being written", () => {
     expect(INTAKE).toMatch(/state\.agentTyping/);
     expect(INTAKE).toMatch(/<Mansour size=\{34\} state="live" \/>/);

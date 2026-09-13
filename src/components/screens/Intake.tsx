@@ -204,22 +204,31 @@ export function Intake() {
   return (
     <div {...pin("create-intake")} className="mx-auto w-full max-w-[880px]">
       {/* ── He asks the question (owner, 2026-09-13: *"use mansour icon more in the chat intake
-          somewhere, i want it to be attractive"*) ─────────────────────────────────────────────────
-          The screen was a heading, a line and a big empty box - correct and characterless. He stands
-          over the heading at 52px, `is-waiting`, which is the kit's own state for exactly this
-          moment: a slow lean-in, *"waiting for the user"*. The heading IS his question, so he is not
-          decoration beside it - he is who is asking.
+          somewhere, i want it to be attractive"*, then *"put mansour before the question"*) ────────
+          The screen was a heading, a line and a big empty box - correct and characterless. He is
+          `is-waiting`, the kit's own state for exactly this moment: a slow lean-in, *"waiting for
+          the user"*. The heading IS his question, so he is not decoration beside it - he is who is
+          asking, which is why he reads BEFORE it rather than over it.
 
-          Above rather than beside: centred over a centred heading he holds the axis the box below
-          also sits on, where a mark to one side would set up a second edge for the eye to find. */}
-      <div className="mb-3 flex justify-center">
-        <Mansour size={52} state="waiting" />
-      </div>
+          ~~Above, centred on the same axis as the box.~~ On its own line he was a mark floating over
+          a page; on the line itself he is the speaker. `inline-flex` with the h1 so the pair stays
+          centred as one object at every width, and `flex-none` so he never squeezes when the
+          question wraps on a phone. */}
+      <h1 className="flex flex-wrap items-center justify-center gap-3 text-center text-display font-extrabold leading-tight tracking-[-.02em] text-navy">
+        <Mansour size={44} state="waiting" className="flex-none" />
+        {t.intake.heading}
+      </h1>
 
-      {/* Centred, because the box below it is the only thing on this screen and a left-aligned
-          heading over a full-width card points at nothing. */}
-      <h1 className="text-center text-display font-extrabold leading-tight tracking-[-.02em] text-navy">{t.intake.heading}</h1>
-      <p className="mx-auto mb-6 mt-2 max-w-[640px] text-center text-subhead leading-relaxed text-muted">{t.intake.subheading}</p>
+      {/* ── One line, never wrapped (owner, 2026-09-13) ───────────────────────────────────────────
+          ~~`max-w-[640px]`, which broke it over two lines and hung «fill themselves in.» alone under
+          the middle of the page.~~ The cap is gone and the sentence was shortened to fit the width
+          this column actually has; at 880px the old one could not be made to fit without shrinking
+          the type, which is a worse answer to «don't wrap it».
+
+          ⚠️ `whitespace-nowrap` only from `sm` up. Below that no sentence fits on one line and
+          forcing it would push the whole DOCUMENT wider than the phone - the fault audited out of
+          three surfaces on 2026-09-08. One line where there is room, wrapped where there is not. */}
+      <p className="mb-6 mt-2 text-center text-subhead leading-relaxed text-muted sm:whitespace-nowrap">{t.intake.subheading}</p>
 
       {/* ── The box ──
           The whole card is the drop target, not a rectangle inside it: a renter dragging a file at
@@ -336,7 +345,19 @@ export function Intake() {
               question was asked unconditionally next to nothing at all, on the first screen a renter
               meets. Passing it IN means the one thing that knows whether there are any sites is the
               one that decides whether to ask about them; they can no longer disagree. */}
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
+          {/* 🔴 **The whole width, so a row holds every chip that fits** (owner, 2026-09-13:
+              *"more project pill can fit in the row so make the max per row"*).
+
+              ~~`flex-1`.~~ The two round controls share this wrapping row, so they reserved their
+              own width on EVERY line of it - about 110px - and the chips wrapped as if the card were
+              that much narrower. On his screenshot the first row ended with 200px of white after it
+              and the next chip had gone to a second line that did not need to exist. The buttons
+              only ever occupy ONE line, which is why the reservation was wrong on all the others.
+
+              ⚠️ `basis-full` sends the controls to a line of their own. That is the trade, one row
+              of height for a strip that uses the card: the sites are the thing being read here, and
+              the two icons are not. */}
+          <div className="flex w-full min-w-0 basis-full flex-wrap items-center gap-x-3 gap-y-2">
             <ProjectChips
               lead={<span className="flex-none text-meta font-semibold text-muted">{t.projects.chips.pick}</span>}
             />

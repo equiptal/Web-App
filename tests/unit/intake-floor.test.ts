@@ -125,20 +125,29 @@ describe("the floor's controls match the pills", () => {
     expect(controls).toMatch(/size=\{15\}/);
   });
 
-  it("Given many sites, Then the wrapper keeps the controls on the LAST row", () => {
+  it("Given many sites, Then the strip takes the whole card and the controls drop below it", () => {
     /**
-     * `items-end` is the whole mechanism, and it is what makes this hold as the strip grows: the
-     * chips wrap inside their own `flex-1` group, the group gets taller, and the two controls stay
-     * pinned to its bottom edge instead of climbing back beside the first row.
+     * 🔴 **This REVERSES «the controls stay on the last row»**, at the owner’s word on
+     * 2026-09-13: *"more project pill can fit in the row so make the max per row"*.
      *
-     * Checked with twelve sites patched into the live DOM: three rows of chips, both controls on
-     * the third, their bottom edge level with the group's to the pixel.
+     * That ruling put the chips in a `flex-1` group with the two round controls beside it, so the
+     * controls held their own width on EVERY line of the wrap - about 110px - and the strip wrapped
+     * as if the card were that much narrower. On his screenshot the first row ended with 200px of
+     * white after it and the next chip had gone to a second line that did not need to exist. The
+     * controls only ever occupy ONE line, which is what made the reservation wrong on all the rest.
+     *
+     * ⚠️ **The cost, stated:** the controls now take a line of their own, so the floor is one row
+     * taller than it was. That is the trade the owner asked for - the sites are what is being read
+     * here, and the two icons are not.
+     *
+     * ⚠️ `items-end` STAYS. It is still what keeps the controls level with the bottom of whatever
+     * sits above them, and it is the half of the old mechanism that was never the problem.
      */
     const row = intake.slice(intake.indexOf("<div className=\"flex flex-wrap items-end"));
     expect(row.slice(0, 120)).toContain("items-end");
-    // `flex-none` beside a `min-w-0 flex-1` group is what stops them being pushed to a row of their
-    // own while there is still width for them.
-    expect(intake).toContain('className="flex min-w-0 flex-1 flex-wrap items-center');
+    // `basis-full` is the reversal: the group takes the line, so the controls wrap past it.
+    expect(intake).toContain("basis-full");
+    expect(intake).not.toContain('className="flex min-w-0 flex-1 flex-wrap items-center');
   });
 
   it("Given the sentence, Then it offers A project rather than claiming one is HIS", () => {
