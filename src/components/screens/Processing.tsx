@@ -176,6 +176,9 @@ export function Processing() {
       imageUrl={picture && broken !== picture ? picture : null}
       title={item ? name : t.processing.reading}
       caption={item ? t.processing.matched : null}
+      /* An ITEM on screen is an answer; the reel is not. The two states already differ by the
+         caption, and this is the same fact moving the ring and the drawing. */
+      found={!!item}
       onImageError={() => setBroken(picture)}
     />
   );
@@ -193,6 +196,7 @@ export function ProcessingView({
   imageUrl,
   title,
   caption,
+  found = false,
   onImageError,
 }: {
   /** The catalogue's drawing of the machine on screen, or null for the agent alone. */
@@ -201,6 +205,15 @@ export function ProcessingView({
   title: string;
   /** Drawn only under a machine's name, to mark it as a finding rather than a label. */
   caption: string | null;
+  /**
+   * This drawing is the agent's ANSWER, not one more candidate from the reel.
+   *
+   * It is what makes the machine arrive rather than appear (owner, 2026-09-13: *"when the image is
+   * found show it appear to the screen like winner"*): the ring closes, and the drawing overshoots
+   * and settles. Drawn straight through to CSS, so `prefers-reduced-motion` still gets the result
+   * with none of the flourish.
+   */
+  found?: boolean;
   onImageError?: () => void;
 }) {
   return (
@@ -221,12 +234,26 @@ export function ProcessingView({
           2026-08-31. Its other rule, the 1.34 scale, belongs to a 52px circle where a letterboxed
           drawing leaves more hole than machine; at 118px there is room to simply fit it. */}
       <span className="relative grid h-[144px] w-[144px] flex-none place-items-center">
+        {/* ── The ring says which of the two states this is ─────────────────────────────────────
+            SEARCHING: a quarter of brand turning through a pale circle — the catalogue being read.
+            FOUND: the circle CLOSES, stops, and takes the full brand edge, arriving with the machine
+            on one timeline (`found-ring`). The search ending is the other half of «he found it»;
+            leaving the quarter spinning over a settled answer would say it is still looking.
+
+            ⚠️ `key` on the state so React REPLACES the element rather than re-styling it — a CSS
+            animation on a kept node does not re-run, and the ring would close without the flourish
+            the drawing beside it is doing. */}
         <span
+          key={found ? "found" : "searching"}
           aria-hidden="true"
-          className="absolute inset-0 rounded-full border-[3px] border-brand/15 border-t-brand motion-safe:animate-spin"
-          style={{ animationDuration: "1.1s" }}
+          className={
+            found
+              ? "absolute inset-0 rounded-full border-[3px] border-brand found-ring"
+              : "absolute inset-0 rounded-full border-[3px] border-brand/15 border-t-brand motion-safe:animate-spin"
+          }
+          style={found ? undefined : { animationDuration: "1.1s" }}
         />
-        <span className="grid h-[118px] w-[118px] place-items-center overflow-hidden rounded-full bg-surface2">
+        <span className="grid h-[134px] w-[134px] place-items-center overflow-hidden rounded-full bg-surface2">
           {imageUrl ? (
             /* ── A URL that fails falls back to the agent ──────────────────────────────────────
                A plain `<img>`, the same as the requests rail and for the same two reasons. The
@@ -244,12 +271,21 @@ export function ProcessingView({
               alt=""
               draggable={false}
               onError={onImageError}
-              /* ⚠️ Scaled PAST its box, and only safe because the parent is `overflow-hidden
-                 rounded-full`. These drawings carry a wide transparent margin of their own - at a
-                 plain `contain` fit the machine filled under half the circle and the tile read as
-                 empty, which is the report this answers. 1.25 is measured off the catalogue's own
-                 art, not chosen: it fills the disc without the widest drawings touching its edge. */
-              className="h-full w-full scale-[1.25] object-contain"
+              /* ── It FITS, and nothing is cut (owner, 2026-09-13: *"make the processing circle
+                 fit the image fully"*) ──────────────────────────────────────────────────────────
+                 🔴 **The scale is GONE, and the disc grew instead** (118 → 134, five pixels inside
+                 the ring). Both earlier values clipped, and the second one was measured to prove it:
+                 the catalogue's drawings are ~1.83:1 with NO horizontal margin — the rail measured
+                 `spider-crane.png` at 1024×559 and drew it 52×28 in a 52px box, edge to edge. So
+                 `contain` already fills the width, and ANY scale above 1 pushes the machine's ends
+                 out through the circle: at 1.5 the spider crane lost both outriggers.
+                 The geometry, for the next person who tries: a w×h picture fits inside a circle of
+                 diameter D when w·√(1+(h/w)²) ≤ D. At 1.83:1 that is w ≤ 0.87D — and `contain`
+                 gives w = D exactly, so 1.0 is already the ceiling, not a starting point.
+                 The machine is big because the DISC is, which is the only lever that cannot clip.
+                 ⚠️ The FOUND pop is on the image, not on the disc: the disc is `overflow-hidden`
+                 and an animation on it would clip the overshoot to a circle that is itself growing. */
+              className={`h-full w-full object-contain${found ? " found-pop" : ""}`}
             />
           ) : (
             /* No drawing — an off-catalogue line, or the tree failed to load. The agent holds the
@@ -278,6 +314,28 @@ export function ProcessingView({
         <p className="text-title font-extrabold tracking-tight text-navy">{title}</p>
         {caption && <p className="text-meta font-semibold text-muted">{caption}</p>}
       </div>
+
+      {/* ── The processing line (owner, 2026-09-13: *"show process line anyways too"*) ─────────────
+          🔴 **It reports no POSITION, and it cannot.** `processRfq` is one request and the server
+          answers once, which is why the old percentage bar went on 2026-09-12 - it was a number
+          moving on a timer, and it lied in the renter's favour right up until it stalled. He asked
+          for the line back anyway; the honest form of «anyway» is INDETERMINATE - a short segment
+          travelling the track, saying «working» and claiming nothing.
+
+          On a match it stops and the track FILLS: the same news the ring closing and the machine
+          landing are giving at that moment.
+
+          ⚠️ 180px and 3px, under the line rather than across the page. A full-width bar would be
+          the loudest thing on a screen whose subject is the machine in the circle.
+          ⚠️ `aria-hidden`: the title above it already says what is happening, in words. A progress
+          bar with no value announces nothing a screen reader can use. */}
+      <span aria-hidden="true" className="h-[3px] w-[180px] overflow-hidden rounded-full bg-surface3">
+        {found ? (
+          <span className="block h-full w-full rounded-full bg-brand" />
+        ) : (
+          <span className="block h-full w-[30%] rounded-full bg-brand proc-seg" />
+        )}
+      </span>
     </div>
   );
 }

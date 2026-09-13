@@ -2,6 +2,111 @@
 
 ## Change log
 
+- **2026-09-13 - The processing line is back, and it is INDETERMINATE.**
+  Owner, on the reading screen: *"show process line anyways too"*.
+  🔴 **This reverses the removal of 2026-09-12**, and the reason it went is still true: `processRfq`
+  is ONE request, the server answers once, and the old bar was a percentage moving on a timer - it
+  lied in the renter's favour right up until it stalled. So what comes back is the honest form of
+  «anyway»: a 30% segment travelling a 180px track, saying WORKING and claiming nothing. On a match
+  it stops and the track fills, which is the same news the ring closing and the machine landing are
+  giving at that moment.
+  Files: `src/app/globals.css` (`proc-slide`, `.proc-seg`),
+  `src/components/screens/Processing.tsx`, `tests/unit/processing-screen.test.tsx` (2 new cases).
+  ⚠️ **180px and 3px, under the line rather than across the page.** A full-width bar would be the
+  loudest thing on a screen whose subject is the machine in the circle.
+  ⚠️ `aria-hidden`. The title above says what is happening in words, and a progress bar with no
+  value announces nothing a screen reader can use.
+  ⚠️ Reduced motion stops the segment and leaves it at the start of the track. A bar that is there
+  and still is the honest version for a reader who asked for no movement; removing it would take
+  away the one thing on the screen that says a request is in flight.
+  ⚠️ The case that pinned «one moving thing» was RENAMED rather than left: there are two now, and a
+  test whose name states a premise that is no longer true is worse than none. What it actually
+  guards - no `transition-[width]` anywhere, which is what a creeping percentage needs - is
+  unchanged and is the half worth keeping.
+  ⚠️ Verified: typecheck, lint (0 errors), 16 passing in the processing suite, break-checked by
+  removing `.proc-seg` (the new case went red), and **SEEN RENDERED** in both states.
+
+- **2026-09-13 - The processing disc fits the whole drawing, and a matched machine ARRIVES instead of appearing.**
+  Owner: *"make the processing circle fit the image fully, and when the image is found show it
+  appear to the screen like winner"*.
+  (1) 🔴 **The scale is gone and the DISC grew instead** (118px → 134px, five pixels inside the
+  ring). This is the third fit tried in this slot and the first that cannot cut anything:
+  `object-cover` was right while the slot held a photograph; `contain` + `scale-[1.25]` answered a
+  tile that read as empty; both CLIP a catalogue drawing. Measured rather than argued - the rail's
+  own note has `spider-crane.png` at 1024×559 drawn 52×28 in a 52px box, edge to edge, so `contain`
+  already fills the WIDTH and there is no horizontal margin to eat. At 1.5 that crane lost both
+  outriggers, seen in the browser.
+  **The geometry, for the next person who reaches for a scale:** a w×h picture fits inside a circle
+  of diameter D when `w·√(1+(h/w)²) ≤ D`. At 1.83:1 that is `w ≤ 0.87D`, and `contain` gives
+  `w = D` - so 1.0 is the ceiling, not a starting point. The machine is big because the disc is,
+  which is the only lever that cannot clip.
+  (2) **`found` closes the ring and pops the machine**, on one timeline. While reading, the ring is a
+  quarter of brand turning through a pale circle - the catalogue being searched. On a match it
+  becomes a CLOSED brand circle and stops, and the drawing overshoots to 1.12 and settles. Landing
+  had no moment before this: the drawing simply swapped, and a renter watching the reel could not
+  tell the answer from one more candidate.
+  Files: `src/app/globals.css` (`found-pop`, `found-ring`), `src/components/screens/Processing.tsx`,
+  `src/app/dev/preview/specimens.tsx`, `tests/unit/processing-screen.test.tsx` (2 new cases, the fit
+  case rewritten).
+  ⚠️ **`key` on the ring's state.** A CSS animation on a KEPT node does not re-run, so without the
+  key the ring would close with no flourish while the drawing beside it popped - two halves of one
+  moment, out of step.
+  ⚠️ The pop is on the IMAGE, not on the disc: the disc is `overflow-hidden`, and animating it would
+  clip the overshoot to a circle that is itself growing.
+  ⚠️ Reduced motion keeps both RESULTS - full-size machine, closed ring - and drops only the
+  overshoot, which is the decoration. Same rule the tick disc has followed since it was written.
+  🔴 **A drawing's own transparent margin is NOT fixable here.** `spider-crane.png` fills the disc;
+  `scissor-lift.png` carries margin on every side and sits small inside it. `contain` cannot tell the
+  difference between a machine and the emptiness around it, and a scale big enough to help the second
+  clips the first. **CONTENT, owed: trim the transparent margin on the taxonomy icons** - the same
+  family of asset problem as the `.jpg` icons that cannot be keyed out (2026-09-08).
+  ⚠️ Verified: typecheck, lint (0 errors), 39 passing across the touched suites, and the full suite
+  serially (3376 passing). Three failures, none from this change: `ui-pins` (pre-existing CRLF),
+  `share-request-email`'s `recipientEmails` (uncommitted work absent from `HEAD`), and
+  `dropdown-scroll`, which passes alone.
+  ⚠️ **SEEN RENDERED**, both states, and the clipping found that way rather than in the source.
+  🔴 The POP itself was not watched - a still frame cannot show it, and the flow it belongs to needs
+  a session.
+
+- **2026-09-13 - A dropdown opens as tall as the room it has, instead of six rows on every screen.**
+  Owner, on the TYPE list: *"the dropdown must always show all taxonomy types, not necessarily the
+  same category as the selected one"*, then *"show all even without search"*.
+  🔴 **The list was ALREADY every subtype across every category** - `MachineCard` passes
+  `tax.allSubtypes`, which flattens the whole catalogue, and the filter is a plain substring match
+  with no cap. What was wrong was how much of it a renter could SEE: the options box was `max-h-56`,
+  a flat 224px, six rows, whatever the screen. On a real catalogue that is a sliver, so he had to
+  TYPE before he could see what was in there - which is the opposite of what a list is for, and why
+  «show me everything» read as «it only shows a few». Everything was rendered; almost none of it was
+  visible.
+  The cap is the space between the trigger and the window's edge now, less a margin and less the
+  search row where one is drawn, with a FLOOR of 200px (a two-row list is worse than a scrolling one)
+  and a CEILING of 420px (a list is a list, not the page).
+  Files: `src/components/Dropdown.tsx`, `tests/unit/dropdown-scroll.test.tsx` (3 new cases).
+  ⚠️ **The flip measurement had to move with it.** `ESTIMATED_LIST_HEIGHT` still decides WHICH
+  side has more room, but a list that flips up is now positioned against the height it will really
+  take - with the old constant, a taller list opened with its top off the screen.
+  ⚠️ `searchable` was hoisted above `openList`, which now reads it. A `const` declared below the
+  function that uses it is safe only by call order, and that is what a later edit breaks silently.
+  ⚠️ **jsdom lays out nothing**, so the measurement falls to its floor in tests. That is the half
+  worth pinning anyway: the floor must be a readable list, and the height must come from the
+  measurement rather than from a class nobody can vary. Break-checked by restoring `max-h-56` - both
+  cases went red.
+  🔴 **And the list could not be SCROLLED to its foot** (owner, same exchange: *"it contains
+  all, but when I search I find - not by scrolling"*). A `position: fixed` layer that extends past
+  the viewport cannot be scrolled into view: the page scrolls and the layer does not move with it, so
+  the rows below the fold were reachable by SEARCH alone. It happens whenever the height floor is
+  taller than the room - near the foot of a page, or in a short window where flipping up cannot save
+  it either, where the old arithmetic could even place the top at a NEGATIVE offset. The height stays
+  at the floor there, because a sliver is worse; the POSITION gives instead, and the whole layer is
+  pushed until it sits inside the window with 8px to spare.
+  ⚠️ The case that pins it needs a window where NEITHER side fits (300px tall, the trigger in the
+  middle). A trigger near the bottom of a tall window does not exercise it - the flip already handles
+  that one, which is why the first version of this test passed against the broken code.
+  🔴 **Reported, NOT fixed - the catalogue can fail silently.** `/api/taxonomy` falls back to a
+  built-in stand-in of 6 categories / 17 subtypes on ANY error from the agents service, and says
+  nothing. A thin catalogue and a failed fetch look identical on this dropdown, which is the other
+  reading of the owner's report and cannot be told apart from the screen.
+
 - **2026-09-13 - The off-catalogue note may take two lines, the offer takes the owner's own words, and TYPE's placeholder matches SIZE's.**
   Owner, an hour after asking for one line: *"the note beside the equipment name is wrapped so make
   it 2 lines fine, and for the notes on the type-size make «not in our list? use your custom name»,

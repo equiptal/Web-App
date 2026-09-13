@@ -69,6 +69,13 @@ export type DropdownTone = "field" | "pill" | "bare" | "overlay" | "brand";
 /** Roughly what an open list needs. Only used to decide which way to open. */
 const ESTIMATED_LIST_HEIGHT = 240;
 
+/** The search row's own height, subtracted from the room the options may take. */
+const SEARCH_ROW_HEIGHT = 46;
+/** Never shorter than this: a two-row list is worse than a scrolling one. */
+const MIN_LIST_HEIGHT = 200;
+/** Never taller than this: a list is a list, not the page. */
+const MAX_LIST_HEIGHT = 420;
+
 export function Dropdown({
   value,
   options,
@@ -160,7 +167,7 @@ export function Dropdown({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   /** Where the portalled list sits, in viewport coordinates. Measured when it opens. */
-  const [at, setAt] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [at, setAt] = useState<{ top: number; left: number; width: number; listMax: number } | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   /** The portalled list, so an outside-click check can tell "inside the menu" from "outside". */
   const listRef = useRef<HTMLDivElement>(null);
@@ -208,6 +215,9 @@ export function Dropdown({
     };
   }, [open]);
 
+  /** Over seven options the list gets a search box — and that box costs the options their room. */
+  const searchable = options.length > 7;
+
   const openList = () => {
     const rect = boxRef.current?.getBoundingClientRect();
     if (rect) {
@@ -216,11 +226,41 @@ export function Dropdown({
       // send the list somewhere even worse.
       const up = below < ESTIMATED_LIST_HEIGHT && rect.top > below;
       const width = Math.min(Math.max(rect.width, 220), Math.min(340, window.innerWidth - 16));
+      /* ── The list takes the room it actually has (owner, 2026-09-13: *"show all even without
+         search"*) ─────────────────────────────────────────────────────────────────────────────
+         ~~`max-h-56`, a flat 224px.~~ Six rows, whatever the screen. A renter opening TYPE on a
+         catalogue of ~120 machines met a sliver and had to type before he could see what was in
+         there — which is the opposite of what a list is for, and it is why «show me everything»
+         read as «it only shows a few».
+         The cap is the space between the trigger and the window's edge now, less a margin, with a
+         FLOOR so a cramped viewport still opens something readable (it scrolls at that point, which
+         is honest) and a CEILING so a full-height column of options does not become the page.
+         ⚠️ The search box is subtracted where it is drawn, or the two together overflow the space
+         that was measured for one. */
+      const margin = 12;
+      const room = (up ? rect.top : below) - margin - (searchable ? SEARCH_ROW_HEIGHT : 0);
+      const listMax = Math.max(MIN_LIST_HEIGHT, Math.min(MAX_LIST_HEIGHT, room));
+      /* ── It must never hang off the bottom of the window (owner, 2026-09-13) ────────────────
+         *"it contains all, but when I search I find - not by scrolling"*.
+         🔴 A `position: fixed` layer that extends past the viewport CANNOT BE SCROLLED INTO VIEW:
+         the page scrolls, the list does not move with it, and scrolling the list itself only moves
+         the part already on screen. So the rows below the fold were unreachable by scrolling, and
+         searching was the only way to them — which is exactly the report.
+         It happens whenever the FLOOR is taller than the room: near the bottom of a page, with too
+         little above to be worth flipping, the list opens at 200px into 90px of space. The height
+         is the floor by design there (a sliver is worse), so the POSITION is what gives: the whole
+         layer is pushed up until it fits, and 8px off either edge is the bound. */
+      const total = listMax + (searchable ? SEARCH_ROW_HEIGHT : 0);
+      const wanted = up ? rect.top - 4 - total : rect.bottom + 4;
+      const top = Math.max(8, Math.min(wanted, window.innerHeight - total - 8));
       setAt({
-        top: up ? Math.max(8, rect.top - 4 - ESTIMATED_LIST_HEIGHT) : rect.bottom + 4,
+        /* Flipping up is measured against the height this list will REALLY take, not against the
+           estimate: with a taller list the old constant put its top off the screen. */
+        top,
         // Clamped to the window, and anchored to the trigger's own inline-start edge.
         left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
         width,
+        listMax,
       });
     }
     setQuery("");
@@ -236,7 +276,6 @@ export function Dropdown({
   }, []);
 
   const selected = options.find((o) => o.value === value);
-  const searchable = options.length > 7;
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options;
@@ -314,7 +353,7 @@ export function Dropdown({
               />
             </div>
           )}
-          <div id={listId} className="max-h-56 overflow-auto py-1" role="listbox" aria-label={label}>
+          <div id={listId} className="overflow-auto py-1" style={{ maxHeight: at.listMax }} role="listbox" aria-label={label}>
             {filtered.map((o) => (
               <button
                 key={o.value}

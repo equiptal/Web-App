@@ -679,6 +679,67 @@ body {
 
    Reduced motion keeps BOTH, and animates neither: the disc and the finished check are the meaning,
    the movement is the flourish. A reader who asked for less motion still gets the answer. */
+/* ── The processing line (owner, 2026-09-13: *"show process line anyways too"*) ────────────────────
+   🔴 **INDETERMINATE, and it has to be.** The screen lost its progress bar on 2026-09-12 because
+   `processRfq` is ONE request: the server answers once, so there is no position to report and the
+   old bar was a number moving on a timer. He asked for the line back anyway, and the honest form of
+   «anyway» is a bar that says WORKING without claiming how far: a short segment travelling the
+   track, which reports nothing and hides nothing.
+
+   On a match it stops travelling and the track FILLS, which is the same news the ring and the
+   drawing are giving at that moment - the search is over.
+
+   ⚠️ Reduced motion: the segment stops moving and sits at the start of the track. A bar that is
+   there and still is the honest version for a reader who asked for no movement; removing it would
+   take away the one thing on the screen that says a request is in flight. */
+@keyframes proc-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(340%); }
+}
+.proc-seg {
+  animation: proc-slide 1.25s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .proc-seg {
+    animation: none;
+  }
+}
+
+/* ── The agent FOUND it (owner, 2026-09-13: *"when the image is found show it appear to the screen
+   like winner"*) ───────────────────────────────────────────────────────────────────────────────────
+   The processing screen flicks through the catalogue while it reads, then lands on the machine the
+   agent matched. Landing had no moment: the drawing simply swapped and a renter watching the reel
+   could not tell the answer from one more candidate.
+
+   `found-pop` overshoots to 1.12 and settles, which is what reads as ARRIVAL rather than as the next
+   frame of a reel; `found-ring` is the ring completing behind it — the search stopping. They share a
+   timeline and start together, so the ring closes as the machine lands.
+
+   ⚠️ Reduced motion keeps the RESULT and drops the flourish: the machine is still there at full size
+   and the ring is still closed. What goes is the overshoot, which is the part that is decoration. */
+@keyframes found-pop {
+  0% { transform: scale(0.62); opacity: 0; }
+  60% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes found-ring {
+  0% { transform: scale(0.86); opacity: 0.35; }
+  60% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.found-pop {
+  animation: found-pop 0.46s cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+.found-ring {
+  animation: found-ring 0.46s cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .found-pop,
+  .found-ring {
+    animation: none;
+  }
+}
+
 @keyframes tick-pop {
   0% { transform: scale(0.4); opacity: 0; }
   55% { transform: scale(1.08); opacity: 1; }

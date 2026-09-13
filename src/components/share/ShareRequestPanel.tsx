@@ -1480,21 +1480,24 @@ export function ShareRequestPanel({
               at the moment he asks for it, which is the only moment it answers a question he has. */}
           <span
             className={cx(
-              "flex h-[38px] min-w-0 items-center gap-2 rounded-md border ps-3 pe-1",
-              /* 🔴 **The width of the card beneath it** (owner, 2026-09-13: *"make its width fit
-                 the «send to my suppliers» card below it"*).
+              "flex h-[38px] min-w-0 flex-1 items-center gap-2 rounded-md border ps-3 pe-1",
+              /* 🔴 **One line: the heading, this field, and the deadline** (owner, 2026-09-13,
+                 twice: *"i wanna the share request - placeholder - expiry to be in one line"*).
 
-                 ~~`flex-1` with an `sm:max-w-[380px]` cap.~~ The cap was answering the previous
-                 fault - a masked stub that grew into every pixel the expiry was not using - and it
-                 over-corrected: the field then ended wherever 380px ran out, which lines up with
-                 nothing on the screen. `basis-full` gives it its own line inside this grid cell and
-                 `w-full` fills it, so its two edges are the supplier card’s two edges, at every
-                 width and in both directions.
+                 ~~`basis-full`.~~ That is a flex line-break by another name: `flex-basis: 100%`
+                 fills the row, so the heading is pushed above it and the deadline in the next cell
+                 floats across two lines of nothing. It was written to answer «fit the card below»
+                 and it over-answered - the field matched the card by TAKING the whole of it.
 
-                 ⚠️ It shares the cell with the panel’s HEADING, which is why `basis-full` and not
-                 just `w-full`: on the surfaces that pass one, the field takes the line under it
-                 rather than whatever the heading leaves. */
-              "w-full basis-full",
+                 ⚠️ **The COLUMN is what lines up with the card, not the field.** This cell is the
+                 grid’s first column and the supplier card beneath is the same column, so the row
+                 already starts where the card starts; `flex-1` then carries the field to the card’s
+                 end. The heading takes what it needs on the leading edge and this takes the rest,
+                 which is the «less width» he asked for - measured against the heading rather than
+                 against a number.
+
+                 ⚠️ No `max-w` returns either. A cap is a guess at where the card ends, and it
+                 stopped the field short of it; the column already knows. */
               uuid ? "border-border bg-surface" : "border-dashed border-border-strong bg-surface2",
             )}
           >
