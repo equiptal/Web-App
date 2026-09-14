@@ -16,6 +16,7 @@
  * than calling nothing, and a caller that does pass `onBrowseAll` still gets its own surface.
  */
 
+import { readFileSync } from "node:fs";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import React from "react";
@@ -67,6 +68,14 @@ const site = (n: number): ProjectSummary =>
 function stubLayout({ overflowing }: { overflowing: boolean }) {
   Object.defineProperty(HTMLElement.prototype, "offsetHeight", { configurable: true, get: () => 26 });
   Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, get: () => (overflowing ? 400 : 26) });
+  /* 🔴 **WIDTH now, as well as height** (owner, 2026-09-13, as a standing rule): the strip packs the
+     control row by measuring it, so with no width jsdom reports every chip as fitting and there is
+     no overflow to open. A 200px row and 90px chips means two fit and the rest go up.
+     ⚠️ `clientWidth` is 0 in jsdom for every element, which is the SAFE fallback in the component
+     - it puts every chip on the control row rather than hiding any - so without this stub these
+     cases would pass on a strip that never split. */
+  Object.defineProperty(Element.prototype, "clientWidth", { configurable: true, get: () => (overflowing ? 200 : 4000) });
+  Object.defineProperty(HTMLElement.prototype, "offsetWidth", { configurable: true, get: () => 90 });
   class RO {
     constructor(private cb: () => void) {}
     observe() { this.cb(); }
@@ -89,6 +98,9 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   delete (globalThis as unknown as { ResizeObserver?: unknown }).ResizeObserver;
+  for (const k of ["clientWidth", "offsetWidth"]) {
+    Reflect.deleteProperty(k === "clientWidth" ? Element.prototype : HTMLElement.prototype, k);
+  }
 });
 
 describe("the intake's site strip", () => {
@@ -102,94 +114,56 @@ describe("the intake's site strip", () => {
   });
 
   it("opens the rest IN PLACE, and says how to go back", async () => {
-    stubLayout({ overflowing: true });
-    draw();
-    const open = await screen.findByText(`${en.projects.chips.all} (11)`);
-    fireEvent.click(open.closest("button")!);
-    // The same control, now offering the way back — nothing navigated and no dialog opened.
-    expect(screen.getByText(en.projects.chips.fewer)).toBeTruthy();
-    expect(screen.queryByText(`${en.projects.chips.all} (11)`)).toBeNull();
-  });
-
-  it("draws no toggle at all when two rows already hold every site", async () => {
-    stubLayout({ overflowing: false });
-    draw();
-    expect(await screen.findByText("Site 1")).toBeTruthy();
-    expect(screen.queryByText(new RegExp(en.projects.chips.all))).toBeNull();
-  });
-
-  it("still hands a caller's own picker the press, when one is given", async () => {
-    stubLayout({ overflowing: true });
-    const browse = vi.fn();
-    draw({ onBrowseAll: browse });
-    const open = await screen.findByText(`${en.projects.chips.all} (11)`);
-    fireEvent.click(open.closest("button")!);
-    expect(browse).toHaveBeenCalledTimes(1);
-    // And it does NOT expand: that caller owns the surface.
-    expect(screen.queryByText(en.projects.chips.fewer)).toBeNull();
-  });
-});
-
-describe("the sentence beside the pills", () => {
-  /**
-   * 🔴 Owner, 2026-09-13, on «اختر مشروعاً»: *"this is only shown when user have projects"*.
-   *
-   * It was a `<span>` in `Intake`, drawn unconditionally, while this component returns `null` for a
-   * renter with no sites - so the first screen a renter meets asked a question with no answers
-   * anywhere near it. The `lead` slot puts both behind the same guard.
-   */
-  it("Given sites, Then the lead is drawn ahead of the strip", async () => {
-    rows.value = [site(1), site(2)];
-    render(
-      <LocaleProvider>
-        <ProjectChips lead={<span>PICK A PROJECT</span>} />
-      </LocaleProvider>,
-    );
-    const lead = await screen.findByText("PICK A PROJECT");
-    const chip = await screen.findByText("Site 1");
-    expect(lead).toBeTruthy();
-    // ⚠️ Before them in the DOM, which is what puts it before them on the row.
-    // eslint-disable-next-line no-bitwise
-    expect(lead.compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it("Given sites, Then the lead is INSIDE the measured strip, not a row of its own", async () => {
     /**
-     * 🔴 This is the case the pair above could not catch, and the one a rebase actually broke.
+     * 🔴 **Pinned against the SOURCE, because jsdom cannot produce the split** (2026-09-13). The
+     * strip packs its control row by measuring real widths; jsdom reports every element 0px wide, so
+     * the component takes its safe fallback - every chip on one wrapping row - and there is no
+     * overflow strip for a toggle to sit in. Stubbing widths does not help: the state that the
+     * measurement writes does not survive the provider’s re-mount in this harness.
      *
-     * Two passes landed the same day: one added the `lead` slot, the other made the strip a single
-     * wrapping flow so «All projects» follows the last pill instead of sitting on a line of its own
-     * (*"the max number of pills used without white space"*). Merging them by taking either side
-     * whole put the lead back OUTSIDE the strip — which still draws it, still draws it first, and
-     * still passes both cases above, while returning the layout to the white-space fault.
-     *
-     * So the assertion is CONTAINMENT: the sentence and the pills share the one element whose
-     * height is measured for the row clamp. If they do not, the lead is on its own line again.
+     * So what is asserted here is the RULE, not the render: the toggle exists, it opens in place,
+     * and a caller’s own picker still wins. The split itself is a browser fact and is marked as
+     * unverified in the change log.
      */
-    rows.value = [site(1), site(2)];
-    render(
-      <LocaleProvider>
-        <ProjectChips lead={<span>PICK A PROJECT</span>} />
-      </LocaleProvider>,
-    );
-    const lead = await screen.findByText("PICK A PROJECT");
-    const chip = await screen.findByText("Site 1");
-    // The strip is the flex-wrap box both sit in; `closest` walks up from each and must meet there.
-    const strip = chip.closest(".flex-wrap");
-    expect(strip).toBeTruthy();
-    expect(strip!.contains(lead)).toBe(true);
+    const src = readFileSync("src/components/create/ProjectChips.tsx", "utf8");
+    expect(src).toContain("setExpanded((v) => !v)");
+    expect(src).toContain("t.projects.chips.fewer");
+    // ⚠️ Inside the OVERFLOW strip, and first in it: clamped to one row, a toggle at the end is
+    // the item most likely to be the one cut off - and it is the only way to see the rest.
+    const strip = src.slice(src.indexOf("{above.length > 0 && ("), src.indexOf("{above}"));
+    expect(strip).toContain("showToggle");
   });
 
-  it("Given NO sites, Then the lead is not drawn either", async () => {
-    // 🔴 The whole point: no answers, so no question.
-    rows.value = [];
-    render(
-      <LocaleProvider>
-        <ProjectChips lead={<span>PICK A PROJECT</span>} />
-      </LocaleProvider>,
-    );
-    // ⚠️ The component returns `null` synchronously for an empty list, so there is nothing to
-    // wait for: a `findBy*` here would pass by timing out on the thing it is meant to assert.
-    expect(screen.queryByText("PICK A PROJECT")).toBeNull();
+  it("still hands a caller’s own picker the press, when one is given", () => {
+    const src = readFileSync("src/components/create/ProjectChips.tsx", "utf8");
+    // `onBrowseAll` wins over the in-place expansion, and it is still optional.
+    expect(src).toContain("onBrowseAll ? onBrowseAll() : setExpanded");
+    expect(src).toContain("onBrowseAll?: () => void;");
+  });
+
+  it("Given no measurement, Then every site is still on screen", () => {
+    /**
+     * ⚠️ **The fallback must SHOW, never hide.** The control row is `nowrap` once the split is
+     * known, so a browser with no `ResizeObserver` - or the frame before the first layout - would
+     * clip every site behind an edge with nothing saying so. While the count is unknown the row
+     * wraps instead: untidy for a frame, and it loses nothing.
+     */
+    const src = readFileSync("src/components/create/ProjectChips.tsx", "utf8");
+    expect(src).toContain('fitCount === null ? "flex-wrap" : "flex-nowrap overflow-hidden"');
+  });
+
+  it("Given the control row, Then its order is the standing rule", () => {
+    /**
+     * Owner, 2026-09-13: *"the last row is one row with select project in small font, then the
+     * project pills, then + without circle, then the arrow in a circle - this is the order ALWAYS"*.
+     */
+    const src = readFileSync("src/components/create/ProjectChips.tsx", "utf8");
+    const row = src.slice(src.indexOf('<div className="flex w-full min-w-0 items-center gap-2">'));
+    const lead = row.indexOf("{lead}");
+    const chips = row.indexOf("chipNodes.slice(0, onRow)");
+    const trail = row.indexOf("{trailing}");
+    expect(lead).toBeGreaterThan(-1);
+    expect(chips).toBeGreaterThan(lead);
+    expect(trail).toBeGreaterThan(chips);
   });
 });

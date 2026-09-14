@@ -18,6 +18,8 @@ interface BackendMe {
   tier?: string;
   /** mobile/016 — first-request slot flag; gates the home "Start Your Request" pop-up. */
   hasUsedFirstRequestSlot?: boolean;
+  /** The signup-completion column the request gate actually reads — see `RenterProfile`. */
+  hasCompletedOnboarding?: boolean;
   crNumber?: string | null;
   commercialRegistrationNumber?: string | null;
   vatNumber?: string | null;
@@ -92,6 +94,11 @@ export async function GET(req: Request) {
         // mobile/016 — the backend exposes this on BOTH /users/me and /users/me/profile-status; read
         // either so the home pop-up gate works regardless of which one carries it.
         hasUsedFirstRequestSlot: me.hasUsedFirstRequestSlot ?? status.hasUsedFirstRequestSlot ?? false,
+        /* 🔴 The flag `POST /agents/requests` refuses on, which is NOT the tier — see the note on
+           `RenterProfile.hasCompletedOnboarding`. Passed straight through, `undefined` and all: the
+           profile form tells «false» from «this backend does not send it» and they mean different
+           things. */
+        hasCompletedOnboarding: me.hasCompletedOnboarding,
         // Company identity for the quotation Rentee block — read from either the user or its profile,
         // tolerant of the backend's field naming. Null when absent (quotation falls back to the pill).
         crNumber: status.crNumber ?? me.crNumber ?? me.commercialRegistrationNumber ?? me.supplierProfile?.crNumber ?? me.supplierProfile?.commercialRegistrationNumber ?? null,

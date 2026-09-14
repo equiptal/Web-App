@@ -2,6 +2,256 @@
 
 ## Change log
 
+- **2026-09-14 - The equipment card gets ONE escape and one panel behind it, and the name box stops being a box he can type in.**
+  Planned against the supervisor's own prototype (`Equipment Detection States`), then cut down from
+  it over a long exchange. Owner: *"despite we see them as 4 cases, user see them in 2 (he found what
+  he want, he didnt)"*, *"the cta instead of describe so he dont feel he is writing again"*, *"many
+  extra text everywhere no need"*, *"dont ever wrap the text"*, and *"if he tries to write then shake
+  the question note - i actually want it read so he understands its use by confirming that he is
+  using his own words"*.
+  (1) **Four states became two.** An exact hit, an alias hit, an unsure guess and a HIDDEN node all
+  draw the same card: the renter cannot tell them apart and does not care. The only division he sees
+  is whether the line has a taxonomy or his words.
+  (2) **One escape, and it stays on screen.** ~~A dashed row that went off-catalogue in a single
+  press.~~ It opens a panel UNDER itself, arrow flipping, and the row remains - the prototype's own
+  behaviour. Its sentence is the state's: «Not the equipment you want?» / «Can't find the equipment
+  you want?», sized to the sentence (`w-max`, `whitespace-nowrap`) and never to its column.
+  (3) **Two doors, not three.** «Search our catalogue» opens the line's own family with the taxonomy's
+  PICTURES and a «Use this» on each; «Search all equipment» widens it to the whole catalogue with a
+  search box. Browse and search were one list at two scopes, which is the owner's own merge.
+  (4) **A pick asks for the SIZE on the row.** Sizes differ per type, so applying the first one is
+  exactly the wrong auto-fill the panel exists to avoid.
+  (5) 🔴 **«Describe it yourself» became a CONFIRMATION.** *"i dont want the user to write anything
+  more here as he already described it in his input before"*. The panel reads «THE REQUEST WILL SAY
+  …» over his own words with one button, «Keep equipment name in my own words», and contains no input
+  at all.
+  (6) 🔴 **The name box is READ-ONLY, reversing 2026-09-12** (*"it is now the user input of the
+  equipment name"*). It holds the agent's output until he rejects the match. A keystroke in it is
+  refused and SHAKES the escape row instead - a field that does nothing teaches nothing, and arriving
+  at his own words through the confirmation is the point: he is choosing them over ours, not filling
+  a box. What it buys: one writer at a time, so the name can never quietly contradict the type beside
+  it. What it costs, stated: he cannot label a matched line, and his words stop arriving as free
+  aliases for the next renter.
+  (7) **His words now ride on EVERY line, not only an off-catalogue one** (owner, 2026-09-14: *"let
+  what [is] detected in your own words [be] stored as the custom always, regardless [of whether the]
+  user change[s] it or not"*). `EQUIPMENT_NAME_ON_EVERY_LINE` flips from default-OFF to the kill-switch
+  shape, because the thing it was waiting for has landed: **B1 is in `Moedatech-App@342ab77f`**, and
+  better than specified - `hasCustomEquipment` is derived from the undefined predicate with `every`
+  rather than `some`, so a link loses its QR only when NOTHING in it can be answered in the app.
+  🔴 **It needs that backend DEPLOYED, not merely committed.** Against an older `agents` every bid
+  link in the product loses its QR and «Go To App», and the preview is cached for 300s, so the
+  mistake outlives its own rollback by five minutes.
+  ⚠️ What is sent is **his** words (`customEquipment ?? rawLabel`), never the catalogue name the box
+  shows on a line he added by hand: storing our own name back into his column would be circular.
+  ⚠️ `undefined` is untouched by all of this - still `no subtype, or a hidden one`.
+    Files: `src/components/create/MachineCard.tsx` (`EquipmentChooser`, new), `src/lib/i18n/{en,ar}.ts`
+  (22 strings), `tests/unit/custom-equipment-canvas.test.tsx` (4 cases rewritten),
+  `tests/unit/off-catalogue-from-type.test.tsx`, `src/lib/flags.ts`,
+  `tests/unit/{equipment-name-every-line,custom-equipment}.test.ts`.
+  ⚠️ **No backend, and no new data.** The payload is unchanged - three ids or a name, one of them -
+  and the pictures come from `Subcategory.equipmentImageUrl`, which `/api/taxonomy` already returns.
+  ⚠️ **A prototype of the two cards is published** as an artifact, in the supervisor's own skin
+  (values lifted from his bundle), so the two can be compared without guessing at colours.
+  🔴 **A write-once rule for scripted edits, learned the hard way.** `io.open(path, "w")` truncates
+  at the OS level BEFORE the `newline` argument is validated, so a script that fails on that argument
+  leaves an EMPTY file and no write. It emptied `off-catalogue-from-type.test.tsx` (219 lines) and I
+  read it as another session's doing before finding my own script in the traceback. Read, replace,
+  assert, and only then open for writing.
+  ⚠️ Verified: typecheck, lint, 169 passing across the thirteen canvas, card, wire and design-guard suites.
+  NOT seen rendered - the panel, the pictures and the shake are all things jsdom cannot judge.
+
+- **2026-09-13 - The details drawer keeps STATUS and drops the rest of its pill row; a DIRECT request names the firm instead of promising a marketplace.**
+  Owner, two screenshots: *"i want to remove these pills, just keep the open or status of request at
+  top in the title header. but in case it is a direct request, instead of these pills will show the
+  store logo and the name, «direct to Sigma store (logo)» for example"*, and on the send
+  confirmation *"in direct, language must change - it is not to all suppliers, i will show here the
+  store logo instead of Moedatech"*.
+  (1) **Four pills became one chip, in the TITLE.** Two of the four repeated what was already on
+  screen - the reference IS the header's subtitle, and the bid count sits above the cards the reader
+  is scrolling to - and the row spent a band of the dialog saying it. The status is the one fact
+  only that row carried, so it rides the title where it is read WITH the request.
+  (2) **A DIRECT request gets a chip of its own**: the store's logo and «Direct to {name}». Reach on
+  such a request is not a category, it is a firm.
+  (3) **The send confirmation stops claiming the marketplace.** That block said *"your request goes
+  live on Moedatech, where every supplier there can bid on it"* over a request that reaches exactly
+  one firm - on the last screen before it leaves. It is the STORE's block now: its logo where the
+  wordmark was, its name as the title, and «goes to this supplier only, and nobody else sees it».
+  Files: `src/lib/contract/requests.ts` (`directTarget`),
+  `src/components/workspace/RequestDetailsModal.tsx`, `src/components/share/ShareRequestPanel.tsx`,
+  `src/components/create/ShareOnPost.tsx`, `src/components/home/HomeRequests.tsx`,
+  `src/components/workspace/RequestsWorkspace.tsx`, `src/lib/i18n/{en,ar}.ts`
+  (`postShare.destDirect{Fallback,Line,Posted}`),
+  `tests/unit/direct-request-identity.test.ts` (new, 11 cases).
+  🔴 **HALF of (2) IS NOT BUILDABLE YET, and the drawer says «Direct request» without a name.**
+  Checked before building rather than assumed: `GET /rentees/me/requests/{id}` spreads the request
+  row, so `supplierId` (an integer) arrives and NOTHING else; `getMyRequests` selects no supplier at
+  all. The store cannot be resolved from that id either - `/api/stores/:id` is keyed on the STORE and
+  the list takes no supplier filter. `directTarget` therefore reads the name and the logo
+  TOLERANTLY, across every spelling the two services might land on, so the chip fills itself the day
+  the field arrives with no second web change - the `DirectorySupplier.equipmentCount` pattern of
+  2026-09-08.
+  🔴 **BACKEND, owed:** put the target firm on the request projections - `supplierName` at minimum,
+  plus `storeId` / `storeName` / `storeLogoUrl` for the mark. BOTH `getMyRequests` and
+  `getRequestDetail`: the drawer reads one and the rail the other.
+  ⚠️ **The CREATE flow is fully built**, because the draft knows what a posted request does not:
+  `DirectTarget` carries `supplierName` and `storeId`, so the confirmation names the firm and fetches
+  its logo. A failed fetch is silent and falls back to the `storefront` glyph - the block's job is to
+  say WHERE the request goes, and it says that in words whether or not a picture loads.
+  ⚠️ **The drawer no longer takes `bids` at all**, and that swept a round trip: `HomeRequests`
+  fetched them only to feed the count pill, so opening a request from the dashboard is one call
+  lighter. Both call sites updated; `workspace.bidsSplit` keeps its other readers and the SOURCE
+  filter above the cards still states the split, which is where a reader acts on it.
+  ⚠️ Verified: typecheck, lint (0 errors), 216 passing across the five touched suites, and the direct
+  branch break-checked - the chip forced to null, one case went red. NOT seen rendered: the drawer
+  needs a signed-in renter with a request, and the direct confirmation needs a draft started from a
+  store.
+
+- **2026-09-13 - «Basic» and «may post a request» are TWO backend facts, and a renter was stuck between them.**
+  Owner, forwarding `+966566493886` blocked on «حسابك لا يسمح بهذا بعد · أكمل ملفك الشخصي لنشر
+  الطلبات» while his badge read basic: *"is having this issue on beta despite he is basic so what??"*
+  🔴 **The gate is not the tier, and nothing on either side says so.**
+   · `getUserTier` (`apps/backend/src/services/profile.service.ts:163`) answers `basic` off
+     `firstName && lastName && city && jobTitle`, and never reads the flag below.
+   · `createRequest` (`apps/backend-agents/.../createRequest.ts:378`) refuses with
+     `GUEST_CANNOT_POST_REQUESTS` / **E10001** on `!owner.hasCompletedOnboarding`, and never reads
+     the tier.
+  Only `completeProfile` (`PUT /users/me/profile`) writes that flag. `updateProfile`
+  (`PUT /profile/me`) does not - verified line by line. So a renter whose four identity fields were
+  filled by any other route reads as basic, is therefore sent to the EDIT endpoint by
+  `EditProfileForm`, and **can never clear the thing blocking him**: basic enough to be denied the
+  fix, not onboarded enough to post. Saving his profile again changes nothing, forever.
+  `isFirstSave` now asks the flag the GATE asks: `tier === "guest" || hasCompletedOnboarding ===
+  false`. The flag was already on `GET /users/me` and the web read it NOWHERE; it is carried through
+  `/api/me` onto `RenterProfile`.
+  Files: `src/lib/contract/onboarding.ts`, `src/app/api/me/route.ts`,
+  `src/components/profile/EditProfileForm.tsx`, `tests/unit/profile-first-save.test.tsx` (new, 6).
+  🔴 **The SAME ACCOUNT as the 2026-09-10 fix, caught by the other half of the same trap.** That
+  entry swapped the endpoint for a GUEST and keyed on the tier - correct for a guest, and silently
+  wrong for him the moment his tier moved without the flag moving with it. The guest arm is kept, so
+  that fix is untouched.
+  ⚠️ **`=== false`, never falsy.** `undefined` means an older backend did not send the field, and a
+  complete account is the ordinary case; guessing the other way would push every healthy renter
+  through the first-save endpoint. The BFF passes it through undefaulted for the same reason - a
+  `?? false` there would erase the distinction the form depends on. A case pins each.
+  ⚠️ **HOW he got into this state is NOT established.** `updateProfile` needs `requireTier('basic')`
+  to be called at all, so he was already basic before it; the four fields were filled by some route
+  that does not complete onboarding (an admin write, a direct edit, an older client). Worth finding,
+  because anyone else it happened to is stuck the same way and this fix only rescues them once they
+  open their profile and press save.
+  🔴 **BACKEND, the durable fix:** `updateProfile` should set `hasCompletedOnboarding: true` when the
+  four identity fields are present, the way `partner/updateProfile` already does with its
+  `firstSave` branch. Until then the two columns can drift apart again on any surface that writes
+  one without the other.
+  ⚠️ Verified: typecheck, lint (0 errors), 29 passing across the four profile/onboarding suites, and
+  break-checked by keying `isFirstSave` back on the tier alone - two cases went red. NOT reproduced
+  against his account: the database is behind a permission block here, so the mechanism is read off
+  both services' source and the E10001 code in his screenshot.
+
+- **2026-09-13 - The processing line is back, and it is INDETERMINATE.**
+  Owner, on the reading screen: *"show process line anyways too"*.
+  🔴 **This reverses the removal of 2026-09-12**, and the reason it went is still true: `processRfq`
+  is ONE request, the server answers once, and the old bar was a percentage moving on a timer - it
+  lied in the renter's favour right up until it stalled. So what comes back is the honest form of
+  «anyway»: a 30% segment travelling a 180px track, saying WORKING and claiming nothing. On a match
+  it stops and the track fills, which is the same news the ring closing and the machine landing are
+  giving at that moment.
+  Files: `src/app/globals.css` (`proc-slide`, `.proc-seg`),
+  `src/components/screens/Processing.tsx`, `tests/unit/processing-screen.test.tsx` (2 new cases).
+  ⚠️ **180px and 3px, under the line rather than across the page.** A full-width bar would be the
+  loudest thing on a screen whose subject is the machine in the circle.
+  ⚠️ `aria-hidden`. The title above says what is happening in words, and a progress bar with no
+  value announces nothing a screen reader can use.
+  ⚠️ Reduced motion stops the segment and leaves it at the start of the track. A bar that is there
+  and still is the honest version for a reader who asked for no movement; removing it would take
+  away the one thing on the screen that says a request is in flight.
+  ⚠️ The case that pinned «one moving thing» was RENAMED rather than left: there are two now, and a
+  test whose name states a premise that is no longer true is worse than none. What it actually
+  guards - no `transition-[width]` anywhere, which is what a creeping percentage needs - is
+  unchanged and is the half worth keeping.
+  ⚠️ Verified: typecheck, lint (0 errors), 16 passing in the processing suite, break-checked by
+  removing `.proc-seg` (the new case went red), and **SEEN RENDERED** in both states.
+
+- **2026-09-13 - The processing disc fits the whole drawing, and a matched machine ARRIVES instead of appearing.**
+  Owner: *"make the processing circle fit the image fully, and when the image is found show it
+  appear to the screen like winner"*.
+  (1) 🔴 **The scale is gone and the DISC grew instead** (118px → 134px, five pixels inside the
+  ring). This is the third fit tried in this slot and the first that cannot cut anything:
+  `object-cover` was right while the slot held a photograph; `contain` + `scale-[1.25]` answered a
+  tile that read as empty; both CLIP a catalogue drawing. Measured rather than argued - the rail's
+  own note has `spider-crane.png` at 1024×559 drawn 52×28 in a 52px box, edge to edge, so `contain`
+  already fills the WIDTH and there is no horizontal margin to eat. At 1.5 that crane lost both
+  outriggers, seen in the browser.
+  **The geometry, for the next person who reaches for a scale:** a w×h picture fits inside a circle
+  of diameter D when `w·√(1+(h/w)²) ≤ D`. At 1.83:1 that is `w ≤ 0.87D`, and `contain` gives
+  `w = D` - so 1.0 is the ceiling, not a starting point. The machine is big because the disc is,
+  which is the only lever that cannot clip.
+  (2) **`found` closes the ring and pops the machine**, on one timeline. While reading, the ring is a
+  quarter of brand turning through a pale circle - the catalogue being searched. On a match it
+  becomes a CLOSED brand circle and stops, and the drawing overshoots to 1.12 and settles. Landing
+  had no moment before this: the drawing simply swapped, and a renter watching the reel could not
+  tell the answer from one more candidate.
+  Files: `src/app/globals.css` (`found-pop`, `found-ring`), `src/components/screens/Processing.tsx`,
+  `src/app/dev/preview/specimens.tsx`, `tests/unit/processing-screen.test.tsx` (2 new cases, the fit
+  case rewritten).
+  ⚠️ **`key` on the ring's state.** A CSS animation on a KEPT node does not re-run, so without the
+  key the ring would close with no flourish while the drawing beside it popped - two halves of one
+  moment, out of step.
+  ⚠️ The pop is on the IMAGE, not on the disc: the disc is `overflow-hidden`, and animating it would
+  clip the overshoot to a circle that is itself growing.
+  ⚠️ Reduced motion keeps both RESULTS - full-size machine, closed ring - and drops only the
+  overshoot, which is the decoration. Same rule the tick disc has followed since it was written.
+  🔴 **A drawing's own transparent margin is NOT fixable here.** `spider-crane.png` fills the disc;
+  `scissor-lift.png` carries margin on every side and sits small inside it. `contain` cannot tell the
+  difference between a machine and the emptiness around it, and a scale big enough to help the second
+  clips the first. **CONTENT, owed: trim the transparent margin on the taxonomy icons** - the same
+  family of asset problem as the `.jpg` icons that cannot be keyed out (2026-09-08).
+  ⚠️ Verified: typecheck, lint (0 errors), 39 passing across the touched suites, and the full suite
+  serially (3376 passing). Three failures, none from this change: `ui-pins` (pre-existing CRLF),
+  `share-request-email`'s `recipientEmails` (uncommitted work absent from `HEAD`), and
+  `dropdown-scroll`, which passes alone.
+  ⚠️ **SEEN RENDERED**, both states, and the clipping found that way rather than in the source.
+  🔴 The POP itself was not watched - a still frame cannot show it, and the flow it belongs to needs
+  a session.
+
+- **2026-09-13 - A dropdown opens as tall as the room it has, instead of six rows on every screen.**
+  Owner, on the TYPE list: *"the dropdown must always show all taxonomy types, not necessarily the
+  same category as the selected one"*, then *"show all even without search"*.
+  🔴 **The list was ALREADY every subtype across every category** - `MachineCard` passes
+  `tax.allSubtypes`, which flattens the whole catalogue, and the filter is a plain substring match
+  with no cap. What was wrong was how much of it a renter could SEE: the options box was `max-h-56`,
+  a flat 224px, six rows, whatever the screen. On a real catalogue that is a sliver, so he had to
+  TYPE before he could see what was in there - which is the opposite of what a list is for, and why
+  «show me everything» read as «it only shows a few». Everything was rendered; almost none of it was
+  visible.
+  The cap is the space between the trigger and the window's edge now, less a margin and less the
+  search row where one is drawn, with a FLOOR of 200px (a two-row list is worse than a scrolling one)
+  and a CEILING of 420px (a list is a list, not the page).
+  Files: `src/components/Dropdown.tsx`, `tests/unit/dropdown-scroll.test.tsx` (3 new cases).
+  ⚠️ **The flip measurement had to move with it.** `ESTIMATED_LIST_HEIGHT` still decides WHICH
+  side has more room, but a list that flips up is now positioned against the height it will really
+  take - with the old constant, a taller list opened with its top off the screen.
+  ⚠️ `searchable` was hoisted above `openList`, which now reads it. A `const` declared below the
+  function that uses it is safe only by call order, and that is what a later edit breaks silently.
+  ⚠️ **jsdom lays out nothing**, so the measurement falls to its floor in tests. That is the half
+  worth pinning anyway: the floor must be a readable list, and the height must come from the
+  measurement rather than from a class nobody can vary. Break-checked by restoring `max-h-56` - both
+  cases went red.
+  🔴 **And the list could not be SCROLLED to its foot** (owner, same exchange: *"it contains
+  all, but when I search I find - not by scrolling"*). A `position: fixed` layer that extends past
+  the viewport cannot be scrolled into view: the page scrolls and the layer does not move with it, so
+  the rows below the fold were reachable by SEARCH alone. It happens whenever the height floor is
+  taller than the room - near the foot of a page, or in a short window where flipping up cannot save
+  it either, where the old arithmetic could even place the top at a NEGATIVE offset. The height stays
+  at the floor there, because a sliver is worse; the POSITION gives instead, and the whole layer is
+  pushed until it sits inside the window with 8px to spare.
+  ⚠️ The case that pins it needs a window where NEITHER side fits (300px tall, the trigger in the
+  middle). A trigger near the bottom of a tall window does not exercise it - the flip already handles
+  that one, which is why the first version of this test passed against the broken code.
+  🔴 **Reported, NOT fixed - the catalogue can fail silently.** `/api/taxonomy` falls back to a
+  built-in stand-in of 6 categories / 17 subtypes on ANY error from the agents service, and says
+  nothing. A thin catalogue and a failed fetch look identical on this dropdown, which is the other
+  reading of the owner's report and cannot be told apart from the screen.
+
 - **2026-09-13 - The off-catalogue note may take two lines, the offer takes the owner's own words, and TYPE's placeholder matches SIZE's.**
   Owner, an hour after asking for one line: *"the note beside the equipment name is wrapped so make
   it 2 lines fine, and for the notes on the type-size make «not in our list? use your custom name»,

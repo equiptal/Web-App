@@ -40,6 +40,51 @@ export function statusMeta(s: string): { cls: string; en: string; ar: string } {
 }
 
 /**
+ * The firm a DIRECT request was sent to, for the surfaces that name it.
+ *
+ * 🔴 **The name and the logo are NOT on the wire yet, and this reads them tolerantly so the day they
+ * are, nothing else has to change.** `GET /rentees/me/requests/{id}` spreads the whole request row,
+ * so `supplierId` (an integer) arrives and nothing else: `getMyRequests` selects no supplier at all,
+ * and `getRequestDetail` adds none. A store cannot be resolved from it either - `/api/stores/:id` is
+ * keyed on the STORE and the list takes no supplier filter.
+ *
+ * So today this answers `{ id, name: null, logoUrl: null }` for a direct request and the surfaces
+ * say «Direct request» without naming anyone. It is the `DirectorySupplier.equipmentCount` pattern
+ * of 2026-09-08: read and render it now, and the field starts working the day it arrives.
+ *
+ * 🔴 **BACKEND, owed:** put the target firm on the request projections - `supplierName` at minimum,
+ * and `storeId` / `storeName` / `storeLogoUrl` for the mark. Both `getMyRequests` and
+ * `getRequestDetail`, since the modal reads one and the rail the other.
+ */
+export interface DirectTargetRef {
+  id: string;
+  name: string | null;
+  logoUrl: string | null;
+}
+
+export function directTarget(rec: Record<string, unknown> | null | undefined): DirectTargetRef | null {
+  if (!rec) return null;
+  const id = rec.supplierId;
+  if (id == null || id === "") return null;
+  const pick = (...keys: string[]): string | null => {
+    for (const k of keys) {
+      const path = k.split(".");
+      let v: unknown = rec;
+      for (const seg of path) v = typeof v === "object" && v !== null ? (v as Record<string, unknown>)[seg] : undefined;
+      if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return null;
+  };
+  return {
+    id: String(id),
+    // Every spelling the two services might land on, store name first: it is the name the renter
+    // pressed to start this request, which is what he will recognise.
+    name: pick("storeName", "store.name", "supplierName", "supplier.name", "supplier.companyName", "supplierCompanyName"),
+    logoUrl: pick("storeLogoUrl", "store.logoUrl", "supplierLogoUrl", "supplier.logoUrl"),
+  };
+}
+
+/**
  * The backend accepts `DELETE /rentees/me/requests/{id}` only while a request is OPEN or ACTIVE —
  * anything else throws REQUEST_CANCEL_NOT_ALLOWED (app backend `request.service.ts:cancelRequest`).
  * Every cancel affordance gates on THIS, per item. It must never gate on a group-level roll-up: a

@@ -75,17 +75,29 @@ export const TRIAL_REQUESTS_ENABLED: boolean = false;
 /**
  * EQUIPMENT_NAME_ON_EVERY_LINE — send the renter's own words beside the taxonomy, not instead of it.
  *
- * OFF until `backend-agents` ships **B1**, and this is not caution, it is a measured consequence:
- * `getBidFormPreview` computes `hasCustomEquipment` as *any line carries a name*, and the Supplier OS
- * suppresses its ENTIRE app handoff on that flag — the QR dialog and «Go To App». The moment every
- * line carries a name, that flag is true for every request in the product and every bid link loses
- * its QR. B1 re-derives the flag from the undefined predicate instead; this switch is thrown after it.
+ * ON by default since 2026-09-14 (owner: *"let what [is] detected in your own words [be] stored as
+ * the custom always, regardless [of whether the] user change[s] it or not"*).
  *
- * With it off, the payload keeps today's shape — ids OR a name — and every other part of this change
- * (the card, the reading rule, the gate) is already live and safe, because none of them touches the
- * wire.
+ * 🔴 It was held OFF for two days, and not out of caution: `getBidFormPreview` computed
+ * `hasCustomEquipment` as *any line carries a name*, and the Supplier OS suppresses its ENTIRE app
+ * handoff on that flag — the QR dialog and «Go To App». With a name on every line that flag would
+ * have been true for every request in the product.
+ * **B1 has landed** (`Moedatech-App@342ab77f`): it derives the flag from the undefined predicate
+ * instead, and with `every` rather than `some`, so the handoff is suppressed only when NOTHING in a
+ * link can be answered in the app. The switch is thrown after it, as planned.
+ *
+ * ⚠️ **It needs that backend DEPLOYED, not merely committed.** Against an older `agents` the QR
+ * disappears from every bid link in the product, and the response is cached for 300s, so a rollback
+ * outlives its own deploy by five minutes.
+ *
+ * ⚠️ What is sent is **his** words — `customEquipment ?? rawLabel` — never the catalogue name the
+ * box happens to show on a line he added by hand. Storing our own name back into his column would
+ * be circular, and it is the one field that is supposed to say what HE calls the machine.
+ *
+ * `=0` is the kill switch, the same shape as `CUSTOM_EQUIPMENT_ENABLED`: it restores the old payload
+ * — ids OR a name — for an environment whose backend is older than B1.
  */
-export const EQUIPMENT_NAME_ON_EVERY_LINE = process.env.NEXT_PUBLIC_EQUIPMENT_NAME_EVERY_LINE === "1";
+export const EQUIPMENT_NAME_ON_EVERY_LINE = process.env.NEXT_PUBLIC_EQUIPMENT_NAME_EVERY_LINE !== "0";
 
 /**
  * Does the renter's own catalogue include HIDDEN nodes?

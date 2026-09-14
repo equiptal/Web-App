@@ -18,8 +18,8 @@
  * platform cannot resolve becomes a document demanded of every supplier who bids.
  */
 
-import { useEffect, useState } from "react";
-import { fmt, useT } from "@/lib/i18n";
+import { useEffect, useMemo, useState } from "react";
+import { fmt, useLocale, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
 import { CUSTOM_EQUIPMENT_ENABLED } from "@/lib/flags";
@@ -30,6 +30,8 @@ import { CertSelect } from "@/components/create/CertSelect";
 import { SearchSelect } from "@/components/create/SearchSelect";
 import { useItemAttachments, useItemOverrides, useItemTaxonomy, useProvenance } from "@/components/create/hooks";
 import { pin } from "@/lib/uiPins";
+import { taxName } from "@/lib/contract/taxonomy";
+import type { Taxonomy } from "@/lib/contract/taxonomy";
 import {
   equipmentYears,
   isCustomLine,
@@ -71,11 +73,6 @@ function OverlayRequired({ title, word }: { title: string; word?: boolean }) {
 /** The trio box's columns, shared by the box and by its first row so the two line up exactly. */
 const TRIO_COLS = "sm:grid-cols-[minmax(150px,1.3fr)_minmax(104px,0.85fr)_minmax(200px,1.35fr)]";
 
-/** The dashed offer that changes the line's kind — one skin, wherever of the two rows it sits in. */
-const ESCAPE_ROW =
-  "w-full rounded-sm border border-dashed border-border-strong px-3 py-2 text-start text-label " +
-  "leading-snug text-muted-dark transition hover:border-brand hover:text-brand-deep";
-
 export function MachineCard({
   item,
   gaps,
@@ -114,14 +111,19 @@ export function MachineCard({
    *  changing the subtype clears a previous failure rather than inheriting it. */
   const [brokenPhoto, setBrokenPhoto] = useState<string | null>(null);
   /**
-   * Presses on «Select from our list», used as a REMOUNT KEY for the TYPE control.
+   * A refused attempt to type into the NAME, which now shakes the escape row instead.
    *
-   * `Dropdown.defaultOpen` is read once, at mount, so that a list the renter asked for can then be
-   * closed and stay closed — its own note says a caller wanting it open again remounts it with a
-   * `key`. This counter is that key: each press remounts the control with the list already open.
-   * Zero means «never asked», which is every ordinary render, so nothing opens by itself.
+   * Owner, 2026-09-14: *"if he tries to write then shake the question note - i actually want it read
+   * so he understands its use by confirming that he is using his own words"*. The name is the
+   * agent's output until he rejects the match; a field that simply does nothing teaches nothing, so
+   * the attempt points at the one row that can change it.
    */
-  const [openTypeAt, setOpenTypeAt] = useState(0);
+  const [hatchShake, setHatchShake] = useState(false);
+  useEffect(() => {
+    if (!hatchShake) return;
+    const id = setTimeout(() => setHatchShake(false), 520);
+    return () => clearTimeout(id);
+  }, [hatchShake]);
 
   /**
    * The «point at what just changed» pulse, after the renter takes the line off-catalogue.
@@ -133,12 +135,10 @@ export function MachineCard({
    * Cleared on a timer rather than on animation end: `animationend` never fires under
    * `prefers-reduced-motion`, where the rule draws a standing outline and no animation at all.
    */
-  /** Offered only while there IS a catalogue answer to reject, and never on a direct line. */
-  const offerOffCatalogue = CUSTOM_EQUIPMENT_ENABLED && !listingLocked && !!item.ref.subcategoryId;
-  const goOffCatalogue = () => {
-    actions.setItemOffCatalogue(item.id, item.customEquipment ?? item.rawLabel ?? "");
-    setPulseName(true);
-  };
+  /** The escape is offered on every line except a direct one, which is taxonomy only. */
+  const offerEscape = CUSTOM_EQUIPMENT_ENABLED && !listingLocked;
+  /** What the read-only name box shows: his own words, else his RFQ's, else the pick he made. */
+  const shownName = item.customEquipment ?? item.rawLabel ?? tax.pickedName ?? "";
 
   const [pulseName, setPulseName] = useState(false);
   useEffect(() => {
@@ -454,11 +454,29 @@ export function MachineCard({
                   shake={shake("custom_equipment")}
                   required={owed("custom_equipment")}
                 >
+                  {/* ── READ-ONLY, and it answers when he tries anyway (owner, 2026-09-13/14) ──
+                      *"the equipment name field will be agent output at first then editable from the
+                      other path when he clicks not what he wants, instead of editing it directly"*,
+                      then *"if he tries to write then shake the question note"*.
+                      🔴 This REVERSES 2026-09-12 (*"it is now the user input of the equipment
+                      name"*), deliberately and at his word. What it buys: one writer at a time, so
+                      the name can never quietly contradict the type beside it. What it costs: he
+                      cannot label a matched line, and his words stop arriving as free aliases.
+                      ⚠️ It stays a real `input`, not a `<div>`: clicking and typing is the gesture
+                      he will make, and it has to be the gesture that teaches him where his words
+                      live. `onKeyDown` catches the character before anything can change. */}
                   <TextInput
-                    value={item.customEquipment ?? item.rawLabel ?? tax.pickedName ?? ""}
+                    readOnly
+                    value={shownName}
                     maxLength={120}
                     placeholder={t.create.machineCard.customEquipmentPlaceholder}
-                    onChange={(e) => set("custom_equipment", { customEquipment: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key.length === 1 || e.key === "Backspace" || e.key === "Delete") {
+                        e.preventDefault();
+                        if (offerEscape) setHatchShake(true);
+                      }
+                    }}
+                    onChange={() => {}}
                   />
                 </CanvasField>
 
@@ -500,8 +518,6 @@ export function MachineCard({
                 source={prov.itemSource("subtype", item.ref.subcategoryId)}
               >
                 <SearchSelect
-                  key={`type-${openTypeAt}`}
-                  defaultOpen={openTypeAt > 0}
                   value={item.ref.subcategoryId}
                   placeholder={t.create.machineCard.typePlaceholder}
                   searchPlaceholder={t.create.machineCard.searchTypes}
@@ -546,36 +562,36 @@ export function MachineCard({
                 />
               </CanvasField>
 
-              {/* ── The way BACK into the catalogue, beside the lists it opens ──────────────
-                  Owner, 2026-09-13: *"if it is clicked then in its place, with no taxonomy selected,
-                  we will write «select from our list»"*, and *"the type-size must be on the same row
-                  as the note below"* — so it sits in row TWO, level with TYPE and SIZE, which is what
-                  it acts on. On a matched line this cell is empty and the offer is up in row one,
-                  beside the name box IT points at. One control, two labels, two homes, each next to
-                  the thing it changes.
-                  It OPENS the type list rather than naming it: the lists are on screen already, so a
-                  row that only pointed at them would be a caption.
+              {/* ── One escape, one panel, two doors (owner, 2026-09-13/14) ───────────────────
+                  Planned against his supervisor's prototype and cut down from it. What survives of
+                  that design: the row stays on screen while its panel is open, the panel is the
+                  white sheet with the orange top edge, the catalogue list carries the taxonomy's own
+                  pictures, and a pick asks for the size on the row itself.
+                  What was cut, and why: FOUR states became two (*"despite we see them as 4 cases,
+                  user see them in 2"* — he cannot tell an alias hit from an exact one, and does not
+                  care); THREE doors became two (browse and search were one list at two scopes); and
+                  «describe it yourself» became a CONFIRMATION, because he described the machine at
+                  the intake and *"i dont want the user to write anything more here"*.
                   ⚠️ Withheld on a line started from a supplier's listing — a DIRECT request is
                   taxonomy only (owner, 2026-09-12), and an off-catalogue one reaches nobody at all,
                   the named supplier included. */}
-              {/* ── The offer, under the two lists it is about (owner, 2026-09-13) ─────────────
-                  *"i want this note inlined with the size-type row"*. Both labels live in this one
-                  cell now: off-catalogue it offers the way BACK to the lists, and on a matched line
-                  it offers the way OUT of them. One control, two labels, one home — under TYPE and
-                  SIZE, which are the two boxes either press is about.
-                  ⚠️ Withheld on a line started from a supplier's listing — a DIRECT request is
-                  taxonomy only (owner, 2026-09-12), and an off-catalogue one reaches nobody at all,
-                  the named supplier included. */}
-              {CUSTOM_EQUIPMENT_ENABLED && !listingLocked && (custom || offerOffCatalogue) && (
-                <div className="flex items-end">
-                  <button
-                    type="button"
-                    onClick={custom ? () => setOpenTypeAt((n) => n + 1) : goOffCatalogue}
-                    className={ESCAPE_ROW}
-                  >
-                    {custom ? t.create.machineCard.selectFromList : t.create.machineCard.useMyOwnName}
-                  </button>
-                </div>
+              {offerEscape && (
+                <EquipmentChooser
+                  item={item}
+                  taxonomy={state.taxonomy}
+                  shake={hatchShake}
+                  onPick={(catId, subId, capId) => {
+                    prov.touch("subtype");
+                    prov.touch("capacity");
+                    if (catId !== item.ref.categoryId) actions.setItemCategory(item.id, catId);
+                    actions.setItemSubcategory(item.id, subId);
+                    actions.setItemMeasurement(item.id, capId);
+                  }}
+                  onKeepOwn={() => {
+                    actions.setItemOffCatalogue(item.id, shownName);
+                    setPulseName(true);
+                  }}
+                />
               )}
             </div>
           )}
@@ -711,6 +727,247 @@ export function MachineCard({
  * prefill on their behalf. It stays visible, acknowledged, and excluded from the broadcast either
  * way — `postableItems` drops every no-match item.
  */
+/**
+ * The escape row, and the single panel behind it.
+ *
+ * Two doors, whatever state the line is in, because the renter only ever sees two situations: this
+ * is his machine, or it is not (owner, 2026-09-13). The panel's HEADER is the only thing that
+ * changes with the state — «Change the equipment» when we matched something, «Widen the search»
+ * when we did not.
+ *
+ * 🔴 The row is sized to its sentence (`w-max`, `whitespace-nowrap`) and never to its column: at a
+ * column's width every sentence short enough to fit was too short to say what the press does, which
+ * cost four wordings before the row moved (owner, 2026-09-13: *"dont ever wrap the text"*).
+ */
+function EquipmentChooser({
+  item,
+  taxonomy,
+  shake,
+  onPick,
+  onKeepOwn,
+}: {
+  item: EquipmentItem;
+  taxonomy: Taxonomy;
+  /** True for one refused keystroke in the NAME box — the row answers for the field. */
+  shake: boolean;
+  onPick: (catId: string, subId: string, capId: string) => void;
+  onKeepOwn: () => void;
+}) {
+  const t = useT();
+  const { locale } = useLocale();
+  const [view, setView] = useState<null | "root" | "list" | "own">(null);
+  const [wide, setWide] = useState(false);
+  const [query, setQuery] = useState("");
+  /** Which row has its sizes open. A pick is two presses — the type, then the size it comes in. */
+  const [sizesFor, setSizesFor] = useState<string | null>(null);
+
+  const rows = useMemo(
+    () =>
+      taxonomy.flatMap((c) =>
+        c.subcategories.map((sub) => ({
+          catId: c.id,
+          catName: taxName(c, locale),
+          id: sub.id,
+          name: taxName(sub, locale),
+          /* The subtype's own drawing, else its category's — the same fallback the card's photo
+             uses, so a type with no picture of its own is not a blank tile. */
+          image: sub.equipmentImageUrl ?? c.equipmentImageUrl ?? null,
+          sizes: sub.measurements.map((m) => ({ id: m.id, name: taxName(m, locale) })),
+        })),
+      ),
+    [taxonomy, locale],
+  );
+
+  const family = rows.filter((r) => r.catId === item.ref.categoryId);
+  /* With no category resolved there is no family to show, so the list opens WIDE — which is the
+     same view, and saves a press that could only lead to an empty one. */
+  const showAll = wide || family.length === 0;
+  const q = query.trim().toLowerCase();
+  const list = (showAll ? rows : family).filter(
+    (r) => !q || `${r.name} ${r.catName}`.toLowerCase().includes(q),
+  );
+
+  const close = () => {
+    setView(null);
+    setSizesFor(null);
+    setQuery("");
+    setWide(false);
+  };
+
+  const label = item.ref.subcategoryId ? t.create.machineCard.hatchMatched : t.create.machineCard.hatchNoMatch;
+
+  return (
+    <div className="sm:col-span-3 flex flex-col gap-2.5">
+      <button
+        type="button"
+        onClick={() => (view ? close() : setView("root"))}
+        className={`flex w-max max-w-full items-center gap-2.5 justify-self-start whitespace-nowrap rounded-sm border px-3.5 py-2.5 text-label font-semibold text-brand-deep transition ${
+          shake ? "shake-error border-brand" : "border-brand-light bg-brand-soft hover:border-brand"
+        }`}
+      >
+        {label}
+        <span aria-hidden className="text-brand">{view ? "▴" : "▾"}</span>
+      </button>
+
+      {view && (
+        <div className="flex flex-col gap-3 rounded-sm border border-border-strong border-t-[3px] border-t-brand bg-surface p-3.5">
+          {view === "root" && (
+            <>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-body font-extrabold text-navy">
+                  {item.ref.subcategoryId ? t.create.machineCard.panelChange : t.create.machineCard.panelWiden}
+                </span>
+                <button type="button" onClick={close} className="text-label font-semibold text-muted-dark hover:text-navy">
+                  {t.common.close}
+                </button>
+              </div>
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setView("list")}
+                  className="rounded-sm border border-border-strong bg-surface px-3.5 py-3 text-start transition hover:border-navy hover:bg-surface2"
+                >
+                  <span className="block text-body font-semibold text-navy">{t.create.machineCard.doorSearch}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView("own")}
+                  className="rounded-sm border border-border-strong bg-surface px-3.5 py-3 text-start transition hover:border-navy hover:bg-surface2"
+                >
+                  <span className="block text-body font-semibold text-navy">{t.create.machineCard.doorOwn}</span>
+                  {/* The only sub-line on either door: the consequence, which the title cannot say. */}
+                  <span className="block text-label text-muted">{t.create.machineCard.doorOwnHint}</span>
+                </button>
+              </div>
+            </>
+          )}
+
+          {view === "list" && (
+            <>
+              <div className="flex flex-wrap items-baseline justify-between gap-3">
+                <span className="text-body font-extrabold text-navy">
+                  {showAll
+                    ? t.create.machineCard.searchHeading
+                    : fmt(t.create.machineCard.browseHeading, { family: family[0]?.catName ?? "" })}
+                </span>
+                <div className="flex items-center gap-3">
+                  {!showAll && (
+                    <button type="button" onClick={() => setWide(true)} className="text-label font-semibold text-action hover:underline">
+                      {t.create.machineCard.searchAll}
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setView("root")} className="text-label font-semibold text-muted-dark hover:text-navy">
+                    {t.create.machineCard.backStep}
+                  </button>
+                </div>
+              </div>
+
+              {showAll && (
+                <TextInput
+                  value={query}
+                  placeholder={t.create.machineCard.searchAny}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              )}
+
+              <div className="flex max-h-[320px] flex-col gap-2 overflow-y-auto">
+                {list.map((r) => (
+                  <div key={r.id} className="rounded-sm border border-border bg-surface">
+                    <button
+                      type="button"
+                      onClick={() => setSizesFor(sizesFor === r.id ? null : r.id)}
+                      className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-start transition hover:bg-surface2"
+                    >
+                      <span className="flex min-w-0 items-center gap-3">
+                        <span className="grid h-[56px] w-[80px] flex-none place-items-center overflow-hidden rounded-sm bg-surface3">
+                          {r.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={r.image} alt="" className="h-full w-full object-contain p-1" />
+                          ) : (
+                            <Icon name="precision_manufacturing" size={20} className="text-muted" />
+                          )}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-body font-semibold text-navy">{r.name}</span>
+                          <span className="block truncate text-label text-muted">
+                            {r.catName} · {r.sizes.map((m) => m.name).join(" · ")}
+                          </span>
+                        </span>
+                      </span>
+                      <span className="flex-none text-label font-semibold text-action">
+                        {r.id === item.ref.subcategoryId ? t.create.machineCard.currentPick : t.create.machineCard.useThis}
+                      </span>
+                    </button>
+
+                    {sizesFor === r.id && (
+                      /* The size is asked on the ROW, not applied silently: sizes differ per type,
+                         and picking the first one for him is the wrong auto-fill this whole panel
+                         exists to avoid. */
+                      <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2.5">
+                        <span className="text-label font-semibold uppercase tracking-[0.05em] text-muted">
+                          {t.create.machineCard.whichSize}
+                        </span>
+                        {r.sizes.map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              onPick(r.catId, r.id, m.id);
+                              close();
+                            }}
+                            className="rounded-sm border border-border-strong bg-surface px-3 py-1.5 text-body text-navy transition hover:border-navy hover:bg-surface2"
+                          >
+                            {m.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {list.length === 0 && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-brand-light bg-brand-soft px-3.5 py-2.5">
+                    <span className="text-label text-brand-deep">{t.create.machineCard.noneFound}</span>
+                    <button type="button" onClick={() => setView("own")} className="text-label font-semibold text-brand-deep hover:underline">
+                      {t.create.machineCard.doorOwn}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {view === "own" && (
+            <>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-body font-extrabold text-navy">{t.create.machineCard.doorOwn}</span>
+                <button type="button" onClick={() => setView("root")} className="text-label font-semibold text-muted-dark hover:text-navy">
+                  {t.create.machineCard.backStep}
+                </button>
+              </div>
+              {/* A confirmation, never a second form: the words are already his, from the intake. */}
+              <span className="text-label font-semibold uppercase tracking-[0.05em] text-muted">
+                {t.create.machineCard.willSay}
+              </span>
+              <span className="rounded-sm border border-border bg-surface2 px-3.5 py-2.5 text-body text-navy">
+                {item.customEquipment ?? item.rawLabel ?? ""}
+              </span>
+              <Button
+                onClick={() => {
+                  onKeepOwn();
+                  close();
+                }}
+              >
+                {t.create.machineCard.keepOwn}
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function UnavailableCard({ item, label }: { item: EquipmentItem; label: string }) {
   const t = useT();
   const { actions } = useRfq();

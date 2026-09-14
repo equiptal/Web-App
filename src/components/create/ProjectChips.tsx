@@ -39,7 +39,7 @@
  * hiding instead: a site you stop using stops being picked, and drops off the six.
  */
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { useRfq } from "@/lib/store/rfq-store";
@@ -77,21 +77,34 @@ const today = () => new Date().toISOString().slice(0, 10);
 export function ProjectChips({
   onBrowseAll,
   lead,
+  trailing,
 }: {
   onBrowseAll?: () => void;
   /**
    * The sentence that names what the pills are for, drawn beside them.
    *
-   * BIG **It belongs to THIS component because this is the one that knows whether there are any**
+   * 🔴 **It belongs to THIS component because this is the one that knows whether there are any**
    * (owner, 2026-09-13: *"«اختر مشروعاً» - this is only shown when user have projects"*). It used to
    * be a `<span>` in `Intake`, rendered unconditionally, while the strip beside it returns `null`
    * for a renter with no sites - so a renter who has never filed one read a question with no answers
    * anywhere near it, on the first screen he meets.
    *
-   * MARK A slot rather than a string: the caller owns the wording and the type scale it is drawn at,
+   * ⚠️ A slot rather than a string: the caller owns the wording and the type scale it is drawn at,
    * and the intake is not the only surface that may want the strip.
    */
   lead?: ReactNode;
+  /**
+   * The floor's own controls, drawn at the END of the control row.
+   *
+   * 🔴 **The row's order is a standing rule** (owner, 2026-09-13): *"the last row of the input text
+   * box is one row with select project in small font, then the project pills, then + then the arrow
+   * - this is the order ALWAYS"*. They are passed IN for the same reason `lead` is: this component
+   * is the one that knows how many chips fit beside them, and the split cannot be made from outside.
+   *
+   * ⚠️ Unlike `lead`, these are drawn even when the renter has NO sites. A guest still needs the
+   * way to hand us a file and the way to send; the sentence and the chips are what disappear.
+   */
+  trailing?: ReactNode;
 }) {
   /* ⚠️ `onBrowseAll` is KEPT and still honoured when a caller passes one — a surface that wants a
      full picker rather than more rows can have it — but the intake passes none, which is why the
@@ -122,6 +135,26 @@ export function ProjectChips({
   /** Whether there is anything BEYOND those two rows — the toggle is drawn only when there is. */
   const [overflows, setOverflows] = useState(false);
   const strip = useRef<HTMLDivElement | null>(null);
+  /**
+   * BIG **How many chips fit BESIDE the controls** (owner, 2026-09-13, as a standing rule):
+   * *"the last row of the input text box is one row with select project in small font, then the
+   * project pills, then + then the arrow - this is the order ALWAYS - and put the number of pills in
+   * this row dynamically depending on the max fit; if the user has more projects than fit, they are
+   * shown in the row ABOVE, and that row fits the whole text box as it has no buttons or text"*.
+   *
+   * So the overflow runs UPWARD, which no CSS wrap mode gives you: `wrap-reverse` stacks the lines
+   * upward but puts the LAST items on the top line, so the two controls end up above the chips
+   * instead of on the bottom row with them. The split has to be measured and made here.
+   *
+   * MARK `null` means «not measured yet», and an unmeasured strip puts EVERY chip on the control
+   * row. It wraps, which is the old behaviour and merely untidy; the alternative - guessing a count
+   * - hides sites on a browser with no `ResizeObserver`, and hiding is the fault this exists to fix.
+   */
+  const [fitCount, setFitCount] = useState<number | null>(null);
+  /** The control row’s own chip slot, measured for width. */
+  const lastRow = useRef<HTMLDivElement | null>(null);
+  /* How many chips the row would hold if it held them all - the chosen site plus the rest. */
+  const chipCount = (state.project ? 1 : 0) + (projects?.filter((x) => x.id !== state.project?.id).length ?? 0);
 
   /* `actions` is rebuilt on every render of the store's provider. Listing it as a dependency would
      re-run the fetch on each of those renders; leaving it out silently would age. Held in a ref, the
@@ -204,6 +237,90 @@ export function ProjectChips({
   });
 
   /**
+   * The split: fill the control row, send the rest upward.
+   *
+   * ⚠️ Measured off a RULER - every chip rendered once, off-screen and on one line - rather than
+   * off the chips on screen. The chips on screen are the OUTPUT of this calculation, so reading
+   * their widths to decide it is a loop that settles on the wrong answer the first time the strip
+   * re-wraps.
+   *
+   * ⚠️ Greedy from the START, so the chosen site (which `ordered` puts first) is always on the
+   * control row. It is the one chip that answers the question the row is asking.
+   */
+  /**
+   * The split: fill the control row, send the rest upward.
+   *
+   * 🔴 **Two phases, and ONE render of each chip.** The first cut measured a hidden «ruler» - every
+   * chip drawn a second time, off-screen, on one line - and that put every site name in the DOM
+   * twice. `aria-hidden` keeps it from a screen reader; it does not keep it from anything else, and
+   * twelve tests started finding two of every project.
+   *
+   * So: while `fitCount` is null the row holds EVERY chip (clipped, for one frame), which is the
+   * measurement; then it holds the ones that fit. The width is what invalidates it.
+   *
+   * ⚠️ Greedy from the START, so the chosen site - which `ordered` puts first - is always on the
+   * control row. It is the one chip that answers the question the row is asking.
+   */
+  /* ⚠️ `useLayoutEffect`, not `useEffect`: this is a MEASUREMENT that decides layout, so it has
+     to run before the browser paints - otherwise the renter sees one frame of every chip crammed
+     into the control row. It is also what makes the update flush synchronously, which is how the
+     split settles in one commit instead of being scheduled after the frame. */
+  useLayoutEffect(() => {
+    const row = lastRow.current;
+    if (!row) return;
+    /* ⚠️ Measure only while the row is holding EVERY chip - that IS the measurement. Reading it
+       once and trusting the answer forever breaks on a remount (the locale provider re-mounts its
+       children once it resolves) and on any width change; re-reading a row that already holds the
+       SPLIT would creep one chip at a time instead. This is the only state in which the question
+       can be answered, so it is the only state in which it is asked. */
+    if (row.children.length !== chipCount) return;
+    const avail = row.clientWidth;
+    if (!avail) return;
+    let used = 0;
+    let k = 0;
+    for (const el of Array.from(row.children) as HTMLElement[]) {
+      const w = el.offsetWidth + (k === 0 ? 0 : ROW_GAP_PX);
+      if (used + w > avail) break;
+      used += w;
+      k += 1;
+    }
+    /* ⚠️ At least one, always. A site whose name is wider than the slot would otherwise leave the
+       control row with no chip at all - which reads as «you have no projects» beside a «Select a
+       project» that is asking about some. */
+    const next = Math.max(1, k);
+    setFitCount((prev) => (prev === next ? prev : next));
+  });
+
+  /* ⚠️ The width is the only thing that can change the answer, so it is the only thing that
+     re-opens the question. Resetting on every render would measure a row that already holds the
+     SPLIT and creep one chip at a time. */
+  useEffect(() => {
+    const row = lastRow.current;
+    if (!row || typeof ResizeObserver === "undefined") return;
+    let last = row.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (row.clientWidth !== last) {
+        last = row.clientWidth;
+        setFitCount(null);
+      }
+    });
+    ro.observe(row);
+    return () => ro.disconnect();
+  }, []);
+
+  /* ⚠️ A site added, removed or chosen changes the chips themselves, so the count is stale.
+     The first run is SKIPPED: on mount it would land in the same commit as the measurement above and
+     undo it, and the strip would then re-measure every render - a loop that never settles. */
+  const firstList = useRef(true);
+  useEffect(() => {
+    if (firstList.current) {
+      firstList.current = false;
+      return;
+    }
+    setFitCount(null);
+  }, [projects?.length, chosenId]);
+
+  /**
    * One thing filed at this site applies ITSELF (owner, 2026-09-01).
    *
    * A dropdown with a single row is a question with one answer: the renter opens it, reads the only
@@ -221,7 +338,11 @@ export function ProjectChips({
   }, [templates, state.templateTerms, picking]);
 
   // Already picked — the pills have taken over the strip.
-  if (!user || !projects?.length) return null;
+  /* ⚠️ The CHIPS need sites; the controls do not. A renter with none still gets the floor row,
+     with the `+` and the arrow where they always are - see `trailing`. */
+  if (!user || !projects?.length) {
+    return trailing ? <div className="flex w-full items-center justify-end gap-2">{trailing}</div> : null;
+  }
 
   const chosen = state.project;
   /* The chosen one leads and is not repeated among the rest. Six of the others, which is enough to
@@ -327,135 +448,156 @@ export function ProjectChips({
 
   const clamped = !expanded && twoRowsPx != null;
 
+  /**
+   * 🔴 **The chips as an ARRAY, so the row can be packed** (owner, 2026-09-13, as a standing rule):
+   * *"the last row is one row with select project, then the pills, then +, then the arrow - always -
+   * and put the number of pills in this row dynamically depending on the max fit; more than fits is
+   * shown in the row ABOVE, and that row fits the whole text box as it has no buttons or text"*.
+   *
+   * ⚠️ They were one wrapping flow until now. A flow cannot answer this: the overflow has to run
+   * UPWARD while the controls stay on the bottom line, and no CSS wrap mode does that -
+   * `wrap-reverse` stacks lines upward but puts the LAST items on the TOP line, which would leave
+   * the `+` and the arrow floating above the sites.
+   */
+  const chipNodes: ReactNode[] = [] = [
+/* ~~«Pick a site, and half of this fills itself in», in an amber chip at the head of the
+          row.~~ Removed (owner, 2026-09-02). It was written to give the row a reason to be pressed,
+          and it sat in the row it was advertising: an amber pill among the site pills, the same size
+          and shape as the things it was pointing at. What a site does is obvious the first time one
+          is picked, and after that the sentence is furniture. */
+
+      /* ── The chosen site, and the dropdown of what is filed under it ──────────────────────────
+          Marked with the brand, so the row says which of these is answering the request. The native
+          `select` covers the whole pill at zero opacity: the press target is the pill, the menu opens
+          where the platform puts it, and the × stays above the layer so clearing the site cannot open
+          the list by accident. */
+      chosen ? (
+        <span key="chosen" className="flex items-center gap-1.5 rounded-full border border-brand bg-brand-soft px-3 py-1 text-label font-semibold text-navy">
+          <Icon name="place" size={13} className="flex-none text-brand" />
+          {chosen.title}
+          {/* Applied is stated, not implied: a renter who has already copied a machine's terms
+              should not have to open the list to find out. */}
+          {state.templateTerms && <span className="font-normal text-muted">· {t.projects.pills.templateApplied}</span>}
+
+          {/* ── What is already filed at this site ────────────────────────────────────────────────
+              The house `Dropdown`, not a native `select` behind an invisible layer (owner,
+              2026-08-31). Two things it fixes on this control alone: the list is the app's own —
+              ticked row, our type, our border, instead of the OS menu's blue bar — and there is no
+              «start from» row at the top of it. That row was the placeholder a native select needs
+              to have nothing selected; it read as a fourth machine you could pick and it does
+              nothing. The invitation belongs on the trigger, which the pill already is.
+
+              Keyed by MACHINE id, not by the order it sits in — two machines on one order are two
+              entries, and picking either copies its own answers. The machine's name leads, because
+              that is what the renter is looking for; the kind and reference are the hint under it,
+              to tell two of the same machine apart. */}
+          {templates.length > 0 && (
+            <Dropdown
+              /* Opens ITSELF the moment a site is chosen (owner, 2026-09-01) — the renter picked the
+                 project, and «what have I already hired here?» is the next question, not one they
+                 should have to find a caret for. Keyed by the project so choosing another site opens
+                 that one's list; `defaultOpen` is read at mount, so closing it keeps it closed. */
+              key={chosen.id}
+              defaultOpen={!state.templateTerms}
+              tone="bare"
+              label={t.projects.pills.startFrom}
+              placeholder=""
+              disabled={picking}
+              value={picked}
+              onChange={(v) => void applyTemplate(v)}
+              options={templates.map((tpl) => ({
+                value: tpl.itemId,
+                label: tpl.machine || tpl.ref,
+                hint: `${tpl.kind === "work_order" ? t.projects.pills.kindWorkOrder : t.projects.pills.kindRequest} ${tpl.ref}`,
+              }))}
+            />
+          )}
+
+          <button
+            type="button"
+            onClick={() => actions.clearProject()}
+            aria-label={t.common.close}
+            className="relative z-10 -me-0.5 grid h-4 w-4 place-items-center rounded-full text-muted transition hover:bg-surface hover:text-navy"
+          >
+            <Icon name="close" size={11} />
+          </button>
+        </span>
+      ) : null,
+
+      ...ordered.map((p) => {
+        const ended = projectEnded(p, today());
+        return (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => actions.selectProject(p)}
+            /* Brand-outlined rather than grey (owner, 2026-09-01: *"project pills need to be more
+               visible"*). Outlined and not filled: filled would compete with Continue, which is the
+               one thing on this screen that should read as the next step. */
+            className="flex items-center gap-1.5 rounded-full border border-brand/45 bg-surface px-3 py-1 text-label font-semibold text-brand-deep transition hover:border-brand hover:bg-brand-soft"
+          >
+            <Icon name="place" size={13} className="flex-none text-brand" />
+            {projectTitle(p)}
+            {/* Tagged, not hidden — see the note at the top. */}
+            {ended && <span className="text-meta font-semibold text-muted">{t.projects.chips.ended}</span>}
+          </button>
+        );
+      }),
+    ];
+
+  /* ⚠️ Unmeasured puts every chip on the control row, where it wraps - untidy, and visible.
+     Guessing a count instead would HIDE sites on a browser with no `ResizeObserver`, and hiding is
+     the fault this whole strip exists to avoid. */
+  const onRow = fitCount ?? chipNodes.length;
+  const above = chipNodes.slice(onRow);
+  const showToggle = above.length > 0 && (overflows || expanded || true);
+
   return (
-    /* INSIDE the box now, on the floor row (owner, 2026-09-01) — the site is what fills half the
-       request, so it belongs in the thing the request is written in rather than under it.
-
-       The strip and its toggle stack, so «All projects» sits UNDER the two rows it opens rather than
-       inside them: a control that moves as the thing it controls grows is a control the renter has to
-       find twice. */
-    /* 🔴 **ONE wrapping strip, not a strip with a control under it** (owner, 2026-09-13: *"the ui
-       is trash here ... the max number of pills used without white space"*). «All projects» used to
-       stack BELOW, in a row of its own, which is what put a line with one chip on it between the
-       sites and the floor controls - and pushed those controls down to a fourth line with white
-       space to their left. It is the last item in the same flow now, so it follows the final pill
-       and the row fills.
-       ⚠️ What that costs, and why it is worth it: the 2026-09-10 note said the toggle stacks so it
-       does not move as the strip grows. It does move now. The white space it was avoiding was worse,
-       and it is always the LAST thing in the flow, so it is where the sites end rather than where a
-       row happens to break. */
-    <div className="contents">
-      <div
-        ref={strip}
-        /* `overflow-hidden` only while clamped — expanded it must not cut a dropdown open on the
-           chosen site's pill, which draws outside the strip's box. */
-        className={`flex min-w-0 flex-1 flex-wrap items-center gap-2${clamped ? " overflow-hidden" : ""}`}
-        style={clamped ? { maxHeight: twoRowsPx } : undefined}
-      >
-      {/* ⚠️ The lead sits INSIDE the wrapping flow, first (owner, 2026-09-13, two instructions that
-          had to be kept together: *"«اختر مشروعاً» is only shown when user have projects"*, which is
-          why this slot belongs to the component that knows whether there are any, and *"the max
-          number of pills used without white space"*, which is why everything is one flow.
-          🔴 It was dropped when these two passes were merged — one had the slot, the other had the
-          flow — and a rebase that took either side whole lost the other. */}
-      {lead}
-      {/* ~~«Pick a site, and half of this fills itself in», in an amber chip at the head of the
-          row.~~ Removed (owner, 2026-09-02). It was written to give the row a reason to be pressed,
-          and it sat in the row it was advertising: an amber pill among the site pills, the same size
-          and shape as the things it was pointing at. What a site does is obvious the first time one
-          is picked, and after that the sentence is furniture. */}
-
-      {/* ── The chosen site, and the dropdown of what is filed under it ──────────────────────────
-          Marked with the brand, so the row says which of these is answering the request. The native
-          `select` covers the whole pill at zero opacity: the press target is the pill, the menu opens
-          where the platform puts it, and the × stays above the layer so clearing the site cannot open
-          the list by accident. */}
-      {chosen && (
-        <span className="flex items-center gap-1.5 rounded-full border border-brand bg-brand-soft px-3 py-1 text-label font-semibold text-navy">
-          <Icon name="place" size={13} className="flex-none text-brand" />
-          {chosen.title}
-          {/* Applied is stated, not implied: a renter who has already copied a machine's terms
-              should not have to open the list to find out. */}
-          {state.templateTerms && <span className="font-normal text-muted">· {t.projects.pills.templateApplied}</span>}
-
-          {/* ── What is already filed at this site ────────────────────────────────────────────────
-              The house `Dropdown`, not a native `select` behind an invisible layer (owner,
-              2026-08-31). Two things it fixes on this control alone: the list is the app's own —
-              ticked row, our type, our border, instead of the OS menu's blue bar — and there is no
-              «start from» row at the top of it. That row was the placeholder a native select needs
-              to have nothing selected; it read as a fourth machine you could pick and it does
-              nothing. The invitation belongs on the trigger, which the pill already is.
-
-              Keyed by MACHINE id, not by the order it sits in — two machines on one order are two
-              entries, and picking either copies its own answers. The machine's name leads, because
-              that is what the renter is looking for; the kind and reference are the hint under it,
-              to tell two of the same machine apart. */}
-          {templates.length > 0 && (
-            <Dropdown
-              /* Opens ITSELF the moment a site is chosen (owner, 2026-09-01) — the renter picked the
-                 project, and «what have I already hired here?» is the next question, not one they
-                 should have to find a caret for. Keyed by the project so choosing another site opens
-                 that one's list; `defaultOpen` is read at mount, so closing it keeps it closed. */
-              key={chosen.id}
-              defaultOpen={!state.templateTerms}
-              tone="bare"
-              label={t.projects.pills.startFrom}
-              placeholder=""
-              disabled={picking}
-              value={picked}
-              onChange={(v) => void applyTemplate(v)}
-              options={templates.map((tpl) => ({
-                value: tpl.itemId,
-                label: tpl.machine || tpl.ref,
-                hint: `${tpl.kind === "work_order" ? t.projects.pills.kindWorkOrder : t.projects.pills.kindRequest} ${tpl.ref}`,
-              }))}
-            />
-          )}
-
-          <button
-            type="button"
-            onClick={() => actions.clearProject()}
-            aria-label={t.common.close}
-            className="relative z-10 -me-0.5 grid h-4 w-4 place-items-center rounded-full text-muted transition hover:bg-surface hover:text-navy"
-          >
-            <Icon name="close" size={11} />
-          </button>
-        </span>
-      )}
-
-      {ordered.map((p) => {
-        const ended = projectEnded(p, today());
-        return (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => actions.selectProject(p)}
-            /* Brand-outlined rather than grey (owner, 2026-09-01: *"project pills need to be more
-               visible"*). Outlined and not filled: filled would compete with Continue, which is the
-               one thing on this screen that should read as the next step. */
-            className="flex items-center gap-1.5 rounded-full border border-brand/45 bg-surface px-3 py-1 text-label font-semibold text-brand-deep transition hover:border-brand hover:bg-brand-soft"
-          >
-            <Icon name="place" size={13} className="flex-none text-brand" />
-            {projectTitle(p)}
-            {/* Tagged, not hidden — see the note at the top. */}
-            {ended && <span className="text-meta font-semibold text-muted">{t.projects.chips.ended}</span>}
-          </button>
-        );
-      })}
-
-      {/* Drawn only when there IS more than three rows of sites — and it opens them here, in place.
-          A caller that passed `onBrowseAll` gets its own surface instead; the intake passes none.
-          ⚠️ INSIDE the strip, as its last item — see the note on the wrapper. */}
-      {(overflows || expanded) && (
-        <button
-          type="button"
-          onClick={() => (onBrowseAll ? onBrowseAll() : setExpanded((v) => !v))}
-          aria-expanded={onBrowseAll ? undefined : expanded}
-          className="rounded-full border border-dashed border-border px-3 py-1 text-label font-semibold text-muted transition hover:border-brand hover:text-brand"
+    <div className="flex w-full min-w-0 flex-col gap-2">
+      {/* ── The rows ABOVE: the sites that did not fit, and nothing else ──────────────────
+          ⚠️ Full width, because there is no lead and no controls up here to make room for - which
+          is the owner’s own note: *"the second row above the last one will fit the whole text box"*.
+          ⚠️ The toggle leads this strip rather than closing it. Clamped to one row, a toggle at the
+          END is the item most likely to be the one cut off - and it is the only way to see the rest. */}
+      {above.length > 0 && (
+        <div
+          ref={strip}
+          className={`flex min-w-0 flex-wrap items-center gap-2${clamped ? " overflow-hidden" : ""}`}
+          style={clamped ? { maxHeight: twoRowsPx } : undefined}
         >
-          {expanded && !onBrowseAll ? t.projects.chips.fewer : `${t.projects.chips.all} (${ordered.length})`}
-        </button>
+          {showToggle && (
+            <button
+              type="button"
+              onClick={() => (onBrowseAll ? onBrowseAll() : setExpanded((v) => !v))}
+              aria-expanded={onBrowseAll ? undefined : expanded}
+              className="flex-none rounded-full border border-dashed border-border px-3 py-1 text-label font-semibold text-muted transition hover:border-brand hover:text-brand"
+            >
+              {expanded && !onBrowseAll ? t.projects.chips.fewer : `${t.projects.chips.all} (${ordered.length})`}
+            </button>
+          )}
+          {above}
+        </div>
       )}
+
+      {/* ── The control row, ALWAYS last and always in this order ───────────────────────
+          the sentence · the sites that fit · the `+` · the arrow. */}
+      <div className="flex w-full min-w-0 items-center gap-2">
+        {lead}
+        {/* ⚠️ `flex-1` and `flex-nowrap`: this slot IS the measurement, so its width is what the
+            row's own width is compared against, and a miscount must CLIP rather than wrap - a wrapped chip
+            here would push the controls onto a line of their own, which is the shape being fixed. */}
+        {/* ⚠️ **It WRAPS while the count is unknown, and only then.** `nowrap` is what lets the
+            measurement see each chip’s true width, but a row that is still measuring must never
+            CLIP: on a browser with no `ResizeObserver`, or before the first layout, every site would
+            be hidden behind an edge with nothing saying so. Wrapping is untidy for a frame and
+            loses nothing, which is the same trade the two-row clamp has always made. */}
+        <div
+          ref={lastRow}
+          className={`flex min-w-0 flex-1 items-center gap-2 ${fitCount === null ? "flex-wrap" : "flex-nowrap overflow-hidden"}`}
+        >
+          {chipNodes.slice(0, onRow)}
+        </div>
+        {trailing}
       </div>
     </div>
   );

@@ -412,6 +412,12 @@ export const en = {
       confirmSubBoth: "It reaches both of these places",
       confirmSubPost: "It reaches one place",
       confirmDoPost: "Post to Moedatech",
+      /* ── A DIRECT request reaches ONE firm (owner, 2026-09-13) ─────────────────────────────
+         «Every supplier there can bid on it» is the broadcast promise and it is false here. The
+         title is the STORE's own name; these are the fallback and the two sentences. */
+      destDirectFallback: "This supplier",
+      destDirectLine: "Your request goes to this supplier only, and nobody else sees it",
+      destDirectPosted: "It is already sent to this supplier",
       destMoedatech: "Moedatech",
       destShared: "Shared",
       destOutlook: "Outlook",
@@ -2501,6 +2507,39 @@ export const en = {
          above this row, so a line that only points at them would be a caption, not a control. */
       selectFromList: "Select from our list",
       addCustomType: "Add a custom equipment type",
+      /* ── The escape, and the one panel behind it (owner, 2026-09-13/14) ──────────────────────
+         Planned against his supervisor's prototype and cut down from it: *"despite we see them as 4
+         cases, user see them in 2"*, *"the cta instead of describe so he dont feel he is writing
+         again"*, *"many extra text everywhere no need"*.
+         ⚠️ ONE sentence per state on the row, and it must never wrap — the control is sized to the
+         sentence, not the sentence to the column. */
+      hatchMatched: "Not the equipment you want?",
+      hatchNoMatch: "Can't find the equipment you want?",
+      /* A label, not a question: the row he just pressed asked the question, and asking again a
+         centimetre below it is the extra text this pass exists to remove. */
+      panelChange: "Change the equipment",
+      panelWiden: "Widen the search",
+      doorSearch: "Search our catalogue",
+      doorOwn: "Keep my own words",
+      /* The only sub-line kept: the consequence, which the title cannot carry. */
+      doorOwnHint: "Nothing of ours is sent",
+      browseHeading: "{family} types in our catalogue",
+      searchAll: "Search all equipment",
+      searchHeading: "Search the Moedatech catalogue",
+      searchAny: "Name or nickname — try “digger”, “roto”, “FLT”",
+      noneFound: "Nothing in the catalogue matches that",
+      useThis: "Use this",
+      currentPick: "Current",
+      whichSize: "WHICH SIZE?",
+      backStep: "← Back",
+      /* He described the machine at the intake. This is a CONFIRMATION, never a second form:
+         *"i dont want the user to write anything more here as he already described it in his input
+         before"*. */
+      willSay: "THE REQUEST WILL SAY",
+      keepOwn: "Keep equipment name in my own words",
+      savedOwn: "Saved as your own equipment — {name}",
+      ownType: "Your own equipment",
+      ownSize: "In your own words",
       searchSizes: "Search sizes…",
       fuel: "FUEL",
       /* ── An ask, not a heading (owner, 2026-09-08) ───────────────────────────────

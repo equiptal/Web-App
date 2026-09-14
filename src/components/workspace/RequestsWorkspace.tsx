@@ -989,7 +989,6 @@ export function RequestsWorkspace() {
         <RequestDetailsModal
           group={group}
           item={item}
-          bids={bids}
           link={link}
           openShare={drawerShare}
           openCancel={drawerCancel}

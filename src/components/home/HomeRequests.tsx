@@ -4,12 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui";
 import { useSession } from "@/lib/session";
-import { cancelRequest, fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail } from "@/lib/api/client";
+import { cancelRequest, fetchAllMyRequests, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail } from "@/lib/api/client";
 import { cancellableItems, groupBiddingClosed, groupRequests, type RequestGroup } from "@/lib/contract/requests";
 import type { InboxBid } from "@/lib/contract/inbox";
 import { requestExpiry, expiryState, type ExpiryState } from "@/lib/contract/request-expiry";
 import { submissionToBidCard } from "@/lib/contract/link-bids";
-import type { WorkspaceBid } from "@/lib/contract/workspace";
 import type { BidCard } from "@/lib/contract/bids";
 import { hiddenRequests, hideRequest, unhideRequest } from "@/lib/access/hidden-requests";
 import { RequestDetailsModal, type ShareLinkMeta } from "@/components/workspace/RequestDetailsModal";
@@ -192,8 +191,13 @@ export function HomeRequests() {
     setOpenShare(share);
     overlay.open(group.id);
   };
-  /** The bids and the share-link settings the modal needs — fetched only once one is opened. */
-  const [openBids, setOpenBids] = useState<WorkspaceBid[]>([]);
+  /**
+   * The share-link settings the modal needs — fetched only once one is opened.
+   *
+   * ~~And its BIDS.~~ They fed the drawer's count pill, and that row went on 2026-09-13 when the
+   * status moved into the header. Dropping the state dropped the `fetchBids` call with it: opening a
+   * request from the dashboard is one round trip lighter, and nothing reads what the other returned.
+   */
   const [openLink, setOpenLink] = useState<ShareLinkMeta | null>(null);
 
   /** The group the ✕ is asking to cancel. Cancelling ALWAYS confirms — see the note on dismissal. */
@@ -211,26 +215,14 @@ export function HomeRequests() {
 
   useEffect(() => {
     if (!open) {
-      setOpenBids([]);
       setOpenLink(null);
       return;
     }
     const first = open.group.items[0];
     if (!first) return;
     let live = true;
-    void Promise.all([
-      fetchBids(first.id).catch(() => ({ bids: [] })),
-      loadSubs(first.id),
-    ]).then(([app, link]) => {
+    void loadSubs(first.id).then((link) => {
       if (!live) return;
-      // One card per item of a submission, as the workspace cuts them: an off-platform supplier can
-      // answer several lines of one RFQ, and each line is its own offer.
-      const offline = (link?.submissions ?? []).flatMap((sub) =>
-        (sub.items.length ? sub.items : [undefined]).map(
-          (it): WorkspaceBid => ({ card: submissionToBidCard(sub, it), source: "offline" }),
-        ),
-      );
-      setOpenBids([...app.bids.map((card): WorkspaceBid => ({ card, source: "app" })), ...offline]);
       setOpenLink(link ? { renterName: link.renterName, bidDeadline: link.bidDeadline, logoUrl: link.logoUrl } : null);
     });
     return () => {
@@ -888,7 +880,6 @@ export function HomeRequests() {
         <RequestDetailsModal
           group={open.group}
           item={open.group.items[0] ?? null}
-          bids={openBids}
           link={openLink}
           openShare={open.share}
           onClose={() => {

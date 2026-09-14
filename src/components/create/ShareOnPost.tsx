@@ -282,6 +282,10 @@ export function ShareOnPost({
         requestUuid={state.shareOnPost ? (state.requestUuids[0] ?? null) : null}
         requestCode={state.requestId}
         draftForm={draftForm}
+        /* Who this DIRECT request is for, so the confirmation names the firm instead of promising a
+           marketplace (owner, 2026-09-13). The draft is the only place that knows: a posted request
+           carries no supplier name on any projection yet. */
+        direct={state.direct ? { supplierName: state.direct.supplierName, storeId: state.direct.storeId } : null}
         onPost={post}
         renterName={renterName}
         onShared={(n, channel, outcome) => {

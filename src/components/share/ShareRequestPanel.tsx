@@ -103,6 +103,19 @@ export interface ShareRequestPanelProps {
   requestCode?: string | null;
   /** `post` mode: the draft, so the preview can be read before the link exists. */
   draftForm?: BidFormData | null;
+  /**
+   * The one firm a DIRECT request is for, when this is one.
+   *
+   * 🔴 **It changes what the confirmation CLAIMS** (owner, 2026-09-13, on the Moedatech block:
+   * *"in direct, language must change - it is not to all suppliers, i will show here the store logo
+   * instead of Moedatech"*). The block said *"your request goes live on Moedatech, where every
+   * supplier there can bid on it"* over a request that reaches exactly one firm, which is the last
+   * screen before it leaves and the wrong thing to tell him there.
+   *
+   * Only the CREATE flow can pass it: the draft holds the target (`DirectTarget`), and a posted
+   * request does not carry its supplier's name on any projection yet - see `directTarget`'s note.
+   */
+  direct?: { supplierName: string | null; storeId: string | null } | null;
   /** `post` mode: posts and returns the new request's uuid. Null means the post failed. */
   onPost?: () => Promise<string | null>;
   /** Fired once a share has gone out, with how many suppliers it reached. */
@@ -172,6 +185,7 @@ export function ShareRequestPanel({
   mode,
   requestUuid = null,
   draftForm = null,
+  direct = null,
   onPost,
   onShared,
   preselect,
@@ -334,6 +348,29 @@ export function ShareRequestPanel({
    * renter to a dead end. So the offer is drawn on `configured && !connected`, never on
    * `!connected` alone.
    */
+  /**
+   * The direct store's logo, fetched once by `storeId`.
+   *
+   * ⚠️ A failure is silent and the block falls back to its glyph: the confirmation's job is to say
+   * WHERE the request goes, and it says that in words whether or not a picture loads. Nothing about
+   * the send waits on this.
+   */
+  const [storeLogo, setStoreLogo] = useState<string | null>(null);
+  useEffect(() => {
+    const id = direct?.storeId;
+    if (!id) return;
+    let live = true;
+    fetch(`/api/stores/${encodeURIComponent(id)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
+      .then((d: { logoUrl?: string | null }) => {
+        if (live && d.logoUrl) setStoreLogo(d.logoUrl);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [direct?.storeId]);
+
   const [connect, setConnect] = useState<MailConnectStatus | null>(null);
   /**
    * He pressed «Don't send by Outlook» in the confirmation.
@@ -2661,6 +2698,21 @@ export function ShareRequestPanel({
               title={c.destNoMarket}
               detail={c.offCatalogueLine}
             />
+          ) : direct ? (
+            /* ── A DIRECT request reaches ONE firm, and the block says whose (owner, 2026-09-13) ──
+                ~~The Moedatech block, promising «every supplier there can bid on it».~~ On a direct
+                request that is simply untrue, and this is the last screen before it goes out.
+                The STORE takes the block: its logo where the wordmark was, its name as the title.
+                ⚠️ The logo is fetched by `storeId`, which the draft carries; with no store behind the
+                target (a supplier reached some other way) the `storefront` glyph stands in and the
+                sentence is unchanged - the fact it states is about the FIRM, not about the picture. */
+            <Destination
+              icon="storefront"
+              logo={storeLogo ? { src: storeLogo, alt: "", className: "h-5 w-5 rounded-full object-contain" } : undefined}
+              tone={uuid ? "done" : "on"}
+              title={direct.supplierName ?? c.destDirectFallback}
+              detail={uuid ? c.destDirectPosted : c.destDirectLine}
+            />
           ) : (
             <Destination
               icon="public"
@@ -2806,7 +2858,15 @@ export function ShareRequestPanel({
  * still an answer to his question, and hiding it is how a renter comes back asking why no e-mail
  * arrived.
  */
-function Destination({
+/**
+ * One place the request is about to reach, as the confirmation lists them.
+ *
+ * ⚠️ Exported for `dev/preview` only (`share-destinations`). The dialog it lives in needs a draft, a
+ * picked supplier and a session, so the three blocks could not be LOOKED AT while they were being
+ * changed - which is what that page exists for, and its rule 1 is that a specimen renders the real
+ * component rather than a copy of its markup.
+ */
+export function Destination({
   icon,
   logo,
   mark,

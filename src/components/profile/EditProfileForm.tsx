@@ -55,8 +55,29 @@ export function EditProfileForm({
   const { locale } = useLocale();
   const ar = locale === "ar";
   const { tier, refresh } = useSession();
-  // A guest has no stored profile yet, so this form IS his first save, not an edit.
-  const isFirstSave = tier === "guest";
+  /**
+   * Is this the renter's FIRST save — the guest→basic transition — or an edit?
+   *
+   * 🔴 **The tier is not the answer, and keying on it stranded a real renter** (owner, 2026-09-13,
+   * on `+966566493886` — the same account as the 2026-09-10 fix, blocked again by the other half of
+   * the same trap). The backend has TWO facts here and they can disagree:
+   *  · `getUserTier` answers `basic` off `firstName && lastName && city && jobTitle`, and never
+   *    reads the flag below;
+   *  · `createRequest` refuses with `GUEST_CANNOT_POST_REQUESTS` on `hasCompletedOnboarding`, and
+   *    never reads the tier.
+   * Only `completeProfile` (`PUT /users/me/profile`) sets that flag. `updateProfile`
+   * (`PUT /profile/me`) does not — so a renter whose four fields were filled some other way reads as
+   * basic, is therefore sent to the EDIT endpoint by this form, and can never clear the flag that is
+   * blocking him. Basic enough to be denied the fix, not onboarded enough to post.
+   *
+   * So the form asks the flag the GATE asks. A guest still lands here too: he cannot have completed
+   * onboarding, so both readings agree for him and the 2026-09-10 fix is untouched.
+   *
+   * ⚠️ `=== false`, never falsy. `undefined` means an older backend did not send it, and the
+   * ordinary account is complete — guessing the other way would push a healthy renter through the
+   * first-save endpoint for nothing.
+   */
+  const isFirstSave = tier === "guest" || profile.hasCompletedOnboarding === false;
 
   const [firstName, setFirstName] = useState(profile.firstName ?? "");
   const [lastName, setLastName] = useState(profile.lastName ?? "");
@@ -115,9 +136,11 @@ export function EditProfileForm({
     setFe({});
     setErr(null);
     setBusy(true);
-    // ⚠️ Guest goes to `completeProfile`, NOT `updateProfile`. `PUT /profile/me` is gated on
-    // `requireTier(basic)`, so sending a guest's first save there 403s him with "complete your
-    // profile" — the thing he was doing. Same fields either way; only the endpoint differs.
+    // ⚠️ A first save goes to `completeProfile`, NOT `updateProfile`. Two reasons, and they are
+    // different faults: `PUT /profile/me` is gated on `requireTier(basic)`, so a GUEST sent there is
+    // 403'd with "complete your profile" — the thing he was doing; and it never writes
+    // `hasCompletedOnboarding`, so a renter already reading as basic stays blocked from posting
+    // however many times he saves. Same fields either way; only the endpoint differs.
     const save = isFirstSave ? completeProfile : updateProfile;
     const r = await save({
       firstName: firstName.trim(),
@@ -132,6 +155,10 @@ export function EditProfileForm({
       // guest→basic. The BFF already re-stamped the mt_user cookie; without this the page keeps the
       // stale tier, so the badge still reads «Guest» and every basic-only action stays blocked over a
       // profile that is now complete. Same step OnboardingForm takes after its own submit.
+      //
+      // ⚠️ It also matters for the renter who was ALREADY basic: nothing visible changes for him
+      // here (the badge was never wrong), but the save has just set `hasCompletedOnboarding` and the
+      // request gate reads it on the next submit.
       await refresh();
     }
     setBusy(false);
