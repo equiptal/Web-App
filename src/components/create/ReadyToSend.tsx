@@ -505,10 +505,20 @@ export function ReadyToSend() {
             </>
           }
         >
+          {/* ── Name the number, and name the way out that costs nothing ──────────────────────────
+             ~~"Basic accounts can post a limited number of requests."~~ True, and it left him with
+             one move: verify, which is a company errand he may not be able to run today. The cap is
+             on LIVE requests, not lifetime (`createRequest.ts`: OPEN / ACTIVE / PARTIALLY_ACCEPTED),
+             so closing one frees a slot immediately, and that is the half he could act on and was
+             never told.
+
+             ⚠️ The «3» is `BASIC_TIER_REQUEST_LIMIT` in `backend-agents/.../createRequest.ts`. It is
+             written out here the way the app writes it (`requestLimitMessage`), so if that constant
+             moves, this sentence and the app's both have to move with it. */}
           <p className="text-body leading-relaxed text-muted">
             {L(
-              "Basic accounts can post a limited number of requests. Get verified to post unlimited requests and unlock the rest of the marketplace.",
-              "تستطيع الحسابات الأساسية إرسال عدد محدود من الطلبات. وثّق حسابك لإرسال طلبات بلا حدود.",
+              "You have 3 active requests, which is the limit on a basic account. Close or finish one to free a slot, or get verified to post as many as you like",
+              "لديك 3 طلبات نشطة، وهذا هو الحد الأقصى للحساب الأساسي. أغلق أحد الطلبات لتحرير مكان، أو وثّق حسابك لإرسال طلبات بلا حدود",
             )}
           </p>
         </Dialog>

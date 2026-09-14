@@ -2538,6 +2538,8 @@ export const en = {
       willSay: "THE REQUEST WILL SAY",
       keepOwn: "Keep equipment name in my own words",
       savedOwn: "Saved as your own equipment — {name}",
+      pillInCatalogue: "In our catalogue",
+      pillNotMatched: "Not matched",
       ownType: "Your own equipment",
       ownSize: "In your own words",
       searchSizes: "Search sizes…",
@@ -2607,7 +2609,9 @@ export const en = {
       notInCatalogueNote: "This one won't reach Moedatech suppliers. Share the link yourself",
       // The renter names the machine himself and the request goes out carrying his words. Prefilled
       // from what he wrote in the RFQ, so the ordinary case is a glance.
-      customEquipment: "EQUIPMENT NAME",
+      /* The prototype's own wording, and his (2026-09-14): the box says WHOSE words it holds,
+         which is the whole reason it is read-only until he asks for it. */
+      customEquipment: "EQUIPMENT NAME IN MY OWN WORDS",
       customEquipmentPlaceholder: "Name the equipment you need",
       // Small and quiet: it is the way to get the machine into the catalogue, not the way out of the
       // request. Named for what it does, not for the app it opens (owner, 2026-09-06).

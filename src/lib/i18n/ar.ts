@@ -2036,6 +2036,8 @@ export const ar: Dictionary = {
       willSay: "سيقول الطلب",
       keepOwn: "احتفظ باسم المعدة بكلماتي",
       savedOwn: "محفوظة كمعدتك الخاصة — {name}",
+      pillInCatalogue: "في قائمتنا",
+      pillNotMatched: "غير مطابقة",
       ownType: "معدتك الخاصة",
       ownSize: "بكلماتك أعلاه",
       searchSizes: "ابحث في الأحجام…",
@@ -2064,7 +2066,7 @@ export const ar: Dictionary = {
       // خارج الكتالوج: النتيجة أولاً — لا مورّد لدينا مطابق لمعدّة يسمّيها المستأجر بنفسه، فلا نرسلها
       // إلى أحد، ثم الطريق الذي يبقى له. لا ادّعاء عن الكتالوج: قد يكون النوع موجوداً وقد رفضه هو.
       notInCatalogueNote: "لا تصل إلى مورّدي معداتك. شارك الرابط بنفسك",
-      customEquipment: "اسم المعدة",
+      customEquipment: "اسم المعدة بكلماتي",
       customEquipmentPlaceholder: "اكتب اسم المعدة التي تحتاجها",
       unavailableWhatsapp: "راسلنا",
       unavailableChoose: "اختر نوعاً آخر",

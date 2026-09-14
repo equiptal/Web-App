@@ -52,6 +52,7 @@ const say = (mark, label, detail) => out.push(`${mark}  ${label}${detail ? ' —
   const users = await q(
     'SELECT id, tenant_id, first_name, last_name, city, job_title, email, whatsapp, ' +
       'has_completed_onboarding, supplier_status, is_verified, company_id, contact_number, ' +
+      'open_request_count, has_used_first_request_slot, active_role, is_rentee, is_supplier, ' +
       'language, created_at, updated_at ' +
       'FROM users WHERE contact_number LIKE ? ORDER BY created_at DESC LIMIT 5',
     '%' + tail + '%',
@@ -126,6 +127,40 @@ const say = (mark, label, detail) => out.push(`${mark}  ${label}${detail ? ' —
     u.id,
   );
   console.log('REQUESTS by status:', J(byStatus));
+
+  const byOrigin = await q(
+    'SELECT request_origin, is_trial, COUNT(*) n FROM equipment_requests ' +
+      'WHERE rentee_id = ? AND deleted_at IS NULL GROUP BY request_origin, is_trial',
+    u.id,
+  );
+  console.log('REQUESTS by origin:', J(byOrigin));
+
+  // ---- app <-> web divergence. One database, two services, and they do not agree. ----
+
+  // The APP's home screen reads the denormalised column; backend-agents COUNTS rows.
+  // Both services maintain the column, so a missed decrement shows the renter a number
+  // on his phone that nothing on the web agrees with.
+  if (num(u.open_request_count) !== liveCount) {
+    say(
+      'WARN',
+      'open_request_count drift',
+      'column says ' + num(u.open_request_count) + ', live rows say ' + liveCount +
+        ' — the app home screen reads the column, the web counts rows',
+    );
+  } else {
+    say('OK  ', 'open_request_count', 'column agrees with the live rows (' + liveCount + ')');
+  }
+
+  // 🔴 The cap is WEB-ONLY. apps/backend removed it (`request.service.ts`: "Request-count cap
+  // removed: all onboarded rentees can post unlimited simultaneous requests"), backend-agents
+  // still enforces 3. So the same person is refused in the browser and served in the app.
+  if (u.supplier_status !== 2 && liveCount >= 3) {
+    say(
+      'FAIL',
+      'capped on WEB, allowed in APP',
+      liveCount + ' live — backend-agents refuses with E8009, apps/backend has no cap. He can post the same request from his phone.',
+    );
+  }
 
   // ---- 2. can he SEND an email share? ----
   if (u.email && EMAIL_RE.test(String(u.email).trim())) {

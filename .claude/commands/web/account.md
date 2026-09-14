@@ -93,6 +93,35 @@ The token is an SSM SecureString at `/moedatech/<stage>/renter-mail/tokens/<user
 
 Empty = not connected, which is **not** a fault: the send falls back to SES if `users.email` is set, else to a compose window.
 
+## Step 2b — the app and the web share one database, and they do not agree
+
+🔴 **This is the half that makes the assessment worth running at all.** One MySQL instance is served by **three** Lambda services, and the same renter moves between them without knowing:
+
+| Service | Who uses it | Which code |
+|---|---|---|
+| `apps/backend` | the **mobile app** | `request.service.ts`, `profile.service.ts` |
+| `apps/backend-agents` | the **web** | `createRequest.ts`, `shareEmail.ts` |
+| `apps/backend-admin` | the **admin panel** | `patchUser.ts`, `admin-user.service.ts` |
+
+So a person can be created in one, edited in a second and refused by a third, and each is reading the same rows through different rules. Never report "his account is fine" — report **which surface** it is fine on.
+
+### Known disagreements — check every one, and name the surface
+
+**1. The request cap is WEB-ONLY.** `apps/backend/src/services/request.service.ts:129` says in as many words: *"Request-count cap removed: all onboarded rentees (verified or not) can post unlimited simultaneous requests."* `REQUEST_LIMIT_REACHED` is defined there and never thrown. `backend-agents/createRequest.ts:384` still enforces **3**.
+> A basic renter with 3 live requests is **refused in the browser and served on his phone.** If he reports "it works on mobile", that is not a web bug report — it is this.
+> ⚠️ `createRequest.ts:369` still claims *"app parity, request.service.ts::requireBasicTier"*. **That comment is stale.** Do not trust it.
+
+**2. Verification is inherited for the tier, not for the cap.** `getUserTier` treats a member of a verified company as Verified. The cap reads `owner.supplierStatus !== 2` — his **own** status, no inheritance. So such a member reads Verified everywhere and is still capped by the web.
+
+**3. `open_request_count` is a denormalised column, and the two sides read different things.** The **app's home screen** reads the column (`home_bloc.dart:129` ← `profile.openRequestCount`); **backend-agents counts rows**. Both services increment and decrement it, and `commitment-cascade.service.ts:134` carries a warning about it drifting upward. A drift means the phone shows a number the browser disagrees with, and neither is obviously wrong from the screen. The script compares them; report a mismatch as a data fault, not a UI one.
+
+**4. `hasCompletedOnboarding` has five writers and one of them is the app's own.** `completeProfile`, both `createUser`s, `forceBasicTier`, `partner/updateProfile`. Two writers of the identity fields set it and two do not. See the known-faults list below.
+
+**5. Requests carry `request_origin`** (`ORGANIC` / `TRIAL` / `OUTREACH`) and `is_trial`. A renter whose history is mostly `TRIAL` has not really used the product, and a trial row expires in 60 minutes — do not read one as evidence that posting works.
+
+### The rule for the report
+When a check fails, say **where** it fails: "capped on web, allowed in the app", "stuck for the web's gate, fine for the app's". A single-verdict answer is wrong on a shared database.
+
 ## Step 3 — report
 
 A verdict table, one row per gate, most severe first. Then, separately, the **one or two things to fix before the demo**, as actions rather than observations.

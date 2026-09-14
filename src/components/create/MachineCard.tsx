@@ -193,7 +193,12 @@ export function MachineCard({
       </div>
 
       {/* The prototype's 2fr / 3fr split, 20px gutter, columns aligned to the top. */}
-      <div {...pin("machine-card-body")} className="grid gap-5 lg:grid-cols-[2fr_3fr] lg:items-stretch">
+      {/* 🔴 `items-start`, not `items-stretch` (owner, 2026-09-14: *"for the image on the left side
+          dont make it responsive to the opening this catalogue, it becomes too long"*). The catalogue
+          panel can add 300px to the right column, and a stretched photograph followed it all the way
+          down — a 1408x768 drawing rendered as a column. The two sides stopped being the same height
+          the day the right one could grow. */}
+      <div {...pin("machine-card-body")} className="grid items-start gap-5 lg:grid-cols-[2fr_3fr]">
         {/* ---------------- The 450px panel, and the four controls on its corners ---------------- */}
         {/* `overflow-hidden`: the photograph now runs to the panel's own edges, so the panel has to
             clip it to its corners or the image squares them off. */}
@@ -448,7 +453,24 @@ export function MachineCard({
                     taxonomy he picked (flow B — a line added by hand fills itself from the pick
                     rather than asking him to retype what he just chose). */}
                 <CanvasField
-                  label={t.create.machineCard.customEquipment}
+                  label={
+                    <span className="flex flex-wrap items-center gap-2">
+                      {t.create.machineCard.customEquipment}
+                      {/* ── The state, as a pill on the label row (the prototype's own) ─────────
+                          It says in two words what the card's colours only imply, and it is the one
+                          place a renter can see that we DID place his machine. */}
+                      {custom ? (
+                        <span className="rounded-sm bg-brand-soft px-2 py-0.5 text-label font-semibold normal-case tracking-normal text-brand-deep">
+                          {t.create.machineCard.pillNotMatched}
+                        </span>
+                      ) : item.ref.subcategoryId ? (
+                        <span className="flex items-center gap-1.5 rounded-sm bg-ok-soft px-2 py-0.5 text-label font-semibold normal-case tracking-normal text-ok-deep">
+                          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-ok" />
+                          {t.create.machineCard.pillInCatalogue}
+                        </span>
+                      ) : null}
+                    </span>
+                  }
                   star={custom}
                   missing={gapFor("custom_equipment")}
                   shake={shake("custom_equipment")}
@@ -517,6 +539,16 @@ export function MachineCard({
                 star={!custom}
                 source={prov.itemSource("subtype", item.ref.subcategoryId)}
               >
+                {custom ? (
+                  /* ── His own words ARE the machine, so the two lists stop asking ───────────────
+                      The prototype replaces both controls with a flat statement, and it is right:
+                      an empty TYPE box beside an empty SIZE box reads as two answers he still owes,
+                      when in fact he has answered — with the name above. The way back is the escape
+                      row under them, which now reads «Can't find the equipment you want?». */
+                  <span className="flex h-[var(--control-md)] items-center rounded-sm border border-ok/40 bg-ok-soft px-3 text-body text-ok-deep">
+                    {t.create.machineCard.ownType}
+                  </span>
+                ) : (
                 <SearchSelect
                   value={item.ref.subcategoryId}
                   placeholder={t.create.machineCard.typePlaceholder}
@@ -539,6 +571,7 @@ export function MachineCard({
                     actions.setItemSubcategory(item.id, v);
                   }}
                 />
+                )}
               </CanvasField>
               <CanvasField
                 label={t.create.machineCard.size}
@@ -548,6 +581,11 @@ export function MachineCard({
                 star={!custom}
                 source={prov.itemSource("capacity", item.ref.measurementId)}
               >
+                {custom ? (
+                  <span className="flex h-[var(--control-md)] items-center rounded-sm border border-ok/40 bg-ok-soft px-3 text-body text-ok-deep">
+                    {t.create.machineCard.ownSize}
+                  </span>
+                ) : (
                 <SearchSelect
                   value={item.ref.measurementId}
                   placeholder={t.create.machineCard.sizePlaceholder}
@@ -560,6 +598,7 @@ export function MachineCard({
                     actions.setItemMeasurement(item.id, v);
                   }}
                 />
+                )}
               </CanvasField>
 
               {/* ── One escape, one panel, two doors (owner, 2026-09-13/14) ───────────────────
@@ -575,6 +614,16 @@ export function MachineCard({
                   ⚠️ Withheld on a line started from a supplier's listing — a DIRECT request is
                   taxonomy only (owner, 2026-09-12), and an off-catalogue one reaches nobody at all,
                   the named supplier included. */}
+              {/* The prototype's own confirmation that the choice stuck. It is drawn UNDER the
+                  escape, so the row that changed the line and the sentence describing the result sit
+                  together rather than a column apart. */}
+              {custom && !!(item.customEquipment ?? item.rawLabel) && (
+                <span className="sm:col-span-3 flex items-center gap-2 rounded-sm border border-ok/40 bg-ok-soft px-3.5 py-2.5 text-body text-ok-deep">
+                  <Icon name="check_circle" size={15} className="flex-none" />
+                  {fmt(t.create.machineCard.savedOwn, { name: item.customEquipment ?? item.rawLabel ?? "" })}
+                </span>
+              )}
+
               {offerEscape && (
                 <EquipmentChooser
                   item={item}
@@ -852,7 +901,7 @@ function EquipmentChooser({
                 </span>
                 <div className="flex items-center gap-3">
                   {!showAll && (
-                    <button type="button" onClick={() => setWide(true)} className="text-label font-semibold text-action hover:underline">
+                    <button type="button" onClick={() => setWide(true)} className="text-label font-semibold text-brand-deep hover:underline">
                       {t.create.machineCard.searchAll}
                     </button>
                   )}
@@ -870,31 +919,37 @@ function EquipmentChooser({
                 />
               )}
 
-              <div className="flex max-h-[320px] flex-col gap-2 overflow-y-auto">
+              <div className="flex max-h-[232px] flex-col gap-1.5 overflow-y-auto">
                 {list.map((r) => (
                   <div key={r.id} className="rounded-sm border border-border bg-surface">
+                    {/* ── ONE line per type, at the card's own metrics (owner, 2026-09-14) ──────
+                        *"can i make the sizes beside the equipment name and make the card less
+                        height even the image of it"*. The name and its sizes were stacked, which
+                        gave every row two lines and an 80px thumbnail beside them — four rows then
+                        filled the card. Name, then sizes after a middot, on one line, against a 44px
+                        drawing.
+                        ⚠️ The action is `brand-deep`, not the map's `--action` blue: this card
+                        speaks orange, and a blue link in the middle of it is a fifth colour. */}
                     <button
                       type="button"
                       onClick={() => setSizesFor(sizesFor === r.id ? null : r.id)}
-                      className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-start transition hover:bg-surface2"
+                      className="flex w-full items-center justify-between gap-3 px-2.5 py-1.5 text-start transition hover:bg-surface2"
                     >
-                      <span className="flex min-w-0 items-center gap-3">
-                        <span className="grid h-[56px] w-[80px] flex-none place-items-center overflow-hidden rounded-sm bg-surface3">
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <span className="grid h-[36px] w-[52px] flex-none place-items-center overflow-hidden rounded-sm bg-surface3">
                           {r.image ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={r.image} alt="" className="h-full w-full object-contain p-1" />
+                            <img src={r.image} alt="" className="h-full w-full object-contain p-0.5" />
                           ) : (
-                            <Icon name="precision_manufacturing" size={20} className="text-muted" />
+                            <Icon name="precision_manufacturing" size={16} className="text-muted" />
                           )}
                         </span>
-                        <span className="min-w-0">
-                          <span className="block truncate text-body font-semibold text-navy">{r.name}</span>
-                          <span className="block truncate text-label text-muted">
-                            {r.catName} · {r.sizes.map((m) => m.name).join(" · ")}
-                          </span>
+                        <span className="min-w-0 truncate">
+                          <span className="text-body font-semibold text-navy">{r.name}</span>
+                          <span className="text-label text-muted"> · {r.sizes.map((m) => m.name).join(" · ")}</span>
                         </span>
                       </span>
-                      <span className="flex-none text-label font-semibold text-action">
+                      <span className="flex-none text-label font-semibold text-brand-deep">
                         {r.id === item.ref.subcategoryId ? t.create.machineCard.currentPick : t.create.machineCard.useThis}
                       </span>
                     </button>
