@@ -2,6 +2,35 @@
 
 ## Change log
 
+- **2026-09-14 - The ready strip is ONE row: «Details» is one word, and the facts give way instead of the button.**
+  Owner, on the review screen: *"make the button details only so it is smaller, and always in one row
+  even if request details beside it stripped - but this card must have the details with the button in
+  one row"*.
+  With four facts and the payment dropdown the card was `flex-wrap`, so the button group wrapped onto
+  a line of its own and «عرض كل التفاصيل» and the pen sat UNDER the card they belong to.
+  (1) **«View all details» → «Details»** / «عرض كل التفاصيل» → «التفاصيل». Its width is now a layout
+  constraint rather than a free choice: it shares a row with four facts that must not be pushed onto
+  a second line, and the old label is 3.4x this one. The pen beside it says «edit»; this one only has
+  to say what it opens.
+  (2) **`sm:flex-nowrap` on the card**, and the facts shrink rather than the row growing.
+  `StripFact` gained `tight`, which marks the ones that may NOT shrink - a date range or a payment
+  term clipped mid-word is not a shorter fact, it is a wrong one. The two that CAN give way, the
+  address and the machine, keep `min-w-0` and already truncate.
+  Files: `src/components/create/ReadyToSend.tsx`, `src/lib/i18n/{en,ar}.ts` (`create.ready.viewAll`),
+  `tests/unit/ready-to-send.test.tsx` (4 new cases; three existing ones renamed to the new label).
+  ⚠️ **It still WRAPS below `sm`.** Four facts and two controls on one line of a phone is not a row,
+  and forcing it would push the whole DOCUMENT wider than the screen - the fault audited out of three
+  surfaces on 2026-09-08. One row where there is room, wrapped where there is not.
+  ⚠️ `whitespace-nowrap` on the button itself as well as `flex-none` on its group: the group holding
+  its width does not stop a two-word label breaking inside it and taking the card's height with it.
+  ⚠️ **The new cases anchor on the `<div` that OPENS the card, not on `basis-[34rem]`** - that string
+  appears in the comment above the element too, and the first match is the prose. A slice that takes
+  in an explanation of the rule instead of the rule is the trap this repo has hit twice before.
+  ⚠️ Verified: typecheck, lint (0 errors), 36 passing across the four touched suites, and the row
+  rule break-checked by deleting `sm:flex-nowrap` - one case went red. NOT seen rendered: the review
+  screen needs a drafted request, and jsdom lays out no flexbox - what the cases pin is the rule that
+  decides the row, never the row itself.
+
 - **2026-09-14 - Requests with no bids are off the `/requests` rail, behind a flag, FOR A DEMO.**
   Owner: *"i want no bids to be hidden from requests list in requests, just for demo purpose"*.
   `HIDE_BIDLESS_REQUESTS` in `src/lib/flags.ts`, a code toggle for the reason

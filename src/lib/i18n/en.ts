@@ -2741,7 +2741,11 @@ export const en = {
       body: "Your request is ready to review. If the request needs another equipment, add it now. It uses the same site and schedule, so there is nothing to fill in twice.",
     },
     ready: {
-      viewAll: "View all details",
+      /* ⚠️ ONE WORD (owner, 2026-09-14: *"make the button details only so it is smaller"*). It
+         shares a row with four facts that must not be pushed onto a second line, so its width is a
+         layout constraint - «View all details» is 3.4x this. The pen beside it says «edit»; this one
+         only has to say what it opens. */
+      viewAll: "Details",
       detailsTitle: "The full request",
       stripDays: "days",
       stripOperator: "with operator",

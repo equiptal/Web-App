@@ -267,7 +267,21 @@ export function MachineCard({
 
                  ⚠️ No padding. `p-*` shrinks the box BEFORE the fit is measured, which is what made
                  the rail’s drawings letterbox at half size - the rail’s own note records it. */
-              className="absolute inset-0 h-full w-full object-cover"
+              /* ── The MACHINE fills the panel, not the file (owner, 2026-09-14: *"still not
+                 fixed"*, after `cover` had already landed) ────────────────────────────────────────
+                 🔴 The bands were never letterboxing. `cover` does fill the box — what is above and
+                 below the excavator is the PHOTOGRAPH'S OWN studio ground, a beige sweep that is part
+                 of the file, which is why it is beige rather than our `surface2` grey. Reading the
+                 screenshot as a fit problem is what made the last answer wrong.
+                 So the fit is right and the FRAMING was not: these renders are shot with a wide
+                 margin all round, and a box exactly the picture's shape shows all of it. A modest
+                 zoom crops that margin and nothing else — the subject reaches the panel's edges,
+                 which is what «full height of its container» means when the container is already
+                 full.
+                 ⚠️ 1.18, not more. At 1.3 the bucket's teeth start leaving the frame on the
+                 wider-shot machines, and a cropped bucket is a different fault from an empty one.
+                 ⚠️ Safe only because the panel is `overflow-hidden`. */
+              className="absolute inset-0 h-full w-full scale-[1.18] object-cover"
             />
           ) : (
             /* No photograph: the glyph keeps its centred box and its caption. Here the name is not a
