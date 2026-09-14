@@ -2517,12 +2517,10 @@ export const en = {
       hatchNoMatch: "Can't find the equipment you want?",
       /* A label, not a question: the row he just pressed asked the question, and asking again a
          centimetre below it is the extra text this pass exists to remove. */
-      panelChange: "Change the equipment",
+      panelChange: "How do you want to change it?",
       panelWiden: "Widen the search",
       doorSearch: "Search our catalogue",
       doorOwn: "Keep my own words",
-      /* The only sub-line kept: the consequence, which the title cannot carry. */
-      doorOwnHint: "Nothing of ours is sent",
       browseHeading: "{family} types in our catalogue",
       searchAll: "Search all equipment",
       searchHeading: "Search the Moedatech catalogue",

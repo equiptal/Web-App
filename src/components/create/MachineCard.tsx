@@ -877,30 +877,36 @@ function EquipmentChooser({
         <div className="sm:col-span-3 flex flex-col gap-3 rounded-sm border border-border-strong border-t-[3px] border-t-brand bg-surface p-3.5">
           {view === "root" && (
             <>
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-body font-extrabold text-navy">
+              {/* ── The question is CENTRED, and the close sits opposite nothing (owner, 2026-09-14)
+                  *"i want «how do you want to change it?» as centre question in the card"*, which is
+                  also how the prototype draws this header: a three-column row whose middle cell holds
+                  the title, so the close on the right cannot pull it off centre. */}
+              <div className="grid grid-cols-[1fr_auto_1fr] items-baseline gap-3">
+                <span />
+                <span className="text-center text-body font-extrabold text-navy">
                   {item.ref.subcategoryId ? t.create.machineCard.panelChange : t.create.machineCard.panelWiden}
                 </span>
-                <button type="button" onClick={close} className="text-label font-semibold text-muted-dark hover:text-navy">
+                <button type="button" onClick={close} className="text-end text-label font-semibold text-muted-dark hover:text-navy">
                   {t.common.close}
                 </button>
               </div>
+              {/* ⚠️ No sub-line under either door (owner, 2026-09-14: *"remove small text below the
+                  keep my own words"*). What the press costs is the note's job, and the note appears
+                  the moment it is pressed. */}
               <div className="grid gap-2.5 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => setView("list")}
-                  className="rounded-sm border border-border-strong bg-surface px-3.5 py-3 text-start transition hover:border-navy hover:bg-surface2"
+                  className="rounded-sm border border-border-strong bg-surface px-3.5 py-3 text-center transition hover:border-navy hover:bg-surface2"
                 >
                   <span className="block text-body font-semibold text-navy">{t.create.machineCard.doorSearch}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setView("own")}
-                  className="rounded-sm border border-border-strong bg-surface px-3.5 py-3 text-start transition hover:border-navy hover:bg-surface2"
+                  className="rounded-sm border border-border-strong bg-surface px-3.5 py-3 text-center transition hover:border-navy hover:bg-surface2"
                 >
                   <span className="block text-body font-semibold text-navy">{t.create.machineCard.doorOwn}</span>
-                  {/* The only sub-line on either door: the consequence, which the title cannot say. */}
-                  <span className="block text-label text-muted">{t.create.machineCard.doorOwnHint}</span>
                 </button>
               </div>
             </>
