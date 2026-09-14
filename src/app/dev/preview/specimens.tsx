@@ -237,6 +237,7 @@ export const SPECIMENS: Specimen[] = [
     label: "Processing — matched",
     render: () => (
       <ProcessingView
+        found
         imageUrl="https://moedatech-eu-storage.s3.eu-central-1.amazonaws.com/default/equipment-taxonomy/scissor-lift.png"
         title={L("Scissor lift 12 m", "منصة مقصية 12 م")}
         caption={L("Matched from our catalogue", "مطابَق من كتالوجنا")}

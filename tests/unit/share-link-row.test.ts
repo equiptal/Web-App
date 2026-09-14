@@ -74,24 +74,26 @@ describe("the link field", () => {
     expect("linkHint" in ar.intake.postShare).toBe(false);
   });
 
-  it("Given the field, Then it is as wide as the supplier card beneath it", () => {
+  it("Given the field, Then it shares the heading’s LINE and ends at the card", () => {
     /**
-     * 🔴 Owner, 2026-09-13: *"this placeholder, also make its width fit the «send to my
-     * suppliers» card below it"*.
+     * 🔴 Owner, 2026-09-13, having asked twice: *"i wanna the share request - placeholder - expiry
+     * to be in one line"*.
      *
-     * ~~`flex-1` with an `sm:max-w-[380px]` cap.~~ The cap answered the fault before it - a masked
-     * stub growing into every pixel the expiry was not using - and over-corrected: the field then
-     * ended wherever 380px ran out, which lines up with nothing on the screen.
+     * ~~`basis-full`.~~ That is a flex line-break by another name - `flex-basis: 100%` fills the
+     * row, so the heading is pushed above it and the deadline in the next cell floats across two
+     * lines of nothing. It was written to answer «fit the card below» and over-answered: the field
+     * matched the card by TAKING the whole of it.
      *
-     * ⚠️ Asserted against the COMMENT-STRIPPED source. The old class is quoted in the note that
-     * explains its removal, so a test reading the raw file would pass on the prose - which this one
-     * did, for one commit, until it was caught.
+     * ⚠️ The COLUMN is what lines up with the card. This cell is the grid’s first column and the
+     * supplier card beneath is the same column, so `flex-1` carries the field to the card’s end
+     * while the heading keeps the leading edge.
+     *
+     * ⚠️ Read against the COMMENT-STRIPPED source: both rejected classes are quoted in the note
+     * that explains their removal, and a test reading the raw file would pass on the prose.
      */
-    expect(code).toContain("w-full basis-full");
+    expect(code).toContain("flex-1");
+    expect(code).not.toContain("basis-full");
     expect(code).not.toContain("max-w-[380px]");
-    // `basis-full` and not merely `w-full`: the cell also holds the panel’s heading on the
-    // surfaces that pass one, and the field must take the line under it rather than the remainder.
-    expect(code).toContain("basis-full");
   });
 
   it("Given both locales, Then the dialog's two lines exist in each", () => {

@@ -84,7 +84,16 @@ describe("matched, it shows the catalogue's own picture", () => {
      */
     const el = draw();
     expect(img(el)?.className).toMatch(/object-contain/);
-    expect(img(el)?.className).toMatch(/scale-\[1\.25\]/);
+    /**
+     * 🔴 **No SCALE at all, and this is the third fit tried here.** `cover` was right for a
+     * photograph; `contain` + 1.25 was the answer while the tile read as empty; both CLIP a
+     * catalogue drawing, which was measured rather than argued: these are ~1.83:1 with no horizontal
+     * margin, so `contain` already fills the width and anything above 1 pushes the machine's ends out
+     * through the circle - at 1.5 the spider crane lost both outriggers.
+     * The geometry: a w×h picture fits a circle of diameter D when w·√(1+(h/w)²) ≤ D, which at
+     * 1.83:1 is w ≤ 0.87D. `contain` gives w = D, so 1.0 is the ceiling.
+     */
+    expect(img(el)?.className).not.toMatch(/scale-\[/);
     expect(img(el)?.className).not.toMatch(/object-cover/);
   });
 
@@ -94,6 +103,32 @@ describe("matched, it shows the catalogue's own picture", () => {
     const el = draw();
     expect(img(el)?.parentElement?.className).toMatch(/overflow-hidden/);
     expect(img(el)?.parentElement?.className).toMatch(/rounded-full/);
+  });
+
+  it("ARRIVES, rather than appearing — the ring closes and the drawing overshoots", () => {
+    /**
+     * Owner, 2026-09-13: *"when the image is found show it appear to the screen like winner"*.
+     * Landing had no moment: the drawing simply swapped and a renter watching the reel could not
+     * tell the ANSWER from one more candidate. `found` closes the ring and pops the machine on one
+     * timeline; `prefers-reduced-motion` keeps both results and drops the overshoot (globals.css).
+     */
+    const el = render(
+      <ProcessingView imageUrl="https://x/eq.png" title="Scissor lift" caption={en.processing.matched} found />,
+    ).container;
+    expect(img(el)?.className).toMatch(/found-pop/);
+    // The ring is a CLOSED brand circle, not a quarter still turning over a settled answer.
+    const ring = el.querySelector(".found-ring");
+    expect(ring).toBeTruthy();
+    expect(ring!.className).not.toMatch(/animate-spin/);
+  });
+
+  it("while READING the ring is still a turning quarter", () => {
+    const el = render(<ProcessingView imageUrl="https://x/eq.png" title="Reading" caption={null} />).container;
+    expect(el.querySelector(".found-ring")).toBeNull();
+    expect(img(el)?.className).not.toMatch(/found-pop/);
+    // Read by CLASS through a filter, never `querySelector`: the `motion-safe:` prefix needs its
+    // colon escaped for CSS and an unescaped one throws rather than missing.
+    expect([...el.querySelectorAll("span")].some((s) => /animate-spin/.test(s.className))).toBe(true);
   });
 
   it("names the machine, and says where the name came from", () => {
@@ -133,9 +168,39 @@ describe("the furniture is gone, not merely hidden", () => {
     }
   });
 
-  it("one moving thing, and it reports no position", () => {
-    // The ring spins; it never fills. The server answers this request in one shot, so a bar that
-    // creeps is a claim about progress nobody can make.
+  it("the processing LINE is back, and it reports no position either", () => {
+    /**
+     * 🔴 Owner, 2026-09-13: *"show process line anyways too"* - reversing the removal of 2026-09-12,
+     * which took the bar out because `processRfq` is ONE request and a percentage moving on a timer
+     * lies in the renter's favour until it stalls. What comes back is the honest form of «anyway»:
+     * INDETERMINATE. A short segment travelling a track says «working» and claims nothing.
+     */
+    const reading = render(<ProcessingView imageUrl={null} title="x" caption={null} />).container;
+    const seg = reading.querySelector(".proc-seg");
+    expect(seg).toBeTruthy();
+    // A SEGMENT of the track, never a width standing for a percentage.
+    expect(seg!.className).toMatch(/w-\[30%\]/);
+    // And nothing on it is a number.
+    expect(reading.textContent).not.toMatch(/\d\s*%/);
+  });
+
+  it("and on a match the track FILLS and stops travelling", () => {
+    // The same news the ring closing and the machine landing give at that moment.
+    const el = render(
+      <ProcessingView imageUrl="https://x/eq.png" title="Scissor lift" caption={en.processing.matched} found />,
+    ).container;
+    expect(el.querySelector(".proc-seg")).toBeNull();
+    const bar = [...el.querySelectorAll("span")].find((s) => /bg-brand/.test(s.className) && /w-full/.test(s.className));
+    expect(bar).toBeTruthy();
+  });
+
+  it("ONE spinner, and nothing anywhere reports a position", () => {
+    /**
+     * The ring spins and the line travels; neither fills toward a number. The server answers this
+     * request in one shot, so a bar that CREEPS is a claim about progress nobody can make - which
+     * is what `transition-[width]` on the old percentage bar was doing, and why its absence is
+     * pinned here rather than left to a comment.
+     */
     const c = render(<ProcessingView imageUrl={null} title="x" caption={null} />).container;
     expect(c.querySelectorAll(".animate-spin, .motion-safe\\:animate-spin").length).toBe(1);
     expect(SRC).not.toMatch(/transition-\[width\]/);
