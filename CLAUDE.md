@@ -2,6 +2,75 @@
 
 ## Change log
 
+- **2026-09-14 - Requests with no bids are off the `/requests` rail, behind a flag, FOR A DEMO.**
+  Owner: *"i want no bids to be hidden from requests list in requests, just for demo purpose"*.
+  `HIDE_BIDLESS_REQUESTS` in `src/lib/flags.ts`, a code toggle for the reason
+  `TRIAL_REQUESTS_ENABLED` is one: a product decision, not a per-environment one. Set it `false` and
+  the rail is exactly what it was - there is nothing else to undo.
+  🔴 **It is NOT a behaviour to keep, and the flag says so.** A live request with no offers yet is
+  precisely when the renter still has things to do with it - share the link, chase a supplier, edit
+  the terms, cancel it - and the rail is his only route to all four. The ✕ dismissal this app
+  already has is deliberately gated on CLOSED for that reason (`hidden-requests.ts`: *"a live request
+  that vanished from the rail would be a request the renter cannot get back to"*), so this goes
+  AROUND that rule rather than changing it and the rule stays stated where it belongs.
+  **TWO guards, and both are the difference between a demo and a broken page:**
+   · **The landing.** `resolveSelection` falls back to `groups[0]`, the NEWEST request, and a tile
+     that is the page's own subject is kept on the rail whatever else says otherwise - so without
+     this the demo would land on a bidless request and draw the very circle the flag exists to
+     remove. With the flag on, the fallback chooses among the requests that HAVE bids. Only when
+     nothing is wanted: a group named by the URL or by a press still resolves against the whole list,
+     so a deliberate visit to a bidless request works and shows its tile.
+   · **The empty rail.** If NO request has a bid the filter stands down and every circle is drawn.
+     Otherwise the rail empties and the page falls through to «create your first request» - the
+     new-account empty state - over an account that has several.
+  Files: `src/lib/flags.ts`, `src/components/workspace/RequestsWorkspace.tsx`,
+  `tests/unit/hide-bidless-requests.test.ts` (new, 7 cases).
+  ⚠️ **It reads `totalBids`, which counts APP bids only.** A request whose offers all arrived through
+  the renter's own shared link has `bidCount: 0` on every item and is hidden by this flag even though
+  it has offers - the same blind spot the dashboard rail was fixed for on 2026-09-05. Counting them
+  needs one `fetchRequestSubmissions` per group, which is not a thing to add for a demo; it is
+  written down instead. **If the demo shows off-platform bids, this will hide the wrong requests.**
+  ⚠️ One case is `it.runIf(HIDE_BIDLESS_REQUESTS)` - the one that describes the demo itself, so the
+  suite goes quiet rather than red the day the flag goes back off. Verified both ways: 7 passing with
+  it on, 6 passing and 1 skipped with it off. The two GUARD cases hold either way, which is the half
+  worth keeping afterwards.
+  ⚠️ Verified: typecheck, lint (0 errors), 57 passing across the four rail/workspace suites. NOT seen
+  rendered - `/requests` needs a signed-in renter with requests, and this browser has no session.
+
+- **2026-09-14 - The machine card's photograph fills the panel, and the chips float on the machine rather than on grey.**
+  Owner: *"equipment image must match the card height too, even in the back of the tuv-year etc"*.
+  `contain` fits the WIDTH, so a 1408x768 photograph (1.83:1) in a panel taller than it is wide drew
+  a grey band above and below - and the four controls float on the panel's corners, so the
+  certificate pill, the quantity stepper, the year and the fuel all sat on that grey instead of on
+  the machine they belong to. `object-cover` now.
+  🔴 **This REVERSES 2026-09-13** (*"three wheels and nothing else"*), and what changed is the PANEL,
+  not the opinion. `cover` was refused while the panel still carried `h-full` and stretched to the
+  right column - about 660x610 in that shot - so it needed 610x1.83 = 1116px of width against 660
+  and threw away **41%**. The panel has been FIXED at 450px since earlier the same day (*"keep it
+  fixed at its card height"*), which makes the same crop 450x1.83 = 823 against ~585: **29%,
+  centred, so 14.5% a side.**
+  🔴 **Measured in a browser before changing it**, both fits side by side at the real 585x450 with
+  the catalogue's own excavator: the whole machine survives - boom, cab, tracks, bucket teeth - and
+  what goes is empty floor and wall, because these photographs are shot with wide margins. The
+  earlier rejection was correct for the box it was made in and stopped being correct when the box
+  changed.
+  Files: `src/components/create/MachineCard.tsx`, `tests/unit/machine-card.test.tsx` (the fit block
+  rewritten, 4 cases).
+  ⚠️ **The fixed height is LOAD-BEARING for this fit**, and a case pins it: restore `h-full` and the
+  panel follows the right column again - the catalogue panel alone adds 300px - and the crop is back
+  to the 41% that was rejected. Anyone widening this panel has to re-measure.
+  ⚠️ **The ROW THUMBNAIL keeps `object-contain p-0.5`** and must: the 36x52 box on a type/size row
+  holds a flat drawing, which is the requests rail's case, not this one. The old cases asserted
+  `contain` over the WHOLE FILE, so they would have passed for the wrong image; both are scoped to
+  their own element now, with a case each.
+  ⚠️ **The request rail reached the opposite answer for its 52px circle on 2026-09-12, and both are
+  right.** The fit is a property of the BOX, not of the picture. Recorded in both places so the next
+  reader does not re-run the experiment in the wrong one.
+  ⚠️ Verified: typecheck, lint (0 errors), 59 passing across the four canvas suites, break-checked by
+  restoring `contain` - two cases went red. **SEEN RENDERED**: the two fits photographed side by side
+  at the panel's real size, which is what settled it; the card itself needs a session and was not
+  re-photographed after the change.
+
 - **2026-09-14 - The intake's last row is the control row, packed to the maximum, and a chip never wraps.**
   Owner, stating it as a standing rule: *"the last row of the input text box is one row with select
   project in small font, then the project pills, then + without circle, then the arrow in a circle -

@@ -2545,7 +2545,9 @@ export const en = {
       pillInCatalogue: "In our catalogue",
       pillNotMatched: "Not matched",
       ownType: "Your own equipment",
-      ownSize: "In your own words",
+      /* The prototype's own wording, and it fits: «In your own words» ran past the SIZE column
+         and was clipped mid-phrase (owner, 2026-09-14: *"still messy"*). */
+      ownSize: "As described",
       searchSizes: "Search sizes…",
       fuel: "FUEL",
       /* ── An ask, not a heading (owner, 2026-09-08) ───────────────────────────────

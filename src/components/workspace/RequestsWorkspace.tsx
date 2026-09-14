@@ -27,6 +27,7 @@ import {
 } from "@/lib/contract/workspace";
 import { RequestRail } from "@/components/workspace/RequestRail";
 import { hiddenRequests, hideRequest } from "@/lib/access/hidden-requests";
+import { HIDE_BIDLESS_REQUESTS } from "@/lib/flags";
 import { RequestContextBar } from "@/components/workspace/RequestContextBar";
 import { ItemTier } from "@/components/workspace/ItemTier";
 import { BidCards } from "@/components/workspace/BidCards";
@@ -138,7 +139,22 @@ export function RequestsWorkspace() {
     };
   }, [status, reloads]);
 
-  const resolved = useMemo(() => resolveSelection(groups ?? [], bids, wanted), [groups, bids, wanted]);
+  const resolved = useMemo(() => {
+    const all = groups ?? [];
+    /* 🔴 **DEMO ONLY**, and it is what makes the rail filter below actually hold. `resolveSelection`
+       falls back to `groups[0]` — the NEWEST request — and a tile that is the page's own subject is
+       kept on the rail whatever else says otherwise. So landing on a bidless request would draw the
+       very circle `HIDE_BIDLESS_REQUESTS` exists to remove. With the flag on, the fallback chooses
+       among the requests that have bids instead.
+
+       ⚠️ Only when nothing is WANTED. A group named by the URL or by a press is resolved against the
+       whole list, so a deliberate visit to a bidless request still works and still shows its tile. */
+    const pool =
+      HIDE_BIDLESS_REQUESTS && !wanted.groupId && all.some((g) => g.totalBids > 0)
+        ? all.filter((g) => g.totalBids > 0)
+        : all;
+    return resolveSelection(pool, bids, wanted);
+  }, [groups, bids, wanted]);
   /** What is open RIGHT NOW, for the entry reader — see `appliedR`. A ref, not state: it is read
    *  inside an effect to tell an arrival from an echo, and reading it must not schedule a render. */
   const resolvedItemId = useRef<string | null>(null);
@@ -377,13 +393,22 @@ export function RequestsWorkspace() {
   useEffect(() => setHidden(hiddenRequests()), []);
   const hide = useCallback((key: string) => setHidden(hideRequest(key)), []);
 
-  const tiles = useMemo(
-    // A hidden request whose circle is nonetheless the one being READ stays on the rail: taking the
-    // page's own subject out from under it would leave the workspace showing a request the renter
-    // cannot see the tile for.
-    () => railTiles(groups ?? []).filter((tl) => !hidden.includes(tl.key) || tl.key === resolved.groupId),
-    [groups, hidden, resolved.groupId],
-  );
+  const tiles = useMemo(() => {
+    const all = railTiles(groups ?? []);
+    /* A hidden request whose circle is nonetheless the one being READ stays on the rail: taking the
+       page's own subject out from under it would leave the workspace showing a request the renter
+       cannot see the tile for. The demo filter below follows the same rule, for the same reason. */
+    const kept = all.filter((tl) => !hidden.includes(tl.key) || tl.key === resolved.groupId);
+    /* 🔴 **DEMO ONLY** (owner, 2026-09-14: *"i want no bids to be hidden from requests list in
+       requests, just for demo purpose"*). `HIDE_BIDLESS_REQUESTS` is a code toggle; set it false and
+       this whole branch stands down. See the flag's own note for what it costs - chiefly that
+       `bids` here is `totalBids`, which counts APP bids and not the renter's own link submissions.
+
+       ⚠️ Guarded on at least one tile HAVING a bid: with none, every circle would go and the page
+       would fall through to «create your first request» over an account that has several. */
+    if (!HIDE_BIDLESS_REQUESTS || !kept.some((tl) => tl.bids > 0)) return kept;
+    return kept.filter((tl) => tl.bids > 0 || tl.key === resolved.groupId);
+  }, [groups, hidden, resolved.groupId]);
 
   /**
    * Bids the renter has taken off the comparison. Owned here rather than inside the matrix so the

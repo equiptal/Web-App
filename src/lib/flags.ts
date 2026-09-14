@@ -73,6 +73,32 @@ export const HELP_MANUAL_ENABLED = process.env.NEXT_PUBLIC_HELP_MANUAL === "1";
 export const TRIAL_REQUESTS_ENABLED: boolean = false;
 
 /**
+ * HIDE_BIDLESS_REQUESTS — keep requests with NO bids off the rail on `/requests`.
+ *
+ * 🔴 **FOR A DEMO, AND IT IS MEANT TO COME BACK OFF** (owner, 2026-09-14: *"i want no bids to be
+ * hidden from requests list in requests, just for demo purpose"*). A code toggle for the reason
+ * `TRIAL_REQUESTS_ENABLED` is one: it is a product decision, not a per-environment one. Set it to
+ * `false` and the rail is exactly what it was - there is nothing else to undo.
+ *
+ * 🔴 **Not a behaviour to keep.** A live request with no offers yet is precisely when the renter
+ * still has things to do with it - share the link, chase a supplier, edit the terms, cancel it - and
+ * the rail is his only route to all four. The existing ✕ dismissal is deliberately gated on CLOSED
+ * for that reason (`hidden-requests.ts`), and this flag goes around that rule rather than changing
+ * it, so the rule stays stated where it belongs.
+ *
+ * ⚠️ **It reads `totalBids`, which counts APP bids only.** A request whose offers all arrived
+ * through the renter's own shared link has `bidCount: 0` on every item and is hidden by this flag
+ * even though it has offers - the same blind spot the dashboard rail was fixed for on 2026-09-05.
+ * Counting them would need one `fetchRequestSubmissions` per group, which is not a thing to add for
+ * a demo; it is written down instead.
+ *
+ * ⚠️ The rail never empties: if NO request has a bid the flag stands down and every circle is drawn,
+ * because a blank workspace would render the «create your first request» empty state over an account
+ * that has several.
+ */
+export const HIDE_BIDLESS_REQUESTS: boolean = true;
+
+/**
  * EQUIPMENT_NAME_ON_EVERY_LINE — send the renter's own words beside the taxonomy, not instead of it.
  *
  * ON by default since 2026-09-14 (owner: *"let what [is] detected in your own words [be] stored as

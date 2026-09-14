@@ -244,21 +244,30 @@ export function MachineCard({
                  float on the corners, so they were drawn for a photograph underneath them rather
                  than beside it.
 
-                 🔴 **`contain`, not `cover`** (owner, 2026-09-13: *"choose the right zoom and size
-                 of the images here"*, on a card showing three wheels and nothing else). The panel is
-                 `min-h-[450px]` and stretches to the column beside it - about 660x610 in his shot,
-                 so taller than it is wide - while a taxonomy photograph is 1408x768, ratio 1.83.
-                 `cover` scales to the HEIGHT and throws away more than half the width, which on a
-                 flatbed is the half with the machine on it.
+                 🔴 **`cover`, and the rejection of 2026-09-13 no longer applies** (owner,
+                 2026-09-14: *"equipment image must match the card height too, even in the back of the
+                 tuv-year etc"*). `contain` fits the WIDTH, so a 1.83:1 photograph in a panel taller
+                 than it is wide left a grey band above and below - and the four chips float on the
+                 corners, so they sat on that grey instead of on the machine.
 
-                 ⚠️ **This is the same measurement the request rail made on 2026-09-12** and it
-                 came out the same way: *"the crop cut the machine into an unreadable jumble"*.
-                 `contain` keeps the whole machine; the grey band above and below is the panel’s own
-                 ground, which the glyph state already shows.
+                 ⚠️ **What changed is the PANEL, not the opinion.** `cover` was tried and refused on
+                 2026-09-13 (*"three wheels and nothing else"*) while the panel still carried `h-full`
+                 and stretched to the right column - about 660x610 in that shot, so `cover` needed
+                 610x1.83 = 1116px of width against 660 and threw away 41% of it. The panel has been
+                 FIXED at 450px since earlier today (*"keep it fixed at its card height"*), so the
+                 same crop is now 450x1.83 = 823 against ~585, which is 29% - and centred, 14.5% a
+                 side.
 
-                 ⚠️ No padding. `p-*` shrinks the box BEFORE `contain` measures it, which is what
-                 made the rail’s drawings letterbox at half size - the rail’s own note records it. */
-              className="absolute inset-0 h-full w-full object-contain"
+                 🔴 **Measured in the browser before changing it**, both fits side by side at the
+                 real 585x450: the whole machine survives - boom, cab, tracks, bucket teeth - and what
+                 goes is empty floor and wall, because these photographs are shot with wide margins.
+                 That is the same test the request rail ran on 2026-09-12 and it came out the other
+                 way there for a 52px circle, which is the point: the answer is a property of the BOX,
+                 not of the picture.
+
+                 ⚠️ No padding. `p-*` shrinks the box BEFORE the fit is measured, which is what made
+                 the rail’s drawings letterbox at half size - the rail’s own note records it. */
+              className="absolute inset-0 h-full w-full object-cover"
             />
           ) : (
             /* No photograph: the glyph keeps its centred box and its caption. Here the name is not a
@@ -487,15 +496,20 @@ export function MachineCard({
                        Inline, the three flow together and wrap only if they genuinely cannot fit. */
                     <span className="inline-flex items-center gap-2 whitespace-nowrap align-middle">
                       {t.create.machineCard.customEquipment}
+                      {/* 🔴 The star is drawn HERE, not by `CanvasField` (`star={false}` below).
+                          It renders the mark as the label's SIBLING, and once the label also carried
+                          a pill that sibling took a row of its own under the words. Inside the label
+                          it is part of the same run and cannot break away. */}
+                      {custom && <span className="font-extrabold text-danger">*</span>}
                       {/* ── The state, as a pill on the label row (the prototype's own) ─────────
                           It says in two words what the card's colours only imply, and it is the one
                           place a renter can see that we DID place his machine. */}
                       {custom ? (
-                        <span className="rounded-sm bg-brand-soft px-2 py-0.5 text-label font-semibold normal-case tracking-normal text-brand-deep">
+                        <span className="rounded-sm border border-brand-light bg-brand-soft px-2 py-0.5 text-label font-semibold normal-case tracking-normal text-brand-deep">
                           {t.create.machineCard.pillNotMatched}
                         </span>
                       ) : item.ref.subcategoryId ? (
-                        <span className="flex items-center gap-1.5 rounded-sm bg-ok-soft px-2 py-0.5 text-label font-semibold normal-case tracking-normal text-ok-deep">
+                        <span className="flex items-center gap-1.5 rounded-sm border border-ok/40 bg-ok-soft px-2 py-0.5 text-label font-semibold normal-case tracking-normal text-ok-deep">
                           <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-ok" />
                           {t.create.machineCard.pillInCatalogue}
                         </span>
@@ -631,16 +645,6 @@ export function MachineCard({
                   ⚠️ Withheld on a line started from a supplier's listing — a DIRECT request is
                   taxonomy only (owner, 2026-09-12), and an off-catalogue one reaches nobody at all,
                   the named supplier included. */}
-              {/* The prototype's own confirmation that the choice stuck. It is drawn UNDER the
-                  escape, so the row that changed the line and the sentence describing the result sit
-                  together rather than a column apart. */}
-              {custom && !!(item.customEquipment ?? item.rawLabel) && (
-                <span className="sm:col-span-3 flex items-center gap-2 rounded-sm border border-ok/40 bg-ok-soft px-3.5 py-2.5 text-body text-ok-deep">
-                  <Icon name="check_circle" size={15} className="flex-none" />
-                  {fmt(t.create.machineCard.savedOwn, { name: item.customEquipment ?? item.rawLabel ?? "" })}
-                </span>
-              )}
-
               {offerEscape && (
                 <EquipmentChooser
                   item={item}
@@ -659,6 +663,16 @@ export function MachineCard({
                   }}
                 />
               )}
+              {/* The prototype's own confirmation that the choice stuck. It is drawn UNDER the
+                  escape, so the row that changed the line and the sentence describing the result sit
+                  together rather than a column apart. */}
+              {custom && !!(item.customEquipment ?? item.rawLabel) && (
+                <span className="sm:col-span-3 flex items-center gap-2 rounded-sm border border-ok/40 bg-ok-soft px-3.5 py-2.5 text-body text-ok-deep">
+                  <Icon name="check_circle" size={15} className="flex-none" />
+                  {fmt(t.create.machineCard.savedOwn, { name: item.customEquipment ?? item.rawLabel ?? "" })}
+                </span>
+              )}
+
             </div>
           )}
 
@@ -881,7 +895,13 @@ function EquipmentChooser({
            2026-09-14). It is the third control on that row in the prototype and it lines up with the
            two beside it; `truncate` keeps the one-line promise if the column is ever too narrow for
            the sentence. */
-        className={`flex h-[var(--control-md)] w-full items-center justify-between gap-2.5 truncate whitespace-nowrap rounded-sm border px-3.5 text-label font-semibold text-brand-deep transition ${
+        /* 🔴 It WRAPS rather than clips (owner, 2026-09-14: *"still messy"*, on a shot of «Can't
+           find the equipment you war»). The one-line rule (2026-09-13) was about the sentence not
+           breaking in a column too narrow to hold it — and the answer then was to widen the column.
+           In this cell it does not fit at any width the row can spare, and a truncated QUESTION is
+           worse than a two-line one: it stops being a question. Minimum height keeps it level with
+           the two controls beside it when it does fit on one line. */
+        className={`flex min-h-[var(--control-md)] w-full items-center justify-between gap-2.5 rounded-sm border px-3.5 py-1.5 text-start text-label font-semibold leading-snug text-brand-deep transition ${
           shake ? "shake-error border-brand" : "border-brand-light bg-brand-soft hover:border-brand"
         }`}
       >

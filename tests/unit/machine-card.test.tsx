@@ -420,32 +420,66 @@ describe("the option list opens where it can be read", () => {
   });
 });
 
-describe("the photograph shows the machine, not a crop of it", () => {
+describe("the photograph FILLS the panel, and the machine survives the crop", () => {
   /**
-   * 🔴 Owner, 2026-09-13, on a card showing three wheels and nothing else: *"can u choose the
-   * right zoom and size of the images here"*.
+   * Owner, 2026-09-14: *"equipment image must match the card height too, even in the back of the
+   * tuv-year etc"*. `contain` fits the WIDTH, so a 1.83:1 photograph in a panel taller than it is
+   * wide left a grey band above and below - and the four chips float on the corners, so they sat on
+   * that grey rather than on the machine.
    *
-   * The panel is `min-h-[450px]` and stretches to the column beside it - taller than it is wide -
-   * while a taxonomy photograph is 1408x768, ratio 1.83. `object-cover` scales to the HEIGHT and
-   * throws away more than half the width, which on a flatbed is the half with the machine on it.
+   * 🔴 **This REVERSES 2026-09-13** (*"three wheels and nothing else"*), and what changed is the
+   * PANEL rather than the opinion. `cover` was refused while the panel carried `h-full` and
+   * stretched to the right column - ~660x610 in that shot, so `cover` needed 610x1.83 = 1116px of
+   * width against 660 and threw away 41%. The panel has been FIXED at 450px since earlier the same
+   * day (*"keep it fixed at its card height"*), so the crop is now 450x1.83 = 823 against ~585:
+   * **29%, centred, so 14.5% a side.**
    *
-   * ⚠️ **The same measurement the request rail made on 2026-09-12**, and it came out the same
-   * way: *"the crop cut the machine into an unreadable jumble"*. Recorded in both places so the
-   * next reader does not re-run the experiment.
+   * ⚠️ **Measured in a browser before the change**, both fits at the real 585x450: the whole machine
+   * survives - boom, cab, tracks, bucket teeth - and what goes is empty floor and wall, because
+   * these photographs are shot with wide margins.
+   *
+   * ⚠️ The request rail reached the OPPOSITE answer for its 52px circle on 2026-09-12, and both are
+   * right: the fit is a property of the BOX, not of the picture. Recorded in both places so the next
+   * reader does not re-run the experiment in the wrong one.
    */
   const SRC = readFileSync("src/components/create/MachineCard.tsx", "utf8");
   const code = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  /**
+   * ⚠️ The PANEL photograph only. This file draws a second image - the 36x52 thumbnail on a
+   * type/size row - which is `object-contain p-0.5` and must stay so: a tiny box holding a flat
+   * drawing is the rail's case, not this one. A blanket `code.toContain` would pass for the wrong
+   * image the day either moves.
+   */
+  const at = code.indexOf("absolute inset-0 h-full w-full");
+  const panelImg = code.slice(at - 260, at + 60);
 
-  it("Given the panel photo, Then it is contained rather than cropped", () => {
-    expect(code).toContain("object-contain");
-    expect(code).not.toContain("object-cover");
+  it("Given the panel photo, Then it covers the panel corner to corner", () => {
+    expect(panelImg).toContain("object-cover");
+    expect(panelImg).not.toContain("object-contain");
   });
 
-  it("Given `contain`, Then the box keeps its full size", () => {
-    // ⚠️ `p-*` shrinks the box BEFORE `contain` measures it, which is what made the rail’s
-    // drawings letterbox at half size - the rail’s own note records that trap.
-    const img = code.slice(code.indexOf("object-contain") - 200, code.indexOf("object-contain") + 40);
-    expect(img).toContain("absolute inset-0 h-full w-full");
-    expect(img).not.toMatch(/\bp-\d/);
+  it("Given the ROW thumbnail, Then it is still contained - a different box, a different answer", () => {
+    const rowAt = code.indexOf("object-contain");
+    const rowImg = code.slice(rowAt - 200, rowAt + 40);
+    expect(rowImg).toContain("h-full w-full object-contain");
+    expect(rowImg).not.toContain("absolute inset-0");
+  });
+
+  it("Given the panel, Then its height is its OWN and does not follow the column beside it", () => {
+    /**
+     * 🔴 Load-bearing for the crop above: at `h-full` the panel grows with the right column - the
+     * catalogue panel alone adds 300px - and `cover` would be throwing away 41% of the width again,
+     * which is the state that was rejected. The fixed height is what keeps this fit honest.
+     */
+    expect(code).toContain("min-h-[450px]");
+    const pAt = code.indexOf('pin("machine-card-image")');
+    expect(code.slice(pAt, pAt + 200)).not.toMatch(/h-full/);
+  });
+
+  it("Given the fit, Then the box keeps its full size", () => {
+    // p-* shrinks the box BEFORE the fit is measured, which is what made the rail's drawings
+    // letterbox at half size - the rail's own note records that trap.
+    expect(panelImg).toContain("absolute inset-0 h-full w-full");
+    expect(panelImg).not.toMatch(/p-\d/);
   });
 });

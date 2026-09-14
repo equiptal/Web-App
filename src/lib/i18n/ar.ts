@@ -2039,7 +2039,7 @@ export const ar: Dictionary = {
       pillInCatalogue: "في قائمتنا",
       pillNotMatched: "غير مطابقة",
       ownType: "معدتك الخاصة",
-      ownSize: "بكلماتك أعلاه",
+      ownSize: "كما وُصِفت",
       searchSizes: "ابحث في الأحجام…",
       fuel: "الوقود",
       minYear: "اختر أقدم سنة",
