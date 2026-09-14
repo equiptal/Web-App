@@ -594,7 +594,7 @@ describe("the shortfall alert is WITHDRAWN from the panel (owner, 2026-09-10)", 
   it("draws no shortfall alert", () => {
     expect(src).not.toMatch(/\{shortfall && \(/);
     expect(src).not.toMatch(/bm-short-t/);
-    expect(src).not.toMatch(/t\.bidMap\.shortfall/);
+    expect(src).not.toMatch(/t\.bidMap\.shortfall\b/);
   });
 
   it("keeps the ASK, which was never the alert's alone", () => {

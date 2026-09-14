@@ -74,6 +74,16 @@ export function taxTag(tag: string | null | undefined, locale: string): string {
 
 /** Locale-aware display name for a taxonomy node: Arabic when locale is "ar" and a name_ar exists,
  *  else the canonical English name. Keeps the English value as the source of truth. */
+/**
+ * Which catalogue the answer came from: `live` (the agents service) or `fixture` (the built-in
+ * stand-in the route falls back to when that service fails).
+ *
+ * ⚠️ A HEADER, not a field in the body. Every consumer of `/api/taxonomy` reads the tree as a bare
+ * array, and wrapping it to carry one flag would touch each of them for a fact only one screen
+ * cares about.
+ */
+export const SOURCE_HEADER = "x-taxonomy-source";
+
 export function taxName(node: { name: string; nameAr?: string | null } | undefined, locale: string): string {
   if (!node) return "";
   return locale === "ar" && node.nameAr ? node.nameAr : node.name;

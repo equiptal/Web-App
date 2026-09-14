@@ -2,6 +2,23 @@
 
 ## Change log
 
+- **2026-09-14 — A TRIAL request made in the app stops arriving on the web dressed as a real one.**
+  Found in a full audit, not reported: the database is SHARED with the mobile app, and the app still
+  offers the 60-minute trial. `TRIAL_REQUESTS_ENABLED = false` only stops this app CREATING one, so a
+  renter who tried it on his phone opened the web and saw an ordinary request — no ribbon, no
+  caption, sample bids from the DEMO supplier reading as real offers, and the whole row gone an hour
+  later when the TTL expired. `isTrial` was on `RequestRecord` and read by NOTHING in `src/`.
+  Files: `src/app/api/me/requests/route.ts`, `tests/unit/my-requests-trial-filter.test.ts` (new, 4).
+  🔴 **Dropped at the BFF, never on a surface.** The workspace, the request rail, the dashboard and
+  every bid count read that one route, so a filter in any one of them would leave a trial COUNTED
+  where it is not drawn — worse than showing it.
+  ⚠️ `=== true`, never truthy. `undefined` means an older backend does not send the field, and the
+  opposite guess empties the workspace on that build. A case pins each edge.
+  ⚠️ Hiding is right only while the web has no way to SAY what a trial is. If trials come to the web,
+  this filter goes and the app's ribbon comes with it.
+  ⚠️ Verified: typecheck, lint, 4 new cases, 15 passing across the touched suites, and
+  break-checked — the filter removed, two cases went red.
+
 - **2026-09-14 - The equipment card gets ONE escape and one panel behind it, and the name box stops being a box he can type in.**
   Planned against the supervisor's own prototype (`Equipment Detection States`), then cut down from
   it over a long exchange. Owner: *"despite we see them as 4 cases, user see them in 2 (he found what

@@ -2527,6 +2527,9 @@ export const en = {
       searchAll: "Search all equipment",
       searchHeading: "Search the Moedatech catalogue",
       searchAny: "Name or nickname — try “digger”, “roto”, “FLT”",
+      /* 🔴 The list is SHORT because the catalogue did not load, not because we do not carry the
+         machine. Without this the two are the same picture, and the renter concludes the wrong one. */
+      catalogueShort: "Our catalogue did not load, so this list is short — try again in a moment",
       noneFound: "Nothing in the catalogue matches that",
       useThis: "Use this",
       currentPick: "Current",

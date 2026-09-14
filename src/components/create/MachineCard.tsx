@@ -31,6 +31,7 @@ import { SearchSelect } from "@/components/create/SearchSelect";
 import { useItemAttachments, useItemOverrides, useItemTaxonomy, useProvenance } from "@/components/create/hooks";
 import { pin } from "@/lib/uiPins";
 import { taxName } from "@/lib/contract/taxonomy";
+import { taxonomyFromFixture } from "@/lib/api/client";
 import type { Taxonomy } from "@/lib/contract/taxonomy";
 import {
   equipmentYears,
@@ -454,7 +455,9 @@ export function MachineCard({
                     rather than asking him to retype what he just chose). */}
                 <CanvasField
                   label={
-                    <span className="flex flex-wrap items-center gap-2">
+                    /* ONE line, never wrapped (owner, 2026-09-14): the pill dropping under the label
+                       put a third row into a block meant to read as a single field. */
+                    <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
                       {t.create.machineCard.customEquipment}
                       {/* ── The state, as a pill on the label row (the prototype's own) ─────────
                           It says in two words what the card's colours only imply, and it is the one
@@ -919,6 +922,17 @@ function EquipmentChooser({
                 />
               )}
 
+              {/* ── The list says WHY it is short (owner, 2026-09-14) ────────────────────────
+                  `/api/taxonomy` falls back to a 17-subtype stand-in whenever the agents service
+                  fails, and said nothing — so a broken fetch and a thin catalogue drew the same
+                  screen, and the renter read it as «you do not carry my machine». */}
+              {taxonomyFromFixture() && (
+                <span className="flex items-start gap-1.5 rounded-sm border border-brand-light bg-brand-soft px-3 py-2 text-label text-brand-deep">
+                  <Icon name="warning" size={13} className="mt-px flex-none" />
+                  {t.create.machineCard.catalogueShort}
+                </span>
+              )}
+
               <div className="flex max-h-[232px] flex-col gap-1.5 overflow-y-auto">
                 {list.map((r) => (
                   <div key={r.id} className="rounded-sm border border-border bg-surface">
@@ -994,27 +1008,38 @@ function EquipmentChooser({
 
           {view === "own" && (
             <>
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-body font-extrabold text-navy">{t.create.machineCard.doorOwn}</span>
+              {/* ── TWO rows, not four (owner, 2026-09-14) ──────────────────────────────────────
+                  *"keep the confirm as side button from the field on one row, and even «what you
+                  request» tell must be beside the title"*. The panel was a title, a label, a value
+                  and a full-width button stacked — four rows to confirm one sentence he had already
+                  written. The label joins the title, and the value sits beside the button it
+                  confirms. */}
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <span className="flex flex-wrap items-baseline gap-2.5">
+                  <span className="text-body font-extrabold text-navy">{t.create.machineCard.doorOwn}</span>
+                  <span className="text-label font-semibold uppercase tracking-[0.05em] text-muted">
+                    {t.create.machineCard.willSay}
+                  </span>
+                </span>
                 <button type="button" onClick={() => setView("root")} className="text-label font-semibold text-muted-dark hover:text-navy">
                   {t.create.machineCard.backStep}
                 </button>
               </div>
               {/* A confirmation, never a second form: the words are already his, from the intake. */}
-              <span className="text-label font-semibold uppercase tracking-[0.05em] text-muted">
-                {t.create.machineCard.willSay}
-              </span>
-              <span className="rounded-sm border border-border bg-surface2 px-3.5 py-2.5 text-body text-navy">
-                {item.customEquipment ?? item.rawLabel ?? ""}
-              </span>
-              <Button
-                onClick={() => {
-                  onKeepOwn();
-                  close();
-                }}
-              >
-                {t.create.machineCard.keepOwn}
-              </Button>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className="min-w-0 flex-1 truncate rounded-sm border border-border bg-surface2 px-3.5 py-2.5 text-body text-navy">
+                  {item.customEquipment ?? item.rawLabel ?? ""}
+                </span>
+                <Button
+                  className="flex-none"
+                  onClick={() => {
+                    onKeepOwn();
+                    close();
+                  }}
+                >
+                  {t.create.machineCard.keepOwn}
+                </Button>
+              </div>
             </>
           )}
         </div>

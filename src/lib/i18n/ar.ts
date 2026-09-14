@@ -2028,6 +2028,7 @@ export const ar: Dictionary = {
       searchAll: "ابحث في كل المعدات",
       searchHeading: "ابحث في قائمة معداتك",
       searchAny: "الاسم أو التسمية الدارجة",
+      catalogueShort: "تعذّر تحميل قائمتنا، لذلك هذه القائمة قصيرة — أعد المحاولة بعد قليل",
       noneFound: "لا شيء في القائمة يطابق ذلك",
       useThis: "اختر هذه",
       currentPick: "الحالية",

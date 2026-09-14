@@ -590,18 +590,19 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
                   type="button"
                   onClick={() => setVerifyOpen(true)}
                   aria-label={t.shell.verifyNudge}
-                  /* ── Quiet enough to sit beside a face, loud enough to be the thing to press ──
-                     ~~`uppercase tracking-[0.05em]`~~ on a solid brand ground: SHOUTED at 11px, on a
-                     navy bar where every other mark is white at reduced strength, and it read as an
-                     alert rather than as an offer. Sentence case at the same size and weight says
-                     the same word without raising its voice.
-
-                     ⚠️ The brand FILL stays. This is an action, not a note — the outlined-white
-                     treatment belongs to the marks beside the wordmark, which state a fact and are
-                     not pressed. `h-[22px]` keeps it off the bar's own edges beside a 34px circle. */
-                  className="flex h-[22px] flex-none items-center rounded-full bg-brand px-2.5 text-label font-semibold text-white transition hover:bg-brand-press"
+                  /* ── It has to read as a BUTTON, not a badge (owner, 2026-09-14) ──────────────
+                     *"verify option is not clear as cta"* — and *"i dont want to change the word but
+                     the ui"*, so the word is untouched and the treatment is what moved.
+                     🔴 At `h-[22px]` and 11px it was a CHIP beside a 34px face, and this bar is full
+                     of chips that state facts and are never pressed — the verified rosette, the tier
+                     marks. Nothing about it said «press me» except its colour.
+                     Now it is the design system's own small control: `control-sm` (30px, one step
+                     under the avatar), `text-meta`, and an arrow that says the press GOES somewhere.
+                     ⚠️ The brand FILL stays, and the radius stays `full`: it sits beside a circular
+                     avatar, and a square corner there reads as a misalignment rather than a button. */
+                  className={btn("primary", "sm", { pill: true, className: "flex-none transition" })}
                 >
-                  {t.shell.verifyNudge}
+                  <Icon name="verified" size={16} /> {t.shell.verifyNudge}
                 </button>
               )}
 

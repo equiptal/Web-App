@@ -213,7 +213,7 @@ export function RequestDetailsModal({
   /** The urgency the renter chose, made readable — `FAR_FUTURE` is not a word. */
   const urgency = (() => {
     const raw = (subjectRecord as { urgency?: string | null } | null)?.urgency ?? null;
-    return raw ? raw.replace(/[_-]+/g, " ").toLowerCase().replace(/\w/g, (c) => c.toUpperCase()) : "";
+    return raw ? raw.replace(/[_-]+/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()) : "";
   })();
   // The Supplier OS host, not this app's origin — so no `typeof window` guard and no SSR-empty value.
   const shareUrl = bidShareUrl(group.id);

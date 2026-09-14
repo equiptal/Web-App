@@ -13,11 +13,6 @@ import { readFileSync } from "node:fs";
  * had been promising *"it sits BESIDE the avatar, not on it"* since the day it was written; the box
  * holding them never said so.
  *
- * The second half is the shouting: `uppercase` + `tracking-[0.05em]` on a solid brand ground, at
- * 11px, on a navy bar where every other mark is white at reduced strength. Sentence case says the
- * same word without reading as an alarm. The FILL stays — this is an action, and the outlined-white
- * treatment belongs to the marks that only state a fact.
- *
  * ⚠️ jsdom lays out nothing and the header needs a session, so this reads the SOURCE. What is
  * assertable is the rule that decides the row, never the row itself.
  */
@@ -30,17 +25,22 @@ const wrapper = (() => {
 })();
 
 /**
- * The «Verify» button's own class list, and ONLY that.
+ * The «Verify» button's whole ELEMENT, and the «Sign in» button beside it.
  *
- * ⚠️ The slice is the quoted `className` VALUE, not the element. The comment above that line names
- * `uppercase` and `tracking-[0.05em]` as the things it removed, so a slice wide enough to take the
- * prose in would fail on its own explanation.
+ * ⚠️ This used to slice the quoted `className` VALUE, and that stopped working the day the button
+ * took the design system's own control (2026-09-14): the first quote after `className` now opens
+ * `btn("primary", …)`, so the slice returned the word «primary» and three assertions failed against
+ * a string that was never the class list. Read the element.
  */
-const pill = (() => {
-  const from = SRC.indexOf("className", SRC.indexOf("setVerifyOpen(true)"));
-  const open = SRC.indexOf('"', from);
-  return SRC.slice(open + 1, SRC.indexOf('"', open + 1));
-})();
+const elementAt = (needle: string) => {
+  const at = SRC.indexOf(needle);
+  /* ⚠️ Comments STRIPPED. The note above the class list names `h-[22px]` as the thing it removed,
+     so an element wide enough to take the prose in fails on its own explanation — the same trap the
+     old class-list slice was written to avoid, one level up. */
+  return SRC.slice(at, SRC.indexOf("</button>", at)).replace(/\/\*[\s\S]*?\*\//g, "");
+};
+const pill = elementAt("setVerifyOpen(true)");
+const signIn = elementAt("openAuth()");
 
 describe("the avatar and the Verify press share a line", () => {
   it("their wrapper is a flex ROW, so the pill cannot drop under the circle", () => {
@@ -55,20 +55,39 @@ describe("the avatar and the Verify press share a line", () => {
   });
 });
 
-describe("the pill is an offer, not an alarm", () => {
-  it("does not shout: no uppercase, no extra tracking", () => {
-    expect(pill).not.toMatch(/uppercase/);
-    expect(pill).not.toMatch(/tracking-\[0\.05em\]/);
+/**
+ * ── It is a BUTTON, and the same one as «Sign in» (owner, 2026-09-14) ────────────────────────────
+ *
+ * *"verify option is not clear as cta"*, then *"i dont want to change the word but the ui"*, then
+ * *"even for sign in make it consistent"*.
+ *
+ * 🔴 It was a hand-rolled 22px pill at 11px type — which is exactly this bar's CHIP shape, and every
+ * chip up there (the verified rosette, the tier marks) states a fact and is never pressed. Nothing
+ * said «press me» except the colour. It takes the design system's own small primary pill now, which
+ * is the control «Sign in» beside it has always used, so the two cannot drift apart again.
+ */
+describe("the Verify press is the same control as Sign in", () => {
+  it("is the design system's button, not a class list of its own", () => {
+    expect(pill).toContain('btn("primary", "sm"');
+    expect(pill).toContain("pill: true");
   });
 
-  it("keeps the brand fill, because it is the thing to press", () => {
-    // The outlined-white treatment is for the marks beside the wordmark, which state a fact and are
-    // never pressed. Demoting this to one of those would hide the only route to the form.
-    expect(pill).toMatch(/bg-brand\b/);
-    expect(pill).toMatch(/hover:bg-brand-press/);
+  it("wears none of the chip treatment it used to", () => {
+    expect(pill).not.toContain("h-[22px]");
+    expect(pill).not.toContain("uppercase");
+    expect(pill).not.toContain("bg-brand ");
   });
 
-  it("states its own height, so it cannot grow into the bar's edges", () => {
-    expect(pill).toMatch(/h-\[22px\]/);
+  it("and Sign in asks for exactly the same thing", () => {
+    const call = (src: string) => {
+      const at = src.indexOf('btn("primary"');
+      return src.slice(at, src.indexOf("}", at));
+    };
+    expect(call(pill).replace("flex-none ", "")).toBe(call(signIn).replace("flex-none ", ""));
+  });
+
+  it("carries a glyph, as Sign in does — a fill alone is only a colour", () => {
+    expect(pill).toContain("<Icon");
+    expect(signIn).toContain("<Icon");
   });
 });
