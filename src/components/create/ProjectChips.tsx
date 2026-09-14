@@ -269,21 +269,32 @@ export function ProjectChips({
     const row = lastRow.current;
     if (!row) return;
     /* ⚠️ Measure only while the row is holding EVERY chip - that IS the measurement. Reading it
-       once and trusting the answer forever breaks on a remount (the locale provider re-mounts its
-       children once it resolves) and on any width change; re-reading a row that already holds the
-       SPLIT would creep one chip at a time instead. This is the only state in which the question
-       can be answered, so it is the only state in which it is asked. */
+       once and trusting the answer forever breaks on a remount and on any width change; re-reading a
+       row that already holds the SPLIT would creep one chip at a time instead. */
     if (row.children.length !== chipCount) return;
-    const avail = row.clientWidth;
-    if (!avail) return;
-    let used = 0;
-    let k = 0;
-    for (const el of Array.from(row.children) as HTMLElement[]) {
-      const w = el.offsetWidth + (k === 0 ? 0 : ROW_GAP_PX);
-      if (used + w > avail) break;
-      used += w;
-      k += 1;
-    }
+
+    /**
+     * 🔴 **Ask the browser which chips are on the first LINE; do not compute it.**
+     *
+     * ~~Greedy arithmetic: available width, minus each chip’s `offsetWidth`, minus a gap constant.~~
+     * It was one chip short every time (owner, 2026-09-14, on a row with room to spare: *"why only 2
+     * pills in last row, it must fit the third one"*). Three sources of error, and they only ever
+     * accumulate in the same direction: `offsetWidth` rounds UP to whole pixels, the gap constant is
+     * a second copy of `gap-2` that nothing keeps in step, and the width is read a frame before the
+     * face the locale loads has settled.
+     *
+     * While the count is unknown the row WRAPS with every chip in it, so the browser has already
+     * done this layout. `offsetTop` says which line each chip landed on, and the ones on the first
+     * line are - exactly, by definition - the ones that fit.
+     *
+     * ⚠️ A 2px tolerance, not equality: `items-center` centres chips of unequal height within a
+     * line, so two chips on the SAME line can differ by a pixel or two.
+     */
+    const kids = Array.from(row.children) as HTMLElement[];
+    if (kids.length === 0) return;
+    const firstLine = Math.min(...kids.map((el) => el.offsetTop));
+    const k = kids.filter((el) => el.offsetTop - firstLine <= 2).length;
+
     /* ⚠️ At least one, always. A site whose name is wider than the slot would otherwise leave the
        control row with no chip at all - which reads as «you have no projects» beside a «Select a
        project» that is asking about some. */
@@ -459,7 +470,13 @@ export function ProjectChips({
    * `wrap-reverse` stacks lines upward but puts the LAST items on the TOP line, which would leave
    * the `+` and the arrow floating above the sites.
    */
-  const chipNodes: ReactNode[] = [] = [
+  /* 🔴 **A chip never wraps its own name** (owner, 2026-09-14: *"this is also not allowed, never
+     wrap it"*, on a pill broken across two lines mid-place-name). `whitespace-nowrap` keeps each
+     one a single run, and `flex-none` stops the row shrinking them to make another fit - which is
+     the same wrap by another route. A name too wide for the row is CLIPPED by the row instead:
+     the split below always leaves at least one chip on it, and half a name that is obviously cut
+     reads better than a pill two lines tall. */
+  const chipNodes: ReactNode[] = [
 /* ~~«Pick a site, and half of this fills itself in», in an amber chip at the head of the
           row.~~ Removed (owner, 2026-09-02). It was written to give the row a reason to be pressed,
           and it sat in the row it was advertising: an amber pill among the site pills, the same size
@@ -472,7 +489,7 @@ export function ProjectChips({
           where the platform puts it, and the × stays above the layer so clearing the site cannot open
           the list by accident. */
       chosen ? (
-        <span key="chosen" className="flex items-center gap-1.5 rounded-full border border-brand bg-brand-soft px-3 py-1 text-label font-semibold text-navy">
+        <span key="chosen" className="flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full border border-brand bg-brand-soft px-3 py-1 text-label font-semibold text-navy">
           <Icon name="place" size={13} className="flex-none text-brand" />
           {chosen.title}
           {/* Applied is stated, not implied: a renter who has already copied a machine's terms
@@ -534,7 +551,7 @@ export function ProjectChips({
             /* Brand-outlined rather than grey (owner, 2026-09-01: *"project pills need to be more
                visible"*). Outlined and not filled: filled would compete with Continue, which is the
                one thing on this screen that should read as the next step. */
-            className="flex items-center gap-1.5 rounded-full border border-brand/45 bg-surface px-3 py-1 text-label font-semibold text-brand-deep transition hover:border-brand hover:bg-brand-soft"
+            className="flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full border border-brand/45 bg-surface px-3 py-1 text-label font-semibold text-brand-deep transition hover:border-brand hover:bg-brand-soft"
           >
             <Icon name="place" size={13} className="flex-none text-brand" />
             {projectTitle(p)}
@@ -548,8 +565,21 @@ export function ProjectChips({
   /* ⚠️ Unmeasured puts every chip on the control row, where it wraps - untidy, and visible.
      Guessing a count instead would HIDE sites on a browser with no `ResizeObserver`, and hiding is
      the fault this whole strip exists to avoid. */
-  const onRow = fitCount ?? chipNodes.length;
-  const above = chipNodes.slice(onRow);
+  /**
+   * 🔴 **Every entry must RENDER, or the count lies** (owner, 2026-09-14: *"why only 2 pills in
+   * last row, it must fit the third one"*).
+   *
+   * The chosen site is a conditional, so with nothing chosen its slot held `null` - an array entry
+   * that takes a place and draws nothing. `slice(0, 3)` on `[null, a, b, c]` is `[null, a, b]`: TWO
+   * chips on a row the measurement had correctly said would hold three. The split was right and the
+   * slice was wrong, which is why the row looked one short at every width.
+   *
+   * ⚠️ Dropped here rather than at the branch, so any future conditional chip is covered by the
+   * same rule instead of having to remember it.
+   */
+  const chips = chipNodes.filter(Boolean);
+  const onRow = fitCount ?? chips.length;
+  const above = chips.slice(onRow);
   const showToggle = above.length > 0 && (overflows || expanded || true);
 
   return (
@@ -570,7 +600,7 @@ export function ProjectChips({
               type="button"
               onClick={() => (onBrowseAll ? onBrowseAll() : setExpanded((v) => !v))}
               aria-expanded={onBrowseAll ? undefined : expanded}
-              className="flex-none rounded-full border border-dashed border-border px-3 py-1 text-label font-semibold text-muted transition hover:border-brand hover:text-brand"
+              className="flex-none whitespace-nowrap rounded-full border border-dashed border-border px-3 py-1 text-label font-semibold text-muted transition hover:border-brand hover:text-brand"
             >
               {expanded && !onBrowseAll ? t.projects.chips.fewer : `${t.projects.chips.all} (${ordered.length})`}
             </button>
@@ -595,7 +625,7 @@ export function ProjectChips({
           ref={lastRow}
           className={`flex min-w-0 flex-1 items-center gap-2 ${fitCount === null ? "flex-wrap" : "flex-nowrap overflow-hidden"}`}
         >
-          {chipNodes.slice(0, onRow)}
+          {chips.slice(0, onRow)}
         </div>
         {trailing}
       </div>

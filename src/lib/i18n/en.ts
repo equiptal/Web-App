@@ -2537,7 +2537,10 @@ export const en = {
          *"i dont want the user to write anything more here as he already described it in his input
          before"*. */
       willSay: "THE REQUEST WILL SAY",
-      keepOwn: "Keep equipment name in my own words",
+      /* Short, because it is a BUTTON (owner, 2026-09-14: *"the button must be smaller with
+         «keep my name» only, in button style"*). The sentence it used to carry is the label above the
+         field it saves. */
+      keepOwn: "Keep my name",
       savedOwn: "Saved as your own equipment — {name}",
       pillInCatalogue: "In our catalogue",
       pillNotMatched: "Not matched",

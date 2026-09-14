@@ -2034,7 +2034,7 @@ export const ar: Dictionary = {
       whichSize: "أي حجم؟",
       backStep: "← رجوع",
       willSay: "سيقول الطلب",
-      keepOwn: "احتفظ باسم المعدة بكلماتي",
+      keepOwn: "احتفظ باسمي",
       savedOwn: "محفوظة كمعدتك الخاصة — {name}",
       pillInCatalogue: "في قائمتنا",
       pillNotMatched: "غير مطابقة",

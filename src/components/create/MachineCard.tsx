@@ -333,16 +333,28 @@ export function MachineCard({
                 the request does not ask for a quantity, it comes with one, and the stepper's own
                 minimum is 1 — so the mark stood over a field nobody can empty. */}
             <div className="flex items-center gap-2.5 rounded-sm bg-[color-mix(in_srgb,var(--navy-deep)_80%,transparent)] px-2 py-1.5 text-meta text-white">
-              <button
-                type="button"
-                aria-label={`${t.create.machineCard.quantity} −`}
-                disabled={item.quantity <= 1}
-                onClick={() => set("quantity", { quantity: Math.max(1, item.quantity - 1) })}
-                className="px-1 disabled:bg-disabled-bg disabled:text-disabled-fg"
-              >
-                −
-              </button>
-              <span className="tabular-nums">×{item.quantity}</span>
+              {/* 🔴 **No − on a single unit** (owner, 2026-09-14: *"remove the − in case it is one
+                  unit, as it is confusing, this white −"*). ~~Drawn and `disabled`.~~ Its disabled
+                  skin is a pale ground on a dark chip, so it read as the BRIGHTEST thing in the
+                  control - a dash lit up beside the number, in the one state where it does nothing.
+                  A control that cannot act is better absent than greyed, which is the ruling the
+                  equipment tab’s ✕ already follows on a one-equipment request.
+                  ⚠️ The `+` never goes: nothing caps how many machines a request asks for, so that
+                  half is always live. */}
+              {item.quantity > 1 && (
+                <button
+                  type="button"
+                  aria-label={`${t.create.machineCard.quantity} −`}
+                  onClick={() => set("quantity", { quantity: Math.max(1, item.quantity - 1) })}
+                  className="px-1"
+                >
+                  −
+                </button>
+              )}
+              {/* ⚠️ **The number alone, no ×** (owner, same message). The chip sits on the
+                  machine’s own photograph with a − and a + beside it: what it counts is not in doubt,
+                  and the multiplication sign read as part of a size («×3» next to «20 ton»). */}
+              <span className="tabular-nums">{item.quantity}</span>
               <button
                 type="button"
                 aria-label={`${t.create.machineCard.quantity} +`}
@@ -429,7 +441,13 @@ export function MachineCard({
                    now speaks everywhere else (the labels, the dot, the pulse) it read as a third
                    colour nobody chose. This pair is the COLLAPSED OPERATOR RAIL's own, one panel to
                    the right of this box: `bg-brand-soft` inside `border-brand-light`. */
-                custom ? "border border-brand-light bg-brand-soft" : "bg-surface2"
+                /* 🔴 ONE ground, matched or not (owner, 2026-09-14: *"align with prototype for
+                   all cases"*). ~~`border-brand-light bg-brand-soft` when off-catalogue.~~ The
+                   prototype keeps its field block the same grey in every state and lets the PILL,
+                   the two green boxes and the saved strip say what the line is. Tinting the whole
+                   block orange painted the state three times, and it swallowed the pill that was
+                   meant to state it — orange type on an orange ground. */
+                "bg-surface2"
               }`}
             >
               {/* ── TWO rows, and nothing wide and useless (owner, 2026-09-13) ──────────────
@@ -462,7 +480,10 @@ export function MachineCard({
                   label={
                     /* ONE line, never wrapped (owner, 2026-09-14): the pill dropping under the label
                        put a third row into a block meant to read as a single field. */
-                    <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+                    /* `inline-flex`, not `flex`: the star that `CanvasField` draws after this
+                       label is its SIBLING, and a block-level label pushed it onto a line of its own.
+                       Inline, the three flow together and wrap only if they genuinely cannot fit. */
+                    <span className="inline-flex items-center gap-2 whitespace-nowrap align-middle">
                       {t.create.machineCard.customEquipment}
                       {/* ── The state, as a pill on the label row (the prototype's own) ─────────
                           It says in two words what the card's colours only imply, and it is the one
@@ -553,7 +574,7 @@ export function MachineCard({
                       an empty TYPE box beside an empty SIZE box reads as two answers he still owes,
                       when in fact he has answered — with the name above. The way back is the escape
                       row under them, which now reads «Can't find the equipment you want?». */
-                  <span className="flex h-[var(--control-md)] items-center rounded-sm border border-ok/40 bg-ok-soft px-3 text-body text-ok-deep">
+                  <span className="flex h-[var(--control-md)] items-center truncate whitespace-nowrap rounded-sm border border-ok/40 bg-ok-soft px-3 text-body text-ok-deep">
                     {t.create.machineCard.ownType}
                   </span>
                 ) : (
@@ -589,8 +610,10 @@ export function MachineCard({
                 star={!custom}
                 source={prov.itemSource("capacity", item.ref.measurementId)}
               >
+                {/* `nowrap`: «In your own words» broke over two lines in the narrower SIZE column
+                    and left the two boxes at different heights. */}
                 {custom ? (
-                  <span className="flex h-[var(--control-md)] items-center rounded-sm border border-ok/40 bg-ok-soft px-3 text-body text-ok-deep">
+                  <span className="flex h-[var(--control-md)] items-center truncate whitespace-nowrap rounded-sm border border-ok/40 bg-ok-soft px-3 text-body text-ok-deep">
                     {t.create.machineCard.ownSize}
                   </span>
                 ) : (
@@ -644,8 +667,8 @@ export function MachineCard({
                     actions.setItemSubcategory(item.id, subId);
                     actions.setItemMeasurement(item.id, capId);
                   }}
-                  onKeepOwn={() => {
-                    actions.setItemOffCatalogue(item.id, shownName);
+                  onKeepOwn={(name) => {
+                    actions.setItemOffCatalogue(item.id, name);
                     setPulseName(true);
                   }}
                 />
@@ -808,7 +831,7 @@ function EquipmentChooser({
   /** True for one refused keystroke in the NAME box — the row answers for the field. */
   shake: boolean;
   onPick: (catId: string, subId: string, capId: string) => void;
-  onKeepOwn: () => void;
+  onKeepOwn: (name: string) => void;
 }) {
   const t = useT();
   const { locale } = useLocale();
@@ -817,6 +840,10 @@ function EquipmentChooser({
   const [query, setQuery] = useState("");
   /** Which row has its sizes open. A pick is two presses — the type, then the size it comes in. */
   const [sizesFor, setSizesFor] = useState<string | null>(null);
+  /** What he will send as his own name. Seeded from the card the moment that door is opened. */
+  const [draft, setDraft] = useState("");
+  /** Types whose drawing failed to load — a well-formed URL in that bucket can still answer 403. */
+  const [brokenArt, setBrokenArt] = useState<string[]>([]);
 
   const rows = useMemo(
     () =>
@@ -903,7 +930,10 @@ function EquipmentChooser({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setView("own")}
+                  onClick={() => {
+                    setDraft(item.customEquipment ?? item.rawLabel ?? "");
+                    setView("own");
+                  }}
                   className="rounded-sm border border-border-strong bg-surface px-3.5 py-3 text-center transition hover:border-navy hover:bg-surface2"
                 >
                   <span className="block text-body font-semibold text-navy">{t.create.machineCard.doorOwn}</span>
@@ -969,9 +999,21 @@ function EquipmentChooser({
                     >
                       <span className="flex min-w-0 items-center gap-2.5">
                         <span className="grid h-[36px] w-[52px] flex-none place-items-center overflow-hidden rounded-sm bg-surface3">
-                          {r.image ? (
+                          {/* ⚠️ `onError` is load-bearing, not defensive (owner, 2026-09-14:
+                              *"the equipment image always, if not exist fallback to icon"*). The
+                              taxonomy's drawings live in a bucket folder that is not public-read on
+                              staging, so a perfectly well-formed URL answers 403 — and without the
+                              catch the row draws a broken image where it could draw a glyph. The
+                              card's own photograph has caught this since 2026-08-31; the list did
+                              not. */}
+                          {r.image && !brokenArt.includes(r.id) ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={r.image} alt="" className="h-full w-full object-contain p-0.5" />
+                            <img
+                              src={r.image}
+                              alt=""
+                              className="h-full w-full object-contain p-0.5"
+                              onError={() => setBrokenArt((b) => (b.includes(r.id) ? b : [...b, r.id]))}
+                            />
                           ) : (
                             <Icon name="precision_manufacturing" size={16} className="text-muted" />
                           )}
@@ -1043,15 +1085,27 @@ function EquipmentChooser({
                   {t.create.machineCard.backStep}
                 </button>
               </div>
-              {/* A confirmation, never a second form: the words are already his, from the intake. */}
+              {/* ── EDITABLE, and this is the one place it is (owner, 2026-09-14) ─────────────
+                  *"the text must be editable, why not? it must be from here"*.
+                  🔴 It seeds from what he already wrote and he may change it, which is the whole
+                  answer to «read-only or not»: the box on the card is the agent's output, and THIS is
+                  where the words become his. One writer, reached deliberately, so the name can still
+                  never quietly contradict a type — by the time he types here, the type is going. */}
               <div className="flex flex-wrap items-center gap-2.5">
-                <span className="min-w-0 flex-1 truncate rounded-sm border border-border bg-surface2 px-3.5 py-2.5 text-body text-navy">
-                  {item.customEquipment ?? item.rawLabel ?? ""}
+                <span className="min-w-0 flex-1">
+                  <TextInput
+                    value={draft}
+                    maxLength={120}
+                    placeholder={t.create.machineCard.customEquipmentPlaceholder}
+                    onChange={(e) => setDraft(e.target.value)}
+                  />
                 </span>
                 <Button
+                  size="sm"
                   className="flex-none"
+                  disabled={!draft.trim()}
                   onClick={() => {
-                    onKeepOwn();
+                    onKeepOwn(draft.trim());
                     close();
                   }}
                 >

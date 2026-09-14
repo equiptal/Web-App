@@ -2,6 +2,51 @@
 
 ## Change log
 
+- **2026-09-14 - The intake's last row is the control row, packed to the maximum, and a chip never wraps.**
+  Owner, stating it as a standing rule: *"the last row of the input text box is one row with select
+  project in small font, then the project pills, then + without circle, then the arrow in a circle -
+  this is the order ALWAYS - and put the number of pills in this row dynamically depending on the max
+  fit; more than fits is shown in the row ABOVE, and that row fits the whole text box as it has no
+  buttons or text"*, then *"why only 2 pills in last row, it must fit the third one"* and *"this is
+  also not allowed, never wrap it"*.
+  🔴 **The overflow runs UPWARD, which no CSS wrap mode gives you.** `wrap-reverse` stacks lines
+  upward but puts the LAST items on the TOP line, so the `+` and the arrow would float above the
+  sites. The split is measured: `ProjectChips` renders every chip on the control row while the count
+  is unknown, reads which of them landed on the first LINE, and moves the rest to a full-width strip
+  above with «All projects» leading it.
+  **Two separate bugs made the row come up one chip short, and both are fixed:**
+  · 🔴 **The count was arithmetic** - available width, minus each `offsetWidth`, minus a gap
+  constant - and all three inputs erred the same way: `offsetWidth` rounds UP, the constant was a
+  second copy of `gap-2` that nothing kept in step, and the width was read before the locale's face
+  had settled. It reads `offsetTop` now: the browser has already done that layout, and the chips on
+  the first line ARE the ones that fit. A 2px tolerance, because `items-center` can leave two chips
+  on one line a pixel apart.
+  · 🔴 **A `null` in the array.** The chosen-site pill is a conditional, so with nothing chosen its
+  slot held `null` - an entry that takes a place and draws nothing. `slice(0, 3)` on `[null, a, b, c]`
+  is `[null, a, b]`: TWO chips on a row the measurement had correctly said held three. That is the
+  owner's screenshot exactly - 3 projects, 1 above, 2 below. `chipNodes.filter(Boolean)` fixes it.
+  **And the chips stopped wrapping their own names**: `whitespace-nowrap` on all three kinds, with
+  `flex-none` beside it - without that the row shrinks chips to squeeze another in, which is the same
+  wrap by another route. A name too wide is CLIPPED by the row instead.
+  Also: the `+` lost its circle (the arrow keeps its - only one of them is the act the screen exists
+  for), and the units chip dropped its `×` and now HIDES the `−` at one unit rather than disabling
+  it: a pale disabled skin on a dark chip made the one dead control the brightest thing in it.
+  Files: `src/components/create/ProjectChips.tsx`, `src/components/create/MachineCard.tsx`,
+  `src/components/screens/Intake.tsx`, `tests/unit/project-chips-rows.test.tsx`,
+  `tests/unit/machine-card.test.tsx`.
+  ⚠️ **`trailing` is a slot, like `lead`.** The two controls are passed IN because this component is
+  the only thing that knows how many chips fit beside them - and unlike `lead` they are drawn even
+  when the renter has NO sites: a guest still needs the way to hand us a file and the way to send.
+  ⚠️ **The fallback SHOWS, never hides.** While the count is unknown the control row wraps instead
+  of clipping, so a browser with no `ResizeObserver` - or the frame before first layout - keeps every
+  site on screen. Untidy for a frame, and it loses nothing.
+  🔴 **jsdom cannot exercise the split at all**: it reports every element 0px wide, so the component
+  takes that fallback and there is no overflow strip. The cases pin the RULES against the source -
+  the row's order, the toggle living in the overflow strip, nowrap on every chip, the measurement
+  reading `offsetTop` rather than widths. The packing itself is a browser fact and is NOT verified
+  here; `npm run dev` is broken on this machine (`--no-experimental-webstorage is not allowed in
+  NODE_OPTIONS`) and staging serves the deployed build, so it wants one look after the next deploy.
+
 - **2026-09-14 — A TRIAL request made in the app stops arriving on the web dressed as a real one.**
   Found in a full audit, not reported: the database is SHARED with the mobile app, and the app still
   offers the 60-minute trial. `TRIAL_REQUESTS_ENABLED = false` only stops this app CREATING one, so a

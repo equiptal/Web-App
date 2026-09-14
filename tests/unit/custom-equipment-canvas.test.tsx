@@ -200,14 +200,24 @@ describe("the escape, and the panel behind it", () => {
     expect(screen.getByRole("button", { name: /Keep my own words/i })).toBeTruthy();
   }, 20_000);
 
-  it("keeps his words through a confirmation, never a second box to type in", async () => {
+  it("hands him his own words, already written, in a field he may change", async () => {
+    /**
+     * 🔴 Reversed on 2026-09-14 (owner: *"the text must be editable, why not? it must be from
+     * here"*). ~~A read-only confirmation.~~ The box on the CARD stays the agent's output; THIS is
+     * where the words become his, and it opens seeded with what he already wrote — so the ordinary
+     * case is still one press and nothing retyped.
+     */
     const row = await open();
     fireEvent.click(row);
     fireEvent.click(screen.getByRole("button", { name: /Keep my own words/i }));
+
     expect(screen.getByText("THE REQUEST WILL SAY")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Keep equipment name in my own words/i })).toBeTruthy();
-    // One button, and nothing to fill in: the words are already his, from the intake.
-    expect(screen.queryByPlaceholderText(/name or nickname/i)).toBeNull();
+    const fields = screen.getAllByPlaceholderText("Name the equipment you need") as HTMLInputElement[];
+    // Two boxes share that placeholder: the card's, which is read-only, and this one, which is not.
+    const editable = fields.find((f) => !f.readOnly)!;
+    expect(editable).toBeTruthy();
+    expect(editable.value).toBe("floating crane barge");
+    expect(screen.getByRole("button", { name: /Keep my name/i })).toBeTruthy();
   }, 20_000);
 
   it("asks for the SIZE on the row rather than choosing one for him", async () => {

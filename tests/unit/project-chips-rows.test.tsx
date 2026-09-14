@@ -160,10 +160,49 @@ describe("the intake's site strip", () => {
     const src = readFileSync("src/components/create/ProjectChips.tsx", "utf8");
     const row = src.slice(src.indexOf('<div className="flex w-full min-w-0 items-center gap-2">'));
     const lead = row.indexOf("{lead}");
-    const chips = row.indexOf("chipNodes.slice(0, onRow)");
+    /* ⚠️ `chips`, not `chipNodes`: the array is filtered before it is sliced, because a
+       conditional entry that renders `null` still takes a place and made the row one chip short. */
+    const chips = row.indexOf("chips.slice(0, onRow)");
     const trail = row.indexOf("{trailing}");
     expect(lead).toBeGreaterThan(-1);
     expect(chips).toBeGreaterThan(lead);
     expect(trail).toBeGreaterThan(chips);
+  });
+
+  it("Given any chip, Then it never wraps its own name", () => {
+    /**
+     * 🔴 Owner, 2026-09-14: *"this is also not allowed, never wrap it"*, on a pill broken across
+     * two lines in the middle of a place name.
+     *
+     * ⚠️ `flex-none` belongs with it. Without it the row shrinks chips to squeeze another one in,
+     * and a squeezed chip wraps - the same fault by another route.
+     */
+    const src = readFileSync("src/components/create/ProjectChips.tsx", "utf8");
+    const chips = (src.match(/className="[^"]*rounded-full border border-brand[^"]*"/g) ?? []);
+    expect(chips.length).toBeGreaterThanOrEqual(2);
+    for (const c of chips) {
+      expect(c).toContain("whitespace-nowrap");
+      expect(c).toContain("flex-none");
+    }
+  });
+
+  it("Given the count, Then it is the browser’s own line, not arithmetic", () => {
+    /**
+     * 🔴 It was greedy arithmetic - available width minus each `offsetWidth` minus a gap constant -
+     * and it came out ONE chip short every time (owner, 2026-09-14: *"why only 2 pills in last row,
+     * it must fit the third one"*). Three errors that only accumulate one way: `offsetWidth` rounds
+     * up, the gap constant is a second copy of `gap-2` that nothing keeps in step, and the width is
+     * read before the locale’s face has settled.
+     *
+     * While the count is unknown the row wraps with every chip in it, so the browser has already
+     * done this layout: `offsetTop` says which line each chip landed on.
+     */
+    const src = readFileSync("src/components/create/ProjectChips.tsx", "utf8");
+    expect(src).toContain("el.offsetTop");
+    const measure = src.slice(src.indexOf("if (row.children.length !== chipCount) return;"), src.indexOf("setFitCount((prev)"));
+    expect(measure).not.toContain("clientWidth");
+    expect(measure).not.toContain("ROW_GAP_PX");
+    // ⚠️ A tolerance, not equality: `items-center` can leave two chips on one line a pixel apart.
+    expect(measure).toContain("<= 2");
   });
 });

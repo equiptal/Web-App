@@ -97,21 +97,38 @@ describe("the four overlay controls (MREQ-AC-16)", () => {
     expect(screen.getByRole("button", { name: "QUANTITY +" })).toBeTruthy();
   });
 
-  it("floors the quantity stepper at one (MREQ-AC-16)", async () => {
+  it("floors the quantity stepper at one, by REMOVING the − (MREQ-AC-16)", async () => {
+    /**
+     * 🔴 **The − is withdrawn at one, not disabled** (owner, 2026-09-14: *"remove the − in case it
+     * is one unit, as it is confusing, this white −"*). Its disabled skin is a pale ground, and the
+     * chip it sits on is dark - so the one control that could do nothing was the brightest thing in
+     * it. A control that cannot act is better absent than greyed, which is the ruling the equipment
+     * tab’s ✕ already follows on a one-equipment request.
+     */
     const handle = await card();
-    const minus = screen.getByRole("button", { name: "QUANTITY −" });
-    await handle.run(() => minus.click());
-    await handle.run(() => minus.click());
+    /* ⚠️ At ONE there is no − at all - which is the ruling - so the way to reach it is to count
+       up first. That is also the renter’s own path: the chip opens at one unit. */
+    expect(screen.queryByRole("button", { name: "QUANTITY −" })).toBeNull();
+    await handle.run(() => screen.getByRole("button", { name: "QUANTITY +" }).click());
+    expect(handle.store().state.draft!.items[0].quantity).toBe(2);
+
+    await handle.run(() => screen.getByRole("button", { name: "QUANTITY −" }).click());
     expect(handle.store().state.draft!.items[0].quantity).toBe(1);
-    // At the floor it is disabled rather than silently doing nothing.
-    expect(minus.hasAttribute("disabled")).toBe(true);
+    // ⚠️ Gone from the DOM, so there is nothing to disable and nothing to press.
+    expect(screen.queryByRole("button", { name: "QUANTITY −" })).toBeNull();
+    // The + is never withdrawn: nothing caps how many machines a request asks for.
+    expect(screen.getByRole("button", { name: "QUANTITY +" })).toBeTruthy();
   });
 
   it("counts up from the panel chip", async () => {
     const handle = await card();
     await handle.run(() => screen.getByRole("button", { name: "QUANTITY +" }).click());
     expect(handle.store().state.draft!.items[0].quantity).toBe(2);
-    expect(screen.getByText("×2")).toBeTruthy();
+    // ⚠️ The number ALONE (owner, 2026-09-14). The chip sits on the machine’s own photograph with
+    // a − and a + beside it, so what it counts is not in doubt - and «×2» beside «20 ton» read as
+    // part of the size.
+    expect(screen.getByText("2")).toBeTruthy();
+    expect(screen.queryByText("×2")).toBeNull();
   });
 });
 
