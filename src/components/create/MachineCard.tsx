@@ -203,7 +203,12 @@ export function MachineCard({
         {/* ---------------- The 450px panel, and the four controls on its corners ---------------- */}
         {/* `overflow-hidden`: the photograph now runs to the panel's own edges, so the panel has to
             clip it to its corners or the image squares them off. */}
-        <div {...pin("machine-card-image")} className="relative h-full min-h-[450px] w-full min-w-0 overflow-hidden rounded-md bg-surface2">
+        {/* 🔴 `h-full` is GONE (owner, 2026-09-14: *"keep it fixed at its card height"*). `items-start`
+            was not enough on its own: a percentage height in a grid resolves against the grid AREA,
+            which IS definite, so `h-full` went on filling whatever the right column grew to — 450px
+            of drawing stretched to 800 the moment the catalogue opened. The panel states its own
+            height and nothing else decides it. */}
+        <div {...pin("machine-card-image")} className="relative min-h-[450px] w-full min-w-0 overflow-hidden rounded-md bg-surface2">
           {/* ── The subtype's own photograph, where the admin panel has one (owner, 2026-08-31) ──
               The panel drew a Material Symbol chosen by matching the subtype's NAME against a list of
               words — «excavator» → the agriculture glyph — which is a reasonable guess and never the
@@ -849,7 +854,13 @@ function EquipmentChooser({
   const label = item.ref.subcategoryId ? t.create.machineCard.hatchMatched : t.create.machineCard.hatchNoMatch;
 
   return (
-    <div className="sm:col-span-3 flex flex-col gap-2.5">
+    /* ── The row is TYPE · SIZE · the escape, as the prototype draws it (owner, 2026-09-14) ───────
+       *"the «not» question must be in same line like prototype"*. A fragment, not a wrapper: these
+       are grid ITEMS of the trio box, so the escape takes the third cell beside the two lists it is
+       about, and the panel below spans all three. A wrapping `<div>` made both of them one full-width
+       row under the lists, which is the layout he is pointing at. */
+    <>
+      <div className="flex items-end">
       <button
         type="button"
         onClick={() => (view ? close() : setView("root"))}
@@ -860,9 +871,10 @@ function EquipmentChooser({
         {label}
         <span aria-hidden className="text-brand">{view ? "▴" : "▾"}</span>
       </button>
+      </div>
 
       {view && (
-        <div className="flex flex-col gap-3 rounded-sm border border-border-strong border-t-[3px] border-t-brand bg-surface p-3.5">
+        <div className="sm:col-span-3 flex flex-col gap-3 rounded-sm border border-border-strong border-t-[3px] border-t-brand bg-surface p-3.5">
           {view === "root" && (
             <>
               <div className="flex items-baseline justify-between gap-3">
@@ -1044,7 +1056,7 @@ function EquipmentChooser({
           )}
         </div>
       )}
-    </div>
+    </>
   );
 }
 
