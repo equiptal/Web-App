@@ -463,7 +463,9 @@ export function MachineCard({
                   the name box lines up EXACTLY with TYPE beneath it. A different ratio here is off by
                   the gap, which shows as a step down the left edge of the box.
                   ⚠️ `sm:items-end` levels the sentence with the INPUT, not with the label above it. */}
-              <div className={`grid gap-2.5 sm:col-span-3 sm:items-end ${TRIO_COLS} ${pulseName ? "attn-pulse" : ""}`}>
+              {/* Row ONE is the name and nothing else, at the block's full width — the shape his
+                  supervisor's card has (owner, 2026-09-14). */}
+              <div className={`sm:col-span-3 ${pulseName ? "attn-pulse" : ""}`}>
                 {/* ── The renter's OWN words, first and always (owner, 2026-09-12) ──────────────
                     ~~Shown only on a line the catalogue could not place.~~ The field stopped meaning
                     «the name of a machine we do not carry» and started meaning «what the renter calls
@@ -500,10 +502,22 @@ export function MachineCard({
                       ) : null}
                     </span>
                   }
-                  star={custom}
+                  star={false}
                   missing={gapFor("custom_equipment")}
                   shake={shake("custom_equipment")}
                   required={owed("custom_equipment")}
+                  hint={
+                    /* ⚠️ The note is the field's HINT again, under the value, not a cell beside it
+                       (owner, 2026-09-14, on his supervisor's shot: *"this must be the UI, not
+                       this"*). The prototype gives the name the block's whole width; a sentence in
+                       the next column is what squeezed it into a third of it. */
+                    custom ? (
+                      <span className="flex items-start gap-1 text-brand-deep">
+                        <Icon name="warning" size={13} className="mt-px flex-none" />
+                        <span className="min-w-0">{t.create.machineCard.notInCatalogueNote}</span>
+                      </span>
+                    ) : undefined
+                  }
                 >
                   {/* ── READ-ONLY, and it answers when he tries anyway (owner, 2026-09-13/14) ──
                       *"the equipment name field will be agent output at first then editable from the
@@ -530,34 +544,6 @@ export function MachineCard({
                     onChange={() => {}}
                   />
                 </CanvasField>
-
-                {/* ── The note, and ONLY the note (owner, 2026-09-13) ──────────────────────────
-                    *"i want this note inlined with the size-type row"* — so the dashed offer moved
-                    down to sit under the lists it acts on, and this cell keeps the sentence alone.
-                    ⚠️ On a MATCHED line there is nothing to say here and the cell is empty. That is
-                    the cost of the move and it is his call: the offer belongs beside the two lists
-                    that failed him, not beside the box it fills. */}
-                <div className="sm:col-span-2">
-                  {custom && (
-                    /* ── The note, in the card's own orange (owner, 2026-09-12/13) ────────────
-                       It was `text-warn` (#b98a1d), which `globals.css` states is a FILL — at 2.97:1
-                       on a pale ground the sentence came out khaki, which is what he read as «not
-                       yellow and not orange». `brand-deep` is the ink this card now uses for every
-                       orange word on it, and it is the AA-safe half of the brand pair.
-                       🔴 **It WRAPS, and two lines are fine** (owner, 2026-09-13, an hour after
-                       asking for one: *"the note beside the equipment name is wrapped so make it 2
-                       lines fine"*). ~~`sm:truncate`.~~ Clipping a warning is the one thing this
-                       sentence must never do, and it was the price of the one-line rule; he looked
-                       at it wrapped and took the wrap instead. The sentence stays SHORT anyway - two
-                       lines is the ceiling here, not the target.
-                       ⚠️ `items-start` so the glyph sits on the FIRST line rather than floating
-                       against the middle of a two-line block. */
-                    <p className="flex items-start gap-1 text-label leading-snug text-brand-deep">
-                      <Icon name="warning" size={13} className="mt-px flex-none" />
-                      <span className="min-w-0">{t.create.machineCard.notInCatalogueNote}</span>
-                    </p>
-                  )}
-                </div>
               </div>
 
               <CanvasField
@@ -891,7 +877,11 @@ function EquipmentChooser({
       <button
         type="button"
         onClick={() => (view ? close() : setView("root"))}
-        className={`flex w-max max-w-full items-center gap-2.5 justify-self-start whitespace-nowrap rounded-sm border px-3.5 py-2.5 text-label font-semibold text-brand-deep transition ${
+        /* ⚠️ A FULL CELL at the controls' own height, not a chip sized to its words (owner,
+           2026-09-14). It is the third control on that row in the prototype and it lines up with the
+           two beside it; `truncate` keeps the one-line promise if the column is ever too narrow for
+           the sentence. */
+        className={`flex h-[var(--control-md)] w-full items-center justify-between gap-2.5 truncate whitespace-nowrap rounded-sm border px-3.5 text-label font-semibold text-brand-deep transition ${
           shake ? "shake-error border-brand" : "border-brand-light bg-brand-soft hover:border-brand"
         }`}
       >

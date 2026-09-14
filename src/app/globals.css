@@ -722,6 +722,16 @@ body {
   60% { transform: scale(1.12); opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
 }
+/* The winner's halo: one ring thrown off the disc as the machine lands, and gone. Outside the
+   disc, which clips; and ONCE, because a repeating pulse reads as «still searching». */
+@keyframes found-halo {
+  0% { transform: scale(1); opacity: 0.55; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+.found-halo {
+  animation: found-halo 0.7s ease-out both;
+}
+
 @keyframes found-ring {
   0% { transform: scale(0.86); opacity: 0.35; }
   60% { transform: scale(1.06); opacity: 1; }

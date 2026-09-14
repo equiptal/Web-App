@@ -34,7 +34,10 @@ describe("the two round controls replaced two rows", () => {
      * rows for two presses, one of them a full-width word for the act every renter is already
      * reaching for.
      */
-    expect(intake).not.toContain("{t.intake.uploadRfq}\n");
+    /* ⚠️ As a CHILD, not as an attribute. That string is still `aria-label` and `title` on the
+       round +, which is the 2026-09-12 ruling — *"the sentence that stood beside Continue is the
+       arrow's own title"* — so a bare `toContain` matches the thing the rule KEPT and fails on it. */
+    expect(intake).not.toMatch(/>\s*\{t\.intake\.uploadRfq\}/);
     expect(intake).not.toContain("t.intake.continueLabel}{\" \"}");
     // The `Button` component went with the Continue it drew.
     expect(intake).not.toMatch(/import \{[^}]*\bButton\b[^}]*\} from "@\/components\/ui"/);

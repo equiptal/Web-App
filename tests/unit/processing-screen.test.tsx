@@ -85,15 +85,20 @@ describe("matched, it shows the catalogue's own picture", () => {
     const el = draw();
     expect(img(el)?.className).toMatch(/object-contain/);
     /**
-     * 🔴 **No SCALE at all, and this is the third fit tried here.** `cover` was right for a
-     * photograph; `contain` + 1.25 was the answer while the tile read as empty; both CLIP a
-     * catalogue drawing, which was measured rather than argued: these are ~1.83:1 with no horizontal
-     * margin, so `contain` already fills the width and anything above 1 pushes the machine's ends out
-     * through the circle - at 1.5 the spider crane lost both outriggers.
-     * The geometry: a w×h picture fits a circle of diameter D when w·√(1+(h/w)²) ≤ D, which at
-     * 1.83:1 is w ≤ 0.87D. `contain` gives w = D, so 1.0 is the ceiling.
+     * 🔴 **The scale is BACK, at the request rail's own figure** (owner, 2026-09-14: *"for the
+     * square image, zoom in inside the circle to fit, like the ones in the requests line header"*).
+     *
+     * This is the fourth fit tried in this slot, and the argument each time is the same geometry
+     * read two ways. `contain` alone cannot clip — but at ~1.83:1 it draws a BAND across a round
+     * hole, with the disc's ground above and below it, and that band is the «square inside a circle»
+     * the owner kept reporting. Filling the circle therefore costs the machine's ends; he has looked
+     * at both and chosen the fill, which is the same trade the rail took on 2026-09-12 and the same
+     * number (1.34 = 52 ÷ 28, measured there).
+     *
+     * ⚠️ `object-cover` stays refused. It was tried on the LIVE rail and rejected: cropping a
+     * drawing enlarges its transparent margin rather than the machine.
      */
-    expect(img(el)?.className).not.toMatch(/scale-\[/);
+    expect(img(el)?.className).toMatch(/scale-\[1\.34\]/);
     expect(img(el)?.className).not.toMatch(/object-cover/);
   });
 

@@ -359,45 +359,82 @@ export function Intake() {
               the two icons are not. */}
           <div className="flex w-full min-w-0 basis-full flex-wrap items-center gap-x-3 gap-y-2">
             <ProjectChips
-              lead={<span className="flex-none text-meta font-semibold text-muted">{t.projects.chips.pick}</span>}
+              /* Small (owner, 2026-09-14): it introduces the pills, it is not one of them. */
+              lead={<span className="flex-none text-label font-semibold text-muted">{t.projects.chips.pick}</span>}
               trailing={
                 <>
-          <span className="ms-auto flex flex-none items-center gap-2">
-            <button
-              type="button"
-              onClick={() => fileInput.current?.click()}
-              aria-label={t.intake.uploadRfq}
-              title={t.intake.uploadRfq}
-              /* 🔴 **No circle on the `+`** (owner, 2026-09-13, stating the row’s order as a
-                 standing rule: *"then + without circule then -> in circule"*). Two ringed controls
-                 side by side read as a pair of equals; they are not. The arrow SENDS - it is the act
-                 the whole screen exists for - and the `+` hands us a file, which is the other way in.
-                 The ring is what says «primary», so only one of them wears it.
-                 ⚠️ The 26px HIT AREA stays. A 15px glyph is not a target on a phone; what goes is
-                 the border and the ground, not the box. */
-              className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full text-navy-mid transition hover:bg-surface2 hover:text-brand"
-            >
-              <Icon name="add" size={15} />
-            </button>
-
-            {/* ⚠️ **What holds it back is on the button itself.** The old Continue had a sentence
-                beside it, because a disabled button with nothing near it reads as broken. A round
-                control has no room for one, so the reason is its `title`: "add something" while it
-                is empty, and what the press will do once it is not. */}
-            <button
-              type="button"
-              disabled={!canStart || state.busy}
-              onClick={runAgent}
-              aria-label={canStart ? (hasDraft ? t.intake.reAnalyze : t.intake.continueLabel) : t.intake.addSomething}
-              title={canStart ? (hasDraft ? t.intake.reAnalyze : t.intake.continueLabel) : t.intake.addSomething}
-              className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full bg-brand text-brand-fg transition hover:bg-brand-press disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
-            >
-              <Icon
-                name={state.busy ? "hourglass_empty" : "arrow_forward"}
-                size={15}
-                className={state.busy ? "" : "rtl:scale-x-[-1]"}
-              />
-            </button>
+          <span className="ms-auto flex flex-none items-center gap-2">
+
+            <button
+
+              type="button"
+
+              onClick={() => fileInput.current?.click()}
+
+              aria-label={t.intake.uploadRfq}
+
+              title={t.intake.uploadRfq}
+
+              /* 🔴 **No circle on the `+`** (owner, 2026-09-13, stating the row’s order as a
+
+                 standing rule: *"then + without circule then -> in circule"*). Two ringed controls
+
+                 side by side read as a pair of equals; they are not. The arrow SENDS - it is the act
+
+                 the whole screen exists for - and the `+` hands us a file, which is the other way in.
+
+                 The ring is what says «primary», so only one of them wears it.
+
+                 ⚠️ The 26px HIT AREA stays. A 15px glyph is not a target on a phone; what goes is
+
+                 the border and the ground, not the box. */
+
+              className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full text-navy-mid transition hover:bg-surface2 hover:text-brand"
+
+            >
+
+              <Icon name="add" size={15} />
+
+            </button>
+
+
+
+            {/* ⚠️ **What holds it back is on the button itself.** The old Continue had a sentence
+
+                beside it, because a disabled button with nothing near it reads as broken. A round
+
+                control has no room for one, so the reason is its `title`: "add something" while it
+
+                is empty, and what the press will do once it is not. */}
+
+            <button
+
+              type="button"
+
+              disabled={!canStart || state.busy}
+
+              onClick={runAgent}
+
+              aria-label={canStart ? (hasDraft ? t.intake.reAnalyze : t.intake.continueLabel) : t.intake.addSomething}
+
+              title={canStart ? (hasDraft ? t.intake.reAnalyze : t.intake.continueLabel) : t.intake.addSomething}
+
+              className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full bg-brand text-brand-fg transition hover:bg-brand-press disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
+
+            >
+
+              <Icon
+
+                name={state.busy ? "hourglass_empty" : "arrow_forward"}
+
+                size={15}
+
+                className={state.busy ? "" : "rtl:scale-x-[-1]"}
+
+              />
+
+            </button>
+
           </span>
                 </>
               }
