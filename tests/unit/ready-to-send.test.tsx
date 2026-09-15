@@ -305,12 +305,46 @@ describe("the ready strip holds its row", () => {
     expect(card).toMatch(/\bflex-wrap\b/);
   });
 
-  it("the facts that may not shrink are marked, and the rest give way", () => {
-    // A date range or a payment term clipped mid-word is not a shorter fact, it is a wrong one.
+  it("the facts that may not shrink are marked", () => {
+    // A date range, a payment term or a place name clipped mid-word is not a shorter fact, it is a
+    // wrong one.
     expect(SRC).toMatch(/<StripFact icon="calendar_month" tight>/);
     expect(SRC).toMatch(/<StripFact tight>/);
-    // The two long ones keep `min-w-0` and truncate into whatever is left.
+    expect(SRC).toMatch(/<StripFact icon="place" tight>/);
     expect(SRC).toMatch(/tight \? "flex-none whitespace-nowrap" : "min-w-0"/);
+  });
+
+  it("the machine's NAME is never stripped", () => {
+    /**
+     * 🔴 Owner, 2026-09-14: *"make the equipment name always full appear, not stripped"*. It had
+     * `truncate`, so a long one clipped to «Crawler Excavator 20 t…» — the one thing on this strip
+     * that says WHAT he is renting.
+     */
+    const at = SRC.indexOf('<StripFact icon="inventory_2">');
+    const fact = SRC.slice(at, at + 520);
+    expect(fact).toMatch(/<span className="flex-none whitespace-nowrap">/);
+    expect(fact.slice(0, fact.indexOf("machineNote"))).not.toMatch(/truncate/);
+  });
+
+  it("its NOTE is the one thing on the card that gives way", () => {
+    /**
+     * The operator and the certificate are each stated in full in the section below, so half of this
+     * restatement costs nothing — while half a machine name costs the fact itself. Everything else
+     * on the row is `tight`.
+     */
+    const at = SRC.indexOf("machineNote && <span");
+    expect(SRC.slice(at, at + 90)).toMatch(/min-w-0 truncate/);
+  });
+
+  it("and the card CLIPS rather than widening the page", () => {
+    /**
+     * ⚠️ Load-bearing now that almost nothing may shrink: a row that cannot fit has to end at the
+     * card's own edge. Without this it would push the whole DOCUMENT wider than the screen, which is
+     * the fault audited out of three surfaces on 2026-09-08.
+     * ⚠️ Safe because `Dropdown` PORTALS its list — an `overflow-hidden` ancestor would otherwise
+     * clip the payment menu the moment it opened.
+     */
+    expect(card).toMatch(/overflow-hidden/);
   });
 
   it("the button group never wraps and never breaks its own label", () => {

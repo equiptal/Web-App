@@ -420,66 +420,71 @@ describe("the option list opens where it can be read", () => {
   });
 });
 
-describe("the photograph FILLS the panel, and the machine survives the crop", () => {
+describe("the whole machine is visible, and the zoom only eats the margin", () => {
   /**
-   * Owner, 2026-09-14: *"equipment image must match the card height too, even in the back of the
-   * tuv-year etc"*. `contain` fits the WIDTH, so a 1.83:1 photograph in a panel taller than it is
-   * wide left a grey band above and below - and the four chips float on the corners, so they sat on
-   * that grey rather than on the machine.
+   * Owner, 2026-09-15: *"the equipment in the machine panel are so zoomed in that make the equipment
+   * not all appear"*.
    *
-   * 🔴 **This REVERSES 2026-09-13** (*"three wheels and nothing else"*), and what changed is the
-   * PANEL rather than the opinion. `cover` was refused while the panel carried `h-full` and
-   * stretched to the right column - ~660x610 in that shot, so `cover` needed 610x1.83 = 1116px of
-   * width against 660 and threw away 41%. The panel has been FIXED at 450px since earlier the same
-   * day (*"keep it fixed at its card height"*), so the crop is now 450x1.83 = 823 against ~585:
-   * **29%, centred, so 14.5% a side.**
+   * 🔴 **`object-cover` was wrong here, and the measurement that chose it was taken in the WRONG
+   * BOX.** It was judged on a 585x450 probe; the panel is **366x450**. At 585 the crop is 29% and
+   * the machine survives; at 366 it is **39%** and the bucket and the counterweight are both cut.
+   * A later `scale-[1.18]` on top of `cover` took it to ~48%.
    *
-   * ⚠️ **Measured in a browser before the change**, both fits at the real 585x450: the whole machine
-   * survives - boom, cab, tracks, bucket teeth - and what goes is empty floor and wall, because
-   * these photographs are shot with wide margins.
+   * 🔴 **Re-measured at the real 366x450**, on the live asset, four fits side by side:
+   *   · `contain`           whole machine, 177px of band
+   *   · `contain` x1.2      whole machine, 122px of band   ← ships
+   *   · `contain` x1.3      whole machine, 95px, nothing to spare
+   *   · `contain` x1.4/1.5  the counterweight clips
+   *   · `cover` (x1.65)     bucket and counterweight both gone
+   * 1.3 is the ceiling for THIS render, so 1.2 leaves headroom for a machine drawn wider.
    *
-   * ⚠️ The request rail reached the OPPOSITE answer for its 52px circle on 2026-09-12, and both are
-   * right: the fit is a property of the BOX, not of the picture. Recorded in both places so the next
-   * reader does not re-run the experiment in the wrong one.
+   * ⚠️ The band is what a 1.34 landscape costs in a 0.81 portrait box. No CSS removes it: `cover`,
+   * `contain` and `scale` all clip from the same source ratio and only move WHERE the loss lands.
+   * The real fix is a square master — recorded in the change log, not achievable here.
    */
   const SRC = readFileSync("src/components/create/MachineCard.tsx", "utf8");
   const code = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-  /**
-   * ⚠️ The PANEL photograph only. This file draws a second image - the 36x52 thumbnail on a
-   * type/size row - which is `object-contain p-0.5` and must stay so: a tiny box holding a flat
-   * drawing is the rail's case, not this one. A blanket `code.toContain` would pass for the wrong
-   * image the day either moves.
-   */
   const at = code.indexOf("absolute inset-0 h-full w-full");
-  const panelImg = code.slice(at - 260, at + 60);
+  const panelImg = code.slice(at - 260, at + 80);
 
-  it("Given the panel photo, Then it covers the panel corner to corner", () => {
-    expect(panelImg).toContain("object-cover");
-    expect(panelImg).not.toContain("object-contain");
+  it("the panel photo is CONTAINED, so nothing of the machine is thrown away", () => {
+    expect(panelImg).toContain("object-contain");
+    expect(panelImg).not.toContain("object-cover");
   });
 
-  it("Given the ROW thumbnail, Then it is still contained - a different box, a different answer", () => {
-    const rowAt = code.indexOf("object-contain");
-    const rowImg = code.slice(rowAt - 200, rowAt + 40);
-    expect(rowImg).toContain("h-full w-full object-contain");
-    expect(rowImg).not.toContain("absolute inset-0");
+  it("and the zoom stays at or under the measured ceiling of 1.3", () => {
+    const m = panelImg.match(/scale-\[([\d.]+)\]/);
+    expect(m).toBeTruthy();
+    expect(Number(m![1])).toBeLessThanOrEqual(1.3);
+    expect(Number(m![1])).toBeGreaterThan(1);
   });
 
-  it("Given the panel, Then its height is its OWN and does not follow the column beside it", () => {
+  it("the zoom is only safe because the panel CLIPS", () => {
+    // Without `overflow-hidden` the scaled photo spills over the four chips on the corners.
+    const pAt = code.indexOf('pin("machine-card-image")');
+    expect(code.slice(pAt, pAt + 240)).toMatch(/overflow-hidden/);
+  });
+
+  it("Given the ROW thumbnail, Then it is contained too, at its own size", () => {
+    const rowAt = code.indexOf("h-full w-full object-contain p-0.5");
+    expect(rowAt).toBeGreaterThan(0);
+    expect(code.slice(rowAt - 200, rowAt + 40)).not.toContain("absolute inset-0");
+  });
+
+  it("Given the panel, Then it matches the column beside it - between a floor and a CEILING", () => {
     /**
-     * 🔴 Load-bearing for the crop above: at `h-full` the panel grows with the right column - the
-     * catalogue panel alone adds 300px - and `cover` would be throwing away 41% of the width again,
-     * which is the state that was rejected. The fixed height is what keeps this fit honest.
+     * Two owner rulings meet on that one line, hours apart, and neither is wrong:
+     *  · *"keep it fixed at its card height"* - the catalogue panel adds ~300px to the right column
+     *    and a stretched photograph followed it to 800.
+     *  · *"make the equipment image card same height as its neighbour card"* - at a flat 450 it
+     *    ended short of an ordinary fields column and left a gap under it.
+     * ⚠️ The ceiling also bounds the BAND: the taller the panel, the more empty ground a 1.34
+     * picture leaves above and below it.
      */
     expect(code).toContain("min-h-[450px]");
+    expect(code).toContain("max-h-[640px]");
+    expect(code).toContain("items-stretch");
     const pAt = code.indexOf('pin("machine-card-image")');
-    expect(code.slice(pAt, pAt + 200)).not.toMatch(/h-full/);
-  });
-
-  it("Given the fit, Then the box keeps its full size", () => {
-    // p-* shrinks the box BEFORE the fit is measured, which is what made the rail's drawings
-    // letterbox at half size - the rail's own note records that trap.
-    expect(panelImg).toContain("absolute inset-0 h-full w-full");
-    expect(panelImg).not.toMatch(/p-\d/);
+    expect(code.slice(pAt, pAt + 240)).not.toMatch(/h-full/);
   });
 });

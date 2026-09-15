@@ -2,6 +2,247 @@
 
 ## Change log
 
+- **2026-09-15 - The machine panel shows the WHOLE machine again: `cover` was chosen on a measurement taken in the wrong box.**
+  Owner: *"the equipment in the machine panel are so zoomed in that make the equipment not all
+  appear"*.
+  🔴 **My own error, and worth naming precisely.** `object-cover` was adopted on 2026-09-14 after a
+  side-by-side probe that looked right - but the probe was built at **585x450** and the panel is
+  **366x450**. At 585 the crop is 29% and the machine survives; at 366 it is **39%** and the bucket
+  and the counterweight are both cut off. A later `scale-[1.18]` on top of `cover` took it to ~48%,
+  which is the state he reported. The lesson is the one this repo already records for the rail: the
+  fit is a property of the BOX, so the probe has to be the box.
+  **Re-measured at the real 366x450 on the live asset**, five fits side by side:
+   · `contain`             whole machine, 177px of band
+   · `contain` **x1.2**    whole machine, 122px of band  ← ships
+   · `contain` x1.3        whole machine, 95px, nothing to spare
+   · `contain` x1.4 / x1.5 the counterweight clips
+   · `cover` (x1.65)       bucket and counterweight both gone
+  1.3 is the ceiling for THIS render, so 1.2 ships: it eats the empty margin these photographs are
+  shot with and leaves headroom for a machine drawn wider than an excavator. A case pins the ceiling.
+  Files: `src/components/create/MachineCard.tsx`,
+  `tests/unit/machine-card.test.tsx` (the fit block rewritten, 5 cases).
+  ⚠️ **The band is what a 1.34 landscape costs in a 0.81 portrait box, and no CSS removes it.**
+  `cover`, `contain` and `scale` all clip from the same source ratio; they only move WHERE the loss
+  lands. Every value between «no band» and «no crop» is a point on one line, and this picks the point
+  nearest «no crop» that still spends the margin.
+  🔴 **CONTENT, still owed, and it is the only real fix**: a SQUARE master. Measured across the three
+  surfaces - card 366x450, rail circle 52x52, processing ring 134x134 - a square source crops 19% /
+  0% / 0% against today's 39% / 25% / 25%, and two of the three boxes are circles, which are square
+  by definition. **1200x1200.** It also retires this scale entirely.
+  ⚠️ If the square master ships, `RequestRail`'s `scale-[1.34]` must become **1** in the same
+  deploy - it was derived as 52 ÷ 28 for a letterbox and is right today only by coincidence.
+  ⚠️ The zoom is safe only because the panel is `overflow-hidden rounded-md`; without that clip it
+  would spill over the four chips on the corners. A case pins it.
+  ⚠️ Verified: typecheck, lint (0 errors), 33 passing in the card suite, the ceiling break-checked at
+  1.45 - the new case went red. **SEEN RENDERED**: the five fits photographed at the panel's real
+  size, which is what settled it.
+
+- **2026-09-15 - On his own words the two lists stay LIVE and turn green, the chooser has ONE list view, and the escape row stops wrapping.**
+  Owner, on two shots of the equipment card: *"if he confirms to use his own words the changes will be
+  as follow: the type - size will stay be dropdown in case user want to select but still shown green
+  ... also no need for saved as your own equipemtn etc just remove it and keep the equipment name
+  field look green"*, then *"dont keep the search as another path just show equipment of same
+  category and search bar with place holder search all equipment instead of text redirect ... with
+  small show all in the end of the shown catelogie of the same type that will show all taxonamy
+  too"*, and as a standing rule *"dont ever wrap this not in the equipment card"*.
+  (1) 🔴 **The two flat green statements are gone and the CONTROLS wear the green.**
+  ~~«Your own equipment» and «As described» replaced TYPE and SIZE on an off-catalogue line.~~ That
+  was the prototype's shape and it closed the one door a renter on his own words might still want:
+  reaching into the catalogue from the card without opening the panel. Both are real `SearchSelect`s
+  again, skinned `border-ok/40 bg-ok-soft text-ok-deep`, and picking a type flips the line back to
+  matched through the reducer that already did so.
+  (2) 🔴 **The «Saved as your own equipment - X» strip is deleted**, with its two strings. It
+  restated, in a full-width band, the name standing two rows above it - which is green now and says
+  the same thing where his words actually are.
+  (3) **ONE list view in the chooser.** ~~A «Search all equipment» LINK on the heading row, which
+  swapped the heading, revealed the search box and widened the list in one press.~~ Three acts behind
+  one word, and it read as a door to somewhere else. The box is simply always there with «Search all
+  equipment» as its PLACEHOLDER, the list under it is the line's own family, and «Show all equipment»
+  sits at the FOOT of that family, in place. `searchAny` is retired with the view it belonged to.
+  (4) 🔴 **The escape row is one line again and CLIPS**, reversing 2026-09-14 (*"it WRAPS rather than
+  clips"*, on the argument that a truncated question stops being a question). He looked at the
+  two-line row and took the clip: a control that changes height rearranges the card under his eyes.
+  The whole sentence is on `title`, one hover away.
+  Files: `src/components/create/MachineCard.tsx`, `src/lib/i18n/{en,ar}.ts`
+  (`showAllTypes` new; `savedOwn`, `ownType`, `ownSize`, `searchAny` deleted), `src/lib/uiPins.ts`
+  (17.8 / 17.9 / 17.10, new), `tests/unit/custom-equipment-canvas.test.tsx` (3 new cases).
+  ⚠️ **The search box reads `rows`, never the family.** It says «all» and it means it: typing is
+  asking for more, so a query reaches past the family without his having to widen anything first.
+  The heading follows the query as well as the widening, or a search across the catalogue would sit
+  under «Crawler types in our catalogue».
+  ⚠️ **The green skin is APPENDED to `INPUT` and to the dropdown's field skin, never substituted**,
+  and that only works because `--color-ok-*` is declared AFTER `--color-surface` and `--color-border`
+  in `globals.css` - Tailwind emits it later, so it wins. Same mechanism `INPUT_ERROR` has always
+  relied on. Class order in the attribute decides nothing, which is the `Skeleton` trap of
+  2026-09-12 read the other way round.
+  ⚠️ **SIZE is disabled on his own words and is green ANYWAY.** No type means no sizes, so the
+  dropdown disables itself, and the base skin's `disabled:` rules would paint it the ordinary grey
+  beside a green TYPE. `disabled:bg-ok-soft` and its two siblings are on the trigger for that reason
+  alone, and a case pins it.
+  ⚠️ **He CHANGED HIS MIND mid-batch on two of these.** Asked whether «Can't find the equipment you
+  want?» should disappear in the own-words state, he answered *"i changed my mind keep it"* - so the
+  escape row and the orange «won't reach Moedatech suppliers» note both stand, and the way to EDIT
+  his words is still that row's «Keep my own words» door. The name box therefore stays READ-ONLY,
+  which is the only reason the green is safe: one writer at a time.
+  ⚠️ **The «Not matched» pill was NOT turned green.** He named the field, not the pill, and the pill
+  is the one thing on that row still saying the catalogue came up empty.
+  ⚠️ The «Show all» press is withheld while a query is running (the search already spans everything)
+  and when the family IS the catalogue - otherwise it is a control that reveals nothing.
+  ⚠️ Verified: typecheck, lint (0 errors), 88 passing across the eight canvas / card / guard suites,
+  and all three new rulings break-checked one at a time - the green skin removed, `whitespace-nowrap`
+  removed, the foot press forced off; each went red alone. 🔴 **NOT seen rendered**: the machine card
+  has no specimen, the canvas needs a session, and `npm run dev` is still broken on this machine
+  (`--no-experimental-webstorage is not allowed in NODE_OPTIONS`). The green is argued from the
+  token declaration order rather than looked at; the clip and the foot press want one look on the
+  next deploy.
+
+- **2026-09-15 - The workspace's context bar leads with the machine's own picture.**
+  Owner, on the navy bar reading «Riyadh — Al Olaya» over «Crawler Excavator · 20 ton ×2»: *"can u
+  have the equipment image as circle on the left of this card"*.
+  A 32px circle on the LEADING edge of the 44px control, so it mirrors with the reading direction by
+  being first in the flex row rather than by a rule of its own.
+  **No new data and no new request**: `RequestListItem.item` has carried `imageUrl` (already resolved
+  through `publicTaxonomyUrl`) and `imageIsPhoto` since the rail was built, and this bar was already
+  handed that item.
+  Files: `src/components/workspace/RequestContextBar.tsx`,
+  `tests/unit/request-context-art.test.ts` (new, 9 cases).
+  ⚠️ **The FIT is the rail's ruling, copied deliberately** - same asset, same shape of hole. A
+  photograph reaches its own edges and takes `object-cover`; a taxonomy DRAWING carries its own
+  transparent margin, so cropping one enlarges the margin rather than the machine, and it takes
+  `object-contain` scaled to the circle's diameter. `object-cover` for the drawings was tried on the
+  live rail and rejected on 2026-09-12; it is not re-litigated here.
+  ⚠️ **1.34 is arithmetic, not taste**: `contain` draws the catalogue's 1.34:1 artwork 32 × 23.9 in
+  this box, and 32 ÷ 23.9 = 1.34. It survives a change of BOX size and would not survive a re-cut of
+  the assets to another aspect (at a square source it is 1). A case pins that the rail carries the
+  same number, so the two can never drift.
+  ⚠️ Scaling past the box is safe only because the circle is `overflow-hidden rounded-full` - without
+  it the drawing spills over its own edge and the bar's corner. A case pins the clip.
+  ⚠️ `onError` is load-bearing, not defensive: the taxonomy's objects are not public-read on staging,
+  so a well-formed URL answers 403 and an `<img>` absorbs that as «no artwork» - drawing a
+  broken-image glyph, which is worse than the icon it replaced. Remembered by URL rather than as a
+  bare flag, or one machine's failure would follow the next one onto the bar.
+  ⚠️ The ground is `surface3`, the rail's own, and NOT the navy behind it: a drawing with a
+  transparent margin needs something light behind it or the margin swallows the machine.
+  ⚠️ Verified: typecheck, lint (0 errors), 54 passing across the three workspace suites, and the fit
+  and the clip break-checked (the scale dropped, then `overflow-hidden` removed) - three cases went
+  red. **NOT seen rendered**: jsdom lays out no images, and the bar needs a signed-in renter with a
+  request, so the circle wants one look on the next deploy.
+
+- **2026-09-14 - The photo panel matches the column beside it, between a floor and a ceiling - and the catalogue's real dimensions were MEASURED, correcting a figure two files had been repeating.**
+  Owner: *"make the equipment image card same height as its neighbour card"*, plus *"what is the best
+  image dimension to fit and what is currently"*.
+  (1) **`items-start` → `items-stretch`, and the panel takes `max-h-[640px]` beside its
+  `min-h-[450px]`.** Two of his rulings meet on that one line, hours apart, and neither is wrong:
+  *"keep it fixed at its card height"* (the catalogue panel adds ~300px to the right column and a
+  stretched photograph followed it to 800) against *"same height as its neighbour"* (at a flat 450 it
+  ended short of an ordinary fields column and left a gap under it). A floor and a CEILING satisfy
+  both - it follows the column, and refuses to follow the catalogue.
+  🔴 **The ceiling is load-bearing for the FIT**: the taller the panel, the more `object-cover`
+  throws away. Raising it without re-measuring that crop is how the «three wheels» of 2026-09-13
+  comes back. A case pins both bounds.
+  (2) 🔴 **The figures this repo has been quoting were STALE, in two files.** Measured against the
+  live tree on beta with the real card on screen rather than computed from class names:
+   · **Every illustrated taxonomy node is now `2400x1792`, ratio 1.339** - all 94 of them, one size.
+     `MachineCard` said «1408x768, ratio 1.83» and `RequestRail` said «1024×559, 1.83:1, the same
+     shape as the photographs», and the rail's whole «a photograph and a drawing are two different
+     kinds» premise rests on a distinction the catalogue no longer makes.
+   · **The card panel is `366x450`** (ratio 0.813) at a 1536 viewport - a `2fr_3fr` grid inside a
+     936px card interior - not the «660x610» the old note used.
+  So `contain` draws the photo 366x273 and leaves **177px of grey**, which is the band he reported,
+  and `cover` crops **39% of the width**.
+  ⚠️ **The rail's `scale-[1.34]` survives by coincidence and is still exactly right**: `contain`
+  draws a 1.34:1 picture 52x38.8 in a 52px box, and 52 ÷ 38.8 = 1.34. It was DERIVED as 52 ÷ 28 for a
+  1.83:1 letterbox. Anyone re-cutting the assets must recompute it - at a square source it is 1.
+  **The dimensions he asked for, from the measurement:**
+   · Card panel - box 366 wide x 450-640 tall. Ideal source **4:5 portrait, 800x1000** (2x of
+     366x450). Today's 1.34:1 landscape is the worst possible shape for it.
+   · Rail circle - box 52x52. Ideal source **square, 104x104** (2x). Today's asset is ~2,100x the
+     pixels that tile can show.
+  Files: `src/components/create/MachineCard.tsx`, `src/components/workspace/RequestRail.tsx` (the
+  stale note corrected, no behaviour change), `tests/unit/machine-card.test.tsx` (the height case
+  rewritten to the floor-and-ceiling rule).
+  🔴 **CONTENT, owed, and it is the real fix**: re-cut the taxonomy assets per surface - a 4:5
+  portrait for the card, a square for the rail. While one 1.34:1 file serves both, every surface is
+  choosing between a band and a crop, and the card is downloading 4.3 megapixels to show 0.16.
+  ⚠️ Verified: typecheck, lint (0 errors), 36 passing across the card and rail suites, and the
+  ceiling break-checked by deleting it - the new case went red. The dimensions were read off the live
+  page and the live taxonomy, not derived. NOT seen rendered after the change: beta still serves the
+  pre-`cover` build, so the stretch and the new crop want one look once it deploys.
+
+- **2026-09-14 - Editing a request can move the SITE and change the SIZE; the category and the type are the only locked fields.**
+  Owner: *"why i cant edit a location of a request?"*, then, on the answer, *"follow the app, all
+  fields editable except taxonomy right"*.
+  🔴 **The lock was OURS, and it was wider than the app's.** Nothing refused it downstream:
+  `updateRequestSchema` has accepted `projectLat` / `projectLng` / `projectAddressLabel` all along,
+  our PATCH route is a bare pass-through, and the app's edit mode reuses the whole create wizard and
+  sends those three itself. The web simply printed the address as a paragraph with a sentence saying
+  it could not be changed here.
+  **The app's line, read off its source rather than assumed** (`bug/post-bid-request-editing.md`,
+  pin 3): `equipment_step.dart` refuses the category picker, the ✕ on the only tab and the +, and
+  `_onEquipmentItemUpdated` copies the OLD `categoryId` and `subtypeId` back over any incoming item
+  as the backstop - whose own comment adds *"every other field on the item … stays freely
+  editable"*. So:
+  · **SIZE is editable.** `capacityId` is NOT in that backstop, and the capacity chooser renders on
+  `caps.length >= 2 && !isDirect` with no edit-mode condition at all. The same condition is used
+  here, and the list is scoped to the locked subtype's own measurements - offering the whole
+  catalogue would be a control whose picks the save must refuse.
+  · **The SITE is editable**, through `GoogleMapLocationPicker` - the create flow's own, which takes
+  no store and needed nothing new.
+  · Adding or removing an equipment is still not offered, which is also the app.
+  Files: `src/components/requests/RequestEditModals.tsx`,
+  `tests/unit/request-edit-fields.test.ts` (new, 14 cases).
+  🔴 **The old ruling was right about a TEXT BOX and wrong to conclude read-only.** *"A text box here
+  would edit the words while leaving the coordinates - which every distance, every map pin and every
+  supplier match is computed from - pointing at the old place."* True, and the answer is the picker:
+  one guard writes the point and the label together, and the label assignment sits INSIDE the
+  coordinate test, so the two can never part. A case pins that ordering.
+  ⚠️ **The Saudi bounds are tested on THIS side** (16 … 32.5, 34.5 … 56, the backend's own
+  `saudiProjectLat` / `saudiProjectLng`). Save is disabled and the save function returns early, and
+  the renter is told which way to move the pin. Necessary rather than tidy: this form's save ends in
+  a bare `catch` that only clears the busy flag, so a 422 would look exactly like a save that worked.
+  🔴 **Reported, NOT fixed: that silent `catch` covers every other failure too.** A refused edit -
+  the one-time post-bid cap spent (`REQUEST_EDIT_ALREADY_USED`), a dropped connection - closes
+  nothing and says nothing. It is pre-existing and wants its own pass, with the reason code beside
+  the sentence the way `AddSuppliersDialog` does it.
+  ⚠️ A moved pin draws a line saying what it changes (which suppliers match, every distance). It
+  states the consequence and does not ask: this is an edit form, and the renter moving the pin is
+  answering the question.
+  ⚠️ The cases read the SOURCE. The modal pulls a `Dialog`, six `Dropdown`s, a `next/dynamic` Google
+  Maps picker and two fetches; a render test would mock five things to assert one ruling about which
+  fields exist.
+  ⚠️ Verified: typecheck, lint (0 errors), 73 passing across the three touched suites, and both new
+  rulings break-checked one at a time - the capacity forced back to the stored id, then the bounds
+  guard removed from the save; two cases went red. **NOT seen rendered**: the drawer needs a
+  signed-in renter with an editable request, so the picker inside this dialog wants one look.
+
+- **2026-09-14 - On the ready strip only the machine's NOTE gives way; the name, the place, the dates and the payment all hold.**
+  Owner, refining the one-row rule taken an hour earlier: *"make the equipment name always full
+  appear, not stripped - but details after it like operator, cert might be stripped, but other fields
+  no"*.
+  ~~The machine name and its note both carried `truncate`, and the address did too.~~ So the first
+  thing to clip on a tight row was «Crawler Excavator 20 t…» - the one fact on the strip that says
+  WHAT he is renting - and «King Khalid International…», where half a place name is a different
+  place.
+  **The note is now the ONLY shrinkable element on the card.** It is a restatement: the operator and
+  the certificate are each stated in full in the section below, so half of it costs nothing. The
+  name, the place, the dates and the payment term are `flex-none whitespace-nowrap`.
+  Files: `src/components/create/ReadyToSend.tsx`, `tests/unit/ready-to-send.test.tsx` (4 new cases,
+  one rewritten).
+  🔴 **The card takes `overflow-hidden`, and it is load-bearing now.** With almost nothing able to
+  shrink, a row that genuinely cannot fit has to end at the card's own edge - without it the strip
+  would push the whole DOCUMENT wider than the screen, which is the fault audited out of three
+  surfaces on 2026-09-08.
+  ⚠️ **Safe only because `Dropdown` PORTALS its list** (`createPortal`, `z-[70]`). An
+  `overflow-hidden` ancestor would otherwise clip the payment menu the moment it opened - checked
+  before adding it, not after.
+  ⚠️ `shortSite` has already cut the address to the text before its first comma, so what the place
+  fact holds is the site's own name rather than a full postal line; that is why refusing to truncate
+  it is affordable.
+  ⚠️ Verified: typecheck, lint (0 errors), 69 passing across the four touched suites, and BOTH new
+  rulings break-checked one at a time - the name forced back to `truncate`, then the clip removed;
+  each went red alone. NOT seen rendered: jsdom lays out no flexbox, so what is pinned is the rule
+  that decides the row, never the row itself - the strip wants one look on the next deploy.
+
 - **2026-09-14 - The ready strip is ONE row: «Details» is one word, and the facts give way instead of the button.**
   Owner, on the review screen: *"make the button details only so it is smaller, and always in one row
   even if request details beside it stripped - but this card must have the details with the button in

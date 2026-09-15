@@ -67,6 +67,9 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**17.5** | Equipment tabs — one equipment | `src/components/create/EquipmentTabs.tsx` |
 | &nbsp;&nbsp;**17.6** | Equipment tabs — the + that adds one | `src/components/create/EquipmentTabs.tsx` |
 | &nbsp;&nbsp;**17.7** | Equipment tabs — the ✕ that removes one | `src/components/create/EquipmentTabs.tsx` |
+| &nbsp;&nbsp;**17.8** | Machine card — the escape row («Can't find the equipment you want?») | `src/components/create/MachineCard.tsx` |
+| &nbsp;&nbsp;**17.9** | Machine card — the equipment chooser panel | `src/components/create/MachineCard.tsx` |
+| &nbsp;&nbsp;**17.10** | Machine card — the chooser's catalogue list | `src/components/create/MachineCard.tsx` |
 | **18** | Operator rail | `src/components/create/OperatorRail.tsx` |
 | &nbsp;&nbsp;**18.1** | Operator rail — head row | `src/components/create/OperatorRail.tsx` |
 | &nbsp;&nbsp;**18.2** | Operator rail — options grid | `src/components/create/OperatorRail.tsx` |

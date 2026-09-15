@@ -74,6 +74,22 @@ function OverlayRequired({ title, word }: { title: string; word?: boolean }) {
 /** The trio box's columns, shared by the box and by its first row so the two line up exactly. */
 const TRIO_COLS = "sm:grid-cols-[minmax(150px,1.3fr)_minmax(104px,0.85fr)_minmax(200px,1.35fr)]";
 
+/* ── The own-words skin, worn by the NAME box and by the two lists beside it (owner, 2026-09-15) ──
+   *"keep the equipment name field look green"*, and *"the type - size will stay be dropdown … but
+   still shown green"*. One constant, so the three controls of that state cannot drift into three
+   greens.
+   ⚠️ It is APPENDED to `INPUT` / to the dropdown's field skin rather than replacing them, and that
+   only works because `--color-ok-*` is declared AFTER `--color-surface` and `--color-border` in
+   `globals.css` — Tailwind emits it later, so it wins. Same mechanism `INPUT_ERROR` has always
+   relied on; class order in the attribute decides nothing. */
+const OWN_SKIN = "border-ok/40 bg-ok-soft text-ok-deep";
+/* ⚠️ The DISABLED half is not decoration: on his own words there is no type, so the SIZE list has no
+   options and the dropdown disables itself — and the base skin's `disabled:` rules would paint it
+   the ordinary grey beside a green TYPE. Both boxes are green in the state he drew. */
+const OWN_TRIGGER =
+  `w-full rounded-sm px-3 py-2 text-body hover:border-ok ${OWN_SKIN} ` +
+  "disabled:border-ok/40 disabled:bg-ok-soft disabled:text-ok-deep";
+
 export function MachineCard({
   item,
   gaps,
@@ -199,16 +215,37 @@ export function MachineCard({
           panel can add 300px to the right column, and a stretched photograph followed it all the way
           down — a 1408x768 drawing rendered as a column. The two sides stopped being the same height
           the day the right one could grow. */}
-      <div {...pin("machine-card-body")} className="grid items-start gap-5 lg:grid-cols-[2fr_3fr]">
+      {/* ── The photo panel matches the column beside it (owner, 2026-09-14) ──────────────────
+          *"make the equipment image card same height as its neighbour card"*.
+          ~~`items-start`, with the panel on its own `min-h-[450px]`.~~ That left it ending short
+          whenever the fields column carried more than the minimum - the off-catalogue row, an
+          attachment, a long note - and the card read as a picture with a gap under it.
+          🔴 **Stretch, but CAPPED.** `items-start` was itself the fix for *"don't make it responsive
+          to the opening of this catalogue, it becomes too long"*: the catalogue panel adds ~300px to
+          the right column and a stretched photograph followed it to 800. `max-h` on the panel is
+          what lets it match the ordinary column without following the extreme one - see the note on
+          the panel itself. */}
+      <div {...pin("machine-card-body")} className="grid items-stretch gap-5 lg:grid-cols-[2fr_3fr]">
         {/* ---------------- The 450px panel, and the four controls on its corners ---------------- */}
         {/* `overflow-hidden`: the photograph now runs to the panel's own edges, so the panel has to
             clip it to its corners or the image squares them off. */}
-        {/* 🔴 `h-full` is GONE (owner, 2026-09-14: *"keep it fixed at its card height"*). `items-start`
-            was not enough on its own: a percentage height in a grid resolves against the grid AREA,
-            which IS definite, so `h-full` went on filling whatever the right column grew to — 450px
-            of drawing stretched to 800 the moment the catalogue opened. The panel states its own
-            height and nothing else decides it. */}
-        <div {...pin("machine-card-image")} className="relative min-h-[450px] w-full min-w-0 overflow-hidden rounded-md bg-surface2">
+        {/* ── 450 floor, 640 ceiling, and the column decides in between (owner, 2026-09-14) ─────
+            Two of his rulings meet on this one line and neither is wrong:
+             · *"keep it fixed at its card height"* - because the catalogue panel adds ~300px to the
+               right column and a stretched photograph followed it to 800, a drawing rendered as a
+               column.
+             · *"make the equipment image card same height as its neighbour card"* - because at the
+               fixed 450 it ended short of an ordinary fields column and left a gap under it.
+            A FLOOR and a CEILING satisfy both: `items-stretch` on the grid makes it follow the
+            column, `min-h` keeps it from collapsing on a short one, and `max-h` refuses to follow
+            the catalogue.
+            ⚠️ **640 is measured, not chosen.** The panel is 366x450 at a 1536 viewport (grid
+            `2fr_3fr` of a 936px card interior), and an ordinary tall column runs ~620. 640 clears
+            that and stops well short of the 800 that was rejected.
+            ⚠️ **The taller it grows the more `object-cover` crops** - the fit below is measured
+            against the 450 case. Raising this ceiling without re-measuring that crop is how the
+            «three wheels» of 2026-09-13 comes back. */}
+        <div {...pin("machine-card-image")} className="relative min-h-[450px] max-h-[640px] w-full min-w-0 overflow-hidden rounded-md bg-surface2">
           {/* ── The subtype's own photograph, where the admin panel has one (owner, 2026-08-31) ──
               The panel drew a Material Symbol chosen by matching the subtype's NAME against a list of
               words — «excavator» → the agriculture glyph — which is a reasonable guess and never the
@@ -243,6 +280,16 @@ export function MachineCard({
                  `absolute inset-0`: the BOX fills the panel corner to corner. The four chips already
                  float on the corners, so they were drawn for a photograph underneath them rather
                  than beside it.
+
+                 🔴 **MEASURED against the live asset, 2026-09-14** - and the figures the notes
+                 below quote were STALE. The taxonomy photograph is **2400x1792 (ratio 1.339)**, not
+                 the 1408x768 / 1.83 this file and the request rail had both been repeating; and the
+                 panel is **366x450 (0.813)** at a 1536 viewport, not the 660x610 the old note used.
+                 Read off beta with the real card on screen, not computed from the class names.
+                 What that means for the fit: `contain` draws it 366x273 and leaves **177px of grey**
+                 - the band the owner reported - while `cover` crops **39% of the width**. The
+                 machine survives that crop because these photographs are shot with wide margins,
+                 which was checked in the browser before the switch.
 
                  🔴 **`cover`, and the rejection of 2026-09-13 no longer applies** (owner,
                  2026-09-14: *"equipment image must match the card height too, even in the back of the
@@ -281,7 +328,33 @@ export function MachineCard({
                  ⚠️ 1.18, not more. At 1.3 the bucket's teeth start leaving the frame on the
                  wider-shot machines, and a cropped bucket is a different fault from an empty one.
                  ⚠️ Safe only because the panel is `overflow-hidden`. */
-              className="absolute inset-0 h-full w-full scale-[1.18] object-cover"
+              /* ── `contain`, zoomed only into the MARGIN (owner, 2026-09-15) ────────────────
+                 *"the equipment in the machine panel are so zoomed in that make the equipment not
+                 all appear"*.
+
+                 🔴 **`cover` was wrong here and the measurement that chose it was taken in the
+                 wrong box.** It was judged on a 585x450 probe; the panel is **366x450**. At 585 the
+                 crop is 29% and the machine survives, at 366 it is **39%** and the bucket and the
+                 counterweight are both cut off. The later `scale-[1.18]` on top of `cover` took it
+                 to ~48% - which is the state reported above.
+
+                 🔴 **Re-measured at the REAL 366x450**, four fits side by side on the live asset:
+                   · `contain`            whole machine, 177px of band
+                   · `contain` x1.2       whole machine, 122px of band   ← this
+                   · `contain` x1.3       whole machine, 95px, nothing to spare
+                   · `contain` x1.4/x1.5  the counterweight clips
+                   · `cover` (x1.65)      bucket and counterweight both gone
+                 1.3 is the ceiling for THIS render, so 1.2 is what ships: it eats the empty margin
+                 these photographs are shot with, and leaves headroom for a machine in the catalogue
+                 that is drawn wider than an excavator.
+
+                 ⚠️ **The band is what a 1.34 landscape costs in a 0.81 portrait box**, and no CSS
+                 removes it - `cover`, `contain` and `scale` all clip from the same source ratio and
+                 only move WHERE the loss lands. A square master is the real fix; see the change log.
+
+                 ⚠️ Safe only because the panel is `overflow-hidden rounded-md`; without that clip
+                 the zoom would spill over the four chips on the corners. */
+              className="absolute inset-0 h-full w-full scale-[1.2] object-contain"
             />
           ) : (
             /* No photograph: the glyph keeps its centred box and its caption. Here the name is not a
@@ -560,6 +633,10 @@ export function MachineCard({
                       live. `onKeyDown` catches the character before anything can change. */}
                   <TextInput
                     readOnly
+                    /* Green once the words are his, which is what replaced the confirmation strip
+                       under the box (owner, 2026-09-15). Still read-only: the way to CHANGE them is
+                       the escape row's «Keep my own words» door, which he kept. */
+                    className={custom ? OWN_SKIN : undefined}
                     value={shownName}
                     maxLength={120}
                     placeholder={t.create.machineCard.customEquipmentPlaceholder}
@@ -582,17 +659,16 @@ export function MachineCard({
                 star={!custom}
                 source={prov.itemSource("subtype", item.ref.subcategoryId)}
               >
-                {custom ? (
-                  /* ── His own words ARE the machine, so the two lists stop asking ───────────────
-                      The prototype replaces both controls with a flat statement, and it is right:
-                      an empty TYPE box beside an empty SIZE box reads as two answers he still owes,
-                      when in fact he has answered — with the name above. The way back is the escape
-                      row under them, which now reads «Can't find the equipment you want?». */
-                  <span className="flex h-[var(--control-md)] items-center truncate whitespace-nowrap rounded-sm border border-ok/40 bg-ok-soft px-3 text-body text-ok-deep">
-                    {t.create.machineCard.ownType}
-                  </span>
-                ) : (
+                {/* ── On his own words the list stays LIVE, and wears the green (owner, 2026-09-15)
+                    *"the type - size will stay be dropdown in case user want to select but still
+                    shown green"*.
+                    🔴 ~~A flat green statement, «Your own equipment», in place of the control.~~ It
+                    was the prototype's shape and it closed the one door a renter on his own words
+                    might still want: reaching into the catalogue from the card, without opening the
+                    panel. Picking a type here flips the line back to matched, which is the reducer's
+                    own behaviour and needed no change. */}
                 <SearchSelect
+                  triggerClass={custom ? OWN_TRIGGER : undefined}
                   value={item.ref.subcategoryId}
                   placeholder={t.create.machineCard.typePlaceholder}
                   searchPlaceholder={t.create.machineCard.searchTypes}
@@ -614,7 +690,6 @@ export function MachineCard({
                     actions.setItemSubcategory(item.id, v);
                   }}
                 />
-                )}
               </CanvasField>
               <CanvasField
                 label={t.create.machineCard.size}
@@ -624,14 +699,10 @@ export function MachineCard({
                 star={!custom}
                 source={prov.itemSource("capacity", item.ref.measurementId)}
               >
-                {/* `nowrap`: «In your own words» broke over two lines in the narrower SIZE column
-                    and left the two boxes at different heights. */}
-                {custom ? (
-                  <span className="flex h-[var(--control-md)] items-center truncate whitespace-nowrap rounded-sm border border-ok/40 bg-ok-soft px-3 text-body text-ok-deep">
-                    {t.create.machineCard.ownSize}
-                  </span>
-                ) : (
+                {/* Green like TYPE beside it, and still DISABLED until a type is chosen: a size is a
+                    size OF something, and that rule does not change with the line's state. */}
                 <SearchSelect
+                  triggerClass={custom ? OWN_TRIGGER : undefined}
                   value={item.ref.measurementId}
                   placeholder={t.create.machineCard.sizePlaceholder}
                   searchPlaceholder={t.create.machineCard.searchSizes}
@@ -643,7 +714,6 @@ export function MachineCard({
                     actions.setItemMeasurement(item.id, v);
                   }}
                 />
-                )}
               </CanvasField>
 
               {/* ── One escape, one panel, two doors (owner, 2026-09-13/14) ───────────────────
@@ -677,15 +747,11 @@ export function MachineCard({
                   }}
                 />
               )}
-              {/* The prototype's own confirmation that the choice stuck. It is drawn UNDER the
-                  escape, so the row that changed the line and the sentence describing the result sit
-                  together rather than a column apart. */}
-              {custom && !!(item.customEquipment ?? item.rawLabel) && (
-                <span className="sm:col-span-3 flex items-center gap-2 rounded-sm border border-ok/40 bg-ok-soft px-3.5 py-2.5 text-body text-ok-deep">
-                  <Icon name="check_circle" size={15} className="flex-none" />
-                  {fmt(t.create.machineCard.savedOwn, { name: item.customEquipment ?? item.rawLabel ?? "" })}
-                </span>
-              )}
+              {/* 🔴 ~~The prototype's own confirmation strip, «Saved as your own equipment — X».~~
+                  Removed by the owner on 2026-09-15: *"no need for saved as your own equipemtn etc
+                  just remove it and keep the equipment name field look green"*. It restated, in a
+                  full-width band, the name standing two rows above it — which is now green, and says
+                  the same thing where his words actually are. */}
 
             </div>
           )}
@@ -881,9 +947,15 @@ function EquipmentChooser({
      same view, and saves a press that could only lead to an empty one. */
   const showAll = wide || family.length === 0;
   const q = query.trim().toLowerCase();
-  const list = (showAll ? rows : family).filter(
-    (r) => !q || `${r.name} ${r.catName}`.toLowerCase().includes(q),
-  );
+  /* ── The BOX always searches the whole catalogue (owner, 2026-09-15) ─────────────────────────
+     *"just show equipment of same category and search bar with place holder search all equipment"*.
+     The list below it is the line's own family until he asks for more; typing is asking for more, so
+     a query reaches past the family without his having to widen anything first. */
+  const list = q
+    ? rows.filter((r) => `${r.name} ${r.catName}`.toLowerCase().includes(q))
+    : showAll
+      ? rows
+      : family;
 
   const close = () => {
     setView(null);
@@ -903,29 +975,32 @@ function EquipmentChooser({
     <>
       <div className="flex items-end">
       <button
+        {...pin("equipment-chooser-row")}
         type="button"
         onClick={() => (view ? close() : setView("root"))}
         /* ⚠️ A FULL CELL at the controls' own height, not a chip sized to its words (owner,
            2026-09-14). It is the third control on that row in the prototype and it lines up with the
            two beside it; `truncate` keeps the one-line promise if the column is ever too narrow for
            the sentence. */
-        /* 🔴 It WRAPS rather than clips (owner, 2026-09-14: *"still messy"*, on a shot of «Can't
-           find the equipment you war»). The one-line rule (2026-09-13) was about the sentence not
-           breaking in a column too narrow to hold it — and the answer then was to widen the column.
-           In this cell it does not fit at any width the row can spare, and a truncated QUESTION is
-           worse than a two-line one: it stops being a question. Minimum height keeps it level with
-           the two controls beside it when it does fit on one line. */
-        className={`flex min-h-[var(--control-md)] w-full items-center justify-between gap-2.5 rounded-sm border px-3.5 py-1.5 text-start text-label font-semibold leading-snug text-brand-deep transition ${
+        /* 🔴 ONE LINE, and it clips (owner, 2026-09-15, as a standing rule: *"dont ever wrap this
+           not in the equipment card"*). ~~It wrapped rather than clipping (2026-09-14, on a shot of
+           «Can't find the equipment you war»), on the argument that a truncated question stops being
+           a question.~~ He looked at the two-line row and took the clip: a control that changes
+           height rearranges the card under his eyes, and the whole sentence is one hover away on
+           `title`.
+           ⚠️ The fixed height is what keeps it level with the two lists beside it. */
+        title={label}
+        className={`flex h-[var(--control-md)] w-full items-center justify-between gap-2.5 rounded-sm border px-3.5 text-start text-label font-semibold whitespace-nowrap text-brand-deep transition ${
           shake ? "shake-error border-brand" : "border-brand-light bg-brand-soft hover:border-brand"
         }`}
       >
-        {label}
-        <span aria-hidden className="text-brand">{view ? "▴" : "▾"}</span>
+        <span className="min-w-0 truncate">{label}</span>
+        <span aria-hidden className="flex-none text-brand">{view ? "▴" : "▾"}</span>
       </button>
       </div>
 
       {view && (
-        <div className="sm:col-span-3 flex flex-col gap-3 rounded-sm border border-border-strong border-t-[3px] border-t-brand bg-surface p-3.5">
+        <div {...pin("equipment-chooser-panel")} className="sm:col-span-3 flex flex-col gap-3 rounded-sm border border-border-strong border-t-[3px] border-t-brand bg-surface p-3.5">
           {view === "root" && (
             <>
               {/* ── The question is CENTRED, and the close sits opposite nothing (owner, 2026-09-14)
@@ -968,31 +1043,30 @@ function EquipmentChooser({
 
           {view === "list" && (
             <>
+              {/* ── ONE list view, not two (owner, 2026-09-15) ─────────────────────────────────
+                  *"dont keep the search as another path"*.
+                  🔴 ~~A «Search all equipment» LINK on this row, which swapped the heading, revealed
+                  the search box and widened the list in one press.~~ Three things behind one word,
+                  and it read as a door to somewhere else. The box is simply always here, and the way
+                  to see the rest of the catalogue is a small press at the FOOT of the family — in
+                  place, under the rows it extends. */}
               <div className="flex flex-wrap items-baseline justify-between gap-3">
                 <span className="text-body font-extrabold text-navy">
-                  {showAll
+                  {q || showAll
                     ? t.create.machineCard.searchHeading
                     : fmt(t.create.machineCard.browseHeading, { family: family[0]?.catName ?? "" })}
                 </span>
-                <div className="flex items-center gap-3">
-                  {!showAll && (
-                    <button type="button" onClick={() => setWide(true)} className="text-label font-semibold text-brand-deep hover:underline">
-                      {t.create.machineCard.searchAll}
-                    </button>
-                  )}
-                  <button type="button" onClick={() => setView("root")} className="text-label font-semibold text-muted-dark hover:text-navy">
-                    {t.create.machineCard.backStep}
-                  </button>
-                </div>
+                <button type="button" onClick={() => setView("root")} className="text-label font-semibold text-muted-dark hover:text-navy">
+                  {t.create.machineCard.backStep}
+                </button>
               </div>
 
-              {showAll && (
-                <TextInput
-                  value={query}
-                  placeholder={t.create.machineCard.searchAny}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              )}
+              {/* The placeholder says «all», and it is the truth: the filter above reads `rows`. */}
+              <TextInput
+                value={query}
+                placeholder={t.create.machineCard.searchAll}
+                onChange={(e) => setQuery(e.target.value)}
+              />
 
               {/* ── The list says WHY it is short (owner, 2026-09-14) ────────────────────────
                   `/api/taxonomy` falls back to a 17-subtype stand-in whenever the agents service
@@ -1005,7 +1079,7 @@ function EquipmentChooser({
                 </span>
               )}
 
-              <div className="flex max-h-[232px] flex-col gap-1.5 overflow-y-auto">
+              <div {...pin("equipment-chooser-list")} className="flex max-h-[232px] flex-col gap-1.5 overflow-y-auto">
                 {list.map((r) => (
                   <div key={r.id} className="rounded-sm border border-border bg-surface">
                     {/* ── ONE line per type, at the card's own metrics (owner, 2026-09-14) ──────
@@ -1077,6 +1151,19 @@ function EquipmentChooser({
                     )}
                   </div>
                 ))}
+
+                {/* The foot of the family: the rest of the catalogue, in place. Withheld while a
+                    query is running (the search already spans everything) and when the family IS
+                    everything. */}
+                {!showAll && !q && rows.length > family.length && (
+                  <button
+                    type="button"
+                    onClick={() => setWide(true)}
+                    className="rounded-sm border border-dashed border-border-strong px-2.5 py-1.5 text-label font-semibold text-brand-deep transition hover:border-brand hover:bg-brand-soft"
+                  >
+                    {t.create.machineCard.showAllTypes}
+                  </button>
+                )}
 
                 {list.length === 0 && (
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-brand-light bg-brand-soft px-3.5 py-2.5">

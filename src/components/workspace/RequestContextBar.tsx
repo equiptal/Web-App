@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useLocale } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import type { RequestGroup, RequestListItem } from "@/lib/contract/requests";
@@ -45,6 +46,21 @@ export function RequestContextBar({
   const label = itemLabel(item, ar);
   const qty = item?.item?.qty ?? 1;
 
+  /**
+   * The machine's own picture, as the rail draws it (owner, 2026-09-15).
+   *
+   * `RequestListItem.item` already carries it — `imageUrl` resolved through `publicTaxonomyUrl` and
+   * `imageIsPhoto` saying WHICH of the taxonomy's two kinds of picture it is — so this costs no
+   * request and no new field. Nothing is invented where the catalogue holds nothing: the glyph.
+   */
+  const art = item?.item?.imageUrl ?? null;
+  /* An `<img>` absorbs a 403 as «no artwork», and the taxonomy's objects are not public-read on
+     staging — so a perfectly well-formed URL answers 403 and the circle would draw a broken-image
+     glyph, which is strictly worse than the icon. Keyed by URL rather than a bare boolean: the bar
+     re-renders for a different machine and a flag would carry the last one's failure onto it. */
+  const [brokenArt, setBrokenArt] = useState<string[]>([]);
+  const showArt = art && !brokenArt.includes(art) ? art : null;
+
   return (
     <div {...pin("request-context")} className="relative flex flex-none items-stretch">
       {/* ── Navy, and 44px like everything else on this row (owner, 2026-08-27) ────────────────────
@@ -78,6 +94,44 @@ export function RequestContextBar({
           onOpenRequest ? "hover:bg-navy-mid" : "cursor-default",
         )}
       >
+        {/* ── The machine, on the leading edge (owner, 2026-09-15) ───────────────────────────────
+            *"can u have the equipment image as circle on the left of this card"* — «left» being the
+            LEADING edge, so it mirrors with the reading direction like everything else on this row;
+            it is first in the flex row and needs no rule of its own to land there.
+
+            32px inside a 44px control leaves 6px clear a side, which is the same air the two lines
+            beside it already sit in. The ground is `surface3`, the rail's own: a picture with a
+            transparent margin needs something behind it, and on navy that has to be the light tone
+            or the margin swallows the machine. */}
+        <span className="grid h-8 w-8 flex-none place-items-center overflow-hidden rounded-full border border-white/15 bg-surface3">
+          {showArt ? (
+            /* ── Which fit, decided by which PICTURE it is ───────────────────────────────────────
+               The rail's ruling, verbatim, because it is the same asset in the same shape of hole:
+               a PHOTOGRAPH reaches its own edges and takes `cover`; a DRAWING carries its own
+               transparent margin, so cropping one enlarges the margin rather than the machine and it
+               takes `contain` scaled up to the circle's diameter instead.
+
+               ⚠️ 1.34 is not a taste: `contain` draws the catalogue's 1.34:1 artwork at
+               32 × 23.9 in this box, and 32 ÷ 23.9 = 1.34. It survives a change of box size and it
+               would NOT survive a re-cut of the assets to a different aspect — at a square source it
+               is 1. Safe only because the parent is `overflow-hidden rounded-full`.
+               (The rail carries the same number and the measurement behind it.) */
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={showArt}
+              alt=""
+              draggable={false}
+              onError={() => setBrokenArt((b) => (b.includes(showArt) ? b : [...b, showArt]))}
+              className={
+                item?.item?.imageIsPhoto
+                  ? "h-8 w-8 rounded-full object-cover"
+                  : "h-8 w-8 scale-[1.34] object-contain"
+              }
+            />
+          ) : (
+            <Icon name="precision_manufacturing" size={15} className="text-muted" />
+          )}
+        </span>
         <span className="flex min-w-0 flex-1 flex-col justify-center gap-1">
         {/* ── The site leads, the machine follows (owner, 2026-08-27) ────────────────────────────
             The site is the 12.5px white and the machine the 11px grey under it. The item filter one

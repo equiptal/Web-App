@@ -2522,9 +2522,17 @@ export const en = {
       doorSearch: "Search our catalogue",
       doorOwn: "Keep my own words",
       browseHeading: "{family} types in our catalogue",
+      /* ⚠️ This is the search box's PLACEHOLDER now, not a link to a second view (owner,
+         2026-09-15: *"dont keep the search as another path"*). It still says «all», because the box
+         searches the whole catalogue even while the list below it shows one family.
+         ~~`searchAny`, «Name or nickname — try “digger”, “roto”, “FLT”».~~ It belonged to the widened
+         view, which no longer exists as a place you go. */
       searchAll: "Search all equipment",
       searchHeading: "Search the Moedatech catalogue",
-      searchAny: "Name or nickname — try “digger”, “roto”, “FLT”",
+      /* The foot of a one-family list: the rest of the catalogue is one small press away, in place,
+         rather than behind a door (owner, 2026-09-15: *"small show all in the end of the shown
+         catelogie of the same type that will show all taxonamy too"*). */
+      showAllTypes: "Show all equipment",
       /* 🔴 The list is SHORT because the catalogue did not load, not because we do not carry the
          machine. Without this the two are the same picture, and the renter concludes the wrong one. */
       catalogueShort: "Our catalogue did not load, so this list is short — try again in a moment",
@@ -2541,13 +2549,15 @@ export const en = {
          «keep my name» only, in button style"*). The sentence it used to carry is the label above the
          field it saves. */
       keepOwn: "Keep my name",
-      savedOwn: "Saved as your own equipment — {name}",
+      /* 🔴 ~~`savedOwn`, «Saved as your own equipment — {name}».~~ Removed by the owner on
+         2026-09-15: *"no need for saved as your own equipemtn etc just remove it and keep the
+         equipment name field look green"*. The green NAME FIELD says it, where his words are. */
       pillInCatalogue: "In our catalogue",
       pillNotMatched: "Not matched",
-      ownType: "Your own equipment",
-      /* The prototype's own wording, and it fits: «In your own words» ran past the SIZE column
-         and was clipped mid-phrase (owner, 2026-09-14: *"still messy"*). */
-      ownSize: "As described",
+      /* 🔴 ~~`ownType` / `ownSize`, the two flat green statements that replaced the lists.~~ Removed
+         2026-09-15: *"the type - size will stay be dropdown in case user want to select but still
+         shown green"*. The lists stay live and wear the green instead, so a renter on his own words
+         can still reach into the catalogue without opening the panel. */
       searchSizes: "Search sizes…",
       fuel: "FUEL",
       /* ── An ask, not a heading (owner, 2026-09-08) ───────────────────────────────

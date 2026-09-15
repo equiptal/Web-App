@@ -259,7 +259,18 @@ export function RequestRail({
 
                            The padding is gone and the drawing is scaled to cover the circle's
                            diameter — 1.34 ≈ 52 ÷ 28, the exact factor that turns that letterbox into
-                           a filled round tile. It is NOT switched to `object-cover`: tried on the
+                           a filled round tile.
+
+                           ⚠️ **RE-MEASURED 2026-09-14, and the ratio above is now stale: the whole
+                           catalogue is 2400×1792 (1.34:1).** All 94 illustrated nodes, one size —
+                           checked against the live tree, not assumed. The scale survives by
+                           coincidence and is still exactly right: `contain` draws a 1.34:1 picture
+                           52×38.8 in this box, and 52 ÷ 38.8 = 1.34. Anyone re-cutting the assets
+                           must recompute it; at a SQUARE source it would have to be 1.
+                           ⚠️ 2400×1792 for a 52px circle is ~2,100× the pixels this tile can show.
+                           The ideal source here is **square, 104×104** (52 at 2×).
+
+                           It is NOT switched to `object-cover`: tried on the
                            live rail and the crop cut the machine into an unreadable jumble, which is
                            what the note above predicted. `contain` keeps the whole machine and the
                            scale gives it the circle. */

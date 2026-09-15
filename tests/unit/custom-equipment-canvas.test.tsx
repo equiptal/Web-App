@@ -220,6 +220,81 @@ describe("the escape, and the panel behind it", () => {
     expect(screen.getByRole("button", { name: /Keep my name/i })).toBeTruthy();
   }, 20_000);
 
+  it("keeps the two lists LIVE and green on his own words, and drops the «saved» strip", async () => {
+    /**
+     * Owner, 2026-09-15: *"the type - size will stay be dropdown in case user want to select but
+     * still shown green"*, and *"no need for saved as your own equipemtn etc just remove it and keep
+     * the equipment name field look green"*.
+     * 🔴 ~~Two flat green statements, «Your own equipment» and «As described», in place of the two
+     * controls, with a full-width «Saved as your own equipment — X» strip under them.~~ The
+     * statements closed the one door a renter on his own words might still want — reaching into the
+     * catalogue from the card without opening the panel — and the strip restated the name two rows
+     * above it.
+     */
+    const { Canvas, confirmedProject, makeAgentDraft, makeItem, renderCanvas } = await withFlag();
+    const barge = makeItem({
+      id: "nm1",
+      rawLabel: "floating crane barge",
+      rawSize: null,
+      ref: { categoryId: null, subcategoryId: null, measurementId: null },
+      verdict: "no-match",
+      resolved: false,
+    });
+    await renderCanvas(<Canvas />, { draft: makeAgentDraft({ items: [barge], project: confirmedProject() }) });
+
+    // Real controls, not sentences.
+    const type = screen.getByRole("combobox", { name: "TYPE" });
+    const size = screen.getByRole("combobox", { name: "SIZE" });
+    expect(screen.queryByText("Your own equipment")).toBeNull();
+    expect(screen.queryByText("As described")).toBeNull();
+    // Green, and the NAME box with them — that is what replaced the strip.
+    const name = screen.getByPlaceholderText("Name the equipment you need");
+    for (const el of [type, size, name]) expect(el.className).toContain("bg-ok-soft");
+    /* ⚠️ SIZE is disabled (no type ⇒ no sizes) and must be green ANYWAY: the base skin's `disabled:`
+       rules would paint it grey beside a green TYPE. */
+    expect((size as HTMLButtonElement).disabled).toBe(true);
+    expect(size.className).toContain("disabled:bg-ok-soft");
+    expect(screen.queryByText(/Saved as your own equipment/i)).toBeNull();
+  }, 20_000);
+
+  it("keeps the escape row to ONE line, clipping rather than wrapping", async () => {
+    /**
+     * Owner, 2026-09-15, as a standing rule: *"dont ever wrap this not in the equipment card"*.
+     * 🔴 This reverses 2026-09-14, where the row was made to wrap on the argument that a truncated
+     * question stops being a question. He looked at the two-line row and took the clip; the whole
+     * sentence is on `title`.
+     */
+    const row = await open();
+    expect(row.className).toContain("whitespace-nowrap");
+    expect(row.className).not.toContain("min-h-");
+    expect(row.getAttribute("title")).toMatch(/find the equipment you want/i);
+  }, 20_000);
+
+  it("shows the family with ONE search box over it, and the rest of the catalogue at its foot", async () => {
+    /**
+     * Owner, 2026-09-15: *"dont keep the search as another path just show equipment of same category
+     * and search bar with place holder search all equipment … it will be directly the search bar
+     * with small show all in the end of the shown catelogie of the same type"*.
+     * 🔴 ~~A «Search all equipment» LINK on the heading row, which swapped the heading, revealed the
+     * search box and widened the list in one press.~~ Three acts behind one word.
+     */
+    /* ⚠️ Opened on a MATCHED line, not the barge: with no category resolved there is no family to
+       show, the list opens WIDE on its own, and the foot press would have nothing left to reveal. */
+    const { Canvas, confirmedProject, makeAgentDraft, makeItem, renderCanvas } = await withFlag();
+    await renderCanvas(<Canvas />, {
+      draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Not the equipment you want/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Search our catalogue/i }));
+
+    // The box is simply there, and it says «all» because it searches all.
+    expect(screen.getByPlaceholderText("Search all equipment")).toBeTruthy();
+    // ...and it is no longer a press that takes him somewhere.
+    expect(screen.queryByRole("button", { name: "Search all equipment" })).toBeNull();
+    // The way to the whole catalogue is at the FOOT of the family, in place.
+    expect(screen.getByRole("button", { name: "Show all equipment" })).toBeTruthy();
+  }, 20_000);
+
   it("asks for the SIZE on the row rather than choosing one for him", async () => {
     const row = await open();
     fireEvent.click(row);

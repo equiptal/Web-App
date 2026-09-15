@@ -193,19 +193,22 @@ export function ReadyToSend() {
             ⚠️ It still WRAPS below `sm`. Four facts and two controls on one line of a phone is not a
             row, it is a smear - and forcing it would push the whole document wider than the screen,
             the fault audited out of three surfaces on 2026-09-08. */}
-        <div className="flex min-w-0 flex-1 basis-[34rem] flex-wrap items-center gap-x-4 gap-y-2 rounded-sm border border-border bg-surface px-4 py-2.5 sm:flex-nowrap">
+        <div className="flex min-w-0 flex-1 basis-[34rem] flex-wrap items-center gap-x-4 gap-y-2 overflow-hidden rounded-sm border border-border bg-surface px-4 py-2.5 sm:flex-nowrap">
         {/* A green dot for «this is ready», the same mark the panels use on the canvas. */}
         <span aria-hidden className="size-2 flex-none rounded-full bg-ok" />
 
         {mapHref && place && (
-          <StripFact icon="place">
+          <StripFact icon="place" tight>
             {/* The real link (owner, 2026-09-02). An address a renter cannot press is an address
-                they retype into another tab to check. */}
+                they retype into another tab to check.
+                ⚠️ It does NOT truncate any more (owner, 2026-09-14: *"other fields no"*). `shortSite`
+                has already cut it to the text before the first comma, so what is left is the place's
+                own name — and half a place name is a different place. */}
             <a
               href={mapHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="truncate underline decoration-border underline-offset-2 hover:text-brand"
+              className="whitespace-nowrap underline decoration-border underline-offset-2 hover:text-brand"
             >
               {shortSite(place)}
             </a>
@@ -222,12 +225,20 @@ export function ReadyToSend() {
         )}
 
         {first && (
+          /* ── The machine's NAME is never stripped; its note is (owner, 2026-09-14) ───────────
+             *"make the equipment name always full appear, not stripped - but details after it like
+             operator, cert might be stripped, but other fields no"*.
+             ~~Both the name and the note truncated~~, so on a long name the row clipped «Crawler
+             Excavator 20 t…» — the one thing on this strip that says WHAT he is renting. The note is
+             the only shrinkable element on the whole card now: it is a restatement (the operator and
+             the certificate are each stated in full in the section below), so half of it costs
+             nothing, while half a machine name costs the fact itself. */
           <StripFact icon="inventory_2">
-            <span className="truncate">
+            <span className="flex-none whitespace-nowrap">
               {first.equipment}
               {first.size ? ` ${first.size}` : ""} ×{num(first.qty)}
             </span>
-            {machineNote && <span className="truncate text-muted">· {machineNote}</span>}
+            {machineNote && <span className="min-w-0 truncate text-muted">· {machineNote}</span>}
             {items.length > 1 && (
               <span className="flex-none font-semibold text-brand">+{num(items.length - 1)}</span>
             )}
