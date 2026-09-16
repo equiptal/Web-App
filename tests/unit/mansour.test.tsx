@@ -19,7 +19,9 @@ const SVG = readFileSync("src/components/Mansour.tsx", "utf8");
 const CSS = readFileSync("src/components/mansour.css", "utf8");
 const PROCESSING = readFileSync("src/components/screens/Processing.tsx", "utf8");
 const INTAKE = readFileSync("src/components/screens/Intake.tsx", "utf8");
-const CHIPS = readFileSync("src/components/create/ProjectChips.tsx", "utf8");
+/* The typewriter moved to the RAIL with the site strip (owner, 2026-09-16); `ProjectChips`
+   is deleted. Who raises the flag changed; the rule that it must be lowered did not. */
+const CHIPS = readFileSync("src/components/create/RequestsRail.tsx", "utf8");
 
 afterEach(cleanup);
 

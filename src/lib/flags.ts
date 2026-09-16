@@ -96,7 +96,7 @@ export const TRIAL_REQUESTS_ENABLED: boolean = false;
  * because a blank workspace would render the «create your first request» empty state over an account
  * that has several.
  */
-export const HIDE_BIDLESS_REQUESTS: boolean = true;
+export const HIDE_BIDLESS_REQUESTS: boolean = false;
 
 /**
  * EQUIPMENT_NAME_ON_EVERY_LINE — send the renter's own words beside the taxonomy, not instead of it.
@@ -145,3 +145,24 @@ export const EQUIPMENT_NAME_ON_EVERY_LINE = process.env.NEXT_PUBLIC_EQUIPMENT_NA
  * is a product decision that lands in one deploy, not a per-environment setting.
  */
 export const TAXONOMY_INCLUDE_HIDDEN = true;
+
+/**
+ * NATIONAL_DAY_ENABLED — the Saudi National Day skin: the green header with its palm grove, dot
+ * lattice and gold Najdi seam, the season chip beside the wordmark, and the seam along the
+ * dashboard band. `src/lib/season.ts` holds the window and the ordinal.
+ *
+ * ON by default, and **the flag is not what turns it on** — the DATE is. The theme is up between
+ * 16 September and 1 October (Asia/Riyadh) and is gone by itself on the 1st, which is what the
+ * owner asked for: *"stay until 1-10"*. This flag is the kill switch OVER that window, for taking
+ * it down early or holding it off one environment without editing the dates.
+ *
+ * 🔴 **It does not repaint the brand.** Green is chrome only; `--brand` stays #f97316 and every CTA
+ * with it (owner, 2026-09-16). The reason is written at the head of `season.ts`: this app already
+ * spends green on `--ok`, and a celebration sharing the success colour is a colour saying two
+ * things at once.
+ *
+ * `=0` is the kill switch, the same shape as `CUSTOM_EQUIPMENT_ENABLED`. Build-time, like every
+ * NEXT_PUBLIC_ variable: rebuild the branch after changing it. The window itself is evaluated at
+ * REQUEST time, in the root layout, so a build that ships before the 16th still turns green on it.
+ */
+export const NATIONAL_DAY_ENABLED = process.env.NEXT_PUBLIC_NATIONAL_DAY !== "0";

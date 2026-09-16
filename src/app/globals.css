@@ -197,6 +197,22 @@
   --shop-amber-soft: #fdf1e0; /* the size chip's ground */
   --shop-field: #fafbfb;      /* the search field, the one surface that is not white */
 
+  /* ── The National Day skin (owner, 2026-09-16) ───────────────────────────────────────────────
+     A SEASON, not a repaint. These seven are ADDITIVE: they are declared all year and painted only
+     under `[data-season="nd"]`, which `layout.tsx` writes between 16 September and 1 October. No
+     token above this block changes value while the season runs — `--brand` in particular stays
+     #f97316, because this app already spends green on `--ok` («it happened») and a celebration
+     borrowing the success colour would give one colour two meanings on the same screen.
+
+     The values are the Flutter kit's own, so the two products celebrate in the same green. */
+  --nd-ground: #00542a;      /* the bar's ground — the kit's `nd-ground` */
+  --nd-deep: #05351f;        /* the gradient's dark corner */
+  --nd-mid: #0a7a3e;         /* the gradient's light corner */
+  --nd-green: #006c35;       /* the flag's green: a solid chip, the corner ribbon */
+  --nd-accent: #d7c48a;      /* pale gold — the Najdi seam, the chip's figure, the hairline */
+  --nd-mint: #e8f2ea;        /* the pale chip's ground, for a LIGHT surface */
+  --nd-ink: #0d5c3e;         /* the pale chip's ink, AA on `--nd-mint` */
+
   /* ── Disabled ────────────────────────────────────────────────────────────────────────────────
      A state with its own colours rather than a faded copy of another one. `opacity: .5` over an
      orange or red fill produced a muddy tint nobody chose, and landed around 2.1:1 against white
@@ -257,6 +273,15 @@
   --color-brand-soft: var(--brand-soft);
   --color-brand-fg: var(--brand-fg);
   --color-gold: var(--gold);
+  /* The National Day skin. Mirrored here for the same reason every other token is: a colour
+     `:root` defines and `@theme` does not is a colour half the app cannot reach. */
+  --color-nd-ground: var(--nd-ground);
+  --color-nd-deep: var(--nd-deep);
+  --color-nd-mid: var(--nd-mid);
+  --color-nd-green: var(--nd-green);
+  --color-nd-accent: var(--nd-accent);
+  --color-nd-mint: var(--nd-mint);
+  --color-nd-ink: var(--nd-ink);
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
   --color-ok-deep: var(--ok-deep);
@@ -794,3 +819,138 @@ body {
 .legal-doc a { color: var(--brand-deep); text-decoration: underline; text-underline-offset: 2px; }
 .legal-doc hr { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
 .legal-doc blockquote { margin: 0 0 12px; padding-inline-start: 12px; border-inline-start: 2px solid var(--border); color: var(--muted-dark); }
+
+/* ══ The category rail on Browse ════════════════════════════════════════════════════════════════
+   A slim scrollbar for the horizontal strip of category pills (owner, 2026-09-16: *"make it thinner
+   and nicer"*). The browser's default bar is ~15px of chrome under a 28px row, so the furniture was
+   half the height of the thing it scrolled.
+
+   ⚠️ **`overflow-x: auto` STAYS on the element** — this styles the bar, it does not remove it. A
+   hidden bar on a strip that really does overflow is a row whose rest is unreachable on a trackpad
+   with no shift-scroll, which is the fault the dropdown list met on 2026-09-13.
+
+   ⚠️ Firefox takes `scrollbar-width`/`scrollbar-color` and ignores the pseudo-elements; WebKit takes
+   the pseudo-elements and ignores those two. Both are stated, so neither engine falls back to the
+   default bar.                                                                                   */
+.shop-rail { scrollbar-width: thin; scrollbar-color: var(--shop-line) transparent; }
+.shop-rail::-webkit-scrollbar { height: 6px; }
+.shop-rail::-webkit-scrollbar-track { background: transparent; }
+.shop-rail::-webkit-scrollbar-thumb { background: var(--shop-line); border-radius: 999px; }
+.shop-rail:hover::-webkit-scrollbar-thumb { background: var(--shop-ink-4); }
+
+
+/* ════════════════════════════════════════════════════════════════════════════════════════════════
+   THE NATIONAL DAY SKIN
+
+   Owner, 2026-09-16: *"can i do a national day version that stay until 1-10 and it is another
+   design theme not replacing ours so maybe just a flag"*, with the Flutter decor kit and a
+   screenshot of the app's own green header as the reference.
+
+   Everything below is scoped under `[data-season="nd"]`, which `layout.tsx` writes on `<html>`
+   between 16 September and 1 October (Asia/Riyadh). Out of season not one of these rules matches,
+   nothing above this block is overridden, and `/nd96-palms.svg` is never fetched.
+
+   🔴 **Nothing here redefines a token.** The season paints by ADDING marks to named hosts, never by
+   moving `--brand`, `--navy-deep` or `--ok` under everyone's feet. That is the whole difference
+   between a second theme and a repaint, and it is why «turn it off» is one attribute.
+
+   ⚠️ **The hosts carry their class ALL YEAR** — `.nd-bar` on the header, `.nd-decor` on its
+   backdrop span, `.nd-seam` on the dashboard band. A component that branched on the date in JS
+   would either mismatch on hydration (the server knows the date, the client re-reads it) or paint
+   navy first and flip green a frame later. An unstyled class costs nothing; a flicker on every
+   cold load for a fortnight is what it buys.
+   ════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* ── The bar ─────────────────────────────────────────────────────────────────────────────────────
+   `bg-navy-deep` sets a background-COLOUR, so the gradient goes on top as a background-IMAGE and the
+   navy stays underneath as the fallback the moment the season ends. The kit's own three stops. */
+[data-season="nd"] .nd-bar {
+  background-image: linear-gradient(to bottom left, var(--nd-deep) 0%, var(--nd-ground) 46%, var(--nd-mid) 100%);
+}
+
+/* ── The backdrop: the dot lattice, then the grove ───────────────────────────────────────────────
+   A real child rather than a `::before`, and deliberately. The header is `sticky z-30`, so it opens
+   a stacking context; a positioned pseudo-element would either paint OVER the logo and the tabs
+   (z-index auto, later in paint order than its non-positioned siblings) or, at `z-index: -1`, drop
+   behind the header's own background and disappear. A sibling span with the content after it in the
+   source needs no z-index at all.
+
+   The dots are 1px at 10% white on a 20px lattice — the campaign deck's own texture, and what stops
+   a flat green bar reading as a colour swatch. The grove is the file, anchored bottom and cropped by
+   `cover`, so the trunks run off the bar's own edge the way the app's do. */
+.nd-decor { display: none; }
+[data-season="nd"] .nd-decor {
+  display: block;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    url("/nd96-palms.svg"),
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.1) 1px, transparent 1.6px);
+  background-repeat: no-repeat, repeat;
+  background-position: center bottom, 0 0;
+  background-size: cover, 20px 20px;
+}
+
+/* ── The Najdi seam ──────────────────────────────────────────────────────────────────────────────
+   One rank of gold triangles along a bottom edge — 6px tall at a 12px pitch, the kit's own numbers.
+
+   The SHAPE is a mask and the COLOUR is `--nd-accent`, rather than a gold triangle baked into a data
+   URI: a colour written inside an encoded SVG is a colour no token can reach and no sweep can find,
+   which is exactly the drift `palette-drift.test.ts` exists to catch. The mask carries black because
+   a mask reads alpha and luminance, never hue.
+
+   Both prefixes are stated: WebKit still wants `-webkit-mask` on the older Safari this product is
+   opened on. */
+.nd-decor::after,
+[data-season="nd"] .nd-seam::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 6px;
+  background: var(--nd-accent);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 6'%3E%3Cpath d='M0 0h12L6 6z' fill='%23000'/%3E%3C/svg%3E") repeat-x 0 0 / 12px 6px;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 6'%3E%3Cpath d='M0 0h12L6 6z' fill='%23000'/%3E%3C/svg%3E") repeat-x 0 0 / 12px 6px;
+}
+/* The seam is drawn by the host, so the host has to be a containing block. The header already is
+   (`relative`); the dashboard band is stated here rather than in a class on the element, because a
+   `relative` added to that band all year would change what its own absolute children measure
+   against. `.nd-seam` is inert out of season for the same reason. */
+[data-season="nd"] .nd-seam { position: relative; }
+
+/* ── The season chip ─────────────────────────────────────────────────────────────────────────────
+   Outlined gold on the green bar, which is the treatment «Beta» already takes beside it (outlined
+   white at 25%): a note ON the wordmark, never a control. A SOLID green chip — the kit's other
+   weight — is for a light surface, and on this bar it would be invisible. */
+.nd-chip { display: none; }
+[data-season="nd"] .nd-chip {
+  align-items: center;
+  gap: 4px;
+  border: 1px solid color-mix(in srgb, var(--nd-accent) 45%, transparent);
+  color: var(--nd-accent);
+}
+
+/* 🔴 **The phone rule is HERE, not a `max-sm:hidden` on the element**, and this is the one
+   thing about this skin that was measured rather than reasoned about.
+
+   Tailwind emits its utilities inside `@layer utilities`; this block is UNLAYERED. Unlayered CSS
+   beats layered CSS outright, whatever the specificity and whatever the order — so
+   `[data-season="nd"] .nd-chip { display: inline-flex }` would have overridden
+   `.max-sm\:hidden { @media (width < 40rem) { display: none } }` at EVERY width, and the chip would
+   have ridden the phone bar all season. It typechecks, it lints, it looks right on a laptop, and it
+   is only visible at 392px on a real browser.
+
+   Same family as the `hidden md:grid` fault of 2026-09-16 and the `rounded-full` one of 2026-09-12:
+   two rules for one property, and the loser is decided somewhere the call site cannot see. One
+   place decides the chip's display now, and it is this block.
+
+   40rem is `sm`, read off the compiled sheet rather than assumed. */
+@media (width >= 40rem) {
+  [data-season="nd"] .nd-chip { display: inline-flex; }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────────────────────────────
+   Nothing in this skin animates, and that is a decision rather than an omission: the kit's confetti
+   is not carried here. It would fire over the dashboard's own «your request is posted» tick, which
+   is the one moment on this product that is allowed to celebrate something. */

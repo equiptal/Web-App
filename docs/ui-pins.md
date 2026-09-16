@@ -34,6 +34,8 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**2.1** | Header — logo | `src/components/AppShell.tsx` |
 | &nbsp;&nbsp;**2.2** | Header — centred nav slot | `src/components/AppShell.tsx` |
 | &nbsp;&nbsp;**2.3** | Header — beta mark | `src/components/AppShell.tsx` |
+| &nbsp;&nbsp;**2.4** | Header — season backdrop (palms, dots, seam) | `src/components/AppShell.tsx` |
+| &nbsp;&nbsp;**2.5** | Header — season chip | `src/components/AppShell.tsx` |
 | **3** | Nav tabs — desktop | `src/components/AppNav.tsx` |
 | &nbsp;&nbsp;**3.1** | Nav tab — one link | `src/components/AppNav.tsx` |
 | **4** | Nav tabs — mobile | `src/components/AppNav.tsx` |
@@ -54,8 +56,13 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**10.5** | Browse — banner + supplier directory | `src/components/stores/BrowsePage.tsx` |
 | &nbsp;&nbsp;**10.6** | My Suppliers — the list | `src/components/suppliers/SuppliersPage.tsx` |
 | &nbsp;&nbsp;**10.7** | Home — notification bubble | `src/components/home/HomeNotificationBubble.tsx` |
+| &nbsp;&nbsp;**10.8** | Home — requests / suppliers / projects tabs | `src/components/home/HomeHub.tsx` |
 | **11** | Start-your-request modal | `src/components/home/StartYourRequestModal.tsx` |
 | **15** | Create — intake screen | `src/components/screens/Intake.tsx` |
+| &nbsp;&nbsp;**15.1** | Intake — previous-requests rail | `src/components/create/RequestsRail.tsx` |
+| &nbsp;&nbsp;**15.2** | Intake rail — one project | `src/components/create/RequestsRail.tsx` |
+| &nbsp;&nbsp;**15.3** | Intake rail — one machine | `src/components/create/RequestsRail.tsx` |
+| &nbsp;&nbsp;**15.4** | Intake — the chosen project and its machines, on the floor | `src/components/create/RequestsRail.tsx` |
 | **16** | Create canvas (3 columns) | `src/components/create/Canvas.tsx` |
 | &nbsp;&nbsp;**16.1** | Create — «leave this request?» confirm | `src/components/create/CreateBack.tsx` |
 | &nbsp;&nbsp;**16.2** | Create — site + schedule locked strip (with «Change») | `src/components/create/Canvas.tsx` |
@@ -149,6 +156,9 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**57.5** | Chat drawer — staged request card | `src/components/map/ChatDock.tsx` |
 | **60** | Inbox | `src/components/inbox/InboxView.tsx` |
 | **61** | Browse stores | `src/components/stores/BrowseSurface.tsx` |
+| &nbsp;&nbsp;**61.1** | Browse — heading + search + city, one row | `src/components/stores/BrowseSurface.tsx` |
+| &nbsp;&nbsp;**61.2** | Browse — category rail | `src/components/stores/BrowseSurface.tsx` |
+| &nbsp;&nbsp;**61.3** | Browse — page arrows | `src/components/stores/BrowseSurface.tsx` |
 | **62** | Store detail | `src/components/stores/StoreDetailSurface.tsx` |
 | **63** | Store card | `src/components/stores/StoreCard.tsx` |
 | **64** | Store card (category) | `src/components/stores/StoreCard.tsx` |

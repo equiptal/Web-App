@@ -98,13 +98,21 @@ const say = (mark, label, detail) => out.push(`${mark}  ${label}${detail ? ' —
     say('OK  ', 'tenant_id = default');
   }
 
+  // ── The post gate, as it stands after 2026-09-13/14 ─────────────────────────
+  // 🔴 The WEB's two entry gates were both DELETED (createRequest.ts:387-411): the
+  // onboarding check on 2026-09-13 and the 3-request cap on 2026-09-14. Its owner
+  // lookup now selects `{ id: true }` and refuses only a missing row.
+  // The APP still refuses, but on an AND, not on the flag alone
+  // (request.service.ts:152): `!hasCompletedOnboarding && tier === 'guest'`.
+  // So the divergence REVERSED — the web is now the permissive side.
   if (!u.has_completed_onboarding) {
-    say('FAIL', 'has_completed_onboarding = 0', 'createRequest refuses with GUEST_CANNOT_POST_REQUESTS / E10001');
-    if (identityComplete) {
-      say('FAIL', 'STUCK ACCOUNT', 'identity complete so he reads as ' + tier + ', but the flag is false. No admin action unsticks this: forceBasicTier throws "already Basic", forceVerifiedTier does not write the flag.');
+    if (tier === 'guest') {
+      say('FAIL', 'APP refuses: real guest', 'has_completed_onboarding = 0 AND tier = guest — GUEST_CANNOT_POST_REQUESTS / E10001 on the phone. The WEB allows it: backend-agents dropped that gate on 2026-09-13.');
+    } else {
+      say('OK  ', 'has_completed_onboarding = 0 — harmless', 'tier = ' + tier + ', so the app guest test (flag AND guest) does not fire, and the web never reads the flag. NOT a stuck account: that trap was retired with the gate.');
     }
   } else {
-    say('OK  ', 'has_completed_onboarding = 1', 'post gate clear');
+    say('OK  ', 'has_completed_onboarding = 1', 'post gate clear on both surfaces');
   }
 
   const live = await q(
@@ -114,13 +122,11 @@ const say = (mark, label, detail) => out.push(`${mark}  ${label}${detail ? ' —
     u.id,
   );
   const liveCount = num(live[0].n);
-  if (u.supplier_status === 2) {
-    say('OK  ', 'open-request cap', 'not applied (supplier_status = 2); ' + liveCount + ' live');
-  } else if (liveCount >= 3) {
-    say('FAIL', 'open-request cap reached', liveCount + '/3 live — REQUEST_LIMIT_REACHED on the next post');
-  } else {
-    say('OK  ', 'open-request cap', liveCount + '/3 live');
-  }
+  // 🔴 There is NO open-request cap on either surface since 2026-09-14. Both
+  // `BASIC_TIER_REQUEST_LIMIT` (web) and the app's own were removed on the owner's
+  // ruling; REQUEST_LIMIT_REACHED is thrown by nothing. The count is kept because
+  // it is the input to the drift check below, not because anything gates on it.
+  say('OK  ', 'open-request cap', 'none exists on either surface since 2026-09-14; ' + liveCount + ' live');
 
   const byStatus = await q(
     'SELECT status, COUNT(*) n FROM equipment_requests WHERE rentee_id = ? AND deleted_at IS NULL GROUP BY status',
@@ -151,22 +157,21 @@ const say = (mark, label, detail) => out.push(`${mark}  ${label}${detail ? ' —
     say('OK  ', 'open_request_count', 'column agrees with the live rows (' + liveCount + ')');
   }
 
-  // 🔴 The cap is WEB-ONLY. apps/backend removed it (`request.service.ts`: "Request-count cap
-  // removed: all onboarded rentees can post unlimited simultaneous requests"), backend-agents
-  // still enforces 3. So the same person is refused in the browser and served in the app.
-  if (u.supplier_status !== 2 && liveCount >= 3) {
-    say(
-      'FAIL',
-      'capped on WEB, allowed in APP',
-      liveCount + ' live — backend-agents refuses with E8009, apps/backend has no cap. He can post the same request from his phone.',
-    );
-  }
+  // ~~The cap is WEB-ONLY~~ — retired 2026-09-14, both sides uncapped. The live
+  // divergence is the guest gate, and it points the OTHER way now; it is reported
+  // by the post-gate block above.
+
 
   // ---- 2. can he SEND an email share? ----
   if (u.email && EMAIL_RE.test(String(u.email).trim())) {
     say('OK  ', 'users.email set', String(u.email) + ' — SES has a From address');
   } else {
-    say('WARN', 'users.email empty', 'SES path refuses with NO_SENDER_ADDRESS; only a connected Outlook mailbox can send');
+    // 🔴 NOT a fault. Graph sends from the mailbox the renter consented with and never
+    // reads users.email (`sendViaGraph` sets no `from`). `NO_SENDER_ADDRESS` now survives
+    // for ONE case: access.reason === 'NOT_CONFIGURED', i.e. the stage has no Microsoft app
+    // registration at all (shareEmail.ts:205-233). Everything else reports NOT_CONNECTED /
+    // RECONNECT_REQUIRED with a connectPath.
+    say('OK  ', 'users.email empty — not a blocker', 'he sends by connecting Outlook; Graph uses that mailbox. Only the SES fallback needs this field.');
   }
 
   // Reads use BOTH scope keys — renter-supplier.service.ts:46

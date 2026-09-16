@@ -1020,38 +1020,53 @@ function MoneyHead({
   return (
     <div
       ref={head}
-      className={`${HEAD} relative flex items-center justify-center gap-1.5 px-2`}
+      className={`${HEAD} relative flex flex-col items-center justify-center px-2`}
       aria-sort={on ? (sortDir === 1 ? "ascending" : "descending") : undefined}
     >
-      {/* The NAME, and what it contains, inside the shared 48px band — both WRAP rather than
-          truncate (owner, 2026-09-09). Two of these bands make the supplier column's own 96px
-          header, so nothing on the table drifts out of line. */}
-      <button type="button" onClick={() => onSort(col.key)} className="flex min-w-0 flex-col items-center justify-center leading-none">
-        <span className="flex min-w-0 items-center gap-1.5">
+      {/* 🔴 **The caption is a SIBLING of the name row, not a line inside it.**
+          It used to sit inside the sort button, which shared its row with the i and the » - so the
+          caption was laid out in what those two left over, about 123px of a 165px column.
+          «rental + mobilization + demobilization · one cycle» needs three lines at that width and two
+          at the full one, and the band is a FIXED 48px: measured with both money groups open, the
+          sorted Delivered cost head wanted **57px at 1700 and 85px at 1366**, so it spilled over its
+          own `border-b` and across the first row of figures. That is the clipping the owner reported
+          (2026-09-16, *"the ui crash if we opened them together"*) - opening both money groups is
+          what puts six money columns on one width and squeezes each of them.
+          Given the full width the caption fits in two lines and the band holds.
+
+          ⚠️ **48 cannot simply be raised.** `HEAD`'s own note says this number and the supplier
+          column's 96px are ONE geometry - 96 is two of these bands - so growing the head here would
+          slide every figure out of line with the supplier column beside it. The fix has to be the
+          content fitting, not the box growing.
+
+          ⚠️ The cost, stated: the caption is no longer part of the sort target. The NAME still
+          is, which is what that rule was always about. */}
+      <div className="flex w-full flex-none items-center justify-center gap-1.5">
+        <button type="button" onClick={() => onSort(col.key)} className="flex min-w-0 items-center gap-1.5 leading-none">
           <span className={`min-w-0 text-center text-label font-semibold uppercase leading-tight tracking-wide ${on ? "text-navy" : "text-muted"}`}>
             {col.label}
           </span>
           <span aria-hidden="true" className={`flex-none text-label font-semibold ${on ? "text-brand" : "text-muted/50"}`}>
             {on ? (sortDir === 1 ? "▲" : "▼") : "↕"}
           </span>
-        </span>
-        {col.sub && (
-          /* `text-label` (11px) with the scale, not an arbitrary 9px: this app has six type steps
-             and a seventh invented for one subtitle is how a scale stops being one. */
-          <span className="mt-0.5 max-w-full text-center text-label font-semibold leading-tight text-muted/80">{col.sub}</span>
-        )}
-      </button>
-      {onInfo && (
-        <button
-          type="button"
-          onClick={onInfo}
-          aria-label={col.label}
-          className="grid h-4 w-4 flex-none place-items-center rounded-full border border-brand/40 bg-brand-soft text-label font-extrabold text-brand"
-        >
-          i
         </button>
+        {onInfo && (
+          <button
+            type="button"
+            onClick={onInfo}
+            aria-label={col.label}
+            className="grid h-4 w-4 flex-none place-items-center rounded-full border border-brand/40 bg-brand-soft text-label font-extrabold text-brand"
+          >
+            i
+          </button>
+        )}
+        <FoldButton onClick={onFold} hint={t.workspace.hideColumn} />
+      </div>
+      {col.sub && (
+        /* `text-label` (11px) with the scale, not an arbitrary 9px: this app has six type steps
+           and a seventh invented for one subtitle is how a scale stops being one. */
+        <span className="mt-0.5 w-full text-center text-label font-semibold leading-tight text-muted/80">{col.sub}</span>
       )}
-      <FoldButton onClick={onFold} hint={t.workspace.hideColumn} />
       {popover?.(head)}
     </div>
   );

@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Governance and compliance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* Moedatech design tokens. Values copied from src/app/globals.css :root, never re-chosen here. */
+:root{
+  --navy-deep:#1c2738; --navy:#22384e; --navy-mid:#33506d;
+  --muted-dark:#444f57; --muted:#59646e; --muted-light:#8a95a0;
+  --border-strong:#c6c6c6; --border:#dcdcdc; --border-hair:#e4e4e4;
+  --surface3:#e8e8e8; --surface2:#f4f4f4; --surface:#ffffff; --background:#f4f4f4;
+  --brand:#f97316; --brand-deep:#c2570f; --brand-light:#e8b64c;
+  --brand-pale:#fee0cc; --brand-soft:#fef1e8;
+  --ok:#1d9e55; --ok-soft:#e2efe7; --ok-deep:#1d7a45;
+  --warn:#b98a1d; --warn-soft:#f7edd8; --warn-deep:#8a6412; --warn-border:#e0c583;
+  --danger:#c02626; --danger-soft:#f7e3e3; --danger-deep:#b91c1c; --danger-border:#e8c1c1;
+  --info:#3b556e; --info-soft:#e7ebee;
+  --font-sans:'Inter',system-ui,-apple-system,sans-serif;
+
+  --text-label:11px; --text-body:13px; --text-lead:15px; --text-head:19px;
+  --radius:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:var(--font-sans); font-size:var(--text-body); line-height:1.5;
+  color:var(--navy); background:var(--background);
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{font-weight:800;line-height:1.25}
+table{border-collapse:collapse;width:100%}
+.num{font-variant-numeric:tabular-nums}
+
+/* ── Chrome ─────────────────────────────────────────────────────────── */
+.bar{
+  background:var(--navy-deep); color:#fff; height:52px;
+  display:flex; align-items:center; gap:16px; padding:0 20px;
+}
+.bar .mark{font-weight:800;font-size:var(--text-lead);letter-spacing:-.01em}
+.bar nav{display:flex;gap:2px;margin-inline-start:12px}
+.bar nav a{
+  color:rgba(255,255,255,.75); text-decoration:none; font-size:12px; font-weight:400;
+  padding:5px 11px; border-radius:var(--radius);
+}
+.bar nav a.on{background:#fff;color:var(--navy-deep);font-weight:600}
+.bar .who{margin-inline-start:auto;display:flex;align-items:center;gap:10px;font-size:12px;color:rgba(255,255,255,.75)}
+.bar .avatar{
+  width:28px;height:28px;border-radius:999px;background:var(--navy-mid);
+  display:grid;place-items:center;font-size:11px;font-weight:800;color:#fff
+}
+
+.wrap{max-width:1320px;margin:0 auto;padding:20px 20px 64px}
+
+.head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.head h1{font-size:var(--text-head)}
+.head p{color:var(--muted);font-size:12px;margin-top:2px}
+.head .acts{margin-inline-start:auto;display:flex;gap:8px}
+
+.btn{
+  font:inherit;font-size:12px;font-weight:600;border-radius:var(--radius);
+  padding:7px 13px;border:1px solid var(--border-strong);background:var(--surface);
+  color:var(--navy);cursor:pointer
+}
+.btn:hover{background:var(--surface2)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.primary:hover{background:#db6513}
+
+/* ── Standing strip ─────────────────────────────────────────────────── */
+.standing{
+  display:flex;flex-wrap:wrap;gap:0;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius);margin-bottom:14px;overflow:hidden
+}
+.standing div{
+  padding:10px 16px;border-inline-end:1px solid var(--border-hair);
+  display:flex;flex-direction:column;gap:2px;min-width:150px;flex:1
+}
+.standing div:last-child{border-inline-end:0}
+.standing dt{font-size:var(--text-label);color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.standing dd{font-size:var(--text-body);font-weight:600}
+
+/* ── Exception tiles ────────────────────────────────────────────────── */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:22px}
+.tile{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:13px 15px;display:flex;flex-direction:column;gap:3px;text-align:start;
+  cursor:pointer;font:inherit;color:inherit
+}
+.tile:hover{border-color:var(--border-strong)}
+.tile .n{font-size:26px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.tile .lbl{font-size:12px;color:var(--muted-dark);font-weight:600}
+.tile .sub{font-size:var(--text-label);color:var(--muted)}
+.tile.bad .n{color:var(--danger-deep)}
+.tile.warn .n{color:var(--warn-deep)}
+.tile.brand .n{color:var(--brand-deep)}
+.tile.calm .n{color:var(--navy)}
+
+/* ── Sections and tables ────────────────────────────────────────────── */
+section{margin-bottom:26px}
+.sec-head{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}
+.sec-head h2{font-size:15px}
+.sec-head .note{font-size:var(--text-label);color:var(--muted)}
+.sec-head .right{margin-inline-start:auto;font-size:12px;color:var(--muted)}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.scroll{overflow-x:auto;overflow-y:clip}
+table{min-width:760px}
+th{
+  font-size:var(--text-label);text-transform:uppercase;letter-spacing:.04em;
+  color:var(--muted);font-weight:600;text-align:start;
+  padding:9px 12px;background:var(--surface2);border-bottom:1px solid var(--border);
+  white-space:nowrap
+}
+td{padding:9px 12px;border-bottom:1px solid var(--border-hair);vertical-align:middle}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:var(--surface2)}
+td.r,th.r{text-align:end}
+.machine{font-weight:600}
+.dim{color:var(--muted);font-size:12px}
+
+.pill{
+  display:inline-flex;align-items:center;gap:5px;font-size:var(--text-label);font-weight:600;
+  padding:2px 8px;border-radius:999px;white-space:nowrap
+}
+.pill.ok{background:var(--ok-soft);color:var(--ok-deep);border:1px solid rgba(29,158,85,.3)}
+.pill.bad{background:var(--danger-soft);color:var(--danger-deep);border:1px solid var(--danger-border)}
+.pill.warn{background:var(--warn-soft);color:var(--warn-deep);border:1px solid var(--warn-border)}
+.pill.flat{background:var(--surface2);color:var(--muted-dark);border:1px solid var(--border)}
+.dot{width:6px;height:6px;border-radius:999px;background:currentColor;flex:none}
+
+.src{font-size:var(--text-label);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+
+.money{font-weight:600;font-variant-numeric:tabular-nums}
+.money .cur{font-size:var(--text-label);color:var(--muted);font-weight:400;margin-inline-start:3px}
+
+tfoot td{background:var(--surface2);font-weight:600;border-top:1px solid var(--border)}
+
+/* ── Two column split ───────────────────────────────────────────────── */
+.split{display:grid;grid-template-columns:repeat(auto-fit,minmax(480px,1fr));gap:20px}
+
+.rows{padding:2px 0}
+.row{
+  display:flex;align-items:center;gap:10px;padding:10px 15px;
+  border-bottom:1px solid var(--border-hair)
+}
+.row:last-child{border-bottom:0}
+.row .grow{flex:1;min-width:0}
+.row .t{font-weight:600}
+.row .s{font-size:12px;color:var(--muted)}
+
+/* Progress track for spend */
+.track{height:6px;border-radius:999px;background:var(--surface3);overflow:hidden;margin-top:5px}
+.track i{display:block;height:100%;background:var(--brand);border-radius:999px}
+.track i.over{background:var(--danger)}
+
+/* ── Not yet block ──────────────────────────────────────────────────── */
+.gap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:15px 17px}
+.gap h3{font-size:13px;margin-bottom:3px}
+.gap > p{font-size:12px;color:var(--muted);margin-bottom:12px}
+.gap ul{list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:9px 22px}
+.gap li{font-size:12px;display:flex;gap:8px;align-items:baseline}
+.gap li b{font-weight:600;color:var(--navy)}
+.gap li span{color:var(--muted)}
+.gap li::before{content:"";width:5px;height:5px;border-radius:999px;background:var(--muted-light);flex:none;transform:translateY(-2px)}
+
+.foot{margin-top:24px;font-size:var(--text-label);color:var(--muted-light);line-height:1.7}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <span class="mark">Moedatech</span>
+  <nav>
+    <a href="#">Browse</a>
+    <a href="#">Dashboard</a>
+    <a href="#">Requests</a>
+    <a href="#" class="on">Governance</a>
+  </nav>
+  <span class="who">
+    Al Rajhi Contracting Est.
+    <span class="avatar">YA</span>
+  </span>
+</div>
+
+<div class="wrap">
+
+  <div class="head">
+    <div>
+      <h1>Governance and compliance</h1>
+      <p>Everything on hire, what it is costing, and what your own records are missing · 16 September 2026</p>
+    </div>
+    <div class="acts">
+      <button class="btn">Export pack</button>
+      <button class="btn primary">Review exceptions</button>
+    </div>
+  </div>
+
+  <!-- Account standing: read straight off the profile and company payloads -->
+  <dl class="standing">
+    <div><dt>Account tier</dt><dd>Verified</dd></div>
+    <div><dt>Can post requests</dt><dd style="color:var(--ok-deep)">Yes</dd></div>
+    <div><dt>Company</dt><dd>Verified · CR on file</dd></div>
+    <div><dt>People with award rights</dt><dd>4 of 4 members</dd></div>
+    <div><dt>Active owners</dt><dd style="color:var(--warn-deep)">1 · single point of control</dd></div>
+    <div><dt>Invite code</dt><dd style="color:var(--warn-deep)">Live · 1 person waiting</dd></div>
+  </dl>
+
+  <!-- The four exceptions worth acting on. Counts, never a score. -->
+  <div class="tiles">
+    <button class="tile bad">
+      <span class="n">2</span>
+      <span class="lbl">Past contracted end, still on hire</span>
+      <span class="sub">42,800 SAR exposure so far</span>
+    </button>
+    <button class="tile warn">
+      <span class="n">3</span>
+      <span class="lbl">Supplier papers expiring in 30 days</span>
+      <span class="sub">1 already has no CR on file</span>
+    </button>
+    <button class="tile brand">
+      <span class="n">5</span>
+      <span class="lbl">Awards with no contract filed</span>
+      <span class="sub">3 of them have no PO either</span>
+    </button>
+    <button class="tile calm">
+      <span class="n">2</span>
+      <span class="lbl">Requests sent on terms nobody reviewed</span>
+      <span class="sub">Delivery and return left at the default</span>
+    </button>
+  </div>
+
+  <!-- ── 1. Live site register ──────────────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <h2>Live site register</h2>
+      <span class="note">Everything marked on site and not yet marked returned</span>
+      <span class="right">8 machines · 2 projects · 4 suppliers</span>
+    </div>
+    <div class="card scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Machine</th>
+            <th>Project</th>
+            <th>Supplier</th>
+            <th>Source</th>
+            <th class="r">Units</th>
+            <th>On hire since</th>
+            <th>Contract end</th>
+            <th>State</th>
+            <th>Papers</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="machine">Crawler Excavator 20 ton</td>
+            <td>Qiddiya Package 3</td>
+            <td>Zahid Tractor</td>
+            <td><span class="src">Marketplace</span></td>
+            <td class="r num">2</td>
+            <td class="num">12 Aug</td>
+            <td class="num">30 Sep</td>
+            <td><span class="pill ok"><i class="dot"></i>On site</span></td>
+            <td><span class="pill ok">PO · Contract</span></td>
+          </tr>
+          <tr>
+            <td class="machine">Mobile Crane 100 ton</td>
+            <td>Qiddiya Package 3</td>
+            <td>Arabian Cranes Co.</td>
+            <td><span class="src">Marketplace</span></td>
+            <td class="r num">1</td>
+            <td class="num">01 Aug</td>
+            <td class="num">08 Sep</td>
+            <td><span class="pill bad"><i class="dot"></i>8 days past end</span></td>
+            <td><span class="pill warn">No contract</span></td>
+          </tr>
+          <tr>
+            <td class="machine">Boom Lift 45 ft</td>
+            <td>Qiddiya Package 3</td>
+            <td>Own fleet</td>
+            <td><span class="src">Work order</span></td>
+            <td class="r num">3</td>
+            <td class="num">20 Jul</td>
+            <td class="num">31 Oct</td>
+            <td><span class="pill ok"><i class="dot"></i>On site</span></td>
+            <td><span class="pill flat">Not applicable</span></td>
+          </tr>
+          <tr>
+            <td class="machine">Water Tanker 20 m³</td>
+            <td>Qiddiya Package 3</td>
+            <td>Nesma Heavy Equipment</td>
+            <td><span class="src">Marketplace</span></td>
+            <td class="r num">1</td>
+            <td class="num">10 Sep</td>
+            <td class="num">24 Sep</td>
+            <td><span class="pill warn"><i class="dot"></i>Ends in 8 days</span></td>
+            <td><span class="pill warn">No contract</span></td>
+          </tr>
+          <tr>
+            <td class="machine">Wheel Loader 966</td>
+            <td>Dammam Port Yard</td>
+            <td>Al Faisal Rentals</td>
+            <td><span class="src">Work order</span></td>
+            <td class="r num">1</td>
+            <td class="num">05 Sep</td>
+            <td class="num">05 Oct</td>
+            <td><span class="pill ok"><i class="dot"></i>On site</span></td>
+            <td><span class="pill ok">PO · Contract</span></td>
+          </tr>
+          <tr>
+            <td class="machine">Telehandler 17 m</td>
+            <td>Dammam Port Yard</td>
+            <td>Al Faisal Rentals</td>
+            <td><span class="src">Work order</span></td>
+            <td class="r num">2</td>
+            <td class="num">28 Jul</td>
+            <td class="num">11 Sep</td>
+            <td><span class="pill bad"><i class="dot"></i>5 days past end</span></td>
+            <td><span class="pill warn">PO only</span></td>
+          </tr>
+          <tr>
+            <td class="machine">Generator 500 kVA</td>
+            <td>Dammam Port Yard</td>
+            <td>Own fleet</td>
+            <td><span class="src">Work order</span></td>
+            <td class="r num">1</td>
+            <td class="num">15 Jun</td>
+            <td class="dim">No end date recorded</td>
+            <td><span class="pill warn"><i class="dot"></i>Open ended</span></td>
+            <td><span class="pill flat">Not applicable</span></td>
+          </tr>
+          <tr>
+            <td class="machine">Forklift 5 ton</td>
+            <td>Dammam Port Yard</td>
+            <td>Al Faisal Rentals</td>
+            <td><span class="src">Work order</span></td>
+            <td class="r num">2</td>
+            <td class="dim">Not marked arrived</td>
+            <td class="num">20 Sep</td>
+            <td><span class="pill flat"><i class="dot"></i>Awarded, awaiting arrival</span></td>
+            <td><span class="pill warn">No PO</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── 2. Overrun and off hire ────────────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <h2>Overrun and off hire</h2>
+      <span class="note">Billed days beyond the contracted end, Fridays excluded</span>
+      <span class="right">Two machines leaking</span>
+    </div>
+    <div class="card scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Machine</th>
+            <th>Supplier</th>
+            <th>Contracted end</th>
+            <th class="r">Days past end</th>
+            <th class="r">Billable days</th>
+            <th class="r">Rate</th>
+            <th class="r">Units</th>
+            <th class="r">Exposure so far</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="machine">Mobile Crane 100 ton</td>
+            <td>Arabian Cranes Co.</td>
+            <td class="num">08 Sep</td>
+            <td class="r num">8</td>
+            <td class="r num">7</td>
+            <td class="r num">4,800</td>
+            <td class="r num">1</td>
+            <td class="r money">33,600<span class="cur">SAR</span></td>
+            <td><button class="btn">Mark returned</button></td>
+          </tr>
+          <tr>
+            <td class="machine">Telehandler 17 m</td>
+            <td>Al Faisal Rentals</td>
+            <td class="num">11 Sep</td>
+            <td class="r num">5</td>
+            <td class="r num">4</td>
+            <td class="r num">1,150</td>
+            <td class="r num">2</td>
+            <td class="r money">9,200<span class="cur">SAR</span></td>
+            <td><button class="btn">Mark returned</button></td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="7">Total unplanned spend on hires past their contracted end</td>
+            <td class="r money">42,800<span class="cur">SAR</span></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+
+  <div class="split">
+
+    <!-- ── 3. Commitment by project ─────────────────────────────────── -->
+    <section>
+      <div class="sec-head">
+        <h2>Commitment by project</h2>
+        <span class="note">Rate plus mobilization, times units, times billable days</span>
+      </div>
+      <div class="card rows">
+        <div class="row">
+          <div class="grow">
+            <div class="t">Qiddiya Package 3</div>
+            <div class="s">4 machines · 3 suppliers</div>
+            <div class="track"><i style="width:78%"></i></div>
+          </div>
+          <div style="text-align:end">
+            <div class="money">486,300<span class="cur">SAR</span></div>
+            <div class="s">of 620,000 stated</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="grow">
+            <div class="t">Dammam Port Yard</div>
+            <div class="s">4 machines · 2 suppliers</div>
+            <div class="track"><i class="over" style="width:100%"></i></div>
+          </div>
+          <div style="text-align:end">
+            <div class="money" style="color:var(--danger-deep)">218,450<span class="cur">SAR</span></div>
+            <div class="s">of 195,000 stated</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="grow">
+            <div class="t">Unfiled requests</div>
+            <div class="s">2 requests belong to no project, so no site terms were applied</div>
+          </div>
+          <div style="text-align:end">
+            <div class="money">31,900<span class="cur">SAR</span></div>
+            <div class="s">no budget to compare</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 4. Papers and expiry ─────────────────────────────────────── -->
+    <section>
+      <div class="sec-head">
+        <h2>Papers on your active suppliers</h2>
+        <span class="note">Company documents carry an expiry, certificates do not yet</span>
+      </div>
+      <div class="card rows">
+        <div class="row">
+          <div class="grow">
+            <div class="t">Arabian Cranes Co.</div>
+            <div class="s">Commercial registration expires 02 Oct 2026</div>
+          </div>
+          <span class="pill warn">16 days</span>
+        </div>
+        <div class="row">
+          <div class="grow">
+            <div class="t">Nesma Heavy Equipment</div>
+            <div class="s">National address expires 28 Sep 2026</div>
+          </div>
+          <span class="pill bad">12 days</span>
+        </div>
+        <div class="row">
+          <div class="grow">
+            <div class="t">Al Faisal Rentals</div>
+            <div class="s">No commercial registration on file, cannot be matched to a legal entity</div>
+          </div>
+          <span class="pill bad">Missing</span>
+        </div>
+        <div class="row">
+          <div class="grow">
+            <div class="t">Zahid Tractor</div>
+            <div class="s">VAT certificate reissued annually, no expiry stored</div>
+          </div>
+          <span class="pill ok">Complete</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 5. Terms discipline ──────────────────────────────────────── -->
+    <section>
+      <div class="sec-head">
+        <h2>Terms nobody reviewed</h2>
+        <span class="note">Values the request carried that no person at your company chose</span>
+      </div>
+      <div class="card rows">
+        <div class="row">
+          <div class="grow">
+            <div class="t">RFQ-1042 · Mobile Crane 100 ton</div>
+            <div class="s">Delivery and return both left at the default, which assigns both legs and both costs to you</div>
+          </div>
+          <span class="pill warn">Default</span>
+        </div>
+        <div class="row">
+          <div class="grow">
+            <div class="t">RFQ-1051 · Water Tanker 20 m³</div>
+            <div class="s">Payment term came from the site, not from this request</div>
+          </div>
+          <span class="pill flat">From project</span>
+        </div>
+        <div class="row">
+          <div class="grow">
+            <div class="t">Dammam Port Yard</div>
+            <div class="s">No payment term set on the site, so every request there starts unanswered</div>
+          </div>
+          <span class="pill warn">Not set</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 6. Access ────────────────────────────────────────────────── -->
+    <section>
+      <div class="sec-head">
+        <h2>Who can act on this account</h2>
+        <span class="note">Every member can post, edit, award and delete</span>
+      </div>
+      <div class="card rows">
+        <div class="row">
+          <div class="grow"><div class="t">Yara Al Faisal</div><div class="s">Owner · joined as founder</div></div>
+          <span class="pill ok">Owner</span>
+        </div>
+        <div class="row">
+          <div class="grow"><div class="t">Mohammed Nasser</div><div class="s">Member · joined by invite code</div></div>
+          <span class="pill flat">Member</span>
+        </div>
+        <div class="row">
+          <div class="grow"><div class="t">Sarah Otaibi</div><div class="s">Member · joined by invite code</div></div>
+          <span class="pill flat">Member</span>
+        </div>
+        <div class="row">
+          <div class="grow"><div class="t">Unknown joiner</div><div class="s">Waiting on the live invite code, not yet approved</div></div>
+          <span class="pill warn">Pending</span>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ── What this page cannot show, and why ────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <h2>Not shown yet</h2>
+      <span class="note">Named so nobody assumes silence means clean</span>
+    </div>
+    <div class="gap">
+      <h3>Blocked on data the platform does not hold</h3>
+      <p>Each line is a real control, held back by one missing field or one missing capture flow</p>
+      <ul>
+        <li><b>Who raised and who awarded</b> <span>no actor stored on a request or an award</span></li>
+        <li><b>Segregation of duties</b> <span>needs that same actor before it can be detected</span></li>
+        <li><b>Approval queue and cycle time</b> <span>there is no approval step in the product</span></li>
+        <li><b>Change log per request</b> <span>edits are capped but never recorded</span></li>
+        <li><b>Last login and dormant accounts</b> <span>not tracked</span></li>
+        <li><b>Serial and plate per unit</b> <span>never captured on the renter side</span></li>
+        <li><b>Named operator per machine</b> <span>a request states operator terms, not a person</span></li>
+        <li><b>Operator iqama, licence and medical</b> <span>no operator record to attach them to</span></li>
+        <li><b>Certificate expiry dates</b> <span>equipment papers arrive with no expiry field</span></li>
+        <li><b>Site permits and lifting plans</b> <span>no upload surface</span></li>
+        <li><b>SLA actuals</b> <span>response time is a declared term, never a measurement</span></li>
+        <li><b>Incidents and pre start checks</b> <span>needs a driver facing flow</span></li>
+        <li><b>Gate check in and out</b> <span>the scan that turns paperwork into a site fact</span></li>
+        <li><b>Muqeem, GOSI, Qiwa, ZATCA, Fahas, Najm</b> <span>no integration yet</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <p class="foot">
+    Every figure on this page comes from your own awards, requests, projects and supplier records.
+    Billable days exclude Fridays, which this platform does not bill, using the same calculation as the quotation.
+    Exposure is what has accrued to today, not a forecast.
+  </p>
+
+</div>
+</body>
+</html>

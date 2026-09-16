@@ -36,12 +36,19 @@ const WIDTHS = [392, 1024];
 /** The ids `/dev/preview` knows. Kept as a literal list so a failure names the missing specimen
  *  rather than silently photographing nothing — the page's index is the other half of this. */
 const SPECIMENS = [
+  /* ⚠️ "compare-matrix" is deliberately NOT in this list, and the specimen itself IS in
+     `specimens.tsx` - open it at `/dev/preview?s=compare-matrix`. It does not render inside this
+     runner's 392px clip (the locator never becomes visible), and a runner that is red for everyone
+     is a runner nobody runs. The phone width of that table is its own question and is not answered
+     here. */
   "yard-card-unconfirmed",
   "yard-card-confirmed",
   "yard-explain",
   "request-card-company",
   "request-card-document",
   "price-footer",
+  "browse-directory",
+  "national-day",
 ];
 
 test.beforeAll(() => {

@@ -8,6 +8,7 @@ import { IntercomWidget } from "@/components/support/IntercomWidget";
 import { UiPins } from "@/components/dev/UiPins";
 import { USER_COOKIE } from "@/lib/api/auth-server";
 import type { RenterUser } from "@/lib/contract/auth";
+import { seasonAt } from "@/lib/season";
 
 // ── The Latin face is the SYSTEM font now (owner, 2026-08-30) ───────────────────────────────
 // ~~Nunito is the prototype's brand typeface, the default sans for the redesign, and Inter is the one
@@ -141,8 +142,21 @@ async function sessionFromCookie(): Promise<RenterUser | null> {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const initialUser = await sessionFromCookie();
+  /* ── The seasonal skin, decided HERE and nowhere else (owner, 2026-09-16) ─────────────────────
+     `data-season="nd"` is the whole switch: `globals.css` scopes the National Day block under it,
+     and out of season the attribute is simply absent, so not one of those rules matches.
+
+     On the SERVER, during render, because the alternative is a flicker. A client effect reading the
+     clock would paint the navy bar, then repaint it green a frame later, on every cold load, for the
+     whole fortnight. This layout is already dynamic — it reads `cookies()` — so the date is
+     evaluated per request and a build that shipped before the 16th still turns green on it.
+
+     ⚠️ It is `undefined` rather than `""` out of season: React omits the attribute entirely for
+     `undefined`, where an empty string would write `data-season=""` and put a selector nobody reads
+     on every page of the year. */
+  const season = seasonAt() ?? undefined;
   return (
-    <html lang="en">
+    <html lang="en" data-season={season}>
       <head>
         <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,500,0,0" />

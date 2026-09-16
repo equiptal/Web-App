@@ -2,6 +2,413 @@
 
 ## Change log
 
+- **2026-09-16 - A National Day SEASON: green chrome behind one attribute, gone by itself on 1 October, and the brand orange does not move.**
+  Owner: *"can i do a national day version that stay until 1-10 and it is another design theme not
+  replacing ours so maybe just a flag"*, handing over the Flutter decor kit and a screenshot of the
+  app's own green header. Asked where it should reach and whether the orange goes with it, he
+  answered *"header and some decorations across screens and elements"*, *"orange stays"*, today to
+  1 October date-gated with a kill switch, and both locales with the Arabic wording kept.
+  🔴 **The whole design is that NOTHING is redefined.** `layout.tsx` writes `data-season="nd"` on
+  `<html>` and a block at the foot of `globals.css` is scoped under it. Not one token changes value
+  while it runs, and a case reads the stylesheet and fails on any `--x:` assignment inside that
+  block. The reason is not caution: this app already spends green on `--ok` («it happened» - the
+  posted tick, the met term, the paper on file), so a celebration borrowing it would give one colour
+  two meanings on one screen, and repainting `--brand` would move every CTA in the product for a
+  fortnight. The seven seasonal tokens are ADDITIVE (`--nd-*`): a surface opts into one, no surface
+  loses one.
+  (1) **The bar**, on every route: the kit's three-stop gradient, a 20px dot lattice at 10% white,
+  the palm grove at 16%, and one rank of gold Najdi triangles (6px at a 12px pitch) along the bottom
+  edge. That is the app's screenshot, drawn with the app's own numbers.
+  (2) **The season chip** beside the wordmark - «96 National Day» / «96 اليوم الوطني» - outlined
+  gold, which is the treatment «Beta» next to it already takes.
+  (3) **The dashboard band** takes the same seam on its bottom edge, and nothing else. Its ground is
+  still the site photograph, its coloured word and its button are still `--brand`.
+  Files: `src/lib/season.ts` (new), `src/lib/flags.ts` (`NATIONAL_DAY_ENABLED`),
+  `src/app/globals.css` (7 tokens + the seasonal block), `src/lib/ds-colors.ts`,
+  `src/app/layout.tsx`, `src/components/AppShell.tsx`, `src/components/home/CtaBanner.tsx`,
+  `public/nd96-palms.svg` (new), `src/lib/i18n/{en,ar}.ts` (`season.nationalDay`),
+  `src/lib/uiPins.ts` (2.4 / 2.5, new), `src/app/dev/preview/specimens.tsx` (`national-day`, new),
+  `tests/e2e/ui-shots.spec.ts`, `tests/unit/national-day-season.test.ts` (new, 23).
+  🔴 **`max-sm:hidden` on the chip CANNOT WORK, and it was in the first cut before the compiled
+  sheet said so.** Tailwind emits its utilities inside `@layer utilities`; the seasonal block is
+  UNLAYERED, and unlayered CSS beats layered CSS outright whatever the specificity - so
+  `[data-season="nd"] .nd-chip { display: inline-flex }` won at every width and the chip would have
+  ridden the phone bar all fortnight. It typechecks, it lints, and it looks right on a laptop. The
+  width is one `@media (width >= 40rem)` inside the seasonal block now, and the element carries no
+  display utility at all. Found by reading `/_next/static/css/app/layout.css`, not by reasoning.
+  Same family as `hidden md:grid` (2026-09-16) and `<Skeleton className="rounded-full">`
+  (2026-09-12): two rules for one property, and the loser decided somewhere the call site cannot see.
+  ⚠️ **The window is judged on RIYADH's clock**, UTC+3 with no daylight saving. A Lambda runs in UTC,
+  so «until 1 October» read there takes the theme down at 03:00 Riyadh on the 1st and puts it up
+  three hours late on the 16th. Two cases pin the pair of instants either side of that boundary.
+  ⚠️ **It is the DATE that turns it on, not the flag.** `NATIONAL_DAY_ENABLED` is the kill switch
+  OVER the window, for taking it down early or holding it off one environment. And the window
+  RECURS - the dates carry no year - so next September it returns by itself and the mark reads 97.
+  ⚠️ **The ordinal is derived, and its offset will drift.** 96 is a HIJRI count, so it cannot come
+  from the 1932 unification (that gap is 94). It is `year - 1930`, checked against the 95th in 2025
+  and the 96th in 2026. The Hijri year is shorter, so the two calendars will eventually slip a year
+  past each other; a case pins today's answer so the correction arrives as a failing test.
+  ⚠️ **Latin digits in both locales**, which is where the web departs from the Flutter kit's «٩٦».
+  The rule is this app's, product-wide, since 2026-09-04.
+  ⚠️ **The hosts carry their classes ALL YEAR and the date is read only in `layout.tsx`.** A
+  component branching on the clock is either a hydration mismatch or a navy bar that flips green a
+  frame after every cold load, for a fortnight. A case asserts `AppShell.tsx` never mentions
+  `seasonAt`.
+  ⚠️ **The backdrop is a SPAN, not a `::before`.** The header is `sticky z-30` and therefore opens a
+  stacking context: a positioned pseudo-element paints over the logo and the tabs, and at
+  `z-index: -1` it drops behind the header's own background and disappears. A sibling first in
+  source needs no z-index at all.
+  ⚠️ **The seam's colour is a token and only its SHAPE is a data URI.** A gold triangle baked into
+  an encoded SVG is a colour no token can reach and no sweep can find - exactly the drift
+  `palette-drift` exists to catch. The mask carries black because a mask reads alpha, never hue.
+  ⚠️ **The palms are a FILE, `public/nd96-palms.svg`, generated from the kit's own
+  `_HeaderDecorPainter` maths** (the ANGLES table, `frond()`, `palm()`), so the two products draw
+  the same tree. The kit forbids assets because a Shorebird patch carries none and a new `Icons.*`
+  glyph is tree-shaken out of the release font; the web has neither constraint, and 6.3 kB of path
+  data inlined into `globals.css` would be paid for by every reader all year. Out of season the
+  selector never matches and it is never fetched.
+  🔴 **No confetti.** The kit has it; it is deliberately not carried. It would fire over the
+  dashboard's own «your request is posted» tick, which is the one moment in this product that is
+  allowed to celebrate something.
+  ⚠️ Verified: typecheck clean, lint 0 errors, **209 files / 3513 passing, 7 skipped** serially (the
+  3 unhandled errors are `intercom-widget`'s two and `suppliers-remove-and-pick`'s one, all
+  pre-existing), and three rulings break-checked one at a time - a token assigned inside the block,
+  the attribute dropped from a selector, and `max-sm:hidden` put back on the chip; each went red
+  alone.
+  **SEEN RENDERED**, which is how the layer fault was found: the bar on and off, in EN and AR, and
+  at a real 392px viewport where the chip stands down.
+  🔴 **`/dev/preview` does not hydrate on this machine and the specimen was NOT photographed through
+  it.** A render-blocking Google Fonts `<link>` in `layout.tsx`'s `<head>` stalls Next's bootstrap
+  scripts, so the page renders null and every specimen is a blank frame - `readyState` sticks at
+  `interactive`. The pictures above were taken from a throwaway static page served out of `public/`
+  carrying the compiled `layout.css` and the real class names, which is the whole of what the skin
+  is; it has been deleted. The specimen is registered in `ui-shots.spec.ts` and wants one run on a
+  machine where that page works.
+  🔴 **NOT seen on the real signed-in bar**, which needs a session: what has been looked at is the
+  skin against the header's own classes, never the decoration sitting behind the logo, the three
+  nav tabs and the 34px avatar, bell and inbox.
+
+- **2026-09-16 - The intake grows a side panel of his past requests; the chip strip moves INTO the selection, and the panel opens behind a toggle on a phone.**
+  Owner, handing over `prototypes/intake-side-panel-v1.html`: *"can we remove the pills and show a
+  side panel of his requests like his previous chats, grouped by a project - show only equipment
+  names on the request"*, and *"add equipment image or icon with the unit before the name like this
+  2 [ICON] EXCAVATOR 20 TON"*. Then, on the first cut, three corrections in one message.
+  (1) **`RequestsRail`**, new: his projects, each opening to the machines already requested or
+  ordered there. A row is `qty - picture - name`, in that order, which is his own shape. The grip
+  resizes it (164-380px, remembered, `setPointerCapture`), and the drag reverses under `dir="rtl"`
+  because the grip is on the TRAILING edge.
+  (2) 🔴 **THE BEHAVIOUR IS THE OLD ONE, and the first cut got this wrong** (owner: *"what do u mean?
+  the behaviour will not change from existing pills just ui"*). ~~Rows from `my-requests`, matched to
+  a template by NAME.~~ The rows ARE the templates - `listTemplates`, the same list the chip's
+  "start from" dropdown read - and a press hands `fetchTemplateTerms` the option itself. Nothing is
+  matched, so nothing can miss. This is `ProjectChips.applyTemplate`, moved rather than rewritten.
+  ⚠️ **The PICTURE is now the only thing looked up, and so the only thing that can fail.** A template
+  carries no image, so the artwork is found by name among his own requests and falls back to a glyph.
+  That is the right way round: a missing icon costs a small drawing, where a missed template cost the
+  machine's stored terms and said nothing about it.
+  (3) **The floor draws the chips ON A SELECTION** (owner: *"the row of project chips on the floor
+  but i want it on a project selection to appear"*). Nothing until a project is picked; from then on
+  its own chip with the X, and a chip per machine filed under it, so he moves between them without
+  going back to the rail. ~~A single pill.~~
+  (4) **On a phone the rail is a SHEET behind a toggle**, the way Claude and ChatGPT draw theirs
+  (owner: *"make it like claude or gpt it opend the pannel through --- in mobile"*). 🔴 That closes a
+  hole the first cut left open: with the rail merely `hidden` below `lg` and the strip deleted, a
+  phone renter had no way to pick a project at all. Scrim, X and Escape, because a layer over the
+  page with no way out is a trap.
+  (5) 🔴 **`ProjectChips.tsx` is DELETED**, 634 lines, with its suite and three strings
+  (`projects.chips.{pick,all,fewer}`). Not a taste call: `create-canvas-wiring` refuses a canvas
+  component nothing imports, and it was right - this floor was its only caller. `label` and `ended`
+  stay, read by the projects board and the move dialog.
+  (6) 🔴 **`intake.subheading` is deleted** in both dictionaries. The box placeholder already types a
+  real request through its example; the sentence was the same lesson a second time, and it had become
+  a layout constraint of its own (one line, `sm:whitespace-nowrap`) for a line nobody read twice.
+  Files: `src/components/create/RequestsRail.tsx` (new - `useRequestRail`, `RequestsRail`,
+  `ProjectFloorChips`), `src/components/screens/Intake.tsx`,
+  `src/components/create/ProjectChips.tsx` (deleted), `src/lib/i18n/{en,ar}.ts`,
+  `src/lib/uiPins.ts` (15.1 / 15.2 / 15.3 / 15.4, new), `tests/unit/intake-rail.test.ts` (new, 19),
+  `tests/unit/intake-floor.test.ts` (rewritten), `tests/unit/project-template-line.test.tsx`
+  (re-pointed at the rail), `tests/unit/mansour.test.tsx`,
+  `tests/unit/project-chips-rows.test.tsx` (deleted).
+  ⚠️ **ONE hook for both surfaces.** `useRequestRail` is called once by `Intake` and handed to the
+  rail and to the floor. Two copies would be two fetches and, worse, two answers to "which machine is
+  chosen" - and they would disagree the first time either was pressed.
+  ⚠️ **A project's machines load LAZILY, and are cached.** `listTemplates` is a `fetchChart` per
+  project, so loading every project on mount would put one request per project in front of the first
+  screen a renter meets, for a list most of which he will never open. The chosen project loads
+  anyway, because the floor draws it.
+  ⚠️ **A machine the catalogue never named LISTS by its reference and is never TYPED.** A template's
+  `machine` is `ChartItem.label`, absent for an off-catalogue line; the row needs a label to be
+  pressed by, and the box must not receive one. Typing it would be the "12 x null" bug of 2026-09-12
+  in a different costume. The terms still apply - they are keyed on the item, not on its name.
+  ⚠️ **The FIT is the request rail's ruling, copied deliberately** - a photograph takes
+  `object-cover`, a taxonomy drawing `object-contain scale-[1.34]`, because cropping a drawing
+  enlarges its own transparent margin rather than the machine. `onError` falls back to the glyph: the
+  taxonomy objects are not public-read on staging, so a well-formed URL answers 403.
+  ⚠️ The rail is withheld entirely for a guest and for a renter with no projects - no caption, no
+  empty state, no band of chrome on the first screen anybody meets.
+  ⚠️ Verified: typecheck, lint (0 errors), **208 files / 3483 passing, 7 skipped** serially, and two
+  rulings break-checked on the first cut (the row order reversed, the two fits collapsed into one) -
+  each went red. The 3 unhandled errors are `intercom-widget`'s two (jsdom has no pointer capture)
+  and `suppliers-remove-and-pick`'s one, all pre-existing.
+  🔴 **NOT SEEN RENDERED, and it cannot be from `/dev/preview`**: the rail is gated on a real session,
+  so a specimen would draw nothing. `npx next dev`, sign in, `/create` - the two-column layout, the
+  Arabic mirror, the phone sheet and the grip all want that look.
+  ⚠️ **A scripting trap, met three times in this session.** A `python - <<'PY'` heredoc whose body
+  contains an ODD number of apostrophes (ordinary prose - "the owner's call") dies with
+  «unexpected EOF while looking for matching `'`», because the command is itself wrapped in single
+  quotes before bash sees it. Write the script to a FILE and run that file; do not pass prose through
+  a shell heredoc.
+
+- **2026-09-16 - The dashboard is THREE TABS: requests, suppliers, projects, one at a time.**
+  Owner: *"for dashboard can we have subtabs to show requests-suppliers-projects or how do u suggest
+  we can show them without scrolling in one page"*, then his pick of the three-tab shape over the
+  two alternatives put to him.
+  🔴 **The cause of the scrolling was NOT the number of blocks.** Both embedded surfaces render
+  their WHOLE contents - `SuppliersPage embedded` draws every supplier row, `ProjectsSurface
+  embedded` every site - and neither caps itself, so the page grew with the account. The
+  alternative offered (requests full width, suppliers and projects side by side, each capped at a
+  few rows behind a «See all») fixes that cause and was REJECTED in favour of the tabs.
+  ⚠️ **The cost, stated at the time and taken anyway**: two of the three states are now behind a
+  press, and this rebuilds - as subtabs - the very tabs that were deleted when suppliers and
+  projects were moved ONTO this page, on the reasoning still written in `HomeHub.tsx`: *"a tab that
+  has to be remembered is a tab that is not used"* (2026-09-01 / 2026-08-30). Those two comments are
+  left in place: the reasoning did not stop being true, it was outvoted.
+  🔴 **Every block stays MOUNTED and the closed two are `hidden`,** never conditionally rendered,
+  and the three consequences are the whole design: the COUNTS on all three tabs are real rather than
+  only the open one's; the three reads happen exactly as they did before this change; and a renter's
+  search box, his filters and his half-made supplier group survive a trip to another tab.
+  **The tabs ARE the section headings.** Each carries the 38px navy plate's glyph, the section's own
+  name and its count, so the three blocks drop their own header (`hideHeading`) - otherwise the page
+  said «My Suppliers · 42» twice, one row apart, which is the duplication the owner has already
+  objected to once (2026-09-02).
+  ⚠️ **A count is REPORTED UP (`onCount`), never fetched again here.** Each block is the only thing
+  that holds its list. `null` until the read lands, and the tab draws «–»: a 0 on a list still
+  loading is a wrong statement rather than a pending one.
+  ⚠️ **The open tab is in the URL (`?view=`), written with `replaceState`** - the workspace's own
+  ruling (2026-09-06), for the same reasons: a reload and a Back from a supplier profile land on the
+  tab the renter left, and the browser's own Back still leaves the page instead of walking three
+  tabs. The default is not written, so a bare `/` is the requests tab.
+  ⚠️ **`HomeRequests` renders NOTHING on an account with no requests** (`if (groups && !groups.length)
+  return null`), which behind a tab is a blank pane rather than a block that simply is not there. The
+  pane draws one line, `home.noRequestsYet`, naming the intake band already on screen above it rather
+  than adding a second door.
+  Files: `src/components/home/HomeHub.tsx` (`DashboardTabs`, new and exported),
+  `src/components/home/HomeRequests.tsx`, `src/components/suppliers/SuppliersPage.tsx`,
+  `src/components/projects/ProjectsSurface.tsx` (`hideHeading` + `onCount` on all three),
+  `src/lib/i18n/{en,ar}.ts` (`home.noRequestsYet`, new), `src/lib/uiPins.ts` (10.8, new),
+  `src/app/dev/preview/specimens.tsx` (`dashboard-tabs`, new),
+  `tests/unit/dashboard-tabs.test.ts` (new, 7 cases), `tests/unit/dashboard-spacing.test.ts`.
+  ⚠️ `DashboardTabs` is exported for `dev/preview` and holds NO state of its own: the dashboard needs
+  a signed-in renter with requests, suppliers and sites, so the row could not otherwise be looked at
+  while it was being built.
+  ⚠️ Checked before relying on it: nothing inside the three blocks measures itself at mount
+  (`ResizeObserver` / `offsetWidth` appear only in `RowMenu`, which measures when the renter opens
+  it), so a block laid out at 0px while hidden is not a hazard here. A block that starts measuring
+  would need `hidden` reconsidered.
+  ⚠️ Verified: typecheck clean, lint 0 errors, 69 passing across nine suites (tabs, spacing, bid
+  rail, bubble, suppliers, shell-nav, pins, palette, font), and the mounted-not-unmounted rule
+  break-checked - one case went red. The one unhandled error in `suppliers-remove-and-pick` is
+  pre-existing (2026-09-09). **SEEN RENDERED**, EN and AR, through the new specimen - the Arabic
+  mirror needs no rule of its own, the flex row reverses.
+  🔴 **NOT seen on the real dashboard**: that needs a signed-in renter with all three lists, so what
+  has been looked at is the tab row, and the blocks under it are pinned by tests only.
+
+- **2026-09-16 - The comparison's sorted money head stops spilling over the row beneath it, and the table finally has a specimen.**
+  Owner, on a screenshot of the table with both money groups open: *"the ui crash if we opened them
+  together"*.
+  **Reproduced and MEASURED before anything was changed.** With «Per cycle» pressed - which opens the
+  grand total beside it (`OPENS_WITH.cycle`), so six money columns share the width - the sorted
+  DELIVERED COST head wanted **85px at 1366 and 57px at 1700** inside a band that is a fixed **48px**.
+  Nothing clips it, so the caption «rental + mobilization + demobilization - one cycle» drew straight
+  over its own `border-b` and across the first row of figures. That is the slicing in his screenshot.
+  🔴 **The cause was the caption sharing a ROW with the two controls.** It sat inside the sort
+  button, whose flex row also carries the i and the »; the caption was therefore laid out in what
+  those left over - about 123px of a 165px column - and needed three lines. As a full-width sibling
+  under the name row it takes two. Measured after: every head has **20-34px of spare**, at 1366, 1440
+  and 1700, in BOTH locales. Before: +37px of overflow.
+  ⚠️ **Raising 48 is not available.** `HEAD`'s own note says this number and the supplier column's
+  96px are ONE geometry (96 is two of these bands), so growing the head slides every figure out of
+  line with the supplier beside it. The content had to fit; the box could not grow.
+  ⚠️ The cost, stated: the caption is no longer part of the sort target. The NAME still is, which
+  is what that rule was always about.
+  Files: `src/components/workspace/CompareMatrix.tsx` (`MoneyHead`),
+  `src/app/dev/preview/specimens.tsx` (`compare-matrix`, new), `tests/e2e/ui-shots.spec.ts`.
+  🔴 **A SPECIMEN, at last, and it is the real point of this entry.** This table has produced
+  FIVE layout faults - the phantom vertical scrollbar twice, the terms strip drawing through the
+  equipment rail, the strip ending short of its container, and now this - and not one of them could
+  be looked at without a signed-in renter holding bids, so every one was found on a screenshot of
+  production. `/dev/preview?s=compare-matrix` draws six offers and nine terms, which is the shape the
+  faults appear at; a two-bid fixture fits any width and proves nothing.
+  ⚠️ It is deliberately NOT in `ui-shots.spec.ts`'s list: it does not render inside that runner's
+  392px clip, and a runner that is red for everyone is a runner nobody runs. **The table's phone
+  width is a real open question and this does not answer it.**
+  🔴 **Reported, NOT fixed - at 1024 and 1440 the EQUIPMENT rail and the last term column fall
+  outside the scroller.** Measured with the terms open at 1024: the strip is 1482px inside a 976px
+  box, so 506px of it - the whole equipment door included - is reachable only by scrolling sideways,
+  with nothing on screen saying so. It is the same family as the four above and it wants its own pass.
+  🔴 **I EMPTIED `CompareMatrix.tsx` mid-session and restored it from `HEAD`.** `io.open(path,
+  "w")` truncates at the OS level BEFORE anything is written, and my script then threw on an encoding
+  error - so 1575 lines became 0 bytes and no write happened. **This repo already recorded this exact
+  trap on 2026-09-14** and I hit it anyway. The rule, again: build the new text, assert it, and only
+  then open for writing - or write through a file the tool wrote, never through a shell heredoc.
+  Nothing was lost (the file was unmodified at `HEAD`), which is luck, not method.
+  ⚠️ Verified: typecheck clean, lint 0 errors, 66 passing across `compare-matrix` and
+  `compare-sheet`, and the fix measured in a real browser at three widths and two locales - which is
+  how the fault was found and the only way it could be judged, since jsdom lays out nothing.
+  🔴 **NOT photographed after the fix.** The throwaway probe that took the measurements went
+  flaky on its last run and saved a blank frame; the numbers above are the evidence, not a picture.
+  The both-groups-open state wants one look.
+  ⚠️ Found while running the gate and NOT mine: `/browse` crashed on `pin("browse-controls")`, an
+  id another session added to `BrowseSurface.tsx` without registering it, and `uiPins.ts` briefly
+  failed typecheck on a `parent` field its own type does not carry. Both were resolved by that
+  session while this work was in flight.
+
+- **2026-09-16 - Browse stores: the heading shares the row with its two controls, the «All» pill names what it restores, and the directory is 20 to a page behind two arrows.**
+  Owner, one batch: *"Most popular suppliers will have the search bar and all cities as sections in the
+  same row, make the search bar and filter with same size and height. then the all pill call it all
+  stores and then show 20 per page then second page will be by <> and the horizantal scroller of the
+  tabs make it thinner and nicer"*.
+  (1) **ONE row.** ~~A title band, then a control band under it.~~ Two bands spent a third of the page
+  above the first card. `flex-wrap`, never a bare row: below `sm` a `text-shop-h1` heading plus a
+  search field plus a city cannot share a line, and forcing it pushes the DOCUMENT wider than the
+  phone - the fault audited out of three surfaces on 2026-09-08. **Seen wrapped at 392 in both
+  scripts.**
+  (2) **The two controls share ONE skin**, `CONTROL_SKIN`, so they cannot drift apart in height again.
+  The city used to fall through to `Dropdown`'s `field` tone - house tokens, `py-2` - so it stood 8px
+  shorter than the input beside it and in a different grey. `triggerClass` is a per-call override and
+  reaches no other dropdown in the product.
+  (3) **«All» → «All stores»** / «كل المتاجر». It is the leading pill on a rail of real category
+  names, and one bare word did not say what pressing it restores.
+  (4) 🔴 **20 a page, `‹ ›`, and the page REPLACES.** This reverses 2026-09-03's *"appending rather
+  than replacing, because a renter who has scrolled to the bottom of sixty cards is not asking to be
+  sent back to the top"*. At sixty that was right; at twenty the grid is one screen, so a page is a
+  page. The dedup branch went with the append.
+  (5) **The rail is thinner**: the pill from ~34px to ~28px, and `.shop-rail` in `globals.css` gives
+  the scroller a 6px bar on a transparent track instead of the browser's ~15px of chrome.
+  Files: `src/components/stores/BrowseSurface.tsx`, `src/app/globals.css` (`.shop-rail`),
+  `src/lib/i18n/{en,ar}.ts` (`allCategories` reworded, `prevPage`/`nextPage` new, `showMore` and
+  `storesAcross` deleted), `src/lib/uiPins.ts` (61.1 / 61.2 / 61.3, new),
+  `src/app/dev/preview/specimens.tsx` (`browse-directory`, new), `tests/e2e/ui-shots.spec.ts`,
+  `src/app/dev/preview/page.tsx`.
+  🔴 **The count beside the title is GONE**, at the owner's call. It read `stores.length`, which with a
+  pager is the PAGE's count - «20 stores across Saudi Arabia» on every page, a FALSE statement about
+  the market rather than a stale one. The true total cannot reach this screen: both call helpers unwrap
+  the envelope to `.data` before the BFF sees `meta.totalPages`, which is the same reason `more` is a
+  heuristic (a full page probably has another behind it). That is also why the pager states no
+  «of N» - it would be a number we do not have, and why «Next» can be live on the last page and
+  correct itself on arrival.
+  ⚠️ **Page one can come back LONGER than it asked for** - the directory merges the featured suppliers
+  into it - so «20 per page» is 20 from page two on and may be a card or two more on page one. The
+  backend's own behaviour, unchanged by this.
+  ⚠️ The pager is withheld inside a preview and when page one is the whole directory: two dead arrows
+  say only that there is nothing to press. `previewCount` has no caller today, so that arm is unexercised.
+  🔴 **A harness bug found by the pictures, and fixed: EVERY phone-width specimen shot was a lie.**
+  `/dev/preview`'s `main` is a flex COLUMN, so its `data-shot` child is a flex ITEM with
+  `min-width: auto` - it grew to its own MIN-CONTENT rather than to the viewport, so a full-width
+  surface photographed at 392 laid itself out at **791px** and came back with rows that had not wrapped
+  and a column of cards sliced off under `dir="rtl"`. That reads as a layout bug in the surface and was
+  a bug in the preview page. `minWidth: 0, maxWidth: "100%"` unless an explicit `?w=` asks for one
+  width. **Measured: 819 → 392 at a 392 viewport, both scripts.** Every earlier «seen rendered at
+  392» in this log was taken through that fault.
+  ⚠️ The browse specimen bends the specimen rules and says so: `BrowseSurface` takes no data props, so
+  the fixture answers its three fetches locally, in the component's own render body, scoped to those
+  paths. Still no network. It also needs the WHOLE `StoreCard` shape - the card reads
+  `categories.length`, and a short fixture threw a client-side exception and rendered nothing at all.
+  ⚠️ Verified: typecheck, lint (0 errors), the full suite serially (**3465 passing, 7 skipped, 207
+  files**; the 3 unhandled errors are `suppliers-remove-and-pick`'s, pre-existing since 2026-09-09),
+  and 57 across the pins, palette, font, stores and wording guards. **SEEN RENDERED**: all four
+  pictures - EN and AR at 392 and 1024 - and the Arabic mirror is what caught the harness fault.
+  ⚠️ The Playwright shot lane times out on the FIRST (cold-compile) shot of a specimen on this
+  machine; a warm re-run passes. The four pictures above were captured directly against the same
+  preview server.
+
+- **2026-09-16 - The CTA band drops its paragraph, and Mansour SPEAKS the headline.**
+  Owner: *"can u redesign the cta and remove its subtext and use this kit as mansour ai agent
+  design, make the cta professional catchy and hd"*.
+  (1) **`home.ctaSubtitle` is deleted from both dictionaries.** *"Describe what you need in plain
+  words. Our AI assistant matches you with the right suppliers"* restated the headline in smaller
+  type, and it was the only thing between the copy and the 160px band's own edges.
+  (2) **The agent stands in front of the sentence.** The band has coloured one word - AI - since the
+  comp landed, with nothing behind it but a photograph of a site. He is this product's face for that
+  word (he writes the equipment line on the intake, he holds the processing ring), so the pattern is
+  the intake's own: *"put mansour before the question"* (2026-09-13). 104px, `pose="viewer"`.
+  (3) **`Mansour` learned the kit's four gaze POSES**, `mansour-poses.json` verbatim - the README's
+  third way of using him. A pose is an inline STYLE plus `animation: none`, never a swapped
+  `transform` attribute: the attribute is the rest pose the keyframes are written against, and
+  without the `animation` half the idle wander overrides the transform on its next frame and he
+  twitches back out of the pose once every nine seconds.
+  Files: `src/components/Mansour.tsx` (`POSES`, `MansourPose`, the `pose` prop),
+  `src/components/home/CtaBanner.tsx`, `src/lib/i18n/{en,ar}.ts` (`ctaSubtitle` deleted),
+  `tests/unit/cta-banner.test.ts` (new, 14 cases).
+  🔴 **`pose="send"` is the obvious choice and is WRONG.** It looks down at a button; the button is
+  across the band, and that row mirrors in Arabic while the pose matrices do not - he would meet it
+  in English and stare into the margin in Arabic. `viewer` is direction-neutral.
+  🔴 **FOUR faults that read correctly in the source and rendered wrong.** All four were found by
+  measuring the element in a browser, and each has a case:
+   · **`hidden md:grid` drew NOTHING at any width.** Both are the `display` property, a media query
+     adds no specificity, and Tailwind emits `hidden` last - so the base class won everywhere. The
+     band shipped one pass with no agent on it. `max-sm:hidden` over a plain block has no ordering
+     to lose.
+   · **The halo was `-z-10` and invisible.** The band draws its two gradients and its multiply at
+     exactly that depth, so it painted UNDER them. Nothing needs a z-index: the halo is absolute and
+     he follows it in source order.
+   · **`grid place-items-center` collapsed the halo to 0x0.** That property sets `justify-self` /
+     `align-self` on every grid child INCLUDING an absolutely-positioned one, which shrinks it to
+     its own content - and a decorative span has none.
+   · **`-inset-6` generated no rule at all**, measured: `top/right/bottom/left` came back as the
+     static position and the span was 0x0 a second time. It is `inset-0 scale-[1.6]`.
+  ⚠️ **The halo is figure-and-ground, not decoration.** He is grey by the kit's own rule (*"grey on
+  purpose so he sits on any brand colour"*), which on a navy band leaves nothing separating him from
+  the ink. It is `--brand` at 30%, the same orange as the word beside him and the button opposite,
+  so the band carries ONE accent in three places rather than three colours.
+  ⚠️ **Nothing may clip him**: the kit keeps `overflow: visible` on the svg because the sway rotates
+  the body and the gear teeth leave the 120x120 box, so he sits inside the band's reading gutter and
+  never against its edge, where the band's own `overflow-hidden` would take the teeth off.
+  🔴 **«HD» is NOT delivered, and cannot be from this repo.** `public/home-cta-site.webp` is
+  **1584x672**, measured. The band is full-window and 160px tall, so `cover` scales by WIDTH: 1.21x
+  upscale at a 1920 window, 1.62x at 2560. That is the softness, and no CSS removes it.
+  **CONTENT, owed: a re-crop at 3200px wide or more**, in the band's own 10:1 shape rather than
+  2.36:1, so `cover` stops throwing away two thirds of the frame's height as well.
+  🔴 **A `` written through an edit script landed as a literal BACKSPACE in the new test**, and
+  two assertions were VACUOUS for one pass - they passed on a band drawing no agent at all. Same
+  trap as 2026-09-12 (three source files). The suite now scans ITSELF for control characters, with
+  the scan written on `charCodeAt` and no escape sequences: writing the range as a unicode escape in
+  a regex literal is how the second copy got in, because the tools that put the file on disk expand
+  those escapes into the very characters being hunted.
+  ⚠️ A case strips JSX COMMENTS before asserting: the note above the halo names `-z-10` three times
+  while saying it must never be used, so `not.toMatch` failed on its own explanation. Third time in
+  this repo (`basis-[34rem]`, `object-contain`).
+  ⚠️ Verified: lint 0 errors, 74 passing across the seven CTA / agent / guard suites, and both new
+  rulings break-checked (the `animation: none` removed, `pose="send"` forced); each went red.
+  **SEEN RENDERED** at 1568px on a local dev build - which is how all four layout faults were found.
+  🔴 **NOT seen in Arabic**, and that is where `viewer` earns its place; it wants one look.
+  🔴 **`npm run typecheck` is RED on a tree I did not touch**: three errors in `src/lib/uiPins.ts`
+  (`'parent' does not exist in type 'PinEntry'`), from another session editing that file during
+  this work. `/browse` also crashed mid-session on `pin("browse-controls")` before that same session
+  registered the id. Reported, not fixed - it is somebody's half-finished change.
+  ⚠️ `npm run dev` is still broken here (`--no-experimental-webstorage is not allowed in
+  NODE_OPTIONS`) and the flag is in the SCRIPT, not in Next: `npx next dev` runs fine. Worth fixing
+  in `package.json`, and not fixed here.
+
+- **2026-09-15 - The demo is over: a request with no bids is back on the `/requests` rail.**
+  Owner: *"i made a recent change here for demo purposes where requests are not visible in his requests
+  feet if no bids arrive, undo this"*.
+  `HIDE_BIDLESS_REQUESTS` is `false`. That is the whole undo, which is what the flag was shaped for
+  yesterday (*"Set it `false` and the rail is exactly what it was - there is nothing else to undo"*) -
+  the two guards and the filter stay in place, inert, and the reason the behaviour must not be kept is
+  still stated where it belongs.
+  Files: `src/lib/flags.ts`.
+  ⚠️ **One case goes QUIET, not red.** `it.runIf(HIDE_BIDLESS_REQUESTS)` describes the demo itself, so
+  the suite reports 6 passing and 1 skipped rather than failing. The two GUARD cases - the landing
+  fallback and the never-empty rail - hold either way, which is the half worth keeping.
+  ⚠️ The blind spot logged with it is now moot while the flag is off: nothing reads `totalBids` to
+  hide anything, so a request whose offers all arrived through the renter's own shared link is on the
+  rail like any other. It comes back the day the flag does.
+  ⚠️ Verified: typecheck, lint (0 errors, warnings pre-existing), 7 in the flag's own suite (6 passing,
+  1 skipped by design) and 59 across the workspace, rail-fit, rail-bleed and request-label suites. NOT
+  seen rendered - `/requests` needs a signed-in renter, and this restores the behaviour that shipped for
+  weeks before yesterday.
+
 - **2026-09-15 - The machine panel shows the WHOLE machine again: `cover` was chosen on a measurement taken in the wrong box.**
   Owner: *"the equipment in the machine panel are so zoomed in that make the equipment not all
   appear"*.

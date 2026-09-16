@@ -102,7 +102,7 @@ const ROW_H = "h-[52px]";
  * already. The window fallback costs a second call, taken only when the renter set no deadline. A
  * row whose lookups fail shows no date rather than a wrong one.
  */
-export function HomeRequests() {
+export function HomeRequests({ hideHeading, onCount }: { hideHeading?: boolean; onCount?: (n: number) => void } = {}) {
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
@@ -111,6 +111,13 @@ export function HomeRequests() {
   const { sessionKey, status } = useSession();
 
   const [groups, setGroups] = useState<RequestGroup[] | null>(null);
+  /* What the dashboard's tab row prints beside «My Requests» (2026-09-16). The SAME figure the
+     summary line below states, so the tab and the block can never disagree, and reported rather
+     than fetched a second time by the page. Nothing while the read is in flight: `null` there is
+     "not answered yet", and a 0 would be a wrong statement rather than a pending one. */
+  useEffect(() => {
+    if (groups) onCount?.(groups.length);
+  }, [groups, onCount]);
   /** `null` until the read lands — an empty array is an ANSWER ("no bids"), and the rail must not
    *  give that answer before it has one. See the rail's own note below. */
   const [bids, setBids] = useState<InboxBid[] | null>(null);
@@ -534,16 +541,29 @@ export function HomeRequests() {
       {/* Section header — the owner's option G (2026-08-29): a navy plate carrying the section's
           glyph, the title over its summary, the action on the trailing edge. No band and no box —
           the page already has enough bordered rectangles, and the plate is what the eye finds. */}
+      {/* ── The heading is the TAB now, on the dashboard (owner, 2026-09-16) ────────────────────
+          The plate, the title and the count moved onto the tab that opens this block, so drawing
+          them again a row below would say «My Requests · 4 open» twice on one screen. What stays is
+          the half the tab cannot carry: the summary sentence and the way out to the workspace. */}
       <div className="flex items-center gap-3">
-        <span className="grid size-[38px] flex-none place-items-center rounded-sm bg-navy text-surface">
-          <Icon name="assignment" size={22} />
-        </span>
-        <span className="min-w-0">
-          <h2 className="text-title font-extrabold text-navy">{t.home.yourRequests}</h2>
-          <span className="mt-0.5 block text-meta text-muted">
+        {!hideHeading && (
+          <>
+            <span className="grid size-[38px] flex-none place-items-center rounded-sm bg-navy text-surface">
+              <Icon name="assignment" size={22} />
+            </span>
+            <span className="min-w-0">
+              <h2 className="text-title font-extrabold text-navy">{t.home.yourRequests}</h2>
+              <span className="mt-0.5 block text-meta text-muted">
+                {fmt(t.home.reqSummary, { n: String(groups?.length ?? 0), bids: String(fresh) })}
+              </span>
+            </span>
+          </>
+        )}
+        {hideHeading && (
+          <span className="min-w-0 text-meta text-muted">
             {fmt(t.home.reqSummary, { n: String(groups?.length ?? 0), bids: String(fresh) })}
           </span>
-        </span>
+        )}
         <span className="flex-1" />
         <button type="button" onClick={() => router.push("/requests")} className={btn("link", "sm")}>
           {t.home.viewAll}

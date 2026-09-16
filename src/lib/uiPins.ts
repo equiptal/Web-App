@@ -105,6 +105,11 @@ export const PIN_REGISTRY = {
   "header-logo": { n: "2.1", label: "Header — logo", file: "src/components/AppShell.tsx" },
   "header-nav-slot": { n: "2.2", label: "Header — centred nav slot", file: "src/components/AppShell.tsx" },
   "header-beta": { n: "2.3", label: "Header — beta mark", file: "src/components/AppShell.tsx" },
+  /* The National Day skin's two elements on the bar (owner, 2026-09-16). Both are drawn ALL YEAR
+     and displayed only under `<html data-season="nd">`, so the overlay numbers them out of season
+     too - which is the point: a note about the seam can quote 2.4 in July. */
+  "header-season-decor": { n: "2.4", label: "Header — season backdrop (palms, dots, seam)", file: "src/components/AppShell.tsx" },
+  "header-season-chip": { n: "2.5", label: "Header — season chip", file: "src/components/AppShell.tsx" },
   "app-nav": { n: "3", label: "Nav tabs — desktop", file: "src/components/AppNav.tsx" },
   "nav-tab": { n: "3.1", label: "Nav tab — one link", file: "src/components/AppNav.tsx" },
   "app-nav-mobile": { n: "4", label: "Nav tabs — mobile", file: "src/components/AppNav.tsx" },
@@ -125,11 +130,16 @@ export const PIN_REGISTRY = {
   "home-hero-actions": { n: "10.2", label: "Home — hero action column", file: "src/components/home/CtaBanner.tsx" },
   "home-requests": { n: "10.4", label: "Home — requests + bids rail", file: "src/components/home/HomeRequests.tsx" },
   "home-bubble": { n: "10.7", label: "Home — notification bubble", file: "src/components/home/HomeNotificationBubble.tsx" },
+  "home-tabs": { n: "10.8", label: "Home — requests / suppliers / projects tabs", file: "src/components/home/HomeHub.tsx" },
   "suppliers-list": { n: "10.6", label: "My Suppliers — the list", file: "src/components/suppliers/SuppliersPage.tsx" },
   "start-request-modal": { n: "11", label: "Start-your-request modal", file: "src/components/home/StartYourRequestModal.tsx" },
 
   /* ── 15–24  create ────────────────────────────────────────────────────────────────────────── */
   "create-intake": { n: "15", label: "Create — intake screen", file: "src/components/screens/Intake.tsx" },
+  "intake-rail": { n: "15.1", label: "Intake — previous-requests rail", file: "src/components/create/RequestsRail.tsx" },
+  "intake-rail-group": { n: "15.2", label: "Intake rail — one project", file: "src/components/create/RequestsRail.tsx" },
+  "intake-rail-row": { n: "15.3", label: "Intake rail — one machine", file: "src/components/create/RequestsRail.tsx" },
+  "intake-pick-pill": { n: "15.4", label: "Intake — the chosen project and its machines, on the floor", file: "src/components/create/RequestsRail.tsx" },
   "create-canvas": { n: "16", label: "Create canvas (3 columns)", file: "src/components/create/Canvas.tsx" },
   "machine-card": { n: "17", label: "Machine card", file: "src/components/create/MachineCard.tsx" },
   "machine-card-head": { n: "17.1", label: "Machine card — head row", file: "src/components/create/MachineCard.tsx" },
@@ -241,6 +251,9 @@ export const PIN_REGISTRY = {
   /* ── 60–69  inbox, stores ─────────────────────────────────────────────────────────────────── */
   "inbox-view": { n: "60", label: "Inbox", file: "src/components/inbox/InboxView.tsx" },
   "browse-surface": { n: "61", label: "Browse stores", file: "src/components/stores/BrowseSurface.tsx" },
+  "browse-controls": { n: "61.1", label: "Browse — heading + search + city, one row", file: "src/components/stores/BrowseSurface.tsx" },
+  "browse-categories": { n: "61.2", label: "Browse — category rail", file: "src/components/stores/BrowseSurface.tsx" },
+  "browse-pager": { n: "61.3", label: "Browse — page arrows", file: "src/components/stores/BrowseSurface.tsx" },
   "store-detail": { n: "62", label: "Store detail", file: "src/components/stores/StoreDetailSurface.tsx" },
   "store-card": { n: "63", label: "Store card", file: "src/components/stores/StoreCard.tsx" },
   "store-card-equipment": { n: "64", label: "Store card (category)", file: "src/components/stores/StoreCard.tsx" },

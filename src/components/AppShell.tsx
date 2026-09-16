@@ -22,6 +22,7 @@ import { NotificationsBell } from "@/components/NotificationsBell";
 import { AppNav, AppNavMobile, type NavItem } from "@/components/AppNav";
 import { ArrowBackIcon, MailIcon, CountBadge } from "@/components/HeaderIcons";
 import { pin } from "@/lib/uiPins";
+import { seasonOrdinal } from "@/lib/season";
 
 /**
  * App shell for the renter web app (web-app/004, AC-01/02/03/09/25). One bar across the top holding
@@ -349,7 +350,21 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
 
             Height stays 52px: the OS's is 46, but its row carries no 34px avatar, bell and inbox,
             and shrinking those to reach parity would cost more than the six pixels are worth. */}
-        <header {...pin("app-header")} className="sticky top-0 z-30 flex h-[52px] items-center gap-3 bg-navy-deep px-4 text-white sm:px-7 relative">
+        <header {...pin("app-header")} className="nd-bar sticky top-0 z-30 flex h-[52px] items-center gap-3 bg-navy-deep px-4 text-white sm:px-7 relative">
+          {/* ── The seasonal backdrop (owner, 2026-09-16) ────────────────────────────────────────
+              Inert all year: `.nd-decor` is `display: none` until `<html data-season="nd">` is
+              written, which `layout.tsx` does between 16 September and 1 October. Under the season
+              it carries the dot lattice and the palm grove, and its `::after` draws the gold Najdi
+              seam along the bar's bottom edge — the header in the app's own screenshot.
+
+              A SPAN rather than a `::before` on the header. This bar is `sticky z-30`, so it opens a
+              stacking context: a positioned pseudo-element would paint over the logo and the tabs,
+              and at `z-index: -1` it would drop behind the header's own background and vanish. A
+              sibling that comes FIRST in the source needs no z-index at all, and the whole row after
+              it paints on top for free.
+
+              `aria-hidden`: it is weather, not information. The bar says what the app is in words. */}
+          <span {...pin("header-season-decor")} className="nd-decor" aria-hidden />
           {/* ~~The Back arrow led this row.~~ It is on the PAGE now, under the bar (owner,
               2026-08-26) — see `usePageBack` and the block at the top of `<main>`. The bar carries
               only what is true of the app on every route; back is true of one page. */}
@@ -395,6 +410,35 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
             className="flex-none rounded-full border border-white/25 px-1.5 py-px text-label font-extrabold uppercase tracking-wide text-white/70"
           >
             {t.shell.beta}
+          </span>
+
+          {/* ── The season chip (owner, 2026-09-16) ──────────────────────────────────────────────
+              The kit's smallest piece: a pill that says the date and nothing else. It sits with the
+              wordmark because that is what it is a note ON — the product, wearing a season — and it
+              takes the same outlined treatment «Beta» beside it takes, in gold rather than white.
+
+              ⚠️ **Latin digits, in both locales.** The Flutter kit draws «٩٦»; this app has said
+              «the numbers should be in eng even in arabic» since 2026-09-04 and applies
+              `latinDigits()` to rows that arrive Arabic-indic from the database. One seasonal pill
+              is not the place to reverse a product-wide rule.
+
+              ⚠️ **Hidden below `sm`, and the rule for that is in `globals.css`, not here.** A phone
+              bar already carries the mark, «Beta», the tabs sheet and three 34px controls, and a
+              fourth pill on that row is what pushes the whole document wider than the screen — the
+              fault audited out of three surfaces on 2026-09-08.
+              🔴 `max-sm:hidden` was on this element and CANNOT WORK: Tailwind emits its utilities
+              inside `@layer utilities` and the seasonal block is unlayered, so the season's own
+              `display` wins at every width and the chip rides the phone bar all fortnight. Read off
+              the compiled sheet, not guessed. The season decides its own display, in one place.
+
+              Rendered all year and drawn by CSS only, so the server and the client agree on the
+              markup and nothing flickers. */}
+          <span
+            {...pin("header-season-chip")}
+            className="nd-chip flex-none rounded-full px-1.5 py-px text-label font-extrabold tracking-wide"
+          >
+            <b className="font-extrabold">{seasonOrdinal()}</b>
+            {t.season.nationalDay}
           </span>
 
           {/* ── The nav sits DEAD CENTRE of the bar, not after the title ────────────────────────────

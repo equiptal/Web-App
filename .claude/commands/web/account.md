@@ -60,7 +60,7 @@ One connection, one pass, every check. It mirrors the backend's own logic rather
 
 - **Tier** is computed exactly as `getUserTier` does (`apps/backend/src/services/profile.service.ts`), inherited company verification included.
 - **Emailability** mirrors `addressesFor` (`shareEmail.ts`), the linked-account fallback included.
-- **The cap** counts the same statuses `createRequest` counts.
+- **The open-request count** compares the denormalised column against the live rows. It is a DRIFT check now, not a cap check — no cap exists on either side since 2026-09-14.
 
 If the schema has moved under it, fix the script rather than working around it in the shell — the next run should not repeat the failure.
 
@@ -71,17 +71,50 @@ Report each as pass or fail, and when it fails, name the **error the renter woul
 **Can he use the app at all**
 - `tenant_id` must be `default`. backend-agents pins `TENANT_ID` by omission, so a row stamped from SSM is invisible to it and every agents call 404s with «المستخدم غير موجود».
 
-**Can he post a request** (`createRequest.ts`)
-- `has_completed_onboarding` must be true, else **E10001 `GUEST_CANNOT_POST_REQUESTS`**. 🔴 **This is the gate — the tier is not.** A renter can read as basic or even verified and still be refused here.
-- If `supplier_status <> 2`, at most **3** open requests (`OPEN`/`ACTIVE`/`PARTIALLY_ACCEPTED`), else `REQUEST_LIMIT_REACHED`.
+**Can he post a request** — and the answer changed on 2026-09-13/14
 
-**Is he a stuck account** — the trap worth checking on every single run
-- Identity complete (first + last + city + jobTitle) **and** `has_completed_onboarding = 0`.
-- Such a person is refused at post, and **no admin action rescues him**: `forceBasicTier` throws "already Basic" because he reads as basic, `forceVerifiedTier` writes the tier but not the flag, and `patchUser` writes neither. Only `completeProfile` (`PUT /users/me/profile`) or a direct write clears it.
-- Say so explicitly when you find one. It is invisible from every screen.
+🔴 **Both of the web's entry gates were DELETED, a day apart.** Read the standing comment at
+`backend-agents/createRequest.ts:387-411` before trusting anything else in this section; it records
+both removals and the owner's words for each.
+
+| Surface | Code | Refuses when |
+|---|---|---|
+| **web** (`backend-agents/createRequest.ts`) | owner lookup selects `{ id: true }` and nothing else | the user row does not exist for this `tenantId`. **That is the whole gate.** |
+| **app** (`apps/backend/request.service.ts:121` `requireBasicTier`) | `!hasCompletedOnboarding && getUserTierFor(user) === 'guest'` | a **real** guest — flag false AND tier guest |
+
+So:
+- ~~`has_completed_onboarding` must be true, else E10001~~ — **gone from the web** (removed 2026-09-13,
+  *"make user if not complete the onboarding can send request"*; prod had five 403s in five minutes from it).
+  On the app it survives only as **half of an AND**, widened the same day: the flag alone asks the wrong
+  question, since only `completeProfile` has ever written that column. Of 1,542 live accounts carrying
+  `false`, **9 are not guests at all and all 9 are ops-verified** (measured 2026-09-13).
+- ~~the 3-request cap~~ — **gone** (removed 2026-09-14). `REQUEST_LIMIT_REACHED` is now thrown by nothing.
+- `E10001 GUEST_CANNOT_POST_REQUESTS` still exists in `error-codes.ts` for other callers. **The web raises it nowhere.**
+
+⚠️ **The divergence REVERSED.** The web used to be the strict side; it is now the permissive one.
+A true guest — no name, no city, no job title, no verification, flag false — is **refused on his phone
+and served in the browser**. Report it that way round.
+
+🔴 **The "stuck account" trap is RETIRED, and do not report it.** Identity complete +
+`has_completed_onboarding = 0` used to be unrescuable by any admin action. It now blocks nothing:
+the web never reads the flag, and the app's guest test fails for such a person because his tier is
+basic or better. The admin-side faults listed at the foot of this file are still real, but they no
+longer strand anybody at post.
+
+⚠️ **What you cannot tell from source: which build prod runs.** The removals landed on
+`origin/main` on 2026-09-14. If an account WOULD have been refused under the old rules, say plainly
+that the answer depends on the deployed build and that you did not verify it.
 
 **Can he share by email** (`shareEmail.ts`)
-- `users.email` present → SES has a `From`. Absent → `NO_SENDER_ADDRESS` unless a mailbox is connected.
+- 🔴 **An empty `users.email` is NOT a blocker, and reporting it as one is wrong.** The renter sends
+  by connecting his own Outlook, and Graph sends from the mailbox he consented with — `sendViaGraph`
+  sets no `from` and never reads `users.email`. The guard was narrowed twice for exactly this:
+  `NO_SENDER_ADDRESS` now survives for **one** case, `access.reason === 'NOT_CONFIGURED'`, where the
+  stage has no Microsoft app registration, nobody can connect, SES is the only path and there is no
+  `From` to claim (`shareEmail.ts:205-233`). Every other failure reports the reason `accessTokenFor`
+  already computed — `NOT_CONNECTED` or `RECONNECT_REQUIRED` — with `connectPath` beside it.
+- So: profile e-mail absent + mailbox connectable = **fine**. Note it as context, never as a risk.
+  It only matters on the SES fallback, which is for a firm whose IT did the DNS work.
 - At least one supplier row with a usable address, his own or the linked account's, else `NO_RECIPIENTS` — **`sent: false`, nothing leaves, and the panel quietly drops him to a compose window.** Zero rows is not the same as rows with no addresses: the first is a new account, the second is a broken send.
 
 **The Outlook mailbox** — not in the database
@@ -107,15 +140,29 @@ So a person can be created in one, edited in a second and refused by a third, an
 
 ### Known disagreements — check every one, and name the surface
 
-**1. The request cap is WEB-ONLY.** `apps/backend/src/services/request.service.ts:129` says in as many words: *"Request-count cap removed: all onboarded rentees (verified or not) can post unlimited simultaneous requests."* `REQUEST_LIMIT_REACHED` is defined there and never thrown. `backend-agents/createRequest.ts:384` still enforces **3**.
-> A basic renter with 3 live requests is **refused in the browser and served on his phone.** If he reports "it works on mobile", that is not a web bug report — it is this.
-> ⚠️ `createRequest.ts:369` still claims *"app parity, request.service.ts::requireBasicTier"*. **That comment is stale.** Do not trust it.
+**1. ~~The request cap is WEB-ONLY.~~ RETIRED 2026-09-14 — there is no cap anywhere.** Both sides now
+post unlimited simultaneous requests. `apps/backend/request.service.ts:156` dropped it first
+(*"Request-count cap removed: all onboarded rentees (verified or not) can post unlimited simultaneous
+requests"*); `backend-agents/createRequest.ts:220` followed, and its `BASIC_TIER_REQUEST_LIMIT` is struck
+through in place. `REQUEST_LIMIT_REACHED` is now raised by nothing. **Never report a cap.**
 
-**2. Verification is inherited for the tier, not for the cap.** `getUserTier` treats a member of a verified company as Verified. The cap reads `owner.supplierStatus !== 2` — his **own** status, no inheritance. So such a member reads Verified everywhere and is still capped by the web.
+**2. The guest gate now cuts the OTHER way, and this is the live divergence.**
+- **app**: `!hasCompletedOnboarding && tier === 'guest'` → `GUEST_CANNOT_POST_REQUESTS`. An **OR, never a
+  swap** (the file says so): widened so nobody who could post lost it, and a genuine phone-only account
+  with no name and no verification is still refused.
+- **web**: no such test at all. The row only has to exist.
+
+> A true guest is **refused on his phone and served in the browser.** That is the sentence to write, and
+> it is the reverse of what this file said before 2026-09-14.
+
+**2b. Verification is inherited for the tier.** `getUserTier` treats a member of a verified company as
+Verified, and `getUserTierFor` does the same inside the app's guest test — so company membership can lift
+an account out of `guest` and past that gate even with the flag false. Nothing reads `supplierStatus` for
+a posting limit any more, because there is no limit.
 
 **3. `open_request_count` is a denormalised column, and the two sides read different things.** The **app's home screen** reads the column (`home_bloc.dart:129` ← `profile.openRequestCount`); **backend-agents counts rows**. Both services increment and decrement it, and `commitment-cascade.service.ts:134` carries a warning about it drifting upward. A drift means the phone shows a number the browser disagrees with, and neither is obviously wrong from the screen. The script compares them; report a mismatch as a data fault, not a UI one.
 
-**4. `hasCompletedOnboarding` has five writers and one of them is the app's own.** `completeProfile`, both `createUser`s, `forceBasicTier`, `partner/updateProfile`. Two writers of the identity fields set it and two do not. See the known-faults list below.
+**4. `hasCompletedOnboarding` has five writers and one of them is the app's own.** `completeProfile`, both `createUser`s, `forceBasicTier`, `partner/updateProfile`. Two writers of the identity fields set it and two do not — which is *why* both gates stopped reading it alone. Worth knowing when reading the column; **not** worth reporting as a risk on its own any more.
 
 **5. Requests carry `request_origin`** (`ORGANIC` / `TRIAL` / `OUTREACH`) and `is_trial`. A renter whose history is mostly `TRIAL` has not really used the product, and a trial row expires in 60 minutes — do not read one as evidence that posting works.
 
@@ -131,7 +178,7 @@ Rules for the report:
 - **Distinguish blocking from cosmetic.** "No suppliers yet" is a starting state. "Two suppliers, neither with an address" is a broken send. Do not file the first as a risk.
 - **Say what you did not check.** The SSM token, anything the classifier refused, anything the schema would not answer.
 - **Never infer a cause from a correlation.** If an account is stuck, the audit log usually cannot tell you how — `patchUser` writes no audit row at all. Say the mechanism is unestablished rather than blaming a surface.
-- **Quote the real error code** (`E10001`, `NO_RECIPIENTS`, `REQUEST_LIMIT_REACHED`). That is what turns a screenshot into a diagnosis.
+- **Quote the real error code** (`E10001`, `NO_RECIPIENTS`, `NOT_CONNECTED`, `RECONNECT_REQUIRED`). That is what turns a screenshot into a diagnosis. `REQUEST_LIMIT_REACHED` is dead — quoting it dates the report.
 
 ## Step 4 — clean up, in the report
 
@@ -159,6 +206,11 @@ Single-account lookups are consistently allowed. That is the whole design of thi
 ## Known backend faults this check keeps meeting
 
 Report them when the account shows them; do not re-investigate from scratch each time.
+
+⚠️ **All four are admin-side and none of them blocks posting any more** (the gate that made them
+bite was removed 2026-09-13). They still leave the column untrue, which matters to anything that reads it.
+
+
 
 1. `forceVerifiedTier` (`admin-user.service.ts:740`) writes `supplierStatus` and `isVerified` and **not** `hasCompletedOnboarding` — so an admin "verifying" a stuck renter leaves him refused at post. `forceBasicTier` gets this right 60 lines above, with a comment explaining exactly why.
 2. `forceBasicTier` (`:673`) throws when the user already reads as basic, which is precisely the stuck population.

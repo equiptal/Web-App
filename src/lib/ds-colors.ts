@@ -136,6 +136,19 @@ export const COLORS = {
   shopAmberDeep: "#b5761a",
   shopAmberSoft: "#fdf1e0",
   shopField: "#fafbfb",
+  /* ── The National Day skin ──────────────────────────────────────────────────────────────────
+     Mirrored because `ds-colors.test.ts` fails on any hex `:root` defines and this file does not —
+     the guard that stops the two copies of the palette drifting apart. Nothing in this file's three
+     surfaces (the OG image, the clipboard card, the printed quotation) wears the season today: a
+     quotation is a contract document and a pasted card lands in somebody else's inbox, and neither
+     is a place to celebrate. They are here to be reachable, and to be checked. */
+  ndGround: "#00542a",
+  ndDeep: "#05351f",
+  ndMid: "#0a7a3e",
+  ndGreen: "#006c35",
+  ndAccent: "#d7c48a",
+  ndMint: "#e8f2ea",
+  ndInk: "#0d5c3e",
 } as const;
 
 /**
@@ -266,6 +279,13 @@ export const CSS_VAR_NAME: Record<keyof typeof COLORS, string> = {
   shopAmberDeep: "--shop-amber-deep",
   shopAmberSoft: "--shop-amber-soft",
   shopField: "--shop-field",
+  ndGround: "--nd-ground",
+  ndDeep: "--nd-deep",
+  ndMid: "--nd-mid",
+  ndGreen: "--nd-green",
+  ndAccent: "--nd-accent",
+  ndMint: "--nd-mint",
+  ndInk: "--nd-ink",
 };
 
 /**

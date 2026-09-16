@@ -23,9 +23,11 @@
  */
 
 import { NoCompanyCard } from "@/components/company/CompanyHub";
+import { BrowseSurface } from "@/components/stores/BrowseSurface";
 import { GuestWall, GuestDashboardPreview, GuestRequestsPreview } from "@/components/common/GuestWall";
 import { ProcessingView } from "@/components/screens/Processing";
 import { Mansour } from "@/components/Mansour";
+import { CompareMatrix } from "@/components/workspace/CompareMatrix";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
 import { RequestCard } from "@/components/map/RequestCard";
 import { PriceFooter } from "@/components/map/PriceFooter";
@@ -34,7 +36,9 @@ import { YardExplainDialog } from "@/components/map/YardExplainDialog";
 import { mapFleet, type FleetMachine } from "@/lib/contract/fleet";
 import { draftSubject, requestCardView, type RequestCardCtx } from "@/lib/contract/request-card";
 import { composeDocumentRequest, composeShortfallRequest, type RenteeRequestDraft } from "@/lib/contract/rentee-request";
-import type { BidCard } from "@/lib/contract/bids";
+import type { BidCard, TermRow } from "@/lib/contract/bids";
+import type { WorkspaceBid } from "@/lib/contract/workspace";
+import { DashboardTabs } from "@/components/home/HomeHub";
 import type { ReactNode } from "react";
 
 const L = (en: string, ar: string) => (typeof document !== "undefined" && document.documentElement.lang === "ar" ? ar : en);
@@ -86,7 +90,143 @@ export interface Specimen {
   render: () => ReactNode;
 }
 
+
+/**
+ * The browse directory, on invented rows.
+ *
+ * ⚠️ **This one bends rule 2, and says so.** `BrowseSurface` takes no data props — it fetches its
+ * cities, its taxonomy and its stores itself — so the only way to render it here without a backend
+ * is to answer those three calls locally. The stub is installed in THIS component's render body,
+ * which runs before the child's effects, and it is scoped to the three paths the surface asks for;
+ * anything else falls through to the real `fetch`. Still no network, still the same picture on a
+ * laptop with no `.env`, which is what the rule protects.
+ *
+ * Giving the surface data props instead would be a refactor of a live screen to suit a preview page.
+ */
+function BrowseSpecimen() {
+  // ⚠️ The WHOLE `StoreCard` shape, `categories` and `matched` included — the card reads
+  // `categories.length`, so a fixture missing it throws a client-side exception and the specimen
+  // renders nothing at all rather than rendering wrong. Learned here, 2026-09-16.
+  const rows = Array.from({ length: 20 }, (_, i) => ({
+    id: `s${i + 1}`,
+    supplierId: `u${i + 1}`,
+    name: L(`Al Faisal Heavy Equipment ${i + 1}`, `الفيصل للمعدات ${i + 1}`),
+    logoUrl: null,
+    isVerified: i % 3 === 0,
+    activeEquipmentCount: 4 + i,
+    city: L(i % 2 ? "Jeddah" : "Riyadh", i % 2 ? "جدة" : "الرياض"),
+    categories: [
+      { id: "c1", name: "Earthmoving", nameAr: "الحفر" },
+      { id: "c2", name: "Lifting", nameAr: "الرفع" },
+      { id: "c3", name: "Concrete", nameAr: "الخرسانة" },
+    ].slice(0, (i % 3) + 1),
+    matched: [],
+  }));
+  const cats = [
+    { id: "c1", name: "Earthmoving", nameAr: "الحفر", children: [] },
+    { id: "c2", name: "Lifting", nameAr: "الرفع", children: [] },
+    { id: "c3", name: "Access platforms", nameAr: "منصات الوصول", children: [] },
+    { id: "c4", name: "Concrete", nameAr: "الخرسانة", children: [] },
+    { id: "c5", name: "Compaction", nameAr: "الدمك", children: [] },
+    { id: "c6", name: "Power & light", nameAr: "الطاقة", children: [] },
+    { id: "c7", name: "Trucks", nameAr: "الشاحنات", children: [] },
+  ];
+  const cities = [
+    { name: "Riyadh", nameAr: "الرياض" },
+    { name: "Jeddah", nameAr: "جدة" },
+    { name: "Dammam", nameAr: "الدمام" },
+  ];
+  if (typeof window !== "undefined" && !(window as unknown as { __browseStub?: boolean }).__browseStub) {
+    (window as unknown as { __browseStub?: boolean }).__browseStub = true;
+    const real = window.fetch.bind(window);
+    const ok = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } }));
+    window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+      // ⚠️ The KEYS are the ones each reader actually looks for: the cities route is parsed loosely
+      // (any array-valued key), the taxonomy route is read as `.taxonomy`, the directory as `.stores`.
+      // Get one wrong and the specimen draws an empty control rather than failing.
+      if (url.includes("/api/master-data/cities")) return ok({ cities });
+      if (url.includes("/api/stores/taxonomy")) return ok({ taxonomy: cats });
+      if (url.includes("/api/stores")) return ok({ stores: rows });
+      return real(input as RequestInfo, init);
+    }) as typeof window.fetch;
+  }
+  return <BrowseSurface title={L("Most popular suppliers", "أكثر المورّدين شهرة")} />;
+}
+
+/* ══ The comparison table ════════════════════════════════════════════════════════════════════════
+   Added 2026-09-16, because this surface has produced FOUR layout faults and not one of them could
+   be seen without a signed-in renter holding bids: the phantom vertical scrollbar (twice), the
+   terms strip drawing through the equipment rail, and the strip ending short of its own container.
+   jsdom lays out nothing, so every one of those was found on a screenshot of production.
+
+   ⚠️ Six bids and nine terms on purpose - that is the shape the faults appear at. A two-bid, two-term
+   fixture fits any width and proves nothing. */
+const cmTerm = (key: string, en: string, ar: string, value: string, extra?: Partial<TermRow>): TermRow => ({
+  key, labelEn: en, labelAr: ar, state: "matched", value, ...extra,
+});
+
+const cmBid = (
+  id: string,
+  supplierName: string,
+  price: number,
+  over: Partial<BidCard> = {},
+): WorkspaceBid =>
+  ({
+    card: {
+      id, status: "PENDING", supplierId: null, supplierCompanyId: null, supplierName,
+      verified: false, rating: null, distanceKm: null, submittedAt: null, validUntil: null,
+      price, mobPrice: 4200, demobPrice: 4200, priceUnit: "PER_MONTH", duration: null,
+      numberOfUnits: 1, unitsOffered: 1, openingPrice: null, lastCounterBy: null,
+      terms: {
+        equipment: [
+          cmTerm("year", "Equipment year", "سنة الصنع", "2021", { renteeValue: "2019" }),
+          cmTerm("equipment_cert", "Certificate", "الشهادة", "TUV", { renteeValue: "TUV" }),
+          cmTerm("fuel", "Fuel type", "نوع الوقود", "Diesel"),
+        ],
+        contract: [
+          cmTerm("operator_included", "Operator", "المشغّل", "Included", { renteeValue: "Included" }),
+          cmTerm("payment_terms", "Payment", "الدفع", "net_30", { renteeValue: "net_30" }),
+          cmTerm("fat_food", "Operator food", "طعام المشغّل", "supplier", { renteeValue: "supplier" }),
+          cmTerm("fat_accommodation", "Operator accommodation and transport", "إقامة ونقل المشغّل", "supplier", { renteeValue: "rentee" }),
+          cmTerm("fuel_responsibility", "Fuel", "الوقود", "supplier", { renteeValue: "supplier" }),
+          cmTerm("night_shift", "Night shift", "الوردية الليلية", "Available"),
+        ],
+        supplier: [],
+      },
+      ...over,
+    },
+  }) as unknown as WorkspaceBid;
+
+/** His own screenshot: six offers, two of them the same firm twice. */
+const cmRows: WorkspaceBid[] = [
+  cmBid("b1", "Nesma Heavy Equipment Co.", 28900),
+  cmBid("b2", "Nesma Heavy Equipment Co.", 28900),
+  cmBid("b3", "Al-Faisal Contracting Est.", 30000),
+  cmBid("b4", "Al-Faisal Contracting Est.", 36500, { mobPrice: 0, demobPrice: 3500 }),
+  cmBid("b5", "Al Jazira Equipment Rental", 33500),
+  cmBid("b6", "Al Jazira Equipment Rental", 33500),
+];
+
 export const SPECIMENS: Specimen[] = [
+  {
+    id: "compare-matrix",
+    pin: "24",
+    label: "Comparison table - six offers, nine terms",
+    render: () => (
+      <CompareMatrix
+        bids={cmRows}
+        durationDays={90}
+        startDate={"2026-10-12"}
+        mobByRentee={false}
+        demobByRentee={false}
+        submissions={{}}
+        benched={new Set()}
+        onBench={() => {}}
+        ranking={null}
+      />
+    ),
+  },
   {
     id: "yard-card-unconfirmed",
     pin: "52.3",
@@ -305,6 +445,97 @@ export const SPECIMENS: Specimen[] = [
         <PriceFooter bid={bid} durationDays={30} />
       </div>
     ),
+  },
+  {
+    /* 61 — the heading, the search and the city on ONE row, the thinned category rail under them,
+       and the ‹ › pager at the foot of twenty cards (owner, 2026-09-16). */
+    id: "browse-directory",
+    pin: "61",
+    label: "Browse — directory",
+    render: () => (
+      /* ⚠️ **Fluid, never a fixed width.** The shot lane photographs every specimen at 392 AND 1024,
+         and a fixed 1180 overflows the narrower viewport — which under `dir="rtl"` spills to the LEFT
+         and the clip comes back with a column of cards sliced off, a picture that looks like a broken
+         mirror and is only a broken fixture. This is a full-width page surface; it should fill
+         whatever it is given, which is also what it does in the app.
+
+         ⚠️ **`minWidth: 0` is load-bearing.** The preview shell is a flex column, so this wrapper is a
+         flex ITEM and `min-width: auto` lets it grow to its own min-content — 791px at a 392 viewport,
+         which photographs as an overflowing page that the real `BrowsePage` (ordinary block flow)
+         never produces. Measured here, 2026-09-16. */
+      <div style={{ width: "100%", minWidth: 0 }}>
+        <BrowseSpecimen />
+      </div>
+    ),
+  },
+  /**
+   * The dashboard's tab row (owner, 2026-09-16). Three states worth looking at in one picture: the
+   * open tab, a closed one with a real count, and one whose block has not answered yet and shows a
+   * dash rather than a 0.
+   */
+  {
+    id: "dashboard-tabs",
+    pin: "10.8",
+    label: "Dashboard - requests / suppliers / projects tabs",
+    render: () => (
+      <div style={{ width: "100%", minWidth: 0 }}>
+        <DashboardTabs view="requests" counts={{ requests: 4, suppliers: 42, projects: null }} onPick={() => {}} />
+      </div>
+    ),
+  },
+  /**
+   * The National Day skin (owner, 2026-09-16).
+   *
+   * 🔴 **This bends rule 1 and says so.** `AppShell` cannot mount here — it reads the session, the
+   * locale, the router AND fires `fetchDealRoomUnread`, which rule 2 forbids outright — so the bar
+   * below repeats the header's own classes rather than importing it. What is being photographed is
+   * the SKIN, and the skin is three class names and a block of `globals.css`: `nd-bar` (the ground),
+   * `nd-decor` (the dot lattice, the palm grove and the gold seam on its `::after`) and `nd-chip`.
+   * Those are the real classes against the real stylesheet, which is the whole of what can be wrong.
+   * What this picture CANNOT prove is how the decoration sits behind the logo, the tabs and the
+   * three 34px controls — that needs the signed-in bar.
+   *
+   * `data-season` is set on the wrapper, not on `<html>`: the seasonal rules are descendant
+   * selectors, so any ancestor carrying the attribute switches them on. That is also how the OFF
+   * state is drawn beside the on one — the same markup, one attribute apart.
+   */
+  {
+    id: "national-day",
+    pin: "2.4",
+    label: "National Day skin - the header bar, on and off",
+    render: () => {
+      const bar = (
+        <>
+          <span className="nd-decor" aria-hidden />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/moedatech-logo.svg" alt="Moedatech" className="block h-5 w-auto flex-none brightness-0 invert" />
+          <span className="flex-none rounded-full border border-white/25 px-1.5 py-px text-label font-extrabold uppercase tracking-wide text-white/70">
+            Beta
+          </span>
+          <span className="nd-chip flex-none rounded-full px-1.5 py-px text-label font-extrabold tracking-wide">
+            <b className="font-extrabold">96</b>
+            {L("National Day", "اليوم الوطني")}
+          </span>
+          <span className="ms-auto flex-none text-body font-extrabold">{L("Dashboard", "الرئيسية")}</span>
+        </>
+      );
+      return (
+        <div style={{ width: "100%", minWidth: 0 }} className="flex flex-col gap-5">
+          <div data-season="nd">
+            <div className="nd-bar relative flex h-[52px] items-center gap-3 bg-navy-deep px-4 text-white sm:px-7">{bar}</div>
+            {/* The band under it, so the seam is read against the page it ends on rather than against
+                the preview's own ground. */}
+            <div className="nd-seam relative flex h-[84px] items-center bg-navy px-4 text-white sm:px-7">
+              <span className="text-body font-extrabold">
+                {L("The dashboard band keeps its own colours", "شريط الرئيسية يحتفظ بألوانه")}
+              </span>
+            </div>
+          </div>
+          {/* The same markup with the attribute absent — which is every day but the fortnight. */}
+          <div className="nd-bar relative flex h-[52px] items-center gap-3 bg-navy-deep px-4 text-white sm:px-7">{bar}</div>
+        </div>
+      );
+    },
   },
 ];
 

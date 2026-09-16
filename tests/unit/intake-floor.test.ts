@@ -60,58 +60,70 @@ describe("the two round controls replaced two rows", () => {
   });
 });
 
-describe("the sites are named on the same row", () => {
-  it("Given the strip, Then the sentence is handed TO the pills, not drawn beside them", () => {
+describe("the chip strip left the floor", () => {
+  /**
+   * 🔴 **REVERSES the whole of the 2026-09-12/13 floor** (owner, 2026-09-16, handing over
+   * `prototypes/intake-side-panel-v1.html`): *"remove the pills and show a side panel of his
+   * requests ... just clicking on a project or a request inside it will show a single pill showing
+   * project-request in one line, no other pills, just the selected one"*.
+   *
+   * What those rulings protected is not lost, it MOVED: every site is still reachable, each with
+   * what has already been hired at it, and the press still applies the project's defaults and the
+   * template's terms. Only the place the picking happens changed.
+   */
+  it("Given the floor, Then no chip strip is drawn on it", () => {
+    expect(intake).not.toContain("<ProjectChips");
+    // The sentence that introduced the strip goes with the strip.
+    expect(intake).not.toContain("t.projects.chips.pick");
+    /* 🔴 `ProjectChips` is DELETED, not merely unused — `create-canvas-wiring` refuses a canvas
+       component nothing imports, and it was right to: this floor was its only caller. Its three
+       strings went with it; `label` and `ended` stay, read by the projects board and the move
+       dialog. */
+    expect("pick" in en.projects.chips).toBe(false);
+    expect("pick" in ar.projects.chips).toBe(false);
+  });
+
+  it("Given a pick, Then the floor draws the project and its machines", () => {
+    /* Owner, 2026-09-16: *"the row of project chips on the floor - but i want it on a project
+       selection to appear"*. Nothing until a project is chosen; from then on its own chip with the
+       ✕, and a chip per machine filed under it. The markup lives with the rail, because both draw
+       the same list and one hook owns it. */
+    expect(intake).toContain("<ProjectFloorChips rail={rail} />");
+    const railSrc = readFileSync(resolve(SRC, "components/create/RequestsRail.tsx"), "utf8");
+    expect(railSrc).toContain('pin("intake-pick-pill")');
+    expect(railSrc).toContain("if (!project) return null;");
+    expect(railSrc).toContain("rail.clear");
+  });
+
+  it("Given the row, Then it holds the pill and the two controls and cannot wrap", () => {
     /**
-     * 🔴 **Only when there are projects** (owner, 2026-09-13: *"«اختر مشروعاً» - this is only shown
-     * when user have projects"*). ~~A `<span>` in this file, next to `<ProjectChips />`.~~ That
-     * component returns `null` for a renter with no sites, and for a guest, so the question was
-     * asked unconditionally beside nothing at all - on the first screen a renter meets.
-     *
-     * ⚠️ The sentence still renders FIRST; what moved is who decides. `ProjectChips` draws `lead`
-     * ahead of its own strip, behind the same guard, so the question and its answers cannot part.
+     * ⚠️ `items-center`, and NO `flex-wrap`. The row holds at most one pill and two 26px
+     * controls, so there is nothing left to push onto a second line - and the pill truncates rather
+     * than growing the row, which is why that can be promised. The old row wrapped because a strip
+     * of eight chips could not do either.
      */
-    expect(intake).toContain("t.projects.chips.pick");
-    // Handed in as the `lead`, so the old bare `<ProjectChips />` is gone from this file.
-    expect(intake).toContain("lead={");
-    expect(intake).not.toContain("<ProjectChips />");
-    const chips = intake.indexOf("<ProjectChips");
-    const sentence = intake.indexOf("t.projects.chips.pick", chips);
-    // It is INSIDE the tag now, which is what makes it conditional.
-    expect(sentence).toBeGreaterThan(chips);
-  });
-
-  it("Given both locales, Then the sentence exists in each", () => {
-    expect(en.projects.chips.pick).toBeTruthy();
-    expect(ar.projects.chips.pick).toBeTruthy();
-    expect(ar.projects.chips.pick).not.toBe(en.projects.chips.pick);
-  });
-
-  it("Given the row, Then the controls are pushed to the trailing edge", () => {
-    // ⚠️ `ms-auto`, not `ml-auto`: this screen mirrors, and the controls belong on the side the
-    // renter reads to, which is the right in English and the left in Arabic.
-    expect(intake).toContain('className="ms-auto flex flex-none items-center gap-2"');
+    const row = intake.slice(intake.indexOf('<div className="flex items-center gap-3 px-5 pb-4 pt-1">'));
+    expect(row.slice(0, 80)).toContain("items-center");
+    expect(intake).not.toContain('className="flex flex-wrap items-end gap-x-4 gap-y-3');
+    expect(intake).not.toContain("basis-full");
   });
 });
 
 /**
- * ── The controls are a CHIP tall, and they ride the last row (owner, 2026-09-12) ────────────────
- *
- * *"make the buttons on the same size of the project pills … also consider if many projects exist,
- * how the ui will be? the buttons must be on the last row always"*.
+ * ── The controls are a CHIP tall (owner, 2026-09-12) ──────────────────────────────────
  *
  * **26px, measured rather than chosen.** A chip is `px-3 py-1 text-label` inside a hairline:
  * 16.5px line box (11px × the body's 1.5) + 8px padding + 1.6px border = 26.1px — and the same in
- * Arabic, because that line box is a RATIO of the font size and not of the face. Verified in a
- * browser at both locales before the number was written down. The circles had been 40px, half again
- * as tall as the row they sit on.
+ * Arabic, because that line box is a RATIO of the font size and not of the face.
  *
- * 🔴 **The cost is on the record: 26px is under the house's 44px target**, the same fault logged
- * against a dozen icon-only controls on 2026-09-08. «The same size as the pills» is what was asked
- * for, and the alternative is the 40px circle beside a 26px chip that was reported.
+ * 🔴 **The cost is on the record: 26px is under the house's 44px target.**
+ *
+ * ⚠️ ~~`ms-auto` on the control group.~~ Gone with the strip: the pill's own group is `flex-1`
+ * now, so it pushes the controls to the trailing edge by taking the room itself. `ms-auto` on top of
+ * that would be a second answer to one question.
  */
 describe("the floor's controls match the pills", () => {
-  const controls = intake.slice(intake.indexOf('className="ms-auto'));
+  const controls = intake.slice(intake.indexOf('<span className="flex flex-none items-center gap-2">'));
 
   it("Given either control, Then it is 26px square — the chip's own height", () => {
     const sized = controls.match(/h-\[26px\] w-\[26px\]/g) ?? [];
@@ -128,33 +140,4 @@ describe("the floor's controls match the pills", () => {
     expect(controls).toMatch(/size=\{15\}/);
   });
 
-  it("Given many sites, Then the strip takes the whole card and the controls drop below it", () => {
-    /**
-     * 🔴 **This REVERSES «the controls stay on the last row»**, at the owner’s word on
-     * 2026-09-13: *"more project pill can fit in the row so make the max per row"*.
-     *
-     * That ruling put the chips in a `flex-1` group with the two round controls beside it, so the
-     * controls held their own width on EVERY line of the wrap - about 110px - and the strip wrapped
-     * as if the card were that much narrower. On his screenshot the first row ended with 200px of
-     * white after it and the next chip had gone to a second line that did not need to exist. The
-     * controls only ever occupy ONE line, which is what made the reservation wrong on all the rest.
-     *
-     * ⚠️ **The cost, stated:** the controls now take a line of their own, so the floor is one row
-     * taller than it was. That is the trade the owner asked for - the sites are what is being read
-     * here, and the two icons are not.
-     *
-     * ⚠️ `items-end` STAYS. It is still what keeps the controls level with the bottom of whatever
-     * sits above them, and it is the half of the old mechanism that was never the problem.
-     */
-    const row = intake.slice(intake.indexOf("<div className=\"flex flex-wrap items-end"));
-    expect(row.slice(0, 120)).toContain("items-end");
-    // `basis-full` is the reversal: the group takes the line, so the controls wrap past it.
-    expect(intake).toContain("basis-full");
-    expect(intake).not.toContain('className="flex min-w-0 flex-1 flex-wrap items-center');
-  });
-
-  it("Given the sentence, Then it offers A project rather than claiming one is HIS", () => {
-    expect(en.projects.chips.pick).toBe("Select a project");
-    expect(en.projects.chips.pick).not.toMatch(/your/i);
-  });
 });

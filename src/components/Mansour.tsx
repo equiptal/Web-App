@@ -32,9 +32,41 @@ import "@/components/mansour.css";
  * by name, the same way it exempts the Gmail and WhatsApp marks. Do not "fix" them to tokens: a
  * recoloured Mansour is a different character from the one on moedatech.net.
  */
+/**
+ * The kit's four gaze POSES, `mansour-poses.json` verbatim - one matrix per eye.
+ *
+ * The kit's third way of using him (README): *"pause the idle animation on `.v4m-eye0` /
+ * `.v4m-eye1` and animate their `transform` to the pose matrix"*. `viewer` = looks at the user,
+ * `words` = reads along a line, `send` = looks down at a button, `rest` = neutral.
+ *
+ * ⚠️ **Copied, not derived.** These sixteen numbers are the rig's output; there is no formula here
+ * to re-derive them from, and a matrix that is a digit out puts his eyes somewhere on his cheek.
+ *
+ * ⚠️ **`rest` is the same pair as the SVG's own `transform` attributes**, which is also where the
+ * `v4mGaze0` / `v4mGaze1` keyframes start and end. If one of the three ever moves, all three move.
+ */
+const POSES = {
+  viewer: ["matrix(0.964, 0, 0, 1, 49.871, 70)", "matrix(0.964, 0, 0, 1, 70.129, 70)"],
+  words: [
+    "matrix(0.713, 0.162, 0.03, 0.965, 33.379, 77.833)",
+    "matrix(0.972, 0.033, 0.03, 0.965, 51.084, 79.888)",
+  ],
+  send: [
+    "matrix(0.978, 0.09, 0.017, 0.865, 52.103, 88.772)",
+    "matrix(0.946, -0.177, 0.017, 0.865, 72.322, 87.853)",
+  ],
+  rest: [
+    "matrix(0.887, -0.318, 0.42, 0.855, 67.182, 54.457)",
+    "matrix(0.664, -0.063, 0.42, 0.855, 83.49, 50.456)",
+  ],
+} as const;
+
+export type MansourPose = keyof typeof POSES;
+
 export function Mansour({
   size = 38,
   state,
+  pose,
   className = "",
 }: {
   /** Both sides of his box, in CSS pixels. 20 is his floor; 38 is the home page's. */
@@ -44,9 +76,19 @@ export function Mansour({
    * `aiming` - eyes locked on a target, idle gaze paused. Absent: he simply idles.
    */
   state?: "live" | "waiting" | "aiming";
+  /**
+   * Hold his eyes on one of the kit's four poses instead of letting them wander.
+   *
+   * ⚠️ It is set as an inline STYLE and not by swapping the SVG's `transform` attribute: a style
+   * wins over a presentation attribute, so the rest pose stays in the markup where the keyframes
+   * expect it. `animation: "none"` beside it is the other half - without it the idle wander goes on
+   * running and overrides the transform on its very next frame, which reads as him twitching back.
+   */
+  pose?: MansourPose;
   className?: string;
 }) {
   const is = state ? ` is-${state}` : "";
+  const held = (i: 0 | 1) => (pose ? { transform: POSES[pose][i], animation: "none" as const } : undefined);
   return (
     <span
       aria-hidden="true"
@@ -69,12 +111,12 @@ export function Mansour({
               strokeLinejoin="round"
             />
             <circle cx="60" cy="70" r="38" fill="#6E7075" />
-            <g className="v4m-eye v4m-eye0" transform="matrix(0.887, -0.318, 0.42, 0.855, 67.182, 54.457)">
+            <g className="v4m-eye v4m-eye0" style={held(0)} transform="matrix(0.887, -0.318, 0.42, 0.855, 67.182, 54.457)">
               <g className="v4m-lid">
                 <rect x="-3.534" y="-7.828" width="7.068" height="15.656" rx="3.534" fill="#f3efea" />
               </g>
             </g>
-            <g className="v4m-eye v4m-eye1" transform="matrix(0.664, -0.063, 0.42, 0.855, 83.49, 50.456)">
+            <g className="v4m-eye v4m-eye1" style={held(1)} transform="matrix(0.664, -0.063, 0.42, 0.855, 83.49, 50.456)">
               <g className="v4m-lid">
                 <rect x="-3.534" y="-7.828" width="7.068" height="15.656" rx="3.534" fill="#f3efea" />
               </g>

@@ -11,13 +11,29 @@ import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 import { PinIcon } from "@/components/stores/shop";
 
-/** Cards per page. The directory is paginated; «Show more» asks for the next one. */
-const PAGE_SIZE = 60;
+/**
+ * Cards per page. ~~60, appended by «Show more».~~ **20, with a `‹ ›` pager** (owner, 2026-09-16:
+ * *"show 20 per page then second page will be by <>"*).
+ *
+ * 🔴 This REVERSES the 2026-09-03 ruling that the next page must APPEND (*"a renter who has
+ * scrolled to the bottom of sixty cards is not asking to be sent back to the top"*). At sixty that was
+ * right; at twenty the argument goes the other way — the grid is one screen, so a page is a page, and
+ * the renter can walk back to the one he was on. The dedup branch went with the append.
+ */
+const PAGE_SIZE = 20;
 
 interface CityOpt {
   value: string;
   label: string;
 }
+
+/**
+ * The search field and the city share ONE skin, so they cannot drift apart in height again (owner,
+ * 2026-09-16: *"make the search bar and filter with same size and height"*). `py-3` on a
+ * `text-shop-control` line box is what sets the height; both controls state it from here.
+ */
+const CONTROL_SKIN =
+  "rounded-shop-control border border-shop-line bg-shop-field py-3 px-4 text-shop-control text-shop-ink outline-none transition focus:border-shop-amber hover:border-shop-amber";
 
 
 /**
@@ -156,9 +172,8 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
    * `limit=60` with no way forward showed 60 of the 89 suppliers on staging as though that were the
    * market (owner, 2026-09-03: *"only the first page"*). The backend has always answered with a
    * `meta.totalPages`; this screen simply never asked for page two, and the BFF was dropping the
-   * count on the floor. Now the first page loads on every change of filter, and «Show more» appends
-   * the next one — appending rather than replacing, because a renter who has scrolled to the bottom
-   * of sixty cards is not asking to be sent back to the top.
+   * count on the floor. The first page still reloads on every change of filter; the `‹ ›` pager now
+   * REPLACES the grid rather than appending to it.
    */
   useEffect(() => {
     setError(false);
@@ -175,14 +190,16 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
     qs.set("limit", String(PAGE_SIZE));
     qs.set("page", String(page));
     const ctrl = new AbortController();
+    // Still «a page other than the first is in flight» — it disables the pager rather than the old
+    // «Show more», so a double press cannot skip a page.
     setLoadingMore(page > 1);
     fetch(`/api/stores?${qs.toString()}`, { cache: "no-store", signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
       .then((d: { stores: StoreCardData[] }) => {
         const rows = d.stores ?? [];
-        // A page beyond the first ADDS. Deduplicated by id, because page 1 of this directory merges
-        // the featured suppliers in and page 2 can legitimately repeat one.
-        setStores((prev) => (page === 1 || prev == null ? rows : [...prev, ...rows.filter((r) => !prev.some((x) => x.id === r.id))]));
+        // ~~A page beyond the first ADDS, deduplicated by id.~~ One page at a time now, so a row that
+        // appears on both pages (page 1 merges the featured suppliers in) is simply a row on each.
+        setStores(rows);
         /* A FULL page means there is probably another; a short one is the end.
          *
          * The backend's own `meta.totalPages` would say so exactly, and cannot reach us: both call
@@ -205,34 +222,32 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
 
   return (
     <div {...pin("browse-surface")} className="flex flex-col">
-      {/* The title, with the count beside it — «Most popular suppliers · 13 stores across Saudi Arabia».
-          The View-all toggle is the preview's, and only a preview ever draws it. */}
-      {title && (
-        <div className="mb-5 flex flex-wrap items-baseline justify-between gap-2.5">
-          <div className="flex flex-wrap items-baseline gap-2.5">
-            <h1 className="m-0 text-shop-h1 font-shop-bold text-shop-ink">{title}</h1>
-            {stores !== null && (
-              <span className="text-shop-item text-shop-ink-4">
-                {stores.length} {t.browse.storesAcross}
-              </span>
-            )}
-          </div>
-          {canToggle && (
-            <button
-              onClick={() => setExpanded((v) => !v)}
-              className="inline-flex items-center gap-0.5 text-shop-meta font-semibold text-shop-ink-3 hover:text-shop-amber"
-            >
-              {expanded ? t.home.showLess : t.home.viewAll}
-              <Icon name={expanded ? "expand_less" : "chevron_right"} size={16} className={expanded ? "" : "rtl:scale-x-[-1]"} />
-            </button>
-          )}
-        </div>
-      )}
+      {/* ── ONE row: the heading, then the two controls ──────────────────────────────────────────
+          Owner, 2026-09-16: *"the search bar and all cities as sections in the same row"*. It was two
+          bands — a title row, then a control row under it — which spent a third of the page above the
+          first card saying «Most popular suppliers» on a line of its own.
 
-      {/* Search and the city. Two controls, as the prototype draws them — the search takes the row
-          and the city sits at its end. */}
-      <div className="mb-[22px] flex items-center gap-3">
-        <div className="relative flex-1">
+          ⚠️ **`flex-wrap`, never a bare row.** Below `sm` a heading at `text-shop-h1` plus a search
+          field plus a city cannot share a line, and forcing it would push the DOCUMENT wider than the
+          phone — the fault audited out of three surfaces on 2026-09-08. One row where there is room.
+
+          🔴 The count beside the title is GONE (owner, 2026-09-16). It read `stores.length`, which
+          with a pager is the PAGE's count — «20 stores across Saudi Arabia» on every page, a false
+          statement about the market rather than a stale one. The true total cannot reach this screen:
+          both call helpers unwrap the envelope to `.data` before the BFF sees `meta.totalPages`, which
+          is the same reason `more` below is a heuristic. */}
+      <div {...pin("browse-controls")} className="mb-[22px] flex flex-wrap items-center gap-3">
+        {title && <h1 className="m-0 me-auto text-shop-h1 font-shop-bold text-shop-ink">{title}</h1>}
+        {canToggle && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="inline-flex items-center gap-0.5 text-shop-meta font-semibold text-shop-ink-3 hover:text-shop-amber"
+          >
+            {expanded ? t.home.showLess : t.home.viewAll}
+            <Icon name={expanded ? "expand_less" : "chevron_right"} size={16} className={expanded ? "" : "rtl:scale-x-[-1]"} />
+          </button>
+        )}
+        <div className="relative min-w-[200px] flex-1">
           <span className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-shop-ink-4">
             <SearchIcon />
           </span>
@@ -240,23 +255,35 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t.browse.search}
-            className="w-full rounded-shop-control border border-shop-line bg-shop-field py-3 ps-10 pe-4 text-shop-control text-shop-ink outline-none placeholder:text-shop-ink-4 focus:border-shop-amber"
+            className={`w-full ps-10 pe-4 ${CONTROL_SKIN} placeholder:text-shop-ink-4`}
           />
         </div>
-        <Dropdown
-          label={t.browse.anyCity}
-          placeholder={t.browse.anyCity}
-          prefix={<PinIcon size={15} strokeWidth={1.8} />}
-          value={city || null}
-          onChange={setCity}
-          options={cities.map((c) => ({ value: c.value, label: c.label }))}
-        />
+        {/* ⚠️ **The city wears the search field's own skin**, which is what «same size and height»
+            means here (owner, 2026-09-16). It used to fall through to `Dropdown`'s `field` tone — house
+            tokens, `py-2` — so it stood 8px shorter than the input beside it and in a different grey.
+            `triggerClass` is a per-call override and reaches no other dropdown in the product.
+            The wrapper carries the width because `Dropdown`'s root takes no `className`. */}
+        <div className="w-[190px] flex-none">
+          <Dropdown
+            label={t.browse.anyCity}
+            placeholder={t.browse.anyCity}
+            prefix={<PinIcon size={15} strokeWidth={1.8} />}
+            value={city || null}
+            onChange={setCity}
+            options={cities.map((c) => ({ value: c.value, label: c.label }))}
+            triggerClass={`w-full ${CONTROL_SKIN}`}
+          />
+        </div>
       </div>
 
       {/* The categories. «All» first, then the tree's top level — the pill that is on is the house
           navy, filled, and every other is an outline. */}
       {taxonomy.length > 0 && (
-        <div className="-mx-1 mb-[26px] flex gap-2.5 overflow-x-auto px-1 pb-2">
+        /* ⚠️ **`shop-rail` is the scrollbar, and it is a LOCAL rule in `globals.css`** — the browser's
+           default bar is ~15px of chrome under a 34px row, which is what read as thick (owner,
+           2026-09-16: *"make it thinner and nicer"*). 6px, the row's own line colour, on a
+           transparent track, and it keeps `overflow-x: auto` so it still scrolls where it must. */
+        <div {...pin("browse-categories")} className="shop-rail -mx-1 mb-[26px] flex gap-2 overflow-x-auto px-1 pb-1.5">
           <Pill label={t.browse.allCategories} active={!categoryId} onClick={() => setCategoryId("")} />
           {taxonomy.map((c) => (
             <Pill key={c.id} label={tabel(c, ar)} active={categoryId === c.id} onClick={() => setCategoryId(c.id)} />
@@ -289,13 +316,26 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
               <StoreCard key={s.id} store={s} />
             ))}
           </div>
-          {/* Only when there IS another page, and never inside a preview — the dashboard's eight-card
-              strip has its own View-all and this would be a second answer to the same question. */}
-          {more && previewCount == null && (
-            <div className="mt-5 flex justify-center">
-              <button onClick={() => setPage((p) => p + 1)} disabled={loadingMore} className={btn("secondary", "md")}>
-                {loadingMore ? t.browse.loading : t.browse.showMore}
-              </button>
+          {/* The `‹ ›` pager. Never inside a preview — the dashboard's strip has its own View-all and
+              this would be a second answer to the same question — and never when page one is the whole
+              directory, where two dead arrows say only that there is nothing to press.
+
+              ⚠️ **`more` is a HEURISTIC, not a total**: a full page probably has another behind it, a
+              short one is the end. `meta.totalPages` cannot reach this screen (see the fetch above), so
+              «Next» can be live on the last page and correct itself on arrival. That is also why the
+              pager states no «of N» — it would be a number we do not have.
+
+              ⚠️ Both chevrons mirror under `dir="rtl"`: previous is the way the reader came from. */}
+          {previewCount == null && (page > 1 || more) && (
+            <div {...pin("browse-pager")} className="mt-6 flex items-center justify-center gap-2">
+              <PageArrow
+                dir="prev"
+                label={t.browse.prevPage}
+                disabled={page === 1 || loadingMore}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              />
+              <span className="min-w-8 text-center text-shop-item font-semibold text-shop-ink">{page}</span>
+              <PageArrow dir="next" label={t.browse.nextPage} disabled={!more || loadingMore} onClick={() => setPage((p) => p + 1)} />
             </div>
           )}
         </>
@@ -310,11 +350,36 @@ function Pill({ label, active, onClick }: { label: string; active: boolean; onCl
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`flex-none whitespace-nowrap rounded-shop-tab border px-[18px] py-[9px] text-shop-item transition ${
+      /* Thinner: ~34px tall to ~28px (owner, 2026-09-16). `whitespace-nowrap` and `flex-none` both
+         stay — without them the row shrinks a pill to squeeze another in, which is a wrap by another
+         route and clips the category name rather than the row. */
+      className={`flex-none whitespace-nowrap rounded-shop-tab border px-3.5 py-1.5 text-shop-item transition ${
         active ? "border-shop-ink bg-shop-ink font-semibold text-white" : "border-shop-line bg-white font-normal text-shop-ink-3 hover:border-shop-amber"
       }`}
     >
       {label}
+    </button>
+  );
+}
+
+/**
+ * One arrow of the pager. A 32px square rather than a labelled button: the row holds two of them and
+ * the page number between, and a word on each would be wider than the grid it pages.
+ *
+ * ⚠️ The label is on `aria-label` AND `title`, so the reason a disabled arrow is disabled is one
+ * hover away and a screen reader hears a name rather than a chevron.
+ */
+function PageArrow({ dir, label, disabled, onClick }: { dir: "prev" | "next"; label: string; disabled: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className="grid h-8 w-8 place-items-center rounded-shop-control border border-shop-line bg-white text-shop-ink-3 transition hover:border-shop-amber hover:text-shop-ink disabled:cursor-not-allowed disabled:border-shop-line disabled:bg-shop-field disabled:text-shop-ink-4 disabled:hover:border-shop-line"
+    >
+      <Icon name={dir === "prev" ? "chevron_left" : "chevron_right"} size={18} className="rtl:scale-x-[-1]" />
     </button>
   );
 }

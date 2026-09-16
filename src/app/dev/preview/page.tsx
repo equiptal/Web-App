@@ -88,7 +88,14 @@ function Preview() {
         background: one.ground === "dark" ? "var(--navy-deep)" : "var(--surface2)",
       }}
     >
-      <div data-shot="1" style={width ? { width } : undefined}>
+      {/* ⚠️ **`minWidth: 0` is load-bearing, and its absence made every phone-width picture a lie.**
+          This `main` is a flex COLUMN, so this div is a flex ITEM, and a flex item's `min-width` is
+          `auto` — it grows to its own MIN-CONTENT rather than to the viewport. A full-width surface
+          photographed at 392 therefore laid itself out at 791px and came back with rows that had not
+          wrapped and columns sliced off, which reads as a layout bug in the surface and is a bug in
+          this page. Measured 2026-09-16 on `browse-directory`; it reached every specimen.
+          An explicit `?w=` still wins, because that is a deliberate ask for one width. */}
+      <div data-shot="1" style={width ? { width } : { minWidth: 0, maxWidth: "100%" }}>
         {one.render()}
       </div>
     </main>

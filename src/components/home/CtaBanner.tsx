@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui";
+import { Mansour } from "@/components/Mansour";
 import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { fetchActivity, type ActivityCounts } from "@/lib/api/client";
@@ -146,7 +147,16 @@ export function CtaBanner() {
          The rounding goes with the gutter: a radius on a band whose corners are off-screen draws a
          notch against the header and nothing else. The COPY keeps the page's reading gutter, so
          the headline still lines up with the blocks below it. */
-      className="relative isolate -mt-[calc(1.5rem+1px)] flex h-[160px] w-screen items-center overflow-hidden sm:-mt-[calc(1.75rem+1px)]"
+      /* `nd-seam` — the one decoration this band takes in season (owner, 2026-09-16). Inert for
+         eleven and a half months: the class matches nothing until `<html data-season="nd">` is
+         written, and then its `::after` draws the gold Najdi seam along the bottom edge, the same
+         6px-at-12px rank the header carries, so the page opens and closes its navy with one mark.
+
+         🔴 The band is NOT recoloured and the agent is not dressed. Its ground is a photograph of a
+         site under two gradients, its one coloured word and its button are `--brand`, and the whole
+         argument of this skin is that the orange does not move. A green band here would put the
+         celebration on top of the one control the dashboard exists to offer. */
+      className="nd-seam relative isolate -mt-[calc(1.5rem+1px)] flex h-[160px] w-screen items-center overflow-hidden sm:-mt-[calc(1.75rem+1px)]"
       /* `calc(50% - 50vw)`, and the 50% is of the CONTAINER — the padded, capped main. That centres a
          100vw child on a container which is itself centred in the viewport, which lands the band on
          the window's edges at every width. Inline because a Tailwind arbitrary value cannot mix the
@@ -209,7 +219,7 @@ export function CtaBanner() {
       <span aria-hidden="true" className="absolute inset-0 -z-10 bg-navy opacity-[0.35] mix-blend-multiply" />
 
       <div className={cx("relative mx-auto flex w-full items-center gap-6", PAGE_MAX, PAGE_X)}>
-        <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 flex-1 items-center gap-4 sm:gap-5">
           {/* A BLOCK, not a flex row: the three text nodes are one sentence, and as flex items the
               spaces between them collapse and the row's own `gap` stands in for them — which sets
               the word spacing of a headline from a layout property. Inline flow keeps the spaces
@@ -235,12 +245,85 @@ export function CtaBanner() {
               pulling Segoe UI's wider letterforms together, and applying it to a condensed face
               closes counters that are already tight. Weight 600 rather than 800 for the same
               reason — Oswald at 800 fills its own counters at this size. */}
-          <h1 className="font-hero text-display font-semibold leading-tight text-white sm:text-hero">
+          {/* ── Mansour SPEAKS the headline ───────────────────────────────────────────────────
+              Owner, 2026-09-16: *"use this kit as mansour ai agent design, make the cta
+              professional catchy and hd"*.
+
+              🔴 **He was first put between the copy and the button, and it was wrong** - seen in
+              the browser, not argued: out there he had the photograph's busiest quarter behind him,
+              the gradient is at its THINNEST on that edge (42% navy against 94% on the leading
+              one), and standing beside a control he does not belong to he read as a stray grey icon
+              rather than as anybody. He is the LEADING edge now, in front of the sentence, which is
+              the pattern this product already uses on the intake (owner, 2026-09-13: *"put mansour
+              before the question"*): the band colours one word, AI, and the thing that word names
+              is now standing in front of it.
+
+              ⚠️ **`pose="viewer"`, not `send`.** `send` looks DOWN AT A BUTTON, which is the
+              obvious choice and is wrong twice: that button is across the band now, and the row
+              mirrors in Arabic while the pose matrices do not - he would meet it in English and
+              stare into the margin in Arabic. `viewer` looks out at the reader, which is
+              direction-neutral and the catchier of the two on a banner.
+
+              ⚠️ **He is GREY, by the kit's own rule** (*"grey on purpose so he sits on any brand
+              colour"*), so the halo is what separates him from the ink rather than a decoration:
+              `--brand` at 30% falling to nothing, the same orange as the word beside him and the
+              button opposite, so the band carries ONE accent in three places and not three colours.
+
+              ⚠️ **Nothing may clip him.** The kit keeps `overflow: visible` on the svg - the sway
+              rotates the whole body and the gear teeth leave the 120x120 box - so he sits inside
+              the band's reading gutter, never against its edge where the band's own
+              `overflow-hidden` would take the teeth off on every sway.
+
+              ⚠️ Hidden below `sm`: at a phone's width the sentence and the button need the whole
+              row. 🔴 `hidden sm:grid` would draw NOTHING at any width - both are the `display`
+              property, a media query adds no specificity, and Tailwind emits `hidden` last - which
+              is exactly the bug this block shipped with for one pass. `max-sm:hidden` over a plain
+              `grid` has no ordering to lose.
+
+              `aria-hidden` throughout: he is not a control, and the button keeps its own label. */}
+          {/* ⚠️ ONE size, 104. `Mansour` writes `width` / `height` as an inline STYLE, so a
+              responsive height class on this box could never resize him - and below `sm` the box is
+              not drawn at all, which makes a second size a rule that can never apply. 104 against a
+              160px band and a 32px headline: he reads as the speaker rather than as a bullet.
+
+              🔴 **This box is a plain block, and `grid place-items-center` is what it must NOT be.**
+              It was, and the halo came out 0x0: `place-items-center` sets `justify-self` and
+              `align-self` on every grid child INCLUDING an absolutely-positioned one, which makes
+              it shrink to its own content - and a decorative span has none. Nothing needs centring
+              anyway, because the box and he are the same 104px. Measured in the browser; from the
+              source it looks like a box with a glow in it. */}
+          <div aria-hidden="true" className="relative h-[104px] w-[104px] flex-none leading-none max-sm:hidden">
+            {/* 🔴 **No `-z-10` here, and that was a real bug**: the band draws its two gradients
+                and its multiply at `-z-10`, so a halo at the same depth painted UNDER them and was
+                invisible on screen while being perfectly present in the DOM. Nothing needs a z-index
+                at all - the halo is `absolute` and he comes after it in source order, so he paints
+                on top on his own. */}
+            <span
+              aria-hidden="true"
+              /* 🔴 `-inset-6` generated NO rule at all - measured, `top/right/bottom/left` came
+                 back as the static position and the span was 0x0 for a second time. `inset-0` with
+                 a scale is two utilities this build certainly emits, and a circle scaled about its
+                 own centre needs no translate and mirrors for free. */
+              className="pointer-events-none absolute inset-0 scale-[1.6] rounded-full"
+              style={{
+                background:
+                  "radial-gradient(circle, color-mix(in srgb, var(--brand) 30%, transparent) 0%, transparent 70%)",
+              }}
+            />
+            <Mansour size={104} pose="viewer" />
+          </div>
+
+          <h1 className="min-w-0 font-hero text-display font-semibold leading-tight text-white sm:text-hero">
             {t.home.ctaTitleBefore}
             <span className="text-brand">{t.home.ctaTitleAi}</span>
             {t.home.ctaTitleAfter}
           </h1>
-          <p className="mt-2.5 max-w-[480px] text-subhead leading-relaxed text-white/70">{t.home.ctaSubtitle}</p>
+          {/* 🔴 **The paragraph is deleted** (owner, 2026-09-16: *"remove its subtext"*), and
+              `home.ctaSubtitle` with it in both dictionaries.
+              ~~«Describe what you need in plain words. Our AI assistant matches you with the right
+              suppliers.»~~ It restated the headline in smaller type - the headline already names the
+              act and names the agent - and it was the only thing standing between the copy and the
+              160px band's own edges. What replaces it is not more words: it is the agent himself. */}
         </div>
 
         {/* Single entry into the RFQ input flow (web-app/002). */}

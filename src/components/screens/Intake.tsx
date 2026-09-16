@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
-import { ProjectChips } from "@/components/create/ProjectChips";
+import { RequestsRail, ProjectFloorChips, useRequestRail } from "@/components/create/RequestsRail";
 import { Mansour } from "@/components/Mansour";
 import { ProjectPills } from "@/components/create/ProjectPills";
 import { warmAgentCache } from "@/lib/api/client";
@@ -119,6 +119,10 @@ export function Intake() {
   const [rejected, setRejected] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
   const [dragging, setDragging] = useState(false);
+  /* ⚠️ ONE hook for BOTH surfaces - the rail on the left and the chip row on the box's floor. Two
+     copies of this state would be two fetches and, worse, two answers to «which machine is chosen»,
+     which would disagree the first time either was pressed. */
+  const rail = useRequestRail();
   const fileInput = useRef<HTMLInputElement>(null);
 
   // ── The typing placeholder ──
@@ -202,7 +206,17 @@ export function Intake() {
   }
 
   return (
-    <div {...pin("create-intake")} className="mx-auto w-full max-w-[880px]">
+    /* ── Two columns: his past requests, and the thing he came here to write ────────────────
+       ⚠️ `items-stretch` is what lets the rail run the full height beside a column that CENTRES its
+       own contents. The centring belongs to the work column alone; a rail told to centre would float
+       a list of projects in the middle of a tall page.
+
+       ⚠️ **780, where this column was 880.** Narrowing is half of «smaller»: a shorter box at the
+       full width reads as squashed rather than smaller. It is the one measurement here taken on
+       looks alone, so it is the first thing to put back if the two should match again. */
+    <div className="flex w-full items-stretch">
+      <RequestsRail rail={rail} />
+      <div {...pin("create-intake")} className="mx-auto w-full min-w-0 max-w-[780px] px-1">
       {/* ── He asks the question (owner, 2026-09-13: *"use mansour icon more in the chat intake
           somewhere, i want it to be attractive"*, then *"put mansour before the question"*) ────────
           The screen was a heading, a line and a big empty box - correct and characterless. He is
@@ -219,16 +233,12 @@ export function Intake() {
         {t.intake.heading}
       </h1>
 
-      {/* ── One line, never wrapped (owner, 2026-09-13) ───────────────────────────────────────────
-          ~~`max-w-[640px]`, which broke it over two lines and hung «fill themselves in.» alone under
-          the middle of the page.~~ The cap is gone and the sentence was shortened to fit the width
-          this column actually has; at 880px the old one could not be made to fit without shrinking
-          the type, which is a worse answer to «don't wrap it».
-
-          ⚠️ `whitespace-nowrap` only from `sm` up. Below that no sentence fits on one line and
-          forcing it would push the whole DOCUMENT wider than the phone - the fault audited out of
-          three surfaces on 2026-09-08. One line where there is room, wrapped where there is not. */}
-      <p className="mb-6 mt-2 text-center text-subhead leading-relaxed text-muted sm:whitespace-nowrap">{t.intake.subheading}</p>
+      {/* 🔴 ~~The line under the question~~ — «Describe your request, or upload an RFQ…» — is
+          DELETED (owner, 2026-09-16, with the side-panel prototype). The placeholder in the box
+          already types a real request through its example, which is the same lesson said once; the
+          sentence was the second time. It had also become a layout constraint of its own — one line,
+          `sm:whitespace-nowrap`, so its LENGTH could not change freely — for a line nobody read
+          twice. `intake.subheading` is deleted from both dictionaries with it. */}
 
       {/* ── The box ──
           The whole card is the drop target, not a rectangle inside it: a renter dragging a file at
@@ -335,35 +345,21 @@ export function Intake() {
             Upload keeps the row but not the lead. It is the other way in for the renter who has a
             document rather than a sentence, and it belongs at the end of the row for the same reason
             it stopped being the only thing on it. */}
-        <div className="flex flex-wrap items-end gap-x-4 gap-y-3 px-5 pb-4 pt-1">
-          {/* ⚠️ **The sentence, then his sites** (owner, 2026-09-12: *"on the left on same row the
-              project pills with sentence «select your project» beside them"*). A bare row of place
-              names is furniture; named, it is a question with an answer already in reach. */}
-          {/* 🔴 **It is the CHIPS that draw the sentence now** (owner, 2026-09-13: *"«اختر مشروعاً» -
-              this is only shown when user have projects"*). ~~A `<span>` here, beside the strip.~~
-              `ProjectChips` returns `null` for a renter with no sites - and for a guest - so the
-              question was asked unconditionally next to nothing at all, on the first screen a renter
-              meets. Passing it IN means the one thing that knows whether there are any sites is the
-              one that decides whether to ask about them; they can no longer disagree. */}
-          {/* 🔴 **The whole width, so a row holds every chip that fits** (owner, 2026-09-13:
-              *"more project pill can fit in the row so make the max per row"*).
+        {/* ── The floor: ONE pill, or nothing at all ─────────────────────────────────────
+            🔴 **The site CHIP STRIP is gone from this row** (owner, 2026-09-16, with the side-panel
+            prototype: *"remove the pills ... just clicking on a project or a request inside it will
+            show a single pill showing project-request in one line, no other pills, just the selected
+            one"*). What it did is the rail's now: every site is in there, each with what has already
+            been hired at it, and the press applies the same defaults and the same template it always
+            did. Nothing about picking moved; only where the picking happens.
 
-              ~~`flex-1`.~~ The two round controls share this wrapping row, so they reserved their
-              own width on EVERY line of it - about 110px - and the chips wrapped as if the card were
-              that much narrower. On his screenshot the first row ended with 200px of white after it
-              and the next chip had gone to a second line that did not need to exist. The buttons
-              only ever occupy ONE line, which is why the reservation was wrong on all the others.
+            ⚠️ The row is `items-center` and does not WRAP any more. It holds at most one pill and
+            two 26px controls, so there is nothing left to push onto a second line — and the pill
+            truncates rather than growing the row, which is why it can be promised. */}
+        <div className="flex items-center gap-3 px-5 pb-4 pt-1">
+          <ProjectFloorChips rail={rail} />
 
-              ⚠️ `basis-full` sends the controls to a line of their own. That is the trade, one row
-              of height for a strip that uses the card: the sites are the thing being read here, and
-              the two icons are not. */}
-          <div className="flex w-full min-w-0 basis-full flex-wrap items-center gap-x-3 gap-y-2">
-            <ProjectChips
-              /* Small (owner, 2026-09-14): it introduces the pills, it is not one of them. */
-              lead={<span className="flex-none text-label font-semibold text-muted">{t.projects.chips.pick}</span>}
-              trailing={
-                <>
-          <span className="ms-auto flex flex-none items-center gap-2">
+          <span className="flex flex-none items-center gap-2">
 
             <button
 
@@ -436,10 +432,6 @@ export function Intake() {
             </button>
 
           </span>
-                </>
-              }
-            />
-          </div>
 
           {/* ⚠️ **Two round controls, and they are the whole floor now** (owner, 2026-09-12:
               *"remove the continue button, remove upload... instead i want a circle icon for + which
@@ -514,6 +506,7 @@ export function Intake() {
 
       {/* Guest hit the free agent-run limit → create an account, then continue processing. */}
       <AccountModal open={showAccount} onClose={() => setShowAccount(false)} onCreated={() => { setShowAccount(false); void actions.process(); }} title={t.guest.trialTitle} subtitle={t.guest.trialSub} />
+      </div>
     </div>
   );
 }

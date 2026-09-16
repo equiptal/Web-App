@@ -19,7 +19,7 @@ Two things it does not hold, on purpose:
 | File | Pins |
 | --- | --- |
 | `src/components/AppNav.tsx` | 3 Nav tabs — desktop (`app-nav`) · 3.1 Nav tab — one link (`nav-tab`) · 4 Nav tabs — mobile (`app-nav-mobile`) |
-| `src/components/AppShell.tsx` | 1 App frame (`app-shell`) · 2 Header bar (navy) (`app-header`) · 2.1 Header — logo (`header-logo`) · 2.2 Header — centred nav slot (`header-nav-slot`) · 2.3 Header — beta mark (`header-beta`) · 5 Account menu + locale toggle (`header-account`) · 5.1 Header — EN/AR toggle (`header-locale`) · 5.2 Header — inbox + bell pair (`header-icons`) · 5.3 Header — avatar (`header-avatar`) · 7 Page body (gutters live here) (`page-main`) · 8 Back arrow (`page-back`) |
+| `src/components/AppShell.tsx` | 1 App frame (`app-shell`) · 2 Header bar (navy) (`app-header`) · 2.1 Header — logo (`header-logo`) · 2.2 Header — centred nav slot (`header-nav-slot`) · 2.3 Header — beta mark (`header-beta`) · 2.4 Header — season backdrop (palms, dots, seam) (`header-season-decor`) · 2.5 Header — season chip (`header-season-chip`) · 5 Account menu + locale toggle (`header-account`) · 5.1 Header — EN/AR toggle (`header-locale`) · 5.2 Header — inbox + bell pair (`header-icons`) · 5.3 Header — avatar (`header-avatar`) · 7 Page body (gutters live here) (`page-main`) · 8 Back arrow (`page-back`) |
 | `src/components/common/GuestWall.tsx` | 9.5 Guest wall — blurred page + sign-in card (`guest-wall`) |
 | `src/components/common/SignInPrompt.tsx` | 79 Sign-in prompt (`sign-in-prompt`) |
 | `src/components/company/CompanyHub.tsx` | 72 Company hub (`company-hub`) |
@@ -30,6 +30,7 @@ Two things it does not hold, on purpose:
 | `src/components/create/MachineCard.tsx` | 17 Machine card (`machine-card`) · 17.1 Machine card — head row (`machine-card-head`) · 17.2 Machine card — body grid (`machine-card-body`) · 17.3 Machine card — image well (`machine-card-image`) · 17.8 Machine card — the escape row («Can't find the equipment you want?») (`equipment-chooser-row`) · 17.9 Machine card — the equipment chooser panel (`equipment-chooser-panel`) · 17.10 Machine card — the chooser's catalogue list (`equipment-chooser-list`) |
 | `src/components/create/OperatorRail.tsx` | 18 Operator rail (`operator-rail`) · 18.1 Operator rail — head row (`operator-rail-head`) · 18.2 Operator rail — options grid (`operator-rail-options`) · 18.3 Operator rail — note block (`operator-rail-note`) · 18.4 Operator rail — closed strip (72px) (`operator-rail-closed`) |
 | `src/components/create/ReadyToSend.tsx` | 21 Create — review & send screen (`ready-to-send`) |
+| `src/components/create/RequestsRail.tsx` | 15.1 Intake — previous-requests rail (`intake-rail`) · 15.2 Intake rail — one project (`intake-rail-group`) · 15.3 Intake rail — one machine (`intake-rail-row`) · 15.4 Intake — the chosen project and its machines, on the floor (`intake-pick-pill`) |
 | `src/components/create/WhenPanel.tsx` | 19 When panel (dates) (`when-panel`) · 19.1 When panel — head button (`when-panel-head`) · 19.2 When panel — open body (`when-panel-body`) |
 | `src/components/create/WherePanel.tsx` | 20 Where panel (site) (`where-panel`) · 20.1 Where panel — head button (`where-panel-head`) · 20.2 Where panel — open body (`where-panel-body`) |
 | `src/components/deal-room/ChatCard.tsx` | 56 Chat card (`chat-card`) |
@@ -38,7 +39,7 @@ Two things it does not hold, on purpose:
 | `src/components/Dropdown.tsx` | 92 Search select (`search-select`) |
 | `src/components/help/HelpManual.tsx` | 6.1 Help manual modal (`help-manual`) |
 | `src/components/home/CtaBanner.tsx` | 10.1 Home — hero band (`home-hero`) · 10.2 Home — hero action column (`home-hero-actions`) |
-| `src/components/home/HomeHub.tsx` | 10 Home (`home-hub`) |
+| `src/components/home/HomeHub.tsx` | 10 Home (`home-hub`) · 10.8 Home — requests / suppliers / projects tabs (`home-tabs`) |
 | `src/components/home/HomeNotificationBubble.tsx` | 10.7 Home — notification bubble (`home-bubble`) |
 | `src/components/home/HomeRequests.tsx` | 10.4 Home — requests + bids rail (`home-requests`) |
 | `src/components/home/StartYourRequestModal.tsx` | 11 Start-your-request modal (`start-request-modal`) |
@@ -69,7 +70,7 @@ Two things it does not hold, on purpose:
 | `src/components/screens/Intake.tsx` | 15 Create — intake screen (`create-intake`) |
 | `src/components/screens/Processing.tsx` | 24 Create — processing screen (`create-processing`) |
 | `src/components/stores/BrowsePage.tsx` | 10.5 Browse — banner + supplier directory (`browse-page`) |
-| `src/components/stores/BrowseSurface.tsx` | 61 Browse stores (`browse-surface`) |
+| `src/components/stores/BrowseSurface.tsx` | 61 Browse stores (`browse-surface`) · 61.1 Browse — heading + search + city, one row (`browse-controls`) · 61.2 Browse — category rail (`browse-categories`) · 61.3 Browse — page arrows (`browse-pager`) |
 | `src/components/stores/EquipmentDetailSurface.tsx` | 65 Equipment sheet (`equipment-sheet`) |
 | `src/components/stores/StoreCard.tsx` | 63 Store card (`store-card`) · 64 Store card (category) (`store-card-equipment`) |
 | `src/components/stores/StoreDetailSurface.tsx` | 62 Store detail (`store-detail`) · 66 Store equipment card (`store-equipment-card`) |

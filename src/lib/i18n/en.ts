@@ -37,6 +37,16 @@ export const en = {
     preferences: "Preferences",
     preview: "Preview",
   },
+  /* ── The seasonal skin's words ────────────────────────────────────────────────────────────────
+     One string. The chip beside the wordmark reads «96 National Day» / «96 اليوم الوطني», and the
+     ORDINAL is not in here on purpose: it is derived from the year in `season.ts`, so next
+     September reads 97 with nothing to translate.
+
+     ⚠️ Latin digits in BOTH locales — this app's rule since 2026-09-04. The Flutter kit draws «٩٦»;
+     the web does not, and `season.ts` says why beside the derivation. */
+  season: {
+    nationalDay: "National Day",
+  },
   shell: {
     home: "Home",
     /* The back control's words. It names its DESTINATION, so a renter knows where a press lands
@@ -129,7 +139,6 @@ export const en = {
     ctaTitleBefore: "Let ",
     ctaTitleAi: "our AI assistant",
     ctaTitleAfter: " find your next equipment",
-    ctaSubtitle: "Describe what you need in plain words. Our AI assistant matches you with the right suppliers.",
     uploadRfq: "Upload RFQ",
     suppliersTitle: "Most popular suppliers",
     viewAll: "View all",
@@ -178,6 +187,9 @@ export const en = {
     verifiedTitle: "You're verified",
     verifiedBody: "Your company is verified.",
     yourRequests: "My Requests",
+    /* Behind the dashboard's Requests tab, where `HomeRequests` renders NOTHING at all (2026-09-16).
+       It names the door already on screen above it rather than adding a second one. */
+    noRequestsYet: "No requests yet. Describe what you need above and we will read it for you",
     priceBids: "Price Bids",
     completedDeals: "Completed Deals",
     soon: "Coming soon",
@@ -207,10 +219,13 @@ export const en = {
     newLabel: "New",
     equipmentCount: "equipment",
     // The pill row's first pill — the shopfront view, before any category narrows the cards.
-    allCategories: "All",
-    // Beside the page title: «13 stores across Saudi Arabia».
-    storesAcross: "stores across Saudi Arabia",
-    showMore: "Show more suppliers",
+    // The leading pill on the category scroller. «All stores», never «All» (owner, 2026-09-16) —
+    // it sits beside real category names and one bare word did not say what it restores.
+    allCategories: "All stores",
+    // The ‹ › pager under the grid. Labels only — the controls draw a chevron each, so these
+    // exist for the screen reader and the tooltip (owner, 2026-09-16: 20 per page, arrows for the rest).
+    prevPage: "Previous page",
+    nextPage: "Next page",
     empty: "No suppliers match your filters.",
     error: "We couldn't load suppliers.",
     retry: "Retry",
@@ -487,11 +502,20 @@ export const en = {
     },
     reading: "Reading",
     heading: "How would you like to create your request?",
-    // ⚠️ ONE LINE (owner, 2026-09-13: *"make the text below as one line dont wrap it"*). It is
-    // `whitespace-nowrap` from `sm` up, so its LENGTH is now a layout constraint rather than a free
-    // choice: the old sentence was 120 characters and could not fit this column at any width the app
-    // has. Keep anything replacing it about this long, and look at it.
-    subheading: "Describe your request, or upload an RFQ. A project fills in its own defaults",
+    /* 🔴 ~~`subheading`~~ — «Describe your request, or upload an RFQ. A project fills in its own
+       defaults» — DELETED (owner, 2026-09-16, with the side-panel prototype). The placeholder in the
+       box already types a real request through its example, which is the same lesson said once; and
+       the sentence it replaced had been a layout constraint of its own («one line, don't wrap it»,
+       2026-09-13) for a line nobody needed to read twice. */
+
+    /* The rail beside the box: his own past requests, grouped by the project they were filed under.
+       `{n}` machines across `{g}` projects — both numbers, because one without the other says
+       nothing about a list you are about to scroll. */
+    rail: {
+      title: "Previous requests",
+      count: "{n} in {g}",
+      resize: "Resize the panel",
+    },
     optUploadTitle: "Write / Upload RFQ",
     optUploadDesc: "Write your request or upload a file. Your AI assistant fills the form automatically.",
     recommended: "Recommended",
@@ -2356,17 +2380,12 @@ export const en = {
         saveProjectOnly: "Project only",
         saveAndApply: "Save and apply to {n}",
       },
+    /* 🔴 ~~`pick` / `all` / `fewer`~~ went with `ProjectChips` (owner, 2026-09-16): the site
+       strip left the intake floor for the requests rail beside the box, and those three strings
+       named its parts. `label` and `ended` stay - the projects board and the move dialog read them. */
     chips: {
       label: "Project",
       ended: "ended",
-      /** Beside the pills on the intake floor (owner, 2026-09-12): a row of place names is
-       *  furniture until something names the question it answers. */
-      /* «a», not «your» (owner, 2026-09-12). The row is a CHOICE among his sites, and the
-         possessive claimed one of them was already his answer. */
-      pick: "Select a project",
-      all: "All projects",
-      /** The way back to two rows once «All projects» has opened the rest. */
-      fewer: "Show fewer",
     },
     pills: {
       startFrom: "start from",

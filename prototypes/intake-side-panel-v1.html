@@ -18,16 +18,22 @@
    showing project-request in one line, no other pills, just the selected one."*
 
    ── What is the SAME as the live screen ──────────────────────────────────────────────────────────
-   The navy bar, Mansour before the question, the one-line subheading, the box with its floor, the
-   two 26px round controls, and every colour and type size below - all read off `globals.css` and
-   the live components, not invented.
+   The navy bar, Mansour before the question, the box with its floor, the two 26px round controls,
+   and every colour and type size below - all read off `globals.css` and the live components, not
+   invented.
+
+   ⚠️ The line under the question («Describe your request, or upload an RFQ...») is DELETED here
+   (owner, 2026-09-15), so this diverges from the live intake by one element. The placeholder in the
+   box already types a real request through its examples, which is the same lesson said once.
 
    ── What CHANGES ────────────────────────────────────────────────────────────────────────────────
    · the project pill strip leaves the floor entirely;
    · a side panel lists the renter's requests the way a chat app lists conversations - grouped under
      the project (or the place) they belong to, each row naming only its EQUIPMENT;
    · picking a project, or a request inside one, puts ONE pill on the floor: «project · request».
-     Nothing else is ever on that row.
+     Nothing else is ever on that row;
+   · and the same press FILLS THE TERMS inside the box - the project's answers, with the request's
+     own written over them, and a red chip for each required one still unanswered.
 
    ⚠️ This is a prototype: the data is invented and nothing posts. It exists to be looked at.
    ═══════════════════════════════════════════════════════════════════════════════════════════════ */
@@ -54,6 +60,12 @@
   --brand-pale: #fee0cc;
   --brand-soft: #fef1e8;
   --ok: #1d9e55;
+  /* A required term left unanswered. The live strip paints `border-danger bg-danger/5
+     text-danger`, so one value does all three jobs and the ground is that value at 5%. */
+  --danger: #c02626;
+
+  /* `--radius-sm`, globals.css: *"chips, tags, tight controls"*. A term pill is one. */
+  --radius-sm: 2px;
 
   /* The six-step type scale. */
   --text-label: 11px;
@@ -64,7 +76,12 @@
   --text-display: 22px;
 
   --control-md: 34px;
-  --rail: 288px;
+  /* The rail's width is the renter's, dragged on the grip and remembered. The floor is where a
+     machine name stops being recognisable; the ceiling is where the rail starts competing with
+     the composer for the screen. */
+  --rail: 208px;
+  --rail-min: 164px;
+  --rail-max: 380px;
 }
 
 * { box-sizing: border-box; }
@@ -108,45 +125,69 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 
 /* ── The two columns ───────────────────────────────────────────────────────────────────────────── */
-.shell { display: flex; align-items: stretch; min-height: calc(100vh - 52px); }
+/* `dvh` as well as `vh`: on a phone the address bar eats `100vh`, and a column that is told it is
+   taller than the screen cannot centre anything inside it. */
+.shell { display: flex; align-items: stretch; min-height: calc(100vh - 52px); min-height: calc(100dvh - 52px); }
 
 /* ── The side panel: his requests, the way a chat app lists conversations ───────────────────────── */
 .rail {
+  position: relative;
   width: var(--rail); flex: none; background: var(--surface);
   border-inline-end: 1px solid var(--border);
   display: flex; flex-direction: column;
 }
+
+/* ⚠️ **The grip, not a preference.** It straddles the rail's own border on the TRAILING edge, so it
+   mirrors in Arabic by `inset-inline-end` rather than by a rule of its own. 7px of hit area over a
+   1px line: the line is what the eye aims at and 1px is not a target. It is a `role="separator"`
+   with a tabindex, so the arrow keys move it for anyone not holding a mouse. */
+.rail-grip {
+  position: absolute; inset-block: 0; inset-inline-end: -3px; width: 7px; z-index: 2;
+  padding: 0; border: 0; background: transparent; cursor: col-resize; touch-action: none;
+}
+.rail-grip::before {
+  content: ""; position: absolute; inset-block: 0; inset-inline-end: 3px; width: 1px;
+  background: transparent; transition: background .12s;
+}
+.rail-grip:hover::before, .rail-grip:focus-visible::before, .is-dragging .rail-grip::before {
+  background: var(--brand);
+}
+.rail-grip:focus-visible { outline: none; }
+/* While a drag is live the whole page takes the cursor and stops selecting text, or the pointer
+   flickers every time it crosses a row and the rail's names highlight blue under it. */
+body.is-dragging, body.is-dragging * { cursor: col-resize !important; user-select: none; }
+
+/* The head is a QUIET caption, not a title. It names the list for a first-time reader and then gets
+   out of the way, which is the whole argument of a rail like this one. */
 .rail-head {
-  padding: 14px 16px 10px; display: flex; align-items: baseline; gap: 8px;
+  padding: 13px 12px 6px; display: flex; align-items: baseline; gap: 6px;
 }
-.rail-head b { font-size: var(--text-subhead); font-weight: 800; letter-spacing: -.01em; }
-.rail-head span { font-size: var(--text-label); color: var(--muted-light); font-weight: 600; }
-.rail-new {
-  margin: 0 12px 10px; display: flex; align-items: center; justify-content: center; gap: 7px;
-  height: var(--control-md); border-radius: 6px; border: 1px dashed var(--border-strong);
-  background: var(--surface); color: var(--muted-dark); font-size: var(--text-body); font-weight: 600;
-  transition: border-color .15s, color .15s;
+.rail-title {
+  flex: 1; min-width: 0; font-size: var(--text-label); font-weight: 600; letter-spacing: .02em;
+  color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.rail-new:hover { border-color: var(--brand); color: var(--brand-deep); }
-.rail-list { flex: 1; overflow-y: auto; padding: 0 8px 16px; }
+.rail-count { flex: none; font-size: var(--text-label); color: var(--muted-light); }
+.rail-list { flex: 1; overflow-y: auto; padding: 0 6px 16px; }
 
 /* A project: the group head. It is pressable - picking the project alone is a valid answer. */
 .grp { margin-bottom: 2px; }
 .grp-head {
-  width: 100%; display: flex; align-items: center; gap: 8px; text-align: start;
-  background: transparent; border: 0; border-radius: 6px; padding: 7px 8px;
+  width: 100%; display: flex; align-items: center; gap: 5px; text-align: start;
+  background: transparent; border: 0; border-radius: 6px; padding: 5px 6px;
   transition: background .12s;
 }
 .grp-head:hover { background: var(--surface2); }
-.grp-head .mi.place { font-size: 15px; color: var(--brand); flex: none; }
+/* ⚠️ The orange place pin is GONE. At this width every glyph costs a few characters of the name
+   beside it, and the chevron already says «this opens», which is the only thing the icon was
+   adding. It is also the loudest colour in the product spent on a row that is not an action. */
 .grp-head .name {
-  flex: 1; min-width: 0; font-size: var(--text-body); font-weight: 600; color: var(--navy);
+  flex: 1; min-width: 0; font-size: var(--text-meta); font-weight: 600; color: var(--navy);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .grp-head .count {
   flex: none; font-size: var(--text-label); font-weight: 600; color: var(--muted-light);
 }
-.grp-head .mi.chev { font-size: 16px; color: var(--muted-light); flex: none; transition: transform .16s; }
+.grp-head .mi.chev { font-size: 15px; color: var(--muted-light); flex: none; transition: transform .16s; }
 .grp.shut .mi.chev { transform: rotate(-90deg); }
 [dir="rtl"] .grp.shut .mi.chev { transform: rotate(90deg); }
 .grp.shut .rows { display: none; }
@@ -158,14 +199,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .row {
   width: 100%; display: flex; align-items: center; gap: 8px; text-align: start;
   background: transparent; border: 0; border-radius: 6px;
-  padding: 6px 8px 6px 30px; transition: background .12s;
+  padding: 5px 6px 5px 26px; transition: background .12s;
 }
-[dir="rtl"] .row { padding: 6px 30px 6px 8px; }
+[dir="rtl"] .row { padding: 5px 26px 5px 6px; }
 .row:hover { background: var(--surface2); }
 .row .dot { width: 5px; height: 5px; border-radius: 999px; background: var(--border-strong); flex: none; }
 .row.live .dot { background: var(--ok); }
 .row .eq {
-  flex: 1; min-width: 0; font-size: var(--text-meta); color: var(--muted-dark);
+  flex: 1; min-width: 0; font-size: var(--text-label); color: var(--muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .row .qty { flex: none; font-size: var(--text-label); font-weight: 600; color: var(--muted-light); }
@@ -173,19 +214,31 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .grp-head.on .name, .row.on .eq { color: var(--brand-deep); font-weight: 600; }
 
 /* ── The working area - the live intake, unchanged apart from its floor ─────────────────────────── */
-.work { flex: 1; min-width: 0; display: flex; justify-content: center; padding: 28px 24px 40px; }
-.stage { width: 100%; max-width: 880px; }
+/* ── The question and the box ride the middle of the column ─────────────────────────────────────
+   Owner, 2026-09-15: *"make the text box and title more centered vertically"*. `align-items:
+   center` is what does it; the rail stretches beside it because `.shell` is `align-items: stretch`
+   and this centring belongs to this column alone.
+
+   ⚠️ **The bottom padding is 108px larger than the top on purpose.** A block centred on the true
+   middle reads as sitting LOW - the eye puts the optical centre a little above the geometric one -
+   and with `align-items: center` the uneven padding is what lifts it, by half the difference. It
+   also keeps room under the box once the content is taller than the screen and the column scrolls,
+   which is when padding starts deciding anything at all. */
+.work {
+  flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center;
+  padding: 32px 24px 140px;
+}
+/* ⚠️ 780, where the live intake is 880. Narrowing is half of «smaller»: a shorter box at the full
+   width reads as squashed rather than smaller, and the reference composer is about this share of
+   the room beside its rail. It is the one measurement here that diverges from the app on looks
+   alone, so it is the first thing to put back if the two should match. */
+.stage { width: 100%; max-width: 780px; }
 
 h1.q {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px;
-  margin: 0; text-align: center;
+  margin: 0 0 24px; text-align: center;
   font-size: var(--text-display); font-weight: 800; line-height: 1.2; letter-spacing: -.02em;
 }
-p.sub {
-  margin: 8px 0 24px; text-align: center; font-size: var(--text-subhead);
-  line-height: 1.6; color: var(--muted);
-}
-@media (min-width: 640px) { p.sub { white-space: nowrap; } }
 
 .box {
   display: flex; flex-direction: column; overflow: hidden;
@@ -193,19 +246,78 @@ p.sub {
   transition: border-color .15s;
 }
 .box:focus-within { border-color: var(--brand); }
+
+/* ── What the selection filled in ────────────────────────────────────────────────────────────────
+   Owner, 2026-09-15: *"clicking any project or request will auto fill the boxes of terms"*.
+
+   Inside the box and above the line he types on, which is where the live app puts it
+   (`ProjectPills`, owner 2026-08-31: *"they will appear on the text area"*). On the floor it would
+   be sharing a row with the one pill, and that row is the pill's.
+
+   ⚠️ **It draws nothing until something is picked** - `:empty` takes the padding with it - so an
+   untouched intake is still a plain box. Same rule `ProjectChips` follows for a renter with no
+   sites: a feature nobody is using reaches nobody.
+
+   ⚠️ **A REQUIRED term draws even when empty; an OPTIONAL one does not.** The owner's own rule
+   (2026-09-02): *"only show filled fields ... or the missing required fields, but optional fields
+   like year-night shift-etc if not filled already they will not appear here"*. An absent required
+   term is a question he has to answer before the request can go out, and a question he cannot see
+   is one the send refuses him over with nothing on screen to fix. */
+.terms { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px 0; }
+.terms:empty { display: none; }
+
+/* 🔴 **This is `ProjectPills`'s own pill, read off the component rather than drawn to look like it**
+   (owner, 2026-09-15: *"the pills must be like existing web terms like boxes"*):
+
+       PILL  = "inline-flex h-8 items-center gap-1.5 rounded-sm border px-2.5 text-label"
+       LABEL = "font-semibold uppercase tracking-[.03em] opacity-55"
+       VALUE = "font-semibold tabular-nums"
+
+   ⚠️ **BOXED, never a capsule** - the component's own note, from the owner on 2026-08-31: *"chips
+   can be less rounded, like boxed, so these toggles fit inside"*. A segmented toggle inside a fully
+   rounded chip leaves two crescents of dead space. ~~`border-radius: 999px`~~ was mine and it was
+   the thing that made this strip read as a different object from the app's.
+
+   ⚠️ **One geometry for every pill**: a fixed `h-8` (32px, the app's small-control height) and one
+   radius, so a wrapping row of eight reads as one instrument rather than eight adjacent chips.
+   The label's `opacity: .55` is what greys it, NOT a colour of its own - that is why it stays
+   readable when the whole pill turns red. */
+.term {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0; height: 32px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface);
+  padding: 0 10px; font-size: var(--text-label); color: var(--navy);
+}
+.term i {
+  flex: none; font-style: normal; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .03em; opacity: .55;
+}
+.term b {
+  min-width: 0; font-weight: 600; font-variant-numeric: tabular-nums;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ⚠️ A value the PROJECT brought is the PLAIN tone, not the brand one. In the live strip the brand
+   edge means *the renter changed it away from the site's answer*, and nothing on this screen has
+   been changed yet - painting every filled pill orange would spend that mark on the ordinary case
+   and leave it saying nothing when it matters. */
+.term.is-missing { border-color: var(--danger); background: rgba(192, 38, 38, .05); color: var(--danger); }
+/* ⚠️ **Smaller than the live intake, deliberately** (owner, 2026-09-15: *"make the input text
+   smaller"*). The app draws this field at `text-subhead` in a 188px box; here it is `--text-meta`
+   in 96px, which is about the proportion the composer in the reference screenshot has. The floor
+   and the two controls under it are untouched. */
 .box textarea {
-  width: 100%; flex: 1; min-height: 188px; resize: none; border: 0; background: transparent;
-  padding: 16px 20px; font: inherit; color: var(--navy); outline: none;
+  width: 100%; flex: 1; min-height: 96px; resize: none; border: 0; background: transparent;
+  padding: 14px 16px 6px; font: inherit; font-size: var(--text-meta); line-height: 1.6;
+  color: var(--navy); outline: none;
 }
 .box textarea::placeholder { color: rgba(89,100,110,.7); }
 
-/* ── The floor: ONE pill, or the invitation ─────────────────────────────────────────────────────── */
+/* ── The floor: ONE pill, or nothing at all ─────────────────────────────────────────────────────── */
 .floor {
   display: flex; align-items: center; gap: 12px;
   padding: 4px 20px 16px;
 }
 .floor .lead { min-width: 0; flex: 1; display: flex; align-items: center; gap: 10px; }
-.hint { font-size: var(--text-meta); font-weight: 600; color: var(--muted); }
 
 /* ⚠️ ONE pill, and it carries the whole answer on one line: «project · request». It replaces a strip
    that could run to three rows of them. */
@@ -288,14 +400,6 @@ p.sub {
   .v4m-eye0, .v4m-eye1, .v4m-lid, .v4m-man-body, .v4m-man.is-waiting .v4m-man-in { animation: none; }
 }
 
-/* The prototype's own note, never part of the screen. */
-.readme {
-  max-width: 880px; margin: 26px auto 0; padding: 14px 16px;
-  border: 1px dashed var(--border-strong); border-radius: 8px;
-  background: var(--surface); color: var(--muted-dark); font-size: var(--text-meta); line-height: 1.7;
-}
-.readme b { color: var(--navy); }
-.readme code { background: var(--surface2); padding: 1px 5px; border-radius: 4px; font-size: 11.5px; }
 
 @media (max-width: 900px) {
   .rail { display: none; }
@@ -322,13 +426,18 @@ p.sub {
        falls back to its PLACE, which is how the workspace labels a group today. -->
   <aside class="rail" id="rail">
     <div class="rail-head">
-      <b>Your requests</b>
-      <span id="railCount"></span>
+      <span class="rail-title">Previous requests</span>
+      <span class="rail-count" id="railCount"></span>
     </div>
-    <button class="rail-new" type="button" id="btnNew">
-      <span class="mi">add</span> New request
-    </button>
     <div class="rail-list" id="railList"></div>
+
+    <!-- 🔴 «+ New request» WAS here and is deleted (owner, 2026-09-15: *"remove + new request, it is
+         confusing - clicking a request only fills, and if he wants it reset he removes the pill by
+         x"*). Nothing in this rail navigates: a press FILLS the composer he is already standing in,
+         and the ✕ on the pill is the undo. A «New request» button beside that implies the two are
+         different places to be, and they are not. -->
+    <button class="rail-grip" id="grip" type="button" role="separator" aria-orientation="vertical"
+            aria-label="Resize the panel" title="Drag to resize"></button>
   </aside>
 
   <main class="work">
@@ -348,16 +457,13 @@ p.sub {
         </span></span>
         How would you like to create your request?
       </h1>
-      <p class="sub">Describe your request, or upload an RFQ. A project fills in its own defaults</p>
-
       <div class="box">
+        <div class="terms" id="terms"></div>
         <textarea id="ta" placeholder="I want 30 forklifts for the King Khalid Airport site, 3 weeks from next Sunday, with an operator…"></textarea>
 
         <!-- ⚠️ ONE row, and at most ONE pill on it. The strip of project chips is gone. -->
         <div class="floor">
-          <div class="lead" id="lead">
-            <span class="hint" id="hint">Pick a project or a past request on the left</span>
-          </div>
+          <div class="lead" id="lead"></div>
           <div class="acts">
             <button class="circ" type="button" title="Upload an RFQ"><span class="mi">add</span></button>
             <button class="circ go" type="button" id="go" disabled title="Add something to continue"><span class="mi">arrow_forward</span></button>
@@ -365,17 +471,6 @@ p.sub {
         </div>
       </div>
 
-      <div class="readme">
-        <b>What changed.</b> The project pill strip is gone from the floor. His requests live in the
-        panel on the left, grouped by project (or by place, for a request filed under none), and each
-        row names only its <b>equipment</b> - which is what a renter remembers a job by.
-        Pressing a <b>project</b> selects the project; pressing a <b>request</b> inside it selects
-        both. Either way the floor shows exactly one pill, <code>project · request</code>, on one
-        line, with an ✕ to clear it. Nothing else is ever on that row.
-        <br><br>
-        <b>Try:</b> press a group head, then a row, then the ✕. Press
-        <code>d</code> to flip the panel between English and Arabic.
-      </div>
 
     </div>
   </main>
@@ -390,21 +485,30 @@ p.sub {
 const GROUPS = [
   {
     id: "p1", project: "Qiddiya - Phase 2", place: "Qiddiya, Riyadh",
+    terms: { site: "Qiddiya, Riyadh", basis: "Monthly", dates: "12 Oct - 12 Jan", payment: "Net 60",
+             year: "2019 or newer", cert: "TUV", delivery: "Supplier", ret: "Supplier", fuel: "Supplier" },
     requests: [
-      { id: "r1", eq: "Crawler excavator 20 ton", qty: 2, live: true },
+      // A request's own answers override the project's, key by key - the `item.<x> ?? project.<x>`
+      // resolution the canvas already does. Everything it does not state it inherits.
+      { id: "r1", eq: "Crawler excavator 20 ton", qty: 2, live: true,
+        terms: { year: "2020 or newer", cert: "TUV + SPSP" } },
       { id: "r2", eq: "Mobile crane 50 ton", qty: 1, live: true },
       { id: "r3", eq: "Telehandler 15 m", qty: 1, live: false },
     ],
   },
   {
     id: "p2", project: "King Khalid International Airport", place: "Riyadh",
+    terms: { site: "Riyadh", basis: "Monthly", dates: "1 Nov - 1 Feb", payment: "Net 30",
+             cert: "SASO", delivery: "Supplier", ret: "Renter", fuel: "Renter" },
     requests: [
-      { id: "r4", eq: "Forklift 3 ton", qty: 30, live: true },
+      { id: "r4", eq: "Forklift 3 ton", qty: 30, live: true,
+        terms: { dates: "5 Nov - 5 Dec", fuel: "Supplier" } },
       { id: "r5", eq: "Scissor lift 12 m", qty: 4, live: false },
     ],
   },
   {
     id: "p3", project: null, place: "Jeddah - Al Hamra",
+    terms: { site: "Jeddah - Al Hamra", basis: "Daily" },
     requests: [
       { id: "r6", eq: "Water truck 5000 gal", qty: 1, live: false },
       { id: "r7", eq: "Spider crane 3 ton", qty: 1, live: false },
@@ -412,12 +516,49 @@ const GROUPS = [
   },
   {
     id: "p4", project: "Neom - Site C", place: "Tabuk",
-    requests: [{ id: "r8", eq: "Articulating boom lift 20 m", qty: 6, live: true }],
+    terms: { site: "Tabuk", basis: "Weekly", dates: "20 Sep - 20 Dec", payment: "Net 45",
+             year: "2021 or newer", cert: "TUV", delivery: "Supplier", ret: "Supplier", fuel: "Renter" },
+    requests: [{ id: "r8", eq: "Articulating boom lift 20 m", qty: 6, live: true,
+                 terms: { cert: "SASO" } }],
   },
 ];
 
 /** A group is named by its project, and falls back to its PLACE - the workspace's own rule. */
 const titleOf = (g) => g.project || g.place;
+
+/**
+ * The terms the strip states, in the order the live app reads them.
+ *
+ * `req` is «the request cannot go out without this», which is what decides whether an EMPTY one is
+ * drawn at all - and the five that carry it are `ProjectPills`'s own five: who delivers, who returns
+ * it, who pays for the fuel (the three every supplier must ask before he can price anything), plus
+ * the model year and the equipment certificate, which joined them on 2026-09-12 when the gate
+ * learned to read the request-level answer.
+ *
+ * ⚠️ SITE, BASIS, DATES and PAYMENT are NOT in that set. They are drawn when the selection brought
+ * one and absent when it did not: an optional field nobody set *"is one of a dozen things nobody
+ * said, and drawing all dozen turns a summary of what IS known into a form"*.
+ */
+const TERMS = [
+  { key: "site", label: "Site", req: false },
+  { key: "basis", label: "Basis", req: false },
+  { key: "dates", label: "Dates", req: false },
+  { key: "payment", label: "Payment", req: false },
+  { key: "year", label: "Min year", req: true },
+  { key: "cert", label: "Certificate", req: true },
+  { key: "delivery", label: "Delivery", req: true },
+  { key: "ret", label: "Return", req: true },
+  { key: "fuel", label: "Fuel", req: true },
+];
+
+/** The project's answers, with the request's own written over them where it has any. */
+function termsFor(pick) {
+  if (!pick) return null;
+  const g = GROUPS.find((x) => x.id === pick.groupId);
+  if (!g) return null;
+  const r = pick.requestId ? g.requests.find((x) => x.id === pick.requestId) : null;
+  return Object.assign({}, g.terms || {}, (r && r.terms) || {});
+}
 
 let sel = null;        // { groupId, requestId|null }
 let shut = new Set();  // collapsed groups
@@ -438,7 +579,6 @@ function render() {
     head.className = "grp-head" + (sel && sel.groupId === g.id && !sel.requestId ? " on" : "");
     head.innerHTML =
       '<span class="mi chev">expand_more</span>' +
-      '<span class="mi place">place</span>' +
       '<span class="name"></span>' +
       '<span class="count">' + g.requests.length + "</span>";
     head.querySelector(".name").textContent = titleOf(g);
@@ -475,19 +615,34 @@ function render() {
   }
 
   renderFloor();
+  renderTerms();
 }
 
-/** ⚠️ ONE pill or the invitation - never both, and never two pills. */
+/** Filled by the SELECTION: the project's answers, with the request's own written over them. */
+function renderTerms() {
+  const box = el("terms");
+  box.innerHTML = "";
+  const t = termsFor(sel);
+  if (!t) return;
+  for (const spec of TERMS) {
+    const v = t[spec.key];
+    if (!v && !spec.req) continue;
+    const chip = document.createElement("span");
+    chip.className = v ? "term" : "term is-missing";
+    const lab = document.createElement("i");
+    lab.textContent = spec.label;
+    const val = document.createElement("b");
+    val.textContent = v || "Not set";
+    chip.append(lab, val);
+    box.appendChild(chip);
+  }
+}
+
+/** ⚠️ ONE pill, or an empty row. Never two pills, and never a sentence where the pill goes. */
 function renderFloor() {
   const lead = el("lead");
   lead.innerHTML = "";
-  if (!sel) {
-    const h = document.createElement("span");
-    h.className = "hint";
-    h.textContent = "Pick a project or a past request on the left";
-    lead.appendChild(h);
-    return;
-  }
+  if (!sel) return;
   const g = GROUPS.find((x) => x.id === sel.groupId);
   const r = g.requests.find((x) => x.id === sel.requestId);
 
@@ -516,7 +671,85 @@ el("ta").addEventListener("input", (e) => {
   el("go").disabled = !has;
   el("go").title = has ? "Continue" : "Add something to continue";
 });
-el("btnNew").addEventListener("click", () => { sel = null; el("ta").value = ""; el("go").disabled = true; render(); });
+/* ── The grip ─────────────────────────────────────────────────────────────────────────────────
+   The width is written to the ROOT, because `--rail` is declared there and the rail reads it; and
+   it is remembered, because a size somebody set by hand is a preference, not a gesture.
+
+   ⚠️ **The delta's sign flips in Arabic.** The grip is on the rail's trailing edge, which is the
+   LEFT one under `dir="rtl"`, so dragging towards the page widens in one direction and narrows in
+   the other. Reading the direction off the document rather than off the pointer is what keeps one
+   gesture meaning one thing.
+
+   ⚠️ `setPointerCapture`, never a document-level mousemove: the pointer leaves this 7px strip on
+   the first frame of any real drag, and with capture the events keep arriving anyway - including
+   the `pointerup` that ends it, which is how a drag avoids sticking on when the mouse is released
+   over another element. */
+const RAIL_KEY = "moedatech.proto.railWidth";
+const grip = el("grip");
+
+function railBounds() {
+  const cs = getComputedStyle(document.documentElement);
+  return {
+    min: parseFloat(cs.getPropertyValue("--rail-min")) || 164,
+    max: parseFloat(cs.getPropertyValue("--rail-max")) || 380,
+  };
+}
+
+function setRail(px, remember) {
+  const { min, max } = railBounds();
+  const w = Math.max(min, Math.min(max, Math.round(px)));
+  document.documentElement.style.setProperty("--rail", w + "px");
+  grip.setAttribute("aria-valuenow", String(w));
+  if (remember) { try { localStorage.setItem(RAIL_KEY, String(w)); } catch { /* private window */ } }
+  return w;
+}
+
+// A stored width can be stale (an older floor, a hand-edited value), so it goes through the same
+// clamp as a drag rather than being trusted.
+try {
+  const saved = parseFloat(localStorage.getItem(RAIL_KEY) || "");
+  if (Number.isFinite(saved)) setRail(saved, false);
+} catch { /* private window: the default stands */ }
+
+let drag = null;
+grip.addEventListener("pointerdown", (e) => {
+  const rail = el("rail");
+  drag = { x: e.clientX, w: rail.getBoundingClientRect().width };
+  grip.setPointerCapture(e.pointerId);
+  document.body.classList.add("is-dragging");
+  el("rail").classList.add("is-dragging");
+  e.preventDefault();
+});
+grip.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const rtl = document.documentElement.dir === "rtl";
+  const moved = e.clientX - drag.x;
+  setRail(drag.w + (rtl ? -moved : moved), false);
+});
+function endDrag() {
+  if (!drag) return;
+  drag = null;
+  document.body.classList.remove("is-dragging");
+  el("rail").classList.remove("is-dragging");
+  setRail(el("rail").getBoundingClientRect().width, true);
+}
+grip.addEventListener("pointerup", endDrag);
+grip.addEventListener("pointercancel", endDrag);
+
+// Keyboard, and a double-press to put it back. The step is 16px so a few taps cross the range.
+grip.addEventListener("keydown", (e) => {
+  const rtl = document.documentElement.dir === "rtl";
+  const now = el("rail").getBoundingClientRect().width;
+  if (e.key === "ArrowRight") setRail(now + (rtl ? -16 : 16), true);
+  else if (e.key === "ArrowLeft") setRail(now + (rtl ? 16 : -16), true);
+  else if (e.key === "Home" || e.key === "Enter") { document.documentElement.style.removeProperty("--rail"); try { localStorage.removeItem(RAIL_KEY); } catch {} }
+  else return;
+  e.preventDefault();
+});
+grip.addEventListener("dblclick", () => {
+  document.documentElement.style.removeProperty("--rail");
+  try { localStorage.removeItem(RAIL_KEY); } catch {}
+});
 
 /* `d` flips direction, because this row has to survive Arabic - the pill, the chevron and the arrow
    all mirror. */

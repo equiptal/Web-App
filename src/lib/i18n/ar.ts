@@ -39,6 +39,10 @@ export const ar: Dictionary = {
     preferences: "التفضيلات",
     preview: "المراجعة",
   },
+  /* See the note in `en.ts`: one string, the number is derived, and the digits stay Latin. */
+  season: {
+    nationalDay: "اليوم الوطني",
+  },
   shell: {
     home: "الرئيسية",
     back: "رجوع",
@@ -109,7 +113,6 @@ export const ar: Dictionary = {
     ctaTitleBefore: "دع ",
     ctaTitleAi: "مساعدنا الذكي",
     ctaTitleAfter: " يجد معدّتك القادمة",
-    ctaSubtitle: "صف ما تحتاجه بكلماتك، ومساعدنا الذكي يوصلك بالمؤجّرين المناسبين.",
     uploadRfq: "رفع طلب عروض",
     suppliersTitle: "المؤجّرون الأكثر شيوعًا",
     viewAll: "عرض الكل",
@@ -144,6 +147,7 @@ export const ar: Dictionary = {
     verifiedTitle: "أنت موثّق",
     verifiedBody: "تم توثيق منشأتك.",
     yourRequests: "طلباتي",
+    noRequestsYet: "لا توجد طلبات بعد. اكتب ما تحتاجه في الأعلى وسنقرأه لك",
     priceBids: "عروض الأسعار",
     completedDeals: "صفقات مكتملة",
     soon: "قريباً",
@@ -172,9 +176,9 @@ export const ar: Dictionary = {
     pickSubcategoryFirst: "اختر فئة فرعية أولاً",
     newLabel: "جديد",
     equipmentCount: "معدّة",
-    allCategories: "الكل",
-    storesAcross: "متجر في أنحاء السعودية",
-    showMore: "عرض مورّدين إضافيين",
+    allCategories: "كل المتاجر",
+    prevPage: "الصفحة السابقة",
+    nextPage: "الصفحة التالية",
     empty: "لا يوجد مؤجرون مطابقون لعوامل التصفية.",
     error: "تعذّر تحميل المؤجرين.",
     retry: "إعادة المحاولة",
@@ -385,7 +389,11 @@ export const ar: Dictionary = {
     },
     reading: "جارٍ القراءة",
     heading: "كيف تريد إنشاء طلبك؟",
-    subheading: "صِف طلبك، أو ارفع مستند طلب عروض. والمشروع يملأ قيمه تلقائيًا",
+    rail: {
+      title: "الطلبات السابقة",
+      count: "{n} في {g}",
+      resize: "تغيير عرض اللوحة",
+    },
     optUploadTitle: "كتابة / رفع طلب العروض",
     optUploadDesc: "اكتب طلبك أو ارفع ملفًا، ومساعدك الذكي يملأ النموذج تلقائيًا.",
     recommended: "موصى به",
@@ -1933,12 +1941,12 @@ export const ar: Dictionary = {
         saveProjectOnly: "المشروع فقط",
         saveAndApply: "احفظ وطبّق على {n}",
       },
+    /* 🔴 ~~`pick` / `all` / `fewer`~~ went with `ProjectChips` (owner, 2026-09-16): the site
+       strip left the intake floor for the requests rail beside the box, and those three strings
+       named its parts. `label` and `ended` stay - the projects board and the move dialog read them. */
     chips: {
       label: "المشروع",
       ended: "منتهي",
-      pick: "اختر مشروعاً",
-      all: "كل المشاريع",
-      fewer: "عرض أقل",
     },
     pills: {
       startFrom: "ابدأ من",
