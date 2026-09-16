@@ -2,6 +2,51 @@
 
 ## Change log
 
+- **2026-09-17 - A bid that lands while he is on the screen is ON the screen, and the bench stops deleting cards.**
+  Owner: *"bids doesnt appear directly in the bid cards, they apear in the compare but not in bid
+  cards, only after refresh"*, then *"i want all bids recieved in real time directly in cards and in
+  compare and in the bids list on home page all must load in real time"*.
+  Two faults, and the first is the one that made the two tabs disagree.
+  (1) 🔴 **The bench was a COMPARE control deleting a CARD.** ✕ on a compare column adds the bid to
+  `benched`; the cards rail was drawn from `shown`, which is the source filter MINUS the bench. So a
+  bid set aside while comparing vanished off a tab that has no bench strip, no ✕ and no way back, and
+  only a reload brought it back, because `benched` is component state. The rail takes `shownAll` now.
+  The bench still narrows the COMPARISON, its printed sheet and the assistant, which is what the
+  2026-08-25 ruling was protecting: *"a sheet that printed a bid he had just removed from the table in
+  front of him is a sheet that disagrees with its own screen"*.
+  (2) **Nothing re-read its bids, anywhere.** `/requests` fetched per item and never again; the
+  dashboard rail read `fetchReceivedBids` once per session; and its off-platform half sat in
+  `subsOnce`, a per-request memo kept for the life of the mount and **never invalidated** - so a
+  reload was the only thing in the product that could show a new off-platform bid.
+  `src/lib/live/useLiveTick.ts` (new) is the house's own polling pattern with the three rules written
+  once instead of four times badly: nothing runs while the tab is hidden, coming BACK is itself a read
+  when the interval has elapsed, and a return INSIDE the interval reads nothing (`focus` fires on
+  every click into the window).
+  Files: `src/lib/live/useLiveTick.ts` (new), `src/components/workspace/RequestsWorkspace.tsx`,
+  `src/components/home/HomeRequests.tsx`, `tests/unit/live-bids.test.tsx` (new, 14 cases).
+  ⚠️ **Two clocks, because the two reads cost very different amounts.** 15s for the open item's bids
+  (two calls) and for the dashboard's app bids (one); **60s** for the dashboard's off-platform
+  fan-out, which is ONE CALL PER GROUP capped at `LINK_FANOUT_MAX` - at 15s a renter with twenty live
+  requests would be making twenty requests every fifteen seconds to keep a five-row card current.
+  ⚠️ **A tick must not EMPTY what it is refreshing.** The workspace effect cleared `bids` on entry;
+  on a poll that would flash «No bids yet» on the cards and fold the table to nothing every 15
+  seconds. `loadedFor` tells an item change (empty first) from a refresh (replace in place), and the
+  dashboard's refresh is a SECOND effect for the same reason - its mount effect sets the rail to
+  `null` on purpose and must keep doing so when the ACCOUNT changes.
+  ⚠️ The size filter is part of that identity: `showLarger` changes which bids the backend answers
+  with, so switching it empties first. A refresh does not.
+  🔴 **This is POLLING, not push, and it is a deliberate choice of the owner's** (offered, and he
+  took it): there is no bid event on the wire. Stream is wired for chat only and its token is minted
+  per deal room, so a true push would be backend work - a `bid.created` event on a user channel, or SSE.
+  Until then a bid is at worst one interval late, and the tab regaining focus is what shortens that
+  in the case the renter actually notices.
+  ⚠️ Verified: typecheck, lint (0 errors), 14 new cases, and the full suite serially (3393 passing).
+  The two failures are both PRE-EXISTING and were reproduced on a stashed tree: `ui-pins` (CRLF
+  staleness) and `share-request-email`'s `recipientEmails`. Break-checked by forcing the dashboard's
+  refresh effect off and the fan-out's cache invalidation off - two cases went red.
+  🔴 **NOT seen rendered.** Every surface here needs a signed-in renter with live bids, so the
+  refresh is pinned by a render test with a fake clock rather than watched on a real one.
+
 - **2026-09-13 - The processing line is back, and it is INDETERMINATE.**
   Owner, on the reading screen: *"show process line anyways too"*.
   🔴 **This reverses the removal of 2026-09-12**, and the reason it went is still true: `processRfq`
