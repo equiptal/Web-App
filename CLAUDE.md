@@ -2,7 +2,115 @@
 
 ## Change log
 
-- **2026-09-16 - A National Day SEASON: green chrome behind one attribute, gone by itself on 1 October, and the brand orange does not move.**
+- **2026-09-17 - The halo behind Mansour is deleted, and NO SHADOW is a standing rule.**
+  Owner, on a screenshot of the CTA band: *"why mansout is not clear? not hd also never use shadow in
+  design remove it around him"*.
+  🔴 **The halo was the softness.** An orange radial glow was put behind him yesterday and argued as
+  figure-and-ground - he is grey by the kit's own rule (*"grey on purpose so he sits on any brand
+  colour"*) and the band is navy, so something had to separate them. What it did was bleed `--brand`
+  at 30% across his outline, so the thing meant to lift him off the ink was sitting ON him. Deleted.
+  The separation is the BAND's job: he stands on the darkest end of its gradient (94% navy), which is
+  where the headline already relies on the same contrast.
+  ⚠️ **It is a rule now, not one element**: no glow, no drop-shadow, no ring behind a figure. This
+  design system already spends none - `IntercomWidget` clears the whole `--shadow-*` namespace and
+  says why - and nothing in the intake rail or its floor carries one.
+  Files: `src/components/home/CtaBanner.tsx`, `tests/unit/cta-banner.test.ts` (the halo's case
+  rewritten to its removal, and widened to shadow and blur).
+  🔴 **«Not HD» is TWO different things, and only one of them was ours.**
+   · **He is inline SVG** and therefore resolution-free at any size - `mansour.test.tsx` has pinned
+     «inline SVG, never an `<img>`» since he landed. Nothing about him is rasterised, so what read as
+     soft was the orange bleed and nothing else.
+   · **The PHOTOGRAPH behind the band genuinely is upscaled.** `public/home-cta-site.webp` measures
+     **1584x672** - read out of the file's own VP8 header, not assumed. The band is full-window and
+     160px tall, so `cover` scales by WIDTH: 1.21x at a 1920 window, 1.62x at 2560. No CSS removes
+     that. **CONTENT, owed and already logged on 2026-09-16: a re-crop at 3200px or wider**, in the
+     band's own ~10:1 shape rather than 2.36:1, so `cover` stops throwing away two thirds of the
+     frame's height as well.
+  ⚠️ What was NOT changed: his four greys. They are the kit's, shared with moedatech.net, and they
+  only mean anything together - recolouring one to gain contrast here would make this app's agent a
+  different character from the marketing site's, with nothing saying so. If he still reads dull on
+  the next look, that is the lever, and it is a decision rather than a fix.
+  ⚠️ Verified: typecheck, lint (0 errors), 32 passing across the CTA and Mansour suites, and
+  **209 files / 3522 passing, 7 skipped** serially. The 3 unhandled errors are `intercom-widget`'s
+  two and `suppliers-remove-and-pick`'s one, both pre-existing.
+  🔴 NOT seen rendered after the removal - the band needs the dashboard, and the screenshot that
+  prompted this is of the state BEFORE it.
+
+- **2026-09-17 - The intake panel takes the screen's edge, wears the catalogue's own drawings, and a picked machine collapses the row to ONE pill.**
+  Owner, on the first build: *"it must be the same as side panel in the prototype as side panel on
+  the edge of the screen and feels like read panel not a card, also fix the padding between the titel
+  text and text box also use the taxonamy image not this fallback icon and put the unit 2 x icon .
+  equipment name like this and clicking on a request in the project will show one single pill show
+  the project-request equipment"*.
+  (1) **The rail is a BAND of the screen.** `AppShell` caps its main at `PAGE_MAX` and gutters it,
+  which is right for a page and wrong for a panel: inside that column the rail floated with page
+  ground either side of it and read as a card. The row breaks out with `mx-[calc(50%-50vw)]
+  w-screen`, symmetric so it needs no mirror rule, and pulls up through the main pad so the panel
+  starts at the top. The gutter it gave up comes back on the COLUMN, so the box keeps its margin
+  while the panel keeps the edge. Same argument the requests rail settled on 2026-09-12: a band takes
+  ONE edge, not four.
+  (2) **Room under the question.** The heading takes `mb-7`; deleting `intake.subheading` yesterday
+  took the gap with it and the box sat against the title.
+  (3) 🔴 **The pictures are the CATALOGUE's, and the first cut was matching the wrong thing.**
+  ~~The artwork was looked up among his own requests by name.~~ It missed nearly every time, which is
+  why he was seeing the grey glyph: `itemName` joins the subtype and the size with a middot while the
+  chart runs the category in front of both, so the two strings are never equal. The app taxonomy TREE
+  is matched instead, on TOKEN CONTAINMENT - a node matches when every word of its name appears in
+  the line, and the longest such node wins, so «Excavator» never beats «Crawler Excavator» for a
+  crawler. One-directional on purpose: the line may say more than the node, never less, or «Crane»
+  would answer for «Tower Crane». It also covers a WORK ORDER, which has no request to borrow a
+  picture from.
+  ⚠️ **One kind of asset now, so one fit.** This tree carries the flat DRAWING, so it is
+  `object-contain scale-[1.34]` and never `object-cover` - cropping a drawing enlarges its own
+  transparent margin rather than the machine. `imageIsPhoto` went with `my-requests`.
+  (4) **«2 ×» leads the row**, his own spelling, then the picture, then the name. Drawn only above
+  one.
+  (5) **A picked machine collapses the floor to ONE pill**, «project · machine», with the ✕. The
+  chips are how he CHOOSES; the pill is what he chose, and leaving the rest beside it would make the
+  row state the question and the answer at once. Only a project picked still draws the project chip
+  and its machines.
+  Files: `src/lib/contract/taxonomy-icons.ts` (`namedIcons` / `iconForName`, new),
+  `src/components/create/RequestsRail.tsx`, `src/components/screens/Intake.tsx`,
+  `tests/unit/{intake-rail,intake-floor}.test.ts`.
+  ⚠️ **A `not.toContain` failed on its own explanation, for the fourth time in this repo.** The note
+  above the `<img>` names `object-cover` while saying it must never be used, so the case now slices
+  the CLASS attribute rather than reading the file. `basis-[34rem]`, `object-contain` and the CTA
+  halo were the other three.
+  ⚠️ Verified: typecheck, lint (0 errors), **209 files / 3522 passing, 7 skipped** serially. The 3
+  unhandled errors are `intercom-widget`'s two and `suppliers-remove-and-pick`'s one, both
+  pre-existing. One earlier run of the same tree reported two timeout failures that a re-run did not
+  reproduce - contention on this machine, which this log already records for the canvas suites.
+  🔴 **STILL NOT SEEN RENDERED**, and it cannot be from `/dev/preview`: the rail is gated on a real
+  session, so a specimen draws nothing. `npx next dev`, sign in, `/create`. The full-bleed breakout,
+  the Arabic mirror and the phone sheet are all measured facts that want one look.
+
+- **2026-09-17 - The dashboard's tabs are the HEADER's pill, inverted.**
+  Owner, on yesterday's row: *"the tabs doesnt feel ui consistency with the header tabs i dont know
+  but i dont like them"*.
+  ~~A bordered box per tab, each carrying a 30px navy plate with the section's glyph, the name at
+  `text-body` extrabold, and the count in a filled chip.~~ Three devices this product's own tabs do
+  not use - and `AppNav`'s own note had named the fault before it was made: *"a row of four
+  icon-plus-label pairs reads as a toolbar rather than as the top of a site"*. Beside a header of
+  plain words in lozenges it read as another product's chrome, which is what he was looking at.
+  **It is `AppNav`'s recipe to the pixel now** - `rounded-full px-4 py-1.5 text-meta`, no border, no
+  glyph - with the fill INVERTED, because this row sits on the page rather than on the navy bar: the
+  header draws the place you are on as a WHITE lozenge on navy, this draws it as a NAVY lozenge on
+  white, and the resting tab is plain `navy-mid` text with a `surface2` hover.
+  ⚠️ **The count rides INSIDE the label's run**, `ms-1.5 tabular-nums`, never a chip: the header's
+  tabs carry no badge, and a filled pill inside a pill was half of what made the row read as a
+  toolbar. It is still a dash until the block answers.
+  ⚠️ Same padding in both states, which is the rule the header's pill was written to keep - the row
+  must not shift by a pixel when the open tab changes.
+  ⚠️ `VIEW_ICON` and the `Icon` import went with the plates rather than being left unused.
+  Files: `src/components/home/HomeHub.tsx` (`DashboardTabs`).
+  ⚠️ Verified: typecheck clean, lint 0 errors, 10 passing across the two dashboard suites - they pin
+  the RULES (mounted not unmounted, the count reported up, the dash, the URL), none of which the skin
+  touches. **SEEN RENDERED** through the `dashboard-tabs` specimen, which is how the old row was
+  judged and how this one was.
+  ⚠️ The browser tool's `zoom` returned blank frames and its screenshots timed out repeatedly on this
+  machine; the picture that settled it was a plain full-frame screenshot on a second attempt.
+
+- **2026-09-16 - A National Day SEASON: nine of the kit's motifs across four surfaces, behind one attribute, gone by itself on 1 October, and the brand orange does not move.**
   Owner: *"can i do a national day version that stay until 1-10 and it is another design theme not
   replacing ours so maybe just a flag"*, handing over the Flutter decor kit and a screenshot of the
   app's own green header. Asked where it should reach and whether the orange goes with it, he
@@ -16,19 +124,41 @@
   two meanings on one screen, and repainting `--brand` would move every CTA in the product for a
   fortnight. The seven seasonal tokens are ADDITIVE (`--nd-*`): a surface opts into one, no surface
   loses one.
-  (1) **The bar**, on every route: the kit's three-stop gradient, a 20px dot lattice at 10% white,
-  the palm grove at 16%, and one rank of gold Najdi triangles (6px at a 12px pitch) along the bottom
-  edge. That is the app's screenshot, drawn with the app's own numbers.
-  (2) **The season chip** beside the wordmark - «96 National Day» / «96 اليوم الوطني» - outlined
-  gold, which is the treatment «Beta» next to it already takes.
-  (3) **The dashboard band** takes the same seam on its bottom edge, and nothing else. Its ground is
-  still the site photograph, its coloured word and its button are still `--brand`.
+  **Where each motif went, and it is the MAPPING that is the decision** (owner, on the first cut:
+  *"use more elements and decorations from the prototype i gave u"*). The kit names the surface each
+  piece is for, and nine of its eleven are now placed:
+  (1) **The bar**, on every route: the three-stop gradient, a 20px dot lattice at 10% white, the
+  four-palm GROVE at 16%, and one rank of gold Najdi triangles (6px at a 12px pitch) along the
+  bottom edge. That is the app's own screenshot, drawn with the app's own numbers. Beside the
+  wordmark, the season CHIP in its outlined gold weight - «96 National Day» / «96 اليوم الوطني» -
+  which is the treatment «Beta» next to it already takes.
+  (2) **The dashboard band** takes the eight-palm TREE LINE and the dot field, the ordinal MARK on
+  its trailing edge (96 outlined over a gold hairline, the kit's own reason kept: *"solid white
+  makes it a heading - it is a mark"*), and the DUNE SWEEP cutting its bottom edge into the page's
+  own colour. The kit is explicit that eight palms *"need room to work - it is for a splash or a
+  role gate, not a 66 dp bar"*, which is why the bar keeps four cut-off trees and this 160px
+  full-window band gets the line.
+  (3) **The guest wall's head strip** - the app's own role gate - takes the gradient, the dots and
+  the INTERLOCKING Najdi band (the woven rank rather than the single row of spikes), with the chip's
+  PALE weight on it, which is the kit's own light-surface pairing. Its body takes one oversized
+  CORNER PALM at 10% of the flag's green.
+  (4) **The intake card** takes the quiet seam on its bottom edge, and nothing else: it is the first
+  screen a renter meets and the box under it is where he types.
+  🔴 **TWO of the eleven are deliberately NOT carried**, and a case records each so the next reader
+  meets them as decisions. **Confetti** would fire over the dashboard's own «your request is
+  posted» tick, which is the one moment in this product that is allowed to celebrate something.
+  **The corner ribbon** marks *"one item as part of the campaign"* - nothing here is part of a
+  campaign, so on a request tile or a bid card it would be a claim about the offer.
+  ⚠️ The band's navy, the photograph behind it, its one orange word and its orange button are all
+  unchanged, and so is every card the skin does not name.
   Files: `src/lib/season.ts` (new), `src/lib/flags.ts` (`NATIONAL_DAY_ENABLED`),
   `src/app/globals.css` (7 tokens + the seasonal block), `src/lib/ds-colors.ts`,
   `src/app/layout.tsx`, `src/components/AppShell.tsx`, `src/components/home/CtaBanner.tsx`,
-  `public/nd96-palms.svg` (new), `src/lib/i18n/{en,ar}.ts` (`season.nationalDay`),
-  `src/lib/uiPins.ts` (2.4 / 2.5, new), `src/app/dev/preview/specimens.tsx` (`national-day`, new),
-  `tests/e2e/ui-shots.spec.ts`, `tests/unit/national-day-season.test.ts` (new, 23).
+  `src/components/common/GuestWall.tsx`, `src/components/screens/Intake.tsx`,
+  `public/nd96-{palms,treeline,corner-palm,dune}.svg` (new), `src/lib/i18n/{en,ar}.ts`
+  (`season.nationalDay`), `src/lib/uiPins.ts` (2.4 / 2.5 / 9.6 / 10.3, new),
+  `src/app/dev/preview/specimens.tsx` (`national-day`, new), `tests/e2e/ui-shots.spec.ts`,
+  `tests/unit/national-day-season.test.ts` (new, 31).
   🔴 **`max-sm:hidden` on the chip CANNOT WORK, and it was in the first cut before the compiled
   sheet said so.** Tailwind emits its utilities inside `@layer utilities`; the seasonal block is
   UNLAYERED, and unlayered CSS beats layered CSS outright whatever the specificity - so
@@ -61,22 +191,46 @@
   ⚠️ **The seam's colour is a token and only its SHAPE is a data URI.** A gold triangle baked into
   an encoded SVG is a colour no token can reach and no sweep can find - exactly the drift
   `palette-drift` exists to catch. The mask carries black because a mask reads alpha, never hue.
+  🔴 **The band's seasonal layer must be declared AFTER its photograph, its two gradients and its
+  multiply.** All four are at exactly `-z-10`, and among equals the last one painted wins - so above
+  them the tree line is perfectly present in the DOM and invisible on screen. That is the CTA halo's
+  own bug of 2026-09-16, in the same file, at the same depth, met a second time and caught by a case.
+  🔴 **The corner palm shipped one pass at 220x190 and read as a pale smudge.** A palm taller than
+  its host shows the middle of its own trunk and none of its crown, and the card body it sits in is
+  about 100px. It is 142x124 now, with negative insets so the tree is CUT by the card's edge rather
+  than standing politely inside it - the kit's word is «bleeding», and a palm with air on both sides
+  of it is a sticker. Seen in a browser; from the source «oversized» is exactly what the kit asks for.
+  ⚠️ **An edge gets ONE finish.** The band carried the seam in the first cut and took the dune sweep
+  in this one; a cut and a rank of triangles an inch apart is two treatments of one line. The seam
+  closes the bar, the role gate's strip and the intake card; the band is where the silhouette changes.
+  ⚠️ **The role gate's ink is an arbitrary VARIANT on the element, never `color` in the seasonal
+  block.** A colour set there would be unlayered and would beat `text-muted-dark` all year - the
+  same trap that caught the header chip's `max-sm:hidden`, read the other way round.
+  ⚠️ **Three of the four artworks are MASKS, not pictures** - the corner palm, the dune and both
+  Najdi ranks are drawn black and painted with a token at the call site. A gold triangle baked into
+  an encoded SVG is a colour no token can reach and no sweep can find, and the same mask marks a
+  white card in green and a navy one in white.
+  ⚠️ **`edit()` scripts must write a file in its OWN line endings.** `CtaBanner.tsx` and
+  `GuestWall.tsx` are CRLF on disk and `Intake.tsx` is LF; a literal written with `\n` matches
+  nothing in the first two, and a replace that did succeed would leave LF islands inside a CRLF file
+  - which is the staleness `ui-pins.test.ts` has been failing on. `globals.css` had 160 of them
+  before this was noticed, and was normalised.
   ⚠️ **The palms are a FILE, `public/nd96-palms.svg`, generated from the kit's own
   `_HeaderDecorPainter` maths** (the ANGLES table, `frond()`, `palm()`), so the two products draw
   the same tree. The kit forbids assets because a Shorebird patch carries none and a new `Icons.*`
   glyph is tree-shaken out of the release font; the web has neither constraint, and 6.3 kB of path
   data inlined into `globals.css` would be paid for by every reader all year. Out of season the
   selector never matches and it is never fetched.
-  🔴 **No confetti.** The kit has it; it is deliberately not carried. It would fire over the
-  dashboard's own «your request is posted» tick, which is the one moment in this product that is
-  allowed to celebrate something.
-  ⚠️ Verified: typecheck clean, lint 0 errors, **209 files / 3513 passing, 7 skipped** serially (the
-  3 unhandled errors are `intercom-widget`'s two and `suppliers-remove-and-pick`'s one, all
-  pre-existing), and three rulings break-checked one at a time - a token assigned inside the block,
-  the attribute dropped from a selector, and `max-sm:hidden` put back on the chip; each went red
-  alone.
-  **SEEN RENDERED**, which is how the layer fault was found: the bar on and off, in EN and AR, and
-  at a real 392px viewport where the chip stands down.
+  ⚠️ Verified: typecheck clean, lint 0 errors, the full suite serially, and three rulings
+  break-checked one at a time - a token assigned inside the block, the attribute dropped from a
+  selector, and `max-sm:hidden` put back on the chip; each went red alone. The 3 unhandled errors
+  are `intercom-widget`'s two and `suppliers-remove-and-pick`'s one, all pre-existing.
+  ⚠️ The guard that fails on an unscoped rule asks a QUESTION rather than holding a list: a rule is
+  inert when its only declaration is `display: none`. The first version kept a list of class names,
+  and a list that has to be edited every time a motif is added is a list that will one day be
+  edited wrongly.
+  **SEEN RENDERED**, which is how three of the faults above were found: all four surfaces, on and
+  off, in EN and AR, and at a real 392px viewport where the chip and the mark both stand down.
   🔴 **`/dev/preview` does not hydrate on this machine and the specimen was NOT photographed through
   it.** A render-blocking Google Fonts `<link>` in `layout.tsx`'s `<head>` stalls Next's bootstrap
   scripts, so the page renders null and every specimen is a blank frame - `readyState` sticks at
@@ -177,10 +331,10 @@
   and the three consequences are the whole design: the COUNTS on all three tabs are real rather than
   only the open one's; the three reads happen exactly as they did before this change; and a renter's
   search box, his filters and his half-made supplier group survive a trip to another tab.
-  **The tabs ARE the section headings.** Each carries the 38px navy plate's glyph, the section's own
-  name and its count, so the three blocks drop their own header (`hideHeading`) - otherwise the page
-  said «My Suppliers · 42» twice, one row apart, which is the duplication the owner has already
-  objected to once (2026-09-02).
+  **The tabs ARE the section headings**, so the three blocks drop their own header (`hideHeading`) -
+  otherwise the page said «My Suppliers · 42» twice, one row apart, which is the duplication the
+  owner has already objected to once (2026-09-02). ~~Each tab carried the section's 38px navy plate
+  and glyph.~~ Corrected the next day; see the entry above it.
   ⚠️ **A count is REPORTED UP (`onCount`), never fetched again here.** Each block is the only thing
   that holds its list. `null` until the read lands, and the tab draws «–»: a 0 on a list still
   loading is a wrong statement rather than a pending one.

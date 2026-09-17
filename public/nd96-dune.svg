@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The dune sweep: a shallow curved cut instead of a straight edge, from the kit's own control
+  points, rescaled so the deepest of them reaches the top of this 40px box and the cut reads.
+
+  A MASK, like the corner palm - the cut is painted in the host's own token, so the same file works
+  against any page colour.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 40" width="1440" height="40" preserveAspectRatio="none">
+ <path fill="#000000" d="M0 40L0 18.33C316.8 1.67 604.8 30 892.8 21.67C1152 15 1296 0 1440 6.67L1440 40Z"/>
+</svg>

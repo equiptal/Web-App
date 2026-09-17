@@ -5,7 +5,9 @@ import { Icon } from "@/components/ui";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { useSession } from "@/lib/session";
-import { fetchMyRequests, listProjects, listTemplates, fetchTemplateTerms } from "@/lib/api/client";
+import { listProjects, listTemplates, fetchTemplateTerms } from "@/lib/api/client";
+import { namedIcons, iconForName, type NamedIcon } from "@/lib/contract/taxonomy-icons";
+import type { TaxonomyNode } from "@/lib/contract/stores";
 import { projectTitle } from "@/lib/contract/project";
 import type { ProjectSummary } from "@/lib/contract/project";
 import type { TemplateOption } from "@/lib/contract/project-apply";
@@ -26,10 +28,15 @@ import { pin } from "@/lib/uiPins";
  * `fetchTemplateTerms` the option's own `itemId`. Nothing is matched, so nothing can miss.
  *
  * ⚠️ **The PICTURE is the only part that is looked up, and so the only part that can fail.** A
- * template carries no image, so the artwork is found by name among his own requests (`my-requests`
- * carries `imageUrl` and `imageIsPhoto`) and falls back to a glyph when it is not. That is the right
- * way round: a missing icon costs a small drawing, where a missed template would cost the machine's
- * stored terms and say nothing about it.
+ * template carries no image and no taxonomy ids — only `ChartItem.label`, the machine run into one
+ * string — so the drawing comes from the app taxonomy TREE, matched on that name
+ * (`iconForName`). Owner, 2026-09-17: *"use the taxonamy image not this fallback icon"*.
+ *
+ * 🔴 ~~Matched against his own requests by name.~~ It missed nearly every time, which is why he was
+ * seeing the glyph: `itemName` joins the subtype and the size with a middot while the chart runs the
+ * category in front of both, so the two strings are never equal. The tree is matched by token
+ * containment instead, and it also covers a WORK ORDER, which has no request to borrow a picture
+ * from.
  */
 
 /** One row: a machine already requested or ordered at this project. */
@@ -39,8 +46,8 @@ export interface RailRow {
   option: TemplateOption;
   name: string;
   qty: number;
+  /** The catalogue's flat DRAWING for this machine, or null when it has none. */
   imageUrl: string | null;
-  imageIsPhoto: boolean;
 }
 
 const RAIL_MIN = 164;
@@ -73,8 +80,8 @@ export function useRequestRail() {
   const { user } = useSession();
 
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
-  /** Machine name → its artwork, off his own requests. Pictures only; nothing branches on it. */
-  const [art, setArt] = useState<Map<string, { url: string | null; isPhoto: boolean }>>(new Map());
+  /** The catalogue's drawings, by name. Pictures only; nothing branches on it. */
+  const [named, setNamed] = useState<NamedIcon[]>([]);
   const [tpls, setTpls] = useState<Map<string, RailRow[]>>(new Map());
   const [loading, setLoading] = useState<ReadonlySet<string>>(new Set());
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
@@ -95,18 +102,16 @@ export function useRequestRail() {
       .catch(() => {
         if (live) setProjects([]);
       });
-    fetchMyRequests({ limit: 200 })
-      .then((d) => {
-        if (!live) return;
-        const m = new Map<string, { url: string | null; isPhoto: boolean }>();
-        for (const r of d.requests ?? []) {
-          if (!r.item?.name || !r.item.imageUrl) continue;
-          if (!m.has(r.item.name)) m.set(r.item.name, { url: r.item.imageUrl, isPhoto: r.item.imageIsPhoto });
-        }
-        setArt(m);
+    /* The APP backend's tree, for its drawings alone — the agents taxonomy the store already holds
+       carries a photograph on 1 row of 413, and this one carries the flat icon on 92 of 412. The
+       browse filters fetch the same thing, so it is cheap and it works signed out. */
+    fetch("/api/stores/taxonomy", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
+      .then((d: { taxonomy: TaxonomyNode[] }) => {
+        if (live) setNamed(namedIcons(d.taxonomy ?? []));
       })
       .catch(() => {
-        /* No pictures, and every row draws its glyph. The rail still works. */
+        /* No drawings, and every row falls back to its glyph. The rail still works. */
       });
     return () => {
       live = false;
@@ -132,14 +137,14 @@ export function useRequestRail() {
             projectId,
             options.map((o) => {
               const name = o.machine?.trim() || o.ref;
-              const found = art.get(name);
               return {
                 itemId: o.itemId,
                 option: o,
                 name,
                 qty: o.quantity,
-                imageUrl: found?.url ?? null,
-                imageIsPhoto: found?.isPhoto ?? false,
+                /* The catalogue's own drawing for this machine. `null` when the tree has none, and
+                   the row draws its glyph — never a photograph, because this tree carries icons. */
+                imageUrl: iconForName(named, name),
               };
             }),
           );
@@ -156,7 +161,7 @@ export function useRequestRail() {
         });
       }
     },
-    [tpls, loading, art],
+    [tpls, loading, named],
   );
 
   /* The chosen project's machines are what the FLOOR draws, so they are wanted whether or not its
@@ -497,10 +502,13 @@ function RailRowButton({ row, on, busy, onPress }: { row: RailRow; on: boolean; 
       }`}
     >
       {/* ⚠️ The COUNT leads, then the picture, then the name (owner, 2026-09-16: *"add equipment
-          image or icon with the unit before the name like this 2 [ICON] EXCAVATOR 20 TON"*). Drawn
-          only above one: «1» on every row of a list where one is the ordinary case is noise. */}
-      {row.qty > 1 && <span className="flex-none text-label font-semibold tabular-nums text-navy">{row.qty}</span>}
-      <MachineArt url={row.imageUrl} isPhoto={row.imageIsPhoto} />
+          image or icon with the unit before the name like this 2 [ICON] EXCAVATOR 20 TON"*, then
+          *"put the unit 2 x icon . equipment name"*). Drawn only above one: «1 ×» on every row of a
+          list where one is the ordinary case is noise with a multiplication sign in front of it. */}
+      {row.qty > 1 && (
+        <span className="flex-none text-label font-semibold tabular-nums text-navy">{row.qty} ×</span>
+      )}
+      <MachineArt url={row.imageUrl} />
       <span className={`min-w-0 flex-1 truncate text-label ${on ? "font-semibold text-brand-deep" : "text-muted"}`}>
         {row.name}
       </span>
@@ -523,44 +531,68 @@ export function ProjectFloorChips({ rail }: { rail: RequestRail }) {
   const project = rail.chosen;
   if (!project) return null;
   const rows = rail.rowsOf(project.id);
+  const one = rows.find((r) => r.itemId === rail.picked) ?? null;
 
+  const clear = (
+    <button
+      type="button"
+      onClick={rail.clear}
+      aria-label={t.common.close}
+      className="grid h-4 w-4 flex-none place-items-center rounded-full text-muted transition hover:bg-surface hover:text-navy"
+    >
+      <Icon name="close" size={11} />
+    </button>
+  );
+
+  /* ── A machine is chosen: ONE pill, and nothing else on the row ────────────────────────────────
+     Owner, 2026-09-17: *"clicking on a request in the project will show one single pill show the
+     project-request equipment"*. The chips are how he CHOOSES; the pill is what he has chosen, and
+     leaving the rest of them beside it would make the row say the question and the answer at once.
+     The way back to the others is the rail, or the ✕. */
+  if (one) {
+    return (
+      <div {...pin("intake-pick-pill")} className="flex min-w-0 flex-1 items-center gap-2.5">
+        <span className="flex min-w-0 items-center gap-1.5 rounded-full border border-brand bg-brand-soft py-1 pe-1.5 ps-3 text-label font-semibold text-navy">
+          <Icon name="place" size={13} className="flex-none text-brand" />
+          <span className="min-w-0 truncate">
+            {projectTitle(project)}
+            <span className="px-1 font-normal text-muted-light">·</span>
+            {one.qty > 1 ? `${one.qty} × ` : ""}
+            {one.name}
+          </span>
+          {clear}
+        </span>
+      </div>
+    );
+  }
+
+  /* ── Only a project so far: its chip, then the machines filed under it ─────────────────────────
+     Owner, 2026-09-16: *"the row of project chips on the floor - but i want it on a project
+     selection to appear"*. The skins are `ProjectChips`s own, so the row reads as the object he has
+     been pressing for a fortnight. */
   return (
     <div {...pin("intake-pick-pill")} className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
       <span className="flex min-w-0 flex-none items-center gap-1.5 whitespace-nowrap rounded-full border border-brand bg-brand-soft py-1 pe-1.5 ps-3 text-label font-semibold text-navy">
         <Icon name="place" size={13} className="flex-none text-brand" />
         <span className="min-w-0 truncate">{projectTitle(project)}</span>
-        <button
-          type="button"
-          onClick={rail.clear}
-          aria-label={t.common.close}
-          className="grid h-4 w-4 flex-none place-items-center rounded-full text-muted transition hover:bg-surface hover:text-navy"
-        >
-          <Icon name="close" size={11} />
-        </button>
+        {clear}
       </span>
 
-      {rows.map((row) => {
-        const on = rail.picked === row.itemId;
-        return (
-          <button
-            key={row.itemId}
-            type="button"
-            disabled={rail.busy}
-            onClick={() => void rail.pressRow(project.id, row)}
-            /* Outlined until it is the one answering the request, then filled — the same pair the
-               site chips used, so «chosen» reads the same on this row as it did on the old one. */
-            className={`flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-label font-semibold transition disabled:cursor-not-allowed ${
-              on
-                ? "border-brand bg-brand-soft text-navy"
-                : "border-brand/45 bg-surface text-brand-deep hover:border-brand hover:bg-brand-soft"
-            }`}
-          >
-            {row.qty > 1 && <span className="tabular-nums">{row.qty}</span>}
-            <MachineArt url={row.imageUrl} isPhoto={row.imageIsPhoto} />
-            <span className="max-w-[160px] truncate">{row.name}</span>
-          </button>
-        );
-      })}
+      {rows.map((row) => (
+        <button
+          key={row.itemId}
+          type="button"
+          disabled={rail.busy}
+          onClick={() => void rail.pressRow(project.id, row)}
+          /* Outlined, never filled: the filled skin is what the CHOSEN thing wears, and once one of
+             these is chosen this row is replaced by its pill anyway. */
+          className="flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full border border-brand/45 bg-surface px-3 py-1 text-label font-semibold text-brand-deep transition hover:border-brand hover:bg-brand-soft disabled:cursor-not-allowed"
+        >
+          {row.qty > 1 && <span className="tabular-nums">{row.qty} ×</span>}
+          <MachineArt url={row.imageUrl} />
+          <span className="max-w-[160px] truncate">{row.name}</span>
+        </button>
+      ))}
     </div>
   );
 }
@@ -568,28 +600,29 @@ export function ProjectFloorChips({ rail }: { rail: RequestRail }) {
 /**
  * The machine's picture, at 18px.
  *
- * ⚠️ **The FIT is the request rail's ruling, copied deliberately** — same asset, same shape of hole.
- * A photograph reaches its own edges and takes `object-cover`; a taxonomy DRAWING carries its own
- * transparent margin, so cropping one enlarges the margin rather than the machine. Scaling past the
- * box is safe only because the tile is `overflow-hidden`.
+ * ⚠️ **One kind of asset, so one fit.** This is the app taxonomy's flat DRAWING, which carries its
+ * own transparent margin — so it is `object-contain` scaled to the tile, never `object-cover`:
+ * cropping a drawing enlarges the margin rather than the machine. 1.34 is the request rail's own
+ * number, and it is arithmetic: `contain` draws a 1.34:1 picture 18 × 13.4 in an 18px box.
+ * ~~`isPhoto`.~~ It came from `my-requests`, which this no longer reads.
  *
  * ⚠️ `onError` is load-bearing, not defensive: the taxonomy's objects are not public-read on
  * staging, so a well-formed URL answers 403 and an `<img>` absorbs that as «no artwork» — drawing a
  * broken-image glyph, which is worse than the icon it replaces.
  */
-function MachineArt({ url, isPhoto }: { url: string | null; isPhoto: boolean }) {
+function MachineArt({ url }: { url: string | null }) {
   const [failed, setFailed] = useState(false);
   if (!url || failed) {
     return <Icon name="precision_manufacturing" size={14} className="flex-none text-muted-light" />;
   }
   return (
-    <span className="grid h-[18px] w-[18px] flex-none place-items-center overflow-hidden rounded-sm bg-surface2">
+    <span className="grid h-[18px] w-[18px] flex-none place-items-center overflow-hidden rounded-sm">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={url}
         alt=""
         onError={() => setFailed(true)}
-        className={`h-full w-full ${isPhoto ? "object-cover" : "scale-[1.34] object-contain"}`}
+        className="h-full w-full scale-[1.34] object-contain"
       />
     </span>
   );

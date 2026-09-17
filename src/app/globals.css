@@ -902,7 +902,7 @@ body {
 
    Both prefixes are stated: WebKit still wants `-webkit-mask` on the older Safari this product is
    opened on. */
-.nd-decor::after,
+[data-season="nd"] .nd-decor::after,
 [data-season="nd"] .nd-seam::after {
   content: "";
   position: absolute;
@@ -948,6 +948,177 @@ body {
    40rem is `sm`, read off the compiled sheet rather than assumed. */
 @media (width >= 40rem) {
   [data-season="nd"] .nd-chip { display: inline-flex; }
+}
+
+/* ── The pale chip, for a LIGHT surface ───────────────────────────────────────────
+   The kit ships the chip in two weights and says which is for which: pale on a light surface, solid
+   on a dark one. The bar takes the outlined gold; a card's own head strip takes this. The ordinal
+   keeps the flag's green against the mint, which is the kit's own pairing. */
+[data-season="nd"] .nd-chip.is-pale {
+  border-color: transparent;
+  background: var(--nd-mint);
+  color: var(--nd-ink);
+}
+[data-season="nd"] .nd-chip.is-pale b { color: var(--nd-green); }
+
+/* ── The tree line, for the dashboard band ────────────────────────────────────────
+   Eight palms of varying height, which is the piece the kit says needs room — "for a splash or a
+   role gate, not a 66 dp bar". The band is 160px and full-window, which is that room; the header
+   keeps the four cut-off trees, which is what the kit says a bar should have.
+
+   ⚠️ **`-z-10`, and it must come AFTER the band's own layers in source.** The photograph, the two
+   gradients and the multiply are all at exactly that depth, so a decoration declared before them
+   paints underneath and is invisible. That is the CTA halo's fault of 2026-09-16, and the reason
+   this span sits last among the band's `-z-10` children rather than first. */
+[data-season="nd"] .nd-band {
+  background-image:
+    url("/nd96-treeline.svg"),
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.08) 1px, transparent 1.6px);
+  background-repeat: no-repeat, repeat;
+  background-position: center bottom, 0 0;
+  background-size: cover, 22px 22px;
+}
+
+/* ── The ordinal mark ─────────────────────────────────────────────────────────
+   96 OUTLINED rather than filled, over a pale gold hairline, with the season's name under it. The
+   kit's reasoning, kept: "outlined because solid white makes it a heading — it is a mark, and it
+   should sit behind the content, not above it."
+
+   It stands on the band's TRAILING edge, which mirrors with the reading direction on its own
+   because the band is a flex row — the headline starts where the reader starts, and the mark sits
+   at the far end of the line in both scripts, with no rule of its own.
+
+   ⚠️ Withheld below `lg`. The band is 160px at every width and the copy takes the whole of it on a
+   laptop; a mark squeezed in beside a wrapped headline is not a mark, it is a collision. */
+.nd-mark { display: none; }
+@media (width >= 64rem) {
+  [data-season="nd"] .nd-mark {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    flex: none;
+    user-select: none;
+  }
+}
+[data-season="nd"] .nd-mark-fig {
+  font-size: 58px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.28);
+}
+/* `-webkit-text-stroke` is the only way to outline text, and it is unprefixed nowhere — so the
+   filled-at-28% rule above is the fallback a browser without it keeps, rather than a value this
+   block would otherwise have to guess at. Same shape as the kit's own `@supports`. */
+@supports (-webkit-text-stroke: 1px #fff) {
+  [data-season="nd"] .nd-mark-fig {
+    color: transparent;
+    -webkit-text-stroke: 2px rgba(255, 255, 255, 0.72);
+  }
+}
+[data-season="nd"] .nd-mark-rule {
+  width: 92px;
+  height: 1px;
+  background: var(--nd-accent);
+  opacity: 0.75;
+}
+[data-season="nd"] .nd-mark-sub {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.66);
+  white-space: nowrap;
+}
+
+/* ── The dune sweep ──────────────────────────────────────────────────────────
+   The band's bottom edge becomes a shallow curve cut in the page's own colour. The kit: "it changes
+   the silhouette of whatever sits below it, which is why it reads as a bigger change than its
+   colour alone would suggest."
+
+   🔴 **This REPLACES the seam on the band.** Both are treatments of one edge and drawing them
+   together gives that edge two finishes an inch apart. The seam stays on the header, where it is
+   what the app's own screenshot shows, and on the guest wall's head strip; the band takes the cut.
+
+   The CUT is a mask and the PAINT is `--background`, so the curve is the page showing through
+   rather than a beige shape drawn over the band — change the page's colour and this follows it.
+   `mask-size: 100% 100%` stretches the wave to the window, which is safe here and would not be for
+   a machine: a shallow curve has no proportion to lose. */
+[data-season="nd"] .nd-dune { position: relative; }
+[data-season="nd"] .nd-dune::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 40px;
+  background: var(--background);
+  pointer-events: none;
+  -webkit-mask: url("/nd96-dune.svg") no-repeat 0 0 / 100% 100%;
+  mask: url("/nd96-dune.svg") no-repeat 0 0 / 100% 100%;
+}
+
+/* ── The corner palm ────────────────────────────────────────────────────────
+   "The cheapest way to mark a single card as seasonal without touching its layout or its colours."
+   One oversized palm bleeding out of the trailing-bottom corner at 7% of the flag's green — a mask,
+   so the same file marks a white card in green and would mark a navy one in white.
+
+   `inset-inline-end` rather than `right`, so it leaves from the corner the reader finishes at in
+   both scripts. The host must clip it; a card that does not would let the fronds run over the page. */
+.nd-palm-corner { display: none; }
+[data-season="nd"] .nd-palm-corner {
+  display: block;
+  position: absolute;
+  /* NEGATIVE, so the tree is CUT by the card's edge rather than standing politely inside it
+     - the kit's word is «bleeding», and a palm with air on both sides of it is a sticker.
+     Logical properties, so it leaves from the corner the reader finishes at in both scripts. */
+  inset-block-end: -14px;
+  inset-inline-end: -34px;
+  /* 🔴 **142x124, and the first cut was 220x190 — measured, not guessed.** A palm taller
+     than its host shows the middle of its own trunk and none of its crown, so a card body of
+     about 100px got a pale vertical smudge rather than a tree. Seen in a browser; from the
+     source it reads as «oversized», which is what the kit asks for and what the kit's own
+     150px canvas could afford. The crown is the recognisable half, so the box is sized to put
+     the crown in the corner.
+     ⚠️ A HOST TALLER than this can take it back up; anything shorter has to come down again.
+     The rule is that the palm fits inside the box it bleeds out of. */
+  width: 142px;
+  height: 124px;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--nd-green) 10%, transparent);
+  -webkit-mask: url("/nd96-corner-palm.svg") no-repeat center / contain;
+  mask: url("/nd96-corner-palm.svg") no-repeat center / contain;
+}
+
+/* ── The Najdi BAND, the interlocking rank ───────────────────────────────────────
+   The kit's louder seam: a second rank inverted into the gaps, "so it reads as a woven band rather
+   than a row of spikes". One mask, two triangles per 24px tile — the gold one pointing up from the
+   bottom, the dark one down from the top, which is what makes it interlock.
+
+   It is used where the strip is SHORT and has to carry the whole season on its own; the long edges
+   (the bar, and the band before it took the dune) keep the quiet single rank. */
+[data-season="nd"] .nd-crown::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 7px;
+  background: var(--nd-accent);
+  pointer-events: none;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 7'%3E%3Cpath d='M0 7h12L6 0zM12 7h12L18 0z' fill='%23000'/%3E%3C/svg%3E") repeat-x 0 0 / 24px 7px;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 7'%3E%3Cpath d='M0 7h12L6 0zM12 7h12L18 0z' fill='%23000'/%3E%3C/svg%3E") repeat-x 0 0 / 24px 7px;
+}
+
+/* ── A card's head strip, in season ──────────────────────────────────────────────
+   The strip keeps its height and its type; what changes is the ground under it — the kit's gradient,
+   the dot lattice, and the woven band along its foot. `!important` is not needed and not used: the
+   strip's own `bg-surface2` is a background-COLOUR and these are background-IMAGES, so the two
+   layer rather than compete, and the colour is what remains the moment the season ends. */
+[data-season="nd"] .nd-crown {
+  position: relative;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.1) 1px, transparent 1.6px),
+    linear-gradient(to bottom left, var(--nd-deep) 0%, var(--nd-ground) 46%, var(--nd-mid) 100%);
+  background-repeat: repeat, no-repeat;
+  background-size: 20px 20px, cover;
 }
 
 /* ── Reduced motion ──────────────────────────────────────────────────────────────────────────────

@@ -214,9 +214,20 @@ export function Intake() {
        ⚠️ **780, where this column was 880.** Narrowing is half of «smaller»: a shorter box at the
        full width reads as squashed rather than smaller. It is the one measurement here taken on
        looks alone, so it is the first thing to put back if the two should match again. */
-    <div className="flex w-full items-stretch">
+    /* ── The rail is a BAND of the screen, not a card on it ────────────────────────────────────
+       Owner, 2026-09-17: *"it must be the same as side panel in the prototype as side panel on the
+       edge of the screen and feels like read panel not a card"*.
+
+       ⚠️ The shell caps its main at `PAGE_MAX` and gutters it, which is right for a page and wrong
+       for a panel: inside that column the rail floated with page ground either side of it. This row
+       breaks out to the window with `mx-[calc(50%-50vw)] w-screen`, which is symmetric and so needs
+       no mirror rule, and pulls up through the main pad so the panel starts at the top of the page.
+       The same argument the requests rail settled on 2026-09-12: a band takes ONE edge, not four. */
+    <div className="relative mx-[calc(50%-50vw)] -mt-6 flex min-h-[calc(100dvh-8rem)] w-screen items-stretch sm:-mt-7">
       <RequestsRail rail={rail} />
-      <div {...pin("create-intake")} className="mx-auto w-full min-w-0 max-w-[780px] px-1">
+      {/* ⚠️ The gutter the shell was giving this content comes back HERE, on the column, so the box
+          keeps its margin while the panel keeps the edge. */}
+      <div {...pin("create-intake")} className="mx-auto flex w-full min-w-0 max-w-[780px] flex-col justify-center px-4 py-6 sm:px-7">
       {/* ── He asks the question (owner, 2026-09-13: *"use mansour icon more in the chat intake
           somewhere, i want it to be attractive"*, then *"put mansour before the question"*) ────────
           The screen was a heading, a line and a big empty box - correct and characterless. He is
@@ -228,7 +239,7 @@ export function Intake() {
           a page; on the line itself he is the speaker. `inline-flex` with the h1 so the pair stays
           centred as one object at every width, and `flex-none` so he never squeezes when the
           question wraps on a phone. */}
-      <h1 className="flex flex-wrap items-center justify-center gap-3 text-center text-display font-extrabold leading-tight tracking-[-.02em] text-navy">
+      <h1 className="mb-7 flex flex-wrap items-center justify-center gap-3 text-center text-display font-extrabold leading-tight tracking-[-.02em] text-navy">
         <Mansour size={44} state="waiting" className="flex-none" />
         {t.intake.heading}
       </h1>
@@ -255,7 +266,19 @@ export function Intake() {
         /* `field-card` is what globals.css hangs the inset focus ring on — see the rule there. The
            card takes the brand border, every control inside it draws its own ring against its own
            edge, and neither can be clipped into a bar across the card. */
-        className={`field-card flex flex-col overflow-hidden rounded-lg border bg-surface transition focus-within:border-brand ${
+        /* `nd-seam` and `relative` — the season's one mark on the first screen a renter meets
+           (owner, 2026-09-16). Inert until `<html data-season="nd">` is written; then the gold
+           Najdi rank finishes the card's bottom edge, which is the kit's own "reads as a finished
+           edge rather than as a pattern".
+
+           ⚠️ `relative` is unconditional and safe: the two absolutely-positioned things in this
+           card (the mirror, and Mansour's perch) both sit inside the inner `relative` wrapper and
+           already measure against that. Adding it seasonally instead would move their anchor for a
+           fortnight, which is the worse of the two.
+
+           ⚠️ A seam and not the corner palm: this card's bottom-trailing corner is where the two
+           round controls are, and a palm behind them is a tint over the one row that is pressed. */
+        className={`nd-seam field-card relative flex flex-col overflow-hidden rounded-lg border bg-surface transition focus-within:border-brand ${
           dragging ? "border-brand ring-2 ring-brand/25" : "border-border"
         }`}
       >

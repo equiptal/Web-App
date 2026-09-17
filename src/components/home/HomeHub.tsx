@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/session";
 import { useT } from "@/lib/i18n";
-import { Icon } from "@/components/ui";
 import { cx } from "@/lib/ds";
 import { GuestDashboardPreview, GuestWall } from "@/components/common/GuestWall";
 import { previousPath } from "@/lib/nav-trail";
@@ -18,7 +17,6 @@ import { pin } from "@/lib/uiPins";
 /** The three things the dashboard holds, one at a time (owner, 2026-09-16). */
 type View = "requests" | "suppliers" | "projects";
 const VIEWS: View[] = ["requests", "suppliers", "projects"];
-const VIEW_ICON = { requests: "assignment", suppliers: "groups", projects: "place" } as const;
 
 /**
  * The tab row.
@@ -27,9 +25,20 @@ const VIEW_ICON = { requests: "assignment", suppliers: "groups", projects: "plac
  * suppliers and sites on a deployed backend, so this row could not otherwise be looked at while it
  * was being built. It takes the whole of its state as props for that reason, and holds none.
  *
- * It IS the three section headings: each tab carries the 38px navy plate's glyph, the section's own
- * name and the count the block used to print under it, so the blocks drop their headers
- * (`hideHeading`) rather than saying «My Suppliers · 42» twice a row apart.
+ * ── It is the HEADER's pill, inverted (owner, 2026-09-17) ───────────────────────────────────────
+ * *"the tabs doesnt feel ui consistency with the header tabs i dont know but i dont like them"*.
+ *
+ * ~~A bordered box per tab, each carrying a 30px navy plate with the section's glyph, the name at
+ * `text-body` extrabold, and the count in a filled chip.~~ Three devices this product's own tabs do
+ * not use, and `AppNav`'s note names the fault exactly: *"a row of four icon-plus-label pairs reads
+ * as a toolbar rather than as the top of a site"*. Beside a header of plain words in lozenges it
+ * read as another product's chrome.
+ *
+ * So it is that row's recipe, to the pixel — `rounded-full px-4 py-1.5 text-meta`, no border, no
+ * glyph — with the fill INVERTED because this row sits on the page rather than on the navy bar: the
+ * header draws the place you are on as a WHITE lozenge on navy, and this draws it as a NAVY lozenge
+ * on white. Same padding in both states, so the row does not shift by a pixel when the open tab
+ * changes, which is the rule the header's own pill was written to keep.
  */
 export function DashboardTabs({
   view,
@@ -42,7 +51,7 @@ export function DashboardTabs({
 }) {
   const t = useT();
   return (
-    <div {...pin("home-tabs")} className="flex flex-wrap items-stretch gap-1.5">
+    <div {...pin("home-tabs")} className="flex flex-wrap items-center gap-1">
       {VIEWS.map((k) => {
         const on = view === k;
         const n = counts[k];
@@ -53,31 +62,16 @@ export function DashboardTabs({
             onClick={() => onPick(k)}
             aria-current={on ? "page" : undefined}
             className={cx(
-              "inline-flex items-center gap-2.5 rounded-sm border px-3 py-2 transition-colors",
-              on ? "border-navy bg-navy text-surface" : "border-border bg-surface text-navy hover:border-border-strong",
+              "whitespace-nowrap rounded-full px-4 py-1.5 text-meta transition",
+              on ? "bg-navy font-semibold text-surface" : "font-normal text-navy-mid hover:bg-surface2 hover:text-navy",
             )}
           >
-            <span
-              className={cx(
-                "grid size-[30px] flex-none place-items-center rounded-sm",
-                on ? "bg-surface/15 text-surface" : "bg-navy text-surface",
-              )}
-            >
-              <Icon name={VIEW_ICON[k]} size={18} />
-            </span>
-            <span className="text-body font-extrabold">
-              {k === "requests" ? t.home.yourRequests : k === "suppliers" ? t.suppliers.title : t.projects.surface.heading}
-            </span>
-            {/* A dash while the block has not answered yet: «0 suppliers» on a list still loading is
-                a wrong statement, not a pending one. */}
-            <span
-              className={cx(
-                "rounded-full px-2 py-0.5 text-meta font-semibold tabular-nums",
-                on ? "bg-surface/20 text-surface" : "bg-surface3 text-muted",
-              )}
-            >
-              {n ?? "–"}
-            </span>
+            {k === "requests" ? t.home.yourRequests : k === "suppliers" ? t.suppliers.title : t.projects.surface.heading}
+            {/* The count rides IN the label's run, not in a chip of its own: the header's tabs carry
+                no badge, and a filled pill inside a pill was half of what made this row read as a
+                toolbar. A dash while the block has not answered yet — «0 suppliers» on a list still
+                loading is a wrong statement, not a pending one. */}
+            <span className={cx("ms-1.5 tabular-nums", on ? "text-surface/70" : "text-muted")}>{n ?? "–"}</span>
           </button>
         );
       })}

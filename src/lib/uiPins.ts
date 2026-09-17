@@ -128,6 +128,10 @@ export const PIN_REGISTRY = {
   "browse-page": { n: "10.5", label: "Browse — banner + supplier directory", file: "src/components/stores/BrowsePage.tsx" },
   "home-hero": { n: "10.1", label: "Home — hero band", file: "src/components/home/CtaBanner.tsx" },
   "home-hero-actions": { n: "10.2", label: "Home — hero action column", file: "src/components/home/CtaBanner.tsx" },
+  /* The season’s mark on the band (owner, 2026-09-16). Drawn all year and displayed only
+     under `<html data-season="nd">`, like every other seasonal element, so a note can quote it
+     in July. */
+  "home-hero-season": { n: "10.3", label: "Dashboard band — season mark", file: "src/components/home/CtaBanner.tsx" },
   "home-requests": { n: "10.4", label: "Home — requests + bids rail", file: "src/components/home/HomeRequests.tsx" },
   "home-bubble": { n: "10.7", label: "Home — notification bubble", file: "src/components/home/HomeNotificationBubble.tsx" },
   "home-tabs": { n: "10.8", label: "Home — requests / suppliers / projects tabs", file: "src/components/home/HomeHub.tsx" },
@@ -270,6 +274,9 @@ export const PIN_REGISTRY = {
   "verification-flow": { n: "77", label: "Verification flow", file: "src/components/onboarding/VerificationFlow.tsx" },
   "auth-gate": { n: "78", label: "Sign-in / register modal", file: "src/components/onboarding/AccountModal.tsx" },
   "guest-wall": { n: "9.5", label: "Guest wall — blurred page + sign-in card", file: "src/components/common/GuestWall.tsx" },
+  /* A SIBLING at 9.6, not a child of 9.5: the registry is two levels deep and 9.5
+     is already the second. */
+  "guest-wall-season": { n: "9.6", label: "Guest wall — season chip", file: "src/components/common/GuestWall.tsx" },
   "sign-in-prompt": { n: "79", label: "Sign-in prompt", file: "src/components/common/SignInPrompt.tsx" },
 
   /* ── 90–99  primitives ────────────────────────────────────────────────────────────────────── */

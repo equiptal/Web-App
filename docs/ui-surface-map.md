@@ -20,7 +20,7 @@ Two things it does not hold, on purpose:
 | --- | --- |
 | `src/components/AppNav.tsx` | 3 Nav tabs — desktop (`app-nav`) · 3.1 Nav tab — one link (`nav-tab`) · 4 Nav tabs — mobile (`app-nav-mobile`) |
 | `src/components/AppShell.tsx` | 1 App frame (`app-shell`) · 2 Header bar (navy) (`app-header`) · 2.1 Header — logo (`header-logo`) · 2.2 Header — centred nav slot (`header-nav-slot`) · 2.3 Header — beta mark (`header-beta`) · 2.4 Header — season backdrop (palms, dots, seam) (`header-season-decor`) · 2.5 Header — season chip (`header-season-chip`) · 5 Account menu + locale toggle (`header-account`) · 5.1 Header — EN/AR toggle (`header-locale`) · 5.2 Header — inbox + bell pair (`header-icons`) · 5.3 Header — avatar (`header-avatar`) · 7 Page body (gutters live here) (`page-main`) · 8 Back arrow (`page-back`) |
-| `src/components/common/GuestWall.tsx` | 9.5 Guest wall — blurred page + sign-in card (`guest-wall`) |
+| `src/components/common/GuestWall.tsx` | 9.5 Guest wall — blurred page + sign-in card (`guest-wall`) · 9.6 Guest wall — season chip (`guest-wall-season`) |
 | `src/components/common/SignInPrompt.tsx` | 79 Sign-in prompt (`sign-in-prompt`) |
 | `src/components/company/CompanyHub.tsx` | 72 Company hub (`company-hub`) |
 | `src/components/company/MyCompanyCard.tsx` | 74 My company card (`my-company-card`) |
@@ -38,7 +38,7 @@ Two things it does not hold, on purpose:
 | `src/components/Dialog.tsx` | 90 Dialog (`dialog`) · 90.1 Dialog — panel (`dialog-panel`) · 90.2 Dialog — header row (`dialog-header`) |
 | `src/components/Dropdown.tsx` | 92 Search select (`search-select`) |
 | `src/components/help/HelpManual.tsx` | 6.1 Help manual modal (`help-manual`) |
-| `src/components/home/CtaBanner.tsx` | 10.1 Home — hero band (`home-hero`) · 10.2 Home — hero action column (`home-hero-actions`) |
+| `src/components/home/CtaBanner.tsx` | 10.1 Home — hero band (`home-hero`) · 10.2 Home — hero action column (`home-hero-actions`) · 10.3 Dashboard band — season mark (`home-hero-season`) |
 | `src/components/home/HomeHub.tsx` | 10 Home (`home-hub`) · 10.8 Home — requests / suppliers / projects tabs (`home-tabs`) |
 | `src/components/home/HomeNotificationBubble.tsx` | 10.7 Home — notification bubble (`home-bubble`) |
 | `src/components/home/HomeRequests.tsx` | 10.4 Home — requests + bids rail (`home-requests`) |

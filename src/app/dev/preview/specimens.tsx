@@ -502,7 +502,7 @@ export const SPECIMENS: Specimen[] = [
   {
     id: "national-day",
     pin: "2.4",
-    label: "National Day skin - the header bar, on and off",
+    label: "National Day skin - bar, band and role gate, on and off",
     render: () => {
       const bar = (
         <>
@@ -523,12 +523,39 @@ export const SPECIMENS: Specimen[] = [
         <div style={{ width: "100%", minWidth: 0 }} className="flex flex-col gap-5">
           <div data-season="nd">
             <div className="nd-bar relative flex h-[52px] items-center gap-3 bg-navy-deep px-4 text-white sm:px-7">{bar}</div>
-            {/* The band under it, so the seam is read against the page it ends on rather than against
-                the preview's own ground. */}
-            <div className="nd-seam relative flex h-[84px] items-center bg-navy px-4 text-white sm:px-7">
+            {/* The dashboard band, carrying the three pieces it takes in season: the eight-palm
+                TREE LINE and the dot lattice on `nd-band`, the ordinal MARK on the trailing edge,
+                and the DUNE SWEEP cutting its bottom edge into the page's own colour. Its navy is
+                unchanged, which is as much the point of the picture as the motifs are. */}
+            <div className="nd-dune nd-band relative flex h-[160px] items-center gap-6 bg-navy px-4 text-white sm:px-7">
               <span className="text-body font-extrabold">
                 {L("The dashboard band keeps its own colours", "شريط الرئيسية يحتفظ بألوانه")}
               </span>
+              <div aria-hidden="true" className="nd-mark ms-auto">
+                <span className="nd-mark-fig">96</span>
+                <span className="nd-mark-rule" />
+                <span className="nd-mark-sub">{L("National Day", "اليوم الوطني")}</span>
+              </div>
+            </div>
+
+            {/* The role gate's card: the head strip takes the gradient, the dot lattice and the
+                INTERLOCKING Najdi band with the kit's PALE chip weight on it; the body takes one
+                oversized corner palm. The card's size, type and words do not move. */}
+            <div className="mt-5 w-[380px] max-w-full overflow-hidden rounded-lg border border-border bg-surface">
+              <p className="nd-crown flex items-center gap-2 border-b border-border bg-surface2 px-4 py-2.5 text-meta font-semibold text-muted-dark [[data-season='nd']_&]:text-white">
+                {L("Join Moedatech", "انضم إلى معداتك")}
+                <span className="nd-chip is-pale ms-auto flex-none rounded-full px-1.5 py-px text-label font-extrabold tracking-wide">
+                  <b className="font-extrabold">96</b>
+                  {L("National Day", "اليوم الوطني")}
+                </span>
+              </p>
+              <div className="relative p-4">
+                <span aria-hidden="true" className="nd-palm-corner" />
+                <h2 className="text-subhead font-extrabold text-navy">{L("Your requests", "طلباتك")}</h2>
+                <p className="mt-1 text-body leading-relaxed text-muted">
+                  {L("Sign in to read the offers on your requests", "سجّل الدخول لقراءة العروض")}
+                </p>
+              </div>
             </div>
           </div>
           {/* The same markup with the attribute absent — which is every day but the fortnight. */}

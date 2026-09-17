@@ -92,6 +92,11 @@ describe("the chip strip left the floor", () => {
     const railSrc = readFileSync(resolve(SRC, "components/create/RequestsRail.tsx"), "utf8");
     expect(railSrc).toContain('pin("intake-pick-pill")');
     expect(railSrc).toContain("if (!project) return null;");
+    /* Owner, 2026-09-17: *"clicking on a request in the project will show one single pill show
+       the project-request equipment"*. The chips are how he CHOOSES; the pill is what he chose,
+       and leaving the rest beside it would make the row say the question and the answer at once. */
+    expect(railSrc).toContain("const one = rows.find((r) => r.itemId === rail.picked) ?? null;");
+    expect(railSrc).toContain("if (one) {");
     expect(railSrc).toContain("rail.clear");
   });
 

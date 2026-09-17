@@ -12,6 +12,7 @@ import { StartYourRequestModal, type StartRequestChoice } from "@/components/hom
 import { TRIAL_REQUESTS_ENABLED } from "@/lib/flags";
 import { btn, cx, PAGE_MAX, PAGE_X } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { seasonOrdinal } from "@/lib/season";
 
 /** Once per tab, mirroring the app's cold-start trigger. */
 const POPUP_SHOWN_KEY = "mt-start-popup-shown";
@@ -147,16 +148,20 @@ export function CtaBanner() {
          The rounding goes with the gutter: a radius on a band whose corners are off-screen draws a
          notch against the header and nothing else. The COPY keeps the page's reading gutter, so
          the headline still lines up with the blocks below it. */
-      /* `nd-seam` — the one decoration this band takes in season (owner, 2026-09-16). Inert for
-         eleven and a half months: the class matches nothing until `<html data-season="nd">` is
-         written, and then its `::after` draws the gold Najdi seam along the bottom edge, the same
-         6px-at-12px rank the header carries, so the page opens and closes its navy with one mark.
+      /* `nd-dune` — the band's seasonal edge (owner, 2026-09-16), inert for eleven and a half
+         months: the class matches nothing until `<html data-season="nd">` is written, and then its
+         `::after` cuts the bottom edge into a shallow curve in the page's own colour.
+
+         🔴 ~~`nd-seam`, the gold rank the header wears.~~ The band asked for the louder piece
+         when the kit was opened properly: an edge can have ONE finish, and a seam plus a cut an
+         inch apart is two. The seam still closes the header and the guest wall's strip; this edge
+         is where the silhouette changes.
 
          🔴 The band is NOT recoloured and the agent is not dressed. Its ground is a photograph of a
          site under two gradients, its one coloured word and its button are `--brand`, and the whole
          argument of this skin is that the orange does not move. A green band here would put the
          celebration on top of the one control the dashboard exists to offer. */
-      className="nd-seam relative isolate -mt-[calc(1.5rem+1px)] flex h-[160px] w-screen items-center overflow-hidden sm:-mt-[calc(1.75rem+1px)]"
+      className="nd-dune relative isolate -mt-[calc(1.5rem+1px)] flex h-[160px] w-screen items-center overflow-hidden sm:-mt-[calc(1.75rem+1px)]"
       /* `calc(50% - 50vw)`, and the 50% is of the CONTAINER — the padded, capped main. That centres a
          100vw child on a container which is itself centred in the viewport, which lands the band on
          the window's edges at every width. Inline because a Tailwind arbitrary value cannot mix the
@@ -217,6 +222,19 @@ export function CtaBanner() {
         }}
       />
       <span aria-hidden="true" className="absolute inset-0 -z-10 bg-navy opacity-[0.35] mix-blend-multiply" />
+
+      {/* ── The season's own layer, and it is LAST here on purpose ───────────────────────
+          The kit's eight-palm TREE LINE plus the dot lattice. The kit says which piece belongs
+          where: eight palms "need room to work — it is for a splash or a role gate, not a 66 dp
+          bar", and this band is 160px and full-window. The header keeps the four cut-off trees.
+
+          🔴 **It must come after the photograph, the two gradients and the multiply**, because all
+          four are at exactly `-z-10` and among equals the last one wins. Declared above them it is
+          perfectly present in the DOM and invisible on screen — which is the halo bug this same
+          file shipped with on 2026-09-16, in the same depth, for the same reason.
+
+          Inert out of season: `.nd-band` matches no rule until the attribute is written. */}
+      <span aria-hidden="true" className="nd-band absolute inset-0 -z-10" />
 
       <div className={cx("relative mx-auto flex w-full items-center gap-6", PAGE_MAX, PAGE_X)}>
         <div className="flex min-w-0 flex-1 items-center gap-4 sm:gap-5">
@@ -293,23 +311,20 @@ export function CtaBanner() {
               anyway, because the box and he are the same 104px. Measured in the browser; from the
               source it looks like a box with a glow in it. */}
           <div aria-hidden="true" className="relative h-[104px] w-[104px] flex-none leading-none max-sm:hidden">
-            {/* 🔴 **No `-z-10` here, and that was a real bug**: the band draws its two gradients
-                and its multiply at `-z-10`, so a halo at the same depth painted UNDER them and was
-                invisible on screen while being perfectly present in the DOM. Nothing needs a z-index
-                at all - the halo is `absolute` and he comes after it in source order, so he paints
-                on top on his own. */}
-            <span
-              aria-hidden="true"
-              /* 🔴 `-inset-6` generated NO rule at all - measured, `top/right/bottom/left` came
-                 back as the static position and the span was 0x0 for a second time. `inset-0` with
-                 a scale is two utilities this build certainly emits, and a circle scaled about its
-                 own centre needs no translate and mirrors for free. */
-              className="pointer-events-none absolute inset-0 scale-[1.6] rounded-full"
-              style={{
-                background:
-                  "radial-gradient(circle, color-mix(in srgb, var(--brand) 30%, transparent) 0%, transparent 70%)",
-              }}
-            />
+            {/* 🔴 ~~An orange radial HALO behind him~~ - deleted (owner, 2026-09-17, on a screenshot
+                of the band: *"why mansout is not clear? not hd also never use shadow in design remove
+                it around him"*).
+
+                It was argued as figure-and-ground: he is grey by the kit’s own rule and the band is
+                navy, so something had to separate them. What it actually did was bleed 30% orange
+                across his outline, which is most of why he read as soft rather than sharp - the
+                thing meant to lift him off the ink was sitting ON him. The separation is the band’s
+                job instead: he stands on the darkest end of the gradient (94% navy), which is where
+                the headline already relies on the same contrast.
+
+                ⚠️ **And it is a standing rule now**: *"never use shadow in design"*. No glow, no
+                drop-shadow, no ring behind a figure. This design system spends none anywhere else -
+                `IntercomWidget` clears the whole `--shadow-*` namespace and says why. */}
             <Mansour size={104} pose="viewer" />
           </div>
 
@@ -331,6 +346,24 @@ export function CtaBanner() {
           <button onClick={onCreateRequest} className={btn("primary", "lg", { className: "transition" })}>
             <Icon name="add" size={16} /> {t.home.createRequest}
           </button>
+        </div>
+
+        {/* ── The ordinal mark (owner, 2026-09-16) ─────────────────────────────────
+            96 OUTLINED over a gold hairline, with the season's name under it. The kit's own reason
+            for the outline is kept: solid white would make it a heading, and it is a mark — it
+            belongs behind the content, not above it.
+
+            LAST in the row, so it sits on the edge the reader finishes at and mirrors in Arabic
+            with the row itself. `aria-hidden`: it is a decoration, and the ordinal is not a fact a
+            renter needs read out on every page of the dashboard.
+
+            ⚠️ Drawn only from `lg` up, by the stylesheet and not by a utility here — the seasonal
+            block is unlayered and would beat any `max-lg:hidden` at every width, which is the trap
+            the season chip on the header bar was caught by. One place decides it. */}
+        <div aria-hidden="true" {...pin("home-hero-season")} className="nd-mark">
+          <span className="nd-mark-fig">{seasonOrdinal()}</span>
+          <span className="nd-mark-rule" />
+          <span className="nd-mark-sub">{t.season.nationalDay}</span>
         </div>
       </div>
     </div>

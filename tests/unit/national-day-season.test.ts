@@ -128,24 +128,33 @@ describe("the skin adds; it moves nothing", () => {
        cut used `/^([^@\s][^{]*)\{/gm` and matched `}` at the start of a line, so it reported the
        whole gap between two rules as a selector — a case that fails on the file's own punctuation
        rather than on anything the file says. */
-    const selectors = skin
+    const blocks = skin
       .split("}")
       .filter((b) => b.includes("{"))
-      .flatMap((b) => b.split("{")[0].split(","))
-      .map((s) => s.replace(/\s+/g, " ").trim())
-      .filter(Boolean);
-    expect(selectors.length).toBeGreaterThan(0);
-    for (const s of selectors) {
+      .map((b) => ({
+        selectors: b.split("{")[0].split(",").map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean),
+        body: b.split("{").slice(1).join("{").replace(/\s+/g, " ").trim(),
+      }));
+    expect(blocks.length).toBeGreaterThan(0);
+    for (const { selectors, body } of blocks) {
+      /* An INERT default is a rule whose only declaration is `display: none` - it paints nothing,
+         so it is safe to declare unscoped, and it is what keeps a host silent for the eleven and a
+         half months the attribute is absent. Asked as a question about the BODY rather than
+         against a list of class names: the list needed editing every time a motif was added, and a
+         list that has to be edited is a list that will one day be edited wrongly. */
+      if (body === "display: none;") continue;
+      for (const s of selectors) {
       /* `.nd-decor` and `.nd-chip` are the two INERT defaults — `display: none`, and the `::after`
          that hangs off the first of them. They paint nothing until the attribute switches their
          display on, which is what makes them safe to declare unscoped. Everything else must name
          the season, or it is painting all year. */
       /* `@media (width >= 40rem)` is an at-rule PRELUDE, not a selector - the split above cannot
          tell the two apart, and the rule inside it is scoped like every other. */
-      if (s.startsWith("@")) continue;
-      const inert = s.startsWith(".nd-decor") || s === ".nd-chip";
-      if (inert) continue;
-      expect(s, `${s} paints outside the season`).toContain('[data-season="nd"]');
+        /* `@media (width >= 40rem)` is an at-rule PRELUDE, not a selector - the split above cannot
+           tell the two apart, and the rule inside it is scoped like every other. */
+        if (s.startsWith("@")) continue;
+        expect(s, `${s} paints outside the season`).toContain('[data-season="nd"]');
+      }
     }
   });
 
@@ -165,8 +174,14 @@ describe("the skin adds; it moves nothing", () => {
   });
 
   it("names its colours as tokens, never as a hex", () => {
-    // The mask carries `%23000` because a mask reads alpha, not hue — it is a shape, not a paint.
-    const paint = skin.replace(/url\("data:image\/svg\+xml,[^"]*"\)/g, "");
+    /* Two things are dropped before the sweep, and neither is paint:
+         - a `data:` mask, because a mask reads ALPHA and never hue - `%23000` is a shape;
+         - an `@supports` prelude, because `(-webkit-text-stroke: 1px #fff)` is a question about
+           whether the browser parses the property at all. The value is the probe, and the colour
+           that actually renders is the rule inside the block. */
+    const paint = skin
+      .replace(/url\("data:image\/svg\+xml,[^"]*"\)/g, "")
+      .replace(/@supports\s*\([^)]*\)/g, "");
     expect(paint.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).toEqual([]);
   });
 });
@@ -223,5 +238,97 @@ describe("the attribute is written on the server, and only there", () => {
    *  `data-season=""` on every page for eleven and a half months. */
   it("leaves the attribute off out of season", () => {
     expect(layout).toContain("seasonAt() ?? undefined");
+  });
+});
+
+/**
+ * **The kit's pieces, and where each one went** (owner, 2026-09-16: *"use more elements and
+ * decorations from the prototype i gave u"*).
+ *
+ * The kit ships eleven motifs and names the surface each is for. These cases pin that mapping,
+ * because the mapping is the decision - the same palm grove on a 52px bar and on a 160px band is
+ * two different judgements, and the kit is explicit that the eight-palm line "needs room to work".
+ */
+describe("the kit's motifs land on the surfaces the kit names", () => {
+  /* Comments stripped, for the reason the block above records: this stylesheet explains which
+     motif goes where, so a sweep over the raw text counts the explanation as well as the rule. */
+  const css = read("src/app/globals.css").replace(/\/\*[\s\S]*?\*\//g, "");
+  const cta = read("src/components/home/CtaBanner.tsx");
+  const wall = read("src/components/common/GuestWall.tsx");
+  const intake = read("src/components/screens/Intake.tsx");
+
+  it("gives the 160px band the eight-palm TREE LINE and the 52px bar the four-palm grove", () => {
+    expect(css).toContain('url("/nd96-treeline.svg")');
+    expect(css).toContain('url("/nd96-palms.svg")');
+    // Each file is named exactly once, so the two cannot quietly swap surfaces.
+    expect(css.match(/nd96-treeline\.svg/g)).toHaveLength(1);
+    expect(css.match(/nd96-palms\.svg/g)).toHaveLength(1);
+  });
+
+  /**
+   * 🔴 The band's seasonal layer must come AFTER the photograph, the two gradients and the
+   * multiply. All four sit at exactly `-z-10`, and among equals the last one painted wins - so
+   * declared above them the tree line is perfectly present in the DOM and invisible on screen.
+   * That is the halo bug this same file shipped with on 2026-09-16, at the same depth.
+   */
+  it("draws the band's season layer after every other -z-10 layer", () => {
+    const multiply = cta.indexOf("mix-blend-multiply");
+    const band = cta.indexOf('className="nd-band');
+    expect(multiply).toBeGreaterThan(-1);
+    expect(band).toBeGreaterThan(multiply);
+  });
+
+  /**
+   * 🔴 An edge gets ONE finish. The band took the dune sweep when the kit was read properly, and
+   * the seam it used to carry went with it - a cut and a rank of triangles an inch apart is two
+   * treatments of one line.
+   */
+  it("gives the band the dune sweep instead of the seam", () => {
+    expect(cta).toContain('className="nd-dune relative isolate');
+    expect(cta).not.toMatch(/className="nd-seam/);
+  });
+
+  it("puts the ordinal mark last in the band's row, so it mirrors with the row", () => {
+    expect(cta.indexOf('pin("home-hero-season")')).toBeGreaterThan(cta.indexOf('pin("home-hero-actions")'));
+    expect(cta).toContain("{seasonOrdinal()}");
+  });
+
+  it("gives the role gate the INTERLOCKING band and the pale chip", () => {
+    expect(wall).toContain("nd-crown");
+    expect(wall).toContain("nd-chip is-pale");
+    expect(wall).toContain("nd-palm-corner");
+    // The woven rank is two triangles per tile; the quiet seam is one.
+    expect(css).toContain("M0 7h12L6 0zM12 7h12L18 0z");
+  });
+
+  /**
+   * ⚠️ The strip's ink is an arbitrary VARIANT on the element, never `color` in the seasonal block.
+   * A colour set there would be unlayered and would beat `text-muted-dark` all year - the same trap
+   * that caught the header chip's `max-sm:hidden`, read the other way round.
+   */
+  it("recolours the strip's ink with a variant, not with an unlayered rule", () => {
+    expect(wall).toContain("[[data-season='nd']_&]:text-white");
+    const crown = css.slice(css.indexOf('[data-season="nd"] .nd-crown {'));
+    expect(crown.slice(0, crown.indexOf("}"))).not.toMatch(/(^|\s)color:/);
+  });
+
+  it("finishes the intake card's edge and does not put a palm behind its controls", () => {
+    expect(intake).toContain("nd-seam field-card relative");
+    expect(intake).not.toContain("nd-palm-corner");
+  });
+
+  /**
+   * 🔴 Two of the kit's eleven are deliberately NOT carried, and this case is the record so the
+   * next reader meets them as decisions rather than as omissions.
+   *
+   *  · **Confetti** would fire over the dashboard's own «your request is posted» tick, which is the
+   *    one moment in this product that is allowed to celebrate something.
+   *  · **The corner ribbon** marks "one item as part of the campaign". Nothing in this product is
+   *    part of a campaign, so on a request tile or a bid card it would be a claim about the offer.
+   */
+  it("carries neither the confetti nor the corner ribbon", () => {
+    for (const src of [css, cta, wall, intake, read("src/components/AppShell.tsx")]) {
+      expect(src).not.toMatch(/nd-confetti|nd-ribbon/);
+    }
   });
 });

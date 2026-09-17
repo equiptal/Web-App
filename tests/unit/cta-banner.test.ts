@@ -114,19 +114,22 @@ describe("the agent", () => {
     expect(agentBlock()).not.toMatch(/overflow-hidden/);
   });
 
-  it("the halo is the BAND's own orange, and is NOT pushed behind its overlays", () => {
+  it("NOTHING is drawn behind him - no halo, no glow, no shadow", () => {
     /**
-     * He is grey by the kit's rule (*"grey on purpose so he sits on any brand colour"*), which on a
-     * navy band leaves nothing separating him from the ink - so the halo is figure-and-ground, not
-     * decoration, and it is the same orange as the word beside him and the button opposite.
+     * \u{1F534} REVERSES the halo (owner, 2026-09-17, on a screenshot of the band): *"why mansout is not
+     * clear? not hd also never use shadow in design remove it around him"*.
      *
-     * 🔴 It carried `-z-10` at first and was invisible: the band draws its two gradients and its
-     * multiply at that exact depth, so the halo painted UNDER them. Nothing here needs a z-index -
-     * the halo is absolute and he comes after it in source order.
+     * It was argued as figure-and-ground - he is grey by the kit rule, the band is navy, something
+     * had to separate them. What it did was bleed 30% orange across his outline, which is most of
+     * why he read as soft. The separation is the band job: he stands on the darkest end of the
+     * gradient, where the headline already relies on the same contrast.
+     *
+     * \u26a0\ufe0f A standing rule, not one element: no glow, no drop-shadow, no ring behind a figure.
      */
     const block = agentBlock();
-    expect(block).toMatch(/radial-gradient\(circle, color-mix\(in srgb, var\(--brand\) 30%/);
-    expect(block).not.toMatch(/-z-10/);
+    expect(block).not.toMatch(/radial-gradient/);
+    expect(block).not.toMatch(/shadow/);
+    expect(block).not.toMatch(/blur/);
   });
 });
 

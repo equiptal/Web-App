@@ -49,9 +49,11 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | **8** | Back arrow | `src/components/AppShell.tsx` |
 | **9** | Page section | `src/components/PageSection.tsx` |
 | &nbsp;&nbsp;**9.5** | Guest wall — blurred page + sign-in card | `src/components/common/GuestWall.tsx` |
+| &nbsp;&nbsp;**9.6** | Guest wall — season chip | `src/components/common/GuestWall.tsx` |
 | **10** | Home | `src/components/home/HomeHub.tsx` |
 | &nbsp;&nbsp;**10.1** | Home — hero band | `src/components/home/CtaBanner.tsx` |
 | &nbsp;&nbsp;**10.2** | Home — hero action column | `src/components/home/CtaBanner.tsx` |
+| &nbsp;&nbsp;**10.3** | Dashboard band — season mark | `src/components/home/CtaBanner.tsx` |
 | &nbsp;&nbsp;**10.4** | Home — requests + bids rail | `src/components/home/HomeRequests.tsx` |
 | &nbsp;&nbsp;**10.5** | Browse — banner + supplier directory | `src/components/stores/BrowsePage.tsx` |
 | &nbsp;&nbsp;**10.6** | My Suppliers — the list | `src/components/suppliers/SuppliersPage.tsx` |

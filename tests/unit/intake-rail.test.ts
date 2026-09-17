@@ -64,15 +64,36 @@ describe("a row reads: the count, the picture, then the machine", () => {
     expect(rail).toContain("{row.qty > 1 && <span");
   });
 
-  it("Given a PHOTOGRAPH, Then it crops; given a DRAWING, Then it is contained and scaled", () => {
+  it("Given the catalogue drawing, Then it is CONTAINED and scaled, never cropped", () => {
     /**
-     * 🔴 The request rail's own ruling, copied deliberately — same asset, same shape of hole. A
-     * photograph reaches its own edges; a taxonomy drawing carries its own transparent margin, so
-     * cropping one enlarges the margin rather than the machine.
+     * \u{1F534} One kind of asset now, so one fit. The app taxonomy carries the flat DRAWING, which has its
+     * own transparent margin built in \u2014 cropping one enlarges the margin rather than the machine. The
+     * 1.34 is the request rail own arithmetic: `contain` draws a 1.34:1 picture 18 x 13.4 in an 18px
+     * box. ~~`isPhoto`~~ went with `my-requests`, which this no longer reads.
      */
-    expect(rail).toContain('isPhoto ? "object-cover" : "scale-[1.34] object-contain"');
+    expect(rail).toContain("scale-[1.34] object-contain");
+    /* ⚠️ The CLASS attribute, not the file. The note above this element names `object-cover` while
+       saying it must never be used, so a bare `not.toContain` fails on its own explanation - the
+       fourth time this repo has met that. */
+    const img = rail.slice(rail.indexOf("<img"), rail.indexOf("</span>", rail.indexOf("<img")));
+    expect(img).not.toContain("object-cover");
     // Scaling past the box is only safe because the tile clips.
     expect(rail).toContain("overflow-hidden rounded-sm");
+  });
+
+  it("Given a machine, Then its picture comes from the TAXONOMY and not from a past request", () => {
+    /**
+     * Owner, 2026-09-17: *"use the taxonamy image not this fallback icon"*.
+     *
+     * \u{1F534} The first cut matched his own requests by NAME and missed nearly every time, which is why
+     * he was seeing the glyph: `itemName` joins the subtype and the size with a middot while the
+     * chart runs the category in front of both, so the two strings are never equal. The tree is
+     * matched by token containment instead, and it also covers a WORK ORDER, which has no request to
+     * borrow a picture from.
+     */
+    expect(rail).toContain("iconForName(named, name)");
+    expect(rail).toContain("/api/stores/taxonomy");
+    expect(rail).not.toContain("fetchMyRequests");
   });
 
   it("Given a picture that 403s, Then the glyph replaces it rather than a broken image", () => {
@@ -103,7 +124,7 @@ describe("what a press does", () => {
     expect(fn).toContain("actions.useTemplate(");
     expect(fn).toContain("await typeInto(");
     // The one thing looked up is the PICTURE, which is the only thing allowed to be absent.
-    expect(rail).toContain("const found = art.get(name);");
+    expect(rail).toContain("iconForName(named, name)");
   });
 
   it("Given a machine the catalogue never named, Then its REFERENCE lists and is never typed", () => {
@@ -159,8 +180,12 @@ describe("the screen around it", () => {
     // ONE hook for both surfaces, or they would disagree on which machine is chosen.
     expect(intake).toContain("const rail = useRequestRail();");
     expect(intake).toContain("<ProjectFloorChips rail={rail} />");
-    // `items-stretch`: the rail runs the full height beside a column that centres its own contents.
-    expect(intake).toContain('className="flex w-full items-stretch"');
+    /* Owner, 2026-09-17: *"side panel on the edge of the screen and feels like read panel not a
+       card"*. The shell caps and gutters its main, which is right for a page and wrong for a
+       panel, so the row breaks out to the window. Symmetric, so it needs no mirror rule. */
+    expect(intake).toContain("mx-[calc(50%-50vw)]");
+    expect(intake).toContain("w-screen");
+    expect(intake).toContain("items-stretch");
   });
 
   it("Given the question, Then the line under it is gone", () => {
