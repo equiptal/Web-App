@@ -412,10 +412,24 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
             {t.shell.beta}
           </span>
 
-          {/* ── The season chip (owner, 2026-09-16) ──────────────────────────────────────────────
-              The kit's smallest piece: a pill that says the date and nothing else. It sits with the
-              wordmark because that is what it is a note ON — the product, wearing a season — and it
-              takes the same outlined treatment «Beta» beside it takes, in gold rather than white.
+          {/* ── The season MARK (owner, 2026-09-16; re-cut 2026-09-17) ───────────────────────────
+              🔴 ~~The kit's chip: a gold outlined PILL saying «96 National Day».~~ It is the kit's
+              ordinal MARK now — the outlined figure, the gold hairline, the small caption — laid out
+              as a row for a 52px bar (owner: *"remove the 96 from the cta and just make this style
+              instead of the 96 pill on header"*). The mark was on the dashboard band; there is one
+              of it, and it is here.
+
+              Why it reads better as well as being the instruction: «Beta» beside it is an outlined
+              pill, so a second outlined pill a hand's width away read as a pair of controls. The
+              mark has no border and no ground, so it cannot.
+
+              It sits with the wordmark because that is what it is a note ON — the product, wearing
+              a season.
+
+              ⚠️ **`aria-hidden`, which the pill was NOT.** That is a behaviour change and it is
+              deliberate: the pill made a screen reader say «96 National Day» in the first breath of
+              every page in the product, for a fortnight, about something nobody can act on. The
+              band's mark was already hidden for the same reason and this is now consistent with it.
 
               ⚠️ **Latin digits, in both locales.** The Flutter kit draws «٩٦»; this app has said
               «the numbers should be in eng even in arabic» since 2026-09-04 and applies
@@ -433,12 +447,10 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
 
               Rendered all year and drawn by CSS only, so the server and the client agree on the
               markup and nothing flickers. */}
-          <span
-            {...pin("header-season-chip")}
-            className="nd-chip flex-none rounded-full px-1.5 py-px text-label font-extrabold tracking-wide"
-          >
-            <b className="font-extrabold">{seasonOrdinal()}</b>
-            {t.season.nationalDay}
+          <span {...pin("header-season-mark")} className="nd-mark" aria-hidden="true">
+            <span className="nd-mark-fig">{seasonOrdinal()}</span>
+            <span className="nd-mark-rule" />
+            <span className="nd-mark-sub">{t.season.nationalDay}</span>
           </span>
 
           {/* ── The nav sits DEAD CENTRE of the bar, not after the title ────────────────────────────

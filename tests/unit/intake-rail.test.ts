@@ -58,10 +58,45 @@ describe("a row reads: the count, the picture, then the machine", () => {
     expect(name).toBeGreaterThan(art);
   });
 
-  it("Given one unit, Then no count is drawn", () => {
-    // «1 ×» on every row of a list where one is the ordinary case is noise with a multiplication
-    // sign in front of it.
-    expect(rail).toContain("{row.qty > 1 && <span");
+  it("Given ONE unit, Then the count is still drawn", () => {
+    /**
+     * \u{1F534} REVERSES the same day (owner, 2026-09-17: *"for 1 unit still show 1 [icon] then name"*).
+     * ~~Drawn only above one, because a column of «1» is noise.~~ Every row reads the same shape now:
+     * a column of counts that skips some of its rows is harder to scan than one that repeats a 1 -
+     * the eye reads down the number, not down the presence of it.
+     */
+    expect(rail).not.toContain("{row.qty > 1 &&");
+    expect(rail).toContain("{row.qty}");
+  });
+
+  it("Given every project, Then it is OPEN when the rail arrives", () => {
+    /**
+     * Owner, 2026-09-17: *"by default make them opened"*. The set records what is SHUT, which is
+     * what makes «all open» the state a fresh visit lands in without seeding it from a project list
+     * that has not arrived yet.
+     *
+     * \u26a0\ufe0f And the chosen project no longer forces itself open. That override was needed while the
+     * default was shut; with every group open it only overrules the renter - he shuts one, presses
+     * its head, and it springs back.
+     */
+    expect(rail).toContain("isOpen: (id: string) => !shut.has(id)");
+    expect(rail).toContain("const open = rail.isOpen(p.id);");
+  });
+
+  it("Given the panel, Then it runs the page height UNDER the header", () => {
+    /**
+     * Owner, 2026-09-17: *"for height make it along the page excpet the header"*, on a screenshot of
+     * a panel that stopped mid-page with grey under it.
+     *
+     * \u{1F534} ~~Stretching to the row~~ made it as tall as the COLUMN beside it, which is a box of
+     * content - so a short intake gave it a short panel, which is the card he photographed. The bar
+     * is `sticky top-0 h-[52px]`, so 52 is where this starts and `100dvh - 52` is the room under it.
+     *
+     * \u26a0\ufe0f `dvh`, never `vh`: on a phone the address bar eats `vh` and a panel told it is taller
+     * than the screen cannot be scrolled to its own foot.
+     */
+    expect(rail).toContain("lg:sticky lg:top-[52px]");
+    expect(rail).toContain("lg:h-[calc(100dvh-52px)]");
   });
 
   it("Given the catalogue drawing, Then it is CONTAINED and scaled, never cropped", () => {

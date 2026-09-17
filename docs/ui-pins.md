@@ -35,7 +35,7 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**2.2** | Header — centred nav slot | `src/components/AppShell.tsx` |
 | &nbsp;&nbsp;**2.3** | Header — beta mark | `src/components/AppShell.tsx` |
 | &nbsp;&nbsp;**2.4** | Header — season backdrop (palms, dots, seam) | `src/components/AppShell.tsx` |
-| &nbsp;&nbsp;**2.5** | Header — season chip | `src/components/AppShell.tsx` |
+| &nbsp;&nbsp;**2.5** | Header — season mark | `src/components/AppShell.tsx` |
 | **3** | Nav tabs — desktop | `src/components/AppNav.tsx` |
 | &nbsp;&nbsp;**3.1** | Nav tab — one link | `src/components/AppNav.tsx` |
 | **4** | Nav tabs — mobile | `src/components/AppNav.tsx` |
@@ -53,7 +53,6 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | **10** | Home | `src/components/home/HomeHub.tsx` |
 | &nbsp;&nbsp;**10.1** | Home — hero band | `src/components/home/CtaBanner.tsx` |
 | &nbsp;&nbsp;**10.2** | Home — hero action column | `src/components/home/CtaBanner.tsx` |
-| &nbsp;&nbsp;**10.3** | Dashboard band — season mark | `src/components/home/CtaBanner.tsx` |
 | &nbsp;&nbsp;**10.4** | Home — requests + bids rail | `src/components/home/HomeRequests.tsx` |
 | &nbsp;&nbsp;**10.5** | Browse — banner + supplier directory | `src/components/stores/BrowsePage.tsx` |
 | &nbsp;&nbsp;**10.6** | My Suppliers — the list | `src/components/suppliers/SuppliersPage.tsx` |

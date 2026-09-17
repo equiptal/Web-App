@@ -920,35 +920,37 @@ body {
 [data-season="nd"] .nd-seam { position: relative; }
 
 /* ── The season chip ─────────────────────────────────────────────────────────────────────────────
-   Outlined gold on the green bar, which is the treatment «Beta» already takes beside it (outlined
-   white at 25%): a note ON the wordmark, never a control. A SOLID green chip — the kit's other
-   weight — is for a light surface, and on this bar it would be invisible. */
+   🔴 ~~Outlined gold on the green bar, beside «Beta».~~ The bar wears the MARK now (owner,
+   2026-09-17), and this skin is left holding only the weight it is actually good at: `is-pale`, on
+   a light surface, which is the role gate's head strip.
+
+   The base rule is kept rather than folded into `.nd-chip.is-pale` because the kit ships the chip
+   in two weights and the second one — solid green on a dark ground — is still the right answer the
+   day a light card needs a louder mark. What it must not be again is a second outlined pill an inch
+   from «Beta», where two pills read as a pair of controls. */
 .nd-chip { display: none; }
 [data-season="nd"] .nd-chip {
   align-items: center;
   gap: 4px;
-  border: 1px solid color-mix(in srgb, var(--nd-accent) 45%, transparent);
-  color: var(--nd-accent);
 }
 
-/* 🔴 **The phone rule is HERE, not a `max-sm:hidden` on the element**, and this is the one
-   thing about this skin that was measured rather than reasoned about.
+/* 🔴 **A width rule for a seasonal host belongs HERE, never as a utility on the element**, and
+   this is the one thing about this skin that was measured rather than reasoned about.
 
    Tailwind emits its utilities inside `@layer utilities`; this block is UNLAYERED. Unlayered CSS
    beats layered CSS outright, whatever the specificity and whatever the order — so
-   `[data-season="nd"] .nd-chip { display: inline-flex }` would have overridden
-   `.max-sm\:hidden { @media (width < 40rem) { display: none } }` at EVERY width, and the chip would
-   have ridden the phone bar all season. It typechecks, it lints, it looks right on a laptop, and it
-   is only visible at 392px on a real browser.
+   `[data-season="nd"] .nd-chip { display: inline-flex }` overrode
+   `.max-sm\:hidden { @media (width < 40rem) { display: none } }` at EVERY width, and the pill it
+   was written for would have ridden the phone bar all season. It typechecks, it lints, it looks
+   right on a laptop, and it is only visible at 392px in a real browser.
 
    Same family as the `hidden md:grid` fault of 2026-09-16 and the `rounded-full` one of 2026-09-12:
-   two rules for one property, and the loser is decided somewhere the call site cannot see. One
-   place decides the chip's display now, and it is this block.
+   two rules for one property, and the loser is decided somewhere the call site cannot see.
 
-   40rem is `sm`, read off the compiled sheet rather than assumed. */
-@media (width >= 40rem) {
-  [data-season="nd"] .nd-chip { display: inline-flex; }
-}
+   The pill is gone and the MARK carries that rule now (`@media (width >= 40rem)`, above). The chip
+   has no width rule left, because the only thing wearing it is a card's head strip, which is the
+   same shape at every width. 40rem is `sm`, read off the compiled sheet rather than assumed. */
+[data-season="nd"] .nd-chip { display: inline-flex; }
 
 /* ── The pale chip, for a LIGHT surface ───────────────────────────────────────────
    The kit ships the chip in two weights and says which is for which: pale on a light surface, solid
@@ -979,46 +981,64 @@ body {
   background-size: cover, 22px 22px;
 }
 
-/* ── The ordinal mark ─────────────────────────────────────────────────────────
-   96 OUTLINED rather than filled, over a pale gold hairline, with the season's name under it. The
-   kit's reasoning, kept: "outlined because solid white makes it a heading — it is a mark, and it
-   should sit behind the content, not above it."
+/* ── The ordinal mark, ON THE BAR ─────────────────────────────────────────────────────────────────
+   96 OUTLINED rather than filled, beside a pale gold hairline, with the season's name after it. The
+   kit's reasoning, kept: "outlined because solid white makes it a heading — it is a mark".
 
-   It stands on the band's TRAILING edge, which mirrors with the reading direction on its own
-   because the band is a flex row — the headline starts where the reader starts, and the mark sits
-   at the far end of the line in both scripts, with no rule of its own.
+   🔴 **It moved here from the dashboard band, and it REPLACES the pill that used to sit beside the
+   wordmark** (owner, 2026-09-17: *"remove the 96 from the cta and just make this style instead of
+   the 96 pill on header"*). One mark, in one place. The band keeps its tree line, its dot field and
+   its dune sweep and says nothing in words — which is the better division anyway: the band is the
+   product's own headline and a second piece of copy over it was competing with the one sentence
+   that screen exists to say.
 
-   ⚠️ Withheld below `lg`. The band is 160px at every width and the copy takes the whole of it on a
-   laptop; a mark squeezed in beside a wrapped headline is not a mark, it is a collision. */
+   ⚠️ **It is the same VOCABULARY, laid out for a 52px bar rather than a 160px band** — the outlined
+   figure, the gold hairline and the small caption. The stack itself could not come: the band drew
+   the figure at 58px, which does not fit in a bar that is 52px tall including its own padding. So
+   the column becomes a row and the rule turns on its side. Everything that made it a mark rather
+   than a heading survives; only the axis changed.
+
+   ⚠️ **No pill, no border, no ground.** That is the point of the swap: «Beta» beside it is an
+   outlined pill, and two pills a hand's width apart read as a pair of controls. A mark is not a
+   control and now does not look like one.
+
+   ⚠️ Withheld below `sm`, and the rule is HERE rather than a `max-sm:hidden` on the element — the
+   seasonal block is unlayered and beats any utility at every width. Same trap, same answer as the
+   pill it replaces. */
 .nd-mark { display: none; }
-@media (width >= 64rem) {
+@media (width >= 40rem) {
   [data-season="nd"] .nd-mark {
-    display: grid;
-    justify-items: center;
-    gap: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
     flex: none;
     user-select: none;
   }
 }
 [data-season="nd"] .nd-mark-fig {
-  font-size: 58px;
+  font-size: 19px;
   font-weight: 800;
   line-height: 1;
-  letter-spacing: 0.02em;
-  color: rgba(255, 255, 255, 0.28);
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.34);
 }
-/* `-webkit-text-stroke` is the only way to outline text, and it is unprefixed nowhere — so the
-   filled-at-28% rule above is the fallback a browser without it keeps, rather than a value this
-   block would otherwise have to guess at. Same shape as the kit's own `@supports`. */
+/* `-webkit-text-stroke` is the only way to outline text and it is unprefixed nowhere, so the
+   filled-at-34% rule above is the fallback a browser without it keeps rather than a value this
+   block would otherwise have to guess at. Same shape as the kit's own `@supports`.
+   ⚠️ 1.2px, not the band's 2px: a stroke is an absolute width, so the weight that read as an
+   outline on a 58px figure reads as a solid slab on a 19px one. */
 @supports (-webkit-text-stroke: 1px #fff) {
   [data-season="nd"] .nd-mark-fig {
     color: transparent;
-    -webkit-text-stroke: 2px rgba(255, 255, 255, 0.72);
+    -webkit-text-stroke: 1.2px rgba(255, 255, 255, 0.82);
   }
 }
+/* The hairline turns on its side with the layout: 92x1 under a column becomes 1x14 between two
+   things in a row. It is the piece that keeps the gold on the bar now that the pill's border has
+   gone, so it is not decoration that can be dropped. */
 [data-season="nd"] .nd-mark-rule {
-  width: 92px;
-  height: 1px;
+  width: 1px;
+  height: 14px;
   background: var(--nd-accent);
   opacity: 0.75;
 }
@@ -1026,7 +1046,7 @@ body {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.66);
+  color: rgba(255, 255, 255, 0.72);
   white-space: nowrap;
 }
 

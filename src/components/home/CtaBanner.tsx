@@ -12,7 +12,6 @@ import { StartYourRequestModal, type StartRequestChoice } from "@/components/hom
 import { TRIAL_REQUESTS_ENABLED } from "@/lib/flags";
 import { btn, cx, PAGE_MAX, PAGE_X } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
-import { seasonOrdinal } from "@/lib/season";
 
 /** Once per tab, mirroring the app's cold-start trigger. */
 const POPUP_SHOWN_KEY = "mt-start-popup-shown";
@@ -348,23 +347,15 @@ export function CtaBanner() {
           </button>
         </div>
 
-        {/* ── The ordinal mark (owner, 2026-09-16) ─────────────────────────────────
-            96 OUTLINED over a gold hairline, with the season's name under it. The kit's own reason
-            for the outline is kept: solid white would make it a heading, and it is a mark — it
-            belongs behind the content, not above it.
+        {/* 🔴 ~~The ordinal mark stood here, on the band's trailing edge.~~ It is on the BAR
+            now, in place of the pill beside the wordmark (owner, 2026-09-17: *"remove the 96 from
+            the cta and just make this style instead of the 96 pill on header"*).
 
-            LAST in the row, so it sits on the edge the reader finishes at and mirrors in Arabic
-            with the row itself. `aria-hidden`: it is a decoration, and the ordinal is not a fact a
-            renter needs read out on every page of the dashboard.
-
-            ⚠️ Drawn only from `lg` up, by the stylesheet and not by a utility here — the seasonal
-            block is unlayered and would beat any `max-lg:hidden` at every width, which is the trap
-            the season chip on the header bar was caught by. One place decides it. */}
-        <div aria-hidden="true" {...pin("home-hero-season")} className="nd-mark">
-          <span className="nd-mark-fig">{seasonOrdinal()}</span>
-          <span className="nd-mark-rule" />
-          <span className="nd-mark-sub">{t.season.nationalDay}</span>
-        </div>
+            What the band keeps is everything that does not speak: the eight-palm tree line, the
+            dot field and the dune sweep cutting its bottom edge. That is the better division and
+            not merely the instruction — this band exists to say ONE sentence, and a second
+            piece of copy at the far end of it was competing with the sentence for the same
+            160px. Pin 10.3 is retired with the element rather than renumbered. */}
       </div>
     </div>
 

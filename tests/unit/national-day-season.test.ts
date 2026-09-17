@@ -202,23 +202,37 @@ describe("the header wears it without branching on the date", () => {
   it("carries all three hosts on the bar", () => {
     expect(shell).toContain('className="nd-bar sticky top-0');
     expect(shell).toContain('className="nd-decor"');
-    expect(shell).toMatch(/className="nd-chip flex-none/);
+    expect(shell).toMatch(/className="nd-mark"/);
   });
 
   /**
-   * 🔴 **The chip carries NO width utility, and that is the fix rather than an omission.**
+   * 🔴 **The bar wears the MARK, never a chip** (owner, 2026-09-17: *"remove the 96 from the cta
+   * and just make this style instead of the 96 pill on header"*) — the outlined figure, the gold
+   * hairline and the caption, laid out as a row for a 52px bar.
+   *
+   * The half a tidy-up would undo: «Beta» beside it is an outlined pill, so a SECOND outlined pill
+   * a hand's width away read as a pair of controls. The mark carries no border and no ground, which
+   * is why putting `.nd-chip` back on this bar is a regression rather than a preference.
+   */
+  it("does not put a chip on the bar", () => {
+    expect(shell).not.toMatch(/nd-chip/);
+  });
+
+  /**
+   * 🔴 **The host carries NO width utility, and that is the fix rather than an omission.**
    * `max-sm:hidden` was on this element and could never have worked: Tailwind emits its utilities
    * inside `@layer utilities`, the seasonal block in `globals.css` is unlayered, and unlayered CSS
    * beats layered CSS whatever the specificity — so the season's `display` won at every width and
-   * the chip would have ridden the phone bar all fortnight. Found by reading the compiled sheet,
+   * the element would have ridden the phone bar all fortnight. Found by reading the compiled sheet,
    * which is the only place it is visible: it typechecks, it lints, and it looks right on a laptop.
    *
    * The width lives with the season now, in one `@media`, and this case is what stops a tidy-up
-   * putting a utility back on the element and quietly undoing it.
+   * putting a utility back on the element and quietly undoing it. It survived the pill becoming a
+   * mark because the trap belongs to the BLOCK, not to whatever is standing in it.
    */
   it("leaves the phone rule to the stylesheet, where it can win", () => {
-    expect(shell).not.toMatch(/nd-chip[^"]*(max-sm:|hidden|sm:inline-flex)/);
-    expect(read("src/app/globals.css")).toContain('[data-season="nd"] .nd-chip { display: inline-flex; }');
+    expect(shell).not.toMatch(/nd-mark[^"]*(max-sm:|hidden|sm:inline-flex)/);
+    expect(read("src/app/globals.css")).toContain("@media (width >= 40rem) {");
   });
 
   it("writes the ordinal in Latin digits, as this app does everywhere", () => {
@@ -288,9 +302,18 @@ describe("the kit's motifs land on the surfaces the kit names", () => {
     expect(cta).not.toMatch(/className="nd-seam/);
   });
 
-  it("puts the ordinal mark last in the band's row, so it mirrors with the row", () => {
-    expect(cta.indexOf('pin("home-hero-season")')).toBeGreaterThan(cta.indexOf('pin("home-hero-actions")'));
-    expect(cta).toContain("{seasonOrdinal()}");
+  /**
+   * 🔴 **The band says nothing in words** (owner, 2026-09-17). It keeps the three motifs that do
+   * not speak — the tree line, the dot field and the dune sweep — and the ordinal mark moved to the
+   * bar. The band exists to say ONE sentence, and a second piece of copy at the far end of it was
+   * competing with that sentence for the same 160px.
+   */
+  it("leaves the band with no mark and no words of its own", () => {
+    expect(cta).not.toMatch(/nd-mark/);
+    expect(cta).not.toMatch(/seasonOrdinal/);
+    // The three silent pieces stay.
+    expect(cta).toContain('className="nd-band');
+    expect(cta).toContain('className="nd-dune relative isolate');
   });
 
   it("gives the role gate the INTERLOCKING band and the pale chip", () => {

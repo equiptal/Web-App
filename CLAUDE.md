@@ -2,6 +2,122 @@
 
 ## Change log
 
+- **2026-09-17 - The intake panel runs the window's height under the header, opens every project, and counts every row.**
+  Owner, on a screenshot of the rail ending mid-page with grey under it: *"make it for this the
+  default width and by default make them opened, then for height make it along the page excpet the
+  header and for 1 unit still show 1 [icon] then name"*.
+  (1) 🔴 **The height was the COLUMN's, and that is what made it a card again.** The panel stretched
+  to the row, and the row is as tall as the content beside it - so a short intake gave it a short
+  panel with page ground under it, which is exactly what he photographed. It is
+  `sticky top-[52px] h-[calc(100dvh-52px)]` now: the bar is `sticky top-0 h-[52px] z-30`, so 52 is
+  where this starts and `100dvh - 52` is precisely the room left under it.
+  ⚠️ `dvh`, never `vh`: on a phone the address bar eats `vh`, and a panel told it is taller than the
+  screen cannot be scrolled to its own foot.
+  (2) **Every project is OPEN when the rail arrives**, and the set records what is SHUT rather than
+  what is open - which is what makes «all open» the state a fresh visit lands in without seeding it
+  from a project list that has not arrived yet.
+  🔴 **The cost, stated: one `fetchChart` PER PROJECT on mount**, where it used to be one per project
+  he chose to open. A renter with twelve projects pays twelve reads when the intake mounts. They are
+  cached and fired once each, and a failure on any of them leaves that project listed and pressable.
+  ⚠️ **The chosen project no longer forces itself open.** That override was needed while the default
+  was shut - the floor draws its machines and the rail would have hidden them - and with every group
+  open it only overrules the renter: he shuts one, presses its head, and it springs back.
+  (3) 🔴 **The count is on EVERY row, one included**, reversing the same day (*"for 1 unit still show
+  1 [icon] then name"*). ~~Drawn only above one, because a column of «1» is noise.~~ A column of
+  counts that skips some of its rows is harder to scan than one that repeats a 1: the eye reads down
+  the number, not down the presence of it.
+  ⚠️ **The `×` is kept on every row**, so the shape is one thing - «2 ×», «1 ×». His two notes spell
+  it both ways (*"put the unit 2 x icon"*, then *"1 [icon] then name"*), and one format for one row
+  is the reading that survives. Cheap to change if he meant the bare number.
+  (4) **The width is unchanged at 208px** - the default he was looking at, and what *"make it for
+  this the default width"* asks for. The grip and its 164-380 range are untouched.
+  Files: `src/components/create/RequestsRail.tsx`, `src/components/screens/Intake.tsx` (the row
+  stops setting a height - the panel sets its own), `tests/unit/intake-rail.test.ts`.
+  ⚠️ Verified: typecheck, lint (0 errors), **210 files / 3533 passing, 7 skipped** serially.
+  🔴 **NOT seen rendered.** The rail needs a signed-in renter, so `/dev/preview` draws nothing and
+  the sticky height, the open groups and the new counts all want one look on a dev build.
+
+- **2026-09-17 - The season's ordinal mark leaves the dashboard band and takes the pill's place on the bar.**
+  Owner, on the first cut of the National Day skin: *"remove the 96 from the cta and just make this
+  style instead of the 96 pill on header"*.
+  🔴 **Two changes, and the second is the one with an argument behind it.** The band's ordinal mark
+  is deleted; the header's gold OUTLINED PILL is replaced by that same mark - the outlined figure,
+  the gold hairline, the small caption - laid out as a ROW for a 52px bar.
+  ⚠️ **The stack itself could not come.** The band drew the figure at 58px inside 160px of height;
+  the bar is 52px including its own padding. So the column becomes a row and the 92x1 rule turns on
+  its side to 1x14. Everything that made it a mark rather than a heading survives - no fill, no
+  ground, no border - and only the axis changed. The stroke went 2px → **1.2px** with it: a stroke
+  is an ABSOLUTE width, so the weight that read as an outline at 58px reads as a solid slab at 19px.
+  ⚠️ **It reads better as well as being the instruction.** «Beta» sits beside it and is an outlined
+  pill; a second outlined pill a hand's width away read as a pair of controls rather than as a note
+  on the wordmark. The mark has no border and no ground, so it cannot. A case pins that `.nd-chip`
+  must never return to this bar.
+  ⚠️ **The band now says NOTHING in words**, and keeps only the three motifs that do not speak: the
+  eight-palm tree line, the dot field and the dune sweep. That is the better division rather than
+  merely the instruction - the band exists to say ONE sentence, and a second piece of copy at the
+  far end of it was competing with that sentence for the same 160px.
+  ⚠️ **`aria-hidden`, which the pill was NOT.** A behaviour change, and deliberate: the pill made a
+  screen reader say «96 National Day» in the first breath of every page in the product, for a
+  fortnight, about something nobody can act on.
+  Files: `src/app/globals.css` (the mark re-cut for the bar; `.nd-chip` reduced to the pale weight),
+  `src/components/AppShell.tsx`, `src/components/home/CtaBanner.tsx` (the mark and the now-unused
+  `seasonOrdinal` import removed), `src/lib/uiPins.ts` (2.5 relabelled; **10.3 retired**),
+  `src/app/dev/preview/specimens.tsx`, `tests/unit/national-day-season.test.ts` (3 cases rewritten,
+  1 new; 32 passing).
+  ⚠️ **`.nd-chip`'s base skin is kept rather than folded into `.nd-chip.is-pale`.** The kit ships
+  the chip in two weights and the solid one is still the right answer the day a light card needs a
+  louder mark; what it must not be again is a second outlined pill on this bar.
+  ⚠️ **The width rule stayed in the stylesheet across the swap**, and the case that pins it now says
+  why: the unlayered-beats-layered trap belongs to the BLOCK, not to whichever element is standing
+  in it. A `max-sm:hidden` on the mark would lose at every width exactly as it lost on the pill.
+  ⚠️ **10.3 is retired, not renumbered** - the `CarryForwardModal` rule of 2026-09-09: a number that
+  has been quoted in a note must not come back meaning something else.
+  ⚠️ Verified: typecheck clean, lint 0 errors, 32 in the season's own suite and 60 across the pins,
+  palette, shell-nav, verify-pill, CTA and guest-wall guards. **SEEN RENDERED**: the bar with the
+  mark in EN and AR, the band silent, the OFF state, and a real 392px viewport where the mark stands
+  down. 🔴 Still not seen on the real signed-in bar or the real dashboard band - the band has a
+  photograph behind it that the harness does not.
+
+- **2026-09-17 - A cancellation SAYS it happened, and the request it shut says so afterwards.**
+  Owner: *"if a request is cancelled add the closed lable to it and show confimration on cancellation
+  with concaclled successfuly note"*.
+  (1) 🔴 **The press used to say nothing at all.** `doCancel` ran `onChanged(); onClose();` - every
+  layer dismissed, the renter back on the page he started from with one circle greyed somewhere
+  behind him. On the ONE act the backend has no inverse for, a silent success reads exactly like a
+  silent failure, and this dialog is the only surface that knows which of the two it was.
+  `ConfirmCancelModal` gained `done`: the same box swaps to a tick, «Request cancelled», and what
+  CHANGED - *"it is closed now, and suppliers can no longer bid on it"* - over one button.
+  ⚠️ **ONE box, two states, never a second dialog.** A tick that arrives where the question was asked
+  reads as the answer to it; a new layer over the old one is a second thing to close.
+  ⚠️ **The caller does NOT dismiss on success.** Closing is the renter pressing Done, and that press
+  is what carries the reload - the rail has to re-read to grey the circle and put «Closed» under it.
+  ⚠️ **`busy` is deliberately left raised** on the success path. The act is over, and a confirm
+  button that comes back to life under a tick invites a second cancellation of a request that has
+  none left. A case pins that the only `setBusy(false)` is the catch's.
+  ⚠️ **BOTH doors, one modal.** The drawer and the dashboard table each cancel through
+  `ConfirmCancelModal`, so the note lands on both - a confirmation on one and silence on the other is
+  exactly the drift this repo keeps finding between two doors onto one act.
+  (2) **The workspace's context bar carries CLOSED.** The rail has said it under the circle since
+  2026-08-30 and the drawer says it in its title; between those two sits the bar naming the request
+  the whole page is about, and it said nothing. A renter who cancelled one and stayed on it read a
+  live-looking subject over a table of bids that can no longer change.
+  ⚠️ **`groupBiddingClosed`, never a status of its own.** A group is shut only when EVERY item in it
+  is: a fanned-out RFQ with one line cancelled and one still open is still taking bids, and labelling
+  it closed would be a lie about the half that is not. It is the same predicate the rail greys its
+  circle with, so the two can never disagree.
+  Files: `src/components/requests/RequestEditModals.tsx` (`done`),
+  `src/components/workspace/RequestDetailsModal.tsx`, `src/components/home/HomeRequests.tsx`,
+  `src/components/workspace/RequestContextBar.tsx`,
+  `tests/unit/cancel-confirmation.test.ts` (new, 8 cases).
+  ⚠️ **No new strings.** The success note is written inline in both locales beside the dialog's other
+  sentences, which is how every line in this component is already carried; `t.workspace.closed` is the
+  rail's own word, reused rather than a second spelling of the same fact.
+  ⚠️ Verified: typecheck, lint (0 errors), 8 new cases, and **3522 passing / 7 skipped** serially. The
+  success state was break-checked by renaming its guard - three cases went red. The 3 unhandled errors
+  are `intercom-widget`'s two and `suppliers-remove-and-pick`'s one, both pre-existing.
+  🔴 **NOT seen rendered**: cancelling needs a signed-in renter with a live request, and it is not a
+  thing to try against prod. The states are pinned by the cases and by the predicate's own tests.
+
 - **2026-09-17 - The halo behind Mansour is deleted, and NO SHADOW is a standing rule.**
   Owner, on a screenshot of the CTA band: *"why mansout is not clear? not hd also never use shadow in
   design remove it around him"*.

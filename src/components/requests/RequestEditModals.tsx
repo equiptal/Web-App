@@ -50,7 +50,14 @@ export type CancelScope =
   | { kind: "item"; idLabel: string; itemLabel: string; others: number };
 
 /** Styled cancel confirmation (replaces the browser prompt), matching the app's destructive dialog. */
-export function ConfirmCancelModal({ ar, L, busy, scope, error, onClose, onConfirm }: { ar: boolean; L: (en: string, arr: string) => string; busy: boolean; scope: CancelScope; error?: string | null; onClose: () => void; onConfirm: () => void }) {
+/**
+ * The cancel confirm, and — once the act is through — the note that it happened (owner, 2026-09-17:
+ * *"show confimration on cancellation with concaclled successfuly note"*).
+ *
+ * ⚠️ `done` is the CALLER saying the request is gone. The dialog does not dismiss itself on it:
+ * closing is the renter pressing Done, which is what carries the reload with it.
+ */
+export function ConfirmCancelModal({ ar, L, busy, scope, error, done, onClose, onConfirm }: { ar: boolean; L: (en: string, arr: string) => string; busy: boolean; scope: CancelScope; error?: string | null; done?: boolean; onClose: () => void; onConfirm: () => void }) {
   // A one-item "all" is just a single request — "All 1 items" would be nonsense.
   const s: CancelScope = scope.kind === "all" && scope.total <= 1 ? { kind: "single", idLabel: scope.idLabel } : scope;
   const id = <span className="font-semibold text-navy">{s.idLabel}</span>;
@@ -70,6 +77,36 @@ export function ConfirmCancelModal({ ar, L, busy, scope, error, onClose, onConfi
     : s.kind === "all" ? L(`Cancel all ${s.total} items`, `إلغاء جميع البنود (${s.total})`)
     : s.kind === "remaining" ? L(`Cancel ${s.count} ${s.count === 1 ? "item" : "items"}`, `إلغاء ${s.count} من البنود`)
     : L("Cancel request", "إلغاء الطلب");
+
+  /* \u26a0\ufe0f ONE box, two states - not a second dialog. A tick that arrives in the place the question was
+     asked reads as the answer to it; a new layer over the old one is a second thing to close. */
+  if (done) {
+    const heading = s.kind === "item" ? L("Item cancelled", "\u062a\u0645 \u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u0628\u0646\u062f") : L("Request cancelled", "\u062a\u0645 \u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u0637\u0644\u0628");
+    return (
+      <Dialog open onClose={onClose} size="sm" padded={false}>
+        <div className="p-5 text-center" dir={ar ? "rtl" : "ltr"}>
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-ok-soft">
+            <span className="material-icons-outlined" style={{ color: "var(--ok)", fontSize: 26 }}>check_circle</span>
+          </div>
+          <h3 className="text-title font-extrabold text-navy">{heading}</h3>
+          {/* What CHANGED, not a congratulation: it is shut, it says so wherever it is listed, and
+              nothing can bid on it now. The renter reads the consequence rather than the verb. */}
+          <p className="mt-1.5 text-body leading-relaxed text-muted">
+            {ar ? (
+              <>\u0627\u0644\u0637\u0644\u0628 {id} \u0645\u063a\u0644\u0642 \u0627\u0644\u0622\u0646\u060c \u0648\u0644\u0645 \u064a\u0639\u062f \u0628\u0625\u0645\u0643\u0627\u0646 \u0627\u0644\u0645\u0624\u062c\u0651\u0631\u064a\u0646 \u062a\u0642\u062f\u064a\u0645 \u0639\u0631\u0648\u0636 \u0639\u0644\u064a\u0647</>
+            ) : (
+              <>Request {id} is closed now, and suppliers can no longer bid on it</>
+            )}
+          </p>
+          <div className="mt-5">
+            <button className={btn("primary", "md", { className: "w-full" })} onClick={onClose}>
+              {L("Done", "\u062a\u0645")}
+            </button>
+          </div>
+        </div>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open onClose={onClose} size="sm" padded={false}>

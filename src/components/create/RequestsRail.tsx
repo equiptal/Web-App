@@ -84,7 +84,10 @@ export function useRequestRail() {
   const [named, setNamed] = useState<NamedIcon[]>([]);
   const [tpls, setTpls] = useState<Map<string, RailRow[]>>(new Map());
   const [loading, setLoading] = useState<ReadonlySet<string>>(new Set());
-  const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
+  /* \u26a0\ufe0f What is SHUT, not what is open (owner, 2026-09-17: *"by default make them opened"*).
+     A set of the closed ones is what makes «all open» the state a fresh visit lands in without
+     having to seed it from a project list that has not arrived yet. */
+  const [shut, setShut] = useState<ReadonlySet<string>>(new Set());
   const [picked, setPicked] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -164,8 +167,17 @@ export function useRequestRail() {
     [tpls, loading, named],
   );
 
-  /* The chosen project's machines are what the FLOOR draws, so they are wanted whether or not its
-     group was ever opened in the rail. */
+  /* \U0001f534 Every project is open on arrival, so every project's machines are wanted on arrival - one
+     `fetchChart` each (owner, 2026-09-17: *"by default make them opened"*). That is the cost of the
+     ruling and it is stated rather than hidden: a renter with twelve projects pays twelve reads when
+     the intake mounts, against one per project he chose to open before. They are still cached and
+     still fired once, and a failure on any of them leaves that project listed and pressable.
+
+     \u26a0\ufe0f The CHOSEN project is loaded whether or not its group is open, because the floor draws it. */
+  useEffect(() => {
+    for (const p of projects ?? []) void load(p.id);
+  }, [projects, load]);
+
   useEffect(() => {
     if (chosen?.id) void load(chosen.id);
   }, [chosen?.id, load]);
@@ -240,17 +252,14 @@ export function useRequestRail() {
 
   const toggle = useCallback(
     (projectId: string) => {
-      setOpen((s) => {
+      setShut((s) => {
         const next = new Set(s);
         if (next.has(projectId)) next.delete(projectId);
-        else {
-          next.add(projectId);
-          void load(projectId);
-        }
+        else next.add(projectId);
         return next;
       });
     },
-    [load],
+    [],
   );
 
   const clear = useCallback(() => {
@@ -269,14 +278,14 @@ export function useRequestRail() {
       picked,
       busy,
       rowsOf,
-      isOpen: (id: string) => open.has(id),
+      isOpen: (id: string) => !shut.has(id),
       isLoading: (id: string) => loading.has(id),
       toggle,
       pressProject,
       pressRow,
       clear,
     }),
-    [user, projects, chosen, picked, busy, rowsOf, open, loading, toggle, pressProject, pressRow, clear],
+    [user, projects, chosen, picked, busy, rowsOf, shut, loading, toggle, pressProject, pressRow, clear],
   );
 }
 
@@ -334,7 +343,11 @@ export function RequestsRail({ rail }: { rail: RequestRail }) {
 
       <div className="flex-1 overflow-y-auto px-1.5 pb-4">
         {rail.projects.map((p) => {
-          const open = rail.isOpen(p.id) || rail.chosen?.id === p.id;
+          /* ⚠️ The chosen project does NOT force itself open any more. It had to while the default
+             was shut - the floor draws its machines and the rail would have hidden them - but with
+             every group open by default that override only overrules the renter: he shuts a group,
+             presses its head, and it springs back. */
+          const open = rail.isOpen(p.id);
           const rows = rail.rowsOf(p.id);
           const on = rail.chosen?.id === p.id && !rail.picked;
           return (
@@ -415,7 +428,17 @@ export function RequestsRail({ rail }: { rail: RequestRail }) {
         {...pin("intake-rail")}
         style={sheet ? undefined : { width }}
         className={`relative flex-none flex-col border-e border-border bg-surface ${
-          sheet ? "fixed inset-y-0 start-0 z-50 flex w-[280px] max-w-[85vw]" : "hidden lg:flex"
+          sheet
+            ? "fixed inset-y-0 start-0 z-50 flex w-[280px] max-w-[85vw]"
+            /* \u26a0\ufe0f **Sticky under the header, and as tall as what is left of the window** (owner,
+               2026-09-17: *"for height make it along the page excpet the header"*). The bar is
+               `sticky top-0 h-[52px] z-30`, so 52 is where this one starts and `100dvh - 52` is
+               exactly the room under it. ~~Stretching to the row~~ made it as tall as the COLUMN
+               beside it, which is a box of content: on a short intake the panel ended mid-page
+               with grey under it, which is the card he photographed.
+               `dvh`, never `vh`: on a phone the address bar eats `vh` and a panel told it is
+               taller than the screen cannot be scrolled to its own foot. */
+            : "hidden lg:sticky lg:top-[52px] lg:flex lg:h-[calc(100dvh-52px)]"
         }`}
       >
         {sheet && (
@@ -504,10 +527,11 @@ function RailRowButton({ row, on, busy, onPress }: { row: RailRow; on: boolean; 
       {/* ⚠️ The COUNT leads, then the picture, then the name (owner, 2026-09-16: *"add equipment
           image or icon with the unit before the name like this 2 [ICON] EXCAVATOR 20 TON"*, then
           *"put the unit 2 x icon . equipment name"*). Drawn only above one: «1 ×» on every row of a
-          list where one is the ordinary case is noise with a multiplication sign in front of it. */}
-      {row.qty > 1 && (
-        <span className="flex-none text-label font-semibold tabular-nums text-navy">{row.qty} ×</span>
-      )}
+          list where one is the ordinary case is noise with a multiplication sign in front of it.~~
+          \U0001f534 Reversed the same day: *"for 1 unit still show 1 [icon] then name"*. Every row now reads
+          the same shape, and a column of counts that skips some of its rows is harder to scan than
+          one that repeats a 1 - the eye reads down the number, not down the presence of it. */}
+      <span className="flex-none text-label font-semibold tabular-nums text-navy">{row.qty} ×</span>
       <MachineArt url={row.imageUrl} />
       <span className={`min-w-0 flex-1 truncate text-label ${on ? "font-semibold text-brand-deep" : "text-muted"}`}>
         {row.name}
@@ -557,7 +581,7 @@ export function ProjectFloorChips({ rail }: { rail: RequestRail }) {
           <span className="min-w-0 truncate">
             {projectTitle(project)}
             <span className="px-1 font-normal text-muted-light">·</span>
-            {one.qty > 1 ? `${one.qty} × ` : ""}
+            {`${one.qty} × `}
             {one.name}
           </span>
           {clear}
@@ -588,7 +612,7 @@ export function ProjectFloorChips({ rail }: { rail: RequestRail }) {
              these is chosen this row is replaced by its pill anyway. */
           className="flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full border border-brand/45 bg-surface px-3 py-1 text-label font-semibold text-brand-deep transition hover:border-brand hover:bg-brand-soft disabled:cursor-not-allowed"
         >
-          {row.qty > 1 && <span className="tabular-nums">{row.qty} ×</span>}
+          <span className="tabular-nums">{row.qty} ×</span>
           <MachineArt url={row.imageUrl} />
           <span className="max-w-[160px] truncate">{row.name}</span>
         </button>

@@ -210,6 +210,8 @@ export function HomeRequests({ hideHeading, onCount }: { hideHeading?: boolean; 
   /** The group the ✕ is asking to cancel. Cancelling ALWAYS confirms — see the note on dismissal. */
   const [cancelling, setCancelling] = useState<RequestGroup | null>(null);
   const [cancelBusy, setCancelBusy] = useState(false);
+  /** The cancellation went through, and the dialog is saying so. */
+  const [cancelled, setCancelled] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
 
   /** Groups this device has taken off the feed. Local, and reversible. */
@@ -496,8 +498,10 @@ export function HomeRequests({ hideHeading, onCount }: { hideHeading?: boolean; 
       // Every cancellable item of the group — the backend refuses the rest, and a partial group is
       // a real state: one item accepted, the others still open.
       await Promise.all(cancellableItems(g.items).map((i) => cancelRequest(i.id)));
-      setCancelling(null);
-      reload();
+      /* \U0001f534 ~~`setCancelling(null); reload();`~~ - the dialog vanished and the table redrew with one
+         row greyed, which is a silent success reading exactly like a silent failure on the one act
+         the backend has no inverse for (owner, 2026-09-17). It stays and says so; Done reloads. */
+      setCancelled(true);
     } catch {
       setCancelError(L("That didn’t go through. Try again.", "لم يتمّ الإجراء. حاول مجددًا."));
     } finally {
@@ -923,7 +927,11 @@ export function HomeRequests({ hideHeading, onCount }: { hideHeading?: boolean; 
             idLabel: cancelling.groupRef ?? cancelling.items[0]?.displayId ?? cancelling.id,
             total: cancellableItems(cancelling.items).length,
           }}
+          done={cancelled}
           onClose={() => {
+            // Done is what carries the reload: every row of the group has to re-read to say «Closed».
+            if (cancelled) reload();
+            setCancelled(false);
             setCancelling(null);
             setCancelError(null);
           }}

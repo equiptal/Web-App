@@ -223,7 +223,7 @@ export function Intake() {
        breaks out to the window with `mx-[calc(50%-50vw)] w-screen`, which is symmetric and so needs
        no mirror rule, and pulls up through the main pad so the panel starts at the top of the page.
        The same argument the requests rail settled on 2026-09-12: a band takes ONE edge, not four. */
-    <div className="relative mx-[calc(50%-50vw)] -mt-6 flex min-h-[calc(100dvh-8rem)] w-screen items-stretch sm:-mt-7">
+    <div className="relative mx-[calc(50%-50vw)] -mt-6 flex w-screen items-stretch sm:-mt-7">
       <RequestsRail rail={rail} />
       {/* ⚠️ The gutter the shell was giving this content comes back HERE, on the column, so the box
           keeps its margin while the panel keeps the edge. */}

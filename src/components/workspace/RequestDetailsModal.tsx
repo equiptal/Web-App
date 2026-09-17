@@ -94,6 +94,8 @@ export function RequestDetailsModal({
   const [editing, setEditing] = useState<RequestRecord | null>(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(!!openCancel);
+  /** The cancellation went through, and the dialog is saying so. */
+  const [cancelled, setCancelled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [deadline, setDeadline] = useState<string | null>(link?.bidDeadline ?? null);
   const [logoUrl, setLogoUrl] = useState<string | null>(link?.logoUrl ?? null);
@@ -237,13 +239,20 @@ export function RequestDetailsModal({
     }
   };
 
+  /* \U0001f534 It no longer closes on success (owner, 2026-09-17: *"show confimration on cancellation with
+     concaclled successfuly note"*). ~~`onChanged(); onClose();`~~ dismissed every layer and left the
+     renter where he started with one circle greyed somewhere behind him - a silent success reading
+     exactly like a silent failure, on the one act the backend has no inverse for. The dialog stays
+     and says what happened; pressing Done is what reloads and closes.
+
+     \u26a0\ufe0f `busy` is deliberately NOT lowered on success: the act is over, and a confirm button that
+     comes back to life under a tick invites a second cancellation of a request that has none left. */
   const doCancel = async () => {
     if (!subject || busy) return;
     setBusy(true);
     try {
       await cancelRequest(subject.id);
-      onChanged();
-      onClose();
+      setCancelled(true);
     } catch {
       setBusy(false);
       setConfirmCancel(false);
@@ -634,8 +643,17 @@ export function RequestDetailsModal({
           ar={ar}
           L={L}
           busy={busy}
+          done={cancelled}
           scope={{ kind: "single", idLabel: subject.displayId }}
-          onClose={() => setConfirmCancel(false)}
+          onClose={() => {
+            setConfirmCancel(false);
+            /* Done is what carries the reload: the rail has to re-read to grey the circle and put
+               «Closed» under it, and the drawer has nothing left to show for a request that is. */
+            if (cancelled) {
+              onChanged();
+              onClose();
+            }
+          }}
           onConfirm={() => void doCancel()}
         />
       )}

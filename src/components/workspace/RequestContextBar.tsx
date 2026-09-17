@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useLocale } from "@/lib/i18n";
+import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
-import type { RequestGroup, RequestListItem } from "@/lib/contract/requests";
+import { groupBiddingClosed, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
 import { cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 
@@ -41,6 +41,7 @@ export function RequestContextBar({
   onOpenRequest: (() => void) | null;
 }) {
   const { locale } = useLocale();
+  const t = useT();
   const ar = locale === "ar";
 
   const label = itemLabel(item, ar);
@@ -160,6 +161,22 @@ export function RequestContextBar({
             {qty > 1 && (
               <span className="flex-none rounded-full bg-white/15 px-1.5 text-label font-semibold text-white/70">
                 ×{qty}
+              </span>
+            )}
+            {/* CLOSED, on the request being read (owner, 2026-09-17: *"if a request is cancelled add
+                the closed label to it"*).
+
+                The rail has said it under the circle since 2026-08-30 and the drawer says it in its
+                title, and BETWEEN those two sits the bar naming the request the whole page is about
+                - which said nothing. A renter who cancelled one and stayed on it read a live-looking
+                subject over a table of bids that can no longer change.
+
+                `groupBiddingClosed`, never a status of its own: a group is shut only when every item
+                in it is, because one live sibling still takes bids. It is the same predicate the
+                rail greys its circle with, so the two can never disagree. */}
+            {groupBiddingClosed(group.items) && (
+              <span className="flex-none rounded-full bg-white/15 px-1.5 text-label font-semibold uppercase tracking-[.04em] text-white/70">
+                {t.workspace.closed}
               </span>
             )}
           </span>

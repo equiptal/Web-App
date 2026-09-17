@@ -512,9 +512,10 @@ export const SPECIMENS: Specimen[] = [
           <span className="flex-none rounded-full border border-white/25 px-1.5 py-px text-label font-extrabold uppercase tracking-wide text-white/70">
             Beta
           </span>
-          <span className="nd-chip flex-none rounded-full px-1.5 py-px text-label font-extrabold tracking-wide">
-            <b className="font-extrabold">96</b>
-            {L("National Day", "اليوم الوطني")}
+          <span className="nd-mark" aria-hidden>
+            <span className="nd-mark-fig">96</span>
+            <span className="nd-mark-rule" />
+            <span className="nd-mark-sub">{L("National Day", "اليوم الوطني")}</span>
           </span>
           <span className="ms-auto flex-none text-body font-extrabold">{L("Dashboard", "الرئيسية")}</span>
         </>
@@ -524,18 +525,14 @@ export const SPECIMENS: Specimen[] = [
           <div data-season="nd">
             <div className="nd-bar relative flex h-[52px] items-center gap-3 bg-navy-deep px-4 text-white sm:px-7">{bar}</div>
             {/* The dashboard band, carrying the three pieces it takes in season: the eight-palm
-                TREE LINE and the dot lattice on `nd-band`, the ordinal MARK on the trailing edge,
-                and the DUNE SWEEP cutting its bottom edge into the page's own colour. Its navy is
-                unchanged, which is as much the point of the picture as the motifs are. */}
+                TREE LINE and the dot lattice on `nd-band`, and the DUNE SWEEP cutting its bottom
+                edge into the page's own colour. Its navy is unchanged, which is as much the point of
+                the picture as the motifs are. 🔴 The ordinal mark is NOT here any more — it is on the
+                bar above, in place of the pill (owner, 2026-09-17). */}
             <div className="nd-dune nd-band relative flex h-[160px] items-center gap-6 bg-navy px-4 text-white sm:px-7">
               <span className="text-body font-extrabold">
                 {L("The dashboard band keeps its own colours", "شريط الرئيسية يحتفظ بألوانه")}
               </span>
-              <div aria-hidden="true" className="nd-mark ms-auto">
-                <span className="nd-mark-fig">96</span>
-                <span className="nd-mark-rule" />
-                <span className="nd-mark-sub">{L("National Day", "اليوم الوطني")}</span>
-              </div>
             </div>
 
             {/* The role gate's card: the head strip takes the gradient, the dot lattice and the

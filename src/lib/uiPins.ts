@@ -109,7 +109,7 @@ export const PIN_REGISTRY = {
      and displayed only under `<html data-season="nd">`, so the overlay numbers them out of season
      too - which is the point: a note about the seam can quote 2.4 in July. */
   "header-season-decor": { n: "2.4", label: "Header — season backdrop (palms, dots, seam)", file: "src/components/AppShell.tsx" },
-  "header-season-chip": { n: "2.5", label: "Header — season chip", file: "src/components/AppShell.tsx" },
+  "header-season-mark": { n: "2.5", label: "Header — season mark", file: "src/components/AppShell.tsx" },
   "app-nav": { n: "3", label: "Nav tabs — desktop", file: "src/components/AppNav.tsx" },
   "nav-tab": { n: "3.1", label: "Nav tab — one link", file: "src/components/AppNav.tsx" },
   "app-nav-mobile": { n: "4", label: "Nav tabs — mobile", file: "src/components/AppNav.tsx" },
@@ -128,10 +128,10 @@ export const PIN_REGISTRY = {
   "browse-page": { n: "10.5", label: "Browse — banner + supplier directory", file: "src/components/stores/BrowsePage.tsx" },
   "home-hero": { n: "10.1", label: "Home — hero band", file: "src/components/home/CtaBanner.tsx" },
   "home-hero-actions": { n: "10.2", label: "Home — hero action column", file: "src/components/home/CtaBanner.tsx" },
-  /* The season’s mark on the band (owner, 2026-09-16). Drawn all year and displayed only
-     under `<html data-season="nd">`, like every other seasonal element, so a note can quote it
-     in July. */
-  "home-hero-season": { n: "10.3", label: "Dashboard band — season mark", file: "src/components/home/CtaBanner.tsx" },
+  /* 🔴 **10.3 is RETIRED, not renumbered** (owner, 2026-09-17). It named the ordinal mark on the
+     dashboard band; the mark is on the header bar now (2.5) and the band says nothing in words.
+     The number is left unused on the house rule the `CarryForwardModal` retirement set on
+     2026-09-09: a number that has been quoted in a note must not come back meaning something else. */
   "home-requests": { n: "10.4", label: "Home — requests + bids rail", file: "src/components/home/HomeRequests.tsx" },
   "home-bubble": { n: "10.7", label: "Home — notification bubble", file: "src/components/home/HomeNotificationBubble.tsx" },
   "home-tabs": { n: "10.8", label: "Home — requests / suppliers / projects tabs", file: "src/components/home/HomeHub.tsx" },
