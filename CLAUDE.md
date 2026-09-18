@@ -2,6 +2,173 @@
 
 ## Change log
 
+- **2026-09-18 - The negotiation sheet is the prototype's THREE SHEETS: a phone column with the running total in its header, a `‹ step ›` switcher in its footer, and a labelled «Send to the supplier» on the last one.**
+  Owner: *"there are chanfes in deal room the 3 negotiation sheets style, check them in app"*, then, asked
+  how far to follow it, **«Restyle all three steps to the app»**.
+  🔴 **The source is `Negotiate Price Sheet Standalone.html`**, the owner's own prototype, which the app
+  builds `counter_offer_flow/` from (*"match it exactly with prototype for the 2 pages terms and price
+  including footer, header, spacing, alignment and all"*). The web had never seen it: its sheet was a
+  QUOTATION PAPER on a grey desk, with a zoom rail, an invoice table, a step rail across the top and a
+  two-column review. ~~All of it.~~
+  (1) **The shell**: a 460px column that fills a phone. One white header carrying the running total on
+  the leading edge and the counterparty on the trailing one; a scrolling body; a white footer.
+  (2) 🔴 **«🔔 New offer from the supplier», and only then** (the app's own change of today). DERIVED
+  from who posted the latest round — there is no seen/unseen bit on a round, and inventing one this
+  sheet could not clear would leave the eyebrow lit for good. With no new offer the header keeps the
+  bare caption, because one that is always there names what the bar's only number obviously is.
+  (3) **Step ① the price**: the four-column table on the prototype's own weights, a `✕` that strikes a
+  transport leg out, an 18px count stepper, and the money input whose COLOURS are the state — green
+  while the figure still matches the supplier's, amber the moment it is edited, with the «Supplier: N»
+  line under it turning with them. Then the summary band and the net in its own navy-bordered box.
+  ⚠️ **The CHARGED DAYS moved into the duration cell** (`12 days` over `14 days, Fridays out`). q3's
+  table has no quantity column for them, and without it the one figure that explains the total is
+  nowhere on the sheet.
+  (4) **Step ② the terms is a QUEUE**, one at a time: settled rows collapse to a strip that says HOW
+  they settled (`✓` took theirs, `✎` countered), the current one opens as a card with «Change» and
+  «Take theirs», and the rest wait, dashed and dimmed. Under them the two collapsed groups —
+  «Acknowledged 🔒» and «Agreed ✓». ~~A four-column table of every term at once, each row a dropdown.~~
+  ⚠️ **The provenance and history lines are KEPT**, which the prototype has no slot for: a renter
+  reading «24 hours» otherwise cannot tell his own ask from the supplier's declaration from the
+  platform's default.
+  (5) **Step ③ the review**: two cards under navy headers of the same shape — the price he is about to
+  send, then the terms index with its progress bar — and the quotation link the app puts there.
+  (6) 🔴 **The last step NAMES its act** (the app's other change today): «Send to the supplier», navy,
+  with a small `‹` on the leading edge. There is nothing to walk forward to on a review, so a bare
+  chevron would submit the whole negotiation — the one irreversible press on the sheet — drawn as
+  navigation. Steps ① and ② keep the centred `‹ step ›`.
+  ⚠️ **Accept stands BESIDE it when everything matches**, and it hands back to the room
+  (`setFlowMode("accept")`) rather than calling accept here: that press must land on the
+  binding-commitment warning, and a button that skipped it would be the sheet deciding he had read it.
+  (7) **The compare card is the prototype's navy block**: the two totals as the two ends of ONE
+  measurement, with the gap on the rule between them, amber when they differ and **green «✓ Matched»
+  when they agree** — the matched case used to draw nothing, which read as unfinished.
+  Files: `src/components/deal-room/DealRoom.tsx` (`CounterFlow` re-rendered; `onAcceptInstead` and
+  `onOpenQuotation` are new), `src/components/deal-room/deal-room-proto.css` (the `.qp-*` wizard block
+  replaced by `.ng-*`; the LOG keeps its own rules), `tests/unit/negotiation-sheet.test.ts` (new, 17).
+  ⚠️ **NOTHING about the deal moved.** Every figure still goes through `computeRentalTotal` /
+  `computeQuoteTotals`, the seeds still come off the reconstructed rounds, the unit caps, the leg
+  exclusion and its confirmation, the term resolutions, the gating (`rate > 0`, then every term
+  answered), the submit payload, the settled read-only room and the log are all untouched. A test
+  block pins each, because a restyle is exactly when a behaviour goes missing unnoticed.
+  🔴 **The prototype's palette could not come with it.** It ships its own greys (`#EEF0F3`, `#F9FAFB`,
+  `#111827`…) and the APP keeps them privately, on the stated reasoning that mixing two near-identical
+  palettes is what makes a screen look almost-right. `palette-drift` forbids a raw hex in `src/`, so
+  each is mapped to its nearest house token — the same trade every ported prototype in this repo has
+  made since the 2026-09-06 sweep.
+  ⚠️ **The `✕` sits on the row's START edge.** The prototype's `right:12px` reads as the END edge under
+  our logical properties, which put a 16px circle on top of the price field — a control that eats the
+  first tap meant for the number. Seen in the picture, not in the source.
+  🔴 **`&#10003;` is a COLOUR to `palette-drift`.** The footer's ticks were written as HTML entities and
+  the guard read `#10003` as a hex literal. They are the glyphs themselves now. Cheap, and it would
+  have been baffling to anyone who met it in a week.
+  ⚠️ Verified: typecheck clean, lint 0 errors, **211 files / 3560 passing, 7 skipped** serially, and two
+  rulings break-checked (the labelled send reverted to «Send reply», the eyebrow forced true) - each
+  went red alone. The 3 unhandled errors are `intercom-widget`'s two and `suppliers-remove-and-pick`'s
+  one, both pre-existing and unchanged in count.
+  ⚠️ **SEEN RENDERED**: all three sheets plus the LTR mirror, built as static markup carrying the real
+  class names and the compiled tokens, served from a throwaway local server — the same method the
+  National Day skin was judged by, because `/dev/preview` does not hydrate on this machine and the sheet
+  needs a signed-in renter with a live room.
+  🔴 **NOT seen on a real room**, so three things want one look on a deployed build: the queue with a
+  term that has options (the fixture's list is hand-written), the footer at 402px with a long supplier
+  name in the header, and the accept-mode sheet, whose binding gate this change did not touch.
+
+- **2026-09-18 - The quotation is the app's `q3` sheet: EIGHT columns with delivery and return among them, ONE numbered terms list, and a navy supplier footer.**
+  Owner: *"can u check the new qoutation in the app and use it as our template here too"*, then, mid-build,
+  *"i changed some on app staging so follow it now"*.
+  🔴 **The app shipped this on 2026-09-16 and recorded the web half as owed**, in as many words:
+  *"WEB IS NOT DONE, and it is a separate renderer"*. The design is the owner's own `q3.pdf` /
+  `Moedatech Quotation - Standalone.html`, handed to the app with *"this is the quotation template u
+  must follow in the preview and in the pdf for all web and app"*. Ported from
+  `Moedatech-App/apps/mobile/.../quotation_document.dart` + `live_quotation_document.dart`, including the
+  changes sitting UNCOMMITTED on that repo's staging tree this morning (the `agreed` mark, the terminal
+  stamp, the sweep).
+  ~~A navy gradient header, avatar circles, a three-column meta strip, a "listed equipment" chip block,
+  a six-column table with the two transport legs as indented `↳` SUB-ROWS, a boxed amount in words, and
+  the terms as key/value cards.~~ Every one of those is gone:
+  (1) **A white title bar**: «Quotation» / «عرض سعر» and one strip of `LABEL` over value (NO. · REQUEST ·
+  DATE · VALID UNTIL · WORK SITE · CURRENCY), over a 2px navy rule. The navy lives on the footer and this
+  rule - a second navy band competes with the one that matters.
+  (2) **Two bordered party boxes**, bilingual eyebrow (`SUPPLIER / المورد`), the name with a green tick
+  beside it, then ONE FIELD PER LINE. 🔴 **The "✓ Verified" PILL is gone**: it stood where a registration
+  number belongs, so a firm with a checked C.R. that simply is not on the payload read identically to one
+  with no C.R. at all. The tick says it once, beside the name; an absent row is not drawn.
+  (3) 🔴 **ONE ROW PER MACHINE**, `Equipment · Description · Units · Period · Rental/unit ·
+  Delivery/unit · Return/unit · Total`. On a single-machine bid both shapes print the same figures; on a
+  multi-item one this reads as a quotation and the old one read as a list of charges.
+  ⚠️ **THREE money cell states, and the difference is the point**: a FIGURE is a price, `–` is a leg that
+  is not the supplier's (struck out in the room, or assigned to the renter by the request), and
+  «Not priced» is a leg nobody put a number on. Collapsing the last two tells a renter a price is still
+  coming when it never was, and a `0` would say the trip is free.
+  🔴 **The CHARGED DAYS moved into a note under the total**, because q3 has no quantity column: `المدة` is
+  the billing period as an ADJECTIVE and `الوحدة` is the machine count. Without it the one figure that
+  explains the total - 9 billable days, not the window's 10 - would be nowhere on the paper.
+  (4) **The totals sit in the table's own last column**, grand row on a navy rule and a pale band.
+  (5) **ONE numbered list**: the term sentences, a hairline, then the five legal clauses.
+  🔴 **The VALUE ladder is the app's own** (`_clausesForBid`): deal-room LOCKED value → latest counter →
+  the supplier's T3 declaration → the request's own side. A clause can therefore never state a term the
+  room contradicts. `BidCard` gained `counters` and `t3Declarations` for it - the mapper has always built
+  them and threw them away.
+  🔴 **«✓ Agreed» marks a SETTLED term, inline** (owner, on the app, today). `lockedTerms` and nothing
+  else: the room's SOFT-ACCEPTED set means "nobody may act on this", never "both sides agreed", and this
+  is a document a customer keeps.
+  🔴 **NO TERM MAY BE MISSING** (owner, on the app, today: *"just make sure agreed and all terms of deal
+  room is mentioned, we will not miss anything"*). After the eight written sentences, every other key the
+  room holds prints as `label: value`, agreed ones first, then by key so two renders cannot disagree.
+  ⚠️ **This REVERSES 2026-08-19's "no FIXED term reaches the paper"**, on that entry's own reasoning:
+  *"a fixed term IS part of the contract, it was accepted by the act of bidding, and a quotation that
+  omits it states less than the deal contains"*. It was right and it was outvoted; now it is the rule.
+  (6) **A navy footer** carrying the SUPPLIER's mark, name, address and registration, plus the support
+  line. A platform mark in the supplier's own footer credits the wrong party.
+  (7) **A terminal stamp beside the title** (`Accepted` / `Cancelled`), and NOTHING on a live one - a
+  sheet that stamps its own normal state teaches the reader to ignore the stamp.
+  Files: `src/lib/quotation/render.ts` (the template, rewritten), `src/lib/quotation/clauses.ts` (new -
+  the ladder, the eight sentences and the sweep, shared by both documents),
+  `src/lib/quotation/bid-quotation.ts`, `src/lib/contract/deal-room.ts` (`buildDealRoomQuotationDoc`
+  rewritten; `COST_TERM_KEYS` + `DETAILS_OWNED_TERM_KEYS` deleted), `src/lib/contract/bids.ts`
+  (`counters`, `t3Declarations`), `src/lib/contract/labels.ts` (three new value maps),
+  `src/components/workspace/RequestsWorkspace.tsx`, `tests/unit/{quotation-render,quotation-unified,
+  deal-room-quotation,labels}.test.ts`.
+  🔴 **`overtime_rate` joined `HIDDEN_DEAL_ROOM_TERM_KEYS`**, matching the app's `kHiddenDealRoomTermKeys`,
+  which has held it since the rentee stopped being asked for one. The web hid it on every SURFACE on
+  2026-09-04 and never at the PARSE - so the new sweep printed «Overtime Rate: 0x» the first time it ran,
+  which is the same `'0'` sentinel that once reached the app's own quotation. It is a SHARED filter: that
+  row is now dropped from every deal-room term surface, as it is in the app.
+  ⚠️ **`crosshire` is relabelled to «Subletting»** in the deal-room document. It IS the request's
+  `subletting` column, the renter answered it under his own word, and the old "one fact, one row" rule
+  survives the loss of the details card that used to own it.
+  ⚠️ **Three new VALUE maps, because the sweep prints keys nobody had rendered before**: `payment_terms`
+  («NET_90» → «Net 90 days» / «صافي 90 يومًا»), `operator_nationality` (the app's own «Arab» / «Non-Arab»),
+  and `insurance` (a party assignment, so it reads «Supplier» rather than a lower-case code). The bid
+  builder's private copy of the payment map went with them - one spelling, two documents.
+  ⚠️ **Dates are LATIN in both locales.** `ar-SA` formats with Arabic-Indic digits and BOTH builders were
+  printing them; the product-wide rule is 2026-09-04's. Seen on the first render, not reasoned about.
+  ⚠️ **Halalas print only when there are any.** `219,075.00 SAR` is wider than the column the fixed table
+  layout gives the grand cell, and it was clipped to «219,075.00 s.» at the sheet's own width. A whole-riyal
+  total prints whole, which is also how the app draws it.
+  ⚠️ **The DRAFT marking is kept, and it is web-only** - q3 has no slot for it. A pre-confirmation
+  quotation is not a document anyone may rely on: the supplier can still counter.
+  🔴 **A backtick inside the CSS template literal ended the string.** `` `/unit` `` in a comment inside
+  `QUOTATION_STYLE` closed it, and the compiler then read the CSS after it as expressions - two errors
+  pointing at lines that looked innocent. Same family as the `${}` trap: a template literal holding a
+  stylesheet may contain neither.
+  ⚠️ Verified: typecheck clean, lint 0 errors, **210 files / 3543 passing, 7 skipped** serially, and two
+  rulings break-checked (the leg's «not the supplier's» arm removed, the term sweep emptied) - each went
+  red alone. The 3 unhandled errors are `intercom-widget`'s two and `suppliers-remove-and-pick`'s one,
+  both pre-existing.
+  ⚠️ **SEEN RENDERED**, which is how the digits, the clipped total, the raw `NET_90` and the raw
+  nationality were all found: all four documents (the bid quotation and the deal-room one, EN and AR)
+  built from fixtures, written to disk and served over a throwaway local server, since `/dev/preview` does
+  not hydrate on this machine and both real surfaces need a signed-in renter.
+  🔴 **NOT seen on a real request or a real room**, and the two things to look at first are a bid whose
+  supplier has a LOGO (the footer tile is drawn only when there is a mark) and a multi-item RFQ, where the
+  eight columns are at their narrowest.
+  🔴 **BACKEND, theirs not ours, and unchanged here:** `apps/backend/src/services/deal-room/
+  quotation.service.ts` still builds the STORED deal-room PDF (`pdfUrl` / `pdfStatus`) on the old
+  template. The web renders its own HTML and never opens that file, so nothing on this side reads it -
+  but a renter who receives it from the app gets the old sheet. The app's own change log already carries
+  this as owed work.
+
 - **2026-09-18 - The dashboard's tabs are boxed again: a glyph, a count pill and an orange foot under the open one.**
   Owner, handing over a screenshot of another product's tab strip: *"use like these tabs design in
   the dashboard"*.

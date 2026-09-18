@@ -1071,6 +1071,9 @@ export function DealRoom({ id, onTitle, initialFlow }: {
           onClose={closeFlow}
           onCounter={submitCounter}
           onAccept={doAccept}
+          // Accept from the counter's review step goes through the accept flow, gate and all.
+          onAcceptInstead={() => setFlowMode("accept")}
+          onOpenQuotation={openQuotation}
         />
       )}
 
@@ -1263,6 +1266,7 @@ function CounterFlow({
   mode, room, ar, L, busy, error,
   resolutions, onResolveLocal, onReopenLocal, unresolvedCount,
   periodLabel, periods, hasDuration, units, messages, onClose, onCounter, onAccept,
+  onAcceptInstead, onOpenQuotation,
 }: {
   mode: "counter" | "accept";
   room: DealRoomView;
@@ -1285,6 +1289,18 @@ function CounterFlow({
     rentalUnits?: number; mobUnits?: number; demobUnits?: number; mobExcluded?: boolean; demobExcluded?: boolean;
   }) => void;
   onAccept: (contractType: string) => void;
+  /**
+   * «Accept offer» from the REVIEW step of a counter (app parity, 2026-09-18: accept stands beside
+   * send when everything matches — they are different acts and neither stands in for the other).
+   *
+   * ⚠️ It hands the decision back to the ROOM rather than calling `onAccept` here, so the press lands
+   * on the accept flow's binding-commitment gate. Accepting is the one act on this sheet the renter
+   * is warned about, and reaching it through a button that skipped the warning would be the sheet
+   * deciding he had already read it.
+   */
+  onAcceptInstead?: () => void;
+  /** The room's own quotation, from step ③ — the same document its CTA opens, never a second one. */
+  onOpenQuotation?: () => void;
 }) {
   /**
    * A settled room still opens the sheet, read-only, and says why in its header (owner, 2026-09-08).
@@ -1341,13 +1357,18 @@ function CounterFlow({
   const [mobExcluded, setMobExcluded] = useState<boolean>(latestRound?.mobExcluded ?? room.mobExcluded);
   const [demobExcluded, setDemobExcluded] = useState<boolean>(latestRound?.demobExcluded ?? room.demobExcluded);
   const [cmpOpen, setCmpOpen] = useState(false); // compare-card per-line breakdown toggle
+  // The term whose options are open. ONE at a time: the prototype answers the queue in order, and two
+  // option lists open at once is two questions asked at once.
+  const [openTerm, setOpenTerm] = useState<string | null>(null);
+  // The two collapsed groups under the queue — shut by default, as the prototype draws them.
+  const [ackOpen, setAckOpen] = useState(false);
+  const [agreedOpen, setAgreedOpen] = useState(false);
   // Confirm before a leg (delivery/return) is excluded from the offer — reversible, but the app confirms.
   const [pendingEx, setPendingEx] = useState<null | { title: string; onYes: () => void }>(null);
   // Quotation-paper UI-only state (spec §6): collapsible دليل البنود categories + the السجل log modal.
   const [guideOpen, setGuideOpen] = useState<Record<string, boolean>>({});
   const [logOpen, setLogOpen] = useState(false);
   const [logTab, setLogTab] = useState<"all" | "price" | "terms">("all");
-  const [paperZoom, setPaperZoom] = useState(0.85); // desk paper zoom (§6 oldWrap): 50%–180%
 
   const num = (s: string) => { const n = Number(s); return s.trim() !== "" && !Number.isNaN(n) && n >= 0 ? n : 0; };
   const rate = editable ? num(rateStr) : (room.rate ?? 0);
@@ -1393,21 +1414,6 @@ function CounterFlow({
   const vat = Math.round(lines.overall.vat);
   const total = subtotal + vat;
 
-  // العدد stepper — symmetric, capped. Rental caps at requested; mob/demob cap at the current rental.
-  const Stepper = ({ value, min, max, onChange, disabled }: { value: number; min: number; max: number; onChange: (v: number) => void; disabled?: boolean }) => {
-    const btn = (d: number, lbl: string, off: boolean) => (
-      <button type="button" disabled={disabled || off} onClick={() => onChange(Math.max(min, Math.min(max, value + d)))}
-        className="grid h-[26px] w-[26px] place-items-center rounded-sm border text-subhead font-extrabold disabled:bg-disabled-bg disabled:text-disabled-fg"
-        style={{ borderColor: "var(--border,var(--border))", color: "var(--navy,var(--navy-deep))", background: "var(--surface1,var(--surface))" }}>{lbl}</button>
-    );
-    return (
-      <span className="inline-flex items-center gap-1.5">
-        {btn(-1, "−", value <= min)}
-        <span className="min-w-[20px] text-center text-body font-extrabold" style={{ color: "var(--navy,var(--navy-deep))" }}>{value}</span>
-        {btn(1, "+", value >= max)}
-      </span>
-    );
-  };
   const sar = L("SAR", "ر.س");
   const money = (v: number) => `${nf(v)} ${sar}`;
 
@@ -1492,7 +1498,6 @@ function CounterFlow({
     if (supStr(t) != null && val === supStr(t)) onResolveLocal(t.key, "accept");
     else onResolveLocal(t.key, "counter", val);
   };
-  const chosenSel = (t: DealTerm): string => { const c = decide(t).chosen; return c != null ? String(c) : "__none"; };
   const catOf = (k: string): string => {
     if (/^operator|^fat|nationality|night_shift/.test(k)) return L("Operator", "المشغّل");
     if (/fuel|maintenance|breakdown|equipment|saso|attachment/.test(k)) return L("Equipment", "المعدّة");
@@ -1574,339 +1579,356 @@ function CounterFlow({
   const showCompare = editable && room.lastCounterBy === "supplier";
   const priceDiff = Math.abs(total - supTotal);
 
-  const STEPS = [L("Price", "السعر"), L("Terms", "الشروط"), L("Review", "المراجعة")];
-  const sheetTitle = `${room.details.equipmentLabel ?? L("Equipment", "المعدّة")}${rNU > 1 ? ` — ${rNU} ${L("units", "وحدات")}` : ""}`;
-  const roomCode = room.shortCode ?? "";
-  // Round number in the header + the Log list — from the history reconstructed at the top of the flow.
-  const roundNo = flowRounds.length + 1;
-  const today = new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const STEP_NAMES = [L("Price", "السعر"), L("Terms", "الشروط"), L("Review", "المراجعة")];
   const changedFrom = (cur: number, ref: number | null) => ref != null && Math.round(cur) !== Math.round(ref);
 
-  // Quotation head (reused on the price + review papers). CR/VAT + a formal quotation number aren't in
-  // the deal-room payload, so we show the company + location + the room short code (no fabricated ids).
-  const qhead = () => (
-    <div className="qp-qhead">
-      <div className="qp-qco">
-        <div className="qp-qlogo">{room.supplier.name.charAt(0).toUpperCase()}</div>
-        <div className="qp-qcoinfo">
-          <b>{room.supplier.name}</b>
-          {room.details.location && <span className="ln">{room.details.location}</span>}
-        </div>
+  /**
+   * «🔔 New offer from the supplier», and ONLY then (app parity, 2026-09-18).
+   *
+   * ⚠️ DERIVED, never a flag: the other side posted the last round, so the ball is in this reader's
+   * court. There is no seen/unseen bit on a round, and inventing one the sheet could not clear would
+   * leave the eyebrow lit for good. With no new offer the header keeps the bare caption, because one
+   * that is always there names what the bar's only number obviously is.
+   */
+  const theirsIsLatest = latestRound?.role === "supplier";
+
+  /** The count stepper, on the prototype's own 18px squares. */
+  const Qty = ({ value, min, max, onChange, live }: { value: number; min: number; max: number; onChange: (v: number) => void; live: boolean }) => (
+    <span className="ng-qty">
+      <button type="button" disabled={!live || value <= min} onClick={() => onChange(Math.max(min, value - 1))}>−</button>
+      <b>{value}</b>
+      <button type="button" disabled={!live || value >= max} onClick={() => onChange(Math.min(max, value + 1))}>+</button>
+    </span>
+  );
+
+  /**
+   * One money cell. 🔴 Its COLOURS are the state: green while the figure still matches the supplier's
+   * standing offer, amber the moment it is edited, and the «Supplier: N» line under it turns with
+   * them. That is the whole of how the prototype says "you have moved this".
+   */
+  const PriceCell = ({ val, onChange, ref: refVal, live }: { val: string; onChange: (s: string) => void; ref: number | null; live: boolean }) => {
+    const edited = refVal != null && changedFrom(num(val), refVal);
+    if (!live) return <div className="ng-price"><b>{nf(num(val))}</b></div>;
+    return (
+      <div className={`ng-price${edited ? " edited" : ""}`}>
+        <input type="number" inputMode="numeric" min={0} value={val} placeholder="0" onChange={(e) => onChange(e.target.value)} />
+        {refVal != null && <div className="ref">{L("Supplier", "المورد")}: {nf(refVal)}</div>}
       </div>
-      <div className="qp-qno" dir="ltr">
-        <div className="lbl">{L("QUOTATION №", "عرض سعر رقم")}</div>
-        <div className="num">{roomCode || "—"}</div>
-        <div className="sub">{L("Issued", "التاريخ")} {today}</div>
-      </div>
+    );
+  };
+
+  /** One line of the price table: the machine, then each transport leg. */
+  const priceRow = (o: {
+    key: string; label: string; duration: string; durationSub?: string | null;
+    qty: number; qtyMin: number; qtyMax: number; onQty: (v: number) => void;
+    val: string; onVal: (s: string) => void; refVal: number | null;
+    excluded?: boolean; onExclude?: (b: boolean) => void; exTitle?: string;
+  }) => (
+    <div key={o.key} className={`ng-row${o.excluded ? " off" : ""}`}>
+      {o.onExclude && editable && (
+        <button type="button" className={`ng-rm${o.excluded ? " on" : ""}`} title={o.excluded ? L("Restore", "استعادة") : L("Exclude", "استبعاد")}
+          onClick={() => (o.excluded ? o.onExclude!(false) : setPendingEx({ title: o.exTitle ?? "", onYes: () => o.onExclude!(true) }))}>
+          {o.excluded ? "+" : "✕"}
+        </button>
+      )}
+      <span className="lbl" title={o.label}>{o.label}</span>
+      <span className="dur">{o.duration}{o.durationSub ? <span className="sub">{o.durationSub}</span> : null}</span>
+      {o.excluded ? <span className="out">{L("Excluded", "مستبعد")}</span> : <Qty value={o.qty} min={o.qtyMin} max={o.qtyMax} onChange={o.onQty} live={editable} />}
+      {o.excluded ? <span className="out">—</span> : <PriceCell val={o.val} onChange={o.onVal} ref={o.refVal} live={editable} />}
     </div>
   );
 
-  // Editable price → the prototype's green "عدّل" box (green tint + inner edit icon).
-  const priceBox = (val: string, onChange: (s: string) => void) => (
-    <span className="qp-pricebox"><span className="material-icons-outlined ic">edit</span><input type="number" inputMode="numeric" min={0} value={val} onChange={(e) => onChange(e.target.value)} className="qp-price-in" placeholder="0" /></span>
-  );
-
-  // A price-table leg row (mob/demob): red ✕ exclude + trip stepper + green price box + المورد ref.
-  const legTr = (label: string, sub: string, priceStr: string, setPrice: (s: string) => void, u: number, setU: (v: number) => void, ex: boolean, setEx: (b: boolean) => void, refPrice: number | null, refUnits: number | null, exTitle: string) => {
-    // Capped only while editing — see `mNU`/`dNU` above.
-    const shown = editable ? Math.min(u, rentalUnits) : u;
-    const line = ex ? 0 : num(priceStr) * shown;
+  /**
+   * A term, in the prototype's three states.
+   *
+   * `done` — settled, a quiet strip with ✓ (took the supplier's) or ✎ (countered).
+   * `now`  — the one being answered: the two positions, then «Change» and «Take theirs».
+   * `later`— waiting its turn, dashed and dimmed.
+   *
+   * ⚠️ ONE queue, one term at a time. ~~A four-column table of every term at once, with a dropdown in
+   * each row.~~ The prototype answers them in order, which is what makes «resolve everything before
+   * you send» readable rather than a table the renter has to audit.
+   */
+  const termCard = (t: DealTerm, state: "done" | "now" | "later") => {
+    const d = decide(t);
+    const mine = resolutions[t.key];
+    const label = ar ? t.labelAr : t.label;
+    const notes = termNotes(t);
+    if (state === "later") {
+      return (
+        <div key={t.key} className="ng-t later">
+          <span className="k">{label}</span>
+          <span className="w">{L("waiting for the one above", "بانتظار البند السابق")}</span>
+        </div>
+      );
+    }
+    if (state === "done") {
+      const countered = mine?.action === "counter";
+      return (
+        <div key={t.key} className="ng-t done">
+          <span className="k">{label}{notes && <span className="why">{notes}</span>}</span>
+          <span className={`v${countered ? " changed" : ""}`}>
+            {countered ? "✎" : "✓"} {tval(t, d.chosen ?? t.value ?? t.supplierDeclared)}
+            {editable && mine && <button type="button" className="undo" title={L("Reopen", "إعادة فتح")} onClick={() => onReopenLocal(t.key)}>↻</button>}
+          </span>
+        </div>
+      );
+    }
+    const opts = choicesFor(t);
+    const open = openTerm === t.key;
     return (
-      <tr className={ex ? "ex" : undefined}>
-        <td>
-          <div className="qp-itemcell">
-            {editable && !ex && <button type="button" className="qp-legx" title={L("Exclude", "استبعاد")} onClick={() => setPendingEx({ title: exTitle, onYes: () => setEx(true) })}>✕</button>}
-            <div>
-              <div className="lbl">{label}</div>
-              <div className="sub">{sub}</div>
-              {editable && ex && <button type="button" className="qp-legbtn restore" onClick={() => setEx(false)}>+ {L("Restore", "استعادة")}</button>}
+      <div key={t.key} className="ng-t now">
+        <div className="h">
+          <span className="k">{label}{notes && <span className="why">{notes}</span>}</span>
+          <span className="side">{L("Yours", "اختيارك")}: <b>{d.chosen != null ? tval(t, d.chosen) : L("not set", "غير محدد")}</b> · {L("Supplier", "المورد")}: <b>{tval(t, t.supplierDeclared)}</b></span>
+        </div>
+        {editable && (
+          <>
+            <div className="acts">
+              <button type="button" className="change" onClick={() => setOpenTerm(open ? null : t.key)}>{L("Change", "تغيير")}</button>
+              <button type="button" className="take" disabled={supStr(t) == null} onClick={() => { onResolveLocal(t.key, "accept"); setOpenTerm(null); }}>{L("Take theirs", "قبول")}</button>
             </div>
-          </div>
-        </td>
-        <td className="mut">{L("Trip", "رحلة")}</td>
-        <td>{ex ? "—" : <div className="qp-qty">{editable && <span className="hint">{L("Your choice", "خيارك")}</span>}{editable ? <Stepper value={shown} min={0} max={rentalUnits} onChange={setU} /> : <b>{shown}</b>}{editable && refUnits != null && <div className={`qp-ref${changedFrom(shown, refUnits) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {refUnits} {L("units", "وحدة")}</div>}</div>}</td>
-        <td>
-          {ex ? <span className="qp-excluded">{L("Excluded", "مستبعد")}</span>
-            : editable ? <>{priceBox(priceStr, setPrice)}{refPrice != null && <div className={`qp-ref${changedFrom(num(priceStr), refPrice) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {nf(refPrice)}</div>}</>
-            : <b className="tot">{money(num(priceStr))}</b>}
-        </td>
-        <td><b className="tot">{ex ? L("Not incl.", "غير مشمول") : money(line)}</b></td>
-      </tr>
+            {open && (
+              <div className="opts">
+                {opts.map((o) => (
+                  <button key={o.value} type="button" className={o.value === supStr(t) ? "on" : undefined}
+                    onClick={() => { pickTerm(t, o.value); setOpenTerm(null); }}>{o.label}</button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
     );
   };
 
-  // One row of the compare-card per-line breakdown (app _DeltaTable parity): your PER-UNIT price vs the
-  // supplier's per-unit price (rate / mobPrice / demobPrice) + the per-line difference. Units are shown
-  // separately in the qty steppers' "Supplier: N units" refs (app splits price vs count the same way).
-  // Excluded legs read "Not included".
-  const cmpRow = (label: string, mine: number, myEx: boolean, theirs: number, theirEx: boolean) => {
-    const bothEx = myEx && theirEx;
-    const oneEx = myEx !== theirEx;
-    const eq = Math.round(mine) === Math.round(theirs);
-    const noDiff = bothEx || (!oneEx && eq); // no meaningful per-unit difference to show
-    return (
-      <tr>
-        <td className="ln">{label}</td>
-        <td>{myEx ? <span className="na">{L("Not incl.", "غير مشمول")}</span> : nf(mine)}</td>
-        <td>{theirEx ? <span className="na">{L("Not incl.", "غير مشمول")}</span> : nf(theirs)}</td>
-        <td className={noDiff ? "na" : "gap"}>{bothEx ? "—" : oneEx ? "±" : eq ? "—" : nf(Math.abs(mine - theirs))}</td>
-      </tr>
-    );
+  // The queue: the terms this renter still has to answer, in order. A term the SERVER settled, and one
+  // fixed by the request, are not in it — they are the two groups underneath.
+  const queue = operatingTerms.filter((t) => { const d = decide(t); return !d.server && d.badge !== "locked"; });
+  const firstOpen = queue.findIndex((t) => !resolutions[t.key]);
+  const agreedTerms = operatingTerms.filter((t) => { const d = decide(t); return d.server && d.badge === "match"; });
+  const ackTerms = operatingTerms.filter((t) => decide(t).badge === "locked");
+
+  const payCard = (t: DealTerm) => {
+    const d = decide(t);
+    const settledHere = d.server || !!resolutions[t.key];
+    return termCard(t, settledHere ? "done" : "now");
   };
+
+  const quotationHref = `/deal-room/${room.id}`;
 
   return (
     <div className="qp-scrim" dir={ar ? "rtl" : "ltr"} onClick={() => !busy && onClose()}>
-      <div className="qp-sheet qp-full" onClick={(e) => e.stopPropagation()}>
-        {/* two-row header */}
-        <div className="qp-head">
-          <div className="qp-head-r1">
-            <div className="qp-htitle">
-              <div className="t">{sheetTitle}</div>
-              <div className="s">{L("Negotiation room", "غرفة التفاوض")}{roomCode ? ` · ${roomCode}` : ""} · {L(`Round ${roundNo}`, `الجولة ${roundNo}`)}</div>
-              {/* The status the renter arrived into, in the sheet's own header — see `settledNote`. */}
-              {settledNote && (
-                <div className={`qp-hnote${room.status === "ABANDONED" ? " danger" : ""}`}>
-                  <span className="material-icons-outlined">{room.status === "ABANDONED" ? "cancel" : room.status === "CLOSED" ? "verified" : "schedule"}</span>
-                  {settledNote}
-                </div>
-              )}
-            </div>
-            <div className="qp-htotal"><div className="k">{L("Your offer", "إجمالي عرضك")}</div><div className="v">{nf(total)} {sar}</div></div>
-            <button className="qp-x" onClick={() => !busy && onClose()} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
+      <div className="ng-shell" onClick={(e) => e.stopPropagation()}>
+        {/* ── header: the running total, and who is on the other side ── */}
+        <div className="ng-head">
+          <div className="ng-head-l">
+            {theirsIsLatest
+              ? <div className="ng-new">🔔 {L("New offer from the supplier", "عرض جديد من المورد")}</div>
+              : <div className="ng-head-cap">{L("Total", "الإجمالي")}</div>}
+            <div className="ng-net">{nf(total)} <span className="cur">{sar}</span></div>
+            {settledNote && (
+              <div className={`ng-note${room.status === "ABANDONED" ? " danger" : ""}`}>
+                <span className="material-icons-outlined">{room.status === "ABANDONED" ? "cancel" : room.status === "CLOSED" ? "verified" : "schedule"}</span>
+                {settledNote}
+              </div>
+            )}
           </div>
-          <div className="qp-steps">
-            {STEPS.map((s, i) => (
-              <Fragment key={i}>
-                {i > 0 && <span className={`bar${i <= page ? " done" : ""}`} />}
-                <span className={`qp-step${i === page ? " on" : i < page ? " done" : ""}`}>
-                  <span className="badge">{i < page ? "✓" : i + 1}</span>
-                  <span className="lbl">{s}</span>
-                </span>
-              </Fragment>
-            ))}
+          <div className="ng-party">
+            <b title={room.supplier.name}>{room.supplier.name}</b>
+            <span className="ng-ava">{room.supplier.name.charAt(0).toUpperCase()}</span>
+            <button type="button" className="ng-x" onClick={() => !busy && onClose()} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
           </div>
         </div>
 
-        {/* body — full-screen grey desk holding the zoomable white paper (§6 oldWrap) */}
-        <div className="qp-desk">
-          <div className="qp-deskpad">
-          {/* ① السعر — quotation paper */}
+        <div className="ng-body">
+          {/* ── ① the price ─────────────────────────────────────────────────────────────────── */}
           {page === 0 && (
-            <div className="qp-paper" style={{ zoom: String(paperZoom) }}>
+            <>
               {showCompare && (
-                <div className="qp-compare">
-                  <div className="duo">
-                    <div className="side sup"><div className="k">{L("Supplier's offer", "عرض المورد")}</div><div className="v">{nf(supTotal)}</div></div>
-                    <div className="side me"><div className="k">{L("Your offer", "عرضك")}</div><div className="v">{nf(total)}</div></div>
-                  </div>
-                  <div className="conv"><span className="track" /><span className={`chip${priceDiff === 0 ? " ok" : ""}`}>{priceDiff === 0 ? L("Match ✓", "تطابق ✓") : `${L("Gap", "الفرق")} ${nf(priceDiff)}`}</span><span className="track" /></div>
-                  <button type="button" className="qp-cmp-toggle" onClick={() => setCmpOpen((o) => !o)} aria-expanded={cmpOpen}>
-                    <span>{cmpOpen ? L("Hide breakdown", "إخفاء التفاصيل") : L("Show breakdown", "عرض التفاصيل")}</span>
-                    <span className="material-icons-outlined">{cmpOpen ? "expand_less" : "expand_more"}</span>
-                  </button>
-                  {cmpOpen && (
-                    <div className="qp-scrollx"><table className="qp-cmp-tbl">
-                      <thead><tr><th>{L("Per-unit rate", "السعر لكل وحدة")}</th><th>{L("Yours", "عرضك")}</th><th>{L("Supplier", "المورد")}</th><th>{L("Difference", "الفرق")}</th></tr></thead>
-                      <tbody>
-                        {cmpRow(L("Base rental", "الإيجار الأساسي"), rate, false, supDeal.rate, false)}
-                        {cmpRow(L("Mobilization", "التعبئة"), mob, mEx, supDeal.mobPrice, supDeal.mobExcluded)}
-                        {cmpRow(L("Return: demob", "الإرجاع"), demob, dEx, supDeal.demobPrice, supDeal.demobExcluded)}
-                      </tbody>
-                    </table></div>
-                  )}
-                </div>
-              )}
-              {qhead()}
-              <div className="qp-sech">{L("Price quotation", "عرض السعر")}</div>
-              <div className="qp-scrollx"><table className="qp-table">
-                <thead><tr><th>{L("Item", "البند")}</th><th>{L("Duration", "المدة")}</th><th>{L("Qty", "العدد")}</th><th>{L("Price", "السعر")}</th><th>{L("Total", "الإجمالي")}</th></tr></thead>
-                <tbody>
-                  <tr>
-                    <td><div className="lbl">{L("Base rental", "الإيجار الأساسي")}</div><div className="sub">{room.details.equipmentLabel ?? periodLabel}</div></td>
-                    {/* Billable days, not the calendar duration — the rate below is charged across THESE,
-                        exactly as the bid card's rental row states it. The calendar span stays underneath
-                        so the renter can see where the number came from. */}
-                    <td className="mut">
-                      {hasDuration && !rentalCalc.raw ? (
-                        <>
-                          <div>{rentalCalc.billable} {L("days", "يوم")}</div>
-                          <div className="sub">{periods} {L("days, Fridays excluded", "يوم، باستثناء الجمعة")}</div>
-                        </>
-                      ) : hasDuration ? `${periods} ${L("days", "يوم")}` : "—"}
-                    </td>
-                    <td><div className="qp-qty">{editable && <span className="hint">{L("Your choice", "خيارك")}</span>}{editable ? <Stepper value={rentalUnits} min={1} max={cap} onChange={(v) => { setRentalUnits(v); setMobUnitsN((u) => Math.min(u, v)); setDemobUnitsN((u) => Math.min(u, v)); }} /> : <b>{rNU}</b>}<span className="qp-qmatch">✓ {L("Qty", "العدد")} {rNU}</span>{editable && supRound?.rentalUnits != null && <div className={`qp-ref${changedFrom(rentalUnits, supRound.rentalUnits) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {supRound.rentalUnits} {L("units", "وحدة")}</div>}</div></td>
-                    <td>
-                      {editable ? <>{priceBox(rateStr, setRateStr)}{refRate != null && <div className={`qp-ref${changedFrom(rate, refRate) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {nf(refRate)}</div>}</> : <b className="tot">{money(rate)}</b>}
-                      {/* The rate is per PERIOD, and the divisor is what turns it into the day count in the
-                          Duration column. Both stated the way the bid card states them. */}
-                      <div className="sub">/ {periodLabel}{rentalDivisorNote ? ` · ${rentalDivisorNote}` : ""}</div>
-                    </td>
-                    <td><b className="tot">{money(rentalLine)}</b></td>
-                  </tr>
-                  {legTr(L("Mobilization: mob", "التعبئة: موب"), L("delivery", "توصيل"), mobStr, setMobStr, mobUnitsN, setMobUnitsN, mobExcluded, setMobExcluded, refMobPrice, supRound?.mobUnits ?? null, L("Cancel mobilization (delivery to site) from the supplier?", "إلغاء التعبئة (النقل إلى الموقع) من المورد؟"))}
-                  {legTr(L("Return: demob", "الإرجاع: ديموب"), L("pickup", "استلام"), demobStr, setDemobStr, demobUnitsN, setDemobUnitsN, demobExcluded, setDemobExcluded, refDemobPrice, supRound?.demobUnits ?? null, L("Cancel demobilization (return from site) from the supplier?", "إلغاء الإرجاع (النقل من الموقع) من المورد؟"))}
-                </tbody>
-              </table></div>
-              <div className="qp-totals">
-                <div className="qp-trow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{money(subtotal)}</span></div>
-                <div className="qp-trow"><span className="l">{L("VAT 15%", "ضريبة القيمة المضافة 15٪")}</span><span className="v">{money(vat)}</span></div>
-                <div className="qp-trow net"><span className="l">{L("Net incl. VAT", "الصافي شامل الضريبة")}</span><span className="v">{money(total)}</span></div>
-              </div>
-              <div className="qp-words"><span className="k">{L("Amount in words", "المبلغ بالحروف")}</span>{nf(total)} {L("Saudi Riyals only", "ريال سعودي فقط لا غير")}</div>
-              {payTerms.length > 0 && (
-                <div className="qp-pay">
-                  <div className="qp-sech">{L("Payment terms", "شروط الدفع")}</div>
-                  {payTerms.map((t) => { const d = decide(t); const opts = choicesFor(t); return (
-                    <div key={t.key} className="qp-pay-row">
-                      <span className="k">{ar ? t.labelAr : t.label}{termNotes(t)}</span>
-                      {editable && !d.server ? (
-                        <Dropdown
-                          label={ar ? t.labelAr : t.label}
-                          placeholder={L(": choose", ": اختر")}
-                          value={chosenSel(t) === "__none" ? null : chosenSel(t)}
-                          onChange={(v) => pickTerm(t, v)}
-                          options={opts.map((o) => ({ value: o.value, label: o.label }))}
-                        />
-                      ) : <b style={{ flex: 1 }}>{tval(t, d.chosen ?? t.supplierDeclared)}</b>}
-                      <span className={`qp-badge ${isSettled(d.badge) ? "match" : d.badge === "conflict" ? "diff" : "none"}`}>{badgeLabel(d.badge)}</span>
-                    </div>
-                  ); })}
-                </div>
-              )}
-              {editable && !rateValid && <p style={{ marginTop: 10, fontSize: 12, fontWeight: 700, color: "var(--danger,var(--danger))" }}>{L("Enter a rate to continue", "أدخل سعرًا للمتابعة")}</p>}
-            </div>
-          )}
-
-          {/* ② الشروط — classic quotation table */}
-          {page === 1 && (
-            <div className="qp-paper" style={{ zoom: String(paperZoom) }}>
-              {qhead()}
-              <div className="qp-sech">{L("Operating terms", "شروط التشغيل")}</div>
-              {operatingTerms.length === 0 ? (
-                <p style={{ padding: "20px 0", textAlign: "center", color: "var(--muted,var(--muted))", fontSize: 13 }}>{L("No operating terms.", "لا توجد شروط تشغيل.")}</p>
-              ) : (
-                <div className="qp-scrollx"><table className="qp-tt">
-                  <thead><tr><th>{L("Term", "البند")}</th><th>{L("Supplier's offer", "عرض المورد")}</th><th>{L("Your decision", "قرارك")}</th><th>{L("Status", "الحالة")}</th></tr></thead>
-                  <tbody>
-                    {groupByCat(operatingTerms.filter((t) => !isSettled(decide(t).badge))).map(([cat, list]) => (
-                      <Fragment key={cat}>
-                        <tr className="cat"><td colSpan={4}>{cat}</td></tr>
-                        {list.map((t) => { const d = decide(t); const opts = choicesFor(t); return (
-                          <tr key={t.key}>
-                            <td className="lbl">{ar ? t.labelAr : t.label}{termNotes(t)}</td>
-                            <td className="sup">{tval(t, t.supplierDeclared)}</td>
-                            <td>{editable ? (
-                              <Dropdown
-                                label={ar ? t.labelAr : t.label}
-                                placeholder={L(": choose", ": اختر")}
-                                value={chosenSel(t) === "__none" ? null : chosenSel(t)}
-                                onChange={(v) => pickTerm(t, v)}
-                                options={opts.map((o) => ({ value: o.value, label: o.label }))}
-                              />
-                            ) : <span className="sup">{tval(t, d.chosen)}</span>}</td>
-                            <td><span className={`qp-ttbadge ${d.badge}`}>{badgeLabel(d.badge)}</span></td>
-                          </tr>
-                        ); })}
-                      </Fragment>
-                    ))}
-                    {/* SETTLED and ACKNOWLEDGE are two sections, not one (app parity: the terms page's
-                        Negotiable and Acknowledge buckets).
-
-                        ~~One "Settled & fixed terms" section.~~ It put two unlike things under one
-                        heading: a term the renter just settled, which he chose and can reopen, beside
-                        a term FIXED by his own request and accepted by the act of bidding, which was
-                        never his to argue. Both carried the right badge, so nothing was wrong — but a
-                        renter scanning headings had to read every badge to learn which rows were still
-                        his to touch. */}
-                    {operatingTerms.some((t) => decide(t).badge === "match") && (
-                      <>
-                        <tr className="cat settled"><td colSpan={4}>{L("Settled", "البنود المحسومة")}</td></tr>
-                        {operatingTerms.filter((t) => decide(t).badge === "match").map((t) => { const d = decide(t); return (
-                          <tr key={t.key}>
-                            <td className="lbl">{ar ? t.labelAr : t.label}{termNotes(t)}</td>
-                            <td className="sup" colSpan={2}>{tval(t, d.chosen ?? t.value)}{editable && !d.server && <button type="button" className="qp-ttreopen" title={L("Reopen", "إعادة فتح")} onClick={() => onReopenLocal(t.key)}>↻</button>}</td>
-                            <td><span className={`qp-ttbadge ${d.badge}`}>{badgeLabel(d.badge)}</span></td>
-                          </tr>
-                        ); })}
-                      </>
-                    )}
-                    {operatingTerms.some((t) => decide(t).badge === "locked") && (
-                      <>
-                        <tr className="cat settled"><td colSpan={4}>{L("Acknowledge: fixed by your request", "للعلم: مثبّتة من طلبك")}</td></tr>
-                        {operatingTerms.filter((t) => decide(t).badge === "locked").map((t) => { const d = decide(t); return (
-                          <tr key={t.key} className="locked">
-                            <td className="lbl">🔒 {ar ? t.labelAr : t.label}{termNotes(t)}</td>
-                            <td className="sup" colSpan={2}>{tval(t, d.chosen ?? t.value)}</td>
-                            <td><span className={`qp-ttbadge ${d.badge}`}>{badgeLabel(d.badge)}</span></td>
-                          </tr>
-                        ); })}
-                      </>
-                    )}
-                  </tbody>
-                </table></div>
-              )}
-            </div>
-          )}
-
-          {/* ③ المراجعة — quotation summary */}
-          {page === 2 && (
-            <div className="qp-paper" style={{ zoom: String(paperZoom) }}>
-              {qhead()}
-              {room.details.location && (
-                <div className="qp-addr">
-                  <div className="qp-addrbox"><span className="k">{L("Address", "العنوان")}</span><span className="v">{room.details.location ? cityLabel(room.details.location, L) : "—"}</span></div>
-                  <div className="qp-addrbox"><span className="k">{L("City", "المدينة")}</span><span className="v">{room.details.location.split(/[·,،]/).map((s) => s.trim()).filter(Boolean).pop()}</span></div>
-                </div>
-              )}
-              <div className="qp-rgrid">
-                <div className="qp-rcol">
-                  <div className="qp-rcard">
-                    <div className="qp-rcard-h"><span className="material-icons-outlined">receipt_long</span>{L("Price summary", "ملخص عرض السعر")}</div>
-                    <div className="qp-totals" style={{ borderTop: 0, paddingTop: 0 }}>
-                      {/* The days quoted here are the BILLABLE ones — the rental below is charged across
-                          exactly these, and naming the calendar span would overstate what the money buys. */}
-                      <div className="qp-trow"><span className="l">{L("Quantity", "الكمية")}</span><span className="v">{rNU} {L("units", "وحدة")}{hasDuration ? (rentalCalc.raw ? ` · ${periods} ${L("days", "يوم")}` : ` · ${rentalCalc.billable} ${L("billable days", "يوم محتسب")}`) : ""}</span></div>
-                      <div className="qp-trow"><span className="l">{L("Base rental", "الإيجار الأساسي")}</span><span className="v">{money(rentalLine)}{rentalDivisorNote ? <span className="sub"> · {rentalDivisorNote}</span> : null}</span></div>
-                      <div className="qp-trow"><span className="l">{L("Mobilization", "التعبئة (موب)")}</span><span className="v">{mEx ? L("Excluded", "غير مشمولة") : money(mobLine)}</span></div>
-                      <div className="qp-trow"><span className="l">{L("Return", "الإرجاع (ديموب)")}</span><span className="v">{dEx ? L("Excluded", "غير مشمول") : money(demobLine)}</span></div>
-                      <div className="qp-trow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{money(subtotal)}</span></div>
-                      <div className="qp-trow"><span className="l">{L("VAT (15%)", "ضريبة القيمة المضافة (15٪)")}</span><span className="v">{money(vat)}</span></div>
-                      <div className="qp-trow net"><span className="l">{L("Net incl. VAT", "الصافي · شامل الضريبة")}</span><span className="v">{money(total)}</span></div>
-                    </div>
-                    {showCompare && <span className={`qp-sumbadge${priceDiff === 0 ? " match" : " diff"}`}>{priceDiff === 0 ? L("Matches supplier's offer", "مطابق لعرض المورد") : `${L("Differs from supplier", "يختلف عن عرض المورد")} (${nf(priceDiff)})`}</span>}
-                  </div>
-                  {payTerms.length > 0 && (
-                    <div className="qp-rcard">
-                      <div className="qp-rcard-h"><span className="material-icons-outlined">credit_card</span>{L("Payment terms", "شروط الدفع")}</div>
-                      <div className="qp-totals" style={{ borderTop: 0, paddingTop: 0 }}>
-                        {payTerms.map((t) => { const d = decide(t); return <div key={t.key} className="qp-trow"><span className="l">{ar ? t.labelAr : t.label}</span><span className="v" style={{ fontFamily: "inherit", color: d.badge === "conflict" ? "var(--danger,var(--danger))" : "var(--navy,var(--navy))" }}>{tval(t, d.chosen ?? t.supplierDeclared)}</span></div>; })}
+                <div className="ng-pad">
+                  <div className="ng-cmp">
+                    <div className="ng-cmp-duo">
+                      <div className="ng-cmp-side">
+                        <div className="k">{L("Supplier's offer", "إجمالي عرض المورد")}</div>
+                        <div className="v">{nf(supTotal)}</div>
+                      </div>
+                      <span className="ng-cmp-rule" />
+                      <span className={`ng-gap${priceDiff === 0 ? " ok" : ""}`}>{priceDiff === 0 ? `✓ ${L("Matched", "مطابق")}` : `${L("Gap", "الفرق")} ${nf(priceDiff)}`}</span>
+                      <span className="ng-cmp-rule b" />
+                      <div className="ng-cmp-side me">
+                        <div className="k">{L("Your offer", "إجمالي عرضك")}</div>
+                        <div className="v">{nf(total)}</div>
                       </div>
                     </div>
-                  )}
+                    <button type="button" className="ng-cmp-more" onClick={() => setCmpOpen((o) => !o)} aria-expanded={cmpOpen}>
+                      <span>{L("The gap, line by line", "تفاصيل الفرق حسب البند")}</span>
+                      <span className={`chev${cmpOpen ? " open" : ""}`}>‹</span>
+                    </button>
+                    {cmpOpen && ([
+                      [L("Base rental", "الإيجار الأساسي"), rate, supDeal.rate] as const,
+                      [L("Delivery", "التوصيل"), mEx ? 0 : mob, supDeal.mobExcluded ? 0 : supDeal.mobPrice] as const,
+                      [L("Return", "الإرجاع"), dEx ? 0 : demob, supDeal.demobExcluded ? 0 : supDeal.demobPrice] as const,
+                    ]).map(([lbl, mineV, theirV]) => {
+                      const gap = (theirV ?? 0) - mineV;
+                      return (
+                        <div key={lbl} className="ng-cmp-row">
+                          <span className="k">{lbl}</span>
+                          <span className="sides">
+                            <span>{L("You", "أنت")} <b>{nf(mineV)}</b></span>
+                            <span>{L("Supplier", "المورد")} <b>{nf(theirV ?? 0)}</b></span>
+                            <span className={`ng-delta${gap === 0 ? " ok" : ""}`}>{gap === 0 ? `✓ ${L("same", "مطابق")}` : `${gap > 0 ? "+" : "−"}${nf(Math.abs(gap))}`}</span>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                {operatingTerms.length > 0 && (() => {
-                  const matched = operatingTerms.filter((t) => isSettled(decide(t).badge)).length;
-                  const diff = operatingTerms.filter((t) => decide(t).badge === "conflict").length;
-                  const pct = (n: number) => `${Math.round((n / operatingTerms.length) * 100)}%`;
-                  return (
-                    <div className="qp-guide-navy">
-                      <div className="qp-gn-h"><span className="material-icons-outlined">list_alt</span>{L("Terms index", "دليل البنود")}<span className="rdy">{matched}/{operatingTerms.length} {L("ready", "جاهز")}</span></div>
-                      <div className="qp-gn-bar"><div className="ok" style={{ width: pct(matched) }} /><div className="df" style={{ width: pct(diff) }} /></div>
-                      <div className="qp-gn-legend"><span className="d ok" />{matched} {L("ready", "جاهز")}<span className="d df" />{diff} {L("differ", "يختلف")}</div>
-                      {diff > 0 && <div className="qp-gn-review"><span className="material-icons-outlined" style={{ fontSize: 15 }}>autorenew</span>{L("Review differing terms", "راجع البنود المختلفة")} ({diff})</div>}
+              )}
+
+              <div className="ng-card">
+                <div className="ng-thead">
+                  <span>{L("Item", "البند")}</span>
+                  <span className="c">{L("Duration", "المدة")}</span>
+                  <span className="c">{L("Count", "العدد")}</span>
+                  <span className="e">{L("Price / unit", "السعر/وحدة")}</span>
+                </div>
+
+                {priceRow({
+                  key: "rental",
+                  label: room.details.equipmentLabel ?? L("Base rental", "الإيجار الأساسي"),
+                  duration: hasDuration ? (rentalCalc.raw ? `${periods} ${L("days", "يوم")}` : `${rentalCalc.billable} ${L("days", "يوم")}`) : periodLabel,
+                  // The billable days are what the rate is charged across; the calendar span is stated
+                  // under them so the renter can see where the number came from.
+                  durationSub: hasDuration && !rentalCalc.raw ? `${periods} ${L("days, Fridays out", "يوم، دون الجمعة")}` : rentalDivisorNote,
+                  qty: rNU, qtyMin: 1, qtyMax: cap,
+                  onQty: (v) => { setRentalUnits(v); setMobUnitsN((u) => Math.min(u, v)); setDemobUnitsN((u) => Math.min(u, v)); },
+                  val: editable ? rateStr : String(room.rate ?? 0), onVal: setRateStr, refVal: refRate,
+                })}
+                {priceRow({
+                  key: "mob",
+                  label: L("Delivery to site", "التوصيل إلى الموقع"),
+                  duration: L("trip", "رحلة"),
+                  qty: mNU, qtyMin: 0, qtyMax: rNU, onQty: setMobUnitsN,
+                  val: editable ? mobStr : String(room.mobPrice ?? 0), onVal: setMobStr, refVal: refMobPrice,
+                  excluded: mEx, onExclude: setMobExcluded,
+                  exTitle: L("Cancel delivery to site from the supplier?", "إلغاء التوصيل إلى الموقع من المورد؟"),
+                })}
+                {priceRow({
+                  key: "demob",
+                  label: L("Return from site", "الإرجاع من الموقع"),
+                  duration: L("trip", "رحلة"),
+                  qty: dNU, qtyMin: 0, qtyMax: rNU, onQty: setDemobUnitsN,
+                  val: editable ? demobStr : String(room.demobPrice ?? 0), onVal: setDemobStr, refVal: refDemobPrice,
+                  excluded: dEx, onExclude: setDemobExcluded,
+                  exTitle: L("Cancel the return leg from the supplier?", "إلغاء الإرجاع من الموقع من المورد؟"),
+                })}
+
+                <div className="ng-sum">
+                  <div className="item"><span>{room.details.equipmentLabel ?? L("Base rental", "الإيجار الأساسي")} · {rNU} × {periodLabel}</span><span>{nf(rentalLine)}</span></div>
+                  <div className={`item${mEx ? " off" : ""}`}><span>{L("Delivery to site", "التوصيل إلى الموقع")}</span><span>{mEx ? L("not priced", "غير مسعّر") : nf(mobLine)}</span></div>
+                  <div className={`item${dEx ? " off" : ""}`}><span>{L("Return from site", "الإرجاع من الموقع")}</span><span>{dEx ? L("not priced", "غير مسعّر") : nf(demobLine)}</span></div>
+                  <div className="rule" />
+                  <div className="line"><span>{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span>{nf(subtotal)}</span></div>
+                  <div className="line"><span>{L("VAT 15%", "ضريبة القيمة المضافة 15٪")}</span><span>{nf(vat)}</span></div>
+                  <div className="ng-net-box"><span className="k">{L("Net incl. VAT", "الصافي شامل الضريبة")}</span><span className="v">{nf(total)}</span></div>
+                </div>
+
+                {payTerms.length > 0 && <div style={{ padding: "0 16px 14px" }}>{payTerms.map(payCard)}</div>}
+                {editable && !rateValid && <p className="ng-err" style={{ padding: "0 16px 14px" }}>{L("Enter a rate to continue", "أدخل سعرًا للمتابعة")}</p>}
+              </div>
+            </>
+          )}
+
+          {/* ── ② the terms ─────────────────────────────────────────────────────────────────── */}
+          {page === 1 && (
+            <div className="ng-card pad">
+              {operatingTerms.length === 0 ? (
+                <p style={{ padding: "20px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>{L("No operating terms.", "لا توجد شروط تشغيل.")}</p>
+              ) : (
+                <>
+                  {queue.map((t, i) => termCard(t, resolutions[t.key] ? "done" : i === firstOpen || !editable ? "now" : "later"))}
+
+                  {ackTerms.length > 0 && (
+                    <>
+                      <button type="button" className="ng-grp" onClick={() => setAckOpen((o) => !o)} aria-expanded={ackOpen}>
+                        <span className={`chev${ackOpen ? " open" : ""}`}>‹</span>
+                        <span>{L("Acknowledged", "مُقر بها")} 🔒</span>
+                      </button>
+                      {ackOpen && ackTerms.map((t) => { const d = decide(t); return (
+                        <div key={t.key} className="ng-grow"><span className="k">{ar ? t.labelAr : t.label}</span><span className="v">{tval(t, d.chosen ?? t.value)}</span></div>
+                      ); })}
+                    </>
+                  )}
+
+                  {agreedTerms.length > 0 && (
+                    <>
+                      <button type="button" className="ng-grp agreed" onClick={() => setAgreedOpen((o) => !o)} aria-expanded={agreedOpen}>
+                        <span className={`chev${agreedOpen ? " open" : ""}`}>‹</span>
+                        <span>{L("Agreed terms", "شروط متفق عليها")} ✓</span>
+                      </button>
+                      {agreedOpen && agreedTerms.map((t) => { const d = decide(t); return (
+                        <div key={t.key} className="ng-grow agreed"><span className="k">{ar ? t.labelAr : t.label}</span><span className="v">{tval(t, d.chosen ?? t.value)}</span></div>
+                      ); })}
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ── ③ the review ────────────────────────────────────────────────────────────────── */}
+          {page === 2 && (
+            <div className="ng-pad" style={{ paddingBottom: 14 }}>
+              <div className="ng-rcard">
+                <div className="ng-rcard-h"><span className="material-icons-outlined">receipt_long</span>{L("The price you are sending", "السعر الذي سترسله")}</div>
+                <div className="ng-rbody">
+                  <div className="ng-rrow"><span className="k">{L("Quantity", "الكمية")}</span><span className="v">{rNU} {L("units", "وحدة")}{hasDuration ? (rentalCalc.raw ? ` · ${periods} ${L("days", "يوم")}` : ` · ${rentalCalc.billable} ${L("billable days", "يوم محتسب")}`) : ""}</span></div>
+                  <div className="ng-rrow"><span className="k">{L("Base rental", "الإيجار الأساسي")}</span><span className="v">{money(rentalLine)}{rentalDivisorNote ? <span className="sub"> · {rentalDivisorNote}</span> : null}</span></div>
+                  <div className="ng-rrow"><span className="k">{L("Delivery to site", "التوصيل إلى الموقع")}</span><span className="v">{mEx ? L("Excluded", "غير مشمول") : money(mobLine)}</span></div>
+                  <div className="ng-rrow"><span className="k">{L("Return from site", "الإرجاع من الموقع")}</span><span className="v">{dEx ? L("Excluded", "غير مشمول") : money(demobLine)}</span></div>
+                  <div className="ng-rrow"><span className="k">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{money(subtotal)}</span></div>
+                  <div className="ng-rrow"><span className="k">{L("VAT (15%)", "ضريبة القيمة المضافة (15٪)")}</span><span className="v">{money(vat)}</span></div>
+                  <div className="ng-rrow net"><span className="k">{L("Net incl. VAT", "الصافي شامل الضريبة")}</span><span className="v">{money(total)}</span></div>
+                </div>
+              </div>
+
+              {operatingTerms.length > 0 && (() => {
+                const matched = operatingTerms.filter((t) => isSettled(decide(t).badge)).length;
+                const diff = operatingTerms.filter((t) => decide(t).badge === "conflict").length;
+                const pct = (n: number) => `${Math.round((n / operatingTerms.length) * 100)}%`;
+                return (
+                  <div className="ng-rcard">
+                    <div className="ng-rcard-h"><span className="material-icons-outlined">list_alt</span>{L("Terms index", "دليل البنود")}<span className="rdy">{matched}/{operatingTerms.length} {L("ready", "جاهز")}</span></div>
+                    <div className="ng-rbody">
+                      <div className="ng-bar"><div className="ok" style={{ width: pct(matched) }} /><div className="df" style={{ width: pct(diff) }} /></div>
+                      <div className="ng-legend"><span className="d ok" />{matched} {L("ready", "جاهز")}<span className="d df" />{diff} {L("differ", "يختلف")}</div>
                       {groupByCat(operatingTerms).map(([cat, list]) => { const open = guideOpen[cat] ?? true; const cm = list.filter((t) => isSettled(decide(t).badge)).length; return (
-                        <div key={cat} className="qp-gncat">
-                          <button type="button" className="qp-gncat-h" onClick={() => setGuideOpen((g) => ({ ...g, [cat]: !open }))}>{cat}<span className="cnt">{cm}/{list.length}</span><span className={`material-icons-outlined chev${open ? " open" : ""}`}>expand_more</span></button>
-                          {open && list.map((t) => { const d = decide(t); return <div key={t.key} className={`qp-gnrow ${d.badge}`}><span className="k">{ar ? t.labelAr : t.label}</span><span className={`qp-gnbadge ${d.badge}`}>{badgeLabel(d.badge)}</span></div>; })}
+                        <div key={cat} className="ng-gcat">
+                          <button type="button" className="ng-gcat-h" onClick={() => setGuideOpen((g) => ({ ...g, [cat]: !open }))}>
+                            {cat}<span className="cnt">{cm}/{list.length}</span><span className={`material-icons-outlined chev${open ? " open" : ""}`}>expand_more</span>
+                          </button>
+                          {open && list.map((t) => { const d = decide(t); return (
+                            <div key={t.key} className="ng-gnrow"><span className="k">{ar ? t.labelAr : t.label}</span><span className={`ng-badge ${d.badge}`}>{badgeLabel(d.badge)}</span></div>
+                          ); })}
                         </div>
                       ); })}
                     </div>
-                  );
-                })()}
-              </div>
+                  </div>
+                );
+              })()}
+
+              {/* The quotation, from step ③ — the renter reads the position back before he sends it
+                  (app parity: `_QuotationLink`). It opens the room's own document, which is the same
+                  paper the room's CTA opens; nothing is generated twice. */}
+              <a className="ng-quote" href={quotationHref} onClick={(e) => { e.preventDefault(); onOpenQuotation?.(); }}>
+                <span>{L("Read the quotation", "عرض السعر")}</span>
+                <span className="material-icons-outlined">chevron_left</span>
+              </a>
+
               {mode === "accept" && (
-                <label style={{ display: "block", marginTop: 16 }}>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: "var(--navy-mid,var(--navy-mid))" }}>{L("Contract type", "نوع العقد")}</span>
+                <div style={{ marginTop: 12 }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: "var(--navy-mid)" }}>{L("Contract type", "نوع العقد")}</span>
                   <div style={{ marginTop: 5 }}>
                     <Dropdown
                       label={L("Contract type", "نوع العقد")}
@@ -1916,40 +1938,56 @@ function CounterFlow({
                       options={CONTRACT_TYPES.map((c) => ({ value: c.value, label: c.label }))}
                     />
                   </div>
-                </label>
+                </div>
               )}
               {mode === "accept" && (
-                <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 14, fontSize: 12.5, fontWeight: 600, color: "var(--navy,var(--navy))" }}>
+                <label className="ng-ack">
                   <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} style={{ marginTop: 2 }} />
                   {L("I confirm the agreed rate and terms.", "أؤكّد السعر والشروط المتفق عليها.")}
                 </label>
               )}
-              {error && <p style={{ marginTop: 8, fontSize: 12.5, fontWeight: 700, color: "var(--danger,var(--danger))" }}>{error}</p>}
+              {error && <p className="ng-err">{error}</p>}
             </div>
           )}
-          </div>
-          {/* zoom rail — fixed in the desk's side margin (right in RTL, left in LTR) */}
-          <div className="qp-zoom">
-            <button type="button" title={L("Zoom in", "تكبير")} onClick={() => setPaperZoom((z) => Math.min(1.8, Math.round((z + 0.15) * 100) / 100))}>+</button>
-            <button type="button" className="pct" title={L("Fit (85%)", "ملاءمة 85٪")} onClick={() => setPaperZoom(0.85)}>{Math.round(paperZoom * 100)}%</button>
-            <button type="button" title={L("Zoom out", "تصغير")} onClick={() => setPaperZoom((z) => Math.max(0.5, Math.round((z - 0.15) * 100) / 100))}>−</button>
-          </div>
         </div>
 
-        {/* footer */}
-        <div className="qp-foot">
-          <button type="button" className="qp-log" onClick={() => setLogOpen(true)}><span className="material-icons-outlined" style={{ fontSize: 16 }}>history</span>{L("Log", "السجل")}</button>
-          <div className="spacer" />
-          <div className="qp-foot-main">
-            {!editable && !settled && allMatched && page < 2 && <button className="qp-fbtn accept" onClick={() => setPage(2)}>✓ {L("Accept offer", "قبول العرض")}</button>}
-            {page < 2 ? (
-              <button className="qp-fbtn primary" disabled={!canNext} onClick={() => setPage((p) => (p + 1) as 0 | 1 | 2)}>{page === 0 ? L("Next: Terms", "التالي: الشروط") : L("Review & send", "مراجعة وإرسال")}<span className="qp-cch">‹</span></button>
-            ) : (
-              <button className={`qp-fbtn ${editable ? "primary" : "accept"}`} disabled={busy || !canSubmit} onClick={doSubmit}>{busy ? L("Sending…", "جارٍ الإرسال…") : settled ? L("Closed", "مغلقة") : editable ? L("Send reply", "إرسال الرد") : L("Accept offer", "قبول العرض")}<span className="qp-cch">‹</span></button>
-            )}
-            <button className="qp-fbtn back" disabled={busy} onClick={() => (page > 0 ? setPage((p) => (p - 1) as 0 | 1 | 2) : onClose())}>{page > 0 ? L("Back", "رجوع") : L("Close", "إغلاق")}<span className="qp-cch">›</span></button>
-          </div>
-          <div className="spacer" />
+        {/* ── footer ───────────────────────────────────────────────────────────────────────────
+            🔴 The LAST step names its act (owner, on the app, 2026-09-18): there is nothing to walk
+            forward to, so a bare chevron would submit the whole negotiation — the one irreversible
+            press on the sheet — drawn as navigation. ⚠️ Accept stands beside it when everything
+            matches: they are different acts and neither stands in for the other. */}
+        <div className="ng-foot">
+          {page === 2 ? (
+            <>
+              {/* Small, on the leading edge: without it the review step is a dead end and a reader who
+                  spots a wrong term has to close the sheet to fix it. */}
+              <button type="button" className="ng-chev" disabled={busy} onClick={() => setPage(1)} aria-label={L("Back", "رجوع")}>‹</button>
+              {editable && !settled && allMatched && onAcceptInstead && (
+                <button type="button" className="ng-accept" disabled={busy} onClick={onAcceptInstead}>✓ {L("Accept offer", "قبول العرض")}</button>
+              )}
+              <span style={{ flex: 1 }} />
+              <button type="button" className={editable ? "ng-send" : "ng-accept"} disabled={busy || !canSubmit} onClick={doSubmit}>
+                {busy ? L("Sending…", "جارٍ الإرسال…")
+                  : settled ? L("Closed", "مغلقة")
+                  : editable ? L("Send to the supplier", "إرسال إلى المورد")
+                  : `✓ ${L("Accept offer", "قبول العرض")}`}
+              </button>
+            </>
+          ) : (
+            <>
+              {!editable && !settled && allMatched
+                ? <button type="button" className="ng-accept" onClick={() => setPage(2)}>✓ {L("Accept offer", "قبول العرض")}</button>
+                : <span style={{ width: 44 }} />}
+              <div className="ng-nav">
+                <button type="button" className="ng-chev" disabled={busy || page === 0} onClick={() => setPage((p) => (p - 1) as 0 | 1 | 2)} aria-label={L("Back", "رجوع")}>‹</button>
+                <span className="step">{STEP_NAMES[page]}</span>
+                <button type="button" className="ng-chev" disabled={busy || !canNext} onClick={() => setPage((p) => (p + 1) as 0 | 1 | 2)} aria-label={L("Next", "التالي")}>›</button>
+              </div>
+            </>
+          )}
+          <button type="button" className="ng-log" onClick={() => setLogOpen(true)} aria-label={L("Log", "السجل")} title={L("Log", "السجل")}>
+            <span className="material-icons-outlined">history</span>
+          </button>
         </div>
 
         {pendingEx && (
@@ -1981,7 +2019,7 @@ function CounterFlow({
                   <button key={k} type="button" className={`qp-log-tab${logTab === k ? " on" : ""}`} onClick={() => setLogTab(k)}>{lbl}</button>
                 ))}
               </div>
-              <div className="qp-body" style={{ background: "var(--surface)", padding: "4px 0 8px" }}>
+              <div className="qp-body" style={{ padding: "4px 0 8px" }}>
                 {/* Reconstructed price rounds (newest first) — role, rate, units, legs, total per round. */}
                 {logTab !== "terms" && flowRounds.length > 0 && (
                   <div className="qp-rounds">
@@ -2007,14 +2045,13 @@ function CounterFlow({
                 )}
                 {(() => {
                   // Real activity log — the deal room's system_bot narration (each counter / rate proposal /
-                  // term action / lifecycle event), newest-first. Full structured per-round price history is
-                  // still latest-only backend-side (spec §11), but every round is narrated here as it happens.
+                  // term action / lifecycle event), newest-first.
                   const sys = messages.filter((m) => m.user?.id === "system_bot" && (m.text ?? "").trim());
                   const sorted = [...sys].sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime());
                   const PRICE_RE = /سعر|ر\.?\s?س|price|rate|تعبئة|إرجاع|موب|ديموب|SAR/i;
                   const TERMS_RE = /شرط|بند|term|إعاشة|وقود|صيانة|دفع|مشغّل|مشغل|قبول/i;
                   const shown = sorted.filter((m) => (logTab === "all" ? true : logTab === "price" ? PRICE_RE.test(m.text ?? "") : TERMS_RE.test(m.text ?? "")));
-                  if (shown.length === 0) return <p style={{ fontSize: 13, color: "var(--muted,var(--muted))", textAlign: "center", padding: "24px 0" }}>{L("No activity yet.", "لا يوجد نشاط بعد.")}</p>;
+                  if (shown.length === 0) return <p style={{ fontSize: 13, color: "var(--muted)", textAlign: "center", padding: "24px 0" }}>{L("No activity yet.", "لا يوجد نشاط بعد.")}</p>;
                   return (
                     <ul className="qp-log-list">
                       {shown.map((m) => (

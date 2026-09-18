@@ -511,6 +511,12 @@ export function RequestsWorkspace() {
             lang: ar ? "ar" : "en",
             quotationNumber: `Q-${reqCode}-${quotationSupplierInitials(supBids[0].card.supplierName)}${si + 1}`,
             reference: code,
+            // The job's site, for the reference strip and the renter's box. The GROUP holds it
+            // ("City — Neighbourhood"), which is the short form the app prints; a request with none
+            // simply omits the pair rather than printing a blank.
+            workSite: group?.locationLabel ?? null,
+            // ABSOLUTE: the quotation opens in a blank window, where a relative path resolves to nothing.
+            sealUrl: `${window.location.origin}/moedatech-logomark.svg`,
             entries: supBids.map((b) => ({
               bid: b.card,
               itemLabel: itemName,
@@ -556,7 +562,7 @@ export function RequestsWorkspace() {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
-  }, [ar, item, shown, checkedBids, fetchedCode, tier]);
+  }, [ar, item, shown, checkedBids, fetchedCode, tier, group?.locationLabel]);
 
   /**
    * ── The comparison, on paper (owner, 2026-09-09) ──────────────────────────────────────────────

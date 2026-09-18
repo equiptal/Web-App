@@ -61,6 +61,23 @@ const FULFILLMENT: Record<string, [string, string]> = {
 };
 export const fulfillmentLabel = (v: string, L: LFn): string => lookup(FULFILLMENT, v, L);
 
+// ── Payment terms ───────────────────────────────────────────────────────────────────────────────
+/** Every spelling the field has arrived in — `NET_30`, `net-30`, `net30` — collapse to one key, because
+ *  a quotation that prints `NET_90` states a code where the two parties agreed a sentence. */
+const PAYMENT_TERMS: Record<string, [string, string]> = {
+  UPFRONT: ["Upfront", "مقدمًا"],
+  DAILY: ["Daily", "يومي"],
+  NET0: ["Net 0", "فوري"],
+  NET30: ["Net 30 days", "صافي 30 يومًا"],
+  NET60: ["Net 60 days", "صافي 60 يومًا"],
+  NET90: ["Net 90 days", "صافي 90 يومًا"],
+  ENDOFJOB: ["End of job", "نهاية المهمة"],
+};
+export const paymentTermsLabel = (v: string, L: LFn): string => {
+  const hit = PAYMENT_TERMS[v.trim().toUpperCase().replace(/[^A-Z0-9]/g, "")];
+  return hit ? L(hit[0], hit[1]) : v;
+};
+
 // ── Breakdown-response SLA ──────────────────────────────────────────────────────────────────────
 // The bare digits are carried alongside the enum names: the same fact reaches the web as `FOUR_HR`
 // from the term catalogue and as `4` from the older request payloads.
@@ -82,6 +99,22 @@ const RESPONSIBILITY: Record<string, [string, string]> = {
   EITHER: ["Either", "أيّهما"],
 };
 export const responsibilityLabel = (v: string, L: LFn): string => lookup(RESPONSIBILITY, partyToken(v), L);
+
+// ── Operator nationality ────────────────────────────────────────────────────────────────────────
+/** App parity (`_nationalityValue`). A value the map does not know is the rentee's own free text and
+ *  is returned unchanged rather than guessed at. */
+const NATIONALITY: Record<string, [string, string]> = {
+  SAUDI: ["Arab", "عربي"],
+  NON_SAUDI: ["Non-Arab", "غير عربي"],
+  "NON-SAUDI": ["Non-Arab", "غير عربي"],
+  EXPAT: ["Non-Arab", "غير عربي"],
+  ANY: ["Any", "أي"],
+  RESTRICTED: ["Restricted", "محدد"],
+};
+export const nationalityLabel = (v: string, L: LFn): string => {
+  const hit = NATIONALITY[v.trim().toUpperCase().replace(/\s+/g, "_")];
+  return hit ? L(hit[0], hit[1]) : v;
+};
 
 /**
  * A responsibility value with the endpoint's display prefix taken off.
@@ -201,7 +234,15 @@ export function termValueLabel(key: string, value: unknown, L: LFn): string | nu
     case "breakdown_response_sla": case "response_time": return slaLabel(value, L);
     case "maintenance_responsibility": case "fuel_responsibility":
     case "transport_responsibility": case "operator_responsibility":
+    /* `insurance` is a party assignment like the four above — it arrives as `supplier` / `rentee` and
+       printed raw it put a lower-case English code on an Arabic quotation. */
+    case "insurance":
       return responsibilityLabel(value, L);
+    /* The operator's nationality, in the APP's own words (`_nationalityValue`): the legacy `SAUDI` /
+       `NON_SAUDI` pair reads as «Arab» / «Non-Arab», and a free-text entry is its own answer and is
+       returned as it was typed. */
+    case "operator_nationality": return nationalityLabel(value, L);
+    case "payment_terms": return paymentTermsLabel(value, L);
     default: return null;
   }
 }

@@ -391,193 +391,247 @@
 .dlproto .rempty { border: 1px dashed var(--border); background: color-mix(in srgb, var(--surface2) 40%, transparent); border-radius: var(--r-lg); padding: 36px; text-align: center; font-size: 13.5px; color: var(--muted); }
 
 /* ════════════════════════════════════════════════════════════════════════════════════════════
-   Negotiation sheet — quotation-paper 3-step wizard (spec §6). Scoped .qp-*; scrim class .qp-scrim
-   lives OUTSIDE .dlproto (the sheet is portaled at the document body via a fixed overlay).
+   The NEGOTIATION SHEET — the owner's `Negotiate Price Sheet Standalone.html`, which the app builds
+   from too (`counter_offer_flow/`, owner 2026-09-17: *"match it exactly with prototype for the 2
+   pages terms and price including footer, header, spacing, alignment and all"*).
+
+   ~~A quotation-"paper" on a grey desk: a zoom rail, an invoice table, a step rail across the top,
+   a two-column review.~~ That was the web's own design and it was not the app's. The prototype is a
+   phone sheet: one white header carrying the running total, a scrolling body, and a footer whose
+   centre is a `‹ step ›` switcher.
+
+   ⚠️ Every colour is a TOKEN. The prototype ships its own greys (`#EEF0F3`, `#F9FAFB`, `#111827`…)
+   and the APP keeps them privately, on the reasoning that mixing two near-identical palettes is what
+   makes a screen look almost-right. The web cannot: `palette-drift` forbids a raw hex in `src/`, and
+   the 2026-09-06 sweep tokenised this very file. Each is mapped to its nearest house token below,
+   which is the same trade every other ported prototype in this repo has made.
    ════════════════════════════════════════════════════════════════════════════════════════════ */
 .qp-scrim { position: fixed; inset: 0; z-index: 60; background: color-mix(in srgb, var(--navy-deep) 50%, transparent); display: flex; align-items: center; justify-content: center; padding: clamp(10px,3%,28px); }
 .qp-scrim .material-icons-outlined { font-family: "Material Icons Outlined"; line-height: 1; }
-.qp-sheet {--rentee: var(--action); --action:var(--brand); --success:var(--ok); --success-bg:var(--ok-soft);--danger-bg:var(--danger-soft); --warning:var(--warn);--line:var(--surface3);--paper-2:var(--surface);
-  display: flex; flex-direction: column; width: 100%; max-width: 860px; max-height: 94vh; background: var(--surface); border-radius: var(--radius-lg); overflow: hidden; font-family: var(--font-sans); color: var(--navy); animation: dpModal .22s ease; }
-@keyframes dpModal { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: none; } }
 
-/* header — two rows */
-.qp-head { flex: 0 0 auto; }
-.qp-head-r1 { display: flex; align-items: center; gap: 14px; padding: 7px 18px 6px; border-bottom: 1px solid var(--line); }
+/* The sheet: a phone-shaped column. It fills the screen on a phone and stands as a card above it. */
+.ng-shell {
+  display: flex; flex-direction: column; width: 100%; max-width: 460px; height: 100%; max-height: 94vh;
+  background: var(--surface2); border-radius: var(--radius-lg); overflow: hidden;
+  font-family: var(--font-sans); color: var(--navy-deep); animation: dpModal .22s ease;
+}
+@media (max-width: 520px) { .ng-shell { max-width: none; max-height: none; height: 100%; border-radius: 0; } }
+
+/* ── header ─────────────────────────────────────────────────────────────────────────────────────
+   The running total on the leading edge, the counterparty on the trailing one. */
+.ng-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; background: var(--surface); border-bottom: 1px solid var(--border-hair); }
+.ng-head-l { flex: 0 0 auto; min-width: 0; }
+.ng-head-cap { font-size: 10px; color: var(--muted-light); font-weight: 600; }
+/* «New offer from the supplier» — drawn ONLY when the other side posted the latest round. A caption
+   that is always there names what the bar's only number obviously is. */
+.ng-new { display: flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 800; color: var(--warn-deep); }
+.ng-net { font-size: 17px; font-weight: 800; color: var(--navy); white-space: nowrap; }
+.ng-net .cur { font-size: 11px; font-weight: 600; color: var(--muted); }
+.ng-party { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ng-party b { font-size: 13px; font-weight: 700; color: var(--navy-deep); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+.ng-ava { flex: 0 0 auto; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--navy); color: var(--surface); font-size: 11px; font-weight: 800; }
+.ng-x { flex: 0 0 auto; display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
+.ng-x:hover { background: var(--surface2); color: var(--navy); }
+/* The status a settled room carries into the sheet: cancelled, closed, or awaiting the supplier. */
+.ng-note { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 11px; font-weight: 700; color: var(--muted); }
+.ng-note.danger { color: var(--danger); }
+.ng-note .material-icons-outlined { font-size: 13px; }
+
+/* ── body ───────────────────────────────────────────────────────────────────────────────────── */
+.ng-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; background: var(--surface2); }
+.ng-pad { padding: 14px 16px 0; }
+.ng-card { background: var(--surface); }
+.ng-card.pad { padding: 14px 16px; margin-top: 8px; }
+
+/* ── the price table ────────────────────────────────────────────────────────────────────────────
+   Four columns on the prototype's own weights, the head band a shade under the paper. */
+.ng-thead, .ng-row { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 4px; padding: 8px 16px; }
+.ng-thead { background: var(--surface-alt); border-bottom: 1px solid var(--border-hair); }
+.ng-thead span { font-size: 10px; font-weight: 700; color: var(--muted-light); }
+.ng-thead span.c { text-align: center; }
+.ng-thead span.e { text-align: end; }
+.ng-row { position: relative; align-items: center; border-bottom: 1px solid var(--surface2); }
+.ng-row.off { opacity: .45; }
+.ng-row .lbl { font-size: 12.5px; font-weight: 700; color: var(--navy-deep); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ng-row.off .lbl { text-decoration: line-through; }
+.ng-row .dur { text-align: center; font-size: 12px; font-weight: 600; color: var(--muted-dark); }
+.ng-row .dur .sub { display: block; font-size: 9.5px; font-weight: 600; color: var(--muted-light); }
+/* The ✕ that strikes a transport leg out, and the + that restores it. It sits on the row's START
+   edge — over the item's own name — because the END edge is the price input, and a 16px circle on top
+   of a field the renter is typing in is a control that eats the first tap meant for the number. */
+.ng-rm { position: absolute; top: 4px; inset-inline-start: 12px; display: grid; place-items: center; width: 16px; height: 16px; padding: 0; border: 0; border-radius: 50%; font-size: 9px; line-height: 1; cursor: pointer; background: var(--danger-soft); color: var(--danger); }
+.ng-rm.on { background: var(--ok-soft); color: var(--ok); }
+/* count stepper */
+.ng-qty { display: flex; align-items: center; justify-content: center; gap: 3px; }
+.ng-qty b { min-width: 13px; text-align: center; font-size: 12px; font-weight: 700; color: var(--navy-deep); }
+.ng-qty button { width: 18px; height: 18px; padding: 0; line-height: 1; border: 1px solid var(--border-hair); border-radius: 6px; background: var(--surface); font-size: 10px; color: var(--muted-dark); cursor: pointer; }
+.ng-qty button:disabled { color: var(--border-strong); cursor: default; }
+/* 🔴 The input's own colours ARE the state: green while the figure still matches the supplier's,
+   amber the moment it is edited. The reference line under it turns with them. */
+.ng-price input { width: 100%; border: 1.5px solid var(--ok); background: color-mix(in srgb, var(--ok) 6%, var(--surface)); border-radius: 7px; padding: 4px 6px; font-size: 12px; font-weight: 700; color: var(--navy-deep); text-align: end; font-family: inherit; }
+.ng-price.edited input { border-color: var(--brand); background: var(--brand-soft); }
+.ng-price .ref { margin-top: 1px; font-size: 9.5px; text-align: end; color: var(--muted-light); }
+.ng-price.edited .ref { color: var(--warn-deep); font-weight: 700; }
+.ng-price b { display: block; text-align: end; font-size: 12.5px; font-weight: 800; color: var(--navy-deep); }
+.ng-row .out { text-align: end; font-size: 11px; font-weight: 700; color: var(--muted-light); }
+
+/* ── the summary band + the net box ───────────────────────────────────────────────────────────── */
+.ng-sum { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; margin-bottom: 12px; background: var(--surface2); }
+.ng-sum .item, .ng-sum .line { display: flex; justify-content: space-between; gap: 10px; }
+.ng-sum .item { font-size: 12.5px; font-weight: 700; color: var(--navy-deep); }
+.ng-sum .item.off { opacity: .45; }
+.ng-sum .item span:last-child { color: var(--muted); }
+.ng-sum .rule { border-top: 1px solid var(--border-hair); margin: 2px 0; }
+.ng-sum .line { font-size: 12px; font-weight: 600; color: var(--muted); }
+.ng-net-box { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 2px; padding: 10px 12px; background: var(--surface); border: 1.5px solid var(--navy); border-radius: 10px; }
+.ng-net-box .k { font-size: 13px; font-weight: 700; color: var(--navy-deep); }
+.ng-net-box .v { font-size: 18px; font-weight: 800; color: var(--navy); }
+
+/* ── a term, in its three states ─────────────────────────────────────────────────────────────────
+   Settled (a quiet strip), active (the card with the two acts), and waiting (dashed, dimmed). One
+   vocabulary for the payment term on the price sheet and every operating term on the terms sheet. */
+.ng-t { margin-bottom: 6px; border-radius: 8px; }
+.ng-t.done { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; background: var(--surface-alt); border: 1px solid var(--surface2); }
+.ng-t.done .k { font-size: 12px; font-weight: 600; color: var(--muted); }
+.ng-t.done .v { font-size: 11.5px; font-weight: 700; color: var(--ok); }
+.ng-t.done .v.changed { color: var(--danger); }
+.ng-t.now { padding: 10px 12px; background: var(--surface); border: 1.5px solid var(--border-hair); }
+.ng-t.now .h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.ng-t.now .h .k { font-size: 12.5px; font-weight: 700; color: var(--navy-deep); }
+.ng-t.now .h .side { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ng-t.now .h .side b { color: var(--navy-deep); font-weight: 700; }
+.ng-t .acts { display: flex; gap: 6px; }
+.ng-t .acts button { flex: 1; border: 0; border-radius: 7px; padding: 7px; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.ng-t .acts .change { background: var(--danger-soft); color: var(--danger); }
+.ng-t .acts .take { background: var(--ok-soft); color: var(--ok); }
+.ng-t .opts { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--surface2); }
+.ng-t .opts button { border: 0; border-radius: 7px; padding: 8px 10px; background: var(--surface-alt); font-family: inherit; font-size: 12px; font-weight: 600; color: var(--muted-dark); text-align: start; cursor: pointer; }
+.ng-t .opts button:hover { background: var(--surface2); }
+.ng-t .opts button.on { color: var(--ok); }
+.ng-t.later { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; background: var(--surface-alt); border: 1px dashed var(--border-hair); opacity: .55; }
+.ng-t.later .k { font-size: 12px; font-weight: 600; color: var(--muted-light); }
+.ng-t.later .w { font-size: 10.5px; color: var(--muted-light); }
+/* Where a term's value came from, and the last move on it — the two sub-lines the web has carried
+   since the terms table. Kept: the prototype states neither, and a renter reading «24h» has no other
+   way to learn whether it is his ask, the supplier's declaration or the platform's default. */
+.ng-t .why { display: block; margin-top: 2px; font-size: 10px; font-weight: 600; color: var(--muted-light); }
+.ng-t .why .material-icons-outlined { font-size: 11px; vertical-align: -1px; }
+/* Reopen a term the renter settled himself. */
+.ng-t .undo { margin-inline-start: 6px; border: 0; background: none; padding: 0; font-size: 12px; color: var(--muted-light); cursor: pointer; }
+
+/* ── the two collapsible groups: acknowledged, and agreed ──────────────────────────────────────── */
+.ng-grp { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin-top: 10px; padding: 11px 12px; border: 1px solid var(--border-hair); border-radius: 8px; background: var(--surface2); font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--muted); cursor: pointer; }
+.ng-grp.agreed { background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 35%, transparent); color: var(--ok); }
+.ng-grp .chev { font-size: 13px; transition: transform .2s ease; }
+.ng-grp .chev.open { transform: rotate(-90deg); }
+.ng-grow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; padding: 8px 12px; border-radius: 8px; background: var(--surface-alt); }
+.ng-grow .k { font-size: 12px; font-weight: 600; color: var(--muted); }
+.ng-grow .v { font-size: 12px; font-weight: 700; color: var(--muted-dark); }
+.ng-grow.agreed { background: color-mix(in srgb, var(--ok-soft) 45%, var(--surface)); }
+.ng-grow.agreed .k { color: var(--muted-dark); }
+.ng-grow.agreed .v { color: var(--ok); }
+
+/* ── the supplier's standing offer, against yours ───────────────────────────────────────────────
+   A navy card: the two totals as the two ends of ONE measurement, with the gap on the rule between
+   them. The pill is amber when they differ and green when they agree — the matched case used to say
+   nothing at all, which read as unfinished. */
+.ng-cmp { background: var(--navy); border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+.ng-cmp-duo { display: flex; align-items: center; gap: 8px; }
+.ng-cmp-side { flex: 0 0 auto; }
+.ng-cmp-side .k { font-size: 10px; color: var(--text-on-dark); margin-bottom: 2px; }
+.ng-cmp-side .v { font-size: 19px; font-weight: 800; color: var(--surface); }
+.ng-cmp-side.me { text-align: end; }
+.ng-cmp-rule { flex: 1; height: 1.5px; background: linear-gradient(to left, var(--surface), var(--navy-mid)); }
+.ng-cmp-rule.b { background: linear-gradient(to right, var(--surface), var(--navy-mid)); }
+.ng-gap { flex: 0 0 auto; border-radius: 20px; padding: 3px 10px; font-size: 10.5px; font-weight: 800; background: var(--brand-light); color: var(--navy); }
+.ng-gap.ok { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok-soft); }
+.ng-cmp-more { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 12px; padding: 10px 0 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--surface) 15%, transparent); background: none; font-family: inherit; font-size: 11px; font-weight: 700; color: var(--text-on-dark); cursor: pointer; }
+.ng-cmp-more .chev { transition: transform .2s ease; }
+.ng-cmp-more .chev.open { transform: rotate(-90deg); }
+.ng-cmp-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 7px 0; white-space: nowrap; }
+.ng-cmp-row .k { font-size: 12px; font-weight: 700; color: var(--surface); }
+.ng-cmp-row .sides { display: flex; align-items: center; gap: 6px; }
+.ng-cmp-row .sides span { font-size: 11px; color: var(--text-on-dark); }
+.ng-cmp-row .sides b { color: var(--surface); }
+.ng-delta { border-radius: 20px; padding: 2px 7px; font-size: 10.5px; font-weight: 700; background: color-mix(in srgb, var(--brand-light) 30%, transparent); color: var(--brand-light); }
+.ng-delta.ok { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok-soft); }
+
+/* ── the review step ────────────────────────────────────────────────────────────────────────────
+   Two cards, each under a NAVY header of the same shape (app parity): the price you are about to
+   send, then the terms index. */
+.ng-rcard { background: var(--surface); border-radius: 10px; overflow: hidden; margin-bottom: 12px; }
+.ng-rcard-h { display: flex; align-items: center; gap: 7px; padding: 10px 12px; background: var(--navy); color: var(--surface); font-size: 12.5px; font-weight: 800; }
+.ng-rcard-h .material-icons-outlined { font-size: 16px; }
+.ng-rcard-h .rdy { margin-inline-start: auto; font-size: 11px; font-weight: 700; color: var(--text-on-dark); }
+.ng-rbody { padding: 10px 12px; }
+.ng-rrow { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 5px 0; font-size: 12px; }
+.ng-rrow .k { color: var(--muted); font-weight: 600; }
+.ng-rrow .v { color: var(--navy-deep); font-weight: 700; }
+.ng-rrow .v .sub { font-size: 10px; font-weight: 600; color: var(--muted-light); }
+.ng-rrow.net { margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--border-hair); font-size: 13px; }
+.ng-rrow.net .v { font-size: 15px; font-weight: 800; color: var(--navy); }
+.ng-bar { display: flex; height: 6px; margin: 6px 0 8px; border-radius: 100px; overflow: hidden; background: var(--surface2); }
+.ng-bar .ok { background: var(--ok); }
+.ng-bar .df { background: var(--danger); }
+.ng-legend { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; color: var(--muted); }
+.ng-legend .d { width: 7px; height: 7px; border-radius: 50%; }
+.ng-legend .d.ok { background: var(--ok); }
+.ng-legend .d.df { background: var(--danger); }
+.ng-gcat { margin-top: 8px; }
+.ng-gcat-h { display: flex; align-items: center; gap: 6px; width: 100%; padding: 7px 0; border: 0; background: none; font-family: inherit; font-size: 11.5px; font-weight: 800; color: var(--muted-dark); cursor: pointer; }
+.ng-gcat-h .cnt { margin-inline-start: auto; font-size: 10.5px; font-weight: 700; color: var(--muted-light); }
+.ng-gcat-h .chev { font-size: 16px; color: var(--muted-light); transition: transform .2s ease; }
+.ng-gcat-h .chev.open { transform: rotate(180deg); }
+.ng-gnrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: 7px; background: var(--surface-alt); margin-bottom: 4px; font-size: 11.5px; }
+.ng-gnrow .k { color: var(--muted-dark); font-weight: 600; }
+.ng-badge { border-radius: 100px; padding: 2px 8px; font-size: 10px; font-weight: 800; background: var(--surface2); color: var(--muted); }
+.ng-badge.match, .ng-badge.locked { background: var(--ok-soft); color: var(--ok); }
+.ng-badge.conflict { background: var(--danger-soft); color: var(--danger); }
+/* The quotation, from step ③ (app parity: the renter reads the position back before sending it). */
+.ng-quote { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 12px; border: 1px solid var(--border-hair); border-radius: 10px; background: var(--surface); font-family: inherit; font-size: 12.5px; font-weight: 800; color: var(--navy); cursor: pointer; }
+.ng-quote:hover { background: var(--surface-alt); }
+.ng-ack { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; font-size: 12.5px; font-weight: 600; color: var(--navy); }
+.ng-err { margin-top: 8px; font-size: 12.5px; font-weight: 700; color: var(--danger); }
+
+/* ── footer ─────────────────────────────────────────────────────────────────────────────────────
+   The switcher is centred in the BAR, never in what the buttons leave over: it is absolutely placed,
+   so the accept button on one side and the log on the other cannot push it off the middle. */
+.ng-foot { position: relative; flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 16px; background: var(--surface); border-top: 1px solid var(--border-hair); }
+.ng-accept { flex: 0 0 auto; border: 0; border-radius: 10px; padding: 10px 16px; background: var(--ok); color: var(--surface); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.ng-accept:disabled { background: var(--disabled-bg); color: var(--disabled-fg); cursor: default; }
+/* The review step's own act, and the only irreversible one on the sheet — so it is LABELLED with
+   whom it goes to rather than drawn as a chevron. Navy, never the accept button's green: green here
+   means «I take your position», and sending a reply is the opposite of that. */
+.ng-send { flex: 0 1 auto; min-width: 0; border: 0; border-radius: 10px; padding: 10px 16px; background: var(--navy); color: var(--surface); font-family: inherit; font-size: 13px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.ng-send:disabled { background: var(--disabled-bg); color: var(--disabled-fg); cursor: default; }
+.ng-nav { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; }
+.ng-nav .step { font-size: 11px; font-weight: 700; color: var(--muted-light); white-space: nowrap; }
+.ng-chev { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--border-hair); border-radius: 10px; background: var(--surface2); color: var(--muted-dark); font-size: 15px; font-family: inherit; cursor: pointer; }
+.ng-chev:disabled { color: var(--border-strong); cursor: default; }
+.ng-log { flex: 0 0 auto; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--border-hair); border-radius: 10px; background: var(--surface); color: var(--muted-dark); cursor: pointer; }
+.ng-log:hover { background: var(--surface2); }
+.ng-log .material-icons-outlined { font-size: 18px; }
+/* The chevrons are DIRECTION, so they mirror with the script. */
+.qp-scrim[dir="rtl"] .ng-chev { transform: scaleX(-1); }
+
+
+/* ── the negotiation LOG, unchanged: its own modal, opened from the footer ─────────────── */
+/* ════════════════════════════════════════════════════════════════════════════════════════════
+   Negotiation sheet — quotation-paper 3-step wizard (spec §6). Scoped .qp-*; scrim class .qp-scrim
+   lives OUTSIDE .dlproto (the sheet is portaled at the document body via a fixed overlay).
+   ════════════════════════════════════════════════════════════════════════════════════════════ */
+  display: flex; flex-direction: column; width: 100%; max-width: 860px; max-height: 94vh; background: var(--surface); border-radius: var(--radius-lg); overflow: hidden; font-family: var(--font-sans); color: var(--navy); animation: dpModal .22s ease; }
 .qp-htitle { min-width: 0; flex: 1; }
 .qp-htitle .t { font-size: 14px; font-weight: 800; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qp-htitle .s { font-size: 10.5px; font-weight: 600; color: var(--muted); margin-top: 2px; }
-/* The status a settled room carries into the sheet: cancelled, closed, or awaiting the supplier.
-   It sits under the room's own line because that is what it qualifies — this room, not this step —
-   and it is the first thing a renter who pressed «counter» on a dead room needs to read. */
-.qp-hnote { display: inline-flex; align-items: center; gap: 5px; margin-top: 5px; padding: 3px 9px 3px 6px; border-radius: 999px; font-size: 10.5px; font-weight: 800; background: var(--warn-soft); color: var(--warn-deep); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); }
-.qp-hnote.danger { background: var(--danger-soft); color: var(--danger-deep); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
-.qp-hnote .material-icons-outlined { font-size: 14px; }
-.qp-htotal { flex: 0 0 auto; text-align: end; }
-.qp-htotal .k { font-size: 9.5px; font-weight: 700; color: var(--muted); }
-.qp-htotal .v { font-size: 16px; font-weight: 800; color: var(--navy); font-family: var(--font-mono); direction: ltr; }
 .qp-x { flex: 0 0 auto; display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); border-radius: 50%; cursor: pointer; }
 .qp-x .material-icons-outlined { font-size: 18px; }
-/* stepper */
-.qp-steps { display: flex; align-items: center; gap: 4px; padding: 12px 22px 14px; background: color-mix(in srgb, var(--action) 8%, white); }
-.qp-step { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
-.qp-step .badge { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--surface2); border: 2px solid var(--border); color: var(--muted); font-size: 14px; font-weight: 800; }
-.qp-step .lbl { font-size: 15px; font-weight: 600; color: var(--muted); }
-.qp-step.on .badge { background: var(--rentee); border-color: var(--rentee); color: var(--surface); }
-.qp-step.on .lbl { color: var(--rentee); font-weight: 800; }
-.qp-step.done .badge { background: var(--success); border-color: var(--success); color: var(--surface); }
-.qp-step.done .lbl { color: var(--success); }
-.qp-steps .bar { flex: 1 1 auto; height: 3px; border-radius: var(--radius-sm); background: var(--border); min-width: 18px; margin: 0 8px; }
-.qp-steps .bar.done { background: var(--success); }
-
-/* body — grey "desk" holding the white paper */
-.qp-body { flex: 1 1 auto; overflow-y: auto; min-height: 0; background: var(--border-mid); padding: 18px clamp(10px,3%,26px) 26px; }
-.qp-paper { width: 800px; max-width: 100%; flex-shrink: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 28px 30px 38px; }
-.qp-paper + .qp-paper { margin-top: 16px; }
-
-/* full-screen desk sheet (§6 oldWrap): fills the viewport, slides up; the paper sits on a grey desk
-   with a side zoom rail. The centered-card .qp-sheet base is kept for the log modal. */
-.qp-sheet.qp-full { position: fixed; inset: 0; width: auto; max-width: none; max-height: none; border-radius: 0; animation: qpSheetUp .3s cubic-bezier(.32,.72,.3,1); }
-@keyframes qpSheetUp { from { transform: translateY(100%); } to { transform: none; } }
-.qp-desk { position: relative; flex: 1 1 auto; min-height: 0; overflow: auto; background: var(--surface2); }
-.qp-deskpad { min-height: 100%; display: flex; justify-content: center; align-items: flex-start; padding: 22px 0 46px; }
-.qp-zoom { position: absolute; top: 50%; inset-inline-start: 20px; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 6; }
-.qp-zoom button { width: 52px; height: 52px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); color: var(--navy); font: inherit; font-size: 26px; font-weight: 800; line-height: 1; cursor: pointer; display: grid; place-items: center; padding: 0; }
-.qp-zoom button.pct { width: auto; height: auto; border-radius: var(--radius-sm); padding: 6px 9px; font-size: 11px; border-color: var(--line); }
-/* quotation head */
-.qp-qhead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); padding-bottom: 14px; margin-bottom: 16px; }
-.qp-qco { display: flex; align-items: center; gap: 12px; }
-.qp-qlogo { width: 46px; height: 46px; border-radius: var(--radius-md); background: var(--navy-deep); color: var(--surface); font-weight: 800; font-size: 18px; display: grid; place-items: center; flex: 0 0 auto; }
-.qp-qcoinfo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.qp-qcoinfo b { font-size: 17px; font-weight: 800; color: var(--navy); }
-.qp-qcoinfo .ln { font-size: 11px; font-weight: 600; color: var(--muted); }
-.qp-qno { text-align: end; flex: 0 0 auto; }
-.qp-qno .lbl { font-size: 10px; font-weight: 800; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
-.qp-qno .num { font-size: 15px; font-weight: 800; color: var(--rentee); direction: ltr; }
-.qp-qno .sub { font-size: 11px; font-weight: 600; color: var(--muted); margin-top: 2px; }
-
-/* price table */
-.qp-sech { font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 4px 0 8px; }
-.qp-table { width: 100%; border-collapse: collapse; }
-.qp-table th { background: var(--navy); color: var(--surface); font-size: 11px; font-weight: 800; padding: 9px 10px; text-align: start; }
-.qp-table th:last-child, .qp-table td:last-child { text-align: end; }
-.qp-table td { border-bottom: 1px solid var(--line); padding: 11px 10px; font-size: 12.5px; vertical-align: middle; }
-.qp-table .lbl { font-weight: 800; color: var(--navy); }
-.qp-table .sub { font-size: 10.5px; font-weight: 600; color: var(--muted); margin-top: 2px; }
-.qp-table .tot { font-family: var(--font-mono); font-weight: 800; color: var(--navy); direction: ltr; }
-.qp-table tr.ex td { background: var(--paper-2); }
-.qp-pricebox { display: inline-flex; align-items: center; gap: 3px; background: var(--success-bg); border: 1.5px solid color-mix(in srgb, var(--ok) 50%, transparent); border-radius: var(--radius-sm); padding: 3px 9px; }
-.qp-pricebox .ic { font-size: 14px; color: var(--success); }
-.qp-price-in { width: 62px; border: 0; background: transparent; padding: 2px 0; font: inherit; font-size: 14px; font-weight: 800; text-align: end; color: var(--success); outline: 0; }
-.qp-ref { font-size: 10px; font-weight: 700; color: var(--muted); margin-top: 4px; }
-.qp-ref.changed { color: var(--warning); }
-.qp-table td.mut { color: var(--muted); }
-.qp-itemcell { display: flex; align-items: flex-start; gap: 9px; }
-.qp-legx { flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%; border: 0; background: var(--danger-bg); color: var(--danger); font-size: 12px; font-weight: 800; cursor: pointer; display: grid; place-items: center; margin-top: 1px; }
-.qp-qty { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.qp-qty .hint { font-size: 9.5px; font-weight: 700; color: var(--rentee); }
-.qp-qmatch { font-size: 10px; font-weight: 800; color: var(--success); background: var(--success-bg); border: 1px solid color-mix(in srgb, var(--ok) 44%, transparent); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
-.qp-legbtn { border: 0; background: none; font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; }
-.qp-legbtn.cancel { color: var(--danger); } .qp-legbtn.restore { color: var(--success); }
-.qp-excluded { font-size: 12px; font-weight: 700; color: var(--muted); }
-/* العدد stepper */
-.qp-step2 { display: inline-flex; align-items: center; gap: 6px; }
-.qp-stepbtn { display: grid; place-items: center; width: 26px; height: 26px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--navy); font-size: 16px; font-weight: 800; cursor: pointer; }
-.qp-stepbtn:disabled { opacity: .4; cursor: default; }
-.qp-stepval { min-width: 18px; text-align: center; font-size: 14px; font-weight: 800; color: var(--navy); }
-
-/* totals + words + payment cards */
-.qp-totals { margin-top: 16px; border-top: 1.5px solid var(--border); padding-top: 10px; }
-.qp-trow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 13px; }
-.qp-trow .l { color: var(--navy-mid); font-weight: 600; } .qp-trow .v { font-family: var(--font-mono); font-weight: 700; direction: ltr; }
-/* The fixed-divisor note trailing a money figure ("· 26 working days/month") — the same muted, smaller
-   treatment `.qp-table .sub` gives it in the price table, so the two papers state it identically. */
-.qp-trow .v .sub { font-family: inherit; font-size: 10.5px; font-weight: 600; color: var(--muted); }
-.qp-trow.net { border-top: 1px solid var(--line); margin-top: 5px; padding-top: 9px; font-size: 15px; }
-.qp-trow.net .l { font-weight: 800; color: var(--navy); } .qp-trow.net .v { color: var(--success); font-weight: 800; }
-.qp-words { margin-top: 10px; background: var(--paper-2); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: var(--navy-mid); }
-.qp-words .k { color: var(--muted); font-weight: 800; margin-inline-end: 6px; }
-.qp-pay { margin-top: 14px; }
-.qp-pay-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
-.qp-pay-row .k { font-size: 12.5px; font-weight: 700; color: var(--navy); flex: 0 0 auto; min-width: 92px; }
-.qp-pay-row select, .qp-sel { flex: 1 1 auto; min-width: 0; height: 38px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 10px; font: inherit; font-size: 13px; font-weight: 700; color: var(--navy); background: var(--surface); outline: 0; }
-.qp-badge { flex: 0 0 auto; font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
-.qp-badge.match { background: var(--success-bg,var(--ok-soft)); color: var(--success); }
-.qp-badge.diff { background: var(--danger-bg,var(--danger-soft)); color: var(--danger); }
-.qp-badge.none { background: var(--info-soft); color: var(--info,var(--info)); }
-
-/* priceCompareNavy */
-.qp-compare { background: linear-gradient(135deg, var(--navy), var(--navy-deep)); color: var(--surface); border-radius: var(--radius-lg); padding: 13px 18px; margin-bottom: 14px; }
-.qp-compare .duo { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-.qp-compare .side { text-align: center; flex: 1; }
-.qp-compare .side .k { font-size: 10.5px; font-weight: 700; color: rgba(255,255,255,.7); }
-.qp-compare .side .v { font-size: 27px; font-weight: 800; font-family: var(--font-mono); direction: ltr; margin-top: 2px; line-height: 1; }
-.qp-compare .side.sup .v { color: var(--warn-amber); } .qp-compare .side.me .v { color: color-mix(in srgb, var(--action) 45%, white); }
-.qp-compare .conv { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
-.qp-compare .conv .track { flex: 1; height: 3px; border-radius: var(--radius-sm); background: rgba(255,255,255,.18); }
-.qp-compare .conv .chip { font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,.14); white-space: nowrap; }
-.qp-compare .conv .chip.ok { background: color-mix(in srgb, var(--ok) 20%, transparent); color: var(--tick-up); }
-/* per-line breakdown (app _DeltaTable parity) — collapsible, sits inside the dark compare card */
-.qp-cmp-toggle { display: flex; align-items: center; justify-content: center; gap: 4px; width: 100%; margin-top: 10px; background: none; border: 0; color: rgba(255,255,255,.82); font: inherit; font-size: 11.5px; font-weight: 800; cursor: pointer; }
-.qp-cmp-toggle .material-icons-outlined { font-size: 16px; }
-.qp-cmp-tbl { width: 100%; border-collapse: collapse; margin-top: 10px; color: var(--surface); }
-.qp-cmp-tbl th { font-size: 9.5px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; color: rgba(255,255,255,.6); padding: 4px 8px; text-align: end; border-bottom: 1px solid rgba(255,255,255,.16); }
-.qp-cmp-tbl th:first-child { text-align: start; }
-.qp-cmp-tbl td { font-size: 12px; font-weight: 700; font-family: var(--font-mono); direction: ltr; padding: 6px 8px; text-align: end; border-bottom: 1px solid rgba(255,255,255,.08); }
-.qp-cmp-tbl td.ln { text-align: start; font-family: inherit; color: rgba(255,255,255,.9); }
-.qp-cmp-tbl td .u { font-size: 9.5px; font-weight: 700; color: rgba(255,255,255,.55); }
-.qp-cmp-tbl td.na { color: rgba(255,255,255,.45); font-weight: 700; }
-.qp-cmp-tbl td.gap { color: var(--warn-amber); }
-
-/* classic terms table (step ②) */
-.qp-tt { width: 100%; border-collapse: collapse; }
-.qp-tt th { background: var(--navy); color: var(--surface); font-size: 11px; font-weight: 800; padding: 9px 10px; text-align: start; }
-.qp-tt td { border-bottom: 1px solid var(--line); padding: 10px; font-size: 12.5px; vertical-align: middle; }
-.qp-tt .cat td { background: color-mix(in srgb, var(--info) 8%, transparent); color: var(--navy); font-weight: 800; font-size: 11px; letter-spacing: .03em; padding: 7px 10px; }
-.qp-tt .cat.settled td { background: color-mix(in srgb, var(--ok) 10%, transparent); color: var(--success); }
-.qp-tt .lbl { font-weight: 700; color: var(--navy); }
-.qp-tt .sup { color: var(--navy-mid); }
-.qp-tt .locked td { color: var(--muted); }
-.qp-tt .locked .lbl { color: var(--navy); }
-.qp-ttbadge { display: inline-flex; align-items: center; font-size: 10.5px; font-weight: 800; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
-.qp-ttbadge.match { background: var(--success-bg,var(--ok-soft)); color: var(--success); }
-.qp-ttbadge.conflict { background: var(--danger-bg,var(--danger-soft)); color: var(--danger); }
-.qp-ttbadge.none { background: var(--info-soft); color: var(--info,var(--info)); }
-.qp-ttbadge.locked { background: var(--surface3,var(--surface3)); color: var(--navy); }
-.qp-ttreopen { border: 0; background: none; color: var(--success); font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; margin-inline-start: 6px; }
-
-/* دليل البنود index (review) */
-.qp-guide { margin-top: 14px; border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
-.qp-guide-h { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--paper-2); font-size: 12.5px; font-weight: 800; color: var(--navy); }
-.qp-guide-bar { flex: 1 1 auto; height: 6px; border-radius: var(--radius-sm); background: var(--surface3,var(--surface3)); overflow: hidden; max-width: 160px; margin-inline-start: auto; }
-.qp-guide-bar > div { height: 100%; background: var(--success); border-radius: var(--radius-sm); }
-.qp-gcat { border-top: 1px solid var(--line); }
-.qp-gcat-h { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: color-mix(in srgb, var(--action) 8%, white); cursor: pointer; padding: 8px 14px; font: inherit; font-size: 12px; font-weight: 800; color: var(--navy); text-align: start; }
-.qp-gcat-h.all-matched { background: var(--ok-soft); color: var(--success); }
-.qp-gcat-h .chev { margin-inline-start: auto; transition: transform .15s; }
-.qp-gcat-h .chev.open { transform: rotate(180deg); }
-.qp-grow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 16px; font-size: 12px; border-top: 1px solid var(--line); }
-.qp-grow.conflict { background: color-mix(in srgb, var(--danger) 6%, transparent); }
-.qp-grow.pending { background: color-mix(in srgb, var(--info) 5%, transparent); }
-.qp-grow .k { color: var(--navy); font-weight: 600; }
-
-/* summary compare badge + payment (review) */
-.qp-sumbadge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; padding: 4px 11px; border-radius: 999px; margin-top: 10px; }
-.qp-sumbadge.match { background: var(--success-bg,var(--ok-soft)); color: var(--success); }
-.qp-sumbadge.diff { background: var(--info-soft); color: var(--rentee); }
-
-/* footer */
-.qp-foot { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 9px 24px; border-top: 1px solid var(--line); background: var(--surface); }
-.qp-foot .spacer { flex: 1 1 auto; }
+.qp-body { flex: 1 1 auto; overflow-y: auto; min-height: 0; background: var(--surface); }
+/* The log's own card. ~~`.qp-sheet` was the wizard's shell and the log modal borrowed it.~~ The
+   wizard is `.ng-shell` now, so the log carries the card it actually needs and nothing else. */
+.qp-sheet { display: flex; flex-direction: column; width: 100%; max-height: 90vh; background: var(--surface); border-radius: var(--radius-lg); overflow: hidden; font-family: var(--font-sans); color: var(--navy); animation: dpModal .22s ease; }
+.qp-head-r1 { display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
 .qp-log { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-md); padding: 8px 12px; font: inherit; font-size: 12.5px; font-weight: 800; color: var(--navy-mid); cursor: pointer; }
-.qp-fbtn { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-md); padding: 8px 14px; font: inherit; font-size: 13px; font-weight: 800; color: var(--navy); cursor: pointer; }
-.qp-fbtn.primary { background: var(--rentee); border-color: var(--rentee); color: var(--surface); }
-.qp-fbtn.accept { background: var(--success); border-color: var(--success); color: var(--surface); }
-.qp-fbtn:disabled { opacity: .5; cursor: not-allowed; }
-.qp-foot-main { display: flex; align-items: center; gap: 10px; }
-.qp-cch { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 900; line-height: 1; flex: 0 0 auto; background: color-mix(in srgb, var(--info) 12%, transparent); color: var(--rentee); }
-.qp-fbtn.primary .qp-cch, .qp-fbtn.accept .qp-cch { background: rgba(255, 255, 255, 0.24); color: var(--surface); }
-.qp-gate { position: absolute; bottom: 64px; inset-inline-start: 50%; transform: translateX(-50%); background: var(--danger); color: var(--surface); font-size: 11.5px; font-weight: 700; padding: 7px 12px; border-radius: var(--radius-sm); }
-
 /* activity log (📜 السجل) — real system_bot negotiation timeline */
 .qp-log-tabs { display: flex; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--border,var(--border)); background: var(--surface2,var(--surface2)); }
 .qp-log-tab { border: 1px solid var(--border,var(--border)); background: var(--surface1,var(--surface)); border-radius: 100px; padding: 5px 14px; font: inherit; font-size: 12px; font-weight: 800; color: var(--muted,var(--muted)); cursor: pointer; }
@@ -588,136 +642,6 @@
 .qp-log-ic { font-size: 16px; color: var(--rentee,var(--action)); flex: 0 0 auto; margin-top: 1px; }
 .qp-log-txt { flex: 1; font-size: 12.5px; font-weight: 600; color: var(--navy,var(--navy)); line-height: 1.5; }
 .qp-log-time { flex: 0 0 auto; font-size: 10.5px; font-weight: 700; color: var(--muted,var(--muted)); white-space: nowrap; }
-
-/* ── shared auxiliary modal (region 9 modalShell): documents · reopen confirm · binding commitment ── */
-@keyframes dlFade { from { opacity: 0; } to { opacity: 1; } }
-@keyframes dlPop { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
-.dlproto .dl-modal { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--navy-deep) 55%, transparent); animation: dlFade .18s ease; }
-.dlproto .dl-modal-card { display: flex; flex-direction: column; width: 100%; max-height: 88vh; overflow: hidden; background: var(--surface1); border-radius: var(--radius-lg); animation: dlPop .22s cubic-bezier(.22, 1, .36, 1); }
-.dlproto .dl-modal-head { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
-.dlproto .dl-modal-ic { width: 40px; height: 40px; border-radius: var(--radius-md); display: grid; place-items: center; flex: 0 0 auto; background: color-mix(in srgb, var(--info) 12%, transparent); color: var(--rentee); }
-.dlproto .dl-modal-ic.warn { background: color-mix(in srgb, var(--brand) 14%, transparent); color: var(--action); }
-.dlproto .dl-modal-ic.danger { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
-.dlproto .dl-modal-ic .material-icons-outlined { font-size: 22px; }
-.dlproto .dl-modal-tt { flex: 1; min-width: 0; }
-.dlproto .dl-modal-title { font-size: 15px; font-weight: 800; color: var(--navy); }
-.dlproto .dl-modal-sub { font-size: 11px; font-weight: 600; color: var(--muted); margin-top: 1px; }
-.dlproto .dl-modal-x { width: 32px; height: 32px; border-radius: 50%; border: 0; background: var(--surface2); color: var(--muted); display: grid; place-items: center; cursor: pointer; flex: 0 0 auto; }
-.dlproto .dl-modal-x .material-icons-outlined { font-size: 18px; }
-.dlproto .dl-modal-body { padding: 18px; overflow-y: auto; }
-.dlproto .dl-modal-body.center { text-align: center; }
-.dlproto .dl-modal-msg { font-size: 13px; line-height: 1.6; color: var(--muted); }
-.dlproto .dl-modal-ack { display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin-top: 14px; font-size: 13px; font-weight: 700; color: var(--navy); cursor: pointer; }
-.dlproto .dl-modal-foot { display: flex; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--border); }
-.dlproto .dl-mbtn { flex: 1; border-radius: var(--radius-md); padding: 11px 16px; font: inherit; font-weight: 800; font-size: 13px; cursor: pointer; border: 1px solid var(--border); background: var(--surface1); color: var(--navy); display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
-.dlproto .dl-mbtn.warn { background: var(--action); border-color: var(--action); color: var(--surface); }
-.dlproto .dl-mbtn.green { background: var(--success); border-color: var(--success); color: var(--surface); }
-.dlproto .dl-mbtn:disabled { opacity: .55; cursor: not-allowed; }
-.dlproto .dl-err { margin-top: 10px; font-size: 12px; font-weight: 700; color: var(--danger); }
-/* documents modal rows */
-.dlproto .dl-docsec { margin-bottom: 16px; }
-.dlproto .dl-docsec:last-child { margin-bottom: 0; }
-.dlproto .dl-docsec-h { margin-bottom: 8px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
-.dlproto .dl-docrow { display: flex; align-items: center; gap: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px; margin-bottom: 8px; text-decoration: none; }
-.dlproto .dl-docrow:last-child { margin-bottom: 0; }
-.dlproto .dl-docrow:hover { background: var(--surface2); }
-.dlproto .dl-docrow .ft { font-size: 22px; flex: 0 0 auto; }
-.dlproto .dl-docrow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; color: var(--navy); }
-.dlproto .dl-docrow .go { font-size: 20px; color: var(--info); flex: 0 0 auto; }
-.dlproto .dl-modal-note { padding: 24px 0; text-align: center; font-size: 13px; color: var(--muted); }
-
-/* ── review / summary (§6.4): address boxes + two-column (price/payment cards · navy دليل card) ── */
-.dlproto .qp-addr { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0 16px; }
-.dlproto .qp-addrbox { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 12px; background: var(--surface1); }
-.dlproto .qp-addrbox .k { display: block; font-size: 10px; font-weight: 700; color: var(--muted); }
-.dlproto .qp-addrbox .v { display: block; font-size: 13.5px; font-weight: 800; color: var(--navy); margin-top: 2px; }
-.dlproto .qp-rgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
-.dlproto .qp-rcol { display: flex; flex-direction: column; gap: 14px; }
-.dlproto .qp-rcard { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0 16px 14px; background: var(--surface1); }
-.dlproto .qp-rcard-h { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; color: var(--navy); padding: 12px 0 10px 10px; border-inline-start: 3px solid var(--rentee); margin: 4px 0 6px; }
-.dlproto .qp-rcard-h .material-icons-outlined { font-size: 18px; color: var(--rentee); }
-/* navy دليل البنود card */
-.dlproto .qp-guide-navy { background: var(--navy-deep); color: var(--surface); border-radius: var(--radius-lg); padding: 14px 15px; display: flex; flex-direction: column; gap: 9px; }
-.dlproto .qp-gn-h { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; }
-.dlproto .qp-gn-h .material-icons-outlined { font-size: 18px; }
-.dlproto .qp-gn-h .rdy { margin-inline-start: auto; font-size: 11px; font-weight: 700; color: rgba(255, 255, 255, 0.72); }
-.dlproto .qp-gn-bar { height: 7px; border-radius: var(--radius-sm); overflow: hidden; display: flex; background: rgba(255, 255, 255, 0.14); }
-.dlproto .qp-gn-bar .ok { background: var(--success); } .dlproto .qp-gn-bar .df { background: var(--action); }
-.dlproto .qp-gn-legend { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: rgba(255, 255, 255, 0.82); }
-.dlproto .qp-gn-legend .d { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.dlproto .qp-gn-legend .d.ok { background: var(--success); } .dlproto .qp-gn-legend .d.df { background: var(--action); margin-inline-start: 8px; }
-.dlproto .qp-gn-review { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; font-size: 11.5px; font-weight: 800; color: color-mix(in srgb, var(--action) 45%, white); }
-.dlproto .qp-gncat { display: flex; flex-direction: column; gap: 6px; }
-.dlproto .qp-gncat-h { display: flex; align-items: center; gap: 7px; width: 100%; background: rgba(255, 255, 255, 0.94); color: var(--navy); border: 0; border-radius: var(--radius-sm); padding: 8px 11px; font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer; text-align: start; }
-.dlproto .qp-gncat-h .cnt { margin-inline-start: auto; font-size: 10.5px; font-weight: 700; color: var(--muted); }
-.dlproto .qp-gncat-h .chev { font-size: 18px; transition: transform 0.15s; } .dlproto .qp-gncat-h .chev.open { transform: rotate(180deg); }
-.dlproto .qp-gnrow { display: flex; align-items: center; gap: 8px; padding: 7px 11px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 700; }
-.dlproto .qp-gnrow .k { color: rgba(255, 255, 255, 0.9); }
-.dlproto .qp-gnrow.conflict { background: color-mix(in srgb, var(--danger) 20%, transparent); }
-.dlproto .qp-gnrow.none { background: color-mix(in srgb, var(--info) 18%, transparent); }
-.dlproto .qp-gnbadge { margin-inline-start: auto; font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
-.dlproto .qp-gnbadge.match { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--tick-up); }
-.dlproto .qp-gnbadge.conflict { background: color-mix(in srgb, var(--danger) 24%, transparent); color: var(--led-mnt); }
-.dlproto .qp-gnbadge.locked { background: rgba(255, 255, 255, 0.14); color: rgba(255, 255, 255, 0.75); }
-.dlproto .qp-gnbadge.none { background: color-mix(in srgb, var(--border-strong) 20%, transparent); color: color-mix(in srgb, var(--action) 45%, white); }
-
-/* page-flip between the 3 sheets (§6.1) — each step mounts a fresh .qp-paper, so this replays on every
-   السعر ⇄ الشروط ⇄ المراجعة transition. Respects reduced-motion. */
-@keyframes qpFlip {
-  0% { opacity: 0; transform: perspective(1600px) rotateY(9deg) translateY(6px); }
-  100% { opacity: 1; transform: perspective(1600px) rotateY(0deg) translateY(0); }
-}
-.dlproto .qp-paper { animation: qpFlip 0.36s cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: 50% 0%; }
-@media (prefers-reduced-motion: reduce) { .dlproto .qp-paper { animation: none; } }
-
-/* Wide tables (price + classic terms) scroll inside their own container — never widen the page. */
-.qp-scrollx { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
-/* ── Mobile (≤600px) — phones. Scoped to this query so the desktop (≥600px) layout is unchanged. ── */
-@media (max-width: 600px) {
-  /* top bar — tighter; already a horizontal-scroll strip (overflow-x:auto) */
-  .dlproto .topbar { gap: 9px; padding: 9px 12px; }
-  .dlproto .tb-spacer { display: none; }
-  /* price bar — smaller hero so the top-corner status pill can't overlap the number; CTAs stretch/wrap */
-  .dlproto .price-bar { padding: 32px 14px 16px; min-height: 0; }
-  .dlproto .pb-status { top: 10px; inset-inline-end: 10px; font-size: 10px; padding: 3px 9px; }
-  .dlproto .pb-hero .n { font-size: 34px; letter-spacing: -1px; }
-  .dlproto .pb-hero .u { font-size: 14px; }
-  .dlproto .pb-btns { flex-wrap: wrap; }
-  .dlproto .pb-btn { flex: 1 1 auto; justify-content: center; }
-  /* chat — wider bubbles, tighter thread */
-  .dlproto .msg { max-width: 86%; }
-  .dlproto .thread { padding: 12px 12px 14px; }
-  /* ── negotiation sheet ── */
-  .qp-steps { padding: 10px 12px; }
-  .qp-step .lbl { font-size: 12.5px; }
-  .qp-step .badge { width: 26px; height: 26px; font-size: 12px; }
-  .qp-steps .bar { min-width: 8px; margin: 0 5px; }
-  .qp-head-r1 { padding: 7px 12px 6px; gap: 10px; }
-  .qp-deskpad { padding: 12px 10px 34px; }
-  /* paper fills the screen — force the inline zoom off (‼ beats inline) so it isn't shrunk on mobile */
-  .qp-paper { zoom: 1 !important; width: 100%; padding: 16px 14px 26px; }
-  .qp-zoom { display: none; }
-  .qp-qhead { gap: 10px; padding-bottom: 12px; margin-bottom: 12px; }
-  /* tables keep usable column widths and scroll horizontally inside .qp-scrollx */
-  .qp-scrollx .qp-table, .qp-scrollx .qp-tt { min-width: 500px; }
-  .qp-table th, .qp-table td, .qp-tt th, .qp-tt td { padding: 8px 7px; font-size: 11.5px; }
-  .qp-price-in { width: 52px; font-size: 13px; }
-  /* review — single column; address boxes stack */
-  .dlproto .qp-rgrid, .dlproto .qp-addr { grid-template-columns: 1fr; }
-  /* footer — buttons wrap and fill the row */
-  .qp-foot { flex-wrap: wrap; gap: 8px; padding: 9px 12px; }
-  .qp-foot .spacer { display: none; }
-  .qp-foot-main { flex: 1 1 auto; }
-  .qp-fbtn { flex: 1 1 auto; justify-content: center; }
-}
-
-/* deal-room/negotiation — turn cue badge + pulsing Negotiate CTA (app parity: negotiateFresh) */
-.dlproto .pb-turn { display: inline-flex; align-items: center; justify-content: center; gap: 5px; margin-top: 8px; font-size: 11.5px; font-weight: 800; color: color-mix(in srgb, var(--action) 45%, white); }
-.dlproto .pb-turn.alert { color: var(--warn-amber); }
-.dlproto .pb-btn.neg.pulse { animation: dlPulse 1.6s ease-in-out infinite; }
-@keyframes dlPulse { 0%, 100% { } 50% { outline: 6px solid color-mix(in srgb, var(--info) 0%, transparent); outline-offset: 0; } }
-
 /* deal-room/negotiation — reconstructed round history (Log modal) */
 .dlproto .qp-rounds { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .dlproto .qp-round { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 9px 11px; background: var(--surface1); }

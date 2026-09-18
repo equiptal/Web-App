@@ -452,6 +452,17 @@ export interface BidCard {
   };
   /** Normalized keys of terms AGREED/locked in the deal room — drives the quotation's "Agreed" badge. */
   agreedTermKeys?: string[];
+  /** The latest COUNTER's proposed value per term (getBidList `counters`).
+   *
+   *  ⚠️ The mapper has always built these to decide a term row's matched/conflict state; they are
+   *  exposed because the QUOTATION resolves every clause down the app's own ladder (locked → counter
+   *  → declared → the request's side) and a counter is the middle rung. */
+  counters?: { key: string; value: unknown }[];
+  /** The supplier's RAW T3 declaration map, keys as the backend sends them.
+   *
+   *  ⚠️ `declaredTerms` above is the five the card reads by name; this is all of them, because the
+   *  quotation must print every term the room holds and cannot know their names in advance. */
+  t3Declarations?: Record<string, unknown>;
   /** 014 lifecycle, server-enriched in getBidList (same source the mobile bid card reads). Drives the
    *  live deal-terms strip + overlays locked terms onto the Terms modal / quotation. */
   lockedTerms: { key: string; value: unknown }[]; // agreed terms + their negotiated value
@@ -1110,6 +1121,8 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
       fuelResponsibility: s(t3decl.fuel_responsibility),
     },
     agreedTermKeys: lockedTerms.map((t) => normKey(t.key)),
+    counters,
+    t3Declarations: t3decl,
     lockedTerms,
     unreadTerms,
     progress,
