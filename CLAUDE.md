@@ -2,6 +2,39 @@
 
 ## Change log
 
+- **2026-09-18 - The dashboard's tabs are boxed again: a glyph, a count pill and an orange foot under the open one.**
+  Owner, handing over a screenshot of another product's tab strip: *"use like these tabs design in
+  the dashboard"*.
+  🔴 **This OVERTURNS yesterday's ruling** (2026-09-17, *"the tabs doesnt feel ui consistency
+  with the header tabs"*), which had made this row `AppNav`'s lozenge inverted. It goes back to a
+  BORDERED BOX per tab - the section's glyph, its name, the count in a small pill - with the open tab
+  filled navy and a 3px brand-orange rule along its foot. His reference, his call.
+  ⚠ **What the withdrawn ruling was protecting is worth keeping in view**: `AppNav`'s own note says
+  *"a row of four icon-plus-label pairs reads as a toolbar rather than as the top of a site"*. It is
+  affordable here because this row is NOT the top of the site - the navy bar two bands above it is,
+  and it still wears the plain lozenges. A page-level tab strip may look like a control.
+  ⚠ **The foot rule is on EVERY tab**, orange when open and the ordinary border when not, so the row
+  does not shift by a pixel when the open tab changes - the one device of the header's pill that
+  survives. Measured: all three tabs 41px, same top.
+  ⚠ **The count pill is NOT the reference's red.** Red is `--danger` in this palette, and a count of
+  the renter's own sites is not an alarm. Grey on the resting tab, the navy tab's own ground inverted
+  on the open one. It is still a dash until the block answers.
+  Files: `src/components/home/HomeHub.tsx` (`VIEW_ICON` back, `DashboardTabs`).
+  🔴 **A stale `.next` told a lie for half an hour, and it is the trap worth recording.** A dev
+  server running across the edit went on serving a `layout.css` that contained NONE of the new
+  utilities - `border-b-[3px]`, `border-b-brand`, `bg-surface/20` all absent from the compiled sheet
+  on disk - so the orange foot measured 1px navy and the obvious conclusion («the shorthand `border`
+  beats the side `border-b-[3px]`») was drawn, and the markup was rewritten around it. On a clean
+  build the side wins outright, measured at 3px #f97316, and the rewrite was reverted.
+  **A new utility that appears to do NOTHING is a build that has not re-scanned the file**; delete
+  `.next` before rewriting markup around what the browser reports.
+  ⚠ Verified: typecheck clean, lint 0 errors, 34 passing across the two dashboard suites plus the
+  pins, palette and shell-nav guards - they pin the RULES (mounted not unmounted, the count reported
+  up, the dash, the URL), none of which the skin touches. **SEEN RENDERED** through the
+  `dashboard-tabs` specimen in EN and AR - the Arabic mirror needs no rule of its own, the flex row
+  reverses.
+  🔴 **NOT seen on the real dashboard**: that needs a signed-in renter with all three lists.
+
 - **2026-09-17 - The dashboard band's bottom edge is a straight line again, and the dune sweep is deleted.**
   Owner: *"make the cta of ai straight line as it was"*.
   🔴 **TWO treatments were tried on that one edge in two days and both are now withdrawn** - the

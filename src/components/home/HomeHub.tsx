@@ -13,10 +13,13 @@ import { HomeRequests } from "@/components/home/HomeRequests";
 import { ProjectsSurface } from "@/components/projects/ProjectsSurface";
 import { SuppliersPage } from "@/components/suppliers/SuppliersPage";
 import { pin } from "@/lib/uiPins";
+import { Icon } from "@/components/Icon";
 
 /** The three things the dashboard holds, one at a time (owner, 2026-09-16). */
 type View = "requests" | "suppliers" | "projects";
 const VIEWS: View[] = ["requests", "suppliers", "projects"];
+
+const VIEW_ICON = { requests: "assignment", suppliers: "groups", projects: "place" } as const;
 
 /**
  * The tab row.
@@ -25,20 +28,33 @@ const VIEWS: View[] = ["requests", "suppliers", "projects"];
  * suppliers and sites on a deployed backend, so this row could not otherwise be looked at while it
  * was being built. It takes the whole of its state as props for that reason, and holds none.
  *
- * ── It is the HEADER's pill, inverted (owner, 2026-09-17) ───────────────────────────────────────
- * *"the tabs doesnt feel ui consistency with the header tabs i dont know but i dont like them"*.
+ * ── A boxed tab with a glyph, a count and an orange foot (owner, 2026-09-18) ────────────────
+ * On a screenshot of another product's tab strip: *"use like these tabs design in the dashboard"*.
+ * So: a bordered box per tab, the section's glyph before its name, the count in a small pill after
+ * it, and the open tab filled NAVY with a brand-orange rule along its foot.
  *
- * ~~A bordered box per tab, each carrying a 30px navy plate with the section's glyph, the name at
- * `text-body` extrabold, and the count in a filled chip.~~ Three devices this product's own tabs do
- * not use, and `AppNav`'s note names the fault exactly: *"a row of four icon-plus-label pairs reads
- * as a toolbar rather than as the top of a site"*. Beside a header of plain words in lozenges it
- * read as another product's chrome.
+ * ~~The header's lozenge, inverted~~ — which is what this row wore for a day (2026-09-17, *"the tabs
+ * doesnt feel ui consistency with the header tabs"*). That ruling is overturned on his own
+ * reference, and the reason it was made is worth keeping in view: `AppNav`'s note warns that *"a row
+ * of four icon-plus-label pairs reads as a toolbar rather than as the top of a site"*. It is
+ * affordable here because this row is NOT the top of the site — the navy bar two bands above it is,
+ * and it still wears the plain lozenges. A page-level tab strip is allowed to look like a control.
  *
- * So it is that row's recipe, to the pixel — `rounded-full px-4 py-1.5 text-meta`, no border, no
- * glyph — with the fill INVERTED because this row sits on the page rather than on the navy bar: the
- * header draws the place you are on as a WHITE lozenge on navy, and this draws it as a NAVY lozenge
- * on white. Same padding in both states, so the row does not shift by a pixel when the open tab
- * changes, which is the rule the header's own pill was written to keep.
+ * ⚠ The foot rule is drawn on EVERY tab, orange when open and the ordinary border when not, so the
+ * row does not shift by a pixel when the open tab changes. That is the rule the header's pill was
+ * written to keep and the one device of it that survives here.
+ *
+ * ⚠ The foot is `border-b-[3px] border-b-brand` OVER the shorthand `border border-navy`, and the
+ * side wins in the compiled sheet — MEASURED in a browser (3px, #f97316) rather than assumed, since
+ * this is the shorthand-versus-side family that has bitten this repo three times.
+ * ⚠ It was measured TWICE, because the first reading was a lie told by a stale `.next`: a dev
+ * server that had been running across the edit went on serving a `layout.css` with none of the new
+ * utilities in it at all, so the foot read 1px navy and the obvious conclusion — "the shorthand
+ * beats the side" — was wrong. A new utility that appears to do NOTHING is a build that has not
+ * re-scanned the file; delete `.next` and look again before rewriting the markup around it.
+ * ⚠ The count is a PILL again, and it is NOT the reference's red: red is `--danger` in this
+ * palette, and a count of the renter's own sites is not an alarm. It takes the page's own grey, and
+ * on the navy tab that same grey inverted.
  */
 export function DashboardTabs({
   view,
@@ -51,7 +67,7 @@ export function DashboardTabs({
 }) {
   const t = useT();
   return (
-    <div {...pin("home-tabs")} className="flex flex-wrap items-center gap-1">
+    <div {...pin("home-tabs")} className="flex flex-wrap items-center gap-2">
       {VIEWS.map((k) => {
         const on = view === k;
         const n = counts[k];
@@ -62,16 +78,24 @@ export function DashboardTabs({
             onClick={() => onPick(k)}
             aria-current={on ? "page" : undefined}
             className={cx(
-              "whitespace-nowrap rounded-full px-4 py-1.5 text-meta transition",
-              on ? "bg-navy font-semibold text-surface" : "font-normal text-navy-mid hover:bg-surface2 hover:text-navy",
+              "inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-b-[3px] px-3.5 py-2 text-meta font-semibold transition",
+              on
+                ? "border-navy border-b-brand bg-navy text-surface"
+                : "border-border bg-surface text-navy-mid hover:border-border-strong hover:text-navy",
             )}
           >
+            <Icon name={VIEW_ICON[k]} size={18} className={on ? "text-surface" : "text-muted-dark"} />
             {k === "requests" ? t.home.yourRequests : k === "suppliers" ? t.suppliers.title : t.projects.surface.heading}
-            {/* The count rides IN the label's run, not in a chip of its own: the header's tabs carry
-                no badge, and a filled pill inside a pill was half of what made this row read as a
-                toolbar. A dash while the block has not answered yet — «0 suppliers» on a list still
-                loading is a wrong statement, not a pending one. */}
-            <span className={cx("ms-1.5 tabular-nums", on ? "text-surface/70" : "text-muted")}>{n ?? "–"}</span>
+            {/* A dash while the block has not answered yet: «0 suppliers» on a list still loading is
+                a wrong statement, not a pending one. */}
+            <span
+              className={cx(
+                "rounded-full px-1.5 py-0.5 text-label font-extrabold tabular-nums",
+                on ? "bg-surface/20 text-surface" : "bg-surface2 text-navy-mid",
+              )}
+            >
+              {n ?? "–"}
+            </span>
           </button>
         );
       })}
