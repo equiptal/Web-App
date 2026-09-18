@@ -1050,31 +1050,17 @@ body {
   white-space: nowrap;
 }
 
-/* ── The dune sweep ──────────────────────────────────────────────────────────
-   The band's bottom edge becomes a shallow curve cut in the page's own colour. The kit: "it changes
-   the silhouette of whatever sits below it, which is why it reads as a bigger change than its
-   colour alone would suggest."
+/* 🔴 ~~The dune sweep — a shallow curved cut, in the page's own colour, along the dashboard band's
+   bottom edge.~~ WITHDRAWN (owner, 2026-09-17: *"make the cta of ai straight line as it was"*), and
+   deleted rather than left inert, `public/nd96-dune.svg` with it.
 
-   🔴 **This REPLACES the seam on the band.** Both are treatments of one edge and drawing them
-   together gives that edge two finishes an inch apart. The seam stays on the header, where it is
-   what the app's own screenshot shows, and on the guest wall's head strip; the band takes the cut.
+   Worth keeping the reason, because the kit still ships the motif and someone will reach for it
+   again: it is the one piece here that changes a SILHOUETTE rather than adding a mark inside a box,
+   and this band's bottom edge is a structural join — the first band of the dashboard meeting the
+   page. A curve there reads as the layout having moved, not as a season. The band wears its season
+   on the inside instead (`.nd-band`, above).
 
-   The CUT is a mask and the PAINT is `--background`, so the curve is the page showing through
-   rather than a beige shape drawn over the band — change the page's colour and this follows it.
-   `mask-size: 100% 100%` stretches the wave to the window, which is safe here and would not be for
-   a machine: a shallow curve has no proportion to lose. */
-[data-season="nd"] .nd-dune { position: relative; }
-[data-season="nd"] .nd-dune::after {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  height: 40px;
-  background: var(--background);
-  pointer-events: none;
-  -webkit-mask: url("/nd96-dune.svg") no-repeat 0 0 / 100% 100%;
-  mask: url("/nd96-dune.svg") no-repeat 0 0 / 100% 100%;
-}
+   Two edges were tried on it and both are gone; the band's bottom is a straight line. */
 
 /* ── The corner palm ────────────────────────────────────────────────────────
    "The cheapest way to mark a single card as seasonal without touching its layout or its colours."

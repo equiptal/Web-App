@@ -147,20 +147,26 @@ export function CtaBanner() {
          The rounding goes with the gutter: a radius on a band whose corners are off-screen draws a
          notch against the header and nothing else. The COPY keeps the page's reading gutter, so
          the headline still lines up with the blocks below it. */
-      /* `nd-dune` — the band's seasonal edge (owner, 2026-09-16), inert for eleven and a half
-         months: the class matches nothing until `<html data-season="nd">` is written, and then its
-         `::after` cuts the bottom edge into a shallow curve in the page's own colour.
+      /* 🔴 **The bottom edge is a STRAIGHT LINE, and it carries no seasonal treatment at all**
+         (owner, 2026-09-17: *"make the cta of ai straight line as it was"*).
+         ~~`nd-seam`, the gold rank the header wears (2026-09-16).~~
+         ~~`nd-dune`, the kit's shallow curved cut in the page's own colour (2026-09-16).~~
+         Both were tried on this one edge and both are withdrawn. The band already carries the
+         season without touching its silhouette — the tree line and the dot field sit INSIDE it —
+         and its bottom edge is the seam between the dashboard's first band and the page under it,
+         which is a join the eye reads as structure rather than as decoration. The dune's own
+         argument was that it *"changes the silhouette of whatever sits below it"*; that turned out
+         to be the objection rather than the case for it.
 
-         🔴 ~~`nd-seam`, the gold rank the header wears.~~ The band asked for the louder piece
-         when the kit was opened properly: an edge can have ONE finish, and a seam plus a cut an
-         inch apart is two. The seam still closes the header and the guest wall's strip; this edge
-         is where the silhouette changes.
+         ⚠️ The class is gone from this element rather than left inert: `.nd-dune` is deleted from
+         the stylesheet and `public/nd96-dune.svg` with it, so nothing here is one edit away from
+         coming back by accident.
 
          🔴 The band is NOT recoloured and the agent is not dressed. Its ground is a photograph of a
          site under two gradients, its one coloured word and its button are `--brand`, and the whole
          argument of this skin is that the orange does not move. A green band here would put the
          celebration on top of the one control the dashboard exists to offer. */
-      className="nd-dune relative isolate -mt-[calc(1.5rem+1px)] flex h-[160px] w-screen items-center overflow-hidden sm:-mt-[calc(1.75rem+1px)]"
+      className="relative isolate -mt-[calc(1.5rem+1px)] flex h-[160px] w-screen items-center overflow-hidden sm:-mt-[calc(1.75rem+1px)]"
       /* `calc(50% - 50vw)`, and the 50% is of the CONTAINER — the padded, capped main. That centres a
          100vw child on a container which is itself centred in the viewport, which lands the band on
          the window's edges at every width. Inline because a Tailwind arbitrary value cannot mix the

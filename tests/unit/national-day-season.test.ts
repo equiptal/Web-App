@@ -293,13 +293,19 @@ describe("the kit's motifs land on the surfaces the kit names", () => {
   });
 
   /**
-   * 🔴 An edge gets ONE finish. The band took the dune sweep when the kit was read properly, and
-   * the seam it used to carry went with it - a cut and a rank of triangles an inch apart is two
-   * treatments of one line.
+   * 🔴 **The band's bottom edge carries NOTHING** (owner, 2026-09-17: *"make the cta of ai straight
+   * line as it was"*). Both treatments were tried on it and both are withdrawn - the gold seam, then
+   * the dune sweep - and `.nd-dune` is deleted from the stylesheet with its artwork, so this case
+   * fails the moment either comes back.
+   *
+   * The reason, for whoever reaches for the kit's dune again: it is the one motif that changes a
+   * SILHOUETTE rather than adding a mark inside a box, and this edge is a structural join. The band
+   * wears its season on the inside.
    */
-  it("gives the band the dune sweep instead of the seam", () => {
-    expect(cta).toContain('className="nd-dune relative isolate');
-    expect(cta).not.toMatch(/className="nd-seam/);
+  it("leaves the band's bottom edge straight", () => {
+    expect(cta).toContain('className="relative isolate -mt-[calc(1.5rem+1px)]');
+    expect(cta).not.toMatch(/className="nd-(seam|dune)/);
+    expect(css).not.toMatch(/\.nd-dune\s*(\{|::after)/);
   });
 
   /**
@@ -311,9 +317,8 @@ describe("the kit's motifs land on the surfaces the kit names", () => {
   it("leaves the band with no mark and no words of its own", () => {
     expect(cta).not.toMatch(/nd-mark/);
     expect(cta).not.toMatch(/seasonOrdinal/);
-    // The three silent pieces stay.
+    // What it keeps: the two pieces that sit INSIDE it and say nothing.
     expect(cta).toContain('className="nd-band');
-    expect(cta).toContain('className="nd-dune relative isolate');
   });
 
   it("gives the role gate the INTERLOCKING band and the pale chip", () => {

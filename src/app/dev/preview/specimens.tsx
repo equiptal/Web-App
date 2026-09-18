@@ -525,11 +525,12 @@ export const SPECIMENS: Specimen[] = [
           <div data-season="nd">
             <div className="nd-bar relative flex h-[52px] items-center gap-3 bg-navy-deep px-4 text-white sm:px-7">{bar}</div>
             {/* The dashboard band, carrying the three pieces it takes in season: the eight-palm
-                TREE LINE and the dot lattice on `nd-band`, and the DUNE SWEEP cutting its bottom
-                edge into the page's own colour. Its navy is unchanged, which is as much the point of
-                the picture as the motifs are. 🔴 The ordinal mark is NOT here any more — it is on the
-                bar above, in place of the pill (owner, 2026-09-17). */}
-            <div className="nd-dune nd-band relative flex h-[160px] items-center gap-6 bg-navy px-4 text-white sm:px-7">
+                TREE LINE and the dot lattice on `nd-band`, and nothing else. Its navy is unchanged,
+                which is as much the point of the picture as the motifs are.
+                🔴 Two things have LEFT this band and the picture is how that is checked: the ordinal
+                mark is on the bar now, in place of the pill, and the dune sweep is gone entirely —
+                the bottom edge is a straight line (owner, 2026-09-17). */}
+            <div className="nd-band relative flex h-[160px] items-center gap-6 bg-navy px-4 text-white sm:px-7">
               <span className="text-body font-extrabold">
                 {L("The dashboard band keeps its own colours", "شريط الرئيسية يحتفظ بألوانه")}
               </span>

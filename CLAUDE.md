@@ -2,6 +2,35 @@
 
 ## Change log
 
+- **2026-09-17 - The dashboard band's bottom edge is a straight line again, and the dune sweep is deleted.**
+  Owner: *"make the cta of ai straight line as it was"*.
+  🔴 **TWO treatments were tried on that one edge in two days and both are now withdrawn** - the
+  gold Najdi seam (2026-09-16), then the kit's dune sweep the same day, on the argument that an edge
+  gets one finish. The edge gets none.
+  ⚠️ **The reason is worth keeping, because the kit still ships the motif and somebody will reach
+  for it again.** The dune is the one piece in the kit that changes a SILHOUETTE rather than adding
+  a mark inside a box, and this band's bottom edge is a structural join: the dashboard's first band
+  meeting the page under it. A curve there reads as the layout having moved, not as a season. The
+  dune's own note argued that it *"changes the silhouette of whatever sits below it"*, which turned
+  out to be the objection rather than the case for it.
+  **The band still wears the season, on the INSIDE**: the eight-palm tree line and the dot field,
+  both on `.nd-band`, both untouched. Its navy, its photograph, its one orange word and its orange
+  button are unchanged, as they have been throughout.
+  ⚠️ **Deleted rather than left inert** - the class off the element, the `.nd-dune` rules out of
+  `globals.css`, and `public/nd96-dune.svg` with them. An unused seasonal rule is one edit away from
+  coming back by accident, and the strike-through in both files carries the reasoning without
+  carrying the code.
+  🔴 **Seven of the kit's eleven motifs are now placed**, down from nine: the dune joins the confetti
+  and the corner ribbon on the list of pieces deliberately not carried, and a case records each.
+  Files: `src/components/home/CtaBanner.tsx`, `src/app/globals.css`,
+  `public/nd96-dune.svg` (deleted), `src/app/dev/preview/specimens.tsx`,
+  `tests/unit/national-day-season.test.ts` (2 cases rewritten; 32 passing).
+  ⚠️ The case that pins it reads the STYLESHEET as well as the component (`.nd-dune` must not be
+  declared at all), so restoring the class alone cannot bring the curve back quietly.
+  ⚠️ Verified: typecheck clean, lint 0 errors, 32 in the season's suite and 46 across the CTA,
+  palette, pins and guest-wall guards. **SEEN RENDERED**: the band in season with the tree line and
+  the dots inside it and a straight bottom edge, beside the same markup out of season.
+
 - **2026-09-17 - The intake panel runs the window's height under the header, opens every project, and counts every row.**
   Owner, on a screenshot of the rail ending mid-page with grey under it: *"make it for this the
   default width and by default make them opened, then for height make it along the page excpet the
