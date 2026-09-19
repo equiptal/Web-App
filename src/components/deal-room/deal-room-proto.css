@@ -616,11 +616,6 @@
 
 
 /* ── the negotiation LOG, unchanged: its own modal, opened from the footer ─────────────── */
-/* ════════════════════════════════════════════════════════════════════════════════════════════
-   Negotiation sheet — quotation-paper 3-step wizard (spec §6). Scoped .qp-*; scrim class .qp-scrim
-   lives OUTSIDE .dlproto (the sheet is portaled at the document body via a fixed overlay).
-   ════════════════════════════════════════════════════════════════════════════════════════════ */
-  display: flex; flex-direction: column; width: 100%; max-width: 860px; max-height: 94vh; background: var(--surface); border-radius: var(--radius-lg); overflow: hidden; font-family: var(--font-sans); color: var(--navy); animation: dpModal .22s ease; }
 .qp-htitle { min-width: 0; flex: 1; }
 .qp-htitle .t { font-size: 14px; font-weight: 800; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qp-htitle .s { font-size: 10.5px; font-weight: 600; color: var(--muted); margin-top: 2px; }

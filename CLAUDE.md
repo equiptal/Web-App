@@ -2,6 +2,39 @@
 
 ## Change log
 
+- **2026-09-19 - STAGING HAD NOT DEPLOYED SINCE THE 18th: `97046ef6` left an orphaned CSS declaration and every build after it failed.**
+  Owner: *"is the last commit and push deployed? i didnt see the changes"*, then *"i am looking to staging check it to build and deploy"*.
+  The push was fine - `5474e470` is on `origin/staging`, 0 ahead / 0 behind. **The BUILD was broken**, so
+  Amplify went on serving the build from `dd435fcf` (18 Sept). Fingerprinted rather than assumed: the
+  deployed `/browse` still carries `max-w-[1440px]` (so the fluid-layout commit is absent) while carrying
+  `data-season="nd"` and no `nd-dune` (so the 17th's work is present).
+  🔴 **The fault: a selector was deleted and its CONTINUATION LINE was left behind.** `deal-room-proto.css`
+  had `.qp-sheet {` opening a rule whose declarations ran onto the next line; the negotiation-sheet rewrite
+  in `97046ef6` deleted the opener (the wizard became `.ng-*`, and the log grew its own `.qp-sheet` further
+  down) and left `  display: flex; ... }` standing alone under a comment. PostCSS: `Unexpected } (623:251)`.
+  Deleted, along with the four-line comment above it that still described the wizard this file no longer
+  holds.
+  ⚠️ **It is invisible to every gate this repo runs.** `typecheck`, `lint` and all 211 test files were GREEN
+  across the 19th's three commits - a stylesheet is not typed, not linted here, and jsdom parses no CSS. The
+  only thing that catches it is `next build`, and `npm run build` **cannot run on this machine**:
+  `NODE_OPTIONS=--no-experimental-webstorage` is refused by the local Node 20 (`is not allowed in
+  NODE_OPTIONS`), which is the same breakage already logged for `npm run dev`. So three commits shipped on a
+  build nobody could run. **Run `NODE_OPTIONS= npx next build` before pushing anything that touches a `.css`
+  file**, or fix the script.
+  ⚠️ The orphan line is present in `git show` as far back as `7b9d37d8` and was HARMLESS there - line 399 was
+  its selector. Searching for the line's first appearance points at the wrong commit; the breakage is where
+  the OPENER went, which is `git show 97046ef6 -- <file> | grep '^-.*qp-sheet {'`.
+  Files: `src/components/deal-room/deal-room-proto.css` (5 lines removed).
+  ⚠️ Verified: `next build` clean (31 routes), typecheck clean, lint 0 errors, **211 files / 3563 passing,
+  7 skipped** serially. The 3 unhandled errors are `intercom-widget`'s two and `suppliers-remove-and-pick`'s
+  one, both pre-existing and unchanged in count.
+  🔴 **NOT deployed by this change.** The fix is in the working tree, uncommitted. Staging will not move until
+  it is pushed, and the Amplify build log was NOT read - there are no AWS credentials on this machine
+  (`aws sts get-caller-identity` -> `NoCredentials`), so «the build failed» is proved by reproducing the
+  failure locally rather than by reading the console.
+  ⚠️ **`origin/beta` is 22 commits behind `origin/staging`** and has none of the September work. If the beta
+  host is what is being looked at, that is a separate, larger gap.
+
 - **2026-09-19 - The intake panel starts at the header and the Back control moves INTO the column; the rail's drawings come back.**
   Owner, on a screenshot of `/create` at desktop width: *"the panel must fit the whole page from the
   header till the end and dont overlap it with the back button also why the equipemtn images / icons
