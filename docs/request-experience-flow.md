@@ -334,7 +334,7 @@ Submit is disabled while busy, while no item would post, or while no rental basi
 | `guest` | The account modal opens first. When the account is created, the request posts automatically. |
 | `basic` | Posts. If the backend rejects with `E8009` (request cap), a verify pop-up appears instead of inline red text. |
 | `verified` | Posts. |
-| No session at all, on the server | The BFF falls back to `AGENTS_TEST_USER_ID`. This is creator attribution, not authorisation. The code notes that a session-less submit on a deployed environment should probably return 401 so the auth gate opens. |
+| No session at all, on the server | The BFF answers 401 (since 2026-09-16; it used to fall back to `AGENTS_TEST_USER_ID`). The client maps it to the `auth` submit-error state. |
 
 Only backend-verified ids are accepted for attribution, so a forged cookie cannot file a request
 under someone else's name.
@@ -550,9 +550,9 @@ These are observations from the current code, not decisions.
 4. **One RFQ becomes many requests.** Fan-out is invisible at submit but visible everywhere after:
    split statuses, per-item cancel, group re-assembly by `requestGroupId`. The create flow and the
    list flow do not describe the request the same way.
-5. **A session-less submit lands on a test user.** The code names this as an open question:
-   attribution falls back to `AGENTS_TEST_USER_ID` rather than returning 401 and opening the auth
-   gate (`src/app/api/requests/route.ts:38-46`).
+5. ~~**A session-less submit lands on a test user.**~~ Resolved 2026-09-16: the route answers
+   401 to a session-less submit on a real backend, and the client maps it to the `auth`
+   submit-error state (`src/app/api/requests/route.ts`).
 6. **The basic-tier request cap only surfaces as a failure.** The renter learns about it after
    completing the whole flow and pressing submit (`E8009` → verify pop-up).
 7. **Urgency is computed twice.** The web derives it from the start date to match the app, and the

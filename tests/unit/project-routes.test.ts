@@ -5,10 +5,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  *
  * Two things are worth a test here and the rest is plumbing:
  *
- *  1. **The guard.** These routes carry authorization, not attribution. `api/requests` keeps an
- *     `AGENTS_TEST_USER_ID` fallback for a session-less submit; if one of these ever grew the same
- *     fallback, a caller with no session would read another company's sites, awards and purchase
- *     orders. That is the single most expensive mistake available in this ticket, so it is pinned.
+ *  1. **The guard.** These routes carry authorization, not attribution. `api/requests` used to keep
+ *     an `AGENTS_TEST_USER_ID` fallback for a session-less submit (dropped 2026-09-16 - it 401s
+ *     now); if one of these ever grew such a fallback, a caller with no session would read another
+ *     company's sites, awards and purchase orders. That is the single most expensive mistake
+ *     available in this ticket, so it is pinned.
  *  2. **409 reaching the browser intact.** An award write carries the version it read, and a
  *     mismatch has to arrive as 409 with the current version so the client re-reads. Flattened into
  *     a 502 it becomes "something went wrong", the renter retries, and hits the same wall.

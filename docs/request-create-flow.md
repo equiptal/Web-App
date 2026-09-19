@@ -173,7 +173,8 @@ This goes to the **agent door**, not Mansour.
 1. **Client** `submitRequest()` (`src/lib/api/client.ts`) calls **`POST /api/requests`**.
 2. **BFF route** `src/app/api/requests/route.ts`:
    - Resolves the **userId**: from the signed-in `mt_user` cookie, or falls back to
-     `AGENTS_TEST_USER_ID` (staging only).
+     `AGENTS_TEST_USER_ID` (local non-production dev only, via `session-user.ts`; since
+     2026-09-16 the route itself answers 401 to a session-less submit on a real backend).
    - Calls **`draftToCreateRequest(draft, userId)`** (`src/lib/api/app-adapters.ts`) to map the
      UI's draft into the backend payload.
    - Forwards to:
@@ -259,7 +260,7 @@ Set in `.env` (prod defaults) / `.env.local` (staging/local overrides):
 MANSOUR_URL=https://normalization-agent-production.up.railway.app   # the AI parser (and /bids/*)
 AGENTS_API_URL=https://kge3xspt36.execute-api.eu-central-1.amazonaws.com  # taxonomy + submit
 AGENTS_API_TOKEN=<bearer>          # auth for the agent door
-AGENTS_TEST_USER_ID=46             # fallback rentee when nobody is signed in (staging)
+AGENTS_TEST_USER_ID=46             # local-dev-only fallback rentee (session-user.ts); the route 401s a session-less submit
 BIDS_API_TOKEN=<optional>          # optional gate on Mansour /bids/* (open when unset)
 ```
 

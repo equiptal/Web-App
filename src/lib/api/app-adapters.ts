@@ -179,7 +179,9 @@ const CERT_TOKEN_MAP: Record<string, string> = {
  * (me ⇒ byRentee true), fuel enum, etc. Taxonomy ids on items must be REAL app ids — true when the
  * catalogue was loaded from GET /agents/taxonomy.
  *
- * `userId` is required by the backend; while web auth is bypassed it comes from AGENTS_TEST_USER_ID.
+ * `userId` is required by the backend; it is the verified session user (a session-less submit 401s
+ * at the route since 2026-09-16; only local non-production dev falls back to a test id, in
+ * `session-user.ts`).
  *
  * Integration rules (ALIGNMENT-web-app-002.md): `startDate` is optional — omit it and the server
  * defaults to "now"; never invent one (rule 3). `urgency` is now sent, computed client-side to mirror

@@ -46,6 +46,13 @@ describe("which side the fault is on", () => {
     expect(readSubmitError({ backendCode: "E8007", backendStatus: 403 }).kind).toBe("auth");
   });
 
+  it("Given a 401 carried on the HTTP status alone, Then it is still the ACCOUNT", () => {
+    // ⚠️ The session-less-submit 401 arrives exactly this way: our own BFF refuses
+    // (`api/requests` since 2026-09-16), so there is no backendStatus — only ApiError's
+    // `status`. Pins the `?? status` arm of the coalesce; reorder it and this goes red.
+    expect(readSubmitError({ status: 401 }).kind).toBe("auth");
+  });
+
   it("Given NO status at all, Then it is the connection", () => {
     /**
      * ⚠️ Not "unknown". A fetch that never got a reply leaves no status, and the renter's next move

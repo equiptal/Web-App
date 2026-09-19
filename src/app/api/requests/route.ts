@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { useRealApp, serverEnv } from "@/lib/config/env";
+import { useRealApp } from "@/lib/config/env";
 import { agentsPost, AgentsBackendError } from "@/lib/api/agents-backend";
 import { sessionUserId } from "@/lib/api/session-user";
 import { draftToCreateRequest } from "@/lib/api/app-adapters";
@@ -9,8 +9,8 @@ import type { CreateRequestResult } from "@/lib/contract/app";
 /**
  * POST /api/requests — submit the assembled broadcast request.
  * Real (AGENTS_API_URL + token set): maps the draft → create_request and POSTs /agents/requests as
- * the signed-in renter (web-app/001, AC-03), falling back to AGENTS_TEST_USER_ID only when there's
- * no session. Otherwise → mock. Body: RfqRequestPayload & { simulateError?, isTrial? }
+ * the signed-in renter (web-app/001, AC-03); with no session it answers 401 so the auth gate owns
+ * the anonymous case. Otherwise → mock. Body: RfqRequestPayload & { simulateError?, isTrial? }
  *
  * mobile/016 — `isTrial: true` (the renter picked "Trial Request" on the home pop-up) is forwarded to
  * the agents backend, which creates the request WITHOUT dispatching it to suppliers, attaches sample
@@ -28,20 +28,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ code: "network" }, { status: 503 });
   }
 
-  // AC-03: submit as the signed-in renter; the env test user is only a no-session fallback.
+  // AC-03: submit as the signed-in renter.
   //
-  // This route DELIBERATELY keeps that fallback while the owner-guarded routes dropped theirs. Here
-  // `userId` is CREATOR ATTRIBUTION, not an authorization decision — it grants no read or delete
-  // access to anyone else's data — and removing it would silently reroute a session-less submit into
-  // the mock branch below, which answers 201 with a fabricated RFQ code. Failing a real submission by
-  // pretending it succeeded is worse than attributing it to the configured test user.
+  // ~~The env test user used to be a no-session fallback here.~~ On a real backend a session-less
+  // submit now answers 401 instead — the open question the old comment left ("should probably 401 so
+  // the auth gate opens") was decided when the OS public share pages started funnelling anonymous
+  // visitors into this exact route: every one of their submits would have been filed as the
+  // configured test user, invisibly, with a green 201. The client is ready for it — a 401 maps to
+  // the designed `auth` submit-error state (`contract/submit-error.ts`: `status === 401 → kind
+  // "auth"`), not a generic failure. And it stays the backstop, not the ordinary path: the only
+  // caller (`ShareOnPost`'s `post()`) gates `tier === "guest"` behind the AccountModal BEFORE
+  // calling `submit()`, so this fires only when the client believes it is signed in and the
+  // server disagrees (expired or cleared session).
   //
-  // The impersonation vector is still closed: `sessionUserId()` now returns only backend-VERIFIED ids,
-  // so a forged cookie can no longer pick whose name a request is filed under — the worst case is
-  // today's no-session behaviour. Open question for the UI owner: a session-less submit on a deployed
-  // environment should probably 401 so the auth gate opens, instead of landing on the test user.
+  // ⚠️ 401 BEFORE the `useRealApp` branch would break local mock dev — the mock below deliberately
+  // answers without any session. The check therefore lives inside the real-backend condition, so
+  // mock mode is unchanged and a SESSION-LESS real submit can no longer reach the mock's
+  // fabricated 201. (A signed-in real-mode POST whose body failed to parse still can, via the
+  // `"items" in body` condition below — pre-existing, untouched here.)
   const verifiedId = await sessionUserId();
-  const userId = verifiedId != null ? String(verifiedId) : serverEnv.agentsTestUserId;
+  if (useRealApp && verifiedId == null) {
+    return NextResponse.json({ code: "unauthorized" }, { status: 401 });
+  }
+  const userId = verifiedId != null ? String(verifiedId) : null;
 
   if (useRealApp && userId && "items" in body) {
     try {

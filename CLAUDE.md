@@ -2,6 +2,35 @@
 
 ## Change log
 
+- **2026-09-16 - A session-less submit on a REAL backend answers 401 now, instead of filing the
+  request as `AGENTS_TEST_USER_ID`.** The route's own comment carried this as an open question;
+  it was decided when the Supplier OS public share pages' new Direct Request button started
+  funnelling anonymous visitors at `/create` (plan:
+  `Moedatech-App/docs/plans/direct-request-from-public-pages.md`). BUILT on branch `beta`, NOT
+  committed, NOT deployed.
+  Files: `src/app/api/requests/route.ts`; stale-reference sweep in the same change:
+  `tests/unit/project-routes.test.ts` (its guard rationale cited the fallback as current),
+  `src/lib/api/app-adapters.ts:182`, `docs/request-create-flow.md`,
+  `docs/request-experience-flow.md` (open-question item marked resolved), and
+  `tests/unit/submit-error.test.tsx` gains a case pinning `{ status: 401 }` alone → `auth`
+  (this route's 401 arrives on ApiError's `status`, not `backendStatus` - nothing pinned that
+  coalesce arm before).
+  ⚠️ The 401 lives INSIDE the real-backend condition - mock mode still answers without a
+  session, on purpose, and a SESSION-LESS real submit can no longer fall into the mock's
+  fabricated 201 (a signed-in POST whose body failed to parse still can, via `"items" in body` -
+  pre-existing, untouched). The client maps 401 to the designed `auth` submit-error state
+  (`contract/submit-error.ts:178`, threaded via ApiError's `status`), and the actual guest gate
+  is ShareOnPost's `tier === "guest"` check opening AccountModal BEFORE `submit()` - NOT
+  AuthGate/requireAuth, which the create flow never uses - so the 401 is the
+  expired/cleared-session backstop. Known, accepted: a transient backend outage during submit
+  (BOTH `/users/me` and `/auth/refresh` failing in `sessionUserId()`) reads as 401 → the auth
+  card instead of the offline card; house pattern on every `sessionUserId()` route, second press
+  recovers.
+  ⚠️ `serverEnv` import dropped with the fallback - `agentsTestUserId` no longer reaches this
+  route at all.
+  Verified: `tsc` clean; vitest 582 failed / 2799 passed BOTH with and without the change - all
+  582 are pre-existing on `beta`, none touch this route.
+
 - **2026-09-13 - The processing line is back, and it is INDETERMINATE.**
   Owner, on the reading screen: *"show process line anyways too"*.
   🔴 **This reverses the removal of 2026-09-12**, and the reason it went is still true: `processRfq`
