@@ -1,12 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { AppShell } from "@/components/AppShell";
-import { CreateBack } from "@/components/create/CreateBack";
+import { CreateBack, IntakeBack } from "@/components/create/CreateBack";
 import { LocaleProvider } from "@/lib/i18n";
 import { SessionProvider } from "@/lib/session";
 import { RfqProvider, useRfq } from "@/lib/store/rfq-store";
 import { en } from "@/lib/i18n/en";
 import { recordTrail, resetTrail } from "@/lib/nav-trail";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { confirmedProject, makeAgentDraft, makeItem, stubFetch } from "../setup/canvas";
 
 /**
@@ -33,6 +35,12 @@ function Probe() {
   return null;
 }
 
+/** What `Intake` does: the control is drawn by the work column, on that screen alone. */
+function OnlyOnIntake() {
+  const { state } = useRfq();
+  return state.phase === "intake" ? <IntakeBack /> : null;
+}
+
 const draw = () =>
   render(
     <LocaleProvider initialLocale="en">
@@ -42,6 +50,11 @@ const draw = () =>
           <AppShell>
             <Probe />
             <CreateBack />
+            {/* \u{1F534} On the INTAKE the shell registers nothing and the work column draws the control
+                itself (owner, 2026-09-19), because the rail is a band of the screen and the shell's
+                Back row runs underneath it. `Intake` renders this; the harness stands in for it, so
+                the chain below can still be walked from the bottom step. */}
+            <OnlyOnIntake />
           </AppShell>
         </RfqProvider>
       </SessionProvider>
@@ -141,9 +154,29 @@ describe("the review screen steps back to the canvas", () => {
 
   it("only leaves the page at the bottom of the chain, and leaves for where he came FROM", async () => {
     draw();
-    // Intake, with nothing to step back to: the control becomes an ordinary page Back.
+    // Intake, with nothing to step back to: the control becomes an ordinary page Back - drawn by
+    // the COLUMN here rather than by the shell, and landing in the same place either way.
     fireEvent.click(back()!);
     expect(nav.pushed).toEqual(["/requests?r=r1&tab=compare"]);
+  });
+
+  it("registers NOTHING with the shell on the intake, so the rail cannot cover it", () => {
+    /**
+     * The panel runs from under the 52px bar to the foot of the window and breaks out to the
+     * window's own edges; the shell draws its Back row across the page gutter, first in `<main>`.
+     * One of them has to move, and it is the control (owner, 2026-09-19: *"the panel must fit the
+     * whole page from the header till the end and dont overlap it with the back button"*).
+     *
+     * \u26a0\ufe0f Read off the SOURCE: what is under test is which component registers, and two Back
+     * controls in one render tree is exactly the state this rule exists to prevent.
+     */
+    const src = readFileSync(resolve(__dirname, "../../src/components/create/CreateBack.tsx"), "utf8");
+    const spec = src.slice(src.indexOf("const spec ="), src.indexOf("usePageBack(spec)"));
+    expect(spec).toContain('phase === "confirmation" || phase === "intake"');
+    // The inline control never registers - that is what makes the pair safe (2026-09-09's trap).
+    const inline = src.slice(src.indexOf("export function IntakeBack"), src.indexOf("export function CreateBack"));
+    expect(inline).not.toContain("usePageBack");
+    expect(readFileSync(resolve(__dirname, "../../src/components/screens/Intake.tsx"), "utf8")).toContain("<IntakeBack />");
   });
 
 });

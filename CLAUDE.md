@@ -2,6 +2,131 @@
 
 ## Change log
 
+- **2026-09-19 - The intake panel starts at the header and the Back control moves INTO the column; the rail's drawings come back.**
+  Owner, on a screenshot of `/create` at desktop width: *"the panel must fit the whole page from the
+  header till the end and dont overlap it with the back button also why the equipemtn images / icons
+  not shown"*.
+  (1) 🔴 **The panel and the shell's Back row were fighting over one band, and the fluid page made
+  it fatal.** The shell draws Back as the first thing in `<main>`, across the page's own gutter; the
+  intake row breaks out to the window (`mx-[calc(50%-50vw)] w-screen`) and pulls up through the main
+  pad. The pull-up cancels 28px of padding and the back row is ~32px, so the panel started BELOW the
+  header by that much and covered the control's left end - which is the clipped arrow in his
+  screenshot. While the page was capped at 1440 the word «Back« sat just clear of the panel's edge
+  by luck; with the cap gone that morning it would have vanished under the panel entirely.
+  **So on the INTAKE the shell registers nothing and the work column draws its own control**
+  (`IntakeBack`), which is also where a reader looks for it: beside the thing it leaves. The row is
+  then main's first child, and **measured after: its top is 52 - the header's own height** - so
+  `lg:top-[52px] lg:h-[calc(100dvh-52px)]` on the rail now means what it always said.
+  ⚠ **It is the shell's markup to the pixel** - same arrow, same word, same tone, same mirror rule -
+  because there is one Back control in this product (owner, 2026-09-03) and it must not read as two.
+  ⚠ **This is NOT the 2026-09-09 trap read backwards.** That failure was two components registering,
+  the child's effect landing first and the parent's `null` overwriting it. Here ONE component
+  registers and its value depends on the phase; the inline control registers nothing at all, which a
+  case pins by reading the source.
+  ⚠ Canvas and review are untouched: the rail is an intake-only surface, so the shell still draws
+  their Back, and the leave-confirmation still belongs to the canvas step.
+  (2) 🔴 **The missing drawings were a RACE, and the fix is to look the picture up when the row is
+  READ.** `imageUrl` was baked in inside `listTemplates`'s `.then`, off the `named` array that
+  closure captured - and since 2026-09-17 every project is opened on arrival, so the template reads
+  and the taxonomy read are fired in the same effect and the templates usually answer first. `named`
+  was therefore `[]` for every row that was ever built, and the tree landing a moment later
+  re-created `load` without re-creating the rows it had already cached: the glyph was permanent, on
+  every row, for everybody. The cache holds a `CachedRow` with no URL now and `rowsOf` resolves it
+  against whatever the tree holds at that render.
+  ⚠ **The catalogue was checked before the code was**: `/api/stores/taxonomy` answers 428 nodes with
+  94 drawings, «Crawler Excavator» among them, and the S3 object returns **200** - so neither a thin
+  tree nor the staging 403 explains his screenshot, which is what pointed at the closure.
+  ⚠ `named` is no longer a dependency of `load`. While it was one it looked like a dependency doing
+  its job, and it was the bug: a new callback, the same stale rows.
+  Files: `src/components/create/CreateBack.tsx` (`IntakeBack`, new), `src/components/screens/Intake.tsx`,
+  `src/components/create/RequestsRail.tsx`, `tests/unit/create-back.test.tsx` (1 new case, the
+  harness now draws the inline control on the intake alone), `tests/unit/intake-rail.test.ts`
+  (1 new case, 1 rewritten).
+  ⚠ Verified: typecheck clean, lint 0 errors, 46 passing across the back, rail, floor and pins
+  suites plus 31 across mansour, the template line, the canvas render and the review reload.
+  **SEEN RENDERED at 1920**: `/create` signed out - one Back control, at the column's own edge, and
+  the intake row's top measured at exactly 52.
+  🔴 **NOT seen with the rail on screen**: it needs a signed-in renter with projects, so the panel
+  running the full height beside the control, and the drawings arriving on the second paint, are
+  argued from the measurement and pinned by cases rather than photographed.
+
+- **2026-09-19 - The dashboard's bid rail is a NAME, a PILL and a PRICE, and the circle holds the firm's mark.**
+  Owner, on a screenshot of the rail: *"here only show supplier name and price nothing more with one
+  small pill for offline, via app and the initials of the supplier must be the supplier logo in this
+  circle"*.
+  🔴 **The second line is deleted, which REVERSES 2026-09-04 and 2026-09-05** (*"the bids in home
+  page must show bidder name, equipment name of the request with price, location if there is enough
+  space"*, then *"show equipment subtype and size, not model and year"*). Both rulings were about
+  WHICH machine name to print, and the machine itself is what goes: the rail stands beside the TABLE
+  of requests that names the machine and the site, and a renter scanning incoming bids is reading who
+  offered and how much. `machineWords` went with it, and `LinkRailBid` lost `machine` / `location`
+  rather than being left computing two facts nothing draws.
+  **The SOURCE is one small pill, on EVERY row.** ~~«Offline · via your link» under the name, and
+  nothing at all on an app bid.~~ A mark that appears on some rows reads as a warning about those
+  rows, where the question it answers - did this come through an account or through my own link - is
+  asked of every bid. It takes `workspace.sourceApp` / `sourceOffline`, which is the SOURCE FILTER's
+  own pair, so the rail and the tab above the bid cards cannot drift apart.
+  ⚠ **That is a third spelling of one fact, deliberately.** The BID CARD says «Via your link»
+  (2026-09-06) because a card is one bid read on its own; this row is scanned in a column of five
+  beside a filter that says «Offline», and a 52px row has width for one word.
+  **The circle draws `supplierLogoUrl`**, which the received-bids projection has carried all along
+  and this rail read none of.
+  ⚠ **The initial is a STATE, not a fallback for tidiness.** An off-platform row cannot have a mark
+  - the firm was typed into the renter's own supplier list, so there is no account behind it - and
+  `onError` is load-bearing rather than defensive: the storage objects are not public-read on
+  staging, so a well-formed URL answers 403 and an `<img>` absorbs that as «no artwork», drawing a
+  broken-image glyph where the firm should be. Remembered BY URL (`badLogos`), or one firm's failure
+  would follow the next one down the rail - the same ruling the workspace's context bar took on
+  2026-09-15.
+  Files: `src/components/home/HomeRequests.tsx`, `tests/unit/home-bid-rail.test.tsx` (4 cases
+  rewritten, 3 new, 2 retired with the facts they pinned; 12 passing).
+  ⚠ Verified: typecheck clean, lint 0 errors, 34 passing across the rail, bubble, dashboard and
+  source-wording suites, and the pill's «every row» rule break-checked - the app arm forced to null,
+  one case went red.
+  🔴 **NOT seen rendered.** The rail needs a signed-in renter with bids and has no specimen, so
+  the logo, its 403 fallback and the new row are pinned by cases only. Worth one look on the next
+  deploy: a wide logo in a 28px circle is `object-cover`, so a lockup will be cropped to its middle.
+
+- **2026-09-19 - Every page is FLUID: the 1440 cap is gone, and only the legal document caps itself.**
+  Owner, on the dashboard at desktop width: *"can u make the web resposive to fit any screen size
+  like now i am opening it on desktop it is too small and margins are big"*. Asked to choose between
+  a fluid page, a raised cap and fluid-with-wider-gutters, he took **fluid, no cap**.
+  🔴 **`PAGE_MAX` is `max-w-none`.** At 1440 a 1920 monitor spent 240px of background on each
+  side and a 2560 one spent 560 - the page read as a tablet layout parked in the middle of a desktop.
+  The width is the window less `PAGE_X` now, at every size. Measured after: the stores column went
+  1360 → **1905** at a 1920 window, and the guest wall's bid grid fills the row.
+  ⚠️ **The constant is KEPT rather than deleted from its ~30 call sites.** The rule it carries is
+  still «one width rule, one place to change it», which is what the 2026-08-26 unification was for:
+  reinstating a cap is this one line, while a `max-w` per page is how two pages drifted 88px apart in
+  the first place.
+  **Four hand-written caps went with it**, because a page-level cap that only some pages obey is the
+  same complaint by another road: the workspace's LOADING rail (`max-w-[1440px]`, written by hand
+  where the live rail already has none), `SHOP_PAGE`'s 1360, My Suppliers' standalone 1560, and the
+  route skeleton's `max-w-6xl`.
+  🔴 **The legal document caps its own CONTENT, and it is the only page that does.** Measured at
+  1920 before the cap: a paragraph ran **1798px**, about 250 characters a line. That is the case
+  `PAGE_MAX`'s own note reserves - a cap on the PROSE rather than a gutter that also moves every band
+  and full-width card on the page. `max-w-[86ch]`, in `ch` so it follows the reader's type size.
+  Files: `src/lib/ds.ts`, `src/components/workspace/RequestsWorkspace.tsx`,
+  `src/components/stores/shop.tsx`, `src/components/suppliers/SuppliersPage.tsx`,
+  `src/app/loading.tsx`, `src/app/legal/[key]/page.tsx`.
+  ⚠️ **Nothing below 1360px changed, by construction**: the gutters are untouched and a cap does not
+  bind at a width narrower than itself, so every phone and tablet layout is byte-identical. Worth
+  saying because the browser tool's `resize` would not take on this machine (logged before, on
+  2026-09-13), so the phone width was NOT re-measured - it is argued, not observed.
+  🔴 **Reported, NOT fixed: the FORM surfaces now stretch too.** `Canvas`, `ReadyToSend`,
+  `ProfileView` and `ProjectsSurface` carry no content cap of their own, so on a 1920 screen their
+  field grids run ~1830px. That is what «fluid» means and it was the owner's pick; if a stretched
+  form reads badly on his monitor, the fix is a content cap on those four, one line each, and it is
+  a decision about each page's content rather than a return of the page cap.
+  ⚠️ Verified: typecheck clean, 120 passing across twelve layout, shell and design-guard suites (the
+  one unhandled error is `suppliers-remove-and-pick`'s, pre-existing). **SEEN RENDERED at 1920**:
+  browse (five store cards a row, the category rail across the window), the requests guest wall, the
+  intake (its own box cap unaffected) and the legal page before and after its content cap.
+  🔴 **NOT seen on the real signed-in dashboard, the canvas or the compare table** - all three need
+  a session, and the compare table's fixed column widths are the next thing to look at with the extra
+  room.
+
 - **2026-09-18 - The negotiation sheet is the prototype's THREE SHEETS: a phone column with the running total in its header, a `‹ step ›` switcher in its footer, and a labelled «Send to the supplier» on the last one.**
   Owner: *"there are chanfes in deal room the 3 negotiation sheets style, check them in app"*, then, asked
   how far to follow it, **«Restyle all three steps to the app»**.

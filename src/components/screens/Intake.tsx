@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { RequestsRail, ProjectFloorChips, useRequestRail } from "@/components/create/RequestsRail";
+import { IntakeBack } from "@/components/create/CreateBack";
 import { Mansour } from "@/components/Mansour";
 import { ProjectPills } from "@/components/create/ProjectPills";
 import { warmAgentCache } from "@/lib/api/client";
@@ -223,11 +224,19 @@ export function Intake() {
        breaks out to the window with `mx-[calc(50%-50vw)] w-screen`, which is symmetric and so needs
        no mirror rule, and pulls up through the main pad so the panel starts at the top of the page.
        The same argument the requests rail settled on 2026-09-12: a band takes ONE edge, not four. */
+    /* ⚠️ The pull-up cancels the MAIN's top padding, and nothing else has to be cancelled: on this
+       screen the shell draws no Back row (`CreateBack` registers null on the intake and the column
+       below carries `IntakeBack`), so this row is the first thing in `<main>` and the panel starts
+       directly under the 52px bar - which is what `lg:top-[52px] lg:h-[calc(100dvh-52px)]` on the
+       rail has always measured against (owner, 2026-09-19: *"the panel must fit the whole page from
+       the header till the end and dont overlap it with the back button"*). */
     <div className="relative mx-[calc(50%-50vw)] -mt-6 flex w-screen items-stretch sm:-mt-7">
       <RequestsRail rail={rail} />
       {/* ⚠️ The gutter the shell was giving this content comes back HERE, on the column, so the box
           keeps its margin while the panel keeps the edge. */}
-      <div {...pin("create-intake")} className="mx-auto flex w-full min-w-0 max-w-[780px] flex-col justify-center px-4 py-6 sm:px-7">
+      <div className="flex min-w-0 flex-1 flex-col px-4 py-6 sm:px-7">
+      <IntakeBack />
+      <div {...pin("create-intake")} className="mx-auto flex w-full min-w-0 max-w-[780px] flex-1 flex-col justify-center">
       {/* ── He asks the question (owner, 2026-09-13: *"use mansour icon more in the chat intake
           somewhere, i want it to be attractive"*, then *"put mansour before the question"*) ────────
           The screen was a heading, a line and a big empty box - correct and characterless. He is
@@ -529,6 +538,7 @@ export function Intake() {
 
       {/* Guest hit the free agent-run limit → create an account, then continue processing. */}
       <AccountModal open={showAccount} onClose={() => setShowAccount(false)} onCreated={() => { setShowAccount(false); void actions.process(); }} title={t.guest.trialTitle} subtitle={t.guest.trialSub} />
+      </div>
       </div>
     </div>
   );

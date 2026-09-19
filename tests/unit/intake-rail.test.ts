@@ -126,7 +126,7 @@ describe("a row reads: the count, the picture, then the machine", () => {
      * matched by token containment instead, and it also covers a WORK ORDER, which has no request to
      * borrow a picture from.
      */
-    expect(rail).toContain("iconForName(named, name)");
+    expect(rail).toContain("iconForName(named, r.name)");
     expect(rail).toContain("/api/stores/taxonomy");
     expect(rail).not.toContain("fetchMyRequests");
   });
@@ -159,7 +159,26 @@ describe("what a press does", () => {
     expect(fn).toContain("actions.useTemplate(");
     expect(fn).toContain("await typeInto(");
     // The one thing looked up is the PICTURE, which is the only thing allowed to be absent.
-    expect(rail).toContain("iconForName(named, name)");
+    expect(rail).toContain("iconForName(named, r.name)");
+  });
+
+  it("Given the taxonomy lands AFTER the templates, Then the rows still draw their machines", () => {
+    /**
+     * \u{1F534} The bug of 2026-09-19 (owner: *"why the equipemtn images / icons not shown"*), and it is a
+     * RACE: every project is opened on arrival, so the template reads and the taxonomy read are
+     * fired in the same effect and the templates usually answer first. With the drawing baked in
+     * inside `listTemplates`'s `.then`, `named` was `[]` for every row that was ever built and the
+     * tree arriving a moment later re-created `load` without re-creating the cached rows - so the
+     * glyph was permanent.
+     *
+     * The rule that fixes it: the cache holds no URL, and `rowsOf` looks it up against whatever the
+     * tree holds AT THIS RENDER. jsdom runs no network here, so what is pinned is the shape.
+     */
+    const cached = rail.slice(rail.indexOf("const options = await listTemplates"), rail.indexOf("} catch {"));
+    expect(cached, "a row must be cached WITHOUT its drawing").not.toContain("imageUrl");
+    const read = rail.slice(rail.indexOf("const rowsOf = useCallback"), rail.indexOf("return useMemo("));
+    expect(read).toContain("iconForName(named, r.name)");
+    expect(read).toContain("[tpls, named]");
   });
 
   it("Given a machine the catalogue never named, Then its REFERENCE lists and is never typed", () => {

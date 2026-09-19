@@ -46,9 +46,23 @@ export interface RailRow {
   option: TemplateOption;
   name: string;
   qty: number;
-  /** The catalogue's flat DRAWING for this machine, or null when it has none. */
+  /**
+   * The catalogue's flat DRAWING for this machine, or null when it has none.
+   *
+   * 🔴 **Resolved when the row is READ, never when it is fetched** (owner, 2026-09-19: *"why the
+   * equipemtn images / icons not shown"*). It was baked in inside `listTemplates`'s `.then`, off
+   * the `named` array captured by that closure - and the two reads RACE: every project is opened on
+   * arrival since 2026-09-17, so the template fetches are fired in the same effect as the taxonomy
+   * tree and almost always answer first. `named` was therefore `[]` at the moment every row was
+   * built, `iconForName` returned null for all of them, and the tree arriving a moment later
+   * re-created `load` without re-creating the rows it had already cached - so the glyph was
+   * permanent, on every row, for everybody.
+   */
   imageUrl: string | null;
 }
+
+/** What the cache holds: a row before its drawing is looked up. See `imageUrl` above. */
+type CachedRow = Omit<RailRow, "imageUrl">;
 
 const RAIL_MIN = 164;
 const RAIL_MAX = 380;
@@ -82,7 +96,7 @@ export function useRequestRail() {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   /** The catalogue's drawings, by name. Pictures only; nothing branches on it. */
   const [named, setNamed] = useState<NamedIcon[]>([]);
-  const [tpls, setTpls] = useState<Map<string, RailRow[]>>(new Map());
+  const [tpls, setTpls] = useState<Map<string, CachedRow[]>>(new Map());
   const [loading, setLoading] = useState<ReadonlySet<string>>(new Set());
   /* \u26a0\ufe0f What is SHUT, not what is open (owner, 2026-09-17: *"by default make them opened"*).
      A set of the closed ones is what makes «all open» the state a fresh visit lands in without
@@ -145,9 +159,6 @@ export function useRequestRail() {
                 option: o,
                 name,
                 qty: o.quantity,
-                /* The catalogue's own drawing for this machine. `null` when the tree has none, and
-                   the row draws its glyph — never a photograph, because this tree carries icons. */
-                imageUrl: iconForName(named, name),
               };
             }),
           );
@@ -164,7 +175,10 @@ export function useRequestRail() {
         });
       }
     },
-    [tpls, loading, named],
+    /* ⚠️ `named` is NOT a dependency: nothing in here reads it any more, and while it was one, a
+       tree that arrived after the templates re-created this callback without re-creating the rows
+       it had already cached - which looked like a dependency doing its job and was the bug. */
+    [tpls, loading],
   );
 
   /* \U0001f534 Every project is open on arrival, so every project's machines are wanted on arrival - one
@@ -267,7 +281,14 @@ export function useRequestRail() {
     actions.clearProject();
   }, [actions]);
 
-  const rowsOf = useCallback((projectId: string) => tpls.get(projectId) ?? [], [tpls]);
+  /* The drawing is looked up HERE, against whatever the tree holds at this render: the two reads
+     race, and this is the side of the race that can be repeated. `named` is empty until the tree
+     lands, so the first paint draws glyphs and the next one draws machines. */
+  const rowsOf = useCallback(
+    (projectId: string): RailRow[] =>
+      (tpls.get(projectId) ?? []).map((r) => ({ ...r, imageUrl: iconForName(named, r.name) })),
+    [tpls, named],
+  );
 
   return useMemo(
     () => ({
