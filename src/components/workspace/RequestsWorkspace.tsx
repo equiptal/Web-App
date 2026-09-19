@@ -42,6 +42,7 @@ import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/rende
 import { quotationDownloadName } from "@/lib/compare/quotation-token";
 import { btn, cx } from "@/lib/ds";
 import { useUrlOverlay } from "@/lib/nav/useUrlOverlay";
+import { BIDS_POLL_MS, useLiveTick } from "@/lib/live/useLiveTick";
 import { pin } from "@/lib/uiPins";
 
 type Tab = "cards" | "compare";
@@ -149,16 +150,34 @@ export function RequestsWorkspace() {
   // Keyed on the item, so switching item drops the previous item's bids rather than showing them
   // against the wrong machine while the new ones load.
   const itemId = resolved.itemId;
+  /* ── A bid that lands while he is reading is ON the page (owner, 2026-09-17) ──────────────────
+     *"i want all bids recieved in real time directly in cards and in compare and in the bids list on
+     home page"*. This read used to happen once per item and never again, so a supplier could answer
+     while the renter sat on the very screen that shows the answer and he would learn nothing until
+     he reloaded. The tick re-runs it; `useLiveTick` is what keeps it off a hidden tab and makes the
+     return to the tab a read of its own. */
+  const bidTick = useLiveTick(BIDS_POLL_MS);
+  /** The item this state belongs to, so a TICK can refresh in place while an item CHANGE empties
+   *  first. Without the distinction every poll would blank both panes for the length of a round
+   *  trip - the cards would flash their «No bids yet» and the table would fold to nothing. */
+  const loadedFor = useRef<string | null>(null);
   useEffect(() => {
     if (status !== "authed" || !itemId) {
+      loadedFor.current = null;
       setBids([]);
       setSubmissionsByBid({});
       return;
     }
     let live = true;
-    setBids([]);
-    setSubmissionsByBid({});
-    setLargerHeld(0);
+    // The size filter changes WHICH bids the backend answers with, so it is part of the identity of
+    // what is on screen: switching it is an item change, not a refresh.
+    const key = `${itemId}|${showLarger}`;
+    if (loadedFor.current !== key) {
+      loadedFor.current = key;
+      setBids([]);
+      setSubmissionsByBid({});
+      setLargerHeld(0);
+    }
     Promise.all([
       fetchBids(itemId, showLarger).catch(() => ({ bids: [], sizeCounts: undefined })),
       fetchRequestSubmissions(itemId).catch(() => ({ submissions: [] as Awaited<ReturnType<typeof fetchRequestSubmissions>>["submissions"] })),
@@ -184,7 +203,7 @@ export function RequestsWorkspace() {
     return () => {
       live = false;
     };
-  }, [status, itemId, showLarger]);
+  }, [status, itemId, showLarger, bidTick]);
 
   // The code the list row lacked. One call, keyed on the item, dropped the moment the item changes so
   // a stale code can never sit over the wrong request.
@@ -213,7 +232,9 @@ export function RequestsWorkspace() {
     return () => {
       live = false;
     };
-  }, [status]);
+    // On the same tick as the bids themselves: a bid arriving with a message on it must not show a
+    // card with no unread mark until the next reload.
+  }, [status, bidTick]);
 
   /* ── Arriving from somewhere else, on a named request (owner, 2026-08-29) ─────────────────
      The dashboard's request table has row actions — open, share, edit, cancel — and every one of
@@ -411,17 +432,28 @@ export function RequestsWorkspace() {
      (`AiRankPanel`), which owns the presets, the conversation and the busy state — the workspace
      keeps only the RESULT, because the matrix draws a ★ from it and the item switch clears it. */
 
-  /** What the source filter allows, minus what the renter benched. Both panes and the export read it. */
+  /**
+   * What the COMPARISON is being read on: the source filter, minus what the renter benched. The
+   * table's own export and the assistant read it, because both answer questions about the table.
+   *
+   * 🔴 **The cards rail does NOT** (owner, 2026-09-17). Bench is a ✕ on a compare COLUMN, and it was
+   * taking the bid off the cards tab as well - a tab with no bench strip, no ✕ and no way back, so
+   * a bid the renter had merely set aside while comparing looked like a bid that had never arrived,
+   * and only a reload (which empties `benched`) brought it back. That is half of what he reported as
+   * *"bids doesnt appear directly in the bid cards"*.
+   */
   const shown = useMemo(
     () => filterBySource(bids, source).filter((b) => !benched.has(b.card.id)),
     [bids, source, benched],
   );
-  /** Everything the filter allows, benched or not — what the matrix needs to draw the bench itself. */
+  /** Every bid the filter allows, benched or not: what the CARDS rail draws, and what the matrix
+   *  needs in order to draw the bench strip itself. */
   const shownAll = useMemo(() => filterBySource(bids, source), [bids, source]);
 
   // A tick on a bid that is no longer on screen — the item changed, the source filter moved — must
-  // not silently ride along into the next download.
-  const shownIds = shown.map((b) => b.card.id).join(",");
+  // not silently ride along into the next download. Benching does not remove a tick: the card is
+  // still on the cards tab, where the ticking happens.
+  const shownIds = shownAll.map((b) => b.card.id).join(",");
   useEffect(() => {
     const live = new Set(shownIds.split(",").filter(Boolean));
     setCheckedBids((prev) => {
@@ -451,11 +483,13 @@ export function RequestsWorkspace() {
    * window and the transport assignment. A refused call costs the letterhead, not the quotation.
    */
   const downloadQuotation = useCallback(async () => {
-    if (typeof window === "undefined" || !item || shown.length === 0) return;
+    if (typeof window === "undefined" || !item || shownAll.length === 0) return;
     // Ticked bids, or every bid on screen when none is ticked. "None ticked" is the renter asking
     // for the lot, not for nothing — the button is «Download quotation», and a download that
     // silently produced an empty file would be the worse reading.
-    const chosen = checkedBids.size > 0 ? shown.filter((b) => checkedBids.has(b.card.id)) : shown;
+    // `shownAll`, not `shown`: this paper belongs to the CARDS tab, and the cards tab does not keep
+    // a bench. A bid set aside on the comparison is still a bid the renter can download the offer of.
+    const chosen = checkedBids.size > 0 ? shownAll.filter((b) => checkedBids.has(b.card.id)) : shownAll;
     if (chosen.length === 0) return;
 
     const [rec, me] = await Promise.all([
@@ -531,7 +565,7 @@ export function RequestsWorkspace() {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
-  }, [ar, item, shown, checkedBids, fetchedCode, tier]);
+  }, [ar, item, shownAll, checkedBids, fetchedCode, tier]);
 
   /**
    * ── The comparison, on paper (owner, 2026-09-09) ──────────────────────────────────────────────
@@ -818,7 +852,7 @@ export function RequestsWorkspace() {
                 44px thing on the line, which is right: they are what the row is FOR. */}
             <button
               type="button"
-              disabled={shown.length === 0}
+              disabled={(tab === "compare" ? shown : shownAll).length === 0}
               onClick={() => (tab === "compare" ? printComparison() : void downloadQuotation())}
               className={btn("secondary", "md", { className: "whitespace-nowrap transition" })}
             >
@@ -918,7 +952,8 @@ export function RequestsWorkspace() {
           <div className="flex flex-col">
           {tab === "cards" ? (
             <BidCards
-              bids={shown}
+              // Every bid on the item: the bench is the comparison's, not this rail's.
+              bids={shownAll}
               checked={checkedBids}
               unreadByBid={unreadByBid}
               submissionsByBid={submissionsByBid}

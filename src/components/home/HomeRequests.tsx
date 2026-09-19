@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { cancelRequest, fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail } from "@/lib/api/client";
+import { BIDS_POLL_MS, LINK_FANOUT_POLL_MS, useLiveTick } from "@/lib/live/useLiveTick";
 import { cancellableItems, groupBiddingClosed, groupRequests, type RequestGroup } from "@/lib/contract/requests";
 import type { InboxBid } from "@/lib/contract/inbox";
 import { requestExpiry, expiryState, type ExpiryState } from "@/lib/contract/request-expiry";
@@ -142,6 +143,9 @@ export function HomeRequests() {
    * read answers `null` to both callers, which is what each of them already handles.
    */
   const subsOnce = useRef(new Map<string, Promise<Awaited<ReturnType<typeof fetchRequestSubmissions>> | null>>());
+  /** The tick the cache above was filled on, so the fan-out empties it once per tick rather than
+   *  once per render — it is read inside an effect that also re-runs when the groups change. */
+  const linkFanFor = useRef(-1);
   const loadSubs = useCallback((requestId: string) => {
     const cached = subsOnce.current.get(requestId);
     if (cached) return cached;
@@ -245,6 +249,15 @@ export function HomeRequests() {
       .catch(() => {});
   }, []);
 
+  /* ── The rail shows what arrived while he was looking at it (owner, 2026-09-17) ───────────────
+     *"i want all bids recieved in real time ... and in the bids list on home page"*. Both halves of
+     this rail were read ONCE per mount - the app's bids in the effect below, and the off-platform
+     ones out of `subsOnce`, which is never invalidated - so a bid landing after the dashboard opened
+     was invisible until a reload. Two clocks, because the two halves cost very different amounts:
+     the app's bids are ONE call, the off-platform ones are one per group. */
+  const bidTick = useLiveTick(BIDS_POLL_MS);
+  const linkTick = useLiveTick(LINK_FANOUT_POLL_MS);
+
   /* Keyed on the ACCOUNT, not on mount (owner, 2026-08-30). Signing in through the modal does not
      remount this page, so with `[]` a renter who arrived as a guest kept the guest's answers — no
      requests, no bids — until they reloaded. `sessionKey` moves the moment the account does; its
@@ -268,6 +281,21 @@ export function HomeRequests() {
     };
   }, [sessionKey, status]);
 
+  /* The refresh, and it is deliberately NOT the effect above: that one empties the rail first, so
+     ticking it would blank the card for the length of a round trip every fifteen seconds. This one
+     replaces the rows in place, and says nothing when the call fails - the rows already on screen
+     are better than an empty card built out of a dropped connection. */
+  useEffect(() => {
+    if (status === "loading" || bidTick === 0) return;
+    let live = true;
+    void fetchReceivedBids()
+      .then((r) => live && setBids(r.bids))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [bidTick, status]);
+
 
   /**
    * The off-platform bids for the renter's own requests, fanned out over his groups.
@@ -286,6 +314,13 @@ export function HomeRequests() {
     // shows the app's bids and silently drops the shared-link ones for the same renter.
     if (!groups?.length || status === "loading") return;
     let live = true;
+    /* The memo is what makes this effect cheap, and what made it PERMANENTLY STALE: one promise per
+       request id, kept for the life of the mount. On a tick the answers are thrown away so the fan
+       reads the wire again; within a tick the deadline lookup still shares this fan's single call. */
+    if (linkFanFor.current !== linkTick) {
+      linkFanFor.current = linkTick;
+      subsOnce.current = new Map();
+    }
     void Promise.all(
       groups.slice(0, LINK_FANOUT_MAX).map(async (g) => {
         const first = g.items[0];
@@ -313,7 +348,7 @@ export function HomeRequests() {
     return () => {
       live = false;
     };
-  }, [groups, status, loadSubs, ar]);
+  }, [groups, status, loadSubs, ar, linkTick]);
 
   /** Resolve the deadline for the rows on screen, link first and the window only if it is unset.
    *  A row the status has already answered is skipped — there is nothing a date could add to it. */
