@@ -694,7 +694,7 @@ export function RequestsWorkspace() {
     return (
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex-none border-b border-border bg-surface3/60">
-          <div className={`mx-auto flex h-[96px] w-full max-w-[1440px] items-center gap-4 ${PAGE_X}`}>
+          <div className={`mx-auto flex h-[96px] w-full ${PAGE_MAX} items-center gap-4 ${PAGE_X}`}>
             {Array.from({ length: 6 }, (_, i) => (
               <div key={i} className="flex flex-none flex-col items-center gap-1">
                 <Skeleton className="size-14 rounded-full" />

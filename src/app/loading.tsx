@@ -5,7 +5,7 @@
  */
 export default function Loading() {
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-7 sm:px-7" aria-busy="true" aria-live="polite">
+    <div className="mx-auto w-full px-4 py-7 sm:px-7" aria-busy="true" aria-live="polite">
       <div className="h-7 w-52 animate-pulse rounded-sm bg-surface2" />
       <div className="mt-2.5 h-4 w-72 max-w-full animate-pulse rounded bg-surface2" />
       <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -17,13 +17,17 @@ import { Photo } from "@/components/Photo";
  */
 
 /**
- * The page column: 1360 capped, a 24px gutter, 80px of foot.
+ * The page column: FLUID, a 24px gutter, 80px of foot.
+ *
+ * ~~`max-w-[1360px]`.~~ Dropped with the app-wide cap (owner, 2026-09-19: *"make the web
+ * resposive to fit any screen size"*) — a directory of cards is exactly the shape that should use
+ * the monitor it is opened on, and its grid already wraps by card width.
  *
  * The TOP is the caller's, because the reference does not use one number: the directory opens at 36
  * and the two detail pages at 24 — a page that begins with a title needs more air over it than one
  * that begins with a back link.
  */
-export const SHOP_PAGE = "mx-auto w-full max-w-[1360px] px-6 pb-20";
+export const SHOP_PAGE = "mx-auto w-full px-6 pb-20";
 
 /**
  * A supplier's mark, in a box the caller sizes.

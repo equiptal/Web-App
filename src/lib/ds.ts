@@ -291,14 +291,25 @@ export const PAGE_X = "px-4 sm:px-6 lg:px-8 xl:px-10";
    keep in step; deleted with the caller. */
 
 /**
- * **The content cap, every page** — the other half of "one margin".
+ * **The page's width rule, every page** — the other half of "one margin".
  *
- * A gutter alone does not settle it: on a 1920 screen a capped page showed 352px of background
- * beside an uncapped one showing 40, which is the same complaint by another road. Full-bleed
- * surfaces are capped too; `fullBleed` means "pinned to the viewport's HEIGHT and owning its own
- * bands", which is a different claim from "as wide as the monitor happens to be".
+ * ~~`max-w-[1440px]`.~~ **There is no cap** (owner, 2026-09-19, on the dashboard at desktop width:
+ * *"can u make the web resposive to fit any screen size like now i am opening it on desktop it is
+ * too small and margins are big"*). At 1440 a 1920 monitor spent 240px of background on each side
+ * and a 2560 one spent 560 — the page read as a tablet layout parked in the middle of a desktop.
+ * Every page is FLUID now: the width is the window less `PAGE_X`, at every size.
+ *
+ * ⚠ The constant is KEPT rather than deleted from its ~30 call sites, because the rule it carries
+ * is still "one width rule, one place to change it" — which is what the 2026-08-26 unification was
+ * about. Reinstating a cap is this one line; sprinkling `max-w` per page is how the 88px drift
+ * between two pages happened in the first place.
+ *
+ * ⚠ **What this does NOT do: give a long paragraph a readable measure.** A page that needs one
+ * caps its own CONTENT, which is a decision about that content rather than a gutter that moves
+ * every band and full-width card on the page with it. The surfaces that carried the old cap are
+ * tables, rails and card grids, which is why fluid was the answer here.
  */
-export const PAGE_MAX = "max-w-[1440px]";
+export const PAGE_MAX = "max-w-none";
 
 /** The vertical rhythm of a page, which is one rule for all of them. */
 export const PAGE_Y = "py-6 sm:py-7";
