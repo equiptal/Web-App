@@ -123,10 +123,23 @@ export function BidCards({
        row, so the «Counter this price» buttons line up and a shorter card's slack sits above its
        footer. Both overflow axes are STATED — CSS computes the other from `visible` to `auto` the
        moment one scrolls, and an unstated `overflow-y` is how this repo grew a phantom vertical bar
-       three times (the bid rail, the compare matrix, the suppliers table). */
+       three times (the bid rail, the compare matrix, the suppliers table).
+
+       ── The strip CENTRES what it holds (owner, 2026-09-19) ─────────────────────────────
+       *«why margin from left not equal to right»*, on a 1920 screen holding ONE bid. The gutters
+       were equal and were measured so - 37px of grey on the left, 39px on the right. What was not
+       equal was the CONTENT: a 344px card against the left gutter with ~1480px of empty white after
+       it. The page cap went the same day (`PAGE_MAX` is `max-w-none`), so this container grew from
+       1360 to 1840 and the card did not grow with it. He chose to CENTRE rather than to cap the
+       content or to let the card stretch.
+       ⚠️ **`center-safe`, never a plain `justify-center`.** This is an `overflow-x-auto` scroller,
+       and centred content that is WIDER than its box overflows equally at BOTH ends - the overflow
+       past the start edge cannot be scrolled to, so the first bid becomes unreachable. `safe` falls
+       back to `flex-start` the moment it would overflow, so a full rail behaves exactly as it does
+       today and only a rail with room to spare moves. */
     <div
       {...pin("workspace-bid-cards")}
-      className="flex items-stretch gap-5 overflow-x-auto overflow-y-clip p-3"
+      className="flex items-stretch justify-center-safe gap-5 overflow-x-auto overflow-y-clip p-3"
     >
       {bids.map((b) => (
         <BidCardTile

@@ -409,17 +409,29 @@
 .qp-scrim { position: fixed; inset: 0; z-index: 60; background: color-mix(in srgb, var(--navy-deep) 50%, transparent); display: flex; align-items: center; justify-content: center; padding: clamp(10px,3%,28px); }
 .qp-scrim .material-icons-outlined { font-family: "Material Icons Outlined"; line-height: 1; }
 
-/* The sheet: a phone-shaped column. It fills the screen on a phone and stands as a card above it. */
+/* 🔴 THE SHEET TAKES THE SCREEN. ~~A 460px card floating on the scrim.~~ Owner, on the first build:
+   *"for deal room negotiation it will sit in the existing 3 styles sheet but with the new design, not
+   as a popup page"*. The three steps are a PLACE the renter goes to answer a negotiation, which is
+   what the wizard it replaced always was and what the app's own route is — a dialog over the room
+   reads as an aside, and this is the room's whole business.
+
+   ⚠️ It slides UP rather than fading in, which is what a sheet does and what the wizard did. */
 .ng-shell {
-  display: flex; flex-direction: column; width: 100%; max-width: 460px; height: 100%; max-height: 94vh;
-  background: var(--surface2); border-radius: var(--radius-lg); overflow: hidden;
-  font-family: var(--font-sans); color: var(--navy-deep); animation: dpModal .22s ease;
+  position: fixed; inset: 0; z-index: 61; display: flex; flex-direction: column;
+  background: var(--surface2); overflow: hidden;
+  font-family: var(--font-sans); color: var(--navy-deep);
+  animation: ngSheetUp .3s cubic-bezier(.32,.72,.3,1);
 }
-@media (max-width: 520px) { .ng-shell { max-width: none; max-height: none; height: 100%; border-radius: 0; } }
+@keyframes ngSheetUp { from { transform: translateY(100%); } to { transform: none; } }
+/* The design is drawn to a phone's column, so on a wide screen the CONTENT is capped and centred
+   while the header and the footer keep their full-width bars. Stretching a four-column price table
+   across 1900px would be the prototype's proportions thrown away for no reader's benefit. */
+.ng-inner { width: 100%; max-width: 760px; margin-inline: auto; }
 
 /* ── header ─────────────────────────────────────────────────────────────────────────────────────
    The running total on the leading edge, the counterparty on the trailing one. */
-.ng-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; background: var(--surface); border-bottom: 1px solid var(--border-hair); }
+.ng-head { flex: 0 0 auto; padding: 14px 16px; background: var(--surface); border-bottom: 1px solid var(--border-hair); }
+.ng-head .ng-inner { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .ng-head-l { flex: 0 0 auto; min-width: 0; }
 .ng-head-cap { font-size: 10px; color: var(--muted-light); font-weight: 600; }
 /* «New offer from the supplier» — drawn ONLY when the other side posted the latest round. A caption
@@ -439,6 +451,7 @@
 
 /* ── body ───────────────────────────────────────────────────────────────────────────────────── */
 .ng-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; background: var(--surface2); }
+.ng-body .ng-inner { padding-bottom: 20px; }
 .ng-pad { padding: 14px 16px 0; }
 .ng-card { background: var(--surface); }
 .ng-card.pad { padding: 14px 16px; margin-top: 8px; }
@@ -500,7 +513,10 @@
 .ng-t.now .h .k { font-size: 12.5px; font-weight: 700; color: var(--navy-deep); }
 .ng-t.now .h .side { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ng-t.now .h .side b { color: var(--navy-deep); font-weight: 700; }
-.ng-t .acts { display: flex; gap: 6px; }
+/* ⚠️ The pair is CAPPED and sits at the reading end. In the prototype these are two `flex:1` buttons
+   across a phone; on the sheet's 760px column they became two 350px slabs, which reads as the card's
+   main event rather than as the two answers to the line above them. */
+.ng-t .acts { display: flex; gap: 6px; max-width: 320px; margin-inline-start: auto; }
 .ng-t .acts button { flex: 1; border: 0; border-radius: 7px; padding: 7px; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .ng-t .acts .change { background: var(--danger-soft); color: var(--danger); }
 .ng-t .acts .take { background: var(--ok-soft); color: var(--ok); }
@@ -596,7 +612,8 @@
 /* ── footer ─────────────────────────────────────────────────────────────────────────────────────
    The switcher is centred in the BAR, never in what the buttons leave over: it is absolutely placed,
    so the accept button on one side and the log on the other cannot push it off the middle. */
-.ng-foot { position: relative; flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 16px; background: var(--surface); border-top: 1px solid var(--border-hair); }
+.ng-foot { flex: 0 0 auto; padding: 10px 16px; background: var(--surface); border-top: 1px solid var(--border-hair); }
+.ng-foot .ng-inner { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ng-accept { flex: 0 0 auto; border: 0; border-radius: 10px; padding: 10px 16px; background: var(--ok); color: var(--surface); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .ng-accept:disabled { background: var(--disabled-bg); color: var(--disabled-fg); cursor: default; }
 /* The review step's own act, and the only irreversible one on the sheet — so it is LABELLED with

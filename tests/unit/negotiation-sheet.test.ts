@@ -60,11 +60,31 @@ describe("the footer", () => {
      the line — it would centre in what the buttons left over. */
   it("centres the step switcher on the bar itself", () => {
     expect(CSS).toMatch(/\.ng-nav \{[^}]*position: absolute[^}]*left: 50%/);
+    // …and on the CONTENT column, not on a 1900px bar, so it sits over the steps it walks.
+    expect(CSS).toMatch(/\.ng-foot \.ng-inner \{[^}]*position: relative/);
   });
 
   /* The chevrons are DIRECTION, so they mirror with the script. */
   it("mirrors the chevrons under rtl", () => {
     expect(CSS).toMatch(/\[dir="rtl"\] \.ng-chev \{ transform: scaleX\(-1\); \}/);
+  });
+});
+
+describe("the sheet itself", () => {
+  /* 🔴 A PLACE, not a dialog (owner, 2026-09-19: *"it will sit in the existing 3 styles sheet but
+     with the new design, not as a popup page"*). The three steps are where a renter goes to answer a
+     negotiation — which is what the wizard this replaced always was, and what the app's own route is.
+     A card floating on a scrim reads as an aside, and this is the room's whole business. */
+  it("takes the screen rather than floating on it", () => {
+    expect(CSS).toMatch(/\.ng-shell \{[^}]*position: fixed;\s*inset: 0/);
+    expect(CSS).not.toMatch(/\.ng-shell \{[^}]*max-width: \d/);
+  });
+
+  /* The design is drawn to a phone's column, so the CONTENT is capped and centred while the header
+     and footer bars run the full width. */
+  it("caps the content column and lets the bars run the width", () => {
+    expect(CSS).toMatch(/\.ng-inner \{[^}]*max-width: 760px[^}]*margin-inline: auto/);
+    expect(FLOW.match(/className="ng-inner"/g)?.length).toBe(3);
   });
 });
 

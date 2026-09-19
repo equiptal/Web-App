@@ -1722,6 +1722,7 @@ function CounterFlow({
       <div className="ng-shell" onClick={(e) => e.stopPropagation()}>
         {/* ── header: the running total, and who is on the other side ── */}
         <div className="ng-head">
+          <div className="ng-inner">
           <div className="ng-head-l">
             {theirsIsLatest
               ? <div className="ng-new">🔔 {L("New offer from the supplier", "عرض جديد من المورد")}</div>
@@ -1739,9 +1740,11 @@ function CounterFlow({
             <span className="ng-ava">{room.supplier.name.charAt(0).toUpperCase()}</span>
             <button type="button" className="ng-x" onClick={() => !busy && onClose()} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
           </div>
+          </div>
         </div>
 
         <div className="ng-body">
+          <div className="ng-inner">
           {/* ── ① the price ─────────────────────────────────────────────────────────────────── */}
           {page === 0 && (
             <>
@@ -1949,6 +1952,7 @@ function CounterFlow({
               {error && <p className="ng-err">{error}</p>}
             </div>
           )}
+          </div>
         </div>
 
         {/* ── footer ───────────────────────────────────────────────────────────────────────────
@@ -1957,6 +1961,7 @@ function CounterFlow({
             press on the sheet — drawn as navigation. ⚠️ Accept stands beside it when everything
             matches: they are different acts and neither stands in for the other. */}
         <div className="ng-foot">
+          <div className="ng-inner">
           {page === 2 ? (
             <>
               {/* Small, on the leading edge: without it the review step is a dead end and a reader who
@@ -1988,6 +1993,7 @@ function CounterFlow({
           <button type="button" className="ng-log" onClick={() => setLogOpen(true)} aria-label={L("Log", "السجل")} title={L("Log", "السجل")}>
             <span className="material-icons-outlined">history</span>
           </button>
+          </div>
         </div>
 
         {pendingEx && (

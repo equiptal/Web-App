@@ -236,7 +236,7 @@ export function Intake() {
           keeps its margin while the panel keeps the edge. */}
       <div className="flex min-w-0 flex-1 flex-col px-4 py-6 sm:px-7">
       <IntakeBack />
-      <div {...pin("create-intake")} className="mx-auto flex w-full min-w-0 max-w-[780px] flex-1 flex-col justify-center">
+      <div {...pin("create-intake")} className="mx-auto flex w-full min-w-0 max-w-[780px] flex-1 flex-col justify-start">
       {/* ── He asks the question (owner, 2026-09-13: *"use mansour icon more in the chat intake
           somewhere, i want it to be attractive"*, then *"put mansour before the question"*) ────────
           The screen was a heading, a line and a big empty box - correct and characterless. He is
@@ -317,7 +317,7 @@ export function Intake() {
             The mirror always renders the FULL text. When the marked line is not found — the renter
             edited it, which is exactly when it stops being the site's words — it renders everything
             in the ordinary colour, which is byte for byte what this box looked like before. */}
-        <div className="relative flex min-h-[188px] w-full flex-1">
+        <div className="relative flex min-h-[96px] w-full flex-1">
           <div
             aria-hidden
             ref={mirror}
@@ -391,7 +391,7 @@ export function Intake() {
         <div className="flex items-center gap-3 px-5 pb-4 pt-1">
           <ProjectFloorChips rail={rail} />
 
-          <span className="flex flex-none items-center gap-2">
+          <span className="ms-auto flex flex-none items-center gap-2">
 
             <button
 

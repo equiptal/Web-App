@@ -51,6 +51,19 @@ describe("the bid cards are a sideways rail", () => {
     expect(rail).toContain("overflow-y-clip");
   });
 
+  it("centres the strip's contents, SAFELY, so one bid is not stranded on the left", () => {
+    /* Owner, 2026-09-19, on a 1920 screen holding one bid: *«why margin from left not equal to
+       right»*. The gutters were equal (measured: 37px left, 39px right); the CARD was not - 344px
+       against the left gutter with ~1480px of white after it, because `PAGE_MAX` went `max-w-none`
+       the same day and this container grew from 1360 to 1840 while the card kept its width. */
+    const rail = classes.find((c) => c.includes("overflow-x-auto") && c.includes("flex"))!;
+    expect(rail).toContain("justify-center-safe");
+    /* ⚠️ The `-safe` half is the whole of why this is allowed on a SCROLLER. Plain centring
+       overflows at both ends, and the overflow past the start edge cannot be scrolled to - the first
+       bid would be unreachable on a request with enough of them. */
+    expect(rail).not.toMatch(/justify-center(?!-safe)/);
+  });
+
   it("gives the card its own width back, and the row's height", () => {
     const card = classes.find((c) => c.includes("rounded-lg border bg-surface transition"));
     expect(card, "the card root").toBeTruthy();

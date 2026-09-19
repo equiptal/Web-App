@@ -2,6 +2,104 @@
 
 ## Change log
 
+- **2026-09-19 - The gutters were EQUAL and the content was not: the bid strip centres what it holds, and the intake sits at the top in a box a third shorter.**
+  Owner: *"why margin from left not equal to right"*, on a 1920 screenshot of `/requests`, then
+  *"all like this"*; and, on two shots of the intake, *"make it more to the top like this size and
+  placement"*.
+  🔴 **MEASURED before anything was changed, off his own screenshot, and the complaint was not what it
+  said.** Every gutter on that page is symmetric: the green header's ink runs 25px in from the left
+  and 29px from the right, the request rail's content 37 / 39, the white bids panel 37 / 39. (The 2px
+  is the shot being 1916px wide for a 1920 window, not the layout.) `PAGE_X` is `px-4 sm:px-6 lg:px-8
+  xl:px-10` and renders exactly that on both sides.
+  **What was unequal is the CONTENT inside the equal gutters.** One bid card occupied x 50-390 and
+  then ~1480px of empty white ran to the panel's edge. That is the 2026-09-19 fluid change landing:
+  `PAGE_MAX` became `max-w-none`, so the container went 1360 -> 1840 and a 344px card did not grow
+  with it. Offered the four ways out (centre / cap the content / stretch the card / restore the cap),
+  he took **centre**.
+  (1) **The bid strip is `justify-center-safe`.**
+  ⚠️ **`-safe`, and the suffix is the whole licence for putting `justify-content` on a SCROLLER.**
+  Plain centring overflows at BOTH ends, and overflow past the START edge cannot be scrolled to - on
+  a request with six bids the FIRST one becomes unreachable. `safe` falls back to `flex-start` the
+  moment it would overflow. Verified in a browser at the real 1840px: one card centres at 747 / 747,
+  six cards (2188px of content) sit flush at 12px with `scrollLeft: 0` reaching the first.
+  ⚠️ **`CompareMatrix` was looked at and deliberately NOT changed**: its terms strip is
+  `flex-[1_0_auto]`, so it grows to fill and there is no free space for `justify-content` to
+  distribute. A utility that can never fire reads as a rule.
+  ⚠️ **The REQUEST RAIL is deliberately NOT centred**, though it has the same 1460px of air. Its
+  «New» circle is aligned to the panel's own left edge, which is the half of the 2026-08-30 ruling
+  that 2026-09-12 kept when it made the rail a band. Centring the tiles takes that alignment away.
+  Worth one word from him; it is one class if he wants it.
+  (2) **The intake: `justify-center` -> `justify-start`, and the typing area `min-h-[188px]` ->
+  `min-h-[96px]`.** Read off his reference shot at 1:1, the box is **142px** where staging draws
+  **235**; measured after the change, 144. The column runs the window's height (the rail sets
+  `100dvh-52`), so `justify-center` was parking the whole block at mid-screen.
+  (3) 🔴 **The two round controls had drifted to the row's LEADING edge, and that is a regression the
+  reference caught.** `ms-auto` was removed on 2026-09-16 with the chip strip, on the reasoning that
+  *"the pill's own group is `flex-1` now, so it pushes the controls to the trailing edge by taking the
+  room itself"*. False on the first screen every renter meets: `ProjectFloorChips` renders **nothing**
+  until a project is picked - not an empty `flex-1` box - so with no pill there is nothing to do the
+  pushing. `ms-auto` is back, it holds in both states, and the standing rule of 2026-09-12 (the
+  controls sit on the side the renter reads TO) holds with it.
+  Files: `src/components/workspace/BidCards.tsx`, `src/components/screens/Intake.tsx`,
+  `tests/unit/bid-cards-rail.test.ts` (1 new case), `tests/unit/intake-floor.test.ts` (1 new case, the
+  `ms-auto` note corrected).
+  🔴 **A test was anchored on the exact class string it was checking, and that is a VACUOUS-PASS
+  trap.** `intake.slice(intake.indexOf('<span className="flex flex-none items-center gap-2">'))` - add
+  one utility to that element and `indexOf` returns -1, `slice(-1)` returns the file's LAST CHARACTER,
+  and every assertion below it then runs against a one-character haystack. Here it went red, which is
+  luck: three of the four assertions in that block are `not.toMatch`, and those would have passed. It
+  anchors on `aria-label={t.intake.uploadRfq}` now.
+  ⚠️ Verified: `next build` clean, typecheck clean, lint 0 errors, **211 files / 3567 passing, 7
+  skipped** serially, and both new cases break-checked one at a time (the centring removed, then
+  `ms-auto` removed) - each went red alone. The 3 unhandled errors are `intercom-widget`'s two and
+  `suppliers-remove-and-pick`'s one, both pre-existing.
+  ⚠️ **SEEN RENDERED**: the intake photographed on a local production build at 1920 (block at the top,
+  box 144px, controls on the trailing edge), and the bid strip's two arms measured on a throwaway page
+  carrying the compiled stylesheet and the real class names - the cards tab needs a signed-in renter
+  with bids, which this machine has no session for.
+  🔴 **NOT seen on the real cards tab**, so the centred strip is argued from the measurement and pinned
+  by a case rather than photographed in place.
+
+- **2026-09-19 - The negotiation sheet TAKES THE SCREEN again: the same three steps and the new design, with the content in a column rather than in a floating card.**
+  Owner, on yesterday's build: *"for deal room negoatiation it will sit in the existing 3 styles sheet
+  but with the new design not as a popup page!!"*.
+  🔴 **The rebuild had turned a PLACE into a dialog.** The prototype is drawn on a phone, so the port
+  took it literally: a 460px card centred on the scrim, with the page showing round it. That reads as
+  an aside — something opened over the room to be glanced at and dismissed — and a negotiation is the
+  room's whole business. The wizard it replaced was `position: fixed; inset: 0`, the app's own is a
+  ROUTE, and this is now a full-screen sheet again: `.ng-shell` is fixed to the viewport, square
+  cornered, sliding up rather than fading in.
+  ⚠️ **The CONTENT is capped at 760px and centred; the header and footer BARS run the full width.**
+  The design's proportions are a phone column's — stretching a four-column price table across 1900px
+  would throw them away for no reader's gain, and letting the bars stop at 760 would leave the sheet
+  looking like the card it just stopped being. One `.ng-inner` wrapper in each of the three bands.
+  ⚠️ **The footer's switcher centres on the COLUMN, not on the bar.** It is absolutely placed inside
+  `.ng-inner`, so it sits over the steps it walks rather than in the middle of a wide screen with the
+  accept button stranded at the far edge.
+  ⚠️ **The term card's «Change / Take theirs» pair is capped at 320px and sits at the reading end.**
+  At the phone's width they are two `flex:1` buttons; on a 760px column they became two 350px slabs
+  and read as the card's main event instead of as the two answers to the line above them.
+  Files: `src/components/deal-room/deal-room-proto.css`,
+  `src/components/deal-room/DealRoom.tsx` (the three `.ng-inner` wrappers),
+  `tests/unit/negotiation-sheet.test.ts` (2 new cases; 19 passing).
+  ⚠️ **Nothing else moved**: same three steps, same order, same header, same footer acts, same
+  pricing, same gating, same log. The test block that pins «what the rebuild did NOT change» is
+  untouched and still green.
+  ⚠️ `@keyframes dpModal` was referenced by the card and **exists nowhere in this repo** - the
+  animation had never run. The sheet names its own `ngSheetUp` now.
+  ⚠️ Verified: **`NODE_OPTIONS= npx next build` clean (31 routes)** - the rule this log set this
+  morning, because a stylesheet fault is invisible to typecheck, lint and jsdom - plus typecheck,
+  lint 0 errors, and **211 files / 3567 passing, 7 skipped**
+  serially. The unhandled errors are DOWN to 2 from the 3 this log has recorded for a fortnight,
+  which is not this change's doing and is not diagnosed - it is `intercom-widget`'s pair and
+  `suppliers-remove-and-pick`'s one, and one of the three did not fire on this run.
+  ⚠️ **SEEN RENDERED at 1568px**: all three steps as a takeover, RTL, built as static markup carrying
+  the real class names and the compiled tokens. The footer is pinned to the foot of the window and
+  the body scrolls between the two bars, which is the half a card could not do.
+  🔴 **NOT seen on a real room**, so the two things to look at first are a long supplier name in the
+  header beside the total, and the sheet on a phone, where the column cap never binds and the design
+  is at its own scale.
+
 - **2026-09-19 - STAGING HAD NOT DEPLOYED SINCE THE 18th: `97046ef6` left an orphaned CSS declaration and every build after it failed.**
   Owner: *"is the last commit and push deployed? i didnt see the changes"*, then *"i am looking to staging check it to build and deploy"*.
   The push was fine - `5474e470` is on `origin/staging`, 0 ahead / 0 behind. **The BUILD was broken**, so

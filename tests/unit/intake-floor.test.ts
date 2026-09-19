@@ -123,16 +123,32 @@ describe("the chip strip left the floor", () => {
  *
  * 🔴 **The cost is on the record: 26px is under the house's 44px target.**
  *
- * ⚠️ ~~`ms-auto` on the control group.~~ Gone with the strip: the pill's own group is `flex-1`
- * now, so it pushes the controls to the trailing edge by taking the room itself. `ms-auto` on top of
- * that would be a second answer to one question.
+ * ⚠️ **`ms-auto` on the control group, restored 2026-09-19.** ~~Gone with the strip: the pill's
+ * own group is `flex-1` now, so it pushes the controls to the trailing edge by taking the room
+ * itself.~~ That premise is FALSE on the first screen every renter meets: `ProjectFloorChips`
+ * renders NOTHING until a project is picked - not an empty `flex-1` box - so with no pill there was
+ * nothing to do the pushing and both controls sat against the row's leading edge. Owner, on a
+ * screenshot of exactly that: *«make it more to the top like this size and placement»*, over a
+ * reference drawing them on the right. `ms-auto` holds in both states, which is what the standing
+ * rule of 2026-09-12 asks for - the controls sit on the side the renter reads TO.
  */
 describe("the floor's controls match the pills", () => {
-  const controls = intake.slice(intake.indexOf('<span className="flex flex-none items-center gap-2">'));
+  /* Anchored on the CONTROLS' own marker, not on the whole class string: that string has changed
+     twice now, and an `indexOf` miss returns -1, which `slice(-1)` turns into the file's last
+     character - so every assertion below passes on an empty haystack instead of going red. */
+  const controls = intake.slice(intake.indexOf('aria-label={t.intake.uploadRfq}'));
 
   it("Given either control, Then it is 26px square — the chip's own height", () => {
     const sized = controls.match(/h-\[26px\] w-\[26px\]/g) ?? [];
     expect(sized).toHaveLength(2);
+  });
+
+  it("Given no pill beside them, Then the controls still hold the trailing edge", () => {
+    /* `ProjectFloorChips` draws nothing until a project is picked, so nothing else in this row can
+       push them over - which is why the group states `ms-auto` itself. Read off the group's own
+       class, not the slice above, which starts inside the first button. */
+    const group = /<span className="([^"]*)">[\s\S]{0,40}?<button/.exec(intake)?.[1] ?? "";
+    expect(group).toContain("ms-auto");
   });
 
   it("Given the 40px circles, Then neither survives", () => {
