@@ -38,27 +38,31 @@ const BIDS_SHOWN = 5;
 /** How many of the renter's request groups the rail reads shared-link bids for — see the effect. */
 const LINK_FANOUT_MAX = 20;
 
-/** «Excavator · 20 ton» — and just «Excavator» when the request named no size. */
-const machineWords = (subtype: string | null, size: string | null): string =>
-  [subtype, size].filter(Boolean).join(" · ");
-
-/** One off-platform bid, as the rail needs it: the card the workspace builds, plus the two facts the
- *  submission cannot know about itself — which request it answers, and where that job is. */
+/** One off-platform bid, as the rail needs it: the card the workspace builds, plus the one fact the
+ *  submission cannot know about itself — which request it answers. ~~Its machine and its site.~~
+ *  Both went with the row's second line (owner, 2026-09-19). */
 interface LinkRailBid {
   card: BidCard;
   requestId: string;
-  machine: string;
-  location: string | null;
 }
 
-/** A row of the rail, from EITHER source. Four facts and a destination — see the merge below. */
+/**
+ * A row of the rail, from EITHER source — see the merge below.
+ *
+ * **THREE facts now, not five** (owner, 2026-09-19, on a screenshot of the rail: *"here only show
+ * supplier name and price nothing more with one small pill for «offline», «via app» and the
+ * initials of the supplier must be the supplier logo in this circle"*). ~~The machine and the
+ * site.~~ Both were a second line of grey under every row, and neither is what the renter is
+ * scanning a rail of incoming bids for: he is reading WHO and HOW MUCH, and the request he is
+ * reading them against is the table beside it.
+ */
 interface RailBid {
   key: string;
   name: string;
   price: number | null;
   priceUnit: string | null;
-  machine: string | null;
-  location: string | null;
+  /** The firm's mark, when the projection carries one — null falls back to the initial. */
+  logo: string | null;
   /** Arrived through the renter's shared link rather than through an account. */
   offPlatform: boolean;
   at: string | null;
@@ -165,6 +169,10 @@ export function HomeRequests({ hideHeading, onCount }: { hideHeading?: boolean; 
    *  row: nothing is hidden behind an inner scrollbar, at the cost of the two cards no longer ending
    *  level once one is open. That was the explicit choice — a list the renter has to scroll inside a
    *  box he already scrolled to reach is two scrollbars for one list. */
+  /** Supplier marks that answered an error, kept BY URL: the taxonomy and company objects are not
+   *  public-read on staging, so a well-formed URL 403s, and a bare boolean would carry one firm's
+   *  failure onto the next row's logo. */
+  const [badLogos, setBadLogos] = useState<string[]>([]);
   const [allRequests, setAllRequests] = useState(false);
   const [allBids, setAllBids] = useState(false);
 
@@ -298,14 +306,9 @@ export function HomeRequests({ hideHeading, onCount }: { hideHeading?: boolean; 
         return (envelope?.submissions ?? []).flatMap((sub) =>
           (sub.items.length ? sub.items : [undefined]).map((it) => {
             const requestId = it?.requestId ?? first.id;
-            // The machine as the REQUEST names it — subtype · size — read off the group's own item
-            // rather than off the submission, which carries only the label the form showed.
-            const row = g.items.find((x) => x.id === requestId) ?? first;
             return {
               card: submissionToBidCard(sub, it),
               requestId,
-              machine: (ar ? row.item?.nameAr || row.item?.name : row.item?.name) ?? it?.label ?? "",
-              location: g.locationLabel,
             };
           }),
         );
@@ -314,7 +317,7 @@ export function HomeRequests({ hideHeading, onCount }: { hideHeading?: boolean; 
     return () => {
       live = false;
     };
-  }, [groups, status, loadSubs, ar]);
+  }, [groups, status, loadSubs]);
 
   /** Resolve the deadline for the rows on screen, link first and the window only if it is unset.
    *  A row the status has already answered is skipped — there is nothing a date could add to it. */
@@ -407,12 +410,7 @@ export function HomeRequests({ hideHeading, onCount }: { hideHeading?: boolean; 
     name: b.supplierName,
     price: b.currentPrice,
     priceUnit: b.priceUnit,
-    // The machine the REQUEST names, not the model the supplier listed (owner, 2026-09-05).
-    machine: machineWords(
-      ar ? b.equipment.subtypeAr ?? b.equipment.subtype : b.equipment.subtype,
-      ar ? b.equipment.sizeAr ?? b.equipment.size : b.equipment.size,
-    ) || b.request.equipmentSummary || b.equipmentName,
-    location: b.request.location,
+    logo: b.supplierLogoUrl,
     offPlatform: false,
     at: b.createdAt,
     // Every app bid opens the workspace; `r` names the request so it lands on the right one.
@@ -423,8 +421,10 @@ export function HomeRequests({ hideHeading, onCount }: { hideHeading?: boolean; 
     name: b.card.supplierName,
     price: b.card.price,
     priceUnit: b.card.priceUnit,
-    machine: b.machine,
-    location: b.location,
+    /* An off-platform submission has NO supplier mark and cannot have one: the firm was typed into
+       the renter's own list, so there is no account behind it to carry a logo. Such a row keeps the
+       initial, which is the whole reason the fallback is not decoration. */
+    logo: null,
     offPlatform: true,
     at: b.card.submittedAt,
     href: `/requests?r=${encodeURIComponent(b.requestId)}`,
@@ -810,56 +810,52 @@ export function HomeRequests({ hideHeading, onCount }: { hideHeading?: boolean; 
                 onClick={() => router.push(b.href)}
                 className={cx(ROW_H, "flex w-full items-center gap-2.5 border-b border-border px-3 text-start transition last:border-b-0 hover:bg-surface2")}
               >
-                <span className="grid size-7 flex-none place-items-center rounded-full border border-border bg-surface3 text-label font-extrabold text-navy">
-                  {b.name.trim().charAt(0) || "?"}
+                {/* ── The firm's MARK, with the initial behind it (owner, 2026-09-19) ─────────────
+                    *"the initials of the supplier must be the supplier logo in this circle"*.
+                    `supplierLogoUrl` has been on the received-bids projection all along and the
+                    rail read none of it.
+
+                    ⚠ The initial is NOT decoration: an off-platform row has no account behind it and
+                    therefore no mark, and `onError` is load-bearing rather than defensive — the
+                    storage objects are not public-read on staging, so a well-formed URL answers 403
+                    and an `<img>` absorbs that as «no artwork», drawing a broken-image glyph where
+                    the firm should be. Remembered by URL, or one firm's failure would follow the
+                    next one down the rail. */}
+                <span className="relative grid size-7 flex-none place-items-center overflow-hidden rounded-full border border-border bg-surface3 text-label font-extrabold text-navy">
+                  {b.logo && !badLogos.includes(b.logo) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={b.logo}
+                      alt=""
+                      className="size-full object-cover"
+                      onError={() => setBadLogos((prev) => (prev.includes(b.logo!) ? prev : [...prev, b.logo!]))}
+                    />
+                  ) : (
+                    b.name.trim().charAt(0) || "?"
+                  )}
                 </span>
-                {/* Four facts, two lines, one card (owner, 2026-09-04): who bid and for how much,
-                    then the machine he bid on and where the job is. The price is the only thing that
-                    never yields — a number cut in half is a wrong number, so it keeps its width and
-                    the NAME truncates beside it.
+                {/* TWO facts, one line: who bid and for how much (owner, 2026-09-19). The price is
+                    the only thing that never yields — a number cut in half is a wrong number, so it
+                    keeps its width and the NAME truncates beside it — and it carries its UNIT,
+                    because 500 a day and 500 a month are not comparable figures.
 
-                    The MACHINE is the request's own words — subtype · size, «Excavator · 20 ton» —
-                    not the supplier's listing (owner, 2026-09-05: *"show equipment subtype and size,
-                    not model and year"*). «Caterpillar 320» answers which machine he is offering; on
-                    a rail of incoming bids the renter is scanning for which machine was ASKED for,
-                    and two firms offering the same 20-tonner under different model numbers read as
-                    two unrelated machines.
+                    ~~The machine, and the site under it.~~ Both went with the second line; the rail
+                    stands beside the table of requests that names them.
 
-                    The price carries its UNIT for the same reason (owner, same day): 500 a day and
-                    500 a month are not comparable numbers, and the rail sits next to a table of
-                    requests whose rental basis varies row by row.
-
-                    The site is the one that goes when the card is tight: it is the least of the four
-                    (the renter usually knows where his own job is), so below 260px of rail it is
-                    dropped rather than shortened to two letters. `@container` measures the RAIL, not
-                    the viewport — this card is 300px beside the table on a desktop and full width on
-                    a phone, so a viewport breakpoint would hide it in exactly the wrong one. */}
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-baseline gap-2">
-                    <span className="min-w-0 truncate text-body font-extrabold text-navy">{b.name}</span>
-                    <span className="ms-auto flex-none whitespace-nowrap text-body font-semibold tabular text-navy">
-                      {money(b.price)}
-                      {b.price != null && priceUnitWord(b.priceUnit) && (
-                        <span className="text-label font-semibold text-muted"> {priceUnitWord(b.priceUnit)}</span>
-                      )}
-                    </span>
+                    The SOURCE is one small pill and it is drawn on every row, not only an
+                    off-platform one: a mark that appears on some rows reads as a warning about those
+                    rows, where the question it answers — did this come through an account or through
+                    my own link — is asked of every bid. It takes the SOURCE FILTER's two words, so
+                    the rail and the tab above the bid cards cannot drift apart. */}
+                <span className="flex min-w-0 flex-1 items-center gap-2">
+                  <span className="min-w-0 truncate text-body font-extrabold text-navy">{b.name}</span>
+                  <span className="flex-none rounded-sm bg-surface2 px-1.5 text-label font-semibold text-muted-dark">
+                    {b.offPlatform ? t.workspace.sourceOffline : t.workspace.sourceApp}
                   </span>
-                  <span className="mt-0.5 flex items-baseline gap-1.5 text-meta text-muted">
-                    {/* A bid that came through the shared link has no account and no chat behind it,
-                        so the row says where it came from rather than leaving the renter to find out
-                        by pressing it. It takes the BID CARD's words («Via your link»), not the
-                        filter tab's — a rail row is one bid, and the filter is a question about all
-                        of them (owner, 2026-09-06). */}
-                    {b.offPlatform && (
-                      <span className="flex-none rounded-sm bg-surface2 px-1.5 text-label font-semibold text-muted-dark">
-                        {t.workspace.sourceOfflineLong}
-                      </span>
-                    )}
-                    <span className="min-w-0 flex-1 truncate">{b.machine || "—"}</span>
-                    {b.location && (
-                      <span className="hidden min-w-0 max-w-[45%] shrink-0 truncate @[260px]/bidrail:block">
-                        · {b.location}
-                      </span>
+                  <span className="ms-auto flex-none whitespace-nowrap text-body font-semibold tabular text-navy">
+                    {money(b.price)}
+                    {b.price != null && priceUnitWord(b.priceUnit) && (
+                      <span className="text-label font-semibold text-muted"> {priceUnitWord(b.priceUnit)}</span>
                     )}
                   </span>
                 </span>
@@ -870,9 +866,9 @@ export function HomeRequests({ hideHeading, onCount }: { hideHeading?: boolean; 
               Array.from({ length: BIDS_SHOWN }, (_, i) => (
                 <div key={`skb-${i}`} className={cx(ROW_H, "flex items-center gap-2.5 border-b border-border px-3 last:border-b-0")}>
                   <span className="size-7 flex-none animate-pulse rounded-full bg-surface2" />
-                  <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
                     <span className="block h-3 w-28 animate-pulse rounded-sm bg-surface2" />
-                    <span className="block h-2.5 w-40 animate-pulse rounded-sm bg-surface2" />
+                    <span className="ms-auto block h-3 w-16 animate-pulse rounded-sm bg-surface2" />
                   </span>
                 </div>
               ))}

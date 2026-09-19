@@ -8,11 +8,16 @@ import { en } from "@/lib/i18n/en";
 import { groupRequests } from "@/lib/contract/requests";
 
 /**
- * The bids rail on the dashboard — one card per bid, four facts in it (owner, 2026-09-04).
+ * The bids rail on the dashboard — one row per bid.
  *
- * *"The bids in home page must show bidder name, equipment name of the request with price, location
- * if there is enough space. But here make sure all these fit in one notification card and doesn't
- * require to scroll horizontal, it looks weird."*
+ * ── TWO facts and a pill (owner, 2026-09-19) ────────────────────────────────────────
+ * *"here only show supplier name and price nothing more with one small pill for offline, via app
+ * and the initials of the supplier must be the supplier logo in this circle"*.
+ *
+ * ~~Four facts on two lines (owner, 2026-09-04).~~ The machine and the site are gone: the rail
+ * stands beside the TABLE of requests that names both, and what the renter scans a rail of incoming
+ * bids for is who offered and how much. The source moved from a sentence under the name to one pill
+ * beside it, drawn on EVERY row — a mark on some rows only reads as a warning about those rows.
  *
  * ── Why a class is asserted here, which these tests otherwise avoid ─────────────────────────────
  * The horizontal scrollbar was not the content's fault and no query can see it: the column was
@@ -129,15 +134,30 @@ const draw = () =>
 const scroller = () => document.querySelector(".overflow-y-auto") as HTMLElement;
 
 describe("one bid, one card", () => {
-  it("states the bidder, the price, the machine and the site", async () => {
+  it("states the bidder and the price, and NOTHING else", async () => {
     draw();
     const row = (await screen.findByText("Al Faisal Heavy Equipment Rentals")).closest("button")!;
     expect(within(row).getByText("48,500")).toBeTruthy();
-    // The machine is the REQUEST's own words — subtype · size — not the supplier's model number
-    // (owner, 2026-09-05: *"show equipment subtype and size, not model and year"*).
-    expect(within(row).getByText("Crawler excavator · 20 ton")).toBeTruthy();
+    // The machine and the site were the second line, and the second line is gone. The supplier own
+    // model number was never drawn here and still is not.
+    expect(within(row).queryByText(/Crawler excavator/)).toBeNull();
     expect(within(row).queryByText(/Caterpillar|320/)).toBeNull();
-    expect(within(row).getByText(/King Khalid International Airport/)).toBeTruthy();
+    expect(within(row).queryByText(/King Khalid International Airport/)).toBeNull();
+  });
+
+  it("wears the firm MARK when the projection carries one", async () => {
+    api.bids = [bid({ supplierLogoUrl: "https://example.test/al-faisal.png" })];
+    draw();
+    const row = (await screen.findByText("Al Faisal Heavy Equipment Rentals")).closest("button")!;
+    const img = row.querySelector("img")!;
+    expect(img.getAttribute("src")).toBe("https://example.test/al-faisal.png");
+  });
+
+  it("draws the initial when there is no mark", async () => {
+    draw();
+    const row = (await screen.findByText("Al Faisal Heavy Equipment Rentals")).closest("button")!;
+    expect(row.querySelector("img")).toBeNull();
+    expect(within(row).getByText("A")).toBeTruthy();
   });
 
   it("carries the price's UNIT, because 500 a day and 500 a month are different offers", async () => {
@@ -164,27 +184,18 @@ describe("one bid, one card", () => {
   it("truncates the long facts rather than widening the card", async () => {
     draw();
     const row = (await screen.findByText("Al Faisal Heavy Equipment Rentals")).closest("button")!;
-    // The name and the machine yield; the PRICE never does — a number cut in half is a wrong number.
+    // The NAME yields; the price never does — a number cut in half is a wrong number.
     expect(within(row).getByText("Al Faisal Heavy Equipment Rentals").className).toContain("truncate");
-    expect(within(row).getByText("Crawler excavator · 20 ton").className).toContain("truncate");
     expect(within(row).getByText("48,500").closest("span")!.className).toContain("flex-none");
   });
 
-  it("drops the site, not the machine, when the rail is narrow", async () => {
-    // A container query on the RAIL, so the fact that goes is decided by the card's own width rather
-    // than by the viewport's — this card is 300px beside the table and full width on a phone.
-    draw();
-    const row = (await screen.findByText("Al Faisal Heavy Equipment Rentals")).closest("button")!;
-    const site = within(row).getByText(/King Khalid International Airport/);
-    expect(site.className).toContain("@[260px]/bidrail:block");
-    expect(site.className).toContain("hidden");
-  });
+  /* ~~drops the site, not the machine, when the rail is narrow.~~ Retired with both of them
+     (owner, 2026-09-19): the row states the name, the pill and the price, and none of the three may
+     be dropped at any width — the name truncates instead. */
 
-  it("falls back to the request's own summary when the taxonomy named nothing", async () => {
-    api.bids = [bid({ equipment: { subtype: null, subtypeAr: null, size: null, sizeAr: null } })];
-    draw();
-    expect(await screen.findByText("Crawler excavator")).toBeTruthy();
-  });
+  /* ~~falls back to the request own summary when the taxonomy named nothing.~~ Retired with the
+     machine line; `machineWords` went with it. That fallback still matters where the machine IS
+     stated — the workspace and the request table — and is pinned there. */
 });
 
 /**
@@ -208,22 +219,33 @@ describe("the bids that came through the shared link", () => {
     expect(screen.getByText(/2 new bids/)).toBeTruthy();
   });
 
-  it("states the same four facts, with the machine from the request", async () => {
+  it("states the same two facts as an app bid", async () => {
     draw();
     const row = (await screen.findByText("Najd Equipment Est.")).closest("button")!;
     expect(within(row).getByText("21,000")).toBeTruthy();
     expect(within(row).getByText("/ month")).toBeTruthy();
-    expect(within(row).getByText("Crawler excavator · 20 ton")).toBeTruthy();
+    expect(within(row).queryByText(/Crawler excavator/)).toBeNull();
   });
 
-  it("says where it came from, because there is no chat behind it", async () => {
+  it("carries a source pill, and so does the app bid beside it", async () => {
     draw();
     const row = (await screen.findByText("Najd Equipment Est.")).closest("button")!;
-    // The rail row is one BID, so it takes the card's words rather than the filter tab's.
-    expect(within(row).getByText(en.workspace.sourceOfflineLong)).toBeTruthy();
-    // The app bid beside it carries no such mark.
+    // The SOURCE FILTER two words, so the rail and the tab above the bid cards cannot drift.
+    expect(within(row).getByText(en.workspace.sourceOffline)).toBeTruthy();
+    expect(within(row).queryByText(en.workspace.sourceApp)).toBeNull();
+    // Drawn on EVERY row: a mark on the off-platform ones alone reads as a warning about them.
     const app = screen.getByText("Al Faisal Heavy Equipment Rentals").closest("button")!;
-    expect(within(app).queryByText(en.workspace.sourceOfflineLong)).toBeNull();
+    expect(within(app).getByText(en.workspace.sourceApp)).toBeTruthy();
+    expect(within(app).queryByText(en.workspace.sourceOffline)).toBeNull();
+  });
+
+  it("has no mark to draw, so it keeps the initial", async () => {
+    // The firm was typed into the renter own supplier list; there is no account behind it to carry
+    // a logo, which is why the initial is a state rather than decoration.
+    draw();
+    const row = (await screen.findByText("Najd Equipment Est.")).closest("button")!;
+    expect(row.querySelector("img")).toBeNull();
+    expect(within(row).getByText("N")).toBeTruthy();
   });
 
   it("sorts the newest first, whichever source it came from", async () => {
