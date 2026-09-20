@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui";
 import { useSession } from "@/lib/session";
-import { cancelRequest, fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail } from "@/lib/api/client";
+import { cancelRequests, fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail } from "@/lib/api/client";
 import { BIDS_POLL_MS, LINK_FANOUT_POLL_MS, useLiveTick } from "@/lib/live/useLiveTick";
-import { cancellableItems, groupBiddingClosed, groupRequests, type RequestGroup } from "@/lib/contract/requests";
+import { cancelFailureLine, cancelRetryWorthIt, cancellableItems, groupBiddingClosed, groupRequests, type RequestGroup } from "@/lib/contract/requests";
 import type { InboxBid } from "@/lib/contract/inbox";
 import { requestExpiry, expiryState, type ExpiryState } from "@/lib/contract/request-expiry";
 import { submissionToBidCard } from "@/lib/contract/link-bids";
@@ -204,6 +204,10 @@ export function HomeRequests() {
   const [cancelling, setCancelling] = useState<RequestGroup | null>(null);
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  /** Whether pressing again could help. False on «already accepted» and friends - see `doCancel`. */
+  const [cancelRetry, setCancelRetry] = useState(true);
+  /** The cancellation went through, and the dialog is saying so rather than vanishing. */
+  const [cancelled, setCancelled] = useState(false);
 
   /** Groups this device has taken off the feed. Local, and reversible. */
   const [hidden, setHidden] = useState<string[]>([]);
@@ -523,6 +527,19 @@ export function HomeRequests() {
     dismiss(g);
   };
 
+  /**
+   * Cancel the group, then SAY what happened — either way.
+   *
+   * 🔴 ~~`Promise.all(...); setCancelling(null); reload();`~~ (owner, 2026-09-20). Two faults, and
+   * together they are the loop he reported:
+   *  · **Success was silent.** The dialog vanished and the table redrew with one row greyed, which
+   *    on the one act the backend has no inverse for reads exactly like a silent failure.
+   *  · **Failure was a guess.** Any refusal printed «that didn't go through», and the commonest
+   *    refusal of a cancel is that it had ALREADY been cancelled — so the screen said the opposite
+   *    of the truth and the renter pressed again, which refused for the same reason.
+   * `cancelRequests` settles every item and re-reads the ones that refused, so the note is the
+   * request's actual state; the dialog now holds either way and Done carries the reload.
+   */
   const doCancel = async () => {
     const g = cancelling;
     if (!g || cancelBusy) return;
@@ -531,10 +548,20 @@ export function HomeRequests() {
     try {
       // Every cancellable item of the group — the backend refuses the rest, and a partial group is
       // a real state: one item accepted, the others still open.
-      await Promise.all(cancellableItems(g.items).map((i) => cancelRequest(i.id)));
-      setCancelling(null);
-      reload();
+      const report = await cancelRequests(cancellableItems(g.items).map((i) => i.id));
+      if (!report.refused.length) {
+        setCancelled(true);
+        return;
+      }
+      setCancelRetry(cancelRetryWorthIt(report));
+      setCancelError(cancelFailureLine(report, ar));
+      /* A partial success is a real change to the table, so it redraws BEHIND the open dialog —
+         and the retry then aims at the items that are genuinely still open rather than re-sending
+         the ones already gone. */
+      if (report.cancelled > 0) reload();
     } catch {
+      /* `cancelRequests` does not throw for a refusal; this is the unreadable case. */
+      setCancelRetry(true);
       setCancelError(L("That didn’t go through. Try again.", "لم يتمّ الإجراء. حاول مجددًا."));
     } finally {
       setCancelBusy(false);
@@ -942,14 +969,22 @@ export function HomeRequests() {
           L={L}
           busy={cancelBusy}
           error={cancelError}
+          canRetry={cancelRetry}
+          done={cancelled}
           scope={{
             kind: "all",
             idLabel: cancelling.groupRef ?? cancelling.items[0]?.displayId ?? cancelling.id,
             total: cancellableItems(cancelling.items).length,
           }}
           onClose={() => {
+            /* Done is what carries the reload: the table has to re-read to grey the row and put
+               «Closed» in its Closes column. */
+            const reloadNow = cancelled;
             setCancelling(null);
             setCancelError(null);
+            setCancelRetry(true);
+            setCancelled(false);
+            if (reloadNow) reload();
           }}
           onConfirm={() => void doCancel()}
         />

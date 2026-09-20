@@ -2,6 +2,68 @@
 
 ## Change log
 
+- **2026-09-20 - A cancellation SAYS what it did, and a request already cancelled stops being reported as a failure.**
+  Owner, forwarding a renter on beta stuck on «لم يتمّ الإجراء. حاول مجددًا» over RFQ-00190: *"it is
+  cancelled in backend but no succuess message or failed mesage shown or anything so he just keep
+  trying and says fail cause already cancelled so make sure the state is clear"*.
+  🔴 **THREE faults, and the loop needs all three.**
+  (1) **The drawer's catch CLOSED THE DIALOG AND SET NOTHING.** `RequestDetailsModal.doCancel` ended
+  `catch { setBusy(false); setConfirmCancel(false); }` - the one call site of `ConfirmCancelModal`
+  that never passed its `error` prop. So a refused cancel said *nothing whatsoever* and looked
+  exactly like a press that had not registered.
+  (2) **Its success was silent too**: `onChanged(); onClose();` dismissed every layer, on the one act
+  the backend has no inverse for.
+  (3) 🔴 **A refused DELETE was read as «the request is still live», and it is not.** It means the
+  backend would not do it AGAIN, and the commonest cause of that is that it already did - so the
+  screen said the opposite of the truth and the renter pressed again, which refused for the same
+  reason. Every refusal is now settled by RE-READING the request (`cancelRequests` in `client.ts`):
+  status CANCELLED/ABANDONED ⇒ the success note, whichever press put it there.
+  **The reference is the APP's own request-detail page** (`request_detail_page.dart`): a loading
+  overlay, then a success snackbar and a jump back to My Requests, or an error snackbar carrying the
+  BACKEND's own sentence through `localizedError(message, messageAr)`. The web threw that sentence
+  away - `cancelRequest` built `new ApiError("unknown", "HTTP 409")` and dropped the body - so «a
+  request can only be cancelled while it is open or active» arrived as «that didn't go through». It
+  is parsed and carried now (`backendCode`, `detail`, `messageAr`), and printed when nothing better
+  can be read.
+  ⚠️ **`Promise.allSettled`, never `all`.** On a fanned-out RFQ `all` rejects at the first refusal and
+  throws away what the other items answered: five cancelled lines and one accepted one reported as a
+  total failure, and the retry then re-sent the five, which the backend refused in turn. A partial
+  now says «3 of 4 were cancelled» AND reloads the table behind the open dialog, so the retry aims
+  only at what is genuinely still open.
+  🔴 **A refusal no retry can move draws NO «Try again»** (`canRetry`). «Already accepted», «already
+  cancelled» and «expired» are states a second press cannot change, and a live retry over one of them
+  is the loop rebuilt one press later. One button, «Close», brand-filled.
+  ⚠️ **The success note is the 2026-09-17 ruling, ported to beta**, which did not have it: one box,
+  two states, a tick where the question was asked, and Done carries the reload. `busy` is not the
+  guard there - the confirm button is simply not rendered in the done state.
+  ⚠️ `cancelBlockedReason` gained a `noun`: the drawer cancels one REQUEST and the dashboard row the
+  items of a group, and calling a whole request «this item» reads as a statement about something else
+  on the screen. It had no live caller before this (both its old ones are commented out).
+  Files: `src/lib/api/client.ts` (`cancelRequest` rewritten, `cancelRequests` new),
+  `src/lib/contract/requests.ts` (`CancelReport`, `isCancelledStatus`, `cancelFailureLine`,
+  `cancelRetryWorthIt`; `cancelBlockedReason` gained `noun`),
+  `src/components/requests/RequestEditModals.tsx` (`done`, `canRetry`),
+  `src/components/workspace/RequestDetailsModal.tsx`, `src/components/home/HomeRequests.tsx`,
+  `tests/unit/cancel-outcome.test.ts` (new, 18 cases).
+  ⚠️ **The BACKEND already fixed its half and it may not be deployed.** `c9cc3946` (on `main` and
+  `staging` of `Moedatech-App`) makes a duplicate cancel a no-op instead of a 409, for this exact
+  reason, and its own comment records the same measurement on staging in September. The web no longer
+  depends on it either way, which is the point.
+  ⚠️ Verified: `NODE_OPTIONS= npx next build` clean, typecheck clean, lint 0 errors, **201 files /
+  3411 passing, 6 skipped** serially, and three rulings break-checked one at a time (`isCancelledStatus`
+  forced false, the drawer's error line replaced by the old silent close, `canRetry` forced on) - each
+  went red alone. The 3 failures (`live-bids`, `share-request-email`, `ui-pins`) are PRE-EXISTING,
+  confirmed by stashing this work and re-running the three files on a clean tree.
+  ⚠️ **SEEN RENDERED**: all five states (ask, done, dead refusal, movable refusal, partial) in RTL plus
+  the LTR mirror, as static markup carrying the real class names and the compiled stylesheet - the
+  dialog needs a signed-in renter with a live request, which this machine has no session for.
+  🔴 **NOT seen on a real request**, and NOT reproduced against the live backend: the mechanism is read
+  off both services' source and the owner's screenshot of RFQ-00190.
+  🔴 **This is on `beta`, and `staging` has the same drawer fault.** Its `doCancel` still ends
+  `catch { setBusy(false); setConfirmCancel(false); }` with no `error` prop, so a refused cancel is
+  silent there too; and staging's own `if (done)` block will conflict with this one on the next merge.
+  Port it, do not re-derive it.
+
 - **2026-09-16 - A session-less submit on a REAL backend answers 401 now, instead of filing the
   request as `AGENTS_TEST_USER_ID`.** The route's own comment carried this as an open question;
   it was decided when the Supplier OS public share pages' new Direct Request button started

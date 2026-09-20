@@ -36,8 +36,26 @@ export type CancelScope =
   | { kind: "remaining"; idLabel: string; total: number; count: number }
   | { kind: "item"; idLabel: string; itemLabel: string; others: number };
 
-/** Styled cancel confirmation (replaces the browser prompt), matching the app's destructive dialog. */
-export function ConfirmCancelModal({ ar, L, busy, scope, error, onClose, onConfirm }: { ar: boolean; L: (en: string, arr: string) => string; busy: boolean; scope: CancelScope; error?: string | null; onClose: () => void; onConfirm: () => void }) {
+/**
+ * Styled cancel confirmation (replaces the browser prompt), matching the app's destructive dialog —
+ * and, once the act is through, the note that it happened.
+ *
+ * 🔴 **Three states, one box** (owner, 2026-09-20, on a request cancelled in the database while the
+ * screen said nothing at all: *"no succuess message or failed mesage shown or anything so he just
+ * keep trying"*). The mobile app answers the same press with a loading overlay, then either a
+ * success snackbar and a jump back to My Requests, or an error snackbar carrying the backend's own
+ * sentence (`request_detail_page.dart`). This is that, kept inside the box the question was asked
+ * in: a tick that arrives where the question was is the answer to it, where a new layer over the
+ * old one is a second thing to close.
+ *
+ * ⚠️ `done` is the CALLER saying the request is gone. The dialog does not dismiss itself on it:
+ * closing is the renter pressing Done, and that press is what carries the reload.
+ *
+ * ⚠️ `canRetry` false hides the retry. A refusal that says «already accepted» or «already
+ * cancelled» cannot be moved by pressing again, and a live «Try again» over one of those is what
+ * turned one refused press into five.
+ */
+export function ConfirmCancelModal({ ar, L, busy, scope, error, canRetry = true, done, onClose, onConfirm }: { ar: boolean; L: (en: string, arr: string) => string; busy: boolean; scope: CancelScope; error?: string | null; canRetry?: boolean; done?: boolean; onClose: () => void; onConfirm: () => void }) {
   // A one-item "all" is just a single request — "All 1 items" would be nonsense.
   const s: CancelScope = scope.kind === "all" && scope.total <= 1 ? { kind: "single", idLabel: scope.idLabel } : scope;
   const id = <span className="font-semibold text-navy">{s.idLabel}</span>;
@@ -58,6 +76,36 @@ export function ConfirmCancelModal({ ar, L, busy, scope, error, onClose, onConfi
     : s.kind === "remaining" ? L(`Cancel ${s.count} ${s.count === 1 ? "item" : "items"}`, `إلغاء ${s.count} من البنود`)
     : L("Cancel request", "إلغاء الطلب");
 
+  /* The act is through, and the box says so where it asked. */
+  if (done) {
+    const heading = s.kind === "item" ? L("Item cancelled", "تم إلغاء البند") : L("Request cancelled", "تم إلغاء الطلب");
+    return (
+      <Dialog open onClose={onClose} size="sm" padded={false}>
+        <div className="p-5 text-center" dir={ar ? "rtl" : "ltr"}>
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-ok-soft">
+            <span className="material-icons-outlined" style={{ color: "var(--ok)", fontSize: 26 }}>check_circle</span>
+          </div>
+          <h3 className="text-title font-extrabold text-navy">{heading}</h3>
+          {/* What CHANGED, not a congratulation: it is shut, it says so wherever it is listed, and
+              nothing can bid on it now. The renter reads the consequence rather than the verb. */}
+          <p className="mt-1.5 text-body leading-relaxed text-muted">
+            {ar
+              ? <>الطلب {id} مغلق الآن، ولم يعد بإمكان المؤجّرين تقديم عروض عليه</>
+              : <>Request {id} is closed now, and suppliers can no longer bid on it</>}
+          </p>
+          <div className="mt-5">
+            <button className={btn("primary", "md", { className: "w-full" })} onClick={onClose}>
+              {L("Done", "تم")}
+            </button>
+          </div>
+        </div>
+      </Dialog>
+    );
+  }
+
+  /* A refusal nothing can move: one way out, and it is not a button that will refuse again. */
+  const dead = !!error && !canRetry;
+
   return (
     <Dialog open onClose={onClose} size="sm" padded={false}>
       <div className="p-5 text-center" dir={ar ? "rtl" : "ltr"}>
@@ -68,12 +116,14 @@ export function ConfirmCancelModal({ ar, L, busy, scope, error, onClose, onConfi
         <p className="mt-1.5 text-body leading-relaxed text-muted">{body}</p>
         {error && <p className="mt-3 rounded-sm bg-danger-soft px-3 py-2 text-meta font-semibold leading-relaxed text-danger-deep">{error}</p>}
         <div className="mt-5 flex gap-2.5">
-          <button className={btn("secondary", "md", { className: "flex-1 text-navy" })} disabled={busy} onClick={onClose}>
+          <button className={btn(dead ? "primary" : "secondary", "md", { className: dead ? "flex-1" : "flex-1 text-navy" })} disabled={busy} onClick={onClose}>
             {error ? L("Close", "إغلاق") : s.kind === "item" ? L("Keep item", "الإبقاء على البند") : L("Keep request", "الإبقاء على الطلب")}
           </button>
-          <button className={btn("danger", "md", { className: "flex-1" })} disabled={busy} onClick={onConfirm}>
-            {busy ? L("Cancelling…", "جارٍ الإلغاء…") : error ? L("Try again", "إعادة المحاولة") : confirmLabel}
-          </button>
+          {!dead && (
+            <button className={btn("danger", "md", { className: "flex-1" })} disabled={busy} onClick={onConfirm}>
+              {busy ? L("Cancelling…", "جارٍ الإلغاء…") : error ? L("Try again", "إعادة المحاولة") : confirmLabel}
+            </button>
+          )}
         </div>
       </div>
     </Dialog>

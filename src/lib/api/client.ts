@@ -1,5 +1,6 @@
 import type { AgentDraft, RfqRequestPayload, Taxonomy } from "@/lib/contract";
-import type { RequestListItem, RequestRecord } from "@/lib/contract/requests";
+import type { CancelReport, RequestListItem, RequestRecord, RequestStatus } from "@/lib/contract/requests";
+import { isCancelledStatus } from "@/lib/contract/requests";
 import type { BidCard, BidSizeCounts } from "@/lib/contract/bids";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import type { CompanyDocsPayload } from "@/lib/contract/company-documents";
@@ -266,7 +267,15 @@ export function fetchRequestDetail(id: string): Promise<RequestRecord> {
   return getJson<RequestRecord>(`/api/me/requests/${encodeURIComponent(id)}`);
 }
 
-/** Cancel a request (DELETE) — allowed while OPEN/ACTIVE. */
+/**
+ * Cancel a request (DELETE) — allowed while OPEN/ACTIVE.
+ *
+ * ⚠️ **The refusal's own words are kept**, the way the mobile app keeps them: its detail page prints
+ * `localizedError(message, messageAr)` straight from the backend, so a renter there reads «a request
+ * can only be cancelled while it is open or active» while the web read «that didn't go through».
+ * The sentence that says WHY is the whole difference between a renter who stops and one who presses
+ * the same button five times.
+ */
 export async function cancelRequest(id: string): Promise<void> {
   let res: Response;
   try {
@@ -274,7 +283,74 @@ export async function cancelRequest(id: string): Promise<void> {
   } catch {
     throw new ApiError("network");
   }
-  if (!res.ok) throw new ApiError(res.status >= 500 ? "network" : "unknown", `HTTP ${res.status}`);
+  if (res.ok) return;
+  let code: string | undefined;
+  let detail: string | undefined;
+  let messageAr: string | undefined;
+  try {
+    // Our own route answers flat `{ code, detail, messageAr }`; `backendCode` carries the app's
+    // own (REQUEST_CANCEL_NOT_ALLOWED and friends), which is what a screenshot needs to be read by.
+    const body = (await res.json()) as { code?: string; backendCode?: string; detail?: string; message?: string; messageAr?: string };
+    code = body.backendCode ?? body.code;
+    detail = body.detail ?? body.message;
+    messageAr = body.messageAr;
+  } catch {
+    /* non-JSON body */
+  }
+  throw new ApiError(res.status >= 500 ? "network" : "unknown", `HTTP ${res.status}`, {
+    status: res.status,
+    backendCode: code,
+    detail,
+    messageAr,
+  });
+}
+
+/**
+ * **Cancel every request a press aimed at, then say what is actually true of each.**
+ *
+ * 🔴 The reason this exists rather than a bare `Promise.all(ids.map(cancelRequest))` (owner,
+ * 2026-09-20, on a request that was CANCELLED in the database while the screen said the act had
+ * failed): a refused DELETE does not mean the request is still live. It means the backend would not
+ * do it AGAIN — and the commonest cause of that is that it already did. So every refusal is settled
+ * by RE-READING the request rather than by believing the status code.
+ *
+ * ⚠️ `allSettled`, never `all`: on a fanned-out RFQ `all` rejects at the first refusal and throws
+ * away what the other items answered, so five cancelled lines and one accepted one reported as a
+ * total failure — and the retry then re-sent the five, which the backend refused in turn.
+ *
+ * ⚠️ A re-read that itself fails leaves the status `null`, which is «we do not know» and is treated
+ * as a real failure with the retry left open. Guessing either way here is how one of these two
+ * screens starts lying.
+ */
+export async function cancelRequests(ids: string[]): Promise<CancelReport> {
+  const settled = await Promise.allSettled(ids.map((id) => cancelRequest(id)));
+  const report: CancelReport = { cancelled: 0, refused: [] };
+  await Promise.all(
+    settled.map(async (r, i) => {
+      if (r.status === "fulfilled") {
+        report.cancelled += 1;
+        return;
+      }
+      let status: RequestStatus | null = null;
+      try {
+        status = (await fetchRequestDetail(ids[i]))?.status ?? null;
+      } catch {
+        /* unreadable — `null` says so, and the caller offers the retry */
+      }
+      if (isCancelledStatus(status)) {
+        report.cancelled += 1;
+        return;
+      }
+      const e = r.reason;
+      report.refused.push({
+        id: ids[i],
+        status,
+        said: e instanceof ApiError ? e.detail ?? null : null,
+        saidAr: e instanceof ApiError ? e.messageAr ?? null : null,
+      });
+    }),
+  );
+  return report;
 }
 
 /** Edit a request (PATCH a partial of its fields) — allowed while OPEN with 0 bids. */

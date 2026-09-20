@@ -6,13 +6,13 @@ import { Icon } from "@/components/ui";
 import { Dialog } from "@/components/Dialog";
 import {
   bidShareUrl,
-  cancelRequest,
+  cancelRequests,
   fetchRequestDetail,
   setBidDeadline,
   setShareLinkLogo,
 } from "@/lib/api/client";
 import { CERT_LABEL } from "@/lib/contract/bids";
-import { publicTaxonomyUrl, statusMeta, type RequestGroup, type RequestListItem, type RequestRecord } from "@/lib/contract/requests";
+import { cancelFailureLine, cancelRetryWorthIt, publicTaxonomyUrl, statusMeta, type RequestGroup, type RequestListItem, type RequestRecord } from "@/lib/contract/requests";
 import { itemDetailRows, requestDetailRows, requestFieldFormatters, type Row } from "@/lib/contract/request-fields";
 import { requestActions, type WorkspaceBid } from "@/lib/contract/workspace";
 import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
@@ -94,6 +94,11 @@ export function RequestDetailsModal({
   const [editing, setEditing] = useState<RequestRecord | null>(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(!!openCancel);
+  /** The refusal to print in the dialog, and whether pressing again could move it. */
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelRetry, setCancelRetry] = useState(true);
+  /** The cancellation went through, and the dialog is saying so rather than vanishing. */
+  const [cancelled, setCancelled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [deadline, setDeadline] = useState<string | null>(link?.bidDeadline ?? null);
   const [logoUrl, setLogoUrl] = useState<string | null>(link?.logoUrl ?? null);
@@ -212,16 +217,38 @@ export function RequestDetailsModal({
     }
   };
 
+  /**
+   * Cancel this request, and SAY what happened — either way.
+   *
+   * 🔴 Both halves were silent, and together they are the loop the owner reported on 2026-09-20
+   * (*"no succuess message or failed mesage shown or anything so he just keep trying"*):
+   *  · ~~`onChanged(); onClose();`~~ dismissed every layer on success, leaving the renter where he
+   *    started with one row greyed somewhere behind him — a silent success reading exactly like a
+   *    silent failure, on the one act the backend has no inverse for. The box now says it and Done
+   *    carries the reload, which is how the mobile app answers the same press (a success snackbar,
+   *    then back to My Requests).
+   *  · The catch CLOSED THE DIALOG and set no error at all, so a refusal said nothing whatsoever.
+   *    The dialog holds now and prints the reason — the request's real status when it can be read,
+   *    else the backend's own sentence, which is what the app has always shown.
+   */
   const doCancel = async () => {
     if (!subject || busy) return;
     setBusy(true);
+    setCancelError(null);
     try {
-      await cancelRequest(subject.id);
-      onChanged();
-      onClose();
+      const report = await cancelRequests([subject.id]);
+      if (!report.refused.length) {
+        setCancelled(true);
+        return;
+      }
+      setCancelRetry(cancelRetryWorthIt(report));
+      setCancelError(cancelFailureLine(report, ar, "request"));
     } catch {
+      /* `cancelRequests` answers a report for every refusal, so this is the unreadable case only. */
+      setCancelRetry(true);
+      setCancelError(L("That didn’t go through. Try again.", "لم يتمّ الإجراء. حاول مجددًا."));
+    } finally {
       setBusy(false);
-      setConfirmCancel(false);
     }
   };
 
@@ -610,8 +637,22 @@ export function RequestDetailsModal({
           ar={ar}
           L={L}
           busy={busy}
+          error={cancelError}
+          canRetry={cancelRetry}
+          done={cancelled}
           scope={{ kind: "single", idLabel: subject.displayId }}
-          onClose={() => setConfirmCancel(false)}
+          onClose={() => {
+            /* Done is what carries the reload AND the exit: the rail has to re-read to grey the
+               circle, and the drawer has nothing left to show for a request that is closed. */
+            setConfirmCancel(false);
+            setCancelError(null);
+            setCancelRetry(true);
+            if (cancelled) {
+              setCancelled(false);
+              onChanged();
+              onClose();
+            }
+          }}
           onConfirm={() => void doCancel()}
         />
       )}

@@ -120,24 +120,110 @@ export function representativeStatus(items: { status: RequestStatus }[]): Reques
 }
 
 /** Why one item can't be cancelled — shown inline when the renter taps its disabled ✕, so a greyed-out
- *  control always explains itself (a tooltip wouldn't, on touch). */
-export function cancelBlockedReason(status: RequestStatus, ar: boolean): string {
+ *  control always explains itself (a tooltip wouldn't, on touch), and by {@link cancelFailureLine}
+ *  after a press the backend refused.
+ *
+ *  ⚠️ `noun` because the same refusal is met at two scales: a line inside a fanned-out RFQ, and a
+ *  request standing on its own in the drawer. Calling a whole request «this item» there reads as a
+ *  statement about something else on the screen. */
+export function cancelBlockedReason(status: RequestStatus, ar: boolean, noun: "item" | "request" = "item"): string {
+  const isItem = noun === "item";
+  const EN = isItem ? "item" : "request";
+  const AR_THIS = isItem ? "هذا البند" : "هذا الطلب";
   switch (status) {
     case "ACCEPTED":
     case "PARTIALLY_ACCEPTED":
-      return ar ? "تم قبول عرض لهذا البند، لذلك لا يمكن إلغاؤه." : "A bid was accepted for this item, so it can’t be cancelled.";
+      return ar ? `تم قبول عرض ل${isItem ? "هذا البند" : "هذا الطلب"}، لذلك لا يمكن إلغاؤه.` : `A bid was accepted for this ${EN}, so it can’t be cancelled.`;
     case "EXPIRED":
     case "FORCE_EXPIRED":
-      return ar ? "انتهت صلاحية هذا البند، لذلك لا يمكن إلغاؤه." : "This item has expired, so it can’t be cancelled.";
+      return ar ? `انتهت صلاحية ${AR_THIS}، لذلك لا يمكن إلغاؤه.` : `This ${EN} has expired, so it can’t be cancelled.`;
     case "CANCELLED":
     case "ABANDONED":
-      return ar ? "هذا البند ملغى بالفعل." : "This item is already cancelled.";
+      return ar ? `${AR_THIS} ملغى بالفعل.` : `This ${EN} is already cancelled.`;
     default: {
       const m = statusMeta(status);
-      return ar ? `لا يمكن إلغاء بند حالته "${m.ar}".` : `An item that is “${m.en}” can’t be cancelled.`;
+      return ar
+        ? `لا يمكن إلغاء ${isItem ? "بند" : "طلب"} حالته "${m.ar}".`
+        : `${isItem ? "An item" : "A request"} that is “${m.en}” can’t be cancelled.`;
     }
   }
 }
+/**
+ * **What a cancel press actually achieved**, per request it aimed at.
+ *
+ * 🔴 A refused DELETE is NOT the same fact as «the request is still live», and reading it that way
+ * is what produced the report of 2026-09-20: the request was CANCELLED in the database while the
+ * screen said the act had failed, so the renter pressed again, and again, each press refused for
+ * the one reason that means it had already worked. Every verdict here is therefore taken from the
+ * request's OWN status after the attempt, never from the HTTP answer alone.
+ */
+export interface CancelReport {
+  /** Requests whose status is now CANCELLED — whether this press put them there or an earlier one. */
+  cancelled: number;
+  /**
+   * The rest, with the status they really carry (`null` when it could not be read at all) and the
+   * server's own words for the refusal.
+   *
+   * ⚠️ Both languages are carried rather than one resolved string: this is built in the API layer,
+   * which has no locale, and the app's rule is to print `messageAr` to an Arabic reader and
+   * `message` otherwise (`localizedError`). Resolving early would print English into an Arabic
+   * dialog on every refusal that has an Arabic twin.
+   */
+  refused: { id: string; status: RequestStatus | null; said?: string | null; saidAr?: string | null }[];
+}
+
+/**
+ * Is what the renter asked for satisfied for THIS request?
+ *
+ * ⚠️ `CANCELLED` and `ABANDONED` only. CLOSED, ACCEPTED and EXPIRED are uncancellable too and are
+ * NOT successes: there the press did not do what it said, and the renter has to be told which of
+ * the two happened, which is what {@link cancelBlockedReason} says in his own words.
+ */
+export function isCancelledStatus(status: RequestStatus | null | undefined): boolean {
+  return status === "CANCELLED" || status === "ABANDONED";
+}
+
+/**
+ * The line a part-done or refused cancellation prints, in the renter's language.
+ *
+ * Four shapes, because four different things happened and one sentence for all of them is how this
+ * screen stopped meaning anything:
+ *  - part of a fanned-out RFQ went and part did not → say the count, and keep the retry;
+ *  - the request is in a state that cannot be cancelled → say WHICH state, in the renter's words;
+ *  - we could not read the state but the SERVER gave a reason → print the server's reason, which is
+ *    the mobile app's rule verbatim (`localizedError(message, messageAr)` on its detail page). It
+ *    is the only text that names the actual refusal, and the app has always shown it while the web
+ *    threw it away for «that didn't go through»;
+ *  - nothing at all → that plain line, which is then the only honest one left.
+ */
+export function cancelFailureLine(report: CancelReport, ar: boolean, noun: "item" | "request" = "item"): string {
+  const { cancelled, refused } = report;
+  if (!refused.length) return "";
+  if (cancelled > 0) {
+    const total = cancelled + refused.length;
+    return ar
+      ? `تم إلغاء ${cancelled} من ${total}، ولم يتمّ إلغاء الباقي. حاول مجددًا.`
+      : `${cancelled} of ${total} were cancelled. The rest did not go through. Try again.`;
+  }
+  const known = refused.find((r) => r.status != null);
+  if (known?.status) return cancelBlockedReason(known.status, ar, noun);
+  const said = refused.map((r) => (ar ? r.saidAr || r.said : r.said)).find((v) => v?.trim());
+  if (said) return said.trim();
+  return ar ? "لم يتمّ الإجراء. حاول مجددًا." : "That didn’t go through. Try again.";
+}
+
+/**
+ * May the renter press again?
+ *
+ * No when every refusal is a state no retry can move — accepted, expired, closed. A «Try again» on
+ * one of those is a button that is going to refuse, which is the loop this change exists to end.
+ * Yes while a refused request is still OPEN/ACTIVE or its status could not be read: those really
+ * can be a blip.
+ */
+export function cancelRetryWorthIt(report: CancelReport): boolean {
+  return report.refused.some((r) => r.status == null || isCancellable(r.status));
+}
+
 export type Urgency = "ASAP" | "SOON" | "FAR_FUTURE" | string;
 
 /** One enriched equipment line as the backend returns it (taxonomy names folded in). */
