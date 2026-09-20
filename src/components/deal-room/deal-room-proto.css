@@ -421,16 +421,21 @@
   background: var(--surface2); overflow: hidden;
   font-family: var(--font-sans); color: var(--navy-deep);
   animation: ngSheetUp .3s cubic-bezier(.32,.72,.3,1);
+  /* The one gutter every band answers to — the header's, the footer's and the body's cards alike. */
+  --ng-gutter: clamp(16px, 3vw, 40px);
 }
 @keyframes ngSheetUp { from { transform: translateY(100%); } to { transform: none; } }
-/* The design is drawn to a phone's column, so on a wide screen the CONTENT is capped and centred
-   while the header and the footer keep their full-width bars. Stretching a four-column price table
-   across 1900px would be the prototype's proportions thrown away for no reader's benefit. */
-.ng-inner { width: 100%; max-width: 760px; margin-inline: auto; }
+/* 🔴 NO COLUMN CAP. ~~The content was capped at 760px and centred, on the argument that the design
+   is drawn to a phone's width.~~ Owner: *"centralize the parent cards across the screen so it has
+   equal margin on right and on left"*, which is also this product's own standing ruling of the same
+   morning — every page is FLUID, the 1440 cap is gone, and a sheet keeping a private one of its own
+   would be the one surface that did not follow it. The cards take the width and each one sits in the
+   SAME gutter, so the margin is equal on both sides at any screen size. */
+.ng-inner { width: 100%; }
 
 /* ── header ─────────────────────────────────────────────────────────────────────────────────────
    The running total on the leading edge, the counterparty on the trailing one. */
-.ng-head { flex: 0 0 auto; padding: 14px 16px; background: var(--surface); border-bottom: 1px solid var(--border-hair); }
+.ng-head { flex: 0 0 auto; padding: 14px var(--ng-gutter); background: var(--surface); border-bottom: 1px solid var(--border-hair); }
 .ng-head .ng-inner { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .ng-head-l { flex: 0 0 auto; min-width: 0; }
 .ng-head-cap { font-size: 10px; color: var(--muted-light); font-weight: 600; }
@@ -451,10 +456,15 @@
 
 /* ── body ───────────────────────────────────────────────────────────────────────────────────── */
 .ng-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; background: var(--surface2); }
-.ng-body .ng-inner { padding-bottom: 20px; }
-.ng-pad { padding: 14px 16px 0; }
-.ng-card { background: var(--surface); }
-.ng-card.pad { padding: 14px 16px; margin-top: 8px; }
+/* ONE gutter, on the body's own column, so every card below inherits the same margin rather than
+   each block carrying its own and drifting apart. */
+.ng-body .ng-inner { padding: 14px var(--ng-gutter) 20px; }
+.ng-pad { padding: 0; }
+/* The white card is a CARD here, not the phone's full-bleed band: on a wide screen a band that
+   reaches both edges stops reading as one object among others. */
+.ng-card { background: var(--surface); border-radius: 10px; overflow: hidden; }
+.ng-card + .ng-card, .ng-cmp + .ng-card { margin-top: 12px; }
+.ng-card.pad { padding: 14px 16px; }
 
 /* ── the price table ────────────────────────────────────────────────────────────────────────────
    Four columns on the prototype's own weights, the head band a shade under the paper. */
@@ -481,7 +491,7 @@
 .ng-qty button:disabled { color: var(--border-strong); cursor: default; }
 /* 🔴 The input's own colours ARE the state: green while the figure still matches the supplier's,
    amber the moment it is edited. The reference line under it turns with them. */
-.ng-price input { width: 100%; border: 1.5px solid var(--ok); background: color-mix(in srgb, var(--ok) 6%, var(--surface)); border-radius: 7px; padding: 4px 6px; font-size: 12px; font-weight: 700; color: var(--navy-deep); text-align: end; font-family: inherit; }
+.ng-price input { width: 100%; max-width: 150px; margin-inline-start: auto; display: block; border: 1.5px solid var(--ok); background: color-mix(in srgb, var(--ok) 6%, var(--surface)); border-radius: 7px; padding: 4px 6px; font-size: 12px; font-weight: 700; color: var(--navy-deep); text-align: end; font-family: inherit; }
 .ng-price.edited input { border-color: var(--brand); background: var(--brand-soft); }
 .ng-price .ref { margin-top: 1px; font-size: 9.5px; text-align: end; color: var(--muted-light); }
 .ng-price.edited .ref { color: var(--warn-deep); font-weight: 700; }
@@ -489,7 +499,7 @@
 .ng-row .out { text-align: end; font-size: 11px; font-weight: 700; color: var(--muted-light); }
 
 /* ── the summary band + the net box ───────────────────────────────────────────────────────────── */
-.ng-sum { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; margin-bottom: 12px; background: var(--surface2); }
+.ng-sum { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; background: var(--surface2); }
 .ng-sum .item, .ng-sum .line { display: flex; justify-content: space-between; gap: 10px; }
 .ng-sum .item { font-size: 12.5px; font-weight: 700; color: var(--navy-deep); }
 .ng-sum .item.off { opacity: .45; }
@@ -513,14 +523,16 @@
 .ng-t.now .h .k { font-size: 12.5px; font-weight: 700; color: var(--navy-deep); }
 .ng-t.now .h .side { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ng-t.now .h .side b { color: var(--navy-deep); font-weight: 700; }
-/* ⚠️ The pair is CAPPED and sits at the reading end. In the prototype these are two `flex:1` buttons
-   across a phone; on the sheet's 760px column they became two 350px slabs, which reads as the card's
-   main event rather than as the two answers to the line above them. */
-.ng-t .acts { display: flex; gap: 6px; max-width: 320px; margin-inline-start: auto; }
+/* ⚠️ The pair is CAPPED and sits at the reading end. In the prototype these are two `flex:1`
+   buttons across a phone; with the sheet's cards running the screen they became two slabs, which
+   reads as the card's main event rather than as the two answers to the line above them. */
+.ng-t .acts { display: flex; gap: 6px; max-width: 320px; margin-inline-end: auto; }
 .ng-t .acts button { flex: 1; border: 0; border-radius: 7px; padding: 7px; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .ng-t .acts .change { background: var(--danger-soft); color: var(--danger); }
 .ng-t .acts .take { background: var(--ok-soft); color: var(--ok); }
-.ng-t .opts { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--surface2); }
+/* Capped like the two acts above them, and for the same reason: an option is an ANSWER to the line
+   it sits under, and a row of them running the whole screen reads as the card's own navigation. */
+.ng-t .opts { display: flex; flex-direction: column; gap: 4px; max-width: 320px; margin-top: 8px; margin-inline-end: auto; padding-top: 8px; border-top: 1px solid var(--surface2); }
 .ng-t .opts button { border: 0; border-radius: 7px; padding: 8px 10px; background: var(--surface-alt); font-family: inherit; font-size: 12px; font-weight: 600; color: var(--muted-dark); text-align: start; cursor: pointer; }
 .ng-t .opts button:hover { background: var(--surface2); }
 .ng-t .opts button.on { color: var(--ok); }
@@ -612,7 +624,7 @@
 /* ── footer ─────────────────────────────────────────────────────────────────────────────────────
    The switcher is centred in the BAR, never in what the buttons leave over: it is absolutely placed,
    so the accept button on one side and the log on the other cannot push it off the middle. */
-.ng-foot { flex: 0 0 auto; padding: 10px 16px; background: var(--surface); border-top: 1px solid var(--border-hair); }
+.ng-foot { flex: 0 0 auto; padding: 10px var(--ng-gutter); background: var(--surface); border-top: 1px solid var(--border-hair); }
 .ng-foot .ng-inner { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ng-accept { flex: 0 0 auto; border: 0; border-radius: 10px; padding: 10px 16px; background: var(--ok); color: var(--surface); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .ng-accept:disabled { background: var(--disabled-bg); color: var(--disabled-fg); cursor: default; }

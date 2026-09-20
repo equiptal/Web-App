@@ -2,6 +2,49 @@
 
 ## Change log
 
+- **2026-09-19 - The negotiation sheet has NO column cap: its cards run the screen inside one gutter, equal on both sides.**
+  Owner, on the capped build: *"undo what did u centralize? i mean centralize the parent cards across
+  the screen so it has equal margin on right and on left"*.
+  🔴 **This WITHDRAWS the 760px centred column taken hours earlier**, and the argument for it
+  (*"the design's proportions are a phone column's"*) loses to the product's own ruling of the same
+  morning: **every page is FLUID, the 1440 cap is gone**, so a sheet keeping a private cap would be
+  the one surface in the app that did not follow it.
+  **ONE gutter, declared once**: `--ng-gutter: clamp(16px, 3vw, 40px)` on `.ng-shell`, answered by the
+  header's padding, the footer's padding and the body column's alike. That is what makes the margin
+  identical on the leading and trailing edge at any width - three bands each carrying their own number
+  is how two of them drift apart.
+  ⚠️ **The white card gained a 10px radius and a 12px gap to the next one.** On a phone it is a
+  full-bleed band and the screen's edges do the separating; across 1900px a band that reaches both
+  edges stops reading as one object among others.
+  🔴 **Three controls are capped instead, because they are ANSWERS and not layout.** The money
+  input (150px, pinned to its column's end), the term card's «Change / Take theirs» pair and its option
+  list (320px, at the reading start). Stretched across the screen each read as the card's main event
+  rather than as the reply to the line above it - the same fault the column cap was hiding, met one
+  element at a time and answered where it actually lives.
+  Files: `src/components/deal-room/deal-room-proto.css`,
+  `tests/unit/negotiation-sheet.test.ts` (the cap's case rewritten to the gutter, 1 new case for the
+  three answer controls; 20 passing).
+  ⚠️ **Nothing moved but the geometry**: same three steps, same header, same footer acts, same
+  pricing, same gating, same log, and the block that pins «what the rebuild did NOT change» is
+  untouched.
+  ⚠️ Verified: **`NODE_OPTIONS= npx next build` clean** - the rule this log set this morning,
+  because a stylesheet fault is invisible to typecheck, lint and jsdom - plus typecheck, lint 0 errors,
+  **211 files / 3568 passing, 7 skipped** serially, and the no-cap ruling break-checked by putting
+  `max-width: 760px` back, which went red alone. The 3 unhandled errors are `intercom-widget`'s two
+  and `suppliers-remove-and-pick`'s one, both pre-existing.
+  ⚠️ **One serial run reported a file failing and the re-run did not reproduce it.** The cause is
+  mine and worth naming: an edit script rewrote `deal-room-proto.css` WHILE that run was in flight,
+  and `negotiation-sheet.test.ts` reads that file off disk at import. Do not edit a file a running
+  suite reads; the second run is the honest one.
+  ⚠️ **SEEN RENDERED at 1568px**: all three steps, RTL, as static markup carrying the real class
+  names and the compiled tokens - which is how the two remaining full-width faults were found, the
+  money field running the table's whole last column and the option rows running the card.
+  🔴 **I EMPTIED `tests/unit/negotiation-sheet.test.ts` mid-session**, for the third time this repo
+  has recorded the same trap: `io.open(path, "w")` truncates at the OS level BEFORE anything is
+  written, and the script then threw on a surrogate in an escape a shell heredoc had mangled. Restored
+  from `HEAD`; nothing was lost. **Write the edit script with the file tool, never through a heredoc**
+  - this repo has now logged the heredoc mangling apostrophes (2026-09-16) and backslashes (today).
+
 - **2026-09-19 - The gutters were EQUAL and the content was not: the bid strip centres what it holds, and the intake sits at the top in a box a third shorter.**
   Owner: *"why margin from left not equal to right"*, on a 1920 screenshot of `/requests`, then
   *"all like this"*; and, on two shots of the intake, *"make it more to the top like this size and
@@ -69,16 +112,15 @@
   room's whole business. The wizard it replaced was `position: fixed; inset: 0`, the app's own is a
   ROUTE, and this is now a full-screen sheet again: `.ng-shell` is fixed to the viewport, square
   cornered, sliding up rather than fading in.
-  ⚠️ **The CONTENT is capped at 760px and centred; the header and footer BARS run the full width.**
-  The design's proportions are a phone column's — stretching a four-column price table across 1900px
-  would throw them away for no reader's gain, and letting the bars stop at 760 would leave the sheet
-  looking like the card it just stopped being. One `.ng-inner` wrapper in each of the three bands.
+  ⚠️ ~~**The CONTENT is capped at 760px and centred; the header and footer BARS run the full
+  width.**~~ **WITHDRAWN the same evening - see the entry above.** The three `.ng-inner` wrappers stay;
+  only the cap on them went.
   ⚠️ **The footer's switcher centres on the COLUMN, not on the bar.** It is absolutely placed inside
   `.ng-inner`, so it sits over the steps it walks rather than in the middle of a wide screen with the
   accept button stranded at the far edge.
   ⚠️ **The term card's «Change / Take theirs» pair is capped at 320px and sits at the reading end.**
-  At the phone's width they are two `flex:1` buttons; on a 760px column they became two 350px slabs
-  and read as the card's main event instead of as the two answers to the line above them.
+  At the phone's width they are two `flex:1` buttons; widened, they became two slabs reading as the
+  card's main event instead of as the two answers to the line above them.
   Files: `src/components/deal-room/deal-room-proto.css`,
   `src/components/deal-room/DealRoom.tsx` (the three `.ng-inner` wrappers),
   `tests/unit/negotiation-sheet.test.ts` (2 new cases; 19 passing).

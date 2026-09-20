@@ -80,11 +80,27 @@ describe("the sheet itself", () => {
     expect(CSS).not.toMatch(/\.ng-shell \{[^}]*max-width: \d/);
   });
 
-  /* The design is drawn to a phone's column, so the CONTENT is capped and centred while the header
-     and footer bars run the full width. */
-  it("caps the content column and lets the bars run the width", () => {
-    expect(CSS).toMatch(/\.ng-inner \{[^}]*max-width: 760px[^}]*margin-inline: auto/);
+  /* NO column cap (owner, 2026-09-19: *"centralize the parent cards across the screen so it has equal
+     margin on right and on left"*). One gutter, declared once on the shell and answered by the header,
+     the footer and the body's cards alike, so the margin is identical on both sides at any width, and
+     this sheet follows the same morning's product-wide "every page is fluid" ruling rather than
+     keeping a private cap of its own. */
+  it("runs the cards the width with one gutter either side", () => {
+    expect(CSS).toMatch(/\.ng-inner \{ width: 100%; \}/);
+    expect(CSS).not.toMatch(/\.ng-inner \{[^}]*max-width/);
+    expect(CSS).toMatch(/--ng-gutter: clamp\(/);
+    expect(CSS).toMatch(/\.ng-head \{[^}]*padding: 14px var\(--ng-gutter\)/);
+    expect(CSS).toMatch(/\.ng-foot \{[^}]*padding: 10px var\(--ng-gutter\)/);
+    expect(CSS).toMatch(/\.ng-body \.ng-inner \{[^}]*padding: 14px var\(--ng-gutter\)/);
     expect(FLOW.match(/className="ng-inner"/g)?.length).toBe(3);
+  });
+
+  /* At the phone's width the answer controls are full-bleed rows; across a wide screen they become
+     slabs that read as the card's main event rather than as the answers to the line above them. */
+  it("keeps the answers to a reading column", () => {
+    expect(CSS).toMatch(/\.ng-t \.acts \{[^}]*max-width: 320px/);
+    expect(CSS).toMatch(/\.ng-t \.opts \{[^}]*max-width: 320px/);
+    expect(CSS).toMatch(/\.ng-price input \{[^}]*max-width: 150px/);
   });
 });
 
