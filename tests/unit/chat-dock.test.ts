@@ -914,18 +914,70 @@ describe("the dock's composer sends what the deal room sends, the way the deal r
     }
   });
 
-  it("disables EVERY control in the row while a send is in flight", () => {
-    // Four controls, four gates, and each one names both flight states: `busy` (the seam, which
-    // spans the room create) and `uploading` (the file on the wire). A control that named neither
-    // would still be pressable during the create it is racing.
+  it("disables every ACT in the row while a send is in flight, and the FIELD is not one", () => {
+    /**
+     * 🔴 **~~Four controls, four gates.~~ Three acts and a text field** (owner, 2026-09-21, on a
+     * renter's complaint: *"he should press on the text panel every time he wants to send a
+     * message"*).
+     *
+     * A disabled control cannot hold focus, so gating the INPUT on `busy` made the browser blur it
+     * on every send — for as long as the round trip took, and `deliver` can create the deal room
+     * inside it. It came back enabled and empty with the caret nowhere, so the next message needed
+     * a click. The reasoning this replaces («a control that named neither would still be pressable
+     * during the create it is racing») is still right about the three that ACT, and was never
+     * about the one that only accepts typing.
+     */
     const gates = [...composerSrc.matchAll(/disabled=\{([^}]*)\}/g)].map((m) => m[1]);
     expect(gates).toHaveLength(4); // attach · recorder · input · send
-    for (const gate of gates) {
+    const acts = gates.filter((g) => g.trim() !== "!active");
+    expect(acts).toHaveLength(3);
+    for (const gate of acts) {
       expect(gate, gate).toMatch(/\bbusy\b/);
       expect(gate, gate).toMatch(/\buploading\b/);
     }
     // …and the send button is additionally gated on there being something to send.
     expect(gates.filter((g) => /text\.trim\(\)/.test(g))).toHaveLength(1);
+    /* ⚠️ The FIELD keeps `!active` and nothing else: that is «there is no conversation here»,
+       not a flight, and nothing typed into it could go anywhere. */
+    const input = composerSrc.slice(composerSrc.indexOf('className="bm-chat-input"'));
+    expect(input.slice(0, input.indexOf("/>"))).toContain("disabled={!active}");
+  });
+
+  it("but the ENTER key still asks the flight question, so nothing is sent twice", () => {
+    // The gate moved off the field and onto the key: with the input live, two fast presses would
+    // otherwise be two sends of the same line.
+    expect(composerSrc).toContain('if (!busy && !uploading) void send();');
+  });
+
+  it("puts the caret BACK in the composer after a send", () => {
+    /**
+     * 🔴 The other half of the same complaint, and it survives the fix above: pressing SEND moves
+     * focus to the send button, which then disables itself the instant the text is cleared — so
+     * focus lands on `<body>` and the next message needs a click anyway.
+     *
+     * ⚠️ Guarded on the element still being focusable: a send can resolve after the dock is closed
+     * or the room goes inactive, and focusing a disabled or detached input scrolls the page to it.
+     */
+    expect(dockSrc).toContain("function focusComposer()");
+    expect(dockSrc).toContain("if (el && !el.disabled && el.isConnected) el.focus();");
+    expect(composerSrc).toContain("ref={composerRef}");
+    // Both doors out of the composer: the typed line, and the attachment whose caption it wrote.
+    const send = dockSrc.slice(dockSrc.indexOf("async function send()"), dockSrc.indexOf("async function sendFiles"));
+    expect(send).toContain("focusComposer();");
+    const files = dockSrc.slice(dockSrc.indexOf("async function sendFiles"), dockSrc.indexOf("async function sendVoiceNote"));
+    expect(files).toContain("focusComposer();");
+  });
+
+  it("clears only the line that actually went", () => {
+    /**
+     * ⚠️ The field is LIVE during the flight now, so a renter may type while the message before it
+     * is still on the wire. ~~`setText("")`~~ would wipe those keystrokes as the answer to an
+     * earlier message — a bug the old `disabled` was accidentally hiding by making it impossible.
+     */
+    const send = dockSrc.slice(dockSrc.indexOf("async function send()"), dockSrc.indexOf("async function sendFiles"));
+    expect(send).toContain('setText((prev) => (prev.trim() === body ? "" : prev));');
+    const files = dockSrc.slice(dockSrc.indexOf("async function sendFiles"), dockSrc.indexOf("async function sendVoiceNote"));
+    expect(files).toContain('setText((prev) => (prev === caption ? "" : prev));');
   });
 
   it("hands the recorder the SHARED cap, and its errors to the composer's own error row", () => {

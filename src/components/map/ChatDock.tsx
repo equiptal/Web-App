@@ -286,6 +286,14 @@ export function ChatDock({
   const channelRef = useRef<Channel | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  /**
+   * The composer, so the caret can be PUT BACK after a send.
+   *
+   * 🔴 Owner, 2026-09-21, reporting a renter's complaint: *"he should press on the text panel every
+   * time he wants to send a message"*. Two causes, and the field needs both closed - see the
+   * `disabled` note on the input and {@link focusComposer}.
+   */
+  const composerRef = useRef<HTMLInputElement | null>(null);
 
   /* ── the tabs (REST) ─────────────────────────────────────────────────────────────────────────── */
 
@@ -716,11 +724,34 @@ export function ChatDock({
     }
   }
 
+  /**
+   * Put the caret back in the composer.
+   *
+   * 🔴 **Pressing SEND moves focus to the send button, and then the button disables itself** the
+   * instant the text is cleared - so focus lands on `<body>` and the next message needs a click
+   * first. That is half of what the renter reported; the other half is the input's own `disabled`,
+   * see its note below.
+   *
+   * ⚠️ Guarded on the element still being focusable. A send can resolve after the dock is closed or
+   * after the room goes inactive, and calling `focus()` on a disabled or unmounted input throws
+   * nothing but scrolls the page to it, which is worse than doing nothing.
+   */
+  function focusComposer() {
+    const el = composerRef.current;
+    if (el && !el.disabled && el.isConnected) el.focus();
+  }
+
   /** The typed message. */
   async function send() {
     const body = text.trim();
     if (!body) return;
-    if (await deliver(async (channel) => { await channel.sendMessage({ text: body }); })) setText("");
+    /* ⚠️ Cleared only if it is still the line that went. The field stays LIVE during the flight
+       now, so a renter who kept typing must not have those keystrokes wiped by an answer to the
+       message before them. */
+    if (await deliver(async (channel) => { await channel.sendMessage({ text: body }); })) {
+      setText((prev) => (prev.trim() === body ? "" : prev));
+    }
+    focusComposer();
   }
 
   /**
@@ -742,8 +773,10 @@ export function ChatDock({
     const caption = text;
     const sent = await deliver((channel) => sendChatAttachment(channel, file, verdict.kind, caption));
     setUploading(false);
-    if (sent) setText("");
+    if (sent) setText((prev) => (prev === caption ? "" : prev));
     else setFileErr(chatSendFailure("attachment", L));
+    // The caption came out of this field, so the caret belongs back in it — same as a typed line.
+    focusComposer();
   }
 
   /** A recorded voice note, down the same seam. `VoiceRecorder` has already applied the cap. */
@@ -1265,13 +1298,32 @@ export function ChatDock({
             />
             {!voiceRecording && (
               <>
+                {/* 🔴 **The FIELD is not gated on the flight, and the three ACTS beside it are**
+                    (owner, 2026-09-21, on a renter's complaint: *"he should press on the text panel
+                    every time he wants to send a message"*).
+
+                    ~~It was gated on `busy`, `uploading` and `!active` alike.~~ A disabled control cannot hold
+                    focus, so the browser BLURRED this input the moment `busy` went true — which is
+                    every send, for as long as the round trip takes, and `deliver` can create the
+                    deal room inside it. It came back enabled and empty with the caret nowhere, so
+                    the next message needed a click first. Every single time.
+
+                    ⚠️ **`!active` stays.** That is not a flight, it is «there is no conversation
+                    here» — nothing typed into it could go anywhere, and the placeholder is the only
+                    thing the row has to say.
+
+                    ⚠️ The ACT is still gated, in three places: the attach button, the recorder and
+                    the send button all name `busy` and `uploading`, and the Enter key below asks
+                    the same question. So nothing can be sent twice; only the typing is allowed to
+                    continue, which is what a chat is for. */}
                 <input
+                  ref={composerRef}
                   className="bm-chat-input"
                   value={text}
                   onChange={(e) => setText(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (!busy && !uploading) void send(); } }}
                   placeholder={t.chatDock.placeholder}
-                  disabled={busy || uploading || !active}
+                  disabled={!active}
                 />
                 <button
                   type="button"

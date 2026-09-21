@@ -2,6 +2,60 @@
 
 ## Change log
 
+- **2026-09-21 - The chat keeps the caret after a send, so the next message does not need a click first.**
+  Owner, forwarding a client on the web app: *"When the client is using the chat on the WebApp he
+  should press on the text panel every time he wants to send a message"*.
+  🔴 **TWO causes, and closing either one alone leaves the complaint standing.**
+  (1) **The FIELD was gated on the flight.** `disabled={busy || uploading || !active}` - and a
+  disabled control cannot hold focus, so the browser BLURRED the input the instant `busy` went
+  true. That is every send, for the whole round trip, and `deliver` can create the deal room inside
+  it. The field came back enabled and empty with the caret nowhere: focus had fallen to `<body>`.
+  (2) **Pressing SEND moves focus to the send button**, which then disables itself the moment the
+  text is cleared - so even with (1) fixed, a click-send strands focus on a dead button and then on
+  `<body>`.
+  **MEASURED in a browser, both paths, before and after**, rather than argued from the source:
+   · OLD, Enter-send  -> focus on **BODY**        · NEW -> focus on the **input**
+   · OLD, click-send  -> focus on the **button**  · NEW -> focus on the **input**
+  **The fix.** The three things that ACT keep both flight gates - the attach button, the recorder
+  and the send button - and the Enter key now asks the same question (`if (!busy && !uploading)`),
+  so nothing can be sent twice. The FIELD keeps `!active` and nothing else, and `focusComposer()`
+  puts the caret back after a typed send and after an attachment.
+  ⚠️ **`!active` stays on the field.** That is «there is no conversation here», not a flight:
+  nothing typed into it could go anywhere, and the placeholder is all the row has to say.
+  ⚠️ **`focusComposer` is guarded on the element still being focusable** (`!el.disabled &&
+  el.isConnected`). A send can resolve after the dock is closed or the room goes inactive, and
+  focusing a detached or disabled input scrolls the page to it.
+  🔴 **The clear had to change with it, and this is the trap the old `disabled` was hiding.** With
+  the field live a renter can type WHILE the line before it is on the wire, and `setText("")` would
+  then wipe those keystrokes as the answer to an earlier message. Both doors clear only what
+  actually went: `prev.trim() === body` for the typed line, `prev === caption` for an attachment's.
+  ⚠️ The VOICE note does not refocus. Its text never came from this field, and popping the keyboard
+  up at the end of a recording is not what the renter asked for.
+  Files: `src/components/map/ChatDock.tsx`, `tests/unit/chat-dock.test.ts` (1 case rewritten, 3 new;
+  77 passing).
+  ⚠️ **ONE composer in the product**, checked rather than assumed: `ChatDock` is the only thing that
+  calls `sendMessage({ text })`, and `BidMapWorkspace` is its only mount. The deal room renders the
+  log and shares this dock's composer rather than keeping a second one.
+  🔴 **My own comment broke the test that counts the gates, and it is the FIFTH time in this repo.**
+  The rewritten case reads `disabled={...}` out of the composer's source, and the JSX note I wrote
+  above the input quoted the retired gate verbatim - so the count came back 5 instead of 4 and the
+  case failed on its own explanation. The prose names the tokens now («gated on `busy`, `uploading`
+  and `!active` alike») and never the attribute. `basis-[34rem]`, `object-contain`, the CTA halo and
+  `-z-10` were the other four.
+  ⚠️ Verified: `NODE_OPTIONS= npx next build` clean, typecheck clean, lint 0 errors, **201 files /
+  3414 passing, 6 skipped** serially, and both halves break-checked one at a time (the field
+  re-gated on the flight, then the refocus deleted from the typed send) - each went red alone. The
+  3 failures are PRE-EXISTING on a clean beta tree, confirmed by stashing earlier today:
+  `live-bids`, `share-request-email` and `ui-pins`.
+  ⚠️ **SEEN BEHAVING**, which is the only way this could be judged - jsdom has no focus model worth
+  the name: both composers built side by side in a real browser, the old one and the new, driven
+  through an Enter-send, a click-send and a mid-flight keystroke, with `document.activeElement`
+  read after each. The table above is that run.
+  🔴 **NOT seen on the real dock**: it needs a signed-in renter with a live bid, so what has been
+  exercised is the mechanism in isolation rather than the dock itself.
+  ⚠️ **`src/components/map/ChatDock.tsx` is byte-identical on `origin/staging`**, so this fix wants
+  porting there as-is rather than re-deriving - checked, not assumed.
+
 - **2026-09-20 - A cancellation SAYS what it did, and a request already cancelled stops being reported as a failure.**
   Owner, forwarding a renter on beta stuck on «لم يتمّ الإجراء. حاول مجددًا» over RFQ-00190: *"it is
   cancelled in backend but no succuess message or failed mesage shown or anything so he just keep
