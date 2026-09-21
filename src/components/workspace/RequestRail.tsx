@@ -36,25 +36,39 @@ import { pin } from "@/lib/uiPins";
  * arithmetic, not taste: `contain` draws the catalogue's 1.34:1 artwork at 1/1.34 of the box's
  * height, and this puts it back. At a SQUARE source it becomes 1 - see the long note below.
  */
+/**
+ * How many machines a 52px circle may show (owner, 2026-09-21: *"show 3 items at most"*).
+ *
+ * ⚠️ A fourth is 13px wide, which is a mark rather than a machine - and the count badge already
+ * states how many lines the request really holds, so nothing is hidden by stopping here.
+ */
+const MAX_IN_CIRCLE = 3;
+
 const fitOf = (isPhoto: boolean) => (isPhoto ? "object-cover" : "scale-[1.34] object-contain");
 
 /**
- * **The circle draws EVERY machine the request asks for** (owner, 2026-09-21: *"for multi item
- * requests we put the image of first item in the request in the top circule, but cant we make the
- * multi item take multi equipmet images small in this circule?"*).
+ * **The circle draws the request's machines on ONE ground** (owner, 2026-09-21: *"cant u merge
+ * their backgorudn like they sit on one background and zoom them out? show 3 items at most in the
+ * circule"*).
  *
- * One picture -> the whole circle, exactly as before. Two -> halves. Three -> one tall and two
- * short, which is the shape that leaves no empty cell. Four -> quarters. More than four -> three
- * machines and «N more», because a fifth 26px cell says less than the number does.
+ * 🔴 ~~A grid of cells with a hairline between them and each on its own grey tile.~~ That was
+ * the first cut, hours earlier, and he is right about it: four framed thumbnails in a 52px circle
+ * read as four broken pictures rather than as one request holding four machines. The machines now
+ * stand side by side on a single continuous ground, each contained and scaled to its share of the
+ * width - which is what «zoom them out» asks for, and what makes each one whole.
  *
- * 🔴 **It montages only what it can actually DRAW.** A group whose second line has no artwork
- * gets the single picture, not a picture beside a grey glyph: a montage is worth its loss of size
- * only when every cell carries a machine. How many lines the request holds is the badge's job, and
- * the badge is on every tile whatever this decides.
+ * 🔴 **The ground is `--photo-ground`, and that is what makes the merge SEAMLESS rather than
+ * merely tidy.** These renders are all shot on one beige studio sweep - measured earlier today
+ * across two assets, twelve samples, all within 4/255 of #e3ded7 - so images laid edge to edge on
+ * a disc painted that colour have no boundary at all. Painted `surface3` instead, the pictures'
+ * own beige draws a visible rectangular band across a grey circle, which is the state this
+ * replaces. Seen at 9x before choosing.
  *
- * ⚠️ At 52px a quarter is 26px, which is smaller than these drawings were ever cut for. It reads
- * as «several machines» rather than as four identifiable ones, and that is the honest ceiling of
- * the idea - the zoomed view below exists because of it.
+ * **THREE at most** (his number). A fourth machine at 13px is not a machine, and how many lines the
+ * request really holds is the count badge's job, on every tile whatever this shows.
+ *
+ * ⚠️ It still draws only what it CAN draw: with fewer than two pictures the circle is the single
+ * image it always was, because one picture beside a grey glyph is worse than the picture alone.
  */
 function CircleArt({
   machines,
@@ -81,46 +95,24 @@ function CircleArt({
       />
     );
   }
-  const shown = art.slice(0, art.length > 4 ? 3 : 4);
-  const extra = art.length - shown.length;
-  /* ⚠️ The hairline between cells is the GRID's own background showing through a 1px gap, never a
-     border on each cell: a border would be drawn inside the round clip on the outer cells too, and
-     would ring the circle. */
+  const shown = art.slice(0, MAX_IN_CIRCLE);
   return (
-    <span className="grid h-[52px] w-[52px] grid-cols-2 gap-px overflow-hidden rounded-full bg-border"
-      style={{ gridTemplateRows: shown.length === 2 ? "1fr" : "1fr 1fr" }}
-    >
+    <span className="flex h-[52px] w-[52px] items-center justify-center overflow-hidden rounded-full">
       {shown.map((m, i) => (
-        <span
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
           key={`${m.id}-${i}`}
-          /* Three machines and nothing held back: the first takes the whole leading column, so
-             there is no empty quarter to explain. */
-          className={`relative grid place-items-center overflow-hidden bg-surface3 ${
-            shown.length === 3 && extra === 0 && i === 0 ? "row-span-2" : ""
-          }`}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={publicTaxonomyUrl(m.url) ?? ""}
-            alt=""
-            draggable={false}
-            onError={(e) => { e.currentTarget.style.display = "none"; onBroken(m.url as string); }}
-            /* ── NO scale in a cell, unlike the whole circle ──────────────────────────
-               🔴 Looked at both ways at the real 26px before choosing. 1.34 exists to hide the
-               drawing own letterbox band against the CIRCLE curve; in a cell the neighbour is a
-               hairline and another machine, so the band costs almost nothing while the crop costs
-               the machine: scaled, a 26px cell shows the middle third of an excavator and reads as
-               a smudge. Unscaled it is small and whole, which is the only thing a cell this size
-               can usefully be. */
-            className={`h-full w-full ${m.isPhoto ? "object-cover" : "object-contain"}`}
-          />
-        </span>
+          src={publicTaxonomyUrl(m.url) ?? ""}
+          alt=""
+          draggable={false}
+          onError={(e) => { e.currentTarget.style.display = "none"; onBroken(m.url as string); }}
+          /* ⚠️ `contain` and NO scale, unlike the single picture. The 1.34 exists to hide one
+             drawing's letterbox band against the round edge; here the neighbours ARE the rest of the
+             band, and scaling would crop each machine to its middle third for nothing. */
+          className={`h-full ${m.isPhoto ? "object-cover" : "object-contain"}`}
+          style={{ width: `${100 / shown.length}%` }}
+        />
       ))}
-      {extra > 0 && (
-        <span className="grid place-items-center bg-surface2 text-label font-extrabold leading-none text-muted-dark">
-          +{extra}
-        </span>
-      )}
     </span>
   );
 }
@@ -345,7 +337,17 @@ export function RequestRail({
                   got thinner. */}
               <span className="relative grid h-14 w-14 flex-none place-items-center rounded-full border border-border bg-surface p-px">
                 <span className="relative h-[52px] w-[52px] rounded-full">
-                  <span className={`grid h-[52px] w-[52px] place-items-center overflow-hidden rounded-full bg-surface3 ${tile.closed ? "grayscale" : ""}`}>
+                  {/* 🔴 **The disc is painted the PHOTOGRAPHS own ground when it holds one**
+                      (owner, 2026-09-21). That is what lets several machines merge into one
+                      picture: these renders share a single beige studio sweep, so images laid edge
+                      to edge on a disc of that colour have no boundary. On `surface3` they draw a
+                      rectangular beige band across a grey circle instead - seen at 9x, and it is
+                      the thing he was looking at.
+                      ⚠️ The glyph fallback keeps `surface3`: a beige disc carrying a grey drawing
+                      reads as a photograph that failed, which is the state it would be imitating.
+                      ⚠️ `--photo-ground` is measured off the assets and is a fact about that render
+                      batch rather than a colour of ours - see its note in `globals.css`. */}
+                  <span className={`grid h-[52px] w-[52px] place-items-center overflow-hidden rounded-full ${img ? "bg-photo-ground" : "bg-surface3"} ${tile.closed ? "grayscale" : ""}`}>
                     {/* ── The picture, or the pictures (owner, 2026-08-25 → 2026-09-21) ─────────────
                         The markup moved into {@link CircleArt}, which is where the one-or-many
                         decision now lives. Nothing about the FIT changed and the reasoning behind

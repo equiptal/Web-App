@@ -2,66 +2,72 @@
 
 ## Change log
 
-- **2026-09-21 - A multi-item circle draws EVERY machine, and a double press opens them big.**
+- **2026-09-21 - A multi-item circle stands its machines on ONE ground, three at most, and a double press opens them big.**
   Owner, on a rail tile whose group holds a Spider Lift and a Crawler Excavator but drew only the
   first: *"for multi item requests we put the image of first item in the request in the top circule,
   but cant we make the multi item take multi equipmet images small in this circule? and clicking
   double on the circule open the circule image big on the screen (still take me to the request
-  clicked) but we will see the zoomed in image"*.
-  **The montage**, inside the same 52px circle: one picture fills it exactly as before; two are
-  halves; THREE is one tall cell and two short, which is the only 2x2 arrangement with no empty
-  quarter; four are quarters; more than four is three machines and «+N», because a fifth 26px cell
-  says less than the number does.
-  🔴 **It montages only what it can DRAW.** A group whose second line has no artwork keeps the
-  single picture rather than setting one machine beside a grey glyph: the montage is worth its loss
-  of size only when every cell carries a machine, and how many LINES the request holds is the
-  badge's job, which is on the tile either way.
-  🔴 **A cell takes `object-contain` and NO scale, where the whole circle still takes 1.34.** Looked
-  at both ways at the real 26px before choosing, and the pictures are in the log of this session:
-  the 1.34 exists to hide a drawing's own letterbox band against the circle's CURVE, and a cell's
-  neighbour is a hairline and another machine. Scaled, a 26px cell shows the middle third of an
-  excavator and reads as a smudge; unscaled it is small and whole, which is the most a cell that
-  size can be.
-  ⚠️ **The hairline between cells is the GRID's own ground showing through a 1px gap**, never a
-  border on each cell - a border would be drawn inside the round clip on the outer cells too and
-  would ring the circle.
+  clicked) but we will see the zoomed in image"*, then, on the first cut: *"cant u merge their
+  backgorudn like they sit on one background and zoom them out? show 3 items at most in the
+  circule"*.
+  🔴 **The first cut was a GRID OF CELLS** - halves, then quarters, each on its own grey tile
+  with a hairline between them, and a «+N» cell past four. He is right about it and the reason is
+  worth keeping: four framed thumbnails in a 52px circle read as four broken pictures, not as one
+  request holding four machines. **Withdrawn the same hour.**
+  **What ships**: the machines stand SIDE BY SIDE on one continuous ground, each `object-contain`
+  at its share of the width - which is what «zoom them out» asks for, and what leaves each one
+  whole. No cells, no hairline, no grid.
+  🔴 **`--photo-ground` under them is what makes the merge SEAMLESS rather than merely tidy.**
+  These renders are all shot on one beige studio sweep - measured earlier the same day across two
+  assets, twelve samples, every one within 4/255 of #e3ded7 - so pictures laid edge to edge on a
+  disc painted that colour have no boundary at all. On `surface3` they draw a visible rectangular
+  beige band across a grey circle, which is the state this replaces. **Both were photographed at
+  9x before choosing**, and at that magnification there is no seam to find.
+  ⚠️ **The disc takes the beige only when it holds a PICTURE.** Behind the glyph fallback a beige
+  disc carrying a grey drawing reads as a photograph that failed, which is the state it would be
+  imitating - that keeps `surface3`. The same ruling the machine card took hours earlier.
+  **THREE at most** (his number). A fourth machine is 13px wide, which is a mark rather than a
+  machine, and the count badge already states how many lines the request really holds - so there is
+  no «+N» inside the circle, which would say it twice.
+  🔴 **A cell takes NO scale, where the single picture still takes 1.34.** Looked at both ways at
+  the real size before choosing: the 1.34 exists to hide one drawing's letterbox band against the
+  circle's CURVE, and in a row the neighbours ARE the rest of the band. Scaled, each machine is
+  cropped to its middle third for nothing.
   **The zoom**: a double press opens every machine large, each named and with its unit count, and
-  still picks the request. `onClick` has already fired twice by then, and picking the same request
-  twice changes nothing - so the selection stays the single press's job and the double press only
+  still picks the request. `onClick` has already fired twice by then and picking the same request
+  twice changes nothing, so the selection stays the single press's job and the double press only
   adds the view. Withheld when the group has no artwork at all: a dialog of grey glyphs is not a
   zoomed picture.
   ⚠️ **The zoomed view lists a machine whose picture never loaded**, named, with the glyph. That
   line is still part of the request, and a view holding fewer machines than the ITEMS tabs would
-  repeat the montage's compromise where there is room not to.
-  ⚠️ **`object-contain` and no scale in the zoom either**, whatever kind of picture it is: the crop
-  and the 1.34 both exist to fill a 52px ROUND hole, and in a square box with room to spare they
-  would only throw the machine's edges away again.
+  repeat the circle's own compromise where there is room not to. It is `object-contain` with no
+  scale either: the crop and the 1.34 both exist to fill a 52px ROUND hole.
   🔴 **`broken` is keyed by URL now, not by tile.** Its old note argued for by-tile *"because the
   same subtype can appear on several rows and they fail together"* - true while a tile held ONE
-  picture, and wrong the moment it holds four: one 403 would blank every machine in the group. By
+  picture, and wrong the moment it holds three: one 403 would blank every machine in the group. By
   URL the same subtype failing on five rows still costs only that subtype, which is what the old
-  note was actually after, and it is the ruling the workspace's context bar and the dashboard's bid
-  rail already take. **Not the edge case**: the taxonomy objects are not all public-read - of three
-  assets pulled by hand today, `mobile-crane-all-terrain` answered 403 and two answered 200.
+  note was actually after. **Not the edge case**: of three assets pulled by hand today,
+  `mobile-crane-all-terrain` answered 403 and two answered 200.
   Files: `src/lib/contract/workspace.ts` (`RailMachine`, `RailTile.machines`; `railTiles` takes the
-  locale), `src/components/workspace/RequestRail.tsx` (`fitOf`, `CircleArt`, `CircleZoom`),
-  `src/components/workspace/RequestsWorkspace.tsx`, `tests/unit/workspace.test.ts` (3 new cases),
-  `tests/unit/rail-circle-art.test.ts` (new, 10), `tests/unit/request-rail-fit.test.ts`.
+  locale), `src/components/workspace/RequestRail.tsx` (`MAX_IN_CIRCLE`, `fitOf`, `CircleArt`,
+  `CircleZoom`), `src/components/workspace/RequestsWorkspace.tsx`,
+  `tests/unit/workspace.test.ts` (3 new cases), `tests/unit/rail-circle-art.test.ts` (new, 10),
+  `tests/unit/request-rail-fit.test.ts`.
   ⚠️ **`imageUrl` is KEPT beside `machines`** and both are derived in one pass. A one-machine
-  request is the ordinary case and drawing it through the montage code would be a grid of one; the
+  request is the ordinary case and drawing it through the montage code would be a row of one; the
   single pass is what stops the two describing different machines.
   ⚠️ **`request-rail-fit.test.ts` was re-pointed, not weakened.** It read the tile's inline
   `imageIsPhoto` ternary, which is now `fitOf`; the RULE is unchanged and the expression moved,
   because a rail that draws several pictures must not hold two answers to one question.
-  ⚠️ Verified: `NODE_OPTIONS= npx next build` clean, typecheck clean, lint 0 errors, **212 files /
-  3582 passing, 7 skipped** serially, and two rulings break-checked (the cell scaled like the whole
-  circle, then the montage threshold moved) - each went red alone. The 2 remaining failures are
-  PRE-EXISTING: `cancel-confirmation` (the CRLF vacuous-slice trap reported on 2026-09-20) and
-  `ui-pins` (the CRLF staleness - re-running the generator produces NO content diff, only line
-  endings, so the docs were left alone).
-  ⚠️ **SEEN RENDERED** at the real 52px, all six states side by side - one, two, three, four, six
-  and a closed one - with the compiled stylesheet and the live taxonomy assets. That is how the
-  cell's scale was decided: the scaled and unscaled versions were photographed at 26px and compared.
+  ⚠️ Verified: `NODE_OPTIONS= npx next build` clean, typecheck clean, lint 0 errors, the full
+  suite serially, and four rulings break-checked one at a time across the two cuts (the cell scaled
+  like the whole circle, the montage threshold moved, the grey disc restored, the cap raised to 4) -
+  each went red alone. The 2 remaining failures are PRE-EXISTING: `cancel-confirmation` (the CRLF
+  vacuous-slice trap reported on 2026-09-20) and `ui-pins` (the CRLF staleness - re-running the
+  generator produces NO content diff, only line endings, so the docs were left alone).
+  ⚠️ **SEEN RENDERED** at the real 52px in a rail strip - one, two, three, a five-machine group
+  capped at three, a closed one and one with no artwork - and again at 5x and 9x, which is how the
+  seam was judged and how the first cut was rejected.
   🔴 **NOT seen on the real rail**, which needs a signed-in renter with a multi-item request, so
   the double press and the dialog are pinned by cases rather than watched.
 

@@ -32,35 +32,58 @@ describe("one machine or many, in one 52px circle", () => {
     expect(art).toContain("if (art.length < 2) {");
   });
 
-  it("Given more than four, Then three are drawn and the rest are a number", () => {
-    // A fifth 26px cell says less than «+2» does.
-    expect(art).toContain("art.slice(0, art.length > 4 ? 3 : 4)");
-    expect(art).toContain("+{extra}");
-  });
-
-  it("Given exactly three, Then the first takes the whole leading column", () => {
-    // Otherwise a 2×2 grid leaves one empty quarter, which reads as a picture that failed.
-    expect(art).toContain('shown.length === 3 && extra === 0 && i === 0 ? "row-span-2" : ""');
-  });
-
-  it("Given a CELL, Then the drawing is contained and NOT scaled", () => {
+  it("Given more than three, Then only three are drawn and nothing says «+N»", () => {
     /**
-     * 🔴 The whole circle scales a drawing by 1.34 to hide its letterbox band against the round
-     * edge. A cell's neighbour is a hairline and another machine, so the band costs almost nothing
-     * while the crop costs the machine — at 26px a scaled excavator is its own middle third and
-     * reads as a smudge. Looked at both ways at the real size before choosing.
+     * 🔴 His number (*"show 3 items at most in the circule"*). A fourth machine is 13px wide, which
+     * is a mark rather than a machine — and the count badge already states how many lines the
+     * request really holds, so an overflow marker inside the circle would say it twice.
      */
-    const cellImg = art.slice(art.indexOf("{shown.map("));
-    expect(cellImg).toContain('m.isPhoto ? "object-cover" : "object-contain"');
-    expect(cellImg).not.toContain("scale-[1.34]");
+    expect(code).toContain("const MAX_IN_CIRCLE = 3;");
+    expect(art).toContain("art.slice(0, MAX_IN_CIRCLE)");
+    expect(art).not.toContain("+{extra}");
+  });
+
+  it("Given several machines, Then they sit in ONE row on ONE ground", () => {
+    /**
+     * 🔴 ~~A grid of cells with a hairline between them, each on its own grey tile.~~ (owner,
+     * 2026-09-21: *"cant u merge their backgorudn like they sit on one background and zoom them
+     * out?"*). Framed thumbnails in a 52px circle read as broken pictures rather than as one
+     * request holding several machines.
+     */
+    expect(art).toContain("flex h-[52px] w-[52px] items-center justify-center overflow-hidden rounded-full");
+    // No cell ground, no hairline, no grid.
+    expect(art).not.toContain("bg-border");
+    expect(art).not.toContain("gap-px");
+    expect(art).not.toContain("row-span-2");
+    // Each takes its share of the width, which is what «zoom them out» means here.
+    expect(art).toContain("width: `${100 / shown.length}%`");
+  });
+
+  it("Given the disc under them, Then it is the PHOTOGRAPHS' own ground", () => {
+    /**
+     * 🔴 This is what makes the merge seamless rather than merely tidy. The renders share one beige
+     * studio sweep — measured across two assets, twelve samples, all within 4/255 of #e3ded7 — so
+     * images laid edge to edge on a disc of that colour have no boundary at all. On `surface3` they
+     * draw a rectangular beige band across a grey circle, which is the state this replaces. Seen at
+     * 9× before choosing.
+     *
+     * ⚠️ The glyph fallback keeps `surface3`: a beige disc carrying a grey drawing reads as a
+     * photograph that failed, which is the state it would be imitating.
+     */
+    expect(code).toContain('img ? "bg-photo-ground" : "bg-surface3"');
+  });
+
+  it("Given a machine in the row, Then the drawing is contained and NOT scaled", () => {
+    /**
+     * ⚠️ The single picture scales a drawing by 1.34 to hide its letterbox band against the round
+     * edge. In the row the neighbours ARE the rest of the band, so scaling would crop each machine
+     * to its middle third for nothing.
+     */
+    const rowImg = art.slice(art.indexOf("{shown.map("));
+    expect(rowImg).toContain('m.isPhoto ? "object-cover" : "object-contain"');
+    expect(rowImg).not.toContain("scale-[1.34]");
     // …and the single-picture path keeps it, so the two cases have not been collapsed.
     expect(code).toContain('const fitOf = (isPhoto: boolean) => (isPhoto ? "object-cover" : "scale-[1.34] object-contain");');
-  });
-
-  it("Given the cells, Then the hairline between them is the grid's own ground", () => {
-    // A border on each cell would be drawn inside the round clip on the outer ones too, ringing
-    // the circle.
-    expect(art).toContain("gap-px overflow-hidden rounded-full bg-border");
   });
 });
 
